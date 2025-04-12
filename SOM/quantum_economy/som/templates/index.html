@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>松麦生态电商平台 - 为每个人的健康服务</title>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iIzAwNjYzMyIvPjxwYXRoIGQ9Ik0xNDAsNzAgQzEyMCw3MCAxMDAsOTAgMTAwLDExMCBDMTAwLDEzMCAxMjAsMTUwIDE0MCwxNTAgQzE2MCwxNTAgMTgwLDEzMCAxODAsMTEwIEMxODAsMTEwIDE2MCw3MCAxNDAsNzAgWiIgZmlsbD0iIzQzQzg0MyIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTkwLCAtMzApIi8+PHBhdGggZD0iTTE0MCwxNTAgQzEyMCwxNTAgMTAwLDE3MCAxMDAsMTkwIEMxMDUsMjIwIDEzMCwyMzAgMTQwLDIzMCBDMTcwLDIzMCAxODAsMjA1IDE4MCwxOTAgQzE4MCwxOTAgMTYwLDE1MCAxNDAsMTUwIFoiIGZpbGw9IiM0M0M4NDMiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC05MCwgLTMwKSIvPjxjaXJjbGUgY3g9IjgwIiBjeT0iMjAwIiByPSIzMCIgZmlsbD0iI0ZGRDcwMCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTkwLCAtMzApIi8+PC9zdmc+" type="image/svg+xml">
+    <style>
+        :root {
+            --primary-color: #006633;
+            --secondary-color: #43C843;
+            --accent-color: #FFD700;
+            --text-color: #333;
+            --light-text: #666;
+            --white: #fff;
+            --light-bg: #f9f9f9;
+            --border-color: #e1e1e1;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            --radius: 8px;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+            color: var(--text-color);
+            background-color: var(--light-bg);
+            line-height: 1.6;
+        }
+        
+        a {
+            text-decoration: none;
+            color: inherit;
+            transition: var(--transition);
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        button, .btn {
+            cursor: pointer;
+            border: none;
+            border-radius: var(--radius);
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition);
+            background-color: var(--primary-color);
+            color: var(--white);
+        }
+        
+        button:hover, .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* 顶部导航 */
+        .header {
+            background-color: var(--white);
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 70px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .logo img {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+        }
+        
+        .nav-links {
+            display: flex;
+            list-style: none;
+        }
+        
+        .nav-links li {
+            margin: 0 15px;
+        }
+        
+        .nav-links a:hover {
+            color: var(--primary-color);
+        }
+        
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background-color: var(--light-bg);
+            border-radius: 20px;
+            padding: 5px 15px;
+            width: 300px;
+        }
+        
+        .search-bar input {
+            border: none;
+            background: transparent;
+            width: 100%;
+            padding: 8px;
+            outline: none;
+        }
+        
+        .search-bar button {
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            color: var(--light-text);
+            font-size: 18px;
+        }
+        
+        .user-menu {
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-menu > * {
+            margin: 0 10px;
+        }
+        
+        .user-menu .btn {
+            padding: 8px 15px;
+        }
+        
+        /* 英雄区 */
+        .hero {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: var(--white);
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .hero p {
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto 30px;
+            opacity: 0.9;
+        }
+        
+        .hero .btn {
+            background-color: var(--accent-color);
+            color: var(--primary-color);
+            font-weight: bold;
+            padding: 12px 30px;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        
+        /* 特色分类 */
+        .categories {
+            padding: 60px 0;
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .section-title h2 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        
+        .section-title p {
+            color: var(--light-text);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .category-card {
+            background-color: var(--white);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+        
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .category-img {
+            height: 180px;
+            overflow: hidden;
+        }
+        
+        .category-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: var(--transition);
+        }
+        
+        .category-card:hover .category-img img {
+            transform: scale(1.05);
+        }
+        
+        .category-content {
+            padding: 20px;
+        }
+        
+        .category-content h3 {
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+        
+        .category-content p {
+            color: var(--light-text);
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        /* 热门产品 */
+        .products {
+            padding: 60px 0;
+            background-color: var(--white);
+        }
+        
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 25px;
+        }
+        
+        .product-card {
+            background-color: var(--white);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            position: relative;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .organic-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: var(--secondary-color);
+            color: var(--white);
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            z-index: 1;
+        }
+        
+        .product-img {
+            height: 180px;
+            overflow: hidden;
+        }
+        
+        .product-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: var(--transition);
+        }
+        
+        .product-card:hover .product-img img {
+            transform: scale(1.05);
+        }
+        
+        .product-content {
+            padding: 20px;
+        }
+        
+        .product-content h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .product-content .price {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .product-content .source {
+            font-size: 12px;
+            color: var(--light-text);
+            margin-bottom: 15px;
+        }
+        
+        .product-content .som-reward {
+            font-size: 13px;
+            color: #d4b106;
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .product-content .som-reward:before {
+            content: "💰";
+            margin-right: 5px;
+        }
+        
+        .product-actions {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .product-actions .btn {
+            padding: 8px 15px;
+            font-size: 13px;
+        }
+        
+        .view-btn {
+            background-color: var(--light-bg);
+            color: var(--text-color);
+        }
+        
+        /* 松麦特色 */
+        .features {
+            padding: 60px 0;
+            background-color: var(--light-bg);
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .feature-card {
+            background-color: var(--white);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            padding: 30px;
+            text-align: center;
+            transition: var(--transition);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+        }
+        
+        .feature-content h3 {
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+        
+        .feature-content p {
+            color: var(--light-text);
+            font-size: 15px;
+        }
+        
+        /* 联盟有机食品样式 */
+        .alliance-products {
+            padding: 60px 0;
+            background-color: #f5f9f5;
+        }
+        
+        .alliance-label {
+            display: inline-block;
+            padding: 4px 8px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border-radius: 4px;
+            font-size: 12px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 25px;
+            margin-top: 40px;
+        }
+        
+        .product-card {
+            background-color: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+            transition: var(--transition);
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .product-img {
+            height: 200px;
+            overflow: hidden;
+        }
+        
+        .product-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: var(--transition);
+        }
+        
+        .product-card:hover .product-img img {
+            transform: scale(1.05);
+        }
+        
+        .product-content {
+            padding: 20px;
+        }
+        
+        .product-content h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .price {
+            color: #e53935;
+            font-weight: bold;
+            font-size: 16px;
+            display: block;
+            margin-bottom: 8px;
+        }
+        
+        .source {
+            display: block;
+            color: var(--light-text);
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+        
+        .alliance-badge {
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 12px;
+            padding: 3px 8px;
+            background-color: #e8f5e9;
+            color: var(--primary-color);
+            border-radius: 20px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 引入统一导航栏 -->
+    <!-- 注释掉无法生效的模板语法 -->
+    <!-- {% include "navigation.html" %} -->
+    <!-- 使用iframe方式引入导航栏 -->
+    <iframe src="/static/navigation.html" style="width:100%; height:60px; border:none; overflow:hidden; margin:0; padding:0;"></iframe>
+    <div style="height:60px;"></div> <!-- 占位，防止内容被导航栏遮挡 -->
+
+    <!-- 顶部导航栏 -->
+    <header class="header">
+        <div class="container">
+            <nav class="nav">
+                <a href="/" class="logo">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iIzAwNjYzMyIvPjxwYXRoIGQ9Ik0xNDAsNzAgQzEyMCw3MCAxMDAsOTAgMTAwLDExMCBDMTAwLDEzMCAxMjAsMTUwIDE0MCwxNTAgQzE2MCwxNTAgMTgwLDEzMCAxODAsMTEwIEMxODAsMTEwIDE2MCw3MCAxNDAsNzAgWiIgZmlsbD0iIzQzQzg0MyIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTkwLCAtMzApIi8+PHBhdGggZD0iTTE0MCwxNTAgQzEyMCwxNTAgMTAwLDE3MCAxMDAsMTkwIEMxMDUsMjIwIDEzMCwyMzAgMTQwLDIzMCBDMTcwLDIzMCAxODAsMjA1IDE4MCwxOTAgQzE4MCwxOTAgMTYwLDE1MCAxNDAsMTUwIFoiIGZpbGw9IiM0M0M4NDMiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC05MCwgLTMwKSIvPjxjaXJjbGUgY3g9IjgwIiBjeT0iMjAwIiByPSIzMCIgZmlsbD0iI0ZGRDcwMCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTkwLCAtMzApIi8+PC9zdmc+" alt="松麦生态">松麦商城
+                </a>
+                <ul class="nav-links">
+                    <li><a href="#categories">商品分类</a></li>
+                    <li><a href="#products">热销产品</a></li>
+                    <li><a href="#features">松麦特色</a></li>
+                    <li><a href="#partners">合作伙伴</a></li>
+                    <li><a href="#about">关于我们</a></li>
+                </ul>
+                <div class="search-bar">
+                    <input type="text" placeholder="搜索产品、商家或服务...">
+                    <button>🔍</button>
+                </div>
+                <div class="user-menu">
+                    <a href="#cart">🛒 购物车</a>
+                    <a href="#favorites">❤️ 收藏</a>
+                    <a href="#login" class="btn">登录/注册</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 英雄区域 -->
+    <section class="hero">
+        <div class="container">
+            <h1>松麦生态电商平台</h1>
+            <p>有机、生态、健康的生活方式，源自大自然的馈赠，为每个人的健康服务</p>
+            <div class="hero-buttons">
+                <a href="#products" class="btn">浏览产品</a>
+                <a href="#app" class="btn">下载APP</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- 特色分类 -->
+    <section id="categories" class="categories">
+        <div class="container">
+            <div class="section-title">
+                <h2>特色分类</h2>
+                <p>探索松麦生态系统提供的多样化健康产品和服务</p>
+            </div>
+            <div class="category-grid">
+                <div class="category-card">
+                    <div class="category-img">
+                        <img src="https://images.unsplash.com/photo-1518843875459-f738682238a6" alt="有机蔬果">
+                    </div>
+                    <div class="category-content">
+                        <h3>有机蔬果</h3>
+                        <p>严选有机认证农场，无农残，更健康</p>
+                        <a href="#" class="btn">查看详情</a>
+                    </div>
+                </div>
+                <div class="category-card">
+                    <div class="category-img">
+                        <img src="https://images.unsplash.com/photo-1550376026-a1eb9759a249" alt="生态肉禽">
+                    </div>
+                    <div class="category-content">
+                        <h3>生态肉禽</h3>
+                        <p>自然放养，无抗生素，口感鲜美</p>
+                        <a href="#" class="btn">查看详情</a>
+                    </div>
+                </div>
+                <div class="category-card">
+                    <div class="category-img">
+                        <img src="https://images.unsplash.com/photo-1580151134699-e0cfbfa474b3" alt="健康粮油">
+                    </div>
+                    <div class="category-content">
+                        <h3>健康粮油</h3>
+                        <p>古法耕种，非转基因，健康饮食基础</p>
+                        <a href="#" class="btn">查看详情</a>
+                    </div>
+                </div>
+                <div class="category-card">
+                    <div class="category-img">
+                        <img src="https://images.unsplash.com/photo-1559682201-8bf52b3d5455" alt="中草药材">
+                    </div>
+                    <div class="category-content">
+                        <h3>中草药材</h3>
+                        <p>原生态种植，品质保证，传承千年智慧</p>
+                        <a href="#" class="btn">查看详情</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 热门产品 -->
+    <section id="products" class="products">
+        <div class="container">
+            <div class="section-title">
+                <h2>热门产品</h2>
+                <p>探索我们最受欢迎的生态健康产品</p>
+            </div>
+            <div class="product-grid">
+                <div class="product-card">
+                    <span class="organic-badge">有机认证</span>
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1542838132-92c53300491e" alt="松麦有机大米">
+                    </div>
+                    <div class="product-content">
+                        <h3>松麦有机大米</h3>
+                        <span class="price">¥68.00/5kg</span>
+                        <span class="source">产地: 黑龙江五常</span>
+                        <span class="som-reward">购买可获得松麦积分13点</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="#" class="btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="product-card">
+                    <span class="organic-badge">有机认证</span>
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1573246123716-6b1782bfc499" alt="高山野生蜂蜜">
+                    </div>
+                    <div class="product-content">
+                        <h3>高山野生蜂蜜</h3>
+                        <span class="price">¥198.00/500g</span>
+                        <span class="source">产地: 四川阿坝</span>
+                        <span class="som-reward">购买可获得松麦积分39点</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="#" class="btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="product-card">
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1578686201771-5ceec5171a71" alt="生态放养土鸡">
+                    </div>
+                    <div class="product-content">
+                        <h3>生态放养土鸡</h3>
+                        <span class="price">¥128.00/只</span>
+                        <span class="source">产地: 云南文山</span>
+                        <span class="som-reward">购买可获得松麦积分25点</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="#" class="btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="product-card">
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1563289142-6cd81a973e31" alt="松麦山茶油">
+                    </div>
+                    <div class="product-content">
+                        <h3>松麦山茶油</h3>
+                        <span class="price">¥268.00/500ml</span>
+                        <span class="source">产地: 湖南衡山</span>
+                        <span class="som-reward">购买可获得松麦积分53点</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="#" class="btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 松麦特色 -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>松麦特色</h2>
+                <p>我们的优势和独特价值</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🌱</div>
+                    <div class="feature-content">
+                        <h3>生态溯源</h3>
+                        <p>每件产品都有完整的区块链溯源记录，确保从农田到餐桌的全程透明。</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💰</div>
+                    <div class="feature-content">
+                        <h3>松麦积分</h3>
+                        <p>购物即可获得松麦生态积分，可用于兑换产品、服务或参与生态建设。</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <div class="feature-content">
+                        <h3>循环经济</h3>
+                        <p>支持环保包装、物流回收，共同建设可持续发展的生态系统。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 合作伙伴 -->
+    <section id="partners" class="partners">
+        <div class="container">
+            <div class="section-title">
+                <h2>合作伙伴</h2>
+                <p>携手共建生态健康产业链</p>
+            </div>
+            <div class="partners-slider">
+                <div class="partner">
+                    <img src="https://via.placeholder.com/150x80?text=Partner+1" alt="合作伙伴1">
+                </div>
+                <div class="partner">
+                    <img src="https://via.placeholder.com/150x80?text=Partner+2" alt="合作伙伴2">
+                </div>
+                <div class="partner">
+                    <img src="https://via.placeholder.com/150x80?text=Partner+3" alt="合作伙伴3">
+                </div>
+                <div class="partner">
+                    <img src="https://via.placeholder.com/150x80?text=Partner+4" alt="合作伙伴4">
+                </div>
+                <div class="partner">
+                    <img src="https://via.placeholder.com/150x80?text=Partner+5" alt="合作伙伴5">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 关于我们 -->
+    <section id="about" class="about">
+        <div class="container">
+            <div class="section-title">
+                <h2>关于松麦</h2>
+                <p>我们的使命是连接生态生产者与健康消费者</p>
+            </div>
+            <div class="about-content">
+                <div class="about-text">
+                    <p>松麦生态电商平台致力于打造一个可持续发展的生态经济体系，通过区块链技术实现全产业链的透明化和可溯源性，确保每一位消费者都能享受到安全、健康、有机的优质产品。</p>
+                    <p>我们与全国各地的生态农场、有机种植基地以及传统手工艺人合作，将他们的产品直接送达消费者，减少中间环节，为生产者创造更多价值，为消费者提供更优惠的价格。</p>
+                    <p>松麦积分系统是我们独特的生态价值循环机制，鼓励用户参与生态建设和可持续消费，共同打造健康、和谐的生活方式。</p>
+                    <a href="/about" class="btn">了解更多</a>
+                </div>
+                <div class="about-video">
+                    <img src="https://images.unsplash.com/photo-1470072768013-bf9b4b1517c3" alt="松麦生态农场风光">
+                    <a href="#" class="video-play-btn">▶</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- APP下载 -->
+    <section id="app" class="app-download">
+        <div class="container">
+            <div class="app-content">
+                <div class="app-text">
+                    <h2>随时随地，畅享生态购物体验</h2>
+                    <p>下载松麦APP，享受更多专属优惠和便捷服务</p>
+                    <ul class="app-features">
+                        <li>专属会员优惠</li>
+                        <li>产品溯源查询</li>
+                        <li>积分实时累计</li>
+                        <li>社区交流分享</li>
+                    </ul>
+                    <div class="app-buttons">
+                        <a href="#" class="btn">App Store下载</a>
+                        <a href="#" class="btn">Google Play下载</a>
+                    </div>
+                </div>
+                <div class="app-image">
+                    <img src="https://via.placeholder.com/300x600?text=App+Screenshot" alt="松麦APP界面">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 联盟有机食品 -->
+    <section id="alliance-products" class="alliance-products">
+        <div class="container">
+            <div class="section-title">
+                <h2>联盟有机食品</h2>
+                <p>精选来自三大权威联盟认证的优质有机食品，保障健康，品质可靠</p>
+            </div>
+            <div class="product-grid">
+                <div class="product-card">
+                    <span class="alliance-label">中国有机联盟</span>
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1586201375761-83865001e8ac" alt="有机黑米">
+                    </div>
+                    <div class="product-content">
+                        <h3>东北有机黑米</h3>
+                        <span class="price">¥58.90/kg</span>
+                        <span class="source">产地: 黑龙江五常</span>
+                        <span class="alliance-badge">中国有机食品联盟认证</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="/api/marketplace/cart/add?product_id=organic_black_rice&quantity=1" class="btn add-to-cart-btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <span class="alliance-label">全球有机联盟</span>
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1550461716-dbf266b2a8a7" alt="有机奇亚籽">
+                    </div>
+                    <div class="product-content">
+                        <h3>澳洲有机奇亚籽</h3>
+                        <span class="price">¥89.00/500g</span>
+                        <span class="source">产地: 澳大利亚</span>
+                        <span class="alliance-badge">全球有机农业联盟认证</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="/api/marketplace/cart/add?product_id=organic_chia_seeds&quantity=1" class="btn add-to-cart-btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <span class="alliance-label">生态农业协会</span>
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1574856344991-aaa31b6f4ce3" alt="有机菌菇">
+                    </div>
+                    <div class="product-content">
+                        <h3>野生松茸菌菇礼盒</h3>
+                        <span class="price">¥298.00/套</span>
+                        <span class="source">产地: 云南香格里拉</span>
+                        <span class="alliance-badge">生态农业协会认证</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="/api/marketplace/cart/add?product_id=wild_mushroom_gift&quantity=1" class="btn add-to-cart-btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <span class="alliance-label">中国有机联盟</span>
+                    <div class="product-img">
+                        <img src="https://images.unsplash.com/photo-1564844536308-50b114a1d946" alt="有机花生油">
+                    </div>
+                    <div class="product-content">
+                        <h3>冷榨有机花生油</h3>
+                        <span class="price">¥118.00/L</span>
+                        <span class="source">产地: 山东济宁</span>
+                        <span class="alliance-badge">中国有机食品联盟认证</span>
+                        <div class="product-actions">
+                            <a href="#" class="btn view-btn">查看详情</a>
+                            <a href="/api/marketplace/cart/add?product_id=organic_peanut_oil&quantity=1" class="btn add-to-cart-btn">加入购物车</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center" style="margin-top: 40px;">
+                <a href="/som/marketplace/organic-products.html" class="btn btn-large">查看更多有机食品</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-col">
+                    <h3>松麦生态</h3>
+                    <p>连接自然与健康的生态电商平台</p>
+                    <div class="social-links">
+                        <a href="#" title="微信">🔄</a>
+                        <a href="#" title="微博">📱</a>
+                        <a href="#" title="抖音">🎵</a>
+                        <a href="#" title="小红书">📖</a>
+                    </div>
+                </div>
+                <div class="footer-col">
+                    <h3>快捷链接</h3>
+                    <ul>
+                        <li><a href="#categories">商品分类</a></li>
+                        <li><a href="#products">热销产品</a></li>
+                        <li><a href="#features">松麦特色</a></li>
+                        <li><a href="#partners">合作伙伴</a></li>
+                        <li><a href="#about">关于我们</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h3>客户服务</h3>
+                    <ul>
+                        <li><a href="#">帮助中心</a></li>
+                        <li><a href="#">配送政策</a></li>
+                        <li><a href="#">退换货政策</a></li>
+                        <li><a href="#">会员积分</a></li>
+                        <li><a href="#">联系我们</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h3>商务合作</h3>
+                    <ul>
+                        <li><a href="#">成为供应商</a></li>
+                        <li><a href="#">生态认证</a></li>
+                        <li><a href="#">品牌推广</a></li>
+                        <li><a href="#">投资者关系</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="copyright">
+                    &copy; 2023 松麦生态电商平台 版权所有
+                </div>
+                <div class="footer-links">
+                    <a href="#">隐私政策</a>
+                    <a href="#">使用条款</a>
+                    <a href="#">网站地图</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 返回顶部 -->
+    <a href="#" class="back-to-top" id="backToTop">↑</a>
+
+    <!-- 快速购物小窗 -->
+    <div class="quick-cart" id="quickCart">
+        <div class="quick-cart-header">
+            <h3>购物车</h3>
+            <span class="close-cart" id="closeCart">×</span>
+        </div>
+        <div class="quick-cart-items">
+            <!-- 购物车内容会动态加载 -->
+            <div class="empty-cart-message">您的购物车是空的</div>
+        </div>
+        <div class="quick-cart-footer">
+            <div class="cart-total">总计: <span>¥0.00</span></div>
+            <a href="#checkout" class="btn">结算</a>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 滚动显示返回顶部按钮
+            const backToTopBtn = document.getElementById('backToTop');
+            
+            window.addEventListener('scroll', function() {
+                if (window.pageYOffset > 300) {
+                    backToTopBtn.classList.add('show');
+                } else {
+                    backToTopBtn.classList.remove('show');
+                }
+            });
+            
+            backToTopBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+            
+            // 导航栏滚动效果
+            const header = document.querySelector('.header');
+            let lastScrollTop = 0;
+            
+            window.addEventListener('scroll', function() {
+                let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                
+                if (scrollTop > lastScrollTop && scrollTop > 70) {
+                    header.style.transform = 'translateY(-100%)';
+                } else {
+                    header.style.transform = 'translateY(0)';
+                }
+                
+                lastScrollTop = scrollTop;
+            });
+            
+            // 快速购物车交互
+            const cartButtons = document.querySelectorAll('.product-actions .btn:not(.view-btn)');
+            const quickCart = document.getElementById('quickCart');
+            const closeCart = document.getElementById('closeCart');
+            
+            cartButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    quickCart.classList.add('open');
+                    // 这里可以添加商品到购物车的逻辑
+                });
+            });
+            
+            closeCart.addEventListener('click', function() {
+                quickCart.classList.remove('open');
+            });
+            
+            // 平滑滚动到锚点
+            document.querySelectorAll('a[href^="#"]:not([href="#"])').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+                    
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 70,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+            
+            // 图片延迟加载
+            const lazyImages = document.querySelectorAll('img[data-src]');
+            
+            if ('IntersectionObserver' in window) {
+                const imageObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            imageObserver.unobserve(img);
+                        }
+                    });
+                });
+                
+                lazyImages.forEach(img => {
+                    imageObserver.observe(img);
+                });
+            } else {
+                // 降级处理，直接加载所有图片
+                lazyImages.forEach(img => {
+                    img.src = img.dataset.src;
+                });
+            }
+
+            // 加入购物车功能
+            const addToCartButtons = document.querySelectorAll('.add-to-cart-btn');
+            
+            addToCartButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const url = this.getAttribute('href');
+                    
+                    // 发送AJAX请求添加到购物车
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                // 显示成功消息
+                                alert(data.message);
+                                
+                                // 更新购物车计数
+                                const cartCountEl = document.querySelector('.cart-count');
+                                if (cartCountEl) {
+                                    cartCountEl.textContent = data.cart_count;
+                                }
+                                
+                                // 打开快速购物车
+                                const quickCart = document.getElementById('quickCart');
+                                if (quickCart) {
+                                    quickCart.classList.add('open');
+                                }
+                            } else {
+                                alert('添加到购物车失败: ' + data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('添加到购物车出错:', error);
+                            alert('添加到购物车时出现错误，请稍后重试');
+                        });
+                });
+            });
+
+            // 添加样式到头部
+            const style = document.createElement('style');
+            style.textContent = `
+                .product-actions {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 15px;
+                }
+                
+                .product-actions .btn {
+                    padding: 8px 12px;
+                    font-size: 13px;
+                }
+                
+                .view-btn {
+                    background-color: var(--light-bg);
+                    color: var(--text-color);
+                }
+                
+                .text-center {
+                    text-align: center;
+                }
+                
+                .btn-large {
+                    font-size: 16px;
+                    padding: 12px 30px;
+                    background-color: var(--primary-color);
+                }
+            `;
+            document.head.appendChild(style);
+        });
+    </script>
+
+    <style>
+        /* 页脚样式 */
+        .footer {
+            background-color: var(--primary-color);
+            color: var(--white);
+            padding: 60px 0 20px;
+        }
+        
+        .footer-top {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .footer-col h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+            position: relative;
+        }
+        
+        .footer-col h3:after {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 3px;
+            background: var(--accent-color);
+            margin-top: 10px;
+        }
+        
+        .footer-col p {
+            margin-bottom: 20px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .footer-col ul {
+            list-style: none;
+        }
+        
+        .footer-col ul li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-col ul li a {
+            font-size: 14px;
+            opacity: 0.8;
+            transition: var(--transition);
+        }
+        
+        .footer-col ul li a:hover {
+            opacity: 1;
+            padding-left: 5px;
+        }
+        
+        .social-links {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .social-links a {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        
+        .social-links a:hover {
+            background: var(--accent-color);
+            color: var(--primary-color);
+        }
+        
+        .footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .copyright {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .footer-links a {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+        
+        .footer-links a:hover {
+            opacity: 1;
+        }
+        
+        /* 关于我们 */
+        .about {
+            padding: 60px 0;
+            background-color: var(--white);
+        }
+        
+        .about-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+        
+        .about-text p {
+            margin-bottom: 20px;
+            font-size: 15px;
+            color: var(--text-color);
+        }
+        
+        .about-text .btn {
+            margin-top: 10px;
+        }
+        
+        .about-video {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        
+        .about-video img {
+            width: 100%;
+            display: block;
+        }
+        
+        .video-play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: var(--accent-color);
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 0 0 10px rgba(255, 215, 0, 0.3);
+            transition: var(--transition);
+        }
+        
+        .video-play-btn:hover {
+            box-shadow: 0 0 0 15px rgba(255, 215, 0, 0.2);
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+        
+        /* APP下载 */
+        .app-download {
+            padding: 60px 0;
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+            color: var(--white);
+        }
+        
+        .app-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+        
+        .app-text h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+        
+        .app-text p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .app-features {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+        
+        .app-features li {
+            margin-bottom: 10px;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .app-features li:before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+        }
+        
+        .app-buttons {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .app-buttons .btn {
+            background-color: var(--accent-color);
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .app-image {
+            text-align: center;
+        }
+        
+        .app-image img {
+            max-height: 500px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* 返回顶部按钮 */
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+            z-index: 99;
+        }
+        
+        .back-to-top.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .back-to-top:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-5px);
+        }
+        
+        /* 快速购物车 */
+        .quick-cart {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 320px;
+            height: 100%;
+            background-color: var(--white);
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .quick-cart.open {
+            right: 0;
+        }
+        
+        .quick-cart-header {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .quick-cart-header h3 {
+            margin: 0;
+        }
+        
+        .close-cart {
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .quick-cart-items {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .empty-cart-message {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--light-text);
+        }
+        
+        .quick-cart-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .cart-total {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        /* 合作伙伴 */
+        .partners {
+            padding: 60px 0;
+            background-color: var(--light-bg);
+        }
+        
+        .partners-slider {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .partner {
+            background-color: var(--white);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+        
+        .partner:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 1024px) {
+            .hero h1 {
+                font-size: 36px;
+            }
+            
+            .about-content,
+            .app-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .app-image {
+                grid-row: 1;
+            }
+            
+            .search-bar {
+                width: 200px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .nav {
+                flex-wrap: wrap;
+                height: auto;
+                padding: 15px 0;
+            }
+            
+            .logo {
+                margin-bottom: 15px;
+            }
+            
+            .nav-links {
+                order: 3;
+                width: 100%;
+                overflow-x: auto;
+                padding: 10px 0;
+                margin-top: 15px;
+                justify-content: space-between;
+            }
+            
+            .search-bar {
+                width: 100%;
+                order: 2;
+            }
+            
+            .user-menu {
+                order: 1;
+            }
+            
+            .hero {
+                padding: 60px 0;
+            }
+            
+            .hero h1 {
+                font-size: 30px;
+            }
+            
+            .footer-bottom {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .footer-links {
+                justify-content: center;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .user-menu > * {
+                margin: 0 5px;
+            }
+            
+            .user-menu .btn {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+            
+            .hero .btn {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+            
+            .about-video {
+                margin-top: 20px;
+            }
+        }
+    </style>
+</body>
+</html> 
+
+<!--
+<!--
+量子基因编码: QE-IND-FFC2A5E59E67
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+-->-->
+
+// 开发团队：中华 ZhoHo ，Claude 

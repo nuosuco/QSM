@@ -1,0 +1,19 @@
+# SOM模块基础模板
+# 量子基因: QG-TMPL-SOM-A1B2
+# 量子纠缠: QE-TMPL-SOM-20240404
+
+@extends world/templates/base.qentl
+
+@block extra_css
+  /SOM/static/css/som.qcss
+@end
+
+@block extra_js
+  /SOM/static/js/som_entanglement_client.qjs
+@end
+
+@quantum-entangle
+  type: template
+  module: som
+  strength: 1.0
+  sync: true 

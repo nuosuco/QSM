@@ -1,0 +1,75 @@
+QEntL: QEntL 2.0 Template File
+QuantumGene: QE-TEMPLATE-PROTOCOL-00001
+CreatedAt: 2023-11-05T11:00:00.000000
+EntanglementStrength: 1.0
+TemplateType: Protocol
+TemplateVersion: 2.0
+Author: Quantum Systems Architecture Team
+
+protocol {
+  id: "$PROTOCOL_ID",
+  version: "$VERSION",
+  name: "$NAME",
+  description: "$DESCRIPTION",
+  
+  properties: {
+    type: "$PROTOCOL_TYPE",
+    category: "$CATEGORY",
+    complexity: $COMPLEXITY_LEVEL,
+    compatibleWith: [
+      "$COMPATIBLE_PROTOCOL1",
+      "$COMPATIBLE_PROTOCOL2"
+    ]
+  },
+  
+  requirements: {
+    minQubits: $MIN_QUBITS,
+    minFidelity: $MIN_FIDELITY,
+    maxLatency: $MAX_LATENCY,
+    minBandwidth: $MIN_BANDWIDTH,
+    supportedChannelTypes: [
+      "$SUPPORTED_CHANNEL_TYPE1",
+      "$SUPPORTED_CHANNEL_TYPE2"
+    ]
+  },
+  
+  parameters: {
+    defaultTimeoutMs: $DEFAULT_TIMEOUT_MS,
+    maxRetries: $MAX_RETRIES,
+    bufferSize: $BUFFER_SIZE,
+    synchronizationMode: "$SYNC_MODE",
+    errorCorrectionLevel: $ERROR_CORRECTION_LEVEL,
+    customParameters: {
+      $CUSTOM_PARAM1_KEY: "$CUSTOM_PARAM1_VALUE",
+      $CUSTOM_PARAM2_KEY: "$CUSTOM_PARAM2_VALUE"
+    }
+  },
+  
+  states: [
+    {
+      name: "INIT",
+      description: "初始化协议状态",
+      transitions: ["READY", "ERROR"]
+    },
+    {
+      name: "READY",
+      description: "准备就绪状态",
+      transitions: ["ACTIVE", "ERROR"]
+    },
+    {
+      name: "ACTIVE",
+      description: "活动状态",
+      transitions: ["COMPLETE", "ERROR"]
+    },
+    {
+      name: "COMPLETE",
+      description: "完成状态",
+      transitions: ["READY"]
+    },
+    {
+      name: "ERROR",
+      description: "错误状态",
+      transitions: ["INIT", "READY"]
+    }
+  ]
+} 

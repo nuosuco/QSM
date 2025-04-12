@@ -1,0 +1,137 @@
+/**
+ * 量子纠缠通信加密模块
+ */
+
+import { createHash } from 'crypto';
+
+// 量子密钥生成
+class QuantumKeyGenerator {
+    constructor() {
+        this.keyPairs = new Map();
+    }
+    
+    // 生成量子密钥对
+    generateKeyPair(channelId) {
+        const timestamp = Date.now();
+        const random = Math.random().toString(36);
+        const baseKey = `${channelId}-${timestamp}-${random}`;
+        
+        // 使用SHA-256生成公钥和私钥
+        const publicKey = createHash('sha256')
+            .update(baseKey + '-public')
+            .digest('hex');
+            
+        const privateKey = createHash('sha256')
+            .update(baseKey + '-private')
+            .digest('hex');
+            
+        this.keyPairs.set(channelId, { publicKey, privateKey });
+        return { publicKey, privateKey };
+    }
+    
+    // 获取密钥对
+    getKeyPair(channelId) {
+        return this.keyPairs.get(channelId);
+    }
+}
+
+// 量子加密器
+class QuantumEncryptor {
+    constructor(keyGenerator) {
+        this.keyGenerator = keyGenerator;
+    }
+    
+    // 加密消息
+    encrypt(message, channelId) {
+        const keyPair = this.keyGenerator.getKeyPair(channelId);
+        if (!keyPair) {
+            throw new Error('No key pair found for channel');
+        }
+        
+        const { publicKey } = keyPair;
+        const iv = crypto.getRandomValues(new Uint8Array(16));
+        
+        // 使用AES-GCM加密
+        return crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv
+            },
+            publicKey,
+            new TextEncoder().encode(JSON.stringify(message))
+        ).then(encrypted => {
+            return {
+                encrypted: Array.from(new Uint8Array(encrypted)),
+                iv: Array.from(iv)
+            };
+        });
+    }
+    
+    // 解密消息
+    decrypt(encryptedData, channelId) {
+        const keyPair = this.keyGenerator.getKeyPair(channelId);
+        if (!keyPair) {
+            throw new Error('No key pair found for channel');
+        }
+        
+        const { privateKey } = keyPair;
+        const { encrypted, iv } = encryptedData;
+        
+        // 使用AES-GCM解密
+        return crypto.subtle.decrypt(
+            {
+                name: 'AES-GCM',
+                iv: new Uint8Array(iv)
+            },
+            privateKey,
+            new Uint8Array(encrypted)
+        ).then(decrypted => {
+            return JSON.parse(new TextDecoder().decode(decrypted));
+        });
+    }
+}
+
+// 量子签名验证
+class QuantumSignature {
+    constructor(keyGenerator) {
+        this.keyGenerator = keyGenerator;
+    }
+    
+    // 生成消息签名
+    sign(message, channelId) {
+        const keyPair = this.keyGenerator.getKeyPair(channelId);
+        if (!keyPair) {
+            throw new Error('No key pair found for channel');
+        }
+        
+        const { privateKey } = keyPair;
+        const messageStr = JSON.stringify(message);
+        
+        return createHash('sha256')
+            .update(messageStr + privateKey)
+            .digest('hex');
+    }
+    
+    // 验证消息签名
+    verify(message, signature, channelId) {
+        const keyPair = this.keyGenerator.getKeyPair(channelId);
+        if (!keyPair) {
+            throw new Error('No key pair found for channel');
+        }
+        
+        const { privateKey } = keyPair;
+        const messageStr = JSON.stringify(message);
+        const expectedSignature = createHash('sha256')
+            .update(messageStr + privateKey)
+            .digest('hex');
+            
+        return signature === expectedSignature;
+    }
+}
+
+// 导出加密模块
+export const QuantumEncryption = {
+    KeyGenerator: QuantumKeyGenerator,
+    Encryptor: QuantumEncryptor,
+    Signature: QuantumSignature
+}; 

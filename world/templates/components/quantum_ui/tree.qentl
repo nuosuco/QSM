@@ -1,0 +1,192 @@
+@quantum-component(name="quantum-tree")
+@quantum-entangle(strength=0.85, sync=true)
+@quantum-state({
+    expandedKeys: new Set(),
+    selectedKey: null
+})
+
+<div class="quantum-tree">
+    <template v-for="node in data">
+        <quantum-tree-node 
+            :node="node"
+            :level="0"
+            :expanded-keys="expandedKeys"
+            :selected-key="selectedKey"
+            @toggle="toggleNode"
+            @select="selectNode"
+        />
+    </template>
+</div>
+
+@quantum-component(name="quantum-tree-node")
+<div class="quantum-tree-node" 
+     :style="{ paddingLeft: level * 24 + 'px' }"
+     :class="{ 'is-selected': selectedKey === node.key }">
+    <div class="quantum-tree-node-content" @click="handleSelect">
+        <span v-if="node.children" 
+              class="quantum-tree-node-arrow"
+              :class="{ expanded: isExpanded }"
+              @click.stop="handleToggle">
+            ▶
+        </span>
+        <span v-else class="quantum-tree-node-indent"></span>
+        
+        <span class="quantum-tree-node-icon" v-if="node.icon">
+            {{ node.icon }}
+        </span>
+        
+        <span class="quantum-tree-node-label">{{ node.label }}</span>
+    </div>
+    
+    <div class="quantum-tree-node-children" v-if="node.children && isExpanded">
+        <quantum-tree-node
+            v-for="child in node.children"
+            :node="child"
+            :level="level + 1"
+            :expanded-keys="expandedKeys"
+            :selected-key="selectedKey"
+            @toggle="$emit('toggle', $event)"
+            @select="$emit('select', $event)"
+        />
+    </div>
+</div>
+
+<style lang="qcss">
+.quantum-tree {
+    background: var(--quantum-bg-color);
+    border: 1px solid var(--quantum-border-color);
+    border-radius: 4px;
+    padding: 8px 0;
+}
+
+.quantum-tree-node {
+    position: relative;
+}
+
+.quantum-tree-node-content {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.quantum-tree-node-content:hover {
+    background: var(--quantum-hover-color);
+}
+
+.quantum-tree-node.is-selected > .quantum-tree-node-content {
+    background: var(--quantum-primary-color-light);
+    color: var(--quantum-primary-color);
+}
+
+.quantum-tree-node-arrow {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s;
+    margin-right: 8px;
+}
+
+.quantum-tree-node-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+.quantum-tree-node-indent {
+    width: 24px;
+}
+
+.quantum-tree-node-icon {
+    margin-right: 8px;
+    opacity: 0.7;
+}
+
+.quantum-tree-node-children {
+    animation: quantumSlideDown 0.3s;
+}
+
+@keyframes quantumSlideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 量子效果 */
+.quantum-tree-node.is-selected::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--quantum-primary-color);
+    animation: quantumPulse 2s infinite;
+}
+</style>
+
+<script lang="qjs">
+export default {
+    name: 'QuantumTree',
+    props: {
+        data: {
+            type: Array,
+            required: true
+        }
+    },
+    
+    methods: {
+        toggleNode(key) {
+            if (this.expandedKeys.has(key)) {
+                this.expandedKeys.delete(key);
+            } else {
+                this.expandedKeys.add(key);
+            }
+            this.$emit('node-toggle', key);
+        },
+        
+        selectNode(key) {
+            this.selectedKey = key;
+            this.$emit('node-select', key);
+        }
+    }
+}
+
+export const QuantumTreeNode = {
+    name: 'QuantumTreeNode',
+    props: {
+        node: {
+            type: Object,
+            required: true
+        },
+        level: {
+            type: Number,
+            default: 0
+        },
+        expandedKeys: {
+            type: Set,
+            required: true
+        },
+        selectedKey: {
+            type: [String, Number],
+            default: null
+        }
+    },
+    
+    computed: {
+        isExpanded() {
+            return this.expandedKeys.has(this.node.key);
+        }
+    },
+    
+    methods: {
+        handleToggle() {
+            this.$emit('toggle', this.node.key);
+        },
+        
+        handleSelect() {
+            this.$emit('select', this.node.key);
+        }
+    }
+}
+</script> 

@@ -1,0 +1,285 @@
+/**
+ * 量子测试页面样式
+ */
+
+/* 量子测试区域样式 */
+.quantum-test-container {
+    background-color: #f8fafc;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin: 2rem auto;
+    max-width: 100%;
+    padding: 2rem;
+}
+
+.quantum-test-header {
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+}
+
+.quantum-test-header h1 {
+    color: #2d3748;
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.quantum-test-header p {
+    color: #4a5568;
+    font-size: 1rem;
+    max-width: 600px;
+    text-align: center;
+}
+
+/* 测试控制区域 */
+.test-controls {
+    background-color: #edf2f7;
+    border-radius: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+}
+
+.control-group label {
+    color: #4a5568;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.control-group select {
+    background-color: white;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    padding: 0.5rem;
+}
+
+.control-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+    width: 100%;
+}
+
+.quantum-button {
+    background-color: #4299e1;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.6rem 1.2rem;
+    transition: background-color 0.3s;
+}
+
+.quantum-button:hover {
+    background-color: #3182ce;
+}
+
+.quantum-button:disabled {
+    background-color: #a0aec0;
+    cursor: not-allowed;
+}
+
+.quantum-button.reset {
+    background-color: #f56565;
+}
+
+.quantum-button.reset:hover {
+    background-color: #e53e3e;
+}
+
+/* 可视化区域 */
+.visualization-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.canvas-wrapper {
+    align-items: center;
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    margin: 0 auto;
+    max-width: 100%;
+    overflow: hidden;
+    padding: 1rem;
+}
+
+#quantum-canvas {
+    background-color: #f0f8ff;
+    border-radius: 4px;
+    display: block;
+    height: 300px;
+    max-width: 100%;
+    width: 600px;
+}
+
+/* 结果显示区域 */
+.results-container {
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin: 0 auto;
+    max-width: 100%;
+    padding: 1.5rem;
+}
+
+.results-container h3 {
+    border-bottom: 1px solid #e2e8f0;
+    color: #2d3748;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+}
+
+.placeholder-text {
+    color: #a0aec0;
+    font-style: italic;
+    text-align: center;
+}
+
+.error {
+    color: #e53e3e;
+    font-weight: 600;
+}
+
+.result-stats {
+    margin-top: 1rem;
+}
+
+.result-stats h4 {
+    color: #4a5568;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.result-stats table {
+    border-collapse: collapse;
+    margin: 0 auto;
+    max-width: 100%;
+    width: 100%;
+}
+
+.result-stats th,
+.result-stats td {
+    border: 1px solid #e2e8f0;
+    padding: 0.5rem;
+    text-align: center;
+}
+
+.result-stats th {
+    background-color: #f7fafc;
+    font-weight: 600;
+}
+
+.interference-pattern {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+}
+
+/* 解释部分 */
+.explanation-section {
+    background-color: #ebf8ff;
+    border-left: 4px solid #4299e1;
+    border-radius: 0 6px 6px 0;
+    margin-top: 2rem;
+    padding: 1.5rem;
+}
+
+.explanation-section h3 {
+    color: #2c5282;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.explanation-section p {
+    color: #2d3748;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.quantum-properties {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+}
+
+.property-card {
+    background-color: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    min-width: 200px;
+    padding: 1rem;
+}
+
+.property-card h4 {
+    border-bottom: 1px solid #e2e8f0;
+    color: #2c5282;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.property-card p {
+    color: #4a5568;
+    font-size: 0.875rem;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .test-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .control-group {
+        width: 100%;
+    }
+    
+    .visualization-container {
+        flex-direction: column;
+    }
+    
+    #quantum-canvas {
+        height: 250px;
+        width: 100%;
+    }
+    
+    .quantum-properties {
+        flex-direction: column;
+    }
+} 
+
+/*
+/*
+量子基因编码: QE-QUA-4C81CA07F5C2
+纠缠状态: 活跃
+纠缠对象: ['test/test_common.py']
+纠缠强度: 0.98
+*/*/
+
+// 开发团队：中华 ZhoHo ，Claude 

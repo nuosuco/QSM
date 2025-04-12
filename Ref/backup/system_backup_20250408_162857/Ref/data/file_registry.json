@@ -1,0 +1,920 @@
+{
+  "registry": {
+    "Ref\\app.py": {
+      "checksum": "c9f91729e95b692ea2bb7bae38e6fafb",
+      "purpose": "量子参考系统(Ref)服务器",
+      "created": "2025-04-06T23:02:59.074585",
+      "last_updated": "2025-04-06T23:02:59.074585",
+      "dependencies": [
+        "E:\\model\\QSM\\global\\tools\\path_resolver.py",
+        "E:\\model\\QSM\\global\\tools\\path_resolver.py"
+      ]
+    },
+    "Ref\\organization_tool.py": {
+      "checksum": "977eda991a2f2a7753798418aaae0ea8",
+      "purpose": "设置命令行参数解析",
+      "created": "2025-04-06T23:02:59.076793",
+      "last_updated": "2025-04-06T23:02:59.076793",
+      "dependencies": []
+    },
+    "Ref\\quantum_entanglement_comm.py": {
+      "checksum": "fb861d9405f7ed0fa7865d67531f1444",
+      "purpose": "量子纠缠通信层 - 为QSM系统中的所有元素提供量子纠缠通道的通信能力",
+      "created": "2025-04-06T23:02:59.078791",
+      "last_updated": "2025-04-06T23:02:59.078791",
+      "dependencies": [
+        "E:\\model\\QSM\\Ref\\gene\\quantum_gene_encoder.py"
+      ]
+    },
+    "Ref\\quantum_ref_demo.py": {
+      "checksum": "998656e31569b42a5100c423f888b224",
+      "purpose": "量子自反省管理模型(Ref)演示程序",
+      "created": "2025-04-06T23:02:59.081780",
+      "last_updated": "2025-04-06T23:02:59.081780",
+      "dependencies": []
+    },
+    "Ref\\README.md": {
+      "checksum": "8cccd8066c4a7e8d36c29bc570fabe82",
+      "purpose": "文件: Ref\\README.md",
+      "created": "2025-04-06T23:02:59.083754",
+      "last_updated": "2025-04-06T23:02:59.083754",
+      "dependencies": []
+    },
+    "Ref\\ref_core.py": {
+      "checksum": "3cc9a0e7424e9d8858bf17bdfc8e4036",
+      "purpose": "Ref量子纠错系统核心模块",
+      "created": "2025-04-06T23:02:59.086746",
+      "last_updated": "2025-04-06T23:02:59.086746",
+      "dependencies": []
+    },
+    "Ref\\system_monitor_enhancer.py": {
+      "checksum": "077a8019d08586caac312f0002a85b24",
+      "purpose": "系统监控增强器 - Ref量子自反省系统的核心组件",
+      "created": "2025-04-06T23:02:59.089738",
+      "last_updated": "2025-04-06T23:02:59.089738",
+      "dependencies": []
+    },
+    "Ref\\test_monitor.py": {
+      "checksum": "1c840c9adbe40e21ce0d87f5f6f3a4d4",
+      "purpose": "测试文件",
+      "created": "2025-04-06T23:02:59.091751",
+      "last_updated": "2025-04-06T23:02:59.091751",
+      "dependencies": [
+        "E:\\model\\QSM\\Ref\\utils\\file_integrity_monitor.py",
+        "E:\\model\\QSM\\Ref\\utils\\file_organization_guardian.py"
+      ]
+    },
+    "Ref\\__init__.py": {
+      "checksum": "282a8f1a51509788df87a1c039ec296e",
+      "purpose": "QSM项目的Ref子系统",
+      "created": "2025-04-06T23:02:59.094639",
+      "last_updated": "2025-04-06T23:02:59.094639",
+      "dependencies": []
+    },
+    "Ref\\api\\ref_api.py": {
+      "checksum": "a8a0aed392e7c9d3a4ac8978dc6dbd7c",
+      "purpose": "Ref量子基因参考系统API服务",
+      "created": "2025-04-06T23:02:59.095047",
+      "last_updated": "2025-04-06T23:02:59.095047",
+      "dependencies": [
+        "E:\\model\\QSM\\Ref\\ref_core.py",
+        "E:\\model\\QSM\\Ref\\quantum_entanglement_comm.py"
+      ]
+    },
+    "Ref\\api\\ref_api_integration.py": {
+      "checksum": "4ef1c83b3ca19c4514856e60822e7034",
+      "purpose": "Ref API 集成模块",
+      "created": "2025-04-06T23:02:59.102178",
+      "last_updated": "2025-04-06T23:02:59.102178",
+      "dependencies": [
+        "E:\\model\\QSM\\Ref\\api\\ref_api.py",
+        "E:\\model\\QSM\\Ref\\ref_core.py",
+        "E:\\model\\QSM\\Ref\\api\\ref_api_integration.py"
+      ]
+    },
+    "Ref\\api\\ref_monitor_api.py": {
+      "checksum": "c79c8220db9b18664b3503d22dcd2078",
+      "purpose": "量子自反省管理模型(Ref) - 监控API",
+      "created": "2025-04-06T23:02:59.105168",
+      "last_updated": "2025-04-06T23:02:59.105168",
+      "dependencies": [
+        "E:\\model\\QSM\\Ref\\ref_core.py",
+        "E:\\model\\QSM\\Ref\\monitor\\system_monitor_enhancer.py",
+        "E:\\model\\QSM\\Ref\\ref_core.py",
+        "E:\\model\\QSM\\Ref\\monitor\\system_monitor_enhancer.py"
+      ]
+    },
+    "Ref\\backup\\backup_manager.py": {
+      "checksum": "4ef9fbd28a31030e35e4dc3309e20720",
+      "purpose": "量子备份管理器 - 自动管理QSM项目的备份",
+      "created": "2025-04-06T23:02:59.107598",
+      "last_updated": "2025-04-06T23:02:59.107598",
+      "dependencies": []
+    },
+    "Ref\\backup\\start_backup_service.py": {
+      "checksum": "c57d84762010fdc1d66f6708338c57fb",
+      "purpose": "启动Ref备份服务",
+      "created": "2025-04-06T23:02:59.109594",
+      "last_updated": "2025-04-06T23:02:59.109594",
+      "dependencies": []
+    },
+    "Ref\\data\\file_registry.json": {
+      "checksum": "fef83ff8571c56edf55ec9e67d3470f1",
+      "purpose": "文件: Ref\\data\\file_registry.json",
+      "created": "2025-04-06T23:02:59.110864",
+      "last_updated": "2025-04-06T23:02:59.110864",
+      "dependencies": []
+    },
+    "Ref\\data\\quantum_entanglement_registry.json": {
+      "checksum": "8e529f24e9bdde91730c5bf61c401390",
+      "purpose": "文件: Ref\\data\\quantum_entanglement_registry.json",
+      "created": "2025-04-06T23:02:59.118214",
+      "last_updated": "2025-04-06T23:02:59.118214",
+      "dependencies": []
+    },
+    "Ref\\data\\quantum_gene_registry.json": {
+      "checksum": "eb025c6dc69004a4514596ed0cbd1a58",
+      "purpose": "文件: Ref\\data\\quantum_gene_registry.json",
+      "created": "2025-04-06T23:02:59.132769",
+      "last_updated": "2025-04-06T23:02:59.132769",
+      "dependencies": []
+    },
+    "Ref\\gene\\count_channels.py": {
+      "checksum": "8a554c312b5d2071a39c7e81cd724881",
+      "purpose": "量子纠缠信道统计工具 - 计算项目中的量子纠缠信道数量和统计信息",
+      "created": "2025-04-06T23:02:59.136759",
+      "last_updated": "2025-04-06T23:02:59.136759",
+      "dependencies": []
+    },
+    "Ref\\gene\\create_quantum_channels.py": {
+      "checksum": "f647ee7941ae649f1b010bc78b8d46ec",
+      "purpose": "量子纠缠信道创建器 - 为QSM系统中的核心文档建立量子纠缠信道",
+      "created": "2025-04-06T23:02:59.140812",
+      "last_updated": "2025-04-06T23:02:59.140812",
+      "dependencies": []
+    },
+    "Ref\\gene\\enhanced_quantum_network.py": {
+      "checksum": "96925abb6b518b5f66a52cd1d3eedb94",
+      "purpose": "增强型量子纠缠网络构建器 - 为每个目录的核心文件建立量子纠缠信道",
+      "created": "2025-04-06T23:02:59.143288",
+      "last_updated": "2025-04-06T23:02:59.143288",
+      "dependencies": []
+    },
+    "Ref\\gene\\quantum_gene.py": {
+      "checksum": "d05260ff7f2e2ec444a352eb4cd28952",
+      "purpose": "Quantum Gene Encoding System",
+      "created": "2025-04-06T23:02:59.144178",
+      "last_updated": "2025-04-06T23:02:59.144178",
+      "dependencies": []
+    },
+    "Ref\\gene\\quantum_gene_encoder.py": {
+      "checksum": "fca38251832b7aebb353266b5122876b",
+      "purpose": "量子基因编码系统 - 为QSM系统中的所有元素提供量子基因编码",
+      "created": "2025-04-06T23:02:59.151831",
+      "last_updated": "2025-04-06T23:02:59.151831",
+      "dependencies": []
+    },
+    "Ref\\gene\\quantum_gene_processor.py": {
+      "checksum": "190369d464e727e7cf43b0e21193fbd3",
+      "purpose": "量子基因处理器 - 为QSM系统中的所有元素提供量子基因编码和量子纠缠信道",
+      "created": "2025-04-06T23:02:59.155026",
+      "last_updated": "2025-04-06T23:02:59.155026",
+      "dependencies": []
+    },
+    "Ref\\gene\\__init__.py": {
+      "checksum": "5d693ca8d99958afa369da82e42c29c8",
+      "purpose": "量子基因编码模块 - 为QSM系统中的所有元素提供量子基因编码",
+      "created": "2025-04-06T23:02:59.159019",
+      "last_updated": "2025-04-06T23:02:59.159019",
+      "dependencies": [
+        "E:\\model\\QSM\\Ref\\gene\\quantum_gene_encoder.py"
+      ]
+    },
+    "Ref\\gene\\test_output_entanglement\\demo.py": {
+      "checksum": "f3c462f8e2f247474477714fb5ae58b8",
+      "purpose": "测试文件",
+      "created": "2025-04-06T23:02:59.162633",
+      "last_updated": "2025-04-06T23:02:59.162633",
+      "dependencies": []
+    },
+    "Ref\\gene\\test_output_entanglement\\multimodal_entanglement.py": {
+      "checksum": "e7bf386f3563a61b2235c20128e5a5f5",
+      "purpose": "测试文件",
+      "created": "2025-04-06T23:02:59.165163",
+      "last_updated": "2025-04-06T23:02:59.165163",
+      "dependencies": []
+    },
+    "Ref\\gene\\test_output_entanglement\\simplified_core.py": {
+      "checksum": "7ececa3edad951e6d8c722505c49cd7a",
+      "purpose": "测试文件",
+      "created": "2025-04-06T23:02:59.168203",
+      "last_updated": "2025-04-06T23:02:59.168203",
+      "dependencies": []
+    },
+    "Ref\\global\\js\\ref_entanglement_client.js": {
+      "checksum": "8784414c2378fde29391f161399f9a28",
+      "purpose": "JavaScript脚本文件",
+      "created": "2025-04-06T23:02:59.171802",
+      "last_updated": "2025-04-06T23:02:59.171802",
+      "dependencies": []
+    },
+    "Ref\\logs\\file_guardian.log": {
+      "checksum": "d41d8cd98f00b204e9800998ecf8427e",
+      "purpose": "文件: Ref\\logs\\file_guardian.log",
+      "created": "2025-04-06T23:02:59.174793",
+      "last_updated": "2025-04-06T23:02:59.174793",
+      "dependencies": []
+    },
+    "Ref\\logs\\file_integrity.log": {
+      "checksum": "3c3e324eb5de0a8f105cb2ccd0c98502",
+      "purpose": "文件: Ref\\logs\\file_integrity.log",
+      "created": "2025-04-06T23:02:59.176876",
+      "last_updated": "2025-04-06T23:02:59.176876",
+      "dependencies": []
+    },
+    "Ref\\monitor\\backup_files.py": {
+      "checksum": "cacea1bdc29fb1d8f71a912a9e935c6f",
+      "purpose": "备份指定文件，添加时间戳",
+      "created": "2025-04-06T23:02:59.184236",
+      "last_updated": "2025-04-06T23:02:59.184236",
+      "dependencies": []
+    },
+    "Ref\\monitor\\backup_frontend.py": {
+      "checksum": "0f7e628a257d6d5bef724e63ffc965ef",
+      "purpose": "备份指定文件，添加时间戳",
+      "created": "2025-04-06T23:02:59.187706",
+      "last_updated": "2025-04-06T23:02:59.187706",
+      "dependencies": []
+    },
+    "Ref\\monitor\\cursor_performance.py": {
+      "checksum": "dc882344b922f7e210fec8bf9b498a1d",
+      "purpose": "Cursor性能优化工具",
+      "created": "2025-04-06T23:02:59.190697",
+      "last_updated": "2025-04-06T23:02:59.190697",
+      "dependencies": []
+    },
+    "Ref\\monitor\\index_monitor.py": {
+      "checksum": "5db5d70dfab002d977646d9575034c7f",
+      "purpose": "索引监控脚本 - 监控项目结构变化并自动更新索引文件",
+      "created": "2025-04-06T23:02:59.194677",
+      "last_updated": "2025-04-06T23:02:59.194677",
+      "dependencies": []
+    },
+    "Ref\\monitor\\optimize_cursor.bat": {
+      "checksum": "96d588dae3312cbc07f829917b5a310d",
+      "purpose": "文件: Ref\\monitor\\optimize_cursor.bat",
+      "created": "2025-04-06T23:02:59.199138",
+      "last_updated": "2025-04-06T23:02:59.199138",
+      "dependencies": []
+    },
+    "Ref\\monitor\\project_manager.py": {
+      "checksum": "650cae9c544b25dcf7bd4c0c9c4ede92",
+      "purpose": "项目自动归类与管理系统",
+      "created": "2025-04-06T23:02:59.203169",
+      "last_updated": "2025-04-06T23:02:59.203169",
+      "dependencies": []
+    },
+    "Ref\\monitor\\system_monitor_enhancer.py": {
+      "checksum": "7c6893834977dec3cb27497b7d8ceb93",
+      "purpose": "量子自反省管理模型(Ref) - 系统监控增强器",
+      "created": "2025-04-06T23:02:59.208156",
+      "last_updated": "2025-04-06T23:02:59.208156",
+      "dependencies": [
+        "E:\\model\\QSM\\Ref\\gene\\quantum_gene_processor.py",
+        "E:\\model\\QSM\\frontend\\tools\\update_project_index.py",
+        "E:\\model\\QSM\\frontend\\tools\\update_project_index.py",
+        "E:\\model\\QSM\\Ref\\gene\\quantum_gene_processor.py",
+        "E:\\model\\QSM\\frontend\\tools\\update_project_index.py",
+        "E:\\model\\QSM\\frontend\\tools\\update_project_index.py"
+      ]
+    },
+    "Ref\\quantum_blockchain\\ref_blockchain.py": {
+      "checksum": "b255b2071efb00fd78a9bb61e081f083",
+      "purpose": "Ref Quantum Blockchain",
+      "created": "2025-04-06T23:02:59.211430",
+      "last_updated": "2025-04-06T23:02:59.211430",
+      "dependencies": [
+        "E:\\model\\QSM\\quantum_core\\quantum_blockchain\\quantum_blockchain_core.py",
+        "E:\\model\\QSM\\quantum_core\\quantum_blockchain\\qsm_main_chain.py"
+      ]
+    },
+    "Ref\\quantum_blockchain\\__init__.py": {
+      "checksum": "c5354166471827b4b953c8cef95b8448",
+      "purpose": "Ref Quantum Blockchain Module",
+      "created": "2025-04-06T23:02:59.220306",
+      "last_updated": "2025-04-06T23:02:59.220306",
+      "dependencies": []
+    },
+    "Ref\\repair\\quantum_self_repair.py": {
+      "checksum": "fecefc8ac1adf1b63bbbcd18cccad66c",
+      "purpose": "实时监测认知偏差率算法（含使命宣言正交验证）",
+      "created": "2025-04-06T23:02:59.225436",
+      "last_updated": "2025-04-06T23:02:59.225436",
+      "dependencies": []
+    },
+    "Ref\\static\\css\\ref_dashboard.css": {
+      "checksum": "189781fbbbab59678b001bef227c2fd5",
+      "purpose": "CSS样式表文件",
+      "created": "2025-04-06T23:02:59.231651",
+      "last_updated": "2025-04-06T23:02:59.231651",
+      "dependencies": []
+    },
+    "Ref\\static\\js\\quantum_entanglement_client.js": {
+      "checksum": "514089298c9b402799e527ec941564c7",
+      "purpose": "JavaScript脚本文件",
+      "created": "2025-04-06T23:02:59.236140",
+      "last_updated": "2025-04-06T23:02:59.236140",
+      "dependencies": []
+    },
+    "Ref\\static\\js\\ref_entanglement_client.js": {
+      "checksum": "649d3cbd3a8091ac06504195d5859812",
+      "purpose": "JavaScript脚本文件",
+      "created": "2025-04-06T23:02:59.239277",
+      "last_updated": "2025-04-06T23:02:59.239277",
+      "dependencies": []
+    },
+    "Ref\\templates\\base.html": {
+      "checksum": "8c30723628d18c0d7165384d5d7a65d7",
+      "purpose": "HTML页面: {% block title %}Ref - 量子自修复系统{% endblock %}",
+      "created": "2025-04-06T23:02:59.239277",
+      "last_updated": "2025-04-06T23:02:59.239277",
+      "dependencies": [
+        "E:\\model\\QSM\\static/js/quantum_loader.js"
+      ]
+    },
+    "Ref\\templates\\base_ref.html": {
+      "checksum": "87b0a2a2211001ef07ebd2e407807c67",
+      "purpose": "文件: Ref\\templates\\base_ref.html",
+      "created": "2025-04-06T23:02:59.249837",
+      "last_updated": "2025-04-06T23:02:59.249837",
+      "dependencies": []
+    },
+    "Ref\\templates\\dashboard.html": {
+      "checksum": "7c611a9f81917868d71a3d00cfb36d39",
+      "purpose": "文件: Ref\\templates\\dashboard.html",
+      "created": "2025-04-06T23:02:59.255101",
+      "last_updated": "2025-04-06T23:02:59.255101",
+      "dependencies": []
+    },
+    "Ref\\templates\\shared\\footer.html": {
+      "checksum": "8bc8db802e47c8e31c837184eab2543c",
+      "purpose": "文件: Ref\\templates\\shared\\footer.html",
+      "created": "2025-04-06T23:02:59.256981",
+      "last_updated": "2025-04-06T23:02:59.256981",
+      "dependencies": [
+        "E:\\model\\QSM\\QSM/templates/shared/css/footer.css"
+      ]
+    },
+    "Ref\\templates\\shared\\navigation.html": {
+      "checksum": "b1748c09dfcae4d53d26f71786c44f14",
+      "purpose": "文件: Ref\\templates\\shared\\navigation.html",
+      "created": "2025-04-06T23:02:59.266245",
+      "last_updated": "2025-04-06T23:02:59.266245",
+      "dependencies": [
+        "E:\\model\\QSM\\QSM/templates/shared/css/navigation.css",
+        "E:\\model\\QSM\\QSM/templates/shared/js/navigation.js"
+      ]
+    },
+    "Ref\\templates\\shared\\css\\footer.css": {
+      "checksum": "4bb38e8b5c050e2fcd673f3367f782ea",
+      "purpose": "CSS样式表文件",
+      "created": "2025-04-06T23:02:59.272250",
+      "last_updated": "2025-04-06T23:02:59.272250",
+      "dependencies": []
+    },
+    "Ref\\templates\\shared\\css\\navigation.css": {
+      "checksum": "b717d2dcc6c00b79db3f6ef935ed1568",
+      "purpose": "CSS样式表文件",
+      "created": "2025-04-06T23:02:59.277546",
+      "last_updated": "2025-04-06T23:02:59.277546",
+      "dependencies": []
+    },
+    "Ref\\templates\\shared\\js\\unified_navigation.js": {
+      "checksum": "3e1c6d2d765ae19413b6a1b2bb5c2012",
+      "purpose": "JavaScript脚本文件",
+      "created": "2025-04-06T23:02:59.284162",
+      "last_updated": "2025-04-06T23:02:59.284162",
+      "dependencies": []
+    },
+    "Ref\\tests\\test_system_monitor.py": {
+      "checksum": "8f7c318584e911f23bdf06862df11cf4",
+      "purpose": "测试文件",
+      "created": "2025-04-06T23:02:59.292008",
+      "last_updated": "2025-04-06T23:02:59.292008",
+      "dependencies": []
+    },
+    "Ref\\utils\\file_integrity_monitor.py": {
+      "checksum": "87bb53bd3f00d515bcfcfd7602fdf05c",
+      "purpose": "文件完整性监控器，用于防止在多次对话中发生重复创建和不一致修改",
+      "created": "2025-04-06T23:02:59.296042",
+      "last_updated": "2025-04-06T23:02:59.296042",
+      "dependencies": []
+    },
+    "Ref\\utils\\file_organization_guardian.py": {
+      "checksum": "f8cdf51be9cd15b98056515e1c3442c4",
+      "purpose": "文件组织监护器，确保项目结构一致性并防止重复文件和冲突",
+      "created": "2025-04-06T23:02:59.301749",
+      "last_updated": "2025-04-06T23:02:59.301749",
+      "dependencies": []
+    },
+    "Ref\\utils\\index_system_setup.py": {
+      "checksum": "19047ac9f5a3e6e0bd163da84bd15db3",
+      "purpose": "索引系统初始化脚本 - 创建必要的目录结构和配置文件",
+      "created": "2025-04-06T23:02:59.301749",
+      "last_updated": "2025-04-06T23:02:59.301749",
+      "dependencies": []
+    },
+    "Ref\\utils\\integrate_weq.py": {
+      "checksum": "9c70de5b69ed8b5f91cfe322b4e2201a",
+      "purpose": "Ref与WeQ集成脚本 - 将Ref索引系统与WeQ多模态系统集成",
+      "created": "2025-04-06T23:02:59.301749",
+      "last_updated": "2025-04-06T23:02:59.301749",
+      "dependencies": []
+    },
+    "Ref\\utils\\__init__.py": {
+      "checksum": "92e6492bd658b9293417c61a13d0d965",
+      "purpose": "Ref子系统工具模块",
+      "created": "2025-04-06T23:02:59.316662",
+      "last_updated": "2025-04-06T23:02:59.316662",
+      "dependencies": []
+    },
+    "E:\\model\\QSM\\Ref\\test_file.txt": {
+      "checksum": "8cccd8066c4a7e8d36c29bc570fabe82",
+      "purpose": "测试安全创建文件功能",
+      "created": "2025-04-06T23:03:22.400360",
+      "last_updated": "2025-04-06T23:03:22.400360",
+      "dependencies": []
+    }
+  },
+  "history": {
+    "Ref\\app.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.074585",
+        "old_checksum": "",
+        "new_checksum": "c9f91729e95b692ea2bb7bae38e6fafb",
+        "action": "create"
+      }
+    ],
+    "Ref\\organization_tool.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.076793",
+        "old_checksum": "",
+        "new_checksum": "977eda991a2f2a7753798418aaae0ea8",
+        "action": "create"
+      }
+    ],
+    "Ref\\quantum_entanglement_comm.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.078791",
+        "old_checksum": "",
+        "new_checksum": "fb861d9405f7ed0fa7865d67531f1444",
+        "action": "create"
+      }
+    ],
+    "Ref\\quantum_ref_demo.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.081780",
+        "old_checksum": "",
+        "new_checksum": "998656e31569b42a5100c423f888b224",
+        "action": "create"
+      }
+    ],
+    "Ref\\README.md": [
+      {
+        "timestamp": "2025-04-06T23:02:59.083754",
+        "old_checksum": "",
+        "new_checksum": "8cccd8066c4a7e8d36c29bc570fabe82",
+        "action": "create"
+      }
+    ],
+    "Ref\\ref_core.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.086746",
+        "old_checksum": "",
+        "new_checksum": "3cc9a0e7424e9d8858bf17bdfc8e4036",
+        "action": "create"
+      }
+    ],
+    "Ref\\system_monitor_enhancer.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.089738",
+        "old_checksum": "",
+        "new_checksum": "077a8019d08586caac312f0002a85b24",
+        "action": "create"
+      }
+    ],
+    "Ref\\test_monitor.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.091751",
+        "old_checksum": "",
+        "new_checksum": "1c840c9adbe40e21ce0d87f5f6f3a4d4",
+        "action": "create"
+      }
+    ],
+    "Ref\\__init__.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.094639",
+        "old_checksum": "",
+        "new_checksum": "282a8f1a51509788df87a1c039ec296e",
+        "action": "create"
+      }
+    ],
+    "Ref\\api\\ref_api.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.095047",
+        "old_checksum": "",
+        "new_checksum": "a8a0aed392e7c9d3a4ac8978dc6dbd7c",
+        "action": "create"
+      }
+    ],
+    "Ref\\api\\ref_api_integration.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.102178",
+        "old_checksum": "",
+        "new_checksum": "4ef1c83b3ca19c4514856e60822e7034",
+        "action": "create"
+      }
+    ],
+    "Ref\\api\\ref_monitor_api.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.105168",
+        "old_checksum": "",
+        "new_checksum": "c79c8220db9b18664b3503d22dcd2078",
+        "action": "create"
+      }
+    ],
+    "Ref\\backup\\backup_manager.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.107598",
+        "old_checksum": "",
+        "new_checksum": "4ef9fbd28a31030e35e4dc3309e20720",
+        "action": "create"
+      }
+    ],
+    "Ref\\backup\\start_backup_service.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.109594",
+        "old_checksum": "",
+        "new_checksum": "c57d84762010fdc1d66f6708338c57fb",
+        "action": "create"
+      }
+    ],
+    "Ref\\data\\file_registry.json": [
+      {
+        "timestamp": "2025-04-06T23:02:59.110864",
+        "old_checksum": "",
+        "new_checksum": "fef83ff8571c56edf55ec9e67d3470f1",
+        "action": "create"
+      }
+    ],
+    "Ref\\data\\quantum_entanglement_registry.json": [
+      {
+        "timestamp": "2025-04-06T23:02:59.118214",
+        "old_checksum": "",
+        "new_checksum": "8e529f24e9bdde91730c5bf61c401390",
+        "action": "create"
+      }
+    ],
+    "Ref\\data\\quantum_gene_registry.json": [
+      {
+        "timestamp": "2025-04-06T23:02:59.132769",
+        "old_checksum": "",
+        "new_checksum": "eb025c6dc69004a4514596ed0cbd1a58",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\count_channels.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.136759",
+        "old_checksum": "",
+        "new_checksum": "8a554c312b5d2071a39c7e81cd724881",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\create_quantum_channels.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.140812",
+        "old_checksum": "",
+        "new_checksum": "f647ee7941ae649f1b010bc78b8d46ec",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\enhanced_quantum_network.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.143288",
+        "old_checksum": "",
+        "new_checksum": "96925abb6b518b5f66a52cd1d3eedb94",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\quantum_gene.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.144178",
+        "old_checksum": "",
+        "new_checksum": "d05260ff7f2e2ec444a352eb4cd28952",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\quantum_gene_encoder.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.151831",
+        "old_checksum": "",
+        "new_checksum": "fca38251832b7aebb353266b5122876b",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\quantum_gene_processor.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.155026",
+        "old_checksum": "",
+        "new_checksum": "190369d464e727e7cf43b0e21193fbd3",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\__init__.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.159019",
+        "old_checksum": "",
+        "new_checksum": "5d693ca8d99958afa369da82e42c29c8",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\test_output_entanglement\\demo.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.162633",
+        "old_checksum": "",
+        "new_checksum": "f3c462f8e2f247474477714fb5ae58b8",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\test_output_entanglement\\multimodal_entanglement.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.165163",
+        "old_checksum": "",
+        "new_checksum": "e7bf386f3563a61b2235c20128e5a5f5",
+        "action": "create"
+      }
+    ],
+    "Ref\\gene\\test_output_entanglement\\simplified_core.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.168203",
+        "old_checksum": "",
+        "new_checksum": "7ececa3edad951e6d8c722505c49cd7a",
+        "action": "create"
+      }
+    ],
+    "Ref\\global\\js\\ref_entanglement_client.js": [
+      {
+        "timestamp": "2025-04-06T23:02:59.171802",
+        "old_checksum": "",
+        "new_checksum": "8784414c2378fde29391f161399f9a28",
+        "action": "create"
+      }
+    ],
+    "Ref\\logs\\file_guardian.log": [
+      {
+        "timestamp": "2025-04-06T23:02:59.174793",
+        "old_checksum": "",
+        "new_checksum": "d41d8cd98f00b204e9800998ecf8427e",
+        "action": "create"
+      }
+    ],
+    "Ref\\logs\\file_integrity.log": [
+      {
+        "timestamp": "2025-04-06T23:02:59.176876",
+        "old_checksum": "",
+        "new_checksum": "3c3e324eb5de0a8f105cb2ccd0c98502",
+        "action": "create"
+      }
+    ],
+    "Ref\\monitor\\backup_files.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.184236",
+        "old_checksum": "",
+        "new_checksum": "cacea1bdc29fb1d8f71a912a9e935c6f",
+        "action": "create"
+      }
+    ],
+    "Ref\\monitor\\backup_frontend.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.187706",
+        "old_checksum": "",
+        "new_checksum": "0f7e628a257d6d5bef724e63ffc965ef",
+        "action": "create"
+      }
+    ],
+    "Ref\\monitor\\cursor_performance.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.190697",
+        "old_checksum": "",
+        "new_checksum": "dc882344b922f7e210fec8bf9b498a1d",
+        "action": "create"
+      }
+    ],
+    "Ref\\monitor\\index_monitor.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.194677",
+        "old_checksum": "",
+        "new_checksum": "5db5d70dfab002d977646d9575034c7f",
+        "action": "create"
+      }
+    ],
+    "Ref\\monitor\\optimize_cursor.bat": [
+      {
+        "timestamp": "2025-04-06T23:02:59.199138",
+        "old_checksum": "",
+        "new_checksum": "96d588dae3312cbc07f829917b5a310d",
+        "action": "create"
+      }
+    ],
+    "Ref\\monitor\\project_manager.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.203169",
+        "old_checksum": "",
+        "new_checksum": "650cae9c544b25dcf7bd4c0c9c4ede92",
+        "action": "create"
+      }
+    ],
+    "Ref\\monitor\\system_monitor_enhancer.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.208156",
+        "old_checksum": "",
+        "new_checksum": "7c6893834977dec3cb27497b7d8ceb93",
+        "action": "create"
+      }
+    ],
+    "Ref\\quantum_blockchain\\ref_blockchain.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.211430",
+        "old_checksum": "",
+        "new_checksum": "b255b2071efb00fd78a9bb61e081f083",
+        "action": "create"
+      }
+    ],
+    "Ref\\quantum_blockchain\\__init__.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.220306",
+        "old_checksum": "",
+        "new_checksum": "c5354166471827b4b953c8cef95b8448",
+        "action": "create"
+      }
+    ],
+    "Ref\\repair\\quantum_self_repair.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.225436",
+        "old_checksum": "",
+        "new_checksum": "fecefc8ac1adf1b63bbbcd18cccad66c",
+        "action": "create"
+      }
+    ],
+    "Ref\\static\\css\\ref_dashboard.css": [
+      {
+        "timestamp": "2025-04-06T23:02:59.231651",
+        "old_checksum": "",
+        "new_checksum": "189781fbbbab59678b001bef227c2fd5",
+        "action": "create"
+      }
+    ],
+    "Ref\\static\\js\\quantum_entanglement_client.js": [
+      {
+        "timestamp": "2025-04-06T23:02:59.236140",
+        "old_checksum": "",
+        "new_checksum": "514089298c9b402799e527ec941564c7",
+        "action": "create"
+      }
+    ],
+    "Ref\\static\\js\\ref_entanglement_client.js": [
+      {
+        "timestamp": "2025-04-06T23:02:59.239277",
+        "old_checksum": "",
+        "new_checksum": "649d3cbd3a8091ac06504195d5859812",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\base.html": [
+      {
+        "timestamp": "2025-04-06T23:02:59.239277",
+        "old_checksum": "",
+        "new_checksum": "8c30723628d18c0d7165384d5d7a65d7",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\base_ref.html": [
+      {
+        "timestamp": "2025-04-06T23:02:59.249837",
+        "old_checksum": "",
+        "new_checksum": "87b0a2a2211001ef07ebd2e407807c67",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\dashboard.html": [
+      {
+        "timestamp": "2025-04-06T23:02:59.255101",
+        "old_checksum": "",
+        "new_checksum": "7c611a9f81917868d71a3d00cfb36d39",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\shared\\footer.html": [
+      {
+        "timestamp": "2025-04-06T23:02:59.256981",
+        "old_checksum": "",
+        "new_checksum": "8bc8db802e47c8e31c837184eab2543c",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\shared\\navigation.html": [
+      {
+        "timestamp": "2025-04-06T23:02:59.266245",
+        "old_checksum": "",
+        "new_checksum": "b1748c09dfcae4d53d26f71786c44f14",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\shared\\css\\footer.css": [
+      {
+        "timestamp": "2025-04-06T23:02:59.272250",
+        "old_checksum": "",
+        "new_checksum": "4bb38e8b5c050e2fcd673f3367f782ea",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\shared\\css\\navigation.css": [
+      {
+        "timestamp": "2025-04-06T23:02:59.277546",
+        "old_checksum": "",
+        "new_checksum": "b717d2dcc6c00b79db3f6ef935ed1568",
+        "action": "create"
+      }
+    ],
+    "Ref\\templates\\shared\\js\\unified_navigation.js": [
+      {
+        "timestamp": "2025-04-06T23:02:59.284162",
+        "old_checksum": "",
+        "new_checksum": "3e1c6d2d765ae19413b6a1b2bb5c2012",
+        "action": "create"
+      }
+    ],
+    "Ref\\tests\\test_system_monitor.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.292008",
+        "old_checksum": "",
+        "new_checksum": "8f7c318584e911f23bdf06862df11cf4",
+        "action": "create"
+      }
+    ],
+    "Ref\\utils\\file_integrity_monitor.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.296042",
+        "old_checksum": "",
+        "new_checksum": "87bb53bd3f00d515bcfcfd7602fdf05c",
+        "action": "create"
+      }
+    ],
+    "Ref\\utils\\file_organization_guardian.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.301749",
+        "old_checksum": "",
+        "new_checksum": "f8cdf51be9cd15b98056515e1c3442c4",
+        "action": "create"
+      }
+    ],
+    "Ref\\utils\\index_system_setup.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.301749",
+        "old_checksum": "",
+        "new_checksum": "19047ac9f5a3e6e0bd163da84bd15db3",
+        "action": "create"
+      }
+    ],
+    "Ref\\utils\\integrate_weq.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.301749",
+        "old_checksum": "",
+        "new_checksum": "9c70de5b69ed8b5f91cfe322b4e2201a",
+        "action": "create"
+      }
+    ],
+    "Ref\\utils\\__init__.py": [
+      {
+        "timestamp": "2025-04-06T23:02:59.316662",
+        "old_checksum": "",
+        "new_checksum": "92e6492bd658b9293417c61a13d0d965",
+        "action": "create"
+      }
+    ],
+    "E:\\model\\QSM\\Ref\\test_file.txt": [
+      {
+        "timestamp": "2025-04-06T23:03:22.400360",
+        "old_checksum": "",
+        "new_checksum": "8cccd8066c4a7e8d36c29bc570fabe82",
+        "action": "create"
+      }
+    ]
+  }
+}
+//
+量子基因编码: QE-FIL-07E3CD7B7536
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98

@@ -1,0 +1,163 @@
+@quantum-component(name="quantum-tabs")
+@quantum-entangle(strength=0.8, sync=true)
+@quantum-state({
+    activeTab: 0,
+    tabs: [],
+    content: []
+})
+
+<div class="quantum-tabs">
+    <div class="quantum-tabs-header">
+        @for(tab, index in tabs)
+            <div class="quantum-tab-item" 
+                 :class="{ active: activeTab === index }"
+                 @click="setActiveTab(index)">
+                {{ tab.label }}
+                @if(tab.closable)
+                    <span class="quantum-tab-close" @click.stop="closeTab(index)">×</span>
+                @endif
+            </div>
+        @endfor
+        @if(allowAdd)
+            <div class="quantum-tab-add" @click="addTab">+</div>
+        @endif
+    </div>
+    
+    <div class="quantum-tabs-content">
+        <div class="quantum-tab-pane" 
+             v-for="(item, index) in content"
+             :class="{ active: activeTab === index }">
+            {{ item }}
+        </div>
+    </div>
+</div>
+
+<style lang="qcss">
+.quantum-tabs {
+    border: 1px solid var(--quantum-border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--quantum-bg-color);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.quantum-tabs-header {
+    display: flex;
+    background: var(--quantum-primary-color-light);
+    border-bottom: 1px solid var(--quantum-border-color);
+    position: relative;
+}
+
+.quantum-tab-item {
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quantum-tab-item:hover {
+    background: var(--quantum-hover-color);
+}
+
+.quantum-tab-item.active {
+    background: var(--quantum-bg-color);
+    border-bottom: 2px solid var(--quantum-primary-color);
+}
+
+.quantum-tab-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--quantum-primary-color);
+    animation: quantumPulse 2s infinite;
+}
+
+.quantum-tab-close {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s;
+}
+
+.quantum-tab-close:hover {
+    background: var(--quantum-danger-color);
+    color: white;
+}
+
+.quantum-tab-add {
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.quantum-tab-add:hover {
+    background: var(--quantum-success-color-light);
+}
+
+.quantum-tabs-content {
+    padding: 16px;
+}
+
+.quantum-tab-pane {
+    display: none;
+    animation: quantumFadeIn 0.3s;
+}
+
+.quantum-tab-pane.active {
+    display: block;
+}
+
+@keyframes quantumFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+<script lang="qjs">
+export default {
+    props: {
+        tabs: {
+            type: Array,
+            default: () => []
+        },
+        content: {
+            type: Array,
+            default: () => []
+        },
+        allowAdd: {
+            type: Boolean,
+            default: false
+        }
+    },
+    
+    methods: {
+        setActiveTab(index) {
+            this.activeTab = index;
+            this.$emit('tab-change', index);
+        },
+        
+        closeTab(index) {
+            this.tabs.splice(index, 1);
+            this.content.splice(index, 1);
+            if (this.activeTab >= this.tabs.length) {
+                this.activeTab = this.tabs.length - 1;
+            }
+            this.$emit('tab-close', index);
+        },
+        
+        addTab() {
+            this.$emit('tab-add');
+        }
+    }
+}
+</script> 

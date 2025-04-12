@@ -1,0 +1,367 @@
+"""
+量子语义注意力机制 (Quantum Semantic Attention)
+包含多头注意力和自注意力机制实现
+"""
+
+import numpy as np
+import cirq
+from typing import List, Dict, Tuple, Any, Optional
+import logging
+import os
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    filename='quantum_attention.log'
+)
+logger = logging.getLogger(__name__)
+
+class QuantumSemanticAttention:
+    """量子语义注意力基类"""
+    
+    def __init__(self, qubits_per_key: int = 4, qubits_per_value: int = 4, num_heads: int = 2):
+        self.qubits_per_key = qubits_per_key
+        self.qubits_per_value = qubits_per_value
+        self.num_heads = num_heads
+        
+        # 初始化量子比特
+        self.key_qubits = [[cirq.GridQubit(h, i) for i in range(qubits_per_key)] for h in range(num_heads)]
+        self.value_qubits = [[cirq.GridQubit(h + num_heads, i) for i in range(qubits_per_value)] for h in range(num_heads)]
+        self.query_qubits = [[cirq.GridQubit(h + 2*num_heads, i) for i in range(qubits_per_key)] for h in range(num_heads)]
+        self.output_qubits = [cirq.GridQubit(3*num_heads, i) for i in range(qubits_per_value)]
+        
+        # 初始化模拟器
+        self.simulator = cirq.Simulator()
+        
+    def _build_attention_circuit(self, 
+                                key: np.ndarray, 
+                                value: np.ndarray, 
+                                query: np.ndarray) -> cirq.Circuit:
+        """构建注意力电路"""
+        circuit = cirq.Circuit()
+        
+        # 编码key
+        for h in range(self.num_heads):
+            for i, k_val in enumerate(key):
+                if i < self.qubits_per_key:
+                    # 归一化到[-1, 1]范围
+                    norm_value = max(min(k_val, 1.0), -1.0)
+                    circuit.append(cirq.Ry(np.pi * norm_value)(self.key_qubits[h][i]))
+        
+        # 编码value
+        for h in range(self.num_heads):
+            for i, v_val in enumerate(value):
+                if i < self.qubits_per_value:
+                    norm_value = max(min(v_val, 1.0), -1.0)
+                    circuit.append(cirq.Ry(np.pi * norm_value)(self.value_qubits[h][i]))
+        
+        # 编码query
+        for h in range(self.num_heads):
+            for i, q_val in enumerate(query):
+                if i < self.qubits_per_key:
+                    norm_value = max(min(q_val, 1.0), -1.0)
+                    circuit.append(cirq.Ry(np.pi * norm_value)(self.query_qubits[h][i]))
+        
+        # 创建key和query之间的交互
+        for h in range(self.num_heads):
+            for i in range(self.qubits_per_key):
+                # 在key和query比特之间创建纠缠
+                circuit.append(cirq.CNOT(self.key_qubits[h][i], self.query_qubits[h][i]))
+                circuit.append(cirq.Ry(np.pi/4)(self.query_qubits[h][i]))
+        
+        # 基于注意力权重传递value信息到输出
+        for h in range(self.num_heads):
+            for i in range(min(self.qubits_per_value, self.qubits_per_key)):
+                # 使用query作为控制比特，条件地作用于value到输出
+                circuit.append(cirq.CNOT(self.query_qubits[h][i], self.value_qubits[h][i]))
+                
+        # 合并各个头的输出
+        for i in range(self.qubits_per_value):
+            for h in range(self.num_heads):
+                if i < len(self.value_qubits[h]):
+                    circuit.append(cirq.CNOT(self.value_qubits[h][i], self.output_qubits[i]))
+                    
+        return circuit
+        
+    def _compute_attention_scores(self, circuit: cirq.Circuit) -> np.ndarray:
+        """计算注意力分数"""
+        # 创建测量电路
+        measure_circuit = cirq.Circuit()
+        for i, qubit in enumerate(self.output_qubits):
+            measure_circuit.append(cirq.measure(qubit, key=f'out{i}'))
+            
+        # 运行多次测量
+        repetitions = 1000
+        results = self.simulator.run(measure_circuit, repetitions=repetitions)
+        
+        # 从测量结果中提取输出向量
+        output_vector = np.zeros(self.qubits_per_value)
+        for i in range(self.qubits_per_value):
+            # 计算测量到1的概率
+            count_ones = sum(results.measurements[f'out{i}'][:, 0])
+            output_vector[i] = count_ones / repetitions * 2 - 1  # 映射到[-1, 1]
+            
+        return output_vector
+        
+    def apply_attention(self, 
+                        key: np.ndarray, 
+                        value: np.ndarray, 
+                        query: np.ndarray) -> np.ndarray:
+        """应用注意力机制"""
+        # 构建电路
+        circuit = self._build_attention_circuit(key, value, query)
+        
+        # 模拟执行电路
+        self.simulator.simulate(circuit)
+        
+        # 计算注意力分数
+        return self._compute_attention_scores(circuit)
+        
+class QuantumSelfAttention(QuantumSemanticAttention):
+    """量子自注意力机制"""
+    
+    def process_sequence(self, sequence: List[np.ndarray]) -> List[np.ndarray]:
+        """处理序列数据，应用自注意力"""
+        output_sequence = []
+        
+        for i, current_vector in enumerate(sequence):
+            # 在自注意力中，当前向量作为query
+            query = current_vector
+            
+            # 计算当前向量与序列中其他向量的注意力
+            attended_vector = np.zeros_like(current_vector)
+            
+            for j, context_vector in enumerate(sequence):
+                # 使用序列中的其他向量作为key和value
+                key = context_vector
+                value = context_vector
+                
+                # 应用注意力
+                attention_output = self.apply_attention(key, value, query)
+                
+                # 加权累加
+                weight = 1.0 / (abs(i - j) + 1)  # 简单的位置加权
+                attended_vector += weight * attention_output
+                
+            # 归一化
+            norm = np.linalg.norm(attended_vector)
+            if norm > 0:
+                attended_vector = attended_vector / norm
+                
+            output_sequence.append(attended_vector)
+            
+        return output_sequence
+
+class QuantumCrossAttention(QuantumSemanticAttention):
+    """量子交叉注意力机制"""
+    
+    def process_sequences(self, 
+                         source_sequence: List[np.ndarray], 
+                         target_sequence: List[np.ndarray]) -> List[np.ndarray]:
+        """处理两个序列之间的交叉注意力"""
+        output_sequence = []
+        
+        for target_vector in target_sequence:
+            # 目标向量作为query
+            query = target_vector
+            
+            # 计算目标向量与源序列中所有向量的注意力
+            attended_vector = np.zeros_like(target_vector)
+            
+            for source_vector in source_sequence:
+                # 源向量作为key和value
+                key = source_vector
+                value = source_vector
+                
+                # 应用注意力
+                attention_output = self.apply_attention(key, value, query)
+                
+                # 累加
+                attended_vector += attention_output
+                
+            # 归一化
+            norm = np.linalg.norm(attended_vector)
+            if norm > 0:
+                attended_vector = attended_vector / norm
+                
+            output_sequence.append(attended_vector)
+            
+        return output_sequence
+
+class QuantumMultiModalAttention(QuantumSemanticAttention):
+    """量子多模态注意力机制"""
+    
+    def __init__(self, qubits_per_key: int = 4, qubits_per_value: int = 4, num_heads: int = 2,
+                 modality_dims: Dict[str, int] = None):
+        super().__init__(qubits_per_key, qubits_per_value, num_heads)
+        
+        # 各个模态的维度
+        self.modality_dims = modality_dims or {
+            'text': qubits_per_key,
+            'image': qubits_per_key,
+            'audio': qubits_per_key
+        }
+        
+        # 为每个模态创建投影矩阵 (简化版)
+        self.projections = {}
+        for modality, dim in self.modality_dims.items():
+            # 简单随机初始化投影矩阵
+            self.projections[modality] = np.random.normal(0, 0.1, (dim, qubits_per_key))
+            
+    def project_modality(self, vector: np.ndarray, modality: str) -> np.ndarray:
+        """将特定模态的向量投影到统一空间"""
+        if modality not in self.projections:
+            raise ValueError(f"未知模态: {modality}")
+            
+        if len(vector) != self.modality_dims[modality]:
+            raise ValueError(f"向量维度 {len(vector)} 与模态 {modality} 所需维度 {self.modality_dims[modality]} 不匹配")
+            
+        # 应用投影
+        projected = np.dot(vector, self.projections[modality])
+        
+        # 归一化
+        norm = np.linalg.norm(projected)
+        if norm > 0:
+            projected = projected / norm
+            
+        return projected
+            
+    def process_multi_modal(self, 
+                           modal_data: Dict[str, np.ndarray],
+                           query_modality: str) -> np.ndarray:
+        """处理多模态数据"""
+        if query_modality not in modal_data:
+            raise ValueError(f"查询模态 {query_modality} 不在提供的模态数据中")
+            
+        # 将查询模态投影作为query
+        query = self.project_modality(modal_data[query_modality], query_modality)
+        
+        # 融合注意力输出
+        fused_vector = np.zeros(self.qubits_per_value)
+        
+        for modality, vector in modal_data.items():
+            if modality == query_modality:
+                continue
+                
+            # 投影其他模态数据
+            projected = self.project_modality(vector, modality)
+            
+            # 应用交叉注意力
+            key = projected
+            value = projected
+            
+            attention_output = self.apply_attention(key, value, query)
+            
+            # 累加
+            fused_vector += attention_output
+            
+        # 归一化
+        norm = np.linalg.norm(fused_vector)
+        if norm > 0:
+            fused_vector = fused_vector / norm
+            
+        return fused_vector
+
+class QuantumHierarchicalAttention(QuantumSemanticAttention):
+    """量子层次注意力机制"""
+    
+    def process_document(self, 
+                        document: List[List[np.ndarray]],  # [句子[词向量]]
+                        level: str = 'sentence') -> List[np.ndarray]:
+        """处理文档的层次注意力
+        
+        Args:
+            document: 文档表示为句子列表，每个句子是词向量列表
+            level: 处理的层次，'sentence'或'document'
+            
+        Returns:
+            处理后的向量列表
+        """
+        if level == 'sentence':
+            # 处理每个句子内部的词级别注意力
+            sentence_vectors = []
+            
+            for sentence in document:
+                # 使用自注意力处理句子中的词
+                self_attention = QuantumSelfAttention(
+                    self.qubits_per_key, 
+                    self.qubits_per_value, 
+                    self.num_heads
+                )
+                attended_words = self_attention.process_sequence(sentence)
+                
+                # 句子表示为词向量的平均
+                sentence_vector = np.mean(attended_words, axis=0)
+                sentence_vectors.append(sentence_vector)
+                
+            return sentence_vectors
+            
+        elif level == 'document':
+            # 先生成句子向量
+            sentence_vectors = self.process_document(document, level='sentence')
+            
+            # 在句子级别应用自注意力
+            self_attention = QuantumSelfAttention(
+                self.qubits_per_key, 
+                self.qubits_per_value, 
+                self.num_heads
+            )
+            attended_sentences = self_attention.process_sequence(sentence_vectors)
+            
+            # 文档向量为加权句子向量
+            return attended_sentences
+            
+        else:
+            raise ValueError(f"未知处理层次: {level}")
+
+# 测试代码
+if __name__ == "__main__":
+    # 测试自注意力
+    self_attention = QuantumSelfAttention(qubits_per_key=3, qubits_per_value=3, num_heads=2)
+    sequence = [np.array([0.1, 0.2, 0.3]), np.array([0.4, 0.5, 0.6]), np.array([0.7, 0.8, 0.9])]
+    self_attention_result = self_attention.process_sequence(sequence)
+    print("自注意力结果:", self_attention_result)
+    
+    # 测试交叉注意力
+    cross_attention = QuantumCrossAttention(qubits_per_key=3, qubits_per_value=3, num_heads=2)
+    source_sequence = [np.array([0.1, 0.2, 0.3]), np.array([0.4, 0.5, 0.6])]
+    target_sequence = [np.array([0.7, 0.8, 0.9]), np.array([0.3, 0.2, 0.1])]
+    cross_attention_result = cross_attention.process_sequences(source_sequence, target_sequence)
+    print("交叉注意力结果:", cross_attention_result)
+    
+    # 测试多模态注意力
+    multi_modal_attention = QuantumMultiModalAttention(
+        qubits_per_key=3, 
+        qubits_per_value=3, 
+        num_heads=2,
+        modality_dims={'text': 3, 'image': 3, 'audio': 3}
+    )
+    modal_data = {
+        'text': np.array([0.1, 0.2, 0.3]),
+        'image': np.array([0.4, 0.5, 0.6]),
+        'audio': np.array([0.7, 0.8, 0.9])
+    }
+    multi_modal_result = multi_modal_attention.process_multi_modal(modal_data, 'text')
+    print("多模态注意力结果:", multi_modal_result)
+    
+    # 测试层次注意力
+    hierarchical_attention = QuantumHierarchicalAttention(qubits_per_key=3, qubits_per_value=3, num_heads=2)
+    document = [
+        [np.array([0.1, 0.2, 0.3]), np.array([0.4, 0.5, 0.6])],  # 第一个句子的词向量
+        [np.array([0.7, 0.8, 0.9]), np.array([0.3, 0.2, 0.1])]   # 第二个句子的词向量
+    ]
+    sentence_vectors = hierarchical_attention.process_document(document, level='sentence')
+    document_vectors = hierarchical_attention.process_document(document, level='document')
+    print("句子向量:", sentence_vectors)
+    print("文档向量:", document_vectors) 
+
+"""
+"""
+量子基因编码: QE-ATT-AFDA3D0FE36E
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+""""""
+
+// 开发团队：中华 ZhoHo ，Claude 

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}量子系统{% endblock %}</title>
+    
+    <!-- 全局样式 -->
+    <link href="/world/static/css/normalize.css" rel="stylesheet">
+    <link href="/world/static/css/quantum-theme.css" rel="stylesheet">
+    <link href="/world/static/css/global.css" rel="stylesheet">
+    <link href="/world/static/css/components/navigation.css" rel="stylesheet">
+    
+    <!-- 模型特定样式 -->
+    {% block model_css %}{% endblock %}
+    
+    <!-- 全局脚本 -->
+    <script src="/world/static/js/quantum_loader.js" defer></script>
+    <script src="/world/static/js/world.js" defer></script>
+    <script src="/world/static/js/multimodal/weq_multimodal_interactions.js" defer></script>
+    
+    <!-- 额外头部内容 -->
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <!-- 全局导航栏 -->
+    {% include "world/templates/components/header.html" %}
+    
+    <!-- 模型特定导航 -->
+    {% block model_nav %}{% endblock %}
+    
+    <!-- 主内容区域 -->
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- 全局页脚 -->
+    {% include "world/templates/components/footer.html" %}
+    
+    <!-- 量子纠缠脚本 -->
+    <script src="/world/static/js/quantum_entanglement.js" defer></script>
+    
+    <!-- 模型特定脚本 -->
+    {% block model_js %}{% endblock %}
+    
+    <!-- 额外脚本 -->
+    {% block scripts_extra %}{% endblock %}
+</body>
+</html> 
+
+<!--
+<!--
+量子基因编码: QE-BAS-120C9A78976F
+纠缠状态: 活跃
+纠缠对象: ['WeQ/weq_core.py']
+纠缠强度: 0.98
+-->-->
+
+// 开发团队：中华 ZhoHo ，Claude 

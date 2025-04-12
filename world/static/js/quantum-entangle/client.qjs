@@ -1,0 +1,284 @@
+/**
+ * 量子纠缠通信客户端
+ * @version 1.0.0
+ */
+
+class QuantumEntangleClient {
+    constructor() {
+        // 获取全局量子纠缠实例
+        this.quantum = window.quantumEntangle;
+        
+        // 初始化DOM观察器
+        this.initObserver();
+        
+        // 初始化事件监听
+        this.initEventListeners();
+        
+        // 订阅消息
+        this.subscribeToMessages();
+    }
+    
+    /**
+     * 初始化DOM观察器
+     * @private
+     */
+    initObserver() {
+        this.observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList') {
+                    this.handleDOMChanges(mutation.addedNodes);
+                }
+                if (mutation.type === 'attributes' && mutation.attributeName === 'data-quantum-entangle') {
+                    this.handleAttributeChange(mutation.target);
+                }
+            });
+        });
+        
+        this.observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-quantum-entangle']
+        });
+    }
+    
+    /**
+     * 初始化事件监听
+     * @private
+     */
+    initEventListeners() {
+        // 监听表单提交
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (form.hasAttribute('data-quantum-entangle')) {
+                event.preventDefault();
+                this.handleFormSubmit(form);
+            }
+        });
+        
+        // 监听点击事件
+        document.addEventListener('click', (event) => {
+            const target = event.target.closest('[data-quantum-entangle]');
+            if (target) {
+                this.handleClick(target, event);
+            }
+        });
+        
+        // 监听输入事件
+        document.addEventListener('input', (event) => {
+            const target = event.target;
+            if (target.hasAttribute('data-quantum-entangle')) {
+                this.handleInput(target);
+            }
+        });
+    }
+    
+    /**
+     * 订阅消息
+     * @private
+     */
+    subscribeToMessages() {
+        // 订阅状态更新
+        this.quantum.subscribe('state_update', (data) => {
+            this.updateState(data);
+        });
+        
+        // 订阅DOM更新
+        this.quantum.subscribe('dom_update', (data) => {
+            this.updateDOM(data);
+        });
+        
+        // 订阅样式更新
+        this.quantum.subscribe('style_update', (data) => {
+            this.updateStyle(data);
+        });
+    }
+    
+    /**
+     * 处理DOM变化
+     * @private
+     * @param {NodeList} nodes 新增节点
+     */
+    handleDOMChanges(nodes) {
+        nodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.hasAttribute('data-quantum-entangle')) {
+                    this.initElement(node);
+                }
+                node.querySelectorAll('[data-quantum-entangle]').forEach(el => {
+                    this.initElement(el);
+                });
+            }
+        });
+    }
+    
+    /**
+     * 处理属性变化
+     * @private
+     * @param {Element} element 目标元素
+     */
+    handleAttributeChange(element) {
+        const value = element.getAttribute('data-quantum-entangle');
+        if (value) {
+            this.initElement(element);
+        }
+    }
+    
+    /**
+     * 初始化量子纠缠元素
+     * @private
+     * @param {Element} element 目标元素
+     */
+    initElement(element) {
+        const config = this.parseConfig(element);
+        
+        // 添加到纠缠对象列表
+        this.quantum.addObject(config.id);
+        
+        // 设置初始状态
+        if (config.state) {
+            this.quantum.send('state_update', {
+                id: config.id,
+                state: config.state
+            });
+        }
+        
+        // 添加动画效果
+        element.classList.add('q-entangled');
+    }
+    
+    /**
+     * 解析元素配置
+     * @private
+     * @param {Element} element 目标元素
+     * @returns {Object} 配置对象
+     */
+    parseConfig(element) {
+        const value = element.getAttribute('data-quantum-entangle');
+        try {
+            return value === 'true' ? { id: element.id } : JSON.parse(value);
+        } catch (error) {
+            return { id: element.id };
+        }
+    }
+    
+    /**
+     * 处理表单提交
+     * @private
+     * @param {HTMLFormElement} form 表单元素
+     */
+    handleFormSubmit(form) {
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        this.quantum.send('form_submit', {
+            id: form.id,
+            data: data
+        });
+    }
+    
+    /**
+     * 处理点击事件
+     * @private
+     * @param {Element} element 目标元素
+     * @param {Event} event 事件对象
+     */
+    handleClick(element, event) {
+        const config = this.parseConfig(element);
+        
+        this.quantum.send('click', {
+            id: config.id,
+            x: event.clientX,
+            y: event.clientY,
+            timestamp: Date.now()
+        });
+    }
+    
+    /**
+     * 处理输入事件
+     * @private
+     * @param {Element} element 目标元素
+     */
+    handleInput(element) {
+        const config = this.parseConfig(element);
+        
+        this.quantum.send('input', {
+            id: config.id,
+            value: element.value,
+            timestamp: Date.now()
+        });
+    }
+    
+    /**
+     * 更新状态
+     * @private
+     * @param {Object} data 状态数据
+     */
+    updateState(data) {
+        const element = document.getElementById(data.id);
+        if (element) {
+            Object.entries(data.state).forEach(([key, value]) => {
+                if (key === 'value') {
+                    element.value = value;
+                } else if (key === 'checked') {
+                    element.checked = value;
+                } else if (key === 'disabled') {
+                    element.disabled = value;
+                } else {
+                    element.dataset[key] = value;
+                }
+            });
+        }
+    }
+    
+    /**
+     * 更新DOM
+     * @private
+     * @param {Object} data DOM更新数据
+     */
+    updateDOM(data) {
+        const element = document.getElementById(data.id);
+        if (element) {
+            if (data.html) {
+                element.innerHTML = data.html;
+            }
+            if (data.text) {
+                element.textContent = data.text;
+            }
+            if (data.attributes) {
+                Object.entries(data.attributes).forEach(([key, value]) => {
+                    element.setAttribute(key, value);
+                });
+            }
+        }
+    }
+    
+    /**
+     * 更新样式
+     * @private
+     * @param {Object} data 样式数据
+     */
+    updateStyle(data) {
+        const element = document.getElementById(data.id);
+        if (element) {
+            if (data.styles) {
+                Object.entries(data.styles).forEach(([key, value]) => {
+                    element.style[key] = value;
+                });
+            }
+            if (data.classes) {
+                if (data.classes.add) {
+                    element.classList.add(...data.classes.add);
+                }
+                if (data.classes.remove) {
+                    element.classList.remove(...data.classes.remove);
+                }
+            }
+        }
+    }
+}
+
+// 创建客户端实例
+window.addEventListener('DOMContentLoaded', () => {
+    window.quantumEntangleClient = new QuantumEntangleClient();
+}); 

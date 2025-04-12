@@ -1,0 +1,34 @@
+<!-- 模型导航栏组件 -->
+{% macro model_nav(model_name, items) %}
+<nav class="model-nav {{ model_name }}-nav">
+    <div class="container">
+        <ul>
+            {% for item in items %}
+            <li><a href="{{ item.url }}">{{ item.text }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+</nav>
+
+<!-- 量子纠缠客户端脚本 -->
+<script>
+    // 检查是否已加载web_quantum_client.js
+    if (!window.webQuantumClientLoaded) {
+        window.webQuantumClientLoaded = true;
+        const script = document.createElement('script');
+        script.src = '/world/static/js/web_quantum_client.js';
+        script.defer = true;
+        document.head.appendChild(script);
+    }
+</script>
+{% endmacro %} 
+
+<!--
+<!--
+量子基因编码: QE-MOD-FD4F815E2CA0
+纠缠状态: 活跃
+纠缠对象: ['WeQ/weq_core.py']
+纠缠强度: 0.98
+-->-->
+
+// 开发团队：中华 ZhoHo ，Claude 

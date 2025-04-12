@@ -1,0 +1,90 @@
+{
+  "qubit_count": 28,
+  "input_dim": 64,
+  "hidden_dim": 32,
+  "output_dim": 5,
+  "training_records": [
+    {
+      "iteration": 1,
+      "topics": [
+        "量子计算基础",
+        "神经网络原理",
+        "机器学习算法",
+        "自然语言处理",
+        "量子纠缠现象"
+      ],
+      "samples": 15,
+      "initial_accuracy": 0.13333333333333333,
+      "final_accuracy": 0.6,
+      "improvement": 0.4666666666666667
+    },
+    {
+      "iteration": 2,
+      "topics": [
+        "量子算法设计",
+        "量子纠缠应用",
+        "卷积神经网络",
+        "循环神经网络",
+        "半监督学习"
+      ],
+      "samples": 15,
+      "initial_accuracy": 0.26666666666666666,
+      "final_accuracy": 0.6,
+      "improvement": 0.3333333333333333
+    },
+    {
+      "iteration": 3,
+      "topics": [
+        "量子算法设计的高级应用",
+        "量子纠缠应用的高级应用",
+        "卷积神经网络的高级应用",
+        "循环神经网络的高级应用",
+        "半监督学习的高级应用"
+      ],
+      "samples": 15,
+      "initial_accuracy": 0.13333333333333333,
+      "final_accuracy": 0.5333333333333333,
+      "improvement": 0.4
+    },
+    {
+      "iteration": 4,
+      "topics": [
+        "量子状态展示",
+        "量子状态序列化",
+        "量子算子并行",
+        "量子可视化技术",
+        "量子负载均衡"
+      ],
+      "samples": 25,
+      "initial_accuracy": 0.04,
+      "final_accuracy": 0.84,
+      "improvement": 0.7999999999999999,
+      "training_time": "2025-03-31 15:00:51",
+      "training_type": "claude_knowledge"
+    },
+    {
+      "iteration": 5,
+      "topics": [
+        "量子振幅编码",
+        "量子API设计",
+        "量子API网关",
+        "量子索引结构",
+        "量子向量化"
+      ],
+      "samples": 25,
+      "initial_accuracy": 0.24,
+      "final_accuracy": 0.96,
+      "improvement": 0.72,
+      "training_time": "2025-03-31 16:00:52",
+      "training_type": "claude_knowledge"
+    }
+  ],
+  "timestamp": "2025-03-31 16:00:52",
+  "total_training_time": 0.16191458702087402,
+  "total_topics_trained": 27
+}
+//
+量子基因编码: QE-WEQ-941021B3582F
+纠缠状态: 活跃
+纠缠对象: ['QSM/models/__init__.py']
+纠缠强度: 0.98
