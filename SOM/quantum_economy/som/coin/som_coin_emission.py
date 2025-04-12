@@ -20,7 +20,11 @@ import numpy as np
 getcontext().prec = 28
 
 # 导入松麦币核心
+<<<<<<< HEAD
 from quantum_economy.SOM.coin.SOM_coin import SomCoin
+=======
+from quantum_economy.som.coin.som_coin import SomCoin
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 # 配置日志
 logging.basicConfig(

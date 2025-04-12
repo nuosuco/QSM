@@ -32,8 +32,13 @@ except ImportError:
 
 # 尝试导入现有的松麦币和钱包系统
 try:
+<<<<<<< HEAD
     from quantum_economy.SOM.blockchain.SOM_chain import SomEconomyChain
     from quantum_economy.SOM.wallet.wallet_core import SomWallet
+=======
+    from quantum_economy.som.blockchain.som_chain import SomEconomyChain
+    from quantum_economy.som.wallet.wallet_core import SomWallet
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     _existing_implementation = True
     
     logging.info("使用现有松麦币和钱包系统")

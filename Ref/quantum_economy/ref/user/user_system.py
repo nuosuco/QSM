@@ -16,7 +16,11 @@ import base64
 from typing import List, Dict, Any, Optional, Tuple
 
 # 导入松麦钱包核心
+<<<<<<< HEAD
 from quantum_economy.Ref.wallet.wallet_core import SomWallet
+=======
+from quantum_economy.ref.wallet.wallet_core import SomWallet
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 # 配置日志
 logging.basicConfig(

@@ -7,8 +7,13 @@
 import os
 import logging
 from flask import Flask, jsonify, render_template, send_from_directory, send_file, redirect, url_for
+<<<<<<< HEAD
 from quantum_economy.QSM.marketplace.api import marketplace_api
 from quantum_economy.QSM.marketplace.marketplace_core import SomMarketplace
+=======
+from quantum_economy.qsm.marketplace.api import marketplace_api
+from quantum_economy.qsm.marketplace.marketplace_core import SomMarketplace
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 # 配置日志
 logging.basicConfig(

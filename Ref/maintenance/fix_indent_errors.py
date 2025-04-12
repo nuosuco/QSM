@@ -458,5 +458,9 @@ def main():
         logger.info(f"修复完成: 已修复 {fixed_count}/{total_count} 个文件")
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     main()
 
+=======
+    main() 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

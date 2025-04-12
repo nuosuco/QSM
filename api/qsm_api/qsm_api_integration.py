@@ -116,7 +116,11 @@ def integrate_som_to_qsm(app):
    
 2. 在QSM API主应用中导入并调用此集成函数：
    
+<<<<<<< HEAD
    from QSM_api_integration import integrate_SOM_to_QSM
+=======
+   from qsm_api_integration import integrate_som_to_qsm
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
    
    # 假设app是QSM的Flask应用实例
    app = integrate_som_to_qsm(app)

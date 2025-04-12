@@ -120,7 +120,11 @@ def weq_output_function():
     
     try:
         # 导入WeQ输出监控系统
+<<<<<<< HEAD
         from Ref.utils.monitor_WeQ_output import WeQOutputMonitor
+=======
+        from Ref.utils.monitor_weq_output import WeQOutputMonitor
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         
         # 创建一个新的WeQ监控器实例，避免使用全局实例
         from Ref.utils.quantum_gene_marker import get_gene_marker

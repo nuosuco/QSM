@@ -750,5 +750,9 @@ if __name__ == "__main__":
         print("使用方法:")
         print("  python quantum_gene_marker.py mark <file_path>")
         print("  python quantum_gene_marker.py update <file_path> [--state <state>] [--objects obj1,obj2] [--strength <value>]")
+<<<<<<< HEAD
         print("  python quantum_gene_marker.py scan <directory> [--no-recursive] [--patterns *.py,*.js]")
 
+=======
+        print("  python quantum_gene_marker.py scan <directory> [--no-recursive] [--patterns *.py,*.js]") 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

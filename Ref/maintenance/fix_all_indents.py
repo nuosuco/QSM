@@ -180,5 +180,9 @@ if __name__ == "__main__":
             else:
                 print_warning(f"目录不存在: {directory}")
         
+<<<<<<< HEAD
         print_info("修复完成")
 
+=======
+        print_info("修复完成") 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

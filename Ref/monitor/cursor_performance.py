@@ -155,7 +155,11 @@ class CursorOptimizer:
         print("1. 重启Cursor编辑器")
         print("2. 启动时使用命令行参数: cursor.exe --max-old-space-size=8192 --js-flags=\"--expose-gc\"")
         print("3. 在编辑器中避免同时打开过多大型文件")
+<<<<<<< HEAD
         print("/n如需恢复默认设置，请删除.vscode/settings.json和.cursorignore文件")
+=======
+        print("\n如需恢复默认设置，请删除.vscode/settings.json和.cursorignore文件")
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         
     def create_vscode_settings(self):
         """创建VSCode/Cursor优化设置"""
@@ -192,7 +196,11 @@ class CursorOptimizer:
         # 添加目录
         ignore_content += "# 数据目录\n"
         for dir_name in CONFIG["exclude_dirs"]:
+<<<<<<< HEAD
             ignore_content += f"{dir_name}//n"
+=======
+            ignore_content += f"{dir_name}/\n"
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         
         # 添加文件
         ignore_content += "\n# 生成的文件\n"
@@ -307,7 +315,11 @@ if __name__ == "__main__":
     
     # 如果是Windows，也创建快捷方式
     if platform.system().lower() == "windows":
+<<<<<<< HEAD
         answer = input("/n是否创建优化的Cursor快捷方式？(y/n): ")
+=======
+        answer = input("\n是否创建优化的Cursor快捷方式？(y/n): ")
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         if answer.lower() == "y":
             optimizer.create_cursor_shortcut()
 
@@ -321,5 +333,9 @@ if __name__ == "__main__":
 """
 """
 
+<<<<<<< HEAD
 // 开发团队：中华 ZhoHo ，Claude
 
+=======
+// 开发团队：中华 ZhoHo ，Claude 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

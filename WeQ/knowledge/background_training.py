@@ -50,7 +50,11 @@ except ImportError as e:
 
 # 尝试导入量子叠加态模型知识库
 try:
+<<<<<<< HEAD
     from quantum_core.quantum_blockchain.QSM_knowledge import get_QSM_knowledge
+=======
+    from quantum_core.quantum_blockchain.qsm_knowledge import get_qsm_knowledge
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     _has_qsm_knowledge = True
     logger.info("成功导入量子叠加态模型知识库")
 except ImportError as e:

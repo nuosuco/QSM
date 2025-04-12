@@ -9,7 +9,11 @@
 - qsm_ecommerce: 松麦电商平台实现
 """
 
+<<<<<<< HEAD
 from quantum_economy.QSM.QSM_economy import (
+=======
+from quantum_economy.qsm.qsm_economy import (
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     SomEconomyModel,
     CycleController,
     ValueDistributor,
@@ -17,7 +21,11 @@ from quantum_economy.QSM.QSM_economy import (
     MarketRegulator
 )
 
+<<<<<<< HEAD
 from quantum_economy.QSM.QSM_ecommerce import SomEcommerce
+=======
+from quantum_economy.qsm.qsm_ecommerce import SomEcommerce
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 __all__ = [
     'SomEconomyModel',

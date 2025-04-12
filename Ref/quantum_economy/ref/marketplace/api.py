@@ -11,7 +11,11 @@ from functools import wraps
 from enum import Enum
 
 # 导入松麦生态商城核心
+<<<<<<< HEAD
 from quantum_economy.Ref.marketplace.marketplace_core import SomMarketplace, ProductCategory, AllianceConnector
+=======
+from quantum_economy.ref.marketplace.marketplace_core import SomMarketplace, ProductCategory, AllianceConnector
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 # 配置日志
 logging.basicConfig(

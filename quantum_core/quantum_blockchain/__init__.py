@@ -12,14 +12,22 @@ from quantum_core.quantum_blockchain.quantum_blockchain_core import (
     EntanglementChannel
 )
 
+<<<<<<< HEAD
 from quantum_core.quantum_blockchain.QSM_main_chain import (
+=======
+from quantum_core.quantum_blockchain.qsm_main_chain import (
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     QsmMainChain,
     get_main_chain
 )
 
 # 导入量子叠加态模型知识库
 try:
+<<<<<<< HEAD
     from quantum_core.quantum_blockchain.QSM_knowledge import (
+=======
+    from quantum_core.quantum_blockchain.qsm_knowledge import (
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         QsmKnowledge,
         get_qsm_knowledge
     )

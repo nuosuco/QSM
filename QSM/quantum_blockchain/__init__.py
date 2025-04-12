@@ -8,7 +8,11 @@ from quantum_core.quantum_blockchain.quantum_blockchain_core import (
     SubQuantumBlockchain,
     QuantumBlock
 )
+<<<<<<< HEAD
 from quantum_core.quantum_blockchain.QSM_main_chain import (
+=======
+from quantum_core.quantum_blockchain.qsm_main_chain import (
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     QsmMainChain, 
     MainChainTransactionTypes, 
     get_qsm_main_chain

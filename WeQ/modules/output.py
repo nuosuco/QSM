@@ -431,9 +431,15 @@ class WeQOutput:
             "  file: \"qentl_operations.log\"",
             "}",
             "paths: {",
+<<<<<<< HEAD
             "  networks: \"./networks/",",
             "  channels: \"./channels/",",
             "  templates: \"./templates/"",
+=======
+            "  networks: \"./networks\",",
+            "  channels: \"./channels\",",
+            "  templates: \"./templates\"",
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             "}"
         ]
         
