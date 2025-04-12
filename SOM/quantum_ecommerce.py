@@ -361,6 +361,7 @@ if __name__ == "__main__":
     recommendations = ecommerce.get_product_recommendations("Alice")
     print(f"商品推荐: {recommendations}")
     
+<<<<<<< HEAD
     print("量子电商系统测试完成！")
 
 """
@@ -371,3 +372,16 @@ if __name__ == "__main__":
 
 开发团队：中华 ZhoHo ，Claude
 """
+=======
+    print("量子电商系统测试完成！") 
+
+"""
+"""
+量子基因编码: QE-QUA-CA7E9FA6C76C
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+""""""
+
+// 开发团队：中华 ZhoHo ，Claude 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

@@ -9,7 +9,11 @@ import random
 from typing import List, Dict, Any, Optional
 
 # 导入松麦经济模型模块
+<<<<<<< HEAD
 from quantum_economy.WeQ.WeQ_economy import SomEconomyModel
+=======
+from quantum_economy.weq.weq_economy import SomEconomyModel
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 # 配置日志
 logging.basicConfig(

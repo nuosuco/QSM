@@ -1,5 +1,9 @@
 import hashlib
+<<<<<<< HEAD
 from QSM_core import QuantumGeneValidator
+=======
+from qsm_core import QuantumGeneValidator
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 from typing import List, Dict
 
 class QuantumAppCompatibility:

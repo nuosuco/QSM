@@ -12,6 +12,7 @@ import logging
 from typing import Dict, Any
 
 # 配置日志
+<<<<<<< HEAD
 def setup_logging(verbose=False):
     level = logging.DEBUG if verbose else logging.INFO
     
@@ -32,6 +33,22 @@ def setup_logging(verbose=False):
 
 # 全局日志对象将在parse_args后初始化
 logger = None
+=======
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('QSM/logs/main.log', mode='a'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger('QSM')
+
+# 创建必要的目录
+os.makedirs('QSM/logs', exist_ok=True)
+
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 def init_subsystems(config: Dict[str, Any] = None):
     """
@@ -45,20 +62,29 @@ def init_subsystems(config: Dict[str, Any] = None):
     # 初始化Ref文件完整性监控系统
     try:
         # 导入Ref启动钩子
+<<<<<<< HEAD
         logger.debug("尝试导入Ref文件监控系统...")
         from Ref.auto_monitor.startup_hook import install_startup_hook
         
         # 安装启动钩子，启动文件监控服务
         logger.debug("尝试安装Ref启动钩子...")
+=======
+        from Ref.auto_monitor.startup_hook import install_startup_hook
+        
+        # 安装启动钩子，启动文件监控服务
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         install_startup_hook()
         logger.info("Ref文件监控系统已初始化")
     except ImportError as e:
         logger.error(f"初始化Ref文件监控系统失败: {str(e)}")
+<<<<<<< HEAD
         logger.debug(f"导入路径: {sys.path}")
     except Exception as e:
         logger.error(f"启动Ref文件监控系统时发生错误: {str(e)}")
         import traceback
         logger.debug(traceback.format_exc())
+=======
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     
     # 初始化其他子系统
     # TODO: 初始化SOM、WeQ等子系统
@@ -83,6 +109,7 @@ def parse_args():
         help="禁用文件监控系统"
     )
     
+<<<<<<< HEAD
     parser.add_argument(
         "--port", "-p",
         dest="port",
@@ -112,6 +139,8 @@ def parse_args():
         help="启用详细日志输出"
     )
     
+=======
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     return parser.parse_args()
 
 
@@ -138,11 +167,17 @@ def load_config(config_file: str = None) -> Dict[str, Any]:
 
 def main():
     """主函数"""
+<<<<<<< HEAD
     global logger
+=======
+    print("欢迎使用QSM系统")
+    print("正在启动...")
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     
     # 解析命令行参数
     args = parse_args()
     
+<<<<<<< HEAD
     # 初始化日志
     logger = setup_logging(args.verbose)
     
@@ -156,6 +191,8 @@ def main():
     logger.debug(f"Python路径: {sys.executable}")
     logger.debug(f"导入路径: {sys.path}")
     
+=======
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     # 加载配置
     config = load_config(args.config_file)
     
@@ -186,10 +223,20 @@ if __name__ == "__main__":
     main() 
 
 """
+<<<<<<< HEAD
+=======
+"""
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 量子基因编码: QE-MAI-8CBE2EE010A8
 纠缠状态: 活跃
 纠缠对象: ['Ref/ref_core.py']
 纠缠强度: 0.98
+<<<<<<< HEAD
 """
 
 # 开发团队：中华 ZhoHo ，Claude 
+=======
+""""""
+
+// 开发团队：中华 ZhoHo ，Claude 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

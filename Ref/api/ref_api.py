@@ -13,6 +13,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any, List
 from flask_restx import Resource, fields, Namespace, Api  # 直接导入所有需要的类
+<<<<<<< HEAD
 from flask import request, jsonify, Flask  # 导入Flask的request对象
 
 # 配置日志记录器
@@ -25,6 +26,33 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("Ref-API")
+=======
+from flask import request  # 导入Flask的request对象
+
+# 配置日志记录器
+logger = logging.getLogger("Ref-API")
+if not logger.handlers:
+    # 避免重复配置
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # 添加控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # 添加文件处理器
+    try:
+        # 确保日志目录存在
+        os.makedirs("Ref/logs", exist_ok=True)
+        file_handler = logging.FileHandler("Ref/logs/ref_api.log")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except Exception as e:
+        print(f"配置日志处理器时出错: {str(e)}")
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 # 将Ref核心添加到路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,12 +60,18 @@ ref_root = os.path.abspath(os.path.join(current_dir, ".."))
 if ref_root not in sys.path:
     sys.path.append(ref_root)
 
+<<<<<<< HEAD
 # 获取项目根目录
 root_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 # 导入Ref核心
 try:
     from Ref.ref_core import get_Ref_core
+=======
+# 导入Ref核心
+try:
+    from Ref.ref_core import get_ref_core
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     from Ref.utils.quantum_gene_marker import get_gene_marker
     
     ref_core_available = True
@@ -45,7 +79,11 @@ except ImportError as e:
     logger.error(f"导入Ref核心模块时出错: {str(e)}")
     ref_core_available = False
 
+<<<<<<< HEAD
 def create_ref_namespace(api=None):
+=======
+def create_ref_namespace(api):
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     """创建Ref API命名空间
     
     Args:
@@ -56,10 +94,17 @@ def create_ref_namespace(api=None):
     """
     logger.info("创建Ref API命名空间")
     
+<<<<<<< HEAD
     # 如果未提供API实例，创建一个新的
     if api is None:
         app = Flask(__name__)
         api = Api(app)
+=======
+    # 确保api不是None
+    if api is None:
+        logger.error("无法创建Ref API命名空间：API实例为None")
+        return None
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     
     # 处理不同类型的API实例
     try:
@@ -194,15 +239,25 @@ def create_ref_namespace(api=None):
                         return {
                             "status": "success",
                             "message": f"模型 {model_id} 修复成功",
+<<<<<<< HEAD
+=======
+                            "model_info": ref_core.registered_models[model_id],
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                             "timestamp": datetime.now().isoformat()
                         }
                     else:
                         return {
                             "status": "error",
                             "error": f"模型 {model_id} 修复失败",
+<<<<<<< HEAD
                             "timestamp": datetime.now().isoformat()
                         }, 500
                     
+=======
+                            "model_info": ref_core.registered_models[model_id],
+                            "timestamp": datetime.now().isoformat()
+                        }, 500
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             except Exception as e:
                     logger.error(f"修复模型 {model_id} 时出错: {str(e)}")
                     return {"status": "error", "error": str(e)}, 500
@@ -216,6 +271,7 @@ def create_ref_namespace(api=None):
                 
                 try:
                     ref_core = get_ref_core()
+<<<<<<< HEAD
                     success = ref_core.optimize_system()
                     
                     if success:
@@ -231,6 +287,17 @@ def create_ref_namespace(api=None):
                             "timestamp": datetime.now().isoformat()
                         }, 500
                     
+=======
+                    
+                    results = ref_core.perform_system_upgrade()
+                    
+                    return {
+                        "status": "success",
+                        "message": "系统优化已完成",
+                        "results": results,
+                        "timestamp": datetime.now().isoformat()
+                    }
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                 except Exception as e:
                     logger.error(f"优化系统时出错: {str(e)}")
                     return {"status": "error", "error": str(e)}, 500
@@ -239,12 +306,17 @@ def create_ref_namespace(api=None):
         class RefAddMarker(Resource):
             @ref_ns.expect(add_marker_model)
             def post(self):
+<<<<<<< HEAD
                 """添加量子基因标记"""
+=======
+                """为文件添加量子基因标记"""
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                 if not ref_core_available:
                     return {"status": "unavailable", "error": "Ref核心模块不可用"}, 503
                 
                 try:
                     data = request.get_json()
+<<<<<<< HEAD
                     
                     # 验证必要参数
                     if 'file_path' not in data:
@@ -256,20 +328,43 @@ def create_ref_namespace(api=None):
                     
                     marker = get_gene_marker()
                     success = marker.add_marker(file_path, entangled_objects, strength)
+=======
+                    file_path = data.get('file_path')
+                    entangled_objects = data.get('entangled_objects')
+                    strength = data.get('strength')
+                    
+                    if not file_path:
+                        return {"status": "error", "error": "缺少必要参数: file_path"}, 400
+                    
+                    marker = get_gene_marker()
+                    success = marker.add_quantum_gene_marker(file_path, entangled_objects, strength)
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                     
                     if success:
                         return {
                             "status": "success",
+<<<<<<< HEAD
                             "message": f"量子基因标记添加成功: {file_path}",
+=======
+                            "message": f"已为文件 {file_path} 添加量子基因标记",
+                            "file_path": file_path,
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                             "timestamp": datetime.now().isoformat()
                         }
                     else:
                         return {
                             "status": "error",
+<<<<<<< HEAD
                             "error": f"量子基因标记添加失败: {file_path}",
                             "timestamp": datetime.now().isoformat()
                         }, 500
                     
+=======
+                            "error": f"为文件 {file_path} 添加量子基因标记失败",
+                            "file_path": file_path,
+                            "timestamp": datetime.now().isoformat()
+                        }, 500
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             except Exception as e:
                     logger.error(f"添加量子基因标记时出错: {str(e)}")
                     return {"status": "error", "error": str(e)}, 500
@@ -278,12 +373,17 @@ def create_ref_namespace(api=None):
         class RefUpdateMarker(Resource):
             @ref_ns.expect(update_marker_model)
             def post(self):
+<<<<<<< HEAD
                 """更新量子基因标记"""
+=======
+                """更新文件的量子基因标记"""
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                 if not ref_core_available:
                     return {"status": "unavailable", "error": "Ref核心模块不可用"}, 503
                 
                 try:
                     data = request.get_json()
+<<<<<<< HEAD
                     
                     # 验证必要参数
                     if 'file_path' not in data:
@@ -295,30 +395,57 @@ def create_ref_namespace(api=None):
                     
                     marker = get_gene_marker()
                     success = marker.update_marker(file_path, entangled_objects, strength)
+=======
+                    file_path = data.get('file_path')
+                    entangled_objects = data.get('entangled_objects')
+                    strength = data.get('strength')
+                    
+                    if not file_path:
+                        return {"status": "error", "error": "缺少必要参数: file_path"}, 400
+                    
+                    marker = get_gene_marker()
+                    success = marker.update_quantum_gene_marker(file_path, entangled_objects, strength)
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                     
                     if success:
                 return {
                             "status": "success",
+<<<<<<< HEAD
                             "message": f"量子基因标记更新成功: {file_path}",
+=======
+                            "message": f"已更新文件 {file_path} 的量子基因标记",
+                            "file_path": file_path,
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                             "timestamp": datetime.now().isoformat()
                         }
                     else:
                         return {
                             "status": "error",
+<<<<<<< HEAD
                             "error": f"量子基因标记更新失败: {file_path}",
                             "timestamp": datetime.now().isoformat()
                         }, 500
                     
+=======
+                            "error": f"更新文件 {file_path} 的量子基因标记失败",
+                            "file_path": file_path,
+                            "timestamp": datetime.now().isoformat()
+                        }, 500
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             except Exception as e:
                     logger.error(f"更新量子基因标记时出错: {str(e)}")
                     return {"status": "error", "error": str(e)}, 500
     
     return ref_ns
+<<<<<<< HEAD
     
+=======
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     except Exception as e:
         logger.error(f"创建Ref API命名空间时出错: {str(e)}")
         return None
 
+<<<<<<< HEAD
 # 创建API接口
 app = Flask(__name__)
 api = Api(app, 
@@ -535,3 +662,19 @@ if __name__ == '__main__':
 """
 
 # 开发团队：中华 ZhoHo，Claude
+=======
+if __name__ == "__main__":
+    print("Ref API模块 - 请通过API集成点调用")
+
+"""
+
+"""
+量子基因编码: QE-REF-D48AE981C483
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+"""
+
+// 开发团队：中华 ZhoHo ，Claude 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

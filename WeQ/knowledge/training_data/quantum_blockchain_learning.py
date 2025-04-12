@@ -369,7 +369,11 @@ class QuantumBlockchainKnowledge:
         # 尝试连接到WeQ区块链
         try:
             # 动态导入避免循环引用
+<<<<<<< HEAD
             from WeQ.quantum_blockchain.weq_blockchain import get_WeQ_chain
+=======
+            from WeQ.quantum_blockchain.weq_blockchain import get_weq_chain
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             self.weq_blockchain = get_weq_chain()
             logger.info("成功连接到WeQ量子区块链")
         except (ImportError, AttributeError) as e:

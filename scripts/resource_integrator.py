@@ -1,0 +1,495 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+资源整合脚本
+用于整合和管理量子叠加模型系统的项目资源
+"""
+
+import os
+import shutil
+import json
+import re
+import argparse
+from pathlib import Path
+from datetime import datetime
+
+# 项目根目录
+ROOT_DIR = Path(__file__).parent.parent.absolute()
+
+# 模块列表
+MODULES = ["world", "QSM", "WeQ", "SOM", "Ref"]  # Ref - 量子自反省模型(量子自反省管理模型)
+
+# 资源类型
+RESOURCE_TYPES = {
+    "js": "JavaScript文件",
+    "css": "CSS样式文件",
+    "html": "HTML模板文件",
+    "templates": "模板目录",
+    "images": "图像资源"
+}
+
+# 资源整合配置
+INTEGRATION_CONFIG = {
+    "move": [
+        # 将web_quantum_client.js移动到world模块
+        {
+            "source": "static/scripts/web_quantum_client.js",
+            "target": "world/static/js/web_quantum_client.js",
+            "backup": True
+        }
+    ],
+    "create_dirs": [
+        # 创建共享组件目录
+        "world/static/css/components",
+        "world/static/js/multimodal",
+        "world/templates/components"
+    ]
+}
+
+def backup_file(file_path, backup_dir=None):
+    """
+    备份文件
+    
+    Args:
+        file_path (str): 要备份的文件路径
+        backup_dir (str, optional): 备份目录。默认为None，将在同目录下创建带时间戳的备份文件。
+    
+    Returns:
+        str: 备份文件路径
+    """
+    source_path = Path(ROOT_DIR) / file_path
+    
+    if not source_path.exists():
+        print(f"警告: 文件不存在，无法备份: {file_path}")
+        return None
+    
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    
+    if backup_dir:
+        backup_path = Path(ROOT_DIR) / backup_dir / f"{source_path.name}.{timestamp}.bak"
+        os.makedirs(Path(backup_path).parent, exist_ok=True)
+    else:
+        backup_path = source_path.with_suffix(f"{source_path.suffix}.{timestamp}.bak")
+    
+    shutil.copy2(source_path, backup_path)
+    print(f"备份文件: {file_path} -> {backup_path.relative_to(ROOT_DIR)}")
+    
+    return str(backup_path.relative_to(ROOT_DIR))
+
+def move_resource(source, target, backup=True):
+    """
+    移动资源文件
+    
+    Args:
+        source (str): 源文件路径
+        target (str): 目标文件路径
+        backup (bool, optional): 是否备份源文件。默认为True。
+    
+    Returns:
+        bool: 操作是否成功
+    """
+    source_path = Path(ROOT_DIR) / source
+    target_path = Path(ROOT_DIR) / target
+    
+    if not source_path.exists():
+        print(f"错误: 源文件不存在: {source}")
+        return False
+    
+    # 确保目标目录存在
+    os.makedirs(target_path.parent, exist_ok=True)
+    
+    # 备份源文件
+    if backup:
+        backup_file(source)
+    
+    # 如果目标文件已存在，也进行备份
+    if target_path.exists():
+        backup_file(target)
+    
+    # 移动文件
+    shutil.copy2(source_path, target_path)
+    print(f"移动资源: {source} -> {target}")
+    
+    return True
+
+def create_directory(dir_path):
+    """
+    创建目录
+    
+    Args:
+        dir_path (str): 要创建的目录路径
+    
+    Returns:
+        bool: 操作是否成功
+    """
+    full_path = Path(ROOT_DIR) / dir_path
+    
+    if full_path.exists():
+        print(f"目录已存在: {dir_path}")
+        return True
+    
+    try:
+        os.makedirs(full_path, exist_ok=True)
+        print(f"创建目录: {dir_path}")
+        return True
+    except Exception as e:
+        print(f"创建目录失败: {dir_path}, 错误: {str(e)}")
+        return False
+
+def scan_resources(module=None):
+    """
+    扫描项目资源
+    
+    Args:
+        module (str, optional): 要扫描的模块名称。默认为None，表示扫描所有模块。
+    
+    Returns:
+        dict: 扫描结果
+    """
+    result = {
+        "js": [],
+        "css": [],
+        "html": [],
+        "templates": [],
+        "images": []
+    }
+    
+    modules_to_scan = [module] if module else MODULES
+    
+    for mod in modules_to_scan:
+        mod_path = Path(ROOT_DIR) / mod
+        
+        if not mod_path.exists():
+            print(f"警告: 模块目录不存在: {mod}")
+            continue
+        
+        # 扫描JavaScript文件
+        js_path = mod_path / "static" / "js"
+        if js_path.exists():
+            for js_file in js_path.glob("**/*.js"):
+                result["js"].append(str(js_file.relative_to(ROOT_DIR)))
+        
+        # 扫描CSS文件
+        css_path = mod_path / "static" / "css"
+        if css_path.exists():
+            for css_file in css_path.glob("**/*.css"):
+                result["css"].append(str(css_file.relative_to(ROOT_DIR)))
+        
+        # 扫描HTML模板
+        templates_path = mod_path / "templates"
+        if templates_path.exists():
+            result["templates"].append(str(templates_path.relative_to(ROOT_DIR)))
+            for html_file in templates_path.glob("**/*.html"):
+                result["html"].append(str(html_file.relative_to(ROOT_DIR)))
+        
+        # 扫描图像资源
+        images_path = mod_path / "static" / "images"
+        if images_path.exists():
+            for img_file in images_path.glob("**/*.*"):
+                if img_file.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".svg"]:
+                    result["images"].append(str(img_file.relative_to(ROOT_DIR)))
+    
+    # 额外扫描static目录
+    static_path = Path(ROOT_DIR) / "static"
+    if static_path.exists():
+        # 扫描JavaScript文件
+        for js_file in static_path.glob("**/*.js"):
+            result["js"].append(str(js_file.relative_to(ROOT_DIR)))
+        
+        # 扫描CSS文件
+        for css_file in static_path.glob("**/*.css"):
+            result["css"].append(str(css_file.relative_to(ROOT_DIR)))
+        
+        # 扫描图像资源
+        for img_file in static_path.glob("**/*.*"):
+            if img_file.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".svg"]:
+                result["images"].append(str(img_file.relative_to(ROOT_DIR)))
+    
+    # 额外扫描templates目录
+    templates_path = Path(ROOT_DIR) / "templates"
+    if templates_path.exists():
+        result["templates"].append(str(templates_path.relative_to(ROOT_DIR)))
+        for html_file in templates_path.glob("**/*.html"):
+            result["html"].append(str(html_file.relative_to(ROOT_DIR)))
+    
+    return result
+
+def check_template_inheritance():
+    """
+    检查模板继承关系
+    
+    Returns:
+        dict: 检查结果
+    """
+    result = {
+        "inherits_world_base": [],
+        "custom_base": [],
+        "inconsistent": []
+    }
+    
+    # 正则表达式匹配模板继承语句
+    extends_pattern = re.compile(r'{%\s*extends\s+[\'"](.+?)[\'"]')
+    
+    for module in MODULES:
+        if module == "world":
+            continue
+        
+        base_template = Path(ROOT_DIR) / module / "templates" / f"base_{module.lower()}.html"
+        
+        if not base_template.exists():
+            print(f"警告: 模块 {module} 没有找到基础模板: {base_template.name}")
+            continue
+        
+        with open(base_template, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+            # 查找extends语句
+            extends_match = extends_pattern.search(content)
+            if extends_match:
+                extends_path = extends_match.group(1)
+                
+                if "/world/templates/base.html" in extends_path:
+                    result["inherits_world_base"].append(str(base_template.relative_to(ROOT_DIR)))
+                else:
+                    result["custom_base"].append({
+                        "template": str(base_template.relative_to(ROOT_DIR)),
+                        "extends": extends_path
+                    })
+            else:
+                result["inconsistent"].append({
+                    "template": str(base_template.relative_to(ROOT_DIR)),
+                    "reason": "没有找到extends语句"
+                })
+    
+    return result
+
+def update_base_template(module, ensure_world_base=True):
+    """
+    更新模块的基础模板，确保继承自world/templates/base.html
+    
+    Args:
+        module (str): 模块名称
+        ensure_world_base (bool, optional): 是否确保继承自world基础模板。默认为True。
+    
+    Returns:
+        bool: 操作是否成功
+    """
+    if module == "world":
+        print("警告: world模块是基础模板，不需要更新继承关系")
+        return False
+    
+    base_template = Path(ROOT_DIR) / module / "templates" / f"base_{module.lower()}.html"
+    
+    if not base_template.exists():
+        print(f"错误: 模块 {module} 没有找到基础模板: {base_template.name}")
+        return False
+    
+    # 备份模板
+    backup_file(str(base_template.relative_to(ROOT_DIR)))
+    
+    with open(base_template, "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    # 正则表达式匹配模板继承语句
+    extends_pattern = re.compile(r'{%\s*extends\s+[\'"](.+?)[\'"]')
+    
+    extends_match = extends_pattern.search(content)
+    if extends_match:
+        extends_path = extends_match.group(1)
+        
+        if "/world/templates/base.html" in extends_path and not ensure_world_base:
+            print(f"模板已经继承自world基础模板: {base_template.name}")
+            return True
+        
+        # 更新继承路径
+        new_content = extends_pattern.sub('{% extends "/world/templates/base.html"', content)
+        
+        with open(base_template, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        
+        print(f"更新模板继承: {base_template.name} -> /world/templates/base.html")
+        return True
+    else:
+        print(f"警告: 模板 {base_template.name} 未找到extends语句，无法更新")
+        return False
+
+def integrate_resources():
+    """
+    整合项目资源
+    
+    Returns:
+        bool: 操作是否成功
+    """
+    success = True
+    
+    # 移动资源
+    for move_config in INTEGRATION_CONFIG["move"]:
+        result = move_resource(
+            move_config["source"], 
+            move_config["target"], 
+            move_config.get("backup", True)
+        )
+        success = success and result
+    
+    # 创建目录
+    for dir_path in INTEGRATION_CONFIG["create_dirs"]:
+        result = create_directory(dir_path)
+        success = success and result
+    
+    return success
+
+def generate_resource_report(output_file=None):
+    """
+    生成资源报告
+    
+    Args:
+        output_file (str, optional): 输出文件路径。默认为None，表示输出到控制台。
+    
+    Returns:
+        str: 报告内容
+    """
+    resources = scan_resources()
+    inheritance = check_template_inheritance()
+    
+    report = []
+    report.append("# 量子叠加模型系统资源报告")
+    report.append(f"\n生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    
+    # 资源统计
+    report.append("## 资源统计")
+    report.append("\n| 资源类型 | 数量 |")
+    report.append("|---------|------|")
+    for res_type, res_list in resources.items():
+        report.append(f"| {RESOURCE_TYPES.get(res_type, res_type)} | {len(res_list)} |")
+    
+    # 模板继承关系
+    report.append("\n## 模板继承关系")
+    
+    report.append("\n### 继承自world基础模板")
+    if inheritance["inherits_world_base"]:
+        for template in inheritance["inherits_world_base"]:
+            report.append(f"- {template}")
+    else:
+        report.append("无")
+    
+    report.append("\n### 自定义基础模板")
+    if inheritance["custom_base"]:
+        for item in inheritance["custom_base"]:
+            report.append(f"- {item['template']} -> {item['extends']}")
+    else:
+        report.append("无")
+    
+    report.append("\n### 继承关系不一致")
+    if inheritance["inconsistent"]:
+        for item in inheritance["inconsistent"]:
+            report.append(f"- {item['template']}: {item['reason']}")
+    else:
+        report.append("无")
+    
+    # 资源详情
+    report.append("\n## 资源详情")
+    
+    for res_type, res_list in resources.items():
+        if not res_list:
+            continue
+            
+        report.append(f"\n### {RESOURCE_TYPES.get(res_type, res_type)}")
+        
+        # 按模块分组
+        by_module = {}
+        for res_path in res_list:
+            module = res_path.split("/")[0] if "/" in res_path else "其他"
+            if module not in by_module:
+                by_module[module] = []
+            by_module[module].append(res_path)
+        
+        # 输出每个模块的资源
+        for module, paths in sorted(by_module.items()):
+            report.append(f"\n#### {module}")
+            for path in sorted(paths):
+                report.append(f"- {path}")
+    
+    report_content = "\n".join(report)
+    
+    if output_file:
+        output_path = Path(ROOT_DIR) / output_file
+        os.makedirs(output_path.parent, exist_ok=True)
+        
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(report_content)
+        
+        print(f"资源报告已生成: {output_file}")
+    
+    return report_content
+
+def main():
+    """
+    主函数
+    """
+    parser = argparse.ArgumentParser(description="量子叠加模型系统资源整合工具")
+    subparsers = parser.add_subparsers(dest="command", help="子命令")
+    
+    # 扫描资源命令
+    scan_parser = subparsers.add_parser("scan", help="扫描项目资源")
+    scan_parser.add_argument("--module", "-m", help="要扫描的模块")
+    scan_parser.add_argument("--output", "-o", help="输出文件路径")
+    
+    # 检查模板继承命令
+    check_parser = subparsers.add_parser("check", help="检查模板继承关系")
+    
+    # 更新模板继承命令
+    update_parser = subparsers.add_parser("update", help="更新模板继承关系")
+    update_parser.add_argument("--module", "-m", required=True, help="要更新的模块")
+    
+    # 整合资源命令
+    integrate_parser = subparsers.add_parser("integrate", help="整合项目资源")
+    
+    # 生成报告命令
+    report_parser = subparsers.add_parser("report", help="生成资源报告")
+    report_parser.add_argument("--output", "-o", required=True, help="输出文件路径")
+    
+    args = parser.parse_args()
+    
+    if args.command == "scan":
+        resources = scan_resources(args.module)
+        
+        if args.output:
+            output_path = Path(ROOT_DIR) / args.output
+            os.makedirs(output_path.parent, exist_ok=True)
+            
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(resources, f, indent=2)
+            
+            print(f"扫描结果已保存到: {args.output}")
+        else:
+            print(json.dumps(resources, indent=2))
+    
+    elif args.command == "check":
+        inheritance = check_template_inheritance()
+        print(json.dumps(inheritance, indent=2))
+    
+    elif args.command == "update":
+        update_base_template(args.module)
+    
+    elif args.command == "integrate":
+        integrate_resources()
+    
+    elif args.command == "report":
+        generate_resource_report(args.output)
+    
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main() 
+
+"""
+"""
+量子基因编码: QE-RES-BE8310E56889
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+""""""
+
+// 开发团队：中华 ZhoHo ，Claude 

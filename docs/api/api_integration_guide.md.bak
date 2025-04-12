@@ -1,0 +1,218 @@
+# QSM系统API集成指南
+
+## 概述
+
+本文档提供了量子叠加态模型(QSM)与其子系统API的集成指南。QSM主API服务整合了以下子系统的API功能：
+
+- **量子纠缠问答系统(WeQ)** - 端口5003
+- **松麦生态商城系统(SOM)** - 端口5001
+- **量子基因参考系统(Ref)** - 端口5002
+
+QSM主API服务运行在端口5000，集成了所有子系统的API，并提供统一的访问接口。
+
+## 系统架构
+
+```
++----------------+
+|                |
+|  QSM API       |
+|  (端口: 5000)   |
+|                |
++-------+--------+
+        |
+        | 集成
+        v
++-------+--------+-------+--------+-------+--------+
+|                |                |                |
+| WeQ API        | SOM API        | Ref API        |
+| (端口: 5003)    | (端口: 5001)    | (端口: 5002)    |
+|                |                |                |
++----------------+----------------+----------------+
+```
+
+## 部署方法
+
+### 1. 单独启动各子系统API
+
+每个子系统的API可以独立启动：
+
+```bash
+# 启动WeQ API服务
+python -m WeQ.api.weq_api
+
+# 启动SOM API服务
+python -m SOM.api.som_api
+
+# 启动Ref API服务
+python -m Ref.api.ref_api
+```
+
+### 2. 启动QSM主API服务（集成模式）
+
+启动QSM主API服务，自动集成所有子系统API：
+
+```bash
+python -m api.qsm_api.qsm_api
+```
+
+### 3. 使用统一启动脚本
+
+使用提供的启动脚本，可以控制启动哪些API服务：
+
+```bash
+# 启动所有API服务
+python -m api.qsm_api.run_api --all
+
+# 仅启动QSM主API服务
+python -m api.qsm_api.run_api --qsm-only
+
+# 启动QSM和特定子系统API
+python -m api.qsm_api.run_api --with-weq --with-som
+```
+
+## API集成配置
+
+API集成的配置位于`api/qsm_api/qsm_api_config.py`文件中，主要配置项包括：
+
+```python
+# API端口配置
+QSM_API_PORT = 5000  # QSM主API服务端口
+WEQ_API_PORT = 5003  # WeQ API服务端口
+SOM_API_PORT = 5001  # SOM API服务端口
+REF_API_PORT = 5002  # Ref API服务端口
+
+# 子系统集成配置
+INTEGRATE_WEQ = True  # 是否集成WeQ API
+INTEGRATE_SOM = True  # 是否集成SOM API
+INTEGRATE_REF = True  # 是否集成Ref API
+
+# 跨域配置
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5000",
+    "http://localhost:5001",
+    "http://localhost:5002",
+    "http://localhost:5003",
+]
+```
+
+## API访问路径
+
+### 直接访问子系统API
+
+```
+WeQ API: http://localhost:5003/api/weq/...
+SOM API: http://localhost:5001/api/som/...
+Ref API: http://localhost:5002/api/ref/...
+```
+
+### 通过QSM主API访问子系统API
+
+```
+WeQ API: http://localhost:5000/api/weq/...
+SOM API: http://localhost:5000/api/som/...
+Ref API: http://localhost:5000/api/ref/...
+QSM API: http://localhost:5000/api/qsm/...
+```
+
+## 子系统API集成过程
+
+### 1. WeQ API集成
+
+WeQ API集成通过`WeQ/api/weq_api_integration.py`文件中的`integrate_weq_api_to_qsm_api`函数实现。该函数将WeQ API的命名空间添加到QSM API中。
+
+### 2. SOM API集成
+
+SOM API集成通过`api/qsm_api/qsm_api_integration.py`文件中的`integrate_som_marketplace_to_qsm_api`函数实现。
+
+### 3. Ref API集成
+
+Ref API集成通过`Ref/api/ref_api_integration.py`文件中的`integrate_ref_api_to_qsm_api`函数实现。该函数将量子基因参考系统API添加到QSM API中。
+
+## 安全与认证
+
+所有API服务都实现了基于JWT的认证机制。通过QSM主API服务访问子系统API时，认证令牌会自动传递给子系统API。
+
+认证配置在`qsm_api_config.py`文件中：
+
+```python
+# JWT配置
+JWT_SECRET_KEY = "quantum_secret_multimodal_key"
+JWT_ACCESS_TOKEN_EXPIRES = 3600  # 令牌过期时间（秒）
+
+# 认证配置
+AUTH_REQUIRED = True
+AUTH_EXCLUDED_ENDPOINTS = [
+    "/api/qsm/health",
+    "/api/weq/health",
+    "/api/som/health",
+    "/api/ref/health",
+    "/api/qsm/auth/login",
+    "/api/qsm/auth/register",
+]
+```
+
+## API文档
+
+API文档可通过以下URL访问：
+
+- QSM API文档: http://localhost:5000/api/docs
+- WeQ API文档: http://localhost:5003/api/docs
+- SOM API文档: http://localhost:5001/api/docs
+- Ref API文档: http://localhost:5002/api/docs
+
+## 日志与监控
+
+每个API服务都有独立的日志文件：
+
+- QSM API: `qsm_api.log`
+- WeQ API: `weq_api.log`
+- SOM API: `som_api.log`
+- Ref API: `ref_api.log`
+
+使用统一启动脚本时，日志文件位于`logs`目录下。
+
+## 故障排查
+
+### 1. 端口占用问题
+
+如果端口已被占用，可在配置文件中修改端口号。
+
+### 2. 集成失败
+
+检查子系统API是否正常运行，查看日志文件获取具体错误信息。
+
+### 3. 跨域问题
+
+跨域配置在`qsm_api_config.py`文件中：
+
+```python
+# 跨域配置
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5000",
+    "http://localhost:5001",
+    "http://localhost:5002",
+    "http://localhost:5003",
+]
+```
+
+## 开发指南
+
+### 添加新的子系统API
+
+1. 创建子系统API服务
+2. 创建集成模块（参考现有子系统的集成方式）
+3. 在`qsm_api_config.py`中添加相关配置
+4. 在`qsm_api.py`中添加子系统API的集成代码
+
+### 添加新的API端点
+
+1. 在相应的命名空间中添加新的资源类
+2. 实现相应的HTTP方法（GET, POST, PUT, DELETE等）
+3. 添加必要的参数验证和认证
+
+## 版本信息
+
+- QSM API: 1.0.0
+- WeQ API: 1.0.0
+- SOM API: 1.0.0
+- Ref API: 1.0.0 

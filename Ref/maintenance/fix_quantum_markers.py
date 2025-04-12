@@ -316,7 +316,11 @@ def scan_weq_output(dry_run: bool = False, verbose: bool = False) -> Dict[str, A
             logger.info("扫描WeQ输出内容...")
         
         # 启用WeQ输出监控
+<<<<<<< HEAD
         from Ref.utils.quantum_gene_marker import monitor_WeQ_output
+=======
+        from Ref.utils.quantum_gene_marker import monitor_weq_output
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         monitor_weq_output(True)
         
         # 检查WeQ输出标记

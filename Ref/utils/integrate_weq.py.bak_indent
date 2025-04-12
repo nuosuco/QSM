@@ -1,0 +1,954 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Ref与WeQ集成脚本 - 将Ref索引系统与WeQ多模态系统集成
+"""
+
+import os
+import sys
+import json
+import shutil
+import logging
+from pathlib import Path
+
+# 设置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("RefWeQIntegration")
+
+# 确保路径正确
+script_dir = os.path.dirname(os.path.abspath(__file__))
+ref_dir = os.path.dirname(script_dir)
+project_root = os.path.dirname(ref_dir)
+weq_dir = os.path.join(project_root, "WeQ")
+
+# 配置文件路径
+REF_CONFIG_PATH = os.path.join(ref_dir, "data", "index_management.json")
+WEQ_STATIC_DIR = os.path.join(weq_dir, "static", "js")
+WEQ_TEMPLATES_DIR = os.path.join(weq_dir, "templates")
+
+def load_ref_config():
+    """加载Ref索引管理配置"""
+    try:
+        if os.path.exists(REF_CONFIG_PATH):
+            with open(REF_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            logger.error(f"Ref配置文件不存在: {REF_CONFIG_PATH}")
+            return None
+    except Exception as e:
+        logger.error(f"加载Ref配置文件出错: {e}")
+        return None
+
+def create_weq_integration_js():
+    """创建WeQ与Ref集成的JavaScript文件"""
+    try:
+        integration_js_path = os.path.join(WEQ_STATIC_DIR, "weq_ref_integration.js")
+        
+        # 获取Ref配置
+        ref_config = load_ref_config()
+        if not ref_config:
+            return False
+        
+        # 生成JavaScript代码
+        js_content = """/**
+ * WeQ与Ref索引系统集成
+ * 
+ * 这个脚本将WeQ多模态系统与Ref索引管理系统集成，
+ * 使用户可以通过多模态交互查询和浏览项目索引。
+ */
+
+# 索引文件映射
+const REF_INDEX_FILES = {
+"""
+        
+        # 添加索引文件配置
+        for key, path in ref_config["index_files"].items():
+            js_content += f'    "{key}": "{path}",\n'
+        
+        js_content = js_content.rstrip(',\n') + '\n};\n\n'
+        
+        # 添加功能函数
+        js_content += """
+# 当前加载的索引内容
+let currentIndexContent = null;
+let currentIndexType = null;
+
+/**
+ * 初始化Ref索引集成
+ */
+function initRefIntegration() {
+    # 监听量子纠缠初始化完成事件
+    document.addEventListener('quantum:initialized', function() {
+        console.log('Ref索引系统集成已初始化');
+        loadIndexContent('navigation');
+    });
+    
+    # 添加索引浏览器到指定容器（如果存在）
+    const indexBrowserContainer = document.getElementById('ref-index-browser');
+    if (indexBrowserContainer) {
+        createIndexBrowser(indexBrowserContainer);
+    }
+}
+
+/**
+ * 加载指定类型的索引内容
+ * @param {string} indexType - 索引类型
+ * @returns {Promise<string>} - 索引内容
+ */
+async function loadIndexContent(indexType) {
+    try {
+        if (!REF_INDEX_FILES[indexType]) {
+            console.error(`未知的索引类型: ${indexType}`);
+            return null;
+        }
+        
+        const response = await fetch(`/${REF_INDEX_FILES[indexType]}`);
+        if (!response.ok) {
+            throw new Error(`无法加载索引: ${response.status} ${response.statusText}`);
+        }
+        
+        const content = await response.text();
+        currentIndexContent = content;
+        currentIndexType = indexType;
+        
+        # 触发索引加载事件
+        document.dispatchEvent(new CustomEvent('ref:indexLoaded', {
+            detail: {
+                type: indexType,
+                content: content
+            }
+        }));
+        
+        return content;
+    } catch (error) {
+        console.error('加载索引出错:', error);
+        return null;
+    }
+}
+
+/**
+ * 创建索引浏览器UI
+ * @param {HTMLElement} container - 容器元素
+ */
+function createIndexBrowser(container) {
+    # 创建索引类型选择器
+    const typeSelector = document.createElement('div');
+    typeSelector.className = 'ref-index-type-selector';
+    
+    # 添加索引类型按钮
+    Object.keys(REF_INDEX_FILES).forEach(type => {
+        const button = document.createElement('button');
+        button.textContent = getIndexTypeDisplayName(type);
+        button.className = 'ref-index-type-button';
+        button.dataset.indexType = type;
+        button.addEventListener('click', () => {
+            # 移除所有按钮的active类
+            document.querySelectorAll('.ref-index-type-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            # 为当前按钮添加active类
+            button.classList.add('active');
+            
+            # 加载选定的索引
+            loadIndexContent(type).then(content => {
+                if (content) {
+                    indexContent.innerHTML = `<div class="ref-markdown-content">${markdownToHtml(content)}</div>`;
+                }
+            });
+        });
+        
+        typeSelector.appendChild(button);
+    });
+    
+    # 创建索引内容显示区域
+    const indexContent = document.createElement('div');
+    indexContent.className = 'ref-index-content';
+    
+    # 添加到容器
+    container.appendChild(typeSelector);
+    container.appendChild(indexContent);
+    
+    # 默认加载导航索引
+    document.querySelector('[data-index-type="navigation"]')?.click();
+}
+
+/**
+ * 将Markdown转换为HTML
+ * @param {string} markdown - Markdown文本
+ * @returns {string} - HTML文本
+ */
+function markdownToHtml(markdown) {
+    # 非常简单的Markdown转HTML
+    # 在实际应用中可以使用更完善的库如marked.js
+    let html = markdown
+        # 标题
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        # 粗体
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        # 斜体
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        # 链接
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
+        # 列表项
+        .replace(/^- (.*$)/gm, '<li>$1</li>')
+        # 代码块
+        .replace(/```([^`]*)```/g, '<pre><code>$1</code></pre>');
+    
+    # 将列表项包装在ul中
+    html = html.replace(/<li>.*?<\/li>/gs, match => {
+        return '<ul>' + match + '</ul>';
+    });
+    
+    # 处理换行
+    html = html.replace(/\n/g, '<br>');
+    
+    return html;
+}
+
+/**
+ * 获取索引类型的显示名称
+ * @param {string} type - 索引类型
+ * @returns {string} - 显示名称
+ */
+function getIndexTypeDisplayName(type) {
+    const displayNames = {
+        'project': '项目总览',
+        'qsm': 'QSM索引',
+        'som': 'SOM索引',
+        'weq': 'WeQ索引',
+        'ref': 'Ref索引',
+        'global': '全局模块',
+        'detailed': '详细目录',
+        'files': '文件索引',
+        'navigation': '导航'
+    };
+    
+    return displayNames[type] || type;
+}
+
+/**
+ * 搜索索引内容
+ * @param {string} query - 搜索关键词
+ * @returns {Array} - 搜索结果
+ */
+function searchIndex(query) {
+    if (!currentIndexContent || !query) {
+        return [];
+    }
+    
+    const results = [];
+    const lines = currentIndexContent.split('\\n');
+    
+    lines.forEach((line, index) => {
+        if (line.toLowerCase().includes(query.toLowerCase())) {
+            results.push({
+                line: index + 1,
+                content: line,
+                type: currentIndexType
+            });
+        }
+    });
+    
+    # 触发搜索完成事件
+    document.dispatchEvent(new CustomEvent('ref:searchCompleted', {
+        detail: {
+            query: query,
+            results: results
+        }
+    }));
+    
+    return results;
+}
+
+# 暴露全局API
+window.RefIndexSystem = {
+    loadIndex: loadIndexContent,
+    search: searchIndex,
+    getIndexTypes: () => Object.keys(REF_INDEX_FILES)
+};
+
+# 初始化
+document.addEventListener('DOMContentLoaded', initRefIntegration);
+"""
+        
+        # 写入文件
+        with open(integration_js_path, 'w', encoding='utf-8') as f:
+            f.write(js_content)
+        
+        logger.info(f"已创建WeQ与Ref集成JavaScript: {integration_js_path}")
+        return True
+    except Exception as e:
+        logger.error(f"创建WeQ与Ref集成JavaScript出错: {e}")
+        return False
+
+def update_weq_demo_page():
+    """更新WeQ多模态演示页面，添加Ref索引浏览功能"""
+    try:
+        demo_html_path = os.path.join(WEQ_TEMPLATES_DIR, "weq_multimodal_demo.html")
+        
+        if not os.path.exists(demo_html_path):
+            logger.error(f"WeQ多模态演示页面不存在: {demo_html_path}")
+            return False
+        
+        # 读取原始HTML
+        with open(demo_html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # 检查是否已经集成
+        if 'weq_ref_integration.js' in html_content:
+            logger.info("WeQ演示页面已包含Ref集成，无需更新")
+            return True
+        
+        # 查找合适位置并添加JavaScript引用
+        js_block_marker = "<!-- 然后加载WeQ特定的客户端和多模态交互 -->"
+        if js_block_marker not in html_content:
+            logger.error("未找到JavaScript引用位置")
+            return False
+        
+        modified_html = html_content.replace(
+            js_block_marker,
+            js_block_marker + '\n    <script src="/WeQ/static/js/weq_ref_integration.js"></script>'
+        )
+        
+        # 添加Ref索引浏览器容器
+        content_area_marker = '<div class="visualization-area">'
+        if content_area_marker not in modified_html:
+            logger.error("未找到可视化区域位置")
+            return False
+        
+        ref_browser_html = """
+                <div class="ref-index-browser-container">
+                    <h3>项目索引浏览器</h3>
+                    <div id="ref-index-browser">
+                        <!-- 索引浏览器将在这里加载 -->
+                    </div>
+                </div>
+                
+                """
+        
+        modified_html = modified_html.replace(
+            content_area_marker,
+            ref_browser_html + content_area_marker
+        )
+        
+        # 添加必要的CSS样式
+        css_marker = "/* 响应式样式 */"
+        if css_marker not in modified_html:
+            logger.error("未找到CSS样式位置")
+            return False
+        
+        ref_css = """
+        /* Ref索引浏览器样式 */
+        .ref-index-browser-container {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .ref-index-type-selector {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        
+        .ref-index-type-button {
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .ref-index-type-button.active {
+            background-color: var(--accent-color);
+        }
+        
+        .ref-index-content {
+            padding: 15px;
+            background-color: rgba(240, 244, 248, 0.5);
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .ref-markdown-content h1 {
+            font-size: 1.5rem;
+        }
+        
+        .ref-markdown-content h2 {
+            font-size: 1.3rem;
+        }
+        
+        .ref-markdown-content h3 {
+            font-size: 1.1rem;
+        }
+        
+        .ref-markdown-content ul {
+            padding-left: 20px;
+        }
+        
+        .ref-markdown-content pre {
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        
+        """
+        
+        modified_html = modified_html.replace(
+            css_marker,
+            ref_css + css_marker
+        )
+        
+        # 写入修改后的HTML
+        with open(demo_html_path, 'w', encoding='utf-8') as f:
+            f.write(modified_html)
+        
+        logger.info(f"已更新WeQ多模态演示页面，添加Ref索引浏览功能: {demo_html_path}")
+        return True
+    except Exception as e:
+        logger.error(f"更新WeQ多模态演示页面出错: {e}")
+        return False
+
+def ensure_weq_static_dir():
+    """确保WeQ静态目录存在"""
+    try:
+        if not os.path.exists(WEQ_STATIC_DIR):
+            os.makedirs(WEQ_STATIC_DIR)
+            logger.info(f"创建WeQ静态目录: {WEQ_STATIC_DIR}")
+        return True
+    except Exception as e:
+        logger.error(f"创建WeQ静态目录出错: {e}")
+        return False
+
+def integrate_ref_with_weq():
+    """将Ref系统与WeQ系统集成"""
+    try:
+        # 确保WeQ静态目录存在
+        if not ensure_weq_static_dir():
+            return False
+        
+        # 创建WeQ与Ref集成的JavaScript文件
+        if not create_weq_integration_js():
+            return False
+        
+        # 更新WeQ多模态演示页面
+        if not update_weq_demo_page():
+            return False
+        
+        logger.info("Ref系统已成功与WeQ系统集成")
+        return True
+    except Exception as e:
+        logger.error(f"Ref与WeQ集成失败: {e}")
+        return False
+
+def main():
+    """主函数"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Ref与WeQ系统集成工具")
+    parser.add_argument('--force', action='store_true', help="强制重新集成")
+    args = parser.parse_args()
+    
+    if args.force:
+        logger.info("强制重新集成Ref与WeQ系统")
+    
+    if integrate_ref_with_weq():
+        logger.info("集成完成")
+        return 0
+    else:
+        logger.error("集成失败")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main()) 
+# -*- coding: utf-8 -*-
+"""
+Ref与WeQ集成脚本 - 将Ref索引系统与WeQ多模态系统集成
+"""
+
+import os
+import sys
+import json
+import shutil
+import logging
+from pathlib import Path
+
+# 设置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("RefWeQIntegration")
+
+# 确保路径正确
+script_dir = os.path.dirname(os.path.abspath(__file__))
+ref_dir = os.path.dirname(script_dir)
+project_root = os.path.dirname(ref_dir)
+weq_dir = os.path.join(project_root, "WeQ")
+
+# 配置文件路径
+REF_CONFIG_PATH = os.path.join(ref_dir, "data", "index_management.json")
+WEQ_STATIC_DIR = os.path.join(weq_dir, "static", "js")
+WEQ_TEMPLATES_DIR = os.path.join(weq_dir, "templates")
+
+def load_ref_config():
+    """加载Ref索引管理配置"""
+    try:
+        if os.path.exists(REF_CONFIG_PATH):
+            with open(REF_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            logger.error(f"Ref配置文件不存在: {REF_CONFIG_PATH}")
+            return None
+    except Exception as e:
+        logger.error(f"加载Ref配置文件出错: {e}")
+        return None
+
+def create_weq_integration_js():
+    """创建WeQ与Ref集成的JavaScript文件"""
+    try:
+        integration_js_path = os.path.join(WEQ_STATIC_DIR, "weq_ref_integration.js")
+        
+        # 获取Ref配置
+        ref_config = load_ref_config()
+        if not ref_config:
+            return False
+        
+        # 生成JavaScript代码
+        js_content = """/**
+ * WeQ与Ref索引系统集成
+ * 
+ * 这个脚本将WeQ多模态系统与Ref索引管理系统集成，
+ * 使用户可以通过多模态交互查询和浏览项目索引。
+ */
+
+# 索引文件映射
+const REF_INDEX_FILES = {
+"""
+        
+        # 添加索引文件配置
+        for key, path in ref_config["index_files"].items():
+            js_content += f'    "{key}": "{path}",\n'
+        
+        js_content = js_content.rstrip(',\n') + '\n};\n\n'
+        
+        # 添加功能函数
+        js_content += """
+# 当前加载的索引内容
+let currentIndexContent = null;
+let currentIndexType = null;
+
+/**
+ * 初始化Ref索引集成
+ */
+function initRefIntegration() {
+    # 监听量子纠缠初始化完成事件
+    document.addEventListener('quantum:initialized', function() {
+        console.log('Ref索引系统集成已初始化');
+        loadIndexContent('navigation');
+    });
+    
+    # 添加索引浏览器到指定容器（如果存在）
+    const indexBrowserContainer = document.getElementById('ref-index-browser');
+    if (indexBrowserContainer) {
+        createIndexBrowser(indexBrowserContainer);
+    }
+}
+
+/**
+ * 加载指定类型的索引内容
+ * @param {string} indexType - 索引类型
+ * @returns {Promise<string>} - 索引内容
+ */
+async function loadIndexContent(indexType) {
+    try {
+        if (!REF_INDEX_FILES[indexType]) {
+            console.error(`未知的索引类型: ${indexType}`);
+            return null;
+        }
+        
+        const response = await fetch(`/${REF_INDEX_FILES[indexType]}`);
+        if (!response.ok) {
+            throw new Error(`无法加载索引: ${response.status} ${response.statusText}`);
+        }
+        
+        const content = await response.text();
+        currentIndexContent = content;
+        currentIndexType = indexType;
+        
+        # 触发索引加载事件
+        document.dispatchEvent(new CustomEvent('ref:indexLoaded', {
+            detail: {
+                type: indexType,
+                content: content
+            }
+        }));
+        
+        return content;
+    } catch (error) {
+        console.error('加载索引出错:', error);
+        return null;
+    }
+}
+
+/**
+ * 创建索引浏览器UI
+ * @param {HTMLElement} container - 容器元素
+ */
+function createIndexBrowser(container) {
+    # 创建索引类型选择器
+    const typeSelector = document.createElement('div');
+    typeSelector.className = 'ref-index-type-selector';
+    
+    # 添加索引类型按钮
+    Object.keys(REF_INDEX_FILES).forEach(type => {
+        const button = document.createElement('button');
+        button.textContent = getIndexTypeDisplayName(type);
+        button.className = 'ref-index-type-button';
+        button.dataset.indexType = type;
+        button.addEventListener('click', () => {
+            # 移除所有按钮的active类
+            document.querySelectorAll('.ref-index-type-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            # 为当前按钮添加active类
+            button.classList.add('active');
+            
+            # 加载选定的索引
+            loadIndexContent(type).then(content => {
+                if (content) {
+                    indexContent.innerHTML = `<div class="ref-markdown-content">${markdownToHtml(content)}</div>`;
+                }
+            });
+        });
+        
+        typeSelector.appendChild(button);
+    });
+    
+    # 创建索引内容显示区域
+    const indexContent = document.createElement('div');
+    indexContent.className = 'ref-index-content';
+    
+    # 添加到容器
+    container.appendChild(typeSelector);
+    container.appendChild(indexContent);
+    
+    # 默认加载导航索引
+    document.querySelector('[data-index-type="navigation"]')?.click();
+}
+
+/**
+ * 将Markdown转换为HTML
+ * @param {string} markdown - Markdown文本
+ * @returns {string} - HTML文本
+ */
+function markdownToHtml(markdown) {
+    # 非常简单的Markdown转HTML
+    # 在实际应用中可以使用更完善的库如marked.js
+    let html = markdown
+        # 标题
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        # 粗体
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        # 斜体
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        # 链接
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>')
+        # 列表项
+        .replace(/^- (.*$)/gm, '<li>$1</li>')
+        # 代码块
+        .replace(/```([^`]*)```/g, '<pre><code>$1</code></pre>');
+    
+    # 将列表项包装在ul中
+    html = html.replace(/<li>.*?<\/li>/gs, match => {
+        return '<ul>' + match + '</ul>';
+    });
+    
+    # 处理换行
+    html = html.replace(/\n/g, '<br>');
+    
+    return html;
+}
+
+/**
+ * 获取索引类型的显示名称
+ * @param {string} type - 索引类型
+ * @returns {string} - 显示名称
+ */
+function getIndexTypeDisplayName(type) {
+    const displayNames = {
+        'project': '项目总览',
+        'qsm': 'QSM索引',
+        'som': 'SOM索引',
+        'weq': 'WeQ索引',
+        'ref': 'Ref索引',
+        'global': '全局模块',
+        'detailed': '详细目录',
+        'files': '文件索引',
+        'navigation': '导航'
+    };
+    
+    return displayNames[type] || type;
+}
+
+/**
+ * 搜索索引内容
+ * @param {string} query - 搜索关键词
+ * @returns {Array} - 搜索结果
+ */
+function searchIndex(query) {
+    if (!currentIndexContent || !query) {
+        return [];
+    }
+    
+    const results = [];
+    const lines = currentIndexContent.split('\\n');
+    
+    lines.forEach((line, index) => {
+        if (line.toLowerCase().includes(query.toLowerCase())) {
+            results.push({
+                line: index + 1,
+                content: line,
+                type: currentIndexType
+            });
+        }
+    });
+    
+    # 触发搜索完成事件
+    document.dispatchEvent(new CustomEvent('ref:searchCompleted', {
+        detail: {
+            query: query,
+            results: results
+        }
+    }));
+    
+    return results;
+}
+
+# 暴露全局API
+window.RefIndexSystem = {
+    loadIndex: loadIndexContent,
+    search: searchIndex,
+    getIndexTypes: () => Object.keys(REF_INDEX_FILES)
+};
+
+# 初始化
+document.addEventListener('DOMContentLoaded', initRefIntegration);
+"""
+        
+        # 写入文件
+        with open(integration_js_path, 'w', encoding='utf-8') as f:
+            f.write(js_content)
+        
+        logger.info(f"已创建WeQ与Ref集成JavaScript: {integration_js_path}")
+        return True
+    except Exception as e:
+        logger.error(f"创建WeQ与Ref集成JavaScript出错: {e}")
+        return False
+
+def update_weq_demo_page():
+    """更新WeQ多模态演示页面，添加Ref索引浏览功能"""
+    try:
+        demo_html_path = os.path.join(WEQ_TEMPLATES_DIR, "weq_multimodal_demo.html")
+        
+        if not os.path.exists(demo_html_path):
+            logger.error(f"WeQ多模态演示页面不存在: {demo_html_path}")
+            return False
+        
+        # 读取原始HTML
+        with open(demo_html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # 检查是否已经集成
+        if 'weq_ref_integration.js' in html_content:
+            logger.info("WeQ演示页面已包含Ref集成，无需更新")
+            return True
+        
+        # 查找合适位置并添加JavaScript引用
+        js_block_marker = "<!-- 然后加载WeQ特定的客户端和多模态交互 -->"
+        if js_block_marker not in html_content:
+            logger.error("未找到JavaScript引用位置")
+            return False
+        
+        modified_html = html_content.replace(
+            js_block_marker,
+            js_block_marker + '\n    <script src="/WeQ/static/js/weq_ref_integration.js"></script>'
+        )
+        
+        # 添加Ref索引浏览器容器
+        content_area_marker = '<div class="visualization-area">'
+        if content_area_marker not in modified_html:
+            logger.error("未找到可视化区域位置")
+            return False
+        
+        ref_browser_html = """
+                <div class="ref-index-browser-container">
+                    <h3>项目索引浏览器</h3>
+                    <div id="ref-index-browser">
+                        <!-- 索引浏览器将在这里加载 -->
+                    </div>
+                </div>
+                
+                """
+        
+        modified_html = modified_html.replace(
+            content_area_marker,
+            ref_browser_html + content_area_marker
+        )
+        
+        # 添加必要的CSS样式
+        css_marker = "/* 响应式样式 */"
+        if css_marker not in modified_html:
+            logger.error("未找到CSS样式位置")
+            return False
+        
+        ref_css = """
+        /* Ref索引浏览器样式 */
+        .ref-index-browser-container {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .ref-index-type-selector {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        
+        .ref-index-type-button {
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .ref-index-type-button.active {
+            background-color: var(--accent-color);
+        }
+        
+        .ref-index-content {
+            padding: 15px;
+            background-color: rgba(240, 244, 248, 0.5);
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .ref-markdown-content h1 {
+            font-size: 1.5rem;
+        }
+        
+        .ref-markdown-content h2 {
+            font-size: 1.3rem;
+        }
+        
+        .ref-markdown-content h3 {
+            font-size: 1.1rem;
+        }
+        
+        .ref-markdown-content ul {
+            padding-left: 20px;
+        }
+        
+        .ref-markdown-content pre {
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        
+        """
+        
+        modified_html = modified_html.replace(
+            css_marker,
+            ref_css + css_marker
+        )
+        
+        # 写入修改后的HTML
+        with open(demo_html_path, 'w', encoding='utf-8') as f:
+            f.write(modified_html)
+        
+        logger.info(f"已更新WeQ多模态演示页面，添加Ref索引浏览功能: {demo_html_path}")
+        return True
+    except Exception as e:
+        logger.error(f"更新WeQ多模态演示页面出错: {e}")
+        return False
+
+def ensure_weq_static_dir():
+    """确保WeQ静态目录存在"""
+    try:
+        if not os.path.exists(WEQ_STATIC_DIR):
+            os.makedirs(WEQ_STATIC_DIR)
+            logger.info(f"创建WeQ静态目录: {WEQ_STATIC_DIR}")
+        return True
+    except Exception as e:
+        logger.error(f"创建WeQ静态目录出错: {e}")
+        return False
+
+def integrate_ref_with_weq():
+    """将Ref系统与WeQ系统集成"""
+    try:
+        # 确保WeQ静态目录存在
+        if not ensure_weq_static_dir():
+            return False
+        
+        # 创建WeQ与Ref集成的JavaScript文件
+        if not create_weq_integration_js():
+            return False
+        
+        # 更新WeQ多模态演示页面
+        if not update_weq_demo_page():
+            return False
+        
+        logger.info("Ref系统已成功与WeQ系统集成")
+        return True
+    except Exception as e:
+        logger.error(f"Ref与WeQ集成失败: {e}")
+        return False
+
+def main():
+    """主函数"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Ref与WeQ系统集成工具")
+    parser.add_argument('--force', action='store_true', help="强制重新集成")
+    args = parser.parse_args()
+    
+    if args.force:
+        logger.info("强制重新集成Ref与WeQ系统")
+    
+    if integrate_ref_with_weq():
+        logger.info("集成完成")
+        return 0
+    else:
+        logger.error("集成失败")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main()) 
+
+"""
+
+"""
+
+    """
+    # 量子基因编码: QE-INT-247618C9605C
+    # 纠缠状态: 活跃
+    # 纠缠对象: []
+    # 纠缠强度: 0.98
+    """
+    
+# 纠缠状态: 活跃
+# 纠缠对象: []
+# 纠缠强度: 0.98
+"""
+"""
+
+# 开发团队：中华 ZhoHo ，Claude 

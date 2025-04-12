@@ -37,7 +37,11 @@ if not logger.handlers:
 
 # 导入WeQ API模块
 try:
+<<<<<<< HEAD
     from WeQ.api.weq_api import create_WeQ_namespace
+=======
+    from WeQ.api.weq_api import create_weq_namespace
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     
     weq_api_available = True
 except ImportError as e:

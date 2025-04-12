@@ -25,7 +25,11 @@ try:
         QuantumBlock,
         _existing_implementation
     )
+<<<<<<< HEAD
     from quantum_core.quantum_blockchain.QSM_main_chain import get_QSM_main_chain
+=======
+    from quantum_core.quantum_blockchain.qsm_main_chain import get_qsm_main_chain
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 except ImportError:
     print("无法导入量子区块链核心，请确保已安装相关依赖")
     sys.exit(1)

@@ -160,7 +160,11 @@ class RefQuantumGeneMarker:
             
             try:
                 # 导入WeQ输出监控系统的通知函数（避免循环导入）
+<<<<<<< HEAD
                 from Ref.utils.monitor_WeQ_output import notify_WeQ_monitor
+=======
+                from Ref.utils.monitor_weq_output import notify_weq_monitor
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                 notify_weq_monitor(file_path, change_type, old_path)
                 
                 # 导入文件监控系统的通知函数（如果需要的话）
@@ -444,4 +448,7 @@ def update_quantum_gene_marker(file_path: str, entangled_objects: List[str] = No
     """
     marker = get_gene_marker()
     return marker.update_quantum_gene_marker(file_path, entangled_objects, strength)
+<<<<<<< HEAD
 
+=======
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

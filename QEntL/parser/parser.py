@@ -145,7 +145,11 @@ class QEntLParser:
     def _parse_body(self, content: str) -> Dict[str, Any]:
         """解析QEntL文件主体内容"""
         # 移除注释
+<<<<<<< HEAD
         content = re.sub(r'//.*?/n', '\n', content)
+=======
+        content = re.sub(r'//.*?\n', '\n', content)
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         
         # 寻找主要定义块
         block_pattern = r'(\w+)\s+(?:"([^"]+)")?\s*{([^}]+)}'

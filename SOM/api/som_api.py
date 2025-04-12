@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/usr/bin/env python3
+=======
+#!/usr/bin/env python
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 # -*- coding: utf-8 -*-
 
 """
@@ -9,17 +13,26 @@ SOM API模块
 import os
 import json
 import logging
+<<<<<<< HEAD
 import time
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from flask import Blueprint, jsonify, request, Flask
+=======
+from typing import Dict, List, Any, Optional
+from flask import Blueprint, jsonify, request
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
+<<<<<<< HEAD
         logging.FileHandler('.logs/som_api.log', mode='a', encoding='utf-8'),
+=======
+        logging.FileHandler('som_api.log'),
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         logging.StreamHandler()
     ]
 )
@@ -135,6 +148,7 @@ def create_som_namespace():
             'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
         })
     
+<<<<<<< HEAD
     # 设置应用实例，用于后续测试和路由
     app = Flask(__name__)
     app.register_blueprint(som_bp, url_prefix='/api/som')
@@ -253,3 +267,22 @@ if __name__ == '__main__':
 """
 
 # 开发团队：中华 ZhoHo，Claude 
+=======
+    return som_bp
+
+if __name__ == '__main__':
+    from flask import Flask
+    app = Flask(__name__)
+    app.register_blueprint(create_som_namespace(), url_prefix='/api/som')
+    app.run(host='0.0.0.0', port=5001, debug=True) 
+
+"""
+"""
+量子基因编码: QE-SOM-D3C9D59EECF2
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+""""""
+
+// 开发团队：中华 ZhoHo ，Claude 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

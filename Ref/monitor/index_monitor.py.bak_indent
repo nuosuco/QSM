@@ -1,0 +1,303 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+索引监控脚本 - 监控项目结构变化并自动更新索引文件
+"""
+
+import os
+import sys
+import time
+import json
+import logging
+import hashlib
+import datetime
+import subprocess
+from pathlib import Path
+
+# 设置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs", "index_monitor.log")),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("IndexMonitor")
+
+# 确保路径正确
+script_dir = os.path.dirname(os.path.abspath(__file__))
+ref_dir = os.path.dirname(script_dir)
+project_root = os.path.dirname(ref_dir)
+update_script_path = os.path.join(project_root, "frontend", "tools", "update_project_index.py")
+config_path = os.path.join(ref_dir, "data", "index_management.json")
+
+# 文件状态的缓存路径
+file_state_path = os.path.join(ref_dir, "data", "file_state.json")
+
+def create_directory_if_not_exists(path):
+    """创建目录（如果不存在）"""
+    if not os.path.exists(path):
+        os.makedirs(path)
+        logger.info(f"创建目录: {path}")
+
+def load_config():
+    """加载索引管理配置"""
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            # 默认配置
+            default_config = {
+                "last_update": datetime.datetime.now().isoformat(),
+                "index_files": {
+                    "project": "docs/world/qsm_project_index.md",
+                    "qsm": "docs/QSM/world/qsm_index.md",
+                    "som": "docs/SOM/world/som_index.md",
+                    "weq": "docs/WeQ/world/weq_index.md",
+                    "ref": "docs/Ref/world/ref_index.md",
+                    "world": "docs/world/world_modules.md",
+                    "detailed": "docs/world/detailed_index.md",
+                    "files": "docs/world/files_index.md"
+                },
+                "backup_directory": "Ref/backup/index_backups",
+                "optimization_level": 3,
+                "auto_update": True,
+                "update_interval": 86400,  # 默认1天
+                "monitor_changes": True
+            }
+            # 创建默认配置
+            create_directory_if_not_exists(os.path.dirname(config_path))
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(default_config, f, indent=2, ensure_ascii=False)
+            logger.info(f"创建默认配置文件: {config_path}")
+            return default_config
+    except Exception as e:
+        logger.error(f"加载配置文件出错: {e}")
+        return None
+
+def save_file_state(file_state):
+    """保存文件状态"""
+    try:
+        create_directory_if_not_exists(os.path.dirname(file_state_path))
+        with open(file_state_path, 'w', encoding='utf-8') as f:
+            json.dump(file_state, f, indent=2, ensure_ascii=False)
+        logger.debug("文件状态已保存")
+    except Exception as e:
+        logger.error(f"保存文件状态出错: {e}")
+
+def load_file_state():
+    """加载文件状态"""
+    try:
+        if os.path.exists(file_state_path):
+            with open(file_state_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            return {}
+    except Exception as e:
+        logger.error(f"加载文件状态出错: {e}")
+        return {}
+
+def get_file_hash(file_path):
+    """计算文件哈希值"""
+    try:
+        with open(file_path, 'rb') as f:
+            return hashlib.md5(f.read()).hexdigest()
+    except Exception as e:
+        logger.error(f"计算文件哈希值出错: {file_path} - {e}")
+        return None
+
+def get_current_file_state():
+    """获取当前项目文件状态"""
+    file_state = {}
+    ignored_dirs = ['.git', '__pycache__', '.venv', 'env', '.vscode', '.idea', '.cursor', 'node_modules',
+                    os.path.join('Ref', 'backup'), os.path.join('Ref', 'logs')]
+    
+    for root, dirs, files in os.walk(project_root):
+        # 跳过忽略的目录
+        dirs[:] = [d for d in dirs if os.path.join(root, d) not in ignored_dirs and d not in ignored_dirs]
+        
+        for file in files:
+            if file.endswith(('.py', '.md', '.html', '.js', '.css', '.json', '.yml', '.yaml')):
+                file_path = os.path.join(root, file)
+                rel_path = os.path.relpath(file_path, project_root)
+                file_hash = get_file_hash(file_path)
+                if file_hash:
+                    file_state[rel_path] = {
+                        'hash': file_hash,
+                        'mtime': os.path.getmtime(file_path)
+                    }
+    
+    return file_state
+
+def check_for_changes():
+    """检查文件变化"""
+    previous_state = load_file_state()
+    current_state = get_current_file_state()
+    
+    changes = False
+    
+    # 检查修改和新增的文件
+    for file_path, state in current_state.items():
+        if file_path not in previous_state or previous_state[file_path]['hash'] != state['hash']:
+            changes = True
+            logger.info(f"检测到文件变化: {file_path}")
+    
+    # 检查删除的文件
+    for file_path in previous_state:
+        if file_path not in current_state:
+            changes = True
+            logger.info(f"检测到文件已删除: {file_path}")
+    
+    # 保存当前状态
+    save_file_state(current_state)
+    
+    return changes
+
+def backup_index_files(config):
+    """备份索引文件"""
+    try:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_dir = os.path.join(project_root, config["backup_directory"], timestamp)
+        create_directory_if_not_exists(backup_dir)
+        
+        for _, index_path in config["index_files"].items():
+            full_path = os.path.join(project_root, index_path)
+            if os.path.exists(full_path):
+                backup_path = os.path.join(backup_dir, os.path.basename(index_path))
+                with open(full_path, 'r', encoding='utf-8') as src, open(backup_path, 'w', encoding='utf-8') as dst:
+                    dst.write(src.read())
+                logger.info(f"已备份: {index_path} -> {backup_path}")
+        
+        return True
+    except Exception as e:
+        logger.error(f"备份索引文件出错: {e}")
+        return False
+
+def update_indices():
+    """更新索引文件"""
+    try:
+        subprocess.run([sys.executable, update_script_path], check=True)
+        logger.info("已成功更新索引文件")
+        return True
+    except subprocess.SubprocessError as e:
+        logger.error(f"更新索引文件失败: {e}")
+        return False
+
+def update_config_timestamp():
+    """更新配置文件的时间戳"""
+    try:
+        config = load_config()
+        if config:
+            config["last_update"] = datetime.datetime.now().isoformat()
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            logger.info("已更新配置时间戳")
+    except Exception as e:
+        logger.error(f"更新配置时间戳出错: {e}")
+
+def run_monitor():
+    """运行监控"""
+    logger.info("启动索引监控服务")
+    
+    # 创建日志目录
+    create_directory_if_not_exists(os.path.join(ref_dir, "logs"))
+    
+    # 初始获取文件状态
+    if not os.path.exists(file_state_path):
+        current_state = get_current_file_state()
+        save_file_state(current_state)
+        logger.info("初始化文件状态完成")
+    
+    while True:
+        try:
+            config = load_config()
+            if not config:
+                logger.error("无法加载配置，监控暂停5分钟")
+                time.sleep(300)
+                continue
+            
+            if not config.get("monitor_changes", True):
+                logger.info("监控已禁用，服务退出")
+                break
+            
+            # 检查文件变化
+            if check_for_changes():
+                logger.info("检测到项目文件变化，准备更新索引")
+                
+                # 备份当前索引
+                if backup_index_files(config):
+                    # 更新索引
+                    if update_indices():
+                        update_config_timestamp()
+            
+            # 睡眠间隔
+            interval = config.get("update_interval", 3600)  # 默认一小时
+            logger.info(f"监控继续，下次检查将在{interval}秒后")
+            time.sleep(interval)
+            
+        except KeyboardInterrupt:
+            logger.info("监控服务被手动终止")
+            break
+        except Exception as e:
+            logger.error(f"监控过程中发生错误: {e}")
+            logger.info("监控服务将在60秒后重试")
+            time.sleep(60)
+
+def main():
+    """主函数"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="QSM项目索引监控工具")
+    parser.add_argument('--once', action='store_true', help="只执行一次更新检查")
+    parser.add_argument('--force-update', action='store_true', help="强制更新索引，无论是否有变化")
+    args = parser.parse_args()
+    
+    if args.once or args.force_update:
+        config = load_config()
+        if not config:
+            print("无法加载配置，退出")
+            return 1
+        
+        if args.force_update or check_for_changes():
+            print("开始更新索引...")
+            if backup_index_files(config):
+                if update_indices():
+                    update_config_timestamp()
+                    print("索引更新完成")
+                    return 0
+                else:
+                    print("索引更新失败")
+                    return 1
+            else:
+                print("备份索引文件失败")
+                return 1
+        else:
+            print("没有检测到文件变化，无需更新索引")
+            return 0
+    else:
+        run_monitor()
+        return 0
+
+if __name__ == "__main__":
+    sys.exit(main()) 
+
+"""
+
+"""
+
+    """
+    # 量子基因编码: QE-IND-AB795B1F2E41
+    # 纠缠状态: 活跃
+    # 纠缠对象: []
+    # 纠缠强度: 0.98
+    """
+    
+# 纠缠状态: 活跃
+# 纠缠对象: []
+# 纠缠强度: 0.98
+"""
+"""
+
+# 开发团队：中华 ZhoHo ，Claude 

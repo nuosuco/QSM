@@ -163,7 +163,11 @@ class QEntLLexer:
         'IDENTIFIER': r'[a-zA-Z][a-zA-Z0-9_]*',
         'NUMBER': r'\d+(\.\d+)?',
         'STRING': r'"([^"\\]|\\.)*"|\'([^\'\\]|\\.)*\'',
+<<<<<<< HEAD
         'OPERATOR': r'<=>|/|/+/||=>|[=+/-*/:<>!&|^%]',
+=======
+        'OPERATOR': r'<=>|\|\+\||=>|[=+\-*/:<>!&|^%]',
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         'PUNCTUATION': r'[(){}\[\],;.]',
         'COMMENT': r'//.*',
         'WHITESPACE': r'[ \t]+',

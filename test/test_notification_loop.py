@@ -27,7 +27,11 @@ logger = logging.getLogger('notification_loop_test')
 try:
     from Ref.utils.quantum_gene_marker import get_gene_marker, notify_monitoring_systems
     from Ref.utils.file_monitor import get_file_monitor, notify_marker_monitor
+<<<<<<< HEAD
     from Ref.utils.monitor_WeQ_output import get_WeQ_monitor, notify_weq_monitor
+=======
+    from Ref.utils.monitor_weq_output import get_weq_monitor, notify_weq_monitor
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     
     MODULES_IMPORTED = True
 except ImportError as e:

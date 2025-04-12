@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # QSM - 量子自组织市场系统
 
 QSM（Quantum Self-Organizing Market）是一个基于量子计算原理的分布式市场和经济模拟系统，结合了自组织映射（SOM）、量子基因网络（WeQ）和量子纠缠通信技术的创新平台。
@@ -174,3 +175,257 @@ python scripts/fix_unclosed_quotes.py
 # 纠缠态：活跃
 # 纠缠对象：QSM系统文档 <-> 量子开发规范
 # 纠缠强度：0.97 
+=======
+# QSM (量子自反省管理模型)
+
+QSM是一个集成了自我维护、自动监控和优化功能的系统框架，旨在为大型项目提供可靠的文件组织、完整性检查和结构优化功能。
+
+## 系统组件
+
+QSM项目由以下主要子系统组成：
+
+1. **Ref (Reference)** - 提供文件完整性监控、组织管理和自动监控功能
+2. **SOM (Self-Organizing Map)** - 实现自组织映射功能
+3. **WeQ (Weighted Quantum)** - 量子加权系统
+
+## 自动文件监控系统
+
+QSM集成了强大的自动文件监控系统，在项目启动时自动启动，实时监控文件变化并执行完整性检查。
+
+### 主要功能
+
+- 实时监控项目文件变化（创建、修改、删除、移动）
+- 自动注册新文件到监控系统
+- 自动备份修改的文件
+- 检测文件内容冲突，防止不一致修改
+- 在项目启动时自动初始化
+
+### 使用方法
+
+使用启动脚本启动QSM系统：
+
+Windows:
+```cmd
+start.bat
+```
+
+Linux/Mac:
+```bash
+./start.sh
+```
+
+关闭自动监控功能：
+
+```bash
+start.bat --no-monitor
+# 或
+./start.sh --no-monitor
+```
+
+独立运行监控服务：
+
+```bash
+python -m Ref.auto_monitor.file_watcher_service start
+```
+
+查看更多详细信息：[Ref自动监控系统](Ref/auto_monitor/README.md)
+
+## 文件完整性监控
+
+QSM项目包含一个完整的文件完整性监控系统，用于防止在多次对话中发生重复创建和不一致修改问题。
+
+### 主要功能
+
+- 文件注册与追踪
+- 冲突检测
+- 相似文件识别
+- 文件历史记录
+- 自动备份
+- 项目标准检查
+
+### 使用方法
+
+使用命令行工具：
+
+```bash
+python Ref/organization_tool.py <command> [options]
+```
+
+可用命令包括：register, scan, check, create, edit, delete
+
+查看更多详细信息：[Ref文件完整性监控系统](Ref/README.md)
+
+## 安装与配置
+
+### 依赖项
+
+- Python 3.6+
+- watchdog库（用于文件系统事件监控）
+
+### 安装
+
+```bash
+# 克隆项目
+git clone https://github.com/your-username/QSM.git
+cd QSM
+
+# 安装依赖
+pip install watchdog
+```
+
+## 配置
+
+QSM系统的配置文件位于：
+
+- `Ref/data/auto_monitor_config.json` - 自动监控系统配置
+- `Ref/data/file_registry.json` - 文件注册表
+
+## 项目结构
+
+```
+QSM/
+├── QSM/            # 主系统代码
+│   └── main.py     # 项目入口
+├── Ref/            # 文件完整性监控系统
+│   ├── auto_monitor/   # 自动监控系统
+│   ├── utils/          # 工具模块
+│   └── README.md       # Ref系统说明
+├── SOM/            # SOM子系统
+├── WeQ/            # WeQ子系统
+├── start.bat       # Windows启动脚本
+├── start.sh        # Linux/Mac启动脚本
+└── README.md       # 项目说明
+```
+
+## 贡献
+
+欢迎提交问题报告和功能请求。如果您想贡献代码，请先fork项目并创建拉取请求。
+
+## 许可证
+
+本项目采用MIT许可证。详情请参阅LICENSE文件。
+
+# 量子叠加态模型 (QSM)
+
+> 量子基因编码: QG-QSM01-DOC-20250402-A7F5E3-ENT7235
+
+量子叠加态模型是一个基于量子理论的创新型自进化系统，集成了神经网络、量子计算和区块链技术的优势，打造下一代分布式智能生态系统。
+
+## 文档指南
+
+详细文档请参阅 [docs/QSM](docs/QSM) 目录：
+
+- [QSM简介](docs/QSM/QSM_Intro.md) - 项目简介和快速上手
+- [QSM概述](docs/QSM/QSM_overview.md) - 项目的全面概述和定义
+- [开发文档](docs/QSM/QSM_Development.md) - 详细的开发指南
+- [系统导航](docs/QSM/QSM_Navigation.md) - 项目地图和导航
+- [用户指南](docs/QSM/QSM_User_Guide.md) - 用户使用指南
+- [项目管理工具](docs/QSM/tools/project_tools_guide.md) - 项目管理工具使用说明
+
+## 快速开始
+
+```bash
+# 克隆仓库
+git clone https://gitee.com/nuosuco/qsm.git
+cd QSM
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 启动自反省核心
+python Ref/ref_core.py
+
+# 启动API服务
+# 启动主量子API服务（集成所有子系统API）
+python api/qsm_api/qsm_api.py
+
+# 或使用统一启动脚本启动所有API服务
+python api/qsm_api/run_api.py --all
+```
+
+---
+
+> "在量子世界中，万物皆相连，时空皆可超越。" - QSM开发理念 
+
+# QSM项目
+
+## 简介
+
+QSM项目是一个集成了量子模拟、量子基因标记和Ref智能系统的综合框架。
+
+## 项目自动化
+
+本项目提供了多种自动化工具，用于简化开发工作流程和提高效率。
+
+### 环境设置
+
+首次使用项目前，需要设置Python虚拟环境：
+
+```bash
+# 创建虚拟环境
+python -m venv .venv
+
+# Windows激活环境
+.venv\Scripts\activate
+
+# Linux/Mac激活环境
+source .venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 自动启动所有服务
+
+我们提供了自动激活环境并启动所有服务的脚本：
+
+- **Windows**: 在PowerShell中运行 `.\activate_env.ps1`
+- **Linux/Mac**: 在终端中运行 `source ./activate_env.sh`
+
+这将自动：
+1. 激活Python虚拟环境
+2. 启动Ref核心系统
+3. 启动量子基因标记监视器
+4. 启动WeQ后台训练系统（如果存在）
+
+### VSCode集成
+
+如果使用VSCode，我们已配置了自动化任务：
+
+1. 打开命令面板（Ctrl+Shift+P）
+2. 输入 "Tasks: Run Task"
+3. 选择 "激活环境并启动所有服务"
+
+您还可以设置VSCode在打开项目文件夹时自动启动所有服务。
+
+### 量子基因标记
+
+量子基因标记功能现在不依赖于Ref系统也可以独立使用：
+
+```bash
+# 标记单个文件
+python QEntL/cli.py mark --file path/to/file.py
+
+# 标记整个目录
+python QEntL/cli.py mark --directory ./project --recursive
+```
+
+## 项目组件
+
+### QEntL (量子纠缠语言)
+
+管理量子基因标记和量子纠缠的框架。
+
+### Ref系统
+
+智能引用系统，提供自动化和优化功能。
+
+### WeQ系统
+
+后台训练和学习系统。
+
+## 注意事项
+
+- 虚拟环境的激活是所有功能正常工作的前提
+- 当所有任务完成后，可以通过运行`deactivate`命令退出虚拟环境 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

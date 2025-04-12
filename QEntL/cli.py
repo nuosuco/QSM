@@ -225,7 +225,11 @@ def cmd_clean_project(args):
                 continue
             
             # 移除量子基因标记
+<<<<<<< HEAD
             pattern = r'(?m)^(?:(?://*|#|//|"""|\'\'\')?)\s*
+=======
+            pattern = r'(?m)^(?:(?:/\*|#|//|"""|\'\'\')?)\s*
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 """
 """
 量子基因编码: Q-D7E6-EAFB-31EC
@@ -235,7 +239,11 @@ def cmd_clean_project(args):
 """"""
             new_content = re.sub(pattern, '', new_content)
             
+<<<<<<< HEAD
             pattern = r'(?m)^(?:(?://*|#|//|"""|\'\'\')?)/s*开发团队：.*?(?:/*/|/'\'\')?\s*$\n?'
+=======
+            pattern = r'(?m)^(?:(?:/\*|#|//|"""|\'\'\')?)\s*开发团队：.*?(?:\*/|\'\'\')?\s*$\n?'
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             new_content = re.sub(pattern, '', new_content)
             
             # 写回文件

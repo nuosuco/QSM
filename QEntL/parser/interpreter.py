@@ -22,12 +22,21 @@ class Interpreter:
         # 文件路径映射规则
         self.path_mappings = {
             # QEntL文件路径映射规则
+<<<<<<< HEAD
             r'(.+?)/core/.qent$': r'/1/qent/core.qent',
             r'(.+?)/quantum_network/.qent$': r'/1/qent/quantum_network.qent',
             r'(.+?)/templates/(.+?)/.qentl$': r'/1/qentl//2.qentl',
             
             # 模块QEntL文件路径映射规则
             r'(.+?)/QEntL/(.+?)_module/.qent$': r'/1/QEntL/qent//2_module.qent'
+=======
+            r'(.+?)/core\.qent$': r'\1/qent/core.qent',
+            r'(.+?)/quantum_network\.qent$': r'\1/qent/quantum_network.qent',
+            r'(.+?)/templates/(.+?)\.qentl$': r'\1/qentl/\2.qentl',
+            
+            # 模块QEntL文件路径映射规则
+            r'(.+?)/QEntL/(.+?)_module\.qent$': r'\1/QEntL/qent/\2_module.qent'
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         }
     
     def _find_project_root(self):

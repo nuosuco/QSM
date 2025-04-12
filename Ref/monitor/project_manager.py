@@ -85,12 +85,21 @@ DEFAULT_CONFIG = {
         'rebuild_interval': 3600,  # 每小时重建一次索引
         'exclude_patterns': [
             '.*/__pycache__/.*',
+<<<<<<< HEAD
             '.*///.git/.*',
             '.*/node_modules/.*',
             '.*/env/.*',
             '.*/venv/.*',
             '.*///.vscode/.*',
             '.*///.idea/.*',
+=======
+            '.*/\\.git/.*',
+            '.*/node_modules/.*',
+            '.*/env/.*',
+            '.*/venv/.*',
+            '.*/\\.vscode/.*',
+            '.*/\\.idea/.*',
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             '.*/backups/.*',
             '.*\\.log$',
             '.*\\.tmp$',

@@ -42,6 +42,7 @@ class FilePathManager:
         """添加默认的路径映射规则"""
         # QEntL文件的映射规则
         self.add_mapping(
+<<<<<<< HEAD
             r'(.*?)/core/.qent$', 
             r'/1/qent/core.qent', 
             file_types=['qentl']
@@ -54,14 +55,33 @@ class FilePathManager:
         self.add_mapping(
             r'(.*?)/templates/(.*?)/.qentl$', 
             r'/1/qentl//2.qentl', 
+=======
+            r'(.*?)/core\.qent$', 
+            r'\1/qent/core.qent', 
+            file_types=['qentl']
+        )
+        self.add_mapping(
+            r'(.*?)/quantum_network\.qent$', 
+            r'\1/qent/quantum_network.qent', 
+            file_types=['qentl']
+        )
+        self.add_mapping(
+            r'(.*?)/templates/(.*?)\.qentl$', 
+            r'\1/qentl/\2.qentl', 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
             file_types=['qentl']
         )
         
         # 各模块QEntL文件的映射规则
         for module in ['QSM', 'WeQ', 'SOM', 'Ref']:
             self.add_mapping(
+<<<<<<< HEAD
                 f'{module}/QEntL/(.+?)_module/.qent$',
                 f'{module}/QEntL/qent///1_module.qent',
+=======
+                f'{module}/QEntL/(.+?)_module\.qent$',
+                f'{module}/QEntL/qent/\\1_module.qent',
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
                 file_types=['qentl']
             )
         

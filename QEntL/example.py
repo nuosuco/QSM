@@ -147,7 +147,11 @@ def update_quantum_gene_marker(file_path: str, entangled_objects = None, strengt
         # 创建新的量子基因标记
         marker = f"{comment_start}        
         # 移除旧的量子基因标记
+<<<<<<< HEAD
         pattern = r"((?://*|#|//|<!--|''')?\s*        clean_content = re.sub(pattern, "", content, flags=re.DOTALL)
+=======
+        pattern = r"((?:/\*|#|//|<!--|''')?\s*        clean_content = re.sub(pattern, "", content, flags=re.DOTALL)
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
         
         # 添加新的标记到文件开头
         with open(file_path, 'w', encoding='utf-8') as f:

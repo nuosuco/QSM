@@ -37,8 +37,13 @@ if not logger.handlers:
 
 # 导入Ref API模块
 try:
+<<<<<<< HEAD
     from Ref.api.ref_api import create_Ref_namespace
     from Ref.ref_core import get_Ref_core
+=======
+    from Ref.api.ref_api import create_ref_namespace
+    from Ref.ref_core import get_ref_core
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
     
     ref_api_available = True
 except ImportError as e:

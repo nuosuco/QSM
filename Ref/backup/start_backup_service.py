@@ -12,7 +12,11 @@ from pathlib import Path
 ref_dir = Path(__file__).parent.parent
 sys.path.append(str(ref_dir))
 
+<<<<<<< HEAD
 from Ref_core import RefCore
+=======
+from ref_core import RefCore
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 
 def main():
     """主函数"""

@@ -251,6 +251,7 @@ if __name__ == "__main__":
     alice_wallet_data = wallet.export_wallet("Alice")
     print(f"Alice的钱包数据: {alice_wallet_data}")
     
+<<<<<<< HEAD
     print("量子钱包系统测试完成！")
 
 """
@@ -261,3 +262,16 @@ if __name__ == "__main__":
 
 开发团队：中华 ZhoHo ，Claude 
 """
+=======
+    print("量子钱包系统测试完成！") 
+
+"""
+"""
+量子基因编码: QE-QUA-9954EFFB89C3
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+""""""
+
+// 开发团队：中华 ZhoHo ，Claude 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

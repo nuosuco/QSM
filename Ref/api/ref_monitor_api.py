@@ -20,7 +20,11 @@ ref_dir = os.path.dirname(current_dir)
 project_root = os.path.dirname(ref_dir)
 sys.path.insert(0, project_root)
 
+<<<<<<< HEAD
 from Ref.ref_core import get_Ref_core
+=======
+from Ref.ref_core import get_ref_core
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 from Ref.monitor.system_monitor_enhancer import get_system_monitor
 
 # 创建蓝图
@@ -485,7 +489,11 @@ ref_dir = os.path.dirname(current_dir)
 project_root = os.path.dirname(ref_dir)
 sys.path.insert(0, project_root)
 
+<<<<<<< HEAD
 from Ref.ref_core import get_Ref_core
+=======
+from Ref.ref_core import get_ref_core
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 from Ref.monitor.system_monitor_enhancer import get_system_monitor
 
 # 创建蓝图
