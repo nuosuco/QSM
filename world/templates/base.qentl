@@ -1,0 +1,136 @@
+# QSM量子叠加模型系统基础模板
+# 量子基因: QG-TMPL-BASE-A1B2
+# 量子纠缠: QE-TMPL-BASE-20240404
+
+@metadata
+title: QSM量子叠加模型系统
+lang: zh-CN
+charset: UTF-8
+viewport: width=device-width, initial-scale=1.0
+
+@styles
+# 基础样式
+/world/static/css/normalize.qcss
+/world/static/css/quantum-theme.qcss
+/world/static/css/global.qcss
+@block extra_css
+
+@scripts
+# 基础脚本
+/world/static/js/quantum_entanglement/core.qjs
+/world/static/js/quantum_entanglement/client.qjs
+/world/static/js/quantum_loader.qjs
+/world/static/js/global.qjs
+@block extra_js
+
+@body
+# 导航栏
+@include components/nav.qentl
+
+# 主要内容
+@container main
+  @block content
+
+# 页脚
+@include components/footer.qentl
+
+# 量子加载器
+@include components/quantum_ui/loader.qentl
+
+# 页面特定脚本
+@block page_js
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="量子叠加态模型系统">
+    
+    <!-- 量子基因编码 -->
+    <meta name="quantum-gene" content="QG-TPL-BASE-WORLD-A1B1">
+    
+    <!-- 量子纠缠信道 -->
+    <script type="text/javascript">
+        window.QUANTUM_ENTANGLE = {
+            channelId: 'QE-TPL-BASE-' + Date.now(),
+            state: 'ACTIVE',
+            strength: 1.0,
+            objects: []
+        };
+    </script>
+    
+    <!-- 基础样式 -->
+    <link rel="stylesheet" href="/static/css/quantum-theme.qcss">
+    <link rel="stylesheet" href="/static/css/quantum-layout.qcss">
+    
+    <!-- 量子组件样式 -->
+    <link rel="stylesheet" href="/static/css/components/quantum-card.qcss">
+    <link rel="stylesheet" href="/static/css/components/quantum-form.qcss">
+    <link rel="stylesheet" href="/static/css/components/quantum-dialog.qcss">
+    <link rel="stylesheet" href="/static/css/components/quantum-notification.qcss">
+    
+    <title>{% block title %}量子叠加态模型系统{% endblock %}</title>
+</head>
+<body>
+    <!-- 量子纠缠容器 -->
+    <div id="quantum-entangle-root" data-strength="1.0" data-sync="true">
+        <!-- 导航栏 -->
+        <nav class="q-nav">
+            <div class="q-nav-logo">
+                <img src="/static/img/logo.png" alt="QSM Logo">
+                <span>量子叠加态模型</span>
+            </div>
+            <div class="q-nav-menu">
+                {% block navigation %}
+                <a href="/" class="q-nav-item">首页</a>
+                <a href="/weq" class="q-nav-item">量子社交</a>
+                <a href="/som" class="q-nav-item">量子经济</a>
+                <a href="/ref" class="q-nav-item">量子自反省</a>
+                {% endblock %}
+            </div>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="q-main">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="q-footer">
+            {% block footer %}
+            <div class="q-footer-content">
+                <div class="q-footer-section">
+                    <h3>关于我们</h3>
+                    <p>服务人类、服务生命、服务宇宙</p>
+                </div>
+                <div class="q-footer-section">
+                    <h3>联系方式</h3>
+                    <p>Email: contact@qsm.quantum</p>
+                </div>
+                <div class="q-footer-section">
+                    <h3>开发团队</h3>
+                    <p>中华 ZhoHo & Claude</p>
+                </div>
+            </div>
+            <div class="q-footer-bottom">
+                <p>&copy; 2024 量子叠加态模型系统. All rights reserved.</p>
+            </div>
+            {% endblock %}
+        </footer>
+    </div>
+
+    <!-- 量子纠缠通信 -->
+    <script src="/static/js/quantum-entangle/core.qjs"></script>
+    <script src="/static/js/quantum-entangle/client.qjs"></script>
+    
+    <!-- 量子组件库 -->
+    <script src="/static/js/components/quantum-card.qjs"></script>
+    <script src="/static/js/components/quantum-form.qjs"></script>
+    <script src="/static/js/components/quantum-dialog.qjs"></script>
+    <script src="/static/js/components/quantum-notification.qjs"></script>
+    
+    <!-- 页面特定脚本 -->
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

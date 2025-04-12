@@ -1,0 +1,155 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+统一日志管理模块
+
+该模块提供了统一的日志管理功能，包括：
+1. 日志目录结构管理
+2. 日志轮转
+3. 日志清理
+4. 服务状态日志记录
+"""
+
+import os
+import sys
+import logging
+import logging.handlers
+from pathlib import Path
+import datetime
+import json
+import shutil
+from typing import Dict, Optional, Union
+from logging.handlers import RotatingFileHandler
+
+class LogManager:
+    """日志管理器类"""
+    
+    def __init__(self, root_dir: Path = None):
+        self.root_dir = root_dir or Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        self.log_dir = self.root_dir / '.logs'
+        self.log_dir.mkdir(exist_ok=True)
+        
+    def get_service_logger(self, service_name: str) -> logging.Logger:
+        """获取服务日志记录器"""
+        logger = logging.getLogger(service_name)
+        logger.setLevel(logging.INFO)
+        
+        # 如果已经有处理器,不重复添加
+        if logger.handlers:
+            return logger
+            
+        # 添加文件处理器
+        file_handler = RotatingFileHandler(
+            self.log_dir / f"{service_name}.log",
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5,
+            encoding='utf-8'
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(file_handler)
+        
+        # 添加控制台处理器
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(console_handler)
+        
+        return logger
+        
+    def get_module_logger(self, module_name: str) -> logging.Logger:
+        """获取模块日志记录器"""
+        logger = logging.getLogger(module_name)
+        logger.setLevel(logging.INFO)
+        
+        # 如果已经有处理器,不重复添加
+        if logger.handlers:
+            return logger
+            
+        # 添加文件处理器
+        file_handler = RotatingFileHandler(
+            self.log_dir / f"{module_name}.log",
+            maxBytes=5*1024*1024,  # 5MB
+            backupCount=3,
+            encoding='utf-8'
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(file_handler)
+        
+        return logger
+        
+    def log_service_status(self, service_name: str, status: Dict):
+        """
+        记录服务状态
+        
+        Args:
+            service_name: 服务名称
+            status: 状态信息字典
+        """
+        status_file = self.log_dir / 'status' / f'{service_name}_status.json'
+        status['timestamp'] = datetime.datetime.now().isoformat()
+        
+        with open(status_file, 'w', encoding='utf-8') as f:
+            json.dump(status, f, ensure_ascii=False, indent=2)
+            
+    def clean_old_logs(self, days: int = 30):
+        """
+        清理指定天数之前的日志文件
+        
+        Args:
+            days: 保留最近几天的日志
+        """
+        cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+        
+        for service_dir in self.log_dir.iterdir():
+            if not service_dir.is_dir():
+                continue
+                
+            for log_file in service_dir.glob('*.log*'):
+                if log_file.stat().st_mtime < cutoff.timestamp():
+                    log_file.unlink()
+                    
+    def get_service_status(self, service_name: str) -> Optional[Dict]:
+        """
+        获取服务状态
+        
+        Args:
+            service_name: 服务名称
+            
+        Returns:
+            Dict: 服务状态信息，如果文件不存在则返回None
+        """
+        status_file = self.log_dir / 'status' / f'{service_name}_status.json'
+        if not status_file.exists():
+            return None
+            
+        with open(status_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+            
+    def get_all_service_status(self) -> Dict[str, Dict]:
+        """
+        获取所有服务的状态
+        
+        Returns:
+            Dict[str, Dict]: 服务名称到状态信息的映射
+        """
+        status = {}
+        status_dir = self.log_dir / 'status'
+        
+        for status_file in status_dir.glob('*_status.json'):
+            service_name = status_file.stem.replace('_status', '')
+            with open(status_file, 'r', encoding='utf-8') as f:
+                status[service_name] = json.load(f)
+                
+        return status
+
+"""
+量子基因编码: QE-REF-LOG-L1M2N3
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py', 'scripts/services/start_all_services.py']
+纠缠强度: 0.93
+""" 

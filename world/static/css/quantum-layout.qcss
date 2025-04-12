@@ -1,0 +1,177 @@
+/* 量子布局样式 */
+
+/* 导航栏 */
+.q-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    padding: 0 var(--q-spacing-4);
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--q-shadow-sm);
+    z-index: 100;
+}
+
+.q-nav-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--q-spacing-2);
+}
+
+.q-nav-logo img {
+    height: 40px;
+    width: auto;
+}
+
+.q-nav-logo span {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--q-gray-900);
+}
+
+.q-nav-menu {
+    display: flex;
+    gap: var(--q-spacing-4);
+}
+
+.q-nav-item {
+    color: var(--q-gray-600);
+    text-decoration: none;
+    padding: var(--q-spacing-2) var(--q-spacing-4);
+    border-radius: var(--q-radius-md);
+    transition: var(--q-transition);
+}
+
+.q-nav-item:hover {
+    color: var(--q-primary);
+    background-color: var(--q-gray-100);
+}
+
+.q-nav-item.active {
+    color: var(--q-primary);
+    background-color: var(--q-gray-100);
+}
+
+/* 主内容区 */
+.q-main {
+    margin-top: 64px;
+    min-height: calc(100vh - 64px - 300px);
+    padding: var(--q-spacing-8);
+}
+
+/* 页脚 */
+.q-footer {
+    background-color: var(--q-gray-800);
+    color: var(--q-gray-100);
+    padding: var(--q-spacing-12) var(--q-spacing-4);
+}
+
+.q-footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--q-spacing-8);
+}
+
+.q-footer-section h3 {
+    color: var(--q-gray-100);
+    margin-bottom: var(--q-spacing-4);
+    font-size: 1.25rem;
+}
+
+.q-footer-section p {
+    color: var(--q-gray-400);
+    margin-bottom: var(--q-spacing-2);
+}
+
+.q-footer-bottom {
+    margin-top: var(--q-spacing-8);
+    padding-top: var(--q-spacing-8);
+    border-top: 1px solid var(--q-gray-700);
+    text-align: center;
+    color: var(--q-gray-400);
+}
+
+/* 网格系统 */
+.q-grid {
+    display: grid;
+    gap: var(--q-spacing-4);
+}
+
+.q-grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+.q-grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.q-grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.q-grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* 容器 */
+.q-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--q-spacing-4);
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+    .q-nav {
+        height: auto;
+        flex-direction: column;
+        padding: var(--q-spacing-2);
+    }
+    
+    .q-nav-menu {
+        flex-direction: column;
+        width: 100%;
+        gap: var(--q-spacing-2);
+    }
+    
+    .q-nav-item {
+        text-align: center;
+    }
+    
+    .q-main {
+        margin-top: 120px;
+        padding: var(--q-spacing-4);
+    }
+    
+    .q-footer-content {
+        grid-template-columns: 1fr;
+        gap: var(--q-spacing-6);
+    }
+    
+    .q-grid-cols-2,
+    .q-grid-cols-3,
+    .q-grid-cols-4 {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .q-grid-cols-3,
+    .q-grid-cols-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* 量子纠缠布局效果 */
+.q-entangle-grid {
+    display: grid;
+    gap: var(--q-spacing-4);
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.q-entangle-flex {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--q-spacing-4);
+}
+
+.q-entangle-item {
+    flex: 1 1 300px;
+    min-width: 0;
+} 

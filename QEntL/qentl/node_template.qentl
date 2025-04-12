@@ -1,0 +1,33 @@
+QEntL: QEntL 2.0 Template File
+QuantumGene: QE-TEMPLATE-NODE-00001
+CreatedAt: 2023-11-05T08:00:00.000000
+EntanglementStrength: 1.0
+TemplateType: Node
+TemplateVersion: 2.0
+Author: Quantum Systems Architecture Team
+
+node {
+  id: "$NODE_ID",
+  type: "$NODE_TYPE",
+  version: "2.0",
+  description: "$DESCRIPTION",
+  
+  properties: {
+    processingPower: $PROCESSING_POWER,
+    memoryCapacity: $MEMORY_CAPACITY,
+    qubitsAvailable: $QUBITS_AVAILABLE,
+    coherenceTime: $COHERENCE_TIME,
+    fidelity: $FIDELITY,
+    errorCorrectionCapability: $ERROR_CORRECTION_CAPABILITY,
+    operationsPerSecond: $OPERATIONS_PER_SECOND
+  },
+  
+  capabilities: [
+    "$CAPABILITY1",
+    "$CAPABILITY2"
+  ],
+  
+  connections: [
+    { target: "$TARGET_NODE_ID", channelType: "$CHANNEL_TYPE" }
+  ]
+} 

@@ -1,0 +1,167 @@
+@quantum-component(name="quantum-chart")
+@quantum-entangle(strength=0.9, sync=true)
+@quantum-state({
+    chartInstance: null,
+    hoveredIndex: -1,
+    selectedIndex: -1
+})
+
+<div class="quantum-chart">
+    <canvas ref="chartCanvas"></canvas>
+    
+    <div class="quantum-chart-tooltip" v-if="hoveredIndex !== -1">
+        <div class="tooltip-title">{{ data.labels[hoveredIndex] }}</div>
+        <div class="tooltip-value">{{ data.datasets[0].data[hoveredIndex] }}</div>
+    </div>
+</div>
+
+<style lang="qcss">
+.quantum-chart {
+    position: relative;
+    background: var(--quantum-bg-color);
+    border: 1px solid var(--quantum-border-color);
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.quantum-chart canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.quantum-chart-tooltip {
+    position: absolute;
+    background: var(--quantum-bg-color);
+    border: 1px solid var(--quantum-border-color);
+    border-radius: 4px;
+    padding: 8px 12px;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+    animation: quantumFadeIn 0.2s;
+}
+
+.tooltip-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: var(--quantum-primary-color);
+}
+
+.tooltip-value {
+    color: var(--quantum-text-color);
+}
+
+/* 量子效果 */
+.quantum-chart::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    right: -1px;
+    bottom: -1px;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    animation: quantumGlow 2s infinite;
+    pointer-events: none;
+}
+
+@keyframes quantumGlow {
+    0% { border-color: var(--quantum-primary-color); opacity: 0; }
+    50% { border-color: var(--quantum-primary-color); opacity: 0.5; }
+    100% { border-color: var(--quantum-primary-color); opacity: 0; }
+}
+</style>
+
+<script lang="qjs">
+import { Chart, registerables } from 'chart.js';
+Chart.register(...registerables);
+
+export default {
+    name: 'QuantumChart',
+    props: {
+        type: {
+            type: String,
+            default: 'line'
+        },
+        data: {
+            type: Object,
+            required: true
+        },
+        options: {
+            type: Object,
+            default: () => ({})
+        }
+    },
+    
+    mounted() {
+        this.initChart();
+    },
+    
+    beforeDestroy() {
+        if (this.chartInstance) {
+            this.chartInstance.destroy();
+        }
+    },
+    
+    watch: {
+        data: {
+            deep: true,
+            handler() {
+                this.updateChart();
+            }
+        }
+    },
+    
+    methods: {
+        initChart() {
+            const ctx = this.$refs.chartCanvas.getContext('2d');
+            
+            // 合并默认配置和用户配置
+            const defaultOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1000,
+                    easing: 'easeInOutQuart'
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            font: {
+                                family: 'Quantum Sans'
+                            }
+                        }
+                    }
+                },
+                onHover: (event, elements) => {
+                    this.hoveredIndex = elements[0]?.index ?? -1;
+                },
+                onClick: (event, elements) => {
+                    this.selectedIndex = elements[0]?.index ?? -1;
+                    this.$emit('data-select', this.selectedIndex);
+                }
+            };
+            
+            const mergedOptions = {
+                ...defaultOptions,
+                ...this.options
+            };
+            
+            // 创建图表实例
+            this.chartInstance = new Chart(ctx, {
+                type: this.type,
+                data: this.data,
+                options: mergedOptions
+            });
+        },
+        
+        updateChart() {
+            if (this.chartInstance) {
+                this.chartInstance.data = this.data;
+                this.chartInstance.update();
+            }
+        }
+    }
+}
+</script> 

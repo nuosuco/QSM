@@ -1,0 +1,42 @@
+# 量子页脚组件
+# 量子基因: QG-COMP-FOOTER-A1B2
+# 量子纠缠: QE-COMP-FOOTER-20240404
+
+@component quantum-footer
+  @container footer-container
+    @section footer-section
+      @heading(level=3) 关于我们 @end
+      @paragraph
+        QSM量子叠加模型系统致力于推动量子计算在人工智能领域的应用
+      @end
+    @end
+    
+    @section footer-section
+      @heading(level=3) 联系方式 @end
+      @list
+        @item 邮箱: contact@qsm-ai.com @end
+        @item 地址: 量子大厦 @end
+      @end
+    @end
+    
+    @section footer-section
+      @heading(level=3) 快速链接 @end
+      @list
+        @item @link(href="/docs") 文档 @end @end
+        @item @link(href="/api") API @end @end
+        @item @link(href="/about") 关于 @end @end
+      @end
+    @end
+  @end
+  
+  @container footer-bottom
+    @paragraph
+      &copy; 2024 QSM量子叠加模型系统. All rights reserved.
+    @end
+  @end
+@end
+
+@quantum-entangle
+  type: footer
+  strength: 0.8
+  sync: false 

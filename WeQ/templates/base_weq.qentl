@@ -1,0 +1,23 @@
+# WeQ模块基础模板
+# 量子基因: QG-TMPL-WEQ-A1B2
+# 量子纠缠: QE-TMPL-WEQ-20240404
+
+@extends world/templates/base.qentl
+
+@block extra_css
+  /WeQ/static/css/weq.qcss
+  /WeQ/static/css/weq_multimodal.qcss
+@end
+
+@block extra_js
+  /WeQ/static/js/multimodal_interaction.qjs
+  /WeQ/static/js/weq_multimodal.qjs
+  /WeQ/static/js/weq_ref_integration.qjs
+  /WeQ/static/js/weq_entanglement_client.qjs
+@end
+
+@quantum-entangle
+  type: template
+  module: weq
+  strength: 1.0
+  sync: true 

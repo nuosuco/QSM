@@ -1,0 +1,505 @@
+/* 全局样式 */
+:root {
+    --primary-color: #3a86ff;
+    --secondary-color: #8338ec;
+    --accent-color: #ff006e;
+    --dark-color: #023047;
+    --light-color: #f8f9fa;
+    --success-color: #06d6a0;
+    --warning-color: #ffbe0b;
+    --danger-color: #ef476f;
+    --info-color: #0099cc;
+    --grey-color: #6c757d;
+    --border-radius: 4px;
+    --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+}
+
+/* 基础样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--dark-color);
+    background-color: var(--light-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+a:hover {
+    color: var(--secondary-color);
+}
+
+ul {
+    list-style: none;
+}
+
+/* 容器 */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+/* 头部导航 */
+.global-header {
+    background-color: var(--dark-color);
+    padding: 15px 0;
+    color: white;
+}
+
+.global-header nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+.global-header .logo a {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.main-nav {
+    display: flex;
+    gap: 20px;
+}
+
+.main-nav a {
+    color: white;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: var(--border-radius);
+}
+
+.main-nav a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 模型导航 */
+.model-nav {
+    background-color: var(--secondary-color);
+    padding: 10px 0;
+    color: white;
+}
+
+.model-nav ul {
+    display: flex;
+    gap: 15px;
+}
+
+.model-nav a {
+    color: white;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: var(--border-radius);
+}
+
+.model-nav a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 各模型特定导航颜色 */
+.qsm-nav {
+    background-color: var(--primary-color);
+}
+
+.weq-nav {
+    background-color: var(--accent-color);
+}
+
+.som-nav {
+    background-color: var(--success-color);
+}
+
+.ref-nav {
+    background-color: var(--info-color);
+}
+
+/* 页脚 */
+.global-footer {
+    background-color: var(--dark-color);
+    color: white;
+    padding: 40px 0 20px;
+    margin-top: 50px;
+}
+
+.footer-cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+.footer-col {
+    flex: 1;
+    min-width: 200px;
+}
+
+.footer-col h4 {
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+.footer-col ul li {
+    margin-bottom: 8px;
+}
+
+.footer-col a {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.footer-col a:hover {
+    color: white;
+}
+
+.social-links {
+    display: flex;
+    gap: 15px;
+}
+
+.copyright {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 14px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .global-header nav {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .main-nav {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .model-nav ul {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .footer-cols {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .footer-col {
+        min-width: 100%;
+    }
+}
+
+/* 工具类 */
+.text-center {
+    text-align: center;
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
+.mt-5 { margin-top: 3rem; }
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
+.mb-5 { margin-bottom: 3rem; }
+
+/* 量子特效类 - 用于全局量子效果 */
+.quantum-glow {
+    box-shadow: 0 0 15px rgba(58, 134, 255, 0.7);
+    animation: quantumPulse 2s infinite alternate;
+}
+
+@keyframes quantumPulse {
+    0% {
+        box-shadow: 0 0 15px rgba(58, 134, 255, 0.7);
+    }
+    100% {
+        box-shadow: 0 0 25px rgba(131, 56, 236, 0.9);
+    }
+} 
+:root {
+    --primary-color: #3a86ff;
+    --secondary-color: #8338ec;
+    --accent-color: #ff006e;
+    --dark-color: #023047;
+    --light-color: #f8f9fa;
+    --success-color: #06d6a0;
+    --warning-color: #ffbe0b;
+    --danger-color: #ef476f;
+    --info-color: #0099cc;
+    --grey-color: #6c757d;
+    --border-radius: 4px;
+    --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+}
+
+/* 基础样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--dark-color);
+    background-color: var(--light-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+a:hover {
+    color: var(--secondary-color);
+}
+
+ul {
+    list-style: none;
+}
+
+/* 容器 */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+/* 头部导航 */
+.global-header {
+    background-color: var(--dark-color);
+    padding: 15px 0;
+    color: white;
+}
+
+.global-header nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+.global-header .logo a {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.main-nav {
+    display: flex;
+    gap: 20px;
+}
+
+.main-nav a {
+    color: white;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: var(--border-radius);
+}
+
+.main-nav a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 模型导航 */
+.model-nav {
+    background-color: var(--secondary-color);
+    padding: 10px 0;
+    color: white;
+}
+
+.model-nav ul {
+    display: flex;
+    gap: 15px;
+}
+
+.model-nav a {
+    color: white;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: var(--border-radius);
+}
+
+.model-nav a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 各模型特定导航颜色 */
+.qsm-nav {
+    background-color: var(--primary-color);
+}
+
+.weq-nav {
+    background-color: var(--accent-color);
+}
+
+.som-nav {
+    background-color: var(--success-color);
+}
+
+.ref-nav {
+    background-color: var(--info-color);
+}
+
+/* 页脚 */
+.global-footer {
+    background-color: var(--dark-color);
+    color: white;
+    padding: 40px 0 20px;
+    margin-top: 50px;
+}
+
+.footer-cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+.footer-col {
+    flex: 1;
+    min-width: 200px;
+}
+
+.footer-col h4 {
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+.footer-col ul li {
+    margin-bottom: 8px;
+}
+
+.footer-col a {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.footer-col a:hover {
+    color: white;
+}
+
+.social-links {
+    display: flex;
+    gap: 15px;
+}
+
+.copyright {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 14px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .global-header nav {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .main-nav {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .model-nav ul {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .footer-cols {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .footer-col {
+        min-width: 100%;
+    }
+}
+
+/* 工具类 */
+.text-center {
+    text-align: center;
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mt-4 { margin-top: 2rem; }
+.mt-5 { margin-top: 3rem; }
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 2rem; }
+.mb-5 { margin-bottom: 3rem; }
+
+/* 量子特效类 - 用于全局量子效果 */
+.quantum-glow {
+    box-shadow: 0 0 15px rgba(58, 134, 255, 0.7);
+    animation: quantumPulse 2s infinite alternate;
+}
+
+@keyframes quantumPulse {
+    0% {
+        box-shadow: 0 0 15px rgba(58, 134, 255, 0.7);
+    }
+    100% {
+        box-shadow: 0 0 25px rgba(131, 56, 236, 0.9);
+    }
+} 
+
+/*
+/*
+量子基因编码: QE-GLO-4C74D691626B
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+*/*/
+
+// 开发团队：中华 ZhoHo ，Claude 

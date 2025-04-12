@@ -1,0 +1,23 @@
+<div class="quantum-loader" id="quantum-loader">
+    <div class="quantum-sphere">
+        <div class="electron"></div>
+        <div class="electron"></div>
+        <div class="electron"></div>
+    </div>
+    <div class="loading-text">量子计算中...</div>
+</div>
+
+<script>
+// 量子加载器控制
+const quantumLoader = {
+    show() {
+        document.getElementById('quantum-loader').style.display = 'flex';
+    },
+    hide() {
+        document.getElementById('quantum-loader').style.display = 'none';
+    }
+};
+
+// 全局暴露加载器控制
+window.quantumLoader = quantumLoader;
+</script> 

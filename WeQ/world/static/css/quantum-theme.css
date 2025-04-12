@@ -1,0 +1,284 @@
+/* quantum-theme.css - 全局量子主题样式 */
+
+:root {
+  /* 颜色变量 */
+  --primary-color: #3a86ff;
+  --secondary-color: #8338ec;
+  --accent-color: #ff006e;
+  --background-color: #f0f8ff;  /* 更改为淡蓝色背景 */
+  --text-color: #1a1a2e;        /* 更改为深色文本 */
+  --dark-bg: #121212;
+  --light-bg: #f8f9fa;
+  
+  /* 主题特定变量 */
+  --qsm-color: #3a86ff;
+  --weq-color: #ff006e;
+  --som-color: #fb5607;
+  --ref-color: #8338ec;
+  
+  /* 动画时间 */
+  --transition-time: 0.3s;
+}
+
+/* 基本样式 */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  background-image: linear-gradient(to bottom right, #f0f8ff, #e6f2ff, #ccedff);  /* 淡蓝色渐变背景 */
+  background-attachment: fixed;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* 主题特定 */
+.qsm-theme {
+  --theme-color: var(--qsm-color);
+}
+
+.weq-theme {
+  --theme-color: var(--weq-color);
+}
+
+.som-theme {
+  --theme-color: var(--som-color);
+}
+
+.ref-theme {
+  --theme-color: var(--ref-color);
+}
+
+/* 容器 */
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 15px;
+}
+
+/* 导航栏 */
+.main-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background-color: rgba(24, 51, 88, 0.9);  /* 深蓝色半透明背景 */
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.main-nav .logo {
+  display: flex;
+  align-items: center;
+}
+
+.main-nav .logo img {
+  height: 40px;
+  margin-right: 10px;
+}
+
+.main-nav .logo span {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ffffff;  /* 保持白色文字在深色导航栏上 */
+}
+
+.nav-links {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-links li {
+  margin: 0 15px;
+}
+
+.nav-links a {
+  color: #ffffff;  /* 导航链接使用白色 */
+  text-decoration: none;
+  font-size: 1rem;
+  transition: color var(--transition-time);
+}
+
+.nav-links a:hover {
+  color: var(--theme-color, var(--accent-color));
+}
+
+.user-area {
+  display: flex;
+  align-items: center;
+}
+
+.user-area .avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+/* 页脚 */
+footer {
+  background-color: rgba(24, 51, 88, 0.9);  /* 深蓝色半透明背景 */
+  padding: 2rem 0;
+  margin-top: 3rem;
+  color: #ffffff;  /* 页脚使用白色文字 */
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.footer-links {
+  display: flex;
+  margin-top: 1rem;
+}
+
+.footer-links a {
+  color: #ffffff;  /* 页脚链接使用白色 */
+  text-decoration: none;
+  margin: 0 10px;
+  transition: color var(--transition-time);
+}
+
+.footer-links a:hover {
+  color: var(--theme-color, var(--primary-color));
+}
+
+/* 卡片和容器 */
+.hero-section {
+  text-align: center;
+  padding: 3rem 0;
+}
+
+.hero-section h1 {
+  font-size: 2.5rem;
+  color: var(--theme-color, var(--primary-color));
+  margin-bottom: 1rem;
+}
+
+.features-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2rem;
+  padding: 2rem 0;
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, 0.8);  /* 更透明的白色背景 */
+  border-radius: 10px;
+  padding: 1.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);  /* 轻微的边框 */
+  transition: transform var(--transition-time), box-shadow var(--transition-time);
+  color: var(--text-color);  /* 使用定义的文本颜色 */
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card h3 {
+  color: var(--theme-color, var(--primary-color));
+  margin-top: 0;
+}
+
+/* 按钮 */
+.btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background-color var(--transition-time), color var(--transition-time);
+}
+
+.btn-primary {
+  background-color: var(--theme-color, var(--primary-color));
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--dark-bg);
+  color: var(--theme-color, var(--primary-color));
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--theme-color, var(--primary-color));
+  border: 2px solid var(--theme-color, var(--primary-color));
+}
+
+.btn-secondary:hover {
+  background-color: var(--theme-color, var(--primary-color));
+  color: white;
+}
+
+/* 量子特效 */
+.quantum-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.quantum-effect::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(var(--theme-color, var(--primary-color)), 0.2) 30%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  opacity: 0;
+  transform: rotate(30deg);
+  transition: opacity var(--transition-time);
+}
+
+.quantum-effect:hover::after {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .main-nav {
+    flex-direction: column;
+    padding: 1rem;
+  }
+  
+  .nav-links {
+    flex-direction: column;
+    width: 100%;
+    margin-top: 1rem;
+  }
+  
+  .nav-links li {
+    margin: 0.5rem 0;
+  }
+  
+  .user-area {
+    margin-top: 1rem;
+  }
+  
+  .features-section {
+    grid-template-columns: 1fr;
+  }
+} 
+
+/*
+/*
+量子基因编码: QE-QUA-1C9DD249F08D
+纠缠状态: 活跃
+纠缠对象: ['WeQ/weq_core.py']
+纠缠强度: 0.98
+*/*/
+
+// 开发团队：中华 ZhoHo ，Claude 

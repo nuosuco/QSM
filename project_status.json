@@ -1,0 +1,3592 @@
+{
+  "timestamp": "2025-04-12 14:54:25",
+  "structure_fixes": {
+    "timestamp": "2025-04-12 14:51:56",
+    "created_directories": [
+      "E:\\model\\QSM\\WeQ\\inference",
+      "E:\\model\\QSM\\SOM\\market",
+      "E:\\model\\QSM\\SOM\\wallet",
+      "E:\\model\\QSM\\Ref\\docs",
+      "E:\\model\\QSM\\docs\\architecture",
+      "E:\\model\\QSM\\docs\\deployment"
+    ],
+    "moved_files": [
+      {
+        "from": "api\\qsm_api\\flask_api.py",
+        "to": "api\\flask_api.py"
+      },
+      {
+        "from": "api\\qsm_api\\qsm_api.py",
+        "to": "api\\qsm_api.py"
+      },
+      {
+        "from": "api\\qsm_api\\run_api.py",
+        "to": "api\\run_api.py"
+      },
+      {
+        "from": "api\\ref_api\\ref_api.py",
+        "to": "api\\ref_api.py"
+      },
+      {
+        "from": "api\\som_api\\som_api.py",
+        "to": "api\\som_api.py"
+      },
+      {
+        "from": "api\\weq_api\\weq_api.py",
+        "to": "api\\weq_api.py"
+      },
+      {
+        "from": "QSM\\quantum_economy\\qsm\\coin\\som_coin_api.py",
+        "to": "QSM\\api\\som_coin_api.py"
+      },
+      {
+        "from": "QSM\\quantum_economy\\qsm\\marketplace\\marketplace_core.py",
+        "to": "QSM\\core\\marketplace_core.py"
+      },
+      {
+        "from": "QSM\\quantum_economy\\qsm\\wallet\\wallet_core.py",
+        "to": "QSM\\core\\wallet_core.py"
+      },
+      {
+        "from": "quantum_core\\quantum_core.py",
+        "to": "core\\quantum_core.py"
+      },
+      {
+        "from": "quantum_core\\quantum_blockchain\\quantum_blockchain_core.py",
+        "to": "core\\quantum_blockchain_core.py"
+      },
+      {
+        "from": "quantum_economy\\som\\coin\\som_coin_api.py",
+        "to": "api\\som_coin_api.py"
+      },
+      {
+        "from": "quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "to": "core\\marketplace_core.py"
+      },
+      {
+        "from": "quantum_economy\\som\\wallet\\wallet_core.py",
+        "to": "core\\wallet_core.py"
+      },
+      {
+        "from": "Ref\\ref_core.py",
+        "to": "Ref\\core\\ref_core.py"
+      },
+      {
+        "from": "Ref\\backup\\imports_20250410_173245\\core_ref_core.py",
+        "to": "Ref\\core\\core_ref_core.py"
+      },
+      {
+        "from": "Ref\\backup\\imports_20250410_173245\\tests_test_monitor.py",
+        "to": "Ref\\Ref\\monitor\\tests_test_monitor.py"
+      },
+      {
+        "from": "Ref\\backup\\imports_20250410_173245\\utils_system_monitor.py",
+        "to": "Ref\\Ref\\monitor\\utils_system_monitor.py"
+      },
+      {
+        "from": "Ref\\backup\\organize_20250410_173155\\ref_core.py",
+        "to": "Ref\\core\\ref_core.py"
+      },
+      {
+        "from": "Ref\\backup\\organize_20250410_173155\\system_monitor.py",
+        "to": "Ref\\Ref\\monitor\\system_monitor.py"
+      },
+      {
+        "from": "Ref\\backup\\organize_20250410_173155\\test_monitor.py",
+        "to": "Ref\\Ref\\monitor\\test_monitor.py"
+      },
+      {
+        "from": "Ref\\gene\\test_output_entanglement\\simplified_core.py",
+        "to": "Ref\\core\\simplified_core.py"
+      },
+      {
+        "from": "Ref\\monitor\\index_monitor.py",
+        "to": "Ref\\Ref\\monitor\\index_monitor.py"
+      },
+      {
+        "from": "Ref\\quantum_economy\\ref\\coin\\som_coin_api.py",
+        "to": "Ref\\api\\som_coin_api.py"
+      },
+      {
+        "from": "Ref\\quantum_economy\\ref\\marketplace\\marketplace_core.py",
+        "to": "Ref\\core\\marketplace_core.py"
+      },
+      {
+        "from": "Ref\\quantum_economy\\ref\\wallet\\wallet_core.py",
+        "to": "Ref\\core\\wallet_core.py"
+      },
+      {
+        "from": "Ref\\repair\\quantum_self_repair.py",
+        "to": "Ref\\Ref\\repair\\quantum_self_repair.py"
+      },
+      {
+        "from": "Ref\\tests\\test_monitor.py",
+        "to": "Ref\\Ref\\monitor\\test_monitor.py"
+      },
+      {
+        "from": "Ref\\tests\\test_system_monitor.py",
+        "to": "Ref\\Ref\\monitor\\test_system_monitor.py"
+      },
+      {
+        "from": "Ref\\utils\\file_integrity_monitor.py",
+        "to": "Ref\\Ref\\monitor\\file_integrity_monitor.py"
+      },
+      {
+        "from": "Ref\\utils\\file_monitor.py",
+        "to": "Ref\\Ref\\monitor\\file_monitor.py"
+      },
+      {
+        "from": "Ref\\utils\\system_monitor.py",
+        "to": "Ref\\Ref\\monitor\\system_monitor.py"
+      },
+      {
+        "from": "SOM\\som_core.py",
+        "to": "SOM\\core\\som_core.py"
+      },
+      {
+        "from": "SOM\\quantum_economy\\som\\coin\\som_coin_api.py",
+        "to": "SOM\\api\\som_coin_api.py"
+      },
+      {
+        "from": "SOM\\quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "to": "SOM\\core\\marketplace_core.py"
+      },
+      {
+        "from": "SOM\\quantum_economy\\som\\wallet\\wallet_core.py",
+        "to": "SOM\\core\\wallet_core.py"
+      },
+      {
+        "from": "SOM\\scripts\\services\\SOM_inference.py",
+        "to": "SOM\\SOM\\inference\\SOM_inference.py"
+      },
+      {
+        "from": "SOM\\scripts\\services\\SOM_train.py",
+        "to": "SOM\\SOM\\train\\SOM_train.py"
+      },
+      {
+        "from": "test\\direct_update_test.py",
+        "to": "tests\\direct_update_test.py"
+      },
+      {
+        "from": "test\\file_monitor_test.py",
+        "to": "tests\\file_monitor_test.py"
+      },
+      {
+        "from": "test\\manual_path_update_test.py",
+        "to": "tests\\manual_path_update_test.py"
+      },
+      {
+        "from": "test\\manual_test.py",
+        "to": "tests\\manual_test.py"
+      },
+      {
+        "from": "test\\move_test.py",
+        "to": "tests\\move_test.py"
+      },
+      {
+        "from": "test\\simple_notification_test.py",
+        "to": "tests\\simple_notification_test.py"
+      },
+      {
+        "from": "test\\simple_test.py",
+        "to": "tests\\simple_test.py"
+      },
+      {
+        "from": "WeQ\\weq_core.py",
+        "to": "WeQ\\core\\weq_core.py"
+      },
+      {
+        "from": "WeQ\\weq_inference.py",
+        "to": "WeQ\\WeQ\\inference\\weq_inference.py"
+      },
+      {
+        "from": "WeQ\\quantum_economy\\weq\\coin\\som_coin_api.py",
+        "to": "WeQ\\api\\som_coin_api.py"
+      },
+      {
+        "from": "WeQ\\quantum_economy\\weq\\marketplace\\marketplace_core.py",
+        "to": "WeQ\\core\\marketplace_core.py"
+      },
+      {
+        "from": "WeQ\\quantum_economy\\weq\\wallet\\wallet_core.py",
+        "to": "WeQ\\core\\wallet_core.py"
+      },
+      {
+        "from": "WeQ\\scripts\\services\\WeQ_inference.py",
+        "to": "WeQ\\WeQ\\inference\\WeQ_inference.py"
+      },
+      {
+        "from": "WeQ\\scripts\\services\\WeQ_train.py",
+        "to": "WeQ\\WeQ\\train\\WeQ_train.py"
+      },
+      {
+        "from": "WeQ\\train\\test_weq_train.py",
+        "to": "WeQ\\WeQ\\train\\test_weq_train.py"
+      },
+      {
+        "from": "WeQ\\train\\weq_train.py",
+        "to": "WeQ\\WeQ\\train\\weq_train.py"
+      }
+    ],
+    "synced_docs": [
+      {
+        "code_file": "__init__.py",
+        "doc_file": "docs\\__init__.md"
+      },
+      {
+        "code_file": "api\\app.py",
+        "doc_file": "docs\\api\\app.md"
+      },
+      {
+        "code_file": "api\\run_api.py",
+        "doc_file": "docs\\api\\run_api.md"
+      },
+      {
+        "code_file": "api\\ui.py",
+        "doc_file": "docs\\api\\ui.md"
+      },
+      {
+        "code_file": "api\\qsm_api\\flask_api.py",
+        "doc_file": "docs\\api\\qsm_api\\flask_api.md"
+      },
+      {
+        "code_file": "api\\qsm_api\\qsm_api.py",
+        "doc_file": "docs\\api\\qsm_api\\qsm_api.md"
+      },
+      {
+        "code_file": "api\\qsm_api\\qsm_api_config.py",
+        "doc_file": "docs\\api\\qsm_api\\qsm_api_config.md"
+      },
+      {
+        "code_file": "api\\qsm_api\\qsm_api_integration.py",
+        "doc_file": "docs\\api\\qsm_api\\qsm_api_integration.md"
+      },
+      {
+        "code_file": "api\\qsm_api\\run_api.py",
+        "doc_file": "docs\\api\\qsm_api\\run_api.md"
+      },
+      {
+        "code_file": "api\\ref_api\\ref_api.py",
+        "doc_file": "docs\\api\\ref_api\\ref_api.md"
+      },
+      {
+        "code_file": "api\\som_api\\som_api.py",
+        "doc_file": "docs\\api\\som_api\\som_api.md"
+      },
+      {
+        "code_file": "api\\weq_api\\weq_api.py",
+        "doc_file": "docs\\api\\weq_api\\weq_api.md"
+      },
+      {
+        "code_file": "crawlers\\quantum_yiwen_encoder.py",
+        "doc_file": "docs\\crawlers\\quantum_yiwen_encoder.md"
+      },
+      {
+        "code_file": "crawlers\\yiwen_crawler.py",
+        "doc_file": "docs\\crawlers\\yiwen_crawler.md"
+      },
+      {
+        "code_file": "crawlers\\yiwen_spider.py",
+        "doc_file": "docs\\crawlers\\yiwen_spider.md"
+      },
+      {
+        "code_file": "docs\\QSM\\images\\quantum_entanglement_network.py",
+        "doc_file": "docs\\QSM\\images\\quantum_entanglement_network.md"
+      },
+      {
+        "code_file": "docs\\QSM\\images\\quantum_watermark_example.py",
+        "doc_file": "docs\\QSM\\images\\quantum_watermark_example.md"
+      },
+      {
+        "code_file": "maintenance\\check_quantum_installation.py",
+        "doc_file": "docs\\maintenance\\check_quantum_installation.md"
+      },
+      {
+        "code_file": "maintenance\\create_path_modules.py",
+        "doc_file": "docs\\maintenance\\create_path_modules.md"
+      },
+      {
+        "code_file": "maintenance\\create_ref_module.py",
+        "doc_file": "docs\\maintenance\\create_ref_module.md"
+      },
+      {
+        "code_file": "maintenance\\fix_duplicates.py",
+        "doc_file": "docs\\maintenance\\fix_duplicates.md"
+      },
+      {
+        "code_file": "maintenance\\fix_indent.py",
+        "doc_file": "docs\\maintenance\\fix_indent.md"
+      },
+      {
+        "code_file": "maintenance\\fix_indent_errors.py",
+        "doc_file": "docs\\maintenance\\fix_indent_errors.md"
+      },
+      {
+        "code_file": "maintenance\\fix_kiwisolver.py",
+        "doc_file": "docs\\maintenance\\fix_kiwisolver.md"
+      },
+      {
+        "code_file": "maintenance\\fix_modules.py",
+        "doc_file": "docs\\maintenance\\fix_modules.md"
+      },
+      {
+        "code_file": "maintenance\\fix_quantum_markers.py",
+        "doc_file": "docs\\maintenance\\fix_quantum_markers.md"
+      },
+      {
+        "code_file": "maintenance\\fix_specific_code.py",
+        "doc_file": "docs\\maintenance\\fix_specific_code.md"
+      },
+      {
+        "code_file": "maintenance\\manage_files.py",
+        "doc_file": "docs\\maintenance\\manage_files.md"
+      },
+      {
+        "code_file": "maintenance\\organize_files.py",
+        "doc_file": "docs\\maintenance\\organize_files.md"
+      },
+      {
+        "code_file": "maintenance\\quantum_gene_stats.py",
+        "doc_file": "docs\\maintenance\\quantum_gene_stats.md"
+      },
+      {
+        "code_file": "maintenance\\test_indent_fixer.py",
+        "doc_file": "docs\\maintenance\\test_indent_fixer.md"
+      },
+      {
+        "code_file": "QEntL\\cli.py",
+        "doc_file": "docs\\QEntL\\cli.md"
+      },
+      {
+        "code_file": "QEntL\\engine.py",
+        "doc_file": "docs\\QEntL\\engine.md"
+      },
+      {
+        "code_file": "QEntL\\example.py",
+        "doc_file": "docs\\QEntL\\example.md"
+      },
+      {
+        "code_file": "QEntL\\file_watcher.py",
+        "doc_file": "docs\\QEntL\\file_watcher.md"
+      },
+      {
+        "code_file": "QEntL\\interpreter.py",
+        "doc_file": "docs\\QEntL\\interpreter.md"
+      },
+      {
+        "code_file": "QEntL\\qentl_cli.py",
+        "doc_file": "docs\\QEntL\\qentl_cli.md"
+      },
+      {
+        "code_file": "QEntL\\repair_qentl_files.py",
+        "doc_file": "docs\\QEntL\\repair_qentl_files.md"
+      },
+      {
+        "code_file": "QEntL\\utils.py",
+        "doc_file": "docs\\QEntL\\utils.md"
+      },
+      {
+        "code_file": "QEntL\\__init__.py",
+        "doc_file": "docs\\QEntL\\__init__.md"
+      },
+      {
+        "code_file": "QEntL\\compiler\\compiler.py",
+        "doc_file": "docs\\QEntL\\compiler\\compiler.md"
+      },
+      {
+        "code_file": "QEntL\\compiler\\__init__.py",
+        "doc_file": "docs\\QEntL\\compiler\\__init__.md"
+      },
+      {
+        "code_file": "QEntL\\demo\\quantum_network_demo.py",
+        "doc_file": "docs\\QEntL\\demo\\quantum_network_demo.md"
+      },
+      {
+        "code_file": "QEntL\\examples\\quantum_entanglement_demo.py",
+        "doc_file": "docs\\QEntL\\examples\\quantum_entanglement_demo.md"
+      },
+      {
+        "code_file": "QEntL\\parser\\interpreter.py",
+        "doc_file": "docs\\QEntL\\parser\\interpreter.md"
+      },
+      {
+        "code_file": "QEntL\\parser\\parser.py",
+        "doc_file": "docs\\QEntL\\parser\\parser.md"
+      },
+      {
+        "code_file": "QEntL\\parser\\validator.py",
+        "doc_file": "docs\\QEntL\\parser\\validator.md"
+      },
+      {
+        "code_file": "QEntL\\parser\\__init__.py",
+        "doc_file": "docs\\QEntL\\parser\\__init__.md"
+      },
+      {
+        "code_file": "QEntL\\ui\\network_config.py",
+        "doc_file": "docs\\QEntL\\ui\\network_config.md"
+      },
+      {
+        "code_file": "QEntL\\ui\\network_monitor.py",
+        "doc_file": "docs\\QEntL\\ui\\network_monitor.md"
+      },
+      {
+        "code_file": "QEntL\\utils\\quantum_network.py",
+        "doc_file": "docs\\QEntL\\utils\\quantum_network.md"
+      },
+      {
+        "code_file": "QEntL\\utils\\quantum_state.py",
+        "doc_file": "docs\\QEntL\\utils\\quantum_state.md"
+      },
+      {
+        "code_file": "QEntL\\utils\\__init__.py",
+        "doc_file": "docs\\QEntL\\utils\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\main.py",
+        "doc_file": "docs\\QSM\\main.md"
+      },
+      {
+        "code_file": "QSM\\setup.py",
+        "doc_file": "docs\\QSM\\setup.md"
+      },
+      {
+        "code_file": "QSM\\api\\qsm_api.py",
+        "doc_file": "docs\\QSM\\api\\qsm_api.md"
+      },
+      {
+        "code_file": "QSM\\quantum_blockchain\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_blockchain\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\blockchain\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\coin\\blockchain.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\coin\\som_coin.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\coin\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\coin\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\som_ecommerce.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\som_ecommerce.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\som_economy.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\som_economy.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\blockchain\\main_chain.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\blockchain\\main_chain.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\blockchain\\som_chain.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\blockchain\\som_chain.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\blockchain\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\coin\\blockchain.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\coin\\som_coin.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\coin\\som_coin_api.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\coin\\som_coin_api.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\coin\\som_coin_emission.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\coin\\som_coin_emission.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\coin\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\coin\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\marketplace\\api.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\marketplace\\api.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\marketplace\\app.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\marketplace\\app.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\marketplace\\marketplace_core.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\marketplace\\marketplace_core.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\marketplace\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\marketplace\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\traceability\\traceability_system.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\traceability\\traceability_system.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\user\\user_system.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\user\\user_system.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\wallet\\transaction.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\wallet\\wallet.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\wallet\\wallet_core.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\wallet\\wallet_core.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\qsm\\wallet\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\qsm\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\wallet\\transaction.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\wallet\\wallet.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "QSM\\quantum_economy\\wallet\\__init__.py",
+        "doc_file": "docs\\QSM\\quantum_economy\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "QSM\\scripts\\services\\QSM_app.py",
+        "doc_file": "docs\\QSM\\scripts\\services\\QSM_app.md"
+      },
+      {
+        "code_file": "QSM\\scripts\\services\\QSM_start_services.py",
+        "doc_file": "docs\\QSM\\scripts\\services\\QSM_start_services.md"
+      },
+      {
+        "code_file": "QSM\\world\\config\\paths_config.py",
+        "doc_file": "docs\\QSM\\world\\config\\paths_config.md"
+      },
+      {
+        "code_file": "QSM\\world\\tools\\path_resolver.py",
+        "doc_file": "docs\\QSM\\world\\tools\\path_resolver.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_core.py",
+        "doc_file": "docs\\quantum_core\\quantum_core.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_distributed.py",
+        "doc_file": "docs\\quantum_core\\quantum_distributed.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_ecosystem.py",
+        "doc_file": "docs\\quantum_core\\quantum_ecosystem.md"
+      },
+      {
+        "code_file": "quantum_core\\__init__.py",
+        "doc_file": "docs\\quantum_core\\__init__.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_blockchain\\qsm_knowledge.py",
+        "doc_file": "docs\\quantum_core\\quantum_blockchain\\qsm_knowledge.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_blockchain\\qsm_main_chain.py",
+        "doc_file": "docs\\quantum_core\\quantum_blockchain\\qsm_main_chain.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_blockchain\\quantum_blockchain_core.py",
+        "doc_file": "docs\\quantum_core\\quantum_blockchain\\quantum_blockchain_core.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_blockchain\\__init__.py",
+        "doc_file": "docs\\quantum_core\\quantum_blockchain\\__init__.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\claude_quantum_bridge.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\claude_quantum_bridge.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\enhanced_qgnn.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\enhanced_qgnn.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_adapter.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_adapter.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_crawler.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_crawler.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_encoder.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_encoder.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_gene_neural_implementation.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_gene_neural_implementation.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_memory.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_memory.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_reasoning.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_reasoning.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\train_quantum_gene_network.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\train_quantum_gene_network.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\weq_trainer.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\weq_trainer.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\__init__.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\__init__.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\claude_weq_bridge\\claude_quantum_bridge.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\claude_weq_bridge\\claude_quantum_bridge.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\claude_weq_bridge\\quantum_adapter.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\claude_weq_bridge\\quantum_adapter.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\claude_weq_bridge\\weq_trainer.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\claude_weq_bridge\\weq_trainer.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\network_expansion\\quantum_node_connector.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\network_expansion\\quantum_node_connector.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\physical_medium\\quantum_watermark.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\physical_medium\\quantum_watermark.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_attention\\attention.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_attention\\attention.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_attention\\__init__.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_attention\\__init__.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_memory\\memory.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_memory\\memory.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_memory\\__init__.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_memory\\__init__.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_reasoning\\reasoning.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_reasoning\\reasoning.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_reasoning\\__init__.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_reasoning\\__init__.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_semantic\\layer.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_semantic\\layer.md"
+      },
+      {
+        "code_file": "quantum_core\\quantum_gene\\quantum_semantic\\__init__.py",
+        "doc_file": "docs\\quantum_core\\quantum_gene\\quantum_semantic\\__init__.md"
+      },
+      {
+        "code_file": "quantum_economy\\__init__.py",
+        "doc_file": "docs\\quantum_economy\\__init__.md"
+      },
+      {
+        "code_file": "quantum_economy\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\quantum_economy\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "quantum_economy\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\quantum_economy\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "quantum_economy\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\quantum_economy\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "quantum_economy\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\quantum_economy\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "quantum_economy\\blockchain\\__init__.py",
+        "doc_file": "docs\\quantum_economy\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\som_ecommerce.py",
+        "doc_file": "docs\\quantum_economy\\som\\som_ecommerce.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\som_economy.py",
+        "doc_file": "docs\\quantum_economy\\som\\som_economy.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\__init__.py",
+        "doc_file": "docs\\quantum_economy\\som\\__init__.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\blockchain\\main_chain.py",
+        "doc_file": "docs\\quantum_economy\\som\\blockchain\\main_chain.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\quantum_economy\\som\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\quantum_economy\\som\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\quantum_economy\\som\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\quantum_economy\\som\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\blockchain\\som_chain.py",
+        "doc_file": "docs\\quantum_economy\\som\\blockchain\\som_chain.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\blockchain\\__init__.py",
+        "doc_file": "docs\\quantum_economy\\som\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\coin\\blockchain.py",
+        "doc_file": "docs\\quantum_economy\\som\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\coin\\som_coin.py",
+        "doc_file": "docs\\quantum_economy\\som\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\coin\\som_coin_api.py",
+        "doc_file": "docs\\quantum_economy\\som\\coin\\som_coin_api.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\coin\\som_coin_emission.py",
+        "doc_file": "docs\\quantum_economy\\som\\coin\\som_coin_emission.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\coin\\__init__.py",
+        "doc_file": "docs\\quantum_economy\\som\\coin\\__init__.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\marketplace\\api.py",
+        "doc_file": "docs\\quantum_economy\\som\\marketplace\\api.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\marketplace\\app.py",
+        "doc_file": "docs\\quantum_economy\\som\\marketplace\\app.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "doc_file": "docs\\quantum_economy\\som\\marketplace\\marketplace_core.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\marketplace\\__init__.py",
+        "doc_file": "docs\\quantum_economy\\som\\marketplace\\__init__.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\traceability\\traceability_system.py",
+        "doc_file": "docs\\quantum_economy\\som\\traceability\\traceability_system.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\user\\user_system.py",
+        "doc_file": "docs\\quantum_economy\\som\\user\\user_system.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\wallet\\transaction.py",
+        "doc_file": "docs\\quantum_economy\\som\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\wallet\\wallet.py",
+        "doc_file": "docs\\quantum_economy\\som\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\wallet\\wallet_core.py",
+        "doc_file": "docs\\quantum_economy\\som\\wallet\\wallet_core.md"
+      },
+      {
+        "code_file": "quantum_economy\\som\\wallet\\__init__.py",
+        "doc_file": "docs\\quantum_economy\\som\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "quantum_shared\\__init__.py",
+        "doc_file": "docs\\quantum_shared\\__init__.md"
+      },
+      {
+        "code_file": "quantum_shared\\quantum_storage\\quantum_db.py",
+        "doc_file": "docs\\quantum_shared\\quantum_storage\\quantum_db.md"
+      },
+      {
+        "code_file": "quantum_shared\\quantum_utils\\quantum_data_processor.py",
+        "doc_file": "docs\\quantum_shared\\quantum_utils\\quantum_data_processor.md"
+      },
+      {
+        "code_file": "quantum_shared\\quantum_utils\\quantum_parallel_query.py",
+        "doc_file": "docs\\quantum_shared\\quantum_utils\\quantum_parallel_query.md"
+      },
+      {
+        "code_file": "quantum_shared\\quantum_utils\\quantum_walk.py",
+        "doc_file": "docs\\quantum_shared\\quantum_utils\\quantum_walk.md"
+      },
+      {
+        "code_file": "Ref\\ref_core.py",
+        "doc_file": "docs\\Ref\\ref_core.md"
+      },
+      {
+        "code_file": "Ref\\__init__.py",
+        "doc_file": "docs\\Ref\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\api\\app.py",
+        "doc_file": "docs\\Ref\\api\\app.md"
+      },
+      {
+        "code_file": "Ref\\api\\ref_api.py",
+        "doc_file": "docs\\Ref\\api\\ref_api.md"
+      },
+      {
+        "code_file": "Ref\\api\\ref_api_integration.py",
+        "doc_file": "docs\\Ref\\api\\ref_api_integration.md"
+      },
+      {
+        "code_file": "Ref\\api\\ref_monitor_api.py",
+        "doc_file": "docs\\Ref\\api\\ref_monitor_api.md"
+      },
+      {
+        "code_file": "Ref\\auto_monitor\\file_watcher_service.py",
+        "doc_file": "docs\\Ref\\auto_monitor\\file_watcher_service.md"
+      },
+      {
+        "code_file": "Ref\\auto_monitor\\startup_hook.py",
+        "doc_file": "docs\\Ref\\auto_monitor\\startup_hook.md"
+      },
+      {
+        "code_file": "Ref\\auto_monitor\\__init__.py",
+        "doc_file": "docs\\Ref\\auto_monitor\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\backup\\backup_manager.py",
+        "doc_file": "docs\\Ref\\backup\\backup_manager.md"
+      },
+      {
+        "code_file": "Ref\\backup\\start_backup_service.py",
+        "doc_file": "docs\\Ref\\backup\\start_backup_service.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\api_app.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\api_app.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\core_ref_core.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\core_ref_core.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\examples_quantum_ref_demo.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\examples_quantum_ref_demo.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\tests_test_monitor.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\tests_test_monitor.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\utils_organization_tool.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\utils_organization_tool.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\utils_quantum_entanglement_comm.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\utils_quantum_entanglement_comm.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\utils_system_monitor.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\utils_system_monitor.md"
+      },
+      {
+        "code_file": "Ref\\backup\\imports_20250410_173245\\utils_system_monitor_enhancer.py",
+        "doc_file": "docs\\Ref\\backup\\imports_20250410_173245\\utils_system_monitor_enhancer.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\app.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\app.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\organization_tool.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\organization_tool.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\quantum_entanglement_comm.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\quantum_entanglement_comm.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\quantum_ref_demo.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\quantum_ref_demo.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\ref_core.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\ref_core.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\system_monitor.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\system_monitor.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\system_monitor_enhancer.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\system_monitor_enhancer.md"
+      },
+      {
+        "code_file": "Ref\\backup\\organize_20250410_173155\\test_monitor.py",
+        "doc_file": "docs\\Ref\\backup\\organize_20250410_173155\\test_monitor.md"
+      },
+      {
+        "code_file": "Ref\\core\\fs_manager.py",
+        "doc_file": "docs\\Ref\\core\\fs_manager.md"
+      },
+      {
+        "code_file": "Ref\\core\\fs_manager_usage.py",
+        "doc_file": "docs\\Ref\\core\\fs_manager_usage.md"
+      },
+      {
+        "code_file": "Ref\\core\\ref_core.py",
+        "doc_file": "docs\\Ref\\core\\ref_core.md"
+      },
+      {
+        "code_file": "Ref\\core\\__init__.py",
+        "doc_file": "docs\\Ref\\core\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\examples\\fs_manager_demo.py",
+        "doc_file": "docs\\Ref\\examples\\fs_manager_demo.md"
+      },
+      {
+        "code_file": "Ref\\examples\\quantum_ref_demo.py",
+        "doc_file": "docs\\Ref\\examples\\quantum_ref_demo.md"
+      },
+      {
+        "code_file": "Ref\\examples\\__init__.py",
+        "doc_file": "docs\\Ref\\examples\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\gene\\count_channels.py",
+        "doc_file": "docs\\Ref\\gene\\count_channels.md"
+      },
+      {
+        "code_file": "Ref\\gene\\create_quantum_channels.py",
+        "doc_file": "docs\\Ref\\gene\\create_quantum_channels.md"
+      },
+      {
+        "code_file": "Ref\\gene\\enhanced_quantum_network.py",
+        "doc_file": "docs\\Ref\\gene\\enhanced_quantum_network.md"
+      },
+      {
+        "code_file": "Ref\\gene\\quantum_gene.py",
+        "doc_file": "docs\\Ref\\gene\\quantum_gene.md"
+      },
+      {
+        "code_file": "Ref\\gene\\quantum_gene_encoder.py",
+        "doc_file": "docs\\Ref\\gene\\quantum_gene_encoder.md"
+      },
+      {
+        "code_file": "Ref\\gene\\quantum_gene_processor.py",
+        "doc_file": "docs\\Ref\\gene\\quantum_gene_processor.md"
+      },
+      {
+        "code_file": "Ref\\gene\\__init__.py",
+        "doc_file": "docs\\Ref\\gene\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\gene\\test_output_entanglement\\demo.py",
+        "doc_file": "docs\\Ref\\gene\\test_output_entanglement\\demo.md"
+      },
+      {
+        "code_file": "Ref\\gene\\test_output_entanglement\\multimodal_entanglement.py",
+        "doc_file": "docs\\Ref\\gene\\test_output_entanglement\\multimodal_entanglement.md"
+      },
+      {
+        "code_file": "Ref\\gene\\test_output_entanglement\\simplified_core.py",
+        "doc_file": "docs\\Ref\\gene\\test_output_entanglement\\simplified_core.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\file_monitor_diagnostics.py",
+        "doc_file": "docs\\Ref\\maintenance\\file_monitor_diagnostics.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_all_indentation.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_all_indentation.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_all_indents.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_all_indents.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_comments.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_comments.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_docstring_indents.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_docstring_indents.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_get_marker.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_get_marker.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_indent.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_indent.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_indentation.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_indentation.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_indent_errors.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_indent_errors.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_logging.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_logging.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_python_methods.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_python_methods.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_pywin32.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_pywin32.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_qentl_relationships.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_qentl_relationships.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_qgm.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_qgm.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_quantum_gene_marker.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_quantum_gene_marker.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_quantum_markers.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_quantum_markers.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_syntax.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_syntax.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_tabs.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_tabs.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_unclosed_quotes.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_unclosed_quotes.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\fix_utility_functions.py",
+        "doc_file": "docs\\Ref\\maintenance\\fix_utility_functions.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\indent_fixer.py",
+        "doc_file": "docs\\Ref\\maintenance\\indent_fixer.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\quantum_gene_fix.py",
+        "doc_file": "docs\\Ref\\maintenance\\quantum_gene_fix.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\replace_utilities.py",
+        "doc_file": "docs\\Ref\\maintenance\\replace_utilities.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\run_indent_fix.py",
+        "doc_file": "docs\\Ref\\maintenance\\run_indent_fix.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\system_monitor_enhancer.py",
+        "doc_file": "docs\\Ref\\maintenance\\system_monitor_enhancer.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\system_monitor_integrator.py",
+        "doc_file": "docs\\Ref\\maintenance\\system_monitor_integrator.md"
+      },
+      {
+        "code_file": "Ref\\maintenance\\test_indent_fixer.py",
+        "doc_file": "docs\\Ref\\maintenance\\test_indent_fixer.md"
+      },
+      {
+        "code_file": "Ref\\monitor\\backup_files.py",
+        "doc_file": "docs\\Ref\\monitor\\backup_files.md"
+      },
+      {
+        "code_file": "Ref\\monitor\\backup_frontend.py",
+        "doc_file": "docs\\Ref\\monitor\\backup_frontend.md"
+      },
+      {
+        "code_file": "Ref\\monitor\\cursor_performance.py",
+        "doc_file": "docs\\Ref\\monitor\\cursor_performance.md"
+      },
+      {
+        "code_file": "Ref\\monitor\\index_monitor.py",
+        "doc_file": "docs\\Ref\\monitor\\index_monitor.md"
+      },
+      {
+        "code_file": "Ref\\monitor\\project_manager.py",
+        "doc_file": "docs\\Ref\\monitor\\project_manager.md"
+      },
+      {
+        "code_file": "Ref\\monitor\\system_monitor_enhancer.py",
+        "doc_file": "docs\\Ref\\monitor\\system_monitor_enhancer.md"
+      },
+      {
+        "code_file": "Ref\\quantum_blockchain\\ref_blockchain.py",
+        "doc_file": "docs\\Ref\\quantum_blockchain\\ref_blockchain.md"
+      },
+      {
+        "code_file": "Ref\\quantum_blockchain\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_blockchain\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\blockchain\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\coin\\blockchain.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\coin\\som_coin.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\coin\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\coin\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\som_ecommerce.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\som_ecommerce.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\som_economy.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\som_economy.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\blockchain\\main_chain.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\blockchain\\main_chain.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\blockchain\\som_chain.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\blockchain\\som_chain.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\blockchain\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\coin\\blockchain.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\coin\\som_coin.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\coin\\som_coin_api.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\coin\\som_coin_api.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\coin\\som_coin_emission.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\coin\\som_coin_emission.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\coin\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\coin\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\marketplace\\api.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\marketplace\\api.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\marketplace\\app.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\marketplace\\app.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\marketplace\\marketplace_core.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\marketplace\\marketplace_core.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\marketplace\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\marketplace\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\traceability\\traceability_system.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\traceability\\traceability_system.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\user\\user_system.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\user\\user_system.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\wallet\\transaction.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\wallet\\wallet.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\wallet\\wallet_core.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\wallet\\wallet_core.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\ref\\wallet\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\ref\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\wallet\\transaction.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\wallet\\wallet.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "Ref\\quantum_economy\\wallet\\__init__.py",
+        "doc_file": "docs\\Ref\\quantum_economy\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\repair\\quantum_self_repair.py",
+        "doc_file": "docs\\Ref\\repair\\quantum_self_repair.md"
+      },
+      {
+        "code_file": "Ref\\scripts\\move_files.py",
+        "doc_file": "docs\\Ref\\scripts\\move_files.md"
+      },
+      {
+        "code_file": "Ref\\scripts\\organize_files.py",
+        "doc_file": "docs\\Ref\\scripts\\organize_files.md"
+      },
+      {
+        "code_file": "Ref\\scripts\\organize_project.py",
+        "doc_file": "docs\\Ref\\scripts\\organize_project.md"
+      },
+      {
+        "code_file": "Ref\\scripts\\services\\Ref_app.py",
+        "doc_file": "docs\\Ref\\scripts\\services\\Ref_app.md"
+      },
+      {
+        "code_file": "Ref\\scripts\\services\\Ref_start_services.py",
+        "doc_file": "docs\\Ref\\scripts\\services\\Ref_start_services.md"
+      },
+      {
+        "code_file": "Ref\\tests\\test_monitor.py",
+        "doc_file": "docs\\Ref\\tests\\test_monitor.md"
+      },
+      {
+        "code_file": "Ref\\tests\\test_quotes.py",
+        "doc_file": "docs\\Ref\\tests\\test_quotes.md"
+      },
+      {
+        "code_file": "Ref\\tests\\test_system_monitor.py",
+        "doc_file": "docs\\Ref\\tests\\test_system_monitor.md"
+      },
+      {
+        "code_file": "Ref\\utils\\directory_structure_optimizer.py",
+        "doc_file": "docs\\Ref\\utils\\directory_structure_optimizer.md"
+      },
+      {
+        "code_file": "Ref\\utils\\file_integrity_monitor.py",
+        "doc_file": "docs\\Ref\\utils\\file_integrity_monitor.md"
+      },
+      {
+        "code_file": "Ref\\utils\\file_monitor.py",
+        "doc_file": "docs\\Ref\\utils\\file_monitor.md"
+      },
+      {
+        "code_file": "Ref\\utils\\file_organization_guardian.py",
+        "doc_file": "docs\\Ref\\utils\\file_organization_guardian.md"
+      },
+      {
+        "code_file": "Ref\\utils\\index_system_setup.py",
+        "doc_file": "docs\\Ref\\utils\\index_system_setup.md"
+      },
+      {
+        "code_file": "Ref\\utils\\integrate_weq.py",
+        "doc_file": "docs\\Ref\\utils\\integrate_weq.md"
+      },
+      {
+        "code_file": "Ref\\utils\\log_config.py",
+        "doc_file": "docs\\Ref\\utils\\log_config.md"
+      },
+      {
+        "code_file": "Ref\\utils\\monitor_weq_output.py",
+        "doc_file": "docs\\Ref\\utils\\monitor_weq_output.md"
+      },
+      {
+        "code_file": "Ref\\utils\\optimize_performance.py",
+        "doc_file": "docs\\Ref\\utils\\optimize_performance.md"
+      },
+      {
+        "code_file": "Ref\\utils\\organization_tool.py",
+        "doc_file": "docs\\Ref\\utils\\organization_tool.md"
+      },
+      {
+        "code_file": "Ref\\utils\\project_organizer.py",
+        "doc_file": "docs\\Ref\\utils\\project_organizer.md"
+      },
+      {
+        "code_file": "Ref\\utils\\quantum_entanglement_comm.py",
+        "doc_file": "docs\\Ref\\utils\\quantum_entanglement_comm.md"
+      },
+      {
+        "code_file": "Ref\\utils\\quantum_gene_marker.py",
+        "doc_file": "docs\\Ref\\utils\\quantum_gene_marker.md"
+      },
+      {
+        "code_file": "Ref\\utils\\quantum_gene_marker_backup.py",
+        "doc_file": "docs\\Ref\\utils\\quantum_gene_marker_backup.md"
+      },
+      {
+        "code_file": "Ref\\utils\\quantum_gene_marker_bak.py",
+        "doc_file": "docs\\Ref\\utils\\quantum_gene_marker_bak.md"
+      },
+      {
+        "code_file": "Ref\\utils\\quantum_gene_marker_fixed.py",
+        "doc_file": "docs\\Ref\\utils\\quantum_gene_marker_fixed.md"
+      },
+      {
+        "code_file": "Ref\\utils\\self_maintenance.py",
+        "doc_file": "docs\\Ref\\utils\\self_maintenance.md"
+      },
+      {
+        "code_file": "Ref\\utils\\system_monitor.py",
+        "doc_file": "docs\\Ref\\utils\\system_monitor.md"
+      },
+      {
+        "code_file": "Ref\\utils\\system_monitor_enhancer.py",
+        "doc_file": "docs\\Ref\\utils\\system_monitor_enhancer.md"
+      },
+      {
+        "code_file": "Ref\\utils\\__init__.py",
+        "doc_file": "docs\\Ref\\utils\\__init__.md"
+      },
+      {
+        "code_file": "Ref\\world\\config\\paths_config.py",
+        "doc_file": "docs\\Ref\\world\\config\\paths_config.md"
+      },
+      {
+        "code_file": "Ref\\world\\tools\\path_resolver.py",
+        "doc_file": "docs\\Ref\\world\\tools\\path_resolver.md"
+      },
+      {
+        "code_file": "scripts\\cleanup_structure.py",
+        "doc_file": "docs\\scripts\\cleanup_structure.md"
+      },
+      {
+        "code_file": "scripts\\debug_script.py",
+        "doc_file": "docs\\scripts\\debug_script.md"
+      },
+      {
+        "code_file": "scripts\\fix_services.py",
+        "doc_file": "docs\\scripts\\fix_services.md"
+      },
+      {
+        "code_file": "scripts\\normalize_structure.py",
+        "doc_file": "docs\\scripts\\normalize_structure.md"
+      },
+      {
+        "code_file": "scripts\\services\\start_all_services.py",
+        "doc_file": "docs\\scripts\\services\\start_all_services.md"
+      },
+      {
+        "code_file": "scripts\\services\\stop_all_services.py",
+        "doc_file": "docs\\scripts\\services\\stop_all_services.md"
+      },
+      {
+        "code_file": "SOM\\ecom_aggregator.py",
+        "doc_file": "docs\\SOM\\ecom_aggregator.md"
+      },
+      {
+        "code_file": "SOM\\mock_cirq.py",
+        "doc_file": "docs\\SOM\\mock_cirq.md"
+      },
+      {
+        "code_file": "SOM\\quantum_app_store.py",
+        "doc_file": "docs\\SOM\\quantum_app_store.md"
+      },
+      {
+        "code_file": "SOM\\quantum_contract.py",
+        "doc_file": "docs\\SOM\\quantum_contract.md"
+      },
+      {
+        "code_file": "SOM\\quantum_ecommerce.py",
+        "doc_file": "docs\\SOM\\quantum_ecommerce.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy.py",
+        "doc_file": "docs\\SOM\\quantum_economy.md"
+      },
+      {
+        "code_file": "SOM\\quantum_merchant_upload.py",
+        "doc_file": "docs\\SOM\\quantum_merchant_upload.md"
+      },
+      {
+        "code_file": "SOM\\quantum_payment_gateway.py",
+        "doc_file": "docs\\SOM\\quantum_payment_gateway.md"
+      },
+      {
+        "code_file": "SOM\\quantum_tracking.py",
+        "doc_file": "docs\\SOM\\quantum_tracking.md"
+      },
+      {
+        "code_file": "SOM\\quantum_wallet.py",
+        "doc_file": "docs\\SOM\\quantum_wallet.md"
+      },
+      {
+        "code_file": "SOM\\som_coin_system.py",
+        "doc_file": "docs\\SOM\\som_coin_system.md"
+      },
+      {
+        "code_file": "SOM\\som_core.py",
+        "doc_file": "docs\\SOM\\som_core.md"
+      },
+      {
+        "code_file": "SOM\\test_qe_system.py",
+        "doc_file": "docs\\SOM\\test_qe_system.md"
+      },
+      {
+        "code_file": "SOM\\__init__.py",
+        "doc_file": "docs\\SOM\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\api\\som_api.py",
+        "doc_file": "docs\\SOM\\api\\som_api.md"
+      },
+      {
+        "code_file": "SOM\\quantum_blockchain\\som_blockchain.py",
+        "doc_file": "docs\\SOM\\quantum_blockchain\\som_blockchain.md"
+      },
+      {
+        "code_file": "SOM\\quantum_blockchain\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_blockchain\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\blockchain\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\coin\\blockchain.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\coin\\som_coin.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\coin\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\coin\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\som_ecommerce.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\som_ecommerce.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\som_economy.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\som_economy.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\blockchain\\main_chain.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\blockchain\\main_chain.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\blockchain\\som_chain.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\blockchain\\som_chain.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\blockchain\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\coin\\blockchain.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\coin\\som_coin.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\coin\\som_coin_api.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\coin\\som_coin_api.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\coin\\som_coin_emission.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\coin\\som_coin_emission.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\coin\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\coin\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\marketplace\\api.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\marketplace\\api.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\marketplace\\app.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\marketplace\\app.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\marketplace\\marketplace_core.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\marketplace\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\marketplace\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\traceability\\traceability_system.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\traceability\\traceability_system.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\user\\user_system.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\user\\user_system.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\wallet\\transaction.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\wallet\\wallet.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\wallet\\wallet_core.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\wallet\\wallet_core.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\som\\wallet\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\som\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\wallet\\transaction.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\wallet\\wallet.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "SOM\\quantum_economy\\wallet\\__init__.py",
+        "doc_file": "docs\\SOM\\quantum_economy\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "SOM\\scripts\\services\\SOM_app.py",
+        "doc_file": "docs\\SOM\\scripts\\services\\SOM_app.md"
+      },
+      {
+        "code_file": "SOM\\scripts\\services\\SOM_inference.py",
+        "doc_file": "docs\\SOM\\scripts\\services\\SOM_inference.md"
+      },
+      {
+        "code_file": "SOM\\scripts\\services\\SOM_start_services.py",
+        "doc_file": "docs\\SOM\\scripts\\services\\SOM_start_services.md"
+      },
+      {
+        "code_file": "SOM\\scripts\\services\\SOM_train.py",
+        "doc_file": "docs\\SOM\\scripts\\services\\SOM_train.md"
+      },
+      {
+        "code_file": "SOM\\world\\config\\paths_config.py",
+        "doc_file": "docs\\SOM\\world\\config\\paths_config.md"
+      },
+      {
+        "code_file": "SOM\\world\\tools\\path_resolver.py",
+        "doc_file": "docs\\SOM\\world\\tools\\path_resolver.md"
+      },
+      {
+        "code_file": "test\\direct_update_test.py",
+        "doc_file": "docs\\test\\direct_update_test.md"
+      },
+      {
+        "code_file": "test\\file_monitor_test.py",
+        "doc_file": "docs\\test\\file_monitor_test.md"
+      },
+      {
+        "code_file": "test\\manual_path_update_2.py",
+        "doc_file": "docs\\test\\manual_path_update_2.md"
+      },
+      {
+        "code_file": "test\\manual_path_update_test.py",
+        "doc_file": "docs\\test\\manual_path_update_test.md"
+      },
+      {
+        "code_file": "test\\manual_test.py",
+        "doc_file": "docs\\test\\manual_test.md"
+      },
+      {
+        "code_file": "test\\moved_file.py",
+        "doc_file": "docs\\test\\moved_file.md"
+      },
+      {
+        "code_file": "test\\move_test.py",
+        "doc_file": "docs\\test\\move_test.md"
+      },
+      {
+        "code_file": "test\\no_entanglement.py",
+        "doc_file": "docs\\test\\no_entanglement.md"
+      },
+      {
+        "code_file": "test\\quantum_reference.py",
+        "doc_file": "docs\\test\\quantum_reference.md"
+      },
+      {
+        "code_file": "test\\simple_notification_test.py",
+        "doc_file": "docs\\test\\simple_notification_test.md"
+      },
+      {
+        "code_file": "test\\simple_ref.py",
+        "doc_file": "docs\\test\\simple_ref.md"
+      },
+      {
+        "code_file": "test\\simple_test.py",
+        "doc_file": "docs\\test\\simple_test.md"
+      },
+      {
+        "code_file": "test\\test_auto_mark2.py",
+        "doc_file": "docs\\test\\test_auto_mark2.md"
+      },
+      {
+        "code_file": "test\\test_common.py",
+        "doc_file": "docs\\test\\test_common.md"
+      },
+      {
+        "code_file": "test\\test_file_handler.py",
+        "doc_file": "docs\\test\\test_file_handler.md"
+      },
+      {
+        "code_file": "test\\test_file_monitor.py",
+        "doc_file": "docs\\test\\test_file_monitor.md"
+      },
+      {
+        "code_file": "test\\test_file_movement.py",
+        "doc_file": "docs\\test\\test_file_movement.md"
+      },
+      {
+        "code_file": "test\\test_marker_independence.py",
+        "doc_file": "docs\\test\\test_marker_independence.md"
+      },
+      {
+        "code_file": "test\\test_moved_back.py",
+        "doc_file": "docs\\test\\test_moved_back.md"
+      },
+      {
+        "code_file": "test\\test_notification_loop.py",
+        "doc_file": "docs\\test\\test_notification_loop.md"
+      },
+      {
+        "code_file": "test\\test_path_update.py",
+        "doc_file": "docs\\test\\test_path_update.md"
+      },
+      {
+        "code_file": "test\\test_quantum_data_processor.py",
+        "doc_file": "docs\\test\\test_quantum_data_processor.md"
+      },
+      {
+        "code_file": "test\\test_quantum_db.py",
+        "doc_file": "docs\\test\\test_quantum_db.md"
+      },
+      {
+        "code_file": "test\\test_quantum_experience.py",
+        "doc_file": "docs\\test\\test_quantum_experience.md"
+      },
+      {
+        "code_file": "test\\test_quantum_self_repair.py",
+        "doc_file": "docs\\test\\test_quantum_self_repair.md"
+      },
+      {
+        "code_file": "test\\test_quantum_walk.py",
+        "doc_file": "docs\\test\\test_quantum_walk.md"
+      },
+      {
+        "code_file": "test\\__init__.py",
+        "doc_file": "docs\\test\\__init__.md"
+      },
+      {
+        "code_file": "test\\file_monitor_test\\destination\\source_file.py",
+        "doc_file": "docs\\test\\file_monitor_test\\destination\\source_file.md"
+      },
+      {
+        "code_file": "test\\file_monitor_test\\source\\reference_file.py",
+        "doc_file": "docs\\test\\file_monitor_test\\source\\reference_file.md"
+      },
+      {
+        "code_file": "test\\monitor_test\\no_gene.py",
+        "doc_file": "docs\\test\\monitor_test\\no_gene.md"
+      },
+      {
+        "code_file": "test\\monitor_test\\no_gene2.py",
+        "doc_file": "docs\\test\\monitor_test\\no_gene2.md"
+      },
+      {
+        "code_file": "test\\monitor_test\\reference.py",
+        "doc_file": "docs\\test\\monitor_test\\reference.md"
+      },
+      {
+        "code_file": "test\\monitor_test\\moved\\source_moved.py",
+        "doc_file": "docs\\test\\monitor_test\\moved\\source_moved.md"
+      },
+      {
+        "code_file": "test\\monitor_test2\\reference_b.py",
+        "doc_file": "docs\\test\\monitor_test2\\reference_b.md"
+      },
+      {
+        "code_file": "test\\monitor_test2\\moved\\source_b_moved.py",
+        "doc_file": "docs\\test\\monitor_test2\\moved\\source_b_moved.md"
+      },
+      {
+        "code_file": "test\\monitor_test3\\reference_c.py",
+        "doc_file": "docs\\test\\monitor_test3\\reference_c.md"
+      },
+      {
+        "code_file": "test\\monitor_test3\\moved\\source_c_moved.py",
+        "doc_file": "docs\\test\\monitor_test3\\moved\\source_c_moved.md"
+      },
+      {
+        "code_file": "test\\moved_folder\\quantum_source_moved.py",
+        "doc_file": "docs\\test\\moved_folder\\quantum_source_moved.md"
+      },
+      {
+        "code_file": "test\\normal_dir\\test_moved.py",
+        "doc_file": "docs\\test\\normal_dir\\test_moved.md"
+      },
+      {
+        "code_file": "test\\normal_dir\\test_normal.py",
+        "doc_file": "docs\\test\\normal_dir\\test_normal.md"
+      },
+      {
+        "code_file": "test\\temp\\reference_file.py",
+        "doc_file": "docs\\test\\temp\\reference_file.md"
+      },
+      {
+        "code_file": "test\\temp\\source_file.py",
+        "doc_file": "docs\\test\\temp\\source_file.md"
+      },
+      {
+        "code_file": "test\\temp_moved\\source_file.py",
+        "doc_file": "docs\\test\\temp_moved\\source_file.md"
+      },
+      {
+        "code_file": "test\\test_dir2\\test_auto_mark1.py",
+        "doc_file": "docs\\test\\test_dir2\\test_auto_mark1.md"
+      },
+      {
+        "code_file": "test\\test_monitor\\simple_moved_new.py",
+        "doc_file": "docs\\test\\test_monitor\\simple_moved_new.md"
+      },
+      {
+        "code_file": "test\\test_monitor\\simple_moved_renamed.py",
+        "doc_file": "docs\\test\\test_monitor\\simple_moved_renamed.md"
+      },
+      {
+        "code_file": "WeQ\\output_processor.py",
+        "doc_file": "docs\\WeQ\\output_processor.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_interaction.py",
+        "doc_file": "docs\\WeQ\\quantum_interaction.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_media.py",
+        "doc_file": "docs\\WeQ\\quantum_media.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_visualization.py",
+        "doc_file": "docs\\WeQ\\quantum_visualization.md"
+      },
+      {
+        "code_file": "WeQ\\weq_core.py",
+        "doc_file": "docs\\WeQ\\weq_core.md"
+      },
+      {
+        "code_file": "WeQ\\weq_inference.py",
+        "doc_file": "docs\\WeQ\\weq_inference.md"
+      },
+      {
+        "code_file": "WeQ\\__init__.py",
+        "doc_file": "docs\\WeQ\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\api\\weq_api.py",
+        "doc_file": "docs\\WeQ\\api\\weq_api.md"
+      },
+      {
+        "code_file": "WeQ\\api\\weq_api_integration.py",
+        "doc_file": "docs\\WeQ\\api\\weq_api_integration.md"
+      },
+      {
+        "code_file": "WeQ\\knowledge\\background_training.py",
+        "doc_file": "docs\\WeQ\\knowledge\\background_training.md"
+      },
+      {
+        "code_file": "WeQ\\knowledge\\qsm_trainer.py",
+        "doc_file": "docs\\WeQ\\knowledge\\qsm_trainer.md"
+      },
+      {
+        "code_file": "WeQ\\knowledge\\start_knowledge_training.py",
+        "doc_file": "docs\\WeQ\\knowledge\\start_knowledge_training.md"
+      },
+      {
+        "code_file": "WeQ\\knowledge\\start_knowledge_training_simple.py",
+        "doc_file": "docs\\WeQ\\knowledge\\start_knowledge_training_simple.md"
+      },
+      {
+        "code_file": "WeQ\\knowledge\\start_yolo_mode.py",
+        "doc_file": "docs\\WeQ\\knowledge\\start_yolo_mode.md"
+      },
+      {
+        "code_file": "WeQ\\knowledge\\train_quantum_gene_network.py",
+        "doc_file": "docs\\WeQ\\knowledge\\train_quantum_gene_network.md"
+      },
+      {
+        "code_file": "WeQ\\knowledge\\training_data\\quantum_blockchain_learning.py",
+        "doc_file": "docs\\WeQ\\knowledge\\training_data\\quantum_blockchain_learning.md"
+      },
+      {
+        "code_file": "WeQ\\modules\\output.py",
+        "doc_file": "docs\\WeQ\\modules\\output.md"
+      },
+      {
+        "code_file": "WeQ\\neural\\quantum_neural_network.py",
+        "doc_file": "docs\\WeQ\\neural\\quantum_neural_network.md"
+      },
+      {
+        "code_file": "WeQ\\output\\qentl_formatter.py",
+        "doc_file": "docs\\WeQ\\output\\qentl_formatter.md"
+      },
+      {
+        "code_file": "WeQ\\output\\sample_output.py",
+        "doc_file": "docs\\WeQ\\output\\sample_output.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_blockchain\\weq_blockchain.py",
+        "doc_file": "docs\\WeQ\\quantum_blockchain\\weq_blockchain.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_blockchain\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_blockchain\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\blockchain\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\coin\\blockchain.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\coin\\som_coin.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\coin\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\coin\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\wallet\\transaction.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\wallet\\wallet.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\wallet\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\som_ecommerce.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\som_ecommerce.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\som_economy.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\som_economy.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\blockchain\\main_chain.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\blockchain\\main_chain.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\blockchain\\quantum_asset.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\blockchain\\quantum_asset.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\blockchain\\quantum_chain.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\blockchain\\quantum_chain.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\blockchain\\quantum_timestamp.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\blockchain\\quantum_timestamp.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\blockchain\\quantum_validator.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\blockchain\\quantum_validator.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\blockchain\\som_chain.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\blockchain\\som_chain.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\blockchain\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\blockchain\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\coin\\blockchain.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\coin\\blockchain.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\coin\\som_coin.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\coin\\som_coin.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\coin\\som_coin_api.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\coin\\som_coin_api.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\coin\\som_coin_emission.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\coin\\som_coin_emission.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\coin\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\coin\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\marketplace\\api.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\marketplace\\api.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\marketplace\\app.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\marketplace\\app.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\marketplace\\marketplace_core.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\marketplace\\marketplace_core.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\marketplace\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\marketplace\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\traceability\\traceability_system.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\traceability\\traceability_system.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\user\\user_system.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\user\\user_system.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\wallet\\transaction.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\wallet\\transaction.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\wallet\\wallet.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\wallet\\wallet.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\wallet\\wallet_core.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\wallet\\wallet_core.md"
+      },
+      {
+        "code_file": "WeQ\\quantum_economy\\weq\\wallet\\__init__.py",
+        "doc_file": "docs\\WeQ\\quantum_economy\\weq\\wallet\\__init__.md"
+      },
+      {
+        "code_file": "WeQ\\scripts\\services\\WeQ_app.py",
+        "doc_file": "docs\\WeQ\\scripts\\services\\WeQ_app.md"
+      },
+      {
+        "code_file": "WeQ\\scripts\\services\\WeQ_inference.py",
+        "doc_file": "docs\\WeQ\\scripts\\services\\WeQ_inference.md"
+      },
+      {
+        "code_file": "WeQ\\scripts\\services\\WeQ_services.py",
+        "doc_file": "docs\\WeQ\\scripts\\services\\WeQ_services.md"
+      },
+      {
+        "code_file": "WeQ\\scripts\\services\\WeQ_start_services.py",
+        "doc_file": "docs\\WeQ\\scripts\\services\\WeQ_start_services.md"
+      },
+      {
+        "code_file": "WeQ\\scripts\\services\\WeQ_train.py",
+        "doc_file": "docs\\WeQ\\scripts\\services\\WeQ_train.md"
+      },
+      {
+        "code_file": "WeQ\\tools\\qentl_repair_tool.py",
+        "doc_file": "docs\\WeQ\\tools\\qentl_repair_tool.md"
+      },
+      {
+        "code_file": "WeQ\\train\\test_weq_train.py",
+        "doc_file": "docs\\WeQ\\train\\test_weq_train.md"
+      },
+      {
+        "code_file": "WeQ\\train\\weq_train.py",
+        "doc_file": "docs\\WeQ\\train\\weq_train.md"
+      },
+      {
+        "code_file": "WeQ\\train\\weq_train_par.py",
+        "doc_file": "docs\\WeQ\\train\\weq_train_par.md"
+      },
+      {
+        "code_file": "WeQ\\train\\weq_train_seq.py",
+        "doc_file": "docs\\WeQ\\train\\weq_train_seq.md"
+      },
+      {
+        "code_file": "WeQ\\world\\config\\paths_config.py",
+        "doc_file": "docs\\WeQ\\world\\config\\paths_config.md"
+      },
+      {
+        "code_file": "WeQ\\world\\tools\\path_resolver.py",
+        "doc_file": "docs\\WeQ\\world\\tools\\path_resolver.md"
+      },
+      {
+        "code_file": "world\\config\\paths_config.py",
+        "doc_file": "docs\\world\\config\\paths_config.md"
+      },
+      {
+        "code_file": "world\\path_manager\\file_path_helpers.py",
+        "doc_file": "docs\\world\\path_manager\\file_path_helpers.md"
+      },
+      {
+        "code_file": "world\\path_manager\\file_path_manager.py",
+        "doc_file": "docs\\world\\path_manager\\file_path_manager.md"
+      },
+      {
+        "code_file": "world\\path_manager\\integrate_path_manager.py",
+        "doc_file": "docs\\world\\path_manager\\integrate_path_manager.md"
+      },
+      {
+        "code_file": "world\\path_manager\\test_path_manager.py",
+        "doc_file": "docs\\world\\path_manager\\test_path_manager.md"
+      },
+      {
+        "code_file": "world\\path_manager\\__init__.py",
+        "doc_file": "docs\\world\\path_manager\\__init__.md"
+      },
+      {
+        "code_file": "world\\tools\\path_resolver.py",
+        "doc_file": "docs\\world\\tools\\path_resolver.md"
+      }
+    ],
+    "added_markers": [],
+    "fixed_references": [
+      {
+        "file": "api\\app.py",
+        "line": 81,
+        "from": "api.qsm_api.qsm_api",
+        "to": "api.QSM_api.QSM_api"
+      },
+      {
+        "file": "api\\app.py",
+        "line": 98,
+        "from": "api.qsm_api.qsm_api",
+        "to": "api.QSM_api.QSM_api"
+      },
+      {
+        "file": "api\\app.py",
+        "line": 144,
+        "from": "api.weq_api.weq_api",
+        "to": "api.WeQ_api.WeQ_api"
+      },
+      {
+        "file": "api\\app.py",
+        "line": 161,
+        "from": "api.weq_api.weq_api",
+        "to": "api.WeQ_api.WeQ_api"
+      },
+      {
+        "file": "api\\app.py",
+        "line": 207,
+        "from": "api.som_api.som_api",
+        "to": "api.SOM_api.SOM_api"
+      },
+      {
+        "file": "api\\app.py",
+        "line": 224,
+        "from": "api.som_api.som_api",
+        "to": "api.SOM_api.SOM_api"
+      },
+      {
+        "file": "api\\app.py",
+        "line": 270,
+        "from": "api.ref_api.ref_api",
+        "to": "api.Ref_api.Ref_api"
+      },
+      {
+        "file": "api\\app.py",
+        "line": 287,
+        "from": "api.ref_api.ref_api",
+        "to": "api.Ref_api.Ref_api"
+      },
+      {
+        "file": "api\\ui.py",
+        "line": 60,
+        "from": "api.qsm_api.qsm_api",
+        "to": "api.QSM_api.QSM_api"
+      },
+      {
+        "file": "api\\ui.py",
+        "line": 61,
+        "from": "api.weq_api.weq_api",
+        "to": "api.WeQ_api.WeQ_api"
+      },
+      {
+        "file": "api\\ui.py",
+        "line": 62,
+        "from": "api.som_api.som_api",
+        "to": "api.SOM_api.SOM_api"
+      },
+      {
+        "file": "api\\ui.py",
+        "line": 63,
+        "from": "api.ref_api.ref_api",
+        "to": "api.Ref_api.Ref_api"
+      },
+      {
+        "file": "api\\qsm_api\\qsm_api.py",
+        "line": 40,
+        "from": "api.qsm_api.flask_api",
+        "to": "api.QSM_api.flask_api"
+      },
+      {
+        "file": "api\\qsm_api\\qsm_api_integration.py",
+        "line": 119,
+        "from": "qsm_api_integration",
+        "to": "QSM_api_integration"
+      },
+      {
+        "file": "api\\qsm_api\\qsm_api_integration.py",
+        "line": 119,
+        "from": "integrate_som_to_qsm",
+        "to": "integrate_som_to_QSM"
+      },
+      {
+        "file": "api\\qsm_api\\qsm_api_integration.py",
+        "line": 119,
+        "from": "integrate_som_to_qsm",
+        "to": "integrate_SOM_to_qsm"
+      },
+      {
+        "file": "api\\qsm_api\\run_api.py",
+        "line": 23,
+        "from": "api.qsm_api.qsm_api_config",
+        "to": "api.QSM_api.QSM_api_config"
+      },
+      {
+        "file": "api\\ref_api\\ref_api.py",
+        "line": 37,
+        "from": "create_ref_namespace",
+        "to": "create_Ref_namespace"
+      },
+      {
+        "file": "api\\som_api\\som_api.py",
+        "line": 38,
+        "from": "create_som_namespace",
+        "to": "create_SOM_namespace"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 48,
+        "from": "(.+?)/core\\.qent$",
+        "to": "(.+?)/core/.qent$"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 48,
+        "from": "\\\\1/qent/core.qent",
+        "to": "//1/qent/core.qent"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 49,
+        "from": "(.+?)/quantum_network\\.qent$",
+        "to": "(.+?)/quantum_network/.qent$"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 49,
+        "from": "\\\\1/qent/quantum_network.qent",
+        "to": "//1/qent/quantum_network.qent"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 50,
+        "from": "(.+?)/templates/(.+?)\\.qentl$",
+        "to": "(.+?)/templates/(.+?)/.qentl$"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 50,
+        "from": "\\\\1/qentl/\\\\2.qentl",
+        "to": "//1/qentl///2.qentl"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 53,
+        "from": "(.+?)/QEntL/(.+?)_module\\.qent$",
+        "to": "(.+?)/QEntL/(.+?)_module/.qent$"
+      },
+      {
+        "file": "maintenance\\create_path_modules.py",
+        "line": 53,
+        "from": "\\\\1/QEntL/qent/\\\\2_module.qent",
+        "to": "//1/QEntL/qent///2_module.qent"
+      },
+      {
+        "file": "maintenance\\organize_files.py",
+        "line": 21,
+        "from": "utils?[/_].*\\.py$",
+        "to": "utils?[/_].*/.py$"
+      },
+      {
+        "file": "maintenance\\organize_files.py",
+        "line": 22,
+        "from": "data[/_].*\\.py$",
+        "to": "data[/_].*/.py$"
+      },
+      {
+        "file": "QEntL\\cli.py",
+        "line": 228,
+        "from": "(?m)^(?:(?:/\\*|#|//|",
+        "to": "(?m)^(?:(?://*|#|//|"
+      },
+      {
+        "file": "QEntL\\cli.py",
+        "line": 238,
+        "from": "(?m)^(?:(?:/\\*|#|//|",
+        "to": "(?m)^(?:(?://*|#|//|"
+      },
+      {
+        "file": "QEntL\\cli.py",
+        "line": 238,
+        "from": ")?)\\s*开发团队：.*?(?:\\*/|\\",
+        "to": ")?)/s*开发团队：.*?(?:/*/|/"
+      },
+      {
+        "file": "QEntL\\example.py",
+        "line": 150,
+        "from": "((?:/\\*|#|//|<!--|",
+        "to": "((?://*|#|//|<!--|"
+      },
+      {
+        "file": "QEntL\\interpreter.py",
+        "line": 166,
+        "from": "<=>|\\|\\+\\||=>|[=+\\-*/:<>!&|^%]",
+        "to": "<=>|/|/+/||=>|[=+/-*/:<>!&|^%]"
+      },
+      {
+        "file": "QEntL\\utils.py",
+        "line": 149,
+        "from": "((?:/\\*|#|//|<!--|",
+        "to": "((?://*|#|//|<!--|"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 25,
+        "from": "(.+?)/core\\.qent$",
+        "to": "(.+?)/core/.qent$"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 25,
+        "from": "\\1/qent/core.qent",
+        "to": "/1/qent/core.qent"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 26,
+        "from": "(.+?)/quantum_network\\.qent$",
+        "to": "(.+?)/quantum_network/.qent$"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 26,
+        "from": "\\1/qent/quantum_network.qent",
+        "to": "/1/qent/quantum_network.qent"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 27,
+        "from": "(.+?)/templates/(.+?)\\.qentl$",
+        "to": "(.+?)/templates/(.+?)/.qentl$"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 27,
+        "from": "\\1/qentl/\\2.qentl",
+        "to": "/1/qentl//2.qentl"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 30,
+        "from": "(.+?)/QEntL/(.+?)_module\\.qent$",
+        "to": "(.+?)/QEntL/(.+?)_module/.qent$"
+      },
+      {
+        "file": "QEntL\\parser\\interpreter.py",
+        "line": 30,
+        "from": "\\1/QEntL/qent/\\2_module.qent",
+        "to": "/1/QEntL/qent//2_module.qent"
+      },
+      {
+        "file": "QEntL\\parser\\parser.py",
+        "line": 148,
+        "from": "//.*?\\n",
+        "to": "//.*?/n"
+      },
+      {
+        "file": "QSM\\api\\qsm_api.py",
+        "line": 46,
+        "from": "api.qsm_api.flask_api",
+        "to": "api.QSM_api.flask_api"
+      },
+      {
+        "file": "QSM\\quantum_blockchain\\__init__.py",
+        "line": 11,
+        "from": "quantum_core.quantum_blockchain.qsm_main_chain",
+        "to": "quantum_core.quantum_blockchain.QSM_main_chain"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\som_ecommerce.py",
+        "line": 12,
+        "from": "quantum_economy.qsm.qsm_economy",
+        "to": "quantum_economy.QSM.QSM_economy"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\som_ecommerce.py",
+        "line": 12,
+        "from": "SomEconomyModel",
+        "to": "SomEconomyModel"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\__init__.py",
+        "line": 12,
+        "from": "quantum_economy.qsm.qsm_economy",
+        "to": "quantum_economy.QSM.QSM_economy"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\__init__.py",
+        "line": 20,
+        "from": "quantum_economy.qsm.qsm_ecommerce",
+        "to": "quantum_economy.QSM.QSM_ecommerce"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\__init__.py",
+        "line": 20,
+        "from": "SomEcommerce",
+        "to": "SomEcommerce"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "quantum_economy.qsm.coin.qsm_coin",
+        "to": "quantum_economy.QSM.coin.QSM_coin"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "SomCoinEmission",
+        "to": "SomCoinEmission"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "quantum_economy.qsm.coin.qsm_coin",
+        "to": "quantum_economy.QSM.coin.QSM_coin"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "SomCoin",
+        "to": "SomCoin"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\api.py",
+        "line": 14,
+        "from": "quantum_economy.qsm.marketplace.marketplace_core",
+        "to": "quantum_economy.QSM.marketplace.marketplace_core"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\api.py",
+        "line": 14,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\app.py",
+        "line": 10,
+        "from": "quantum_economy.qsm.marketplace.api",
+        "to": "quantum_economy.QSM.marketplace.api"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\app.py",
+        "line": 11,
+        "from": "quantum_economy.qsm.marketplace.marketplace_core",
+        "to": "quantum_economy.QSM.marketplace.marketplace_core"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\app.py",
+        "line": 11,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "quantum_economy.qsm.traceability.traceability_system",
+        "to": "quantum_economy.QSM.traceability.traceability_system"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "SomTraceabilitySystem",
+        "to": "SomTraceabilitySystem"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "quantum_economy.qsm.marketplace.marketplace_core",
+        "to": "quantum_economy.QSM.marketplace.marketplace_core"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\marketplace\\__init__.py",
+        "line": 9,
+        "from": "quantum_economy.qsm.marketplace.api",
+        "to": "quantum_economy.QSM.marketplace.api"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\user\\user_system.py",
+        "line": 19,
+        "from": "quantum_economy.qsm.wallet.wallet_core",
+        "to": "quantum_economy.QSM.wallet.wallet_core"
+      },
+      {
+        "file": "QSM\\quantum_economy\\qsm\\user\\user_system.py",
+        "line": 19,
+        "from": "SomWallet",
+        "to": "SomWallet"
+      },
+      {
+        "file": "quantum_core\\quantum_blockchain\\quantum_blockchain_core.py",
+        "line": 26,
+        "from": "quantum_economy.som.blockchain.main_chain",
+        "to": "quantum_economy.SOM.blockchain.main_chain"
+      },
+      {
+        "file": "quantum_core\\quantum_blockchain\\quantum_blockchain_core.py",
+        "line": 26,
+        "from": "SomMainChain",
+        "to": "SomMainChain"
+      },
+      {
+        "file": "quantum_core\\quantum_blockchain\\quantum_blockchain_core.py",
+        "line": 27,
+        "from": "quantum_economy.som.blockchain.som_chain",
+        "to": "quantum_economy.SOM.blockchain.SOM_chain"
+      },
+      {
+        "file": "quantum_core\\quantum_blockchain\\quantum_blockchain_core.py",
+        "line": 27,
+        "from": "SomEconomyChain",
+        "to": "SomEconomyChain"
+      },
+      {
+        "file": "quantum_core\\quantum_blockchain\\__init__.py",
+        "line": 15,
+        "from": "quantum_core.quantum_blockchain.qsm_main_chain",
+        "to": "quantum_core.quantum_blockchain.QSM_main_chain"
+      },
+      {
+        "file": "quantum_core\\quantum_blockchain\\__init__.py",
+        "line": 22,
+        "from": "quantum_core.quantum_blockchain.qsm_knowledge",
+        "to": "quantum_core.quantum_blockchain.QSM_knowledge"
+      },
+      {
+        "file": "quantum_economy\\som\\som_ecommerce.py",
+        "line": 12,
+        "from": "quantum_economy.som.som_economy",
+        "to": "quantum_economy.SOM.SOM_economy"
+      },
+      {
+        "file": "quantum_economy\\som\\som_ecommerce.py",
+        "line": 12,
+        "from": "SomEconomyModel",
+        "to": "SomEconomyModel"
+      },
+      {
+        "file": "quantum_economy\\som\\__init__.py",
+        "line": 12,
+        "from": "quantum_economy.som.som_economy",
+        "to": "quantum_economy.SOM.SOM_economy"
+      },
+      {
+        "file": "quantum_economy\\som\\__init__.py",
+        "line": 20,
+        "from": "quantum_economy.som.som_ecommerce",
+        "to": "quantum_economy.SOM.SOM_ecommerce"
+      },
+      {
+        "file": "quantum_economy\\som\\__init__.py",
+        "line": 20,
+        "from": "SomEcommerce",
+        "to": "SomEcommerce"
+      },
+      {
+        "file": "quantum_economy\\som\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "quantum_economy.som.coin.som_coin",
+        "to": "quantum_economy.SOM.coin.SOM_coin"
+      },
+      {
+        "file": "quantum_economy\\som\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "SomCoinEmission",
+        "to": "SomCoinEmission"
+      },
+      {
+        "file": "quantum_economy\\som\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "quantum_economy.som.coin.som_coin",
+        "to": "quantum_economy.SOM.coin.SOM_coin"
+      },
+      {
+        "file": "quantum_economy\\som\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "SomCoin",
+        "to": "SomCoin"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\api.py",
+        "line": 14,
+        "from": "quantum_economy.som.marketplace.marketplace_core",
+        "to": "quantum_economy.SOM.marketplace.marketplace_core"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\api.py",
+        "line": 14,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\app.py",
+        "line": 10,
+        "from": "quantum_economy.som.marketplace.api",
+        "to": "quantum_economy.SOM.marketplace.api"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\app.py",
+        "line": 11,
+        "from": "quantum_economy.som.marketplace.marketplace_core",
+        "to": "quantum_economy.SOM.marketplace.marketplace_core"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\app.py",
+        "line": 11,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "quantum_economy.som.traceability.traceability_system",
+        "to": "quantum_economy.SOM.traceability.traceability_system"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "SomTraceabilitySystem",
+        "to": "SomTraceabilitySystem"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "quantum_economy.som.marketplace.marketplace_core",
+        "to": "quantum_economy.SOM.marketplace.marketplace_core"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "quantum_economy\\som\\marketplace\\__init__.py",
+        "line": 9,
+        "from": "quantum_economy.som.marketplace.api",
+        "to": "quantum_economy.SOM.marketplace.api"
+      },
+      {
+        "file": "quantum_economy\\som\\user\\user_system.py",
+        "line": 19,
+        "from": "quantum_economy.som.wallet.wallet_core",
+        "to": "quantum_economy.SOM.wallet.wallet_core"
+      },
+      {
+        "file": "quantum_economy\\som\\user\\user_system.py",
+        "line": 19,
+        "from": "SomWallet",
+        "to": "SomWallet"
+      },
+      {
+        "file": "Ref\\api\\ref_api.py",
+        "line": 40,
+        "from": "get_ref_core",
+        "to": "get_Ref_core"
+      },
+      {
+        "file": "Ref\\api\\ref_api_integration.py",
+        "line": 40,
+        "from": "create_ref_namespace",
+        "to": "create_Ref_namespace"
+      },
+      {
+        "file": "Ref\\api\\ref_api_integration.py",
+        "line": 41,
+        "from": "get_ref_core",
+        "to": "get_Ref_core"
+      },
+      {
+        "file": "Ref\\api\\ref_monitor_api.py",
+        "line": 23,
+        "from": "get_ref_core",
+        "to": "get_Ref_core"
+      },
+      {
+        "file": "Ref\\api\\ref_monitor_api.py",
+        "line": 488,
+        "from": "get_ref_core",
+        "to": "get_Ref_core"
+      },
+      {
+        "file": "Ref\\backup\\start_backup_service.py",
+        "line": 15,
+        "from": "ref_core",
+        "to": "Ref_core"
+      },
+      {
+        "file": "Ref\\backup\\imports_20250410_173245\\examples_quantum_ref_demo.py",
+        "line": 14,
+        "from": "ref_core",
+        "to": "Ref_core"
+      },
+      {
+        "file": "Ref\\backup\\organize_20250410_173155\\quantum_ref_demo.py",
+        "line": 14,
+        "from": "ref_core",
+        "to": "Ref_core"
+      },
+      {
+        "file": "Ref\\core\\fs_manager.py",
+        "line": 129,
+        "from": "utils?[/_].*\\.py$",
+        "to": "utils?[/_].*/.py$"
+      },
+      {
+        "file": "Ref\\core\\fs_manager.py",
+        "line": 130,
+        "from": "data[/_].*\\.py$",
+        "to": "data[/_].*/.py$"
+      },
+      {
+        "file": "Ref\\examples\\quantum_ref_demo.py",
+        "line": 14,
+        "from": "ref_core",
+        "to": "Ref_core"
+      },
+      {
+        "file": "Ref\\maintenance\\fix_quantum_markers.py",
+        "line": 319,
+        "from": "monitor_weq_output",
+        "to": "monitor_WeQ_output"
+      },
+      {
+        "file": "Ref\\monitor\\cursor_performance.py",
+        "line": 158,
+        "from": "\\n如需恢复默认设置，请删除.vscode/settings.json和.cursorignore文件",
+        "to": "/n如需恢复默认设置，请删除.vscode/settings.json和.cursorignore文件"
+      },
+      {
+        "file": "Ref\\monitor\\cursor_performance.py",
+        "line": 195,
+        "from": "{dir_name}/\\n",
+        "to": "{dir_name}//n"
+      },
+      {
+        "file": "Ref\\monitor\\project_manager.py",
+        "line": 88,
+        "from": ".*/\\\\.git/.*",
+        "to": ".*///.git/.*"
+      },
+      {
+        "file": "Ref\\monitor\\project_manager.py",
+        "line": 92,
+        "from": ".*/\\\\.vscode/.*",
+        "to": ".*///.vscode/.*"
+      },
+      {
+        "file": "Ref\\monitor\\project_manager.py",
+        "line": 93,
+        "from": ".*/\\\\.idea/.*",
+        "to": ".*///.idea/.*"
+      },
+      {
+        "file": "Ref\\quantum_blockchain\\ref_blockchain.py",
+        "line": 28,
+        "from": "quantum_core.quantum_blockchain.qsm_main_chain",
+        "to": "quantum_core.quantum_blockchain.QSM_main_chain"
+      },
+      {
+        "file": "Ref\\quantum_blockchain\\ref_blockchain.py",
+        "line": 28,
+        "from": "get_qsm_main_chain",
+        "to": "get_QSM_main_chain"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\som_ecommerce.py",
+        "line": 12,
+        "from": "quantum_economy.ref.ref_economy",
+        "to": "quantum_economy.Ref.Ref_economy"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\som_ecommerce.py",
+        "line": 12,
+        "from": "SomEconomyModel",
+        "to": "SomEconomyModel"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\__init__.py",
+        "line": 12,
+        "from": "quantum_economy.ref.ref_economy",
+        "to": "quantum_economy.Ref.Ref_economy"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\__init__.py",
+        "line": 20,
+        "from": "quantum_economy.ref.ref_ecommerce",
+        "to": "quantum_economy.Ref.Ref_ecommerce"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\__init__.py",
+        "line": 20,
+        "from": "SomEcommerce",
+        "to": "SomEcommerce"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "quantum_economy.ref.coin.ref_coin",
+        "to": "quantum_economy.Ref.coin.Ref_coin"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "SomCoinEmission",
+        "to": "SomCoinEmission"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "quantum_economy.ref.coin.ref_coin",
+        "to": "quantum_economy.Ref.coin.Ref_coin"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "SomCoin",
+        "to": "SomCoin"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\api.py",
+        "line": 14,
+        "from": "quantum_economy.ref.marketplace.marketplace_core",
+        "to": "quantum_economy.Ref.marketplace.marketplace_core"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\api.py",
+        "line": 14,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\app.py",
+        "line": 10,
+        "from": "quantum_economy.ref.marketplace.api",
+        "to": "quantum_economy.Ref.marketplace.api"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\app.py",
+        "line": 11,
+        "from": "quantum_economy.ref.marketplace.marketplace_core",
+        "to": "quantum_economy.Ref.marketplace.marketplace_core"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\app.py",
+        "line": 11,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "quantum_economy.ref.traceability.traceability_system",
+        "to": "quantum_economy.Ref.traceability.traceability_system"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "SomTraceabilitySystem",
+        "to": "SomTraceabilitySystem"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "quantum_economy.ref.marketplace.marketplace_core",
+        "to": "quantum_economy.Ref.marketplace.marketplace_core"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\marketplace\\__init__.py",
+        "line": 9,
+        "from": "quantum_economy.ref.marketplace.api",
+        "to": "quantum_economy.Ref.marketplace.api"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\user\\user_system.py",
+        "line": 19,
+        "from": "quantum_economy.ref.wallet.wallet_core",
+        "to": "quantum_economy.Ref.wallet.wallet_core"
+      },
+      {
+        "file": "Ref\\quantum_economy\\ref\\user\\user_system.py",
+        "line": 19,
+        "from": "SomWallet",
+        "to": "SomWallet"
+      },
+      {
+        "file": "Ref\\scripts\\move_files.py",
+        "line": 27,
+        "from": "utils?[/_].*\\.py$",
+        "to": "utils?[/_].*/.py$"
+      },
+      {
+        "file": "Ref\\scripts\\move_files.py",
+        "line": 28,
+        "from": "data[/_].*\\.py$",
+        "to": "data[/_].*/.py$"
+      },
+      {
+        "file": "Ref\\scripts\\services\\Ref_app.py",
+        "line": 97,
+        "from": "ref_core",
+        "to": "Ref_core"
+      },
+      {
+        "file": "Ref\\scripts\\services\\Ref_app.py",
+        "line": 108,
+        "from": "ref_manager_api",
+        "to": "Ref_manager_api"
+      },
+      {
+        "file": "Ref\\scripts\\services\\Ref_app.py",
+        "line": 115,
+        "from": "ref_index_api",
+        "to": "Ref_index_api"
+      },
+      {
+        "file": "Ref\\utils\\project_organizer.py",
+        "line": 520,
+        "from": "\\s]+/[^\\",
+        "to": "/s]+/[^/"
+      },
+      {
+        "file": "Ref\\utils\\quantum_gene_marker.py",
+        "line": 163,
+        "from": "Ref.utils.monitor_weq_output",
+        "to": "Ref.utils.monitor_WeQ_output"
+      },
+      {
+        "file": "Ref\\utils\\quantum_gene_marker.py",
+        "line": 163,
+        "from": "notify_weq_monitor",
+        "to": "notify_WeQ_monitor"
+      },
+      {
+        "file": "SOM\\quantum_app_store.py",
+        "line": 2,
+        "from": "qsm_core",
+        "to": "QSM_core"
+      },
+      {
+        "file": "SOM\\som_coin_system.py",
+        "line": 26,
+        "from": "SomQuantumChain",
+        "to": "SomQuantumChain"
+      },
+      {
+        "file": "SOM\\som_coin_system.py",
+        "line": 35,
+        "from": "quantum_economy.som.blockchain.som_chain",
+        "to": "quantum_economy.SOM.blockchain.SOM_chain"
+      },
+      {
+        "file": "SOM\\som_coin_system.py",
+        "line": 35,
+        "from": "SomEconomyChain",
+        "to": "SomEconomyChain"
+      },
+      {
+        "file": "SOM\\som_coin_system.py",
+        "line": 36,
+        "from": "quantum_economy.som.wallet.wallet_core",
+        "to": "quantum_economy.SOM.wallet.wallet_core"
+      },
+      {
+        "file": "SOM\\som_coin_system.py",
+        "line": 36,
+        "from": "SomWallet",
+        "to": "SomWallet"
+      },
+      {
+        "file": "SOM\\quantum_blockchain\\som_blockchain.py",
+        "line": 28,
+        "from": "quantum_core.quantum_blockchain.qsm_main_chain",
+        "to": "quantum_core.quantum_blockchain.QSM_main_chain"
+      },
+      {
+        "file": "SOM\\quantum_blockchain\\som_blockchain.py",
+        "line": 28,
+        "from": "get_qsm_main_chain",
+        "to": "get_QSM_main_chain"
+      },
+      {
+        "file": "SOM\\quantum_blockchain\\som_blockchain.py",
+        "line": 35,
+        "from": "quantum_economy.som.blockchain.som_chain",
+        "to": "quantum_economy.SOM.blockchain.SOM_chain"
+      },
+      {
+        "file": "SOM\\quantum_blockchain\\som_blockchain.py",
+        "line": 35,
+        "from": "SomEconomyChain",
+        "to": "SomEconomyChain"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\som_ecommerce.py",
+        "line": 12,
+        "from": "quantum_economy.som.som_economy",
+        "to": "quantum_economy.SOM.SOM_economy"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\som_ecommerce.py",
+        "line": 12,
+        "from": "SomEconomyModel",
+        "to": "SomEconomyModel"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\__init__.py",
+        "line": 12,
+        "from": "quantum_economy.som.som_economy",
+        "to": "quantum_economy.SOM.SOM_economy"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\__init__.py",
+        "line": 20,
+        "from": "quantum_economy.som.som_ecommerce",
+        "to": "quantum_economy.SOM.SOM_ecommerce"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\__init__.py",
+        "line": 20,
+        "from": "SomEcommerce",
+        "to": "SomEcommerce"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "quantum_economy.som.coin.som_coin",
+        "to": "quantum_economy.SOM.coin.SOM_coin"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "SomCoinEmission",
+        "to": "SomCoinEmission"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "quantum_economy.som.coin.som_coin",
+        "to": "quantum_economy.SOM.coin.SOM_coin"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "SomCoin",
+        "to": "SomCoin"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\api.py",
+        "line": 14,
+        "from": "quantum_economy.som.marketplace.marketplace_core",
+        "to": "quantum_economy.SOM.marketplace.marketplace_core"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\api.py",
+        "line": 14,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\app.py",
+        "line": 10,
+        "from": "quantum_economy.som.marketplace.api",
+        "to": "quantum_economy.SOM.marketplace.api"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\app.py",
+        "line": 11,
+        "from": "quantum_economy.som.marketplace.marketplace_core",
+        "to": "quantum_economy.SOM.marketplace.marketplace_core"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\app.py",
+        "line": 11,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "quantum_economy.som.traceability.traceability_system",
+        "to": "quantum_economy.SOM.traceability.traceability_system"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "SomTraceabilitySystem",
+        "to": "SomTraceabilitySystem"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "quantum_economy.som.marketplace.marketplace_core",
+        "to": "quantum_economy.SOM.marketplace.marketplace_core"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\marketplace\\__init__.py",
+        "line": 9,
+        "from": "quantum_economy.som.marketplace.api",
+        "to": "quantum_economy.SOM.marketplace.api"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\user\\user_system.py",
+        "line": 19,
+        "from": "quantum_economy.som.wallet.wallet_core",
+        "to": "quantum_economy.SOM.wallet.wallet_core"
+      },
+      {
+        "file": "SOM\\quantum_economy\\som\\user\\user_system.py",
+        "line": 19,
+        "from": "SomWallet",
+        "to": "SomWallet"
+      },
+      {
+        "file": "test\\test_marker_independence.py",
+        "line": 123,
+        "from": "Ref.utils.monitor_weq_output",
+        "to": "Ref.utils.monitor_WeQ_output"
+      },
+      {
+        "file": "test\\test_notification_loop.py",
+        "line": 30,
+        "from": "Ref.utils.monitor_weq_output",
+        "to": "Ref.utils.monitor_WeQ_output"
+      },
+      {
+        "file": "test\\test_notification_loop.py",
+        "line": 30,
+        "from": "get_weq_monitor",
+        "to": "get_WeQ_monitor"
+      },
+      {
+        "file": "WeQ\\api\\weq_api_integration.py",
+        "line": 40,
+        "from": "create_weq_namespace",
+        "to": "create_WeQ_namespace"
+      },
+      {
+        "file": "WeQ\\knowledge\\background_training.py",
+        "line": 53,
+        "from": "quantum_core.quantum_blockchain.qsm_knowledge",
+        "to": "quantum_core.quantum_blockchain.QSM_knowledge"
+      },
+      {
+        "file": "WeQ\\knowledge\\background_training.py",
+        "line": 53,
+        "from": "get_qsm_knowledge",
+        "to": "get_QSM_knowledge"
+      },
+      {
+        "file": "WeQ\\knowledge\\training_data\\quantum_blockchain_learning.py",
+        "line": 372,
+        "from": "get_weq_chain",
+        "to": "get_WeQ_chain"
+      },
+      {
+        "file": "WeQ\\modules\\output.py",
+        "line": 434,
+        "from": "./networks\\",
+        "to": "./networks/"
+      },
+      {
+        "file": "WeQ\\modules\\output.py",
+        "line": 435,
+        "from": "./channels\\",
+        "to": "./channels/"
+      },
+      {
+        "file": "WeQ\\modules\\output.py",
+        "line": 436,
+        "from": "./templates\\",
+        "to": "./templates/"
+      },
+      {
+        "file": "WeQ\\quantum_blockchain\\weq_blockchain.py",
+        "line": 28,
+        "from": "quantum_core.quantum_blockchain.qsm_main_chain",
+        "to": "quantum_core.quantum_blockchain.QSM_main_chain"
+      },
+      {
+        "file": "WeQ\\quantum_blockchain\\weq_blockchain.py",
+        "line": 28,
+        "from": "get_qsm_main_chain",
+        "to": "get_QSM_main_chain"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\som_ecommerce.py",
+        "line": 12,
+        "from": "quantum_economy.weq.weq_economy",
+        "to": "quantum_economy.WeQ.WeQ_economy"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\som_ecommerce.py",
+        "line": 12,
+        "from": "SomEconomyModel",
+        "to": "SomEconomyModel"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\__init__.py",
+        "line": 12,
+        "from": "quantum_economy.weq.weq_economy",
+        "to": "quantum_economy.WeQ.WeQ_economy"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\__init__.py",
+        "line": 20,
+        "from": "quantum_economy.weq.weq_ecommerce",
+        "to": "quantum_economy.WeQ.WeQ_ecommerce"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\__init__.py",
+        "line": 20,
+        "from": "SomEcommerce",
+        "to": "SomEcommerce"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "quantum_economy.weq.coin.weq_coin",
+        "to": "quantum_economy.WeQ.coin.WeQ_coin"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\coin\\som_coin_api.py",
+        "line": 15,
+        "from": "SomCoinEmission",
+        "to": "SomCoinEmission"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "quantum_economy.weq.coin.weq_coin",
+        "to": "quantum_economy.WeQ.coin.WeQ_coin"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\coin\\som_coin_emission.py",
+        "line": 23,
+        "from": "SomCoin",
+        "to": "SomCoin"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\api.py",
+        "line": 14,
+        "from": "quantum_economy.weq.marketplace.marketplace_core",
+        "to": "quantum_economy.WeQ.marketplace.marketplace_core"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\api.py",
+        "line": 14,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\app.py",
+        "line": 10,
+        "from": "quantum_economy.weq.marketplace.api",
+        "to": "quantum_economy.WeQ.marketplace.api"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\app.py",
+        "line": 11,
+        "from": "quantum_economy.weq.marketplace.marketplace_core",
+        "to": "quantum_economy.WeQ.marketplace.marketplace_core"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\app.py",
+        "line": 11,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "quantum_economy.weq.traceability.traceability_system",
+        "to": "quantum_economy.WeQ.traceability.traceability_system"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\marketplace_core.py",
+        "line": 22,
+        "from": "SomTraceabilitySystem",
+        "to": "SomTraceabilitySystem"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "quantum_economy.weq.marketplace.marketplace_core",
+        "to": "quantum_economy.WeQ.marketplace.marketplace_core"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\__init__.py",
+        "line": 8,
+        "from": "SomMarketplace",
+        "to": "SomMarketplace"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\marketplace\\__init__.py",
+        "line": 9,
+        "from": "quantum_economy.weq.marketplace.api",
+        "to": "quantum_economy.WeQ.marketplace.api"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\user\\user_system.py",
+        "line": 19,
+        "from": "quantum_economy.weq.wallet.wallet_core",
+        "to": "quantum_economy.WeQ.wallet.wallet_core"
+      },
+      {
+        "file": "WeQ\\quantum_economy\\weq\\user\\user_system.py",
+        "line": 19,
+        "from": "SomWallet",
+        "to": "SomWallet"
+      },
+      {
+        "file": "WeQ\\train\\test_weq_train.py",
+        "line": 17,
+        "from": "weq_train",
+        "to": "WeQ_train"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 45,
+        "from": "(.*?)/core\\.qent$",
+        "to": "(.*?)/core/.qent$"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 46,
+        "from": "\\1/qent/core.qent",
+        "to": "/1/qent/core.qent"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 50,
+        "from": "(.*?)/quantum_network\\.qent$",
+        "to": "(.*?)/quantum_network/.qent$"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 51,
+        "from": "\\1/qent/quantum_network.qent",
+        "to": "/1/qent/quantum_network.qent"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 55,
+        "from": "(.*?)/templates/(.*?)\\.qentl$",
+        "to": "(.*?)/templates/(.*?)/.qentl$"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 56,
+        "from": "\\1/qentl/\\2.qentl",
+        "to": "/1/qentl//2.qentl"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 63,
+        "from": "{module}/QEntL/(.+?)_module\\.qent$",
+        "to": "{module}/QEntL/(.+?)_module/.qent$"
+      },
+      {
+        "file": "world\\path_manager\\file_path_manager.py",
+        "line": 64,
+        "from": "{module}/QEntL/qent/\\\\1_module.qent",
+        "to": "{module}/QEntL/qent///1_module.qent"
+      }
+    ]
+  },
+  "docs_fixes": {
+    "timestamp": "2025-04-12 14:51:59",
+    "created_directories": [],
+    "created_files": [
+      "docs\\api\\flask_api.md",
+      "docs\\api\\qsm_api.md",
+      "docs\\api\\ref_api.md",
+      "docs\\api\\som_api.md",
+      "docs\\api\\som_coin_api.md",
+      "docs\\api\\weq_api.md",
+      "docs\\core\\marketplace_core.md",
+      "docs\\core\\quantum_blockchain_core.md",
+      "docs\\core\\quantum_core.md",
+      "docs\\core\\wallet_core.md",
+      "docs\\QSM\\api\\som_coin_api.md",
+      "docs\\QSM\\core\\marketplace_core.md",
+      "docs\\QSM\\core\\wallet_core.md",
+      "docs\\Ref\\api\\som_coin_api.md",
+      "docs\\Ref\\core\\core_ref_core.md",
+      "docs\\Ref\\core\\marketplace_core.md",
+      "docs\\Ref\\core\\simplified_core.md",
+      "docs\\Ref\\core\\wallet_core.md",
+      "docs\\Ref\\Ref\\monitor\\file_integrity_monitor.md",
+      "docs\\Ref\\Ref\\monitor\\file_monitor.md",
+      "docs\\Ref\\Ref\\monitor\\index_monitor.md",
+      "docs\\Ref\\Ref\\monitor\\system_monitor.md",
+      "docs\\Ref\\Ref\\monitor\\tests_test_monitor.md",
+      "docs\\Ref\\Ref\\monitor\\test_monitor.md",
+      "docs\\Ref\\Ref\\monitor\\test_system_monitor.md",
+      "docs\\Ref\\Ref\\monitor\\utils_system_monitor.md",
+      "docs\\Ref\\Ref\\repair\\quantum_self_repair.md",
+      "docs\\SOM\\api\\som_coin_api.md",
+      "docs\\SOM\\core\\marketplace_core.md",
+      "docs\\SOM\\core\\som_core.md",
+      "docs\\SOM\\core\\wallet_core.md",
+      "docs\\SOM\\SOM\\inference\\SOM_inference.md",
+      "docs\\SOM\\SOM\\train\\SOM_train.md",
+      "docs\\tests\\direct_update_test.md",
+      "docs\\tests\\file_monitor_test.md",
+      "docs\\tests\\manual_path_update_test.md",
+      "docs\\tests\\manual_test.md",
+      "docs\\tests\\move_test.md",
+      "docs\\tests\\simple_notification_test.md",
+      "docs\\tests\\simple_test.md",
+      "docs\\WeQ\\api\\som_coin_api.md",
+      "docs\\WeQ\\core\\marketplace_core.md",
+      "docs\\WeQ\\core\\wallet_core.md",
+      "docs\\WeQ\\core\\weq_core.md",
+      "docs\\WeQ\\WeQ\\inference\\weq_inference.md",
+      "docs\\WeQ\\WeQ\\train\\test_weq_train.md",
+      "docs\\WeQ\\WeQ\\train\\WeQ_train.md"
+    ]
+  }
+}

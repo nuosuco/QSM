@@ -1,0 +1,128 @@
+QEntL: QEntL 2.0 Configuration File
+QuantumGene: QE-EXAMPLE-NETWORK-00001
+CreatedAt: 2023-11-05T12:00:00.000000
+EntanglementStrength: 1.0
+ConfigType: NetworkConfiguration
+ConfigVersion: 2.0
+Author: Quantum Systems Architecture Team
+
+// 导入基础模板
+import "../node_template.qentl" as NodeTemplate
+import "../channel_template.qentl" as ChannelTemplate
+import "../protocol_template.qentl" as ProtocolTemplate
+import "../network_template.qentl" as NetworkTemplate
+
+// 定义量子纠缠网络
+network "quantum_research_network" {
+  // 使用网络模板
+  include: NetworkTemplate,
+  params: {
+    NETWORK_ID: "qrn-001",
+    DESCRIPTION: "量子研究实验室网络",
+    TOPOLOGY_TYPE: "mesh",
+    MAX_DISTANCE: 500,
+    REDUNDANCY_LEVEL: 3,
+    SECURITY_LEVEL: 5,
+    THROUGHPUT_CAPACITY: 10000,
+    NODE_CAPACITY: 50,
+    QUBITS_RESERVED: 128
+  },
+  
+  // 定义节点
+  nodes: [
+    {
+      include: NodeTemplate,
+      params: {
+        NODE_ID: "node-lab1",
+        NODE_TYPE: "quantum_processor",
+        DESCRIPTION: "实验室主量子处理器",
+        PROCESSING_POWER: 50,
+        MEMORY_CAPACITY: 128,
+        QUBITS_AVAILABLE: 64,
+        COHERENCE_TIME: 500,
+        FIDELITY: 0.985,
+        ERROR_CORRECTION: 0.9,
+        OPS_PER_SECOND: 1000000
+      }
+    },
+    {
+      include: NodeTemplate,
+      params: {
+        NODE_ID: "node-lab2",
+        NODE_TYPE: "quantum_memory",
+        DESCRIPTION: "量子存储单元",
+        PROCESSING_POWER: 20,
+        MEMORY_CAPACITY: 512,
+        QUBITS_AVAILABLE: 32,
+        COHERENCE_TIME: 1000,
+        FIDELITY: 0.95,
+        ERROR_CORRECTION: 0.85,
+        OPS_PER_SECOND: 500000
+      }
+    }
+  ],
+  
+  // 定义通道
+  channels: [
+    {
+      include: ChannelTemplate,
+      params: {
+        CHANNEL_ID: "channel-lab1-2",
+        DESCRIPTION: "实验室主通道",
+        CHANNEL_TYPE: "fiber_optic",
+        BANDWIDTH: 100,
+        LATENCY: 5,
+        ERROR_RATE: 0.001,
+        ENCRYPTION_TYPE: "quantum_key",
+        AUTH_METHOD: "entanglement_based",
+        QUBITS_REQUIRED: 8,
+        FIDELITY_THRESHOLD: 0.9,
+        RECOVERY_TIME: 15,
+        SOURCE_NODE_ID: "node-lab1",
+        TARGET_NODE_ID: "node-lab2",
+        PROTOCOL_NAME: "qepp-v2",
+        PROTOCOL_VERSION: "2.1",
+        PURIFICATION_CYCLES: 3,
+        TIMEOUT_MS: 5000,
+        RETRY_COUNT: 5,
+        RELIABILITY: 0.99,
+        THROUGHPUT_CAPACITY: 5000,
+        MAX_DISTANCE: 200,
+        OPERATIONAL_LIFETIME: "365d"
+      }
+    }
+  ],
+  
+  // 定义协议
+  protocols: [
+    {
+      include: ProtocolTemplate,
+      params: {
+        PROTOCOL_ID: "qepp-v2",
+        VERSION: "2.1",
+        NAME: "量子纠缠纯化协议",
+        DESCRIPTION: "用于高精度量子纠缠纯化的协议",
+        PROTOCOL_TYPE: "purification",
+        CATEGORY: "entanglement_maintenance",
+        COMPLEXITY_LEVEL: 4,
+        COMPATIBLE_PROTOCOL1: "qmem-v1",
+        COMPATIBLE_PROTOCOL2: "qrep-v2",
+        MIN_QUBITS: 4,
+        MIN_FIDELITY: 0.8,
+        MAX_LATENCY: 50,
+        MIN_BANDWIDTH: 10,
+        SUPPORTED_CHANNEL_TYPE1: "fiber_optic",
+        SUPPORTED_CHANNEL_TYPE2: "satellite_link",
+        DEFAULT_TIMEOUT_MS: 5000,
+        MAX_RETRIES: 10,
+        BUFFER_SIZE: 64,
+        SYNC_MODE: "synchronous",
+        ERROR_CORRECTION_LEVEL: 3,
+        CUSTOM_PARAM1_KEY: "max_concurrent",
+        CUSTOM_PARAM1_VALUE: "8",
+        CUSTOM_PARAM2_KEY: "noise_threshold",
+        CUSTOM_PARAM2_VALUE: "0.05"
+      }
+    }
+  ]
+} 

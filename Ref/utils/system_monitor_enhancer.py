@@ -1,0 +1,1608 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+系统监控增强器 - Ref量子自反省系统的核心组件
+用于增强Ref的系统自监控能力，包括健康检查、异常检测和自动优化
+"""
+
+import os
+import sys
+import time
+import json
+import logging
+import threading
+import traceback
+import datetime
+import shutil
+import random
+import subprocess
+import psutil
+from collections import deque
+import numpy as np
+from typing import Dict, List, Tuple, Any, Optional, Union, Callable
+
+# 配置日志记录
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] [Ref-Monitor] %(message)s',
+    handlers=[
+        logging.FileHandler("Ref/logs/system_monitor.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("RefSystemMonitor")
+
+# 系统常量
+METRICS_HISTORY_SIZE = 1000  # 保留的历史指标数量
+ANOMALY_THRESHOLD = 3.0      # Z分数异常阈值
+CHECK_INTERVAL = 60          # 监控检查间隔（秒）
+OPTIMIZATION_INTERVAL = 86400  # 自动优化间隔（秒）
+
+class SystemHealth:
+    """系统健康状态类"""
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    CRITICAL = "critical"
+
+class SystemMonitorEnhancer:
+    """系统监控增强器类，提供自反省监控功能"""
+    
+    def __init__(self, ref_core=None):
+        """初始化系统监控增强器"""
+        self.ref_core = ref_core
+        self.running = False
+        self.monitor_thread = None
+        self.models_health = {}
+        self.system_metrics = {}
+        self.metrics_history = {}
+        self.anomalies = []
+        self.suggestions = []
+        self.check_lock = threading.Lock()
+        self.last_optimization = 0
+        self.index_status = {}
+        self.system_status = {
+            "health": {"score": 100, "status": SystemHealth.HEALTHY},
+            "last_check": 0,
+            "resources": {"cpu": 0, "memory": 0, "disk": 0}
+        }
+        
+        # 初始化指标历史记录
+        self._init_metrics_history()
+        
+        logger.info("系统监控增强器已初始化")
+        
+    def _init_metrics_history(self):
+        """初始化指标历史记录"""
+        metrics = ["cpu_usage", "memory_usage", "disk_usage", "system_health"]
+        for metric in metrics:
+            self.metrics_history[metric] = deque(maxlen=METRICS_HISTORY_SIZE)
+    
+    def start_monitoring(self):
+        """启动系统监控"""
+        if self.running:
+            return
+            
+        self.running = True
+        self.monitor_thread = threading.Thread(
+            target=self._monitoring_loop,
+            name="RefSystemMonitorThread",
+            daemon=True
+        )
+        self.monitor_thread.start()
+        logger.info("系统监控已启动")
+        
+    def stop_monitoring(self):
+        """停止系统监控"""
+        self.running = False
+        if self.monitor_thread:
+            self.monitor_thread.join(timeout=5)
+            self.monitor_thread = None
+        logger.info("系统监控已停止")
+    
+    def _monitoring_loop(self):
+        """监控循环，定期检查系统健康状态"""
+        while self.running:
+            try:
+                self.check_system_health()
+                self.detect_anomalies()
+                self.generate_suggestions()
+                
+                # 检查是否需要自动优化
+                current_time = time.time()
+                if (current_time - self.last_optimization) > OPTIMIZATION_INTERVAL:
+                    self.auto_optimize()
+                    self.last_optimization = current_time
+                
+                # 广播系统状态更新
+                self._broadcast_status()
+            except Exception as e:
+                logger.error(f"监控循环出错: {str(e)}")
+                logger.debug(traceback.format_exc())
+            
+            # 休眠到下一次检查
+            time.sleep(CHECK_INTERVAL)
+    
+    def check_system_health(self):
+        """检查系统健康状态"""
+        with self.check_lock:
+            logger.debug("正在检查系统健康状态...")
+            
+            # 获取系统资源使用情况
+            try:
+                self._check_resources()
+                self._check_models_health()
+                self._check_index_status()
+                self._calculate_overall_health()
+                
+                # 更新最后检查时间
+                self.system_status["last_check"] = time.time()
+                
+                logger.debug(f"系统健康检查完成, 健康分数: {self.system_status['health']['score']}")
+            except Exception as e:
+                logger.error(f"健康检查出错: {str(e)}")
+                logger.debug(traceback.format_exc())
+    
+    def _check_resources(self):
+        """检查系统资源使用情况"""
+        # CPU使用率
+        cpu_percent = psutil.cpu_percent(interval=1)
+        self.system_metrics["cpu_usage"] = cpu_percent
+        self.metrics_history["cpu_usage"].append((time.time(), cpu_percent))
+        self.system_status["resources"]["cpu"] = cpu_percent
+        
+        # 内存使用率
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        self.system_metrics["memory_usage"] = memory_percent
+        self.metrics_history["memory_usage"].append((time.time(), memory_percent))
+        self.system_status["resources"]["memory"] = memory_percent
+        
+        # 磁盘使用率
+        disk = psutil.disk_usage('/')
+        disk_percent = disk.percent
+        self.system_metrics["disk_usage"] = disk_percent
+        self.metrics_history["disk_usage"].append((time.time(), disk_percent))
+        self.system_status["resources"]["disk"] = disk_percent
+        
+        logger.debug(f"资源使用情况 - CPU: {cpu_percent}%, 内存: {memory_percent}%, 磁盘: {disk_percent}%")
+    
+    def _check_models_health(self):
+        """检查所有模型的健康状态"""
+        # 如果有ref_core，使用其注册的模型列表
+        if self.ref_core and hasattr(self.ref_core, 'registered_models'):
+            for model_id, model_data in self.ref_core.registered_models.items():
+                health_score = self._get_model_health(model_id, model_data)
+                
+                # 确定状态等级
+                status = SystemHealth.HEALTHY
+                if health_score < 70:
+                    status = SystemHealth.DEGRADED
+                if health_score < 40:
+                    status = SystemHealth.CRITICAL
+                
+                self.models_health[model_id] = {
+                    "health": health_score,
+                    "status": status,
+                    "last_check": time.time()
+                }
+        else:
+            # 模拟一些模型状态用于测试
+            self._simulate_models_health()
+    
+    def _get_model_health(self, model_id, model_data):
+        """获取特定模型的健康分数"""
+        # 实际实现中应该检查模型文件完整性、依赖性和最近的执行状态
+        try:
+            # 检查模型是否存在
+            if not model_data or 'path' not in model_data:
+                return 30.0
+                
+            model_path = model_data['path']
+            if not os.path.exists(model_path):
+                return 0.0
+            
+            # 检查模型文件的完整性
+            if 'checksum' in model_data and model_data['checksum']:
+                # 这里应该执行实际的校验和验证
+                checksum_valid = True
+                if not checksum_valid:
+                    return 40.0
+            
+            # 检查最近的执行状态
+            if 'last_execution' in model_data:
+                last_exec = model_data['last_execution']
+                if 'success' in last_exec and not last_exec['success']:
+                    return 60.0
+                
+                # 检查最后执行时间是否过久
+                if 'timestamp' in last_exec:
+                    elapsed = time.time() - last_exec['timestamp']
+                    if elapsed > 604800:  # 一周
+                        return 70.0
+                    elif elapsed > 86400 * 3:  # 三天
+                        return 85.0
+            
+            # 默认健康
+            return 95.0
+            
+        except Exception as e:
+            logger.error(f"检查模型 {model_id} 健康状态出错: {str(e)}")
+            return 50.0  # 出错默认给一个中等的分数
+    
+    def _simulate_models_health(self):
+        """模拟模型健康状态（仅用于测试）"""
+        models = ['qsm', 'som', 'weq']
+        
+        for model in models:
+            # 随机生成一个健康分数，大部分应该是健康的
+            health = random.uniform(50, 100)
+            if random.random() < 0.1:  # 10%的概率出现问题
+                health = random.uniform(20, 49)
+            
+            # 确定状态等级
+            status = SystemHealth.HEALTHY
+            if health < 70:
+                status = SystemHealth.DEGRADED
+            if health < 40:
+                status = SystemHealth.CRITICAL
+            
+            self.models_health[model] = {
+                "health": health,
+                "status": status,
+                "last_check": time.time()
+            }
+    
+    def _check_index_status(self):
+        """检查项目索引状态"""
+        try:
+            # 检查索引文件是否存在
+            index_files = [
+                "docs/global/qsm_project_index.md",
+                "docs/global/detailed_index.md",
+                "docs/global/files_index.md"
+            ]
+            
+            for idx_file in index_files:
+                file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), idx_file)
+                
+                if not os.path.exists(file_path):
+                    self.index_status[idx_file] = {
+                        "exists": False,
+                        "status": "missing",
+                        "last_modified": 0
+                    }
+                    continue
+                
+                # 获取文件修改时间
+                mod_time = os.path.getmtime(file_path)
+                
+                # 检查文件是否过期
+                current_time = time.time()
+                days_since_update = (current_time - mod_time) / 86400
+                
+                status = "healthy"
+                if days_since_update > 30:
+                    status = "outdated"
+                elif days_since_update > 7:
+                    status = "stale"
+                
+                self.index_status[idx_file] = {
+                    "exists": True,
+                    "status": status,
+                    "last_modified": mod_time,
+                    "days_since_update": days_since_update
+                }
+                
+            logger.debug(f"索引状态检查完成，共检查了 {len(index_files)} 个索引文件")
+                
+        except Exception as e:
+            logger.error(f"检查索引状态出错: {str(e)}")
+    
+    def _calculate_overall_health(self):
+        """计算整体系统健康分数"""
+        health_score = 100.0
+        
+        # 资源使用扣分
+        cpu_penalty = max(0, (self.system_metrics.get("cpu_usage", 0) - 80) * 0.5)
+        memory_penalty = max(0, (self.system_metrics.get("memory_usage", 0) - 80) * 0.5)
+        disk_penalty = max(0, (self.system_metrics.get("disk_usage", 0) - 80) * 1.0)
+        
+        # 模型健康扣分
+        model_health_sum = 0
+        for model_id, health_data in self.models_health.items():
+            model_health = health_data.get("health", 0)
+            model_health_sum += model_health
+            
+            # 不健康的模型会导致较大扣分
+            if model_health < 40:
+                health_score -= 15
+            elif model_health < 70:
+                health_score -= 5
+        
+        # 索引状态扣分
+        for idx_file, status in self.index_status.items():
+            if not status.get("exists", False):
+                health_score -= 5
+            elif status.get("status") == "outdated":
+                health_score -= 3
+            elif status.get("status") == "stale":
+                health_score -= 1
+        
+        # 应用扣分
+        health_score -= (cpu_penalty + memory_penalty + disk_penalty)
+        
+        # 确保分数在0-100之间
+        health_score = max(0, min(100, health_score))
+        
+        # 确定状态等级
+        status = SystemHealth.HEALTHY
+        if health_score < 70:
+            status = SystemHealth.DEGRADED
+        if health_score < 40:
+            status = SystemHealth.CRITICAL
+        
+        # 更新系统状态
+        self.system_status["health"]["score"] = health_score
+        self.system_status["health"]["status"] = status
+        
+        # 记录健康分数历史
+        self.metrics_history["system_health"].append((time.time(), health_score))
+        
+        logger.debug(f"系统整体健康分数: {health_score}, 状态: {status}")
+    
+    def detect_anomalies(self):
+        """检测系统异常"""
+        try:
+            new_anomalies = []
+            
+            # 检查各项指标
+            for metric, history in self.metrics_history.items():
+                if len(history) < 10:  # 需要足够的数据点
+                    continue
+                
+                # 提取最近的值和时间
+                recent_values = [value for _, value in list(history)[-20:]]
+                
+                # 计算均值和标准差
+                mean = np.mean(recent_values[:-1])  # 排除最新值
+                std = np.std(recent_values[:-1])
+                if std == 0:  # 避免除以零
+                    std = 0.001
+                
+                # 计算最新值的Z分数
+                latest_time, latest_value = history[-1]
+                z_score = (latest_value - mean) / std
+                
+                # 检查是否异常
+                if abs(z_score) > ANOMALY_THRESHOLD:
+                    # 只关注上升异常（资源使用增加或健康度下降）
+                    if (metric != "system_health" and z_score > 0) or \
+                       (metric == "system_health" and z_score < 0):
+                        
+                        new_anomalies.append({
+                            "metric": metric,
+                            "value": latest_value,
+                            "mean": mean,
+                            "std": std,
+                            "z_score": z_score,
+                            "timestamp": latest_time
+                        })
+                        logger.warning(f"检测到异常: {metric}, 值: {latest_value}, Z分数: {z_score:.2f}")
+            
+            # 更新异常列表，保留最近的10个
+            self.anomalies = (new_anomalies + self.anomalies)[:10]
+            
+        except Exception as e:
+            logger.error(f"检测异常出错: {str(e)}")
+    
+    def generate_suggestions(self):
+        """生成系统优化建议"""
+        try:
+            new_suggestions = []
+            
+            # 基于资源使用情况的建议
+            if self.system_metrics.get("cpu_usage", 0) > 80:
+                new_suggestions.append({
+                    "message": "CPU使用率过高",
+                    "suggestion": "考虑限制并发任务数量或优化计算密集型操作",
+                    "severity": "high" if self.system_metrics.get("cpu_usage", 0) > 90 else "medium"
+                })
+            
+            if self.system_metrics.get("memory_usage", 0) > 80:
+                new_suggestions.append({
+                    "message": "内存使用率过高",
+                    "suggestion": "检查可能的内存泄漏或考虑增加系统内存",
+                    "severity": "high" if self.system_metrics.get("memory_usage", 0) > 90 else "medium"
+                })
+            
+            if self.system_metrics.get("disk_usage", 0) > 85:
+                new_suggestions.append({
+                    "message": "磁盘空间不足",
+                    "suggestion": "清理临时文件并考虑扩展存储空间",
+                    "severity": "high" if self.system_metrics.get("disk_usage", 0) > 95 else "medium"
+                })
+            
+            # 基于模型健康状态的建议
+            for model_id, health_data in self.models_health.items():
+                if health_data.get("status") == SystemHealth.CRITICAL:
+                    new_suggestions.append({
+                        "message": f"模型 {model_id.upper()} 处于危险状态",
+                        "suggestion": f"执行 {model_id.upper()} 子系统修复，检查代码完整性和依赖",
+                        "severity": "high"
+                    })
+                elif health_data.get("status") == SystemHealth.DEGRADED:
+                    new_suggestions.append({
+                        "message": f"模型 {model_id.upper()} 性能下降",
+                        "suggestion": "检查子系统资源使用并考虑优化",
+                        "severity": "medium"
+                    })
+            
+            # 基于索引状态的建议
+            missing_indices = [idx for idx, status in self.index_status.items() 
+                              if not status.get("exists", False)]
+            if missing_indices:
+                new_suggestions.append({
+                    "message": "缺少项目索引文件",
+                    "suggestion": f"运行索引更新脚本创建缺失的索引: {', '.join(missing_indices)}",
+                    "severity": "medium"
+                })
+            
+            outdated_indices = [idx for idx, status in self.index_status.items() 
+                               if status.get("status") == "outdated"]
+            if outdated_indices:
+                new_suggestions.append({
+                    "message": "项目索引过期",
+                    "suggestion": "运行索引更新脚本刷新过期的索引",
+                    "severity": "low"
+                })
+            
+            # 更新建议列表
+            self.suggestions = new_suggestions
+            
+            logger.debug(f"生成了 {len(new_suggestions)} 条系统优化建议")
+            
+        except Exception as e:
+            logger.error(f"生成优化建议出错: {str(e)}")
+    
+    def auto_optimize(self):
+        """执行自动优化"""
+        logger.info("开始执行系统自动优化...")
+        optimization_results = {
+            "actions": [],
+            "start_time": time.time(),
+            "end_time": None
+        }
+        
+        try:
+            # 1. 修复不健康的模型
+            for model_id, health_data in self.models_health.items():
+                if health_data.get("status") != SystemHealth.HEALTHY:
+                    success = self._repair_model(model_id)
+                    optimization_results["actions"].append({
+                        "action": "repair_model",
+                        "target": model_id,
+                        "success": success
+                    })
+            
+            # 2. 优化项目索引
+            index_optimized = self._optimize_indices()
+            optimization_results["actions"].append({
+                "action": "optimize_indices",
+                "success": index_optimized
+            })
+            
+            # 3. 创建系统备份
+            backup_created = self._create_system_backup()
+            optimization_results["actions"].append({
+                "action": "create_backup",
+                "success": backup_created
+            })
+            
+            # 4. 清理日志和临时文件
+            cleanup_success = self._cleanup_logs()
+            optimization_results["actions"].append({
+                "action": "cleanup_logs",
+                "success": cleanup_success
+            })
+            
+            # 记录优化完成时间
+            optimization_results["end_time"] = time.time()
+            self.last_optimization = time.time()
+            
+            # 记录优化报告
+            self._save_optimization_report(optimization_results)
+            
+            logger.info("系统自动优化完成")
+            return optimization_results
+            
+        except Exception as e:
+            logger.error(f"系统自动优化出错: {str(e)}")
+            logger.debug(traceback.format_exc())
+            
+            # 记录错误信息
+            optimization_results["end_time"] = time.time()
+            optimization_results["error"] = str(e)
+            self._save_optimization_report(optimization_results)
+            
+            return {"error": str(e), "actions": optimization_results["actions"]}
+    
+    def _repair_model(self, model_id):
+        """修复特定模型"""
+        logger.info(f"正在修复模型: {model_id}")
+        try:
+            # 如果有ref_core，使用其修复功能
+            if self.ref_core and hasattr(self.ref_core, 'repair_model'):
+                repair_result = self.ref_core.repair_model(model_id)
+                return repair_result
+            
+            # 模拟修复过程
+            logger.info(f"模拟修复模型 {model_id} 完成")
+            
+            # 更新模型健康状态
+            self.models_health[model_id] = {
+                "health": 95.0,
+                "status": SystemHealth.HEALTHY,
+                "last_check": time.time()
+            }
+            
+            return True
+        except Exception as e:
+            logger.error(f"修复模型 {model_id} 出错: {str(e)}")
+            return False
+    
+    def _optimize_indices(self):
+        """优化项目索引"""
+        logger.info("正在优化项目索引...")
+        try:
+            # 尝试运行索引更新脚本
+            script_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), 
+                "frontend/tools/update_project_index.py"
+            )
+            
+            if not os.path.exists(script_path):
+                logger.error(f"索引更新脚本不存在: {script_path}")
+                return False
+            
+            # 执行脚本
+            result = subprocess.run(
+                [sys.executable, script_path], 
+                capture_output=True, 
+                text=True
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"索引更新脚本执行失败: {result.stderr}")
+                return False
+            
+            logger.info("项目索引优化完成")
+            return True
+            
+        except Exception as e:
+            logger.error(f"优化项目索引出错: {str(e)}")
+            return False
+    
+    def _create_system_backup(self):
+        """创建系统备份"""
+        logger.info("正在创建系统备份...")
+        try:
+            # 创建备份目录
+            backup_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "Ref/backup"
+            )
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # 创建带时间戳的备份目录
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"system_backup_{timestamp}")
+            os.makedirs(backup_path, exist_ok=True)
+            
+            # 备份关键文件和目录
+            dirs_to_backup = [
+                "docs/global",
+                "Ref/data",
+                "Ref/logs",
+                "frontend/tools"
+            ]
+            
+            for dir_path in dirs_to_backup:
+                src_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), dir_path)
+                if os.path.exists(src_path):
+                    dst_path = os.path.join(backup_path, dir_path)
+                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                    
+                    if os.path.isdir(src_path):
+                        shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(src_path, dst_path)
+            
+            # 创建备份元数据文件
+            metadata = {
+                "timestamp": time.time(),
+                "datetime": timestamp,
+                "backup_path": backup_path,
+                "dirs_backed_up": dirs_to_backup,
+                "system_health": self.system_status["health"]
+            }
+            
+            with open(os.path.join(backup_path, "backup_metadata.json"), "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"系统备份创建完成: {backup_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"创建系统备份出错: {str(e)}")
+            return False
+    
+    def _cleanup_logs(self):
+        """清理旧日志和临时文件"""
+        logger.info("正在清理日志和临时文件...")
+        try:
+            # 清理旧日志文件
+            logs_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "Ref/logs"
+            )
+            
+            if os.path.exists(logs_dir):
+                current_time = time.time()
+                # 删除30天前的日志
+                for log_file in os.listdir(logs_dir):
+                    if not log_file.endswith(".log"):
+                        continue
+                        
+                    log_path = os.path.join(logs_dir, log_file)
+                    file_time = os.path.getmtime(log_path)
+                    
+                    # 如果文件超过30天
+                    if (current_time - file_time) > (86400 * 30):
+                        os.remove(log_path)
+                        logger.debug(f"已删除旧日志: {log_file}")
+            
+            # 清理临时文件目录
+            temp_dirs = [
+                "Ref/tmp",
+                "Ref/cache"
+            ]
+            
+            for temp_dir in temp_dirs:
+                dir_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), temp_dir)
+                if os.path.exists(dir_path):
+                    for item in os.listdir(dir_path):
+                        item_path = os.path.join(dir_path, item)
+                        try:
+                            if os.path.isfile(item_path):
+                                os.remove(item_path)
+                            elif os.path.isdir(item_path):
+                                shutil.rmtree(item_path)
+                        except Exception as e:
+                            logger.warning(f"无法删除临时文件: {item_path}, 原因: {str(e)}")
+            
+            logger.info("日志和临时文件清理完成")
+            return True
+            
+        except Exception as e:
+            logger.error(f"清理日志和临时文件出错: {str(e)}")
+            return False
+    
+    def _save_optimization_report(self, report):
+        """保存优化报告"""
+        try:
+            reports_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "Ref/reports"
+            )
+            os.makedirs(reports_dir, exist_ok=True)
+            
+            # 创建带时间戳的报告文件
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_path = os.path.join(reports_dir, f"optimization_report_{timestamp}.json")
+            
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+                
+            logger.info(f"优化报告已保存: {report_path}")
+            
+        except Exception as e:
+            logger.error(f"保存优化报告出错: {str(e)}")
+    
+    def _broadcast_status(self):
+        """广播系统状态更新"""
+        # 准备状态数据
+        status_data = {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "models": self.models_health,
+            "suggestions": self.suggestions,
+            "anomalies": self.anomalies,
+            "timestamp": time.time()
+        }
+        
+        # 如果有ref_core并且它有广播功能，则使用它
+        if self.ref_core and hasattr(self.ref_core, 'broadcast_message'):
+            self.ref_core.broadcast_message('system_status', status_data)
+        
+        # 否则记录状态
+        else:
+            logger.debug(f"系统状态更新: 健康分数={status_data['health']['score']}, "
+                        f"状态={status_data['health']['status']}")
+    
+    def get_system_status(self):
+        """获取系统状态概要"""
+        return {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "last_check": self.system_status["last_check"],
+            "models_count": len(self.models_health),
+            "anomalies_count": len(self.anomalies),
+            "suggestions_count": len(self.suggestions)
+        }
+    
+    def get_detailed_status(self):
+        """获取系统详细状态"""
+        return {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "models": self.models_health,
+            "anomalies": self.anomalies,
+            "suggestions": self.suggestions,
+            "last_check": self.system_status["last_check"],
+            "index_status": self.index_status,
+            "last_optimization": self.last_optimization
+        }
+    
+    def get_model_health(self, model_id):
+        """获取特定模型健康状态"""
+        if model_id in self.models_health:
+            return self.models_health[model_id]
+        return None
+    
+    def get_dashboard_data(self):
+        """获取仪表盘所需数据"""
+        return {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "models": self.models_health,
+            "suggestions": self.suggestions,
+            "anomalies": self.anomalies,
+            "timestamp": time.time()
+        }
+
+
+# 如果直接运行此模块，执行简单测试
+if __name__ == "__main__":
+    print("初始化系统监控增强器...")
+    
+    # 创建监控器并启动
+    monitor = SystemMonitorEnhancer()
+    monitor.start_monitoring()
+    
+    try:
+        print("监控器已启动，按Ctrl+C停止...")
+        
+        # 每30秒输出一次状态
+        while True:
+            time.sleep(30)
+            status = monitor.get_system_status()
+            print(f"健康状态: {status['health']['status']}, 分数: {status['health']['score']}")
+            print(f"资源使用: CPU {status['resources']['cpu']}%, "
+                 f"内存 {status['resources']['memory']}%, "
+                 f"磁盘 {status['resources']['disk']}%")
+            
+    except KeyboardInterrupt:
+        print("正在停止监控器...")
+        monitor.stop_monitoring()
+        print("已停止。") 
+# -*- coding: utf-8 -*-
+
+"""
+系统监控增强器 - Ref量子自反省系统的核心组件
+用于增强Ref的系统自监控能力，包括健康检查、异常检测和自动优化
+"""
+
+import os
+import sys
+import time
+import json
+import logging
+import threading
+import traceback
+import datetime
+import shutil
+import random
+import subprocess
+import psutil
+from collections import deque
+import numpy as np
+from typing import Dict, List, Tuple, Any, Optional, Union, Callable
+
+# 配置日志记录
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] [Ref-Monitor] %(message)s',
+    handlers=[
+        logging.FileHandler("Ref/logs/system_monitor.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("RefSystemMonitor")
+
+# 系统常量
+METRICS_HISTORY_SIZE = 1000  # 保留的历史指标数量
+ANOMALY_THRESHOLD = 3.0      # Z分数异常阈值
+CHECK_INTERVAL = 60          # 监控检查间隔（秒）
+OPTIMIZATION_INTERVAL = 86400  # 自动优化间隔（秒）
+
+class SystemHealth:
+    """系统健康状态类"""
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    CRITICAL = "critical"
+
+class SystemMonitorEnhancer:
+    """系统监控增强器类，提供自反省监控功能"""
+    
+    def __init__(self, ref_core=None):
+        """初始化系统监控增强器"""
+        self.ref_core = ref_core
+        self.running = False
+        self.monitor_thread = None
+        self.models_health = {}
+        self.system_metrics = {}
+        self.metrics_history = {}
+        self.anomalies = []
+        self.suggestions = []
+        self.check_lock = threading.Lock()
+        self.last_optimization = 0
+        self.index_status = {}
+        self.system_status = {
+            "health": {"score": 100, "status": SystemHealth.HEALTHY},
+            "last_check": 0,
+            "resources": {"cpu": 0, "memory": 0, "disk": 0}
+        }
+        
+        # 初始化指标历史记录
+        self._init_metrics_history()
+        
+        logger.info("系统监控增强器已初始化")
+        
+    def _init_metrics_history(self):
+        """初始化指标历史记录"""
+        metrics = ["cpu_usage", "memory_usage", "disk_usage", "system_health"]
+        for metric in metrics:
+            self.metrics_history[metric] = deque(maxlen=METRICS_HISTORY_SIZE)
+    
+    def start_monitoring(self):
+        """启动系统监控"""
+        if self.running:
+            return
+            
+        self.running = True
+        self.monitor_thread = threading.Thread(
+            target=self._monitoring_loop,
+            name="RefSystemMonitorThread",
+            daemon=True
+        )
+        self.monitor_thread.start()
+        logger.info("系统监控已启动")
+        
+    def stop_monitoring(self):
+        """停止系统监控"""
+        self.running = False
+        if self.monitor_thread:
+            self.monitor_thread.join(timeout=5)
+            self.monitor_thread = None
+        logger.info("系统监控已停止")
+    
+    def _monitoring_loop(self):
+        """监控循环，定期检查系统健康状态"""
+        while self.running:
+            try:
+                self.check_system_health()
+                self.detect_anomalies()
+                self.generate_suggestions()
+                
+                # 检查是否需要自动优化
+                current_time = time.time()
+                if (current_time - self.last_optimization) > OPTIMIZATION_INTERVAL:
+                    self.auto_optimize()
+                    self.last_optimization = current_time
+                
+                # 广播系统状态更新
+                self._broadcast_status()
+            except Exception as e:
+                logger.error(f"监控循环出错: {str(e)}")
+                logger.debug(traceback.format_exc())
+            
+            # 休眠到下一次检查
+            time.sleep(CHECK_INTERVAL)
+    
+    def check_system_health(self):
+        """检查系统健康状态"""
+        with self.check_lock:
+            logger.debug("正在检查系统健康状态...")
+            
+            # 获取系统资源使用情况
+            try:
+                self._check_resources()
+                self._check_models_health()
+                self._check_index_status()
+                self._calculate_overall_health()
+                
+                # 更新最后检查时间
+                self.system_status["last_check"] = time.time()
+                
+                logger.debug(f"系统健康检查完成, 健康分数: {self.system_status['health']['score']}")
+            except Exception as e:
+                logger.error(f"健康检查出错: {str(e)}")
+                logger.debug(traceback.format_exc())
+    
+    def _check_resources(self):
+        """检查系统资源使用情况"""
+        # CPU使用率
+        cpu_percent = psutil.cpu_percent(interval=1)
+        self.system_metrics["cpu_usage"] = cpu_percent
+        self.metrics_history["cpu_usage"].append((time.time(), cpu_percent))
+        self.system_status["resources"]["cpu"] = cpu_percent
+        
+        # 内存使用率
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        self.system_metrics["memory_usage"] = memory_percent
+        self.metrics_history["memory_usage"].append((time.time(), memory_percent))
+        self.system_status["resources"]["memory"] = memory_percent
+        
+        # 磁盘使用率
+        disk = psutil.disk_usage('/')
+        disk_percent = disk.percent
+        self.system_metrics["disk_usage"] = disk_percent
+        self.metrics_history["disk_usage"].append((time.time(), disk_percent))
+        self.system_status["resources"]["disk"] = disk_percent
+        
+        logger.debug(f"资源使用情况 - CPU: {cpu_percent}%, 内存: {memory_percent}%, 磁盘: {disk_percent}%")
+    
+    def _check_models_health(self):
+        """检查所有模型的健康状态"""
+        # 如果有ref_core，使用其注册的模型列表
+        if self.ref_core and hasattr(self.ref_core, 'registered_models'):
+            for model_id, model_data in self.ref_core.registered_models.items():
+                health_score = self._get_model_health(model_id, model_data)
+                
+                # 确定状态等级
+                status = SystemHealth.HEALTHY
+                if health_score < 70:
+                    status = SystemHealth.DEGRADED
+                if health_score < 40:
+                    status = SystemHealth.CRITICAL
+                
+                self.models_health[model_id] = {
+                    "health": health_score,
+                    "status": status,
+                    "last_check": time.time()
+                }
+        else:
+            # 模拟一些模型状态用于测试
+            self._simulate_models_health()
+    
+    def _get_model_health(self, model_id, model_data):
+        """获取特定模型的健康分数"""
+        # 实际实现中应该检查模型文件完整性、依赖性和最近的执行状态
+        try:
+            # 检查模型是否存在
+            if not model_data or 'path' not in model_data:
+                return 30.0
+                
+            model_path = model_data['path']
+            if not os.path.exists(model_path):
+                return 0.0
+            
+            # 检查模型文件的完整性
+            if 'checksum' in model_data and model_data['checksum']:
+                # 这里应该执行实际的校验和验证
+                checksum_valid = True
+                if not checksum_valid:
+                    return 40.0
+            
+            # 检查最近的执行状态
+            if 'last_execution' in model_data:
+                last_exec = model_data['last_execution']
+                if 'success' in last_exec and not last_exec['success']:
+                    return 60.0
+                
+                # 检查最后执行时间是否过久
+                if 'timestamp' in last_exec:
+                    elapsed = time.time() - last_exec['timestamp']
+                    if elapsed > 604800:  # 一周
+                        return 70.0
+                    elif elapsed > 86400 * 3:  # 三天
+                        return 85.0
+            
+            # 默认健康
+            return 95.0
+            
+        except Exception as e:
+            logger.error(f"检查模型 {model_id} 健康状态出错: {str(e)}")
+            return 50.0  # 出错默认给一个中等的分数
+    
+    def _simulate_models_health(self):
+        """模拟模型健康状态（仅用于测试）"""
+        models = ['qsm', 'som', 'weq']
+        
+        for model in models:
+            # 随机生成一个健康分数，大部分应该是健康的
+            health = random.uniform(50, 100)
+            if random.random() < 0.1:  # 10%的概率出现问题
+                health = random.uniform(20, 49)
+            
+            # 确定状态等级
+            status = SystemHealth.HEALTHY
+            if health < 70:
+                status = SystemHealth.DEGRADED
+            if health < 40:
+                status = SystemHealth.CRITICAL
+            
+            self.models_health[model] = {
+                "health": health,
+                "status": status,
+                "last_check": time.time()
+            }
+    
+    def _check_index_status(self):
+        """检查项目索引状态"""
+        try:
+            # 检查索引文件是否存在
+            index_files = [
+                "docs/global/qsm_project_index.md",
+                "docs/global/detailed_index.md",
+                "docs/global/files_index.md"
+            ]
+            
+            for idx_file in index_files:
+                file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), idx_file)
+                
+                if not os.path.exists(file_path):
+                    self.index_status[idx_file] = {
+                        "exists": False,
+                        "status": "missing",
+                        "last_modified": 0
+                    }
+                    continue
+                
+                # 获取文件修改时间
+                mod_time = os.path.getmtime(file_path)
+                
+                # 检查文件是否过期
+                current_time = time.time()
+                days_since_update = (current_time - mod_time) / 86400
+                
+                status = "healthy"
+                if days_since_update > 30:
+                    status = "outdated"
+                elif days_since_update > 7:
+                    status = "stale"
+                
+                self.index_status[idx_file] = {
+                    "exists": True,
+                    "status": status,
+                    "last_modified": mod_time,
+                    "days_since_update": days_since_update
+                }
+                
+            logger.debug(f"索引状态检查完成，共检查了 {len(index_files)} 个索引文件")
+                
+        except Exception as e:
+            logger.error(f"检查索引状态出错: {str(e)}")
+    
+    def _calculate_overall_health(self):
+        """计算整体系统健康分数"""
+        health_score = 100.0
+        
+        # 资源使用扣分
+        cpu_penalty = max(0, (self.system_metrics.get("cpu_usage", 0) - 80) * 0.5)
+        memory_penalty = max(0, (self.system_metrics.get("memory_usage", 0) - 80) * 0.5)
+        disk_penalty = max(0, (self.system_metrics.get("disk_usage", 0) - 80) * 1.0)
+        
+        # 模型健康扣分
+        model_health_sum = 0
+        for model_id, health_data in self.models_health.items():
+            model_health = health_data.get("health", 0)
+            model_health_sum += model_health
+            
+            # 不健康的模型会导致较大扣分
+            if model_health < 40:
+                health_score -= 15
+            elif model_health < 70:
+                health_score -= 5
+        
+        # 索引状态扣分
+        for idx_file, status in self.index_status.items():
+            if not status.get("exists", False):
+                health_score -= 5
+            elif status.get("status") == "outdated":
+                health_score -= 3
+            elif status.get("status") == "stale":
+                health_score -= 1
+        
+        # 应用扣分
+        health_score -= (cpu_penalty + memory_penalty + disk_penalty)
+        
+        # 确保分数在0-100之间
+        health_score = max(0, min(100, health_score))
+        
+        # 确定状态等级
+        status = SystemHealth.HEALTHY
+        if health_score < 70:
+            status = SystemHealth.DEGRADED
+        if health_score < 40:
+            status = SystemHealth.CRITICAL
+        
+        # 更新系统状态
+        self.system_status["health"]["score"] = health_score
+        self.system_status["health"]["status"] = status
+        
+        # 记录健康分数历史
+        self.metrics_history["system_health"].append((time.time(), health_score))
+        
+        logger.debug(f"系统整体健康分数: {health_score}, 状态: {status}")
+    
+    def detect_anomalies(self):
+        """检测系统异常"""
+        try:
+            new_anomalies = []
+            
+            # 检查各项指标
+            for metric, history in self.metrics_history.items():
+                if len(history) < 10:  # 需要足够的数据点
+                    continue
+                
+                # 提取最近的值和时间
+                recent_values = [value for _, value in list(history)[-20:]]
+                
+                # 计算均值和标准差
+                mean = np.mean(recent_values[:-1])  # 排除最新值
+                std = np.std(recent_values[:-1])
+                if std == 0:  # 避免除以零
+                    std = 0.001
+                
+                # 计算最新值的Z分数
+                latest_time, latest_value = history[-1]
+                z_score = (latest_value - mean) / std
+                
+                # 检查是否异常
+                if abs(z_score) > ANOMALY_THRESHOLD:
+                    # 只关注上升异常（资源使用增加或健康度下降）
+                    if (metric != "system_health" and z_score > 0) or \
+                       (metric == "system_health" and z_score < 0):
+                        
+                        new_anomalies.append({
+                            "metric": metric,
+                            "value": latest_value,
+                            "mean": mean,
+                            "std": std,
+                            "z_score": z_score,
+                            "timestamp": latest_time
+                        })
+                        logger.warning(f"检测到异常: {metric}, 值: {latest_value}, Z分数: {z_score:.2f}")
+            
+            # 更新异常列表，保留最近的10个
+            self.anomalies = (new_anomalies + self.anomalies)[:10]
+            
+        except Exception as e:
+            logger.error(f"检测异常出错: {str(e)}")
+    
+    def generate_suggestions(self):
+        """生成系统优化建议"""
+        try:
+            new_suggestions = []
+            
+            # 基于资源使用情况的建议
+            if self.system_metrics.get("cpu_usage", 0) > 80:
+                new_suggestions.append({
+                    "message": "CPU使用率过高",
+                    "suggestion": "考虑限制并发任务数量或优化计算密集型操作",
+                    "severity": "high" if self.system_metrics.get("cpu_usage", 0) > 90 else "medium"
+                })
+            
+            if self.system_metrics.get("memory_usage", 0) > 80:
+                new_suggestions.append({
+                    "message": "内存使用率过高",
+                    "suggestion": "检查可能的内存泄漏或考虑增加系统内存",
+                    "severity": "high" if self.system_metrics.get("memory_usage", 0) > 90 else "medium"
+                })
+            
+            if self.system_metrics.get("disk_usage", 0) > 85:
+                new_suggestions.append({
+                    "message": "磁盘空间不足",
+                    "suggestion": "清理临时文件并考虑扩展存储空间",
+                    "severity": "high" if self.system_metrics.get("disk_usage", 0) > 95 else "medium"
+                })
+            
+            # 基于模型健康状态的建议
+            for model_id, health_data in self.models_health.items():
+                if health_data.get("status") == SystemHealth.CRITICAL:
+                    new_suggestions.append({
+                        "message": f"模型 {model_id.upper()} 处于危险状态",
+                        "suggestion": f"执行 {model_id.upper()} 子系统修复，检查代码完整性和依赖",
+                        "severity": "high"
+                    })
+                elif health_data.get("status") == SystemHealth.DEGRADED:
+                    new_suggestions.append({
+                        "message": f"模型 {model_id.upper()} 性能下降",
+                        "suggestion": "检查子系统资源使用并考虑优化",
+                        "severity": "medium"
+                    })
+            
+            # 基于索引状态的建议
+            missing_indices = [idx for idx, status in self.index_status.items() 
+                              if not status.get("exists", False)]
+            if missing_indices:
+                new_suggestions.append({
+                    "message": "缺少项目索引文件",
+                    "suggestion": f"运行索引更新脚本创建缺失的索引: {', '.join(missing_indices)}",
+                    "severity": "medium"
+                })
+            
+            outdated_indices = [idx for idx, status in self.index_status.items() 
+                               if status.get("status") == "outdated"]
+            if outdated_indices:
+                new_suggestions.append({
+                    "message": "项目索引过期",
+                    "suggestion": "运行索引更新脚本刷新过期的索引",
+                    "severity": "low"
+                })
+            
+            # 更新建议列表
+            self.suggestions = new_suggestions
+            
+            logger.debug(f"生成了 {len(new_suggestions)} 条系统优化建议")
+            
+        except Exception as e:
+            logger.error(f"生成优化建议出错: {str(e)}")
+    
+    def auto_optimize(self):
+        """执行自动优化"""
+        logger.info("开始执行系统自动优化...")
+        optimization_results = {
+            "actions": [],
+            "start_time": time.time(),
+            "end_time": None
+        }
+        
+        try:
+            # 1. 修复不健康的模型
+            for model_id, health_data in self.models_health.items():
+                if health_data.get("status") != SystemHealth.HEALTHY:
+                    success = self._repair_model(model_id)
+                    optimization_results["actions"].append({
+                        "action": "repair_model",
+                        "target": model_id,
+                        "success": success
+                    })
+            
+            # 2. 优化项目索引
+            index_optimized = self._optimize_indices()
+            optimization_results["actions"].append({
+                "action": "optimize_indices",
+                "success": index_optimized
+            })
+            
+            # 3. 创建系统备份
+            backup_created = self._create_system_backup()
+            optimization_results["actions"].append({
+                "action": "create_backup",
+                "success": backup_created
+            })
+            
+            # 4. 清理日志和临时文件
+            cleanup_success = self._cleanup_logs()
+            optimization_results["actions"].append({
+                "action": "cleanup_logs",
+                "success": cleanup_success
+            })
+            
+            # 记录优化完成时间
+            optimization_results["end_time"] = time.time()
+            self.last_optimization = time.time()
+            
+            # 记录优化报告
+            self._save_optimization_report(optimization_results)
+            
+            logger.info("系统自动优化完成")
+            return optimization_results
+            
+        except Exception as e:
+            logger.error(f"系统自动优化出错: {str(e)}")
+            logger.debug(traceback.format_exc())
+            
+            # 记录错误信息
+            optimization_results["end_time"] = time.time()
+            optimization_results["error"] = str(e)
+            self._save_optimization_report(optimization_results)
+            
+            return {"error": str(e), "actions": optimization_results["actions"]}
+    
+    def _repair_model(self, model_id):
+        """修复特定模型"""
+        logger.info(f"正在修复模型: {model_id}")
+        try:
+            # 如果有ref_core，使用其修复功能
+            if self.ref_core and hasattr(self.ref_core, 'repair_model'):
+                repair_result = self.ref_core.repair_model(model_id)
+                return repair_result
+            
+            # 模拟修复过程
+            logger.info(f"模拟修复模型 {model_id} 完成")
+            
+            # 更新模型健康状态
+            self.models_health[model_id] = {
+                "health": 95.0,
+                "status": SystemHealth.HEALTHY,
+                "last_check": time.time()
+            }
+            
+            return True
+        except Exception as e:
+            logger.error(f"修复模型 {model_id} 出错: {str(e)}")
+            return False
+    
+    def _optimize_indices(self):
+        """优化项目索引"""
+        logger.info("正在优化项目索引...")
+        try:
+            # 尝试运行索引更新脚本
+            script_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), 
+                "frontend/tools/update_project_index.py"
+            )
+            
+            if not os.path.exists(script_path):
+                logger.error(f"索引更新脚本不存在: {script_path}")
+                return False
+            
+            # 执行脚本
+            result = subprocess.run(
+                [sys.executable, script_path], 
+                capture_output=True, 
+                text=True
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"索引更新脚本执行失败: {result.stderr}")
+                return False
+            
+            logger.info("项目索引优化完成")
+            return True
+            
+        except Exception as e:
+            logger.error(f"优化项目索引出错: {str(e)}")
+            return False
+    
+    def _create_system_backup(self):
+        """创建系统备份"""
+        logger.info("正在创建系统备份...")
+        try:
+            # 创建备份目录
+            backup_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "Ref/backup"
+            )
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # 创建带时间戳的备份目录
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"system_backup_{timestamp}")
+            os.makedirs(backup_path, exist_ok=True)
+            
+            # 备份关键文件和目录
+            dirs_to_backup = [
+                "docs/global",
+                "Ref/data",
+                "Ref/logs",
+                "frontend/tools"
+            ]
+            
+            for dir_path in dirs_to_backup:
+                src_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), dir_path)
+                if os.path.exists(src_path):
+                    dst_path = os.path.join(backup_path, dir_path)
+                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                    
+                    if os.path.isdir(src_path):
+                        shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(src_path, dst_path)
+            
+            # 创建备份元数据文件
+            metadata = {
+                "timestamp": time.time(),
+                "datetime": timestamp,
+                "backup_path": backup_path,
+                "dirs_backed_up": dirs_to_backup,
+                "system_health": self.system_status["health"]
+            }
+            
+            with open(os.path.join(backup_path, "backup_metadata.json"), "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"系统备份创建完成: {backup_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"创建系统备份出错: {str(e)}")
+            return False
+    
+    def _cleanup_logs(self):
+        """清理旧日志和临时文件"""
+        logger.info("正在清理日志和临时文件...")
+        try:
+            # 清理旧日志文件
+            logs_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "Ref/logs"
+            )
+            
+            if os.path.exists(logs_dir):
+                current_time = time.time()
+                # 删除30天前的日志
+                for log_file in os.listdir(logs_dir):
+                    if not log_file.endswith(".log"):
+                        continue
+                        
+                    log_path = os.path.join(logs_dir, log_file)
+                    file_time = os.path.getmtime(log_path)
+                    
+                    # 如果文件超过30天
+                    if (current_time - file_time) > (86400 * 30):
+                        os.remove(log_path)
+                        logger.debug(f"已删除旧日志: {log_file}")
+            
+            # 清理临时文件目录
+            temp_dirs = [
+                "Ref/tmp",
+                "Ref/cache"
+            ]
+            
+            for temp_dir in temp_dirs:
+                dir_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), temp_dir)
+                if os.path.exists(dir_path):
+                    for item in os.listdir(dir_path):
+                        item_path = os.path.join(dir_path, item)
+                        try:
+                            if os.path.isfile(item_path):
+                                os.remove(item_path)
+                            elif os.path.isdir(item_path):
+                                shutil.rmtree(item_path)
+                        except Exception as e:
+                            logger.warning(f"无法删除临时文件: {item_path}, 原因: {str(e)}")
+            
+            logger.info("日志和临时文件清理完成")
+            return True
+            
+        except Exception as e:
+            logger.error(f"清理日志和临时文件出错: {str(e)}")
+            return False
+    
+    def _save_optimization_report(self, report):
+        """保存优化报告"""
+        try:
+            reports_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "Ref/reports"
+            )
+            os.makedirs(reports_dir, exist_ok=True)
+            
+            # 创建带时间戳的报告文件
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_path = os.path.join(reports_dir, f"optimization_report_{timestamp}.json")
+            
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+                
+            logger.info(f"优化报告已保存: {report_path}")
+            
+        except Exception as e:
+            logger.error(f"保存优化报告出错: {str(e)}")
+    
+    def _broadcast_status(self):
+        """广播系统状态更新"""
+        # 准备状态数据
+        status_data = {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "models": self.models_health,
+            "suggestions": self.suggestions,
+            "anomalies": self.anomalies,
+            "timestamp": time.time()
+        }
+        
+        # 如果有ref_core并且它有广播功能，则使用它
+        if self.ref_core and hasattr(self.ref_core, 'broadcast_message'):
+            self.ref_core.broadcast_message('system_status', status_data)
+        
+        # 否则记录状态
+        else:
+            logger.debug(f"系统状态更新: 健康分数={status_data['health']['score']}, "
+                        f"状态={status_data['health']['status']}")
+    
+    def get_system_status(self):
+        """获取系统状态概要"""
+        return {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "last_check": self.system_status["last_check"],
+            "models_count": len(self.models_health),
+            "anomalies_count": len(self.anomalies),
+            "suggestions_count": len(self.suggestions)
+        }
+    
+    def get_detailed_status(self):
+        """获取系统详细状态"""
+        return {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "models": self.models_health,
+            "anomalies": self.anomalies,
+            "suggestions": self.suggestions,
+            "last_check": self.system_status["last_check"],
+            "index_status": self.index_status,
+            "last_optimization": self.last_optimization
+        }
+    
+    def get_model_health(self, model_id):
+        """获取特定模型健康状态"""
+        if model_id in self.models_health:
+            return self.models_health[model_id]
+        return None
+    
+    def get_dashboard_data(self):
+        """获取仪表盘所需数据"""
+        return {
+            "health": self.system_status["health"],
+            "resources": self.system_status["resources"],
+            "models": self.models_health,
+            "suggestions": self.suggestions,
+            "anomalies": self.anomalies,
+            "timestamp": time.time()
+        }
+
+
+# 如果直接运行此模块，执行简单测试
+if __name__ == "__main__":
+    print("初始化系统监控增强器...")
+    
+    # 创建监控器并启动
+    monitor = SystemMonitorEnhancer()
+    monitor.start_monitoring()
+    
+    try:
+        print("监控器已启动，按Ctrl+C停止...")
+        
+        # 每30秒输出一次状态
+        while True:
+            time.sleep(30)
+            status = monitor.get_system_status()
+            print(f"健康状态: {status['health']['status']}, 分数: {status['health']['score']}")
+            print(f"资源使用: CPU {status['resources']['cpu']}%, "
+                 f"内存 {status['resources']['memory']}%, "
+                 f"磁盘 {status['resources']['disk']}%")
+            
+    except KeyboardInterrupt:
+        print("正在停止监控器...")
+        monitor.stop_monitoring()
+        print("已停止。") 
+
+"""
+
+"""
+量子基因编码: QE-SYS-01BB50EB5D2B
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+"""
+
+// 开发团队：中华 ZhoHo ，Claude 
+

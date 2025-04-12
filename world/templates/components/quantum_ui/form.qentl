@@ -1,0 +1,435 @@
+# 量子表单组件
+# 量子基因: QG-COMP-FORM-A1B1
+# 量子纠缠: QE-COMP-FORM-20240404
+
+@component q-form
+@props
+  fields: array = []             # 表单字段配置数组
+  submitText: string = "提交"     # 提交按钮文本
+  cancelText: string = "取消"     # 取消按钮文本
+  showCancel: boolean = false    # 是否显示取消按钮
+  layout: string = "vertical"    # 布局方式：vertical/horizontal/inline
+  labelWidth: string = "120px"   # 标签宽度
+  labelAlign: string = "right"   # 标签对齐方式：left/right
+  size: string = "medium"        # 表单大小：small/medium/large
+  disabled: boolean = false      # 是否禁用整个表单
+  loading: boolean = false       # 是否显示加载状态
+  validateOnChange: boolean = true # 是否在字段变化时验证
+  entangleStrength: number = 0.9  # 量子纠缠强度
+
+@template
+<form class="q-form"
+      data-quantum-entangle='{
+        "id": "form-${@id}",
+        "strength": ${entangleStrength},
+        "sync": true
+      }'
+      data-layout="${layout}"
+      data-size="${size}"
+      @submit.prevent="handleSubmit"
+>
+    <div class="q-form-fields">
+        @each field in fields
+        <div class="q-form-item"
+             data-field-type="${field.type}"
+             data-required="${field.required || false}"
+             data-status="${field.status || ''}"
+        >
+            @if field.label
+            <label class="q-form-label"
+                   style="width: ${labelWidth}; text-align: ${labelAlign};"
+                   for="${field.name}"
+            >
+                @if field.required
+                <span class="q-form-required">*</span>
+                @endif
+                ${field.label}
+            </label>
+            @endif
+            
+            <div class="q-form-content">
+                @switch field.type
+                    @case "text", "email", "password", "number", "tel", "url"
+                        <input type="${field.type}"
+                               id="${field.name}"
+                               name="${field.name}"
+                               class="q-input"
+                               value="${field.value || ''}"
+                               placeholder="${field.placeholder || ''}"
+                               @input="handleInput"
+                               @blur="handleBlur"
+                               :disabled="disabled || field.disabled"
+                               :required="field.required"
+                               :min="field.min"
+                               :max="field.max"
+                               :pattern="field.pattern"
+                        >
+                    @case "textarea"
+                        <textarea id="${field.name}"
+                                  name="${field.name}"
+                                  class="q-textarea"
+                                  placeholder="${field.placeholder || ''}"
+                                  @input="handleInput"
+                                  @blur="handleBlur"
+                                  :disabled="disabled || field.disabled"
+                                  :required="field.required"
+                                  rows="${field.rows || 4}"
+                        >${field.value || ''}</textarea>
+                    @case "select"
+                        <select id="${field.name}"
+                                name="${field.name}"
+                                class="q-select"
+                                @change="handleInput"
+                                @blur="handleBlur"
+                                :disabled="disabled || field.disabled"
+                                :required="field.required"
+                        >
+                            @if field.placeholder
+                            <option value="" disabled selected>${field.placeholder}</option>
+                            @endif
+                            @each option in field.options
+                            <option value="${option.value}"
+                                    :selected="option.value === field.value"
+                            >${option.label}</option>
+                            @end
+                        </select>
+                    @case "checkbox"
+                        <label class="q-checkbox">
+                            <input type="checkbox"
+                                   id="${field.name}"
+                                   name="${field.name}"
+                                   :checked="field.value"
+                                   @change="handleInput"
+                                   :disabled="disabled || field.disabled"
+                                   :required="field.required"
+                            >
+                            <span class="q-checkbox-label">${field.checkboxLabel}</span>
+                        </label>
+                    @case "radio"
+                        <div class="q-radio-group">
+                            @each option in field.options
+                            <label class="q-radio">
+                                <input type="radio"
+                                       name="${field.name}"
+                                       value="${option.value}"
+                                       :checked="option.value === field.value"
+                                       @change="handleInput"
+                                       :disabled="disabled || field.disabled"
+                                       :required="field.required"
+                                >
+                                <span class="q-radio-label">${option.label}</span>
+                            </label>
+                            @end
+                        </div>
+                @end
+                
+                @if field.help
+                <div class="q-form-help">${field.help}</div>
+                @endif
+                
+                @if field.error
+                <div class="q-form-error">${field.error}</div>
+                @endif
+            </div>
+        </div>
+        @end
+    </div>
+    
+    <div class="q-form-actions">
+        <button type="submit"
+                class="q-btn q-btn-primary"
+                :disabled="disabled || loading"
+        >
+            @if loading
+            <span class="q-loading-icon"></span>
+            @endif
+            ${submitText}
+        </button>
+        
+        @if showCancel
+        <button type="button"
+                class="q-btn q-btn-default"
+                @click="handleCancel"
+                :disabled="disabled || loading"
+        >${cancelText}</button>
+        @endif
+    </div>
+</form>
+
+@style
+.q-form {
+    width: 100%;
+}
+
+.q-form[data-layout="horizontal"] .q-form-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: var(--q-spacing-4);
+}
+
+.q-form[data-layout="vertical"] .q-form-item {
+    margin-bottom: var(--q-spacing-4);
+}
+
+.q-form[data-layout="inline"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--q-spacing-4);
+}
+
+.q-form[data-layout="inline"] .q-form-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.q-form-label {
+    display: inline-block;
+    margin-bottom: var(--q-spacing-2);
+    color: var(--q-gray-700);
+    font-size: 0.875rem;
+}
+
+.q-form[data-layout="horizontal"] .q-form-label {
+    margin-bottom: 0;
+    padding-right: var(--q-spacing-4);
+}
+
+.q-form-required {
+    color: var(--q-error);
+    margin-right: var(--q-spacing-1);
+}
+
+.q-form-content {
+    flex: 1;
+}
+
+.q-input,
+.q-textarea,
+.q-select {
+    width: 100%;
+    padding: var(--q-spacing-2) var(--q-spacing-3);
+    border: 1px solid var(--q-gray-300);
+    border-radius: var(--q-radius-md);
+    font-size: 0.875rem;
+    color: var(--q-gray-900);
+    background-color: var(--q-gray-50);
+    transition: var(--q-transition);
+}
+
+.q-form[data-size="small"] .q-input,
+.q-form[data-size="small"] .q-textarea,
+.q-form[data-size="small"] .q-select {
+    padding: var(--q-spacing-1) var(--q-spacing-2);
+    font-size: 0.75rem;
+}
+
+.q-form[data-size="large"] .q-input,
+.q-form[data-size="large"] .q-textarea,
+.q-form[data-size="large"] .q-select {
+    padding: var(--q-spacing-3) var(--q-spacing-4);
+    font-size: 1rem;
+}
+
+.q-input:focus,
+.q-textarea:focus,
+.q-select:focus {
+    outline: none;
+    border-color: var(--q-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.q-input:disabled,
+.q-textarea:disabled,
+.q-select:disabled {
+    background-color: var(--q-gray-100);
+    cursor: not-allowed;
+}
+
+.q-checkbox,
+.q-radio {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.q-checkbox input,
+.q-radio input {
+    margin-right: var(--q-spacing-2);
+}
+
+.q-radio-group {
+    display: flex;
+    gap: var(--q-spacing-4);
+}
+
+.q-form-help {
+    margin-top: var(--q-spacing-1);
+    font-size: 0.75rem;
+    color: var(--q-gray-500);
+}
+
+.q-form-error {
+    margin-top: var(--q-spacing-1);
+    font-size: 0.75rem;
+    color: var(--q-error);
+}
+
+.q-form-item[data-status="error"] .q-input,
+.q-form-item[data-status="error"] .q-textarea,
+.q-form-item[data-status="error"] .q-select {
+    border-color: var(--q-error);
+}
+
+.q-form-item[data-status="success"] .q-input,
+.q-form-item[data-status="success"] .q-textarea,
+.q-form-item[data-status="success"] .q-select {
+    border-color: var(--q-success);
+}
+
+.q-form-actions {
+    margin-top: var(--q-spacing-6);
+    display: flex;
+    gap: var(--q-spacing-2);
+}
+
+.q-loading-icon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: var(--q-spacing-2);
+    border: 2px solid var(--q-gray-200);
+    border-top-color: var(--q-primary);
+    border-radius: 50%;
+    animation: q-spin 0.8s linear infinite;
+}
+
+/* 量子纠缠效果 */
+.q-form[data-quantum-entangle] .q-input:focus,
+.q-form[data-quantum-entangle] .q-textarea:focus,
+.q-form[data-quantum-entangle] .q-select:focus {
+    animation: q-glow 2s infinite;
+}
+
+@script
+export default {
+    data() {
+        return {
+            formData: {},
+            errors: {},
+            touched: {}
+        };
+    },
+    
+    mounted() {
+        // 初始化表单数据
+        this.initFormData();
+        
+        // 设置量子纠缠
+        const formId = `form-${this.id}`;
+        window.quantumEntangle.addObject(formId);
+        window.quantumEntangle.setStrength(this.entangleStrength);
+    },
+    
+    methods: {
+        initFormData() {
+            this.fields.forEach(field => {
+                this.formData[field.name] = field.value || '';
+            });
+        },
+        
+        handleInput(event) {
+            const field = event.target;
+            const name = field.name;
+            const value = field.type === 'checkbox' ? field.checked : field.value;
+            
+            this.formData[name] = value;
+            this.touched[name] = true;
+            
+            if (this.validateOnChange) {
+                this.validateField(name);
+            }
+            
+            // 发送量子纠缠消息
+            window.quantumEntangle.send('form_change', {
+                id: `form-${this.id}`,
+                field: name,
+                value: value
+            });
+        },
+        
+        handleBlur(event) {
+            const field = event.target;
+            const name = field.name;
+            
+            this.touched[name] = true;
+            this.validateField(name);
+        },
+        
+        validateField(name) {
+            const field = this.fields.find(f => f.name === name);
+            if (!field) return;
+            
+            const value = this.formData[name];
+            let error = '';
+            
+            if (field.required && !value) {
+                error = '此字段是必填的';
+            } else if (field.validator) {
+                error = field.validator(value);
+            }
+            
+            this.errors[name] = error;
+            
+            // 更新字段状态
+            const fieldElement = document.querySelector(`[name="${name}"]`).closest('.q-form-item');
+            fieldElement.dataset.status = error ? 'error' : 'success';
+        },
+        
+        validateForm() {
+            let isValid = true;
+            
+            this.fields.forEach(field => {
+                this.validateField(field.name);
+                if (this.errors[field.name]) {
+                    isValid = false;
+                }
+            });
+            
+            return isValid;
+        },
+        
+        handleSubmit() {
+            if (this.validateForm()) {
+                // 发送量子纠缠消息
+                window.quantumEntangle.send('form_submit', {
+                    id: `form-${this.id}`,
+                    data: this.formData
+                });
+            }
+        },
+        
+        handleCancel() {
+            // 发送量子纠缠消息
+            window.quantumEntangle.send('form_cancel', {
+                id: `form-${this.id}`
+            });
+        },
+        
+        reset() {
+            this.initFormData();
+            this.errors = {};
+            this.touched = {};
+            
+            // 重置所有字段状态
+            document.querySelectorAll('.q-form-item').forEach(item => {
+                item.dataset.status = '';
+            });
+        }
+    },
+    
+    beforeDestroy() {
+        // 清理量子纠缠
+        window.quantumEntangle.removeObject(`form-${this.id}`);
+    }
+} 

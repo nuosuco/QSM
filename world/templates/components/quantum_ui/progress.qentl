@@ -1,0 +1,188 @@
+@quantum-component(name="quantum-progress")
+@quantum-entangle(strength=0.95, sync=true)
+@quantum-state({
+    currentValue: 0,
+    animating: false
+})
+
+<div class="quantum-progress" 
+     :class="[
+         `quantum-progress--${type}`,
+         { 'is-animating': animating }
+     ]">
+    <div class="quantum-progress-bar">
+        <div class="quantum-progress-inner" 
+             :style="{ width: `${percentage}%` }">
+            <div class="quantum-progress-wave"></div>
+        </div>
+        
+        <div class="quantum-progress-glow"></div>
+    </div>
+    
+    <div v-if="showInfo" class="quantum-progress-info">
+        <span class="quantum-progress-text" v-if="text">
+            {{ text }}
+        </span>
+        <span v-else class="quantum-progress-percentage">
+            {{ percentage }}%
+        </span>
+    </div>
+</div>
+
+<style lang="qcss">
+.quantum-progress {
+    position: relative;
+    margin: 16px 0;
+}
+
+.quantum-progress-bar {
+    height: 6px;
+    background: var(--quantum-bg-color);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+
+.quantum-progress-inner {
+    height: 100%;
+    background: var(--quantum-primary-color);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+/* 波浪效果 */
+.quantum-progress-wave {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: quantumWave 2s infinite linear;
+}
+
+/* 发光效果 */
+.quantum-progress-glow {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: var(--quantum-primary-color);
+    filter: blur(4px);
+    opacity: 0.2;
+    border-radius: 4px;
+}
+
+.quantum-progress-info {
+    margin-top: 8px;
+    display: flex;
+    justify-content: flex-end;
+    font-size: 14px;
+    color: var(--quantum-text-color);
+}
+
+/* 类型样式 */
+.quantum-progress--success .quantum-progress-inner {
+    background: var(--quantum-success-color);
+}
+
+.quantum-progress--warning .quantum-progress-inner {
+    background: var(--quantum-warning-color);
+}
+
+.quantum-progress--error .quantum-progress-inner {
+    background: var(--quantum-danger-color);
+}
+
+/* 动画效果 */
+.quantum-progress.is-animating .quantum-progress-inner {
+    animation: quantumProgress 1.5s ease infinite;
+}
+
+@keyframes quantumWave {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+}
+
+@keyframes quantumProgress {
+    0% { transform: scaleX(1); }
+    50% { transform: scaleX(0.98); }
+    100% { transform: scaleX(1); }
+}
+
+/* 响应式设计 */
+@media screen and (max-width: 768px) {
+    .quantum-progress-bar {
+        height: 4px;
+    }
+    
+    .quantum-progress-info {
+        font-size: 12px;
+    }
+}
+</style>
+
+<script lang="qjs">
+export default {
+    name: 'QuantumProgress',
+    props: {
+        percentage: {
+            type: Number,
+            required: true,
+            validator: value => value >= 0 && value <= 100
+        },
+        type: {
+            type: String,
+            default: 'default',
+            validator: value => ['default', 'success', 'warning', 'error'].includes(value)
+        },
+        text: {
+            type: String,
+            default: ''
+        },
+        showInfo: {
+            type: Boolean,
+            default: true
+        }
+    },
+    
+    watch: {
+        percentage: {
+            handler(newVal, oldVal) {
+                if (newVal !== oldVal) {
+                    this.handleProgressChange(newVal);
+                }
+            },
+            immediate: true
+        }
+    },
+    
+    methods: {
+        handleProgressChange(value) {
+            // 启动动画
+            this.animating = true;
+            this.currentValue = value;
+            
+            // 300ms后停止动画
+            setTimeout(() => {
+                this.animating = false;
+            }, 300);
+            
+            // 触发change事件
+            this.$emit('change', value);
+            
+            // 当进度达到100%时触发完成事件
+            if (value === 100) {
+                this.$emit('complete');
+            }
+        }
+    }
+}
+</script> 

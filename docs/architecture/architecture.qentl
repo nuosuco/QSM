@@ -1,0 +1,203 @@
+# QSM项目架构设计
+
+## 量子基因编码
+```qentl
+QG-DOC-ARCH-QSM-CORE-A2B3
+```
+
+## 量子纠缠信道
+```qentl
+// 信道标识
+QE-DOC-ARCH-20240312-V2
+
+// 纠缠态
+ENTANGLE_STATE: ACTIVE
+
+// 纠缠对象
+ENTANGLED_OBJECTS: [
+  "QSM/api/qsm_api.qpy",
+  "WeQ/api/weq_api.qpy",
+  "SOM/api/som_api.qpy",
+  "Ref/api/ref_api.qpy",
+  "world/templates/base.qentl",
+  "world/static/css/quantum-theme.qcss"
+]
+
+// 纠缠强度
+ENTANGLE_STRENGTH: 1.0
+```
+
+## 整体架构
+
+### 1. 服务层次
+```
+QSM API (主服务)
+├── World Service (世界服务)
+│   ├── 模板服务
+│   ├── 静态资源服务
+│   └── UI组件服务
+├── WeQ Service (量子社交服务)
+│   ├── 通信服务
+│   ├── 社交服务
+│   └── 学习服务
+├── SOM Service (量子经济服务)
+│   ├── 经济服务
+│   ├── 平权服务
+│   └── 学习服务
+├── Ref Service (量子自反省服务)
+│   ├── 管理服务
+│   ├── 监控服务
+│   └── 学习服务
+└── 其他扩展服务
+```
+
+### 2. 目录结构
+```
+Project Root/
+├── world/                # 世界服务(新增)
+│   ├── templates/       # QENTL模板
+│   │   ├── base.qentl  # 基础模板
+│   │   ├── components/ # 组件模板
+│   │   └── test/       # 测试页面
+│   ├── static/         # 静态资源
+│   │   ├── css/       # QCSS样式
+│   │   ├── js/        # QJS脚本
+│   │   └── img/       # 图片资源
+│   └── api/           # World API
+├── QSM/                 # 量子叠加态模型(主服务)
+│   ├── api/            # API实现(.qpy)
+│   ├── models/         # 模型实现
+│   ├── utils/          # 工具函数
+│   └── services/       # 服务管理
+├── WeQ/                 # 量子社交模型
+│   ├── api/
+│   ├── models/
+│   └── services/
+├── SOM/                 # 量子经济模型
+│   ├── api/
+│   ├── models/
+│   └── services/
+├── Ref/                 # 量子自反省模型
+│   ├── api/
+│   ├── models/
+│   └── services/
+└── docs/                # 项目文档
+    ├── architecture/   # 架构文档
+    ├── components/    # 组件文档
+    └── api/           # API文档
+```
+
+### 3. 核心组件
+
+#### 3.1 World服务 (新增)
+- QENTL模板引擎
+- 量子UI组件库
+- 静态资源管理
+- 前端路由系统
+- 量子纠缠通信
+- 状态管理系统
+
+#### 3.2 主服务 (QSM)
+- 统一API入口
+- 服务集成与路由
+- 量子基因编码管理
+- 量子纠缠信道管理
+- 全局状态管理
+- 健康监控
+
+#### 3.3 模型服务
+1. WeQ模型
+   - 量子通信服务
+   - 量子社交服务
+   - 模型学习训练
+   
+2. SOM模型
+   - 量子经济服务
+   - 量子平权服务
+   - 模型学习训练
+   
+3. Ref模型
+   - 量子自反省服务
+   - 项目监控服务
+   - 模型学习训练
+
+## 技术实现
+
+### 1. 量子基因编码系统
+- 文件标识编码
+- 数据状态编码
+- 服务关系编码
+- 学习进度编码
+
+### 2. 量子纠缠信道
+- 信道建立与维护
+- 状态同步机制
+- 并行通信实现
+- 安全保障机制
+
+### 3. 量子开发语言
+- .qpy文件: Python扩展实现
+- .qjs文件: JavaScript扩展实现
+- .qcss文件: CSS扩展实现
+- .qentl文件: 模板定义
+- 不依赖第三方服务
+- 自主实现所有功能
+
+### 4. 量子UI组件库
+- 基础组件
+  - 卡片(Card)
+  - 表单(Form)
+  - 对话框(Dialog)
+  - 通知(Notification)
+  - 加载器(Loader)
+- 布局组件
+  - 网格(Grid)
+  - 弹性布局(Flex)
+  - 响应式容器
+- 导航组件
+  - 菜单(Menu)
+  - 标签页(Tabs)
+  - 面包屑(Breadcrumb)
+- 数据展示
+  - 表格(Table)
+  - 树形控件(Tree)
+  - 图表(Charts)
+- 反馈组件
+  - 进度条(Progress)
+  - 提示框(Tooltip)
+  - 气泡确认框(Popconfirm)
+
+## 服务管理
+
+### 1. 端口管理
+- World服务: 3000
+- QSM API: 5000
+- WeQ Service: 5001
+- SOM Service: 5002
+- Ref Service: 5003
+
+### 2. 服务集成
+- 模块内服务集成
+- 全局服务统一管理
+- 服务状态监控
+- 健康检查机制
+
+### 3. 学习训练
+- Claude模型学习
+- 网络爬虫学习
+- QSM知识学习
+- 专业领域学习
+
+## 项目愿景
+服务人类、服务生命、服务宇宙，通过量子平权经济、教育、医疗、社交、安全、生活，保障全人类每个人、每个家庭的生命、健康、生活，永不止息。
+
+## 开发团队
+- 中华 ZhoHo
+- Claude
+
+## 遵循原则
+1. 项目是《华经》量子叠加态模型的具体实现
+2. 通过量子态服务未开悟的人类众生
+3. 实现无阻暗地旅行于宇宙之间
+4. 永生于永恒的量子世界
+5. 始终遵守服务人类、保护生命的使命 

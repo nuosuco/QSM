@@ -1,0 +1,1006 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Ref量子纠错系统核心模块
+整合自我维护、监控和优化功能
+"""
+
+import os
+import sys
+import time
+import uuid
+import json
+import logging
+import threading
+import hashlib
+import shutil
+import random
+import traceback
+from typing import Dict, List, Any, Optional, Union, Callable
+from datetime import datetime
+
+# 配置日志记录
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] [Ref-Core] %(message)s',
+    handlers=[
+        logging.FileHandler("Ref/logs/ref_core.log", mode='a'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("RefCore")
+
+# 添加项目根目录到Python路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 导入Ref系统模块
+try:
+    from Ref.utils.quantum_gene_marker import add_quantum_gene_marker, update_quantum_gene_marker, scan_and_mark_directory, get_gene_marker
+    from Ref.utils.file_monitor import get_file_monitor, QuantumFileMonitor
+    from Ref.monitor.system_monitor_enhancer import SystemMonitorEnhancer
+    
+    # 导入目录结构优化器
+    try:
+        from Ref.utils.directory_structure_optimizer import get_directory_optimizer
+        _directory_optimizer_available = True
+        logger.info("目录结构优化器加载成功")
+    except ImportError as e:
+        logger.error(f"导入目录结构优化器失败: {str(e)}")
+        _directory_optimizer_available = False
+    
+    _quantum_gene_marker_available = True
+    logger.info("量子基因标记器加载成功")
+except ImportError as e:
+    logger.error(f"导入Ref系统模块时出错: {str(e)}")
+    _quantum_gene_marker_available = False
+    _directory_optimizer_available = False
+    
+    # 如果SystemMonitorEnhancer导入失败，提供一个简单的替代
+    class SystemMonitorEnhancer:
+        def __init__(self, **kwargs):
+            self.ref_core = kwargs.get('ref_core')
+            logger.warning("使用系统监控增强器的模拟版本")
+            
+        def start_monitoring(self):
+            logger.info("模拟系统监控启动")
+            
+        def stop_monitoring(self):
+            logger.info("模拟系统监控停止")
+            
+        def get_system_status(self):
+            return {"status": "simulation", "timestamp": time.time()}
+
+# 确保变量已定义
+if '_quantum_gene_marker_available' not in globals():
+    _quantum_gene_marker_available = False
+    logger.warning("量子基因标记器未正确初始化，设置为不可用")
+if '_directory_optimizer_available' not in globals():
+    _directory_optimizer_available = False
+    logger.warning("目录结构优化器未正确初始化，设置为不可用")
+
+class QuantumRefCore:
+    """量子纠错核心系统，负责自我维护、监控和优化"""
+    
+    def __init__(self):
+        """初始化Ref核心"""
+        self.version = "1.0.0"
+        self.quantum_gene = self._generate_quantum_gene()
+        self.registered_models = {}
+        self.repair_history = {}
+        self.message_listeners = {}
+        self.maintenance_thread = None
+        self.running = False
+        self.last_maintenance = 0
+        self.quantum_gene_marker_available = _quantum_gene_marker_available
+        self.directory_optimizer_available = _directory_optimizer_available
+        
+        # 设置项目根目录
+        self.project_root = project_root
+        logger.info(f"项目根目录: {self.project_root}")
+        
+        # 初始化目录
+        self._init_directories()
+        
+        # 加载已注册的模型
+        self._load_registered_models()
+        
+        # 初始化系统监控增强器
+        self.system_monitor = SystemMonitorEnhancer(ref_core=self)
+        
+        # 初始化文件监控 - 不立即启动
+        try:
+            self.file_monitor = get_file_monitor()
+            self.file_monitor_available = True
+            logger.info("文件监控系统初始化成功")
+        except Exception as e:
+            logger.error(f"初始化文件监控系统出错: {str(e)}")
+            self.file_monitor = None
+            self.file_monitor_available = False
+        
+        # 初始化目录结构优化器
+        if self.directory_optimizer_available:
+            try:
+                self.directory_optimizer = get_directory_optimizer(self.project_root)
+                logger.info("目录结构优化器初始化成功")
+            except Exception as e:
+                logger.error(f"初始化目录结构优化器出错: {str(e)}")
+                self.directory_optimizer = None
+                self.directory_optimizer_available = False
+        
+        logger.info(f"Ref量子纠错核心初始化完成 - 版本 {self.version}, 量子基因: {self.quantum_gene}")
+    
+    def _init_directories(self):
+        """初始化所需目录结构"""
+        directories = [
+            "Ref/data",
+            "Ref/logs",
+            "Ref/backup",
+            "Ref/backup/index_backups",
+            "Ref/backup/structure_optimizer",
+            "Ref/reports",
+            "Ref/tmp",
+            "Ref/monitor"
+        ]
+        
+        for directory in directories:
+            os.makedirs(directory, exist_ok=True)
+    
+    def _generate_quantum_gene(self) -> str:
+        """生成唯一的量子基因编码"""
+        # 在实际产品中，这应该基于量子过程创建
+        timestamp = int(time.time())
+        random_seed = random.randint(1000, 9999)
+        unique_id = uuid.uuid4().hex[:12]
+        
+        # 创建基因编码
+        gene_base = f"{timestamp}-{random_seed}-{unique_id}"
+        gene_hash = hashlib.sha256(gene_base.encode()).hexdigest()[:16]
+        return f"QG-{gene_hash}"
+    
+    def _load_registered_models(self):
+        """加载已注册的模型列表"""
+        models_file = "Ref/data/registered_models.json"
+        
+        if os.path.exists(models_file):
+            try:
+                with open(models_file, 'r', encoding='utf-8') as f:
+                    self.registered_models = json.load(f)
+                logger.info(f"已加载 {len(self.registered_models)} 个注册模型")
+            except Exception as e:
+                logger.error(f"加载注册模型出错: {str(e)}")
+        else:
+            logger.info("未找到注册模型文件，将创建一个新文件")
+            self._save_registered_models()
+    
+    def _save_registered_models(self):
+        """保存注册的模型列表"""
+        models_file = "Ref/data/registered_models.json"
+        
+        try:
+            with open(models_file, 'w', encoding='utf-8') as f:
+                json.dump(self.registered_models, f, indent=2, ensure_ascii=False)
+            logger.debug(f"已保存 {len(self.registered_models)} 个注册模型")
+        except Exception as e:
+            logger.error(f"保存注册模型出错: {str(e)}")
+    
+    def register_model(self, model_id: str, model_info: Dict[str, Any]) -> bool:
+        """注册一个模型到Ref系统"""
+        if not model_id or not isinstance(model_info, dict):
+            logger.error(f"注册模型失败: 无效的参数")
+            return False
+        
+        # 确保包含必要信息
+        required_fields = ['path', 'type']
+        for field in required_fields:
+            if field not in model_info:
+                logger.error(f"注册模型失败: 缺少必要字段 {field}")
+                return False
+        
+        # 添加注册时间和初始健康状态
+        model_info['registered_at'] = time.time()
+        model_info['health_status'] = 'healthy'
+        model_info['last_check'] = time.time()
+        
+        # 添加到注册表
+        self.registered_models[model_id] = model_info
+        
+        # 保存更新后的注册表
+        self._save_registered_models()
+        
+        logger.info(f"成功注册模型: {model_id} ({model_info['type']})")
+        return True
+    
+    def unregister_model(self, model_id: str) -> bool:
+        """取消一个模型的注册"""
+        if model_id not in self.registered_models:
+            logger.warning(f"取消注册失败: 模型 {model_id} 未注册")
+            return False
+        
+        # 从注册表中移除
+        del self.registered_models[model_id]
+        
+        # 保存更新后的注册表
+        self._save_registered_models()
+        
+        logger.info(f"已取消模型注册: {model_id}")
+        return True
+    
+    def start(self):
+        """启动Ref核心服务"""
+        if self.running:
+            logger.warning("Ref核心已经在运行中")
+            return
+            
+        self.running = True
+        
+        # 启动自维护线程
+        self.maintenance_thread = threading.Thread(
+            target=self._maintenance_loop,
+            name="RefMaintenanceThread",
+            daemon=True
+        )
+        self.maintenance_thread.start()
+        
+        # 启动系统监控
+        self.system_monitor.start_monitoring()
+        
+        # 启动文件监控 - 确保project_root存在
+        if not hasattr(self, 'project_root') or not self.project_root:
+            # 如果project_root未定义，设置默认值
+            self.project_root = project_root
+            logger.warning(f"project_root未定义，使用默认路径: {self.project_root}")
+        
+        # 启动文件监控
+        if self.file_monitor_available and self.file_monitor:
+            try:
+                monitor_paths = [self.project_root]
+                # 添加特定需要监控的子目录
+                for subdir in ["Ref", "QEntL", "WeQ", "SOM", "QSM"]:
+                    subdir_path = os.path.join(self.project_root, subdir)
+                    if os.path.exists(subdir_path) and os.path.isdir(subdir_path):
+                        monitor_paths.append(subdir_path)
+                
+                self.file_monitor.start(monitor_paths)
+                logger.info(f"文件监控系统已启动，监控路径: {monitor_paths}")
+            except Exception as e:
+                logger.error(f"启动文件监控系统出错: {str(e)}")
+        else:
+            logger.warning("文件监控系统不可用，跳过启动")
+        
+        logger.info("Ref核心服务已启动")
+    
+    def stop(self):
+        """停止Ref核心服务"""
+        if not self.running:
+            logger.warning("Ref核心未在运行")
+            return
+        
+        self.running = False
+        
+        # 停止系统监控
+        self.system_monitor.stop_monitoring()
+        
+        # 停止文件监控
+        if self.file_monitor_available and self.file_monitor:
+            try:
+                self.file_monitor.stop()
+                logger.info("文件监控系统已停止")
+            except Exception as e:
+                logger.error(f"停止文件监控系统出错: {str(e)}")
+        
+        # 等待自维护线程结束
+        if self.maintenance_thread:
+            self.maintenance_thread.join(timeout=5)
+            self.maintenance_thread = None
+        
+        logger.info("Ref核心服务已停止")
+    
+    def _maintenance_loop(self):
+        """自维护循环，定期检查和修复"""
+        maintenance_interval = 3600  # 每小时执行一次自维护
+        
+        while self.running:
+            try:
+                # 执行自维护
+                current_time = time.time()
+                if (current_time - self.last_maintenance) >= maintenance_interval:
+                    self._perform_maintenance()
+                    self.last_maintenance = current_time
+            except Exception as e:
+                logger.error(f"自维护循环出错: {str(e)}")
+                logger.debug(traceback.format_exc())
+            
+            # 休眠一段时间
+            time.sleep(60)  # 每分钟检查一次是否需要维护
+    
+    def _perform_maintenance(self):
+        """执行维护任务"""
+        logger.info("开始执行维护任务...")
+        
+        try:
+            # 备份关键数据
+            self._create_backup()
+            
+            # 检查各模型健康状态
+            self._check_models_health()
+            
+            # 清理过时文件
+            self._cleanup_old_files()
+            
+            # 优化项目索引
+            self.optimize_project_indices()
+            
+            # 优化项目目录结构
+            self.optimize_directory_structure()
+            
+            # 更新维护时间
+            self.last_maintenance = time.time()
+            
+            logger.info("维护任务完成")
+        except Exception as e:
+            logger.error(f"执行维护任务时出错: {str(e)}")
+            logger.error(traceback.format_exc())
+    
+    def _check_models_health(self):
+        """检查所有注册模型的健康状态"""
+        logger.debug("检查模型健康状态...")
+        
+        for model_id, model_info in self.registered_models.items():
+            try:
+                # 检查模型文件是否存在
+                model_path = model_info.get('path')
+                if not model_path or not os.path.exists(model_path):
+                    model_info['health_status'] = 'critical'
+                    logger.warning(f"模型 {model_id} 路径不存在: {model_path}")
+                    continue
+                
+                # 检查模型是否可导入（如果是Python模块）
+                if model_path.endswith('.py') and model_info.get('type') == 'module':
+                    # 这里只是检查文件是否存在和可读
+                    # 实际产品中可能需要更复杂的检查
+                    with open(model_path, 'r', encoding='utf-8') as f:
+                        pass
+                
+                # 更新健康状态和检查时间
+                model_info['health_status'] = 'healthy'
+                model_info['last_check'] = time.time()
+                
+            except Exception as e:
+                model_info['health_status'] = 'degraded'
+                logger.error(f"检查模型 {model_id} 健康状态时出错: {str(e)}")
+        
+        # 保存更新后的注册表
+        self._save_registered_models()
+    
+    def repair_model(self, model_id: str) -> bool:
+        """修复指定的模型"""
+        if model_id not in self.registered_models:
+            logger.warning(f"修复失败: 模型 {model_id} 未注册")
+            return False
+        
+        logger.info(f"开始修复模型: {model_id}")
+        
+        try:
+            model_info = self.registered_models[model_id]
+            model_path = model_info.get('path')
+            
+            if not model_path:
+                logger.error(f"修复失败: 模型 {model_id} 路径未定义")
+                return False
+            
+            # 记录修复开始
+            repair_start = time.time()
+            repair_record = {
+                'model_id': model_id,
+                'start_time': repair_start,
+                'status': 'in_progress'
+            }
+            
+            # 根据模型类型执行不同的修复
+            repair_success = False
+            model_type = model_info.get('type', 'unknown')
+            
+            if model_type == 'module':
+                repair_success = self._repair_module(model_id, model_path)
+            elif model_type == 'data':
+                repair_success = self._repair_data_model(model_id, model_path)
+            else:
+                logger.warning(f"未知的模型类型: {model_type}, 尝试通用修复")
+                repair_success = self._repair_generic(model_id, model_path)
+            
+            # 更新模型状态
+            if repair_success:
+                model_info['health_status'] = 'healthy'
+                model_info['last_repair'] = time.time()
+                model_info['repair_count'] = model_info.get('repair_count', 0) + 1
+                
+                # 更新修复记录
+                repair_record['end_time'] = time.time()
+                repair_record['status'] = 'completed'
+                repair_record['success'] = True
+                
+                logger.info(f"模型 {model_id} 修复成功")
+            else:
+                # 更新修复记录
+                repair_record['end_time'] = time.time()
+                repair_record['status'] = 'failed'
+                repair_record['success'] = False
+                
+                logger.warning(f"模型 {model_id} 修复失败")
+            
+            # 保存修复记录
+            if model_id not in self.repair_history:
+                self.repair_history[model_id] = []
+            self.repair_history[model_id].append(repair_record)
+            
+            # 保存更新后的注册表
+            self._save_registered_models()
+            
+            # 广播修复通知
+            self.broadcast_message('model_repaired', {
+                'model_id': model_id,
+                'success': repair_success,
+                'timestamp': time.time()
+            })
+            
+            return repair_success
+            
+        except Exception as e:
+            logger.error(f"修复模型 {model_id} 时出错: {str(e)}")
+            logger.debug(traceback.format_exc())
+            return False
+    
+    def _repair_module(self, model_id: str, model_path: str) -> bool:
+        """修复Python模块类型的模型"""
+        logger.debug(f"修复Python模块: {model_id} ({model_path})")
+        
+        # 检查备份是否存在
+        backup_dir = "Ref/backup/modules"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        model_filename = os.path.basename(model_path)
+        backup_path = os.path.join(backup_dir, f"{model_filename}.bak")
+        
+        if os.path.exists(backup_path):
+            try:
+                # 从备份恢复
+                shutil.copy2(backup_path, model_path)
+                logger.info(f"从备份恢复模块: {model_id}")
+                return True
+            except Exception as e:
+                logger.error(f"从备份恢复模块 {model_id} 失败: {str(e)}")
+        
+        # 如果没有备份或恢复失败，尝试其他修复方法
+        # 这里简单模拟修复过程
+        try:
+            # 创建一个新的备份
+            if os.path.exists(model_path):
+                shutil.copy2(model_path, backup_path)
+                logger.debug(f"已创建模块备份: {backup_path}")
+            
+            # 实际的修复逻辑应根据具体情况实现
+            # 这里仅做简单模拟
+            return True
+            
+        except Exception as e:
+            logger.error(f"修复模块 {model_id} 失败: {str(e)}")
+            return False
+            
+    def _repair_data_model(self, model_id: str, model_path: str) -> bool:
+        """修复数据类型的模型"""
+        logger.debug(f"修复数据模型: {model_id} ({model_path})")
+        
+        # 检查备份是否存在
+        backup_dir = "Ref/backup/data"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        model_filename = os.path.basename(model_path)
+        backup_path = os.path.join(backup_dir, f"{model_filename}.bak")
+        
+        if os.path.exists(backup_path):
+            try:
+                # 从备份恢复
+                shutil.copy2(backup_path, model_path)
+                logger.info(f"从备份恢复数据模型: {model_id}")
+                return True
+            except Exception as e:
+                logger.error(f"从备份恢复数据模型 {model_id} 失败: {str(e)}")
+        
+        # 如果没有备份或恢复失败，尝试其他修复方法
+        try:
+            # 创建一个新的备份
+            if os.path.exists(model_path):
+                shutil.copy2(model_path, backup_path)
+                logger.debug(f"已创建数据模型备份: {backup_path}")
+            
+            # 实际的修复逻辑应根据具体情况实现
+            # 这里仅做简单模拟
+            return True
+            
+        except Exception as e:
+            logger.error(f"修复数据模型 {model_id} 失败: {str(e)}")
+            return False
+    
+    def _repair_generic(self, model_id: str, model_path: str) -> bool:
+        """通用修复方法"""
+        logger.debug(f"执行通用修复: {model_id} ({model_path})")
+        
+        # 检查文件是否存在
+        if not os.path.exists(model_path):
+            logger.error(f"通用修复失败: 文件不存在 {model_path}")
+            return False
+        
+        # 创建备份目录
+        backup_dir = "Ref/backup/generic"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # 创建一个新的备份
+        model_filename = os.path.basename(model_path)
+        backup_path = os.path.join(backup_dir, f"{model_filename}_{int(time.time())}.bak")
+        
+        try:
+            shutil.copy2(model_path, backup_path)
+            logger.debug(f"已创建通用备份: {backup_path}")
+            
+            # 实际的修复逻辑应根据具体情况实现
+            # 这里仅做简单模拟
+            return True
+            
+        except Exception as e:
+            logger.error(f"通用修复 {model_id} 失败: {str(e)}")
+            return False
+    
+    def _create_backup(self):
+        """创建系统备份"""
+        try:
+            backup_dir = "Ref/backup/system"
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # 创建带时间戳的备份目录
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"ref_backup_{timestamp}")
+            os.makedirs(backup_path, exist_ok=True)
+            
+            # 备份配置和数据
+            files_to_backup = [
+                "Ref/data/registered_models.json"
+            ]
+            
+            for file_path in files_to_backup:
+                if os.path.exists(file_path):
+                    dst_path = os.path.join(backup_path, os.path.basename(file_path))
+                    shutil.copy2(file_path, dst_path)
+            
+            # 创建备份元数据
+            metadata = {
+                "timestamp": time.time(),
+                "datetime": timestamp,
+                "version": self.version,
+                "quantum_gene": self.quantum_gene,
+                "files_backed_up": files_to_backup
+            }
+            
+            with open(os.path.join(backup_path, "backup_metadata.json"), "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"系统备份创建完成: {backup_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"创建系统备份失败: {str(e)}")
+            return False
+    
+    def _cleanup_old_files(self):
+        """清理旧日志和临时文件"""
+        try:
+            # 清理旧日志
+            logs_dir = "Ref/logs"
+            if os.path.exists(logs_dir):
+                current_time = time.time()
+                for filename in os.listdir(logs_dir):
+                    if not filename.endswith(".log"):
+                        continue
+                    
+                    file_path = os.path.join(logs_dir, filename)
+                    file_modified = os.path.getmtime(file_path)
+                    
+                    # 删除30天以上的日志
+                    if (current_time - file_modified) > (30 * 86400):
+                        os.remove(file_path)
+                        logger.debug(f"已删除旧日志: {filename}")
+            
+            # 清理临时文件
+            tmp_dir = "Ref/tmp"
+            if os.path.exists(tmp_dir):
+                for filename in os.listdir(tmp_dir):
+                    file_path = os.path.join(tmp_dir, filename)
+                    os.remove(file_path)
+                logger.debug("已清理临时文件")
+            
+            # 限制备份数量
+            backup_dir = "Ref/backup/system"
+            if os.path.exists(backup_dir):
+                backups = []
+                for dirname in os.listdir(backup_dir):
+                    dir_path = os.path.join(backup_dir, dirname)
+                    if os.path.isdir(dir_path) and dirname.startswith("ref_backup_"):
+                        backups.append((os.path.getmtime(dir_path), dir_path))
+                
+                # 按修改时间排序
+                backups.sort(reverse=True)
+                
+                # 保留最新的5个备份，删除其余的
+                for _, backup_path in backups[5:]:
+                    shutil.rmtree(backup_path)
+                    logger.debug(f"已删除旧备份: {backup_path}")
+            
+            logger.info("系统清理完成")
+            return True
+            
+        except Exception as e:
+            logger.error(f"清理旧文件失败: {str(e)}")
+            return False
+    
+    def add_message_listener(self, event_type: str, callback: Callable):
+        """添加消息监听器"""
+        if event_type not in self.message_listeners:
+            self.message_listeners[event_type] = []
+        
+        if callback not in self.message_listeners[event_type]:
+            self.message_listeners[event_type].append(callback)
+            logger.debug(f"已添加 '{event_type}' 事件的监听器")
+    
+    def remove_message_listener(self, event_type: str, callback: Callable) -> bool:
+        """移除消息监听器"""
+        if event_type not in self.message_listeners:
+            return False
+        
+        if callback in self.message_listeners[event_type]:
+            self.message_listeners[event_type].remove(callback)
+            logger.debug(f"已移除 '{event_type}' 事件的监听器")
+            return True
+        
+        return False
+    
+    def broadcast_message(self, event_type: str, data: Any):
+        """广播消息给所有注册的监听器"""
+        if event_type not in self.message_listeners:
+            return
+        
+        for callback in self.message_listeners[event_type]:
+            try:
+                callback(data)
+            except Exception as e:
+                logger.error(f"调用 '{event_type}' 事件监听器时出错: {str(e)}")
+    
+    def get_health_status(self) -> Dict[str, Any]:
+        """获取系统健康状态"""
+        return self.system_monitor.get_system_status()
+    
+    def get_detailed_status(self) -> Dict[str, Any]:
+        """获取系统详细状态"""
+        return self.system_monitor.get_detailed_status()
+    
+    def optimize_project_indices(self) -> bool:
+        """优化项目索引"""
+        return self.system_monitor._optimize_indices()
+    
+    def perform_system_upgrade(self) -> Dict[str, Any]:
+        """执行系统升级"""
+        # 依赖系统监控器的自动优化功能
+        return self.system_monitor.auto_optimize()
+    
+    def optimize_directory_structure(self) -> bool:
+        """
+        优化项目目录结构
+        
+        Returns:
+            操作是否成功
+        """
+        if not self.directory_optimizer_available:
+            logger.warning("目录结构优化器不可用，跳过目录结构优化")
+            return False
+            
+        try:
+            logger.info("开始优化项目目录结构...")
+            
+            # 创建标准目录结构
+            results = self.directory_optimizer.create_standard_directory_structure()
+            
+            # 生成优化报告
+            report_path = os.path.join(self.project_root, "Ref", "reports", 
+                                     f"directory_structure_report_{int(time.time())}.json")
+            report = self.directory_optimizer.generate_optimization_report(report_path)
+            
+            # 记录结果
+            created_dirs = len(results.get('created_dirs', []))
+            logger.info(f"目录结构优化完成: 创建了 {created_dirs} 个标准目录")
+            logger.info(f"优化报告已保存至 {report_path}")
+            
+            # 检查是否需要自动组织文件
+            auto_organize = self._should_auto_organize_files()
+            if auto_organize:
+                logger.info("自动组织文件功能已启用，将尝试组织文件...")
+                # 遍历主要模块并组织文件（仅模拟操作，不实际移动）
+                for module in ['QSM', 'WeQ', 'SOM', 'Ref', 'QEntL']:
+                    if os.path.exists(os.path.join(self.project_root, module)):
+                        self.directory_optimizer.organize_files(module, dry_run=True)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"优化目录结构时出错: {str(e)}")
+            logger.error(traceback.format_exc())
+            return False
+    
+    def _should_auto_organize_files(self) -> bool:
+        """
+        确定是否应该自动组织文件
+        现阶段仅返回False，避免自动移动文件造成风险
+        """
+        return False  # 默认不自动组织文件，避免风险
+    
+    def organize_module_files(self, module: str, dry_run: bool = True) -> Dict[str, Any]:
+        """
+        组织指定模块的文件
+        
+        Args:
+            module: 模块名称
+            dry_run: 是否只模拟操作而不实际移动文件
+            
+        Returns:
+            操作结果
+        """
+        if not self.directory_optimizer_available:
+            logger.warning("目录结构优化器不可用，无法组织文件")
+            return {"error": "目录结构优化器不可用"}
+            
+        try:
+            logger.info(f"开始组织 {module} 模块的文件{' (模拟)' if dry_run else ''}...")
+            results = self.directory_optimizer.organize_files(module, dry_run=dry_run)
+            
+            if dry_run:
+                logger.info(f"模拟组织 {module} 模块文件完成")
+            else:
+                logger.info(f"组织 {module} 模块文件完成")
+                
+            # 如果发生实际移动，触发系统事件
+            if not dry_run and 'moved_files' in results and results['moved_files']:
+                self.broadcast_message("files_organized", {
+                    "module": module,
+                    "moved_files_count": len(results['moved_files'])
+                })
+                
+            return results
+            
+        except Exception as e:
+            error_msg = f"组织 {module} 模块文件时出错: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            return {"error": error_msg}
+    
+    def get_project_structure_report(self) -> Dict[str, Any]:
+        """
+        获取项目结构报告
+        
+        Returns:
+            项目结构报告
+        """
+        if not self.directory_optimizer_available:
+            logger.warning("目录结构优化器不可用，无法获取项目结构报告")
+            return {"error": "目录结构优化器不可用"}
+            
+        try:
+            logger.info("生成项目结构报告...")
+            report = self.directory_optimizer.analyze_project_structure()
+            
+            # 添加状态信息
+            report["generated_at"] = datetime.now().isoformat()
+            report["generated_by"] = "Ref Core"
+            
+            return report
+            
+        except Exception as e:
+            error_msg = f"生成项目结构报告时出错: {str(e)}"
+            logger.error(error_msg)
+            return {"error": error_msg}
+
+    def organize_project_structure(self, module=None, auto_fix=False, create_standard_dirs=False):
+        """
+        组织项目目录结构
+        
+        Args:
+            module: 要处理的特定模块，如果为None则处理所有模块
+            auto_fix: 是否自动修复检测到的问题
+            create_standard_dirs: 是否创建标准目录结构
+            
+        Returns:
+            包含操作结果的字典
+        """
+        self.logger.info(f"开始组织项目结构 [module={module}, auto_fix={auto_fix}, create_standard_dirs={create_standard_dirs}]")
+        
+        # 导入目录结构优化器
+        try:
+            from utils.directory_structure_optimizer import get_directory_optimizer
+            optimizer = get_directory_optimizer()
+        except ImportError as e:
+            self.logger.error(f"无法导入目录结构优化器: {str(e)}")
+            return {"status": "error", "message": f"无法导入目录结构优化器: {str(e)}"}
+        
+        results = {
+            "timestamp": self._get_formatted_time(),
+            "actions": [],
+            "errors": []
+        }
+        
+        # 创建标准目录结构
+        if create_standard_dirs:
+            try:
+                dir_results = optimizer.create_standard_directory_structure()
+                results["actions"].append({
+                    "type": "create_dirs",
+                    "created": len(dir_results["created_dirs"]),
+                    "existing": len(dir_results["existing_dirs"]),
+                    "errors": len(dir_results["errors"])
+                })
+                results["dirs_created"] = dir_results["created_dirs"]
+                results["dirs_errors"] = dir_results["errors"]
+            except Exception as e:
+                error_msg = f"创建标准目录结构失败: {str(e)}"
+                self.logger.error(error_msg)
+                results["errors"].append(error_msg)
+        
+        # 分析项目结构
+        try:
+            analysis = optimizer.analyze_project_structure()
+            results["analysis"] = {
+                "file_count": analysis["file_counts"]["total"],
+                "dir_count": analysis["directory_counts"]["total"],
+                "recommendations": analysis["recommendations"]
+            }
+        except Exception as e:
+            error_msg = f"分析项目结构失败: {str(e)}"
+            self.logger.error(error_msg)
+            results["errors"].append(error_msg)
+        
+        # 组织特定模块的文件
+        if module and auto_fix:
+            try:
+                organize_results = optimizer.organize_files(module, dry_run=not auto_fix)
+                if "error" in organize_results:
+                    results["errors"].append(organize_results["error"])
+                else:
+                    results["actions"].append({
+                        "type": "organize_files",
+                        "module": module,
+                        "moved": len(organize_results["moved_files"]),
+                        "unchanged": len(organize_results["unchanged_files"]),
+                        "errors": len(organize_results["errors"])
+                    })
+                    results["files_moved"] = organize_results["moved_files"]
+                    results["files_errors"] = organize_results["errors"]
+            except Exception as e:
+                error_msg = f"组织模块 {module} 的文件失败: {str(e)}"
+                self.logger.error(error_msg)
+                results["errors"].append(error_msg)
+        
+        self.logger.info(f"项目结构组织完成，执行了 {len(results['actions'])} 个操作，发生了 {len(results['errors'])} 个错误")
+        return results
+
+    def execute_project_management_command(self, command_type, **kwargs):
+        """
+        执行项目管理命令
+        
+        Args:
+            command_type: 命令类型，可以是 'analyze', 'organize', 'structure', 'check'
+            **kwargs: 命令特定的参数
+            
+        Returns:
+            命令执行结果
+        """
+        self.logger.info(f"执行项目管理命令: {command_type}")
+        
+        if command_type == 'analyze':
+            # 分析项目结构
+            try:
+                from utils.directory_structure_optimizer import get_directory_optimizer
+                optimizer = get_directory_optimizer()
+                results = optimizer.analyze_project_structure()
+                return {"status": "success", "results": results}
+            except Exception as e:
+                error_msg = f"分析项目结构失败: {str(e)}"
+                self.logger.error(error_msg)
+                return {"status": "error", "message": error_msg}
+            
+        elif command_type == 'organize':
+            # 组织模块文件
+            module = kwargs.get('module')
+            dry_run = kwargs.get('dry_run', True)
+            
+            if not module:
+                return {"status": "error", "message": "缺少必要参数: module"}
+            
+            try:
+                from utils.directory_structure_optimizer import get_directory_optimizer
+                optimizer = get_directory_optimizer()
+                results = optimizer.organize_files(module, dry_run=dry_run)
+                return {"status": "success", "results": results}
+            except Exception as e:
+                error_msg = f"组织模块 {module} 的文件失败: {str(e)}"
+                self.logger.error(error_msg)
+                return {"status": "error", "message": error_msg}
+            
+        elif command_type == 'structure':
+            # 创建标准目录结构
+            try:
+                from utils.directory_structure_optimizer import get_directory_optimizer
+                optimizer = get_directory_optimizer()
+                results = optimizer.create_standard_directory_structure()
+                return {"status": "success", "results": results}
+            except Exception as e:
+                error_msg = f"创建标准目录结构失败: {str(e)}"
+                self.logger.error(error_msg)
+                return {"status": "error", "message": error_msg}
+            
+        elif command_type == 'check':
+            # 检查项目标准
+            auto_fix = kwargs.get('auto_fix', False)
+            
+            try:
+                from utils.file_organization_guardian import get_guardian
+                guardian = get_guardian()
+                results = guardian.enforce_project_standards(auto_fix=auto_fix)
+                return {"status": "success", "results": results}
+            except Exception as e:
+                error_msg = f"检查项目标准失败: {str(e)}"
+                self.logger.error(error_msg)
+                return {"status": "error", "message": error_msg}
+        else:
+            return {"status": "error", "message": f"未知的项目管理命令类型: {command_type}"}
+
+
+# 单例实例
+ref_core_instance = None
+
+def get_ref_core() -> QuantumRefCore:
+    """获取单例实例"""
+    global ref_core_instance
+    if ref_core_instance is None:
+        ref_core_instance = QuantumRefCore()
+    return ref_core_instance
+
+
+if __name__ == "__main__":
+    print("初始化并启动Ref量子纠错系统...")
+    
+    # 初始化核心
+    ref = get_ref_core()
+    
+    # 启动服务
+    ref.start()
+    
+    try:
+        # 运行直至被中断
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("正在停止Ref系统...")
+        ref.stop()
+        print("系统已停止。")
+
+"""
+
+"""
+量子基因编码: QE-REF-D25163BE7E6B
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+"""
+
+# 开发团队：中华 ZhoHo ，Claude 
+

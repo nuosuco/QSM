@@ -1,0 +1,187 @@
+/**
+ * 量子纠缠通信核心
+ * @version 1.0.0
+ */
+
+class QuantumEntangle {
+    constructor(config = {}) {
+        this.channelId = config.channelId || 'QE-' + Date.now();
+        this.state = config.state || 'ACTIVE';
+        this.strength = config.strength || 1.0;
+        this.objects = config.objects || [];
+        this.subscribers = new Map();
+        this.messageQueue = [];
+        this.isProcessing = false;
+        
+        // 初始化WebSocket连接
+        this.initWebSocket();
+    }
+    
+    /**
+     * 初始化WebSocket连接
+     * @private
+     */
+    initWebSocket() {
+        this.ws = new WebSocket(`ws://localhost:5000/quantum-entangle/${this.channelId}`);
+        
+        this.ws.onopen = () => {
+            console.log(`量子纠缠信道 ${this.channelId} 已建立`);
+            this.processMessageQueue();
+        };
+        
+        this.ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            this.handleMessage(message);
+        };
+        
+        this.ws.onclose = () => {
+            console.log(`量子纠缠信道 ${this.channelId} 已关闭`);
+            // 5秒后尝试重连
+            setTimeout(() => this.initWebSocket(), 5000);
+        };
+        
+        this.ws.onerror = (error) => {
+            console.error('量子纠缠信道错误:', error);
+        };
+    }
+    
+    /**
+     * 发送量子纠缠消息
+     * @param {string} type 消息类型
+     * @param {*} data 消息数据
+     * @param {number} [strength=1.0] 纠缠强度
+     */
+    send(type, data, strength = 1.0) {
+        const message = {
+            type,
+            data,
+            strength,
+            timestamp: Date.now(),
+            channelId: this.channelId
+        };
+        
+        if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(message));
+        } else {
+            this.messageQueue.push(message);
+        }
+    }
+    
+    /**
+     * 处理消息队列
+     * @private
+     */
+    async processMessageQueue() {
+        if (this.isProcessing || this.messageQueue.length === 0) {
+            return;
+        }
+        
+        this.isProcessing = true;
+        
+        while (this.messageQueue.length > 0) {
+            const message = this.messageQueue.shift();
+            if (this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify(message));
+                // 等待100ms以确保消息按顺序发送
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } else {
+                // 如果连接断开，将消息重新加入队列
+                this.messageQueue.unshift(message);
+                break;
+            }
+        }
+        
+        this.isProcessing = false;
+    }
+    
+    /**
+     * 处理接收到的消息
+     * @private
+     * @param {Object} message 消息对象
+     */
+    handleMessage(message) {
+        const subscribers = this.subscribers.get(message.type) || [];
+        subscribers.forEach(callback => {
+            try {
+                callback(message.data, message.strength);
+            } catch (error) {
+                console.error('处理量子纠缠消息时出错:', error);
+            }
+        });
+    }
+    
+    /**
+     * 订阅消息
+     * @param {string} type 消息类型
+     * @param {Function} callback 回调函数
+     */
+    subscribe(type, callback) {
+        if (!this.subscribers.has(type)) {
+            this.subscribers.set(type, []);
+        }
+        this.subscribers.get(type).push(callback);
+    }
+    
+    /**
+     * 取消订阅
+     * @param {string} type 消息类型
+     * @param {Function} callback 回调函数
+     */
+    unsubscribe(type, callback) {
+        if (!this.subscribers.has(type)) {
+            return;
+        }
+        const subscribers = this.subscribers.get(type);
+        const index = subscribers.indexOf(callback);
+        if (index !== -1) {
+            subscribers.splice(index, 1);
+        }
+    }
+    
+    /**
+     * 添加纠缠对象
+     * @param {string} objectId 对象ID
+     */
+    addObject(objectId) {
+        if (!this.objects.includes(objectId)) {
+            this.objects.push(objectId);
+            this.send('object_added', { objectId });
+        }
+    }
+    
+    /**
+     * 移除纠缠对象
+     * @param {string} objectId 对象ID
+     */
+    removeObject(objectId) {
+        const index = this.objects.indexOf(objectId);
+        if (index !== -1) {
+            this.objects.splice(index, 1);
+            this.send('object_removed', { objectId });
+        }
+    }
+    
+    /**
+     * 设置纠缠强度
+     * @param {number} strength 纠缠强度 (0.0-1.0)
+     */
+    setStrength(strength) {
+        this.strength = Math.max(0, Math.min(1, strength));
+        this.send('strength_changed', { strength: this.strength });
+    }
+    
+    /**
+     * 销毁量子纠缠实例
+     */
+    destroy() {
+        if (this.ws) {
+            this.ws.close();
+        }
+        this.subscribers.clear();
+        this.messageQueue = [];
+        this.objects = [];
+    }
+}
+
+// 创建全局量子纠缠实例
+window.quantumEntangle = new QuantumEntangle(window.QUANTUM_ENTANGLE || {}); 

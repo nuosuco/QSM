@@ -1,0 +1,524 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+量子基因编码: QG-QSM01-CODE-20250405122233-E8F7D6-ENT3892
+
+多模态元素量子纠缠管理器
+支持所有类型元素的量子基因编码和量子纠缠通道建立
+"""
+
+import os
+import sys
+import json
+import hashlib
+import base64
+import uuid
+import time
+from typing import Dict, List, Union, Any, Optional, Tuple, Set
+from datetime import datetime
+
+# 导入简化版编码器和网络
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from simplified_core import SimplifiedEncoder, SimplifiedNetwork
+
+class UniversalEntanglementManager:
+    """通用元素量子纠缠管理器"""
+    
+    def __init__(self):
+        """初始化管理器"""
+        self.encoder = SimplifiedEncoder()
+        self.network = SimplifiedNetwork()
+        self.output_registry = {}
+        self.element_registry = {}
+        self.gateway_registry = {}
+        
+        # 创建默认网关
+        self.create_default_gateways()
+    
+    def create_default_gateways(self):
+        """创建默认网关节点"""
+        # 核心网关 - 连接所有核心元素
+        self.register_gateway("core_gateway", "连接所有核心元素的网关")
+        
+        # 输出网关 - 连接所有输出元素
+        self.register_gateway("output_gateway", "连接所有输出元素的网关")
+        
+        # 目录网关 - 连接所有目录
+        self.register_gateway("directory_gateway", "连接所有目录的网关")
+    
+    def register_gateway(self, gateway_id: str, description: str) -> str:
+        """注册新的网关节点"""
+        # 创建网关量子基因
+        gateway_gene = self.encoder.generate_quantum_gene(
+            "network", 
+            gateway_id, 
+            {
+                "is_gateway": True,
+                "description": description,
+                "is_core": True
+            }
+        )
+        
+        # 注册网关
+        self.gateway_registry[gateway_id] = {
+            "quantum_gene": gateway_gene,
+            "description": description,
+            "connected_elements": [],
+            "created_at": time.time()
+        }
+        
+        return gateway_gene
+    
+    def register_element(self, element_type: str, element_id: str, 
+                       metadata: Dict = None, is_core: bool = False) -> Dict:
+        """
+        注册任意类型元素并生成量子基因编码
+        
+        Args:
+            element_type: 元素类型
+            element_id: 元素ID
+            metadata: 元数据
+            is_core: 是否为核心元素
+            
+        Returns:
+            包含量子基因编码和纠缠通道的字典
+        """
+        if metadata is None:
+            metadata = {}
+            
+        # 标记为核心元素
+        metadata["is_core"] = is_core
+        
+        # 通过网络注册元素
+        quantum_gene = self.network.register_element(
+            element_type, element_id, is_core, metadata
+        )
+        
+        # 为核心元素添加特殊标记
+        if is_core:
+            # 将元素连接到核心网关
+            if "core_gateway" in self.gateway_registry:
+                core_gateway_gene = self.gateway_registry["core_gateway"]["quantum_gene"]
+                channel_id = self.network.create_channel(quantum_gene, core_gateway_gene, force=True)
+                if channel_id:
+                    self.gateway_registry["core_gateway"]["connected_elements"].append(quantum_gene)
+        
+        # 存储元素信息
+        self.element_registry[element_id] = {
+            "type": element_type,
+            "quantum_gene": quantum_gene,
+            "registered_at": time.time(),
+            "metadata": metadata
+        }
+        
+        return {
+            "element_id": element_id,
+            "element_type": element_type,
+            "quantum_gene": quantum_gene,
+            "is_core": is_core
+        }
+    
+    def process_element(self, content: Any, element_type: str, 
+                      element_id: str = None, metadata: Dict = None) -> Dict:
+        """
+        处理任意类型元素
+        
+        Args:
+            content: 元素内容
+            element_type: 元素类型
+            element_id: 元素ID (可选)
+            metadata: 元数据 (可选)
+            
+        Returns:
+            处理结果
+        """
+        # 生成默认元素ID
+        if element_id is None:
+            element_id = f"{element_type}_{uuid.uuid4().hex[:8]}"
+            
+        # 设置默认元数据
+        if metadata is None:
+            metadata = {}
+            
+        # 添加通用元数据
+        metadata.update({
+            "content_type": element_type,
+            "timestamp": datetime.now().isoformat(),
+            "process_id": str(uuid.uuid4())
+        })
+        
+        # 根据内容类型添加特定元数据
+        if element_type in ["text", "code", "document"]:
+            if isinstance(content, str):
+                metadata.update({
+                    "length": len(content),
+                    "hash": hashlib.md5(content.encode()).hexdigest()[:10]
+                })
+        
+        elif element_type in ["image", "video", "audio"]:
+            if isinstance(content, bytes):
+                metadata.update({
+                    "size_bytes": len(content),
+                    "hash": hashlib.md5(content).hexdigest()[:10]
+                })
+            elif isinstance(content, str) and os.path.exists(content):
+                metadata.update({
+                    "path": content,
+                    "size_bytes": os.path.getsize(content)
+                })
+                
+        # 检查是否是核心元素
+        is_core = metadata.get("is_core", False)
+        
+        # 注册元素
+        element_info = self.register_element(element_type, element_id, metadata, is_core)
+        quantum_gene = element_info["quantum_gene"]
+        
+        # 处理内容并嵌入量子基因编码
+        processed_content = self._embed_quantum_gene(content, element_type, quantum_gene)
+        
+        # 为元素建立所有必要的量子纠缠通道
+        channels = self._establish_all_entanglement(quantum_gene, element_type, is_core)
+        
+        return {
+            "original_content": content,
+            "processed_content": processed_content,
+            "element_id": element_id,
+            "element_type": element_type,
+            "quantum_gene": quantum_gene,
+            "channels": channels
+        }
+    
+    def process_text_output(self, text: str, metadata: Dict = None) -> Dict:
+        """处理文本输出"""
+        if metadata is None:
+            metadata = {}
+            
+        metadata["output_type"] = "text"
+        
+        # 将元素连接到输出网关
+        if "output_gateway" not in metadata:
+            metadata["output_gateway"] = "output_gateway"
+            
+        return self.process_element(text, "text", None, metadata)
+    
+    def process_code_output(self, code: str, language: str = "python", metadata: Dict = None) -> Dict:
+        """处理代码输出"""
+        if metadata is None:
+            metadata = {}
+            
+        metadata.update({
+            "output_type": "code",
+            "language": language
+        })
+        
+        # 将元素连接到输出网关
+        if "output_gateway" not in metadata:
+            metadata["output_gateway"] = "output_gateway"
+            
+        return self.process_element(code, "code", None, metadata)
+    
+    def process_image_output(self, image_data: Union[str, bytes], metadata: Dict = None) -> Dict:
+        """处理图像输出"""
+        if metadata is None:
+            metadata = {}
+            
+        if isinstance(image_data, str):
+            # 路径
+            if os.path.exists(image_data):
+                file_ext = os.path.splitext(image_data)[1].lower().replace(".", "")
+                metadata.update({
+                    "format": file_ext,
+                    "output_type": "image"
+                })
+        else:
+            # 二进制数据
+            metadata["output_type"] = "image"
+            
+        # 将元素连接到输出网关
+        if "output_gateway" not in metadata:
+            metadata["output_gateway"] = "output_gateway"
+            
+        return self.process_element(image_data, "image", None, metadata)
+    
+    def process_video_output(self, video_data: Union[str, bytes], metadata: Dict = None) -> Dict:
+        """处理视频输出"""
+        if metadata is None:
+            metadata = {}
+            
+        if isinstance(video_data, str):
+            # 路径
+            if os.path.exists(video_data):
+                file_ext = os.path.splitext(video_data)[1].lower().replace(".", "")
+                metadata.update({
+                    "format": file_ext,
+                    "output_type": "video"
+                })
+        else:
+            # 二进制数据
+            metadata["output_type"] = "video"
+            
+        # 将元素连接到输出网关
+        if "output_gateway" not in metadata:
+            metadata["output_gateway"] = "output_gateway"
+            
+        return self.process_element(video_data, "video", None, metadata)
+    
+    def process_file(self, file_path: str, metadata: Dict = None) -> Dict:
+        """处理文件"""
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"文件不存在: {file_path}")
+            
+        if metadata is None:
+            metadata = {}
+            
+        # 确定文件类型
+        file_ext = os.path.splitext(file_path)[1].lower().replace(".", "")
+        file_name = os.path.basename(file_path)
+        
+        metadata.update({
+            "file_name": file_name,
+            "file_extension": file_ext,
+            "file_size": os.path.getsize(file_path),
+            "file_path": os.path.abspath(file_path)
+        })
+        
+        # 检查是否是核心文件
+        is_core = metadata.get("is_core", False)
+        
+        # 生成元素ID
+        element_id = f"file_{file_name}_{uuid.uuid4().hex[:8]}"
+        
+        return self.process_element(file_path, "file", element_id, metadata)
+    
+    def process_directory(self, dir_path: str, metadata: Dict = None) -> Dict:
+        """处理目录"""
+        if not os.path.isdir(dir_path):
+            raise NotADirectoryError(f"目录不存在: {dir_path}")
+            
+        if metadata is None:
+            metadata = {}
+            
+        dir_name = os.path.basename(dir_path)
+        
+        metadata.update({
+            "dir_name": dir_name,
+            "dir_path": os.path.abspath(dir_path),
+            "item_count": len(os.listdir(dir_path)),
+            "is_core": True  # 所有目录都是核心元素
+        })
+        
+        # 生成元素ID
+        element_id = f"dir_{dir_name}_{uuid.uuid4().hex[:8]}"
+        
+        result = self.process_element(dir_path, "folder", element_id, metadata)
+        
+        # 将元素连接到目录网关
+        if "directory_gateway" in self.gateway_registry:
+            dir_gene = result["quantum_gene"]
+            gateway_gene = self.gateway_registry["directory_gateway"]["quantum_gene"]
+            channel_id = self.network.create_channel(dir_gene, gateway_gene, force=True)
+            if channel_id:
+                self.gateway_registry["directory_gateway"]["connected_elements"].append(dir_gene)
+        
+        return result
+    
+    def _embed_quantum_gene(self, content: Any, content_type: str, quantum_gene: str) -> Any:
+        """将量子基因编码嵌入内容"""
+        if content_type == "text":
+            if isinstance(content, str):
+                return f"{content}\n\n<!-- 量子基因编码: {quantum_gene} -->"
+            
+        elif content_type == "code":
+            if isinstance(content, str):
+                # 获取适当的注释标记
+                comment_markers = {
+                    "python": "# ",
+                    "javascript": "// ",
+                    "java": "// ",
+                    "c": "// ",
+                    "cpp": "// ",
+                    "csharp": "// ",
+                    "ruby": "# ",
+                    "php": "// ",
+                    "swift": "// ",
+                    "go": "// ",
+                    "rust": "// ",
+                    "kotlin": "// ",
+                    "scala": "// ",
+                    "typescript": "// ",
+                    "html": "<!-- ",
+                    "css": "/* ",
+                    "sql": "-- "
+                }
+                
+                end_markers = {
+                    "html": " -->",
+                    "css": " */"
+                }
+                
+                # 获取语言(如果在元数据中指定)
+                language = "python"  # 默认
+                for element_id, data in self.element_registry.items():
+                    if data.get("quantum_gene") == quantum_gene:
+                        language = data.get("metadata", {}).get("language", "python")
+                        break
+                
+                marker = comment_markers.get(language.lower(), "# ")
+                end_marker = end_markers.get(language.lower(), "")
+                
+                return f"{marker}量子基因编码: {quantum_gene}{end_marker}\n\n{content}"
+                
+        elif content_type in ["image", "video", "audio"]:
+            # 对于文件路径，我们不修改文件，只在元数据中记录量子基因编码
+            # 在实际应用中，应使用适当的库将编码作为水印嵌入媒体文件
+            if isinstance(content, str) and os.path.exists(content):
+                print(f"已为媒体文件 {content} 生成量子基因编码: {quantum_gene}")
+                # 这里应该调用水印库添加量子基因编码
+                return content
+            elif isinstance(content, bytes):
+                print(f"已为二进制媒体数据生成量子基因编码: {quantum_gene}")
+                # 这里应该调用水印库添加量子基因编码
+                return content
+                
+        elif content_type == "file":
+            # 不修改文件，只在元数据中记录量子基因编码
+            if isinstance(content, str) and os.path.exists(content):
+                print(f"已为文件 {content} 生成量子基因编码: {quantum_gene}")
+                return content
+                
+        elif content_type == "folder":
+            # 不修改目录，只在元数据中记录量子基因编码
+            if isinstance(content, str) and os.path.isdir(content):
+                print(f"已为目录 {content} 生成量子基因编码: {quantum_gene}")
+                return content
+                
+        # 默认情况下，不修改内容
+        return content
+    
+    def _establish_all_entanglement(self, quantum_gene: str, element_type: str, 
+                                 is_core: bool = False) -> List[str]:
+        """为元素建立所有必要的量子纠缠通道"""
+        channels = []
+        
+        # 1. 与系统核心建立通道
+        ref_core_gene = self.encoder.get_quantum_gene("model", "ref_core")
+        if ref_core_gene:
+            channel = self.network.create_channel(quantum_gene, ref_core_gene)
+            if channel:
+                channels.append(channel)
+        
+        # 2. 与WeQ子系统建立通道
+        weq_core_gene = self.encoder.get_quantum_gene("model", "weq_core")
+        if weq_core_gene:
+            channel = self.network.create_channel(quantum_gene, ref_core_gene)
+            if channel:
+                channels.append(channel)
+        
+        # 3. 如果是输出元素，连接到输出网关
+        if element_type in ["text", "code", "image", "video", "audio"] and "output_gateway" in self.gateway_registry:
+            output_gateway_gene = self.gateway_registry["output_gateway"]["quantum_gene"]
+            channel = self.network.create_channel(quantum_gene, output_gateway_gene, force=True)
+            if channel:
+                channels.append(channel)
+                self.gateway_registry["output_gateway"]["connected_elements"].append(quantum_gene)
+        
+        # 4. 如果是目录，连接到目录网关
+        if element_type == "folder" and "directory_gateway" in self.gateway_registry:
+            directory_gateway_gene = self.gateway_registry["directory_gateway"]["quantum_gene"]
+            channel = self.network.create_channel(quantum_gene, directory_gateway_gene, force=True)
+            if channel:
+                channels.append(channel)
+                self.gateway_registry["directory_gateway"]["connected_elements"].append(quantum_gene)
+        
+        # 5. 如果是核心元素，连接到核心网关
+        if is_core and "core_gateway" in self.gateway_registry:
+            core_gateway_gene = self.gateway_registry["core_gateway"]["quantum_gene"]
+            channel = self.network.create_channel(quantum_gene, core_gateway_gene, force=True)
+            if channel:
+                channels.append(channel)
+                self.gateway_registry["core_gateway"]["connected_elements"].append(quantum_gene)
+        
+        # 6. 与所有目录建立纠缠通道
+        directories = self.encoder.get_all_directories()
+        for dir_name, dir_gene in directories:
+            channel = self.network.create_channel(quantum_gene, dir_gene)
+            if channel:
+                channels.append(channel)
+        
+        return channels
+    
+    def get_entanglement_status(self, quantum_gene: str) -> Dict:
+        """获取元素的纠缠状态"""
+        # 获取纠缠网络
+        network = self.network.detect_entanglement_network(0.3)
+        
+        # 查找元素
+        element_name = self.network._find_element_name_by_gene(quantum_gene)
+        
+        # 获取纠缠关系
+        entanglements = network.get(element_name, [])
+        
+        # 生成状态报告
+        return {
+            "quantum_gene": quantum_gene,
+            "element_name": element_name,
+            "entangled": len(entanglements) > 0,
+            "entanglement_count": len(entanglements),
+            "entanglements": entanglements,
+            "gateways_connected": self._get_connected_gateways(quantum_gene)
+        }
+    
+    def _get_connected_gateways(self, quantum_gene: str) -> List[str]:
+        """获取元素连接的所有网关"""
+        connected_gateways = []
+        
+        for gateway_id, gateway in self.gateway_registry.items():
+            if quantum_gene in gateway.get("connected_elements", []):
+                connected_gateways.append(gateway_id)
+        
+        return connected_gateways
+    
+    def optimize_network(self) -> Dict:
+        """优化量子纠缠网络"""
+        return self.network.optimize_network()
+
+# 兼容旧接口
+class MultimodalEntanglementManager(UniversalEntanglementManager):
+    """多模态输出量子纠缠管理器"""
+    pass
+
+if __name__ == "__main__":
+    # 简单演示
+    manager = UniversalEntanglementManager()
+    
+    # 演示文本输出
+    text_output = manager.process_text_output(
+        "这是一段示例文本输出，将会添加量子基因编码并建立纠缠通道。"
+    )
+    print(f"文本输出量子基因: {text_output['quantum_gene']}")
+    print(f"建立的纠缠通道数: {len(text_output['channels'])}")
+    
+    # 查看纠缠状态
+    status = manager.get_entanglement_status(text_output['quantum_gene'])
+    print(f"纠缠状态: 已纠缠={status['entangled']}, 纠缠数量={status['entanglement_count']}")
+    print(f"连接的网关: {status['gateways_connected']}")
+    
+    # 演示代码输出
+    code_output = manager.process_code_output(
+        "def hello_world():\n    print('Hello, Quantum World!')",
+        language="python",
+        metadata={"purpose": "demonstration", "author": "QSM"}
+    )
+    print(f"\n代码输出量子基因: {code_output['quantum_gene']}")
+    print(f"建立的纠缠通道数: {len(code_output['channels'])}")
+    
+    # 查看处理后的代码
+    print("\n处理后的代码:")
+    print(code_output['processed_content'])
+    
+    # 优化网络
+    print("\n优化量子纠缠网络:")
+    result = manager.optimize_network()
+    print(f"优化结果: {result}") 
