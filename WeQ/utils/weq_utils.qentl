@@ -1,0 +1,485 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+WeQ工具函数模块
+提供量子情感网络模型的工具函数
+"""
+
+# 量子基因编码
+QG-UTILS-WEQ-EMOTION-U8T9
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-UTILS-WEQ-20240501
+  state: ACTIVE
+  strength: 0.97
+  objects: [
+    "WeQ/models/weq_model.qentl",
+    "WeQ/api/weq_api.qentl"
+  ]
+
+@imports
+  standard: [os, json, logging, datetime, time, math, random, re, uuid]
+  quantum: [Dict, List, Tuple, Any, Optional, Union, Path]
+  quantum_numpy: [numpy as np]
+  quantum_nlp: [text_processing]
+  quantum_internal: [
+    "../models/weq_model.qentl" as weq_model
+  ]
+
+@constants
+  ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+  LOG_DIR = ROOT_DIR / 'logs'
+  DATA_DIR = ROOT_DIR / 'data'
+  CACHE_DIR = DATA_DIR / 'cache'
+  
+  # 情感词典文件路径
+  EMOTION_LEXICON_DIR = ROOT_DIR / 'data' / 'lexicons'
+  
+  # 情感词典映射
+  EMOTION_LEXICONS = {
+    'JOY': EMOTION_LEXICON_DIR / 'joy.txt',
+    'SADNESS': EMOTION_LEXICON_DIR / 'sadness.txt',
+    'ANGER': EMOTION_LEXICON_DIR / 'anger.txt',
+    'FEAR': EMOTION_LEXICON_DIR / 'fear.txt', 
+    'DISGUST': EMOTION_LEXICON_DIR / 'disgust.txt',
+    'SURPRISE': EMOTION_LEXICON_DIR / 'surprise.txt',
+    'TRUST': EMOTION_LEXICON_DIR / 'trust.txt',
+    'ANTICIPATION': EMOTION_LEXICON_DIR / 'anticipation.txt'
+  }
+  
+  # 情感强度标记
+  INTENSITY_MARKERS = {
+    'extremely': 1.0,
+    'very': 0.8,
+    'quite': 0.6,
+    'somewhat': 0.4,
+    'slightly': 0.2
+  }
+
+@initialization
+  # 创建目录
+  LOG_DIR.mkdir(exist_ok=True)
+  DATA_DIR.mkdir(exist_ok=True, parents=True)
+  CACHE_DIR.mkdir(exist_ok=True, parents=True)
+  EMOTION_LEXICON_DIR.mkdir(exist_ok=True, parents=True)
+  
+  # 配置日志
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+    handlers=[
+      logging.FileHandler(LOG_DIR / f'weq_utils_{datetime.datetime.now().strftime("%Y%m%d")}.log'),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('WeQ-UTILS')
+  
+  # 加载情感词典
+  _emotion_words = {}
+  
+  # 尝试加载情感词典，如果不存在则创建示例
+  for emotion_type, lexicon_path in EMOTION_LEXICONS.items():
+    try:
+      if lexicon_path.exists():
+        with open(lexicon_path, 'r', encoding='utf-8') as f:
+          _emotion_words[emotion_type] = set(word.strip() for word in f.readlines() if word.strip())
+      else:
+        # 创建一个简单的示例词典
+        _emotion_words[emotion_type] = set(_create_sample_lexicon(emotion_type))
+        
+        # 保存示例词典
+        lexicon_path.parent.mkdir(exist_ok=True, parents=True)
+        with open(lexicon_path, 'w', encoding='utf-8') as f:
+          f.write('\n'.join(_emotion_words[emotion_type]))
+    except Exception as e:
+      logger.error(f"加载情感词典 {emotion_type} 出错: {str(e)}")
+      _emotion_words[emotion_type] = set()
+
+@function _create_sample_lexicon(emotion_type: str) -> List[str]:
+  """创建示例情感词典
+  
+  Args:
+      emotion_type: 情感类型
+      
+  Returns:
+      示例词汇列表
+  """
+  sample_lexicons = {
+    'JOY': ["happy", "joy", "delighted", "glad", "pleased", "cheerful", "content", "satisfied"],
+    'SADNESS': ["sad", "unhappy", "depressed", "gloomy", "miserable", "sorrowful", "heartbroken"],
+    'ANGER': ["angry", "mad", "furious", "outraged", "irritated", "annoyed", "hostile"],
+    'FEAR': ["afraid", "scared", "frightened", "terrified", "anxious", "worried", "nervous"],
+    'DISGUST': ["disgusted", "repulsed", "revolted", "nauseated", "appalled", "loathe"],
+    'SURPRISE': ["surprised", "amazed", "astonished", "shocked", "startled", "stunned"],
+    'TRUST': ["trust", "believe", "confident", "faith", "assured", "dependable", "reliable"],
+    'ANTICIPATION': ["anticipate", "expect", "look forward", "await", "hopeful", "excited"]
+  }
+  
+  return sample_lexicons.get(emotion_type, [])
+
+@function analyze_text_emotion(text: str) -> Dict[str, float]:
+  """分析文本情感
+  
+  Args:
+      text: 输入文本
+      
+  Returns:
+      情感类型与强度的字典 {emotion_type: intensity}
+  """
+  # 文本预处理
+  clean_text = text_processing.normalize(text)
+  words = text_processing.tokenize(clean_text)
+  
+  # 初始化情感分数
+  emotion_scores = {emotion_type: 0.0 for emotion_type in weq_model.EMOTION_TYPES if emotion_type != 'NEUTRAL'}
+  emotion_word_counts = {emotion_type: 0 for emotion_type in emotion_scores}
+  
+  # 分析强度标记
+  intensity_multiplier = 1.0
+  
+  for i, word in enumerate(words):
+    word = word.lower()
+    
+    # 检查是否是强度标记
+    if word in INTENSITY_MARKERS and i < len(words) - 1:
+      intensity_multiplier = INTENSITY_MARKERS[word]
+      continue
+    
+    # 检查每种情感的词典
+    for emotion_type, word_set in _emotion_words.items():
+      if word in word_set:
+        emotion_scores[emotion_type] += intensity_multiplier
+        emotion_word_counts[emotion_type] += 1
+        intensity_multiplier = 1.0  # 重置强度乘数
+        break
+  
+  # 归一化情感分数
+  total_score = sum(emotion_scores.values())
+  max_score = max(emotion_scores.values()) if emotion_scores else 0
+  
+  if total_score > 0:
+    normalized_scores = {emotion: score / total_score for emotion, score in emotion_scores.items()}
+  elif max_score > 0:
+    # 如果只有一种情感
+    normalized_scores = {emotion: 1.0 if score == max_score else 0.0 for emotion, score in emotion_scores.items()}
+  else:
+    # 如果没有检测到情感，默认为中性
+    normalized_scores = {emotion: 0.0 for emotion in emotion_scores}
+    normalized_scores['NEUTRAL'] = 1.0
+  
+  return normalized_scores
+
+@function extract_emotion_keywords(text: str) -> Dict[str, List[str]]:
+  """提取文本中的情感关键词
+  
+  Args:
+      text: 输入文本
+      
+  Returns:
+      每种情感类型的关键词列表 {emotion_type: [keywords]}
+  """
+  # 文本预处理
+  clean_text = text_processing.normalize(text)
+  words = text_processing.tokenize(clean_text)
+  
+  # 初始化结果
+  emotion_keywords = {emotion_type: [] for emotion_type in weq_model.EMOTION_TYPES if emotion_type != 'NEUTRAL'}
+  
+  # 提取情感关键词
+  for word in words:
+    word = word.lower()
+    for emotion_type, word_set in _emotion_words.items():
+      if word in word_set:
+        emotion_keywords[emotion_type].append(word)
+  
+  return emotion_keywords
+
+@function create_emotion_vector_from_text(text: str, dimension: int = 8) -> weq_model.EmotionVector:
+  """从文本创建情感向量
+  
+  Args:
+      text: 输入文本
+      dimension: 情感向量维度
+      
+  Returns:
+      情感向量
+  """
+  emotion_scores = analyze_text_emotion(text)
+  
+  # 创建情感向量
+  vector = weq_model.create_emotion_vector(dimension)
+  
+  # 设置情感值
+  for emotion_type, intensity in emotion_scores.items():
+    vector.set_emotion(emotion_type, intensity)
+  
+  vector.normalize()
+  return vector
+
+@function generate_random_emotion_vector(dimension: int = 8) -> weq_model.EmotionVector:
+  """生成随机情感向量
+  
+  Args:
+      dimension: 情感向量维度
+      
+  Returns:
+      随机情感向量
+  """
+  vector = weq_model.create_emotion_vector(dimension)
+  
+  # 随机选择1-3种主要情感
+  emotion_types = list(weq_model.EMOTION_TYPES.keys())
+  num_emotions = random.randint(1, 3)
+  selected_emotions = random.sample(emotion_types, num_emotions)
+  
+  # 设置情感值
+  for emotion in selected_emotions:
+    if emotion != 'NEUTRAL':
+      intensity = random.uniform(0.5, 1.0)
+      vector.set_emotion(emotion, intensity)
+  
+  vector.normalize()
+  return vector
+
+@function generate_complementary_emotion(emotion_type: str) -> str:
+  """生成互补情感类型
+  
+  Args:
+      emotion_type: 原始情感类型
+      
+  Returns:
+      互补情感类型
+  """
+  emotion_pairs = {
+    'JOY': 'SADNESS',
+    'SADNESS': 'JOY',
+    'ANGER': 'TRUST',
+    'FEAR': 'ANTICIPATION',
+    'DISGUST': 'TRUST',
+    'SURPRISE': 'ANTICIPATION',
+    'TRUST': 'FEAR',
+    'ANTICIPATION': 'SURPRISE',
+    'NEUTRAL': 'JOY'
+  }
+  
+  return emotion_pairs.get(emotion_type, 'NEUTRAL')
+
+@function emotion_blend(emotions: List[Tuple[str, float]]) -> Dict[str, float]:
+  """混合多种情感
+  
+  Args:
+      emotions: 情感与强度列表 [(emotion_type, intensity)]
+      
+  Returns:
+      混合后的情感强度字典 {emotion_type: intensity}
+  """
+  result = {emotion_type: 0.0 for emotion_type in weq_model.EMOTION_TYPES}
+  
+  total_intensity = sum(intensity for _, intensity in emotions)
+  
+  if total_intensity > 0:
+    for emotion_type, intensity in emotions:
+      if emotion_type in result:
+        result[emotion_type] += intensity / total_intensity
+  else:
+    result['NEUTRAL'] = 1.0
+    
+  return result
+
+@function export_emotion_data(
+                         user_emotions: Dict[str, Any],
+                         interaction_history: List[Dict[str, Any]],
+                         filepath: Optional[str] = None) -> str:
+  """导出情感数据
+  
+  Args:
+      user_emotions: 用户情感数据
+      interaction_history: 交互历史
+      filepath: 导出文件路径 (可选)
+      
+  Returns:
+      导出文件路径
+  """
+  if filepath is None:
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(DATA_DIR, f'emotion_data_{timestamp}.json')
+  
+  # 准备导出数据
+  export_data = {
+    'timestamp': datetime.datetime.now().isoformat(),
+    'user_emotions': user_emotions,
+    'interaction_history': interaction_history
+  }
+  
+  # 确保目录存在
+  os.makedirs(os.path.dirname(filepath), exist_ok=True)
+  
+  # 导出数据
+  with open(filepath, 'w', encoding='utf-8') as f:
+    json.dump(export_data, f, ensure_ascii=False, indent=2)
+    
+  logger.info(f"情感数据已导出到: {filepath}")
+  return filepath
+
+@function import_emotion_data(filepath: str) -> Dict[str, Any]:
+  """导入情感数据
+  
+  Args:
+      filepath: 数据文件路径
+      
+  Returns:
+      导入的数据
+  """
+  try:
+    with open(filepath, 'r', encoding='utf-8') as f:
+      data = json.load(f)
+    
+    logger.info(f"从{filepath}导入情感数据")
+    return data
+    
+  except Exception as e:
+    logger.error(f"导入情感数据出错: {str(e)}")
+    raise
+
+@function generate_test_messages(count: int = 10) -> List[Dict[str, Any]]:
+  """生成测试消息
+  
+  Args:
+      count: 消息数量
+      
+  Returns:
+      测试消息列表
+  """
+  user_ids = [f"user_{i}" for i in range(5)]
+  
+  # 示例消息模板
+  message_templates = [
+    "I'm feeling {emotion} today!",
+    "This news makes me {emotion}.",
+    "I'm {intensity} {emotion} about our project.",
+    "The meeting was {emotion}.",
+    "I feel {emotion} when thinking about the future.",
+    "Today's weather makes me {emotion}.",
+    "This situation is {intensity} {emotion}.",
+    "I'm {emotion} to hear about your success!",
+    "That movie was {emotion}.",
+    "I was {emotion} by your message."
+  ]
+  
+  # 情感词汇
+  emotion_words = {
+    'JOY': ["happy", "joyful", "delighted", "glad", "pleased"],
+    'SADNESS': ["sad", "unhappy", "depressed", "gloomy", "heartbroken"],
+    'ANGER': ["angry", "mad", "furious", "outraged", "irritated"],
+    'FEAR': ["afraid", "scared", "frightened", "terrified", "anxious"],
+    'DISGUST': ["disgusted", "repulsed", "revolted", "nauseated", "appalled"],
+    'SURPRISE': ["surprised", "amazed", "astonished", "shocked", "stunned"],
+    'TRUST': ["trusting", "believing", "confident", "assured", "faithful"],
+    'ANTICIPATION': ["anticipating", "expecting", "hopeful", "excited", "eager"]
+  }
+  
+  # 强度词汇
+  intensity_words = ["slightly", "somewhat", "quite", "very", "extremely"]
+  
+  messages = []
+  for i in range(count):
+    # 随机选择发送者和接收者
+    sender_id = random.choice(user_ids)
+    recipients = random.sample([u for u in user_ids if u != sender_id], 
+                              k=random.randint(1, min(3, len(user_ids)-1)))
+    
+    # 随机选择情感类型和强度
+    emotion_type = random.choice(list(emotion_words.keys()))
+    emotion_word = random.choice(emotion_words[emotion_type])
+    intensity_word = random.choice(intensity_words)
+    
+    # 生成消息内容
+    template = random.choice(message_templates)
+    if "{intensity}" in template:
+      content = template.format(emotion=emotion_word, intensity=intensity_word)
+    else:
+      content = template.format(emotion=emotion_word)
+    
+    # 创建消息
+    message = {
+      'message_id': f"msg_{uuid.uuid4().hex[:8]}",
+      'sender_id': sender_id,
+      'recipients': recipients,
+      'content': content,
+      'message_type': 'TEXT',
+      'timestamp': (datetime.datetime.now() - datetime.timedelta(
+        hours=random.randint(0, 48),
+        minutes=random.randint(0, 60)
+      )).isoformat()
+    }
+    
+    messages.append(message)
+  
+  # 按时间戳排序
+  messages.sort(key=lambda x: x['timestamp'])
+  return messages
+
+@function process_test_messages(model: weq_model.WeQModel, messages: List[Dict[str, Any]]) -> weq_model.WeQModel:
+  """处理测试消息
+  
+  Args:
+      model: WeQ模型
+      messages: 消息列表
+      
+  Returns:
+      处理后的模型
+  """
+  for message in messages:
+    try:
+      model.process_message(
+        message_id=message['message_id'],
+        sender_id=message['sender_id'],
+        content=message['content'],
+        recipients=message['recipients'],
+        message_type=message['message_type']
+      )
+    except Exception as e:
+      logger.warning(f"处理消息 {message['message_id']} 时出错: {str(e)}")
+  
+  return model
+
+@function validate_emotion_data(emotion_data: Dict[str, Any]) -> Tuple[bool, str]:
+  """验证情感数据
+  
+  Args:
+      emotion_data: 情感数据
+      
+  Returns:
+      (是否有效, 错误信息)
+  """
+  # 检查必要字段
+  if not isinstance(emotion_data, dict):
+    return False, "情感数据必须是字典格式"
+  
+  required_fields = ["user_emotions", "interaction_history"]
+  for field in required_fields:
+    if field not in emotion_data:
+      return False, f"缺少必要字段: {field}"
+  
+  # 验证用户情感数据
+  user_emotions = emotion_data["user_emotions"]
+  if not isinstance(user_emotions, dict):
+    return False, "用户情感数据必须是字典格式"
+  
+  # 验证交互历史
+  interaction_history = emotion_data["interaction_history"]
+  if not isinstance(interaction_history, list):
+    return False, "交互历史必须是列表格式"
+  
+  for interaction in interaction_history:
+    if not isinstance(interaction, dict):
+      return False, "交互记录必须是字典格式"
+    
+    required_interaction_fields = ["message_id", "sender_id", "recipients", "timestamp"]
+    for field in required_interaction_fields:
+      if field not in interaction:
+        return False, f"交互记录缺少必要字段: {field}"
+  
+  return True, "" 

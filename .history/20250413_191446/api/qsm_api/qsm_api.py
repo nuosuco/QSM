@@ -1,0 +1,169 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+量子叠加态模型(QSM) - 主量子API
+
+量子基因编码: QG-QSM01-API-20250401-F8D37B-ENT5432
+"""
+
+# 这只是一个初始文件，待完整实现
+# 主量子API将集成所有子模型API功能
+
+# 导入必要库
+import os
+import sys
+import logging
+from flask import Flask, jsonify, request, Blueprint
+from flask_restx import Api, Resource, Namespace
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager
+from datetime import datetime
+
+# 添加项目根目录到系统路径
+sys.path.append('.')
+
+# 导入配置
+from api.qsm_api.qsm_api_config import (
+    QSM_API_PORT, 
+    QSM_API_PREFIX,
+    CORS_ALLOWED_ORIGINS,
+    JWT_SECRET_KEY,
+    LOG_LEVEL,
+    LOG_FORMAT,
+    LOG_FILE,
+    INTEGRATE_WEQ,
+    INTEGRATE_SOM,
+    INTEGRATE_REF,
+    API_VERSION
+)
+
+# 配置日志
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format=LOG_FORMAT,
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("QSM-API")
+
+def create_app():
+    """创建并配置Flask应用"""
+    try:
+        app = Flask(__name__)
+        
+        # 配置应用
+        app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'quantum-secret-key')
+        app.config['JSON_AS_ASCII'] = False
+        
+        # 创建API
+        api = Api(
+            app,
+            version='1.0',
+            title='QSM API',
+            description='量子软件市场API服务',
+            doc='/swagger/'
+        )
+        
+        # 将API实例保存到app中，以便子模块可以使用
+        app.api = api
+        
+        # 添加基本路由
+        @app.route('/')
+        def index():
+            return jsonify({
+                'name': 'QSM API',
+                'version': '1.0',
+                'status': 'running',
+                'docs_url': '/swagger/'
+            })
+        
+        @app.route('/health')
+        def health():
+            """健康检查端点"""
+            return jsonify({
+                'status': 'healthy',
+                'timestamp': datetime.now().isoformat(),
+                'services': {
+                    'qsm_api': 'running'
+                }
+            })
+        
+        try:
+            # 集成WeQ API
+            logger.info("正在集成WeQ API...")
+            try:
+                from WeQ.api.weq_api_integration import integrate_weq_api_to_qsm_api
+                # 传递api实例而不是app
+                weq_ns = integrate_weq_api_to_qsm_api(api)
+                if weq_ns:
+                    api.add_namespace(weq_ns, path='/api/weq')
+                    logger.info("WeQ API集成成功")
+                else:
+                    logger.warning("WeQ API命名空间创建失败，跳过集成")
+            except ImportError as e:
+                logger.error(f"WeQ API集成失败: {str(e)}")
+            except Exception as e:
+                logger.error(f"WeQ API集成失败: {str(e)}")
+            logger.info("WeQ API集成过程完成")
+            
+            # 集成SOM API
+            logger.info("正在集成SOM API...")
+            try:
+                from api.qsm_api.qsm_api_integration import integrate_som_to_qsm
+                if app is not None:
+                    # 使用app实例
+                    integrate_som_to_qsm(app)
+                    logger.info("SOM API集成成功")
+                else:
+                    logger.error("无法集成SOM API：Flask应用实例为None")
+            except Exception as e:
+                logger.error(f"SOM API集成失败: {str(e)}")
+            logger.info("SOM API集成过程完成")
+            
+            # 集成Ref API
+            logger.info("正在集成Ref API...")
+            try:
+                from Ref.api.ref_api_integration import integrate_ref_api_to_qsm_api
+                # 传递api实例而不是app
+                ref_ns = integrate_ref_api_to_qsm_api(api)
+                if ref_ns:
+                    api.add_namespace(ref_ns, path='/api/ref')
+                    logger.info("Ref API集成成功")
+                else:
+                    logger.warning("Ref API命名空间创建失败，跳过集成")
+            except ImportError as e:
+                logger.error(f"Ref API集成失败: {str(e)}")
+            except Exception as e:
+                logger.error(f"Ref API集成失败: {str(e)}")
+            logger.info("Ref API集成过程完成")
+                
+        except Exception as e:
+            logger.error(f"API集成过程中出错: {str(e)}")
+        
+        logger.info(f"QSM API服务启动在端口 {QSM_API_PORT}")
+        return app
+    except Exception as e:
+        logger.critical(f"创建QSM API应用失败: {str(e)}")
+        # 返回一个最小的可用Flask应用，以防止程序崩溃
+        fallback_app = Flask(__name__)
+        
+        @fallback_app.route('/')
+        def fallback_index():
+            return jsonify({
+                'name': 'QSM API (故障模式)',
+                'status': 'degraded',
+                'error': str(e)
+            })
+        
+        return fallback_app
+
+def main():
+    """启动QSM API服务"""
+    app = create_app()
+    app.run(debug=True, host='0.0.0.0', port=QSM_API_PORT)
+
+if __name__ == "__main__":
+    main()

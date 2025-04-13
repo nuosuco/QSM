@@ -1,188 +1,482 @@
-@quantum-component(name="quantum-progress")
-@quantum-entangle(strength=0.95, sync=true)
-@quantum-state({
-    currentValue: 0,
-    animating: false
-})
+/* 量子基因编码 */
+QG-COMP-PROGRESS-UI-FEEDBACK-A1B1
 
-<div class="quantum-progress" 
-     :class="[
-         `quantum-progress--${type}`,
-         { 'is-animating': animating }
-     ]">
-    <div class="quantum-progress-bar">
-        <div class="quantum-progress-inner" 
-             :style="{ width: `${percentage}%` }">
-            <div class="quantum-progress-wave"></div>
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.8,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-layout.qcss",
+    "world/static/css/quantum-animation.qcss"
+  ]
+}
+
+/* 组件属性 */
+@properties {
+  // 进度值
+  percentage: number = 0,
+  // 进度条类型
+  type: 'line' | 'circle' | 'dashboard' = 'line',
+  // 进度条状态
+  status: 'normal' | 'success' | 'warning' | 'error' = 'normal',
+  // 进度条颜色
+  color: string | object | function = '',
+  // 进度条宽度
+  strokeWidth: number = 6,
+  // 在进度条上显示百分比值
+  textInside: boolean = false,
+  // 进度条背景色
+  trackColor: string = '',
+  // 是否显示进度条文字
+  showText: boolean = true,
+  // 自定义文字
+  format: function = null,
+  // 是否条纹
+  striped: boolean = false,
+  // 是否动画条纹
+  stripedFlow: boolean = false,
+  // 圆形/仪表盘进度条画布宽度
+  width: number = 120,
+  // 仪表盘进度条起始角度
+  startAngle: number = -225,
+  // 仪表盘进度条结束角度
+  endAngle: number = 45,
+  // 是否动画过渡
+  animated: boolean = true,
+  // 动画持续时间(毫秒)
+  duration: number = 800,
+  // 缓动效果
+  easing: string = 'cubic-bezier(0.4, 0, 0.2, 1)',
+  // 量子态配置
+  quantum: {
+    // 量子纠缠强度
+    entangleStrength: number = 0.8,
+    // 量子态动画
+    stateAnimation: boolean = true,
+    // 量子态持续时间
+    stateDuration: number = 300
+  }
+}
+
+/* 模板结构 */
+<template>
+  <div class="q-progress"
+       :class="[
+         `q-progress-${type}`,
+         {
+           [`q-progress-${status}`]: status !== 'normal',
+           'q-progress-without-text': !showText,
+           'q-progress-text-inside': textInside && type === 'line'
+         }
+       ]">
+    <!-- 线形进度条 -->
+    <div v-if="type === 'line'"
+         class="q-progress-outer">
+      <div class="q-progress-inner">
+        <div class="q-progress-bg"
+             :style="{
+               width: `${percentage}%`,
+               backgroundColor: computedColor,
+               transition: animated ? `width ${duration}ms ${easing}` : 'none'
+             }"
+             :class="{
+               'q-progress-striped': striped,
+               'q-progress-striped-flow': stripedFlow
+             }">
+          <div v-if="textInside && showText"
+               class="q-progress-text">
+            {{ content }}
+          </div>
         </div>
+      </div>
+    </div>
+    
+    <!-- 圆形/仪表盘进度条 -->
+    <div v-else
+         class="q-progress-circle"
+         :style="{ height: `${width}px`, width: `${width}px` }">
+      <svg viewBox="0 0 100 100">
+        <!-- 背景圆环 -->
+        <path class="q-progress-circle-track"
+              :d="trackPath"
+              :stroke="trackColor"
+              :stroke-width="strokeWidth"
+              fill="none" />
         
-        <div class="quantum-progress-glow"></div>
+        <!-- 进度圆环 -->
+        <path class="q-progress-circle-path"
+              :d="trackPath"
+              :stroke="computedColor"
+              :stroke-width="strokeWidth"
+              fill="none"
+              :style="{
+                strokeDasharray: `${perimeter}px, ${perimeter}px`,
+                strokeDashoffset: `${(1 - relativePercentage) * perimeter}px`,
+                transition: animated ? `stroke-dashoffset ${duration}ms ${easing}` : 'none'
+              }" />
+      </svg>
+      
+      <!-- 中间文本 -->
+      <div v-if="showText"
+           class="q-progress-circle-text">
+        {{ content }}
+      </div>
     </div>
     
-    <div v-if="showInfo" class="quantum-progress-info">
-        <span class="quantum-progress-text" v-if="text">
-            {{ text }}
-        </span>
-        <span v-else class="quantum-progress-percentage">
-            {{ percentage }}%
-        </span>
+    <!-- 外部文本 -->
+    <div v-if="showText && !textInside && type === 'line'"
+         class="q-progress-text">
+      <span>{{ content }}</span>
     </div>
-</div>
+  </div>
+</template>
 
-<style lang="qcss">
-.quantum-progress {
-    position: relative;
-    margin: 16px 0;
+/* 组件样式 */
+<style>
+/* 通用样式 */
+.q-progress {
+  position: relative;
+  font-size: var(--q-font-size);
+  line-height: 1;
+  display: flex;
+  align-items: center;
 }
 
-.quantum-progress-bar {
-    height: 6px;
-    background: var(--quantum-bg-color);
-    border-radius: 3px;
-    overflow: hidden;
-    position: relative;
+/* 文本样式 */
+.q-progress-text {
+  margin-left: var(--q-spacing);
+  min-width: 50px;
+  color: var(--q-text-color);
+  font-size: 1em;
+  white-space: nowrap;
+  text-align: right;
 }
 
-.quantum-progress-inner {
-    height: 100%;
-    background: var(--quantum-primary-color);
-    border-radius: 3px;
-    transition: width 0.3s ease;
-    position: relative;
+.q-progress-text-inside .q-progress-text {
+  margin-left: 0;
+  color: var(--q-white);
 }
 
-/* 波浪效果 */
-.quantum-progress-wave {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.3),
-        transparent
-    );
-    animation: quantumWave 2s infinite linear;
+.q-progress-without-text .q-progress-text {
+  display: none;
 }
 
-/* 发光效果 */
-.quantum-progress-glow {
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: var(--quantum-primary-color);
-    filter: blur(4px);
-    opacity: 0.2;
-    border-radius: 4px;
+/* 线形进度条 */
+.q-progress-line {
+  width: 100%;
 }
 
-.quantum-progress-info {
-    margin-top: 8px;
-    display: flex;
-    justify-content: flex-end;
-    font-size: 14px;
-    color: var(--quantum-text-color);
+.q-progress-outer {
+  height: 6px;
+  border-radius: 6px;
+  background-color: var(--q-bg-color-light);
+  overflow: hidden;
+  position: relative;
+  vertical-align: middle;
+  width: 100%;
 }
 
-/* 类型样式 */
-.quantum-progress--success .quantum-progress-inner {
-    background: var(--quantum-success-color);
+.q-progress-inner {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  overflow: hidden;
 }
 
-.quantum-progress--warning .quantum-progress-inner {
-    background: var(--quantum-warning-color);
+.q-progress-bg {
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--q-primary);
+  transition: width var(--q-animation-duration) var(--q-animation-timing-function-ease);
+  position: relative;
 }
 
-.quantum-progress--error .quantum-progress-inner {
-    background: var(--quantum-danger-color);
+.q-progress-text-inside .q-progress-bg .q-progress-text {
+  position: absolute;
+  top: 0;
+  right: 5px;
+  line-height: 6px;
+  font-size: var(--q-font-size-sm);
+  display: flex;
+  align-items: center;
+  height: 100%;
+  margin: 0;
 }
 
-/* 动画效果 */
-.quantum-progress.is-animating .quantum-progress-inner {
-    animation: quantumProgress 1.5s ease infinite;
+/* 条纹效果 */
+.q-progress-striped {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 20px 20px;
 }
 
-@keyframes quantumWave {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(100%); }
+.q-progress-striped-flow {
+  animation: q-progress-stripe 1s linear infinite;
 }
 
-@keyframes quantumProgress {
-    0% { transform: scaleX(1); }
-    50% { transform: scaleX(0.98); }
-    100% { transform: scaleX(1); }
+@keyframes q-progress-stripe {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 20px 0;
+  }
 }
 
-/* 响应式设计 */
-@media screen and (max-width: 768px) {
-    .quantum-progress-bar {
-        height: 4px;
-    }
-    
-    .quantum-progress-info {
-        font-size: 12px;
-    }
+/* 圆形进度条 */
+.q-progress-circle {
+  position: relative;
+  display: inline-block;
+}
+
+.q-progress-circle svg {
+  transform: rotate(-90deg);
+}
+
+.q-progress-circle-track {
+  stroke: var(--q-bg-color-light);
+}
+
+.q-progress-circle-path {
+  stroke: var(--q-primary);
+  stroke-linecap: round;
+}
+
+.q-progress-circle-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--q-font-size);
+  color: var(--q-text-color);
+  text-align: center;
+}
+
+/* 仪表盘进度条 */
+.q-progress-dashboard svg {
+  transform: rotate(calc(-90deg + var(--dashboard-start-angle, -225deg)));
+}
+
+/* 状态样式 */
+.q-progress-success .q-progress-bg,
+.q-progress-success .q-progress-circle-path {
+  background-color: var(--q-success);
+  stroke: var(--q-success);
+}
+
+.q-progress-warning .q-progress-bg,
+.q-progress-warning .q-progress-circle-path {
+  background-color: var(--q-warning);
+  stroke: var(--q-warning);
+}
+
+.q-progress-error .q-progress-bg,
+.q-progress-error .q-progress-circle-path {
+  background-color: var(--q-danger);
+  stroke: var(--q-danger);
+}
+
+/* 量子态样式 */
+@quantum-state hover {
+  .q-progress:hover .q-progress-bg {
+    filter: brightness(105%);
+  }
+  
+  .q-progress:hover .q-progress-circle-path {
+    filter: brightness(105%);
+  }
+}
+
+@quantum-state active {
+  .q-progress:active .q-progress-bg,
+  .q-progress:active .q-progress-circle-path {
+    filter: brightness(95%);
+  }
+}
+
+@quantum-state pulse {
+  .q-progress .q-progress-bg,
+  .q-progress .q-progress-circle-path {
+    animation: q-progress-pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes q-progress-pulse {
+  0% {
+    filter: brightness(100%);
+  }
+  50% {
+    filter: brightness(105%);
+  }
+  100% {
+    filter: brightness(100%);
+  }
 }
 </style>
 
-<script lang="qjs">
+/* 组件脚本 */
+<script>
 export default {
-    name: 'QuantumProgress',
-    props: {
-        percentage: {
-            type: Number,
-            required: true,
-            validator: value => value >= 0 && value <= 100
-        },
-        type: {
-            type: String,
-            default: 'default',
-            validator: value => ['default', 'success', 'warning', 'error'].includes(value)
-        },
-        text: {
-            type: String,
-            default: ''
-        },
-        showInfo: {
-            type: Boolean,
-            default: true
-        }
-    },
-    
-    watch: {
-        percentage: {
-            handler(newVal, oldVal) {
-                if (newVal !== oldVal) {
-                    this.handleProgressChange(newVal);
-                }
-            },
-            immediate: true
-        }
-    },
-    
-    methods: {
-        handleProgressChange(value) {
-            // 启动动画
-            this.animating = true;
-            this.currentValue = value;
-            
-            // 300ms后停止动画
-            setTimeout(() => {
-                this.animating = false;
-            }, 300);
-            
-            // 触发change事件
-            this.$emit('change', value);
-            
-            // 当进度达到100%时触发完成事件
-            if (value === 100) {
-                this.$emit('complete');
-            }
-        }
+  name: 'QProgress',
+  
+  data() {
+    return {
+      currentPercentage: 0
     }
+  },
+  
+  computed: {
+    // 进度条文本内容
+    content() {
+      if (this.format) {
+        return this.format(this.percentage)
+      }
+      return `${this.percentage}%`
+    },
+    
+    // 计算颜色
+    computedColor() {
+      if (this.status !== 'normal') {
+        // 根据状态返回颜色
+        const statusColors = {
+          success: 'var(--q-success)',
+          warning: 'var(--q-warning)',
+          error: 'var(--q-danger)'
+        }
+        return statusColors[this.status]
+      }
+      
+      if (!this.color) {
+        return ''
+      }
+      
+      // 支持函数回调
+      if (typeof this.color === 'function') {
+        return this.color(this.percentage)
+      }
+      
+      // 支持对象形式的渐变色
+      if (typeof this.color === 'object') {
+        const { from = 'var(--q-primary-light)', to = 'var(--q-primary)' } = this.color
+        return `linear-gradient(to right, ${from}, ${to})`
+      }
+      
+      // 字符串颜色
+      return this.color
+    },
+    
+    // 圆形轨道路径
+    trackPath() {
+      const radius = 50 - this.strokeWidth / 2
+      
+      if (this.type === 'dashboard') {
+        // 仪表盘类型使用部分圆弧
+        const startAngle = this.startAngle
+        const endAngle = this.endAngle
+        
+        // 将角度转换为弧度
+        const startRadian = (startAngle * Math.PI) / 180
+        const endRadian = (endAngle * Math.PI) / 180
+        
+        // 计算起点和终点坐标
+        const x1 = 50 + radius * Math.cos(startRadian)
+        const y1 = 50 + radius * Math.sin(startRadian)
+        const x2 = 50 + radius * Math.cos(endRadian)
+        const y2 = 50 + radius * Math.sin(endRadian)
+        
+        // 计算是否是大弧
+        const largeArcFlag = Math.abs(endAngle - startAngle) >= 180 ? 1 : 0
+        
+        // 生成路径
+        return `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`
+      } else {
+        // 圆形类型使用完整圆
+        return `M 50,${50 - radius} a ${radius},${radius} 0 1,1 0,${2 * radius} a ${radius},${radius} 0 1,1 0,-${2 * radius}`
+      }
+    },
+    
+    // 圆形周长
+    perimeter() {
+      const radius = 50 - this.strokeWidth / 2
+      
+      if (this.type === 'dashboard') {
+        // 仪表盘类型使用部分圆弧
+        const startAngle = this.startAngle
+        const endAngle = this.endAngle
+        const totalAngle = endAngle - startAngle
+        
+        // 计算弧长
+        return 2 * Math.PI * radius * (Math.abs(totalAngle) / 360)
+      } else {
+        // 圆形类型使用完整圆
+        return 2 * Math.PI * radius
+      }
+    },
+    
+    // 相对百分比（仪表盘类型的百分比与圆形不同）
+    relativePercentage() {
+      if (this.type === 'dashboard') {
+        // 仪表盘类型转换为0-1之间的值
+        return this.percentage / 100
+      } else {
+        // 圆形类型直接使用百分比
+        return this.percentage / 100
+      }
+    }
+  },
+  
+  watch: {
+    percentage: {
+      handler(val) {
+        // 使用过渡动画
+        if (this.animated) {
+          this.currentPercentage = val
+        } else {
+          this.currentPercentage = val
+        }
+        
+        // 更新量子态
+        this.updateQuantumState(val / 100)
+      },
+      immediate: true
+    }
+  },
+  
+  methods: {
+    // 量子态方法
+    updateQuantumState(progress) {
+      if (!this.quantum.stateAnimation) return
+      
+      const state = progress * this.quantum.entangleStrength
+      
+      // 应用量子态效果
+      if (this.$el) {
+        // 根据进度值调整亮度
+        const brightness = 100 + state * 10
+        this.$el.style.filter = `brightness(${brightness}%)`
+        
+        // 产生脉冲效果
+        if (progress >= 1) {
+          this.$el.classList.add('q-quantum-pulse')
+        } else {
+          this.$el.classList.remove('q-quantum-pulse')
+        }
+      }
+    }
+  },
+  
+  mounted() {
+    this.updateQuantumState(this.percentage / 100)
+  }
 }
 </script> 

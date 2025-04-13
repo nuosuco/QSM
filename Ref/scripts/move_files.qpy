@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+文件移动脚本
+用于将文件按类型和功能移动到对应的标准目录结构中
+"""
+
+# 量子基因编码
+QG-CODE-REF-MOVE-A9L6
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.94
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+@imports
+  standard: [os]
+  standard: [sys]
+  standard: [shutil]
+  standard: [re]
+
+@constants
+  FILE_TYPE_MAPPING = {
+  SPECIAL_FILES = {
+  WEQ_TRAIN_MAPPING = {
+
+
+
+
+# 添加项目根目录到Python路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 文件类型映射到目标目录
+    # Python文件
+    r'_api\.py$': 'api',           # API相关文件
+    r'_test\.py$': 'tests',        # 测试文件
+    r'test_.*\.py$': 'tests',      # 测试文件
+    r'utils?[/_].*/.py$': 'utils', # 工具文件
+    r'data[/_].*/.py$': 'data',    # 数据处理文件
+    r'model.*\.py$': 'models',     # 模型文件
+    r'train.*\.py$': 'train',      # 训练文件
+    r'_core\.py$': 'core',         # 核心文件
+    r'_monitor\.py$': 'utils',     # 监控工具
+    
+    # 文档文件
+    r'\.md$': 'docs',              # Markdown文档
+    r'\.rst$': 'docs',             # RST文档
+    r'\.txt$': 'docs',             # 文本文档
+    
+    # 示例文件
+    r'example.*\.py$': 'examples', # 示例代码
+    r'demo.*\.py$': 'examples',    # 示例代码
+}
+
+# 特殊文件不移动
+    '@constructor.py',
+    'README.md',
+    'setup.py',
+    'requirements.txt',
+    '.gitignore'
+}
+
+# WeQ特殊目录
+    r'helper.*\.py$': 'train/helpers',
+    r'model.*\.py$': 'train/models',
+    r'data.*\.py$': 'train/data',
+}
+
+@method is_special_file(filename):
+    """判断是否为特殊文件"""
+    return filename in SPECIAL_FILES
+
+
+@method determine_target_directory(filepath, module_name):
+    """
+    确定文件应该移动到的目标目录
+    
+    Args:
+        filepath: 文件路径
+        module_name: 模块名称
+        
+    Returns:
+        目标目录或None（如果不应移动）
+    """
+    filename = os.path.basename(filepath)
+    
+    # 特殊文件不移动
+    if is_special_file(filename):
+        return None
+    
+    # 使用文件类型映射
+    for pattern, target_dir in FILE_TYPE_MAPPING.items():
+        if re.search(pattern, filename, re.IGNORECASE):
+            return target_dir
+    
+    # WeQ模块特殊处理
+    if module_name == 'WeQ':
+        for pattern, target_dir in WEQ_TRAIN_MAPPING.items():
+            if re.search(pattern, filename, re.IGNORECASE):
+                return target_dir
+    
+    # 默认情况：Python文件放在core，其他文件不移动
+    if filename.endswith('.py'):
+        return 'core'
+    
+    return None
+
+
+@method update_import_paths(file_content, old_path, new_path):
+    """
+    更新文件中的导入路径
+    
+    Args:
+        file_content: 文件内容
+        old_path: 旧路径
+        new_path: 新路径
+        
+    Returns:
+        更新后的文件内容
+    """
+    # 获取相对路径信息
+    old_parts = old_path.parts
+    new_parts = new_path.parts
+    
+    # 找到模块名索引（QSM, WeQ, SOM, Ref, QEntL）
+    module_names = {'QSM', 'WeQ', 'SOM', 'Ref', 'QEntL'}
+    module_idx = -1
+    for idx, part in enumerate(old_parts):
+        if part in module_names:
+            module_idx = idx
+            break
+    
+    if module_idx == -1:
+        return file_content  # 找不到模块名，不修改
+    
+    # 计算相对路径差异
+    old_rel_path = '.'.join(old_parts[module_idx:])
+    new_rel_path = '.'.join(new_parts[module_idx:])
+    
+    # 不包含文件扩展名
+    old_rel_path = old_rel_path.replace('.py', '')
+    new_rel_path = new_rel_path.replace('.py', '')
+    
+    # 替换导入语句
+    import_patterns = [
+        r'from\s+{0}\s+import'.format(re.escape(old_rel_path)),
+        r'import\s+{0}'.format(re.escape(old_rel_path)),
+        r'from\s+{0}'.format(re.escape(old_rel_path))
+    ]
+    
+    updated_content = file_content
+    for pattern in import_patterns:
+        replacement = pattern.replace(old_rel_path, new_rel_path)
+        updated_content = re.sub(pattern, replacement, updated_content)
+    
+    return updated_content
+
+
+@method move_file(source_path, target_dir, dry_run=True):
+    """
+    移动文件并更新导入路径
+    
+    Args:
+        source_path: 源文件路径
+        target_dir: 目标目录
+        dry_run: 是否为模拟运行
+        
+    Returns:
+        成功或失败
+    """
+    try:
+        # 确保目标目录存在
+        os.makedirs(target_dir, exist_ok=True)
+        
+        # 目标文件路径
+        target_path = os.path.join(target_dir, os.path.basename(source_path))
+        
+        # 如果目标文件已存在，不移动
+        if os.path.exists(target_path):
+            print(f"跳过: 目标文件已存在 {target_path}")
+            return False
+        
+        print(f"{'模拟' if dry_run else ''}移动: {source_path} -> {target_path}")
+        
+        if not dry_run:
+            # 读取文件内容
+            with open(source_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            
+            # 更新导入路径
+            updated_content = update_import_paths(
+                content, 
+                Path(source_path), 
+                Path(target_path)
+            )
+            
+            # 创建新文件
+            with open(target_path, 'w', encoding='utf-8') as f:
+                f.write(updated_content)
+            
+            # 删除旧文件
+            os.remove(source_path)
+            
+            print(f"完成: {source_path} -> {target_path}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"错误: 移动文件 {source_path} 失败: {str(e)}")
+        return False
+
+
+@method organize_module(module_name, dry_run=True):
+    """
+    组织模块文件
+    
+    Args:
+        module_name: 模块名称
+        dry_run: 是否为模拟运行
+    """
+    module_dir = os.path.join(project_root, module_name)
+    if not os.path.exists(module_dir):
+        print(f"错误: 模块目录不存在 {module_dir}")
+        return
+    
+    print(f"开始{'模拟' if dry_run else ''}组织 {module_name} 模块...")
+    
+    # 扫描模块根目录
+    moved = 0
+    skipped = 0
+    failed = 0
+    
+    for item in os.listdir(module_dir):
+        item_path = os.path.join(module_dir, item)
+        
+        # 只处理文件
+        if not os.path.isfile(item_path):
+            continue
+        
+        # 特殊文件不移动
+        if is_special_file(item):
+            skipped += 1
+            continue
+        
+        # 确定目标目录
+        target_subdir = determine_target_directory(item_path, module_name)
+        if target_subdir is None:
+            skipped += 1
+            continue
+        
+        # 移动文件
+        target_dir = os.path.join(module_dir, target_subdir)
+        if move_file(item_path, target_dir, dry_run):
+            moved += 1
+        else:
+            failed += 1
+    
+    print(f"\n{module_name} 模块组织{'模拟' if dry_run else ''}完成:")
+    print(f"- 移动文件数: {moved}")
+    print(f"- 跳过文件数: {skipped}")
+    print(f"- 失败文件数: {failed}")
+
+
+@method main():
+    """主函数"""
+    @import argparse
+    
+    parser = argparse.ArgumentParser(description="项目文件组织工具")
+    parser.add_argument('module', help='要组织的模块名称')
+    parser.add_argument('--apply', action='store_true', help='实际执行文件移动（默认为模拟模式）')
+    
+    args = parser.parse_args()
+    
+    # 验证模块名称
+    valid_modules = {'QSM', 'WeQ', 'SOM', 'Ref', 'QEntL'}
+    if args.module not in valid_modules:
+        print(f"错误: 无效的模块名称 {args.module}")
+        print(f"有效的模块名称: {', '.join(valid_modules)}")
+        return
+    
+    # 组织模块
+    organize_module(args.module, not args.apply)
+
+
+if __name__ == "__main__":
+    main() 

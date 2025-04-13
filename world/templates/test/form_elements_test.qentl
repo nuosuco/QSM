@@ -1,0 +1,406 @@
+# 量子表单元素测试页面
+# 量子基因: QG-TEST-FORM-ELEMENTS-A1B2
+# 量子纠缠: QE-TEST-FORM-ELEMENTS-20240406
+
+@component q-form-elements-test
+@props
+  pageTitle: string = "量子表单元素测试"
+
+@template
+<div class="q-test-container" 
+     data-quantum-entangle='{
+       "id": "form-elements-test-container",
+       "strength": 0.9,
+       "sync": true
+     }'
+>
+    <h1 class="q-test-title">${pageTitle}</h1>
+    
+    <div class="q-test-form">
+        <form @submit.prevent="handleSubmit">
+            <div class="q-form-section">
+                <h2 class="q-form-section-title">个人信息</h2>
+                
+                <div class="q-form-item">
+                    <label class="q-form-label">用户名</label>
+                    <q-input 
+                        name="username"
+                        placeholder="请输入用户名" 
+                        value="${formData.username}"
+                        @input="handleInput('username', $event)"
+                        required
+                        :status="getFieldStatus('username')"
+                    />
+                    <div class="q-form-help">用户名将用于登录和显示</div>
+                </div>
+                
+                <div class="q-form-item">
+                    <label class="q-form-label">电子邮箱</label>
+                    <q-input 
+                        type="email"
+                        name="email"
+                        placeholder="请输入电子邮箱" 
+                        value="${formData.email}"
+                        @input="handleInput('email', $event)"
+                        required
+                        suffix="@"
+                        :status="getFieldStatus('email')"
+                    />
+                </div>
+                
+                <div class="q-form-item">
+                    <label class="q-form-label">密码</label>
+                    <q-input 
+                        type="password"
+                        name="password"
+                        placeholder="请输入密码" 
+                        value="${formData.password}"
+                        @input="handleInput('password', $event)"
+                        required
+                        showPasswordToggle
+                        :status="getFieldStatus('password')"
+                    />
+                    <div class="q-form-help">密码长度至少为8位</div>
+                </div>
+            </div>
+            
+            <div class="q-form-section">
+                <h2 class="q-form-section-title">详细信息</h2>
+                
+                <div class="q-form-item">
+                    <label class="q-form-label">个人简介</label>
+                    <q-textarea 
+                        name="bio"
+                        placeholder="请输入个人简介" 
+                        value="${formData.bio}"
+                        @input="handleInput('bio', $event)"
+                        rows="4"
+                        resize="vertical"
+                        maxlength="200"
+                        showCount
+                        :status="getFieldStatus('bio')"
+                    />
+                </div>
+                
+                <div class="q-form-item">
+                    <label class="q-form-label">联系地址</label>
+                    <q-textarea 
+                        name="address"
+                        placeholder="请输入联系地址" 
+                        value="${formData.address}"
+                        @input="handleInput('address', $event)"
+                        autosize
+                        minRows="2"
+                        maxRows="4"
+                        :status="getFieldStatus('address')"
+                    />
+                </div>
+            </div>
+            
+            <div class="q-form-section">
+                <h2 class="q-form-section-title">量子偏好</h2>
+                
+                <div class="q-form-item">
+                    <label class="q-form-label">首选量子状态</label>
+                    <div class="q-form-input-group">
+                        <q-input 
+                            name="quantumPreference"
+                            placeholder="选择量子状态" 
+                            value="${formData.quantumPreference}"
+                            @input="handleInput('quantumPreference', $event)"
+                            quantumState="entangled"
+                            entangleStrength="0.95"
+                            :status="getFieldStatus('quantumPreference')"
+                        />
+                        <q-input 
+                            disabled
+                            placeholder="纠缠预览" 
+                            value="${formData.quantumPreference}"
+                            quantumState="entangled"
+                        />
+                    </div>
+                    <div class="q-form-help">输入你偏好的量子状态，会实时纠缠显示在右侧</div>
+                </div>
+                
+                <div class="q-form-item">
+                    <label class="q-form-label">量子体验反馈</label>
+                    <q-textarea 
+                        name="feedback"
+                        placeholder="请分享您对量子体验的反馈" 
+                        value="${formData.feedback}"
+                        @input="handleInput('feedback', $event)"
+                        quantumState="superposition"
+                        :status="getFieldStatus('feedback')"
+                    />
+                </div>
+            </div>
+            
+            <div class="q-form-actions">
+                <button type="submit" class="q-btn q-btn-primary" :disabled="isSubmitting">
+                    ${isSubmitting ? '提交中...' : '提交表单'}
+                </button>
+                <button type="button" class="q-btn q-btn-default" @click="resetForm">
+                    重置表单
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="q-test-results" v-if="showResults">
+        <h2 class="q-results-title">表单提交结果</h2>
+        <pre class="q-results-data">${JSON.stringify(formData, null, 2)}</pre>
+    </div>
+</div>
+
+@style
+.q-test-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--q-spacing-6);
+    font-family: var(--q-font-sans);
+}
+
+.q-test-title {
+    text-align: center;
+    color: var(--q-primary);
+    font-size: 1.75rem;
+    margin-bottom: var(--q-spacing-6);
+}
+
+.q-test-form {
+    background-color: var(--q-white);
+    border-radius: var(--q-radius-lg);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    padding: var(--q-spacing-6);
+}
+
+.q-form-section {
+    margin-bottom: var(--q-spacing-6);
+    padding-bottom: var(--q-spacing-6);
+    border-bottom: 1px solid var(--q-gray-200);
+}
+
+.q-form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.q-form-section-title {
+    font-size: 1.25rem;
+    color: var(--q-gray-800);
+    margin-bottom: var(--q-spacing-4);
+}
+
+.q-form-item {
+    margin-bottom: var(--q-spacing-4);
+}
+
+.q-form-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: var(--q-spacing-2);
+    color: var(--q-gray-700);
+}
+
+.q-form-help {
+    font-size: 0.75rem;
+    color: var(--q-gray-500);
+    margin-top: var(--q-spacing-1);
+}
+
+.q-form-input-group {
+    display: flex;
+    gap: var(--q-spacing-3);
+}
+
+.q-form-actions {
+    display: flex;
+    gap: var(--q-spacing-3);
+    margin-top: var(--q-spacing-6);
+}
+
+.q-btn {
+    padding: var(--q-spacing-2) var(--q-spacing-4);
+    border-radius: var(--q-radius-md);
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.q-btn-primary {
+    background-color: var(--q-primary);
+    color: white;
+}
+
+.q-btn-primary:hover {
+    background-color: var(--q-primary-dark);
+}
+
+.q-btn-primary:disabled {
+    background-color: var(--q-gray-400);
+    cursor: not-allowed;
+}
+
+.q-btn-default {
+    background-color: var(--q-gray-200);
+    color: var(--q-gray-800);
+}
+
+.q-btn-default:hover {
+    background-color: var(--q-gray-300);
+}
+
+.q-test-results {
+    margin-top: var(--q-spacing-6);
+    padding: var(--q-spacing-4);
+    background-color: var(--q-gray-100);
+    border-radius: var(--q-radius-md);
+}
+
+.q-results-title {
+    font-size: 1.25rem;
+    color: var(--q-gray-800);
+    margin-bottom: var(--q-spacing-3);
+}
+
+.q-results-data {
+    background-color: var(--q-gray-800);
+    color: var(--q-gray-100);
+    padding: var(--q-spacing-3);
+    border-radius: var(--q-radius-md);
+    font-family: monospace;
+    overflow-x: auto;
+}
+
+@script
+export default {
+    data() {
+        return {
+            formData: {
+                username: '',
+                email: '',
+                password: '',
+                bio: '',
+                address: '',
+                quantumPreference: '',
+                feedback: ''
+            },
+            touched: {},
+            errors: {},
+            isSubmitting: false,
+            showResults: false
+        };
+    },
+    
+    mounted() {
+        // 初始化量子纠缠
+        window.quantumEntangle.addObject('form-elements-test-container');
+    },
+    
+    methods: {
+        handleInput(field, value) {
+            this.formData[field] = value;
+            this.touched[field] = true;
+            this.validateField(field);
+        },
+        
+        validateField(field) {
+            let error = '';
+            
+            switch(field) {
+                case 'username':
+                    if (!this.formData.username) {
+                        error = '用户名不能为空';
+                    } else if (this.formData.username.length < 3) {
+                        error = '用户名长度至少为3个字符';
+                    }
+                    break;
+                    
+                case 'email':
+                    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!this.formData.email) {
+                        error = '电子邮箱不能为空';
+                    } else if (!emailPattern.test(this.formData.email)) {
+                        error = '请输入有效的电子邮箱地址';
+                    }
+                    break;
+                    
+                case 'password':
+                    if (!this.formData.password) {
+                        error = '密码不能为空';
+                    } else if (this.formData.password.length < 8) {
+                        error = '密码长度至少为8个字符';
+                    }
+                    break;
+            }
+            
+            this.errors[field] = error;
+        },
+        
+        getFieldStatus(field) {
+            if (!this.touched[field]) return '';
+            return this.errors[field] ? 'error' : 'success';
+        },
+        
+        validateForm() {
+            const fields = ['username', 'email', 'password'];
+            let isValid = true;
+            
+            fields.forEach(field => {
+                this.validateField(field);
+                if (this.errors[field]) {
+                    isValid = false;
+                }
+            });
+            
+            return isValid;
+        },
+        
+        async handleSubmit() {
+            if (!this.validateForm()) {
+                return;
+            }
+            
+            this.isSubmitting = true;
+            
+            // 模拟提交
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            this.isSubmitting = false;
+            this.showResults = true;
+            
+            // 模拟量子纠缠效果
+            window.quantumEntangle.send('form_submit', {
+                id: 'form-elements-test-container',
+                data: this.formData
+            });
+        },
+        
+        resetForm() {
+            this.formData = {
+                username: '',
+                email: '',
+                password: '',
+                bio: '',
+                address: '',
+                quantumPreference: '',
+                feedback: ''
+            };
+            this.touched = {};
+            this.errors = {};
+            this.showResults = false;
+            
+            // 量子重置效果
+            window.quantumEntangle.send('form_reset', {
+                id: 'form-elements-test-container'
+            });
+        }
+    },
+    
+    beforeDestroy() {
+        // 清理量子纠缠
+        window.quantumEntangle.removeObject('form-elements-test-container');
+    }
+} 

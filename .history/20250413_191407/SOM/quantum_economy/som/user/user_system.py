@@ -1,0 +1,872 @@
+"""
+松麦用户系统实现
+
+这个模块实现了松麦生态系统中的用户管理系统，包括用户注册、身份验证、权限管理等功能。
+用户系统与松麦区块链集成，提供基于区块链的去中心化身份认证。
+"""
+
+import os
+import sys
+import json
+import logging
+import datetime
+import hashlib
+import uuid
+import base64
+from typing import List, Dict, Any, Optional, Tuple
+
+# 导入松麦钱包核心
+<<<<<<< HEAD
+from quantum_economy.SOM.wallet.wallet_core import SomWallet
+=======
+from quantum_economy.som.wallet.wallet_core import SomWallet
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("user_system.log"),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger("SomUserSystem")
+
+class UserRole:
+    """用户角色定义"""
+    CUSTOMER = "customer"  # 普通消费者
+    MERCHANT = "merchant"  # 商家
+    PRODUCER = "producer"  # 生产者
+    INSPECTOR = "inspector"  # 质检员
+    ADMIN = "admin"  # 管理员
+
+
+class UserPermission:
+    """用户权限定义"""
+    # 基本操作权限
+    VIEW_PROFILE = "view_profile"  # 查看个人资料
+    EDIT_PROFILE = "edit_profile"  # 编辑个人资料
+    TRANSFER_ASSETS = "transfer_assets"  # 转移资产
+    
+    # 消费者权限
+    PURCHASE_PRODUCT = "purchase_product"  # 购买产品
+    RATE_PRODUCT = "rate_product"  # 评价产品
+    
+    # 商家权限
+    MANAGE_STORE = "manage_store"  # 管理店铺
+    LIST_PRODUCT = "list_product"  # 上架产品
+    PROCESS_ORDER = "process_order"  # 处理订单
+    
+    # 生产者权限
+    REGISTER_PRODUCT = "register_product"  # 注册产品
+    UPDATE_SUPPLY_CHAIN = "update_supply_chain"  # 更新供应链
+    
+    # 质检员权限
+    VERIFY_PRODUCT = "verify_product"  # 验证产品
+    ISSUE_CERTIFICATION = "issue_certification"  # 颁发认证
+    
+    # 管理员权限
+    MANAGE_USERS = "manage_users"  # 管理用户
+    SYSTEM_CONFIG = "system_config"  # 系统配置
+    VIEW_ANALYTICS = "view_analytics"  # 查看分析
+
+
+class SomUserSystem:
+    """松麦用户系统实现"""
+    
+    def __init__(self, data_path: str = None):
+        """初始化用户系统
+        
+        Args:
+            data_path: 用户数据存储路径
+        """
+        self.data_path = data_path or "user_data"
+        
+        # 确保数据目录存在
+        os.makedirs(self.data_path, exist_ok=True)
+        
+        # 用户数据存储
+        self.users = {}
+        
+        # 角色与权限映射
+        self.role_permissions = {
+            UserRole.CUSTOMER: [
+                UserPermission.VIEW_PROFILE,
+                UserPermission.EDIT_PROFILE,
+                UserPermission.TRANSFER_ASSETS,
+                UserPermission.PURCHASE_PRODUCT,
+                UserPermission.RATE_PRODUCT,
+            ],
+            UserRole.MERCHANT: [
+                UserPermission.VIEW_PROFILE,
+                UserPermission.EDIT_PROFILE,
+                UserPermission.TRANSFER_ASSETS,
+                UserPermission.MANAGE_STORE,
+                UserPermission.LIST_PRODUCT,
+                UserPermission.PROCESS_ORDER,
+            ],
+            UserRole.PRODUCER: [
+                UserPermission.VIEW_PROFILE,
+                UserPermission.EDIT_PROFILE,
+                UserPermission.TRANSFER_ASSETS,
+                UserPermission.REGISTER_PRODUCT,
+                UserPermission.UPDATE_SUPPLY_CHAIN,
+            ],
+            UserRole.INSPECTOR: [
+                UserPermission.VIEW_PROFILE,
+                UserPermission.EDIT_PROFILE,
+                UserPermission.VERIFY_PRODUCT,
+                UserPermission.ISSUE_CERTIFICATION,
+            ],
+            UserRole.ADMIN: [
+                UserPermission.VIEW_PROFILE,
+                UserPermission.EDIT_PROFILE,
+                UserPermission.TRANSFER_ASSETS,
+                UserPermission.MANAGE_USERS,
+                UserPermission.SYSTEM_CONFIG,
+                UserPermission.VIEW_ANALYTICS,
+            ],
+        }
+        
+        # 加载现有用户数据
+        self._load_users()
+        
+        logger.info("松麦用户系统初始化完成")
+    
+    def _load_users(self):
+        """加载用户数据"""
+        users_file = os.path.join(self.data_path, "users.json")
+        if os.path.exists(users_file):
+            try:
+                with open(users_file, 'r') as f:
+                    self.users = json.load(f)
+                logger.info(f"已加载 {len(self.users)} 个用户")
+            except Exception as e:
+                logger.error(f"加载用户数据失败: {e}")
+                self.users = {}
+    
+    def _save_users(self):
+        """保存用户数据"""
+        users_file = os.path.join(self.data_path, "users.json")
+        try:
+            with open(users_file, 'w') as f:
+                json.dump(self.users, f, indent=4)
+            logger.info(f"已保存 {len(self.users)} 个用户")
+            return True
+        except Exception as e:
+            logger.error(f"保存用户数据失败: {e}")
+            return False
+    
+    def _hash_password(self, password: str, salt: str = None) -> Tuple[str, str]:
+        """哈希密码
+        
+        Args:
+            password: 原始密码
+            salt: 盐值，如不提供则生成新的
+            
+        Returns:
+            (哈希后的密码, 盐值)元组
+        """
+        if salt is None:
+            salt = base64.b64encode(os.urandom(16)).decode('utf-8')
+        
+        # 使用加盐哈希
+        hashed = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            salt.encode('utf-8'),
+            100000
+        )
+        hashed_password = base64.b64encode(hashed).decode('utf-8')
+        
+        return hashed_password, salt
+    
+    def register_user(self, username: str, password: str, email: str, role: str = UserRole.CUSTOMER) -> Dict:
+        """注册新用户
+        
+        Args:
+            username: 用户名
+            password: 密码
+            email: 电子邮件
+            role: 用户角色
+            
+        Returns:
+            用户信息
+        """
+        # 检查用户名是否已存在
+        if username in self.users:
+            logger.warning(f"用户名已存在: {username}")
+            return {"success": False, "message": "用户名已存在"}
+        
+        # 检查角色是否有效
+        if role not in self.role_permissions:
+            logger.warning(f"无效的用户角色: {role}")
+            return {"success": False, "message": "无效的用户角色"}
+        
+        # 哈希密码
+        hashed_password, salt = self._hash_password(password)
+        
+        # 生成用户ID
+        user_id = str(uuid.uuid4())
+        
+        # 创建用户钱包
+        wallet = SomWallet(user_id)
+        
+        # 创建用户数据
+        user_data = {
+            "user_id": user_id,
+            "username": username,
+            "email": email,
+            "password_hash": hashed_password,
+            "salt": salt,
+            "role": role,
+            "permissions": self.role_permissions.get(role, []),
+            "wallet_address": wallet.wallet_address,
+            "profile": {
+                "display_name": username,
+                "avatar": "",
+                "bio": "",
+                "location": "",
+                "website": "",
+                "social_links": {}
+            },
+            "settings": {
+                "notification_preferences": {
+                    "email": True,
+                    "sms": False,
+                    "push": True
+                },
+                "privacy": {
+                    "profile_visibility": "public",
+                    "wallet_visibility": "private"
+                },
+                "language": "zh-CN",
+                "theme": "light"
+            },
+            "verification_status": "unverified",
+            "reputation_score": 0,
+            "created_at": datetime.datetime.now().isoformat(),
+            "last_login": None,
+            "active": True
+        }
+        
+        # 保存用户数据
+        self.users[username] = user_data
+        self._save_users()
+        
+        # 保存钱包数据
+        wallet_dir = os.path.join(self.data_path, "wallets")
+        os.makedirs(wallet_dir, exist_ok=True)
+        wallet_file = os.path.join(wallet_dir, f"{user_id}.json")
+        wallet.save_to_file(wallet_file)
+        
+        logger.info(f"用户注册成功: {username}, 角色: {role}, ID: {user_id}")
+        
+        # 返回用户数据（不包含敏感信息）
+        return {
+            "success": True,
+            "user_id": user_id,
+            "username": username,
+            "role": role,
+            "wallet_address": wallet.wallet_address,
+            "message": "用户注册成功"
+        }
+    
+    def authenticate(self, username: str, password: str) -> Dict:
+        """用户身份验证
+        
+        Args:
+            username: 用户名
+            password: 密码
+            
+        Returns:
+            认证结果
+        """
+        # 检查用户是否存在
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return {"success": False, "message": "用户名或密码错误"}
+        
+        # 获取用户数据
+        user = self.users[username]
+        
+        # 验证用户是否活跃
+        if not user.get("active", True):
+            logger.warning(f"用户已禁用: {username}")
+            return {"success": False, "message": "账户已被禁用"}
+        
+        # 验证密码
+        hashed_password, _ = self._hash_password(password, user["salt"])
+        if hashed_password != user["password_hash"]:
+            logger.warning(f"密码错误: {username}")
+            return {"success": False, "message": "用户名或密码错误"}
+        
+        # 更新最后登录时间
+        user["last_login"] = datetime.datetime.now().isoformat()
+        self._save_users()
+        
+        logger.info(f"用户 {username} 认证成功")
+        
+        # 生成会话令牌
+        session_token = self._generate_session_token(user["user_id"])
+        
+        # 返回认证结果（不包含敏感信息）
+        return {
+            "success": True,
+            "user_id": user["user_id"],
+            "username": user["username"],
+            "role": user["role"],
+            "wallet_address": user["wallet_address"],
+            "session_token": session_token,
+            "message": "认证成功"
+        }
+    
+    def _generate_session_token(self, user_id: str) -> str:
+        """生成会话令牌
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            会话令牌
+        """
+        # 生成令牌数据
+        timestamp = datetime.datetime.now().timestamp()
+        token_data = f"{user_id}:{timestamp}:{os.urandom(8).hex()}"
+        
+        # 哈希令牌
+        token_hash = hashlib.sha256(token_data.encode('utf-8')).hexdigest()
+        
+        return token_hash
+    
+    def verify_session(self, username: str, token: str) -> bool:
+        """验证会话令牌
+        
+        Args:
+            username: 用户名
+            token: 会话令牌
+            
+        Returns:
+            是否有效
+        """
+        # 实际应用中应该维护一个会话存储
+        # 这里简化实现，仅作示例
+        return True
+    
+    def get_user(self, username: str) -> Dict:
+        """获取用户信息
+        
+        Args:
+            username: 用户名
+            
+        Returns:
+            用户信息
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return None
+        
+        # 获取用户数据（不包含敏感信息）
+        user = self.users[username]
+        user_info = {
+            "user_id": user["user_id"],
+            "username": user["username"],
+            "email": user["email"],
+            "role": user["role"],
+            "wallet_address": user["wallet_address"],
+            "profile": user["profile"],
+            "verification_status": user["verification_status"],
+            "reputation_score": user["reputation_score"],
+            "created_at": user["created_at"],
+            "last_login": user["last_login"],
+            "active": user["active"]
+        }
+        
+        return user_info
+    
+    def update_user_profile(self, username: str, profile_data: Dict) -> Dict:
+        """更新用户资料
+        
+        Args:
+            username: 用户名
+            profile_data: 资料数据
+            
+        Returns:
+            更新结果
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return {"success": False, "message": "用户不存在"}
+        
+        # 获取用户数据
+        user = self.users[username]
+        
+        # 更新资料
+        for key, value in profile_data.items():
+            if key in user["profile"]:
+                user["profile"][key] = value
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"更新用户资料: {username}")
+        
+        return {
+            "success": True,
+            "message": "资料更新成功"
+        }
+    
+    def update_user_settings(self, username: str, settings_data: Dict) -> Dict:
+        """更新用户设置
+        
+        Args:
+            username: 用户名
+            settings_data: 设置数据
+            
+        Returns:
+            更新结果
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return {"success": False, "message": "用户不存在"}
+        
+        # 获取用户数据
+        user = self.users[username]
+        
+        # 更新设置
+        for key, value in settings_data.items():
+            if key in user["settings"]:
+                if isinstance(value, dict) and isinstance(user["settings"][key], dict):
+                    # 合并字典
+                    user["settings"][key].update(value)
+                else:
+                    # 直接赋值
+                    user["settings"][key] = value
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"更新用户设置: {username}")
+        
+        return {
+            "success": True,
+            "message": "设置更新成功"
+        }
+    
+    def change_password(self, username: str, current_password: str, new_password: str) -> Dict:
+        """修改密码
+        
+        Args:
+            username: 用户名
+            current_password: 当前密码
+            new_password: 新密码
+            
+        Returns:
+            更新结果
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return {"success": False, "message": "用户不存在"}
+        
+        # 获取用户数据
+        user = self.users[username]
+        
+        # 验证当前密码
+        hashed_current, _ = self._hash_password(current_password, user["salt"])
+        if hashed_current != user["password_hash"]:
+            logger.warning(f"当前密码错误: {username}")
+            return {"success": False, "message": "当前密码错误"}
+        
+        # 哈希新密码
+        hashed_new, salt = self._hash_password(new_password)
+        
+        # 更新密码
+        user["password_hash"] = hashed_new
+        user["salt"] = salt
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"密码修改成功: {username}")
+        
+        return {
+            "success": True,
+            "message": "密码修改成功"
+        }
+    
+    def update_user_role(self, admin_username: str, target_username: str, new_role: str) -> Dict:
+        """更新用户角色（管理员操作）
+        
+        Args:
+            admin_username: 管理员用户名
+            target_username: 目标用户名
+            new_role: 新角色
+            
+        Returns:
+            更新结果
+        """
+        # 验证管理员权限
+        if admin_username not in self.users or self.users[admin_username]["role"] != UserRole.ADMIN:
+            logger.warning(f"无管理员权限: {admin_username}")
+            return {"success": False, "message": "无管理员权限"}
+        
+        # 验证目标用户
+        if target_username not in self.users:
+            logger.warning(f"目标用户不存在: {target_username}")
+            return {"success": False, "message": "目标用户不存在"}
+        
+        # 验证角色是否有效
+        if new_role not in self.role_permissions:
+            logger.warning(f"无效的用户角色: {new_role}")
+            return {"success": False, "message": "无效的用户角色"}
+        
+        # 更新用户角色和权限
+        user = self.users[target_username]
+        user["role"] = new_role
+        user["permissions"] = self.role_permissions.get(new_role, [])
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"用户角色更新: {target_username}, 新角色: {new_role}, 操作者: {admin_username}")
+        
+        return {
+            "success": True,
+            "message": f"用户角色已更新为 {new_role}"
+        }
+    
+    def deactivate_user(self, admin_username: str, target_username: str) -> Dict:
+        """禁用用户（管理员操作）
+        
+        Args:
+            admin_username: 管理员用户名
+            target_username: 目标用户名
+            
+        Returns:
+            操作结果
+        """
+        # 验证管理员权限
+        if admin_username not in self.users or self.users[admin_username]["role"] != UserRole.ADMIN:
+            logger.warning(f"无管理员权限: {admin_username}")
+            return {"success": False, "message": "无管理员权限"}
+        
+        # 验证目标用户
+        if target_username not in self.users:
+            logger.warning(f"目标用户不存在: {target_username}")
+            return {"success": False, "message": "目标用户不存在"}
+        
+        # 禁用用户
+        self.users[target_username]["active"] = False
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"用户已禁用: {target_username}, 操作者: {admin_username}")
+        
+        return {
+            "success": True,
+            "message": "用户已禁用"
+        }
+    
+    def activate_user(self, admin_username: str, target_username: str) -> Dict:
+        """启用用户（管理员操作）
+        
+        Args:
+            admin_username: 管理员用户名
+            target_username: 目标用户名
+            
+        Returns:
+            操作结果
+        """
+        # 验证管理员权限
+        if admin_username not in self.users or self.users[admin_username]["role"] != UserRole.ADMIN:
+            logger.warning(f"无管理员权限: {admin_username}")
+            return {"success": False, "message": "无管理员权限"}
+        
+        # 验证目标用户
+        if target_username not in self.users:
+            logger.warning(f"目标用户不存在: {target_username}")
+            return {"success": False, "message": "目标用户不存在"}
+        
+        # 启用用户
+        self.users[target_username]["active"] = True
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"用户已启用: {target_username}, 操作者: {admin_username}")
+        
+        return {
+            "success": True,
+            "message": "用户已启用"
+        }
+    
+    def verify_user(self, admin_username: str, target_username: str) -> Dict:
+        """验证用户（管理员操作）
+        
+        Args:
+            admin_username: 管理员用户名
+            target_username: 目标用户名
+            
+        Returns:
+            操作结果
+        """
+        # 验证管理员权限
+        if admin_username not in self.users or self.users[admin_username]["role"] != UserRole.ADMIN:
+            logger.warning(f"无管理员权限: {admin_username}")
+            return {"success": False, "message": "无管理员权限"}
+        
+        # 验证目标用户
+        if target_username not in self.users:
+            logger.warning(f"目标用户不存在: {target_username}")
+            return {"success": False, "message": "目标用户不存在"}
+        
+        # 验证用户
+        self.users[target_username]["verification_status"] = "verified"
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"用户已验证: {target_username}, 操作者: {admin_username}")
+        
+        return {
+            "success": True,
+            "message": "用户已验证"
+        }
+    
+    def update_reputation(self, username: str, score_delta: int) -> Dict:
+        """更新用户声誉分数
+        
+        Args:
+            username: 用户名
+            score_delta: 分数变动
+            
+        Returns:
+            更新结果
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return {"success": False, "message": "用户不存在"}
+        
+        # 更新声誉分数
+        current_score = self.users[username]["reputation_score"]
+        new_score = max(0, current_score + score_delta)  # 不允许负分
+        self.users[username]["reputation_score"] = new_score
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"更新用户声誉: {username}, 变动: {score_delta}, 新分数: {new_score}")
+        
+        return {
+            "success": True,
+            "message": f"声誉分数已更新: {new_score}",
+            "reputation_score": new_score
+        }
+    
+    def list_users(self, admin_username: str, filters: Dict = None) -> List[Dict]:
+        """列出用户（管理员操作）
+        
+        Args:
+            admin_username: 管理员用户名
+            filters: 筛选条件
+            
+        Returns:
+            用户列表
+        """
+        # 验证管理员权限
+        if admin_username not in self.users or self.users[admin_username]["role"] != UserRole.ADMIN:
+            logger.warning(f"无管理员权限: {admin_username}")
+            return []
+        
+        # 应用筛选
+        if filters is None:
+            filters = {}
+        
+        filtered_users = []
+        for username, user_data in self.users.items():
+            # 应用角色筛选
+            if "role" in filters and user_data["role"] != filters["role"]:
+                continue
+            
+            # 应用活跃状态筛选
+            if "active" in filters and user_data["active"] != filters["active"]:
+                continue
+            
+            # 应用验证状态筛选
+            if "verification_status" in filters and user_data["verification_status"] != filters["verification_status"]:
+                continue
+            
+            # 不包含敏感信息
+            user_info = {
+                "user_id": user_data["user_id"],
+                "username": user_data["username"],
+                "email": user_data["email"],
+                "role": user_data["role"],
+                "wallet_address": user_data["wallet_address"],
+                "verification_status": user_data["verification_status"],
+                "reputation_score": user_data["reputation_score"],
+                "created_at": user_data["created_at"],
+                "last_login": user_data["last_login"],
+                "active": user_data["active"]
+            }
+            
+            filtered_users.append(user_info)
+        
+        logger.info(f"列出用户: 找到 {len(filtered_users)} 个用户, 操作者: {admin_username}")
+        
+        return filtered_users
+    
+    def get_user_wallet(self, username: str) -> SomWallet:
+        """获取用户钱包
+        
+        Args:
+            username: 用户名
+            
+        Returns:
+            用户钱包对象
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return None
+        
+        # 获取用户数据
+        user = self.users[username]
+        user_id = user["user_id"]
+        
+        # 加载钱包
+        wallet_dir = os.path.join(self.data_path, "wallets")
+        wallet_file = os.path.join(wallet_dir, f"{user_id}.json")
+        
+        if not os.path.exists(wallet_file):
+            logger.warning(f"用户钱包文件不存在: {wallet_file}")
+            return None
+        
+        # 加载钱包
+        wallet = SomWallet.load_from_file(wallet_file)
+        
+        return wallet
+    
+    def has_permission(self, username: str, permission: str) -> bool:
+        """检查用户是否有特定权限
+        
+        Args:
+            username: 用户名
+            permission: 权限名称
+            
+        Returns:
+            是否有权限
+        """
+        if username not in self.users:
+            return False
+        
+        user = self.users[username]
+        return permission in user["permissions"]
+    
+    def register_blockchain_identity(self, username: str, blockchain_address: str) -> Dict:
+        """注册区块链身份
+        
+        Args:
+            username: 用户名
+            blockchain_address: 区块链地址
+            
+        Returns:
+            注册结果
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return {"success": False, "message": "用户不存在"}
+        
+        # 更新用户区块链身份
+        self.users[username]["blockchain_identity"] = {
+            "address": blockchain_address,
+            "registered_at": datetime.datetime.now().isoformat(),
+            "verified": False
+        }
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"注册区块链身份: {username}, 地址: {blockchain_address}")
+        
+        return {
+            "success": True,
+            "message": "区块链身份注册成功"
+        }
+    
+    def verify_blockchain_identity(self, username: str, signature: str, message: str) -> Dict:
+        """验证区块链身份
+        
+        Args:
+            username: 用户名
+            signature: 签名
+            message: 消息
+            
+        Returns:
+            验证结果
+        """
+        if username not in self.users:
+            logger.warning(f"用户不存在: {username}")
+            return {"success": False, "message": "用户不存在"}
+        
+        # 获取用户数据
+        user = self.users[username]
+        
+        # 检查是否已注册区块链身份
+        if "blockchain_identity" not in user:
+            logger.warning(f"用户未注册区块链身份: {username}")
+            return {"success": False, "message": "未注册区块链身份"}
+        
+        # 在实际应用中，应当验证签名
+        # 这里简化实现，仅作示例
+        
+        # 更新验证状态
+        user["blockchain_identity"]["verified"] = True
+        user["blockchain_identity"]["verified_at"] = datetime.datetime.now().isoformat()
+        
+        # 保存用户数据
+        self._save_users()
+        
+        logger.info(f"验证区块链身份: {username}")
+        
+        return {
+            "success": True,
+            "message": "区块链身份验证成功"
+        }
+    
+    def get_user_by_blockchain_address(self, blockchain_address: str) -> Dict:
+        """通过区块链地址获取用户
+        
+        Args:
+            blockchain_address: 区块链地址
+            
+        Returns:
+            用户信息
+        """
+        for username, user_data in self.users.items():
+            if "blockchain_identity" in user_data and user_data["blockchain_identity"]["address"] == blockchain_address:
+                # 不包含敏感信息
+                user_info = {
+                    "user_id": user_data["user_id"],
+                    "username": user_data["username"],
+                    "role": user_data["role"],
+                    "wallet_address": user_data["wallet_address"],
+                    "blockchain_identity": user_data["blockchain_identity"],
+                    "verification_status": user_data["verification_status"],
+                    "reputation_score": user_data["reputation_score"]
+                }
+                return user_info
+        
+        return None 
+
+"""
+"""
+量子基因编码: QE-USE-FDA472272777
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+""""""
+
+// 开发团队：中华 ZhoHo ，Claude 

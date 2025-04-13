@@ -1,0 +1,446 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+QSM工具函数模块
+提供量子自组织映射社交模型的工具函数
+"""
+
+# 量子基因编码
+QG-UTILS-QSM-SOCIAL-U4T7
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-UTILS-QSM-20240501
+  state: ACTIVE
+  strength: 0.97
+  objects: [
+    "QSM/models/qsm_model.qentl",
+    "QSM/api/qsm_api.qentl"
+  ]
+
+@imports
+  standard: [os, json, logging, datetime, time, math, random]
+  quantum: [Dict, List, Tuple, Any, Optional, Union, Path]
+  quantum_numpy: [numpy as np]
+  quantum_vis: [matplotlib]
+  quantum_internal: [
+    "../models/qsm_model.qentl" as qsm_model
+  ]
+
+@constants
+  ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+  LOG_DIR = ROOT_DIR / 'logs'
+  DATA_DIR = ROOT_DIR / 'data'
+  
+  # 颜色常量
+  COLORS = {
+    'PRIMARY': '#3366CC',
+    'SECONDARY': '#DC3912',
+    'SUCCESS': '#109618',
+    'INFO': '#3366CC',
+    'WARNING': '#FF9900',
+    'DANGER': '#DC3912',
+    'LIGHT': '#F2F2F2',
+    'DARK': '#333333'
+  }
+  
+  # 默认可视化参数
+  VIZ_PARAMS = {
+    'node_size': 300,
+    'edge_width': 1.5,
+    'font_size': 10,
+    'alpha': 0.8,
+    'width': 800,
+    'height': 600,
+    'margin': 50
+  }
+
+@initialization
+  # 配置日志
+  LOG_DIR.mkdir(exist_ok=True)
+  DATA_DIR.mkdir(exist_ok=True, parents=True)
+  
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+    handlers=[
+      logging.FileHandler(LOG_DIR / f'qsm_utils_{datetime.datetime.now().strftime("%Y%m%d")}.log'),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('QSM-UTILS')
+
+@function generate_feature_vector(dimension: int = 8, min_val: float = 0.0, max_val: float = 1.0) -> np.ndarray:
+  """生成随机特征向量
+  
+  Args:
+      dimension: 向量维度
+      min_val: 最小值
+      max_val: 最大值
+      
+  Returns:
+      特征向量
+  """
+  return np.random.uniform(min_val, max_val, dimension)
+
+@function generate_user_features(
+                            user_count: int, 
+                            dimension: int = 8, 
+                            min_val: float = 0.0, 
+                            max_val: float = 1.0,
+                            prefix: str = "user_") -> Dict[str, np.ndarray]:
+  """生成随机用户特征
+  
+  Args:
+      user_count: 用户数量
+      dimension: 特征向量维度
+      min_val: 特征最小值
+      max_val: 特征最大值
+      prefix: 用户ID前缀
+      
+  Returns:
+      用户特征字典 {user_id: feature_vector}
+  """
+  user_features = {}
+  
+  for i in range(user_count):
+    user_id = f"{prefix}{i}"
+    user_features[user_id] = generate_feature_vector(dimension, min_val, max_val)
+    
+  return user_features
+
+@function generate_random_connections(
+                                user_ids: List[str], 
+                                connection_probability: float = 0.3,
+                                bidirectional: bool = True) -> Dict[str, List[str]]:
+  """生成随机用户连接
+  
+  Args:
+      user_ids: 用户ID列表
+      connection_probability: 连接概率
+      bidirectional: 是否双向连接
+      
+  Returns:
+      用户连接字典 {user_id: [connected_user_ids]}
+  """
+  connections = {user_id: [] for user_id in user_ids}
+  
+  for i, user1 in enumerate(user_ids):
+    for j, user2 in enumerate(user_ids[i+1:], i+1):
+      if random.random() < connection_probability:
+        connections[user1].append(user2)
+        
+        if bidirectional:
+          connections[user2].append(user1)
+          
+  return connections
+
+@function calculate_network_metrics(connections: Dict[str, List[str]]) -> Dict[str, Any]:
+  """计算网络指标
+  
+  Args:
+      connections: 用户连接字典 {user_id: [connected_user_ids]}
+      
+  Returns:
+      网络指标字典
+  """
+  # 用户数量
+  user_count = len(connections)
+  
+  # 连接总数
+  connection_count = sum(len(targets) for targets in connections.values())
+  if connection_count % 2 == 0 and connection_count > 0:
+    # 如果是双向连接，实际连接数是一半
+    connection_count //= 2
+  
+  # 计算每个用户的连接数
+  degree = {user_id: len(targets) for user_id, targets in connections.items()}
+  
+  # 平均连接数
+  avg_degree = sum(degree.values()) / user_count if user_count > 0 else 0
+  
+  # 密度 (实际连接数 / 可能的最大连接数)
+  max_connections = user_count * (user_count - 1) / 2
+  density = connection_count / max_connections if max_connections > 0 else 0
+  
+  # 中心性 - 简单度中心性 (normalized)
+  degree_centrality = {
+    user_id: deg / (user_count - 1) if user_count > 1 else 0
+    for user_id, deg in degree.items()
+  }
+  
+  # 找出中心用户 (连接数最多的)
+  central_users = sorted(degree.items(), key=lambda x: x[1], reverse=True)[:min(3, user_count)]
+  
+  return {
+    'user_count': user_count,
+    'connection_count': connection_count,
+    'average_degree': avg_degree,
+    'density': density,
+    'degree_centrality': degree_centrality,
+    'central_users': [{'user_id': u[0], 'degree': u[1]} for u in central_users],
+    'timestamp': datetime.datetime.now().isoformat(),
+    'quantum_signature': f"QS-METRICS-{int(time.time())}"
+  }
+
+@function export_network_data(
+                         user_features: Dict[str, np.ndarray], 
+                         connections: Dict[str, List[str]],
+                         model: Optional[qsm_model.QSMModel] = None,
+                         filepath: Optional[str] = None) -> str:
+  """导出网络数据
+  
+  Args:
+      user_features: 用户特征字典
+      connections: 用户连接字典
+      model: QSM模型实例（可选）
+      filepath: 导出文件路径（可选）
+      
+  Returns:
+      导出文件路径
+  """
+  if filepath is None:
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(DATA_DIR, f'network_data_{timestamp}.json')
+  
+  # 准备导出数据
+  export_data = {
+    'metadata': {
+      'timestamp': datetime.datetime.now().isoformat(),
+      'user_count': len(user_features),
+      'connection_count': sum(len(targets) for targets in connections.values()),
+    },
+    'features': {
+      user_id: features.tolist() for user_id, features in user_features.items()
+    },
+    'connections': connections
+  }
+  
+  # 如果提供了模型，添加模型信息
+  if model is not None:
+    export_data['model'] = model.to_dict()
+    
+    # 添加关系分析
+    export_data['relationships'] = model.analyze_relationships(user_features)
+  
+  # 确保目录存在
+  os.makedirs(os.path.dirname(filepath), exist_ok=True)
+  
+  # 导出数据
+  with open(filepath, 'w', encoding='utf-8') as f:
+    json.dump(export_data, f, ensure_ascii=False, indent=2)
+    
+  logger.info(f"网络数据已导出到: {filepath}")
+  return filepath
+
+@function import_network_data(filepath: str) -> Dict[str, Any]:
+  """导入网络数据
+  
+  Args:
+      filepath: 数据文件路径
+      
+  Returns:
+      导入的数据
+  """
+  try:
+    with open(filepath, 'r', encoding='utf-8') as f:
+      data = json.load(f)
+    
+    # 将特征列表转换回numpy数组
+    if 'features' in data:
+      data['features'] = {
+        user_id: np.array(features) 
+        for user_id, features in data['features'].items()
+      }
+    
+    logger.info(f"从{filepath}导入网络数据")
+    return data
+    
+  except Exception as e:
+    logger.error(f"导入网络数据出错: {str(e)}")
+    raise
+
+@function convert_to_visualization_format(
+                                     user_features: Dict[str, np.ndarray],
+                                     connections: Dict[str, List[str]],
+                                     model: qsm_model.QSMModel) -> Dict[str, Any]:
+  """转换为可视化格式
+  
+  Args:
+      user_features: 用户特征字典
+      connections: 用户连接字典
+      model: QSM模型实例
+      
+  Returns:
+      可视化数据
+  """
+  return model.visualize_network(user_features, connections)
+
+@function generate_test_dataset(
+                           user_count: int = 20, 
+                           feature_dim: int = 8,
+                           connection_probability: float = 0.3) -> Dict[str, Any]:
+  """生成测试数据集
+  
+  Args:
+      user_count: 用户数量
+      feature_dim: 特征维度
+      connection_probability: 连接概率
+      
+  Returns:
+      测试数据集
+  """
+  # 生成用户特征
+  user_features = generate_user_features(user_count, feature_dim)
+  
+  # 获取用户ID列表
+  user_ids = list(user_features.keys())
+  
+  # 生成随机连接
+  connections = generate_random_connections(user_ids, connection_probability)
+  
+  # 计算网络指标
+  metrics = calculate_network_metrics(connections)
+  
+  # 创建数据集
+  dataset = {
+    'user_features': user_features,
+    'connections': connections,
+    'metrics': metrics,
+    'metadata': {
+      'user_count': user_count,
+      'feature_dim': feature_dim,
+      'connection_probability': connection_probability,
+      'timestamp': datetime.datetime.now().isoformat(),
+      'quantum_signature': f"QS-DATASET-{int(time.time())}"
+    }
+  }
+  
+  return dataset
+
+@function validate_user_features(user_features: Dict[str, Any]) -> Tuple[bool, str]:
+  """验证用户特征数据
+  
+  Args:
+      user_features: 用户特征字典
+      
+  Returns:
+      (是否有效, 错误信息)
+  """
+  if not user_features:
+    return False, "用户特征为空"
+  
+  # 检查所有特征向量维度是否一致
+  dimensions = set()
+  
+  for user_id, features in user_features.items():
+    if not isinstance(features, (list, np.ndarray)):
+      return False, f"用户 {user_id} 的特征不是向量格式"
+    
+    # 获取维度
+    dim = len(features)
+    dimensions.add(dim)
+    
+    # 检查值是否有效
+    if isinstance(features, list):
+      for val in features:
+        if not isinstance(val, (int, float)):
+          return False, f"用户 {user_id} 的特征向量包含非数值元素"
+    
+  # 检查维度是否一致
+  if len(dimensions) > 1:
+    return False, f"特征向量维度不一致: {dimensions}"
+  
+  return True, ""
+
+@function validate_connections(connections: Dict[str, List[str]], user_ids: List[str]) -> Tuple[bool, str]:
+  """验证用户连接数据
+  
+  Args:
+      connections: 用户连接字典
+      user_ids: 有效的用户ID列表
+      
+  Returns:
+      (是否有效, 错误信息)
+  """
+  if not connections:
+    return True, ""  # 空连接是有效的
+  
+  # 转为集合加速查询
+  valid_users = set(user_ids)
+  
+  # 检查每个连接
+  for user_id, targets in connections.items():
+    if user_id not in valid_users:
+      return False, f"无效的用户ID: {user_id}"
+    
+    if not isinstance(targets, list):
+      return False, f"用户 {user_id} 的连接不是列表格式"
+    
+    for target in targets:
+      if target not in valid_users:
+        return False, f"用户 {user_id} 有连接到无效用户: {target}"
+      
+      if target == user_id:
+        return False, f"用户 {user_id} 有自我连接"
+  
+  return True, ""
+
+@function find_communities(connections: Dict[str, List[str]]) -> Dict[int, List[str]]:
+  """查找社区
+  
+  使用简单的标签传播算法查找社区
+  
+  Args:
+      connections: 用户连接字典
+      
+  Returns:
+      社区字典 {community_id: [user_ids]}
+  """
+  # 用户列表
+  users = list(connections.keys())
+  
+  # 初始化标签(每个用户初始为自己的社区)
+  labels = {user: i for i, user in enumerate(users)}
+  
+  # 迭代传播标签
+  max_iterations = 10
+  for _ in range(max_iterations):
+    # 记录是否有变化
+    changed = False
+    
+    # 随机顺序处理用户
+    random_users = users.copy()
+    random.shuffle(random_users)
+    
+    for user in random_users:
+      # 收集邻居的标签
+      neighbor_labels = {}
+      
+      for neighbor in connections.get(user, []):
+        label = labels.get(neighbor)
+        if label is not None:
+          neighbor_labels[label] = neighbor_labels.get(label, 0) + 1
+      
+      # 如果有邻居，选择最常见的标签
+      if neighbor_labels:
+        most_common_label = max(neighbor_labels.items(), key=lambda x: x[1])[0]
+        
+        # 如果标签变化，记录变化
+        if labels[user] != most_common_label:
+          labels[user] = most_common_label
+          changed = True
+    
+    # 如果没有变化，提前结束
+    if not changed:
+      break
+  
+  # 将结果转换为社区格式
+  communities = {}
+  for user, label in labels.items():
+    if label not in communities:
+      communities[label] = []
+    communities[label].append(user)
+  
+  return communities 

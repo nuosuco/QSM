@@ -1,0 +1,165 @@
+/* 量子基因编码 */
+QG-COMP-GRID-UI-LAYOUT-A1B1
+
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.8,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-layout.qcss"
+  ]
+}
+
+/* 组件定义 */
+@component QuantumGrid {
+  /* 属性定义 */
+  props: {
+    columns: {
+      type: Number,
+      default: 12
+    },
+    gap: {
+      type: String,
+      default: "16px"
+    },
+    rowGap: {
+      type: String,
+      default: null
+    },
+    columnGap: {
+      type: String,
+      default: null
+    },
+    justify: {
+      type: String,
+      default: "start",
+      values: ["start", "end", "center", "space-around", "space-between", "space-evenly"]
+    },
+    align: {
+      type: String,
+      default: "stretch",
+      values: ["start", "end", "center", "stretch", "baseline"]
+    }
+  }
+
+  /* 容器模板 */
+  template: {
+    <div class="q-grid" :style="gridStyle">
+      <slot></slot>
+    </div>
+  }
+
+  /* 子组件定义 */
+  @component QuantumGridItem {
+    props: {
+      span: {
+        type: Number,
+        default: 1
+      },
+      offset: {
+        type: Number,
+        default: 0
+      },
+      xs: {
+        type: [Number, Object],
+        default: null
+      },
+      sm: {
+        type: [Number, Object],
+        default: null
+      },
+      md: {
+        type: [Number, Object],
+        default: null
+      },
+      lg: {
+        type: [Number, Object],
+        default: null
+      },
+      xl: {
+        type: [Number, Object],
+        default: null
+      }
+    }
+
+    template: {
+      <div class="q-grid-item" :style="itemStyle">
+        <slot></slot>
+      </div>
+    }
+  }
+
+  /* 样式定义 */
+  styles: {
+    .q-grid {
+      display: grid;
+      width: 100%;
+      transition: all 0.3s;
+      
+      /* 量子态样式 */
+      @quantum-state hover {
+        grid-gap: calc(@gap * 1.1);
+      }
+      
+      @quantum-state active {
+        grid-gap: calc(@gap * 0.9);
+      }
+    }
+
+    .q-grid-item {
+      min-width: 0;
+      transition: all 0.3s;
+      
+      /* 量子态样式 */
+      @quantum-state hover {
+        transform: scale(1.02);
+      }
+      
+      @quantum-state active {
+        transform: scale(0.98);
+      }
+    }
+
+    /* 响应式布局 */
+    @media (max-width: 576px) {
+      .q-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    @media (min-width: 576px) {
+      .q-grid {
+        grid-template-columns: repeat(8, 1fr);
+      }
+    }
+
+    @media (min-width: 992px) {
+      .q-grid {
+        grid-template-columns: repeat(12, 1fr);
+      }
+    }
+
+    @media (min-width: 1200px) {
+      .q-grid {
+        grid-template-columns: repeat(16, 1fr);
+      }
+    }
+  }
+
+  /* 脚本定义 */
+  script: {
+    computed: {
+      gridStyle() {
+        return {
+          gridTemplateColumns: `repeat(${this.columns}, 1fr)`,
+          gap: this.gap,
+          rowGap: this.rowGap,
+          columnGap: this.columnGap,
+          justifyContent: this.justify,
+          alignItems: this.align
+        }
+      }
+    }
+  }
+} 

@@ -1,0 +1,516 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+量子管理器 - 项目集中管理与优化工具
+
+此脚本提供了以下功能：
+- 项目结构管理：分析并优化项目结构
+- 量子转换：将普通代码转换为量子格式(.py -> .qpy等)
+- 量子纠缠管理：管理项目中的量子纠缠关系
+- 性能监控：监控量子组件性能
+- 依赖分析：分析并可视化项目依赖关系
+- 自动化测试：为量子组件生成测试用例
+"""
+
+# 量子基因编码
+QG-TOOL-SCRIPTS-MANAGER-M5K7
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-TOOL-SCRIPTS-20250413
+  state: ACTIVE
+  strength: 0.98
+  objects: [
+    "scripts/utils/quantum_converter.qpy",
+    "scripts/utils/move_to_reference.qpy",
+    "scripts/utils/convert_to_qentl.qpy"
+  ]
+
+
+@imports
+  standard: [os]
+  standard: [sys]
+  standard: [re]
+  standard: [json]
+  standard: [shutil]
+  standard: [logging]
+  standard: [argparse]
+  standard: [datetime]
+  standard: [time]
+  standard: [subprocess]
+  standard: [importlib]
+  from: [pathlib, Path]
+  from: [typing, List, Dict, Tuple, Optional, Union, Any]
+  from: [multiprocessing, Pool, cpu_count]
+
+
+# 目录设置
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_DIR = os.path.join(ROOT_DIR, '.logs')
+REFERENCE_DIR = os.path.join(ROOT_DIR, 'reference')
+HISTORY_DIR = os.path.join(ROOT_DIR, '.history')
+REPORTS_DIR = os.path.join(ROOT_DIR, '.reports')
+
+# 确保目录存在
+for directory in [LOG_DIR, REFERENCE_DIR, HISTORY_DIR, REPORTS_DIR]:
+    os.makedirs(directory, exist_ok=True)
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join(LOG_DIR, 'quantum_manager.log')),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger('Quantum-Manager')
+
+# 项目模块列表
+PROJECT_MODULES = [
+    "QSM",      # 量子超位态模型
+    "WeQ",      # 量子社交引擎
+    "SOM",      # 量子自组织市场
+    "Ref",      # 量子自反省管理
+    "world",    # 世界服务
+    "scripts",  # 脚本工具
+]
+
+# ============================== 工具功能导入 ==============================
+
+@method import_util(util_name):
+    """动态导入工具模块
+    
+    Args:
+        util_name: 工具名称
+        
+    Returns:
+        module: 导入的模块对象，如果失败则返回None
+    """
+    try:
+        # 尝试导入量子版本
+        module_path = f"scripts.utils.{util_name}"
+        return importlib.import_module(module_path)
+    except ImportError as e:
+        logger.warning(f"无法导入量子版本的工具 {util_name}: {e}")
+        try:
+            # 尝试导入原始Python版本
+            module_path = f"reference.scripts.utils.{util_name}"
+            return importlib.import_module(module_path)
+        except ImportError as e2:
+            logger.error(f"无法导入任何版本的工具 {util_name}: {e2}")
+            return None
+
+# ============================== 项目结构管理 ==============================
+
+@method analyze_project_structure():
+    """分析项目结构，生成结构报告
+    
+    Returns:
+        dict: 项目结构报告
+    """
+    report = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "modules": {},
+        "statistics": {
+            "total_files": 0,
+            "total_quantum_files": 0,
+            "total_size": 0,
+            "quantum_conversion_rate": 0.0
+        }
+    }
+    
+    # 遍历项目模块
+    for module in PROJECT_MODULES:
+        module_path = os.path.join(ROOT_DIR, module)
+        if not os.path.exists(module_path):
+            continue
+            
+        module_stats = {
+            "files": 0,
+            "quantum_files": 0,
+            "size": 0,
+            "dirs": {},
+            "file_types": {}
+        }
+        
+        # 遍历模块目录
+        for root, dirs, files in os.walk(module_path):
+            rel_root = os.path.relpath(root, ROOT_DIR)
+            if "reference" in rel_root or ".history" in rel_root:
+                continue
+                
+            # 提取当前目录相对于模块的路径
+            if root != module_path:
+                dir_rel_path = os.path.relpath(root, module_path)
+                current_dir = module_stats["dirs"]
+                for part in dir_rel_path.split(os.sep):
+                    if part not in current_dir:
+                        current_dir[part] = {"files": 0, "quantum_files": 0, "size": 0, "dirs": {}}
+                    current_dir = current_dir[part]["dirs"]
+            
+            # 处理文件
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_size = os.path.getsize(file_path)
+                file_ext = os.path.splitext(file)[1].lower()
+                
+                # 更新统计信息
+                module_stats["files"] += 1
+                module_stats["size"] += file_size
+                report["statistics"]["total_files"] += 1
+                report["statistics"]["total_size"] += file_size
+                
+                # 检查是否为量子文件
+                is_quantum = any(file.endswith(qext) for qext in ['.qpy', '.qjs', '.qcss', '.qentl', '.qjson', '.qxml', '.qtxt'])
+                if is_quantum:
+                    module_stats["quantum_files"] += 1
+                    report["statistics"]["total_quantum_files"] += 1
+                
+                # 更新文件类型统计
+                if file_ext not in module_stats["file_types"]:
+                    module_stats["file_types"][file_ext] = {"count": 0, "size": 0, "quantum_count": 0}
+                module_stats["file_types"][file_ext]["count"] += 1
+                module_stats["file_types"][file_ext]["size"] += file_size
+                if is_quantum:
+                    module_stats["file_types"][file_ext]["quantum_count"] += 1
+        
+        # 计算转换率
+        if module_stats["files"] > 0:
+            module_stats["quantum_conversion_rate"] = module_stats["quantum_files"] / module_stats["files"]
+        
+        # 添加到报告
+        report["modules"][module] = module_stats
+    
+    # 计算总体转换率
+    if report["statistics"]["total_files"] > 0:
+        report["statistics"]["quantum_conversion_rate"] = report["statistics"]["total_quantum_files"] / report["statistics"]["total_files"]
+    
+    # 保存报告
+    report_path = os.path.join(REPORTS_DIR, f"project_structure_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(report_path, 'w', encoding='utf-8') as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"项目结构分析完成，报告保存至: {report_path}")
+    return report
+
+# ============================== 量子转换功能 ==============================
+
+@method convert_project(args):
+    """批量转换项目中的文件
+    
+    Args:
+        args: 命令行参数
+        
+    Returns:
+        bool: 转换是否成功
+    """
+    # 导入量子转换工具
+    converter = import_util("quantum_converter")
+    if not converter:
+        logger.error("无法导入量子转换工具，转换失败")
+        return False
+    
+    try:
+        # 根据参数执行不同的转换
+        if args.file:
+            # 转换单个文件
+            success, output_path = converter.convert_file(args.file, dry_run=args.dry_run)
+            if success:
+                logger.info(f"文件转换成功: {args.file} -> {output_path}")
+                return True
+            else:
+                logger.error(f"文件转换失败: {args.file}")
+                return False
+        elif args.module:
+            # 转换模块
+            success = converter.convert_module(args.module, dry_run=args.dry_run)
+            if success:
+                logger.info(f"模块转换成功: {args.module}")
+                return True
+            else:
+                logger.error(f"模块转换失败: {args.module}")
+                return False
+        elif args.directory:
+            # 转换目录
+            processed, success_count = converter.convert_directory(args.directory, pattern=args.pattern, exclude=args.exclude, dry_run=args.dry_run)
+            success_rate = success_count / processed if processed > 0 else 0
+            logger.info(f"目录转换完成: {args.directory}, 成功率: {success_rate:.2%} ({success_count}/{processed})")
+            return success_count > 0
+        else:
+            # 转换整个项目
+            modules = args.modules.split(",") if args.modules else None
+            success, failure = converter.convert_project(modules=modules, dry_run=args.dry_run)
+            logger.info(f"项目转换完成, 成功模块: {len(success)}, 失败模块: {len(failure)}")
+            if failure:
+                logger.warning(f"以下模块转换失败: {', '.join(failure)}")
+            return len(failure) == 0
+    except Exception as e:
+        logger.exception(f"转换过程中发生错误: {e}")
+        return False
+
+# ============================== 量子纠缠管理 ==============================
+
+@method analyze_entanglements():
+    """分析项目中的量子纠缠关系
+    
+    Returns:
+        dict: 量子纠缠分析报告
+    """
+    entanglement_report = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "channels": [],
+        "statistics": {
+            "total_channels": 0,
+            "average_strength": 0.0,
+            "high_strength_channels": 0,
+            "entangled_files": set()
+        }
+    }
+    
+    total_strength = 0.0
+    
+    # 遍历项目文件查找纠缠信道
+    for module in PROJECT_MODULES:
+        module_path = os.path.join(ROOT_DIR, module)
+        if not os.path.exists(module_path):
+            continue
+            
+        for root, _, files in os.walk(module_path):
+            for file in files:
+                if file.endswith(('.qpy', '.qjs', '.qcss', '.qentl', '.qjson', '.qxml', '.qtxt')):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            
+                        # 提取量子纠缠信道信息
+                        channel_pattern = r'@quantum_entangle\s+channel_id:\s+(QE-[A-Z]+-[A-Z]+-\d+)\s+state:\s+(\w+)\s+strength:\s+([\d\.]+)\s+objects:\s+\[(.*?)\]'
+                        for match in re.finditer(channel_pattern, content, re.DOTALL):
+                            channel_id, state, strength, objects_str = match.groups()
+                            
+                            # 解析对象列表
+                            objects = []
+                            for obj_line in objects_str.strip().split("\n"):
+                                obj = obj_line.strip().strip(',').strip('"\'')
+                                if obj:
+                                    objects.append(obj)
+                                    entanglement_report["statistics"]["entangled_files"].add(obj)
+                            
+                            # 添加纠缠信道信息
+                            channel_info = {
+                                "channel_id": channel_id,
+                                "source_file": os.path.relpath(file_path, ROOT_DIR),
+                                "state": state,
+                                "strength": float(strength),
+                                "objects": objects
+                            }
+                            entanglement_report["channels"].append(channel_info)
+                            entanglement_report["statistics"]["total_channels"] += 1
+                            total_strength += float(strength)
+                            
+                            if float(strength) >= 0.95:
+                                entanglement_report["statistics"]["high_strength_channels"] += 1
+                    
+                    except Exception as e:
+                        logger.warning(f"处理文件 {file_path} 时出错: {e}")
+    
+    # 计算平均强度
+    if entanglement_report["statistics"]["total_channels"] > 0:
+        entanglement_report["statistics"]["average_strength"] = total_strength / entanglement_report["statistics"]["total_channels"]
+    
+    # 将集合转换为列表
+    entanglement_report["statistics"]["entangled_files"] = list(entanglement_report["statistics"]["entangled_files"])
+    entanglement_report["statistics"]["entangled_file_count"] = len(entanglement_report["statistics"]["entangled_files"])
+    
+    # 保存报告
+    report_path = os.path.join(REPORTS_DIR, f"entanglement_analysis_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(report_path, 'w', encoding='utf-8') as f:
+        json.dump(entanglement_report, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"量子纠缠分析完成，报告保存至: {report_path}")
+    return entanglement_report
+
+# ============================== 性能监控功能 ==============================
+
+@method monitor_performance(duration=60, interval=5):
+    """监控量子组件性能
+    
+    Args:
+        duration: 监控持续时间（秒）
+        interval: 采样间隔（秒）
+        
+    Returns:
+        dict: 性能监控报告
+    """
+    performance_report = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "duration": duration,
+        "interval": interval,
+        "samples": [],
+        "statistics": {
+            "average_cpu": 0.0,
+            "average_memory": 0.0,
+            "peak_cpu": 0.0,
+            "peak_memory": 0.0
+        }
+    }
+    
+    # 获取项目相关进程
+    def get_project_processes():
+        try:
+            # 这里使用简化的方法，实际可能需要更复杂的进程识别逻辑
+            processes = []
+            
+            # 检查Python进程
+            python_procs = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq python.exe", "/FO", "CSV"],
+                capture_output=True, text=True, check=False
+            ).stdout
+            
+            for line in python_procs.strip().split('\n')[1:]:  # 跳过标题行
+                if not line:
+                    continue
+                parts = line.strip('"').split('","')
+                processes.append({
+                    "name": parts[0],
+                    "pid": int(parts[1]),
+                    "memory": float(parts[4].replace(',', '.').replace(' K', '')) / 1024  # 转换为MB
+                })
+            
+            return processes
+        except Exception as e:
+            logger.error(f"获取进程信息失败: {e}")
+            return []
+    
+    # 执行监控采样
+    start_time = time.time()
+    while time.time() - start_time < duration:
+        try:
+            processes = get_project_processes()
+            
+            if not processes:
+                logger.warning("没有找到项目相关进程")
+                time.sleep(interval)
+                continue
+            
+            # 计算总体资源使用
+            total_memory = sum(p["memory"] for p in processes)
+            sample = {
+                "timestamp": time.time(),
+                "processes": len(processes),
+                "memory_mb": total_memory,
+                "process_details": processes
+            }
+            
+            # 更新统计信息
+            performance_report["statistics"]["peak_memory"] = max(
+                performance_report["statistics"]["peak_memory"], 
+                total_memory
+            )
+            
+            # 添加采样数据
+            performance_report["samples"].append(sample)
+            
+            # 等待下一个采样间隔
+            time.sleep(interval)
+            
+        except Exception as e:
+            logger.error(f"性能监控采样失败: {e}")
+            time.sleep(interval)
+    
+    # 计算平均值
+    if performance_report["samples"]:
+        performance_report["statistics"]["average_memory"] = sum(
+            s["memory_mb"] for s in performance_report["samples"]
+        ) / len(performance_report["samples"])
+    
+    # 保存报告
+    report_path = os.path.join(REPORTS_DIR, f"performance_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(report_path, 'w', encoding='utf-8') as f:
+        json.dump(performance_report, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"性能监控完成，报告保存至: {report_path}")
+    return performance_report
+
+# ============================== 参数解析 ==============================
+
+@method parse_arguments():
+    """解析命令行参数
+    
+    Returns:
+        argparse.Namespace: 解析后的参数
+    """
+    parser = argparse.ArgumentParser(description="量子管理器 - 项目集中管理与优化工具")
+    subparsers = parser.add_subparsers(dest="command", help="命令")
+    
+    # 1. 结构分析命令
+    structure_parser = subparsers.add_parser("structure", help="分析项目结构")
+    structure_parser.add_argument("--output", "-o", help="输出报告文件路径")
+    
+    # 2. 量子转换命令
+    convert_parser = subparsers.add_parser("convert", help="转换项目文件为量子格式")
+    convert_parser.add_argument("--file", "-f", help="转换单个文件")
+    convert_parser.add_argument("--directory", "-d", help="转换目录")
+    convert_parser.add_argument("--module", "-m", help="转换模块")
+    convert_parser.add_argument("--modules", help="转换多个模块，逗号分隔")
+    convert_parser.add_argument("--pattern", "-p", help="文件模式")
+    convert_parser.add_argument("--exclude", "-e", help="排除模式")
+    convert_parser.add_argument("--dry-run", action="store_true", help="仅模拟执行不实际转换")
+    
+    # 3. 纠缠分析命令
+    entangle_parser = subparsers.add_parser("entangle", help="分析量子纠缠关系")
+    entangle_parser.add_argument("--output", "-o", help="输出报告文件路径")
+    
+    # 4. 性能监控命令
+    monitor_parser = subparsers.add_parser("monitor", help="监控量子组件性能")
+    monitor_parser.add_argument("--duration", "-d", type=int, default=60, help="监控持续时间（秒）")
+    monitor_parser.add_argument("--interval", "-i", type=int, default=5, help="采样间隔（秒）")
+    monitor_parser.add_argument("--output", "-o", help="输出报告文件路径")
+    
+    # 5. 运行所有命令
+    all_parser = subparsers.add_parser("all", help="运行所有管理功能")
+    all_parser.add_argument("--dry-run", action="store_true", help="转换时仅模拟执行")
+    
+    return parser.parse_args()
+
+# ============================== 主函数 ==============================
+
+@method main():
+    """主函数"""
+    args = parse_arguments()
+    
+    if not args.command:
+        logger.error("请指定要执行的命令")
+        return 1
+    
+    try:
+        if args.command == "structure":
+            analyze_project_structure()
+        elif args.command == "convert":
+            convert_project(args)
+        elif args.command == "entangle":
+            analyze_entanglements()
+        elif args.command == "monitor":
+            monitor_performance(duration=args.duration, interval=args.interval)
+        elif args.command == "all":
+            # 执行所有功能
+            logger.info("开始执行全面项目管理...")
+            analyze_project_structure()
+            convert_project(args)
+            analyze_entanglements()
+            monitor_performance()
+            logger.info("全面项目管理完成")
+        else:
+            logger.error(f"未知命令: {args.command}")
+            return 1
+        
+        return 0
+    except Exception as e:
+        logger.exception(f"执行命令 {args.command} 时发生错误: {e}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main()) 

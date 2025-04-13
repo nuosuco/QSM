@@ -1,192 +1,564 @@
-@quantum-component(name="quantum-tree")
-@quantum-entangle(strength=0.85, sync=true)
-@quantum-state({
-    expandedKeys: new Set(),
-    selectedKey: null
-})
+/* 量子基因编码 */
+QG-COMP-TREE-UI-DATA-A1B1
 
-<div class="quantum-tree">
-    <template v-for="node in data">
-        <quantum-tree-node 
-            :node="node"
-            :level="0"
-            :expanded-keys="expandedKeys"
-            :selected-key="selectedKey"
-            @toggle="toggleNode"
-            @select="selectNode"
-        />
-    </template>
-</div>
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.85,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-layout.qcss",
+    "world/static/css/quantum-animation.qcss"
+  ]
+}
 
-@quantum-component(name="quantum-tree-node")
-<div class="quantum-tree-node" 
-     :style="{ paddingLeft: level * 24 + 'px' }"
-     :class="{ 'is-selected': selectedKey === node.key }">
-    <div class="quantum-tree-node-content" @click="handleSelect">
-        <span v-if="node.children" 
-              class="quantum-tree-node-arrow"
-              :class="{ expanded: isExpanded }"
-              @click.stop="handleToggle">
-            ▶
-        </span>
-        <span v-else class="quantum-tree-node-indent"></span>
-        
-        <span class="quantum-tree-node-icon" v-if="node.icon">
-            {{ node.icon }}
-        </span>
-        
-        <span class="quantum-tree-node-label">{{ node.label }}</span>
+/* 组件属性 */
+@properties {
+  // 树节点数据
+  data: Array = [],
+  
+  // 节点属性配置
+  props: {
+    // 子节点属性名称
+    children: String = 'children',
+    // 节点标签属性名称
+    label: String = 'label',
+    // 节点是否禁用属性名称
+    disabled: String = 'disabled',
+    // 节点是否为叶节点属性名称
+    isLeaf: String = 'isLeaf'
+  },
+  
+  // 是否在点击节点时展开或收缩节点
+  expandOnClickNode: Boolean = true,
+  
+  // 是否在选择子节点时自动选择父节点
+  checkStrictly: Boolean = false,
+  
+  // 是否显示复选框
+  showCheckbox: Boolean = false,
+  
+  // 默认展开所有节点
+  defaultExpandAll: Boolean = false,
+  
+  // 默认展开的节点key数组
+  defaultExpandedKeys: Array = [],
+  
+  // 默认选中的节点key数组
+  defaultCheckedKeys: Array = [],
+  
+  // 当前选中的节点key数组
+  currentNodeKey: String | Number = null,
+  
+  // 是否启用拖拽
+  draggable: Boolean = false,
+  
+  // 允许拖拽的节点类型
+  allowDrag: Function = null,
+  
+  // 允许放置的节点类型
+  allowDrop: Function = null,
+  
+  // 远程加载方法
+  load: Function = null,
+  
+  // 自定义节点过滤方法
+  filterNodeMethod: Function = null,
+  
+  // 节点图标
+  nodeIcon: String = '',
+  
+  // 叶子节点图标
+  leafIcon: String = '',
+  
+  // 禁用状态
+  disabled: Boolean = false,
+  
+  // 量子态配置
+  quantum: {
+    // 量子纠缠强度
+    entangleStrength: Number = 0.85,
+    // 量子态转换动画
+    stateTransition: Boolean = true,
+    // 量子态持续时间
+    stateDuration: Number = 300
+  }
+}
+
+/* 模板结构 */
+<template>
+  <div class="q-tree"
+       :class="{
+         'q-tree-disabled': disabled
+       }">
+       
+    <!-- 搜索过滤器 -->
+    <div class="q-tree-filter" v-if="$slots.filter">
+      <slot name="filter"></slot>
     </div>
     
-    <div class="quantum-tree-node-children" v-if="node.children && isExpanded">
-        <quantum-tree-node
-            v-for="child in node.children"
-            :node="child"
-            :level="level + 1"
-            :expanded-keys="expandedKeys"
-            :selected-key="selectedKey"
-            @toggle="$emit('toggle', $event)"
-            @select="$emit('select', $event)"
-        />
+    <!-- 树节点列表 -->
+    <div class="q-tree-nodes">
+      <template v-if="data && data.length">
+        <div class="q-tree-node"
+             v-for="(node, index) in data"
+             :key="index">
+          
+          <!-- 节点内容 -->
+          <div class="q-tree-node-content"
+               :class="{
+                 'q-tree-node-expanded': isExpanded(node),
+                 'q-tree-node-checked': isChecked(node),
+                 'q-tree-node-selected': isSelected(node),
+                 'q-tree-node-disabled': isDisabled(node)
+               }"
+               @click="handleNodeClick(node)">
+               
+            <!-- 展开/收缩图标 -->
+            <span class="q-tree-node-expand-icon"
+                  v-if="!isLeaf(node)"
+                  @click.stop="toggleExpand(node)">
+              <span v-if="isExpanded(node)">▼</span>
+              <span v-else>▶</span>
+            </span>
+            <span class="q-tree-node-expand-icon-placeholder" v-else></span>
+            
+            <!-- 复选框 -->
+            <span class="q-tree-node-checkbox"
+                  v-if="showCheckbox"
+                  @click.stop="handleCheckChange(node)">
+              <input type="checkbox"
+                    :checked="isChecked(node)"
+                    :disabled="isDisabled(node)">
+            </span>
+            
+            <!-- 节点图标 -->
+            <span class="q-tree-node-icon" v-if="nodeIcon || leafIcon">
+              <span v-if="isLeaf(node) && leafIcon" :class="leafIcon"></span>
+              <span v-else-if="nodeIcon" :class="nodeIcon"></span>
+            </span>
+            
+            <!-- 节点标签 -->
+            <span class="q-tree-node-label">
+              {{ getNodeLabel(node) }}
+            </span>
+          </div>
+          
+          <!-- 子节点 -->
+          <div class="q-tree-node-children"
+               v-if="!isLeaf(node) && isExpanded(node)">
+            <!-- 递归渲染子节点 -->
+            <div class="q-tree-node"
+                 v-for="(childNode, childIndex) in getChildNodes(node)"
+                 :key="childIndex">
+              <!-- 子节点内容 (简化版，实际应递归组件自身) -->
+              <div class="q-tree-node-content"
+                   :class="{
+                     'q-tree-node-expanded': isExpanded(childNode),
+                     'q-tree-node-checked': isChecked(childNode),
+                     'q-tree-node-selected': isSelected(childNode),
+                     'q-tree-node-disabled': isDisabled(childNode)
+                   }"
+                   @click="handleNodeClick(childNode)">
+                <!-- 子节点内容简化，实际应递归 -->
+                {{ getNodeLabel(childNode) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      
+      <!-- 空状态 -->
+      <div class="q-tree-empty" v-else>
+        <slot name="empty">
+          暂无数据
+        </slot>
+      </div>
     </div>
-</div>
+  </div>
+</template>
 
-<style lang="qcss">
-.quantum-tree {
-    background: var(--quantum-bg-color);
-    border: 1px solid var(--quantum-border-color);
-    border-radius: 4px;
-    padding: 8px 0;
+/* 组件样式 */
+<style>
+.q-tree {
+  font-size: var(--q-font-size);
+  color: var(--q-text-color);
 }
 
-.quantum-tree-node {
-    position: relative;
+.q-tree-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.quantum-tree-node-content {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: all 0.3s;
+.q-tree-filter {
+  margin-bottom: var(--q-spacing);
 }
 
-.quantum-tree-node-content:hover {
-    background: var(--quantum-hover-color);
+.q-tree-nodes {
+  padding: 0;
+  margin: 0;
 }
 
-.quantum-tree-node.is-selected > .quantum-tree-node-content {
-    background: var(--quantum-primary-color-light);
-    color: var(--quantum-primary-color);
+/* 节点样式 */
+.q-tree-node {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  white-space: nowrap;
 }
 
-.quantum-tree-node-arrow {
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.3s;
-    margin-right: 8px;
+.q-tree-node-content {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--q-spacing-sm);
+  margin: var(--q-spacing-xs) 0;
+  border-radius: var(--q-border-radius-sm);
+  cursor: pointer;
+  transition: all var(--q-animation-duration) var(--q-animation-timing-function-ease);
 }
 
-.quantum-tree-node-arrow.expanded {
-    transform: rotate(90deg);
+.q-tree-node-children {
+  padding-left: 18px;
 }
 
-.quantum-tree-node-indent {
-    width: 24px;
+/* 节点图标 */
+.q-tree-node-expand-icon {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: var(--q-spacing-xs);
+  font-size: 10px;
+  color: var(--q-text-color-secondary);
 }
 
-.quantum-tree-node-icon {
-    margin-right: 8px;
-    opacity: 0.7;
+.q-tree-node-expand-icon-placeholder {
+  width: 16px;
+  margin-right: var(--q-spacing-xs);
 }
 
-.quantum-tree-node-children {
-    animation: quantumSlideDown 0.3s;
+.q-tree-node-checkbox {
+  margin-right: var(--q-spacing-xs);
 }
 
-@keyframes quantumSlideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+.q-tree-node-icon {
+  margin-right: var(--q-spacing-xs);
+  color: var(--q-text-color-secondary);
 }
 
-/* 量子效果 */
-.quantum-tree-node.is-selected::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: var(--quantum-primary-color);
-    animation: quantumPulse 2s infinite;
+.q-tree-node-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 节点状态 */
+.q-tree-node-expanded {
+}
+
+.q-tree-node-selected {
+  background-color: var(--q-bg-color-hover);
+  color: var(--q-primary);
+}
+
+.q-tree-node-checked {
+}
+
+.q-tree-node-disabled {
+  color: var(--q-text-color-disabled);
+  cursor: not-allowed;
+}
+
+/* 空状态 */
+.q-tree-empty {
+  padding: var(--q-spacing);
+  color: var(--q-text-color-secondary);
+  text-align: center;
+}
+
+/* 量子态样式 */
+@quantum-state hover {
+  .q-tree-node-content:not(.q-tree-node-disabled):hover {
+    background-color: var(--q-bg-color-hover);
+  }
+  
+  .q-tree-node-expand-icon:hover {
+    color: var(--q-primary);
+  }
+}
+
+@quantum-state active {
+  .q-tree-node-content:not(.q-tree-node-disabled):active {
+    background-color: var(--q-bg-color-active);
+  }
 }
 </style>
 
-<script lang="qjs">
+/* 组件脚本 */
+<script>
 export default {
-    name: 'QuantumTree',
-    props: {
-        data: {
-            type: Array,
-            required: true
-        }
-    },
-    
-    methods: {
-        toggleNode(key) {
-            if (this.expandedKeys.has(key)) {
-                this.expandedKeys.delete(key);
-            } else {
-                this.expandedKeys.add(key);
-            }
-            this.$emit('node-toggle', key);
-        },
-        
-        selectNode(key) {
-            this.selectedKey = key;
-            this.$emit('node-select', key);
-        }
+  name: 'QTree',
+  
+  data() {
+    return {
+      // 内部状态
+      expandedKeys: [...(this.defaultExpandedKeys || [])],
+      checkedKeys: [...(this.defaultCheckedKeys || [])],
+      selectedKey: this.currentNodeKey,
+      nodeMap: new Map()
     }
-}
-
-export const QuantumTreeNode = {
-    name: 'QuantumTreeNode',
-    props: {
-        node: {
-            type: Object,
-            required: true
-        },
-        level: {
-            type: Number,
-            default: 0
-        },
-        expandedKeys: {
-            type: Set,
-            required: true
-        },
-        selectedKey: {
-            type: [String, Number],
-            default: null
-        }
-    },
-    
-    computed: {
-        isExpanded() {
-            return this.expandedKeys.has(this.node.key);
-        }
-    },
-    
-    methods: {
-        handleToggle() {
-            this.$emit('toggle', this.node.key);
-        },
-        
-        handleSelect() {
-            this.$emit('select', this.node.key);
-        }
+  },
+  
+  mounted() {
+    if (this.defaultExpandAll) {
+      this.expandAll()
     }
+    
+    // 初始化节点映射
+    this.initNodeMap(this.data)
+  },
+  
+  watch: {
+    data: {
+      handler() {
+        this.initNodeMap(this.data)
+      },
+      deep: true
+    },
+    
+    defaultExpandedKeys(keys) {
+      this.expandedKeys = [...keys]
+    },
+    
+    defaultCheckedKeys(keys) {
+      this.checkedKeys = [...keys]
+    },
+    
+    currentNodeKey(key) {
+      this.selectedKey = key
+      
+      if (key) {
+        this.expandParent(this.getNode(key))
+      }
+    }
+  },
+  
+  methods: {
+    // 获取节点ID
+    getNodeId(node) {
+      // 实际项目中应该有一个唯一标识符
+      return node.id || node[this.props.label]
+    },
+    
+    // 获取节点标签
+    getNodeLabel(node) {
+      return node[this.props.label] || ''
+    },
+    
+    // 获取子节点
+    getChildNodes(node) {
+      return node[this.props.children] || []
+    },
+    
+    // 判断是否为叶子节点
+    isLeaf(node) {
+      if (node[this.props.isLeaf] !== undefined) {
+        return node[this.props.isLeaf]
+      }
+      
+      return !node[this.props.children] || node[this.props.children].length === 0
+    },
+    
+    // 判断节点是否已展开
+    isExpanded(node) {
+      const nodeId = this.getNodeId(node)
+      return this.expandedKeys.includes(nodeId)
+    },
+    
+    // 判断节点是否已选中
+    isChecked(node) {
+      const nodeId = this.getNodeId(node)
+      return this.checkedKeys.includes(nodeId)
+    },
+    
+    // 判断节点是否被选择
+    isSelected(node) {
+      const nodeId = this.getNodeId(node)
+      return this.selectedKey === nodeId
+    },
+    
+    // 判断节点是否禁用
+    isDisabled(node) {
+      return node[this.props.disabled] || this.disabled
+    },
+    
+    // 切换节点展开状态
+    toggleExpand(node) {
+      if (this.isDisabled(node)) return
+      
+      const nodeId = this.getNodeId(node)
+      const index = this.expandedKeys.indexOf(nodeId)
+      
+      if (index > -1) {
+        this.expandedKeys.splice(index, 1)
+      } else {
+        this.expandedKeys.push(nodeId)
+      }
+      
+      this.updateQuantumState(0.5)
+      
+      this.$emit('node-expand', node, this.expandedKeys)
+    },
+    
+    // 处理节点点击
+    handleNodeClick(node) {
+      if (this.isDisabled(node)) return
+      
+      // 设置为当前选中节点
+      this.selectedKey = this.getNodeId(node)
+      this.$emit('node-click', node)
+      this.$emit('current-change', node)
+      
+      // 如果配置了点击节点展开，则切换展开状态
+      if (this.expandOnClickNode && !this.isLeaf(node)) {
+        this.toggleExpand(node)
+      }
+      
+      this.updateQuantumState(0.8)
+    },
+    
+    // 处理复选框状态变化
+    handleCheckChange(node) {
+      if (this.isDisabled(node)) return
+      
+      const nodeId = this.getNodeId(node)
+      const index = this.checkedKeys.indexOf(nodeId)
+      
+      if (index > -1) {
+        this.checkedKeys.splice(index, 1)
+      } else {
+        this.checkedKeys.push(nodeId)
+      }
+      
+      // 处理父子节点关联选中
+      if (!this.checkStrictly) {
+        if (index === -1) {
+          // 选中时，选中所有子节点
+          this.selectChildNodes(node)
+        } else {
+          // 取消选中时，取消所有子节点
+          this.unselectChildNodes(node)
+        }
+        
+        // 更新父节点状态
+        this.updateParentNodeCheckStatus(node)
+      }
+      
+      this.updateQuantumState(0.6)
+      this.$emit('check-change', node, this.checkedKeys)
+    },
+    
+    // 选中所有子节点
+    selectChildNodes(node) {
+      if (this.isLeaf(node)) return
+      
+      const childNodes = this.getChildNodes(node)
+      childNodes.forEach(child => {
+        if (!this.isDisabled(child)) {
+          const childId = this.getNodeId(child)
+          if (!this.checkedKeys.includes(childId)) {
+            this.checkedKeys.push(childId)
+          }
+          
+          this.selectChildNodes(child)
+        }
+      })
+    },
+    
+    // 取消选中所有子节点
+    unselectChildNodes(node) {
+      if (this.isLeaf(node)) return
+      
+      const childNodes = this.getChildNodes(node)
+      childNodes.forEach(child => {
+        const childId = this.getNodeId(child)
+        const index = this.checkedKeys.indexOf(childId)
+        if (index > -1) {
+          this.checkedKeys.splice(index, 1)
+        }
+        
+        this.unselectChildNodes(child)
+      })
+    },
+    
+    // 更新父节点选中状态
+    updateParentNodeCheckStatus(node) {
+      // 实际项目中应递归向上查找父节点并更新状态
+      // 这里简化处理
+    },
+    
+    // 展开所有节点
+    expandAll() {
+      const expandAllNodes = (nodes) => {
+        nodes.forEach(node => {
+          const nodeId = this.getNodeId(node)
+          if (!this.expandedKeys.includes(nodeId)) {
+            this.expandedKeys.push(nodeId)
+          }
+          
+          if (!this.isLeaf(node)) {
+            expandAllNodes(this.getChildNodes(node))
+          }
+        })
+      }
+      
+      expandAllNodes(this.data)
+    },
+    
+    // 收起所有节点
+    collapseAll() {
+      this.expandedKeys = []
+    },
+    
+    // 展开到指定节点的所有父节点
+    expandParent(node) {
+      // 实际项目中应递归向上查找父节点并展开
+      // 这里简化处理
+    },
+    
+    // 初始化节点映射
+    initNodeMap(nodes, parent = null) {
+      nodes.forEach(node => {
+        const nodeId = this.getNodeId(node)
+        // 存储节点及其父节点信息
+        this.nodeMap.set(nodeId, {
+          node,
+          parent
+        })
+        
+        if (!this.isLeaf(node)) {
+          this.initNodeMap(this.getChildNodes(node), node)
+        }
+      })
+    },
+    
+    // 根据ID获取节点
+    getNode(nodeId) {
+      const nodeInfo = this.nodeMap.get(nodeId)
+      return nodeInfo ? nodeInfo.node : null
+    },
+    
+    // 量子态方法
+    updateQuantumState(state) {
+      if (!this.quantum.stateTransition) return
+      
+      const quantum = state * this.quantum.entangleStrength
+      
+      // 应用量子态效果
+      this.$el.style.transform = `scale(${1 + quantum * 0.01})`
+      this.$el.style.filter = `brightness(${1 + quantum * 0.05})`
+    }
+  }
 }
 </script> 

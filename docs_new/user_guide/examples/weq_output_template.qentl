@@ -1,0 +1,169 @@
+<!-- 
+  WeQ输出量子纠缠标记模板
+  版本: 1.0
+  用途: 为WeQ输出内容提供量子纠缠标记能力的标准模板
+-->
+
+<QEntL:template id="weq-output-template" version="1.0">
+  <QEntL:description>
+    标准WeQ输出量子纠缠标记模板，适用于各种WeQ生成内容的量子基因标记和纠缠信道建立。
+    此模板自动处理源内容引用、纠缠关系建立和信道状态显示。
+  </QEntL:description>
+  
+  <QEntL:parameters>
+    <!-- 必需参数 -->
+    <QEntL:param name="content_type" type="string" required="true" description="内容类型，如'text'、'code'、'image'等" />
+    <QEntL:param name="title" type="string" required="true" description="内容标题" />
+    <QEntL:param name="source_files" type="array" required="true" description="源文件路径列表" />
+    
+    <!-- 可选参数 -->
+    <QEntL:param name="marker_id" type="string" required="false" description="自定义量子基因标记ID，不提供则自动生成" />
+    <QEntL:param name="entanglement_strength" type="float" default="0.95" description="默认纠缠强度" />
+    <QEntL:param name="auto_sync" type="boolean" default="true" description="是否自动同步内容变更" />
+    <QEntL:param name="show_status" type="boolean" default="true" description="是否显示纠缠信道状态" />
+    <QEntL:param name="status_position" type="string" default="bottom-right" description="信道状态显示位置" />
+  </QEntL:parameters>
+  
+  <QEntL:template_content>
+    <QEntL:document type="weq_output">
+      <QEntL:metadata>
+        <QEntL:title>{{title}}</QEntL:title>
+        <QEntL:description>WeQ量子纠缠输出: {{title}}</QEntL:description>
+        <QEntL:created_at>{{QEntL.timestamp()}}</QEntL:created_at>
+        <QEntL:generator>WeQ Quantum Output System</QEntL:generator>
+        <QEntL:content_type>{{content_type}}</QEntL:content_type>
+      </QEntL:metadata>
+      
+      <QEntL:entanglement_channel 
+        id="weq-channel-{{QEntL.generateUUID()}}" 
+        auto_connect="{{auto_sync}}"
+      >
+        <QEntL:quantum_gene 
+          marker="{{marker_id || 'QE-WEQ-' + QEntL.generateHash(title)}}"
+          strength="{{entanglement_strength}}"
+          timestamp="{{QEntL.timestamp()}}"
+        >
+          <!-- 动态生成源文件纠缠关系 -->
+          <QEntL:for-each item="source" in="{{source_files}}">
+            <QEntL:entangled_with 
+              path="{{source.path}}" 
+              type="{{source.type || 'source'}}" 
+              strength="{{source.strength || entanglement_strength}}" 
+            />
+          </QEntL:for-each>
+          
+          <QEntL:properties>
+            <QEntL:property name="sync_mode" value="bidirectional" />
+            <QEntL:property name="update_propagation" value="immediate" />
+            <QEntL:property name="conflict_resolution" value="last_write_wins" />
+          </QEntL:properties>
+        </QEntL:quantum_gene>
+        
+        <!-- 内容插槽 -->
+        <QEntL:content type="{{QEntL.getContentMimeType(content_type)}}">
+          <QEntL:slot name="content" />
+        </QEntL:content>
+        
+        <!-- 可选的媒体内容插槽 -->
+        <QEntL:if condition="{{QEntL.hasSlot('media')}}">
+          <QEntL:media>
+            <QEntL:slot name="media" />
+          </QEntL:media>
+        </QEntL:if>
+        
+        <!-- 条件渲染信道状态组件 -->
+        <QEntL:if condition="{{show_status}}">
+          <QEntL:channel_status 
+            position="{{status_position}}"
+            auto_hide="true" 
+            theme="system"
+            expanded_width="280px"
+          >
+            <QEntL:status_indicator>
+              <QEntL:connected>已连接 ({channel_count}个信道)</QEntL:connected>
+              <QEntL:connecting>建立量子纠缠中...</QEntL:connecting>
+              <QEntL:disconnected>量子纠缠已断开</QEntL:disconnected>
+              <QEntL:error>量子纠缠错误</QEntL:error>
+            </QEntL:status_indicator>
+            
+            <QEntL:detail_view>
+              <QEntL:section name="quantum_sources" title="量子纠缠源">
+                <QEntL:source_list max_items="5" show_strength="true" />
+              </QEntL:section>
+              
+              <QEntL:section name="entanglement_stats" title="纠缠统计">
+                <QEntL:stat name="strength" label="纠缠强度" format="percentage" />
+                <QEntL:stat name="sync_time" label="最后同步" format="relative_time" />
+              </QEntL:section>
+            </QEntL:detail_view>
+          </QEntL:channel_status>
+        </QEntL:if>
+      </QEntL:entanglement_channel>
+      
+      <!-- 默认脚本行为 -->
+      <QEntL:script>
+        // 当源文件更新时自动更新内容
+        QEntL.on('source_update', (sourceData) => {
+          QEntL.updateContent();
+          
+          // 如果纠缠强度低于阈值，通知用户
+          if (QEntL.getEntanglementStrength() < 0.5) {
+            QEntL.notifyUser('量子纠缠强度减弱，建议刷新连接');
+          }
+        });
+        
+        // 自定义脚本插槽
+        <QEntL:slot name="custom_script" />
+        
+        // 初始化
+        QEntL.ready(() => {
+          // 注册所有源文件的监视器
+          <QEntL:for-each item="source" in="{{source_files}}">
+            QEntL.registerSourceWatcher('{{source.path}}', {
+              interval: {{source.interval || 30000}},
+              changeDetection: '{{source.detection || "hash"}}'
+            });
+          </QEntL:for-each>
+          
+          <QEntL:if condition="{{show_status}}">
+            QEntL.channelStatus.show();
+          </QEntL:if>
+        });
+      </QEntL:script>
+    </QEntL:document>
+  </QEntL:template_content>
+  
+  <!-- 使用示例 -->
+  <QEntL:usage_example>
+    <!-- 使用模板创建文本输出 -->
+    <QEntL:use template="weq-output-template">
+      <QEntL:param name="content_type" value="text" />
+      <QEntL:param name="title" value="数据分析报告" />
+      <QEntL:param name="source_files" value='[
+        {"path": "data/users.json", "type": "source", "strength": 0.95},
+        {"path": "models/analysis.py", "type": "reference", "strength": 0.85}
+      ]' />
+      
+      <QEntL:fill slot="content">
+        # 数据分析报告
+        
+        ## 摘要
+        本报告分析了用户行为数据，显示了主要使用模式。
+        
+        ## 主要发现
+        1. 用户主要在工作日使用系统
+        2. 平均会话时长为23分钟
+        3. 最常用功能为数据导出
+      </QEntL:fill>
+      
+      <QEntL:fill slot="custom_script">
+        // 自定义行为: 点击链接时更新纠缠强度
+        document.addEventListener('click', (e) => {
+          if (e.target.tagName === 'A') {
+            QEntL.strengthenEntanglement(0.05);
+          }
+        });
+      </QEntL:fill>
+    </QEntL:use>
+  </QEntL:usage_example>
+</QEntL:template> 

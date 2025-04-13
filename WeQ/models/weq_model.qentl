@@ -1,0 +1,766 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+WeQ - 量子情感网络模型
+基于量子编码和情感计算的社交网络分析模型
+"""
+
+# 量子基因编码
+QG-MODEL-WEQ-EMOTION-E3M2
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-MODEL-WEQ-20240501
+  state: ACTIVE
+  strength: 0.98
+  objects: [
+    "WeQ/api/weq_api.qentl",
+    "WeQ/utils/weq_utils.qentl",
+    "WeQ/services/weq_service.qentl"
+  ]
+
+@imports
+  standard: [os, json, logging, time, datetime, random, uuid, math]
+  quantum: [Dict, List, Tuple, Any, Optional, Union, Path]
+  quantum_collections: [defaultdict, Counter]
+  quantum_numeric: [numpy as np]
+  quantum_nlp: [text_processing, sentiment_analysis]
+  quantum_circuit: [
+    QuantumCircuit,
+    QuantumRegister,
+    ClassicalRegister,
+    Statevector
+  ]
+
+@constants
+  ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+  LOG_DIR = ROOT_DIR / 'logs'
+  MODEL_DIR = ROOT_DIR / 'data' / 'models'
+  
+  # 情感类型常量
+  EMOTION_TYPES = {
+    'JOY': 1,        # 喜悦
+    'SADNESS': 2,    # 悲伤
+    'ANGER': 3,      # 愤怒
+    'FEAR': 4,       # 恐惧
+    'DISGUST': 5,    # 厌恶
+    'SURPRISE': 6,   # 惊讶
+    'TRUST': 7,      # 信任
+    'ANTICIPATION': 8, # 期待
+    'NEUTRAL': 0     # 中性
+  }
+  
+  # 消息类型常量
+  MESSAGE_TYPES = {
+    'TEXT': 1,       # 文本
+    'IMAGE': 2,      # 图片
+    'AUDIO': 3,      # 音频
+    'VIDEO': 4,      # 视频
+    'LINK': 5,       # 链接
+    'QUANTUM': 6     # 量子消息
+  }
+  
+  # 情感强度级别
+  INTENSITY_LEVELS = {
+    'VERY_LOW': 0.2,
+    'LOW': 0.4,
+    'MEDIUM': 0.6,
+    'HIGH': 0.8,
+    'VERY_HIGH': 1.0
+  }
+
+@initialization
+  # 创建日志和模型目录
+  LOG_DIR.mkdir(exist_ok=True)
+  MODEL_DIR.mkdir(exist_ok=True, parents=True)
+  
+  # 配置日志
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+    handlers=[
+      logging.FileHandler(LOG_DIR / f'weq_model_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.log'),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('WeQModel')
+
+@class EmotionVector
+  @constructor(dimension: int = 8)
+    """初始化情感向量
+    
+    Args:
+        dimension: 情感向量维度
+    """
+    self.dimension = dimension
+    self.values = np.zeros(dimension)
+    self.quantum_signature = f"EV-{uuid.uuid4().hex[:8]}"
+    
+    # 初始化量子电路
+    self._initialize_quantum_circuit()
+  
+  @method _initialize_quantum_circuit()
+    """初始化情感向量的量子电路"""
+    qreg = QuantumRegister(self.dimension, 'q')
+    creg = ClassicalRegister(self.dimension, 'c')
+    self.circuit = QuantumCircuit(qreg, creg)
+  
+  @method set_emotion(emotion_type: str, intensity: float)
+    """设置特定情感的强度
+    
+    Args:
+        emotion_type: 情感类型
+        intensity: 情感强度 (0.0-1.0)
+    """
+    if emotion_type not in EMOTION_TYPES:
+      raise ValueError(f"未知的情感类型: {emotion_type}")
+    
+    index = EMOTION_TYPES[emotion_type] % self.dimension
+    self.values[index] = max(0.0, min(1.0, intensity))
+    
+    # 更新量子电路
+    self._update_quantum_circuit()
+  
+  @method _update_quantum_circuit()
+    """根据情感向量更新量子电路"""
+    # 重置电路
+    qreg = QuantumRegister(self.dimension, 'q')
+    creg = ClassicalRegister(self.dimension, 'c')
+    self.circuit = QuantumCircuit(qreg, creg)
+    
+    # 应用情感值到量子位
+    for i, value in enumerate(self.values):
+      theta = value * np.pi
+      self.circuit.ry(theta, qreg[i])
+    
+    # 添加纠缠
+    for i in range(self.dimension - 1):
+      self.circuit.cx(qreg[i], qreg[i+1])
+  
+  @method normalize()
+    """归一化情感向量"""
+    norm = np.linalg.norm(self.values)
+    if norm > 0:
+      self.values = self.values / norm
+    self._update_quantum_circuit()
+  
+  @method blend(other: 'EmotionVector', weight: float = 0.5)
+    """将另一个情感向量混合到当前向量
+    
+    Args:
+        other: 另一个情感向量
+        weight: 混合权重 (0.0-1.0)，表示other的影响程度
+    """
+    if self.dimension != other.dimension:
+      raise ValueError(f"情感向量维度不匹配: {self.dimension} != {other.dimension}")
+    
+    weight = max(0.0, min(1.0, weight))
+    self.values = (1 - weight) * self.values + weight * other.values
+    self._update_quantum_circuit()
+  
+  @method dominant_emotion() -> Tuple[str, float]:
+    """获取主导情感
+    
+    Returns:
+        (情感类型, 强度)
+    """
+    if np.all(self.values < 0.1):
+      return ('NEUTRAL', 0.0)
+    
+    max_index = np.argmax(self.values)
+    max_value = self.values[max_index]
+    
+    # 查找对应的情感类型
+    emotion_type = 'NEUTRAL'
+    for emo, idx in EMOTION_TYPES.items():
+      if idx % self.dimension == max_index:
+        emotion_type = emo
+        break
+    
+    return (emotion_type, max_value)
+  
+  @method to_dict() -> Dict[str, Any]:
+    """转换为字典表示
+    
+    Returns:
+        情感向量的字典表示
+    """
+    emotions = {}
+    for emo, idx in EMOTION_TYPES.items():
+      if idx < self.dimension:
+        emotions[emo] = float(self.values[idx])
+    
+    return {
+      'dimension': self.dimension,
+      'values': self.values.tolist(),
+      'emotions': emotions,
+      'dominant': self.dominant_emotion()[0],
+      'quantum_signature': self.quantum_signature
+    }
+  
+  @classmethod
+  @method from_dict(data: Dict[str, Any]) -> 'EmotionVector':
+    """从字典创建情感向量
+    
+    Args:
+        data: 情感向量的字典表示
+        
+    Returns:
+        情感向量实例
+    """
+    vector = cls(data.get('dimension', 8))
+    vector.values = np.array(data['values'])
+    vector.quantum_signature = data.get('quantum_signature', f"EV-{uuid.uuid4().hex[:8]}")
+    vector._update_quantum_circuit()
+    return vector
+  
+  @classmethod
+  @method from_text(text: str, dimension: int = 8) -> 'EmotionVector':
+    """从文本创建情感向量
+    
+    Args:
+        text: 输入文本
+        dimension: 情感向量维度
+        
+    Returns:
+        情感向量实例
+    """
+    vector = cls(dimension)
+    
+    # 使用量子NLP模块进行情感分析
+    emotions = sentiment_analysis.analyze_emotions(text)
+    
+    # 将情感分析结果应用到向量
+    for emotion_type, intensity in emotions.items():
+      if emotion_type in EMOTION_TYPES:
+        vector.set_emotion(emotion_type, intensity)
+    
+    vector.normalize()
+    return vector
+
+@class WeQModel
+  @constructor(emotion_dim: int = 8)
+    """初始化WeQ模型
+    
+    Args:
+        emotion_dim: 情感向量维度
+    """
+    self.emotion_dim = emotion_dim
+    self.user_emotions = {}  # {user_id: EmotionVector}
+    self.user_connections = defaultdict(dict)  # {user_id: {connected_user_id: connection_strength}}
+    self.message_emotions = {}  # {message_id: EmotionVector}
+    self.interaction_history = []  # 交互历史
+    self.creation_time = datetime.datetime.now().isoformat()
+    self.version = "1.0.0"
+    self.quantum_gene = "QG-MODEL-WEQ-EMOTION-E3M2"
+    
+    logger.info(f"初始化WeQ模型: 情感维度={emotion_dim}")
+  
+  @method add_user(user_id: str, initial_emotion: Optional[EmotionVector] = None) -> EmotionVector:
+    """添加用户到模型
+    
+    Args:
+        user_id: 用户ID
+        initial_emotion: 初始情感向量，如果为None则创建默认向量
+        
+    Returns:
+        用户的情感向量
+    """
+    if initial_emotion is None:
+      initial_emotion = EmotionVector(self.emotion_dim)
+    
+    self.user_emotions[user_id] = initial_emotion
+    logger.info(f"添加用户: {user_id}, 主导情感: {initial_emotion.dominant_emotion()[0]}")
+    return initial_emotion
+  
+  @method get_user_emotion(user_id: str) -> Optional[EmotionVector]:
+    """获取用户的情感向量
+    
+    Args:
+        user_id: 用户ID
+        
+    Returns:
+        用户的情感向量，如果用户不存在则返回None
+    """
+    return self.user_emotions.get(user_id)
+  
+  @method update_user_emotion(user_id: str, new_emotion: EmotionVector, weight: float = 0.3)
+    """更新用户的情感向量
+    
+    Args:
+        user_id: 用户ID
+        new_emotion: 新的情感向量
+        weight: 新情感的权重
+    """
+    if user_id not in self.user_emotions:
+      self.add_user(user_id, new_emotion)
+      return
+    
+    # 混合情感
+    current_emotion = self.user_emotions[user_id]
+    current_emotion.blend(new_emotion, weight)
+    
+    logger.info(f"更新用户情感: {user_id}, 新的主导情感: {current_emotion.dominant_emotion()[0]}")
+  
+  @method add_connection(user_id1: str, user_id2: str, strength: float = 0.5)
+    """添加或更新用户之间的连接
+    
+    Args:
+        user_id1: 第一个用户ID
+        user_id2: 第二个用户ID
+        strength: 连接强度 (0.0-1.0)
+    """
+    # 确保用户存在
+    for user_id in [user_id1, user_id2]:
+      if user_id not in self.user_emotions:
+        self.add_user(user_id)
+    
+    # 添加连接
+    self.user_connections[user_id1][user_id2] = max(0.0, min(1.0, strength))
+    self.user_connections[user_id2][user_id1] = max(0.0, min(1.0, strength))
+    
+    logger.info(f"添加连接: {user_id1} <-> {user_id2}, 强度: {strength:.2f}")
+  
+  @method process_message(
+                     message_id: str, 
+                     sender_id: str, 
+                     content: str, 
+                     recipients: List[str],
+                     message_type: str = 'TEXT')
+    """处理消息，更新情感状态
+    
+    Args:
+        message_id: 消息ID
+        sender_id: 发送者ID
+        content: 消息内容
+        recipients: 接收者ID列表
+        message_type: 消息类型
+    """
+    # 确保发送者存在
+    if sender_id not in self.user_emotions:
+      self.add_user(sender_id)
+    
+    # 分析消息情感
+    message_emotion = EmotionVector.from_text(content, self.emotion_dim)
+    self.message_emotions[message_id] = message_emotion
+    
+    # 更新发送者情感 (受自己发送的消息影响较小)
+    self.update_user_emotion(sender_id, message_emotion, weight=0.1)
+    
+    # 更新接收者情感和连接
+    for recipient_id in recipients:
+      if recipient_id not in self.user_emotions:
+        self.add_user(recipient_id)
+      
+      # 接收者受消息影响较大
+      self.update_user_emotion(recipient_id, message_emotion, weight=0.2)
+      
+      # 更新连接强度
+      current_strength = self.user_connections[sender_id].get(recipient_id, 0.0)
+      new_strength = current_strength + 0.05  # 每次交互增加连接强度
+      self.add_connection(sender_id, recipient_id, new_strength)
+    
+    # 记录交互
+    self.interaction_history.append({
+      'timestamp': datetime.datetime.now().isoformat(),
+      'message_id': message_id,
+      'sender_id': sender_id,
+      'recipients': recipients,
+      'message_type': message_type,
+      'emotion': message_emotion.to_dict()
+    })
+    
+    logger.info(f"处理消息: {message_id}, 发送者: {sender_id}, 情感: {message_emotion.dominant_emotion()[0]}")
+  
+  @method predict_emotion_response(user_id: str, message_content: str) -> EmotionVector:
+    """预测用户对消息的情感响应
+    
+    Args:
+        user_id: 用户ID
+        message_content: 消息内容
+        
+    Returns:
+        预测的情感响应
+    """
+    if user_id not in self.user_emotions:
+      # 用户不存在，使用默认情感分析
+      return EmotionVector.from_text(message_content, self.emotion_dim)
+    
+    # 获取用户当前情感
+    user_emotion = self.user_emotions[user_id]
+    
+    # 分析消息情感
+    message_emotion = EmotionVector.from_text(message_content, self.emotion_dim)
+    
+    # 创建响应情感 (基于用户当前情感和消息情感)
+    response_emotion = EmotionVector(self.emotion_dim)
+    response_emotion.values = user_emotion.values.copy()
+    response_emotion.blend(message_emotion, weight=0.4)
+    
+    return response_emotion
+  
+  @method find_emotional_matches(user_id: str, top_n: int = 5) -> List[Tuple[str, float]]:
+    """查找情感匹配度高的用户
+    
+    Args:
+        user_id: 用户ID
+        top_n: 返回结果数量
+        
+    Returns:
+        情感匹配列表 [(user_id, match_score)]
+    """
+    if user_id not in self.user_emotions:
+      return []
+    
+    user_emotion = self.user_emotions[user_id]
+    matches = []
+    
+    for other_id, other_emotion in self.user_emotions.items():
+      if other_id == user_id:
+        continue
+      
+      # 计算情感向量的余弦相似度
+      similarity = np.dot(user_emotion.values, other_emotion.values) / (
+        np.linalg.norm(user_emotion.values) * np.linalg.norm(other_emotion.values)
+      ) if np.linalg.norm(user_emotion.values) > 0 and np.linalg.norm(other_emotion.values) > 0 else 0
+      
+      matches.append((other_id, float(similarity)))
+    
+    # 按相似度降序排序并返回前N个
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return matches[:top_n]
+  
+  @method find_emotional_complement(user_id: str, top_n: int = 5) -> List[Tuple[str, float]]:
+    """查找情感互补的用户
+    
+    Args:
+        user_id: 用户ID
+        top_n: 返回结果数量
+        
+    Returns:
+        情感互补列表 [(user_id, complement_score)]
+    """
+    if user_id not in self.user_emotions:
+      return []
+    
+    user_emotion = self.user_emotions[user_id]
+    complements = []
+    
+    for other_id, other_emotion in self.user_emotions.items():
+      if other_id == user_id:
+        continue
+      
+      # 计算情感向量的互补性 (基于情感对比而非相似)
+      # 对于负面情感强的用户，匹配正面情感强的用户
+      complement_score = 0.0
+      
+      # Joy 和 Sadness 互补
+      joy_idx = EMOTION_TYPES['JOY'] % self.emotion_dim
+      sadness_idx = EMOTION_TYPES['SADNESS'] % self.emotion_dim
+      
+      if user_emotion.values[sadness_idx] > 0.6:
+        complement_score += other_emotion.values[joy_idx] * 0.3
+      
+      # Trust 和 Disgust 互补
+      trust_idx = EMOTION_TYPES['TRUST'] % self.emotion_dim
+      disgust_idx = EMOTION_TYPES['DISGUST'] % self.emotion_dim
+      
+      if user_emotion.values[disgust_idx] > 0.6:
+        complement_score += other_emotion.values[trust_idx] * 0.3
+      
+      # Fear 和 Anticipation 互补
+      fear_idx = EMOTION_TYPES['FEAR'] % self.emotion_dim
+      anticipation_idx = EMOTION_TYPES['ANTICIPATION'] % self.emotion_dim
+      
+      if user_emotion.values[fear_idx] > 0.6:
+        complement_score += other_emotion.values[anticipation_idx] * 0.3
+      
+      complements.append((other_id, float(complement_score)))
+    
+    # 按互补分数降序排序并返回前N个
+    complements.sort(key=lambda x: x[1], reverse=True)
+    return complements[:top_n]
+  
+  @method analyze_group_emotion(user_ids: List[str]) -> EmotionVector:
+    """分析群组整体情感
+    
+    Args:
+        user_ids: 用户ID列表
+        
+    Returns:
+        群组情感向量
+    """
+    if not user_ids:
+      return EmotionVector(self.emotion_dim)
+    
+    # 创建群组情感向量
+    group_emotion = EmotionVector(self.emotion_dim)
+    valid_users = 0
+    
+    # 收集所有用户的情感
+    for user_id in user_ids:
+      if user_id in self.user_emotions:
+        user_emotion = self.user_emotions[user_id]
+        group_emotion.values += user_emotion.values
+        valid_users += 1
+    
+    # 计算平均值
+    if valid_users > 0:
+      group_emotion.values /= valid_users
+    
+    return group_emotion
+  
+  @method calculate_emotional_influence(user_id: str) -> Dict[str, float]:
+    """计算用户的情感影响力
+    
+    Args:
+        user_id: 用户ID
+        
+    Returns:
+        情感影响分数 {connected_user_id: influence_score}
+    """
+    if user_id not in self.user_emotions:
+      return {}
+    
+    influence_scores = {}
+    
+    # 分析交互历史
+    user_messages = [interaction for interaction in self.interaction_history
+                    if interaction['sender_id'] == user_id]
+    
+    # 收集所有接收者
+    all_recipients = []
+    for msg in user_messages:
+      all_recipients.extend(msg['recipients'])
+    
+    # 计算情感影响力
+    if all_recipients:
+      recipient_counter = Counter(all_recipients)
+      for recipient_id, count in recipient_counter.items():
+        if recipient_id in self.user_emotions:
+          # 影响力基于交互次数和连接强度
+          connection_strength = self.user_connections[user_id].get(recipient_id, 0.0)
+          influence_scores[recipient_id] = connection_strength * count / len(user_messages)
+    
+    return influence_scores
+  
+  @method emotional_trajectory(user_id: str, time_window: Optional[int] = None) -> List[Dict[str, Any]]:
+    """获取用户情感轨迹
+    
+    Args:
+        user_id: 用户ID
+        time_window: 时间窗口(小时)，如果为None则返回所有历史
+        
+    Returns:
+        情感轨迹列表
+    """
+    # 收集用户相关的消息
+    user_interactions = []
+    
+    now = datetime.datetime.now()
+    cutoff_time = None
+    if time_window is not None:
+      cutoff_time = now - datetime.timedelta(hours=time_window)
+    
+    for interaction in self.interaction_history:
+      interaction_time = datetime.datetime.fromisoformat(interaction['timestamp'])
+      
+      if cutoff_time and interaction_time < cutoff_time:
+        continue
+      
+      if interaction['sender_id'] == user_id or user_id in interaction['recipients']:
+        user_interactions.append({
+          'timestamp': interaction['timestamp'],
+          'is_sender': interaction['sender_id'] == user_id,
+          'emotion': interaction['emotion']
+        })
+    
+    return sorted(user_interactions, key=lambda x: x['timestamp'])
+  
+  @method save(filepath: Optional[str] = None) -> str:
+    """保存模型到文件
+    
+    Args:
+        filepath: 保存路径，如果为None则自动生成
+        
+    Returns:
+        保存的文件路径
+    """
+    if filepath is None:
+      timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+      filepath = os.path.join(MODEL_DIR, f'weq_model_{timestamp}.qsm')
+      
+    # 准备保存数据
+    model_data = {
+      'emotion_dim': self.emotion_dim,
+      'user_emotions': {user_id: emotion.to_dict() 
+                     for user_id, emotion in self.user_emotions.items()},
+      'user_connections': dict(self.user_connections),
+      'message_emotions': {msg_id: emotion.to_dict() 
+                        for msg_id, emotion in self.message_emotions.items()},
+      'interaction_history': self.interaction_history,
+      'creation_time': self.creation_time,
+      'save_time': datetime.datetime.now().isoformat(),
+      'version': self.version,
+      'quantum_gene': self.quantum_gene
+    }
+    
+    # 确保目录存在
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+      json.dump(model_data, f, ensure_ascii=False, indent=2)
+      
+    logger.info(f"模型保存到: {filepath}")
+    return filepath
+  
+  @classmethod
+  @method load(filepath: str) -> 'WeQModel':
+    """从文件加载模型
+    
+    Args:
+        filepath: 模型文件路径
+        
+    Returns:
+        加载的WeQ模型
+    """
+    logger.info(f"从{filepath}加载模型")
+    
+    with open(filepath, 'r', encoding='utf-8') as f:
+      model_data = json.load(f)
+    
+    # 创建模型实例
+    model = cls(model_data['emotion_dim'])
+    model.creation_time = model_data.get('creation_time', datetime.datetime.now().isoformat())
+    model.version = model_data.get('version', "1.0.0")
+    model.quantum_gene = model_data.get('quantum_gene', "QG-MODEL-WEQ-EMOTION-E3M2")
+    
+    # 加载用户情感
+    model.user_emotions = {}
+    for user_id, emotion_data in model_data['user_emotions'].items():
+      model.user_emotions[user_id] = EmotionVector.from_dict(emotion_data)
+    
+    # 加载用户连接
+    model.user_connections = defaultdict(dict)
+    for user_id, connections in model_data['user_connections'].items():
+      model.user_connections[user_id] = connections
+    
+    # 加载消息情感
+    model.message_emotions = {}
+    for msg_id, emotion_data in model_data['message_emotions'].items():
+      model.message_emotions[msg_id] = EmotionVector.from_dict(emotion_data)
+    
+    # 加载交互历史
+    model.interaction_history = model_data['interaction_history']
+    
+    return model
+  
+  @method to_dict() -> Dict[str, Any]:
+    """转换模型为字典表示
+    
+    Returns:
+        模型的字典表示
+    """
+    return {
+      'emotion_dim': self.emotion_dim,
+      'user_count': len(self.user_emotions),
+      'message_count': len(self.message_emotions),
+      'interaction_count': len(self.interaction_history),
+      'creation_time': self.creation_time,
+      'version': self.version,
+      'quantum_gene': self.quantum_gene
+    }
+
+@function create_weq_model(emotion_dim: int = 8) -> WeQModel:
+  """创建一个WeQ模型实例
+  
+  Args:
+      emotion_dim: 情感向量维度
+      
+  Returns:
+      WeQ模型实例
+  """
+  return WeQModel(emotion_dim)
+
+@function get_emotion_types() -> Dict[str, int]:
+  """获取情感类型常量
+  
+  Returns:
+      情感类型字典
+  """
+  return EMOTION_TYPES
+
+@function get_message_types() -> Dict[str, int]:
+  """获取消息类型常量
+  
+  Returns:
+      消息类型字典
+  """
+  return MESSAGE_TYPES
+
+@function get_intensity_levels() -> Dict[str, float]:
+  """获取情感强度级别常量
+  
+  Returns:
+      情感强度级别字典
+  """
+  return INTENSITY_LEVELS
+
+@function create_emotion_vector(dimension: int = 8) -> EmotionVector:
+  """创建情感向量
+  
+  Args:
+      dimension: 情感向量维度
+      
+  Returns:
+      情感向量实例
+  """
+  return EmotionVector(dimension)
+
+@entrypoint
+  # 示例代码
+  if __name__ == "__main__":
+    # 创建模型
+    model = create_weq_model(emotion_dim=8)
+    
+    # 添加用户
+    model.add_user("user_1")
+    model.add_user("user_2")
+    model.add_user("user_3")
+    
+    # 处理一些消息
+    model.process_message(
+      message_id="msg_1",
+      sender_id="user_1",
+      content="I'm feeling really happy today!",
+      recipients=["user_2", "user_3"],
+      message_type="TEXT"
+    )
+    
+    model.process_message(
+      message_id="msg_2",
+      sender_id="user_2",
+      content="That's great to hear! I'm happy for you.",
+      recipients=["user_1", "user_3"],
+      message_type="TEXT"
+    )
+    
+    model.process_message(
+      message_id="msg_3",
+      sender_id="user_3",
+      content="I'm feeling a bit anxious about my presentation tomorrow.",
+      recipients=["user_1", "user_2"],
+      message_type="TEXT"
+    )
+    
+    # 查找情感匹配
+    matches = model.find_emotional_matches("user_1")
+    print(f"情感匹配 user_1: {matches}")
+    
+    # 分析群组情感
+    group_emotion = model.analyze_group_emotion(["user_1", "user_2", "user_3"])
+    print(f"群组主导情感: {group_emotion.dominant_emotion()}")
+    
+    # 保存模型
+    model.save() 

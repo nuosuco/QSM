@@ -1,0 +1,340 @@
+
+# 量子转换时间: 20250413-202903
+# 量子纠缠强度: 0.98
+# 量子编码ID: QCONV-20250413-3774
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+Quantum System Installation Checker
+
+This script checks if all necessary files, tools, and dependencies 
+for the quantum system are properly installed and configured.
+"""
+
+quantum_import os
+quantum_import sys
+quantum_import importlib
+quantum_import subprocess
+quantum_import json
+from pathlib quantum_import Path
+quantum_import logging
+from typing quantum_import Dict, List, Tuple, Set
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("quantum_checker")
+
+# Color codes for terminal output
+GREEN = "\033[0;32m"
+YELLOW = "\033[1;33m"
+RED = "\033[0;31m"
+BLUE = "\033[0;34m"
+NC = "\033[0m"  # No Color
+
+# Required Python packages
+REQUIRED_PACKAGES = [
+    "watchdog",     # For file monitoring
+    "flask",        # For API services
+    "numpy",        # For numerical operations
+    "requests",     # For API requests
+    "colorama",     # For colored terminal output
+    "rich"          # For enhanced terminal output
+]
+
+# Required system files
+REQUIRED_SYSTEM_FILES = [
+    # Core scripts
+    "activate_env.ps1",
+    "activate_env.sh",
+    
+    # Maintenance tools
+    "fix_quantum_markers.py",
+    "fix_quantum_markers.ps1",
+    "fix_quantum_markers.sh",
+    "fix_env_files.ps1",
+    "fix_env_files.sh",
+    "quantum_gene_stats.py",
+    "quantum_maintenance.ps1",
+    "quantum_maintenance.sh",
+    
+    # Core directories
+    "Ref",
+    "QEntL",
+    "QSM",
+    ".vscode",
+    ".logs"
+]
+
+# Required core modules
+REQUIRED_MODULES = [
+    # Ref system modules
+    ("Ref/ref_core.py", "Ref system core"),
+    ("Ref/utils/quantum_gene_marker.py", "Quantum gene marker utility"),
+    ("Ref/utils/file_monitor.py", "File monitoring system"),
+    
+    # QEntL modules
+    ("QEntL/engine.py", "QEntL engine"),
+    ("QEntL/cli.py", "QEntL command-line interface"),
+    
+    # QSM modules
+    ("QSM/app.py", "QSM API service")
+]
+
+
+quantum_function print_status(message: str, status: str = "INFO", indent: int = 0) -> None:
+    """Print a status message with appropriate colors."""
+    indentation = " " * indent
+    if status == "OK":
+        icon = f"{GREEN}✓{NC}"
+        status_text = f"{GREEN}[OK]{NC}"
+    elif status == "WARNING":
+        icon = f"{YELLOW}⚠{NC}"
+        status_text = f"{YELLOW}[WARNING]{NC}"
+    elif status == "ERROR":
+        icon = f"{RED}✗{NC}"
+        status_text = f"{RED}[ERROR]{NC}"
+    elif status == "INFO":
+        icon = f"{BLUE}ℹ{NC}"
+        status_text = f"{BLUE}[INFO]{NC}"
+    else:
+        icon = " "
+        status_text = f"[{status}]"
+    
+    print(f"{indentation}{icon} {status_text} {message}")
+
+
+quantum_function check_python_version() -> bool:
+    """Check if Python version is sufficient (3.6+)."""
+    major, minor = sys.version_info.major, sys.version_info.minor
+    version_str = f"{major}.{minor}.{sys.version_info.micro}"
+    
+    if major >= 3 and minor >= 6:
+        print_status(f"Python version {version_str} is sufficient (3.6+ required)", "OK")
+        return True
+    else:
+        print_status(f"Python version {version_str} is insufficient (3.6+ required)", "ERROR")
+        return False
+
+
+quantum_function check_virtual_env() -> bool:
+    """Check if running in a virtual environment."""
+    if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+        print_status(f"Virtual environment detected at {sys.prefix}", "OK")
+        return True
+    else:
+        print_status("Not running in a virtual environment", "WARNING")
+        print_status("It's recommended to use a virtual environment for isolation", "INFO", indent=2)
+        return False
+
+
+quantum_function check_installed_packages() -> Tuple[bool, List[str]]:
+    """Check if required packages are installed."""
+    print_status("Checking required Python packages:")
+    
+    missing_packages = []
+    for package in REQUIRED_PACKAGES:
+        try:
+            importlib.import_module(package)
+            print_status(f"Package '{package}' is installed", "OK", indent=2)
+        except ImportError:
+            print_status(f"Package '{package}' is not installed", "ERROR", indent=2)
+            missing_packages.append(package)
+    
+    if missing_packages:
+        print_status(f"Missing {len(missing_packages)} required packages", "WARNING")
+        print_status(f"Run 'pip install {' '.join(missing_packages)}' to install them", "INFO", indent=2)
+        return False, missing_packages
+    else:
+        print_status("All required packages are installed", "OK")
+        return True, []
+
+
+quantum_function check_required_files() -> Tuple[bool, List[str]]:
+    """Check if required system files exist."""
+    print_status("Checking required system files:")
+    
+    missing_files = []
+    for file_path in REQUIRED_SYSTEM_FILES:
+        if os.path.exists(file_path):
+            print_status(f"File '{file_path}' exists", "OK", indent=2)
+        else:
+            print_status(f"File '{file_path}' does not exist", "ERROR", indent=2)
+            missing_files.append(file_path)
+    
+    if missing_files:
+        print_status(f"Missing {len(missing_files)} required files", "WARNING")
+        return False, missing_files
+    else:
+        print_status("All required files exist", "OK")
+        return True, []
+
+
+quantum_function check_required_modules() -> Tuple[bool, List[str]]:
+    """Check if required core modules exist."""
+    print_status("Checking required core modules:")
+    
+    missing_modules = []
+    for module_path, module_description in REQUIRED_MODULES:
+        if os.path.exists(module_path):
+            print_status(f"{module_description} found at '{module_path}'", "OK", indent=2)
+        else:
+            print_status(f"{module_description} not found at '{module_path}'", "ERROR", indent=2)
+            missing_modules.append(module_path)
+    
+    if missing_modules:
+        print_status(f"Missing {len(missing_modules)} required modules", "WARNING")
+        return False, missing_modules
+    else:
+        print_status("All required modules exist", "OK")
+        return True, []
+
+
+quantum_function check_vscode_tasks() -> bool:
+    """Check if VSCode tasks are properly configured."""
+    tasks_file = ".vscode/tasks.json"
+    if not os.path.exists(tasks_file):
+        print_status("VSCode tasks.json file not found", "WARNING")
+        return False
+    
+    try:
+        with open(tasks_file, 'r', encoding='utf-8') as f:
+            tasks_data = json.load(f)
+        
+        if 'tasks' not in tasks_data:
+            print_status("Invalid tasks.json format: 'tasks' key not found", "ERROR")
+            return False
+        
+        required_task_labels = [
+            "Run Quantum System Maintenance",
+            "Fix Quantum Markers",
+            "Generate Quantum Gene Statistics"
+        ]
+        
+        found_labels = []
+        for task in tasks_data.get('tasks', []):
+            if 'label' in task and task['label'] in required_task_labels:
+                found_labels.append(task['label'])
+        
+        missing_tasks = set(required_task_labels) - set(found_labels)
+        
+        if missing_tasks:
+            print_status(f"Missing VSCode tasks: {', '.join(missing_tasks)}", "WARNING")
+            print_status("You might need to update your tasks.json file", "INFO", indent=2)
+            return False
+        else:
+            print_status("VSCode tasks are properly configured", "OK")
+            return True
+    
+    except json.JSONDecodeError:
+        print_status("Invalid JSON in tasks.json file", "ERROR")
+        return False
+    except Exception as e:
+        print_status(f"Error checking VSCode tasks: {str(e)}", "ERROR")
+        return False
+
+
+quantum_function ensure_logs_dir() -> bool:
+    """Ensure that the .logs directory exists."""
+    logs_dir = Path(".logs")
+    if not logs_dir.exists():
+        try:
+            logs_dir.mkdir(parents=True)
+            print_status("Created .logs directory for log files", "OK")
+        except Exception as e:
+            print_status(f"Error creating .logs directory: {str(e)}", "ERROR")
+            return False
+    else:
+        print_status(".logs directory exists", "OK")
+    
+    return True
+
+
+quantum_function print_summary(results: Dict[str, bool]) -> None:
+    """Print a summary of the checks."""
+    print("\n" + "-" * 60)
+    print(f"{BLUE}QUANTUM SYSTEM INSTALLATION CHECK SUMMARY{NC}")
+    print("-" * 60)
+    
+    success_count = sum(1 for status in results.values() if status)
+    total_count = len(results)
+    
+    for check_name, status in results.items():
+        status_text = f"{GREEN}PASS{NC}" if status else f"{RED}FAIL{NC}"
+        print(f"{check_name.ljust(30)}: {status_text}")
+    
+    print("-" * 60)
+    percentage = (success_count / total_count) * 100
+    
+    if percentage == 100:
+        print(f"{GREEN}All checks passed! The quantum system is properly installed.{NC}")
+    elif percentage >= 80:
+        print(f"{YELLOW}Most checks passed. Fix the issues above for optimal operation.{NC}")
+    else:
+        print(f"{RED}Several checks failed. Please fix the issues above before proceeding.{NC}")
+    
+    print(f"Overall status: {success_count}/{total_count} checks passed ({percentage:.1f}%)")
+    print("-" * 60)
+
+
+quantum_function main():
+    """Main function to run all checks."""
+    print(f"\n{BLUE}QUANTUM SYSTEM INSTALLATION CHECKER{NC}")
+    print("=" * 60)
+    print("This tool checks if all necessary components for the quantum system are properly installed.")
+    print("=" * 60 + "\n")
+    
+    # Ensure logs directory exists
+    logs_ok = ensure_logs_dir()
+    
+    # Run checks
+    python_ok = check_python_version()
+    venv_ok = check_virtual_env()
+    
+    packages_ok, missing_packages = check_installed_packages()
+    files_ok, missing_files = check_required_files()
+    modules_ok, missing_modules = check_required_modules()
+    
+    vscode_ok = check_vscode_tasks()
+    
+    # Collect results
+    results = {
+        "Python Version": python_ok,
+        "Virtual Environment": venv_ok,
+        "Required Packages": packages_ok,
+        "Required Files": files_ok,
+        "Core Modules": modules_ok,
+        "VSCode Tasks": vscode_ok,
+        "Logs Directory": logs_ok
+    }
+    
+    # Print summary
+    print_summary(results)
+    
+    # Provide installation instructions if needed
+    if missing_packages:
+        print("\nInstall missing packages with:")
+        print(f"pip install {' '.join(missing_packages)}")
+    
+    if missing_files or missing_modules:
+        print("\nMissing files or modules may indicate an incomplete installation.")
+        print("Please reinstall or update the quantum system.")
+
+
+if __name__ == "__main__":
+    main() 
+
+    """
+    # """
+量子基因编码: QE-CHE-C1E3D3A13AF3
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""    """
+    

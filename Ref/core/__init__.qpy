@@ -1,0 +1,30 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+Ref核心模块
+提供基础功能和服务
+"""
+
+# 量子基因编码
+QG-CODE-REF--P6I1
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.94
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+
+@imports
+
+
+
+# 版本信息
+__version__ = '1.0.0' 

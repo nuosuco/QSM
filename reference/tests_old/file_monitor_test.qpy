@@ -1,0 +1,28 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+# 测试引用文件
+print('This is a test reference file')
+
+    """
+    # """
+量子基因编码: QE-FIL-9976707D1F17
+纠缠状态: 活跃
+纠缠对象: ['test/test_common.py']
+纠缠强度: 0.98
+"""    """
+    
+
+# 量子基因编码
+QG-CODE-TESTS-FILE-G4N5
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-TESTS-20250413
+  state: ACTIVE
+  strength: 0.99
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]

@@ -1,0 +1,253 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# # 
+"""
+量子基因编码: QE-IND-1E9660489E27
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+
+# 量子基因编码
+QG-CODE-REF-INDENT-D1O3
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.98
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+@imports
+  standard: [os]
+  standard: [sys]
+  standard: [argparse]
+  standard: [logging]
+
+@constants
+  GREEN = "\033[92m"
+  YELLOW = "\033[93m"
+  RED = "\033[91m"
+  RESET = "\033[0m"
+
+
+"""
+量子缩进修复工具 - 命令行入口
+
+这个工具用于扫描和修复Python文件中的缩进错误，包括：
+1. 混合使用制表符和空格
+2. 类方法缩进不一致
+3. 文档字符串缩进错误
+4. 条件语句缩进错误（特别是elif与if不对齐）
+5. 量子基因标记类相关缩进问题
+
+用法:
+    python indent_fixer.py [file_path]
+    python indent_fixer.py --dir [directory_path] [--recursive]
+    python indent_fixer.py --dir [directory_path] --dry-run
+"""
+
+
+# 颜色定义
+
+@method print_status(message):
+    """打印状态消息，使用绿色"""
+    print(f"{GREEN}[+] {message}{RESET}")
+
+@method print_warning(message):
+    """打印警告消息，使用黄色"""
+    print(f"{YELLOW}[!] {message}{RESET}")
+
+@method print_error(message):
+    """打印错误消息，使用红色"""
+    print(f"{RED}[-] {message}{RESET}")
+
+@method setup_logging(verbose=False):
+    """设置日志记录"""
+    log_level = logging.DEBUG if verbose else logging.INFO
+    
+    # 创建.logs目录如果不存在
+    log_dir = Path('.logs')
+    if not log_dir.exists():
+        log_dir.mkdir(parents=True)
+    
+    # 配置日志记录器
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_dir / 'indent_fixer.log'),
+            logging.StreamHandler() if verbose else logging.NullHandler()
+        ]
+    )
+    
+    # 获取IndentFixer的日志记录器并设置级别
+    indent_fixer_logger = logging.getLogger("IndentFixer")
+    indent_fixer_logger.setLevel(log_level)
+    
+    return indent_fixer_logger
+
+@method is_python_file(file_path):
+    """
+    检查文件是否是Python文件
+    
+    Args:
+        file_path (str): 文件路径
+        
+    Returns:
+        bool: 如果是Python文件返回True，否则返回False
+    """
+    if str(file_path).endswith('.py'):
+        return True
+    
+    # 检查文件头部是否含有Python shebang
+    try:
+        with open(file_path, 'rb') as f:
+            header = f.read(100)
+            if b'#!/usr/bin/env python' in header or b'#!/usr/bin/python' in header:
+                return True
+    except:
+        pass
+    
+    return False
+
+@method process_directory(dir_path, recursive=False, dry_run=False, exclude_dirs=None, verbose=False):
+    """
+    处理目录中的Python文件
+    
+    Args:
+        dir_path (str): 目录路径
+        recursive (bool): 是否递归处理子目录
+        dry_run (bool): 如果为True，仅检测问题但不修复
+        exclude_dirs (list): 要排除的目录名列表
+        verbose (bool): 是否输出详细日志
+        
+    Returns:
+        tuple: (修复的文件数, 处理的文件总数)
+    """
+    if exclude_dirs is None:
+        exclude_dirs = ['.git', '.venv', 'venv', '__pycache__', 'node_modules']
+    
+    logger = logging.getLogger("IndentFixer")
+    fixed_count = 0
+    total_count = 0
+    python_files = []
+    
+    if recursive:
+        for root, dirs, files in os.walk(dir_path):
+            # 跳过排除的目录
+            dirs[:] = [d for d in dirs if d not in exclude_dirs]
+            
+            for file in files:
+                file_path = os.path.join(root, file)
+                if is_python_file(file_path):
+                    python_files.append(file_path)
+    else:
+        # 仅处理当前目录中的文件
+        for item in os.listdir(dir_path):
+            item_path = os.path.join(dir_path, item)
+            if os.path.isfile(item_path) and is_python_file(item_path):
+                python_files.append(item_path)
+    
+    # 批量处理文件
+    if python_files:
+        if verbose:
+            print_status(f"找到 {len(python_files)} 个Python文件")
+        
+        for file_path in python_files:
+            if verbose:
+                print_status(f"处理文件: {file_path}")
+            
+            try:
+                if fix_indentation_errors(file_path, dry_run):
+                    fixed_count += 1
+                    if not dry_run:
+                        print_status(f"已修复文件: {file_path}")
+                    else:
+                        print_warning(f"需要修复: {file_path}")
+                else:
+                    if verbose:
+                        print_status(f"文件无需修复: {file_path}")
+            except Exception as e:
+                print_error(f"处理文件 {file_path} 时出错: {str(e)}")
+                logger.error(f"处理文件 {file_path} 时出错: {str(e)}", exc_info=True)
+            
+            total_count += 1
+    
+    return fixed_count, total_count
+
+@method main():
+    """主函数 - 解析命令行参数并执行相应操作"""
+    parser = argparse.ArgumentParser(description="量子缩进修复工具 - 修复Python文件中的缩进错误")
+    parser.add_argument('file_path', nargs='?', help='要修复的Python文件路径')
+    parser.add_argument('--dir', help='要扫描的目录路径')
+    parser.add_argument('--recursive', '-r', action='store_true', help='递归处理子目录')
+    parser.add_argument('--dry-run', action='store_true', help='仅检测问题，不进行修复')
+    parser.add_argument('--verbose', '-v', action='store_true', help='显示详细日志')
+    parser.add_argument('--exclude', nargs='+', default=['.git', '.venv', 'venv', '__pycache__', 'node_modules'],
+                        help='要排除的目录名（默认: .git .venv venv __pycache__ node_modules）')
+    
+    args = parser.parse_args()
+    
+    # 设置日志记录
+    logger = setup_logging(args.verbose)
+    
+    if args.dir:
+        # 扫描目录
+        dir_path = args.dir
+        if not os.path.isdir(dir_path):
+            print_error(f"目录不存在: {dir_path}")
+            return 1
+        
+        print_status(f"{'检查' if args.dry_run else '修复'}目录: {dir_path}" + (" (递归)" if args.recursive else ""))
+        fixed_count, total_count = process_directory(
+            dir_path, 
+            recursive=args.recursive,
+            dry_run=args.dry_run,
+            exclude_dirs=args.exclude,
+            verbose=args.verbose
+        )
+        
+        if args.dry_run:
+            print_status(f"扫描完成。发现 {fixed_count} 个需要修复的文件，共处理 {total_count} 个文件")
+        else:
+            print_status(f"扫描完成。已修复 {fixed_count} 个文件，共处理 {total_count} 个文件")
+    
+    elif args.file_path:
+        # 修复单个文件
+        file_path = args.file_path
+        if not os.path.isfile(file_path):
+            print_error(f"文件不存在: {file_path}")
+            return 1
+        
+        if not is_python_file(file_path):
+            print_warning(f"不是Python文件: {file_path}")
+            return 1
+        
+        if args.dry_run:
+            print_status(f"检查文件: {file_path}")
+            if fix_indentation_errors(file_path, dry_run=True):
+                print_warning(f"文件需要修复: {file_path}")
+            else:
+                print_status(f"文件无需修复: {file_path}")
+        else:
+            print_status(f"修复文件: {file_path}")
+            if fix_indentation_errors(file_path):
+                print_status(f"文件已修复: {file_path}")
+            else:
+                print_status(f"文件无需修复: {file_path}")
+    
+    else:
+        print_warning("未指定文件或目录。使用 --help 查看帮助。")
+        return 1
+    
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main()) 

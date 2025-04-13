@@ -1,0 +1,334 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+增强型量子纠缠网络构建器 - 为每个目录的核心文件建立量子纠缠信道
+这是量子自反省管理模型(Ref)的高级组件，提供更强的网络韧性
+"""
+
+# 量子基因编码
+QG-CODE-REF-ENHANCED-O1K1
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.94
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+
+@imports
+  standard: [json]
+  standard: [os]
+  standard: [re]
+  standard: [hashlib]
+  standard: [time]
+
+@constants
+  QG_PATTERN = r'QG-[A-Z0-9]{2,6}-[A-Z]{3,5}-\d{8,14}-[A-Z0-9]{6}-ENT\d{4}'
+
+
+
+
+# 量子基因编码的正则表达式模式
+
+@class EnhancedQuantumNetwork:
+    """增强型量子纠缠网络构建器"""
+    
+    @method @constructor(this):
+        this.registry_path = "Ref/data/quantum_gene_registry.json"
+        this.entanglement_registry_path = "Ref/data/quantum_entanglement_registry.json"
+        this.registry = this._load_registry()
+        this.entanglement_registry = this._load_entanglement_registry()
+        this.log_path = "Ref/logs/quantum_network_log.json"
+        
+        # 排除的目录
+        this.excluded_dirs = [
+            "node_modules", ".git", "__pycache__", ".vscode", ".venv", ".cursor",
+            "dist", "build", "temp", "tmp", ".next", "target"
+        ]
+        
+        # 已连接的文件计数
+        this.connected_files = 0
+        this.connection_count = 0
+        
+        # 确保必要的目录存在
+        os.makedirs(os.path.dirname(this.registry_path), exist_ok=True)
+        os.makedirs(os.path.dirname(this.entanglement_registry_path), exist_ok=True)
+        os.makedirs(os.path.dirname(this.log_path), exist_ok=True)
+    
+    @method _load_registry(this) -> Dict:
+        """加载量子基因注册表"""
+        if os.path.exists(this.registry_path):
+            try:
+                with open(this.registry_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"加载基因注册表失败: {e}")
+                return {"files": {}}
+        else:
+            return {"files": {}}
+    
+    @method _load_entanglement_registry(this) -> Dict:
+        """加载量子纠缠注册表"""
+        if os.path.exists(this.entanglement_registry_path):
+            try:
+                with open(this.entanglement_registry_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"加载纠缠注册表失败: {e}")
+                return {"channels": {}}
+        else:
+            return {"channels": {}}
+    
+    @method _save_entanglement_registry(this) -> None:
+        """保存量子纠缠注册表"""
+        try:
+            with open(this.entanglement_registry_path, 'w', encoding='utf-8') as f:
+                json.dump(this.entanglement_registry, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"保存纠缠注册表失败: {e}")
+    
+    @method _save_network_log(this, log_data: Dict) -> None:
+        """保存网络日志"""
+        try:
+            with open(this.log_path, 'w', encoding='utf-8') as f:
+                json.dump(log_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"保存网络日志失败: {e}")
+    
+    @method extract_gene_from_file(this, file_path: str) -> str:
+        """从文件中提取量子基因编码"""
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read(10000)  # 只读取前10KB以提高效率
+                
+            match = re.search(QG_PATTERN, content)
+            if match:
+                return match.group(0)
+            else:
+                # 尝试从注册表中获取
+                normalized_path = os.path.normpath(file_path).replace('\\', '/')
+                for file_key, info in this.registry.get("files", {}).items():
+                    if normalized_path.endswith(file_key.replace('\\', '/').lstrip('./')) or file_key.replace('\\', '/').lstrip('./').endswith(normalized_path):
+                        return info.get("quantum_gene")
+                
+                return None
+        except Exception as e:
+            return None
+    
+    @method create_entanglement_channel(this, source_gene: str, target_gene: str, channel_type: str = "SYNC") -> str:
+        """
+        创建量子纠缠信道
+        
+        Args:
+            source_gene: 源量子基因
+            target_gene: 目标量子基因
+            channel_type: 信道类型 (SYNC, ASYNC, DATA)
+            
+        Returns:
+            信道ID
+        """
+        if not source_gene or not target_gene or source_gene == target_gene:
+            return None
+            
+        channel_id = f"QEC-{hashlib.md5((source_gene + target_gene).encode()).hexdigest()[:8]}"
+        
+        # 检查是否已存在
+        for existing_id, channel in this.entanglement_registry["channels"].items():
+            if (channel.get("source_gene") == source_gene and 
+                channel.get("target_gene") == target_gene) or \
+               (channel.get("source_gene") == target_gene and 
+                channel.get("target_gene") == source_gene):
+                return existing_id
+        
+        this.entanglement_registry["channels"][channel_id] = {
+            "source_gene": source_gene,
+            "target_gene": target_gene,
+            "channel_type": channel_type,
+            "created_at": datetime.now().isoformat(),
+            "status": "active",
+            "strength": 0.95  # 初始强度
+        }
+        
+        this.connection_count += 1
+        if this.connection_count % 50 == 0:  # 每创建50个连接保存一次
+            this._save_entanglement_registry()
+            
+        return channel_id
+    
+    @method select_key_file(this, directory: str) -> str:
+        """
+        从目录中选择最重要的文件
+        选择标准：优先选择 _core, main, index 文件，其次是最近修改的文件
+        """
+        if not os.path.exists(directory) or not os.path.isdir(directory):
+            return None
+            
+        files = []
+        for filename in os.listdir(directory):
+            file_path = os.path.join(directory, filename)
+            if os.path.isfile(file_path):
+                # 跳过隐藏文件和二进制文件
+                if filename.startswith('.'):
+                    continue
+                    
+                # 检查文件扩展名
+                _, ext = os.path.splitext(filename.lower())
+                if ext in ['.jpg', '.png', '.gif', '.jpeg', '.ico', '.svg', '.webp', '.mp3', '.mp4', '.wav', '.ogg', '.pdf']:
+                    continue
+                
+                try:
+                    mtime = os.path.getmtime(file_path)
+                    size = os.path.getsize(file_path)
+                    
+                    # 跳过过大的文件
+                    if size > 1024 * 1024:  # 1MB
+                        continue
+                        
+                    # 计算重要性分数：优先核心文件，次之按修改时间排序
+                    importance = 0
+                    name_lower = filename.lower()
+                    if '_core' in name_lower or 'core_' in name_lower:
+                        importance += 100
+                    if 'main' in name_lower:
+                        importance += 80
+                    if 'index' in name_lower:
+                        importance += 60
+                    if ext in ['.py', '.js', '.java', '.ts', '.go', '.rs', '.c', '.cpp', '.h', '.hpp']:
+                        importance += 40
+                    if ext in ['.md', '.txt', '.json', '.yaml', '.yml']:
+                        importance += 30
+                        
+                    # 时间因素（越新越重要）
+                    time_factor = min(30, (time.time() - mtime) / (60 * 60 * 24 * 30))  # 最多30天
+                    importance += (30 - time_factor)
+                    
+                    files.append((file_path, importance))
+                except Exception:
+                    continue
+        
+        if not files:
+            return None
+            
+        # 按重要性排序并返回最重要的文件
+        files.sort(key=lambda x: x[1], reverse=True)
+        return files[0][0]
+    
+    @method find_key_files_in_project(this) -> Dict[str, str]:
+        """查找项目中每个目录的关键文件及其量子基因"""
+        key_files = {}
+        project_root = "."  # 当前目录
+        
+        for root, dirs, _ in os.walk(project_root):
+            # 排除不需要的目录
+            dirs[:] = [d for d in dirs if d not in this.excluded_dirs and not d.startswith('.')]
+            
+            # 为当前目录选择关键文件
+            key_file = this.select_key_file(root)
+            if key_file:
+                gene = this.extract_gene_from_file(key_file)
+                if gene:
+                    key_files[key_file] = gene
+        
+        return key_files
+    
+    @method build_mesh_network(this, key_files: Dict[str, str]) -> None:
+        """
+        构建网格型量子纠缠网络
+        每个关键文件与其他最多10个关键文件建立连接
+        """
+        print(f"开始构建增强型量子纠缠网络，共有{len(key_files)}个关键文件...")
+        
+        # 创建日志数据
+        log_data = {
+            "network_build_time": datetime.now().isoformat(),
+            "key_files_count": len(key_files),
+            "connections": {}
+        }
+        
+        # 将文件列表转换为可索引的列表
+        file_list = list(key_files.items())
+        total_files = len(file_list)
+        
+        for i, (source_file, source_gene) in enumerate(file_list):
+            # 每处理10个文件输出一次进度
+            if i % 10 == 0:
+                print(f"处理进度: {i}/{total_files}")
+            
+            connections = []
+            # 为每个文件最多连接10个其他文件
+            # 优先连接同目录或相近目录的文件
+            source_dir = os.path.dirname(source_file)
+            
+            # 构建目录距离字典
+            dir_distance = {}
+            for j, (target_file, _) in enumerate(file_list):
+                if i == j:  # 跳过自身
+                    continue
+                target_dir = os.path.dirname(target_file)
+                
+                # 计算目录距离（共同路径部分）
+                common_prefix = os.path.commonprefix([source_dir, target_dir])
+                source_remaining = source_dir[len(common_prefix):].count(os.sep) + 1
+                target_remaining = target_dir[len(common_prefix):].count(os.sep) + 1
+                distance = source_remaining + target_remaining
+                
+                dir_distance[j] = distance
+            
+            # 按目录距离排序，选择最近的10个文件
+            closest_indices = sorted(dir_distance.keys(), key=lambda x: dir_distance[x])[:10]
+            
+            for j in closest_indices:
+                target_file, target_gene = file_list[j]
+                channel_id = this.create_entanglement_channel(source_gene, target_gene)
+                if channel_id:
+                    connections.append({
+                        "target_file": target_file,
+                        "channel_id": channel_id
+                    })
+                    this.connected_files += 1
+            
+            if connections:
+                rel_source_file = os.path.relpath(source_file)
+                log_data["connections"][rel_source_file] = connections
+        
+        # 保存最终的纠缠注册表和日志
+        this._save_entanglement_registry()
+        this._save_network_log(log_data)
+        
+        print(f"增强型量子纠缠网络构建完成!")
+        print(f"- 关键文件总数: {len(key_files)}")
+        print(f"- 创建的量子纠缠信道总数: {this.connection_count}")
+        print(f"- 网络日志已保存到: {this.log_path}")
+    
+    @method build_enhanced_network(this) -> None:
+        """构建增强型量子纠缠网络"""
+        # 步骤1: 找到每个目录的关键文件
+        key_files = this.find_key_files_in_project()
+        print(f"已识别 {len(key_files)} 个关键文件")
+        
+        # 步骤2: 构建网格网络
+        this.build_mesh_network(key_files)
+
+
+if __name__ == "__main__":
+    network_builder = EnhancedQuantumNetwork()
+    network_builder.build_enhanced_network() 
+
+"""
+
+"""
+量子基因编码: QE-ENH-C960175EE2C8
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+"""
+
+// 开发团队：中华 ZhoHo ，Claude 

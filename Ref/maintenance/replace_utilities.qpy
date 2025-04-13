@@ -1,0 +1,221 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+量子基因标记器实用工具修复
+直接将实用工具部分替换为正确缩进的代码
+"""
+
+# 量子基因编码
+QG-CODE-REF-REPLACE-M9A5
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.98
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+@imports
+  standard: [os]
+  standard: [sys]
+  standard: [logging]
+
+
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+@method main():
+    # 确定文件路径
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    target_file = os.path.join(current_dir, '..', 'utils', 'quantum_gene_marker.py')
+    
+    if not os.path.exists(target_file):
+        logger.error(f"目标文件不存在: {target_file}")
+        return 1
+    
+    # 读取文件内容
+    try:
+        with open(target_file, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+    except Exception as e:
+        logger.error(f"读取文件失败: {str(e)}")
+        return 1
+    
+    # 找到get_gene_marker函数的结尾
+    marker_end_index = content.find("return _marker_instance") + len("return _marker_instance")
+    if marker_end_index == -1:
+        logger.error("无法找到get_gene_marker函数的结尾")
+        return 1
+    
+    # 将文件分成两部分
+    first_part = content[:marker_end_index]
+    
+    # 新的实用工具部分
+    utilities_part = '''
+
+# 导出公共函数，这些函数会在模块顶层被导入时使用
+@method add_quantum_gene_marker(file_path: str, entangled_objects: List[str] = None, strength: float = 0.98) -> bool:
+    """为文件添加量子基因标记的便捷函数
+
+    Args:
+        file_path: 文件路径
+        entangled_objects: 纠缠对象列表
+        strength: 纠缠强度
+
+    Returns:
+        如果成功添加则返回True，否则返回False
+    """
+    marker = get_gene_marker()
+    return marker.add_quantum_gene_marker(file_path, entangled_objects, strength)
+
+@method update_quantum_gene_marker(file_path: str, entangled_objects: List[str] = None, strength: float = None) -> bool:
+    """更新文件的量子基因标记的便捷函数
+
+    Args:
+        file_path: 文件路径
+        entangled_objects: 新的纠缠对象列表
+        strength: 新的纠缠强度
+
+    Returns:
+        如果成功更新则返回True，否则返回False
+    """
+    marker = get_gene_marker()
+    return marker.update_quantum_gene_marker(file_path, entangled_objects, strength)
+
+@method scan_and_mark_directory(directory: str, patterns: List[str] = None, recursive: bool = True) -> Dict[str, Any]:
+    """扫描目录并为文件添加量子基因标记
+
+    Args:
+        directory: 要扫描的目录
+        patterns: 文件匹配模式
+        recursive: 是否递归扫描子目录
+
+    Returns:
+        扫描结果
+    """
+    marker = get_gene_marker()
+    return marker.scan_directory(directory, patterns, recursive)
+
+# 设置要导出的模块级函数
+__all__ = [
+    'RefQuantumGeneMarker',
+    'get_gene_marker',
+    'add_quantum_gene_marker',
+    'update_quantum_gene_marker',
+    'scan_and_mark_directory'
+]
+
+# 当作为命令行工具运行时的入口点
+if __name__ == "__main__":
+    @import argparse
+
+    # 创建命令行解析器
+    parser = argparse.ArgumentParser(description="量子基因标记工具")
+    subparsers = parser.add_subparsers(dest="action", help="可用命令")
+
+    # 添加mark命令
+    mark_parser = subparsers.add_parser("mark", help="标记单个文件")
+    mark_parser.add_argument("--file", "-f", help="要标记的文件路径")
+    mark_parser.add_argument("--entangled", "-e", nargs="+", help="纠缠对象列表")
+    mark_parser.add_argument("--strength", "-s", type=float, default=0.98, help="纠缠强度")
+
+    # 添加update命令
+    update_parser = subparsers.add_parser("update", help="更新标记")
+    update_parser.add_argument("--file", "-f", help="要更新的文件路径")
+    update_parser.add_argument("--entangled", "-e", nargs="+", help="新的纠缠对象列表")
+    update_parser.add_argument("--strength", "-s", type=float, help="新的纠缠强度")
+
+    # 添加scan命令
+    scan_parser = subparsers.add_parser("scan", help="扫描目录")
+    scan_parser.add_argument("--path", "-p", required=True, help="要扫描的目录路径")
+    scan_parser.add_argument("--recursive", "-r", action="store_true", help="是否递归扫描子目录")
+    scan_parser.add_argument("--entangled", "-e", nargs="+", help="默认纠缠对象列表")
+    scan_parser.add_argument("--strength", "-s", type=float, default=0.98, help="默认纠缠强度")
+    scan_parser.add_argument("--patterns", "-pat", nargs="+", help="文件匹配模式")
+
+    # 添加全局monitor参数，使脚本可以作为监视器运行
+    parser.add_argument("--monitor", "-m", action="store_true", help="作为监视器运行，监控项目文件变化")
+
+    # 解析命令行参数
+    args = parser.parse_args()
+
+    # 如果没有指定操作，但有monitor参数，运行监视器模式
+    if args.monitor:
+        print("正在启动量子基因标记监视器...")
+
+        # 设置日志
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+
+        # 启动监视器
+        try:
+            marker = get_gene_marker()
+
+            # 扫描当前目录
+            directory = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            print(f"扫描目录: {directory}")
+
+            # 使用内部scan_directory方法而不是依赖qentl_utils
+            results = marker.scan_directory(directory)
+
+            print(f"扫描完成，找到 {results.get('total_files', 0)} 个文件")
+            print(f"已添加标记: {results.get('marked_files', 0)} 个文件")
+
+            # 等待用户中断
+            while True:
+                @import time
+                time.sleep(1)
+
+        except KeyboardInterrupt:
+            print("\\n量子基因标记监视器已停止")
+
+    # 否则，执行指定的命令
+    elif args.action == "mark" and args.file:
+        add_quantum_gene_marker(args.file, args.entangled, args.strength)
+
+    elif args.action == "update" and args.file:
+        update_quantum_gene_marker(args.file, args.entangled, args.strength)
+
+    elif args.action == "scan" and args.path:
+        results = scan_and_mark_directory(args.path, args.patterns, args.recursive)
+        print(f"扫描完成，处理了 {len(results.get('files', []))} 个文件")
+
+    else:
+        parser.print_help()
+'''
+    
+    # 创建新的文件内容
+    new_content = first_part + utilities_part
+    
+    # 写回文件
+    try:
+        with open(target_file, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        logger.info("成功替换了实用工具部分")
+        return 0
+    except Exception as e:
+        logger.error(f"写入文件失败: {str(e)}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main()) 
+
+    """
+    # 
+"""
+量子基因编码: QE-REP-F656B76ED6FB
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+    """
+    

@@ -1,167 +1,611 @@
-@quantum-component(name="quantum-chart")
-@quantum-entangle(strength=0.9, sync=true)
-@quantum-state({
-    chartInstance: null,
-    hoveredIndex: -1,
-    selectedIndex: -1
-})
+/* 量子基因编码 */
+QG-COMP-CHART-UI-DATA-A1B1
 
-<div class="quantum-chart">
-    <canvas ref="chartCanvas"></canvas>
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.85,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-layout.qcss",
+    "world/static/css/quantum-animation.qcss",
+    "world/static/js/quantum-core.qjs"
+  ]
+}
+
+/* 组件属性 */
+@properties {
+  // 图表类型
+  type: 'line' | 'bar' | 'pie' | 'radar' | 'scatter' | 'heatmap' = 'line',
+  
+  // 图表数据
+  data: Object = {},
+  
+  // 图表配置
+  options: Object = {},
+  
+  // 图表尺寸
+  width: String | Number = '100%',
+  height: String | Number = '400px',
+  
+  // 是否响应式
+  responsive: Boolean = true,
+  
+  // 主题
+  theme: 'light' | 'dark' | 'quantum' = 'light',
+  
+  // 加载状态
+  loading: Boolean = false,
+  
+  // 空数据显示文本
+  emptyText: String = '暂无数据',
+  
+  // 动画配置
+  animation: {
+    // 是否启用动画
+    enabled: Boolean = true,
+    // 动画持续时间
+    duration: Number = 1000,
+    // 动画缓动函数
+    easing: String = 'cubicOut',
+    // 延迟时间
+    delay: Number = 0,
+    // 量子态动画
+    quantum: Boolean = true
+  },
+  
+  // 交互配置
+  interaction: {
+    // 是否可缩放
+    zoomable: Boolean = false,
+    // 是否可拖拽
+    draggable: Boolean = false,
+    // 是否展示工具栏
+    toolbar: Boolean = false,
+    // 是否允许保存图表
+    savable: Boolean = false,
+    // 是否可选择数据点
+    selectable: Boolean = false,
+    // 悬停高亮
+    highlight: Boolean = true,
+    // 悬停提示
+    tooltip: Boolean = true
+  },
+  
+  // 量子态配置
+  quantum: {
+    // 量子纠缠强度
+    entangleStrength: Number = 0.85,
+    // 量子态转换动画
+    stateTransition: Boolean = true,
+    // 量子态持续时间
+    stateDuration: Number = 500,
+    // 量子波动效果
+    waveEffect: Boolean = true,
+    // 量子状态响应
+    stateResponse: Boolean = true
+  }
+}
+
+/* 模板结构 */
+<template>
+  <div class="q-chart"
+       :class="[
+         `q-chart-${type}`,
+         `q-chart-theme-${theme}`,
+         {
+           'q-chart-loading': loading,
+           'q-chart-responsive': responsive
+         }
+       ]"
+       :style="{
+         width: typeof width === 'number' ? `${width}px` : width,
+         height: typeof height === 'number' ? `${height}px` : height
+       }">
     
-    <div class="quantum-chart-tooltip" v-if="hoveredIndex !== -1">
-        <div class="tooltip-title">{{ data.labels[hoveredIndex] }}</div>
-        <div class="tooltip-value">{{ data.datasets[0].data[hoveredIndex] }}</div>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="q-chart-loading-mask">
+      <div class="q-chart-loading-spinner"></div>
     </div>
-</div>
+    
+    <!-- 空数据状态 -->
+    <div v-if="isEmpty" class="q-chart-empty">
+      <slot name="empty">{{ emptyText }}</slot>
+    </div>
+    
+    <!-- 图表容器 -->
+    <div v-show="!isEmpty" ref="chartContainer" class="q-chart-container"></div>
+    
+    <!-- 工具栏 -->
+    <div v-if="interaction.toolbar" class="q-chart-toolbar">
+      <button v-if="interaction.zoomable" class="q-chart-toolbar-btn q-chart-zoom-in" @click="handleZoomIn">
+        <slot name="zoom-in-icon">+</slot>
+      </button>
+      <button v-if="interaction.zoomable" class="q-chart-toolbar-btn q-chart-zoom-out" @click="handleZoomOut">
+        <slot name="zoom-out-icon">-</slot>
+      </button>
+      <button v-if="interaction.zoomable" class="q-chart-toolbar-btn q-chart-zoom-reset" @click="handleZoomReset">
+        <slot name="zoom-reset-icon">⟲</slot>
+      </button>
+      <button v-if="interaction.savable" class="q-chart-toolbar-btn q-chart-save" @click="handleSave">
+        <slot name="save-icon">↓</slot>
+      </button>
+    </div>
+  </div>
+</template>
 
-<style lang="qcss">
-.quantum-chart {
-    position: relative;
-    background: var(--quantum-bg-color);
-    border: 1px solid var(--quantum-border-color);
-    border-radius: 4px;
-    padding: 16px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+/* 组件样式 */
+<style>
+.q-chart {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: var(--q-border-radius);
+  background-color: var(--q-bg-color);
+  box-shadow: var(--q-shadow-sm);
+  transition: all var(--q-animation-duration) var(--q-animation-timing-function-ease);
 }
 
-.quantum-chart canvas {
-    width: 100% !important;
-    height: 100% !important;
+.q-chart-container {
+  width: 100%;
+  height: 100%;
 }
 
-.quantum-chart-tooltip {
-    position: absolute;
-    background: var(--quantum-bg-color);
-    border: 1px solid var(--quantum-border-color);
-    border-radius: 4px;
-    padding: 8px 12px;
-    pointer-events: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    z-index: 10;
-    animation: quantumFadeIn 0.2s;
+.q-chart-responsive {
+  width: 100%;
+  height: 100%;
 }
 
-.tooltip-title {
-    font-weight: bold;
-    margin-bottom: 4px;
-    color: var(--quantum-primary-color);
+/* 加载状态 */
+.q-chart-loading-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.7);
+  z-index: 10;
 }
 
-.tooltip-value {
-    color: var(--quantum-text-color);
+.q-chart-theme-dark .q-chart-loading-mask {
+  background-color: rgba(0, 0, 0, 0.7);
 }
 
-/* 量子效果 */
-.quantum-chart::after {
-    content: '';
-    position: absolute;
-    top: -1px;
-    left: -1px;
-    right: -1px;
-    bottom: -1px;
-    border: 2px solid transparent;
-    border-radius: 4px;
-    animation: quantumGlow 2s infinite;
-    pointer-events: none;
+.q-chart-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--q-primary-light);
+  border-top-color: var(--q-primary);
+  border-radius: 50%;
+  animation: q-chart-spin 1s infinite linear;
 }
 
-@keyframes quantumGlow {
-    0% { border-color: var(--quantum-primary-color); opacity: 0; }
-    50% { border-color: var(--quantum-primary-color); opacity: 0.5; }
-    100% { border-color: var(--quantum-primary-color); opacity: 0; }
+@keyframes q-chart-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 空数据状态 */
+.q-chart-empty {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--q-text-color-secondary);
+  font-size: var(--q-font-size-lg);
+  background-color: var(--q-bg-color);
+}
+
+/* 工具栏 */
+.q-chart-toolbar {
+  position: absolute;
+  top: var(--q-spacing);
+  right: var(--q-spacing);
+  display: flex;
+  gap: var(--q-spacing-xs);
+  z-index: 5;
+}
+
+.q-chart-toolbar-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--q-border-radius-sm);
+  background-color: var(--q-bg-color);
+  color: var(--q-text-color);
+  font-size: var(--q-font-size);
+  cursor: pointer;
+  box-shadow: var(--q-shadow-sm);
+  transition: all var(--q-animation-duration) var(--q-animation-timing-function-ease);
+}
+
+/* 主题 */
+.q-chart-theme-dark {
+  background-color: var(--q-bg-color-dark);
+  color: var(--q-text-color-dark);
+}
+
+.q-chart-theme-quantum {
+  background: linear-gradient(135deg, rgba(var(--q-primary-rgb), 0.05), rgba(var(--q-secondary-rgb), 0.05));
+  backdrop-filter: blur(8px);
+}
+
+/* 量子态样式 */
+@quantum-state hover {
+  .q-chart:hover {
+    box-shadow: var(--q-shadow);
+  }
+  
+  .q-chart-toolbar-btn:hover {
+    background-color: var(--q-bg-color-hover);
+    color: var(--q-primary);
+  }
+}
+
+@quantum-state active {
+  .q-chart-toolbar-btn:active {
+    transform: scale(0.95);
+  }
 }
 </style>
 
-<script lang="qjs">
-import { Chart, registerables } from 'chart.js';
-Chart.register(...registerables);
-
+/* 组件脚本 */
+<script>
 export default {
-    name: 'QuantumChart',
-    props: {
-        type: {
-            type: String,
-            default: 'line'
-        },
-        data: {
-            type: Object,
-            required: true
-        },
-        options: {
-            type: Object,
-            default: () => ({})
-        }
-    },
-    
-    mounted() {
-        this.initChart();
-    },
-    
-    beforeDestroy() {
-        if (this.chartInstance) {
-            this.chartInstance.destroy();
-        }
-    },
-    
-    watch: {
-        data: {
-            deep: true,
-            handler() {
-                this.updateChart();
-            }
-        }
-    },
-    
-    methods: {
-        initChart() {
-            const ctx = this.$refs.chartCanvas.getContext('2d');
-            
-            // 合并默认配置和用户配置
-            const defaultOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                    duration: 1000,
-                    easing: 'easeInOutQuart'
-                },
-                plugins: {
-                    legend: {
-                        labels: {
-                            font: {
-                                family: 'Quantum Sans'
-                            }
-                        }
-                    }
-                },
-                onHover: (event, elements) => {
-                    this.hoveredIndex = elements[0]?.index ?? -1;
-                },
-                onClick: (event, elements) => {
-                    this.selectedIndex = elements[0]?.index ?? -1;
-                    this.$emit('data-select', this.selectedIndex);
-                }
-            };
-            
-            const mergedOptions = {
-                ...defaultOptions,
-                ...this.options
-            };
-            
-            // 创建图表实例
-            this.chartInstance = new Chart(ctx, {
-                type: this.type,
-                data: this.data,
-                options: mergedOptions
-            });
-        },
-        
-        updateChart() {
-            if (this.chartInstance) {
-                this.chartInstance.data = this.data;
-                this.chartInstance.update();
-            }
-        }
+  name: 'QChart',
+  
+  data() {
+    return {
+      chartInstance: null,
+      resizeObserver: null,
+      quantum: {
+        lastUpdateTime: 0,
+        waveEffectInterval: null
+      }
     }
+  },
+  
+  computed: {
+    isEmpty() {
+      if (!this.data) return true
+      
+      // 检查数据是否为空
+      if (this.type === 'pie' || this.type === 'radar') {
+        return !this.data.series || this.data.series.length === 0
+      }
+      
+      return !this.data.series || !this.data.series.length || 
+             (this.data.series.every(s => !s.data || s.data.length === 0))
+    }
+  },
+  
+  watch: {
+    data: {
+      handler: 'updateChart',
+      deep: true
+    },
+    options: {
+      handler: 'updateChart',
+      deep: true
+    },
+    type() {
+      this.initChart()
+    },
+    theme() {
+      this.updateTheme()
+    },
+    width() {
+      this.$nextTick(this.resizeChart)
+    },
+    height() {
+      this.$nextTick(this.resizeChart)
+    }
+  },
+  
+  mounted() {
+    this.initChart()
+    
+    // 监听容器大小变化
+    if (this.responsive && window.ResizeObserver) {
+      this.resizeObserver = new ResizeObserver(this.resizeChart)
+      this.resizeObserver.observe(this.$el)
+    }
+    
+    // 初始化量子波动效果
+    if (this.quantum.waveEffect) {
+      this.initQuantumWaveEffect()
+    }
+    
+    // 监听量子纠缠事件
+    if (window.QuantumEntanglementChannel && this.quantum.stateResponse) {
+      this.subscribeToQuantumEvents()
+    }
+  },
+  
+  beforeUnmount() {
+    this.destroyChart()
+    
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect()
+      this.resizeObserver = null
+    }
+    
+    // 清除量子波动效果
+    if (this.quantum.waveEffectInterval) {
+      clearInterval(this.quantum.waveEffectInterval)
+    }
+    
+    // 取消量子纠缠事件订阅
+    if (window.QuantumEntanglementChannel && this.quantum.stateResponse) {
+      window.QuantumEntanglementChannel.unsubscribe('chart:update')
+    }
+  },
+  
+  methods: {
+    // 初始化图表
+    initChart() {
+      this.destroyChart()
+      
+      if (this.isEmpty) return
+      
+      this.$nextTick(() => {
+        // 此处应集成第三方图表库，如 ECharts 或 Chart.js
+        // 这里使用伪代码模拟图表初始化
+        this.chartInstance = {
+          setOption: this.setChartOptions,
+          resize: this.resizeChart,
+          dispose: () => {}
+        }
+        
+        this.setChartOptions()
+        this.updateTheme()
+        this.updateQuantumState(1)
+      })
+    },
+    
+    // 设置图表配置
+    setChartOptions() {
+      if (!this.chartInstance) return
+      
+      const options = this.getChartOptions()
+      
+      // 应用动画配置
+      if (this.animation.enabled) {
+        options.animation = {
+          duration: this.animation.duration,
+          easing: this.animation.easing,
+          delay: this.animation.delay
+        }
+      }
+      
+      // 应用交互配置
+      options.tooltip = { show: this.interaction.tooltip }
+      options.toolbox = { show: this.interaction.toolbar }
+      
+      // 应用缩放配置
+      if (this.type === 'line' || this.type === 'bar' || this.type === 'scatter') {
+        options.dataZoom = [
+          { type: 'inside', disabled: !this.interaction.zoomable },
+          { type: 'slider', show: this.interaction.zoomable && this.interaction.toolbar }
+        ]
+      }
+      
+      // 伪代码调用图表库的方法
+      console.log('Setting chart options:', options)
+    },
+    
+    // 根据图表类型获取配置
+    getChartOptions() {
+      const baseOptions = {
+        ...this.options,
+        series: this.formatSeriesData()
+      }
+      
+      // 根据图表类型返回特定配置
+      switch (this.type) {
+        case 'line':
+          return {
+            ...baseOptions,
+            xAxis: this.data.xAxis,
+            yAxis: this.data.yAxis
+          }
+        case 'bar':
+          return {
+            ...baseOptions,
+            xAxis: this.data.xAxis,
+            yAxis: this.data.yAxis
+          }
+        case 'pie':
+          return {
+            ...baseOptions,
+            legend: this.data.legend
+          }
+        case 'radar':
+          return {
+            ...baseOptions,
+            radar: this.data.radar
+          }
+        case 'scatter':
+          return {
+            ...baseOptions,
+            xAxis: this.data.xAxis,
+            yAxis: this.data.yAxis
+          }
+        case 'heatmap':
+          return {
+            ...baseOptions,
+            xAxis: this.data.xAxis,
+            yAxis: this.data.yAxis,
+            visualMap: this.data.visualMap
+          }
+        default:
+          return baseOptions
+      }
+    },
+    
+    // 格式化系列数据
+    formatSeriesData() {
+      if (!this.data || !this.data.series) return []
+      
+      // 根据图表类型格式化数据
+      switch (this.type) {
+        case 'pie':
+          return [{
+            type: 'pie',
+            data: this.data.series
+          }]
+        case 'radar':
+          return this.data.series.map(item => ({
+            type: 'radar',
+            ...item
+          }))
+        default:
+          return this.data.series.map(item => ({
+            type: this.type,
+            ...item
+          }))
+      }
+    },
+    
+    // 更新图表
+    updateChart() {
+      if (!this.chartInstance) {
+        this.initChart()
+      } else {
+        this.setChartOptions()
+      }
+    },
+    
+    // 更新主题
+    updateTheme() {
+      if (!this.chartInstance) return
+      
+      // 此处应应用不同的主题
+      console.log(`Applying ${this.theme} theme`)
+      
+      // 量子主题特殊处理
+      if (this.theme === 'quantum') {
+        this.applyQuantumTheme()
+      }
+    },
+    
+    // 应用量子主题
+    applyQuantumTheme() {
+      // 应用特殊的量子态视觉效果
+      if (this.quantum.waveEffect) {
+        this.generateQuantumWave()
+      }
+    },
+    
+    // 调整图表大小
+    resizeChart() {
+      if (!this.chartInstance) return
+      
+      this.chartInstance.resize()
+    },
+    
+    // 销毁图表
+    destroyChart() {
+      if (this.chartInstance) {
+        this.chartInstance.dispose()
+        this.chartInstance = null
+      }
+    },
+    
+    // 工具栏按钮事件处理
+    handleZoomIn() {
+      console.log('Zoom in')
+      this.updateQuantumState(0.5)
+    },
+    
+    handleZoomOut() {
+      console.log('Zoom out')
+      this.updateQuantumState(0.3)
+    },
+    
+    handleZoomReset() {
+      console.log('Zoom reset')
+      this.updateQuantumState(0.7)
+    },
+    
+    handleSave() {
+      console.log('Save chart')
+      this.updateQuantumState(0.9)
+      
+      // 实现图表保存逻辑
+      // 例如生成图片并下载
+    },
+    
+    // 量子效果方法
+    initQuantumWaveEffect() {
+      if (this.quantum.waveEffectInterval) {
+        clearInterval(this.quantum.waveEffectInterval)
+      }
+      
+      this.quantum.waveEffectInterval = setInterval(() => {
+        this.generateQuantumWave()
+      }, 3000)
+    },
+    
+    generateQuantumWave() {
+      // 实现量子波动效果
+      if (!this.$el) return
+      
+      const intensity = Math.random() * this.quantum.entangleStrength * 0.2
+      this.$el.style.boxShadow = `0 0 ${10 + intensity * 20}px ${intensity * 10}px rgba(var(--q-primary-rgb), ${0.1 + intensity * 0.2})`
+    },
+    
+    // 量子态方法
+    updateQuantumState(state) {
+      if (!this.quantum.stateTransition) return
+      if (!this.$el) return
+      
+      const now = Date.now()
+      // 限制更新频率
+      if (now - this.quantum.lastUpdateTime < 100) return
+      this.quantum.lastUpdateTime = now
+      
+      const quantum = state * this.quantum.entangleStrength
+      
+      // 应用量子态效果
+      this.$el.style.transform = `scale(${1 + quantum * 0.02})`
+      this.$el.style.filter = `brightness(${1 + quantum * 0.05})`
+      
+      // 触发量子纠缠事件
+      if (window.QuantumEntanglementChannel) {
+        window.QuantumEntanglementChannel.send({
+          type: 'chart:update',
+          state: quantum,
+          chartType: this.type,
+          source: this._uid
+        })
+      }
+    },
+    
+    // 订阅量子事件
+    subscribeToQuantumEvents() {
+      window.QuantumEntanglementChannel.subscribe('chart:update', (message) => {
+        // 避免自循环
+        if (message.source === this._uid) return
+        
+        // 响应同类型图表的更新
+        if (message.chartType === this.type) {
+          // 轻微响应其他图表的变化
+          this.updateQuantumState(message.state * 0.3)
+        }
+      })
+    }
+  }
 }
 </script> 

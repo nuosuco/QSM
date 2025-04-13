@@ -1,0 +1,367 @@
+# 量子文本区域组件
+# 量子基因: QG-COMP-TEXTAREA-A2B1
+# 量子纠缠: QE-COMP-TEXTAREA-20240406
+
+@component q-textarea
+@props
+  value: string = ""              # 输入值
+  name: string = ""               # 字段名
+  placeholder: string = ""        # 占位文本
+  disabled: boolean = false       # 是否禁用
+  readonly: boolean = false       # 是否只读
+  required: boolean = false       # 是否必填
+  autofocus: boolean = false      # 是否自动聚焦
+  rows: number = 4                # 行数
+  minRows: number = null          # 最小行数
+  maxRows: number = null          # 最大行数
+  autosize: boolean = false       # 是否自动调整高度
+  resize: string = "none"         # 调整大小方式: none/both/horizontal/vertical
+  maxlength: number = null        # 最大长度
+  showCount: boolean = false      # 是否显示字数统计
+  size: string = "medium"         # 尺寸: small/medium/large
+  status: string = ""             # 状态: success/error/warning
+  entangleStrength: number = 0.85  # 量子纠缠强度
+  quantumState: string = "superposition"  # 量子状态: superposition/entangled/focused
+  
+@template
+<div class="q-textarea-wrapper" 
+     data-size="${size}" 
+     data-status="${status}"
+     data-resize="${resize}"
+     data-quantum-state="${quantumState}"
+     data-quantum-entangle='{
+       "id": "textarea-${@id}",
+       "strength": ${entangleStrength},
+       "sync": true
+     }'
+>
+    <div class="q-textarea-container">
+        <textarea
+            name="${name}"
+            placeholder="${placeholder}"
+            class="q-textarea"
+            :disabled="disabled"
+            :readonly="readonly"
+            :required="required"
+            :autofocus="autofocus"
+            :rows="rows"
+            :maxlength="maxlength"
+            @input="handleInput"
+            @focus="handleFocus"
+            @blur="handleBlur"
+        >${value}</textarea>
+        
+        @if showCount && maxlength
+        <div class="q-textarea-count">
+            ${currentLength} / ${maxlength}
+        </div>
+        @endif
+    </div>
+    
+    <div class="q-quantum-effect"></div>
+</div>
+
+@style
+.q-textarea-wrapper {
+    position: relative;
+    display: flex;
+    width: 100%;
+    border: 1px solid var(--q-gray-300);
+    border-radius: var(--q-radius-md);
+    transition: all 0.3s ease;
+    background-color: var(--q-white);
+}
+
+.q-textarea-wrapper:hover {
+    border-color: var(--q-gray-400);
+}
+
+.q-textarea-wrapper:focus-within {
+    border-color: var(--q-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.q-textarea-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.q-textarea {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.875rem;
+    padding: var(--q-spacing-2) var(--q-spacing-3);
+    color: var(--q-gray-900);
+    resize: none;
+    min-height: 80px;
+}
+
+.q-textarea-wrapper[data-resize="both"] .q-textarea {
+    resize: both;
+}
+
+.q-textarea-wrapper[data-resize="horizontal"] .q-textarea {
+    resize: horizontal;
+}
+
+.q-textarea-wrapper[data-resize="vertical"] .q-textarea {
+    resize: vertical;
+}
+
+.q-textarea-wrapper[data-size="small"] .q-textarea {
+    padding: var(--q-spacing-1) var(--q-spacing-2);
+    font-size: 0.75rem;
+    min-height: 60px;
+}
+
+.q-textarea-wrapper[data-size="large"] .q-textarea {
+    padding: var(--q-spacing-3) var(--q-spacing-4);
+    font-size: 1rem;
+    min-height: 100px;
+}
+
+.q-textarea-count {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    font-size: 0.75rem;
+    color: var(--q-gray-500);
+    background: rgba(255, 255, 255, 0.8);
+    padding: 0 4px;
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.q-textarea-wrapper[data-status="success"] {
+    border-color: var(--q-success);
+}
+
+.q-textarea-wrapper[data-status="error"] {
+    border-color: var(--q-error);
+}
+
+.q-textarea-wrapper[data-status="warning"] {
+    border-color: var(--q-warning);
+}
+
+.q-textarea-wrapper[disabled] .q-textarea,
+.q-textarea[disabled] {
+    background-color: var(--q-gray-100);
+    cursor: not-allowed;
+}
+
+/* 量子效果 */
+.q-quantum-effect {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.q-textarea-wrapper[data-quantum-state="superposition"] .q-quantum-effect {
+    background: linear-gradient(45deg, rgba(99, 102, 241, 0.03), rgba(99, 102, 241, 0.05));
+}
+
+.q-textarea-wrapper[data-quantum-state="entangled"] .q-quantum-effect {
+    background: linear-gradient(45deg, rgba(99, 102, 241, 0.05), rgba(236, 72, 153, 0.05));
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+}
+
+.q-textarea-wrapper[data-quantum-state="focused"] .q-quantum-effect {
+    animation: q-textarea-glow 2s infinite alternate;
+}
+
+@keyframes q-textarea-glow {
+    0% {
+        box-shadow: 0 0 5px rgba(99, 102, 241, 0.2);
+    }
+    100% {
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+    }
+}
+
+@script
+export default {
+    data() {
+        return {
+            localValue: this.value,
+            focused: false,
+            currentHeight: null,
+            observer: null
+        };
+    },
+    
+    computed: {
+        currentLength() {
+            return this.localValue ? this.localValue.length : 0;
+        }
+    },
+    
+    mounted() {
+        // 初始化量子纠缠
+        const textareaId = `textarea-${this.id}`;
+        window.quantumEntangle.addObject(textareaId);
+        window.quantumEntangle.setStrength(this.entangleStrength);
+        
+        // 监听量子纠缠事件
+        window.quantumEntangle.on('textarea_change', (data) => {
+            if (data.id === textareaId && data.value !== this.localValue) {
+                this.localValue = data.value;
+                
+                // 更新实际DOM元素的值
+                const textareaElement = this.$el.querySelector('textarea');
+                if (textareaElement) {
+                    textareaElement.value = data.value;
+                }
+                
+                // 如果启用了自动调整高度，则调整高度
+                if (this.autosize) {
+                    this.$nextTick(() => {
+                        this.adjustHeight();
+                    });
+                }
+            }
+        });
+        
+        // 如果启用了自动调整高度，初始化调整
+        if (this.autosize) {
+            this.$nextTick(() => {
+                this.initAutosize();
+            });
+        }
+    },
+    
+    methods: {
+        handleInput(event) {
+            this.localValue = event.target.value;
+            
+            // 更新量子纠缠状态
+            window.quantumEntangle.send('textarea_change', {
+                id: `textarea-${this.id}`,
+                value: this.localValue
+            });
+            
+            // 触发v-model更新
+            this.$emit('input', this.localValue);
+            this.$emit('change', event);
+            
+            // 如果启用了自动调整高度，则调整高度
+            if (this.autosize) {
+                this.adjustHeight();
+            }
+        },
+        
+        handleFocus(event) {
+            this.focused = true;
+            this.$emit('focus', event);
+            
+            // 更新量子状态
+            this.updateQuantumState('focused');
+        },
+        
+        handleBlur(event) {
+            this.focused = false;
+            this.$emit('blur', event);
+            
+            // 恢复量子状态
+            this.updateQuantumState(this.quantumState);
+        },
+        
+        updateQuantumState(state) {
+            this.$el.dataset.quantumState = state;
+            
+            // 更新量子纠缠状态
+            window.quantumEntangle.send('textarea_state_change', {
+                id: `textarea-${this.id}`,
+                state: state
+            });
+        },
+        
+        initAutosize() {
+            const textareaElement = this.$el.querySelector('textarea');
+            if (!textareaElement) return;
+            
+            // 设置初始高度
+            this.adjustHeight();
+            
+            // 创建 MutationObserver 以监视值变化
+            this.observer = new MutationObserver(() => {
+                this.adjustHeight();
+            });
+            
+            // 观察textarea的值变化
+            this.observer.observe(textareaElement, {
+                attributes: true,
+                childList: true,
+                characterData: true,
+                subtree: true
+            });
+        },
+        
+        adjustHeight() {
+            const textareaElement = this.$el.querySelector('textarea');
+            if (!textareaElement) return;
+            
+            // 重置高度以获取实际滚动高度
+            textareaElement.style.height = 'auto';
+            
+            // 计算新高度
+            let newHeight = textareaElement.scrollHeight;
+            
+            // 应用最小/最大行数限制
+            if (this.minRows) {
+                const lineHeight = parseInt(getComputedStyle(textareaElement).lineHeight);
+                const minHeight = this.minRows * lineHeight;
+                newHeight = Math.max(newHeight, minHeight);
+            }
+            
+            if (this.maxRows) {
+                const lineHeight = parseInt(getComputedStyle(textareaElement).lineHeight);
+                const maxHeight = this.maxRows * lineHeight;
+                newHeight = Math.min(newHeight, maxHeight);
+            }
+            
+            // 设置新高度
+            textareaElement.style.height = `${newHeight}px`;
+            this.currentHeight = newHeight;
+        },
+        
+        reset() {
+            this.localValue = '';
+            
+            // 更新实际DOM元素的值
+            const textareaElement = this.$el.querySelector('textarea');
+            if (textareaElement) {
+                textareaElement.value = '';
+            }
+            
+            // 恢复量子状态
+            this.updateQuantumState('superposition');
+            
+            // 如果启用了自动调整高度，则调整高度
+            if (this.autosize) {
+                this.$nextTick(() => {
+                    this.adjustHeight();
+                });
+            }
+        }
+    },
+    
+    beforeDestroy() {
+        // 清理 MutationObserver
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+        
+        // 清理量子纠缠
+        window.quantumEntangle.removeObject(`textarea-${this.id}`);
+    }
+} 

@@ -1,0 +1,189 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+量子基因标记器修复工具
+直接替换错误缩进的方法
+"""
+
+# 量子基因编码
+QG-CODE-REF-FIX-M1G3
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.97
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+@imports
+  standard: [os]
+  standard: [re]
+  standard: [sys]
+  standard: [logging]
+
+
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+@method fix_parse_entangled_objects(target_file):
+    """修复_parse_entangled_objects方法的实现"""
+    
+    # 正确的实现
+    correct_method = '''    @method _parse_entangled_objects(this, content: str) -> List[str]:
+        """从文件内容中提取纠缠对象列表
+
+        Args:
+            content: 文件内容
+
+        Returns:
+            纠缠对象列表
+        """
+        pattern = r"# 纠缠对象: \[(.*?)\]"
+        match = re.search(pattern, content, re.DOTALL)
+        if not match:
+            return []
+
+        # 提取并解析纠缠对象
+        objects_str = match.group(1).strip()
+        if not objects_str:
+            return []
+
+        # 尝试解析为Python列表
+        try:
+            # 替换单引号为双引号以符合JSON格式
+            objects_str = objects_str.replace("'", '"')
+            return json.loads(f"[{objects_str}]")
+        except:
+            # 如果解析失败，尝试通过分割来解析
+            return [obj.strip().strip("'\"") for obj in objects_str.split(',') if obj.strip()]'''
+    
+    try:
+        # 读取文件内容
+        with open(target_file, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+            
+        # 查找损坏的方法定义
+        pattern = r'@method _parse_entangled_objects.*?(?=@method update_file_path|$)'
+        match = re.search(pattern, content, re.DOTALL)
+        
+        if not match:
+            logger.error("无法找到_parse_entangled_objects方法")
+            return False
+            
+        # 替换为正确的实现
+        new_content = content.replace(match.group(0), correct_method)
+        
+        # 写回文件
+        with open(target_file, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+            
+        logger.info("成功修复_parse_entangled_objects方法")
+        return True
+        
+    except Exception as e:
+        logger.error(f"修复时出错: {str(e)}")
+        return False
+
+@method fix_indentation_issues(target_file):
+    """修复文件中的缩进问题"""
+    try:
+        # 读取文件内容
+        with open(target_file, 'r', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+            
+        fixed_lines = []
+        in_function = False
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # 检测函数定义
+            if re.match(r'^def\s+\w+', stripped):
+                in_function = True
+                fixed_lines.append(line)
+                continue
+                
+            # 空行保持不变
+            if not stripped:
+                fixed_lines.append(line)
+                continue
+                
+            # 为嵌套在函数中的内容添加正确的缩进
+            if in_function and stripped and not re.match(r'^\s{4}', line):
+                if '"""' in stripped and not stripped.startswith('"""'):
+                    # 文档字符串结束
+                    spaces = ' ' * 8
+                    fixed_lines.append(spaces + stripped + '\n')
+                else:
+                    # 函数体内的代码
+                    spaces = ' ' * 8
+                    fixed_lines.append(spaces + stripped + '\n')
+            else:
+                fixed_lines.append(line)
+                
+        # 写回文件
+        with open(target_file, 'w', encoding='utf-8') as f:
+            f.writelines(fixed_lines)
+            
+        logger.info("成功修复缩进问题")
+        return True
+        
+    except Exception as e:
+        logger.error(f"修复缩进问题时出错: {str(e)}")
+        return False
+
+@method main():
+    # 当前脚本所在目录
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 目标文件
+    target_file = os.path.abspath(os.path.join(current_dir, '..', 'utils', 'quantum_gene_marker.py'))
+    
+    if not os.path.exists(target_file):
+        logger.error(f"目标文件不存在: {target_file}")
+        return 1
+        
+    # 创建备份
+    backup_file = target_file + '.bak' + str(int(time.time()))
+    try:
+        @import shutil
+        shutil.copy2(target_file, backup_file)
+        logger.info(f"已创建备份: {backup_file}")
+    except Exception as e:
+        logger.error(f"创建备份时出错: {str(e)}")
+        return 1
+        
+    # 先修复_parse_entangled_objects方法
+    if not fix_parse_entangled_objects(target_file):
+        logger.error("修复_parse_entangled_objects方法失败")
+        return 1
+        
+    # 再修复通用缩进问题
+    if not fix_indentation_issues(target_file):
+        logger.error("修复缩进问题失败")
+        return 1
+        
+    logger.info("所有修复已完成")
+    return 0
+
+if __name__ == "__main__":
+    @import time
+    sys.exit(main()) 
+
+    """
+    # 
+"""
+量子基因编码: QE-FIX-2EBCCC50A062
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+    """
+    

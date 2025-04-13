@@ -1,0 +1,529 @@
+/* 量子基因编码: QG-SYS-COMPILER-CORE-FRONTEND-A1B1 */
+
+/**
+ * 量子模板编译器(Quantum Compiler)
+ * 负责将QENTL模板编译为可执行的JavaScript代码
+ * 支持模板语法、指令解析、组件化和量子通信集成
+ */
+
+// 引入量子核心
+import { QuantumEntanglementChannel } from './quantum-core.qjs';
+
+/**
+ * 模板解析器类
+ */
+class TemplateParser {
+  /**
+   * 解析模板
+   * @param {string} template 模板字符串
+   * @returns {Object} 解析结果
+   */
+  static parse(template) {
+    // 清理模板
+    template = template.trim();
+    
+    // 解析基因编码
+    const genePattern = /\/\*\s*量子基因编码:?\s*(QG-[\w-]+)\s*\*\//;
+    const geneMatch = template.match(genePattern);
+    const geneCode = geneMatch ? geneMatch[1] : null;
+    
+    // 提取量子纠缠信道
+    const entanglePattern = /<entangle\s+strength="([^"]+)">([\s\S]*?)<\/entangle>/;
+    const entangleMatch = template.match(entanglePattern);
+    const entangleInfo = entangleMatch ? {
+      strength: parseFloat(entangleMatch[1]),
+      content: entangleMatch[2]
+    } : null;
+    
+    // 解析同步引用
+    const syncRefs = [];
+    if (entangleInfo && entangleInfo.content) {
+      const syncPattern = /<sync\s+ref="([^"]+)"\s*\/>/g;
+      let syncMatch;
+      while ((syncMatch = syncPattern.exec(entangleInfo.content)) !== null) {
+        syncRefs.push(syncMatch[1]);
+      }
+    }
+    
+    // 提取组件定义
+    const componentPattern = /<component\s+name="([^"]+)">([\s\S]*?)<\/component>/;
+    const componentMatch = template.match(componentPattern);
+    let componentInfo = null;
+    
+    if (componentMatch) {
+      const name = componentMatch[1];
+      const content = componentMatch[2];
+      
+      // 解析props
+      const propsPattern = /<props>([\s\S]*?)<\/props>/;
+      const propsMatch = content.match(propsPattern);
+      const props = propsMatch ? this._parseProps(propsMatch[1]) : [];
+      
+      // 解析events
+      const eventsPattern = /<events>([\s\S]*?)<\/events>/;
+      const eventsMatch = content.match(eventsPattern);
+      const events = eventsMatch ? this._parseEvents(eventsMatch[1]) : [];
+      
+      // 解析slots
+      const slotsPattern = /<slots>([\s\S]*?)<\/slots>/;
+      const slotsMatch = content.match(slotsPattern);
+      const slots = slotsMatch ? this._parseSlots(slotsMatch[1]) : [];
+      
+      // 提取模板内容
+      const templatePattern = /<template>([\s\S]*?)<\/template>/;
+      const templateMatch = content.match(templatePattern);
+      const templateContent = templateMatch ? templateMatch[1].trim() : '';
+      
+      // 提取样式内容
+      const stylePattern = /<style>([\s\S]*?)<\/style>/;
+      const styleMatch = content.match(stylePattern);
+      const styleContent = styleMatch ? styleMatch[1].trim() : '';
+      
+      // 提取脚本内容
+      const scriptPattern = /<script>([\s\S]*?)<\/script>/;
+      const scriptMatch = content.match(scriptPattern);
+      const scriptContent = scriptMatch ? scriptMatch[1].trim() : '';
+      
+      componentInfo = {
+        name,
+        props,
+        events,
+        slots,
+        template: templateContent,
+        style: styleContent,
+        script: scriptContent
+      };
+    }
+    
+    return {
+      geneCode,
+      entangle: entangleInfo ? {
+        strength: entangleInfo.strength,
+        syncRefs
+      } : null,
+      component: componentInfo
+    };
+  }
+  
+  /**
+   * 解析props定义
+   * @param {string} content props内容
+   * @returns {Array} 解析后的props数组
+   * @private
+   */
+  static _parseProps(content) {
+    const propPattern = /<prop\s+name="([^"]+)"\s+type="([^"]+)"\s+default="([^"]*)"\s+desc="([^"]+)"(?:\s+options="([^"]+)")?(?:\s+sync)?(?:\s*\/)?>([\s\S]*?)<\/prop>/g;
+    const props = [];
+    let propMatch;
+    
+    while ((propMatch = propPattern.exec(content)) !== null) {
+      props.push({
+        name: propMatch[1],
+        type: propMatch[2],
+        default: propMatch[3],
+        description: propMatch[4],
+        options: propMatch[5] ? propMatch[5].split(',') : null,
+        sync: /\s+sync/.test(propMatch[0])
+      });
+    }
+    
+    // 处理自闭合标签
+    const selfClosingPattern = /<prop\s+name="([^"]+)"\s+type="([^"]+)"\s+default="([^"]*)"\s+desc="([^"]+)"(?:\s+options="([^"]+)")?(?:\s+sync)?\s*\/>/g;
+    let selfClosingMatch;
+    
+    while ((selfClosingMatch = selfClosingPattern.exec(content)) !== null) {
+      props.push({
+        name: selfClosingMatch[1],
+        type: selfClosingMatch[2],
+        default: selfClosingMatch[3],
+        description: selfClosingMatch[4],
+        options: selfClosingMatch[5] ? selfClosingMatch[5].split(',') : null,
+        sync: /\s+sync/.test(selfClosingMatch[0])
+      });
+    }
+    
+    return props;
+  }
+  
+  /**
+   * 解析事件定义
+   * @param {string} content 事件内容
+   * @returns {Array} 解析后的事件数组
+   * @private
+   */
+  static _parseEvents(content) {
+    const eventPattern = /<event\s+name="([^"]+)"\s+desc="([^"]+)"(?:\s+params="([^"]+)")?\s*\/>/g;
+    const events = [];
+    let eventMatch;
+    
+    while ((eventMatch = eventPattern.exec(content)) !== null) {
+      events.push({
+        name: eventMatch[1],
+        description: eventMatch[2],
+        params: eventMatch[3] || null
+      });
+    }
+    
+    return events;
+  }
+  
+  /**
+   * 解析插槽定义
+   * @param {string} content 插槽内容
+   * @returns {Array} 解析后的插槽数组
+   * @private
+   */
+  static _parseSlots(content) {
+    const slotPattern = /<slot\s+name="([^"]+)"\s+desc="([^"]+)"\s*\/>/g;
+    const slots = [];
+    let slotMatch;
+    
+    while ((slotMatch = slotPattern.exec(content)) !== null) {
+      slots.push({
+        name: slotMatch[1],
+        description: slotMatch[2]
+      });
+    }
+    
+    return slots;
+  }
+}
+
+/**
+ * 模板编译器类
+ */
+class TemplateCompiler {
+  /**
+   * 编译模板
+   * @param {Object} parsedTemplate 解析后的模板
+   * @returns {string} 编译后的JavaScript代码
+   */
+  static compile(parsedTemplate) {
+    const { geneCode, entangle, component } = parsedTemplate;
+    
+    if (!component) {
+      throw new Error('[QuantumCompiler] No component found in template');
+    }
+    
+    // 构建组件选项
+    const componentOptions = [];
+    
+    // 组件名称
+    componentOptions.push(`  name: '${component.name}',`);
+    
+    // 生成props配置
+    if (component.props && component.props.length > 0) {
+      componentOptions.push('  props: {');
+      
+      component.props.forEach(prop => {
+        let propDef = `    ${prop.name}: {`;
+        
+        // 类型转换
+        const typeParts = prop.type.split('|').map(t => t.trim());
+        if (typeParts.length === 1) {
+          // 单一类型
+          propDef += `\n      type: ${this._mapType(typeParts[0])},`;
+        } else {
+          // 多种类型
+          propDef += `\n      type: [${typeParts.map(t => this._mapType(t)).join(', ')}],`;
+        }
+        
+        // 默认值
+        if (prop.default !== undefined) {
+          const defaultValue = this._formatDefaultValue(prop.type, prop.default);
+          propDef += `\n      default: ${defaultValue},`;
+        }
+        
+        // 校验函数（如果有选项）
+        if (prop.options) {
+          propDef += `\n      validator: function(value) {\n`;
+          propDef += `        return [${prop.options.map(o => `'${o}'`).join(', ')}].includes(value);\n`;
+          propDef += `      },`;
+        }
+        
+        propDef += '\n    },';
+        componentOptions.push(propDef);
+      });
+      
+      componentOptions.push('  },');
+    }
+    
+    // 生成data函数
+    componentOptions.push('  data() {');
+    componentOptions.push('    return {');
+    componentOptions.push('      geneCode: ' + (geneCode ? `'${geneCode}'` : 'null') + ',');
+    
+    if (entangle) {
+      componentOptions.push('      entangleStrength: ' + entangle.strength + ',');
+      componentOptions.push('      syncRefs: ' + JSON.stringify(entangle.syncRefs) + ',');
+    }
+    
+    // 默认返回空对象
+    componentOptions.push('    };');
+    componentOptions.push('  },');
+    
+    // 添加量子通信处理
+    if (entangle) {
+      componentOptions.push('  created() {');
+      componentOptions.push('    // 创建量子纠缠通道');
+      componentOptions.push('    this.quantum = new QuantumEntanglementChannel({');
+      componentOptions.push(`      channelId: '${component.name}-channel',`);
+      componentOptions.push('      initialState: {},');
+      componentOptions.push('      entangleStrength: this.entangleStrength,');
+      componentOptions.push('      onMessage: this._handleQuantumMessage.bind(this)');
+      componentOptions.push('    });');
+      componentOptions.push('  },');
+      
+      componentOptions.push('  methods: {');
+      componentOptions.push('    // 处理量子消息');
+      componentOptions.push('    _handleQuantumMessage(message) {');
+      componentOptions.push('      // 处理量子消息逻辑');
+      componentOptions.push('      console.log("[QuantumCompiler] Received quantum message:", message);');
+      componentOptions.push('    },');
+      componentOptions.push('  },');
+    }
+    
+    // 添加自定义脚本
+    if (component.script) {
+      // 如果已经有methods，就不再添加methods定义
+      if (componentOptions.some(line => line.trim() === 'methods: {')) {
+        const methodsIndex = componentOptions.findIndex(line => line.trim() === 'methods: {');
+        // 找到methods闭合的花括号
+        const closingIndex = componentOptions.findIndex((line, index) => {
+          return index > methodsIndex && line.trim() === '  },';
+        });
+        
+        if (closingIndex !== -1) {
+          // 在闭合前插入自定义方法
+          const customMethods = component.script
+            .replace(/export\s+default\s*{[\s\S]*}/, '') // 移除export default {...}
+            .replace(/methods\s*:\s*{[\s\S]*?},\s*(?=\w|$)/, '') // 移除已有的methods
+            .trim();
+          
+          componentOptions.splice(closingIndex, 0, customMethods);
+        }
+      } else {
+        // 插入完整脚本
+        const script = component.script
+          .replace(/export\s+default\s*{/, '') // 移除开头
+          .replace(/}\s*$/, ''); // 移除结尾
+        
+        componentOptions.push(script);
+      }
+    }
+    
+    // 组装完整组件定义
+    const componentCode = [
+      '// 生成的量子组件代码',
+      `// 量子基因编码: ${geneCode || 'None'}`,
+      '',
+      'import { QuantumEntanglementChannel } from \'./quantum-core.qjs\';',
+      '',
+      `// ${component.name} 组件定义`,
+      'export default {',
+      componentOptions.join('\n'),
+      '};',
+      '',
+      '// 组件模板',
+      '/* template',
+      component.template,
+      '*/;',
+      '',
+      '// 组件样式',
+      '/* style',
+      component.style,
+      '*/;'
+    ].join('\n');
+    
+    return componentCode;
+  }
+  
+  /**
+   * 映射JavaScript类型
+   * @param {string} typeStr 类型字符串
+   * @returns {string} JavaScript类型
+   * @private
+   */
+  static _mapType(typeStr) {
+    const typeMap = {
+      'string': 'String',
+      'number': 'Number',
+      'boolean': 'Boolean',
+      'array': 'Array',
+      'object': 'Object',
+      'function': 'Function',
+      'date': 'Date',
+      'symbol': 'Symbol',
+      'any': 'null'
+    };
+    
+    return typeMap[typeStr.toLowerCase()] || 'null';
+  }
+  
+  /**
+   * 格式化默认值
+   * @param {string} type 属性类型
+   * @param {string} value 默认值字符串
+   * @returns {string} 格式化后的默认值
+   * @private
+   */
+  static _formatDefaultValue(type, value) {
+    if (value === '') {
+      return "''";
+    }
+    
+    if (type.includes('string')) {
+      return `'${value}'`;
+    } else if (type.includes('number')) {
+      return isNaN(parseFloat(value)) ? '0' : value;
+    } else if (type.includes('boolean')) {
+      return value === 'true' ? 'true' : 'false';
+    } else if (type.includes('array')) {
+      try {
+        JSON.parse(value);
+        return value;
+      } catch (e) {
+        return '[]';
+      }
+    } else if (type.includes('object')) {
+      try {
+        JSON.parse(value);
+        return value;
+      } catch (e) {
+        return '{}';
+      }
+    } else if (type.includes('function')) {
+      return `function() { return ${value}; }`;
+    } else {
+      return `'${value}'`;
+    }
+  }
+}
+
+/**
+ * 模板运行器类
+ */
+class TemplateRunner {
+  /**
+   * 运行编译后的组件
+   * @param {string} compiledCode 编译后的代码
+   * @param {HTMLElement} container 挂载容器
+   * @param {Object} props 组件属性
+   * @returns {Object} 组件实例
+   */
+  static run(compiledCode, container, props = {}) {
+    // 提取模板
+    const templateMatch = compiledCode.match(/\/\* template\n([\s\S]*?)\n\*\/;/);
+    const template = templateMatch ? templateMatch[1] : '';
+    
+    // 提取样式
+    const styleMatch = compiledCode.match(/\/\* style\n([\s\S]*?)\n\*\/;/);
+    const style = styleMatch ? styleMatch[1] : '';
+    
+    // 运行代码获取组件定义
+    const componentDefMatch = compiledCode.match(/export default \{([\s\S]*?)\};/);
+    const componentDef = componentDefMatch ? `{${componentDefMatch[1]}}` : '{}';
+    
+    try {
+      // 创建样式元素
+      if (style) {
+        const styleEl = document.createElement('style');
+        styleEl.textContent = style;
+        document.head.appendChild(styleEl);
+      }
+      
+      // 创建组件构造函数
+      const Component = new Function(
+        'QuantumEntanglementChannel',
+        `const component = ${componentDef};\n` +
+        `component.template = \`${template.replace(/`/g, '\\`')}\`;\n` +
+        'return component;'
+      )(QuantumEntanglementChannel);
+      
+      // 创建组件实例
+      const vm = new Vue({
+        render: h => h(Component, { props })
+      }).$mount();
+      
+      // 挂载到容器
+      container.appendChild(vm.$el);
+      
+      return vm;
+    } catch (error) {
+      console.error('[QuantumCompiler] Error running component:', error);
+      throw error;
+    }
+  }
+}
+
+/**
+ * 量子模板编译器主类
+ */
+class QuantumCompiler {
+  /**
+   * 解析模板
+   * @param {string} template 模板字符串
+   * @returns {Object} 解析结果
+   */
+  static parse(template) {
+    return TemplateParser.parse(template);
+  }
+  
+  /**
+   * 编译模板
+   * @param {string|Object} template 模板字符串或解析结果
+   * @returns {string} 编译后的JavaScript代码
+   */
+  static compile(template) {
+    const parsedTemplate = typeof template === 'string'
+      ? this.parse(template)
+      : template;
+    
+    return TemplateCompiler.compile(parsedTemplate);
+  }
+  
+  /**
+   * 运行模板
+   * @param {string} template 模板字符串
+   * @param {HTMLElement} container 挂载容器
+   * @param {Object} props 组件属性
+   * @returns {Object} 组件实例
+   */
+  static run(template, container, props = {}) {
+    const compiledCode = this.compile(template);
+    return TemplateRunner.run(compiledCode, container, props);
+  }
+  
+  /**
+   * 获取模板中的量子基因编码
+   * @param {string} template 模板字符串
+   * @returns {string|null} 量子基因编码
+   */
+  static getGeneCode(template) {
+    const parsedTemplate = this.parse(template);
+    return parsedTemplate.geneCode;
+  }
+  
+  /**
+   * 获取模板中的纠缠信息
+   * @param {string} template 模板字符串
+   * @returns {Object|null} 纠缠信息
+   */
+  static getEntangleInfo(template) {
+    const parsedTemplate = this.parse(template);
+    return parsedTemplate.entangle;
+  }
+  
+  /**
+   * 获取模板中的组件信息
+   * @param {string} template 模板字符串
+   * @returns {Object|null} 组件信息
+   */
+  static getComponentInfo(template) {
+    const parsedTemplate = this.parse(template);
+    return parsedTemplate.component;
+  }
+}
+
+// 导出量子模板编译器
+export default QuantumCompiler; 
