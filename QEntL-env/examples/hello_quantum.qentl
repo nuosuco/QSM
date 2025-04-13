@@ -1,0 +1,201 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+QEntL示例程序：量子Hello World
+这个示例展示了QEntL语言的基本特性和量子操作。
+"""
+
+# 量子基因编码
+QG-EXAMPLE-HELLO-Q1W0
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-HELLO-WORLD-20250413
+  state: ACTIVE
+  strength: 0.85
+  objects: []
+
+@imports
+  standard: [io, math, random]
+  quantum: [qubit, register, gates]
+
+@constants
+  # 常量定义
+  ITERATIONS = 10
+  MESSAGE = "Hello Quantum World!"
+
+@initialization
+  # 初始化量子寄存器
+  qreg = register.create(2)
+  
+  # 将第一个量子比特置于叠加态
+  gates.hadamard(qreg[0])
+  
+  # 将第二个量子比特置于|0⟩状态
+  gates.reset(qreg[1])
+  
+  # 创建两个量子比特之间的纠缠
+  gates.cnot(qreg[0], qreg[1])
+  
+  # 记录初始状态
+  io.print("初始量子状态:")
+  io.print(register.state_string(qreg))
+
+@function quantum_message(message: str) -> str:
+  """对消息进行量子编码处理
+  
+  Args:
+      message: 要处理的消息
+      
+  Returns:
+      量子处理后的消息
+  """
+  # 创建一个与消息长度相同的量子寄存器
+  message_reg = register.create(len(message) * 8)
+  
+  # 对每个字符进行量子编码
+  for i, char in enumerate(message):
+    # 获取字符的ASCII码
+    ascii_val = char.to_ascii()
+    
+    # 将ASCII码转换为二进制，并编码到量子寄存器中
+    for j in range(8):
+      if (ascii_val & (1 << j)) > 0:
+        gates.pauli_x(message_reg[i * 8 + j])
+      
+    # 在每组8个量子比特上应用Hadamard门，创建叠加态
+    for j in range(8):
+      gates.hadamard(message_reg[i * 8 + j])
+  
+  # 测量并获取结果
+  result = ""
+  for i in range(0, len(message_reg), 8):
+    # 获取8个量子比特的测量结果
+    byte_val = 0
+    for j in range(8):
+      # 测量量子比特
+      measurement = gates.measure(message_reg[i + j])
+      if measurement == 1:
+        byte_val |= (1 << j)
+    
+    # 将测量结果转换回字符
+    result += byte_val.to_char()
+  
+  return result
+
+@function entangle_messages(msg1: str, msg2: str) -> [str, str]:
+  """创建两个量子消息之间的纠缠
+  
+  Args:
+      msg1: 第一个消息
+      msg2: 第二个消息
+      
+  Returns:
+      纠缠后的两个消息
+  """
+  # 确保消息长度相同
+  if len(msg1) != len(msg2):
+    raise Error("消息长度必须相同才能纠缠")
+  
+  # 创建量子寄存器
+  reg1 = register.create(len(msg1) * 8)
+  reg2 = register.create(len(msg2) * 8)
+  
+  # 编码消息
+  for i in range(len(msg1)):
+    for j in range(8):
+      if (msg1[i].to_ascii() & (1 << j)) > 0:
+        gates.pauli_x(reg1[i * 8 + j])
+      
+      if (msg2[i].to_ascii() & (1 << j)) > 0:
+        gates.pauli_x(reg2[i * 8 + j])
+  
+  # 创建纠缠
+  for i in range(len(reg1)):
+    gates.hadamard(reg1[i])
+    gates.cnot(reg1[i], reg2[i])
+  
+  # 测量并获取结果
+  result1 = ""
+  result2 = ""
+  
+  for i in range(0, len(reg1), 8):
+    byte1 = 0
+    byte2 = 0
+    
+    for j in range(8):
+      # 测量量子比特
+      m1 = gates.measure(reg1[i + j])
+      m2 = gates.measure(reg2[i + j])
+      
+      if m1 == 1:
+        byte1 |= (1 << j)
+      
+      if m2 == 1:
+        byte2 |= (1 << j)
+    
+    # 将测量结果转换回字符
+    result1 += byte1.to_char()
+    result2 += byte2.to_char()
+  
+  return [result1, result2]
+
+@entrypoint
+def main():
+  """程序入口点"""
+  io.print(MESSAGE)
+  
+  # 展示量子叠加和测量
+  io.print("\n=== 量子叠加示例 ===")
+  
+  # 创建单个量子比特
+  q = qubit.create()
+  
+  # 应用Hadamard门，创建叠加态
+  gates.hadamard(q)
+  io.print(f"叠加态: {qubit.state_string(q)}")
+  
+  # 多次测量叠加态
+  io.print("\n多次测量结果:")
+  zero_count = 0
+  one_count = 0
+  
+  for i in range(ITERATIONS):
+    # 重置量子比特
+    qubit.reset(q)
+    
+    # 创建叠加态
+    gates.hadamard(q)
+    
+    # 测量
+    result = gates.measure(q)
+    io.print(f"  测量 {i+1}: {result}")
+    
+    if result == 0:
+      zero_count += 1
+    else:
+      one_count += 1
+  
+  io.print(f"\n测量统计: |0⟩出现{zero_count}次, |1⟩出现{one_count}次")
+  
+  # 展示量子纠缠
+  io.print("\n=== 量子纠缠示例 ===")
+  
+  # 量子消息处理
+  io.print("\n原始消息: " + MESSAGE)
+  quantum_result = quantum_message(MESSAGE)
+  io.print("量子处理后: " + quantum_result)
+  
+  # 量子纠缠演示
+  io.print("\n=== 消息纠缠示例 ===")
+  message1 = "Quantum"
+  message2 = "Entangle"
+  io.print(f"消息1: {message1}")
+  io.print(f"消息2: {message2}")
+  
+  [result1, result2] = entangle_messages(message1, message2)
+  io.print(f"纠缠后消息1: {result1}")
+  io.print(f"纠缠后消息2: {result2}")
+  
+  io.print("\n程序执行完成!") 

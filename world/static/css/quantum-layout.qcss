@@ -1,5 +1,356 @@
 /* 量子布局样式 */
 
+/* 量子基因编码 */
+QG-SYS-LAYOUT-UI-STYLE-A1B1
+
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.9,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-animation.qcss"
+  ]
+}
+
+/* 基础布局重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--q-font-family);
+  font-size: var(--q-font-size);
+  line-height: var(--q-line-height-normal);
+  color: var(--q-text-color);
+  background-color: var(--q-bg-color);
+}
+
+/* 栅格系统 */
+.q-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: calc(-1 * var(--q-grid-gutter) / 2);
+}
+
+.q-col {
+  padding: calc(var(--q-grid-gutter) / 2);
+  flex-grow: 1;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+@for $i from 1 to var(--q-grid-columns) {
+  .q-col-$i {
+    flex: 0 0 calc($i / var(--q-grid-columns) * 100%);
+    max-width: calc($i / var(--q-grid-columns) * 100%);
+  }
+}
+
+/* 响应式布局 */
+@media (max-width: var(--q-breakpoint-xs)) {
+  @for $i from 1 to var(--q-grid-columns) {
+    .q-col-xs-$i {
+      flex: 0 0 calc($i / var(--q-grid-columns) * 100%);
+      max-width: calc($i / var(--q-grid-columns) * 100%);
+    }
+  }
+}
+
+@media (min-width: var(--q-breakpoint-sm)) {
+  @for $i from 1 to var(--q-grid-columns) {
+    .q-col-sm-$i {
+      flex: 0 0 calc($i / var(--q-grid-columns) * 100%);
+      max-width: calc($i / var(--q-grid-columns) * 100%);
+    }
+  }
+}
+
+@media (min-width: var(--q-breakpoint-md)) {
+  @for $i from 1 to var(--q-grid-columns) {
+    .q-col-md-$i {
+      flex: 0 0 calc($i / var(--q-grid-columns) * 100%);
+      max-width: calc($i / var(--q-grid-columns) * 100%);
+    }
+  }
+}
+
+@media (min-width: var(--q-breakpoint-lg)) {
+  @for $i from 1 to var(--q-grid-columns) {
+    .q-col-lg-$i {
+      flex: 0 0 calc($i / var(--q-grid-columns) * 100%);
+      max-width: calc($i / var(--q-grid-columns) * 100%);
+    }
+  }
+}
+
+@media (min-width: var(--q-breakpoint-xl)) {
+  @for $i from 1 to var(--q-grid-columns) {
+    .q-col-xl-$i {
+      flex: 0 0 calc($i / var(--q-grid-columns) * 100%);
+      max-width: calc($i / var(--q-grid-columns) * 100%);
+    }
+  }
+}
+
+/* Flex布局 */
+.q-flex {
+  display: flex;
+}
+
+.q-inline-flex {
+  display: inline-flex;
+}
+
+/* 主轴对齐 */
+.q-justify-start {
+  justify-content: flex-start;
+}
+
+.q-justify-end {
+  justify-content: flex-end;
+}
+
+.q-justify-center {
+  justify-content: center;
+}
+
+.q-justify-between {
+  justify-content: space-between;
+}
+
+.q-justify-around {
+  justify-content: space-around;
+}
+
+.q-justify-evenly {
+  justify-content: space-evenly;
+}
+
+/* 交叉轴对齐 */
+.q-items-start {
+  align-items: flex-start;
+}
+
+.q-items-end {
+  align-items: flex-end;
+}
+
+.q-items-center {
+  align-items: center;
+}
+
+.q-items-baseline {
+  align-items: baseline;
+}
+
+.q-items-stretch {
+  align-items: stretch;
+}
+
+/* 自身对齐 */
+.q-self-start {
+  align-self: flex-start;
+}
+
+.q-self-end {
+  align-self: flex-end;
+}
+
+.q-self-center {
+  align-self: center;
+}
+
+.q-self-baseline {
+  align-self: baseline;
+}
+
+.q-self-stretch {
+  align-self: stretch;
+}
+
+/* 方向 */
+.q-flex-row {
+  flex-direction: row;
+}
+
+.q-flex-row-reverse {
+  flex-direction: row-reverse;
+}
+
+.q-flex-col {
+  flex-direction: column;
+}
+
+.q-flex-col-reverse {
+  flex-direction: column-reverse;
+}
+
+/* 换行 */
+.q-flex-wrap {
+  flex-wrap: wrap;
+}
+
+.q-flex-nowrap {
+  flex-wrap: nowrap;
+}
+
+.q-flex-wrap-reverse {
+  flex-wrap: wrap-reverse;
+}
+
+/* 间距 */
+.q-gap-xs {
+  gap: var(--q-spacing-xs);
+}
+
+.q-gap-sm {
+  gap: var(--q-spacing-sm);
+}
+
+.q-gap {
+  gap: var(--q-spacing);
+}
+
+.q-gap-lg {
+  gap: var(--q-spacing-lg);
+}
+
+.q-gap-xl {
+  gap: var(--q-spacing-xl);
+}
+
+/* 容器 */
+.q-container {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: var(--q-spacing);
+  padding-left: var(--q-spacing);
+}
+
+@media (min-width: var(--q-breakpoint-sm)) {
+  .q-container {
+    max-width: calc(var(--q-breakpoint-sm) - var(--q-spacing) * 2);
+  }
+}
+
+@media (min-width: var(--q-breakpoint-md)) {
+  .q-container {
+    max-width: calc(var(--q-breakpoint-md) - var(--q-spacing) * 2);
+  }
+}
+
+@media (min-width: var(--q-breakpoint-lg)) {
+  .q-container {
+    max-width: calc(var(--q-breakpoint-lg) - var(--q-spacing) * 2);
+  }
+}
+
+@media (min-width: var(--q-breakpoint-xl)) {
+  .q-container {
+    max-width: calc(var(--q-breakpoint-xl) - var(--q-spacing) * 2);
+  }
+}
+
+.q-container-fluid {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: var(--q-spacing);
+  padding-left: var(--q-spacing);
+}
+
+/* 定位 */
+.q-relative {
+  position: relative;
+}
+
+.q-absolute {
+  position: absolute;
+}
+
+.q-fixed {
+  position: fixed;
+}
+
+.q-sticky {
+  position: sticky;
+}
+
+/* 显示 */
+.q-block {
+  display: block;
+}
+
+.q-inline-block {
+  display: inline-block;
+}
+
+.q-inline {
+  display: inline;
+}
+
+.q-hidden {
+  display: none;
+}
+
+/* 可见性 */
+.q-visible {
+  visibility: visible;
+}
+
+.q-invisible {
+  visibility: hidden;
+}
+
+/* 溢出 */
+.q-overflow-auto {
+  overflow: auto;
+}
+
+.q-overflow-hidden {
+  overflow: hidden;
+}
+
+.q-overflow-visible {
+  overflow: visible;
+}
+
+.q-overflow-scroll {
+  overflow: scroll;
+}
+
+/* 量子态布局 */
+@quantum-state hover {
+  .q-hover-grow {
+    transform: scale(1.05);
+  }
+
+  .q-hover-shrink {
+    transform: scale(0.95);
+  }
+
+  .q-hover-rotate {
+    transform: rotate(5deg);
+  }
+}
+
+@quantum-state active {
+  .q-active-push {
+    transform: translateY(2px);
+  }
+}
+
+@quantum-state focus {
+  .q-focus-outline {
+    outline: 2px solid var(--q-primary);
+    outline-offset: 2px;
+  }
+}
+
 /* 导航栏 */
 .q-nav {
     position: fixed;
@@ -108,13 +459,6 @@
 .q-grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
 .q-grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
 .q-grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
-
-/* 容器 */
-.q-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 var(--q-spacing-4);
-}
 
 /* 响应式布局 */
 @media (max-width: 768px) {

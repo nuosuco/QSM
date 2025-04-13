@@ -1,0 +1,892 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+WeQ API模块
+提供量子情感网络模型的API接口
+"""
+
+# 量子基因编码
+QG-API-WEQ-EMOTION-N2V8
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-API-WEQ-20240501
+  state: ACTIVE
+  strength: 0.97
+  objects: [
+    "../services/weq_service.qentl",
+    "../models/weq_model.qentl",
+    "../utils/weq_utils.qentl"
+  ]
+
+@imports
+  standard: [json, uuid, logging, time, datetime, os]
+  quantum: [Dict, List, Any, Optional, Union, Path]
+  quantum_flask: [Flask, request, jsonify, Response as FlaskResponse]
+  quantum_flask_cors: [CORS]
+  quantum_internal: [
+    "../services/weq_service.qentl" as weq_service
+  ]
+
+@constants
+  ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+  LOG_DIR = ROOT_DIR / 'logs'
+  
+  API_VERSION = "v1"
+  DEFAULT_PORT = 5002
+  DEFAULT_HOST = "0.0.0.0"
+  
+  # API返回状态码
+  STATUS_SUCCESS = 200
+  STATUS_BAD_REQUEST = 400
+  STATUS_NOT_FOUND = 404
+  STATUS_INTERNAL_ERROR = 500
+  
+  # 接口限流设置
+  RATE_LIMIT = {
+    'analyze_text': 60,           # 每分钟请求数
+    'process_message': 30,
+    'find_matches': 20,
+    'user_management': 30
+  }
+
+@initialization
+  # 创建日志目录
+  LOG_DIR.mkdir(exist_ok=True)
+  
+  # 配置日志
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+    handlers=[
+      logging.FileHandler(LOG_DIR / f'weq_api_{datetime.datetime.now().strftime("%Y%m%d")}.log'),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('WeQ-API')
+  
+  # 创建Flask应用
+  app = Flask("WeQ-API")
+  CORS(app)
+  
+  # 请求计数器（用于限流）
+  request_counters = {}
+
+@function initialize_api() -> None:
+  """初始化API
+  
+  Returns:
+      None
+  """
+  # 初始化服务
+  weq_service.initialize()
+  logger.info("WeQ API 已初始化")
+
+@function api_response(
+             data: Any = None,
+             message: str = "",
+             status: int = STATUS_SUCCESS) -> Dict[str, Any]:
+  """生成API响应格式
+  
+  Args:
+      data: 响应数据
+      message: 响应消息
+      status: 状态码
+      
+  Returns:
+      API响应对象
+  """
+  response = {
+    'status': status,
+    'message': message,
+    'timestamp': time.time(),
+    'api_version': API_VERSION
+  }
+  
+  if data is not None:
+    response['data'] = data
+  
+  return response
+
+@function check_rate_limit(endpoint: str) -> bool:
+  """检查接口是否超过限流
+  
+  Args:
+      endpoint: 接口名称
+      
+  Returns:
+      是否允许请求
+  """
+  current_time = time.time()
+  
+  # 初始化请求计数器
+  if endpoint not in request_counters:
+    request_counters[endpoint] = {
+      'count': 0,
+      'reset_time': current_time + 60  # 1分钟后重置
+    }
+  
+  # 检查是否需要重置计数器
+  if current_time > request_counters[endpoint]['reset_time']:
+    request_counters[endpoint] = {
+      'count': 0,
+      'reset_time': current_time + 60
+    }
+  
+  # 检查限流
+  limit = RATE_LIMIT.get(endpoint, 30)  # 默认限制30次/分钟
+  if request_counters[endpoint]['count'] >= limit:
+    return False
+  
+  # 更新计数器
+  request_counters[endpoint]['count'] += 1
+  return True
+
+@flask_route('/api/<version>/health', methods=['GET'])
+def health_check(version: str) -> FlaskResponse:
+  """健康检查接口
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 获取服务状态
+  models = weq_service.ModelManager.list_models()
+  
+  return jsonify(api_response(
+    data={
+      'status': 'healthy',
+      'models': models,
+      'timestamp': time.time()
+    },
+    message="服务正常"
+  )), STATUS_SUCCESS
+
+@flask_route('/api/<version>/analyze/text', methods=['POST'])
+def analyze_text(version: str) -> FlaskResponse:
+  """分析文本情感
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('analyze_text'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 解析请求
+    data = request.get_json()
+    if not data or 'text' not in data:
+      return jsonify(api_response(
+        message="缺少必要参数: text",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+    
+    text = data['text']
+    
+    # 获取参数
+    include_keywords = data.get('include_keywords', False)
+    
+    # 分析文本
+    emotion_analysis = weq_service.EmotionAnalysisService.analyze_text(text)
+    
+    # 返回结果
+    result = {
+      'emotions': emotion_analysis
+    }
+    
+    # 提取关键词（如果需要）
+    if include_keywords:
+      emotion_keywords = weq_service.EmotionAnalysisService.extract_emotion_keywords(text)
+      result['keywords'] = emotion_keywords
+    
+    return jsonify(api_response(
+      data=result,
+      message="文本情感分析成功"
+    )), STATUS_SUCCESS
+  
+  except Exception as e:
+    logger.error(f"分析文本情感出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/messages', methods=['POST'])
+def process_message(version: str) -> FlaskResponse:
+  """处理消息
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('process_message'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 解析请求
+    data = request.get_json()
+    if not data:
+      return jsonify(api_response(
+        message="请求体不能为空",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+    
+    # 验证必要参数
+    required_fields = ['sender_id', 'content', 'recipients']
+    missing_fields = [field for field in required_fields if field not in data]
+    
+    if missing_fields:
+      return jsonify(api_response(
+        message=f"缺少必要参数: {', '.join(missing_fields)}",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+    
+    # 获取参数
+    message_id = data.get('message_id', f"msg_{uuid.uuid4().hex[:8]}")
+    sender_id = data['sender_id']
+    content = data['content']
+    recipients = data['recipients']
+    message_type = data.get('message_type', 'TEXT')
+    model_id = data.get('model_id', 'default')
+    async_processing = data.get('async', False)
+    
+    if async_processing:
+      # 异步处理
+      task_id = weq_service.MessageProcessor.queue_message({
+        'message_id': message_id,
+        'sender_id': sender_id,
+        'content': content,
+        'recipients': recipients,
+        'message_type': message_type,
+        'model_id': model_id
+      })
+      
+      return jsonify(api_response(
+        data={'task_id': task_id},
+        message="消息已加入处理队列"
+      )), STATUS_SUCCESS
+    else:
+      # 同步处理
+      result = weq_service.MessageProcessor.process_message(
+        message_id=message_id,
+        sender_id=sender_id,
+        content=content,
+        recipients=recipients,
+        message_type=message_type,
+        model_id=model_id
+      )
+      
+      return jsonify(api_response(
+        data=result,
+        message="消息处理成功"
+      )), STATUS_SUCCESS
+  
+  except Exception as e:
+    logger.error(f"处理消息出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/users', methods=['GET'])
+def list_users(version: str) -> FlaskResponse:
+  """获取用户列表
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('user_management'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 获取参数
+    model_id = request.args.get('model_id', 'default')
+    
+    # 获取用户列表
+    users = weq_service.UserManagementService.list_users(model_id)
+    
+    return jsonify(api_response(
+      data={'users': users},
+      message="获取用户列表成功"
+    )), STATUS_SUCCESS
+  
+  except Exception as e:
+    logger.error(f"获取用户列表出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/users/<user_id>', methods=['GET'])
+def get_user(version: str, user_id: str) -> FlaskResponse:
+  """获取用户信息
+  
+  Args:
+      version: API版本
+      user_id: 用户ID
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('user_management'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 获取参数
+    model_id = request.args.get('model_id', 'default')
+    
+    # 获取用户信息
+    try:
+      user_info = weq_service.UserManagementService.get_user(user_id, model_id)
+      
+      return jsonify(api_response(
+        data={'user': user_info},
+        message="获取用户信息成功"
+      )), STATUS_SUCCESS
+    
+    except ValueError:
+      return jsonify(api_response(
+        message=f"用户不存在: {user_id}",
+        status=STATUS_NOT_FOUND
+      )), STATUS_NOT_FOUND
+  
+  except Exception as e:
+    logger.error(f"获取用户信息出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/users', methods=['POST'])
+def add_user(version: str) -> FlaskResponse:
+  """添加用户
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('user_management'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 解析请求
+    data = request.get_json()
+    if not data or 'user_id' not in data:
+      return jsonify(api_response(
+        message="缺少必要参数: user_id",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+    
+    # 获取参数
+    user_id = data['user_id']
+    initial_emotions = data.get('initial_emotions', None)
+    model_id = data.get('model_id', 'default')
+    
+    # 添加用户
+    user_info = weq_service.UserManagementService.add_user(
+      user_id=user_id,
+      initial_emotions=initial_emotions,
+      model_id=model_id
+    )
+    
+    return jsonify(api_response(
+      data={'user': user_info},
+      message="添加用户成功"
+    )), STATUS_SUCCESS
+  
+  except Exception as e:
+    logger.error(f"添加用户出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/users/<user_id>', methods=['PUT'])
+def update_user_emotions(version: str, user_id: str) -> FlaskResponse:
+  """更新用户情感
+  
+  Args:
+      version: API版本
+      user_id: 用户ID
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('user_management'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 解析请求
+    data = request.get_json()
+    if not data or 'emotions' not in data:
+      return jsonify(api_response(
+        message="缺少必要参数: emotions",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+    
+    # 获取参数
+    emotions = data['emotions']
+    model_id = data.get('model_id', 'default')
+    
+    # 更新用户情感
+    try:
+      user_info = weq_service.UserManagementService.update_user_emotions(
+        user_id=user_id,
+        emotions=emotions,
+        model_id=model_id
+      )
+      
+      return jsonify(api_response(
+        data={'user': user_info},
+        message="更新用户情感成功"
+      )), STATUS_SUCCESS
+    
+    except ValueError:
+      return jsonify(api_response(
+        message=f"用户不存在: {user_id}",
+        status=STATUS_NOT_FOUND
+      )), STATUS_NOT_FOUND
+  
+  except Exception as e:
+    logger.error(f"更新用户情感出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/users/<user_id>', methods=['DELETE'])
+def remove_user(version: str, user_id: str) -> FlaskResponse:
+  """移除用户
+  
+  Args:
+      version: API版本
+      user_id: 用户ID
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('user_management'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 获取参数
+    model_id = request.args.get('model_id', 'default')
+    
+    # 移除用户
+    success = weq_service.UserManagementService.remove_user(
+      user_id=user_id,
+      model_id=model_id
+    )
+    
+    if success:
+      return jsonify(api_response(
+        message="移除用户成功"
+      )), STATUS_SUCCESS
+    else:
+      return jsonify(api_response(
+        message=f"用户不存在: {user_id}",
+        status=STATUS_NOT_FOUND
+      )), STATUS_NOT_FOUND
+  
+  except Exception as e:
+    logger.error(f"移除用户出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/matches/<user_id>', methods=['GET'])
+def find_emotional_matches(version: str, user_id: str) -> FlaskResponse:
+  """查找情感匹配用户
+  
+  Args:
+      version: API版本
+      user_id: 用户ID
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('find_matches'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 获取参数
+    model_id = request.args.get('model_id', 'default')
+    num_matches = request.args.get('num_matches', 5)
+    try:
+      num_matches = int(num_matches)
+    except ValueError:
+      num_matches = 5
+    
+    match_type = request.args.get('type', 'similar')
+    
+    try:
+      # 查找匹配
+      if match_type.lower() == 'similar' or match_type.lower() == 'match':
+        matches = weq_service.EmotionAnalysisService.find_emotional_matches(
+          user_id=user_id,
+          num_matches=num_matches,
+          model_id=model_id
+        )
+      elif match_type.lower() == 'complement':
+        matches = weq_service.EmotionAnalysisService.find_emotional_complements(
+          user_id=user_id,
+          num_matches=num_matches,
+          model_id=model_id
+        )
+      else:
+        return jsonify(api_response(
+          message=f"不支持的匹配类型: {match_type}，支持的类型: similar, complement",
+          status=STATUS_BAD_REQUEST
+        )), STATUS_BAD_REQUEST
+      
+      return jsonify(api_response(
+        data={'matches': matches},
+        message=f"查找{'情感互补' if match_type.lower() == 'complement' else '情感匹配'}用户成功"
+      )), STATUS_SUCCESS
+    
+    except ValueError:
+      return jsonify(api_response(
+        message=f"用户不存在: {user_id}",
+        status=STATUS_NOT_FOUND
+      )), STATUS_NOT_FOUND
+  
+  except Exception as e:
+    logger.error(f"查找情感匹配用户出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/group/emotion', methods=['POST'])
+def analyze_group_emotion(version: str) -> FlaskResponse:
+  """分析群组情感
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('analyze_text'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 解析请求
+    data = request.get_json()
+    if not data or 'user_ids' not in data:
+      return jsonify(api_response(
+        message="缺少必要参数: user_ids",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+    
+    # 获取参数
+    user_ids = data['user_ids']
+    model_id = data.get('model_id', 'default')
+    
+    # 分析群组情感
+    try:
+      group_emotion = weq_service.EmotionAnalysisService.analyze_group_emotion(
+        user_ids=user_ids,
+        model_id=model_id
+      )
+      
+      return jsonify(api_response(
+        data={'group_emotion': group_emotion},
+        message="分析群组情感成功"
+      )), STATUS_SUCCESS
+    
+    except ValueError as e:
+      return jsonify(api_response(
+        message=str(e),
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+  
+  except Exception as e:
+    logger.error(f"分析群组情感出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/trajectory/<user_id>', methods=['GET'])
+def analyze_emotional_trajectory(version: str, user_id: str) -> FlaskResponse:
+  """分析情感轨迹
+  
+  Args:
+      version: API版本
+      user_id: 用户ID
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  # 检查限流
+  if not check_rate_limit('analyze_text'):
+    return jsonify(api_response(
+      message="请求过于频繁，请稍后再试",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 获取参数
+    model_id = request.args.get('model_id', 'default')
+    window_size = request.args.get('window_size', 10)
+    try:
+      window_size = int(window_size)
+    except ValueError:
+      window_size = 10
+    
+    # 分析情感轨迹
+    try:
+      trajectory = weq_service.EmotionAnalysisService.analyze_emotional_trajectory(
+        user_id=user_id,
+        window_size=window_size,
+        model_id=model_id
+      )
+      
+      return jsonify(api_response(
+        data={'trajectory': trajectory},
+        message="分析情感轨迹成功"
+      )), STATUS_SUCCESS
+    
+    except ValueError:
+      return jsonify(api_response(
+        message=f"用户不存在: {user_id}",
+        status=STATUS_NOT_FOUND
+      )), STATUS_NOT_FOUND
+  
+  except Exception as e:
+    logger.error(f"分析情感轨迹出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/export', methods=['GET'])
+def export_model_data(version: str) -> FlaskResponse:
+  """导出模型数据
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 获取参数
+    model_id = request.args.get('model_id', 'default')
+    
+    # 导出数据
+    export_path = weq_service.DataExportService.export_model_data(model_id)
+    
+    return jsonify(api_response(
+      data={'export_path': export_path},
+      message="导出模型数据成功"
+    )), STATUS_SUCCESS
+  
+  except Exception as e:
+    logger.error(f"导出模型数据出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@flask_route('/api/<version>/import', methods=['POST'])
+def import_model_data(version: str) -> FlaskResponse:
+  """导入模型数据
+  
+  Args:
+      version: API版本
+      
+  Returns:
+      API响应
+  """
+  if version != API_VERSION:
+    return jsonify(api_response(
+      message=f"不支持的API版本: {version}",
+      status=STATUS_BAD_REQUEST
+    )), STATUS_BAD_REQUEST
+  
+  try:
+    # 解析请求
+    data = request.get_json()
+    if not data or 'filepath' not in data:
+      return jsonify(api_response(
+        message="缺少必要参数: filepath",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+    
+    # 获取参数
+    filepath = data['filepath']
+    model_id = data.get('model_id', 'default')
+    
+    # 导入数据
+    success = weq_service.DataExportService.import_model_data(
+      filepath=filepath,
+      model_id=model_id
+    )
+    
+    if success:
+      return jsonify(api_response(
+        message="导入模型数据成功"
+      )), STATUS_SUCCESS
+    else:
+      return jsonify(api_response(
+        message="导入模型数据失败，请检查数据格式",
+        status=STATUS_BAD_REQUEST
+      )), STATUS_BAD_REQUEST
+  
+  except Exception as e:
+    logger.error(f"导入模型数据出错: {str(e)}")
+    return jsonify(api_response(
+      message=f"内部服务错误: {str(e)}",
+      status=STATUS_INTERNAL_ERROR
+    )), STATUS_INTERNAL_ERROR
+
+@entrypoint
+def run_api(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+  """运行API服务
+  
+  Args:
+      host: 主机地址
+      port: 端口号
+  """
+  try:
+    # 初始化API
+    initialize_api()
+    
+    # 启动Flask应用
+    logger.info(f"WeQ API 服务启动 - http://{host}:{port}")
+    app.run(host=host, port=port)
+  
+  except Exception as e:
+    logger.error(f"API服务启动出错: {str(e)}")
+  
+  finally:
+    # 清理资源
+    weq_service.cleanup()
+
+# 如果直接运行该文件
+if __name__ == "__main__":
+  run_api() 

@@ -1,0 +1,208 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# # 
+"""
+量子基因编码: QE-FIX-FCE4DDE667D7
+纠缠状态: 活跃
+纠缠对象: ['Ref/ref_core.py']
+纠缠强度: 0.98
+"""
+
+# 量子基因编码
+QG-CODE-REF-FIX-F2F3
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.91
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+@imports
+  standard: [os]
+  standard: [re]
+  standard: [sys]
+
+@constants
+  GREEN = '\033[92m'
+  YELLOW = '\033[93m'
+  RED = '\033[91m'
+  RESET = '\033[0m'
+
+
+
+"""
+递归修复项目中所有Python文件的缩进错误
+特别是处理三引号字符串导致的意外缩进
+"""
+
+
+
+@method print_info(message):
+    print(f"{GREEN}[INFO]{RESET} {message}")
+
+@method print_warning(message):
+    print(f"{YELLOW}[WARNING]{RESET} {message}")
+
+@method print_error(message):
+    print(f"{RED}[ERROR]{RESET} {message}")
+
+@method fix_indentation_in_file(file_path):
+    """修复单个文件中的缩进错误，特别是三引号字符串的缩进"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        # 创建备份
+        backup_path = f"{file_path}.bak_indent"
+        with open(backup_path, 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+        
+        modified = False
+        new_lines = []
+        skip_next = False
+        
+        # 用于检测意外的缩进
+        for i, line in enumerate(lines):
+            if skip_next:
+                skip_next = False
+                continue
+                
+            # 检查是否有引号前的意外缩进
+            if re.match(r'^\s+"""', line) or re.match(r'^\s+\'\'\'', line):
+                # 如果之前的行是函数定义或类定义，这可能是合法的缩进
+                if i > 0 and (re.search(r'def\s+\w+\(.*\):', lines[i-1]) or 
+                             re.search(r'class\s+\w+', lines[i-1])):
+                    new_lines.append(line)
+                # 否则可能是错误的缩进
+                else:
+                    # 移除缩进
+                    fixed_line = line.lstrip()
+                    new_lines.append(fixed_line)
+                    modified = True
+                    print_info(f"在 {file_path} 第 {i+1} 行修复了缩进")
+            else:
+                new_lines.append(line)
+        
+        if modified:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines)
+            return True
+        else:
+            # 如果没有修改，删除备份文件
+            os.remove(backup_path)
+            return False
+    
+    except Exception as e:
+        print_error(f"处理文件 {file_path} 时出错: {str(e)}")
+        return False
+
+@method process_directory(directory, recursive=True):
+    """处理指定目录下的所有Python文件"""
+    fixed_count = 0
+    error_count = 0
+    processed_count = 0
+    
+    try:
+        dir_path = Path(directory)
+        if not dir_path.exists():
+            print_error(f"目录不存在: {directory}")
+            return False
+        
+        # 获取所有Python文件
+        python_files = []
+        if recursive:
+            for root, _, files in os.walk(directory):
+                # 跳过.开头的目录
+                if os.path.basename(root).startswith('.') and os.path.basename(root) not in ['.', '..']:
+                    continue
+                    
+                for file in files:
+                    if file.endswith('.py'):
+                        python_files.append(os.path.join(root, file))
+        else:
+            python_files = [f for f in dir_path.glob('*.py') if f.is_file()]
+        
+        print_info(f"在 {directory} 中找到 {len(python_files)} 个Python文件")
+        
+        # 依次处理每个文件
+        for file_path in python_files:
+            processed_count += 1
+            try:
+                if fix_indentation_in_file(file_path):
+                    fixed_count += 1
+            except Exception as e:
+                print_error(f"修复 {file_path} 时出错: {str(e)}")
+                error_count += 1
+        
+        print_info(f"处理完成: 检查了 {processed_count} 个文件，修复了 {fixed_count} 个文件，失败 {error_count} 个文件")
+        return True
+    
+    except Exception as e:
+        print_error(f"处理目录 {directory} 时出错: {str(e)}")
+        return False
+
+@method fix_specific_file(file_path):
+    """修复特定文件"""
+    if not os.path.exists(file_path):
+        print_error(f"文件不存在: {file_path}")
+        return False
+    
+    print_info(f"正在修复文件: {file_path}")
+    if fix_indentation_in_file(file_path):
+        print_info(f"文件 {file_path} 修复成功")
+        return True
+    else:
+        print_info(f"文件 {file_path} 未发现需要修复的问题")
+        return True
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        # 如果提供了参数，视为文件或目录路径
+        path = sys.argv[1]
+        if os.path.isfile(path):
+            fix_specific_file(path)
+        elif os.path.isdir(path):
+            process_directory(path)
+        else:
+            print_error(f"路径无效: {path}")
+    else:
+        # 默认修复特定的文件和关键目录
+        print_info("正在修复关键文件...")
+        
+        # 修复已知存在问题的文件
+        specific_files = [
+            "Ref/monitor/system_monitor_enhancer.py",
+            "Ref/ref_core.py"
+        ]
+        
+        for file in specific_files:
+            if os.path.exists(file):
+                fix_specific_file(file)
+            else:
+                print_warning(f"文件不存在: {file}")
+        
+        # 修复关键目录
+        key_dirs = [
+            "Ref/utils",
+            "Ref/monitor"
+        ]
+        
+        for directory in key_dirs:
+            if os.path.exists(directory):
+                process_directory(directory)
+            else:
+                print_warning(f"目录不存在: {directory}")
+        
+<<<<<<< HEAD
+        print_info("修复完成")
+
+=======
+        print_info("修复完成") 
+>>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea

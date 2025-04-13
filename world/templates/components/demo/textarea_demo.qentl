@@ -1,0 +1,364 @@
+# 量子文本区域组件演示
+# 量子基因: QG-DEMO-TEXTAREA-A1B1
+# 量子纠缠: QE-DEMO-TEXTAREA-20240406
+
+@component q-textarea-demo
+@props
+  demoTitle: string = "量子文本区域组件演示"
+
+@template
+<div class="q-demo-container" 
+     data-quantum-entangle='{
+       "id": "textarea-demo-container",
+       "strength": 0.9,
+       "sync": true
+     }'
+>
+    <h1 class="q-demo-title">${demoTitle}</h1>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">基本用法</h2>
+        <div class="q-demo-box">
+            <q-textarea 
+                placeholder="请输入多行文本" 
+                @input="handleBasicInput" 
+                value="${basicValue}" 
+            />
+            <div class="q-demo-value">输入值: ${basicValue}</div>
+        </div>
+    </section>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">不同尺寸</h2>
+        <div class="q-demo-box q-demo-size-box">
+            <q-textarea 
+                placeholder="小尺寸" 
+                size="small" 
+                rows="3"
+            />
+            <q-textarea 
+                placeholder="中等尺寸" 
+                size="medium" 
+                rows="4"
+            />
+            <q-textarea 
+                placeholder="大尺寸" 
+                size="large" 
+                rows="5"
+            />
+        </div>
+    </section>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">不同状态</h2>
+        <div class="q-demo-box q-demo-status-box">
+            <q-textarea 
+                placeholder="正常状态" 
+            />
+            <q-textarea 
+                placeholder="成功状态" 
+                status="success" 
+                value="这是一个成功状态的文本区域。" 
+            />
+            <q-textarea 
+                placeholder="错误状态" 
+                status="error" 
+                value="这是一个错误状态的文本区域。" 
+            />
+            <q-textarea 
+                placeholder="警告状态" 
+                status="warning" 
+                value="这是一个警告状态的文本区域。" 
+            />
+            <q-textarea 
+                placeholder="禁用状态" 
+                disabled 
+                value="这是一个禁用状态的文本区域。" 
+            />
+            <q-textarea 
+                placeholder="只读状态" 
+                readonly 
+                value="这是一个只读状态的文本区域。" 
+            />
+        </div>
+    </section>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">调整大小方式</h2>
+        <div class="q-demo-box">
+            <div class="q-demo-resize-item">
+                <span class="q-demo-label">不可调整大小</span>
+                <q-textarea 
+                    placeholder="不可调整大小" 
+                    resize="none" 
+                />
+            </div>
+            
+            <div class="q-demo-resize-item">
+                <span class="q-demo-label">可垂直调整大小</span>
+                <q-textarea 
+                    placeholder="可垂直调整大小" 
+                    resize="vertical" 
+                />
+            </div>
+            
+            <div class="q-demo-resize-item">
+                <span class="q-demo-label">可水平调整大小</span>
+                <q-textarea 
+                    placeholder="可水平调整大小" 
+                    resize="horizontal" 
+                />
+            </div>
+            
+            <div class="q-demo-resize-item">
+                <span class="q-demo-label">可自由调整大小</span>
+                <q-textarea 
+                    placeholder="可自由调整大小" 
+                    resize="both" 
+                />
+            </div>
+        </div>
+    </section>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">字数限制与统计</h2>
+        <div class="q-demo-box">
+            <q-textarea 
+                placeholder="请输入文本（最多100个字符）" 
+                maxlength="100" 
+                showCount 
+                value="${countValue}" 
+                @input="handleCountInput" 
+            />
+            <div class="q-demo-value">输入字数: ${countValue ? countValue.length : 0}/100</div>
+        </div>
+    </section>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">自动调整高度</h2>
+        <div class="q-demo-box">
+            <q-textarea 
+                placeholder="输入更多内容将自动增加高度" 
+                autosize 
+                minRows="2" 
+                maxRows="6" 
+            />
+            <div class="q-demo-note">
+                文本区域会根据内容自动调整高度，最小显示2行，最大显示6行。
+            </div>
+        </div>
+    </section>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">不同量子状态</h2>
+        <div class="q-demo-box q-demo-quantum-box">
+            <q-textarea 
+                placeholder="叠加态" 
+                quantumState="superposition" 
+            />
+            <q-textarea 
+                placeholder="纠缠态" 
+                quantumState="entangled" 
+            />
+            <q-textarea 
+                placeholder="聚焦态" 
+                quantumState="focused" 
+            />
+        </div>
+    </section>
+    
+    <section class="q-demo-section">
+        <h2 class="q-demo-section-title">量子纠缠演示</h2>
+        <div class="q-demo-box q-demo-entangle-box">
+            <div class="q-demo-entangle-textareas">
+                <q-textarea 
+                    placeholder="文本区域 A" 
+                    value="${entangledValueA}" 
+                    @input="handleEntangledInputA" 
+                    entangleStrength="0.95" 
+                    quantumState="entangled" 
+                />
+                <div class="q-demo-entangle-connection">⟷</div>
+                <q-textarea 
+                    placeholder="文本区域 B" 
+                    value="${entangledValueB}" 
+                    @input="handleEntangledInputB" 
+                    entangleStrength="0.95" 
+                    quantumState="entangled" 
+                />
+            </div>
+            <div class="q-demo-note">
+                这两个文本区域通过量子纠缠连接，在一个文本区域中输入内容会影响另一个文本区域。
+                尝试在任一文本区域中输入内容，观察量子纠缠效果。
+            </div>
+        </div>
+    </section>
+</div>
+
+@style
+.q-demo-container {
+    padding: var(--q-spacing-6);
+    max-width: 800px;
+    margin: 0 auto;
+    font-family: var(--q-font-sans);
+}
+
+.q-demo-title {
+    margin-bottom: var(--q-spacing-6);
+    color: var(--q-primary);
+    font-size: 1.75rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.q-demo-section {
+    margin-bottom: var(--q-spacing-8);
+    padding: var(--q-spacing-4);
+    border: 1px solid var(--q-gray-200);
+    border-radius: var(--q-radius-lg);
+    background-color: var(--q-white);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.q-demo-section-title {
+    margin-bottom: var(--q-spacing-4);
+    color: var(--q-gray-800);
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.q-demo-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--q-spacing-4);
+}
+
+.q-demo-value {
+    padding: var(--q-spacing-2) var(--q-spacing-4);
+    border-radius: var(--q-radius-md);
+    background-color: var(--q-gray-100);
+    color: var(--q-gray-700);
+    font-size: 0.875rem;
+}
+
+.q-demo-size-box,
+.q-demo-status-box,
+.q-demo-quantum-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--q-spacing-4);
+}
+
+.q-demo-resize-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--q-spacing-2);
+}
+
+.q-demo-label {
+    font-size: 0.875rem;
+    color: var(--q-gray-700);
+    margin-bottom: var(--q-spacing-1);
+}
+
+.q-demo-entangle-box {
+    position: relative;
+}
+
+.q-demo-entangle-textareas {
+    display: flex;
+    align-items: center;
+    gap: var(--q-spacing-4);
+}
+
+.q-demo-entangle-connection {
+    font-size: 1.5rem;
+    color: var(--q-primary);
+    animation: pulse 2s infinite;
+}
+
+.q-demo-note {
+    margin-top: var(--q-spacing-4);
+    padding: var(--q-spacing-2) var(--q-spacing-4);
+    border-radius: var(--q-radius-md);
+    background-color: var(--q-gray-100);
+    color: var(--q-gray-700);
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.5;
+    }
+}
+
+@script
+export default {
+    data() {
+        return {
+            basicValue: '',
+            countValue: '',
+            entangledValueA: '',
+            entangledValueB: ''
+        };
+    },
+    
+    mounted() {
+        // 初始化量子纠缠
+        window.quantumEntangle.addObject('textarea-demo-container');
+        
+        // 添加量子纠缠监听器
+        window.quantumEntangle.on('textarea_change', (data) => {
+            if (data.id.includes('entangled')) {
+                // 处理纠缠输入
+                if (data.value !== this.entangledValueA && data.value !== this.entangledValueB) {
+                    if (Math.random() > 0.5) {
+                        this.entangledValueA = data.value;
+                    } else {
+                        this.entangledValueB = data.value;
+                    }
+                }
+            }
+        });
+    },
+    
+    methods: {
+        handleBasicInput(value) {
+            this.basicValue = value;
+        },
+        
+        handleCountInput(value) {
+            this.countValue = value;
+        },
+        
+        handleEntangledInputA(value) {
+            this.entangledValueA = value;
+            
+            // 根据量子纠缠强度决定是否同步
+            if (Math.random() < 0.95) {
+                this.entangledValueB = value;
+            }
+        },
+        
+        handleEntangledInputB(value) {
+            this.entangledValueB = value;
+            
+            // 根据量子纠缠强度决定是否同步
+            if (Math.random() < 0.95) {
+                this.entangledValueA = value;
+            }
+        }
+    },
+    
+    beforeDestroy() {
+        // 清理量子纠缠
+        window.quantumEntangle.removeObject('textarea-demo-container');
+    }
+} 

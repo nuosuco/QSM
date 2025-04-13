@@ -1,0 +1,366 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+QSM API模块
+提供量子自组织映射社交模型的API接口
+"""
+
+# 量子基因编码
+QG-API-QSM-SOCIAL-A7B3
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-API-QSM-20240501
+  state: ACTIVE
+  strength: 0.95
+  objects: [
+    "QSM/models/qsm_model.qentl",
+    "QSM/utils/qsm_utils.qentl",
+    "QSM/services/qsm_service.qentl"
+  ]
+
+@imports
+  standard: [os, json, logging, datetime, uuid]
+  quantum: [Dict, List, Tuple, Any, Optional, Union, Path]
+  quantum_web: [fastapi, APIRouter, HTTPException, status, Request]
+  quantum_internal: [
+    "../models/qsm_model.qentl" as qsm_model,
+    "../utils/qsm_utils.qentl" as qsm_utils
+  ]
+
+@constants
+  ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+  LOG_DIR = ROOT_DIR / 'logs'
+  API_VERSION = "1.0.0"
+  
+  # API端点常量
+  ENDPOINTS = {
+    'MODEL': '/api/qsm/model',
+    'TRAIN': '/api/qsm/train',
+    'PREDICT': '/api/qsm/predict',
+    'ANALYZE': '/api/qsm/analyze',
+    'RECOMMEND': '/api/qsm/recommend',
+    'VISUALIZE': '/api/qsm/visualize'
+  }
+
+@initialization
+  # 创建路由器
+  router = APIRouter(
+    prefix="/api/qsm",
+    tags=["qsm"],
+    responses={404: {"description": "未找到"}}
+  )
+  
+  # 配置日志
+  LOG_DIR.mkdir(exist_ok=True)
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+    handlers=[
+      logging.FileHandler(LOG_DIR / f'qsm_api_{datetime.datetime.now().strftime("%Y%m%d")}.log'),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('QSM-API')
+  
+  # 创建默认模型实例
+  default_model = qsm_model.create_qsm_model()
+  logger.info(f"创建默认QSM模型: {default_model.to_dict()}")
+
+@route GET "/"
+  @description "获取API信息"
+  @response_model Dict[str, Any]
+  @function()
+    """API根端点，返回基本信息"""
+    return {
+      "name": "QSM API",
+      "version": API_VERSION,
+      "description": "量子自组织映射社交模型API",
+      "quantum_gene": "QG-API-QSM-SOCIAL-A7B3",
+      "endpoints": ENDPOINTS,
+      "timestamp": datetime.datetime.now().isoformat()
+    }
+
+@route GET "/model"
+  @description "获取模型信息"
+  @response_model Dict[str, Any]
+  @function()
+    """获取模型信息端点"""
+    return {
+      "model": default_model.to_dict(),
+      "timestamp": datetime.datetime.now().isoformat()
+    }
+
+@route POST "/train"
+  @description "训练模型"
+  @request_body Dict[str, Any]
+  @response_model Dict[str, Any]
+  @function(data: Dict[str, Any])
+    """训练模型端点
+    
+    Request Body:
+      data: 训练数据列表
+      iterations: 训练迭代次数（可选）
+    """
+    try:
+      # 验证请求数据
+      if "data" not in data:
+        raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="缺少必要的训练数据"
+        )
+      
+      # 获取参数
+      training_data = data["data"]
+      iterations = data.get("iterations", 1000)
+      
+      # 训练模型
+      logger.info(f"开始训练模型: 数据量={len(training_data)}, 迭代次数={iterations}")
+      default_model.train(training_data, iterations=iterations)
+      
+      # 返回结果
+      return {
+        "status": "success",
+        "message": f"模型训练完成: {len(training_data)}个数据点, {iterations}次迭代",
+        "model": default_model.to_dict(),
+        "timestamp": datetime.datetime.now().isoformat()
+      }
+      
+    except Exception as e:
+      logger.error(f"训练过程出错: {str(e)}")
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"训练过程出错: {str(e)}"
+      )
+
+@route POST "/analyze"
+  @description "分析用户关系"
+  @request_body Dict[str, Any]
+  @response_model Dict[str, Any]
+  @function(data: Dict[str, Any])
+    """分析用户关系端点
+    
+    Request Body:
+      user_features: 用户特征字典 {user_id: feature_vector}
+    """
+    try:
+      # 验证请求数据
+      if "user_features" not in data:
+        raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="缺少必要的用户特征数据"
+        )
+      
+      # 获取参数
+      user_features = data["user_features"]
+      
+      # 分析关系
+      logger.info(f"开始分析用户关系: 用户数量={len(user_features)}")
+      relationships = default_model.analyze_relationships(user_features)
+      
+      # 返回结果
+      return {
+        "status": "success",
+        "relationships": relationships,
+        "users_count": len(user_features),
+        "timestamp": datetime.datetime.now().isoformat(),
+        "quantum_signature": f"QS-{uuid.uuid4().hex[:8]}"
+      }
+      
+    except Exception as e:
+      logger.error(f"分析过程出错: {str(e)}")
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"分析过程出错: {str(e)}"
+      )
+
+@route POST "/recommend"
+  @description "推荐用户连接"
+  @request_body Dict[str, Any]
+  @response_model Dict[str, Any]
+  @function(data: Dict[str, Any])
+    """推荐用户连接端点
+    
+    Request Body:
+      user_id: 用户ID
+      user_features: 所有用户的特征向量
+      existing_connections: 现有连接 {user_id: [connected_user_ids]}
+      top_n: 返回的推荐数量（可选）
+    """
+    try:
+      # 验证请求数据
+      required_fields = ["user_id", "user_features", "existing_connections"]
+      for field in required_fields:
+        if field not in data:
+          raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"缺少必要的字段: {field}"
+          )
+      
+      # 获取参数
+      user_id = data["user_id"]
+      user_features = data["user_features"]
+      existing_connections = data["existing_connections"]
+      top_n = data.get("top_n", 5)
+      
+      # 进行推荐
+      logger.info(f"开始为用户 {user_id} 推荐连接")
+      recommendations = default_model.recommend_connections(
+        user_id, 
+        user_features, 
+        existing_connections, 
+        top_n
+      )
+      
+      # 返回结果
+      return {
+        "status": "success",
+        "user_id": user_id,
+        "recommendations": [
+          {"user_id": rec[0], "score": float(rec[1])} 
+          for rec in recommendations
+        ],
+        "timestamp": datetime.datetime.now().isoformat(),
+        "quantum_signature": f"QS-{uuid.uuid4().hex[:8]}"
+      }
+      
+    except Exception as e:
+      logger.error(f"推荐过程出错: {str(e)}")
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"推荐过程出错: {str(e)}"
+      )
+
+@route POST "/visualize"
+  @description "可视化用户网络"
+  @request_body Dict[str, Any]
+  @response_model Dict[str, Any]
+  @function(data: Dict[str, Any])
+    """可视化用户网络端点
+    
+    Request Body:
+      user_features: 用户特征
+      connections: 用户连接
+    """
+    try:
+      # 验证请求数据
+      required_fields = ["user_features", "connections"]
+      for field in required_fields:
+        if field not in data:
+          raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"缺少必要的字段: {field}"
+          )
+      
+      # 获取参数
+      user_features = data["user_features"]
+      connections = data["connections"]
+      
+      # 可视化网络
+      logger.info(f"开始可视化用户网络: 用户数量={len(user_features)}")
+      visualization = default_model.visualize_network(
+        user_features, 
+        connections
+      )
+      
+      # 返回结果
+      return {
+        "status": "success",
+        "visualization": visualization,
+        "users_count": len(user_features),
+        "connections_count": sum(len(targets) for targets in connections.values()),
+        "timestamp": datetime.datetime.now().isoformat(),
+        "quantum_signature": f"QS-{uuid.uuid4().hex[:8]}"
+      }
+      
+    except Exception as e:
+      logger.error(f"可视化过程出错: {str(e)}")
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"可视化过程出错: {str(e)}"
+      )
+
+@route POST "/save"
+  @description "保存模型"
+  @request_body Dict[str, Any]
+  @response_model Dict[str, Any]
+  @function(data: Dict[str, Any] = {})
+    """保存模型端点
+    
+    Request Body:
+      filepath: 保存路径（可选）
+    """
+    try:
+      # 获取参数
+      filepath = data.get("filepath")
+      
+      # 保存模型
+      logger.info(f"开始保存模型: 路径={filepath or '默认'}")
+      saved_path = default_model.save(filepath)
+      
+      # 返回结果
+      return {
+        "status": "success",
+        "message": "模型保存成功",
+        "filepath": saved_path,
+        "timestamp": datetime.datetime.now().isoformat(),
+        "quantum_signature": f"QS-{uuid.uuid4().hex[:8]}"
+      }
+      
+    except Exception as e:
+      logger.error(f"保存模型出错: {str(e)}")
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"保存模型出错: {str(e)}"
+      )
+
+@route POST "/load"
+  @description "加载模型"
+  @request_body Dict[str, str]
+  @response_model Dict[str, Any]
+  @function(data: Dict[str, str])
+    """加载模型端点
+    
+    Request Body:
+      filepath: 模型文件路径
+    """
+    try:
+      # 验证请求数据
+      if "filepath" not in data:
+        raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="缺少必要的文件路径"
+        )
+      
+      # 获取参数
+      filepath = data["filepath"]
+      
+      # 加载模型
+      logger.info(f"开始加载模型: 路径={filepath}")
+      global default_model
+      default_model = qsm_model.QSMModel.load(filepath)
+      
+      # 返回结果
+      return {
+        "status": "success",
+        "message": "模型加载成功",
+        "model": default_model.to_dict(),
+        "timestamp": datetime.datetime.now().isoformat(),
+        "quantum_signature": f"QS-{uuid.uuid4().hex[:8]}"
+      }
+      
+    except Exception as e:
+      logger.error(f"加载模型出错: {str(e)}")
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"加载模型出错: {str(e)}"
+      )
+
+@function get_router() -> APIRouter:
+  """获取API路由器
+  
+  Returns:
+      FastAPI路由器对象
+  """
+  return router 

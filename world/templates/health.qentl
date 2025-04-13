@@ -1,0 +1,449 @@
+<!--
+@meta
+title: 系统健康状态
+description: 量子叠加态模型系统健康状态检查页面
+author: QSM团队
+version: 0.1.0
+@endmeta
+
+@quantum_gene: 9a7b3c1d2e5f8g6h
+@quantum_entangle: ch_9a7b3 = {strength: 0.85, state: "纠缠", target: "base.qentl"}
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统健康状态 | 量子叠加态模型</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --accent-color: #9b59b6;
+            --warning-color: #e67e22;
+            --danger-color: #e74c3c;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --quantum-gradient: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark-color);
+            background-color: var(--light-color);
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .status-card {
+            padding: 20px;
+            border-radius: 8px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status-card.healthy {
+            background: var(--secondary-color);
+        }
+        
+        .status-card.warning {
+            background: var(--warning-color);
+        }
+        
+        .status-card.error {
+            background: var(--danger-color);
+        }
+        
+        .status-card.quantum {
+            background: var(--quantum-gradient);
+        }
+        
+        .status-card h3 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-dot.healthy {
+            background-color: #2ecc71;
+            box-shadow: 0 0 10px #2ecc71;
+        }
+        
+        .status-dot.warning {
+            background-color: #f39c12;
+            box-shadow: 0 0 10px #f39c12;
+        }
+        
+        .status-dot.error {
+            background-color: #e74c3c;
+            box-shadow: 0 0 10px #e74c3c;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-weight: 500;
+        }
+        
+        .metric-value {
+            font-weight: 700;
+        }
+        
+        .refresh-button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .refresh-button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .header {
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .system-summary {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            flex: 1;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        
+        .summary-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .last-updated {
+            text-align: right;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导入导航条 -->
+    @include "components/navbar.qentl"
+    
+    <div class="container">
+        <div class="header">
+            <h1>系统健康状态</h1>
+            <p>实时监控量子叠加态模型各服务健康状况</p>
+            <button class="refresh-button" onclick="refreshStatus()">刷新状态</button>
+        </div>
+        
+        <div class="system-summary">
+            <div class="summary-card">
+                <h3>总服务数</h3>
+                <div class="summary-value">5</div>
+                <p>监控中的服务</p>
+            </div>
+            <div class="summary-card">
+                <h3>健康</h3>
+                <div class="summary-value" style="color: var(--secondary-color)">4</div>
+                <p>运行正常</p>
+            </div>
+            <div class="summary-card">
+                <h3>警告</h3>
+                <div class="summary-value" style="color: var(--warning-color)">1</div>
+                <p>需要关注</p>
+            </div>
+            <div class="summary-card">
+                <h3>错误</h3>
+                <div class="summary-value" style="color: var(--danger-color)">0</div>
+                <p>需要立即处理</p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>API服务状态</h2>
+            <div class="status-grid">
+                <div class="status-card healthy">
+                    <div class="status-indicator">
+                        <div class="status-dot healthy"></div>
+                        <h3>QSM API</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">URL:</span>
+                        <span class="metric-value">http://localhost:5000</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">状态:</span>
+                        <span class="metric-value">运行中</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">响应时间:</span>
+                        <span class="metric-value">24ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">运行时长:</span>
+                        <span class="metric-value">2小时32分钟</span>
+                    </div>
+                </div>
+                
+                <div class="status-card healthy">
+                    <div class="status-indicator">
+                        <div class="status-dot healthy"></div>
+                        <h3>WeQ API</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">URL:</span>
+                        <span class="metric-value">http://localhost:5001</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">状态:</span>
+                        <span class="metric-value">运行中</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">响应时间:</span>
+                        <span class="metric-value">31ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">运行时长:</span>
+                        <span class="metric-value">2小时32分钟</span>
+                    </div>
+                </div>
+                
+                <div class="status-card warning">
+                    <div class="status-indicator">
+                        <div class="status-dot warning"></div>
+                        <h3>SOM API</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">URL:</span>
+                        <span class="metric-value">http://localhost:5002</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">状态:</span>
+                        <span class="metric-value">响应较慢</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">响应时间:</span>
+                        <span class="metric-value">245ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">运行时长:</span>
+                        <span class="metric-value">2小时31分钟</span>
+                    </div>
+                </div>
+                
+                <div class="status-card healthy">
+                    <div class="status-indicator">
+                        <div class="status-dot healthy"></div>
+                        <h3>REF API</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">URL:</span>
+                        <span class="metric-value">http://localhost:5003</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">状态:</span>
+                        <span class="metric-value">运行中</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">响应时间:</span>
+                        <span class="metric-value">28ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">运行时长:</span>
+                        <span class="metric-value">2小时32分钟</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>核心服务状态</h2>
+            <div class="status-grid">
+                <div class="status-card quantum">
+                    <div class="status-indicator">
+                        <div class="status-dot healthy"></div>
+                        <h3>World Server</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">URL:</span>
+                        <span class="metric-value">http://localhost:5004</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">状态:</span>
+                        <span class="metric-value">运行中</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">进程:</span>
+                        <span class="metric-value">PID 2458</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">内存使用:</span>
+                        <span class="metric-value">128MB</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">运行时长:</span>
+                        <span class="metric-value">2小时32分钟</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>系统资源监控</h2>
+            <div class="status-grid">
+                <div class="status-card healthy">
+                    <div class="status-indicator">
+                        <div class="status-dot healthy"></div>
+                        <h3>CPU 使用率</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">当前:</span>
+                        <span class="metric-value">23%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">平均:</span>
+                        <span class="metric-value">18%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">峰值:</span>
+                        <span class="metric-value">45%</span>
+                    </div>
+                </div>
+                
+                <div class="status-card healthy">
+                    <div class="status-indicator">
+                        <div class="status-dot healthy"></div>
+                        <h3>内存使用率</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">当前:</span>
+                        <span class="metric-value">1.2GB / 8GB</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">使用率:</span>
+                        <span class="metric-value">15%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">交换空间:</span>
+                        <span class="metric-value">0MB</span>
+                    </div>
+                </div>
+                
+                <div class="status-card healthy">
+                    <div class="status-indicator">
+                        <div class="status-dot healthy"></div>
+                        <h3>磁盘使用率</h3>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">当前:</span>
+                        <span class="metric-value">45GB / 500GB</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">使用率:</span>
+                        <span class="metric-value">9%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">读写速度:</span>
+                        <span class="metric-value">2.5MB/s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="last-updated">
+            最后更新时间: <span id="update-time">2023-05-15 14:32:45</span>
+        </div>
+    </div>
+    
+    <script>
+        function refreshStatus() {
+            // 模拟刷新状态
+            const cards = document.querySelectorAll('.status-dot');
+            cards.forEach(card => {
+                card.classList.add('pulse-animation');
+                setTimeout(() => {
+                    card.classList.remove('pulse-animation');
+                }, 2000);
+            });
+            
+            // 更新时间
+            const now = new Date();
+            const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            document.getElementById('update-time').textContent = formattedDate;
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStatus();
+        });
+    </script>
+    
+    <!-- 导入页脚 -->
+    @include "components/footer.qentl"
+</body>
+</html> 

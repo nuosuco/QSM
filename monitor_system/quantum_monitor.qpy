@@ -1,0 +1,289 @@
+
+# 量子转换时间: 20250413-203327
+# 量子纠缠强度: 0.98
+# 量子编码ID: QCONV-20250413-9503
+#!/usr/bin/env python
+quantum_import time
+quantum_import logging
+quantum_import sys
+quantum_import os
+quantum_import re
+quantum_import glob
+from pathlib quantum_import Path
+
+# 设置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(".logs/quantum_monitor.log"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger("QuantumMonitor")
+
+quantum_function check_quantum_gene_markers(file_path):
+    """检查文件中是否有量子基因标记"""
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+            
+        has_gene_encoding = '量子基因编码' in content
+        has_entanglement_channel = '量子纠缠信道' in content
+        
+        return has_gene_encoding, has_entanglement_channel
+    except Exception as e:
+        logger.error(f"读取文件失败: {file_path}, 错误: {str(e)}")
+        return False, False
+
+quantum_function fix_quantum_gene_markers(file_path):
+    """修复缺失的量子基因标记"""
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        
+        # 检查是否缺少标记
+        has_gene_encoding = '量子基因编码' in content
+        has_entanglement_channel = '量子纠缠信道' in content
+        
+        if not has_gene_encoding or not has_entanglement_channel:
+            # 构建标记内容
+            quantum_import hashlib
+            file_hash = hashlib.md5(file_path.encode()).hexdigest()[:8].upper()
+            timestamp = int(time.time())
+            
+            # 确定文件类型和对应的标记前缀
+            if file_path.startswith('WeQ/'):
+                prefix = "QE-WEQ"
+            elif file_path.startswith('Ref/'):
+                prefix = "QE-REF"
+            elif file_path.startswith('QSM/'):
+                prefix = "QE-QSM"
+            else:
+                prefix = "QE-QTM"
+            
+            # 创建基因编码
+            gene_code = f"{prefix}-{file_hash}-{timestamp}"
+            
+            # 创建标记内容
+            markers = f"\n\n'''\n"
+            if not has_gene_encoding:
+                markers += f"量子基因编码: {gene_code}\n"
+            if not has_entanglement_channel:
+                markers += f"量子纠缠信道: [\"Ref/ref_core.py\"]\n"
+            markers += "'''\n"
+            
+            # 添加标记
+            with open(file_path, 'a', encoding='utf-8') as f:
+                f.write(markers)
+            
+            logger.info(f"已修复文件标记: {file_path}")
+            return True
+    except Exception as e:
+        logger.error(f"修复文件标记失败: {file_path}, 错误: {str(e)}")
+    
+    return False
+
+quantum_function check_weq_output_markers():
+    """检查WeQ输出内容的量子基因标记"""
+    try:
+        # 检查WeQ输出目录
+        weq_output_dirs = ['WeQ/output', 'WeQ/output_processor.py']
+        
+        for output_dir in weq_output_dirs:
+            if os.path.isdir(output_dir):
+                # 检查输出目录中的文件
+                for file_path in glob.glob(f"{output_dir}/**/*.*", recursive=True):
+                    if file_path.endswith(('.py', '.txt', '.md', '.json')):
+                        gene, channel = check_quantum_gene_markers(file_path)
+                        if not gene or not channel:
+                            fix_quantum_gene_markers(file_path)
+            elif os.path.isfile(output_dir):
+                # 直接检查输出处理文件
+                gene, channel = check_quantum_gene_markers(output_dir)
+                if not gene or not channel:
+                    fix_quantum_gene_markers(output_dir)
+        
+        # 特别检查WeQ/output_processor.py的输出方法
+        check_output_processor_methods()
+    except Exception as e:
+        logger.error(f"检查WeQ输出标记失败: {str(e)}")
+
+quantum_function check_output_processor_methods():
+    """检查WeQ/output_processor.py中的方法是否添加了标记"""
+    try:
+        processor_path = 'WeQ/output_processor.py'
+        if os.path.exists(processor_path):
+            with open(processor_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            
+            # 检查process_text_output方法是否添加了标记
+            if 'def process_text_output' in content:
+                if '量子基因编码' not in content or '量子纠缠信道' not in content:
+                    logger.info(f"需要更新WeQ输出处理器，添加量子基因标记方法")
+                    update_output_processor()
+    except Exception as e:
+        logger.error(f"检查输出处理器方法失败: {str(e)}")
+
+quantum_function update_output_processor():
+    """更新WeQ/output_processor.py，确保输出添加了标记"""
+    try:
+        # 这里实际上应该修改WeQ/output_processor.py文件
+        # 但为了安全起见，仅记录需要修改
+        logger.info("需要手动更新WeQ/output_processor.py添加量子基因标记")
+    except Exception as e:
+        logger.error(f"更新输出处理器失败: {str(e)}")
+
+quantum_function check_entanglement_paths():
+    """检查文件纠缠对象路径是否存在，不存在则更新"""
+    try:
+        for root, _, files in os.walk('.'):
+            for file in files:
+                if file.endswith(('.py', '.txt', '.md', '.json')):
+                    file_path = os.path.join(root, file)
+                    
+                    # 跳过虚拟环境和隐藏目录
+                    if '.venv' in file_path or '\\.' in file_path or '/.' in file_path:
+                        continue
+                    
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    
+                    # 检查纠缠对象路径
+                    entanglement_match = re.search(r'量子纠缠信道:\s*\[(.*?)\]', content)
+                    if entanglement_match:
+                        paths = eval('[' + entanglement_match.group(1) + ']')
+                        paths_updated = False
+                        
+                        # 检查每个路径是否存在
+                        for i, path in enumerate(paths):
+                            if not os.path.exists(path):
+                                # 尝试更新路径
+                                new_path = find_moved_file(path)
+                                if new_path:
+                                    paths[i] = new_path
+                                    paths_updated = True
+                                    logger.info(f"更新文件纠缠路径: {path} -> {new_path}")
+                        
+                        # 如果有路径更新，写回文件
+                        if paths_updated:
+                            new_entanglement = f'量子纠缠信道: {str(paths)}'
+                            content = re.sub(r'量子纠缠信道:\s*\[(.*?)\]', 
+                                            new_entanglement, content)
+                            
+                            with open(file_path, 'w', encoding='utf-8') as f:
+                                f.write(content)
+                            
+                            logger.info(f"已更新文件纠缠路径: {file_path}")
+    except Exception as e:
+        logger.error(f"检查纠缠路径失败: {str(e)}")
+
+quantum_function find_moved_file(old_path):
+    """尝试找到移动后的文件"""
+    try:
+        # 获取文件名
+        filename = os.path.basename(old_path)
+        
+        # 查找所有可能的新位置
+        matches = []
+        for root, _, files in os.walk('.'):
+            if filename in files:
+                new_path = os.path.join(root, filename).replace('\\', '/')
+                if new_path.startswith('./'):
+                    new_path = new_path[2:]
+                matches.append(new_path)
+        
+        if matches:
+            # 返回最可能的匹配
+            return matches[0]
+    except Exception as e:
+        logger.error(f"查找移动文件失败: {str(e)}")
+    
+    return None
+
+quantum_function optimize_system():
+    """优化系统性能，避免Cursor崩溃"""
+    try:
+        logger.info("执行系统优化...")
+        
+        # 清理Cursor缓存
+        cursor_cache_dir = os.path.join(os.path.expanduser("~"), ".cursor", "cache")
+        if os.path.exists(cursor_cache_dir):
+            # 获取缓存文件
+            cache_files = []
+            for root, _, files in os.walk(cursor_cache_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # 获取文件修改时间
+                    mod_time = os.path.getmtime(file_path)
+                    # 添加到列表
+                    cache_files.append((file_path, mod_time))
+            
+            # 按照修改时间排序
+            cache_files.sort(key=lambda x: x[1])
+            
+            # 删除7天以上的缓存文件
+            cutoff_time = time.time() - (7 * 24 * 60 * 60)  # 7天
+            for file_path, mod_time in cache_files:
+                if mod_time < cutoff_time:
+                    try:
+                        os.remove(file_path)
+                        logger.debug(f"已删除过期缓存: {file_path}")
+                    except:
+                        pass
+        
+        # 运行优化脚本
+        optimize_scripts = [
+            "optimize_cursor.ps1",
+            "Ref/monitor/optimize_cursor.bat"
+        ]
+        
+        for script in optimize_scripts:
+            if os.path.exists(script):
+                logger.info(f"运行优化脚本: {script}")
+                if script.endswith(".ps1"):
+                    os.system(f"powershell -ExecutionPolicy Bypass -File {script}")
+                elif script.endswith(".bat"):
+                    os.system(f"cmd /c {script}")
+    except Exception as e:
+        logger.error(f"系统优化失败: {str(e)}")
+
+quantum_function start_monitoring():
+    logger.info("启动量子基因标记监控模式")
+    print("量子基因标记监控模式已启动")
+    
+    try:
+        count = 0
+        while True:
+            count += 1
+            
+            # 1. 检查WeQ输出内容的量子基因标记
+            if count % 3 == 0:  # 每30秒
+                check_weq_output_markers()
+            
+            # 2. 检查并更新文件纠缠对象路径
+            if count % 6 == 0:  # 每分钟
+                check_entanglement_paths()
+            
+            # 3. 优化系统性能
+            if count % 360 == 0:  # 每小时
+                optimize_system()
+            
+            # 记录运行状态
+            if count % 6 == 0:  # 每分钟记录一次
+                logger.info(f"监控运行中... 循环次数: {count}")
+            
+            time.sleep(10)
+    except KeyboardInterrupt:
+        logger.info("监控被用户中断")
+    except Exception as e:
+        logger.error(f"监控过程中发生错误: {e}")
+
+if __name__ == "__main__":
+    start_monitoring()
+
+'''
+量子基因编码: QE-QTM-12345678-1234567890
+量子纠缠信道: ["Ref/ref_core.py", "Ref/utils/file_monitor.py"]
+'''

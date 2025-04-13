@@ -1,0 +1,465 @@
+/* 量子基因编码 */
+QG-PAGE-DEMO-WORLD-TEST-A1B1
+
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.9,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-layout.qcss",
+    "world/static/css/quantum-responsive.qcss",
+    "world/static/css/quantum-animation.qcss"
+  ]
+}
+
+/* 页面定义 */
+@extends('base.qentl')
+
+@section('title', '量子UI组件演示')
+
+@section('content')
+<div class="q-container">
+  <div class="q-row">
+    <div class="q-col-12">
+      <h1 class="q-text-center q-mt-lg q-mb-lg">量子UI组件演示</h1>
+      <p class="q-text-center q-mb-xl">展示量子叠加态模型的UI组件系统功能</p>
+    </div>
+  </div>
+  
+  <!-- 组件演示区域 -->
+  <div class="q-row">
+    <div class="q-col-md-3">
+      <div class="q-sidebar">
+        <h3>组件导航</h3>
+        <ul class="q-menu q-menu-vertical">
+          <li class="q-menu-item">
+            <a href="#card" data-nav="card">卡片组件</a>
+          </li>
+          <li class="q-menu-item">
+            <a href="#form" data-nav="form">表单组件</a>
+          </li>
+          <li class="q-menu-item">
+            <a href="#dialog" data-nav="dialog">对话框组件</a>
+          </li>
+          <li class="q-menu-item">
+            <a href="#grid" data-nav="grid">栅格系统</a>
+          </li>
+          <li class="q-menu-item">
+            <a href="#buttons" data-nav="buttons">按钮组件</a>
+          </li>
+          <li class="q-menu-item">
+            <a href="#notification" data-nav="notification">通知组件</a>
+          </li>
+          <li class="q-menu-item">
+            <a href="#progress" data-nav="progress">进度条组件</a>
+          </li>
+          <li class="q-menu-item">
+            <a href="#tooltip" data-nav="tooltip">提示框组件</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="q-col-md-9">
+      <div class="q-content">
+        <!-- 卡片组件 -->
+        <section id="card" class="q-section">
+          <h2 class="q-section-title">卡片组件</h2>
+          <div class="q-row">
+            <div class="q-col-md-4">
+              <q-card title="基础卡片" content="这是一个基础卡片示例，展示了卡片的基本用法。" />
+            </div>
+            <div class="q-col-md-4">
+              <q-card 
+                title="带图片的卡片" 
+                image="/static/img/demo/card-image.jpg" 
+                content="这张卡片包含了图片、内容和操作按钮。" 
+                :actions="[
+                  { text: '查看详情', type: 'primary' },
+                  { text: '取消', type: 'default' }
+                ]" />
+            </div>
+            <div class="q-col-md-4">
+              <q-card 
+                title="高级卡片" 
+                shadow="hover" 
+                content="这是一个高级卡片，鼠标悬停时显示阴影效果，支持量子态动画。" 
+                :actions="[{ text: '了解更多', type: 'primary' }]"
+                :quantum="{ stateAnimation: true, entangleStrength: 0.9 }" />
+            </div>
+          </div>
+        </section>
+        
+        <!-- 表单组件 -->
+        <section id="form" class="q-section">
+          <h2 class="q-section-title">表单组件</h2>
+          <q-form 
+            :fields="[
+              { type: 'text', name: 'username', label: '用户名', placeholder: '请输入用户名', required: true },
+              { type: 'password', name: 'password', label: '密码', placeholder: '请输入密码', required: true },
+              { type: 'email', name: 'email', label: '邮箱', placeholder: '请输入邮箱地址' },
+              { 
+                type: 'select', 
+                name: 'role', 
+                label: '角色', 
+                options: [
+                  { value: 'admin', label: '管理员' },
+                  { value: 'user', label: '普通用户' },
+                  { value: 'guest', label: '访客' }
+                ] 
+              },
+              { type: 'checkbox', name: 'remember', label: '记住我', value: true },
+              { 
+                type: 'radio', 
+                name: 'gender', 
+                label: '性别', 
+                options: [
+                  { value: 'male', label: '男' },
+                  { value: 'female', label: '女' }
+                ] 
+              }
+            ]" 
+            submitText="提交表单" 
+            cancelText="重置" 
+            layout="horizontal" 
+            :labelWidth="100" />
+        </section>
+        
+        <!-- 对话框组件 -->
+        <section id="dialog" class="q-section">
+          <h2 class="q-section-title">对话框组件</h2>
+          <div class="q-row">
+            <div class="q-col-md-6">
+              <q-button type="primary" @click="openDialog('basicDialog')">打开基础对话框</q-button>
+              <q-dialog id="basicDialog" title="基础对话框" width="400px">
+                <div slot="content">
+                  <p>这是一个基础对话框示例，展示了对话框的基本用法。</p>
+                </div>
+                <div slot="footer">
+                  <q-button type="primary" @click="closeDialog('basicDialog')">确定</q-button>
+                  <q-button type="default" @click="closeDialog('basicDialog')">取消</q-button>
+                </div>
+              </q-dialog>
+            </div>
+            <div class="q-col-md-6">
+              <q-button type="warning" @click="openDialog('confirmDialog')">打开确认对话框</q-button>
+              <q-dialog id="confirmDialog" title="确认操作" type="warning" width="400px">
+                <div slot="content">
+                  <p>您确定要执行此操作吗？此操作无法撤销。</p>
+                </div>
+                <div slot="footer">
+                  <q-button type="warning" @click="confirmAction">确认</q-button>
+                  <q-button type="default" @click="closeDialog('confirmDialog')">取消</q-button>
+                </div>
+              </q-dialog>
+            </div>
+          </div>
+        </section>
+        
+        <!-- 栅格系统 -->
+        <section id="grid" class="q-section">
+          <h2 class="q-section-title">栅格系统</h2>
+          <div class="q-row q-mb-md">
+            <div class="q-col-md-6">
+              <div class="q-grid-demo">列宽 6/12</div>
+            </div>
+            <div class="q-col-md-6">
+              <div class="q-grid-demo">列宽 6/12</div>
+            </div>
+          </div>
+          <div class="q-row q-mb-md">
+            <div class="q-col-md-4">
+              <div class="q-grid-demo">列宽 4/12</div>
+            </div>
+            <div class="q-col-md-4">
+              <div class="q-grid-demo">列宽 4/12</div>
+            </div>
+            <div class="q-col-md-4">
+              <div class="q-grid-demo">列宽 4/12</div>
+            </div>
+          </div>
+          <div class="q-row q-mb-md">
+            <div class="q-col-md-3">
+              <div class="q-grid-demo">列宽 3/12</div>
+            </div>
+            <div class="q-col-md-3">
+              <div class="q-grid-demo">列宽 3/12</div>
+            </div>
+            <div class="q-col-md-3">
+              <div class="q-grid-demo">列宽 3/12</div>
+            </div>
+            <div class="q-col-md-3">
+              <div class="q-grid-demo">列宽 3/12</div>
+            </div>
+          </div>
+          <div class="q-row">
+            <div class="q-col-xs-12 q-col-sm-6 q-col-md-4 q-col-lg-3">
+              <div class="q-grid-demo">响应式列</div>
+            </div>
+            <div class="q-col-xs-12 q-col-sm-6 q-col-md-4 q-col-lg-3">
+              <div class="q-grid-demo">响应式列</div>
+            </div>
+            <div class="q-col-xs-12 q-col-sm-6 q-col-md-4 q-col-lg-3">
+              <div class="q-grid-demo">响应式列</div>
+            </div>
+            <div class="q-col-xs-12 q-col-sm-6 q-col-md-4 q-col-lg-3">
+              <div class="q-grid-demo">响应式列</div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- 按钮组件 -->
+        <section id="buttons" class="q-section">
+          <h2 class="q-section-title">按钮组件</h2>
+          <div class="q-row">
+            <div class="q-col-12">
+              <q-button type="default" class="q-mr-sm">默认按钮</q-button>
+              <q-button type="primary" class="q-mr-sm">主要按钮</q-button>
+              <q-button type="success" class="q-mr-sm">成功按钮</q-button>
+              <q-button type="warning" class="q-mr-sm">警告按钮</q-button>
+              <q-button type="danger" class="q-mr-sm">危险按钮</q-button>
+              <q-button type="info" class="q-mr-sm">信息按钮</q-button>
+            </div>
+          </div>
+          <div class="q-row q-mt-md">
+            <div class="q-col-12">
+              <q-button type="primary" shape="round" class="q-mr-sm">圆角按钮</q-button>
+              <q-button type="primary" shape="circle" icon="search" class="q-mr-sm"></q-button>
+              <q-button type="primary" size="large" class="q-mr-sm">大号按钮</q-button>
+              <q-button type="primary" size="default" class="q-mr-sm">默认大小</q-button>
+              <q-button type="primary" size="small" class="q-mr-sm">小号按钮</q-button>
+              <q-button type="primary" disabled class="q-mr-sm">禁用按钮</q-button>
+            </div>
+          </div>
+        </section>
+        
+        <!-- 通知组件 -->
+        <section id="notification" class="q-section">
+          <h2 class="q-section-title">通知组件</h2>
+          <div class="q-row">
+            <div class="q-col-md-6">
+              <q-button type="primary" @click="showNotification('info')">显示信息通知</q-button>
+              <q-button type="success" @click="showNotification('success')" class="q-ml-sm">显示成功通知</q-button>
+            </div>
+            <div class="q-col-md-6">
+              <q-button type="warning" @click="showNotification('warning')">显示警告通知</q-button>
+              <q-button type="danger" @click="showNotification('error')" class="q-ml-sm">显示错误通知</q-button>
+            </div>
+          </div>
+        </section>
+        
+        <!-- 进度条组件 -->
+        <section id="progress" class="q-section">
+          <h2 class="q-section-title">进度条组件</h2>
+          <div class="q-row">
+            <div class="q-col-md-6">
+              <h4>线形进度条</h4>
+              <q-progress :percentage="30" class="q-mb-md" />
+              <q-progress :percentage="50" status="success" class="q-mb-md" />
+              <q-progress :percentage="80" status="warning" class="q-mb-md" />
+              <q-progress :percentage="100" status="error" class="q-mb-md" />
+              <q-progress :percentage="50" :striped="true" :stripedFlow="true" />
+            </div>
+            <div class="q-col-md-6">
+              <h4>环形进度条</h4>
+              <div class="q-flex q-justify-around">
+                <q-progress type="circle" :percentage="30" />
+                <q-progress type="circle" :percentage="70" status="success" />
+                <q-progress type="dashboard" :percentage="80" status="warning" />
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- 提示框组件 -->
+        <section id="tooltip" class="q-section">
+          <h2 class="q-section-title">提示框组件</h2>
+          <div class="q-row">
+            <div class="q-col-12 q-flex q-justify-center q-align-center">
+              <q-tooltip content="上方提示" placement="top">
+                <q-button>上方提示</q-button>
+              </q-tooltip>
+              <q-tooltip content="右侧提示" placement="right">
+                <q-button class="q-ml-lg">右侧提示</q-button>
+              </q-tooltip>
+              <q-tooltip content="下方提示" placement="bottom">
+                <q-button class="q-ml-lg">下方提示</q-button>
+              </q-tooltip>
+              <q-tooltip content="左侧提示" placement="left">
+                <q-button class="q-ml-lg">左侧提示</q-button>
+              </q-tooltip>
+              <q-popconfirm 
+                title="确定删除这条记录吗？" 
+                confirm-text="确定" 
+                cancel-text="取消"
+                @confirm="handleConfirm" 
+                @cancel="handleCancel">
+                <q-button type="danger" class="q-ml-lg">删除</q-button>
+              </q-popconfirm>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+@endsection
+
+@section('styles')
+<style>
+.q-section {
+  margin-bottom: 60px;
+  padding-top: 20px;
+}
+
+.q-section-title {
+  font-size: 24px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--q-border-color);
+}
+
+.q-sidebar {
+  position: sticky;
+  top: 20px;
+  padding: 20px;
+  border-radius: var(--q-border-radius);
+  background-color: var(--q-bg-color);
+  box-shadow: var(--q-shadow-sm);
+}
+
+.q-sidebar h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.q-menu-item {
+  margin-bottom: 10px;
+}
+
+.q-menu-item a {
+  display: block;
+  padding: 8px 12px;
+  color: var(--q-text-color);
+  border-radius: var(--q-border-radius);
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.q-menu-item a:hover,
+.q-menu-item a.active {
+  background-color: var(--q-primary-light);
+  color: var(--q-primary);
+}
+
+.q-grid-demo {
+  background-color: var(--q-primary-light);
+  color: var(--q-primary);
+  padding: 10px;
+  text-align: center;
+  border-radius: var(--q-border-radius);
+  margin-bottom: 10px;
+}
+</style>
+@endsection
+
+@section('scripts')
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // 实现滚动导航高亮
+    const sections = document.querySelectorAll('.q-section');
+    const navItems = document.querySelectorAll('.q-menu-item a');
+    
+    function setActiveNavItem() {
+      const scrollPosition = window.scrollY;
+      
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 100;
+        const sectionHeight = section.offsetHeight;
+        const sectionId = section.getAttribute('id');
+        
+        if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+          navItems.forEach(item => {
+            item.classList.remove('active');
+            if (item.getAttribute('data-nav') === sectionId) {
+              item.classList.add('active');
+            }
+          });
+        }
+      });
+    }
+    
+    window.addEventListener('scroll', setActiveNavItem);
+    setActiveNavItem();
+    
+    // 平滑滚动到锚点
+    navItems.forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.preventDefault();
+        const targetId = this.getAttribute('href');
+        const targetElement = document.querySelector(targetId);
+        
+        window.scrollTo({
+          top: targetElement.offsetTop - 20,
+          behavior: 'smooth'
+        });
+      });
+    });
+  });
+  
+  // 对话框操作
+  function openDialog(id) {
+    const dialog = document.getElementById(id);
+    if (dialog) {
+      dialog.visible = true;
+    }
+  }
+  
+  function closeDialog(id) {
+    const dialog = document.getElementById(id);
+    if (dialog) {
+      dialog.visible = false;
+    }
+  }
+  
+  function confirmAction() {
+    showNotification('success', '操作已确认！');
+    closeDialog('confirmDialog');
+  }
+  
+  // 通知操作
+  function showNotification(type) {
+    const titles = {
+      info: '信息通知',
+      success: '成功通知',
+      warning: '警告通知',
+      error: '错误通知'
+    };
+    
+    const messages = {
+      info: '这是一条信息通知，用于展示普通信息。',
+      success: '操作成功完成！这是一条成功通知。',
+      warning: '请注意，这是一条警告通知！',
+      error: '操作失败！这是一条错误通知。'
+    };
+    
+    if (window.quantumUI && window.quantumUI.notification) {
+      window.quantumUI.notification[type]({
+        title: titles[type],
+        message: messages[type],
+        duration: 4500
+      });
+    }
+  }
+  
+  // 确认框回调
+  function handleConfirm() {
+    showNotification('success', '删除成功！');
+  }
+  
+  function handleCancel() {
+    showNotification('info', '操作已取消');
+  }
+</script>
+@endsection 

@@ -1,0 +1,353 @@
+# 量子输入组件
+# 量子基因: QG-COMP-INPUT-A2B3
+# 量子纠缠: QE-COMP-INPUT-20240406
+
+@component q-input
+@props
+  type: string = "text"           # 输入类型: text/password/email/number/tel/etc
+  value: string = ""              # 输入值
+  name: string = ""               # 字段名
+  placeholder: string = ""        # 占位文本
+  disabled: boolean = false       # 是否禁用
+  readonly: boolean = false       # 是否只读
+  required: boolean = false       # 是否必填
+  autofocus: boolean = false      # 是否自动聚焦
+  autocomplete: string = "off"    # 自动完成
+  min: number = null              # 最小值 (number类型)
+  max: number = null              # 最大值 (number类型)
+  minlength: number = null        # 最小长度
+  maxlength: number = null        # 最大长度
+  pattern: string = null          # 验证模式
+  size: string = "medium"         # 尺寸: small/medium/large
+  status: string = ""             # 状态: success/error/warning
+  prefix: string = ""             # 前缀图标或文本
+  suffix: string = ""             # 后缀图标或文本
+  clearable: boolean = false      # 是否可清除
+  showPasswordToggle: boolean = false  # 是否显示密码切换
+  entangleStrength: number = 0.85  # 量子纠缠强度
+  quantumState: string = "superposition"  # 量子状态: superposition/entangled/focused
+  
+@template
+<div class="q-input-wrapper" 
+     data-size="${size}" 
+     data-status="${status}"
+     data-quantum-state="${quantumState}"
+     data-quantum-entangle='{
+       "id": "input-${@id}",
+       "strength": ${entangleStrength},
+       "sync": true
+     }'
+>
+    @if prefix
+    <div class="q-input-prefix">
+        ${prefix}
+    </div>
+    @endif
+    
+    <div class="q-input-container">
+        <input
+            type="${type === 'password' && showPassword ? 'text' : type}"
+            name="${name}"
+            value="${value}"
+            placeholder="${placeholder}"
+            class="q-input"
+            :disabled="disabled"
+            :readonly="readonly"
+            :required="required"
+            :autofocus="autofocus"
+            autocomplete="${autocomplete}"
+            :min="min"
+            :max="max"
+            :minlength="minlength"
+            :maxlength="maxlength"
+            :pattern="pattern"
+            @input="handleInput"
+            @focus="handleFocus"
+            @blur="handleBlur"
+            @keyup="handleKeyup"
+            @keydown="handleKeydown"
+        />
+        
+        @if clearable && value && !disabled && !readonly
+        <button type="button" class="q-input-clear" @click="handleClear">
+            ×
+        </button>
+        @endif
+        
+        @if type === 'password' && showPasswordToggle
+        <button type="button" class="q-input-password-toggle" @click="togglePasswordVisibility">
+            ${showPassword ? '👁️' : '👁️‍🗨️'}
+        </button>
+        @endif
+    </div>
+    
+    @if suffix
+    <div class="q-input-suffix">
+        ${suffix}
+    </div>
+    @endif
+    
+    <div class="q-quantum-effect"></div>
+</div>
+
+@style
+.q-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border: 1px solid var(--q-gray-300);
+    border-radius: var(--q-radius-md);
+    transition: all 0.3s ease;
+    background-color: var(--q-white);
+    overflow: hidden;
+}
+
+.q-input-wrapper:hover {
+    border-color: var(--q-gray-400);
+}
+
+.q-input-wrapper:focus-within {
+    border-color: var(--q-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.q-input-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+}
+
+.q-input {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.875rem;
+    padding: var(--q-spacing-2) var(--q-spacing-3);
+    color: var(--q-gray-900);
+}
+
+.q-input-wrapper[data-size="small"] .q-input {
+    padding: var(--q-spacing-1) var(--q-spacing-2);
+    font-size: 0.75rem;
+}
+
+.q-input-wrapper[data-size="large"] .q-input {
+    padding: var(--q-spacing-3) var(--q-spacing-4);
+    font-size: 1rem;
+}
+
+.q-input-prefix,
+.q-input-suffix {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--q-spacing-2);
+    color: var(--q-gray-500);
+}
+
+.q-input-clear,
+.q-input-password-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--q-gray-500);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.q-input-clear:hover,
+.q-input-password-toggle:hover {
+    opacity: 1;
+}
+
+.q-input-wrapper[data-status="success"] {
+    border-color: var(--q-success);
+}
+
+.q-input-wrapper[data-status="error"] {
+    border-color: var(--q-error);
+}
+
+.q-input-wrapper[data-status="warning"] {
+    border-color: var(--q-warning);
+}
+
+.q-input-wrapper[disabled] {
+    background-color: var(--q-gray-100);
+    cursor: not-allowed;
+}
+
+.q-input[disabled] {
+    cursor: not-allowed;
+}
+
+/* 量子效果 */
+.q-quantum-effect {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.q-input-wrapper[data-quantum-state="superposition"] .q-quantum-effect {
+    background: linear-gradient(45deg, rgba(99, 102, 241, 0.03), rgba(99, 102, 241, 0.05));
+}
+
+.q-input-wrapper[data-quantum-state="entangled"] .q-quantum-effect {
+    background: linear-gradient(45deg, rgba(99, 102, 241, 0.05), rgba(236, 72, 153, 0.05));
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+}
+
+.q-input-wrapper[data-quantum-state="focused"] .q-quantum-effect {
+    animation: q-input-glow 2s infinite alternate;
+}
+
+@keyframes q-input-glow {
+    0% {
+        box-shadow: 0 0 5px rgba(99, 102, 241, 0.2);
+    }
+    100% {
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+    }
+}
+
+@script
+export default {
+    data() {
+        return {
+            showPassword: false,
+            focused: false,
+            localValue: this.value
+        };
+    },
+    
+    computed: {
+        currentValue() {
+            return this.localValue;
+        }
+    },
+    
+    mounted() {
+        // 初始化量子纠缠
+        const inputId = `input-${this.id}`;
+        window.quantumEntangle.addObject(inputId);
+        window.quantumEntangle.setStrength(this.entangleStrength);
+        
+        // 监听量子纠缠事件
+        window.quantumEntangle.on('input_change', (data) => {
+            if (data.id === inputId && data.value !== this.localValue) {
+                this.localValue = data.value;
+                
+                // 更新实际DOM元素的值
+                const inputElement = this.$el.querySelector('input');
+                if (inputElement) {
+                    inputElement.value = data.value;
+                }
+            }
+        });
+    },
+    
+    methods: {
+        handleInput(event) {
+            this.localValue = event.target.value;
+            
+            // 更新量子纠缠状态
+            window.quantumEntangle.send('input_change', {
+                id: `input-${this.id}`,
+                value: this.localValue
+            });
+            
+            // 触发v-model更新
+            this.$emit('input', this.localValue);
+            this.$emit('change', event);
+        },
+        
+        handleFocus(event) {
+            this.focused = true;
+            this.$emit('focus', event);
+            
+            // 更新量子状态
+            this.updateQuantumState('focused');
+        },
+        
+        handleBlur(event) {
+            this.focused = false;
+            this.$emit('blur', event);
+            
+            // 恢复量子状态
+            this.updateQuantumState(this.quantumState);
+        },
+        
+        handleKeyup(event) {
+            this.$emit('keyup', event);
+            
+            if (event.key === 'Enter') {
+                this.$emit('enter', event);
+            }
+        },
+        
+        handleKeydown(event) {
+            this.$emit('keydown', event);
+        },
+        
+        handleClear() {
+            this.localValue = '';
+            
+            // 更新实际DOM元素的值
+            const inputElement = this.$el.querySelector('input');
+            if (inputElement) {
+                inputElement.value = '';
+                inputElement.focus();
+            }
+            
+            // 更新量子纠缠状态
+            window.quantumEntangle.send('input_change', {
+                id: `input-${this.id}`,
+                value: ''
+            });
+            
+            // 触发v-model更新
+            this.$emit('input', '');
+            this.$emit('clear');
+        },
+        
+        togglePasswordVisibility() {
+            this.showPassword = !this.showPassword;
+        },
+        
+        updateQuantumState(state) {
+            this.$el.dataset.quantumState = state;
+            
+            // 更新量子纠缠状态
+            window.quantumEntangle.send('input_state_change', {
+                id: `input-${this.id}`,
+                state: state
+            });
+        },
+        
+        reset() {
+            this.localValue = '';
+            this.showPassword = false;
+            
+            // 恢复量子状态
+            this.updateQuantumState('superposition');
+        }
+    },
+    
+    beforeDestroy() {
+        // 清理量子纠缠
+        window.quantumEntangle.removeObject(`input-${this.id}`);
+    }
+} 

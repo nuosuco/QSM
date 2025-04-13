@@ -1,0 +1,633 @@
+#!/usr/bin/env qentl
+# -*- coding: utf-8 -*-
+
+"""
+量子叠加态模型（QSM）主控程序
+启动所有相关服务并管理它们的运行
+"""
+
+# 量子基因编码
+QG-SYS-MAIN-CONTROLLER-R7T9
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-SYS-MAIN-20250413
+  state: ACTIVE
+  strength: 0.99
+  objects: [
+    "QSM/api/qsm_api.qpy",
+    "WeQ/api/weq_api.qpy",
+    "SOM/api/som_api.qpy",
+    "Ref/api/ref_api.qpy"
+  ]
+
+@imports
+  standard: [os, sys, json, logging, time, argparse, subprocess, threading, signal, atexit]
+  quantum: [Dict, List, Any, Optional]
+  quantum_web: [Flask]
+  quantum_datetime: [datetime]
+  quantum_internal: [
+    "QSM/api/qsm_api.qpy" as qsm_api,
+    "WeQ/api/weq_api.qpy" as weq_api,
+    "SOM/api/som_api.qpy" as som_api,
+    "Ref/api/ref_api.qpy" as ref_api
+  ]
+
+@constants
+  # 目录设置
+  ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+  LOG_DIR = os.path.join(ROOT_DIR, '.logs')
+  CONFIG_DIR = os.path.join(ROOT_DIR, 'config')
+  
+  # 服务配置
+  SERVICE_CONFIG = {
+    "qsm": {
+        "name": "量子叠加态模型服务",
+        "module": "QSM",
+        "script": "api/qsm_api.qpy",
+        "port": 5000,
+        "priority": 1,
+        "required": True
+    },
+    "weq": {
+        "name": "量子社交引擎服务",
+        "module": "WeQ",
+        "script": "api/weq_api.qpy",
+        "port": 5001,
+        "priority": 2,
+        "required": False
+    },
+    "som": {
+        "name": "量子自组织市场服务",
+        "module": "SOM",
+        "script": "api/som_api.qpy",
+        "port": 5002,
+        "priority": 2,
+        "required": False
+    },
+    "ref": {
+        "name": "量子自反省管理服务",
+        "module": "Ref",
+        "script": "api/ref_api.qpy",
+        "port": 5003,
+        "priority": 3,
+        "required": False
+    },
+    "world": {
+        "name": "世界服务",
+        "module": "world",
+        "script": "world_server.qpy",
+        "port": 5004,
+        "priority": 4,
+        "required": False
+    }
+  }
+
+@initialization
+  # 创建必要的目录
+  os.makedirs(LOG_DIR, exist_ok=True)
+  os.makedirs(CONFIG_DIR, exist_ok=True)
+  
+  # 配置日志
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+      logging.FileHandler(os.path.join(LOG_DIR, 'qsm_main.log')),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('QSM-Main')
+  
+  # 全局变量
+  running_services = {}
+  service_status = {}
+  main_app = Flask(__name__)
+
+@function start_service(service_id) -> bool:
+  """启动指定服务
+  
+  Args:
+      service_id: 服务ID
+      
+  Returns:
+      bool: 是否成功启动
+  """
+  if service_id not in SERVICE_CONFIG:
+    logger.error(f"未知服务: {service_id}")
+    return False
+    
+  if service_id in running_services and running_services[service_id].poll() is None:
+    logger.warning(f"服务 {service_id} 已经在运行中")
+    return True
+    
+  service = SERVICE_CONFIG[service_id]
+  service_path = os.path.join(ROOT_DIR, service["module"], service["script"])
+  
+  if not os.path.exists(service_path):
+    logger.error(f"服务脚本不存在: {service_path}")
+    return False
+  
+  try:
+    # 准备环境变量
+    env = os.environ.copy()
+    env["QSM_SERVICE_PORT"] = str(service["port"])
+    env["QSM_ROOT_DIR"] = ROOT_DIR
+    
+    # 启动服务进程
+    process = subprocess.Popen(
+      ["qentl", service_path],
+      env=env,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      text=True
+    )
+    
+    # 记录服务信息
+    running_services[service_id] = process
+    service_status[service_id] = {
+      "id": service_id,
+      "name": service["name"],
+      "start_time": datetime.now().isoformat(),
+      "pid": process.pid,
+      "port": service["port"],
+      "status": "starting"
+    }
+    
+    logger.info(f"已启动服务 {service_id} (PID: {process.pid})")
+    
+    # 启动日志监控线程
+    threading.Thread(
+      target=monitor_service_logs,
+      args=(service_id, process),
+      daemon=True
+    ).start()
+    
+    # 等待服务启动
+    time.sleep(2)
+    
+    # 检查服务是否成功启动
+    if process.poll() is not None:
+      # 服务已经退出
+      stdout, stderr = process.communicate()
+      logger.error(f"服务 {service_id} 启动失败: {stderr}")
+      service_status[service_id]["status"] = "failed"
+      return False
+    
+    # 更新状态为运行中
+    service_status[service_id]["status"] = "running"
+    return True
+    
+  except Exception as e:
+    logger.exception(f"启动服务 {service_id} 时出错: {e}")
+    if service_id in service_status:
+      service_status[service_id]["status"] = "error"
+    return False
+
+@function stop_service(service_id) -> bool:
+  """停止指定服务
+  
+  Args:
+      service_id: 服务ID
+      
+  Returns:
+      bool: 是否成功停止
+  """
+  if service_id not in running_services:
+    logger.warning(f"服务 {service_id} 未运行")
+    return True
+    
+  process = running_services[service_id]
+  
+  try:
+    if process.poll() is None:
+      # 服务仍在运行，尝试正常终止
+      logger.info(f"正在停止服务 {service_id}...")
+      
+      # 在Windows上使用CTRL_BREAK_EVENT信号
+      if os.name == 'nt':
+        process.send_signal(signal.CTRL_BREAK_EVENT)
+      else:
+        process.terminate()
+      
+      # 等待进程终止
+      for _ in range(5):
+        if process.poll() is not None:
+          break
+        time.sleep(1)
+          
+      # 如果仍未终止，强制终止
+      if process.poll() is None:
+        logger.warning(f"服务 {service_id} 未响应，强制终止")
+        process.kill()
+        process.wait()
+    
+    # 更新状态
+    if service_id in service_status:
+      service_status[service_id]["status"] = "stopped"
+      service_status[service_id]["end_time"] = datetime.now().isoformat()
+    
+    # 从运行列表中移除
+    del running_services[service_id]
+    logger.info(f"服务 {service_id} 已停止")
+    return True
+    
+  except Exception as e:
+    logger.exception(f"停止服务 {service_id} 时出错: {e}")
+    return False
+
+@function monitor_service_logs(service_id, process) -> None:
+  """监控服务日志输出
+  
+  Args:
+      service_id: 服务ID
+      process: 服务进程对象
+  """
+  service_name = SERVICE_CONFIG[service_id]["name"]
+  service_logger = logging.getLogger(f"Service-{service_id}")
+  
+  # 设置日志文件
+  log_file = os.path.join(LOG_DIR, f"{service_id}_service.log")
+  file_handler = logging.FileHandler(log_file)
+  file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+  service_logger.addHandler(file_handler)
+  
+  # 监控标准输出
+  for line in iter(process.stdout.readline, ''):
+    if not line:
+      break
+    service_logger.info(f"[{service_name}] {line.strip()}")
+  
+  # 监控标准错误
+  for line in iter(process.stderr.readline, ''):
+    if not line:
+      break
+    service_logger.error(f"[{service_name}] {line.strip()}")
+  
+  # 检查进程状态
+  exit_code = process.poll()
+  if exit_code is not None:
+    if exit_code == 0:
+      service_logger.info(f"服务 {service_name} 已正常终止")
+    else:
+      service_logger.error(f"服务 {service_name} 异常终止，退出码: {exit_code}")
+    
+    # 更新状态
+    if service_id in service_status:
+      service_status[service_id]["status"] = "stopped" if exit_code == 0 else "crashed"
+      service_status[service_id]["exit_code"] = exit_code
+
+@function start_required_services() -> bool:
+  """按优先级启动所有必需的服务
+  
+  Returns:
+      bool: 是否所有必需服务都已成功启动
+  """
+  # 按优先级对服务进行排序
+  sorted_services = sorted(
+    SERVICE_CONFIG.items(),
+    key=lambda x: x[1]["priority"]
+  )
+  
+  success = True
+  
+  # 启动必需的服务
+  for service_id, config in sorted_services:
+    if config["required"]:
+      logger.info(f"正在启动必需服务: {config['name']}")
+      if not start_service(service_id):
+        logger.error(f"必需服务 {config['name']} 启动失败")
+        success = False
+        # 不要中断，尝试启动其他必需服务
+  
+  return success
+
+@function start_all_services() -> bool:
+  """启动所有配置的服务
+  
+  Returns:
+      bool: 是否所有服务都已成功启动
+  """
+  # 按优先级对服务进行排序
+  sorted_services = sorted(
+    SERVICE_CONFIG.items(),
+    key=lambda x: x[1]["priority"]
+  )
+  
+  all_success = True
+  
+  # 启动所有服务
+  for service_id, config in sorted_services:
+    logger.info(f"正在启动服务: {config['name']}")
+    if not start_service(service_id):
+      logger.error(f"服务 {config['name']} 启动失败")
+      all_success = False
+        
+      # 如果是必需服务，则中断启动流程
+      if config["required"]:
+        logger.error("由于必需服务启动失败，中断启动流程")
+        break
+  
+  return all_success
+
+@function stop_all_services() -> bool:
+  """停止所有正在运行的服务
+  
+  Returns:
+      bool: 是否所有服务都已成功停止
+  """
+  # 按照与启动相反的优先级顺序停止服务
+  sorted_services = sorted(
+    SERVICE_CONFIG.items(),
+    key=lambda x: -x[1]["priority"]  # 负号表示反向排序
+  )
+  
+  all_success = True
+  
+  # 停止所有服务
+  for service_id, _ in sorted_services:
+    if service_id in running_services:
+      logger.info(f"正在停止服务: {SERVICE_CONFIG[service_id]['name']}")
+      if not stop_service(service_id):
+        logger.error(f"服务 {SERVICE_CONFIG[service_id]['name']} 停止失败")
+        all_success = False
+  
+  return all_success
+
+@function check_services_health() -> Dict:
+  """检查所有服务的健康状态
+  
+  Returns:
+      dict: 服务健康状态报告
+  """
+  health_report = {
+    "timestamp": datetime.now().isoformat(),
+    "services": {},
+    "overall_status": "healthy"
+  }
+  
+  # 检查每个运行中的服务
+  for service_id, process in list(running_services.items()):
+    service_config = SERVICE_CONFIG[service_id]
+    service_status = "unknown"
+    
+    # 检查进程是否仍在运行
+    if process.poll() is not None:
+      # 进程已终止
+      service_status = "stopped"
+      stdout, stderr = process.communicate()
+        
+      # 如果是必需服务，则标记为不健康
+      if service_config["required"]:
+        health_report["overall_status"] = "unhealthy"
+          
+      # 尝试重启必需服务
+      if service_config["required"]:
+        logger.warning(f"必需服务 {service_config['name']} 已终止，尝试重启")
+        start_service(service_id)
+    else:
+      # 进程正在运行，尝试访问健康检查端点
+      try:
+        import requests
+        response = requests.get(
+          f"http://localhost:{service_config['port']}/health",
+          timeout=2
+        )
+          
+        if response.status_code == 200:
+          service_status = "healthy"
+          service_data = response.json()
+        else:
+          service_status = "unhealthy"
+          if service_config["required"]:
+            health_report["overall_status"] = "unhealthy"
+      except Exception as e:
+        logger.warning(f"无法连接到服务 {service_config['name']}: {e}")
+        service_status = "unreachable"
+        if service_config["required"]:
+          health_report["overall_status"] = "unhealthy"
+    
+    # 添加到报告
+    health_report["services"][service_id] = {
+      "name": service_config["name"],
+      "status": service_status,
+      "required": service_config["required"],
+      "port": service_config["port"]
+    }
+  
+  # 检查未运行的必需服务
+  for service_id, config in SERVICE_CONFIG.items():
+    if service_id not in running_services and config["required"]:
+      health_report["services"][service_id] = {
+        "name": config["name"],
+        "status": "not_running",
+        "required": True,
+        "port": config["port"]
+      }
+      health_report["overall_status"] = "unhealthy"
+        
+      # 尝试启动未运行的必需服务
+      logger.warning(f"必需服务 {config['name']} 未运行，尝试启动")
+      start_service(service_id)
+  
+  return health_report
+
+@route main_app GET "/status"
+def status_api():
+  """获取所有服务的状态"""
+  try:
+    status_report = {
+      "timestamp": datetime.now().isoformat(),
+      "services": service_status,
+      "overall_status": "operational" if all(
+        s["status"] == "running" 
+        for s in service_status.values() 
+        if SERVICE_CONFIG[s["id"]]["required"]
+      ) else "degraded"
+    }
+    return json.dumps(status_report), 200, {'Content-Type': 'application/json'}
+  except Exception as e:
+    logger.exception(f"获取状态时出错: {e}")
+    return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+@route main_app POST "/start/{service_id}"
+def start_service_api(service_id):
+  """API启动指定服务"""
+  try:
+    if service_id not in SERVICE_CONFIG:
+      return json.dumps({"error": f"未知服务: {service_id}"}), 404, {'Content-Type': 'application/json'}
+        
+    result = start_service(service_id)
+    return json.dumps({
+      "success": result,
+      "service": service_id,
+      "status": service_status.get(service_id, {}).get("status", "unknown")
+    }), 200, {'Content-Type': 'application/json'}
+  except Exception as e:
+    logger.exception(f"启动服务API出错: {e}")
+    return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+@route main_app POST "/stop/{service_id}"
+def stop_service_api(service_id):
+  """API停止指定服务"""
+  try:
+    if service_id not in SERVICE_CONFIG:
+      return json.dumps({"error": f"未知服务: {service_id}"}), 404, {'Content-Type': 'application/json'}
+        
+    result = stop_service(service_id)
+    return json.dumps({
+      "success": result,
+      "service": service_id,
+      "status": service_status.get(service_id, {}).get("status", "unknown")
+    }), 200, {'Content-Type': 'application/json'}
+  except Exception as e:
+    logger.exception(f"停止服务API出错: {e}")
+    return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+@route main_app GET "/health"
+def health_api():
+  """获取服务健康状态"""
+  try:
+    health_report = check_services_health()
+    status_code = 200 if health_report["overall_status"] == "healthy" else 503
+    return json.dumps(health_report), status_code, {'Content-Type': 'application/json'}
+  except Exception as e:
+    logger.exception(f"健康检查出错: {e}")
+    return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+@route main_app POST "/restart/{service_id}"
+def restart_service_api(service_id):
+  """API重启指定服务"""
+  try:
+    if service_id not in SERVICE_CONFIG:
+      return json.dumps({"error": f"未知服务: {service_id}"}), 404, {'Content-Type': 'application/json'}
+        
+    # 先停止再启动服务
+    stop_result = stop_service(service_id)
+    if stop_result:
+      # 等待服务完全停止
+      time.sleep(2)
+      start_result = start_service(service_id)
+      success = start_result
+    else:
+      success = False
+        
+    return json.dumps({
+      "success": success,
+      "service": service_id,
+      "status": service_status.get(service_id, {}).get("status", "unknown")
+    }), 200, {'Content-Type': 'application/json'}
+  except Exception as e:
+    logger.exception(f"重启服务API出错: {e}")
+    return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+@route main_app POST "/restart_all"
+def restart_all_services_api():
+  """API重启所有服务"""
+  try:
+    logger.info("正在重启所有服务...")
+    
+    # 停止所有服务
+    stop_all_services()
+    
+    # 等待所有服务完全停止
+    time.sleep(5)
+    
+    # 启动所有服务
+    start_result = start_all_services()
+    
+    return json.dumps({
+      "success": start_result,
+      "services": service_status
+    }), 200, {'Content-Type': 'application/json'}
+  except Exception as e:
+    logger.exception(f"重启所有服务API出错: {e}")
+    return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+@function cleanup() -> None:
+  """程序退出时的清理操作"""
+  logger.info("正在清理服务...")
+  stop_all_services()
+  logger.info("所有服务已停止")
+
+@function parse_arguments():
+  """解析命令行参数
+  
+  Returns:
+      argparse.Namespace: 解析后的参数
+  """
+  parser = argparse.ArgumentParser(description="量子叠加态模型（QSM）主控程序")
+  parser.add_argument("--port", type=int, default=3000, help="主控程序API端口")
+  parser.add_argument("--api-only", action="store_true", help="仅启动API，不自动启动服务")
+  parser.add_argument("--start-service", help="启动指定服务")
+  parser.add_argument("--stop-service", help="停止指定服务")
+  parser.add_argument("--restart-service", help="重启指定服务")
+  parser.add_argument("--check-health", action="store_true", help="检查服务健康状态")
+  parser.add_argument("--test-mode", action="store_true", help="测试模式，只检查配置")
+  
+  return parser.parse_args()
+
+@function main() -> int:
+  """主函数"""
+  # 解析命令行参数
+  args = parse_arguments()
+
+  # 测试模式
+  if args.test_mode:
+    logger.info("测试模式：检查配置...")
+    print("QSM配置检查通过！")
+    logger.info("配置检查成功")
+    return 0
+  
+  # 注册清理函数
+  atexit.register(cleanup)
+  
+  # 处理特定命令
+  if args.start_service:
+    if args.start_service == "all":
+      logger.info("正在启动所有服务...")
+      start_all_services()
+    else:
+      logger.info(f"正在启动服务: {args.start_service}")
+      start_service(args.start_service)
+  
+  elif args.stop_service:
+    if args.stop_service == "all":
+      logger.info("正在停止所有服务...")
+      stop_all_services()
+    else:
+      logger.info(f"正在停止服务: {args.stop_service}")
+      stop_service(args.stop_service)
+  
+  elif args.restart_service:
+    if args.restart_service == "all":
+      logger.info("正在重启所有服务...")
+      stop_all_services()
+      time.sleep(2)
+      start_all_services()
+    else:
+      logger.info(f"正在重启服务: {args.restart_service}")
+      stop_service(args.restart_service)
+      time.sleep(2)
+      start_service(args.restart_service)
+  
+  elif args.check_health:
+    health_report = check_services_health()
+    print(json.dumps(health_report, indent=2))
+    return 0
+  
+  # 如果没有特定命令且不是仅API模式，自动启动必需服务
+  elif not args.api_only:
+    logger.info("正在启动必需服务...")
+    start_required_services()
+  
+  # 启动主控API
+  logger.info(f"正在启动主控API，端口: {args.port}")
+  main_app.run(host='0.0.0.0', port=args.port)
+  
+  return 0
+
+@entrypoint
+def run():
+  """入口点函数"""
+  sys.exit(main()) 

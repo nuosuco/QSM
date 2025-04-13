@@ -1,0 +1,804 @@
+/* 量子基因编码 */
+QG-COMP-TABLE-UI-DATA-A1B1
+
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.8,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-layout.qcss",
+    "world/static/css/quantum-animation.qcss"
+  ]
+}
+
+/* Table 组件属性 */
+@properties {
+  // 数据源
+  data: array = [],
+  // 列配置
+  columns: array = [],
+  // 是否显示边框
+  border: boolean = false,
+  // 是否显示斑马纹
+  stripe: boolean = false,
+  // 表格尺寸
+  size: 'small' | 'medium' | 'large' = 'medium',
+  // 是否显示表头
+  showHeader: boolean = true,
+  // 表格宽度
+  width: string | number = '',
+  // 表格高度
+  height: string | number = '',
+  // 最大高度
+  maxHeight: string | number = '',
+  // 行唯一标识
+  rowKey: string | function = 'id',
+  // 是否高亮当前行
+  highlightCurrentRow: boolean = false,
+  // 选择类型
+  selectionType: '' | 'single' | 'multiple' = '',
+  // 当前选中行
+  selected: array | object = null,
+  // 表格布局方式
+  tableLayout: 'auto' | 'fixed' = 'fixed',
+  // 分页配置
+  pagination: {
+    // 是否显示分页
+    show: boolean = false,
+    // 页码
+    page: number = 1,
+    // 每页数量
+    pageSize: number = 10,
+    // 总数
+    total: number = 0,
+    // 分页位置
+    position: 'left' | 'center' | 'right' = 'right',
+    // 每页数量选项
+    pageSizeOptions: array = [10, 20, 50, 100]
+  },
+  // 排序配置
+  sortConfig: {
+    // 排序字段
+    field: string = '',
+    // 排序方向
+    order: 'asc' | 'desc' = 'asc'
+  },
+  // 是否开启本地数据处理
+  localProcessing: boolean = false,
+  // 加载状态
+  loading: boolean = false,
+  // 空数据提示
+  emptyText: string = '暂无数据',
+  // 量子态配置
+  quantum: {
+    // 量子纠缠强度
+    entangleStrength: number = 0.8,
+    // 量子态转换动画
+    stateTransition: boolean = true,
+    // 量子态持续时间
+    stateDuration: number = 300
+  }
+}
+
+/* 模板结构 */
+<template>
+  <div class="q-table-container"
+       :class="[
+         {
+           'q-table-border': border,
+           'q-table-stripe': stripe,
+           [`q-table-${size}`]: size
+         }
+       ]">
+    <!-- 加载遮罩 -->
+    <div v-if="loading"
+         class="q-table-loading-mask">
+      <div class="q-table-loading-spinner">
+        <i class="q-icon-loading"></i>
+        <span>加载中...</span>
+      </div>
+    </div>
+    
+    <!-- 表格内容 -->
+    <div class="q-table-wrapper"
+         :style="wrapperStyle">
+      <table class="q-table"
+             :style="tableStyle"
+             :class="[
+               {
+                 'q-table-layout-fixed': tableLayout === 'fixed'
+               }
+             ]">
+        <!-- 表头 -->
+        <thead v-if="showHeader"
+               class="q-table-header">
+          <tr>
+            <!-- 选择列 -->
+            <th v-if="selectionType === 'multiple'"
+                class="q-table-column q-table-column-selection">
+              <div class="q-table-cell">
+                <q-checkbox v-model="isAllSelected"
+                           :indeterminate="isIndeterminate"
+                           @change="handleSelectAll" />
+              </div>
+            </th>
+            <th v-else-if="selectionType === 'single'"
+                class="q-table-column q-table-column-selection">
+              <div class="q-table-cell"></div>
+            </th>
+            
+            <!-- 数据列 -->
+            <th v-for="(column, index) in columns"
+                :key="index"
+                class="q-table-column"
+                :class="[
+                  {
+                    'q-table-column-sortable': column.sortable,
+                    [`q-table-align-${column.align || 'left'}`]: column.align
+                  }
+                ]"
+                :style="getColumnStyle(column)"
+                @click="handleHeaderClick(column)">
+              <div class="q-table-cell">
+                <span class="q-table-column-label">{{ column.title }}</span>
+                
+                <!-- 排序图标 -->
+                <span v-if="column.sortable"
+                      class="q-table-sort-caret-wrapper">
+                  <i class="q-table-sort-caret-up"
+                     :class="{ 'is-active': sortConfig.field === column.field && sortConfig.order === 'asc' }"></i>
+                  <i class="q-table-sort-caret-down"
+                     :class="{ 'is-active': sortConfig.field === column.field && sortConfig.order === 'desc' }"></i>
+                </span>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        
+        <!-- 表格主体 -->
+        <tbody class="q-table-body">
+          <template v-if="processedData.length">
+            <tr v-for="(row, rowIndex) in processedData"
+                :key="getRowKey(row)"
+                class="q-table-row"
+                :class="{ 
+                  'q-table-row-current': isCurrentRow(row),
+                  'q-table-row-selected': isSelected(row)
+                }"
+                @click="handleRowClick(row, rowIndex)">
+              <!-- 选择列 -->
+              <td v-if="selectionType === 'multiple'"
+                  class="q-table-column q-table-column-selection">
+                <div class="q-table-cell">
+                  <q-checkbox v-model="selectedRows[getRowKey(row)]"
+                             @change="handleSelect(row)" />
+                </div>
+              </td>
+              <td v-else-if="selectionType === 'single'"
+                  class="q-table-column q-table-column-selection">
+                <div class="q-table-cell">
+                  <q-radio v-model="currentRow"
+                          :value="getRowKey(row)"
+                          @change="handleSelect(row)" />
+                </div>
+              </td>
+              
+              <!-- 数据列 -->
+              <td v-for="(column, columnIndex) in columns"
+                  :key="columnIndex"
+                  class="q-table-column"
+                  :class="[
+                    {
+                      [`q-table-align-${column.align || 'left'}`]: column.align
+                    }
+                  ]">
+                <div class="q-table-cell">
+                  <template v-if="column.render">
+                    <component :is="column.render(row, column, rowIndex)" />
+                  </template>
+                  <template v-else-if="column.slot">
+                    <slot :name="column.slot"
+                          :row="row"
+                          :column="column"
+                          :index="rowIndex">
+                      {{ getCellValue(row, column) }}
+                    </slot>
+                  </template>
+                  <template v-else>
+                    {{ getCellValue(row, column) }}
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </template>
+          
+          <!-- 空数据 -->
+          <tr v-else class="q-table-empty-row">
+            <td :colspan="getTotalColumnSpan()"
+                class="q-table-empty-text">
+              <slot name="empty">
+                <div class="q-table-empty-content">
+                  <i class="q-icon-inbox"></i>
+                  <p>{{ emptyText }}</p>
+                </div>
+              </slot>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- 分页 -->
+    <div v-if="pagination.show"
+         class="q-table-pagination"
+         :class="[`q-table-pagination-${pagination.position}`]">
+      <q-pagination v-model="pagination.page"
+                   :total="pagination.total"
+                   :page-size="pagination.pageSize"
+                   :page-size-options="pagination.pageSizeOptions"
+                   @change="handlePageChange"
+                   @page-size-change="handlePageSizeChange" />
+    </div>
+  </div>
+</template>
+
+/* 组件样式 */
+<style>
+/* 表格容器 */
+.q-table-container {
+  position: relative;
+  border-radius: var(--q-border-radius);
+  background-color: var(--q-bg-color);
+  transition: all var(--q-animation-duration) var(--q-animation-timing-function-ease);
+}
+
+/* 加载遮罩 */
+.q-table-loading-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.q-table-loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--q-primary);
+}
+
+.q-table-loading-spinner i {
+  font-size: 24px;
+  margin-bottom: 8px;
+  animation: q-rotate 1s linear infinite;
+}
+
+@keyframes q-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 表格包装器 */
+.q-table-wrapper {
+  overflow: auto;
+}
+
+/* 表格 */
+.q-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: auto;
+}
+
+.q-table-layout-fixed {
+  table-layout: fixed;
+}
+
+/* 边框样式 */
+.q-table-border .q-table {
+  border: 1px solid var(--q-border-color);
+}
+
+.q-table-border .q-table-column {
+  border-right: 1px solid var(--q-border-color);
+}
+
+.q-table-border .q-table-row:last-child .q-table-column {
+  border-bottom: none;
+}
+
+/* 单元格 */
+.q-table-cell {
+  padding: var(--q-spacing);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 表头 */
+.q-table-header {
+  background-color: var(--q-bg-color-light);
+}
+
+.q-table-header .q-table-column {
+  border-bottom: 2px solid var(--q-border-color);
+  font-weight: 600;
+  color: var(--q-text-color);
+  transition: background-color var(--q-animation-duration) var(--q-animation-timing-function-ease);
+}
+
+/* 表格主体 */
+.q-table-body .q-table-column {
+  border-bottom: 1px solid var(--q-border-color);
+  transition: background-color var(--q-animation-duration) var(--q-animation-timing-function-ease);
+}
+
+/* 表格行 */
+.q-table-row {
+  transition: background-color var(--q-animation-duration) var(--q-animation-timing-function-ease);
+}
+
+.q-table-row-current {
+  background-color: var(--q-primary-light);
+  color: var(--q-primary-dark);
+}
+
+.q-table-row-selected {
+  background-color: var(--q-primary-lighter);
+}
+
+/* 斑马纹 */
+.q-table-stripe .q-table-row:nth-child(2n) {
+  background-color: var(--q-bg-color-light);
+}
+
+/* 空数据 */
+.q-table-empty-text {
+  text-align: center;
+  color: var(--q-text-color-secondary);
+  padding: var(--q-spacing-xl);
+}
+
+.q-table-empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.q-table-empty-content i {
+  font-size: 48px;
+  margin-bottom: var(--q-spacing);
+  color: var(--q-text-color-lighter);
+}
+
+/* 对齐方式 */
+.q-table-align-left {
+  text-align: left;
+}
+
+.q-table-align-center {
+  text-align: center;
+}
+
+.q-table-align-right {
+  text-align: right;
+}
+
+/* 排序图标 */
+.q-table-sort-caret-wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  height: 14px;
+  width: 14px;
+  vertical-align: middle;
+  cursor: pointer;
+  overflow: initial;
+  position: relative;
+  margin-left: var(--q-spacing-sm);
+}
+
+.q-table-sort-caret-up,
+.q-table-sort-caret-down {
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  position: absolute;
+}
+
+.q-table-sort-caret-up {
+  border-bottom-color: var(--q-text-color-lighter);
+  top: -2px;
+}
+
+.q-table-sort-caret-down {
+  border-top-color: var(--q-text-color-lighter);
+  bottom: -7px;
+}
+
+.q-table-sort-caret-up.is-active {
+  border-bottom-color: var(--q-primary);
+}
+
+.q-table-sort-caret-down.is-active {
+  border-top-color: var(--q-primary);
+}
+
+/* 表格尺寸 */
+.q-table-small .q-table-cell {
+  padding: var(--q-spacing-sm) var(--q-spacing);
+}
+
+.q-table-large .q-table-cell {
+  padding: var(--q-spacing) var(--q-spacing-lg);
+}
+
+/* 分页 */
+.q-table-pagination {
+  padding: var(--q-spacing);
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--q-border-color);
+}
+
+.q-table-pagination-left {
+  justify-content: flex-start;
+}
+
+.q-table-pagination-center {
+  justify-content: center;
+}
+
+.q-table-pagination-right {
+  justify-content: flex-end;
+}
+
+/* 量子态样式 */
+@quantum-state hover {
+  .q-table-row:hover:not(.q-table-empty-row) {
+    background-color: var(--q-bg-hover);
+  }
+  
+  .q-table-column-sortable:hover {
+    background-color: var(--q-bg-hover);
+  }
+}
+
+@quantum-state active {
+  .q-table-row:active:not(.q-table-empty-row) {
+    transform: scale(0.99);
+  }
+  
+  .q-table-column-sortable:active {
+    opacity: 0.9;
+  }
+}
+</style>
+
+/* 组件脚本 */
+<script>
+export default {
+  name: 'QTable',
+  
+  data() {
+    return {
+      currentRow: null,
+      selectedRows: {},
+      internalPagination: {
+        page: this.pagination.page,
+        pageSize: this.pagination.pageSize
+      },
+      internalSortConfig: {
+        field: this.sortConfig.field,
+        order: this.sortConfig.order
+      }
+    }
+  },
+  
+  computed: {
+    // 处理后的数据
+    processedData() {
+      let result = [...this.data]
+      
+      // 本地排序
+      if (this.localProcessing && this.internalSortConfig.field) {
+        result = this.sortData(result)
+      }
+      
+      // 本地分页
+      if (this.localProcessing && this.pagination.show) {
+        const { page, pageSize } = this.internalPagination
+        const startIndex = (page - 1) * pageSize
+        result = result.slice(startIndex, startIndex + pageSize)
+      }
+      
+      return result
+    },
+    
+    // 表格样式
+    tableStyle() {
+      const style = {}
+      
+      if (this.width) {
+        style.width = typeof this.width === 'number' ? `${this.width}px` : this.width
+      }
+      
+      return style
+    },
+    
+    // 包装器样式
+    wrapperStyle() {
+      const style = {}
+      
+      if (this.height) {
+        style.height = typeof this.height === 'number' ? `${this.height}px` : this.height
+        style.overflowY = 'auto'
+      }
+      
+      if (this.maxHeight) {
+        style.maxHeight = typeof this.maxHeight === 'number' ? `${this.maxHeight}px` : this.maxHeight
+        style.overflowY = 'auto'
+      }
+      
+      return style
+    },
+    
+    // 是否全选
+    isAllSelected() {
+      if (!this.data.length) return false
+      
+      return this.data.every(row => this.selectedRows[this.getRowKey(row)])
+    },
+    
+    // 是否部分选中
+    isIndeterminate() {
+      if (!this.data.length) return false
+      
+      const selectedCount = this.data.filter(row => this.selectedRows[this.getRowKey(row)]).length
+      return selectedCount > 0 && selectedCount < this.data.length
+    }
+  },
+  
+  watch: {
+    data: {
+      handler() {
+        // 重置选择状态
+        if (this.selectionType === 'single') {
+          this.currentRow = null
+        } else if (this.selectionType === 'multiple') {
+          this.selectedRows = {}
+        }
+        
+        // 更新量子态
+        this.updateQuantumState(0.5)
+      },
+      deep: true
+    },
+    
+    selected: {
+      handler(val) {
+        if (!val) return
+        
+        if (this.selectionType === 'single' && val) {
+          this.currentRow = this.getRowKey(val)
+        } else if (this.selectionType === 'multiple' && Array.isArray(val)) {
+          this.selectedRows = {}
+          val.forEach(row => {
+            this.selectedRows[this.getRowKey(row)] = true
+          })
+        }
+      },
+      immediate: true,
+      deep: true
+    },
+    
+    pagination: {
+      handler(val) {
+        this.internalPagination = {
+          page: val.page,
+          pageSize: val.pageSize
+        }
+      },
+      deep: true,
+      immediate: true
+    },
+    
+    sortConfig: {
+      handler(val) {
+        this.internalSortConfig = {
+          field: val.field,
+          order: val.order
+        }
+      },
+      deep: true,
+      immediate: true
+    }
+  },
+  
+  methods: {
+    // 获取行唯一标识
+    getRowKey(row) {
+      if (typeof this.rowKey === 'function') {
+        return this.rowKey(row)
+      }
+      return row[this.rowKey]
+    },
+    
+    // 获取单元格值
+    getCellValue(row, column) {
+      const { field } = column
+      if (!field) return ''
+      
+      // 支持嵌套属性访问，如 user.name
+      return field.split('.').reduce((obj, key) => {
+        return obj ? obj[key] : ''
+      }, row)
+    },
+    
+    // 获取列样式
+    getColumnStyle(column) {
+      const style = {}
+      
+      if (column.width) {
+        style.width = typeof column.width === 'number' ? `${column.width}px` : column.width
+      }
+      
+      if (column.minWidth) {
+        style.minWidth = typeof column.minWidth === 'number' ? `${column.minWidth}px` : column.minWidth
+      }
+      
+      if (column.maxWidth) {
+        style.maxWidth = typeof column.maxWidth === 'number' ? `${column.maxWidth}px` : column.maxWidth
+      }
+      
+      return style
+    },
+    
+    // 获取列总数
+    getTotalColumnSpan() {
+      let span = this.columns.length
+      if (this.selectionType) {
+        span += 1
+      }
+      return span
+    },
+    
+    // 是否为当前行
+    isCurrentRow(row) {
+      if (!this.highlightCurrentRow) return false
+      
+      return this.currentRow === this.getRowKey(row)
+    },
+    
+    // 是否选中
+    isSelected(row) {
+      if (this.selectionType === 'single') {
+        return this.currentRow === this.getRowKey(row)
+      } else if (this.selectionType === 'multiple') {
+        return this.selectedRows[this.getRowKey(row)]
+      }
+      return false
+    },
+    
+    // 处理行点击
+    handleRowClick(row, index) {
+      if (this.highlightCurrentRow) {
+        this.currentRow = this.getRowKey(row)
+      }
+      
+      this.$emit('row-click', row, index)
+    },
+    
+    // 处理表头点击
+    handleHeaderClick(column) {
+      if (!column.sortable) return
+      
+      const { field } = column
+      let order = 'asc'
+      
+      // 切换排序方向
+      if (this.internalSortConfig.field === field) {
+        order = this.internalSortConfig.order === 'asc' ? 'desc' : 'asc'
+      }
+      
+      this.internalSortConfig = { field, order }
+      this.$emit('sort-change', { field, order })
+      
+      // 更新外部排序配置
+      this.$emit('update:sortConfig', { field, order })
+    },
+    
+    // 处理选择
+    handleSelect(row) {
+      if (this.selectionType === 'single') {
+        const selectedRow = this.currentRow === this.getRowKey(row) ? row : null
+        this.$emit('update:selected', selectedRow)
+        this.$emit('select', selectedRow)
+      } else if (this.selectionType === 'multiple') {
+        const selectedRows = this.data.filter(row => this.selectedRows[this.getRowKey(row)])
+        this.$emit('update:selected', selectedRows)
+        this.$emit('select', selectedRows)
+      }
+    },
+    
+    // 处理全选
+    handleSelectAll() {
+      if (this.selectionType !== 'multiple') return
+      
+      const newSelectedRows = {}
+      
+      if (!this.isAllSelected) {
+        // 全选
+        this.data.forEach(row => {
+          newSelectedRows[this.getRowKey(row)] = true
+        })
+      }
+      
+      this.selectedRows = newSelectedRows
+      const selectedRows = this.data.filter(row => this.selectedRows[this.getRowKey(row)])
+      this.$emit('update:selected', selectedRows)
+      this.$emit('select-all', selectedRows)
+    },
+    
+    // 处理页码变化
+    handlePageChange(page) {
+      this.internalPagination.page = page
+      this.$emit('update:pagination', { ...this.pagination, page })
+      this.$emit('page-change', page)
+    },
+    
+    // 处理每页数量变化
+    handlePageSizeChange(pageSize) {
+      this.internalPagination.pageSize = pageSize
+      this.$emit('update:pagination', { ...this.pagination, pageSize })
+      this.$emit('page-size-change', pageSize)
+    },
+    
+    // 本地排序
+    sortData(data) {
+      const { field, order } = this.internalSortConfig
+      if (!field) return data
+      
+      return [...data].sort((a, b) => {
+        const valueA = this.getCellValue(a, { field })
+        const valueB = this.getCellValue(b, { field })
+        
+        if (valueA === valueB) return 0
+        
+        // 根据排序方向排序
+        const result = valueA > valueB ? 1 : -1
+        return order === 'asc' ? result : -result
+      })
+    },
+    
+    // 量子态方法
+    updateQuantumState(state) {
+      if (!this.quantum.stateTransition) return
+      
+      const quantum = state * this.quantum.entangleStrength
+      
+      // 应用量子态效果
+      this.$el.style.transform = `scale(${1 + quantum * 0.01})`
+      this.$el.style.filter = `brightness(${1 + quantum * 0.05})`
+    }
+  },
+  
+  mounted() {
+    this.updateQuantumState(0.5)
+  }
+}
+</script> 

@@ -1,0 +1,560 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+量子自组织市场 (SOM) - 市场智能合约模块
+Quantum Self-Organizing Market (SOM) - Market Smart Contract Module
+
+量子基因编码: QG-SOM-CONTRACT-MARKET-A2B4
+量子纠缠信道: QE-SOM-CONTRACT-20240406:0.96
+
+本模块实现了量子市场智能合约系统，支持创建和执行复杂的市场合约逻辑。
+"""
+
+import os
+import sys
+import json
+import uuid
+import time
+import datetime
+import logging
+from typing import Dict, List, Any, Optional, Union, Callable
+
+# 设置日志记录
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(os.path.join('logs', 'som_market_contract.log')),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger('som_market_contract')
+
+class Contract:
+    """智能合约基类"""
+    
+    def __init__(this, name: str, code: str, creator_id: str, parameters: Dict = None):
+        """初始化合约
+        
+        Args:
+            name: 合约名称
+            code: 合约代码
+            creator_id: 创建者ID
+            parameters: 合约参数
+        """
+        this.id = str(uuid.uuid4())
+        this.name = name
+        this.code = code
+        this.creator_id = creator_id
+        this.parameters = parameters or {}
+        this.creation_time = datetime.datetime.now().isoformat()
+        this.last_update_time = this.creation_time
+        this.status = "active"  # active, paused, expired
+        this.execution_count = 0
+        this.last_execution_time = None
+        this.quantum_state = None
+        
+        # 创建量子状态
+        this.create_quantum_state()
+        
+        logger.info(f"合约创建: ID: {this.id}, 名称: {this.name}, 创建者: {this.creator_id}")
+    
+    def create_quantum_state(this):
+        """创建合约的量子状态"""
+        # 这里实现量子状态的创建逻辑
+        this.quantum_state = {
+            "entanglement_level": 0.8,
+            "coherence": 0.9,
+            "superposition_states": ["active", "executing", "completed"]
+        }
+        logger.debug(f"合约量子状态创建: ID: {this.id}")
+    
+    def execute(this, context, **params):
+        """执行合约
+        
+        Args:
+            context: 执行上下文
+            **params: 执行参数
+            
+        Returns:
+            dict: 执行结果
+        """
+        try:
+            this.last_execution_time = datetime.datetime.now().isoformat()
+            this.execution_count += 1
+            
+            # 准备执行环境
+            execution_env = {
+                "context": context,
+                "contract": this,
+                "params": params
+            }
+            
+            # 执行代码
+            logger.info(f"开始执行合约: ID: {this.id}, 执行计数: {this.execution_count}")
+            # 安全执行方式，实际实现可以使用受限的执行环境
+            # 这里简化了实现，实际上需要更安全的机制
+            result = {"status": "success", "message": f"合约 {this.name} 执行成功", "data": {}}
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"合约执行失败: ID: {this.id}, 错误: {str(e)}")
+            return {"status": "error", "message": str(e)}
+    
+    def update_code(this, new_code: str, updater_id: str):
+        """更新合约代码
+        
+        Args:
+            new_code: 新代码
+            updater_id: 更新者ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        if this.status == "expired":
+            logger.error(f"更新合约代码失败: 合约 {this.id} 已过期")
+            return False
+        
+        this.code = new_code
+        this.last_update_time = datetime.datetime.now().isoformat()
+        logger.info(f"合约代码更新: ID: {this.id}, 更新者: {updater_id}")
+        return True
+    
+    def update_parameters(this, new_parameters: Dict, updater_id: str):
+        """更新合约参数
+        
+        Args:
+            new_parameters: 新参数
+            updater_id: 更新者ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        if this.status == "expired":
+            logger.error(f"更新合约参数失败: 合约 {this.id} 已过期")
+            return False
+        
+        this.parameters.update(new_parameters)
+        this.last_update_time = datetime.datetime.now().isoformat()
+        logger.info(f"合约参数更新: ID: {this.id}, 更新者: {updater_id}")
+        return True
+    
+    def pause(this):
+        """暂停合约
+        
+        Returns:
+            bool: 是否成功
+        """
+        if this.status == "expired":
+            logger.error(f"暂停合约失败: 合约 {this.id} 已过期")
+            return False
+        
+        this.status = "paused"
+        this.last_update_time = datetime.datetime.now().isoformat()
+        logger.info(f"合约暂停: ID: {this.id}")
+        return True
+    
+    def activate(this):
+        """激活合约
+        
+        Returns:
+            bool: 是否成功
+        """
+        if this.status == "expired":
+            logger.error(f"激活合约失败: 合约 {this.id} 已过期")
+            return False
+        
+        this.status = "active"
+        this.last_update_time = datetime.datetime.now().isoformat()
+        logger.info(f"合约激活: ID: {this.id}")
+        return True
+    
+    def expire(this):
+        """使合约过期
+        
+        Returns:
+            bool: 是否成功
+        """
+        this.status = "expired"
+        this.last_update_time = datetime.datetime.now().isoformat()
+        logger.info(f"合约过期: ID: {this.id}")
+        return True
+    
+    def to_dict(this):
+        """转换为字典格式
+        
+        Returns:
+            dict: 字典表示
+        """
+        return {
+            "id": this.id,
+            "name": this.name,
+            "creator_id": this.creator_id,
+            "parameters": this.parameters,
+            "creation_time": this.creation_time,
+            "last_update_time": this.last_update_time,
+            "status": this.status,
+            "execution_count": this.execution_count,
+            "last_execution_time": this.last_execution_time,
+            "quantum_state": this.quantum_state
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict):
+        """从字典创建合约
+        
+        Args:
+            data: 合约数据
+            
+        Returns:
+            Contract: 合约实例
+        """
+        contract = cls(
+            name=data["name"],
+            code=data.get("code", ""),
+            creator_id=data["creator_id"],
+            parameters=data.get("parameters", {})
+        )
+        contract.id = data["id"]
+        contract.creation_time = data["creation_time"]
+        contract.last_update_time = data["last_update_time"]
+        contract.status = data["status"]
+        contract.execution_count = data["execution_count"]
+        contract.last_execution_time = data["last_execution_time"]
+        contract.quantum_state = data.get("quantum_state")
+        
+        return contract
+
+class MarketContract(Contract):
+    """市场智能合约"""
+    
+    def __init__(this, 
+                name: str, 
+                code: str, 
+                creator_id: str, 
+                market_id: str, 
+                parameters: Dict = None, 
+                conditions: List[Dict] = None,
+                actions: List[Dict] = None):
+        """初始化市场合约
+        
+        Args:
+            name: 合约名称
+            code: 合约代码
+            creator_id: 创建者ID
+            market_id: 市场ID
+            parameters: 合约参数
+            conditions: 触发条件
+            actions: 合约动作
+        """
+        super().__init__(name, code, creator_id, parameters)
+        this.market_id = market_id
+        this.conditions = conditions or []
+        this.actions = actions or []
+        logger.info(f"市场合约创建: ID: {this.id}, 市场: {market_id}")
+    
+    def add_condition(this, condition_type: str, parameters: Dict):
+        """添加触发条件
+        
+        Args:
+            condition_type: 条件类型
+            parameters: 条件参数
+            
+        Returns:
+            bool: 是否成功
+        """
+        condition = {
+            "id": str(uuid.uuid4()),
+            "type": condition_type,
+            "parameters": parameters,
+            "created_at": datetime.datetime.now().isoformat()
+        }
+        this.conditions.append(condition)
+        logger.info(f"市场合约添加条件: 合约ID: {this.id}, 条件类型: {condition_type}")
+        return True
+    
+    def add_action(this, action_type: str, parameters: Dict):
+        """添加合约动作
+        
+        Args:
+            action_type: 动作类型
+            parameters: 动作参数
+            
+        Returns:
+            bool: 是否成功
+        """
+        action = {
+            "id": str(uuid.uuid4()),
+            "type": action_type,
+            "parameters": parameters,
+            "created_at": datetime.datetime.now().isoformat()
+        }
+        this.actions.append(action)
+        logger.info(f"市场合约添加动作: 合约ID: {this.id}, 动作类型: {action_type}")
+        return True
+    
+    def check_conditions(this, context):
+        """检查触发条件
+        
+        Args:
+            context: 执行上下文
+            
+        Returns:
+            bool: 是否满足所有条件
+        """
+        if not this.conditions:
+            return True
+            
+        for condition in this.conditions:
+            # 根据条件类型检查条件
+            if condition["type"] == "price_threshold":
+                # 检查价格阈值条件
+                market = context.get_market(this.market_id)
+                if not market:
+                    logger.error(f"检查条件失败: 市场 {this.market_id} 不存在")
+                    return False
+                
+                current_price = market.last_price
+                threshold = condition["parameters"].get("threshold")
+                comparison = condition["parameters"].get("comparison", "greater")
+                
+                if comparison == "greater" and current_price <= threshold:
+                    return False
+                elif comparison == "less" and current_price >= threshold:
+                    return False
+                    
+            elif condition["type"] == "volume_threshold":
+                # 检查交易量阈值条件
+                market = context.get_market(this.market_id)
+                if not market:
+                    logger.error(f"检查条件失败: 市场 {this.market_id} 不存在")
+                    return False
+                
+                volume = market.get_volume(24)  # 24小时交易量
+                threshold = condition["parameters"].get("threshold")
+                comparison = condition["parameters"].get("comparison", "greater")
+                
+                if comparison == "greater" and volume <= threshold:
+                    return False
+                elif comparison == "less" and volume >= threshold:
+                    return False
+            
+            elif condition["type"] == "time_window":
+                # 检查时间窗口条件
+                now = datetime.datetime.now()
+                start_time = datetime.datetime.fromisoformat(condition["parameters"].get("start_time"))
+                end_time = datetime.datetime.fromisoformat(condition["parameters"].get("end_time"))
+                
+                if now < start_time or now > end_time:
+                    return False
+        
+        return True
+    
+    def execute_actions(this, context):
+        """执行合约动作
+        
+        Args:
+            context: 执行上下文
+            
+        Returns:
+            dict: 执行结果
+        """
+        results = []
+        
+        for action in this.actions:
+            try:
+                # 根据动作类型执行动作
+                if action["type"] == "place_order":
+                    # 下单动作
+                    wallet_id = action["parameters"].get("wallet_id")
+                    order_type = action["parameters"].get("order_type")
+                    amount = action["parameters"].get("amount")
+                    price = action["parameters"].get("price")
+                    
+                    order = context.place_order(this.market_id, wallet_id, order_type, amount, price)
+                    if order:
+                        results.append({
+                            "action_id": action["id"],
+                            "status": "success",
+                            "result": {"order_id": order.id}
+                        })
+                    else:
+                        results.append({
+                            "action_id": action["id"],
+                            "status": "error",
+                            "message": "下单失败"
+                        })
+                        
+                elif action["type"] == "transfer":
+                    # 转账动作
+                    sender_id = action["parameters"].get("sender_id")
+                    recipient_id = action["parameters"].get("recipient_id")
+                    coin_id = action["parameters"].get("coin_id")
+                    amount = action["parameters"].get("amount")
+                    
+                    tx = context.create_transaction(sender_id, recipient_id, coin_id, amount, 0)
+                    if tx and context.execute_transaction(tx.id):
+                        results.append({
+                            "action_id": action["id"],
+                            "status": "success",
+                            "result": {"transaction_id": tx.id}
+                        })
+                    else:
+                        results.append({
+                            "action_id": action["id"],
+                            "status": "error",
+                            "message": "转账失败"
+                        })
+                        
+                elif action["type"] == "adjust_price":
+                    # 调整价格动作
+                    market = context.get_market(this.market_id)
+                    if not market:
+                        results.append({
+                            "action_id": action["id"],
+                            "status": "error",
+                            "message": f"市场 {this.market_id} 不存在"
+                        })
+                        continue
+                    
+                    adjustment = action["parameters"].get("adjustment")
+                    adjustment_type = action["parameters"].get("type", "absolute")
+                    
+                    if adjustment_type == "absolute":
+                        new_price = adjustment
+                    else:  # relative
+                        new_price = market.last_price * (1 + adjustment)
+                    
+                    market.update_price(new_price)
+                    results.append({
+                        "action_id": action["id"],
+                        "status": "success",
+                        "result": {"new_price": new_price}
+                    })
+            
+            except Exception as e:
+                logger.error(f"执行动作失败: 合约ID: {this.id}, 动作ID: {action['id']}, 错误: {str(e)}")
+                results.append({
+                    "action_id": action["id"],
+                    "status": "error",
+                    "message": str(e)
+                })
+        
+        return results
+    
+    def execute(this, context, **params):
+        """执行市场合约
+        
+        Args:
+            context: 执行上下文
+            **params: 执行参数
+            
+        Returns:
+            dict: 执行结果
+        """
+        try:
+            # 更新执行计数和时间
+            this.last_execution_time = datetime.datetime.now().isoformat()
+            this.execution_count += 1
+            
+            logger.info(f"开始执行市场合约: ID: {this.id}, 市场: {this.market_id}")
+            
+            # 检查条件
+            if not this.check_conditions(context):
+                logger.info(f"市场合约条件不满足: ID: {this.id}")
+                return {
+                    "status": "skipped",
+                    "message": "条件不满足，跳过执行"
+                }
+            
+            # 执行动作
+            action_results = this.execute_actions(context)
+            
+            result = {
+                "status": "success",
+                "message": f"市场合约 {this.name} 执行成功",
+                "actions": action_results
+            }
+            
+            logger.info(f"市场合约执行成功: ID: {this.id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"市场合约执行失败: ID: {this.id}, 错误: {str(e)}")
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+    
+    def to_dict(this):
+        """转换为字典格式
+        
+        Returns:
+            dict: 字典表示
+        """
+        base_dict = super().to_dict()
+        base_dict.update({
+            "market_id": this.market_id,
+            "conditions": this.conditions,
+            "actions": this.actions
+        })
+        return base_dict
+    
+    @classmethod
+    def from_dict(cls, data: Dict):
+        """从字典创建市场合约
+        
+        Args:
+            data: 合约数据
+            
+        Returns:
+            MarketContract: 市场合约实例
+        """
+        contract = cls(
+            name=data["name"],
+            code=data.get("code", ""),
+            creator_id=data["creator_id"],
+            market_id=data["market_id"],
+            parameters=data.get("parameters", {}),
+            conditions=data.get("conditions", []),
+            actions=data.get("actions", [])
+        )
+        contract.id = data["id"]
+        contract.creation_time = data["creation_time"]
+        contract.last_update_time = data["last_update_time"]
+        contract.status = data["status"]
+        contract.execution_count = data["execution_count"]
+        contract.last_execution_time = data["last_execution_time"]
+        contract.quantum_state = data.get("quantum_state")
+        
+        return contract
+
+# 用法示例
+if __name__ == "__main__":
+    # 创建市场合约
+    contract = MarketContract(
+        name="价格警报合约",
+        code="# 这里是合约代码",
+        creator_id="system",
+        market_id="qtc_market_id"
+    )
+    
+    # 添加条件
+    contract.add_condition("price_threshold", {
+        "threshold": 100,
+        "comparison": "greater"
+    })
+    
+    # 添加动作
+    contract.add_action("place_order", {
+        "wallet_id": "system_wallet",
+        "order_type": "sell",
+        "amount": 10,
+        "price": 105
+    })
+    
+    # 保存为字典
+    contract_dict = contract.to_dict()
+    print(f"合约已创建: {contract.id}") 

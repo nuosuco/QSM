@@ -1,0 +1,373 @@
+{% extends "base.qentl" %}
+
+{% block title %}仪表盘 - 量子叠加态模型系统{% endblock %}
+
+{% block content %}
+<div class="q-page-header">
+  <h1>量子数据可视化仪表盘</h1>
+  <p>展示量子叠加态模型系统的数据展示组件</p>
+</div>
+
+<!-- 顶部数据卡片 -->
+<div class="q-grid">
+  <div class="q-col-3">
+    <div class="q-card q-card-primary q-quantum-hover">
+      <div class="q-card-body">
+        <div class="q-flex q-flex-between">
+          <div class="q-data-card-value">
+            <h2>12,846</h2>
+            <p>量子状态总数</p>
+          </div>
+          <div class="q-data-card-icon">
+            <i class="q-icon q-icon-chart-bar"></i>
+          </div>
+        </div>
+        <div class="q-progress q-mt-2">
+          <div class="q-progress-bar q-progress-primary" style="width: 85%"></div>
+        </div>
+        <div class="q-data-card-footer q-mt-2">
+          <small>较上月 <span class="q-text-success">+15%</span></small>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="q-col-3">
+    <div class="q-card q-card-success q-quantum-hover">
+      <div class="q-card-body">
+        <div class="q-flex q-flex-between">
+          <div class="q-data-card-value">
+            <h2>4,295</h2>
+            <p>量子纠缠事件</p>
+          </div>
+          <div class="q-data-card-icon">
+            <i class="q-icon q-icon-link"></i>
+          </div>
+        </div>
+        <div class="q-progress q-mt-2">
+          <div class="q-progress-bar q-progress-success" style="width: 65%"></div>
+        </div>
+        <div class="q-data-card-footer q-mt-2">
+          <small>较上月 <span class="q-text-success">+8%</span></small>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="q-col-3">
+    <div class="q-card q-card-warning q-quantum-hover">
+      <div class="q-card-body">
+        <div class="q-flex q-flex-between">
+          <div class="q-data-card-value">
+            <h2>1,432</h2>
+            <p>量子态坍缩</p>
+          </div>
+          <div class="q-data-card-icon">
+            <i class="q-icon q-icon-warning"></i>
+          </div>
+        </div>
+        <div class="q-progress q-mt-2">
+          <div class="q-progress-bar q-progress-warning" style="width: 45%"></div>
+        </div>
+        <div class="q-data-card-footer q-mt-2">
+          <small>较上月 <span class="q-text-danger">+23%</span></small>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="q-col-3">
+    <div class="q-card q-card-info q-quantum-hover">
+      <div class="q-card-body">
+        <div class="q-flex q-flex-between">
+          <div class="q-data-card-value">
+            <h2>98.7%</h2>
+            <p>量子效率</p>
+          </div>
+          <div class="q-data-card-icon">
+            <i class="q-icon q-icon-chart-line"></i>
+          </div>
+        </div>
+        <div class="q-progress q-mt-2">
+          <div class="q-progress-bar q-progress-info" style="width: 98%"></div>
+        </div>
+        <div class="q-data-card-footer q-mt-2">
+          <small>较上月 <span class="q-text-success">+2.3%</span></small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 图表和表格区域 -->
+<div class="q-grid">
+  <!-- 左侧图表 -->
+  <div class="q-col-8">
+    <div class="q-card">
+      <div class="q-card-header">
+        <h3>量子状态变化趋势</h3>
+        <div class="q-card-header-actions">
+          <div class="q-btn-group">
+            <button class="q-btn q-btn-outline-primary q-btn-sm active">日</button>
+            <button class="q-btn q-btn-outline-primary q-btn-sm">周</button>
+            <button class="q-btn q-btn-outline-primary q-btn-sm">月</button>
+          </div>
+        </div>
+      </div>
+      <div class="q-card-body">
+        <div class="q-chart" style="height: 300px;">
+          <!-- 假设的图表区域 -->
+          <div class="q-chart-placeholder">
+            <div class="q-chart-line" style="height: 150px; background: linear-gradient(to right, var(--q-primary-300), var(--q-primary-500))"></div>
+            <div class="q-chart-axis">
+              <span>周一</span>
+              <span>周二</span>
+              <span>周三</span>
+              <span>周四</span>
+              <span>周五</span>
+              <span>周六</span>
+              <span>周日</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="q-card q-mt-4">
+      <div class="q-card-header">
+        <h3>量子组件使用统计</h3>
+      </div>
+      <div class="q-card-body">
+        <div class="q-table-responsive">
+          <table class="q-table q-table-hover">
+            <thead>
+              <tr>
+                <th>组件名称</th>
+                <th>使用次数</th>
+                <th>纠缠强度</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>量子按钮</td>
+                <td>13,485</td>
+                <td>0.95</td>
+                <td><span class="q-badge q-badge-success">活跃</span></td>
+                <td>
+                  <button class="q-btn q-btn-primary q-btn-sm">查看</button>
+                  <button class="q-btn q-btn-outline-danger q-btn-sm">禁用</button>
+                </td>
+              </tr>
+              <tr>
+                <td>量子表单</td>
+                <td>8,752</td>
+                <td>0.88</td>
+                <td><span class="q-badge q-badge-success">活跃</span></td>
+                <td>
+                  <button class="q-btn q-btn-primary q-btn-sm">查看</button>
+                  <button class="q-btn q-btn-outline-danger q-btn-sm">禁用</button>
+                </td>
+              </tr>
+              <tr>
+                <td>量子卡片</td>
+                <td>6,429</td>
+                <td>0.75</td>
+                <td><span class="q-badge q-badge-warning">警告</span></td>
+                <td>
+                  <button class="q-btn q-btn-primary q-btn-sm">查看</button>
+                  <button class="q-btn q-btn-outline-danger q-btn-sm">禁用</button>
+                </td>
+              </tr>
+              <tr>
+                <td>量子对话框</td>
+                <td>4,182</td>
+                <td>0.92</td>
+                <td><span class="q-badge q-badge-success">活跃</span></td>
+                <td>
+                  <button class="q-btn q-btn-primary q-btn-sm">查看</button>
+                  <button class="q-btn q-btn-outline-danger q-btn-sm">禁用</button>
+                </td>
+              </tr>
+              <tr>
+                <td>量子菜单</td>
+                <td>3,871</td>
+                <td>0.68</td>
+                <td><span class="q-badge q-badge-danger">故障</span></td>
+                <td>
+                  <button class="q-btn q-btn-primary q-btn-sm">查看</button>
+                  <button class="q-btn q-btn-outline-danger q-btn-sm">禁用</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 右侧信息 -->
+  <div class="q-col-4">
+    <div class="q-card">
+      <div class="q-card-header">
+        <h3>量子纠缠分布</h3>
+      </div>
+      <div class="q-card-body">
+        <div class="q-chart" style="height: 200px;">
+          <!-- 假设的饼图区域 -->
+          <div class="q-chart-placeholder">
+            <div class="q-chart-pie">
+              <div class="q-pie-segment" style="background-color: var(--q-primary-500); transform: rotate(0deg) skew(30deg);"></div>
+              <div class="q-pie-segment" style="background-color: var(--q-success-500); transform: rotate(120deg) skew(60deg);"></div>
+              <div class="q-pie-segment" style="background-color: var(--q-warning-500); transform: rotate(210deg) skew(45deg);"></div>
+              <div class="q-pie-segment" style="background-color: var(--q-info-500); transform: rotate(285deg) skew(75deg);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="q-chart-legend q-mt-3">
+          <div class="q-flex q-flex-between">
+            <div class="q-legend-item">
+              <span class="q-legend-color" style="background-color: var(--q-primary-500);"></span>
+              <span>UI组件</span>
+            </div>
+            <div>45%</div>
+          </div>
+          <div class="q-flex q-flex-between">
+            <div class="q-legend-item">
+              <span class="q-legend-color" style="background-color: var(--q-success-500);"></span>
+              <span>数据层</span>
+            </div>
+            <div>30%</div>
+          </div>
+          <div class="q-flex q-flex-between">
+            <div class="q-legend-item">
+              <span class="q-legend-color" style="background-color: var(--q-warning-500);"></span>
+              <span>通信层</span>
+            </div>
+            <div>15%</div>
+          </div>
+          <div class="q-flex q-flex-between">
+            <div class="q-legend-item">
+              <span class="q-legend-color" style="background-color: var(--q-info-500);"></span>
+              <span>其他</span>
+            </div>
+            <div>10%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="q-card q-mt-4">
+      <div class="q-card-header">
+        <h3>最近活动</h3>
+      </div>
+      <div class="q-card-body">
+        <div class="q-timeline">
+          <div class="q-timeline-item">
+            <div class="q-timeline-point q-bg-primary"></div>
+            <div class="q-timeline-content">
+              <h4>量子路由器更新</h4>
+              <p>系统完成量子路由器核心功能更新</p>
+              <small class="q-text-muted">今天 14:25</small>
+            </div>
+          </div>
+          <div class="q-timeline-item">
+            <div class="q-timeline-point q-bg-success"></div>
+            <div class="q-timeline-content">
+              <h4>新增量子组件</h4>
+              <p>添加了5个新的量子UI组件到系统</p>
+              <small class="q-text-muted">昨天 09:30</small>
+            </div>
+          </div>
+          <div class="q-timeline-item">
+            <div class="q-timeline-point q-bg-warning"></div>
+            <div class="q-timeline-content">
+              <h4>量子纠缠警告</h4>
+              <p>检测到3个组件的量子纠缠强度下降</p>
+              <small class="q-text-muted">2天前 18:15</small>
+            </div>
+          </div>
+          <div class="q-timeline-item">
+            <div class="q-timeline-point q-bg-info"></div>
+            <div class="q-timeline-content">
+              <h4>系统维护</h4>
+              <p>完成系统例行维护和性能优化</p>
+              <small class="q-text-muted">3天前 22:45</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="q-card q-mt-4">
+      <div class="q-card-header">
+        <h3>系统状态</h3>
+      </div>
+      <div class="q-card-body">
+        <div class="q-list">
+          <div class="q-list-item">
+            <div class="q-flex q-flex-between q-flex-middle">
+              <div>量子处理器负载</div>
+              <div>75%</div>
+            </div>
+            <div class="q-progress q-mt-1">
+              <div class="q-progress-bar q-progress-primary" style="width: 75%"></div>
+            </div>
+          </div>
+          <div class="q-list-item">
+            <div class="q-flex q-flex-between q-flex-middle">
+              <div>量子内存使用</div>
+              <div>45%</div>
+            </div>
+            <div class="q-progress q-mt-1">
+              <div class="q-progress-bar q-progress-success" style="width: 45%"></div>
+            </div>
+          </div>
+          <div class="q-list-item">
+            <div class="q-flex q-flex-between q-flex-middle">
+              <div>量子通信带宽</div>
+              <div>92%</div>
+            </div>
+            <div class="q-progress q-mt-1">
+              <div class="q-progress-bar q-progress-warning" style="width: 92%"></div>
+            </div>
+          </div>
+          <div class="q-list-item">
+            <div class="q-flex q-flex-between q-flex-middle">
+              <div>纠缠稳定性</div>
+              <div>89%</div>
+            </div>
+            <div class="q-progress q-mt-1">
+              <div class="q-progress-bar q-progress-info" style="width: 89%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+  // 假设的图表初始化代码
+  document.addEventListener('DOMContentLoaded', function() {
+    // 这里可以添加图表初始化代码，如果有真实的图表库
+    console.log('仪表盘初始化完成');
+    
+    // 为按钮组添加切换效果
+    const btnGroup = document.querySelector('.q-btn-group');
+    if (btnGroup) {
+      const buttons = btnGroup.querySelectorAll('.q-btn');
+      buttons.forEach(btn => {
+        btn.addEventListener('click', function() {
+          buttons.forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+        });
+      });
+    }
+  });
+</script>
+{% endblock %} 

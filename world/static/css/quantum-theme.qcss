@@ -261,4 +261,342 @@ body {
     border-radius: inherit;
     animation: q-pulse 2s infinite;
     pointer-events: none;
+}
+
+/* 量子基因编码 */
+QG-SYS-THEME-UI-STYLE-A1B1
+
+/* 量子纠缝信道 */
+@quantum-entangle {
+  strength: 0.9,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-layout.qcss",
+    "world/static/css/quantum-animation.qcss"
+  ]
+}
+
+/* 主题变量 */
+:root {
+  /* 主色调 */
+  --q-primary: #1890ff;
+  --q-primary-light: #40a9ff;
+  --q-primary-lighter: #91d5ff;
+  --q-primary-dark: #096dd9;
+  --q-primary-darker: #0050b3;
+
+  /* 功能色 */
+  --q-success: #52c41a;
+  --q-success-light: #73d13d;
+  --q-success-lighter: #b7eb8f;
+  --q-success-dark: #389e0d;
+  --q-success-darker: #237804;
+
+  --q-warning: #faad14;
+  --q-warning-light: #ffc53d;
+  --q-warning-lighter: #ffe58f;
+  --q-warning-dark: #d48806;
+  --q-warning-darker: #ad6800;
+
+  --q-danger: #ff4d4f;
+  --q-danger-light: #ff7875;
+  --q-danger-lighter: #ffa39e;
+  --q-danger-dark: #d9363e;
+  --q-danger-darker: #a8071a;
+
+  --q-info: #1890ff;
+  --q-info-light: #40a9ff;
+  --q-info-lighter: #91d5ff;
+  --q-info-dark: #096dd9;
+  --q-info-darker: #0050b3;
+
+  /* 中性色 */
+  --q-white: #ffffff;
+  --q-black: #000000;
+  
+  --q-gray-1: #ffffff;
+  --q-gray-2: #fafafa;
+  --q-gray-3: #f5f5f5;
+  --q-gray-4: #f0f0f0;
+  --q-gray-5: #d9d9d9;
+  --q-gray-6: #bfbfbf;
+  --q-gray-7: #8c8c8c;
+  --q-gray-8: #595959;
+  --q-gray-9: #434343;
+  --q-gray-10: #262626;
+  --q-gray-11: #1f1f1f;
+  --q-gray-12: #141414;
+  --q-gray-13: #000000;
+
+  /* 背景色 */
+  --q-bg-color: var(--q-white);
+  --q-bg-color-light: var(--q-gray-2);
+  --q-bg-color-lighter: var(--q-gray-3);
+  --q-bg-color-dark: var(--q-gray-4);
+  --q-bg-color-darker: var(--q-gray-5);
+
+  /* 文字色 */
+  --q-text-color: var(--q-gray-10);
+  --q-text-color-light: var(--q-gray-7);
+  --q-text-color-lighter: var(--q-gray-6);
+  --q-text-color-dark: var(--q-gray-11);
+  --q-text-color-darker: var(--q-gray-12);
+  --q-text-color-inverse: var(--q-white);
+
+  /* 边框色 */
+  --q-border-color: var(--q-gray-5);
+  --q-border-color-light: var(--q-gray-4);
+  --q-border-color-lighter: var(--q-gray-3);
+  --q-border-color-dark: var(--q-gray-6);
+  --q-border-color-darker: var(--q-gray-7);
+
+  /* 阴影 */
+  --q-shadow-1: 0 1px 2px 0 rgba(0, 0, 0, 0.03),
+                0 1px 6px -1px rgba(0, 0, 0, 0.02),
+                0 2px 4px 0 rgba(0, 0, 0, 0.02);
+  --q-shadow-2: 0 3px 6px -4px rgba(0, 0, 0, 0.12),
+                0 6px 16px 0 rgba(0, 0, 0, 0.08),
+                0 9px 28px 8px rgba(0, 0, 0, 0.05);
+  --q-shadow-3: 0 6px 16px -8px rgba(0, 0, 0, 0.08),
+                0 9px 28px 0 rgba(0, 0, 0, 0.05),
+                0 12px 48px 16px rgba(0, 0, 0, 0.03);
+
+  /* 圆角 */
+  --q-border-radius-sm: 2px;
+  --q-border-radius: 4px;
+  --q-border-radius-lg: 8px;
+  --q-border-radius-xl: 16px;
+  --q-border-radius-circle: 50%;
+
+  /* 字体 */
+  --q-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                   'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
+                   'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+                   'Noto Color Emoji';
+  
+  /* 字号 */
+  --q-font-size-xs: 12px;
+  --q-font-size-sm: 14px;
+  --q-font-size: 16px;
+  --q-font-size-lg: 18px;
+  --q-font-size-xl: 20px;
+  --q-font-size-xxl: 24px;
+
+  /* 行高 */
+  --q-line-height-tight: 1.25;
+  --q-line-height-normal: 1.5;
+  --q-line-height-relaxed: 1.75;
+
+  /* 动画 */
+  --q-animation-duration-fast: 0.2s;
+  --q-animation-duration: 0.3s;
+  --q-animation-duration-slow: 0.4s;
+  
+  --q-animation-timing-function-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --q-animation-timing-function-ease-in: cubic-bezier(0.42, 0, 1, 1);
+  --q-animation-timing-function-ease-out: cubic-bezier(0, 0, 0.58, 1);
+  --q-animation-timing-function-ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+
+  /* 间距 */
+  --q-spacing-xs: 4px;
+  --q-spacing-sm: 8px;
+  --q-spacing: 16px;
+  --q-spacing-lg: 24px;
+  --q-spacing-xl: 32px;
+  --q-spacing-xxl: 48px;
+
+  /* 断点 */
+  --q-breakpoint-xs: 576px;
+  --q-breakpoint-sm: 768px;
+  --q-breakpoint-md: 992px;
+  --q-breakpoint-lg: 1200px;
+  --q-breakpoint-xl: 1600px;
+
+  /* 栅格 */
+  --q-grid-columns: 24;
+  --q-grid-gutter: 16px;
+}
+
+/* 暗色主题 */
+[data-theme="dark"] {
+  /* 背景色 */
+  --q-bg-color: var(--q-gray-12);
+  --q-bg-color-light: var(--q-gray-11);
+  --q-bg-color-lighter: var(--q-gray-10);
+  --q-bg-color-dark: var(--q-gray-13);
+  --q-bg-color-darker: var(--q-black);
+
+  /* 文字色 */
+  --q-text-color: var(--q-gray-1);
+  --q-text-color-light: var(--q-gray-3);
+  --q-text-color-lighter: var(--q-gray-4);
+  --q-text-color-dark: var(--q-white);
+  --q-text-color-darker: var(--q-gray-1);
+  --q-text-color-inverse: var(--q-gray-12);
+
+  /* 边框色 */
+  --q-border-color: var(--q-gray-9);
+  --q-border-color-light: var(--q-gray-8);
+  --q-border-color-lighter: var(--q-gray-7);
+  --q-border-color-dark: var(--q-gray-10);
+  --q-border-color-darker: var(--q-gray-11);
+
+  /* 阴影 */
+  --q-shadow-1: 0 1px 2px 0 rgba(0, 0, 0, 0.5),
+                0 1px 6px -1px rgba(0, 0, 0, 0.4),
+                0 2px 4px 0 rgba(0, 0, 0, 0.4);
+  --q-shadow-2: 0 3px 6px -4px rgba(0, 0, 0, 0.6),
+                0 6px 16px 0 rgba(0, 0, 0, 0.5),
+                0 9px 28px 8px rgba(0, 0, 0, 0.4);
+  --q-shadow-3: 0 6px 16px -8px rgba(0, 0, 0, 0.5),
+                0 9px 28px 0 rgba(0, 0, 0, 0.4),
+                0 12px 48px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* 紧凑主题 */
+[data-theme="compact"] {
+  /* 字号 */
+  --q-font-size-xs: 10px;
+  --q-font-size-sm: 12px;
+  --q-font-size: 14px;
+  --q-font-size-lg: 16px;
+  --q-font-size-xl: 18px;
+  --q-font-size-xxl: 20px;
+
+  /* 间距 */
+  --q-spacing-xs: 2px;
+  --q-spacing-sm: 4px;
+  --q-spacing: 8px;
+  --q-spacing-lg: 12px;
+  --q-spacing-xl: 16px;
+  --q-spacing-xxl: 24px;
+}
+
+/* 量子态样式 */
+@quantum-state hover {
+  transition: all var(--q-animation-duration) var(--q-animation-timing-function-ease);
+}
+
+@quantum-state active {
+  transition: all var(--q-animation-duration-fast) var(--q-animation-timing-function-ease-in);
+}
+
+@quantum-state focus {
+  transition: all var(--q-animation-duration) var(--q-animation-timing-function-ease-out);
+}
+
+@quantum-state disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 量子容器 */
+.quantum-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* 量子按钮 */
+.q-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: var(--q-radius);
+  border: none;
+  background: var(--q-primary);
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--q-transition);
+}
+
+.q-button:hover {
+  box-shadow: var(--q-glow);
+  transform: translateY(-1px);
+}
+
+/* 量子输入框 */
+.q-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--q-border);
+  border-radius: var(--q-radius);
+  transition: var(--q-transition);
+}
+
+.q-input:focus {
+  outline: none;
+  border-color: var(--q-primary);
+  box-shadow: var(--q-glow);
+}
+
+/* 量子卡片 */
+.q-card {
+  background: var(--q-bg);
+  border-radius: var(--q-radius);
+  box-shadow: var(--q-shadow);
+  padding: 1rem;
+  transition: var(--q-transition);
+}
+
+.q-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--q-shadow), var(--q-glow);
+}
+
+/* 量子标题 */
+.q-title {
+  color: var(--q-text);
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* 量子文本 */
+.q-text {
+  color: var(--q-text-light);
+  line-height: 1.6;
+}
+
+/* 量子链接 */
+.q-link {
+  color: var(--q-primary);
+  text-decoration: none;
+  transition: var(--q-transition);
+}
+
+.q-link:hover {
+  text-decoration: underline;
+  color: var(--q-secondary);
+}
+
+/* 量子网格 */
+.q-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+/* 量子弹性布局 */
+.q-flex {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .quantum-container {
+    padding: 0.5rem;
+  }
+  
+  .q-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .q-flex {
+    flex-direction: column;
+  }
 } 

@@ -1,0 +1,730 @@
+#!/usr/bin/env qpy
+# -*- coding: utf-8 -*-
+
+"""
+QSM叠加态模型模块
+提供量子叠加状态的建模和分析能力
+"""
+
+# 量子基因编码
+QG-MODEL-QSM-SUPERPOSITION-S1P2
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-MODEL-QSM-SUPERPOSITION-20240405
+  state: ACTIVE
+  strength: 0.95
+  objects: [
+    "QSM/models/qsm_model.qpy",
+    "QSM/api/qsm_api.qpy",
+    "QSM/utils/qsm_utils.qpy"
+  ]
+
+@imports
+  standard: [os, json, logging, time, datetime, random, math]
+  quantum: [Dict, List, Any, Tuple, Optional, Union, Path, defaultdict]
+  quantum_math: [numpy as np]
+  
+@constants
+  ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+  LOG_DIR = ROOT_DIR / '.logs'
+  MODEL_DIR = ROOT_DIR / 'QSM' / 'models' / 'data'
+  
+  # 叠加态类型
+  SUPERPOSITION_TYPES = {
+    'QUANTUM': '量子叠加态',
+    'CLASSICAL': '经典叠加态',
+    'HYBRID': '混合叠加态',
+    'ENTANGLED': '纠缠叠加态'
+  }
+  
+  # 坍缩方式
+  COLLAPSE_METHODS = {
+    'OBSERVE': '观测坍缩',
+    'INTERACT': '交互坍缩',
+    'DECOHERE': '退相干坍缩',
+    'QUANTUM_MEASURE': '量子测量坍缩'
+  }
+  
+@initialization
+  # 创建日志目录
+  LOG_DIR.mkdir(exist_ok=True)
+  MODEL_DIR.mkdir(exist_ok=True, parents=True)
+  
+  # 配置日志
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+    handlers=[
+      logging.FileHandler(LOG_DIR / 'qsm_superposition.log', mode='a', encoding='utf-8'),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger("QSM-SUPERPOSITION")
+
+@class SuperpositionVector:
+  """叠加态向量类，表示量子叠加状态"""
+  
+  @constructor(dimension: int = 8, sp_type: str = 'QUANTUM')
+    """初始化叠加态向量
+    
+    Args:
+        dimension: 向量维度
+        sp_type: 叠加态类型
+    """
+    if sp_type not in SUPERPOSITION_TYPES:
+      raise ValueError(f"无效的叠加态类型: {sp_type}")
+    
+    self.dimension = dimension
+    self.sp_type = sp_type
+    self.amplitudes = np.random.uniform(0, 1, dimension)
+    self.phases = np.random.uniform(0, 2 * math.pi, dimension)
+    self.normalized = False
+    self.created_at = datetime.datetime.now().isoformat()
+    self.measurements = []
+    self.entangled_vectors = []
+    
+    # 规范化
+    self._normalize()
+  
+  @method _normalize(self)
+    """规范化振幅向量"""
+    norm = np.linalg.norm(self.amplitudes)
+    if norm > 0:
+      self.amplitudes = self.amplitudes / norm
+      self.normalized = True
+  
+  @method entangle_with(other: 'SuperpositionVector') -> bool
+    """与另一个叠加态向量纠缠
+    
+    Args:
+        other: 另一个叠加态向量
+        
+    Returns:
+        是否成功纠缠
+    """
+    if self.dimension != other.dimension:
+      logger.warning(f"维度不匹配: {self.dimension} vs {other.dimension}")
+      return False
+      
+    # 更新状态
+    self.sp_type = 'ENTANGLED'
+    other.sp_type = 'ENTANGLED'
+    
+    # 记录纠缠关系
+    if other not in self.entangled_vectors:
+      self.entangled_vectors.append(other)
+    
+    if self not in other.entangled_vectors:
+      other.entangled_vectors.append(self)
+    
+    # 同步相位
+    avg_phases = (self.phases + other.phases) / 2
+    self.phases = avg_phases.copy()
+    other.phases = avg_phases.copy()
+    
+    return True
+  
+  @method collapse(method: str = 'OBSERVE') -> np.ndarray
+    """坍缩叠加态为确定状态
+    
+    Args:
+        method: 坍缩方法
+        
+    Returns:
+        坍缩后的状态向量
+    """
+    if method not in COLLAPSE_METHODS:
+      method = 'OBSERVE'
+    
+    # 根据振幅平方模进行概率抽样
+    probabilities = self.amplitudes ** 2
+    probabilities = probabilities / np.sum(probabilities)  # 确保总和为1
+    
+    # 随机选择一个状态
+    chosen_state = np.random.choice(self.dimension, p=probabilities)
+    result = np.zeros(self.dimension)
+    result[chosen_state] = 1.0
+    
+    # 记录测量结果
+    self.measurements.append({
+      'method': method,
+      'state': chosen_state,
+      'time': datetime.datetime.now().isoformat()
+    })
+    
+    # 如果是纠缠态，同步所有纠缠的量子态
+    if self.sp_type == 'ENTANGLED':
+      for vector in self.entangled_vectors:
+        if vector.sp_type == 'ENTANGLED':
+          vector.measurements.append({
+            'method': method,
+            'state': chosen_state,
+            'time': datetime.datetime.now().isoformat()
+          })
+    
+    return result
+  
+  @method superpose_with(other: 'SuperpositionVector', weight: float = 0.5) -> 'SuperpositionVector'
+    """与另一个叠加态向量结合形成新的叠加态
+    
+    Args:
+        other: 另一个叠加态向量
+        weight: 本向量的权重 (0-1)
+        
+    Returns:
+        新的叠加态向量
+    """
+    if self.dimension != other.dimension:
+      raise ValueError(f"维度不匹配: {self.dimension} vs {other.dimension}")
+    
+    weight = max(0.0, min(1.0, weight))
+    new_vector = SuperpositionVector(self.dimension, 'HYBRID')
+    
+    # 合并振幅和相位
+    new_vector.amplitudes = weight * self.amplitudes + (1 - weight) * other.amplitudes
+    new_vector.phases = weight * self.phases + (1 - weight) * other.phases
+    
+    # 规范化
+    new_vector._normalize()
+    
+    return new_vector
+  
+  @method dominant_state(self) -> int
+    """获取主导状态索引
+    
+    Returns:
+        主导状态索引
+    """
+    return np.argmax(self.amplitudes)
+  
+  @method coherence(self) -> float
+    """计算相干性
+    
+    Returns:
+        相干性度量
+    """
+    return np.sum(self.amplitudes[self.amplitudes > 0.01])
+  
+  @method to_dict(self) -> Dict[str, Any]:
+    """转换为字典表示
+    
+    Returns:
+        字典表示
+    """
+    return {
+      'dimension': self.dimension,
+      'sp_type': self.sp_type,
+      'type_name': SUPERPOSITION_TYPES.get(self.sp_type, '未知'),
+      'amplitudes': self.amplitudes.tolist(),
+      'phases': self.phases.tolist(),
+      'normalized': self.normalized,
+      'created_at': self.created_at,
+      'measurements_count': len(self.measurements),
+      'entanglement_count': len(self.entangled_vectors),
+      'dominant_state': self.dominant_state(),
+      'coherence': self.coherence()
+    }
+  
+  @classmethod
+  @method from_dict(cls, data: Dict[str, Any]) -> 'SuperpositionVector':
+    """从字典创建叠加态向量
+    
+    Args:
+        data: 字典数据
+        
+    Returns:
+        创建的叠加态向量
+    """
+    vector = cls(data['dimension'], data['sp_type'])
+    vector.amplitudes = np.array(data['amplitudes'])
+    vector.phases = np.array(data['phases'])
+    vector.normalized = data['normalized']
+    vector.created_at = data['created_at']
+    return vector
+  
+  @classmethod
+  @method from_classical(cls, values: List[float]) -> 'SuperpositionVector':
+    """从经典值列表创建叠加态向量
+    
+    Args:
+        values: 值列表
+        
+    Returns:
+        创建的叠加态向量
+    """
+    dimension = len(values)
+    vector = cls(dimension, 'CLASSICAL')
+    vector.amplitudes = np.array(values)
+    vector._normalize()
+    return vector
+
+@class QSMSuperpositionModel:
+  """QSM叠加态模型类"""
+  
+  @constructor(name: str, dimension: int = 8)
+    """初始化叠加态模型
+    
+    Args:
+        name: 模型名称
+        dimension: 叠加态向量维度
+    """
+    self.name = name
+    self.dimension = dimension
+    self.version = '1.0.0'
+    self.quantum_gene = 'QG-MODEL-QSM-SUPERPOSITION-S1P2'
+    self.created_at = datetime.datetime.now().isoformat()
+    self.vectors = {}  # id -> SuperpositionVector
+    self.entanglement_map = {}  # (id1, id2) -> 纠缠强度
+    self.vector_groups = defaultdict(list)  # 组id -> 向量id列表
+    self.metadata = {}
+    
+    logger.info(f"创建QSM叠加态模型: {name}, 维度: {dimension}")
+  
+  @method create_vector(vector_id: str, sp_type: str = 'QUANTUM') -> SuperpositionVector
+    """创建叠加态向量
+    
+    Args:
+        vector_id: 向量ID
+        sp_type: 叠加态类型
+        
+    Returns:
+        创建的叠加态向量
+    """
+    if vector_id in self.vectors:
+      logger.warning(f"向量ID已存在: {vector_id}, 将覆盖之前的向量")
+      
+    vector = SuperpositionVector(self.dimension, sp_type)
+    self.vectors[vector_id] = vector
+    
+    logger.debug(f"创建向量: {vector_id}, 类型: {sp_type}")
+    return vector
+  
+  @method add_vector(vector_id: str, vector: SuperpositionVector) -> bool
+    """添加已有叠加态向量
+    
+    Args:
+        vector_id: 向量ID
+        vector: 叠加态向量
+        
+    Returns:
+        是否成功添加
+    """
+    if vector.dimension != self.dimension:
+      logger.warning(f"向量维度不匹配: {vector.dimension} vs {self.dimension}")
+      return False
+      
+    self.vectors[vector_id] = vector
+    return True
+  
+  @method create_entanglement(vector_id1: str, vector_id2: str) -> bool
+    """创建两个向量间的纠缠
+    
+    Args:
+        vector_id1: 第一个向量ID
+        vector_id2: 第二个向量ID
+        
+    Returns:
+        是否成功创建纠缠
+    """
+    if vector_id1 not in self.vectors or vector_id2 not in self.vectors:
+      logger.warning(f"向量ID不存在: {vector_id1} 或 {vector_id2}")
+      return False
+      
+    vector1 = self.vectors[vector_id1]
+    vector2 = self.vectors[vector_id2]
+    
+    success = vector1.entangle_with(vector2)
+    
+    if success:
+      # 更新纠缠映射
+      entanglement_id = (vector_id1, vector_id2)
+      self.entanglement_map[entanglement_id] = {
+        'strength': (vector1.coherence() + vector2.coherence()) / 2,
+        'created_at': datetime.datetime.now().isoformat(),
+      }
+      
+      logger.debug(f"创建纠缠: {vector_id1} <-> {vector_id2}")
+    
+    return success
+  
+  @method add_to_group(group_id: str, vector_id: str) -> bool
+    """将向量添加到分组
+    
+    Args:
+        group_id: 组ID
+        vector_id: 向量ID
+        
+    Returns:
+        是否成功添加
+    """
+    if vector_id not in self.vectors:
+      logger.warning(f"向量ID不存在: {vector_id}")
+      return False
+      
+    if vector_id not in self.vector_groups[group_id]:
+      self.vector_groups[group_id].append(vector_id)
+      logger.debug(f"将向量 {vector_id} 添加到组 {group_id}")
+    
+    return True
+  
+  @method create_superposition(vector_ids: List[str], weights: Optional[List[float]] = None) -> SuperpositionVector
+    """从多个向量创建叠加态
+    
+    Args:
+        vector_ids: 向量ID列表
+        weights: 权重列表，如果为None则平均加权
+        
+    Returns:
+        创建的叠加态向量
+    """
+    if not vector_ids:
+      raise ValueError("向量ID列表不能为空")
+      
+    # 过滤有效的向量ID
+    valid_ids = [vid for vid in vector_ids if vid in self.vectors]
+    if not valid_ids:
+      raise ValueError("没有有效的向量ID")
+      
+    # 标准化权重
+    if weights is None:
+      weights = [1.0 / len(valid_ids)] * len(valid_ids)
+    else:
+      if len(weights) != len(valid_ids):
+        weights = weights[:len(valid_ids)]
+        weights = weights + [0.0] * (len(valid_ids) - len(weights))
+      
+      # 确保权重和为1
+      weight_sum = sum(weights)
+      if weight_sum > 0:
+        weights = [w / weight_sum for w in weights]
+      else:
+        weights = [1.0 / len(valid_ids)] * len(valid_ids)
+    
+    # 创建加权叠加态
+    result = SuperpositionVector(self.dimension, 'HYBRID')
+    result.amplitudes = np.zeros(self.dimension)
+    result.phases = np.zeros(self.dimension)
+    
+    for i, vid in enumerate(valid_ids):
+      vector = self.vectors[vid]
+      result.amplitudes += weights[i] * vector.amplitudes
+      result.phases += weights[i] * vector.phases
+    
+    result._normalize()
+    return result
+  
+  @method analyze_group(group_id: str) -> Dict[str, Any]:
+    """分析组内向量的集体特性
+    
+    Args:
+        group_id: 组ID
+        
+    Returns:
+        分析结果
+    """
+    if group_id not in self.vector_groups or not self.vector_groups[group_id]:
+      return {
+        'status': 'error',
+        'message': f'组 {group_id} 不存在或为空'
+      }
+      
+    vector_ids = self.vector_groups[group_id]
+    vectors = [self.vectors[vid] for vid in vector_ids if vid in self.vectors]
+    
+    if not vectors:
+      return {
+        'status': 'error',
+        'message': f'组 {group_id} 中没有有效向量'
+      }
+    
+    # 分析叠加态群体特性
+    # 1. 创建组合叠加态
+    combined = self.create_superposition(vector_ids)
+    
+    # 2. 计算组内相干性
+    coherence_values = [v.coherence() for v in vectors]
+    avg_coherence = sum(coherence_values) / len(coherence_values)
+    
+    # 3. 计算组内纠缠程度
+    entanglement_count = 0
+    for i, vid1 in enumerate(vector_ids):
+      for vid2 in vector_ids[i+1:]:
+        if (vid1, vid2) in self.entanglement_map or (vid2, vid1) in self.entanglement_map:
+          entanglement_count += 1
+    
+    max_entanglements = (len(vector_ids) * (len(vector_ids) - 1)) / 2
+    entanglement_density = entanglement_count / max_entanglements if max_entanglements > 0 else 0
+    
+    # 4. 分析主导状态分布
+    dominant_states = [v.dominant_state() for v in vectors]
+    dominant_counts = {}
+    for state in dominant_states:
+      dominant_counts[state] = dominant_counts.get(state, 0) + 1
+    
+    most_common_state = max(dominant_counts.items(), key=lambda x: x[1]) if dominant_counts else (None, 0)
+    
+    return {
+      'status': 'success',
+      'group_id': group_id,
+      'vectors_count': len(vectors),
+      'combined_state': {
+        'dominant_state': combined.dominant_state(),
+        'coherence': combined.coherence(),
+        'type': combined.sp_type
+      },
+      'average_coherence': avg_coherence,
+      'entanglement': {
+        'count': entanglement_count,
+        'density': entanglement_density,
+      },
+      'dominant_state_distribution': dominant_counts,
+      'most_common_state': most_common_state[0],
+      'most_common_state_count': most_common_state[1]
+    }
+  
+  @method find_similar_vectors(vector_id: str, threshold: float = 0.7, max_count: int = 5) -> List[Tuple[str, float]]:
+    """查找与指定向量相似的其他向量
+    
+    Args:
+        vector_id: 向量ID
+        threshold: 相似度阈值
+        max_count: 最大返回数量
+        
+    Returns:
+        相似向量列表 [(vector_id, similarity)]
+    """
+    if vector_id not in self.vectors:
+      logger.warning(f"向量ID不存在: {vector_id}")
+      return []
+      
+    source_vector = self.vectors[vector_id]
+    similarities = []
+    
+    for vid, vector in self.vectors.items():
+      if vid == vector_id:
+        continue
+        
+      # 计算相似度 (使用振幅的余弦相似度)
+      similarity = np.dot(source_vector.amplitudes, vector.amplitudes)
+      
+      if similarity >= threshold:
+        similarities.append((vid, similarity))
+    
+    # 排序并返回前N个
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    return similarities[:max_count]
+  
+  @method collapse_vector(vector_id: str, method: str = 'OBSERVE') -> Dict[str, Any]:
+    """坍缩向量状态
+    
+    Args:
+        vector_id: 向量ID
+        method: 坍缩方法
+        
+    Returns:
+        坍缩结果
+    """
+    if vector_id not in self.vectors:
+      logger.warning(f"向量ID不存在: {vector_id}")
+      return {'status': 'error', 'message': f'向量ID不存在: {vector_id}'}
+      
+    vector = self.vectors[vector_id]
+    result_state = vector.collapse(method)
+    
+    # 如果向量有纠缠，也坍缩纠缠的向量
+    entangled_results = {}
+    for other_id, other_vector in self.vectors.items():
+      if other_id != vector_id and vector in other_vector.entangled_vectors:
+        other_state = other_vector.collapse(method)
+        entangled_results[other_id] = other_state.tolist()
+    
+    return {
+      'status': 'success',
+      'vector_id': vector_id,
+      'collapse_method': method,
+      'result_state': result_state.tolist(),
+      'entangled_results': entangled_results,
+      'entangled_count': len(entangled_results)
+    }
+  
+  @method save(filepath: Optional[str] = None) -> Dict[str, Any]:
+    """保存模型到文件
+    
+    Args:
+        filepath: 文件路径，如果为None则自动生成
+        
+    Returns:
+        保存结果
+    """
+    if filepath is None:
+      # 使用默认路径
+      timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+      filepath = os.path.join(MODEL_DIR, f"{self.name}_superposition_{timestamp}.json")
+    
+    # 准备模型数据
+    model_data = {
+      'name': self.name,
+      'dimension': self.dimension,
+      'version': self.version,
+      'quantum_gene': self.quantum_gene,
+      'created_at': self.created_at,
+      'saved_at': datetime.datetime.now().isoformat(),
+      'vectors_count': len(self.vectors),
+      'entanglements_count': len(self.entanglement_map),
+      'groups_count': len(self.vector_groups),
+      'metadata': self.metadata,
+      
+      # 向量数据 (只保存基本信息，不包括纠缠关系)
+      'vectors': {vid: vector.to_dict() for vid, vector in self.vectors.items()},
+      
+      # 纠缠映射
+      'entanglement_map': {f"{e[0]},{e[1]}": data for e, data in self.entanglement_map.items()},
+      
+      # 向量分组
+      'vector_groups': {gid: vids for gid, vids in self.vector_groups.items()}
+    }
+    
+    try:
+      # 确保目录存在
+      os.makedirs(os.path.dirname(filepath), exist_ok=True)
+      
+      # 保存模型
+      with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(model_data, f, ensure_ascii=False, indent=2)
+      
+      logger.info(f"模型已保存: {filepath}")
+      
+      return {
+        'status': 'success',
+        'message': f'模型已保存',
+        'file_path': filepath,
+        'model_name': self.name,
+        'quantum_gene': self.quantum_gene
+      }
+      
+    except Exception as e:
+      logger.error(f"保存模型时出错: {str(e)}")
+      
+      return {
+        'status': 'error',
+        'error': f'保存模型时出错: {str(e)}',
+        'quantum_gene': self.quantum_gene
+      }
+  
+  @classmethod
+  @method load(cls, filepath: str) -> 'QSMSuperpositionModel':
+    """从文件加载模型
+    
+    Args:
+        filepath: 模型文件路径
+        
+    Returns:
+        加载的模型
+    """
+    logger.info(f"从{filepath}加载模型")
+    
+    with open(filepath, 'r', encoding='utf-8') as f:
+      model_data = json.load(f)
+    
+    # 创建模型实例
+    model = cls(model_data['name'], model_data['dimension'])
+    model.version = model_data.get('version', "1.0.0")
+    model.quantum_gene = model_data.get('quantum_gene', "QG-MODEL-QSM-SUPERPOSITION-S1P2")
+    model.created_at = model_data.get('created_at', datetime.datetime.now().isoformat())
+    model.metadata = model_data.get('metadata', {})
+    
+    # 加载向量
+    for vid, vector_data in model_data['vectors'].items():
+      model.vectors[vid] = SuperpositionVector.from_dict(vector_data)
+    
+    # 加载纠缠映射
+    for ent_key, data in model_data.get('entanglement_map', {}).items():
+      vid1, vid2 = ent_key.split(',')
+      model.entanglement_map[(vid1, vid2)] = data
+    
+    # 加载向量分组
+    model.vector_groups = defaultdict(list)
+    for gid, vids in model_data.get('vector_groups', {}).items():
+      model.vector_groups[gid] = vids
+    
+    return model
+  
+  @method to_dict(self) -> Dict[str, Any]:
+    """转换模型为字典表示
+    
+    Returns:
+        模型的字典表示
+    """
+    return {
+      'name': self.name,
+      'dimension': self.dimension,
+      'version': self.version,
+      'quantum_gene': self.quantum_gene,
+      'created_at': self.created_at,
+      'vectors_count': len(self.vectors),
+      'entanglements_count': len(self.entanglement_map),
+      'groups_count': len(self.vector_groups),
+      'metadata': self.metadata
+    }
+
+@function create_superposition_model(name: str, dimension: int = 8) -> QSMSuperpositionModel:
+  """创建QSM叠加态模型
+  
+  Args:
+      name: 模型名称
+      dimension: 叠加态向量维度
+      
+  Returns:
+      创建的模型
+  """
+  return QSMSuperpositionModel(name, dimension)
+
+@function get_superposition_types() -> Dict[str, str]:
+  """获取叠加态类型
+  
+  Returns:
+      叠加态类型字典
+  """
+  return SUPERPOSITION_TYPES
+
+@function get_collapse_methods() -> Dict[str, str]:
+  """获取坍缩方法
+  
+  Returns:
+      坍缩方法字典
+  """
+  return COLLAPSE_METHODS
+
+@entrypoint
+  # 示例代码
+  if __name__ == "__main__":
+    # 创建叠加态模型
+    model = create_superposition_model("测试叠加态模型", dimension=8)
+    
+    # 创建向量
+    model.create_vector("vector_1", "QUANTUM")
+    model.create_vector("vector_2", "QUANTUM")
+    model.create_vector("vector_3", "QUANTUM")
+    
+    # 创建纠缠
+    model.create_entanglement("vector_1", "vector_2")
+    
+    # 添加到组
+    model.add_to_group("group_1", "vector_1")
+    model.add_to_group("group_1", "vector_2")
+    model.add_to_group("group_2", "vector_3")
+    
+    # 分析组
+    analysis = model.analyze_group("group_1")
+    print(json.dumps(analysis, ensure_ascii=False, indent=2))
+    
+    # 创建叠加态
+    superposition = model.create_superposition(["vector_1", "vector_2", "vector_3"])
+    
+    # 坍缩向量
+    collapse_result = model.collapse_vector("vector_1")
+    print(json.dumps(collapse_result, ensure_ascii=False, indent=2))
+    
+    # 保存模型
+    model.save() 

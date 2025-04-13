@@ -1,0 +1,614 @@
+#!/usr/bin/env qpy
+# -*- coding: utf-8 -*-
+
+"""
+量子自反省管理系统(Ref) - API服务
+为量子自反省系统提供API接口
+"""
+
+# 量子基因编码
+QG-API-REF-MONITOR-A1B3
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-API-REF-20240406
+  state: ACTIVE
+  strength: 0.98
+  objects: [
+    "Ref/models/ref_model.qpy",
+    "Ref/monitor/system_monitor_enhancer.qpy",
+    "Ref/services/repair_service.qpy",
+    "Ref/services/backup_service.qpy"
+  ]
+
+@imports
+  standard: [os, sys, json, logging, time, datetime]
+  quantum_web: [flask, request, jsonify, Blueprint]
+  quantum_typing: [Dict, List, Any, Optional, Union, Tuple]
+  quantum_models: [
+    "Ref/models/ref_model.qpy" as ref_model,
+    "Ref/monitor/system_monitor_enhancer.qpy" as system_monitor
+  ]
+
+@constants
+  # 目录设置
+  ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  LOG_DIR = os.path.join(ROOT_DIR, '.logs')
+  
+  # API版本
+  API_VERSION = "1.0.0"
+  
+  # 服务配置
+  DEFAULT_PORT = 5003
+
+@initialization
+  # 创建日志目录
+  os.makedirs(LOG_DIR, exist_ok=True)
+  
+  # 配置日志
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+      logging.FileHandler(os.path.join(LOG_DIR, 'ref_api.log')),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('Ref-API')
+  
+  # 创建Blueprint
+  ref_bp = Blueprint('ref_api', __name__)
+  
+  # 获取核心模型和监控器
+  default_model = ref_model.RefModel()
+  monitor = system_monitor.get_system_monitor()
+  model_health_monitor = system_monitor.get_model_health_monitor()
+
+@function get_blueprint():
+  """获取Ref API Blueprint
+  
+  Returns:
+      Blueprint: Ref API Blueprint
+  """
+  return ref_bp
+
+@function get_status():
+  """获取Ref状态
+  
+  Returns:
+      Dict: Ref状态信息
+  """
+  return {
+    'status': 'online',
+    'version': API_VERSION,
+    'timestamp': datetime.datetime.now().isoformat(),
+    'model': {
+      'is_initialized': default_model.is_initialized(),
+      'strategies_count': len(getattr(default_model, 'repair_strategies', [])),
+      'monitors_count': len(getattr(default_model, 'monitors', []))
+    }
+  }
+
+@route ref_bp GET "/"
+def ref_index():
+  """Ref API根端点"""
+  return jsonify({
+    'name': 'Ref API',
+    'version': API_VERSION,
+    'description': '量子自反省管理系统API服务',
+    'timestamp': datetime.datetime.now().isoformat(),
+    'endpoints': {
+      'status': '/api/ref/status',
+      'health': '/api/ref/health',
+      'models': '/api/ref/models',
+      'resources': '/api/ref/resources',
+      'anomalies': '/api/ref/anomalies',
+      'strategies': '/api/ref/strategies',
+      'backup': '/api/ref/backup',
+      'repair': '/api/ref/repair'
+    }
+  })
+
+@route ref_bp GET "/status"
+def ref_status():
+  """获取Ref状态"""
+  return jsonify(get_status())
+
+@route ref_bp GET "/health"
+def system_health():
+  """获取系统健康状态"""
+  try:
+    # 获取系统健康评分
+    score, details = monitor.get_system_health_score()
+    
+    return jsonify({
+      'health_score': score,
+      'status': 'healthy' if score >= 80 else ('degraded' if score >= 50 else 'critical'),
+      'details': details,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"获取系统健康状态时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/models"
+def list_models():
+  """获取所有模型健康状态"""
+  try:
+    models = {
+      'QSM': None,
+      'WeQ': None,
+      'SOM': None,
+      'Ref': None
+    }
+    
+    # 尝试获取每个模型实例
+    try:
+      from QSM.models.qsm_model import QuantumStateModel
+      qsm_model = QuantumStateModel()
+      models['QSM'] = model_health_monitor.check_model_health("QSM", qsm_model)
+    except Exception as e:
+      logger.warning(f"获取QSM模型时出错: {str(e)}")
+    
+    try:
+      from WeQ.models.weq_model import WeQuantumModel
+      weq_model = WeQuantumModel()
+      models['WeQ'] = model_health_monitor.check_model_health("WeQ", weq_model)
+    except Exception as e:
+      logger.warning(f"获取WeQ模型时出错: {str(e)}")
+    
+    try:
+      from SOM.models.som_model import SelfOrganizingMarket
+      som_model = SelfOrganizingMarket()
+      models['SOM'] = model_health_monitor.check_model_health("SOM", som_model)
+    except Exception as e:
+      logger.warning(f"获取SOM模型时出错: {str(e)}")
+    
+    # Ref模型已经有了
+    models['Ref'] = model_health_monitor.check_model_health("Ref", default_model)
+    
+    return jsonify({
+      'models': models,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"获取模型健康状态时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/models/<model_id>"
+def get_model(model_id):
+  """获取特定模型的健康状态"""
+  try:
+    model = None
+    
+    # 根据model_id获取对应的模型实例
+    if model_id == "QSM":
+      try:
+        from QSM.models.qsm_model import QuantumStateModel
+        model = QuantumStateModel()
+      except Exception as e:
+        logger.warning(f"获取QSM模型时出错: {str(e)}")
+        return jsonify({
+          'error': f"获取QSM模型时出错: {str(e)}"
+        }), 404
+    
+    elif model_id == "WeQ":
+      try:
+        from WeQ.models.weq_model import WeQuantumModel
+        model = WeQuantumModel()
+      except Exception as e:
+        logger.warning(f"获取WeQ模型时出错: {str(e)}")
+        return jsonify({
+          'error': f"获取WeQ模型时出错: {str(e)}"
+        }), 404
+    
+    elif model_id == "SOM":
+      try:
+        from SOM.models.som_model import SelfOrganizingMarket
+        model = SelfOrganizingMarket()
+      except Exception as e:
+        logger.warning(f"获取SOM模型时出错: {str(e)}")
+        return jsonify({
+          'error': f"获取SOM模型时出错: {str(e)}"
+        }), 404
+    
+    elif model_id == "Ref":
+      model = default_model
+    
+    else:
+      return jsonify({
+        'error': '未知的模型ID'
+      }), 404
+    
+    # 检查模型健康状态
+    health = model_health_monitor.check_model_health(model_id, model)
+    
+    return jsonify({
+      'model_id': model_id,
+      'health': health,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"获取模型健康状态时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp POST "/models/<model_id>/repair"
+def repair_model(model_id):
+  """修复特定模型"""
+  try:
+    # 检查模型是否存在
+    if model_id not in ["QSM", "WeQ", "SOM", "Ref"]:
+      return jsonify({
+        'error': '未知的模型ID'
+      }), 404
+    
+    # 创建修复策略
+    strategy = default_model.create_repair_strategy(
+      f"repair_{model_id.lower()}",
+      f"修复{model_id}模型"
+    )
+    
+    # 添加修复步骤
+    strategy.add_step(
+      "check_model", 
+      f"检查{model_id}模型状态",
+      {"model_id": model_id}
+    )
+    
+    strategy.add_step(
+      "backup_model", 
+      f"备份{model_id}模型",
+      {"model_id": model_id}
+    )
+    
+    strategy.add_step(
+      "repair_model", 
+      f"修复{model_id}模型",
+      {"model_id": model_id}
+    )
+    
+    # 执行修复策略
+    result = strategy.execute()
+    
+    return jsonify({
+      'status': 'success' if result else 'failed',
+      'message': f"{'成功' if result else '失败'}修复{model_id}模型",
+      'repair_id': strategy.id,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"修复模型时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/resources"
+def system_resources():
+  """获取系统资源使用情况"""
+  try:
+    resources = monitor.resource_monitor.check_resources()
+    
+    return jsonify({
+      'resources': resources,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"获取系统资源时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/anomalies"
+def system_anomalies():
+  """获取系统异常"""
+  try:
+    # 获取查询参数
+    hours = int(request.args.get('hours', 24))
+    
+    # 获取异常
+    anomalies = monitor.anomaly_detector.get_anomalies(hours)
+    
+    return jsonify({
+      'anomalies': anomalies,
+      'count': len(anomalies),
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"获取系统异常时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/strategies"
+def list_strategies():
+  """列出所有修复策略"""
+  try:
+    strategies = getattr(default_model, 'repair_strategies', [])
+    
+    return jsonify({
+      'strategies': [
+        {
+          'id': strategy.id,
+          'name': strategy.name,
+          'description': strategy.description,
+          'steps_count': len(strategy.steps),
+          'last_executed': strategy.last_executed,
+          'success_rate': strategy.success_rate
+        }
+        for strategy in strategies
+      ],
+      'count': len(strategies),
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"列出修复策略时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp POST "/strategies"
+def create_strategy():
+  """创建新修复策略"""
+  try:
+    data = request.get_json()
+    
+    if not data:
+      return jsonify({
+        'error': '无效的请求数据'
+      }), 400
+    
+    # 获取策略数据
+    name = data.get('name')
+    description = data.get('description')
+    steps = data.get('steps', [])
+    
+    if not name or not description:
+      return jsonify({
+        'error': '缺少必要参数(name, description)'
+      }), 400
+    
+    # 创建策略
+    strategy = default_model.create_repair_strategy(name, description)
+    
+    # 添加步骤
+    for step in steps:
+      if not step.get('action') or not step.get('description'):
+        continue
+        
+      strategy.add_step(
+        step.get('action'),
+        step.get('description'),
+        step.get('params', {})
+      )
+    
+    return jsonify({
+      'status': 'success',
+      'message': '修复策略创建成功',
+      'strategy_id': strategy.id,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"创建修复策略时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/strategies/<strategy_id>"
+def get_strategy(strategy_id):
+  """获取特定修复策略"""
+  try:
+    strategies = getattr(default_model, 'repair_strategies', [])
+    
+    # 查找对应ID的策略
+    strategy = next((s for s in strategies if s.id == strategy_id), None)
+    
+    if not strategy:
+      return jsonify({
+        'error': '修复策略不存在'
+      }), 404
+    
+    return jsonify({
+      'id': strategy.id,
+      'name': strategy.name,
+      'description': strategy.description,
+      'steps': [
+        {
+          'action': step.action,
+          'description': step.description,
+          'params': step.params
+        }
+        for step in strategy.steps
+      ],
+      'preconditions': strategy.preconditions,
+      'postconditions': strategy.postconditions,
+      'dependencies': strategy.dependencies,
+      'last_executed': strategy.last_executed,
+      'success_rate': strategy.success_rate,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"获取修复策略时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp POST "/strategies/<strategy_id>/execute"
+def execute_strategy(strategy_id):
+  """执行特定修复策略"""
+  try:
+    strategies = getattr(default_model, 'repair_strategies', [])
+    
+    # 查找对应ID的策略
+    strategy = next((s for s in strategies if s.id == strategy_id), None)
+    
+    if not strategy:
+      return jsonify({
+        'error': '修复策略不存在'
+      }), 404
+    
+    # 执行策略
+    result = strategy.execute()
+    
+    return jsonify({
+      'status': 'success' if result else 'failed',
+      'message': f"{'成功' if result else '失败'}执行修复策略",
+      'strategy_id': strategy.id,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"执行修复策略时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/backup"
+def list_backups():
+  """列出所有备份"""
+  try:
+    backups = default_model.get_all_backups()
+    
+    return jsonify({
+      'backups': backups,
+      'count': len(backups),
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"列出备份时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp POST "/backup"
+def create_backup():
+  """创建新备份"""
+  try:
+    data = request.get_json()
+    
+    if not data:
+      return jsonify({
+        'error': '无效的请求数据'
+      }), 400
+    
+    # 获取备份数据
+    name = data.get('name')
+    description = data.get('description')
+    targets = data.get('targets', [])
+    
+    if not name:
+      return jsonify({
+        'error': '缺少必要参数(name)'
+      }), 400
+    
+    # 创建备份
+    backup_id = default_model.create_backup(name, description, targets)
+    
+    return jsonify({
+      'status': 'success',
+      'message': '备份创建成功',
+      'backup_id': backup_id,
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"创建备份时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@route ref_bp GET "/suggestions"
+def system_suggestions():
+  """获取系统优化建议"""
+  try:
+    # 分析系统状态，提供优化建议
+    resources = monitor.resource_monitor.check_resources()
+    health_score, _ = monitor.get_system_health_score()
+    anomalies = monitor.anomaly_detector.get_anomalies(24)
+    
+    suggestions = []
+    
+    # 基于CPU使用率的建议
+    cpu_percent = resources.get("cpu", {}).get("percent", 0)
+    if cpu_percent > 80:
+      suggestions.append({
+        "type": "resource",
+        "resource": "cpu",
+        "severity": "high",
+        "suggestion": "CPU使用率过高，建议减少计算密集型任务或增加CPU资源",
+        "current_value": cpu_percent
+      })
+    
+    # 基于内存使用率的建议
+    memory_percent = resources.get("memory", {}).get("percent", 0)
+    if memory_percent > 80:
+      suggestions.append({
+        "type": "resource",
+        "resource": "memory",
+        "severity": "high",
+        "suggestion": "内存使用率过高，建议优化内存使用或增加内存资源",
+        "current_value": memory_percent
+      })
+    
+    # 基于磁盘使用率的建议
+    disk_percent = resources.get("disk", {}).get("percent", 0)
+    if disk_percent > 80:
+      suggestions.append({
+        "type": "resource",
+        "resource": "disk",
+        "severity": "medium",
+        "suggestion": "磁盘使用率过高，建议清理不必要的文件或增加存储空间",
+        "current_value": disk_percent
+      })
+    
+    # 基于健康评分的建议
+    if health_score < 60:
+      suggestions.append({
+        "type": "system",
+        "severity": "high",
+        "suggestion": "系统健康状况不佳，建议运行系统修复程序",
+        "current_value": health_score
+      })
+    
+    # 基于异常数量的建议
+    if len(anomalies) > 5:
+      suggestions.append({
+        "type": "anomaly",
+        "severity": "medium",
+        "suggestion": f"系统存在{len(anomalies)}个异常，建议检查并解决这些异常",
+        "current_value": len(anomalies)
+      })
+    
+    return jsonify({
+      'suggestions': suggestions,
+      'count': len(suggestions),
+      'timestamp': datetime.datetime.now().isoformat()
+    })
+  except Exception as e:
+    logger.error(f"获取系统优化建议时出错: {str(e)}")
+    return jsonify({
+      'error': str(e)
+    }), 500
+
+@function run_api_server(host='127.0.0.1', port=DEFAULT_PORT, debug=False):
+  """运行API服务器
+  
+  Args:
+      host: 主机地址
+      port: 端口号
+      debug: 是否启用调试模式
+  """
+  from flask import Flask
+  
+  app = Flask(__name__)
+  app.register_blueprint(ref_bp, url_prefix='/api/ref')
+  
+  logger.info(f"启动Ref API服务: http://{host}:{port}")
+  app.run(host=host, port=port, debug=debug)
+
+# 主函数
+if __name__ == "__main__":
+  run_api_server(debug=True) 

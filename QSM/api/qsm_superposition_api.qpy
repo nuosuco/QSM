@@ -1,0 +1,658 @@
+#!/usr/bin/env qpy
+# -*- coding: utf-8 -*-
+
+"""
+QSM叠加态API模块
+提供QSM叠加态模型的API接口
+"""
+
+# 量子基因编码
+QG-API-QSM-SUPERPOSITION-A1P2
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-API-QSM-SUPERPOSITION-20240405
+  state: ACTIVE
+  strength: 0.95
+  objects: [
+    "QSM/models/qsm_superposition_model.qpy",
+    "QSM/utils/qsm_superposition_utils.qpy"
+  ]
+
+@imports
+  standard: [os, json, logging, time, datetime, uuid]
+  quantum: [Dict, List, Tuple, Any, Optional, Union, Path]
+  quantum_internal: [
+    "../models/qsm_superposition_model.qpy" as qsm_model,
+    "../utils/qsm_superposition_utils.qpy" as qsm_utils
+  ]
+
+@constants
+  ROOT_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+  LOG_DIR = ROOT_DIR / '.logs'
+  API_VERSION = '1.0.0'
+  
+  # API错误代码
+  ERROR_CODES = {
+    'INVALID_REQUEST': 400,
+    'NOT_FOUND': 404,
+    'INTERNAL_ERROR': 500,
+    'VALIDATION_ERROR': 422
+  }
+
+@initialization
+  # 创建日志目录
+  LOG_DIR.mkdir(exist_ok=True)
+  
+  # 配置日志
+  logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s',
+    handlers=[
+      logging.FileHandler(LOG_DIR / f'qsm_superposition_api_{datetime.datetime.now().strftime("%Y%m%d")}.log'),
+      logging.StreamHandler()
+    ]
+  )
+  logger = logging.getLogger('QSM-SUPERPOSITION-API')
+  
+  # 创建全局模型实例
+  try:
+    _global_model = qsm_model.create_superposition_model('全局叠加态模型', dimension=8)
+    logger.info("全局叠加态模型初始化成功")
+  except Exception as e:
+    logger.error(f"全局叠加态模型初始化失败: {str(e)}")
+    _global_model = None
+
+@class QSMSuperpositionAPI:
+  """QSM叠加态API类"""
+  
+  @constructor()
+    """初始化API"""
+    self.version = API_VERSION
+    self.model = _global_model
+    self.request_count = 0
+    self.last_request_time = None
+  
+  @method _make_response(success: bool, data: Any = None, error: str = None, code: int = 200) -> Dict[str, Any]:
+    """生成API响应
+    
+    Args:
+        success: 是否成功
+        data: 返回数据
+        error: 错误信息
+        code: 状态码
+        
+    Returns:
+        API响应
+    """
+    response = {
+      'success': success,
+      'version': self.version,
+      'timestamp': datetime.datetime.now().isoformat(),
+      'request_id': str(uuid.uuid4())
+    }
+    
+    if success:
+      response['data'] = data
+    else:
+      response['error'] = {
+        'message': error,
+        'code': code
+      }
+    
+    return response
+  
+  @method get_info() -> Dict[str, Any]:
+    """获取API信息
+    
+    Returns:
+        API信息
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    info = {
+      'version': self.version,
+      'model_info': self.model.to_dict(),
+      'superposition_types': qsm_model.get_superposition_types(),
+      'collapse_methods': qsm_model.get_collapse_methods(),
+      'composite_types': qsm_utils.COMPOSITE_TYPES,
+      'transformation_types': qsm_utils.TRANSFORMATION_TYPES,
+      'stats': {
+        'request_count': self.request_count,
+        'last_request_time': self.last_request_time,
+        'vector_count': len(self.model.vectors) if self.model else 0,
+        'group_count': len(self.model.vector_groups) if self.model else 0
+      }
+    }
+    
+    return self._make_response(True, data=info)
+  
+  @method create_vector(vector_id: str, dimension: Optional[int] = None, sp_type: str = 'QUANTUM') -> Dict[str, Any]:
+    """创建叠加态向量
+    
+    Args:
+        vector_id: 向量ID
+        dimension: 向量维度，默认使用模型维度
+        sp_type: 叠加态类型
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not vector_id:
+      return self._make_response(False, error="向量ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    if sp_type not in qsm_model.get_superposition_types():
+      return self._make_response(False, error=f"无效的叠加态类型: {sp_type}", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    try:
+      # 创建向量
+      vector_dim = dimension or self.model.dimension
+      vector = self.model.create_vector(vector_id, sp_type)
+      
+      return self._make_response(True, data={
+        'vector_id': vector_id,
+        'vector_info': vector.to_dict()
+      })
+    
+    except Exception as e:
+      logger.error(f"创建向量出错: {str(e)}")
+      return self._make_response(False, error=f"创建向量出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method get_vector(vector_id: str) -> Dict[str, Any]:
+    """获取向量信息
+    
+    Args:
+        vector_id: 向量ID
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not vector_id:
+      return self._make_response(False, error="向量ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    if vector_id not in self.model.vectors:
+      return self._make_response(False, error=f"向量不存在: {vector_id}", code=ERROR_CODES['NOT_FOUND'])
+    
+    vector = self.model.vectors[vector_id]
+    
+    # 创建可视化数据
+    visualization = qsm_utils.visualize_vector(vector)
+    
+    return self._make_response(True, data={
+      'vector_id': vector_id,
+      'vector_info': vector.to_dict(),
+      'visualization': visualization
+    })
+  
+  @method list_vectors(group_id: Optional[str] = None) -> Dict[str, Any]:
+    """列出模型中的向量
+    
+    Args:
+        group_id: 如果提供，则只列出指定组中的向量
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    if group_id:
+      # 列出指定组中的向量
+      if group_id not in self.model.vector_groups:
+        return self._make_response(False, error=f"组不存在: {group_id}", code=ERROR_CODES['NOT_FOUND'])
+      
+      vector_ids = self.model.vector_groups[group_id]
+      vectors = {}
+      for vid in vector_ids:
+        if vid in self.model.vectors:
+          vectors[vid] = self.model.vectors[vid].to_dict()
+      
+      return self._make_response(True, data={
+        'group_id': group_id,
+        'vectors': vectors,
+        'count': len(vectors)
+      })
+    else:
+      # 列出所有向量
+      vectors = {vid: vector.to_dict() for vid, vector in self.model.vectors.items()}
+      
+      return self._make_response(True, data={
+        'vectors': vectors,
+        'count': len(vectors)
+      })
+  
+  @method create_entanglement(vector_id1: str, vector_id2: str) -> Dict[str, Any]:
+    """创建向量间的纠缠
+    
+    Args:
+        vector_id1: 第一个向量ID
+        vector_id2: 第二个向量ID
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not vector_id1 or not vector_id2:
+      return self._make_response(False, error="向量ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    if vector_id1 not in self.model.vectors:
+      return self._make_response(False, error=f"向量不存在: {vector_id1}", code=ERROR_CODES['NOT_FOUND'])
+    
+    if vector_id2 not in self.model.vectors:
+      return self._make_response(False, error=f"向量不存在: {vector_id2}", code=ERROR_CODES['NOT_FOUND'])
+    
+    # 创建纠缠
+    try:
+      success = self.model.create_entanglement(vector_id1, vector_id2)
+      
+      if success:
+        entanglement_key = (vector_id1, vector_id2)
+        entanglement_data = self.model.entanglement_map.get(entanglement_key, {})
+        
+        return self._make_response(True, data={
+          'vector_id1': vector_id1,
+          'vector_id2': vector_id2,
+          'success': success,
+          'entanglement_data': entanglement_data
+        })
+      else:
+        return self._make_response(False, error="创建纠缠失败", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    except Exception as e:
+      logger.error(f"创建纠缠出错: {str(e)}")
+      return self._make_response(False, error=f"创建纠缠出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method add_to_group(group_id: str, vector_id: str) -> Dict[str, Any]:
+    """将向量添加到组
+    
+    Args:
+        group_id: 组ID
+        vector_id: 向量ID
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not group_id or not vector_id:
+      return self._make_response(False, error="组ID和向量ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    if vector_id not in self.model.vectors:
+      return self._make_response(False, error=f"向量不存在: {vector_id}", code=ERROR_CODES['NOT_FOUND'])
+    
+    # 添加到组
+    try:
+      success = self.model.add_to_group(group_id, vector_id)
+      
+      if success:
+        group_vectors = self.model.vector_groups.get(group_id, [])
+        
+        return self._make_response(True, data={
+          'group_id': group_id,
+          'vector_id': vector_id,
+          'success': success,
+          'group_size': len(group_vectors)
+        })
+      else:
+        return self._make_response(False, error="添加到组失败", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    except Exception as e:
+      logger.error(f"添加到组出错: {str(e)}")
+      return self._make_response(False, error=f"添加到组出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method analyze_group(group_id: str) -> Dict[str, Any]:
+    """分析组
+    
+    Args:
+        group_id: 组ID
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not group_id:
+      return self._make_response(False, error="组ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    # 分析组
+    try:
+      analysis = self.model.analyze_group(group_id)
+      
+      if analysis.get('status') == 'error':
+        return self._make_response(False, error=analysis.get('message', "分析组失败"), code=ERROR_CODES['NOT_FOUND'])
+      
+      return self._make_response(True, data=analysis)
+    
+    except Exception as e:
+      logger.error(f"分析组出错: {str(e)}")
+      return self._make_response(False, error=f"分析组出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method create_superposition(vector_ids: List[str], weights: Optional[List[float]] = None) -> Dict[str, Any]:
+    """创建向量叠加
+    
+    Args:
+        vector_ids: 向量ID列表
+        weights: 权重列表
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not vector_ids:
+      return self._make_response(False, error="向量ID列表不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    # 验证所有向量存在
+    missing_vectors = [vid for vid in vector_ids if vid not in self.model.vectors]
+    if missing_vectors:
+      return self._make_response(False, error=f"以下向量不存在: {missing_vectors}", code=ERROR_CODES['NOT_FOUND'])
+    
+    # 创建叠加态
+    try:
+      superposition = self.model.create_superposition(vector_ids, weights)
+      
+      return self._make_response(True, data={
+        'result_vector': superposition.to_dict(),
+        'source_vectors': vector_ids,
+        'weights': weights
+      })
+    
+    except Exception as e:
+      logger.error(f"创建叠加态出错: {str(e)}")
+      return self._make_response(False, error=f"创建叠加态出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method collapse_vector(vector_id: str, method: str = 'OBSERVE') -> Dict[str, Any]:
+    """坍缩向量
+    
+    Args:
+        vector_id: 向量ID
+        method: 坍缩方法
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not vector_id:
+      return self._make_response(False, error="向量ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    if vector_id not in self.model.vectors:
+      return self._make_response(False, error=f"向量不存在: {vector_id}", code=ERROR_CODES['NOT_FOUND'])
+    
+    if method not in qsm_model.get_collapse_methods():
+      return self._make_response(False, error=f"无效的坍缩方法: {method}", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    # 执行坍缩
+    try:
+      result = self.model.collapse_vector(vector_id, method)
+      
+      return self._make_response(True, data=result)
+    
+    except Exception as e:
+      logger.error(f"向量坍缩出错: {str(e)}")
+      return self._make_response(False, error=f"向量坍缩出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method find_similar_vectors(vector_id: str, threshold: float = 0.7, max_count: int = 5) -> Dict[str, Any]:
+    """查找相似向量
+    
+    Args:
+        vector_id: 向量ID
+        threshold: 相似度阈值
+        max_count: 最大返回数量
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not vector_id:
+      return self._make_response(False, error="向量ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    if vector_id not in self.model.vectors:
+      return self._make_response(False, error=f"向量不存在: {vector_id}", code=ERROR_CODES['NOT_FOUND'])
+    
+    # 查找相似向量
+    try:
+      similar_vectors = self.model.find_similar_vectors(vector_id, threshold, max_count)
+      
+      # 获取详细信息
+      results = []
+      for vid, similarity in similar_vectors:
+        vector_info = self.model.vectors[vid].to_dict()
+        results.append({
+          'vector_id': vid,
+          'similarity': similarity,
+          'vector_info': vector_info
+        })
+      
+      return self._make_response(True, data={
+        'source_vector_id': vector_id,
+        'similar_vectors': results,
+        'count': len(results)
+      })
+    
+    except Exception as e:
+      logger.error(f"查找相似向量出错: {str(e)}")
+      return self._make_response(False, error=f"查找相似向量出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method apply_transformation(vector_id: str, transformation_type: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """应用变换到向量
+    
+    Args:
+        vector_id: 向量ID
+        transformation_type: 变换类型
+        params: 变换参数
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 参数验证
+    if not vector_id:
+      return self._make_response(False, error="向量ID不能为空", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    if vector_id not in self.model.vectors:
+      return self._make_response(False, error=f"向量不存在: {vector_id}", code=ERROR_CODES['NOT_FOUND'])
+    
+    if transformation_type not in qsm_utils.TRANSFORMATION_TYPES:
+      return self._make_response(False, error=f"无效的变换类型: {transformation_type}", code=ERROR_CODES['VALIDATION_ERROR'])
+    
+    # 应用变换
+    try:
+      vector = self.model.vectors[vector_id]
+      transformed_vector = qsm_utils.transform_vector(vector, transformation_type, params)
+      
+      # 创建新向量ID并保存到模型
+      new_vector_id = f"{vector_id}_transformed_{int(time.time())}"
+      self.model.add_vector(new_vector_id, transformed_vector)
+      
+      return self._make_response(True, data={
+        'original_vector_id': vector_id,
+        'transformed_vector_id': new_vector_id,
+        'transformation_type': transformation_type,
+        'params': params,
+        'transformed_vector': transformed_vector.to_dict()
+      })
+    
+    except Exception as e:
+      logger.error(f"应用变换出错: {str(e)}")
+      return self._make_response(False, error=f"应用变换出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method save_model(filepath: Optional[str] = None) -> Dict[str, Any]:
+    """保存模型
+    
+    Args:
+        filepath: 保存路径
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 保存模型
+    try:
+      result = self.model.save(filepath)
+      
+      return self._make_response(True, data=result)
+    
+    except Exception as e:
+      logger.error(f"保存模型出错: {str(e)}")
+      return self._make_response(False, error=f"保存模型出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method load_model(filepath: str) -> Dict[str, Any]:
+    """加载模型
+    
+    Args:
+        filepath: 模型文件路径
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    # 加载模型
+    try:
+      self.model = qsm_model.QSMSuperpositionModel.load(filepath)
+      
+      return self._make_response(True, data={
+        'model_info': self.model.to_dict(),
+        'loaded_from': filepath
+      })
+    
+    except Exception as e:
+      logger.error(f"加载模型出错: {str(e)}")
+      return self._make_response(False, error=f"加载模型出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+  
+  @method export_model_data(filepath: Optional[str] = None) -> Dict[str, Any]:
+    """导出模型数据
+    
+    Args:
+        filepath: 导出文件路径
+        
+    Returns:
+        API响应
+    """
+    self.request_count += 1
+    self.last_request_time = datetime.datetime.now().isoformat()
+    
+    if self.model is None:
+      return self._make_response(False, error="全局模型未初始化", code=ERROR_CODES['INTERNAL_ERROR'])
+    
+    # 导出模型数据
+    try:
+      export_path = qsm_utils.export_model_data(self.model, filepath)
+      
+      return self._make_response(True, data={
+        'export_path': export_path,
+        'model_name': self.model.name,
+        'vectors_count': len(self.model.vectors),
+        'groups_count': len(self.model.vector_groups)
+      })
+    
+    except Exception as e:
+      logger.error(f"导出模型数据出错: {str(e)}")
+      return self._make_response(False, error=f"导出模型数据出错: {str(e)}", code=ERROR_CODES['INTERNAL_ERROR'])
+
+# 创建API实例
+_api_instance = QSMSuperpositionAPI()
+
+@function get_api() -> QSMSuperpositionAPI:
+  """获取API实例
+  
+  Returns:
+      API实例
+  """
+  return _api_instance
+
+@entrypoint
+  # 示例使用代码
+  if __name__ == "__main__":
+    api = get_api()
+    
+    # 获取API信息
+    info_response = api.get_info()
+    print(json.dumps(info_response, ensure_ascii=False, indent=2))
+    
+    # 创建向量
+    vector1_response = api.create_vector("test_vector_1", sp_type="QUANTUM")
+    print(json.dumps(vector1_response, ensure_ascii=False, indent=2))
+    
+    vector2_response = api.create_vector("test_vector_2", sp_type="QUANTUM")
+    print(json.dumps(vector2_response, ensure_ascii=False, indent=2))
+    
+    # 创建纠缠
+    entanglement_response = api.create_entanglement("test_vector_1", "test_vector_2")
+    print(json.dumps(entanglement_response, ensure_ascii=False, indent=2))
+    
+    # 添加到组
+    group_response = api.add_to_group("test_group", "test_vector_1")
+    print(json.dumps(group_response, ensure_ascii=False, indent=2))
+    
+    group_response = api.add_to_group("test_group", "test_vector_2")
+    print(json.dumps(group_response, ensure_ascii=False, indent=2))
+    
+    # 分析组
+    analysis_response = api.analyze_group("test_group")
+    print(json.dumps(analysis_response, ensure_ascii=False, indent=2)) 

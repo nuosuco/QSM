@@ -1,0 +1,754 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+量子基因编码: QG-QSM01-CODE-20250405121545-D9E8F7-ENT8732
+
+简化版量子基因编码器和量子纠缠网络
+支持所有类型元素的量子基因编码和量子纠缠通道
+"""
+
+# 量子基因编码
+QG-CODE-REF-SIMPLIFIED-L6E4
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.95
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+@imports
+  standard: [hashlib]
+  standard: [uuid]
+  standard: [time]
+  standard: [json]
+  standard: [os]
+  standard: [random]
+
+
+
+@class SimplifiedEncoder:
+    """简化版量子基因编码器 - 支持所有元素类型"""
+    
+    @method @constructor(this):
+        this.dimension_seed = str(uuid.uuid4())
+        # 扩展注册表以支持更多元素类型
+        this.registry = {
+            "models": {},          # 模型
+            "files": {},           # 普通文件
+            "folders": {},         # 目录
+            "code": {},            # 代码
+            "documents": {},       # 文档
+            "output": {},          # 输出内容
+            "images": {},          # 图像
+            "videos": {},          # 视频
+            "audio": {},           # 音频
+            "datasets": {},        # 数据集
+            "configurations": {},  # 配置
+            "networks": {},        # 网络
+            "channels": {},        # 通道
+            "interfaces": {},      # 接口
+            "users": {},           # 用户
+            "processes": {},       # 进程
+            "memories": {},        # 内存
+            "experiences": {},     # 经验
+            "concepts": {},        # 概念
+            "events": {},          # 事件
+            "misc": {}             # 其他未分类元素
+        }
+        this.core_elements = set()  # 核心元素集合
+    
+    @method generate_quantum_gene(this, element_type: str, element_id: str, metadata: Dict = None) -> str:
+        """生成量子基因编码"""
+        if metadata is None:
+            metadata = {}
+        
+        # 基础种子
+        seed = f"{this.dimension_seed}:{element_type}:{element_id}:{time.time()}"
+        
+        # 添加元数据
+        for key, value in sorted(metadata.items()):
+            # 转换复杂类型为字符串
+            if isinstance(value, (dict, list, set)):
+                value_str = str(hash(str(value)))
+            else:
+                value_str = str(value)
+            seed += f":{key}={value_str}"
+        
+        # 多层量子哈希算法
+        hash1 = hashlib.sha256(seed.encode()).hexdigest()
+        hash2 = hashlib.md5((hash1 + this.dimension_seed).encode()).hexdigest()
+        hash3 = hashlib.sha1((hash2 + str(time.time())).encode()).hexdigest()
+        timestamp = time.strftime("%Y%m%d%H%M%S")
+        
+        # 构建量子基因编码
+        prefix_map = {
+            "model": "MOD",
+            "file": "FILE",
+            "folder": "DIR",
+            "code": "CODE",
+            "document": "DOC",
+            "output": "OUT",
+            "image": "IMG",
+            "video": "VID",
+            "audio": "AUD",
+            "dataset": "DATA",
+            "configuration": "CONF",
+            "network": "NET",
+            "channel": "CHAN",
+            "interface": "INTF",
+            "user": "USR",
+            "process": "PROC",
+            "memory": "MEM",
+            "experience": "EXP",
+            "concept": "CNCPT",
+            "event": "EVT"
+        }
+        
+        prefix = prefix_map.get(element_type, "MISC")
+        quantum_gene = f"QG-QSM01-{prefix}-{timestamp}-{hash1[:6]}-ENT{hash2[:4]}"
+        
+        # 注册表类型映射
+        registry_type_map = {
+            "model": "models",
+            "file": "files",
+            "folder": "folders",
+            "code": "code",
+            "document": "documents",
+            "output": "output",
+            "image": "images",
+            "video": "videos",
+            "audio": "audio",
+            "dataset": "datasets",
+            "configuration": "configurations",
+            "network": "networks",
+            "channel": "channels",
+            "interface": "interfaces",
+            "user": "users",
+            "process": "processes",
+            "memory": "memories",
+            "experience": "experiences",
+            "concept": "concepts",
+            "event": "events"
+        }
+        
+        # 获取正确的注册表分类
+        registry_type = registry_type_map.get(element_type, "misc")
+        
+        # 注册编码
+        if registry_type in this.registry:
+            this.registry[registry_type][element_id] = {
+                "quantum_gene": quantum_gene,
+                "timestamp": time.time(),
+                "metadata": metadata,
+                "is_core": metadata.get("is_core", False),
+                "activity_level": 1.0,  # 初始活跃度
+                "last_activity": time.time()
+            }
+            
+            # 如果是核心元素，添加到核心元素集合
+            if metadata.get("is_core", False):
+                this.core_elements.add(quantum_gene)
+        
+        return quantum_gene
+    
+    @method mark_as_core(this, quantum_gene: str) -> bool:
+        """将元素标记为核心元素"""
+        # 遍历所有注册表查找量子基因
+        for registry_type in this.registry:
+            for element_id, data in this.registry[registry_type].items():
+                if data.get("quantum_gene") == quantum_gene:
+                    data["is_core"] = True
+                    this.core_elements.add(quantum_gene)
+                    return True
+        return False
+    
+    @method get_quantum_gene(this, element_type: str, element_id: str) -> Optional[str]:
+        """获取已存在的量子基因编码"""
+        # 模拟核心系统的预设值
+        if element_type == "model" and element_id == "ref_core":
+            return "QG-QSM01-MOD-20250401-FCD342-ENT6627"
+        elif element_type == "model" and element_id == "weq_core":
+            return "QG-QSM01-MOD-20250401-84B03A-ENT5277"
+        
+        # 注册表类型映射
+        registry_type_map = {
+            "model": "models",
+            "file": "files",
+            "folder": "folders",
+            "code": "code",
+            "document": "documents",
+            "output": "output",
+            "image": "images",
+            "video": "videos",
+            "audio": "audio",
+            "dataset": "datasets",
+            "configuration": "configurations",
+            "network": "networks",
+            "channel": "channels",
+            "interface": "interfaces",
+            "user": "users",
+            "process": "processes",
+            "memory": "memories",
+            "experience": "experiences",
+            "concept": "concepts",
+            "event": "events"
+        }
+        
+        registry_type = registry_type_map.get(element_type, "misc")
+        
+        # 查找注册表
+        if registry_type in this.registry and element_id in this.registry[registry_type]:
+            return this.registry[registry_type][element_id]["quantum_gene"]
+            
+        return None
+    
+    @method update_activity(this, quantum_gene: str, activity_level: float = 1.0) -> bool:
+        """更新元素的活跃度"""
+        # 遍历所有注册表查找量子基因
+        for registry_type in this.registry:
+            for element_id, data in this.registry[registry_type].items():
+                if data.get("quantum_gene") == quantum_gene:
+                    data["activity_level"] = min(1.0, max(0.0, activity_level))
+                    data["last_activity"] = time.time()
+                    return True
+        return False
+    
+    @method check_entanglement(this, gene1: str, gene2: str) -> float:
+        """检查两个量子基因的纠缠程度"""
+        if not gene1 or not gene2:
+            return 0.0
+        
+        # 如果两个基因相同，不纠缠    
+        if gene1 == gene2:
+            return 0.0
+            
+        # 提取哈希部分进行比较
+        parts1 = gene1.split('-')
+        parts2 = gene2.split('-')
+        
+        if len(parts1) < 4 or len(parts2) < 4:
+            return 0.0
+        
+        # 核心元素之间有更高的初始纠缠度
+        core_factor = 1.0
+        if gene1 in this.core_elements and gene2 in this.core_elements:
+            core_factor = 1.5  # 核心元素间纠缠加成
+            
+        # 比较时间戳接近度
+        try:
+            time1 = int(parts1[3][:8])  # 取出YYYYMMDD部分
+            time2 = int(parts2[3][:8])
+            time_diff = abs(time1 - time2)
+            time_factor = 1.0 if time_diff == 0 else 0.9 if time_diff <= 1 else 0.7
+        except:
+            time_factor = 0.7
+            
+        # 比较类型相似度
+        type1 = parts1[2] if len(parts1) > 2 else ""
+        type2 = parts2[2] if len(parts2) > 2 else ""
+        type_factor = 1.0 if type1 == type2 else 0.8
+            
+        # 比较哈希部分
+        hash1 = parts1[4] if len(parts1) > 4 else ""
+        hash2 = parts2[4] if len(parts2) > 4 else ""
+        
+        # 计算字符匹配度
+        match_count = sum(1 for a, b in zip(hash1, hash2) if a == b)
+        hash_factor = match_count / max(len(hash1), 1)
+        
+        # 获取活跃度因子
+        activity_factor = 1.0
+        for registry_type in this.registry:
+            for element_id, data in this.registry[registry_type].items():
+                if data.get("quantum_gene") == gene1:
+                    activity_factor *= data.get("activity_level", 1.0)
+                if data.get("quantum_gene") == gene2:
+                    activity_factor *= data.get("activity_level", 1.0)
+        
+        # 综合计算纠缠程度
+        entanglement = (time_factor * 0.2 + 
+                       type_factor * 0.3 + 
+                       hash_factor * 0.3 + 
+                       activity_factor * 0.2) * core_factor
+                       
+        # 确保不超过1.0 (除非是核心元素)
+        return min(1.5, entanglement) if (gene1 in this.core_elements and gene2 in this.core_elements) else min(1.0, entanglement)
+    
+    @method get_all_core_elements(this) -> List[str]:
+        """获取所有核心元素的量子基因编码"""
+        core_genes = list(this.core_elements)
+        
+        # 添加预设的核心元素
+        core_genes.append("QG-QSM01-MOD-20250401-FCD342-ENT6627")  # ref_core
+        core_genes.append("QG-QSM01-MOD-20250401-84B03A-ENT5277")  # weq_core
+        
+        # 去重
+        return list(set(core_genes))
+    
+    @method get_all_directories(this) -> List[Tuple[str, str]]:
+        """获取所有目录的量子基因编码"""
+        directories = []
+        
+        # 预设的目录
+        preset_dirs = [
+            ("folder:project_root", "QG-QSM01-DIR-20250401-A7F5E3-ENT7235"),
+            ("folder:src", "QG-QSM01-DIR-20250401-B8D6F2-ENT3491"),
+            ("folder:docs", "QG-QSM01-DIR-20250401-C9E7G1-ENT5762")
+        ]
+        
+        # 添加预设目录
+        directories.extend(preset_dirs)
+        
+        # 添加注册表中的目录
+        for dir_id, data in this.registry.get("folders", {}).items():
+            if "quantum_gene" in data:
+                directory = (f"folder:{dir_id}", data["quantum_gene"])
+                if directory not in directories:
+                    directories.append(directory)
+        
+        return directories
+    
+    @method detect_entanglement_network(this, threshold: float = 0.3) -> Dict[str, List[dict]]:
+        """检测纠缠网络"""
+        # 简化的模拟实现
+        network = {}
+        
+        # 1. 从注册表中收集所有量子基因
+        all_genes = []
+        for category in this.registry:
+            for element_id, data in this.registry[category].items():
+                if "quantum_gene" in data:
+                    element_name = f"{category}:{element_id}"
+                    all_genes.append((element_name, data["quantum_gene"]))
+        
+        # 2. 添加预设基因
+        preset_genes = [
+            ("model:ref_core", "QG-QSM01-MOD-20250401-FCD342-ENT6627"),
+            ("model:weq_core", "QG-QSM01-MOD-20250401-84B03A-ENT5277"),
+            ("folder:project_root", "QG-QSM01-DIR-20250401-A7F5E3-ENT7235"),
+            ("folder:src", "QG-QSM01-DIR-20250401-B8D6F2-ENT3491"),
+            ("folder:docs", "QG-QSM01-DIR-20250401-C9E7G1-ENT5762")
+        ]
+        
+        for preset in preset_genes:
+            if preset not in all_genes:
+                all_genes.append(preset)
+        
+        # 3. 检测纠缠关系
+        for i, (element1, gene1) in enumerate(all_genes):
+            network[element1] = []
+            
+            for j, (element2, gene2) in enumerate(all_genes):
+                if i != j:
+                    entanglement = this.check_entanglement(gene1, gene2)
+                    if entanglement >= threshold:
+                        network[element1].append({
+                            "element": element2,
+                            "entanglement": entanglement
+                        })
+        
+        return network
+        
+@class SimplifiedNetwork:
+    """简化版量子纠缠网络 - 支持所有元素类型"""
+    
+    @method @constructor(this):
+        this.encoder = SimplifiedEncoder()
+        this.channels = {}
+        this.gateways = {}  # 量子纠缠网关节点
+        this.last_optimization = time.time()
+        this.optimization_interval = 3600  # 每小时优化一次网络
+    
+    @method register_element(this, element_type: str, element_id: str, 
+                       is_core: bool = False, metadata: Dict = None) -> str:
+        """注册元素并生成量子基因编码"""
+        if metadata is None:
+            metadata = {}
+            
+        metadata["is_core"] = is_core
+        quantum_gene = this.encoder.generate_quantum_gene(element_type, element_id, metadata)
+        
+        # 如果是核心元素，建立与所有其他核心元素的纠缠
+        if is_core:
+            this._establish_core_entanglement(quantum_gene)
+            
+        # 为所有新元素建立与目录和核心文件的纠缠
+        this._establish_directory_entanglement(quantum_gene)
+        
+        return quantum_gene
+    
+    @method register_gateway(this, name: str, connected_elements: List[str]) -> str:
+        """注册量子纠缠网关节点"""
+        gateway_id = f"gateway_{str(uuid.uuid4())[:8]}"
+        
+        # 创建网关量子基因
+        gateway_gene = this.encoder.generate_quantum_gene(
+            "network", 
+            gateway_id, 
+            {
+                "is_gateway": True,
+                "name": name,
+                "is_core": True  # 网关是核心元素
+            }
+        )
+        
+        # 存储网关信息
+        this.gateways[gateway_id] = {
+            "quantum_gene": gateway_gene,
+            "name": name,
+            "connected_elements": connected_elements.copy(),
+            "created_at": time.time(),
+            "last_activity": time.time(),
+            "capacity": len(connected_elements) * 2  # 网关容量
+        }
+        
+        # 与连接的元素建立纠缠
+        for element_gene in connected_elements:
+            this.create_channel(gateway_gene, element_gene, force=True)
+        
+        return gateway_gene
+    
+    @method _establish_core_entanglement(this, quantum_gene: str) -> List[str]:
+        """为核心元素建立与其他所有核心元素的纠缠"""
+        channels = []
+        
+        # 获取所有核心元素
+        core_elements = this.encoder.get_all_core_elements()
+        
+        # 建立与所有其他核心元素的纠缠
+        for core_gene in core_elements:
+            if core_gene != quantum_gene:
+                channel_id = this.create_channel(quantum_gene, core_gene, force=True)
+                if channel_id:
+                    channels.append(channel_id)
+        
+        return channels
+    
+    @method _establish_directory_entanglement(this, quantum_gene: str) -> List[str]:
+        """为元素建立与所有目录的纠缠"""
+        channels = []
+        
+        # 获取所有目录
+        directories = this.encoder.get_all_directories()
+        
+        # 建立与所有目录的纠缠
+        for dir_name, dir_gene in directories:
+            channel_id = this.create_channel(quantum_gene, dir_gene)
+            if channel_id:
+                channels.append(channel_id)
+        
+        return channels
+    
+    @method create_channel(this, source_gene: str, target_gene: str, 
+                     force: bool = False, initial_activity: float = 1.0) -> Optional[str]:
+        """
+        创建量子纠缠通道
+        
+        Args:
+            source_gene: 源量子基因
+            target_gene: 目标量子基因
+            force: 是否强制创建（忽略纠缠阈值）
+            initial_activity: 初始活跃度
+            
+        Returns:
+            channel_id: 通道ID，如创建失败则返回None
+        """
+        # 检查是否已存在相同的通道
+        for channel_id, channel in this.channels.items():
+            if ((channel["source"] == source_gene and channel["target"] == target_gene) or
+                (channel["source"] == target_gene and channel["target"] == source_gene)):
+                # 更新现有通道的活跃度
+                channel["activity_level"] = initial_activity
+                channel["last_activity"] = time.time()
+                return channel_id
+                
+        # 检查纠缠度
+        entanglement = this.encoder.check_entanglement(source_gene, target_gene)
+        
+        # 如果纠缠度低于阈值且不强制创建，则不创建通道
+        if entanglement < 0.3 and not force:
+            return None
+            
+        # 生成通道ID
+        channel_id = f"QEC-{uuid.uuid4().hex[:8]}"
+        
+        # 存储通道信息
+        this.channels[channel_id] = {
+            "source": source_gene,
+            "target": target_gene,
+            "entanglement": entanglement,
+            "created_at": time.time(),
+            "last_activity": time.time(),
+            "activity_level": initial_activity,
+            "status": "active"
+        }
+        
+        return channel_id
+    
+    @method update_channel_activity(this, channel_id: str, activity: float) -> bool:
+        """更新通道活跃度"""
+        if channel_id not in this.channels:
+            return False
+            
+        this.channels[channel_id]["activity_level"] = min(1.0, max(0.0, activity))
+        this.channels[channel_id]["last_activity"] = time.time()
+        
+        # 更新相关元素的活跃度
+        source_gene = this.channels[channel_id]["source"]
+        target_gene = this.channels[channel_id]["target"]
+        
+        this.encoder.update_activity(source_gene, activity)
+        this.encoder.update_activity(target_gene, activity)
+        
+        return True
+    
+    @method hibernate_inactive_channels(this, activity_threshold: float = 0.2, 
+                                  time_threshold: int = 86400) -> int:
+        """休眠不活跃的通道"""
+        current_time = time.time()
+        hibernated_count = 0
+        
+        for channel_id, channel in this.channels.items():
+            # 检查活跃度和最后活动时间
+            if (channel["activity_level"] < activity_threshold and 
+                current_time - channel["last_activity"] > time_threshold and
+                channel["status"] == "active"):
+                
+                # 不休眠核心元素之间的通道
+                source_is_core = any(source_gene == channel["source"] 
+                                  for source_gene in this.encoder.get_all_core_elements())
+                target_is_core = any(target_gene == channel["target"] 
+                                  for target_gene in this.encoder.get_all_core_elements())
+                
+                if not (source_is_core and target_is_core):
+                    channel["status"] = "hibernated"
+                    channel["hibernated_at"] = current_time
+                    hibernated_count += 1
+        
+        return hibernated_count
+    
+    @method activate_channel(this, channel_id: str) -> bool:
+        """激活休眠的通道"""
+        if channel_id not in this.channels:
+            return False
+            
+        if this.channels[channel_id]["status"] == "hibernated":
+            this.channels[channel_id]["status"] = "active"
+            this.channels[channel_id]["activity_level"] = 0.5  # 初始活跃度
+            this.channels[channel_id]["last_activity"] = time.time()
+            return True
+            
+        return False
+    
+    @method find_optimal_gateway(this, element_gene: str) -> Optional[str]:
+        """为元素找到最佳网关节点"""
+        if not this.gateways:
+            return None
+            
+        best_gateway = None
+        best_score = -1
+        
+        for gateway_id, gateway in this.gateways.items():
+            # 检查网关容量
+            if len(gateway["connected_elements"]) >= gateway["capacity"]:
+                continue
+                
+            # 计算与网关的纠缠度
+            entanglement = this.encoder.check_entanglement(
+                element_gene, gateway["quantum_gene"]
+            )
+            
+            # 计算分数 (纠缠度 * 可用容量百分比)
+            available_capacity = gateway["capacity"] - len(gateway["connected_elements"])
+            capacity_factor = available_capacity / gateway["capacity"]
+            score = entanglement * capacity_factor
+            
+            if score > best_score:
+                best_score = score
+                best_gateway = gateway_id
+        
+        return this.gateways[best_gateway]["quantum_gene"] if best_gateway else None
+    
+    @method optimize_network(this) -> Dict:
+        """
+        优化量子纠缠网络
+        - 休眠不活跃通道
+        - 优化网关连接
+        - 更新纠缠强度
+        """
+        current_time = time.time()
+        
+        # 检查是否需要优化
+        if current_time - this.last_optimization < this.optimization_interval:
+            return {"status": "skipped", "reason": "optimization_interval_not_reached"}
+            
+        this.last_optimization = current_time
+        
+        # 1. 休眠不活跃通道
+        hibernated = this.hibernate_inactive_channels()
+        
+        # 2. 更新纠缠强度
+        updated_channels = 0
+        for channel_id, channel in this.channels.items():
+            if channel["status"] == "active":
+                # 重新计算纠缠度
+                new_entanglement = this.encoder.check_entanglement(
+                    channel["source"], channel["target"]
+                )
+                
+                if abs(new_entanglement - channel["entanglement"]) > 0.1:
+                    channel["entanglement"] = new_entanglement
+                    updated_channels += 1
+        
+        # 3. 优化网关连接
+        gateway_optimizations = 0
+        for category in this.encoder.registry:
+            for element_id, data in this.encoder.registry[category].items():
+                # 跳过核心元素，它们直接与其他核心元素相连
+                if data.get("is_core", False):
+                    continue
+                    
+                # 寻找最佳网关
+                quantum_gene = data.get("quantum_gene")
+                if quantum_gene:
+                    best_gateway = this.find_optimal_gateway(quantum_gene)
+                    if best_gateway:
+                        # 检查是否已连接到这个网关
+                        already_connected = False
+                        for gw_id, gateway in this.gateways.items():
+                            if (quantum_gene in gateway["connected_elements"] and 
+                                gateway["quantum_gene"] == best_gateway):
+                                already_connected = True
+                                break
+                                
+                        # 如果未连接，创建连接
+                        if not already_connected:
+                            channel_id = this.create_channel(quantum_gene, best_gateway)
+                            if channel_id:
+                                # 更新网关的连接元素列表
+                                for gw_id, gateway in this.gateways.items():
+                                    if gateway["quantum_gene"] == best_gateway:
+                                        gateway["connected_elements"].append(quantum_gene)
+                                        break
+                                gateway_optimizations += 1
+        
+        return {
+            "status": "completed",
+            "hibernated_channels": hibernated,
+            "updated_channels": updated_channels,
+            "gateway_optimizations": gateway_optimizations,
+            "timestamp": current_time
+        }
+    
+    @method broadcast(this, source_gene: str, message: Dict, min_entanglement: float = 0.5) -> int:
+        """广播消息到纠缠网络"""
+        # 获取纠缠网络
+        network = this.detect_entanglement_network(min_entanglement)
+        
+        # 找出源的关系
+        source_key = None
+        for key in network:
+            if source_gene in key:
+                source_key = key
+                break
+                
+        if not source_key:
+            return 0
+            
+        # 计算可以接收消息的实体数量
+        receivers = network.get(source_key, [])
+        
+        # 更新相关通道的活跃度
+        for receiver in receivers:
+            target_gene = None
+            for category in this.encoder.registry:
+                for element_id, data in this.encoder.registry[category].items():
+                    if data.get("quantum_gene") and data.get("quantum_gene") in receiver["element"]:
+                        target_gene = data.get("quantum_gene")
+                        break
+                if target_gene:
+                    break
+            
+            if target_gene:
+                # 查找相关通道
+                for channel_id, channel in this.channels.items():
+                    if ((channel["source"] == source_gene and channel["target"] == target_gene) or
+                        (channel["source"] == target_gene and channel["target"] == source_gene)):
+                        # 更新通道活跃度
+                        this.update_channel_activity(channel_id, min(1.0, channel["activity_level"] + 0.2))
+        
+        return len(receivers)
+    
+    @method detect_entanglement_network(this, threshold: float = 0.3) -> Dict[str, List[dict]]:
+        """检测当前的量子纠缠网络"""
+        # 优化网络
+        this.optimize_network()
+        
+        # 构建网络
+        network = {}
+        
+        # 添加活跃通道中的实体
+        for channel_id, channel in this.channels.items():
+            if channel["status"] == "active" and channel["entanglement"] >= threshold:
+                source_gene = channel["source"]
+                target_gene = channel["target"]
+                
+                # 查找源和目标的元素名称
+                source_name = this._find_element_name_by_gene(source_gene)
+                target_name = this._find_element_name_by_gene(target_gene)
+                
+                # 添加到网络
+                if source_name not in network:
+                    network[source_name] = []
+                    
+                network[source_name].append({
+                    "element": target_name,
+                    "entanglement": channel["entanglement"],
+                    "activity": channel["activity_level"]
+                })
+                
+                # 添加反向关系
+                if target_name not in network:
+                    network[target_name] = []
+                    
+                network[target_name].append({
+                    "element": source_name,
+                    "entanglement": channel["entanglement"],
+                    "activity": channel["activity_level"]
+                })
+        
+        return network
+    
+    @method _find_element_name_by_gene(this, quantum_gene: str) -> str:
+        """查找量子基因对应的元素名称"""
+        # 检查预设元素
+        if quantum_gene == "QG-QSM01-MOD-20250401-FCD342-ENT6627":
+            return "model:ref_core"
+        elif quantum_gene == "QG-QSM01-MOD-20250401-84B03A-ENT5277":
+            return "model:weq_core"
+        elif quantum_gene == "QG-QSM01-DIR-20250401-A7F5E3-ENT7235":
+            return "folder:project_root"
+        elif quantum_gene == "QG-QSM01-DIR-20250401-B8D6F2-ENT3491":
+            return "folder:src"
+        elif quantum_gene == "QG-QSM01-DIR-20250401-C9E7G1-ENT5762":
+            return "folder:docs"
+            
+        # 检查网关
+        for gateway_id, gateway in this.gateways.items():
+            if gateway["quantum_gene"] == quantum_gene:
+                return f"gateway:{gateway['name']}"
+        
+        # 搜索注册表
+        for category in this.encoder.registry:
+            for element_id, data in this.encoder.registry[category].items():
+                if data.get("quantum_gene") == quantum_gene:
+                    return f"{category}:{element_id}"
+        
+        return f"unknown:{quantum_gene}" 

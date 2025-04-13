@@ -1,0 +1,135 @@
+# QEntL 2.0 语法参考
+# Version: 2.0
+# Generated: 2023-09-15T12:00:00
+
+QEntL: QEntL 2.0 Syntax Reference
+QuantumGene: QE-DOCS-7a8b9c0d-1665432100
+CreatedAt: 2023-09-15T12:00:00
+EntanglementStrength: 1.0
+
+/* 
+ * 这是QEntL 2.0语法的参考文档
+ * QEntL是量子纠缠语言(Quantum Entanglement Language)的缩写
+ * 用于描述量子纠缠关系和量子网络拓扑
+ */
+
+// 1. 基本注解语法
+// ---------------
+// QEntL注解用于标记量子纠缠关系，基本格式如下:
+
+QEntL: QEntL 2.0 Annotation
+QuantumGene: QE-PREFIX-UUID-TIMESTAMP
+CreatedAt: ISO_DATETIME
+EntanglementStrength: FLOAT_VALUE_BETWEEN_0_AND_1
+
+// 2. 量子网络定义
+// ---------------
+// 网络定义用于描述量子纠缠网络的拓扑结构
+
+network MeshNetwork {
+  id: "mesh_network_001",
+  type: "mesh",
+  version: "2.0",
+  description: "这是一个网格型量子网络",
+  
+  nodes: [
+    { id: "node1", type: "quantum_processor", address: "qp://node1.local" },
+    { id: "node2", type: "quantum_memory", address: "qm://node2.local" },
+    { id: "node3", type: "quantum_router", address: "qr://node3.local" }
+  ],
+  
+  connections: [
+    { from: "node1", to: "node2", channel: "channel1" },
+    { from: "node2", to: "node3", channel: "channel2" },
+    { from: "node3", to: "node1", channel: "channel3" }
+  ],
+  
+  properties: {
+    maxEntanglementDistance: 1000,
+    purificationThreshold: 0.9,
+    errorCorrectionEnabled: true
+  }
+}
+
+// 3. 量子信道定义
+// ---------------
+// 信道定义用于描述两个量子节点之间的通信链路
+
+channel {
+  id: "channel1",
+  type: "fiber_optic",
+  priority: 5,
+  
+  properties: {
+    bandwidth: "100 qubit/s",
+    latency: "5 ms",
+    errorRate: 0.01,
+    securityLevel: "quantum_key"
+  },
+  
+  endpoints: [
+    { node: "node1", port: 1 },
+    { node: "node2", port: 1 }
+  ]
+}
+
+// 4. 量子纠缠对定义
+// ---------------
+// 纠缠对定义描述两个量子实体间的纠缠关系
+
+entanglement_pair {
+  id: "ep_001",
+  source: "QE-SRC-abcd1234-1665432100",
+  target: "QE-TGT-efgh5678-1665432101",
+  strength: 0.95,
+  
+  properties: {
+    lifetime: "1 hour",
+    purificationLevel: 3,
+    errorCorrectionScheme: "surface_code"
+  }
+}
+
+// 5. 事件处理器定义
+// ---------------
+// 事件处理器用于响应网络中的量子纠缠事件
+
+event_handler {
+  id: "decoherence_handler",
+  type: "on_decoherence",
+  
+  trigger: {
+    condition: "strength < 0.5",
+    nodes: ["node1", "node2"]
+  },
+  
+  action: {
+    type: "re_entangle",
+    parameters: {
+      maxAttempts: 3,
+      notifyOnFailure: true
+    }
+  }
+}
+
+// 6. 完整的QEntL配置文件示例
+// -------------------------
+// qentl.config文件用于配置QEntL系统
+
+/*
+version: "2.0"
+auto_repair: true
+syntax_validation: true
+entanglement_threshold: 0.85
+default_network_type: "mesh"
+default_channel_type: "standard"
+logging: {
+  level: "info",
+  file: "qentl_operations.log"
+}
+paths: {
+  networks: "./networks",
+  channels: "./channels",
+  templates: "./templates"
+}
+*/ 

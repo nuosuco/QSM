@@ -1,0 +1,337 @@
+/* 量子基因编码 */
+QG-COMP-TOOLTIP-UI-FEEDBACK-A1B1
+
+/* 量子纠缠信道 */
+@quantum-entangle {
+  strength: 0.8,
+  sync: true,
+  objects: [
+    "world/static/css/quantum-theme.qcss",
+    "world/static/css/quantum-layout.qcss",
+    "world/static/css/quantum-animation.qcss"
+  ]
+}
+
+/* 组件属性 */
+@properties {
+  // 提示内容
+  content: string = '',
+  // 弹出位置
+  placement: 'top' | 'right' | 'bottom' | 'left' = 'top',
+  // 触发方式
+  trigger: 'hover' | 'click' | 'focus' = 'hover',
+  // 是否支持HTML内容
+  rawContent: boolean = false,
+  // 是否禁用
+  disabled: boolean = false,
+  // 偏移距离
+  offset: number = 8,
+  // 过渡效果
+  transition: string = 'fade',
+  // 是否显示箭头
+  showArrow: boolean = true,
+  // 弹出层选项
+  popperOptions: object = {},
+  // 是否可以进入弹出层
+  enterable: boolean = true,
+  // 隐藏延时(毫秒)
+  hideDelay: number = 200,
+  // tabindex
+  tabindex: number = 0,
+  // 量子态配置
+  quantum: {
+    // 量子纠缠强度
+    entangleStrength: number = 0.8,
+    // 量子态转换动画
+    stateTransition: boolean = true,
+    // 量子态持续时间
+    stateDuration: number = 300
+  }
+}
+
+/* 模板结构 */
+<template>
+  <div class="q-tooltip-trigger"
+       :class="{ 'q-tooltip-disabled': disabled }"
+       @mouseenter="handleMouseEnter"
+       @mouseleave="handleMouseLeave"
+       @click="handleClick"
+       @focus="handleFocus"
+       @blur="handleBlur"
+       :tabindex="tabindex">
+    <!-- 触发元素 -->
+    <slot></slot>
+    
+    <!-- 提示框 -->
+    <transition :name="`q-tooltip-${transition}`">
+      <div v-show="visible"
+           class="q-tooltip"
+           :class="[
+             `q-tooltip-${placement}`,
+             {
+               'q-tooltip-with-arrow': showArrow
+             }
+           ]"
+           :style="tooltipStyle"
+           @mouseenter="handleTooltipMouseEnter"
+           @mouseleave="handleTooltipMouseLeave">
+        <!-- 箭头 -->
+        <div v-if="showArrow"
+             class="q-tooltip-arrow"
+             :style="arrowStyle">
+        </div>
+        
+        <!-- 内容 -->
+        <div class="q-tooltip-content"
+             :class="{ 'q-tooltip-raw': rawContent }"
+             v-html="rawContent ? content : null">
+          <template v-if="!rawContent">{{ content }}</template>
+        </div>
+      </div>
+    </transition>
+  </div>
+</template>
+
+/* 组件样式 */
+<style>
+.q-tooltip-trigger {
+  display: inline-block;
+  position: relative;
+}
+
+.q-tooltip-disabled {
+  cursor: not-allowed;
+}
+
+/* 提示框样式 */
+.q-tooltip {
+  position: absolute;
+  z-index: 9999;
+  padding: var(--q-spacing-sm) var(--q-spacing);
+  font-size: var(--q-font-size-sm);
+  line-height: 1.4;
+  min-width: 30px;
+  word-wrap: break-word;
+  color: var(--q-white);
+  text-align: left;
+  text-decoration: none;
+  background-color: var(--q-gray-900);
+  border-radius: var(--q-border-radius-sm);
+  box-shadow: var(--q-shadow-2);
+}
+
+/* 箭头样式 */
+.q-tooltip-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: var(--q-gray-900);
+  transform: rotate(45deg);
+}
+
+/* 位置样式 */
+.q-tooltip-top {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: var(--q-spacing);
+}
+
+.q-tooltip-top .q-tooltip-arrow {
+  bottom: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+
+.q-tooltip-right {
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  margin-left: var(--q-spacing);
+}
+
+.q-tooltip-right .q-tooltip-arrow {
+  top: 50%;
+  left: -4px;
+  margin-top: -4px;
+}
+
+.q-tooltip-bottom {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: var(--q-spacing);
+}
+
+.q-tooltip-bottom .q-tooltip-arrow {
+  top: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+
+.q-tooltip-left {
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  margin-right: var(--q-spacing);
+}
+
+.q-tooltip-left .q-tooltip-arrow {
+  top: 50%;
+  right: -4px;
+  margin-top: -4px;
+}
+
+/* 内容样式 */
+.q-tooltip-content {
+  white-space: nowrap;
+}
+
+.q-tooltip-raw {
+  white-space: normal;
+}
+
+/* 过渡动画 */
+.q-tooltip-fade-enter-active,
+.q-tooltip-fade-leave-active {
+  transition: opacity var(--q-animation-duration) var(--q-animation-timing-function-ease),
+              transform var(--q-animation-duration) var(--q-animation-timing-function-ease);
+}
+
+.q-tooltip-fade-enter-from,
+.q-tooltip-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+/* 量子态样式 */
+@quantum-state hover {
+  .q-tooltip {
+    opacity: 0.95;
+  }
+}
+
+@quantum-state active {
+  .q-tooltip {
+    transform: scale(0.98);
+  }
+}
+</style>
+
+/* 组件脚本 */
+<script>
+export default {
+  name: 'QTooltip',
+  
+  data() {
+    return {
+      visible: false,
+      timeoutId: null
+    }
+  },
+  
+  computed: {
+    tooltipStyle() {
+      return {
+        ...this.popperOptions.styles?.popper,
+        transform: `translate(${this.offset}px, 0)`
+      }
+    },
+    
+    arrowStyle() {
+      return {
+        ...this.popperOptions.styles?.arrow,
+        transform: `rotate(45deg) translate(${this.offset / 2}px, 0)`
+      }
+    }
+  },
+  
+  methods: {
+    // 显示提示框
+    show() {
+      if (this.disabled) return
+      this.visible = true
+      this.updateQuantumState(1)
+    },
+    
+    // 隐藏提示框
+    hide() {
+      this.visible = false
+      this.updateQuantumState(0)
+    },
+    
+    // 处理鼠标进入
+    handleMouseEnter() {
+      if (this.trigger !== 'hover') return
+      if (this.timeoutId) {
+        clearTimeout(this.timeoutId)
+        this.timeoutId = null
+      }
+      this.show()
+    },
+    
+    // 处理鼠标离开
+    handleMouseLeave() {
+      if (this.trigger !== 'hover') return
+      this.timeoutId = setTimeout(() => {
+        this.hide()
+      }, this.hideDelay)
+    },
+    
+    // 处理点击
+    handleClick() {
+      if (this.trigger !== 'click') return
+      if (this.visible) {
+        this.hide()
+      } else {
+        this.show()
+      }
+    },
+    
+    // 处理焦点
+    handleFocus() {
+      if (this.trigger !== 'focus') return
+      this.show()
+    },
+    
+    // 处理失焦
+    handleBlur() {
+      if (this.trigger !== 'focus') return
+      this.hide()
+    },
+    
+    // 处理提示框鼠标进入
+    handleTooltipMouseEnter() {
+      if (!this.enterable) return
+      if (this.timeoutId) {
+        clearTimeout(this.timeoutId)
+        this.timeoutId = null
+      }
+    },
+    
+    // 处理提示框鼠标离开
+    handleTooltipMouseLeave() {
+      if (!this.enterable) return
+      this.handleMouseLeave()
+    },
+    
+    // 量子态方法
+    updateQuantumState(state) {
+      if (!this.quantum.stateTransition) return
+      
+      const quantum = state * this.quantum.entangleStrength
+      
+      // 应用量子态效果
+      this.$el.style.transform = `scale(${1 + quantum * 0.02})`
+      this.$el.style.filter = `brightness(${1 + quantum * 0.05})`
+    }
+  },
+  
+  beforeUnmount() {
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId)
+      this.timeoutId = null
+    }
+  }
+}
+</script> 

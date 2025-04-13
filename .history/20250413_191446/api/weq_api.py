@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+WeQ API适配器模块 - 将请求转发到WeQ模型API
+"""
+
+import os
+import sys
+import logging
+import json
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+from flask import request, jsonify
+
+# 配置日志记录器
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('.logs/weq_api.log', mode='a', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("WeQ-API-Adapter")
+
+# 获取项目根目录
+root_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+# 将WeQ模块添加到系统路径
+weq_path = os.path.join(root_dir, 'WeQ')
+if weq_path not in sys.path:
+    sys.path.insert(0, weq_path)
+
+# 尝试导入WeQ API模块
+try:
+    from WeQ.api.weq_api import WeQModelAPI
+    weq_api = WeQModelAPI()
+    logger.info("成功导入WeQ模型API")
+except ImportError as e:
+    logger.error(f"导入WeQ模型API失败: {str(e)}")
+    weq_api = None
+
+def get_status():
+    """获取API状态
+    
+    Returns:
+        API状态信息
+    """
+    return jsonify({
+        'name': 'WeQ API',
+        'version': '1.0.0' if weq_api is None else weq_api.version,
+        'status': 'running',
+        'timestamp': datetime.now().isoformat()
+    })
+
+def handle_request(path, request_obj):
+    """处理API请求
+    
+    Args:
+        path: 请求路径
+        request_obj: Flask请求对象
+        
+    Returns:
+        API响应
+    """
+    if weq_api is None:
+        return jsonify({
+            'status': 'error',
+            'message': 'WeQ API模块未正确初始化'
+        }), 500
+    
+    logger.info(f"处理WeQ API请求: {path}")
+    
+    # 根据路径处理请求
+    if path == 'process' or path == 'process/':
+        if request_obj.method == 'POST':
+            try:
+                data = request_obj.get_json()
+                result = weq_api.process_quantum_input(data)
+                return jsonify(result)
+            except Exception as e:
+                logger.error(f"处理输入数据时出错: {str(e)}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'处理输入数据时出错: {str(e)}'
+                }), 500
+        else:
+            return jsonify({
+                'status': 'info',
+                'message': '请使用POST方法提交量子处理请求，需要包含type和data字段'
+            })
+    
+    elif path == 'menu' or path == 'menu/':
+        try:
+            menu_items = weq_api.get_nav_menu_items()
+            return jsonify({
+                'status': 'success',
+                'menu_items': menu_items
+            })
+        except Exception as e:
+            logger.error(f"获取菜单项时出错: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': f'获取菜单项时出错: {str(e)}'
+            }), 500
+    
+    elif path == 'suggestions' or path == 'suggestions/':
+        try:
+            suggestions = weq_api.get_suggested_actions()
+            return jsonify({
+                'status': 'success',
+                'suggestions': suggestions
+            })
+        except Exception as e:
+            logger.error(f"获取建议操作时出错: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': f'获取建议操作时出错: {str(e)}'
+            }), 500
+    
+    elif path == 'preferences' or path == 'preferences/':
+        try:
+            preferences = weq_api.get_user_preferences()
+            return jsonify({
+                'status': 'success',
+                'preferences': preferences
+            })
+        except Exception as e:
+            logger.error(f"获取用户偏好设置时出错: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': f'获取用户偏好设置时出错: {str(e)}'
+            }), 500
+    
+    elif path == 'history' or path == 'history/':
+        try:
+            history = weq_api.get_interaction_history()
+            return jsonify({
+                'status': 'success',
+                'history': history
+            })
+        except Exception as e:
+            logger.error(f"获取交互历史时出错: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': f'获取交互历史时出错: {str(e)}'
+            }), 500
+    
+    else:
+        return jsonify({
+            'status': 'error',
+            'message': f'未知的API路径: {path}'
+        }), 404
+
+"""
+量子基因编码: QE-API-WEQ-7B8C4D2F
+纠缠状态: 活跃
+纠缠对象: ['WeQ/api/weq_api.py']
+纠缠强度: 0.98
+"""
+
+# 开发团队：中华 ZhoHo，Claude

@@ -1,0 +1,171 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+引用模型(Ref)主API服务
+集成API服务与模型单独端口API服务
+开发团队: 中华 ZhoHo, Claude
+"""
+
+# 量子基因编码
+QG-CODE-REF-REF-K3B6
+
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-CODE-REF-20250413
+  state: ACTIVE
+  strength: 0.96
+  objects: [
+    "QSM/api/qsm_api.qpy"
+    "world/templates/base.qentl"
+  ]
+
+
+@imports
+  standard: [os]
+  standard: [sys]
+  standard: [time]
+  standard: [logging]
+  standard: [argparse]
+  standard: [subprocess]
+
+
+
+# 设置根路径
+root_dir = Path(__file__).resolve().parent.parent.parent.parent
+ref_dir = Path(__file__).resolve().parent.parent.parent
+os.chdir(root_dir)  # 将工作目录设置为项目根目录
+
+# 设置日志
+@method setup_logging():
+    log_dir = root_dir / '.logs'
+    log_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = log_dir / f'Ref_api_starter_{timestamp}.log'
+    err_file = log_dir / f'Ref_api_starter_{timestamp}.err'
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+    
+    # 创建错误日志处理器
+    err_handler = logging.FileHandler(err_file, encoding='utf-8')
+    err_handler.setLevel(logging.ERROR)
+    err_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    err_handler.setFormatter(err_formatter)
+    
+    # 将错误处理器添加到根日志记录器
+    logging.getLogger('').addHandler(err_handler)
+    
+    return logging.getLogger('Ref API启动')
+
+logger = setup_logging()
+
+@method parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description="Ref API服务启动器")
+    parser.add_argument("--port", type=int, default=5003, help="API服务端口号")
+    parser.add_argument("--debug", action="store_true", help="启用调试模式")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="API服务绑定地址")
+    return parser.parse_args()
+
+@method start_ref_api_service(port=5003, host="0.0.0.0", debug=False):
+    """启动Ref API服务"""
+    try:
+        # 导入Flask应用
+        sys.path.insert(0, ref_dir)
+        sys.path.insert(0, os.path.join(ref_dir, "api"))
+        
+        # 尝试导入Ref的app模块
+        try:
+            @from app @import app
+            logger.info("已成功导入Ref应用模块")
+        except ImportError:
+            # 如果app.py不存在，创建一个基本的Flask应用
+            logger.warning("无法导入Ref应用模块，将创建一个基本的Flask应用")
+            @from flask @import Flask, jsonify
+            app = Flask(__name__)
+            
+            @app.route('/')
+            @method index():
+                return jsonify({"status": "running", "service": "Ref API"})
+            
+            @app.route('/api/status')
+            @method status():
+                return jsonify({
+                    "status": "operational",
+                    "service": "Ref API",
+                    "version": "1.0.0",
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        logger.info(f"正在启动Ref API服务: 地址={host}, 端口={port}, 调试模式={debug}")
+        
+        # 导入核心服务（如果有）
+        try:
+            @from Ref_core @import RefCore
+            # 初始化Ref核心服务
+            ref_core = RefCore()
+            # 注册到Flask应用
+            app.config['REF_CORE'] = ref_core
+            logger.info("Ref核心服务已成功集成到API")
+        except ImportError as e:
+            logger.warning(f"无法导入Ref核心服务: {str(e)}")
+        
+        # 导入其他Ref相关API
+        try:
+            @from Ref_manager_api @import integrate_manager_api
+            integrate_manager_api(app)
+            logger.info("引用管理API已成功集成")
+        except ImportError as e:
+            logger.warning(f"无法集成引用管理API: {str(e)}")
+        
+        try:
+            @from Ref_index_api @import integrate_index_api
+            integrate_index_api(app)
+            logger.info("引用索引API已成功集成")
+        except ImportError as e:
+            logger.warning(f"无法集成引用索引API: {str(e)}")
+        
+        # 启动Flask应用
+        app.run(host=host, port=port, debug=debug)
+        return True
+        
+    except Exception as e:
+        logger.error(f"启动Ref API服务失败: {str(e)}")
+        @import traceback
+        logger.error(traceback.format_exc())
+        return False
+
+@method main():
+    """主函数"""
+    args = parse_args()
+    
+    logger.info("Ref API启动器开始运行...")
+    
+    # 记录目录信息
+    logger.info(f"项目根目录: {root_dir}")
+    logger.info(f"Ref目录: {ref_dir}")
+    
+    # 启动Ref API服务
+    start_ref_api_service(args.port, args.host, args.debug)
+    
+    logger.info("Ref API启动器执行完成")
+    return True
+
+if __name__ == "__main__":
+    main()
+
+# 量子基因编码: QE-API-R3F9A2P7S4
+# 纠缠状态: 活跃
+# 纠缠对象: ['Ref/scripts/services/Ref_start_services.py', 'Ref/scripts/services/Ref_start_all.ps1']
+# 纠缠强度: 0.94
+
+# 开发团队：中华 ZhoHo ，Claude 
