@@ -1,0 +1,335 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+reference目录清理脚本
+清理reference目录中的冗余文件和空目录
+"""
+
+# 量子基因编码
+QG-UTIL-CLEAN-REF-D7F8
+
+# 量子纠缠信道
+@quantum_entangle
+  channel_id: QE-UTIL-CLEAN-REF-20250414
+  state: ACTIVE
+  strength: 0.85
+  objects: []
+
+@imports
+  standard: [os, shutil, re, time, datetime, logging]
+  standard: [sys]
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("CleanReference")
+
+# 常量定义
+REFERENCE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reference")
+BACKUP_DIR = os.path.join(REFERENCE_DIR, "backups", f"cleanup_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
+BACKUPS_ROOT = os.path.join(REFERENCE_DIR, "backups")
+MAX_BACKUP_AGE_DAYS = 30
+
+# 要删除的文件模式
+FILE_PATTERNS_TO_DELETE = [
+    r'.*\.log$',          # 日志文件
+    r'.*\.tmp$',          # 临时文件
+    r'.*\.temp$',         # 临时文件
+    r'.*\.bak$',          # 备份文件
+    r'.*\.backup$',       # 备份文件
+    r'test_.*\.py$',      # 测试文件
+    r'test_.*\.qpy$',     # 测试文件
+    r'.*_test\.py$',      # 测试文件
+    r'.*_test\.qpy$',     # 测试文件
+    r'.*\.pyc$',          # Python编译文件
+    r'.*\.pyo$',          # Python优化文件
+    r'.*\.pyd$',          # Python动态链接库
+    r'.*\.so$',           # 共享对象文件
+    r'.*\.o$',            # 目标文件
+    r'.*\.obj$',          # 目标文件
+    r'.*\.exe$',          # 可执行文件
+    r'.*\.dll$',          # 动态链接库
+    r'.*\.a$',            # 静态库
+    r'.*\.lib$',          # 库文件
+    r'.*\.suo$',          # Visual Studio用户选项
+    r'.*\.sln$',          # Visual Studio解决方案
+    r'.*\.vcproj$',       # Visual Studio项目
+    r'.*\.vcxproj$',      # Visual Studio项目
+    r'.*\.user$',         # 用户文件
+    r'\.DS_Store$',       # macOS文件
+    r'Thumbs\.db$',       # Windows缩略图文件
+    r'desktop\.ini$',     # Windows桌面设置
+    r'\.vscode.*',        # VSCode设置
+    r'\.idea.*',          # IntelliJ IDEA设置
+    r'__pycache__.*',     # Python缓存
+    r'moved_files_info\.md$', # 移动文件信息
+    r'.*temp.*',          # 包含temp的文件
+    r'null$',             # 空文件
+]
+
+# 不删除的目录
+DIRS_TO_KEEP = [
+    "docs",
+    "templates",
+    "QEntL",
+    "QSM",
+    "SOM",
+    "WeQ",
+    "Ref",
+    "world",
+    "quantum_core"
+]
+
+@function backup_file(file_path):
+    """备份文件
+    
+    Args:
+        file_path: 要备份的文件路径
+    """
+    if not os.path.exists(BACKUP_DIR):
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+    
+    rel_path = os.path.relpath(file_path, REFERENCE_DIR)
+    backup_path = os.path.join(BACKUP_DIR, rel_path)
+    
+    backup_dir = os.path.dirname(backup_path)
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir, exist_ok=True)
+    
+    try:
+        shutil.copy2(file_path, backup_path)
+        logger.debug(f"已备份文件: {file_path} -> {backup_path}")
+    except Exception as e:
+        logger.error(f"备份文件失败: {file_path} - {str(e)}")
+
+@function should_delete_file(file_path):
+    """判断文件是否应该删除
+    
+    Args:
+        file_path: 文件路径
+        
+    Returns:
+        bool: 是否应该删除
+    """
+    file_name = os.path.basename(file_path)
+    
+    # 检查文件模式
+    for pattern in FILE_PATTERNS_TO_DELETE:
+        if re.match(pattern, file_name):
+            return True
+    
+    return False
+
+@function clean_old_backups():
+    """清理超过30天的备份文件
+    
+    Returns:
+        int: 删除的备份文件和文件夹数量
+    """
+    if not os.path.exists(BACKUPS_ROOT):
+        logger.warning(f"备份目录不存在: {BACKUPS_ROOT}")
+        return 0
+    
+    logger.info(f"开始清理超过 {MAX_BACKUP_AGE_DAYS} 天的备份文件...")
+    
+    now = datetime.datetime.now()
+    deleted_count = 0
+    
+    # 遍历备份目录
+    for root, dirs, files in os.walk(BACKUPS_ROOT, topdown=False):
+        # 跳过当前备份目录
+        if root.startswith(BACKUP_DIR):
+            continue
+        
+        # 处理文件
+        for file in files:
+            file_path = os.path.join(root, file)
+            
+            # 获取文件的修改时间
+            try:
+                mod_time = datetime.datetime.fromtimestamp(os.path.getmtime(file_path))
+                age_days = (now - mod_time).days
+                
+                # 如果文件超过30天，删除它
+                if age_days > MAX_BACKUP_AGE_DAYS:
+                    try:
+                        os.remove(file_path)
+                        logger.info(f"已删除超过 {MAX_BACKUP_AGE_DAYS} 天的备份文件: {file_path} (年龄: {age_days}天)")
+                        deleted_count += 1
+                    except Exception as e:
+                        logger.error(f"删除旧备份文件失败: {file_path} - {str(e)}")
+            except Exception as e:
+                logger.error(f"获取文件时间失败: {file_path} - {str(e)}")
+    
+    # 删除空目录
+    for root, dirs, files in os.walk(BACKUPS_ROOT, topdown=False):
+        # 跳过当前备份目录
+        if root.startswith(BACKUP_DIR) or root == BACKUPS_ROOT:
+            continue
+        
+        # 如果目录为空，删除它
+        if not os.listdir(root):
+            try:
+                os.rmdir(root)
+                logger.info(f"已删除空备份目录: {root}")
+                deleted_count += 1
+            except Exception as e:
+                logger.error(f"删除空备份目录失败: {root} - {str(e)}")
+    
+    # 清理特殊的日期命名目录（如20250414）
+    date_pattern = re.compile(r'^\d{8}$')
+    for item in os.listdir(BACKUPS_ROOT):
+        item_path = os.path.join(BACKUPS_ROOT, item)
+        
+        # 如果是日期目录
+        if os.path.isdir(item_path) and date_pattern.match(item):
+            try:
+                # 尝试解析日期
+                folder_date = datetime.datetime.strptime(item, '%Y%m%d')
+                age_days = (now - folder_date).days
+                
+                # 如果目录超过30天，删除它
+                if age_days > MAX_BACKUP_AGE_DAYS:
+                    try:
+                        shutil.rmtree(item_path)
+                        logger.info(f"已删除超过 {MAX_BACKUP_AGE_DAYS} 天的备份目录: {item_path} (年龄: {age_days}天)")
+                        deleted_count += 1
+                    except Exception as e:
+                        logger.error(f"删除旧备份目录失败: {item_path} - {str(e)}")
+            except ValueError:
+                # 如果不是有效日期格式，跳过
+                pass
+    
+    return deleted_count
+
+@function clean_empty_dirs(directory):
+    """递归删除空目录
+    
+    Args:
+        directory: 目录路径
+        
+    Returns:
+        int: 删除的空目录数量
+    """
+    deleted_count = 0
+    
+    for root, dirs, files in os.walk(directory, topdown=False):
+        # 跳过根目录
+        if root == REFERENCE_DIR:
+            continue
+            
+        # 跳过要保留的目录
+        skip = False
+        for keep_dir in DIRS_TO_KEEP:
+            if os.path.basename(root) == keep_dir:
+                skip = True
+                break
+        
+        if skip:
+            continue
+            
+        # 如果目录为空，删除它
+        if not os.listdir(root):
+            try:
+                os.rmdir(root)
+                logger.info(f"已删除空目录: {root}")
+                deleted_count += 1
+            except Exception as e:
+                logger.error(f"删除空目录失败: {root} - {str(e)}")
+    
+    return deleted_count
+
+@function clean_reference_dir():
+    """清理reference目录"""
+    if not os.path.exists(REFERENCE_DIR):
+        logger.error(f"reference目录不存在: {REFERENCE_DIR}")
+        return
+    
+    # 统计
+    total_files = 0
+    deleted_files = 0
+    
+    # 清理旧备份
+    old_backups_deleted = clean_old_backups()
+    
+    # 遍历reference目录
+    for root, dirs, files in os.walk(REFERENCE_DIR):
+        # 跳过备份目录
+        if root.startswith(BACKUP_DIR):
+            continue
+        
+        # 处理文件
+        for file in files:
+            total_files += 1
+            file_path = os.path.join(root, file)
+            
+            if should_delete_file(file_path):
+                try:
+                    # 备份文件
+                    backup_file(file_path)
+                    
+                    # 删除文件
+                    os.remove(file_path)
+                    logger.info(f"已删除文件: {file_path}")
+                    deleted_files += 1
+                except Exception as e:
+                    logger.error(f"删除文件失败: {file_path} - {str(e)}")
+    
+    # 删除空目录
+    deleted_dirs = clean_empty_dirs(REFERENCE_DIR)
+    
+    # 输出统计信息
+    logger.info(f"清理完成!")
+    logger.info(f"总文件数: {total_files}")
+    logger.info(f"已删除文件数: {deleted_files}")
+    logger.info(f"已删除空目录数: {deleted_dirs}")
+    logger.info(f"已删除过期备份数: {old_backups_deleted}")
+    logger.info(f"备份目录: {BACKUP_DIR}")
+    logger.info(f"备份保留时间: {MAX_BACKUP_AGE_DAYS}天")
+
+@function create_cron_job():
+    """创建计划任务用于定期执行清理脚本"""
+    script_path = os.path.abspath(__file__)
+    
+    # 创建说明文件
+    cron_info_path = os.path.join(os.path.dirname(script_path), "cron_setup_info.md")
+    with open(cron_info_path, "w", encoding="utf-8") as f:
+        f.write(f"""# 自动清理计划任务说明
+
+## Windows 计划任务设置方法
+
+1. 打开任务计划程序（可在开始菜单搜索"任务计划程序"）
+2. 点击"创建基本任务"
+3. 名称：输入"QSM参考目录清理"
+4. 触发器：选择"每天"
+5. 每天运行时间：选择凌晨3点
+6. 操作：选择"启动程序"
+7. 程序/脚本：输入`{sys.executable}`
+8. 添加参数：输入`{script_path}`
+9. 完成设置
+
+## Linux Cron 设置方法
+
+添加以下行到 crontab:
+
+```
+0 3 * * * {sys.executable} {script_path}
+```
+
+这将设置在每天凌晨3点自动运行清理脚本，删除超过{MAX_BACKUP_AGE_DAYS}天的备份文件。
+""")
+    
+    logger.info(f"已创建计划任务说明文件: {cron_info_path}")
+    logger.info(f"请按照说明文件中的步骤设置自动清理计划任务")
+
+@entrypoint
+  """脚本入口函数"""
+  logger.info("开始清理reference目录...")
+  clean_reference_dir()
+  create_cron_job() 

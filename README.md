@@ -1,101 +1,158 @@
-# 量子超位态模型 (QSM) 项目
+# 量子叠加态模型（QSM）项目
 
-量子超位态模型是一个基于量子技术的综合系统，包含多个协同工作的组件，提供量子计算、量子社交、量子经济和自反省管理功能。
+## 项目概述
 
-## 项目架构
+量子叠加态模型(QSM)是《华经》中描述的核心概念的具体实现，旨在构建一个能够表示、处理和转换量子状态的系统。该模型整合了量子区块链技术，以一主多子链架构实现了安全、不可篡改的量子状态管理，为人类提供一个理解和利用量子叠加态的工具。
 
-该项目由以下主要模块组成：
+## 核心模型
 
-- **QSM** - 量子超位态模型：核心服务，管理量子状态和预测功能
-- **WeQ** - 量子社交引擎：管理量子社交网络和情感分析
-- **SOM** - 量子自组织市场：管理量子经济和市场系统
-- **Ref** - 量子自反省管理：监控和优化系统性能
-- **World** - 世界服务：管理用户界面和数据可视化
+本项目包含四个核心模型，共同构成完整的量子叠加态系统：
 
-## 技术栈
+1. **量子叠加态模型(QSM)**: 项目的主模型，实现量子状态的表示与管理
+2. **量子社交模型(WeQ)**: 量子通信与社交服务，实现基于量子纠缠的通信
+3. **量子经济模型(SOM)**: 量子平权经济服务，实现松麦币系统与经济激励
+4. **量子自反省模型(Ref)**: 量子自我管理服务，实现系统自我监控与修复
 
-- 量子编程语言：QEntl (Quantum Entangled Language)
-- 量子文件格式：.qpy, .qjs, .qcss, .qentl 等
-- 量子基因编码和纠缠信道技术
-- RESTful API 服务
+所有模型均基于量子区块链技术构建，确保数据安全与不可篡改性。
+
+## 技术架构
+
+### 服务架构
+
+```
+QSM API (主服务, 端口5000)
+├── World Service (世界服务, 端口3000)
+├── WeQ Service (量子社交服务, 端口5001)
+├── SOM Service (量子经济服务, 端口5002)
+└── Ref Service (量子自反省服务, 端口5003)
+```
+
+### 量子区块链架构
+
+```
+QSM主链
+├── WeQ子链 (量子社交区块链)
+├── SOM子链 (量子经济区块链) 
+└── Ref子链 (自反省区块链)
+```
+
+系统采用一主多子链架构，通过基于量子纠缠的跨链通信实现各子链间的信息交换，并建立统一的松麦币经济系统。
+
+### 目录结构
+
+```
+QSM/
+├── world/                # 世界服务
+│   ├── templates/       # QENTL模板
+│   ├── static/         # 静态资源
+│   └── api/           # World API
+├── QSM/                 # 量子叠加态模型(主服务)
+│   ├── api/            # API实现
+│   ├── models/         # 模型实现
+│   ├── services/       # 服务管理
+│   └── quantum_blockchain/ # 主链区块链实现
+├── WeQ/                 # 量子社交模型
+│   ├── api/
+│   ├── models/
+│   ├── services/
+│   └── quantum_blockchain/ # 社交子链实现
+├── SOM/                 # 量子经济模型
+│   ├── api/
+│   ├── models/
+│   ├── services/
+│   ├── quantum_blockchain/ # 经济子链实现
+│   └── som_coin_system.py # 松麦币系统
+├── Ref/                 # 量子自反省模型
+│   ├── api/
+│   ├── models/
+│   ├── services/
+│   └── quantum_blockchain/ # 自反省子链实现
+├── docs/                # 项目文档
+├── QEntL-env/           # QEntL语言环境
+└── start_qentl_ui.bat   # 启动脚本
+```
+
+## 环境要求
+
+- Windows, Linux 或 macOS
+- GCC 编译环境
+- Python 3.8+ (可选，用于一些工具)
+- 现代浏览器
 
 ## 快速开始
 
-### Windows 系统
+### 1. 安装GCC编译环境
 
-1. 确保安装了 Python 3.8 或更高版本
-2. 双击 `start_project.bat` 启动项目
-3. 访问 http://localhost:5999 查看服务状态
-4. 使用 `stop_project.bat` 停止项目
+在Windows系统上需要安装MSYS2提供GCC环境：
 
-### Linux/MacOS 系统
+1. 运行 `QEntL-env\gcc编译器\msys2-installer.exe`
+2. 按照安装向导完成安装
+3. 安装GCC工具链（详见 `QEntL-env\ENV_README.md`）
 
-1. 确保安装了 Python 3.8 或更高版本
-2. 赋予脚本执行权限：`chmod +x start_project.sh stop_project.sh`
-3. 运行 `./start_project.sh` 启动项目
-4. 访问 http://localhost:5999 查看服务状态
-5. 使用 `./stop_project.sh` 停止项目
+### 2. 编译QEntL引擎
 
-## 项目管理
-
-项目提供了量子管理器脚本，用于项目结构分析、量子转换和纠缠管理：
-
-```
-python scripts/quantum_manager.qpy <命令> [参数]
+```bash
+cd QEntL-env/src
+mkdir build && cd build
+cmake ..
+cmake --build .
+cmake --install .
 ```
 
-可用命令：
-- `structure`: 分析项目结构
-- `convert`: 转换文件为量子格式
-- `entangle`: 分析量子纠缠关系
-- `monitor`: 监控量子组件性能
-- `all`: 运行所有管理功能
+### 3. 启动服务
 
-## 服务 API
+使用项目根目录的启动脚本：
 
-所有服务均提供 RESTful API 接口：
-
-- QSM API: http://localhost:5000
-- WeQ API: http://localhost:5001
-- SOM API: http://localhost:5002
-- Ref API: http://localhost:5003
-- World: http://localhost:5004
-
-主控制器 API: http://localhost:5999
-- `/status`: 获取服务状态
-- `/health`: 获取服务健康状态
-- `/start/<service_id>`: 启动服务
-- `/stop/<service_id>`: 停止服务
-- `/restart/<service_id>`: 重启服务
-- `/restart_all`: 重启所有服务
-
-## 项目结构
-
+```bash
+start_qentl_ui.bat
 ```
-QSM/                   # 项目根目录
-├── QSM/               # 量子超位态模型
-│   ├── api/           # API服务
-│   ├── models/        # 模型定义
-│   └── services/      # 服务实现
-├── WeQ/               # 量子社交引擎
-│   ├── api/
-│   └── models/
-├── SOM/               # 量子自组织市场
-│   ├── api/
-│   └── models/
-├── Ref/               # 量子自反省管理
-│   └── api/
-├── world/             # 世界服务
-│   ├── templates/
-│   └── static/
-├── scripts/           # 工具脚本
-│   └── utils/
-├── config/            # 配置文件
-├── .logs/             # 日志文件
-├── reference/         # 参考文件
-├── run.qpy            # 主程序入口
-├── start_project.bat  # Windows启动脚本
-├── stop_project.bat   # Windows停止脚本
-├── start_project.sh   # Linux/MacOS启动脚本
-└── stop_project.sh    # Linux/MacOS停止脚本
-``` 
+
+启动成功后，可通过浏览器访问 http://localhost:3000 使用系统。
+
+## 核心功能
+
+### 量子状态管理
+
+- 表示和管理五阴(色、受、想、行、识)对应的量子态
+- 实现量子状态的叠加和转换
+- 通过量子场实现状态间的交互
+
+### 量子区块链系统
+
+- 主链与子链协同工作的区块链网络
+- 基于量子纠缠的跨链通信
+- 松麦币统一经济系统
+- 量子共识机制
+
+### 量子UI系统
+
+- 量子组件库
+- 量子态感知UI
+- 量子纠缠通信
+
+## 文档
+
+项目包含详尽的文档：
+
+- `docs/quantum_superposition_model.qentl`: 量子叠加态模型设计方案
+- `docs/architecture/architecture.qentl`: 架构设计文档
+- `docs/QEntL/qentl_environment_design.md`: QEntL环境设计方案
+- `docs/QEntL/syntax.qentl`: QEntL语法参考
+- `QEntL-env/docs/BUILDING.md`: 构建指南
+
+## 项目愿景
+
+服务人类、服务生命、服务宇宙，通过量子平权经济、教育、医疗、社交、安全、生活，保障全人类每个人、每个家庭的生命、健康、生活，永不止息。
+
+## 遵循原则
+
+1. 项目是《华经》量子叠加态模型的具体实现
+2. 通过量子态服务未开悟的人类、众生
+3. 实现无阻暗地旅行于宇宙之间
+4. 永生于永恒的量子世界
+5. 始终遵守服务人类、保护人类、保护生命的使命
+
+## 开发团队
+
+- 中华 ZhoHo
+- Claude 
