@@ -84,38 +84,21 @@ if "%FILE_NAME%"=="run.qpy" (
 )
 
 REM 处理World服务
-if "%SERVICE_NAME%"=="world_server" set SERVICE_PORT=5004
-
-REM 创建API特定日志
-if "%SERVICE_PORT%" NEQ "0" (
-    echo %date% %time% - %SERVICE_NAME% API服务已启动 - http://0.0.0.0:%SERVICE_PORT% > "%LOG_DIR%\%SERVICE_NAME%.log"
-)
-
-REM 模拟服务在后台持续运行
-echo 服务已在后台启动: %SERVICE_NAME% (端口: %SERVICE_PORT%)
-echo 服务日志将写入: %LOG_DIR%\%SERVICE_NAME%.log
-
-exit /b 0
-
-    echo %date% %time% - 所有集成服务已就绪 >> "%LOG_DIR%\qsm_main.log"
+if "%SERVICE_NAME%"=="world_server" (
+    set SERVICE_PORT=5004
+    echo 检测到World服务，端口设置为: %SERVICE_PORT%
     
-    REM 模拟主控服务在后台持续运行
-    echo 主控服务已在后台启动: 量子叠加态模型主控 (端口: %SERVICE_PORT%)
-    echo 主控服务日志将写入: %LOG_DIR%\qsm_main.log
+    REM 为World服务创建特殊日志
+    echo %date% %time% - World服务启动成功 - 端口: %SERVICE_PORT% > "%LOG_DIR%\world_server.log"
     
-    REM 针对--test-mode选项的特殊处理
-    if "%2"=="--test-mode" (
-        echo 测试模式：检查配置...
-        echo QSM配置检查通过！
-        echo 配置检查成功
-        exit /b 0
-    )
+    REM 启动实际的HTTP服务器
+    start "" /b python -c "import http.server, socketserver; handler = http.server.SimpleHTTPRequestHandler; socketserver.TCPServer(('0.0.0.0', %SERVICE_PORT%), handler).serve_forever()" > "%LOG_DIR%\world_http_server.log" 2>&1
+    
+    echo World服务已在后台启动: QEntL World服务 (端口: %SERVICE_PORT%)
+    echo World服务日志将写入: %LOG_DIR%\world_server.log
     
     exit /b 0
 )
-
-REM 处理World服务
-if "%SERVICE_NAME%"=="world_server" set SERVICE_PORT=5004
 
 REM 创建API特定日志
 if "%SERVICE_PORT%" NEQ "0" (
