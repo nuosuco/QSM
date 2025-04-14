@@ -8,12 +8,12 @@
 
 本项目包含四个核心模型，共同构成完整的量子叠加态系统：
 
-1. **量子叠加态模型(QSM)**: 项目的主模型，实现量子状态的表示与管理
-2. **量子社交模型(WeQ)**: 量子通信与社交服务，实现基于量子纠缠的通信
-3. **量子经济模型(SOM)**: 量子平权经济服务，实现松麦币系统与经济激励
-4. **量子自反省模型(Ref)**: 量子自我管理服务，实现系统自我监控与修复
+1. **量子叠加态模型(QSM)**: 项目的主模型，实现量子状态的表示与管理，负责核心状态提供、转换引擎、量子场生成和纠缠管理
+2. **量子社交模型(WeQ)**: 量子通信与社交服务，实现基于量子纠缠的通信，包括社交网络、知识管理和学习系统
+3. **量子经济模型(SOM)**: 量子平权经济服务，实现松麦币系统与经济激励，负责资源分配、经济决策和平权系统
+4. **量子自反省模型(Ref)**: 量子自我管理服务，实现系统自我监控与修复，包括系统诊断、自动修复和优化功能
 
-所有模型均基于量子区块链技术构建，确保数据安全与不可篡改性。
+所有模型均基于量子区块链技术构建，通过量子纠缠机制实现紧密集成，确保数据安全与不可篡改性。
 
 ## 技术架构
 
@@ -30,13 +30,25 @@ QSM API (主服务, 端口5000)
 ### 量子区块链架构
 
 ```
-QSM主链
-├── WeQ子链 (量子社交区块链)
-├── SOM子链 (量子经济区块链) 
-└── Ref子链 (自反省区块链)
+QSM主链 (QUANTUM_PROOF_OF_STATE共识)
+├── WeQ子链 (量子社交区块链, QUANTUM_PROOF_OF_KNOWLEDGE共识)
+├── SOM子链 (量子经济区块链, QUANTUM_PROOF_OF_EQUITY共识) 
+└── Ref子链 (自反省区块链, QUANTUM_PROOF_OF_HEALTH共识)
 ```
 
 系统采用一主多子链架构，通过基于量子纠缠的跨链通信实现各子链间的信息交换，并建立统一的松麦币经济系统。
+
+### 模型集成架构
+
+项目采用以下机制实现四大模型的无缝集成：
+
+1. **量子纠缠同步器**: 通过量子纠缠实现模型间状态实时同步
+2. **集成事件总线**: 提供异步事件发布/订阅机制
+3. **统一服务网关**: 集中管理服务访问和路由
+4. **跨模型映射系统**: 建立不同模型域之间的数据映射关系
+5. **量子区块链跨链通信**: 实现不同链之间的安全可信通信
+
+完整架构详见 `docs/integration/models_integration_details.qentl`
 
 ### 目录结构
 
@@ -68,6 +80,11 @@ QSM/
 │   ├── services/
 │   └── quantum_blockchain/ # 自反省子链实现
 ├── docs/                # 项目文档
+│   ├── architecture/    # 架构文档
+│   ├── integration/     # 集成文档
+│   ├── project_plan/    # 项目计划
+│   ├── project_state/   # 项目状态
+│   └── change_history/  # 变更历史
 ├── QEntL-env/           # QEntL语言环境
 └── start_qentl_ui.bat   # 启动脚本
 ```
@@ -130,12 +147,22 @@ start_qentl_ui.bat
 - 量子态感知UI
 - 量子纠缠通信
 
+### 模型集成系统
+
+- 模型注册与服务发现
+- 跨模型状态映射
+- 量子纠缠同步器
+- 统一事件总线
+- 跨链资产与状态同步
+
 ## 文档
 
 项目包含详尽的文档：
 
 - `docs/quantum_superposition_model.qentl`: 量子叠加态模型设计方案
 - `docs/architecture/architecture.qentl`: 架构设计文档
+- `docs/integration/models_integration_framework.qentl`: 模型集成框架
+- `docs/integration/models_integration_details.qentl`: 模型集成详情
 - `docs/QEntL/qentl_environment_design.md`: QEntL环境设计方案
 - `docs/QEntL/syntax.qentl`: QEntL语法参考
 - `QEntL-env/docs/BUILDING.md`: 构建指南

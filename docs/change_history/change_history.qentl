@@ -8,7 +8,7 @@ QG-DOC-HIST-QSM-CORE-A1B2
 ## 量子纠缠信道
 ```qentl
 // 信道标识
-QE-DOC-HIST-20240312
+QE-DOC-HIST-20240414
 
 // 纠缠态
 ENTANGLE_STATE: ACTIVE
@@ -16,7 +16,8 @@ ENTANGLE_STATE: ACTIVE
 // 纠缠对象
 ENTANGLED_OBJECTS: [
   "docs/project_state/project_state.qentl",
-  "docs/architecture/architecture.qentl"
+  "docs/architecture/architecture.qentl",
+  "docs/integration/models_integration_details.qentl"
 ]
 
 // 纠缠强度
@@ -24,6 +25,29 @@ ENTANGLE_STRENGTH: 1.0
 ```
 
 ## 重大变更记录
+
+### 2024-04-14 四大模型集成架构细化
+1. 模型集成架构
+   - 创建了详细的模型集成文档(`docs/integration/models_integration_details.qentl`)
+   - 细化了四个核心模型之间的状态映射机制
+   - 定义了详细的跨模型接口规范
+   - 完善了量子区块链跨链操作详情
+   - 建立了数据一致性保障和冲突解决机制
+   - 设计了完整的集成测试与监控系统
+
+2. 集成细节实现
+   - 定义了QSM-SOM状态映射规则
+   - 定义了QSM-WeQ状态映射规则
+   - 定义了QSM-Ref状态映射规则
+   - 设计了跨链资产转移与状态同步操作
+   - 完善了模型间事件通信机制
+   - 建立了模型角色与职责划分
+
+3. 文档与设计
+   - 更新了README.md，补充模型集成信息
+   - 更新了项目状态文档
+   - 更新了变更历史文档
+   - 为四个模型添加了详细的实现计划
 
 ### 2024-04-04 量子区块链集成
 1. 区块链架构设计
