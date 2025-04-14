@@ -149,4 +149,147 @@ QEntL环境采用分层架构：
 
 ## 9. 结论
 
-QEntL环境将提供完全独立、自主可控的量子编程平台，为量子超位态模型（QSM）项目提供关键技术支持。通过实现这一环境，我们将不再依赖任何第三方技术，实现技术自主，并为量子计算领域做出重要贡献。 
+QEntL环境将提供完全独立、自主可控的量子编程平台，为量子叠加态模型（QSM）项目提供关键技术支持。通过实现这一环境，我们将不再依赖任何第三方技术，实现技术自主，并为量子计算领域做出重要贡献。
+
+## 10. 环境安装与使用指南
+
+本节提供详细的QEntL环境安装和使用步骤，确保开发者能够快速搭建环境并开始开发。
+
+### 10.1 安装GCC编译器环境
+
+QEntL环境需要GCC编译器支持。在Windows系统上，我们使用MSYS2提供GCC环境。
+
+#### Windows平台安装步骤:
+
+1. **安装MSYS2**:
+   - 运行 `QEntL-env\gcc编译器\msys2-installer.exe`
+   - 按照安装向导完成安装，推荐安装到 `C:\msys64` 目录
+   - 安装完成后，MSYS2会自动打开一个终端窗口
+
+2. **更新MSYS2**:
+   ```bash
+   pacman -Syu
+   ```
+   - 完成后关闭终端窗口
+   - 重新打开MSYS2终端
+   - 再次运行:
+   ```bash
+   pacman -Syu
+   ```
+
+3. **安装GCC编译工具**:
+   ```bash
+   pacman -S mingw-w64-x86_64-toolchain
+   pacman -S make
+   pacman -S mingw-w64-x86_64-cmake
+   ```
+
+4. **设置环境变量**:
+   - 右键"此电脑"，选择"属性"
+   - 点击"高级系统设置"
+   - 点击"环境变量"按钮
+   - 在"系统变量"部分，找到并选择"Path"变量，点击"编辑"
+   - 点击"新建"按钮，添加 `C:\msys64\mingw64\bin`
+   - 点击"确定"保存所有更改
+
+5. **验证安装**:
+   - 打开新的命令提示符或PowerShell窗口
+   - 运行以下命令验证GCC安装:
+   ```
+   gcc --version
+   g++ --version
+   make --version
+   ```
+
+#### Linux/macOS平台安装步骤:
+
+1. **Linux (Debian/Ubuntu)**:
+   ```bash
+   sudo apt update
+   sudo apt install build-essential cmake
+   ```
+
+2. **Linux (Fedora/RHEL/CentOS)**:
+   ```bash
+   sudo dnf update
+   sudo dnf group install "Development Tools"
+   sudo dnf install cmake
+   ```
+
+3. **macOS**:
+   ```bash
+   xcode-select --install
+   brew install cmake
+   ```
+
+### 10.2 编译QEntL引擎
+
+安装完GCC环境后，需要编译QEntL引擎:
+
+1. **打开命令提示符或PowerShell窗口**
+
+2. **进入QEntL源码目录**:
+   ```
+   cd QEntL-env\src
+   ```
+
+3. **编译引擎**:
+   ```
+   mkdir build
+   cd build
+   cmake ..
+   cmake --build .
+   ```
+
+4. **安装编译结果**:
+   ```
+   cmake --install .
+   ```
+   这将把编译好的文件安装到正确的位置。
+
+### 10.3 启动QEntL服务
+
+完成编译后，可以启动QEntL环境并运行服务:
+
+1. **使用批处理启动全部服务**:
+   - 直接运行项目根目录下的 `start_qentl_ui.bat` 文件
+   - 该批处理将自动启动所有需要的服务
+   - 启动成功后，会在终端显示各服务的状态
+   - 会提供一个本地URL，通常是 `http://localhost:3000`，可以在浏览器中访问
+
+2. **手动启动各个服务**:
+   ```
+   cd QEntL-env\bin
+   qentl --port=5000 --service=qsm
+   qentl --port=5001 --service=weq
+   qentl --port=5002 --service=som
+   qentl --port=5003 --service=ref
+   ```
+
+3. **运行QEntL脚本**:
+   ```
+   cd QEntL-env\bin
+   qentl path\to\your\script.qentl
+   ```
+
+### 10.4 常见问题排查
+
+1. **服务无法启动**:
+   - 检查端口是否被占用，可使用 `netstat -ano | findstr 5000` 查看
+   - 确认GCC环境变量是否正确设置
+   - 检查编译是否成功
+
+2. **编译错误**:
+   - 确保GCC版本为8.0以上
+   - 检查是否已安装所有必要的依赖包
+   - 检查源码完整性
+
+3. **脚本运行错误**:
+   - 检查脚本语法
+   - 查看日志文件，通常位于 `QEntL-env\logs` 目录
+   - 使用debug模式运行: `qentl --debug path\to\your\script.qentl` 
+
+## 开发团队
+
+- 中华 ZhoHo
+- Claude 
