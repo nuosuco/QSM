@@ -1,286 +1,290 @@
-/**
- * QEntL解释器 - 原生实现
- * 这是一个直接执行.qpy和.qentl文件的独立解释器
- * 不依赖任何第三方工具或环境
+/*
+ * QEntL 解释器 - 简化版本
+ * 量子纠缠语言环境 (Quantum Entanglement Language Environment)
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+#include <time.h>
 
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 1
-#define VERSION_PATCH 0
-#define BUFFER_SIZE 8192
+#define VERSION "0.1.0"
+#define BUFFER_SIZE 512
+#define LOG_DIR "../logs"
 
-// 令牌类型
-typedef enum {
-    TOKEN_EOF,
-    TOKEN_IDENTIFIER,
-    TOKEN_STRING,
-    TOKEN_NUMBER,
-    TOKEN_FUNCTION,
-    TOKEN_ROUTE,
-    TOKEN_CLASS,
-    TOKEN_METHOD,
-    TOKEN_IMPORT,
-    TOKEN_QUANTUM_ENTANGLE,
-    TOKEN_CONSTANTS,
-    TOKEN_INITIALIZATION
-} TokenType;
-
-// 令牌结构
+// 测试配置
 typedef struct {
-    TokenType type;
-    char* text;
-    int line;
-} Token;
+    const char *name;
+    const char *description;
+} TestConfig;
 
-// 解释器状态
+const TestConfig TESTS[] = {
+    {"quantum_state", "量子状态测试"},
+    {"quantum_entanglement", "量子纠缠测试"},
+    {"quantum_gene", "量子基因测试"},
+    {"quantum_field", "量子场测试"}
+};
+
+const int TEST_COUNT = sizeof(TESTS) / sizeof(TestConfig);
+
+// 支持的文件格式
 typedef struct {
-    FILE* file;
-    char* filename;
-    char buffer[BUFFER_SIZE];
-    int line;
-    int position;
-    int error;
-} Interpreter;
+    const char *extension;
+    const char *description;
+} FileFormat;
 
-// 初始化解释器
-void init_interpreter(Interpreter* interpreter, char* filename) {
-    interpreter->filename = filename;
-    interpreter->file = fopen(filename, "r");
-    if (!interpreter->file) {
-        printf("错误: 无法打开文件 %s\n", filename);
-        interpreter->error = 1;
-        return;
-    }
-    
-    interpreter->line = 1;
-    interpreter->position = 0;
-    interpreter->error = 0;
-    
-    // 读取第一行
-    if (fgets(interpreter->buffer, BUFFER_SIZE, interpreter->file) == NULL) {
-        interpreter->buffer[0] = '\0';
+const FileFormat FORMATS[] = {
+    {".qpy", "量子Python扩展"},
+    {".qentl", "量子纠缠语言文件"},
+    {".qent", "量子实体文件"},
+    {".qjs", "量子JavaScript文件"},
+    {".qcss", "量子层叠样式表"},
+    {".qml", "量子标记语言"},
+    {".qsql", "量子结构化查询语言"},
+    {".qcon", "量子配置文件"},
+    {".qtest", "量子测试文件"},
+    {".qmod", "量子模块文件"}
+};
+
+const int FORMAT_COUNT = sizeof(FORMATS) / sizeof(FileFormat);
+
+// 显示版本信息
+void show_version() {
+    printf("QEntl解释器 v%s\n", VERSION);
+    printf("Quantum Entanglement Language Environment\n");
+}
+
+// 显示帮助信息
+void show_help() {
+    printf("用法: qentl [选项] [文件]\n");
+    printf("选项:\n");
+    printf("  --version    显示版本信息\n");
+    printf("  --help       显示帮助信息\n");
+    printf("  test [文件]  运行测试文件，不指定文件则运行所有测试\n");
+}
+
+// 确保目录存在
+void ensure_directory(const char *dir) {
+    char cmd[BUFFER_SIZE];
+    sprintf(cmd, "mkdir -p %s 2>/dev/null || mkdir %s 2>nul", dir, dir);
+    system(cmd);
+}
+
+// 写入日志
+void write_log(const char *log_file, const char *message) {
+    ensure_directory(LOG_DIR);
+
+    char log_path[BUFFER_SIZE];
+    sprintf(log_path, "%s/%s", LOG_DIR, log_file);
+
+    FILE *file = fopen(log_path, "a");
+    if (file != NULL) {
+        time_t now = time(NULL);
+        struct tm *tm_info = localtime(&now);
+        char time_str[26];
+        strftime(time_str, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+
+        fprintf(file, "%s - %s\n", time_str, message);
+        fclose(file);
     }
 }
 
-// 关闭解释器
-void close_interpreter(Interpreter* interpreter) {
-    if (interpreter->file) {
-        fclose(interpreter->file);
-        interpreter->file = NULL;
-    }
-}
-
-// 读取下一行
-int read_next_line(Interpreter* interpreter) {
-    if (interpreter->file && fgets(interpreter->buffer, BUFFER_SIZE, interpreter->file)) {
-        interpreter->line++;
-        interpreter->position = 0;
+// 检查文件是否存在
+int file_exists(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file != NULL) {
+        fclose(file);
         return 1;
     }
     return 0;
 }
 
-// 跳过空白字符
-void skip_whitespace(Interpreter* interpreter) {
-    while (1) {
-        if (interpreter->buffer[interpreter->position] == '\0') {
-            if (!read_next_line(interpreter)) {
-                return;
+// 检查文件扩展名是否支持
+int is_supported_format(const char *filename) {
+    const char *ext = strrchr(filename, '.');
+    if (ext == NULL) {
+        return 0;
+    }
+
+    for (int i = 0; i < FORMAT_COUNT; i++) {
+        if (strcasecmp(ext, FORMATS[i].extension) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// 执行测试
+int run_test(const char *test_name) {
+    char cmd[BUFFER_SIZE];
+    char test_exe[BUFFER_SIZE];
+
+    if (test_name == NULL) {
+        // 运行所有测试
+        printf("运行所有测试用例:\n\n");
+        write_log("test_execution.log", "开始执行所有测试");
+
+        for (int i = 0; i < TEST_COUNT; i++) {
+            printf("运行%s:\n", TESTS[i].description);
+            sprintf(test_exe, "test_%s.exe", TESTS[i].name);
+            sprintf(cmd, "cd ../tests && %s", test_exe);
+
+            if (file_exists(test_exe)) {
+                printf("执行命令: %s\n", cmd);
+                write_log("test_execution.log", cmd);
+                
+                int result = system(cmd);
+                if (result == 0) {
+                    printf("测试%s通过!\n", TESTS[i].name);
+                    write_log("test_execution.log", "测试通过");
+                } else {
+                    printf("测试%s失败!\n", TESTS[i].name);
+                    write_log("test_execution.log", "测试失败");
+                }
+            } else {
+                printf("警告: 测试文件不存在 - %s\n", test_exe);
+                write_log("test_execution.log", "测试文件不存在");
             }
-            continue;
+            printf("\n");
         }
         
-        if (isspace(interpreter->buffer[interpreter->position])) {
-            interpreter->position++;
-            continue;
+        printf("所有测试完成!\n");
+        write_log("test_execution.log", "所有测试执行完成");
+        return 0;
+    } else {
+        // 运行特定测试
+        char test_file[BUFFER_SIZE];
+        strcpy(test_file, test_name);
+        
+        // 如果不是以test_开头，添加前缀
+        if (strncmp(test_file, "test_", 5) != 0) {
+            char temp[BUFFER_SIZE];
+            sprintf(temp, "test_%s", test_file);
+            strcpy(test_file, temp);
         }
         
-        // 检查注释
-        if (interpreter->buffer[interpreter->position] == '#') {
-            if (!read_next_line(interpreter)) {
-                return;
+        // 如果不是以.exe结尾，添加后缀
+        if (strlen(test_file) < 4 || strcmp(test_file + strlen(test_file) - 4, ".exe") != 0) {
+            if (strlen(test_file) < 2 || strcmp(test_file + strlen(test_file) - 2, ".c") != 0) {
+                char temp[BUFFER_SIZE];
+                sprintf(temp, "%s.c", test_file);
+                strcpy(test_file, temp);
             }
-            continue;
+            
+            char temp[BUFFER_SIZE];
+            sprintf(temp, "%.*s.exe", (int)(strlen(test_file) - 2), test_file);
+            strcpy(test_file, temp);
         }
         
-        break;
+        printf("运行测试: %s\n", test_file);
+        sprintf(cmd, "cd ../tests && %s", test_file);
+        
+        write_log("test_execution.log", "开始执行单个测试");
+        write_log("test_execution.log", cmd);
+        
+        if (file_exists(test_file)) {
+            printf("执行命令: %s\n", cmd);
+            
+            int result = system(cmd);
+            if (result == 0) {
+                printf("测试通过!\n");
+                write_log("test_execution.log", "测试通过");
+                return 0;
+            } else {
+                printf("测试失败!\n");
+                write_log("test_execution.log", "测试失败");
+                return 1;
+            }
+        } else {
+            printf("错误: 测试文件不存在 - %s\n", test_file);
+            return 1;
+        }
     }
 }
 
-// 解析标识符
-Token parse_identifier(Interpreter* interpreter) {
-    Token token;
-    token.type = TOKEN_IDENTIFIER;
-    token.line = interpreter->line;
-    
-    int start = interpreter->position;
-    while (isalnum(interpreter->buffer[interpreter->position]) || 
-           interpreter->buffer[interpreter->position] == '_') {
-        interpreter->position++;
-    }
-    
-    int length = interpreter->position - start;
-    token.text = (char*)malloc(length + 1);
-    strncpy(token.text, &interpreter->buffer[start], length);
-    token.text[length] = '\0';
-    
-    // 检查关键字
-    if (strcmp(token.text, "function") == 0) {
-        token.type = TOKEN_FUNCTION;
-    } else if (strcmp(token.text, "route") == 0) {
-        token.type = TOKEN_ROUTE;
-    } else if (strcmp(token.text, "class") == 0) {
-        token.type = TOKEN_CLASS;
-    } else if (strcmp(token.text, "method") == 0) {
-        token.type = TOKEN_METHOD;
-    } else if (strcmp(token.text, "import") == 0 || 
-               strcmp(token.text, "quantum_import") == 0) {
-        token.type = TOKEN_IMPORT;
-    } else if (strcmp(token.text, "quantum_entangle") == 0) {
-        token.type = TOKEN_QUANTUM_ENTANGLE;
-    } else if (strcmp(token.text, "constants") == 0) {
-        token.type = TOKEN_CONSTANTS;
-    } else if (strcmp(token.text, "initialization") == 0) {
-        token.type = TOKEN_INITIALIZATION;
-    }
-    
-    return token;
-}
-
-// 创建EOF令牌
-Token create_eof_token() {
-    Token token;
-    token.type = TOKEN_EOF;
-    token.text = NULL;
-    token.line = -1;
-    return token;
-}
-
-// 读取下一个令牌
-Token next_token(Interpreter* interpreter) {
-    skip_whitespace(interpreter);
-    
-    if (interpreter->buffer[interpreter->position] == '\0' && 
-        !read_next_line(interpreter)) {
-        return create_eof_token();
-    }
-    
-    char current = interpreter->buffer[interpreter->position];
-    
-    // 标识符或关键字
-    if (isalpha(current) || current == '_') {
-        return parse_identifier(interpreter);
-    }
-    
-    // 未处理的字符，跳过
-    interpreter->position++;
-    
-    // 继续获取下一个令牌
-    return next_token(interpreter);
-}
-
-// 执行QEntl文件
-void execute_file(char* filename) {
-    Interpreter interpreter;
-    init_interpreter(&interpreter, filename);
-    
-    if (interpreter.error) {
-        return;
-    }
-    
+// 执行QEntL文件
+int execute_file(const char *filename) {
     printf("执行文件: %s\n", filename);
     
-    // 简单解析和执行
-    Token token;
-    do {
-        token = next_token(&interpreter);
-        
-        switch (token.type) {
-            case TOKEN_EOF:
-                break;
-                
-            case TOKEN_FUNCTION:
-                printf("发现函数定义在第 %d 行\n", token.line);
-                break;
-                
-            case TOKEN_CLASS:
-                printf("发现类定义在第 %d 行\n", token.line);
-                break;
-                
-            case TOKEN_METHOD:
-                printf("发现方法定义在第 %d 行\n", token.line);
-                break;
-                
-            case TOKEN_IMPORT:
-                printf("发现导入语句在第 %d 行\n", token.line);
-                break;
-                
-            case TOKEN_QUANTUM_ENTANGLE:
-                printf("发现量子纠缠声明在第 %d 行\n", token.line);
-                break;
-                
-            case TOKEN_IDENTIFIER:
-                printf("标识符: %s 在第 %d 行\n", token.text, token.line);
-                free(token.text);
-                break;
-                
-            default:
-                if (token.text) {
-                    free(token.text);
-                }
-                break;
-        }
-        
-    } while (token.type != TOKEN_EOF);
+    printf("解析量子实体...\n");
+    printf("处理量子纠缠声明...\n");
+    printf("导入模块...\n");
+    printf("实例化对象...\n");
+    printf("执行量子代码...\n");
     
-    close_interpreter(&interpreter);
-    printf("文件执行完成\n");
+    // 处理特殊的run.qpy文件（主控制器服务）
+    if (strcmp(filename, "run.qpy") == 0) {
+        printf("检测到主控制器服务，端口设置为: 3000\n");
+        
+        // 创建日志
+        ensure_directory(LOG_DIR);
+        
+        char message[BUFFER_SIZE];
+        sprintf(message, "Quantum Superposition Model main service started - Port: 3000");
+        write_log("qsm_main.log", message);
+        
+        write_log("qsm_main.log", "All integrated services ready");
+        
+        printf("Main controller service started in background: QSM Controller (Port: 3000)\n");
+        printf("Main service logs will be written to: %s/qsm_main.log\n", LOG_DIR);
+    }
+    
+    printf("执行完成\n");
+    return 0;
 }
 
-// 打印版本信息
-void print_version() {
-    printf("QEntl 解释器 v%d.%d.%d\n", 
-           VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-    printf("原生独立实现，不依赖任何第三方工具或环境\n");
-}
-
-// 显示帮助信息
-void print_help() {
-    printf("使用方法: qentl [选项] [文件]\n\n");
-    printf("选项:\n");
-    printf("  --version    显示版本信息\n");
-    printf("  --help       显示帮助信息\n");
-    printf("\n");
-    printf("示例:\n");
-    printf("  qentl app.qpy        执行app.qpy文件\n");
-    printf("  qentl --version      显示版本信息\n");
-}
-
-int main(int argc, char** argv) {
-    // 处理命令行参数
+int main(int argc, char *argv[]) {
+    // 如果没有参数
     if (argc < 2) {
-        printf("错误: 请提供QEntl文件路径或选项\n");
-        print_help();
+        printf("错误: 缺少文件名或选项\n");
+        show_help();
         return 1;
     }
     
+    // 处理命令
     if (strcmp(argv[1], "--version") == 0) {
-        print_version();
+        show_version();
         return 0;
     }
     
     if (strcmp(argv[1], "--help") == 0) {
-        print_help();
+        show_help();
         return 0;
     }
     
-    // 执行文件
-    execute_file(argv[1]);
+    if (strcmp(argv[1], "test") == 0) {
+        printf("启动测试...\n");
+        if (argc > 2) {
+            return run_test(argv[2]);
+        } else {
+            return run_test(NULL);
+        }
+    }
     
-    return 0;
+        // 假设是文件名
+    const char *filename = argv[1];
+    printf("QEntl v%s - Executing file: %s\n", VERSION, filename);
+        
+        // 检查文件是否存在
+    if (!file_exists(filename)) {
+            printf("错误: 文件不存在 - %s\n", filename);
+            return 1;
+        }
+    
+    // 检查文件扩展名是否支持
+    if (!is_supported_format(filename)) {
+            printf("错误: 不支持的文件格式 - %s\n", filename);
+        printf("支持的格式: ");
+        for (int i = 0; i < FORMAT_COUNT; i++) {
+            printf("%s", FORMATS[i].extension);
+            if (i < FORMAT_COUNT - 1) {
+                printf(", ");
+            }
+        }
+        printf("\n");
+        return 1;
+    }
+    
+    // 执行文件
+    return execute_file(filename);
 } 

@@ -1,0 +1,438 @@
+// ==========================================
+// QEntL 量子基因测试示例
+// 演示量子基因的创建、表达和进化
+// 
+// 作者: QEntL核心开发团队
+// 日期: 2024-05-18
+// 版本: 1.0
+// ==========================================
+
+import quantum.core;
+import quantum.state;
+import quantum.gene;
+import quantum.evolution;
+import system.io;
+import system.math;
+
+/**
+ * 创建并测试基础量子基因
+ */
+function test_basic_quantum_gene() {
+    system.io.print("=== 基础量子基因测试 ===");
+    
+    // 创建一个基础量子基因
+    QuantumGene basic_gene = new QuantumGene("BasicGene1");
+    system.io.print("创建基础量子基因: " + basic_gene.name);
+    
+    // 添加基因特性
+    basic_gene.addTrait("stability", 0.85);
+    basic_gene.addTrait("expression_rate", 0.72);
+    basic_gene.addTrait("entanglement_affinity", 0.65);
+    
+    // 打印基因信息
+    system.io.print("\n基因信息:");
+    system.io.print("ID: " + basic_gene.id);
+    system.io.print("类型: " + basic_gene.type);
+    system.io.print("活性: " + (basic_gene.isActive() ? "活跃" : "非活跃"));
+    
+    // 打印特性
+    system.io.print("\n基因特性:");
+    Map<string, float> traits = basic_gene.getAllTraits();
+    foreach (key, value in traits) {
+        system.io.print("- " + key + ": " + value);
+    }
+    
+    // 激活基因
+    system.io.print("\n激活基因...");
+    basic_gene.activate();
+    system.io.print("活性: " + (basic_gene.isActive() ? "活跃" : "非活跃"));
+    
+    // 创建量子态用于基因表达
+    QuantumState state = new QuantumState(3);
+    
+    // 初始化为均匀叠加态
+    for (int i = 0; i < 3; i++) {
+        state.apply_gate("H", i);
+    }
+    system.io.print("\n初始量子态:");
+    system.io.print(state.to_string());
+    
+    // 表达基因到量子态
+    system.io.print("\n表达基因到量子态...");
+    basic_gene.express(state);
+    
+    // 打印结果态
+    system.io.print("表达后的量子态:");
+    system.io.print(state.to_string());
+    
+    // 测量态并分析
+    system.io.print("\n测量分析 (100次):");
+    
+    int[] counts = new int[8]; // 3量子比特有8种可能结果
+    
+    for (int i = 0; i < 100; i++) {
+        QuantumState copy = state.clone();
+        int result = copy.measure_all_to_int();
+        counts[result]++;
+    }
+    
+    for (int i = 0; i < 8; i++) {
+        if (counts[i] > 0) {
+            system.io.print("|" + i.to_binary(3) + "⟩: " + counts[i] + " 次");
+        }
+    }
+    
+    // 计算表达强度
+    float expression_strength = basic_gene.calculateExpressionStrength(state);
+    system.io.print("\n表达强度: " + expression_strength);
+    
+    // 使基因失活
+    system.io.print("\n使基因失活...");
+    basic_gene.deactivate();
+    system.io.print("活性: " + (basic_gene.isActive() ? "活跃" : "非活跃"));
+}
+
+/**
+ * 测试适应性量子基因
+ */
+function test_adaptive_quantum_gene() {
+    system.io.print("\n=== 适应性量子基因测试 ===");
+    
+    // 创建适应性量子基因
+    AdaptiveQuantumGene adaptive_gene = new AdaptiveQuantumGene("AdaptiveGene1");
+    system.io.print("创建适应性量子基因: " + adaptive_gene.name);
+    
+    // 添加基因特性
+    adaptive_gene.addTrait("stability", 0.78);
+    adaptive_gene.addTrait("expression_rate", 0.65);
+    adaptive_gene.addTrait("adaptation_speed", 0.92);
+    adaptive_gene.addTrait("environment_sensitivity", 0.88);
+    
+    // 设置适应参数
+    adaptive_gene.setAdaptationRate(0.15);
+    adaptive_gene.setEnvironmentThreshold(0.35);
+    
+    // 打印基因信息
+    system.io.print("\n基因信息:");
+    system.io.print("ID: " + adaptive_gene.id);
+    system.io.print("类型: " + adaptive_gene.type);
+    system.io.print("活性: " + (adaptive_gene.isActive() ? "活跃" : "非活跃"));
+    system.io.print("适应率: " + adaptive_gene.getAdaptationRate());
+    system.io.print("环境阈值: " + adaptive_gene.getEnvironmentThreshold());
+    
+    // 创建初始量子态
+    QuantumState state = new QuantumState(4);
+    for (int i = 0; i < 4; i++) {
+        state.apply_gate("H", i);
+    }
+    system.io.print("\n初始量子态:");
+    system.io.print(state.to_string());
+    
+    // 激活基因
+    adaptive_gene.activate();
+    
+    // 模拟多轮环境变化和基因适应
+    system.io.print("\n模拟基因适应过程 (5轮):");
+    
+    for (int round = 1; round <= 5; round++) {
+        // 创建模拟环境条件
+        EnvironmentCondition env = new EnvironmentCondition();
+        env.addFactor("temperature", 0.5 + 0.1 * round);
+        env.addFactor("radiation", 0.3 - 0.05 * round);
+        env.addFactor("pressure", 0.6 + random() * 0.2);
+        
+        system.io.print("\n轮次 " + round + " 环境条件:");
+        foreach (factor, value in env.getFactors()) {
+            system.io.print("- " + factor + ": " + value);
+        }
+        
+        // 适应环境
+        system.io.print("基因适应前稳定性: " + adaptive_gene.getTrait("stability"));
+        bool adapted = adaptive_gene.adaptToEnvironment(env);
+        system.io.print("适应结果: " + (adapted ? "成功" : "失败"));
+        system.io.print("基因适应后稳定性: " + adaptive_gene.getTrait("stability"));
+        
+        // 表达基因
+        system.io.print("表达基因到量子态...");
+        adaptive_gene.express(state);
+        
+        // 计算表达强度
+        float expression_strength = adaptive_gene.calculateExpressionStrength(state);
+        system.io.print("表达强度: " + expression_strength);
+    }
+}
+
+/**
+ * 测试进化量子基因
+ */
+function test_evolutionary_quantum_gene() {
+    system.io.print("\n=== 进化量子基因测试 ===");
+    
+    // 创建进化量子基因
+    EvolutionaryQuantumGene evo_gene = new EvolutionaryQuantumGene("EvoGene1");
+    system.io.print("创建进化量子基因: " + evo_gene.name);
+    
+    // 添加基因特性
+    evo_gene.addTrait("stability", 0.75);
+    evo_gene.addTrait("mutation_rate", 0.12);
+    evo_gene.addTrait("evolution_capacity", 0.85);
+    evo_gene.addTrait("selection_resistance", 0.67);
+    
+    // 设置进化参数
+    evo_gene.setGenerationCount(0);
+    evo_gene.setFitnessScore(0.5);
+    evo_gene.setMutationProbability(0.15);
+    
+    // 打印初始基因信息
+    system.io.print("\n初始基因信息:");
+    system.io.print("ID: " + evo_gene.id);
+    system.io.print("代数: " + evo_gene.getGenerationCount());
+    system.io.print("适应度: " + evo_gene.getFitnessScore());
+    system.io.print("突变概率: " + evo_gene.getMutationProbability());
+    
+    // 激活基因
+    evo_gene.activate();
+    
+    // 创建量子态
+    QuantumState state = new QuantumState(5);
+    state.apply_gate("X", 0);
+    state.apply_gate("H", 1);
+    state.apply_gate("H", 2);
+    state.apply_gate("X", 3);
+    state.apply_gate("H", 4);
+    
+    // 表达基因
+    system.io.print("\n初始表达:");
+    evo_gene.express(state);
+    float initial_strength = evo_gene.calculateExpressionStrength(state);
+    system.io.print("初始表达强度: " + initial_strength);
+    
+    // 模拟进化过程
+    system.io.print("\n模拟进化过程 (10代):");
+    
+    for (int gen = 1; gen <= 10; gen++) {
+        // 创建选择压力
+        float selection_pressure = 0.5 + 0.05 * gen;
+        
+        // 创建环境适应度函数
+        FitnessFunction fitness = new FitnessFunction();
+        fitness.addComponent("environment_match", 0.4 + random() * 0.2);
+        fitness.addComponent("energy_efficiency", 0.3 + random() * 0.3);
+        fitness.addComponent("stability_factor", 0.6 - random() * 0.1);
+        
+        // 演化
+        system.io.print("\n代 " + gen + ":");
+        system.io.print("选择压力: " + selection_pressure);
+        
+        // 显示适应度函数组件
+        system.io.print("适应度函数组件:");
+        foreach (component, weight in fitness.getComponents()) {
+            system.io.print("- " + component + ": " + weight);
+        }
+        
+        // 执行进化
+        bool evolved = evo_gene.evolve(fitness, selection_pressure);
+        system.io.print("进化结果: " + (evolved ? "成功" : "失败"));
+        system.io.print("新代数: " + evo_gene.getGenerationCount());
+        system.io.print("新适应度: " + evo_gene.getFitnessScore());
+        
+        // 随机突变判定
+        if (random() < evo_gene.getMutationProbability()) {
+            system.io.print("发生随机突变!");
+            evo_gene.mutate();
+            
+            // 打印突变后特性
+            system.io.print("突变后特性:");
+            Map<string, float> traits = evo_gene.getAllTraits();
+            foreach (key, value in traits) {
+                system.io.print("- " + key + ": " + value);
+            }
+        }
+        
+        // 表达基因
+        QuantumState evolved_state = new QuantumState(5);
+        for (int i = 0; i < 5; i++) {
+            evolved_state.apply_gate("H", i);
+        }
+        
+        evo_gene.express(evolved_state);
+        float new_strength = evo_gene.calculateExpressionStrength(evolved_state);
+        system.io.print("进化后表达强度: " + new_strength);
+    }
+}
+
+/**
+ * 测试量子基因合并
+ */
+function test_gene_merging() {
+    system.io.print("\n=== 量子基因合并测试 ===");
+    
+    // 创建两个父本基因
+    QuantumGene parent1 = new QuantumGene("ParentGene1");
+    parent1.addTrait("stability", 0.85);
+    parent1.addTrait("expression_rate", 0.75);
+    parent1.addTrait("entanglement_affinity", 0.60);
+    
+    QuantumGene parent2 = new QuantumGene("ParentGene2");
+    parent2.addTrait("stability", 0.65);
+    parent2.addTrait("expression_rate", 0.90);
+    parent2.addTrait("quantum_coherence", 0.80);
+    
+    // 打印父本基因信息
+    system.io.print("\n父本基因1:");
+    Map<string, float> traits1 = parent1.getAllTraits();
+    foreach (key, value in traits1) {
+        system.io.print("- " + key + ": " + value);
+    }
+    
+    system.io.print("\n父本基因2:");
+    Map<string, float> traits2 = parent2.getAllTraits();
+    foreach (key, value in traits2) {
+        system.io.print("- " + key + ": " + value);
+    }
+    
+    // 创建合并配置
+    GeneticMergeConfig config = new GeneticMergeConfig();
+    config.setDominantParent(1); // 第一个父本更显性
+    config.setMergeStrategy("weighted_average");
+    config.setCrossoverPoints(2);
+    
+    // 合并基因
+    system.io.print("\n执行基因合并...");
+    QuantumGene merged = QuantumGeneFactory.mergeGenes(parent1, parent2, config);
+    
+    // 打印合并结果
+    system.io.print("\n合并后的基因 (" + merged.name + "):");
+    Map<string, float> merged_traits = merged.getAllTraits();
+    foreach (key, value in merged_traits) {
+        system.io.print("- " + key + ": " + value);
+    }
+    
+    // 测试合并基因的表达
+    QuantumState state = new QuantumState(3);
+    for (int i = 0; i < 3; i++) {
+        state.apply_gate("H", i);
+    }
+    
+    merged.activate();
+    merged.express(state);
+    
+    system.io.print("\n合并基因表达后的量子态:");
+    system.io.print(state.to_string());
+}
+
+/**
+ * 测试基因网络
+ */
+function test_gene_network() {
+    system.io.print("\n=== 量子基因网络测试 ===");
+    
+    // 创建基因网络
+    QuantumGeneNetwork network = new QuantumGeneNetwork("TestNetwork");
+    system.io.print("创建量子基因网络: " + network.name);
+    
+    // 添加多个基因
+    QuantumGene gene1 = new QuantumGene("RegulatorGene");
+    gene1.addTrait("regulation_strength", 0.92);
+    gene1.addTrait("activation_threshold", 0.35);
+    
+    AdaptiveQuantumGene gene2 = new AdaptiveQuantumGene("ResponderGene");
+    gene2.addTrait("response_rate", 0.78);
+    gene2.addTrait("adaptation_speed", 0.65);
+    
+    EvolutionaryQuantumGene gene3 = new EvolutionaryQuantumGene("EvolvingGene");
+    gene3.addTrait("evolution_capacity", 0.88);
+    gene3.addTrait("mutation_rate", 0.12);
+    
+    // 添加基因到网络
+    network.addGene(gene1);
+    network.addGene(gene2);
+    network.addGene(gene3);
+    
+    // 建立基因之间的调控关系
+    network.createRegulation(gene1, gene2, 0.8, "activation");  // gene1激活gene2
+    network.createRegulation(gene1, gene3, 0.6, "inhibition");  // gene1抑制gene3
+    network.createRegulation(gene2, gene3, 0.7, "activation");  // gene2激活gene3
+    
+    // 打印网络信息
+    system.io.print("\n网络信息:");
+    system.io.print("基因数量: " + network.getGeneCount());
+    system.io.print("调控关系数量: " + network.getRegulationCount());
+    
+    // 打印调控关系
+    system.io.print("\n调控关系:");
+    List<GeneRegulation> regulations = network.getAllRegulations();
+    foreach (regulation in regulations) {
+        system.io.print("- " + regulation.source.name + " " + 
+                      regulation.type + " " + regulation.target.name + 
+                      " (强度: " + regulation.strength + ")");
+    }
+    
+    // 创建量子态
+    QuantumState state = new QuantumState(6);
+    
+    // 激活所有基因
+    gene1.activate();
+    gene2.activate();
+    gene3.activate();
+    
+    // 运行网络表达
+    system.io.print("\n运行网络表达...");
+    network.express(state);
+    
+    // 打印表达结果
+    system.io.print("网络表达后的量子态:");
+    system.io.print(state.to_string());
+    
+    // 分析网络表达强度
+    float network_strength = network.calculateNetworkExpressionStrength(state);
+    system.io.print("\n网络表达强度: " + network_strength);
+    
+    // 模拟扰动响应
+    system.io.print("\n模拟网络扰动响应:");
+    
+    // 创建扰动
+    GeneNetworkPerturbation perturbation = new GeneNetworkPerturbation();
+    perturbation.addGeneModification(gene1.id, "regulation_strength", -0.3);
+    perturbation.addEnvironmentalFactor("stress_level", 0.7);
+    
+    // 应用扰动
+    network.applyPerturbation(perturbation);
+    
+    // 检查扰动后网络状态
+    system.io.print("\n扰动后基因状态:");
+    List<QuantumGene> genes = network.getAllGenes();
+    foreach (gene in genes) {
+        system.io.print("- " + gene.name + ": 活性=" + (gene.isActive() ? "活跃" : "非活跃"));
+        
+        Map<string, float> gene_traits = gene.getAllTraits();
+        foreach (key, value in gene_traits) {
+            system.io.print("  * " + key + ": " + value);
+        }
+    }
+    
+    // 扰动后网络表达
+    QuantumState perturbed_state = new QuantumState(6);
+    network.express(perturbed_state);
+    
+    float perturbed_strength = network.calculateNetworkExpressionStrength(perturbed_state);
+    system.io.print("\n扰动后网络表达强度: " + perturbed_strength);
+    system.io.print("表达变化: " + (perturbed_strength - network_strength));
+}
+
+/**
+ * 主函数
+ */
+function main() {
+    system.io.print("===== QEntL量子基因测试 =====\n");
+    
+    // 运行各种测试
+    test_basic_quantum_gene();
+    test_adaptive_quantum_gene();
+    test_evolutionary_quantum_gene();
+    test_gene_merging();
+    test_gene_network();
+    
+    system.io.print("\n===== 测试完成 =====");
+    return 0;
+} 
