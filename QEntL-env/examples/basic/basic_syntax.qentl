@@ -1,0 +1,230 @@
+// ==========================================
+// QEntL 基础语法示例
+// 演示QEntL语言的基本语法和结构
+// 
+// 作者: QEntL核心开发团队
+// 日期: 2024-05-18
+// 版本: 1.0
+// ==========================================
+
+// 引入必要的库
+import quantum.core;
+import quantum.state;
+import quantum.entanglement;
+import system.io;
+
+// 定义量子状态
+QuantumState main_state = new QuantumState(4);  // 创建4量子比特的状态
+
+// 基本函数定义
+function initialize_state() {
+    // 将所有量子比特初始化为|0⟩状态
+    main_state.reset();
+    
+    // 在第0个量子比特上应用Hadamard门
+    main_state.apply_gate("H", 0);
+    
+    // 在第1和第2个量子比特之间创建纠缠态(Bell态)
+    main_state.apply_gate("H", 1);
+    main_state.apply_gate("CNOT", 1, 2);
+    
+    // 输出当前状态
+    system.io.print("初始化状态完成:");
+    system.io.print(main_state.to_string());
+}
+
+// 变量声明和基本数据类型
+function demonstrate_variables() {
+    // 整数
+    int count = 10;
+    
+    // 浮点数
+    float probability = 0.5;
+    
+    // 布尔值
+    bool is_entangled = true;
+    
+    // 字符串
+    string description = "量子纠缠演示";
+    
+    // 复数 (用于量子态表示)
+    complex amplitude = 0.7071 + 0.7071i;
+    
+    // 数组
+    int[] qubits = [0, 1, 2, 3];
+    
+    // 字典
+    map<string, float> gate_times = {
+        "H": 10.5,
+        "X": 8.2,
+        "CNOT": 25.7
+    };
+    
+    // 输出变量值
+    system.io.print("变量演示:");
+    system.io.print("count = " + count);
+    system.io.print("probability = " + probability);
+    system.io.print("is_entangled = " + is_entangled);
+    system.io.print("description = " + description);
+    system.io.print("amplitude = " + amplitude);
+    
+    // 数组遍历
+    system.io.print("量子比特列表:");
+    for (int i = 0; i < qubits.length; i++) {
+        system.io.print("  qubit[" + i + "] = " + qubits[i]);
+    }
+    
+    // 字典遍历
+    system.io.print("门操作时间:");
+    foreach (key, value in gate_times) {
+        system.io.print("  " + key + " 门: " + value + " ns");
+    }
+}
+
+// 条件语句
+function demonstrate_conditionals(float measurement_result) {
+    if (measurement_result > 0.7) {
+        system.io.print("测量结果很强!");
+    } else if (measurement_result > 0.3) {
+        system.io.print("测量结果中等");
+    } else {
+        system.io.print("测量结果很弱");
+    }
+    
+    // 三元运算符
+    string state_description = (measurement_result > 0.5) ? "接近|1⟩" : "接近|0⟩";
+    system.io.print("状态描述: " + state_description);
+    
+    // switch语句
+    int result_category = (int)(measurement_result * 10);
+    switch (result_category) {
+        case 0:
+        case 1:
+            system.io.print("类别: 非常低");
+            break;
+        case 2:
+        case 3:
+        case 4:
+            system.io.print("类别: 低");
+            break;
+        case 5:
+        case 6:
+        case 7:
+            system.io.print("类别: 中");
+            break;
+        default:
+            system.io.print("类别: 高");
+            break;
+    }
+}
+
+// 循环语句
+function demonstrate_loops() {
+    system.io.print("循环演示:");
+    
+    // for循环
+    system.io.print("For循环:");
+    for (int i = 0; i < 5; i++) {
+        system.io.print("  迭代 " + i);
+    }
+    
+    // while循环
+    system.io.print("While循环:");
+    int j = 0;
+    while (j < 3) {
+        system.io.print("  迭代 " + j);
+        j++;
+    }
+    
+    // do-while循环
+    system.io.print("Do-While循环:");
+    int k = 0;
+    do {
+        system.io.print("  迭代 " + k);
+        k++;
+    } while (k < 3);
+    
+    // foreach循环(用于集合)
+    string[] gates = ["H", "X", "Y", "Z", "CNOT"];
+    system.io.print("Foreach循环:");
+    foreach (gate in gates) {
+        system.io.print("  门: " + gate);
+    }
+}
+
+// 量子操作示例
+function quantum_operations() {
+    system.io.print("量子操作演示:");
+    
+    // 重置状态
+    main_state.reset();
+    
+    // 单量子比特门操作
+    main_state.apply_gate("H", 0);    // Hadamard门
+    main_state.apply_gate("X", 1);    // Pauli-X门 (NOT门)
+    main_state.apply_gate("Y", 2);    // Pauli-Y门
+    main_state.apply_gate("Z", 3);    // Pauli-Z门
+    
+    // 显示状态
+    system.io.print("应用单比特门后:");
+    system.io.print(main_state.to_string());
+    
+    // 两量子比特门操作
+    main_state.apply_gate("CNOT", 0, 1);  // 受控非门
+    main_state.apply_gate("CZ", 2, 3);    // 受控Z门
+    
+    // 显示状态
+    system.io.print("应用两比特门后:");
+    system.io.print(main_state.to_string());
+    
+    // 测量操作
+    bool result0 = main_state.measure(0);
+    bool result1 = main_state.measure(1);
+    
+    system.io.print("测量结果:");
+    system.io.print("  量子比特0: " + (result0 ? "|1⟩" : "|0⟩"));
+    system.io.print("  量子比特1: " + (result1 ? "|1⟩" : "|0⟩"));
+    
+    // 测量后状态
+    system.io.print("测量后状态:");
+    system.io.print(main_state.to_string());
+}
+
+// 错误处理
+function error_handling() {
+    system.io.print("错误处理演示:");
+    
+    try {
+        // 尝试应用不存在的门
+        main_state.apply_gate("INVALID_GATE", 0);
+    } catch (GateNotFoundException e) {
+        system.io.print("捕获到门未找到异常: " + e.message);
+    }
+    
+    try {
+        // 尝试访问不存在的量子比特
+        main_state.apply_gate("H", 10);  // 超出范围
+    } catch (QubitOutOfRangeException e) {
+        system.io.print("捕获到量子比特越界异常: " + e.message);
+    } catch (Exception e) {
+        system.io.print("捕获到通用异常: " + e.message);
+    } finally {
+        system.io.print("无论是否有异常，finally块都会执行");
+    }
+}
+
+// 主函数
+function main() {
+    system.io.print("===== QEntL基础语法示例 =====");
+    
+    // 调用各演示函数
+    initialize_state();
+    demonstrate_variables();
+    demonstrate_conditionals(0.75);
+    demonstrate_loops();
+    quantum_operations();
+    error_handling();
+    
+    system.io.print("===== 示例完成 =====");
+    return 0;
+} 

@@ -1,0 +1,261 @@
+// ==========================================
+// QEntL 量子状态测试示例
+// 演示量子状态的创建、操作和测量
+// 
+// 作者: QEntL核心开发团队
+// 日期: 2024-05-18
+// 版本: 1.0
+// ==========================================
+
+import quantum.core;
+import quantum.state;
+import system.io;
+import system.math;
+
+/**
+ * 单量子比特状态测试
+ * 展示单量子比特状态的基本操作和测量统计
+ */
+function test_single_qubit() {
+    system.io.print("=== 单量子比特状态测试 ===");
+    
+    // 创建一个单量子比特的量子状态
+    QuantumState qubit = new QuantumState(1);
+    
+    // 初始状态 |0⟩
+    system.io.print("初始状态: |0⟩");
+    system.io.print(qubit.to_string());
+    system.io.print("概率分布: |0⟩:" + qubit.probability(0) + ", |1⟩:" + qubit.probability(1));
+    
+    // 应用H门 - 创建均匀叠加态 (|0⟩ + |1⟩)/√2
+    qubit.apply_gate("H", 0);
+    system.io.print("\n应用H门后:");
+    system.io.print(qubit.to_string());
+    system.io.print("概率分布: |0⟩:" + qubit.probability(0) + ", |1⟩:" + qubit.probability(1));
+    
+    // 应用X门 - 将状态翻转为 (|0⟩ - |1⟩)/√2
+    qubit.apply_gate("X", 0);
+    system.io.print("\n应用X门后:");
+    system.io.print(qubit.to_string());
+    system.io.print("概率分布: |0⟩:" + qubit.probability(0) + ", |1⟩:" + qubit.probability(1));
+    
+    // 应用Z门 - 将|1⟩分量的相位翻转，变为 (|0⟩ + |1⟩)/√2
+    qubit.apply_gate("Z", 0);
+    system.io.print("\n应用Z门后:");
+    system.io.print(qubit.to_string());
+    system.io.print("概率分布: |0⟩:" + qubit.probability(0) + ", |1⟩:" + qubit.probability(1));
+    
+    // 应用旋转门
+    float theta = system.math.PI / 4;  // 45度
+    qubit.apply_rotation("RX", 0, theta);
+    system.io.print("\n应用RX(π/4)门后:");
+    system.io.print(qubit.to_string());
+    system.io.print("概率分布: |0⟩:" + qubit.probability(0) + ", |1⟩:" + qubit.probability(1));
+    
+    // 多次测量统计
+    system.io.print("\n进行1000次测量统计:");
+    int zeros = 0;
+    int ones = 0;
+    
+    for (int i = 0; i < 1000; i++) {
+        // 复制当前状态(因为测量会改变状态)
+        QuantumState copy = qubit.clone();
+        bool result = copy.measure(0);
+        if (result) {
+            ones++;
+        } else {
+            zeros++;
+        }
+    }
+    
+    system.io.print("|0⟩测量结果: " + zeros + " 次 (" + (zeros / 10.0) + "%)");
+    system.io.print("|1⟩测量结果: " + ones + " 次 (" + (ones / 10.0) + "%)");
+    
+    // 单次测量与状态坍缩
+    system.io.print("\n演示单次测量与状态坍缩:");
+    system.io.print("测量前状态:");
+    system.io.print(qubit.to_string());
+    
+    bool measurement = qubit.measure(0);
+    
+    system.io.print("测量结果: " + (measurement ? "|1⟩" : "|0⟩"));
+    system.io.print("测量后状态:");
+    system.io.print(qubit.to_string());
+    system.io.print("概率分布: |0⟩:" + qubit.probability(0) + ", |1⟩:" + qubit.probability(1));
+}
+
+/**
+ * 双量子比特状态测试
+ * 展示Bell状态的创建和纠缠特性
+ */
+function test_bell_state() {
+    system.io.print("\n=== Bell态(纠缠态)测试 ===");
+    
+    // 创建双量子比特状态
+    QuantumState bell = new QuantumState(2);
+    
+    // 创建Bell态 (|00⟩ + |11⟩)/√2
+    system.io.print("创建Bell态 (|00⟩ + |11⟩)/√2:");
+    bell.apply_gate("H", 0);      // 将第一个比特置于叠加态
+    bell.apply_gate("CNOT", 0, 1); // 纠缠两个比特
+    
+    system.io.print(bell.to_string());
+    
+    // 检查概率分布 - 应该只有|00⟩和|11⟩有概率
+    system.io.print("\n检查概率分布:");
+    system.io.print("|00⟩概率: " + bell.probability(0, 0));
+    system.io.print("|01⟩概率: " + bell.probability(0, 1));
+    system.io.print("|10⟩概率: " + bell.probability(1, 0));
+    system.io.print("|11⟩概率: " + bell.probability(1, 1));
+    
+    // 验证纠缠特性：多次测量，验证两个比特总是相同结果
+    system.io.print("\n进行100次纠缠特性验证测量:");
+    int same_result = 0;
+    int diff_result = 0;
+    
+    for (int i = 0; i < 100; i++) {
+        QuantumState copy = bell.clone();
+        bool result0 = copy.measure(0);
+        bool result1 = copy.measure(1);
+        
+        if (result0 == result1) {
+            same_result++;
+        } else {
+            diff_result++;
+        }
+    }
+    
+    system.io.print("两个比特结果相同: " + same_result + " 次");
+    system.io.print("两个比特结果不同: " + diff_result + " 次");
+    
+    // 测量一个比特会影响另一个
+    system.io.print("\n演示测量一个比特影响另一个比特:");
+    QuantumState bell2 = new QuantumState(2);
+    bell2.apply_gate("H", 0);
+    bell2.apply_gate("CNOT", 0, 1);
+    
+    system.io.print("测量前Bell态:");
+    system.io.print(bell2.to_string());
+    
+    // 测量第一个比特
+    bool result0 = bell2.measure(0);
+    system.io.print("第一个比特测量结果: " + (result0 ? "|1⟩" : "|0⟩"));
+    system.io.print("测量后状态:");
+    system.io.print(bell2.to_string());
+    
+    // 测量第二个比特
+    bool result1 = bell2.measure(1);
+    system.io.print("第二个比特测量结果: " + (result1 ? "|1⟩" : "|0⟩"));
+    system.io.print("两个比特是否相同: " + (result0 == result1 ? "是" : "否"));
+}
+
+/**
+ * 三量子比特GHZ态测试
+ * 展示多量子比特纠缠态
+ */
+function test_ghz_state() {
+    system.io.print("\n=== GHZ态测试 ===");
+    
+    // 创建三量子比特状态
+    QuantumState ghz = new QuantumState(3);
+    
+    // 创建GHZ态 (|000⟩ + |111⟩)/√2
+    system.io.print("创建GHZ态 (|000⟩ + |111⟩)/√2:");
+    ghz.apply_gate("H", 0);       // 第一个比特叠加
+    ghz.apply_gate("CNOT", 0, 1); // 纠缠第一、二比特
+    ghz.apply_gate("CNOT", 0, 2); // 纠缠第一、三比特
+    
+    system.io.print(ghz.to_string());
+    
+    // 检查概率分布 - 应该只有|000⟩和|111⟩有概率
+    system.io.print("\n检查概率分布:");
+    system.io.print("|000⟩概率: " + ghz.probability(0, 0, 0));
+    system.io.print("|001⟩概率: " + ghz.probability(0, 0, 1));
+    system.io.print("|010⟩概率: " + ghz.probability(0, 1, 0));
+    system.io.print("|011⟩概率: " + ghz.probability(0, 1, 1));
+    system.io.print("|100⟩概率: " + ghz.probability(1, 0, 0));
+    system.io.print("|101⟩概率: " + ghz.probability(1, 0, 1));
+    system.io.print("|110⟩概率: " + ghz.probability(1, 1, 0));
+    system.io.print("|111⟩概率: " + ghz.probability(1, 1, 1));
+    
+    // GHZ态特性：测量一个比特后，其他比特会坍缩到相同状态
+    system.io.print("\n演示GHZ态特性:");
+    QuantumState ghz2 = ghz.clone();
+    
+    bool m0 = ghz2.measure(0);
+    system.io.print("第一个比特测量结果: " + (m0 ? "|1⟩" : "|0⟩"));
+    system.io.print("测量后状态:");
+    system.io.print(ghz2.to_string());
+    
+    bool m1 = ghz2.measure(1);
+    bool m2 = ghz2.measure(2);
+    
+    system.io.print("第二个比特测量结果: " + (m1 ? "|1⟩" : "|0⟩"));
+    system.io.print("第三个比特测量结果: " + (m2 ? "|1⟩" : "|0⟩"));
+    system.io.print("三个比特是否全部相同: " + ((m0 == m1 && m1 == m2) ? "是" : "否"));
+}
+
+/**
+ * 量子傅里叶变换测试
+ */
+function test_quantum_fourier_transform() {
+    system.io.print("\n=== 量子傅里叶变换(QFT)测试 ===");
+    
+    // 创建4量子比特状态
+    QuantumState qft_state = new QuantumState(4);
+    
+    // 初始化为|0001⟩状态（二进制表示数字1）
+    qft_state.apply_gate("X", 3);
+    system.io.print("初始状态 |0001⟩:");
+    system.io.print(qft_state.to_string());
+    
+    // 应用4量子比特QFT
+    system.io.print("\n应用QFT:");
+    
+    // QFT实现
+    // 第一步: 对所有比特应用H门
+    for (int i = 0; i < 4; i++) {
+        qft_state.apply_gate("H", i);
+    }
+    
+    // 第二步: 应用受控旋转门
+    float factor = 1.0;
+    for (int i = 0; i < 4; i++) {
+        for (int j = i + 1; j < 4; j++) {
+            float angle = system.math.PI / (1 << (j - i));
+            qft_state.apply_controlled_rotation("RZ", i, j, angle);
+        }
+    }
+    
+    // 第三步: 交换比特顺序
+    qft_state.swap_qubits(0, 3);
+    qft_state.swap_qubits(1, 2);
+    
+    system.io.print("QFT后状态:");
+    system.io.print(qft_state.to_string());
+    
+    // 显示QFT后的概率分布
+    system.io.print("\nQFT后概率分布:");
+    for (int i = 0; i < 16; i++) {
+        float prob = qft_state.probability_of_state(i);
+        if (prob > 0.01) {
+            system.io.print("|" + i.to_binary(4) + "⟩: " + prob);
+        }
+    }
+}
+
+/**
+ * 主函数
+ */
+function main() {
+    system.io.print("===== QEntL量子状态测试 =====\n");
+    
+    // 运行测试
+    test_single_qubit();
+    test_bell_state();
+    test_ghz_state();
+    test_quantum_fourier_transform();
+    
+    system.io.print("\n===== 测试完成 =====");
+    return 0;
+} 

@@ -1,0 +1,409 @@
+// ==========================================
+// QEntL 量子纠缠测试示例
+// 演示量子纠缠的创建、操作和性质
+// 
+// 作者: QEntL核心开发团队
+// 日期: 2024-05-18
+// 版本: 1.0
+// ==========================================
+
+import quantum.core;
+import quantum.state;
+import quantum.entanglement;
+import system.io;
+import system.math;
+
+/**
+ * 创建Bell态（最基本的双量子比特纠缠态）
+ * @param type Bell态类型(0-3)
+ * @return 创建的Bell态
+ */
+function create_bell_state(int type) {
+    system.io.print("=== 创建Bell态 ===");
+    
+    // 创建双量子比特状态
+    QuantumState bell = new QuantumState(2);
+    
+    // 应用Hadamard门到第一个量子比特
+    bell.apply_gate("H", 0);
+    
+    // 应用CNOT门纠缠两个量子比特
+    bell.apply_gate("CNOT", 0, 1);
+    
+    // 根据类型应用额外的门操作调整为特定的Bell态
+    switch (type) {
+        case 0: // |β00⟩ = (|00⟩ + |11⟩)/√2
+            system.io.print("创建β00态: (|00⟩ + |11⟩)/√2");
+            break;
+        case 1: // |β01⟩ = (|00⟩ - |11⟩)/√2
+            system.io.print("创建β01态: (|00⟩ - |11⟩)/√2");
+            bell.apply_gate("Z", 0);
+            break;
+        case 2: // |β10⟩ = (|01⟩ + |10⟩)/√2
+            system.io.print("创建β10态: (|01⟩ + |10⟩)/√2");
+            bell.apply_gate("X", 1);
+            break;
+        case 3: // |β11⟩ = (|01⟩ - |10⟩)/√2
+            system.io.print("创建β11态: (|01⟩ - |10⟩)/√2");
+            bell.apply_gate("X", 1);
+            bell.apply_gate("Z", 0);
+            break;
+    }
+    
+    // 打印状态
+    system.io.print("状态向量:");
+    system.io.print(bell.to_string());
+    
+    // 打印概率分布
+    system.io.print("\n概率分布:");
+    system.io.print("|00⟩: " + bell.probability(0, 0));
+    system.io.print("|01⟩: " + bell.probability(0, 1));
+    system.io.print("|10⟩: " + bell.probability(1, 0));
+    system.io.print("|11⟩: " + bell.probability(1, 1));
+    
+    return bell;
+}
+
+/**
+ * 测试Bell态的纠缠性质
+ * @param bell_type Bell态类型(0-3)
+ */
+function test_bell_entanglement(int bell_type) {
+    system.io.print("\n=== 测试Bell态的纠缠性质 ===");
+    system.io.print("Bell态类型: " + bell_type);
+    
+    // 创建Bell态
+    QuantumState bell = create_bell_state(bell_type);
+    
+    // 进行1000次测量统计
+    system.io.print("\n进行1000次测量统计:");
+    
+    int count_00 = 0;
+    int count_01 = 0;
+    int count_10 = 0;
+    int count_11 = 0;
+    
+    for (int i = 0; i < 1000; i++) {
+        // 创建副本以避免状态坍缩影响后续测量
+        QuantumState copy = bell.clone();
+        
+        // 测量两个量子比特
+        bool result0 = copy.measure(0);
+        bool result1 = copy.measure(1);
+        
+        // 统计结果
+        if (!result0 && !result1) count_00++;
+        else if (!result0 && result1) count_01++;
+        else if (result0 && !result1) count_10++;
+        else count_11++;
+    }
+    
+    // 打印测量结果
+    system.io.print("测量结果统计:");
+    system.io.print("|00⟩: " + count_00 + " 次 (" + (count_00 / 10.0) + "%)");
+    system.io.print("|01⟩: " + count_01 + " 次 (" + (count_01 / 10.0) + "%)");
+    system.io.print("|10⟩: " + count_10 + " 次 (" + (count_10 / 10.0) + "%)");
+    system.io.print("|11⟩: " + count_11 + " 次 (" + (count_11 / 10.0) + "%)");
+    
+    // 分析结果
+    bool has_perfect_correlation = false;
+    
+    switch (bell_type) {
+        case 0: // |β00⟩: 00和11应该有相等概率出现
+            has_perfect_correlation = (count_01 + count_10 < 50); // 允许少量误差
+            break;
+        case 1: // |β01⟩: 00和11应该有相等概率出现
+            has_perfect_correlation = (count_01 + count_10 < 50);
+            break;
+        case 2: // |β10⟩: 01和10应该有相等概率出现
+            has_perfect_correlation = (count_00 + count_11 < 50);
+            break;
+        case 3: // |β11⟩: 01和10应该有相等概率出现
+            has_perfect_correlation = (count_00 + count_11 < 50);
+            break;
+    }
+    
+    system.io.print("\n纠缠性分析: " + (has_perfect_correlation ? "符合理论预期" : "不符合理论预期"));
+}
+
+/**
+ * 演示量子隐形传态
+ * 使用贝尔态将一个未知的量子态从一个位置传送到另一个位置
+ */
+function quantum_teleportation() {
+    system.io.print("\n=== 量子隐形传态演示 ===");
+    
+    // 创建3量子比特的系统
+    // 比特0: 源状态（要传送的状态）
+    // 比特1和2: 共享的Bell对
+    QuantumState teleport = new QuantumState(3);
+    
+    // 步骤1: 准备要传送的状态
+    system.io.print("\n步骤1: 准备要传送的量子态");
+    
+    // 创建一个任意的单比特状态：例如 α|0⟩ + β|1⟩
+    float alpha = 0.8;
+    float beta = 0.6;
+    float norm = sqrt(alpha*alpha + beta*beta);
+    alpha /= norm;
+    beta /= norm;
+    
+    system.io.print("创建状态: " + alpha + "|0⟩ + " + beta + "|1⟩");
+    
+    // 使用旋转门创建该状态
+    float theta = 2 * acos(alpha);
+    teleport.apply_rotation("RY", 0, theta);
+    
+    // 打印初始状态
+    system.io.print("初始状态向量:");
+    system.io.print(teleport.to_string());
+    
+    // 步骤2: 在比特1和2之间创建Bell态
+    system.io.print("\n步骤2: 创建Bell纠缠对");
+    teleport.apply_gate("H", 1);
+    teleport.apply_gate("CNOT", 1, 2);
+    
+    // 步骤3: 将源比特与Bell对的一半纠缠
+    system.io.print("\n步骤3: 源比特与Bell对的其中一个比特纠缠");
+    teleport.apply_gate("CNOT", 0, 1);
+    teleport.apply_gate("H", 0);
+    
+    // 打印准备传送的状态
+    system.io.print("准备传送前的系统状态:");
+    system.io.print(teleport.to_string());
+    
+    // 步骤4: 测量前两个比特
+    system.io.print("\n步骤4: 测量前两个比特");
+    bool m0 = teleport.measure(0);
+    bool m1 = teleport.measure(1);
+    
+    system.io.print("测量结果: |" + (m0 ? "1" : "0") + (m1 ? "1" : "0") + "⟩");
+    system.io.print("测量后状态:");
+    system.io.print(teleport.to_string());
+    
+    // 步骤5: 根据测量结果应用校正操作
+    system.io.print("\n步骤5: 根据测量结果应用校正操作");
+    
+    if (m1) {
+        system.io.print("应用X门到目标比特");
+        teleport.apply_gate("X", 2);
+    }
+    
+    if (m0) {
+        system.io.print("应用Z门到目标比特");
+        teleport.apply_gate("Z", 2);
+    }
+    
+    // 检查传送结果
+    system.io.print("\n传送后的状态:");
+    system.io.print(teleport.to_string());
+    
+    // 验证传送的正确性
+    system.io.print("\n验证传送结果:");
+    
+    // 在多次运行中验证统计特性
+    QuantumState original = new QuantumState(1);
+    original.apply_rotation("RY", 0, theta);
+    
+    system.io.print("原始态概率分布: |0⟩:" + original.probability(0) + ", |1⟩:" + original.probability(1));
+    system.io.print("传送态概率分布: |0⟩:" + teleport.probability(2, 0) + ", |1⟩:" + teleport.probability(2, 1));
+    
+    float prob_diff = abs(original.probability(0) - teleport.probability(2, 0));
+    system.io.print("概率差异: " + prob_diff);
+    system.io.print("传送结果: " + (prob_diff < 0.01 ? "成功" : "失败"));
+}
+
+/**
+ * 展示纠缠交换（Entanglement Swapping）
+ * 通过测量使两个初始未纠缠的粒子变得纠缠
+ */
+function entanglement_swapping() {
+    system.io.print("\n=== 纠缠交换演示 ===");
+    
+    // 创建4量子比特系统
+    // 比特0和1: 第一个Bell对
+    // 比特2和3: 第二个Bell对
+    QuantumState swap = new QuantumState(4);
+    
+    // 步骤1: 创建两个独立的Bell对
+    system.io.print("\n步骤1: 创建两个独立的Bell对");
+    
+    // 创建第一个Bell对(比特0和1)
+    swap.apply_gate("H", 0);
+    swap.apply_gate("CNOT", 0, 1);
+    
+    // 创建第二个Bell对(比特2和3)
+    swap.apply_gate("H", 2);
+    swap.apply_gate("CNOT", 2, 3);
+    
+    system.io.print("初始状态（两个独立的Bell对）:");
+    system.io.print(swap.to_string());
+    
+    // 步骤2: 对中间两个比特(1和2)进行Bell测量
+    system.io.print("\n步骤2: 对中间两个比特进行Bell测量");
+    
+    // 应用Bell测量变换
+    swap.apply_gate("CNOT", 1, 2);
+    swap.apply_gate("H", 1);
+    
+    // 测量中间两个比特
+    bool m1 = swap.measure(1);
+    bool m2 = swap.measure(2);
+    
+    system.io.print("测量结果: |" + (m1 ? "1" : "0") + (m2 ? "1" : "0") + "⟩");
+    system.io.print("测量后状态:");
+    system.io.print(swap.to_string());
+    
+    // 步骤3: 验证比特0和3现在是纠缠的
+    system.io.print("\n步骤3: 验证比特0和3现在是纠缠的");
+    
+    // 根据测量结果应用必要的校正操作
+    if (m2) {
+        system.io.print("应用X门到比特3");
+        swap.apply_gate("X", 3);
+    }
+    
+    if (m1) {
+        system.io.print("应用Z门到比特3");
+        swap.apply_gate("Z", 3);
+    }
+    
+    system.io.print("校正后的状态:");
+    system.io.print(swap.to_string());
+    
+    // 进行统计测量验证纠缠
+    system.io.print("\n进行100次测量验证纠缠:");
+    
+    int same = 0;   // 测量结果相同的次数
+    int diff = 0;   // 测量结果不同的次数
+    
+    for (int i = 0; i < 100; i++) {
+        QuantumState copy = swap.clone();
+        bool result0 = copy.measure(0);
+        bool result3 = copy.measure(3);
+        
+        if (result0 == result3) {
+            same++;
+        } else {
+            diff++;
+        }
+    }
+    
+    system.io.print("测量结果相同: " + same + "次");
+    system.io.print("测量结果不同: " + diff + "次");
+    
+    // 分析结果
+    bool has_entanglement = (same > 90 || diff > 90); // 如果大部分结果一致或大部分结果不同，都说明有纠缠
+    system.io.print("\n纠缠交换分析: " + (has_entanglement ? "成功" : "失败"));
+}
+
+/**
+ * 演示基于纠缠的量子密钥分发（BB84协议简化版）
+ */
+function quantum_key_distribution() {
+    system.io.print("\n=== 基于纠缠的量子密钥分发演示 ===");
+    
+    // 使用Bell态创建共享密钥
+    int key_length = 16;  // 生成的密钥长度
+    system.io.print("目标密钥长度: " + key_length + " 比特");
+    
+    // 存储Alice和Bob的基和结果
+    bool[] alice_bases = new bool[key_length];
+    bool[] bob_bases = new bool[key_length];
+    bool[] alice_results = new bool[key_length];
+    bool[] bob_results = new bool[key_length];
+    
+    // 存储最终的共享密钥
+    int[] shared_key = new int[key_length];
+    int actual_key_length = 0;
+    
+    system.io.print("\n步骤1: 生成和分发纠缠对");
+    for (int i = 0; i < key_length; i++) {
+        // 随机选择测量基
+        alice_bases[i] = (random() > 0.5);  // true表示X基，false表示Z基
+        bob_bases[i] = (random() > 0.5);
+        
+        // 创建Bell态
+        QuantumState bell = new QuantumState(2);
+        bell.apply_gate("H", 0);
+        bell.apply_gate("CNOT", 0, 1);
+        
+        // Alice和Bob分别测量他们的量子比特
+        // 如果使用X基，先应用H门
+        if (alice_bases[i]) {
+            bell.apply_gate("H", 0);
+        }
+        
+        if (bob_bases[i]) {
+            bell.apply_gate("H", 1);
+        }
+        
+        // 测量
+        alice_results[i] = bell.measure(0);
+        bob_results[i] = bell.measure(1);
+    }
+    
+    system.io.print("\n步骤2: 公开比较测量基");
+    for (int i = 0; i < key_length; i++) {
+        if (alice_bases[i] == bob_bases[i]) {
+            // 测量基相同，结果应该完美关联（在无噪声情况下）
+            system.io.print("比特 " + i + ": 基相同 - Alice: " + 
+                            (alice_bases[i] ? "X" : "Z") + ", Bob: " + 
+                            (bob_bases[i] ? "X" : "Z"));
+            
+            // 在Perfect Bell态中，当使用相同的测量基时，结果应该相关
+            if ((alice_bases[i] && alice_results[i] == bob_results[i]) ||
+                (!alice_bases[i] && alice_results[i] != bob_results[i])) {
+                system.io.print("  结果一致，加入密钥");
+                shared_key[actual_key_length++] = alice_results[i] ? 1 : 0;
+            } else {
+                system.io.print("  结果不一致，可能有窃听者");
+            }
+        } else {
+            system.io.print("比特 " + i + ": 基不同 - Alice: " + 
+                            (alice_bases[i] ? "X" : "Z") + ", Bob: " + 
+                            (bob_bases[i] ? "X" : "Z") + " (丢弃)");
+        }
+    }
+    
+    // 打印生成的密钥
+    system.io.print("\n生成的共享密钥 (" + actual_key_length + " 比特):");
+    string key_string = "";
+    for (int i = 0; i < actual_key_length; i++) {
+        key_string += shared_key[i];
+    }
+    system.io.print(key_string);
+    
+    // 估计窃听比例
+    float error_rate = 1.0 - (float)actual_key_length / key_length;
+    system.io.print("\n估计错误率: " + (error_rate * 100) + "%");
+    
+    if (error_rate > 0.25) {
+        system.io.print("错误率过高，可能存在窃听。建议重新生成密钥。");
+    } else {
+        system.io.print("错误率在可接受范围内，密钥可以安全使用。");
+    }
+}
+
+/**
+ * 主函数
+ */
+function main() {
+    system.io.print("===== QEntL量子纠缠测试 =====\n");
+    
+    // 测试不同类型的Bell态
+    test_bell_entanglement(0);
+    test_bell_entanglement(3);
+    
+    // 演示量子隐形传态
+    quantum_teleportation();
+    
+    // 演示纠缠交换
+    entanglement_swapping();
+    
+    // 演示基于纠缠的量子密钥分发
+    quantum_key_distribution();
+    
+    system.io.print("\n===== 测试完成 =====");
+    return 0;
+} 

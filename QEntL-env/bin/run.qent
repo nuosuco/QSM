@@ -1,0 +1,95 @@
+// QEntL主控制器服务
+// 用于启动和管理QEntL环境中的各种服务
+
+// 导入所需模块
+import quantum_core;
+import quantum_networking;
+import quantum_services;
+
+// 主服务器配置
+const SERVER_CONFIG = {
+    port: 3000,
+    host: "localhost",
+    services: {
+        qsm_api: {port: 5000, enabled: true},
+        weq_api: {port: 5001, enabled: true},
+        som_api: {port: 5002, enabled: true},
+        ref_api: {port: 5003, enabled: true},
+        world_server: {port: 5004, enabled: true}
+    }
+};
+
+// 量子实体定义
+quantum_entity MainController {
+    // 系统属性
+    properties {
+        name: "main_controller",
+        version: "1.0.0",
+        status: "running",
+        log_file: "../logs/main.log"
+    }
+    
+    // 初始化服务
+    function initialize_services() {
+        console.log("初始化QEntL服务...");
+        
+        // 初始化量子核心
+        quantum_core.initialize();
+        
+        // 初始化网络服务
+        quantum_networking.setup_server(SERVER_CONFIG.port, SERVER_CONFIG.host);
+        
+        // 启动各个API服务
+        for (service_name in SERVER_CONFIG.services) {
+            let config = SERVER_CONFIG.services[service_name];
+            if (config.enabled) {
+                console.log("启动服务: " + service_name + " (端口: " + config.port + ")");
+                quantum_services.start_service(service_name, config.port);
+            }
+        }
+        
+        console.log("所有服务初始化完成");
+    }
+    
+    // 主函数
+    function main() {
+        console.log("QEntL主控制器启动...");
+        
+        // 初始化服务
+        this.initialize_services();
+        
+        // 开始监听
+        console.log("主控制器在端口 " + SERVER_CONFIG.port + " 上监听");
+        quantum_networking.start_listening();
+        
+        // 注册关闭回调
+        system.on_exit(() => this.shutdown());
+        
+        // 创建量子纠缠监视器
+        create_entanglement(service_monitor, "status_check");
+        
+        // 保持服务运行
+        console.log("主控制器服务已启动并在后台运行");
+    }
+    
+    // 关闭函数
+    function shutdown() {
+        console.log("正在关闭QEntL服务...");
+        
+        // 关闭所有服务
+        for (service_name in SERVER_CONFIG.services) {
+            quantum_services.stop_service(service_name);
+        }
+        
+        // 关闭网络
+        quantum_networking.stop_listening();
+        
+        // 清理量子核心
+        quantum_core.cleanup();
+        
+        console.log("所有服务已关闭");
+    }
+}
+
+// 程序入口
+MainController.main(); 

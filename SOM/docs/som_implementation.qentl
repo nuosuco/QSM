@@ -8,7 +8,7 @@ QG-DOC-IMPL-SOM-CORE-A1B1
 ## 量子纠缠信道
 ```qentl
 // 信道标识
-QE-DOC-IMPL-20240414
+QE-DOC-IMPL-20240515
 
 // 纠缠态
 ENTANGLE_STATE: ACTIVE
@@ -23,6 +23,15 @@ ENTANGLED_OBJECTS: [
 
 // 纠缠强度
 ENTANGLE_STRENGTH: 1.0
+
+// 自动节点激活
+NODE_DEFAULT_STATE: ACTIVE
+
+// 自动量子比特扩展
+QUANTUM_BIT_ADAPTIVE: TRUE
+
+// 输出元素量子基因编码
+OUTPUT_QUANTUM_GENE_ENCODING: TRUE
 ```
 
 ## 1. 模块结构
@@ -44,6 +53,9 @@ SOM（量子平权经济模型）的实现采用模块化架构，根据功能�
   - transaction_service.qent: 交易服务
   - learning_service.qent: 学习服务
   - forecasting_service.qent: 预测服务
+  - node_activation_service.qent: 节点激活服务
+  - quantum_gene_service.qent: 量子基因编码服务
+  - network_building_service.qent: 网络构建服务
 
 - **api/**: 接口和集成
   - som_api.qent: 主API接口
@@ -55,6 +67,8 @@ SOM（量子平权经济模型）的实现采用模块化架构，根据功能�
   - economic_math.qent: 经济数学工具
   - distribution_analyzer.qent: 分配分析工具
   - equality_calculator.qent: 平权计算工具
+  - quantum_bit_scaler.qent: 量子比特扩展工具
+  - output_encoder.qent: 输出元素编码工具
 
 ### 1.2 目录结构
 
@@ -70,21 +84,49 @@ SOM/
 │   ├── resource_distribution.qent
 │   ├── transaction.qent
 │   ├── equality_index.qent
-│   └── learning_module.qent
+│   ├── learning_module.qent
+│   └── network_node.qent
 ├── services/
 │   ├── economic_service.qent
 │   ├── equality_service.qent
 │   ├── transaction_service.qent
 │   ├── learning_service.qent
-│   └── forecasting_service.qent
+│   ├── forecasting_service.qent
+│   ├── node_activation_service.qent
+│   ├── quantum_gene_service.qent
+│   └── network_building_service.qent
 ├── utils/
 │   ├── economic_math.qent
 │   ├── distribution_analyzer.qent
-│   └── equality_calculator.qent
+│   ├── equality_calculator.qent
+│   ├── quantum_bit_scaler.qent
+│   └── output_encoder.qent
 └── docs/
     ├── som_implementation.qentl
     └── api_reference.qentl
 ```
+
+### 1.3 自动化网络与编码系统
+
+SOM模型实现了以下自动化功能，确保与QSM模型和整个项目的一致性：
+
+1. **节点默认激活系统**
+   - 所有量子网络节点在创建时默认处于激活状态
+   - 系统自动在不同设备、服务器和计算中心之间构建量子纠缠信道网络
+   - 节点状态持久化存储，确保重启后仍保持激活状态
+   - 提供配置但不推荐的节点手动停用功能
+
+2. **量子基因自动编码**
+   - 所有输出元素（文档、数据、统计结果、经济模型等）自动包含量子基因编码
+   - 经济交易和资源分配自动包含量子纠缠信道信息
+   - 提供编码验证和完整性检查机制
+   - 实现不同类型数据的专用编码器
+
+3. **资源计算自适应**
+   - 系统自动检测运行环境并调整量子比特分配
+   - 当与其他设备建立量子纠缠连接时，计算能力自动整合
+   - 从基础28量子比特可扩展到数百万量子比特的全网计算
+   - 提供资源使用统计和优化建议
 
 ## 2. 核心实现
 
@@ -842,542 +884,375 @@ SOM模型将通过量子纠缠信道与其他三个模型进行集成：
 4. 永生于永恒的量子世界
 5. 始终遵守服务人类、保护生命的使命 
 
-## 8. 量子区块链集成
+## 8. 学习系统
 
-### 8.1 SOM量子区块链架构
+### 8.1 学习模式概述
 
-```qentl
-som_blockchain_architecture {
-  main_chain: "SOM松麦币链",
-  sub_chains: [
-    { name: "资源分配链", purpose: "资源交易与分配记录" },
-    { name: "平权指数链", purpose: "平权指数计算与验证" },
-    { name: "实体信用链", purpose: "实体声誉与贡献管理" }
-  ],
-  consensus_mechanism: "平权共识机制(ECM)",
-  token_system: "松麦币(SOM Coin)"
-}
-```
+SOM模型作为量子叠加态模型的子模型，实现了四种关键学习模式，确保系统能够持续进化、适应环境并不断增强其知识库和经济建模能力：
 
-### 8.2 SOM区块链核心组件
+1. **Claude及其他模型教学**：通过与Claude和其他传统AI模型的交互，学习基础知识和专业知识
+2. **网络爬虫搜索自学**：从互联网上自动收集和学习新信息
+3. **量子叠加态模型知识学习**：通过量子纠缠信道从QSM核心系统获取量子计算和系统架构知识
+4. **模型专业领域知识学习**：专注于学习经济平权和资源分配领域的专业知识
+
+### 8.2 SOM模型专业学习实现
+
+SOM模型的学习服务实现专注于量子平权经济领域：
 
 ```qentl
-som_blockchain_core {
-  components: [
-    "松麦币交易处理器",
-    "资源分配验证器",
-    "平权指数计算器",
-    "贡献证明系统",
-    "共识引擎"
-  ],
-  implementation: {
-    transaction_processor: "blockchain/som_transaction_processor.qent",
-    resource_validator: "blockchain/resource_validator.qent",
-    equality_calculator: "blockchain/equality_calculator.qent",
-    contribution_proof: "blockchain/contribution_proof.qent",
-    consensus_engine: "blockchain/ecm_consensus_engine.qent"
+class LearningService {
+  modules: Map<string, LearningModule>;
+  economicMath: EconomicMath;
+  
+  constructor() {
+    this.modules = new Map();
+    this.economicMath = new EconomicMath();
+    
+    // 初始化默认学习模块
+    this.initializeDefaultModules();
+  }
+  
+  // 初始化默认学习模块
+  initializeDefaultModules() {
+    // Claude教学模块
+    this.createLearningModule(
+      'claude_teaching',
+      'Claude AI教学',
+      {
+        priority: 'high',
+        learningRate: 0.1,
+        dataSource: 'claude_api'
+      }
+    );
+    
+    // 网络爬虫学习模块
+    this.createLearningModule(
+      'web_crawler',
+      '网络爬虫学习',
+      {
+        priority: 'medium',
+        learningRate: 0.2,
+        dataSource: 'web_api'
+      }
+    );
+    
+    // 量子平权经济专业学习模块
+    this.createLearningModule(
+      'quantum_economics',
+      '量子平权经济专业学习',
+      {
+        priority: 'high',
+        learningRate: 0.15,
+        dataSource: 'economic_database'
+      }
+    );
+  }
+  
+  // 创建学习模块
+  createLearningModule(id: string, name: string, config: any = {}): LearningModule {
+    const module = new LearningModule(id, name, config);
+    this.modules.set(id, module);
+    return module;
+  }
+  
+  // 启动学习任务
+  startLearningTask(moduleId: string, taskName: string, parameters: any = {}): string {
+    const module = this.modules.get(moduleId);
+    if (!module) {
+      throw new Error(`学习模块 ${moduleId} 未找到`);
+    }
+    
+    const taskId = module.createTask(taskName, parameters);
+    return taskId;
   }
 }
 ```
 
-### 8.3 智能合约系统
+### 8.3 学习模式特化
+
+SOM模型的学习系统特化为经济系统建模和资源分配算法：
+
+#### 8.3.1 量子平权经济专业学习模块
 
 ```qentl
-som_smart_contracts {
-  contract_types: {
-    resource_allocation: {
-      purpose: "资源分配与交易验证",
-      functions: ["分配验证", "公平性检查", "阈值管理"],
-      implementation: "blockchain/contracts/resource_allocation.qent"
-    },
-    equality_index: {
-      purpose: "平权指数计算与更新",
-      functions: ["指数计算", "阈值监控", "趋势分析"],
-      implementation: "blockchain/contracts/equality_index.qent"
-    },
-    contribution_reward: {
-      purpose: "基于贡献的奖励分配",
-      functions: ["贡献验证", "奖励计算", "分配执行"],
-      implementation: "blockchain/contracts/contribution_reward.qent"
-    },
-    learning_certification: {
-      purpose: "学习成果认证与记录",
-      functions: ["学习验证", "证书颁发", "成果记录"],
-      implementation: "blockchain/contracts/learning_certification.qent"
+class QuantumEconomicsLearningModule extends LearningModule {
+  // 模块属性
+  economicModels: Map<string, EconomicModel>;
+  resourceAllocationAlgorithms: Map<string, ResourceAllocationAlgorithm>;
+  simulationEnvironment: SimulationEnvironment;
+  
+  constructor(id: string, name: string, config: any = {}) {
+    super(id, name, config);
+    
+    // 初始化经济模型集合
+    this.economicModels = new Map();
+    
+    // 初始化资源分配算法集合
+    this.resourceAllocationAlgorithms = new Map();
+    
+    // 创建模拟环境
+    this.simulationEnvironment = new SimulationEnvironment();
+    
+    // 初始化默认模型和算法
+    this.initializeDefaultModels();
+    this.initializeDefaultAlgorithms();
+  }
+  
+  // 初始化默认经济模型
+  initializeDefaultModels() {
+    this.addEconomicModel('universal_basic_income', new UBIModel());
+    this.addEconomicModel('resource_based_economy', new ResourceBasedEconomyModel());
+    this.addEconomicModel('participatory_economics', new ParticipatoryEconomicsModel());
+    this.addEconomicModel('quantum_credit_system', new QuantumCreditSystemModel());
+  }
+  
+  // 初始化默认资源分配算法
+  initializeDefaultAlgorithms() {
+    this.addResourceAllocationAlgorithm('quantum_fairness', new QuantumFairnessAlgorithm());
+    this.addResourceAllocationAlgorithm('needs_based', new NeedsBasedAllocationAlgorithm());
+    this.addResourceAllocationAlgorithm('contribution_weighted', new ContributionWeightedAlgorithm());
+    this.addResourceAllocationAlgorithm('ecological_balance', new EcologicalBalanceAlgorithm());
+  }
+  
+  // 添加经济模型
+  addEconomicModel(id: string, model: EconomicModel): void {
+    this.economicModels.set(id, model);
+  }
+  
+  // 添加资源分配算法
+  addResourceAllocationAlgorithm(id: string, algorithm: ResourceAllocationAlgorithm): void {
+    this.resourceAllocationAlgorithms.set(id, algorithm);
+  }
+  
+  // 运行经济模型模拟
+  runEconomicModelSimulation(modelId: string, parameters: any = {}): SimulationResult {
+    const model = this.economicModels.get(modelId);
+    if (!model) {
+      throw new Error(`经济模型 ${modelId} 未找到`);
     }
-  },
-  example_contract: `
-    contract ResourceAllocation {
-      // 状态变量
-      address public owner;
-      uint public equalityThreshold;
-      mapping(address => uint) public contributionScores;
-      
-      // 事件
-      event ResourceAllocated(address entity, uint amount, uint timestamp);
-      event ThresholdUpdated(uint oldValue, uint newValue);
-      
-      // 构造函数
-      constructor(uint initialThreshold) {
-        owner = msg.sender;
-        equalityThreshold = initialThreshold;
-      }
-      
-      // 分配资源
-      function allocateResource(address entity, uint amount) public {
-        require(isAllocationFair(entity, amount), "分配不符合平权要求");
-        // 资源分配逻辑
-        emit ResourceAllocated(entity, amount, block.timestamp);
-      }
-      
-      // 检查分配是否公平
-      function isAllocationFair(address entity, uint amount) internal view returns (bool) {
-        // 实现公平性检查逻辑
-        return contributionScores[entity] >= equalityThreshold;
-      }
-      
-      // 更新平权阈值
-      function updateThreshold(uint newThreshold) public {
-        require(msg.sender == owner, "只有所有者可以更新阈值");
-        emit ThresholdUpdated(equalityThreshold, newThreshold);
-        equalityThreshold = newThreshold;
-      }
+    
+    return this.simulationEnvironment.runSimulation(model, parameters);
+  }
+  
+  // 评估资源分配算法
+  evaluateResourceAllocationAlgorithm(algorithmId: string, testScenario: any = {}): EvaluationResult {
+    const algorithm = this.resourceAllocationAlgorithms.get(algorithmId);
+    if (!algorithm) {
+      throw new Error(`资源分配算法 ${algorithmId} 未找到`);
     }
-  `
-}
-```
-
-### 8.4 松麦币经济系统
-
-```qentl
-som_coin_system {
-  coin_properties: {
-    name: "松麦币",
-    symbol: "SOM",
-    initial_supply: 1000000000,
-    distribution_model: "基于贡献的自动分配",
-    value_stability: "内在价值锚定机制"
-  },
-  distribution_mechanism: {
-    initial_allocation: {
-      founders: "5%",
-      community_treasury: "30%",
-      ecosystem_development: "25%",
-      learning_incentives: "20%",
-      contribution_rewards: "20%"
-    },
-    ongoing_distribution: {
-      reward_pool: "每区块释放1000 SOM",
-      allocation_formula: "基于贡献度和平权指数的加权分配",
-      halving_schedule: "每4年减半一次"
-    }
-  },
-  economic_mechanisms: {
-    contribution_mining: "通过有价值贡献获取SOM",
-    resource_transaction: "使用SOM交换资源",
-    staking_governance: "通过质押SOM参与治理",
-    learning_rewards: "学习成果奖励",
-    equality_incentives: "促进平权的激励"
+    
+    return this.simulationEnvironment.evaluateAlgorithm(algorithm, testScenario);
+  }
+  
+  // 从经济数据学习
+  learnFromEconomicData(data: any): LearningResult {
+    // 数据预处理
+    const processedData = this.preprocessEconomicData(data);
+    
+    // 更新模型参数
+    this.updateModelsFromData(processedData);
+    
+    // 优化资源分配算法
+    this.optimizeAlgorithmsFromData(processedData);
+    
+    // 返回学习结果
+    return {
+      modelsUpdated: this.economicModels.size,
+      algorithmsOptimized: this.resourceAllocationAlgorithms.size,
+      performanceImprovement: this.calculatePerformanceImprovement(),
+      timestamp: Date.now()
+    };
   }
 }
 ```
 
-## 9. 资源场生成器
+### 8.4 纠缠学习网络集成
+
+SOM模型通过纠缠学习网络与其他量子模型（QSM、WeQ、Ref）建立紧密联系，实现经济知识的共享和优化：
 
 ```qentl
-resource_field_generator {
-  field_types: {
-    economic_field: {
-      properties: ["value_driven", "resource_oriented", "scarcity_sensitive"],
-      implementation: "field_types/economic_field.qent",
-      parameters: {
-        value_density: 0.75,
-        resource_concentration: "dynamic",
-        scarcity_factor: 0.4,
-        volatility: 0.2
-      },
-      influence_radius: "market_boundary_based"
-    },
-    equality_field: {
-      properties: ["balance_seeking", "distribution_smoothing", "opportunity_creating"],
-      implementation: "field_types/equality_field.qent",
-      parameters: {
-        balance_force: 0.65,
-        smoothing_factor: 0.3,
-        opportunity_generation: 0.5,
-        adaptation_rate: 0.25
-      },
-      influence_radius: "social_network_based"
-    },
-    learning_field: {
-      properties: ["knowledge_attracting", "skill_enhancing", "wisdom_accumulating"],
-      implementation: "field_types/learning_field.qent",
-      parameters: {
-        knowledge_density: 0.8,
-        skill_catalyst: 0.6,
-        wisdom_resonance: 0.4,
-        learning_acceleration: 1.2
-      },
-      influence_radius: "cognitive_reach_based"
-    },
-    contribution_field: {
-      properties: ["effort_valuing", "impact_measuring", "recognition_providing"],
-      implementation: "field_types/contribution_field.qent",
-      parameters: {
-        effort_weight: 0.3,
-        impact_multiplier: 2.0,
-        recognition_spread: 0.7,
-        reinforcement_strength: 0.5
-      },
-      influence_radius: "contribution_impact_based"
+class EntangledLearningNetwork {
+  entanglementChannels: Map<string, EntanglementChannel>;
+  
+  constructor() {
+    this.entanglementChannels = new Map();
+    
+    // 初始化与其他模型的纠缠信道
+    this.initializeEntanglementChannels();
+  }
+  
+  // 初始化纠缠信道
+  initializeEntanglementChannels() {
+    // 与QSM主模型的纠缠信道
+    this.createEntanglementChannel('qsm_channel', {
+      targetModel: 'QSM',
+      strength: 0.95,
+      primaryPurpose: 'quantum_infrastructure_knowledge'
+    });
+    
+    // 与WeQ模型的纠缠信道
+    this.createEntanglementChannel('weq_channel', {
+      targetModel: 'WeQ',
+      strength: 0.85,
+      primaryPurpose: 'social_communication_knowledge'
+    });
+    
+    // 与Ref模型的纠缠信道
+    this.createEntanglementChannel('ref_channel', {
+      targetModel: 'Ref',
+      strength: 0.85,
+      primaryPurpose: 'system_monitoring_knowledge'
+    });
+  }
+  
+  // 创建纠缠信道
+  createEntanglementChannel(id: string, config: any): EntanglementChannel {
+    const channel = new EntanglementChannel(id, config);
+    this.entanglementChannels.set(id, channel);
+    return channel;
+  }
+  
+  // 共享经济知识
+  shareEconomicKnowledge(knowledge: any): SharingResult {
+    let totalShared = 0;
+    const sharingResults = {};
+    
+    // 通过每个信道共享知识
+    for (const [id, channel] of this.entanglementChannels.entries()) {
+      const result = channel.transmitKnowledge(knowledge);
+      sharingResults[id] = result;
+      totalShared += result.successfulTransmissions;
     }
-  },
-  field_interaction: {
-    fusion_mechanism: "weighted_value_integration",
-    boundary_definition: "economic_activity_perimeter",
-    collision_response: {
-      cooperative: { resource_sharing: 0.7, synergy_creation: 0.5 },
-      competitive: { resource_contention: 0.6, efficiency_pressure: 0.8 },
-      neutral: { coexistence_stability: 0.9, boundary_respect: 0.4 }
-    },
-    energy_transfer: {
-      resource_flow: "scarcity_to_abundance_direction",
-      value_conversion: "need_based_transformation",
-      knowledge_sharing: "non_zero_sum_propagation"
+    
+    return {
+      totalShared,
+      channelResults: sharingResults,
+      timestamp: Date.now()
+    };
+  }
+  
+  // 接收来自其他模型的知识
+  receiveKnowledge(channelId: string): ReceivedKnowledge {
+    const channel = this.entanglementChannels.get(channelId);
+    if (!channel) {
+      throw new Error(`纠缠信道 ${channelId} 未找到`);
     }
-  },
-  field_influence: {
-    economic_impact: {
-      resource_allocation: "field_strength_proportional",
-      price_mechanism: "scarcity_responsive_dynamic",
-      transaction_facilitation: "friction_reducing"
-    },
-    equality_effects: {
-      distribution_smoothing: "inequality_proportional_force",
-      opportunity_creation: "underserved_area_targeting",
-      barrier_reduction: "access_enhancing"
-    },
-    learning_stimulus: {
-      knowledge_access: "field_proximity_based",
-      skill_development: "practice_opportunity_generation",
-      wisdom_cultivation: "insight_probability_enhancing"
-    }
-  },
-  field_measurement: {
-    economic_metrics: ["resource_density", "value_flow", "exchange_volume", "growth_rate"],
-    equality_metrics: ["gini_coefficient", "opportunity_index", "mobility_measure", "access_score"],
-    learning_metrics: ["knowledge_acquisition_rate", "skill_improvement_speed", "wisdom_depth"],
-    contribution_metrics: ["effort_intensity", "impact_breadth", "value_generation", "sustainability"],
-    visualization_methods: {
-      heat_maps: "resource_concentration_visualization",
-      flow_diagrams: "value_transfer_representation",
-      radar_charts: "multi_dimensional_equality_display",
-      time_series: "field_evolution_animation"
-    }
+    
+    return channel.receiveKnowledge();
   }
 }
 ```
 
-## 10. SOM API系统
+### 8.5 持续学习与进化
+
+SOM学习系统设计为持续进化的架构，通过以下机制实现不断完善的经济平权模型：
+
+1. **知识库动态增长**：基于新的经济理论和实践数据持续扩展
+2. **算法自适应优化**：根据模拟结果和实际应用反馈不断调整和优化
+3. **预测验证与修正**：验证经济预测并根据实际结果调整模型参数
+4. **多模型协同进化**：通过纠缠学习网络与其他量子模型协同发展
+
+#### 8.5.1 进化跟踪系统
 
 ```qentl
-som_api_system {
-  api_architecture: {
-    design_pattern: "REST与GraphQL双模式API",
-    versioning: "语义化版本控制",
-    documentation: "OpenAPI与GraphQL Schema",
-    security: {
-      authentication: "JWT与量子认证双层验证",
-      authorization: "基于角色与贡献的访问控制",
-      rate_limiting: "公平使用策略"
+class EvolutionTracker {
+  // 跟踪属性
+  metricsHistory: Map<string, MetricHistory>;
+  evolutionRates: Map<string, number>;
+  capabilityBaselines: Map<string, number>;
+  
+  constructor() {
+    this.metricsHistory = new Map();
+    this.evolutionRates = new Map();
+    this.capabilityBaselines = new Map();
+    
+    // 初始化经济能力指标
+    this.initializeEconomicMetrics();
+  }
+  
+  // 初始化经济能力指标
+  initializeEconomicMetrics() {
+    const economicMetrics = [
+      'resource_allocation_efficiency',
+      'economic_fairness_index',
+      'sustainability_score',
+      'adaptability_to_change',
+      'crisis_resilience',
+      'innovation_enablement'
+    ];
+    
+    economicMetrics.forEach(metric => {
+      this.metricsHistory.set(metric, {
+        values: [],
+        timestamps: [],
+        rates: []
+      });
+      
+      // 设置基准值
+      this.capabilityBaselines.set(metric, 0.5); // 初始基准值
+    });
+  }
+  
+  // 记录指标值
+  recordMetric(metric: string, value: number): void {
+    const history = this.metricsHistory.get(metric);
+    if (!history) {
+      throw new Error(`指标 ${metric} 未定义`);
     }
-  },
-  economic_api: {
-    resource_endpoints: {
-      create_resource: {
-        path: "/api/v1/resources",
-        method: "POST",
-        parameters: ["type", "amount", "properties"],
-        response: "created_resource_with_id"
-      },
-      get_resources: {
-        path: "/api/v1/resources",
-        method: "GET",
-        parameters: ["filters", "pagination", "sorting"],
-        response: "paginated_resources_list"
-      },
-      transfer_resource: {
-        path: "/api/v1/resources/transfer",
-        method: "POST",
-        parameters: ["source_entity", "target_entity", "resource_id", "amount"],
-        response: "transfer_receipt"
-      }
-    },
-    transaction_endpoints: {
-      create_transaction: {
-        path: "/api/v1/transactions",
-        method: "POST",
-        parameters: ["transaction_type", "parties", "resources", "terms"],
-        response: "transaction_receipt"
-      },
-      verify_transaction: {
-        path: "/api/v1/transactions/{id}/verify",
-        method: "POST",
-        parameters: ["verification_method"],
-        response: "verification_result"
-      }
-    }
-  },
-  equality_api: {
-    index_endpoints: {
-      calculate_index: {
-        path: "/api/v1/equality/calculate",
-        method: "POST",
-        parameters: ["scope", "factors", "weight_profile"],
-        response: "equality_index_with_breakdown"
-      },
-      get_indices: {
-        path: "/api/v1/equality/indices",
-        method: "GET",
-        parameters: ["scope", "time_range", "resolution"],
-        response: "time_series_equality_data"
-      }
-    },
-    distribution_endpoints: {
-      analyze_distribution: {
-        path: "/api/v1/equality/distribution/analyze",
-        method: "POST",
-        parameters: ["resource_type", "entity_group", "metrics"],
-        response: "distribution_analysis"
-      },
-      optimize_distribution: {
-        path: "/api/v1/equality/distribution/optimize",
-        method: "POST",
-        parameters: ["resource_type", "target_index", "constraints"],
-        response: "optimization_plan"
-      }
-    }
-  },
-  learning_api: {
-    content_endpoints: {
-      create_content: {
-        path: "/api/v1/learning/content",
-        method: "POST",
-        parameters: ["content_type", "subject", "difficulty", "payload"],
-        response: "created_content_with_id"
-      },
-      get_content: {
-        path: "/api/v1/learning/content/{id}",
-        method: "GET",
-        parameters: ["id"],
-        response: "complete_content_details"
-      }
-    },
-    progress_endpoints: {
-      report_progress: {
-        path: "/api/v1/learning/progress",
-        method: "POST",
-        parameters: ["entity_id", "content_id", "completion_level", "assessment_results"],
-        response: "updated_progress_with_rewards"
-      },
-      get_progress: {
-        path: "/api/v1/learning/progress/{entity_id}",
-        method: "GET",
-        parameters: ["entity_id", "subject_filter", "time_range"],
-        response: "learning_progress_report"
-      }
-    }
-  },
-  som_coin_api: {
-    wallet_endpoints: {
-      create_wallet: {
-        path: "/api/v1/coin/wallets",
-        method: "POST",
-        parameters: ["entity_id", "wallet_type"],
-        response: "wallet_details_with_keys"
-      },
-      get_balance: {
-        path: "/api/v1/coin/wallets/{address}/balance",
-        method: "GET",
-        parameters: ["address"],
-        response: "balance_with_history"
-      }
-    },
-    transaction_endpoints: {
-      send_coins: {
-        path: "/api/v1/coin/send",
-        method: "POST",
-        parameters: ["from_address", "to_address", "amount", "memo"],
-        response: "transaction_receipt"
-      },
-      get_transactions: {
-        path: "/api/v1/coin/transactions",
-        method: "GET",
-        parameters: ["address", "transaction_types", "time_range", "pagination"],
-        response: "paginated_transactions"
-      }
-    }
-  },
-  integration_api: {
-    qsm_integration: {
-      sync_state: {
-        path: "/api/v1/integration/qsm/state",
-        method: "POST",
-        parameters: ["entities", "resources", "synchronization_type"],
-        response: "sync_result"
-      },
-      trigger_transition: {
-        path: "/api/v1/integration/qsm/transition",
-        method: "POST",
-        parameters: ["economic_event", "target_states"],
-        response: "triggered_transitions"
-      }
-    },
-    weq_integration: {
-      community_insight: {
-        path: "/api/v1/integration/weq/community",
-        method: "GET",
-        parameters: ["community_id", "insight_type"],
-        response: "community_economic_insight"
-      },
-      economic_intent: {
-        path: "/api/v1/integration/weq/intent",
-        method: "POST",
-        parameters: ["entity_id", "economic_intent", "intent_strength"],
-        response: "intent_registration_result"
-      }
-    },
-    ref_integration: {
-      system_evaluation: {
-        path: "/api/v1/integration/ref/evaluate",
-        method: "POST",
-        parameters: ["evaluation_metrics", "time_period"],
-        response: "system_evaluation_result"
-      },
-      improvement_suggestion: {
-        path: "/api/v1/integration/ref/suggest",
-        method: "POST",
-        parameters: ["target_metric", "improvement_goal"],
-        response: "economic_improvement_plan"
-      }
+    
+    // 添加新值和时间戳
+    history.values.push(value);
+    history.timestamps.push(Date.now());
+    
+    // 如果有足够的历史记录，计算进化率
+    if (history.values.length >= 2) {
+      const latestIndex = history.values.length - 1;
+      const previousIndex = latestIndex - 1;
+      const timeDiff = (history.timestamps[latestIndex] - history.timestamps[previousIndex]) / (1000 * 60 * 60); // 小时
+      const valueDiff = history.values[latestIndex] - history.values[previousIndex];
+      const rate = valueDiff / timeDiff;
+      
+      history.rates.push(rate);
+      this.evolutionRates.set(metric, rate);
     }
   }
-}
-```
-
-## 11. 可视化系统
-
-```qentl
-som_visualization_system {
-  visualization_framework: {
-    rendering_engine: "经济数据专用渲染引擎",
-    data_binding: "实时经济数据流绑定系统",
-    interactivity: "交互式经济参数调整",
-    responsive_design: "多设备适配架构"
-  },
-  visualization_components: {
-    resource_visualization: {
-      distribution_map: {
-        representation: "地理与抽象空间双模式",
-        color_coding: "资源类型与丰富度编码",
-        interaction: "资源流动与交换模拟"
-      },
-      resource_flow: {
-        representation: "资源流动路径与强度",
-        animation: "时间序列资源流动",
-        filtering: "资源类型与数量过滤"
-      },
-      comparison_tools: {
-        entity_comparison: "实体间资源对比",
-        time_series: "资源分布历史趋势",
-        scenario_modeling: "资源分配策略比较"
-      }
-    },
-    equality_visualization: {
-      index_dashboard: {
-        components: ["平权指数时间线", "分布洛伦兹曲线", "机会分布热力图"],
-        interaction: "多层次平权指标探索",
-        alerts: "不平等阈值警报系统"
-      },
-      distribution_analysis: {
-        representations: ["基尼系数变化图", "分层分布柱状图", "资源集中度圆环图"],
-        comparison: "真实分布与理想分布对比",
-        prediction: "政策影响预测视图"
-      },
-      opportunity_mapping: {
-        visualization: "机会分布地图",
-        access_paths: "资源获取路径图",
-        barriers: "不平等障碍可视化"
-      }
-    },
-    economic_network: {
-      entity_network: {
-        representation: "经济实体关系网络",
-        node_design: "实体类型与规模视觉编码",
-        edge_design: "交易关系与强度表示"
-      },
-      market_dynamics: {
-        visualization: "市场活动热力图",
-        price_trends: "多维价格变动图表",
-        supply_demand: "供需平衡动态视图"
-      },
-      community_economics: {
-        representation: "社区经济健康指标",
-        interaction: "社区间经济活动流图",
-        development: "经济发展轨迹图"
-      }
-    },
-    learning_visualization: {
-      knowledge_maps: {
-        representation: "知识领域与掌握程度",
-        connections: "知识点关联网络",
-        progress: "学习路径与进度指示"
-      },
-      skill_development: {
-        charts: "技能发展雷达图",
-        benchmarking: "群体技能水平比较",
-        growth: "技能成长时间线"
-      },
-      impact_analysis: {
-        visualization: "学习对经济贡献影响",
-        correlation: "技能发展与经济机会关联",
-        predictions: "技能投资回报预测"
-      }
-    },
-    som_coin_visualization: {
-      transaction_explorer: {
-        features: ["交易流向图", "区块时间线", "交易类型筛选器"],
-        entity_focus: "实体交易行为分析视图",
-        anomaly_detection: "异常交易高亮显示"
-      },
-      economic_indicators: {
-        charts: ["币值变化趋势", "流通速度指标", "持币分布图"],
-        correlations: "经济活动与币值关联图",
-        predictions: "经济模型预测器"
-      },
-      contribution_rewards: {
-        visualization: "贡献奖励分布图",
-        comparison: "贡献类型与奖励对比",
-        history: "奖励机制演变时间线"
-      }
+  
+  // 获取当前进化状态
+  getEvolutionState(): EvolutionState {
+    const metrics = {};
+    for (const [metric, history] of this.metricsHistory.entries()) {
+      metrics[metric] = {
+        currentValue: history.values.length > 0 ? history.values[history.values.length - 1] : null,
+        baseline: this.capabilityBaselines.get(metric),
+        evolutionRate: this.evolutionRates.get(metric) || 0,
+        historicalData: {
+          values: history.values,
+          timestamps: history.timestamps
+        }
+      };
     }
-  },
-  interactive_dashboards: {
-    economic_policy: {
-      components: ["策略模拟器", "影响预测图", "参数调整控制台"],
-      scenarios: "多场景比较视图",
-      recommendations: "AI优化建议显示"
-    },
-    individual_insights: {
-      personal_economy: "个人经济状况仪表板",
-      opportunity_finder: "个性化机会地图",
-      contribution_tracker: "个人贡献与回报分析"
-    },
-    system_overview: {
-      monitoring: "系统健康状态监控",
-      key_indicators: "关键经济指标汇总",
-      alerts: "系统风险与机会预警"
+    
+    return {
+      metrics,
+      overallEvolutionRate: this.calculateOverallEvolutionRate(),
+      timestamp: Date.now()
+    };
+  }
+  
+  // 计算整体进化率
+  calculateOverallEvolutionRate(): number {
+    if (this.evolutionRates.size === 0) {
+      return 0;
     }
+    
+    let sum = 0;
+    for (const rate of this.evolutionRates.values()) {
+      sum += rate;
+    }
+    
+    return sum / this.evolutionRates.size;
   }
 }
 ``` 
+
+这些学习模式系统的实现使SOM模型能够不断进化其经济平权算法，优化资源分配策略，并通过与其他量子模型的协作共同构建更有效的经济系统。 
