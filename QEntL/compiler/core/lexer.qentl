@@ -1,0 +1,263 @@
+/**
+ * QEntL词法分析器
+ * QuantumGene: QG-COMPILER-LEXER-E6F7-1714043602
+ * EntanglementStrength: 1.0
+ */
+
+quantum_program Lexer {
+    // 量子基因编码
+    metadata: {
+        name: "QEntL词法分析器",
+        version: "1.0.0",
+        description: "QEntL语言词法分析组件",
+        quantum_gene: "QG-COMPILER-LEXER-E6F7-1714043602",
+        entanglement_strength: 1.0,
+        node_state: "ACTIVE"
+    },
+    
+    // 词法分析器状态
+    state: {
+        initialized: false,
+        token_definitions: null,
+        current_source: null,
+        current_position: 0,
+        current_line: 1,
+        current_column: 1,
+        tokens: [],
+        errors: [],
+        warnings: []
+    },
+    
+    // 初始化词法分析器
+    initialize: function() {
+        if (this.state.initialized) {
+            return;
+        }
+        
+        log("Lexer", "初始化词法分析器");
+        
+        // 初始化词元定义
+        this.state.token_definitions = [
+            // 关键字
+            { type: "KEYWORD", pattern: /^(quantum_program|function|if|else|for|while|return|break|continue|import|export|metadata|components|state|entangle)(?![a-zA-Z0-9_])/ },
+            
+            // 基本类型
+            { type: "TYPE", pattern: /^(int|float|boolean|string|qubit|quantum|complex|void)(?![a-zA-Z0-9_])/ },
+            
+            // 特殊量子关键字
+            { type: "QUANTUM_KEYWORD", pattern: /^(entanglement_strength|quantum_gene|node_state)(?![a-zA-Z0-9_])/ },
+            
+            // 标识符
+            { type: "IDENTIFIER", pattern: /^[a-zA-Z_][a-zA-Z0-9_]*/ },
+            
+            // 字符串字面量
+            { type: "STRING", pattern: /^"([^"\\]|\\.)*"/ },
+            
+            // 数字字面量
+            { type: "NUMBER", pattern: /^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/ },
+            
+            // 复数字面量
+            { type: "COMPLEX", pattern: /^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?[+-][0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?i/ },
+            
+            // 布尔字面量
+            { type: "BOOLEAN", pattern: /^(true|false)(?![a-zA-Z0-9_])/ },
+            
+            // 操作符
+            { type: "OPERATOR", pattern: /^(\+\+|--|==|!=|<=|>=|&&|\|\||<<|>>|\+|-|\*|\/|%|=|<|>|!|&|\||\^|~|\?)/ },
+            
+            // 分隔符
+            { type: "DELIMITER", pattern: /^(\{|\}|\(|\)|\[|\]|;|,|:|\.|\?>|@)/ },
+            
+            // 量子操作符
+            { type: "QUANTUM_OPERATOR", pattern: /^(|>|<\||<==>|~=~)/ },
+            
+            // 注释
+            { type: "COMMENT", pattern: /^\/\/.*?(?=\n|$)|^\/\*[\s\S]*?\*\// }
+        ];
+        
+        this.state.initialized = true;
+        log("Lexer", "词法分析器初始化完成");
+    },
+    
+    // 重置词法分析器状态
+    reset: function() {
+        this.state.current_source = null;
+        this.state.current_position = 0;
+        this.state.current_line = 1;
+        this.state.current_column = 1;
+        this.state.tokens = [];
+        this.state.errors = [];
+        this.state.warnings = [];
+    },
+    
+    // 词法分析
+    tokenize: function(source, filename, options) {
+        // 确保初始化
+        if (!this.state.initialized) {
+            this.initialize();
+        }
+        
+        // 重置状态
+        this.reset();
+        
+        // 设置源代码
+        this.state.current_source = source;
+        
+        log("Lexer", `开始词法分析: ${filename}`);
+        
+        try {
+            // 循环处理输入直到结束
+            while (this.state.current_position < this.state.current_source.length) {
+                // 跳过空白字符
+                if (this.skipWhitespace()) {
+                    continue;
+                }
+                
+                // 尝试匹配词元
+                if (!this.matchToken()) {
+                    // 无效字符
+                    const char = this.state.current_source[this.state.current_position];
+                    this.addError(`无效字符: '${char}'`);
+                    this.advance(1);
+                }
+            }
+            
+            // 添加文件结束词元
+            this.addToken("EOF", null);
+            
+            log("Lexer", `词法分析完成，共生成 ${this.state.tokens.length} 个词元`);
+            
+            return {
+                success: this.state.errors.length === 0,
+                tokens: this.state.tokens,
+                errors: this.state.errors,
+                warnings: this.state.warnings
+            };
+            
+        } catch (error) {
+            this.addError(`词法分析异常: ${error.message}`);
+            
+            return {
+                success: false,
+                tokens: this.state.tokens,
+                errors: this.state.errors,
+                warnings: this.state.warnings
+            };
+        }
+    },
+    
+    // 跳过空白字符
+    skipWhitespace: function() {
+        const char = this.state.current_source[this.state.current_position];
+        
+        if (char === ' ' || char === '\t' || char === '\r') {
+            this.advance(1);
+            return true;
+        } else if (char === '\n') {
+            this.state.current_line++;
+            this.state.current_column = 1;
+            this.advance(1);
+            return true;
+        }
+        
+        return false;
+    },
+    
+    // 尝试匹配词元
+    matchToken: function() {
+        const currentText = this.state.current_source.substring(this.state.current_position);
+        
+        // 遍历词元定义
+        for (const def of this.state.token_definitions) {
+            const match = currentText.match(def.pattern);
+            
+            if (match && match.index === 0) {
+                const value = match[0];
+                
+                // 如果是注释，跳过
+                if (def.type === "COMMENT") {
+                    // 更新行号
+                    for (let i = 0; i < value.length; i++) {
+                        if (value[i] === '\n') {
+                            this.state.current_line++;
+                            this.state.current_column = 1;
+                        } else {
+                            this.state.current_column++;
+                        }
+                    }
+                    
+                    this.state.current_position += value.length;
+                    return true;
+                }
+                
+                // 添加词元
+                this.addToken(def.type, value);
+                
+                // 更新位置
+                this.advance(value.length);
+                
+                return true;
+            }
+        }
+        
+        return false;
+    },
+    
+    // 添加词元
+    addToken: function(type, value) {
+        const token = {
+            type: type,
+            value: value,
+            line: this.state.current_line,
+            column: this.state.current_column,
+            position: this.state.current_position
+        };
+        
+        this.state.tokens.push(token);
+    },
+    
+    // 添加错误
+    addError: function(message) {
+        const error = {
+            message: message,
+            line: this.state.current_line,
+            column: this.state.current_column,
+            position: this.state.current_position
+        };
+        
+        this.state.errors.push(error);
+        log("Lexer", `错误(${this.state.current_line}:${this.state.current_column}): ${message}`, "ERROR");
+    },
+    
+    // 添加警告
+    addWarning: function(message) {
+        const warning = {
+            message: message,
+            line: this.state.current_line,
+            column: this.state.current_column,
+            position: this.state.current_position
+        };
+        
+        this.state.warnings.push(warning);
+        log("Lexer", `警告(${this.state.current_line}:${this.state.current_column}): ${message}`, "WARNING");
+    },
+    
+    // 前进指定字符数
+    advance: function(count) {
+        for (let i = 0; i < count; i++) {
+            if (this.state.current_position < this.state.current_source.length) {
+                if (this.state.current_source[this.state.current_position] === '\n') {
+                    this.state.current_line++;
+                    this.state.current_column = 1;
+                } else {
+                    this.state.current_column++;
+                }
+                
+                this.state.current_position++;
+            }
+        }
+    }
+};
+
+// 导出词法分析器
+export Lexer; 

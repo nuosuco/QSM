@@ -1,0 +1,410 @@
+// 源文�? F:\model\QSM\QEntL\compiler\tests\test_compile_exe.qentl 
+// 编译时间: ��һ-04-21 11-10- 
+ 
+// 这是一个QEntL可执行文�?.qexe
+HEADER { 
+    magic: "QENTL", 
+    version: "1.0", 
+    timestamp: ��һ-04-2111-10-, 
+    quantum_gene: "QG-COMPILED-EXE-29219-31285", 
+    target_platform: "quantum_universal", 
+    entry_point: "main" 
+} 
+ENTRY_POINT { function: "main", address: 0x0000 } 
+ 
+// 从源文件复制内容... 
+/**
+ * QEntL测试程序 - 编译为.qexe
+ * QuantumGene: QG-TEST-COMPILE-EXE-C3D4-1714044100
+ * EntanglementStrength: 0.95
+ */
+
+quantum_program TestCompileExe {
+    // 量子基因编码
+    metadata: {
+        name: "QEntL编译测试 - 可执行文件",
+        version: "1.0.0",
+        description: "用于测试编译成可执行文件(.qexe)的QEntL程序",
+        quantum_gene: "QG-TEST-COMPILE-EXE-C3D4-1714044100",
+        entanglement_strength: 0.95,
+        node_state: "ACTIVE"
+    },
+    
+    // 状态
+    state: {
+        iterations: 0,
+        qubit_count: 4,
+        results: [],
+        is_running: false
+    },
+    
+    // 初始化
+    initialize: function() {
+        log("TestCompileExe", "初始化可执行程序");
+        this.state.iterations = 0;
+        this.state.qubit_count = 4;
+        this.state.results = [];
+        this.state.is_running = true;
+        return true;
+    },
+    
+    // 主函数 - 入口点
+    main: function() {
+        log("TestCompileExe", "程序入口点执行");
+        
+        // 确保初始化
+        if (!this.state.is_running) {
+            this.initialize();
+        }
+        
+        // 创建贝尔对
+        this.createBellPair();
+        
+        // 执行量子傅里叶变换
+        this.quantumFourierTransform();
+        
+        // 执行Grove搜索算法
+        this.groverSearch();
+        
+        log("TestCompileExe", "程序执行完成");
+        
+        return {
+            status: "success",
+            iterations: this.state.iterations,
+            results: this.state.results
+        };
+    },
+    
+    // 创建贝尔对
+    createBellPair: function() {
+        log("TestCompileExe", "创建贝尔对");
+        
+        // 申请两个量子比特
+        let qreg = quantum_allocate(2);
+        
+        // 创建贝尔态 |Φ+⟩ = (|00⟩ + |11⟩)/√2
+        hadamard(qreg[0]);
+        cnot(qreg[0], qreg[1]);
+        
+        // 测量结果
+        const result = quantum_measure(qreg);
+        
+        this.state.results.push({
+            operation: "Bell Pair",
+            result: result
+        });
+        
+        this.state.iterations++;
+        log("TestCompileExe", `贝尔对测量结果: ${result}`);
+        
+        return result;
+    },
+    
+    // 量子傅里叶变换
+    quantumFourierTransform: function() {
+        log("TestCompileExe", `执行${this.state.qubit_count}量子比特的QFT`);
+        
+        // 申请量子比特
+        let qreg = quantum_allocate(this.state.qubit_count);
+        
+        // 初始化为均匀叠加态
+        for (let i = 0; i < this.state.qubit_count; i++) {
+            hadamard(qreg[i]);
+        }
+        
+        // 执行QFT
+        // 对每个量子比特
+        for (let i = 0; i < this.state.qubit_count; i++) {
+            // 应用受控相位旋转
+            for (let j = i + 1; j < this.state.qubit_count; j++) {
+                const angle = Math.PI / Math.pow(2, j - i);
+                controlled_phase(qreg[i], qreg[j], angle);
+            }
+        }
+        
+        // 测量结果
+        const result = quantum_measure(qreg);
+        
+        this.state.results.push({
+            operation: "Quantum Fourier Transform",
+            result: result
+        });
+        
+        this.state.iterations++;
+        log("TestCompileExe", `QFT测量结果: ${result}`);
+        
+        return result;
+    },
+    
+    // Grove搜索算法
+    groverSearch: function() {
+        log("TestCompileExe", "执行Grove搜索算法");
+        
+        // 搜索空间大小 (2^n)
+        const n = 2; // 2个量子比特，4个搜索空间
+        
+        // 申请量子比特
+        let qreg = quantum_allocate(n);
+        
+        // 初始化为均匀叠加态
+        for (let i = 0; i < n; i++) {
+            hadamard(qreg[i]);
+        }
+        
+        // 标记目标态 (假设我们寻找|01⟩)
+        const target = 1; // |01⟩
+        
+        // 应用Oracle (标记目标状态)
+        if ((target & 1) === 1) x(qreg[0]);
+        if ((target & 2) === 2) x(qreg[1]);
+        
+        // 应用Z门到所有量子比特
+        z(qreg[0]);
+        z(qreg[1]);
+        
+        // 如果需要，反转标记
+        if ((target & 1) === 1) x(qreg[0]);
+        if ((target & 2) === 2) x(qreg[1]);
+        
+        // 应用扩散算子
+        for (let i = 0; i < n; i++) {
+            hadamard(qreg[i]);
+            x(qreg[i]);
+        }
+        
+        // 应用共同的Z门
+        z(qreg[0]);
+        
+        // 撤销X门和H门
+        for (let i = 0; i < n; i++) {
+            x(qreg[i]);
+            hadamard(qreg[i]);
+        }
+        
+        // 测量结果
+        const result = quantum_measure(qreg);
+        
+        this.state.results.push({
+            operation: "Grover Search",
+            result: result,
+            target: target
+        });
+        
+        this.state.iterations++;
+        log("TestCompileExe", `Grove搜索结果: ${result}, 目标: ${target}`);
+        
+        return result;
+    },
+    
+    // 关闭程序
+    shutdown: function() {
+        log("TestCompileExe", "关闭程序");
+        this.state.is_running = false;
+        return true;
+    }
+};
+
+// 导出程序
+export TestCompileExe; HEADER { 
+    magic: "QENTL", 
+    version: "1.0", 
+    timestamp: ��һ-04-2111-10-, 
+    quantum_gene: "QG-COMPILED-OBJ-22574-24428", 
+    format: "QOM" 
+} 
+ 
+// 从源文件复制内容... 
+/**
+ * QEntL测试程序 - 编译为.qexe
+ * QuantumGene: QG-TEST-COMPILE-EXE-C3D4-1714044100
+ * EntanglementStrength: 0.95
+ */
+
+quantum_program TestCompileExe {
+    // 量子基因编码
+    metadata: {
+        name: "QEntL编译测试 - 可执行文件",
+        version: "1.0.0",
+        description: "用于测试编译成可执行文件(.qexe)的QEntL程序",
+        quantum_gene: "QG-TEST-COMPILE-EXE-C3D4-1714044100",
+        entanglement_strength: 0.95,
+        node_state: "ACTIVE"
+    },
+    
+    // 状态
+    state: {
+        iterations: 0,
+        qubit_count: 4,
+        results: [],
+        is_running: false
+    },
+    
+    // 初始化
+    initialize: function() {
+        log("TestCompileExe", "初始化可执行程序");
+        this.state.iterations = 0;
+        this.state.qubit_count = 4;
+        this.state.results = [];
+        this.state.is_running = true;
+        return true;
+    },
+    
+    // 主函数 - 入口点
+    main: function() {
+        log("TestCompileExe", "程序入口点执行");
+        
+        // 确保初始化
+        if (!this.state.is_running) {
+            this.initialize();
+        }
+        
+        // 创建贝尔对
+        this.createBellPair();
+        
+        // 执行量子傅里叶变换
+        this.quantumFourierTransform();
+        
+        // 执行Grove搜索算法
+        this.groverSearch();
+        
+        log("TestCompileExe", "程序执行完成");
+        
+        return {
+            status: "success",
+            iterations: this.state.iterations,
+            results: this.state.results
+        };
+    },
+    
+    // 创建贝尔对
+    createBellPair: function() {
+        log("TestCompileExe", "创建贝尔对");
+        
+        // 申请两个量子比特
+        let qreg = quantum_allocate(2);
+        
+        // 创建贝尔态 |Φ+⟩ = (|00⟩ + |11⟩)/√2
+        hadamard(qreg[0]);
+        cnot(qreg[0], qreg[1]);
+        
+        // 测量结果
+        const result = quantum_measure(qreg);
+        
+        this.state.results.push({
+            operation: "Bell Pair",
+            result: result
+        });
+        
+        this.state.iterations++;
+        log("TestCompileExe", `贝尔对测量结果: ${result}`);
+        
+        return result;
+    },
+    
+    // 量子傅里叶变换
+    quantumFourierTransform: function() {
+        log("TestCompileExe", `执行${this.state.qubit_count}量子比特的QFT`);
+        
+        // 申请量子比特
+        let qreg = quantum_allocate(this.state.qubit_count);
+        
+        // 初始化为均匀叠加态
+        for (let i = 0; i < this.state.qubit_count; i++) {
+            hadamard(qreg[i]);
+        }
+        
+        // 执行QFT
+        // 对每个量子比特
+        for (let i = 0; i < this.state.qubit_count; i++) {
+            // 应用受控相位旋转
+            for (let j = i + 1; j < this.state.qubit_count; j++) {
+                const angle = Math.PI / Math.pow(2, j - i);
+                controlled_phase(qreg[i], qreg[j], angle);
+            }
+        }
+        
+        // 测量结果
+        const result = quantum_measure(qreg);
+        
+        this.state.results.push({
+            operation: "Quantum Fourier Transform",
+            result: result
+        });
+        
+        this.state.iterations++;
+        log("TestCompileExe", `QFT测量结果: ${result}`);
+        
+        return result;
+    },
+    
+    // Grove搜索算法
+    groverSearch: function() {
+        log("TestCompileExe", "执行Grove搜索算法");
+        
+        // 搜索空间大小 (2^n)
+        const n = 2; // 2个量子比特，4个搜索空间
+        
+        // 申请量子比特
+        let qreg = quantum_allocate(n);
+        
+        // 初始化为均匀叠加态
+        for (let i = 0; i < n; i++) {
+            hadamard(qreg[i]);
+        }
+        
+        // 标记目标态 (假设我们寻找|01⟩)
+        const target = 1; // |01⟩
+        
+        // 应用Oracle (标记目标状态)
+        if ((target & 1) === 1) x(qreg[0]);
+        if ((target & 2) === 2) x(qreg[1]);
+        
+        // 应用Z门到所有量子比特
+        z(qreg[0]);
+        z(qreg[1]);
+        
+        // 如果需要，反转标记
+        if ((target & 1) === 1) x(qreg[0]);
+        if ((target & 2) === 2) x(qreg[1]);
+        
+        // 应用扩散算子
+        for (let i = 0; i < n; i++) {
+            hadamard(qreg[i]);
+            x(qreg[i]);
+        }
+        
+        // 应用共同的Z门
+        z(qreg[0]);
+        
+        // 撤销X门和H门
+        for (let i = 0; i < n; i++) {
+            x(qreg[i]);
+            hadamard(qreg[i]);
+        }
+        
+        // 测量结果
+        const result = quantum_measure(qreg);
+        
+        this.state.results.push({
+            operation: "Grover Search",
+            result: result,
+            target: target
+        });
+        
+        this.state.iterations++;
+        log("TestCompileExe", `Grove搜索结果: ${result}, 目标: ${target}`);
+        
+        return result;
+    },
+    
+    // 关闭程序
+    shutdown: function() {
+        log("TestCompileExe", "关闭程序");
+        this.state.is_running = false;
+        return true;
+    }
+};
+
+// 导出程序
+export TestCompileExe;  
+// 编译完成 

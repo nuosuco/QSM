@@ -1,0 +1,758 @@
+/**
+ * QEntL代码生成器
+ * QuantumGene: QG-COMPILER-CODEGEN-I7J8-1714043604
+ * EntanglementStrength: 1.0
+ */
+
+quantum_program CodeGenerator {
+    // 量子基因编码
+    metadata: {
+        name: "QEntL代码生成器",
+        version: "1.0.0",
+        description: "QEntL语言代码生成组件",
+        quantum_gene: "QG-COMPILER-CODEGEN-I7J8-1714043604",
+        entanglement_strength: 1.0,
+        node_state: "ACTIVE"
+    },
+    
+    // 代码生成器状态
+    state: {
+        initialized: false,
+        target_platform: "multiplatform",
+        include_debug_info: false,
+        ast: null,
+        symbol_table: null,
+        ir: null,
+        output_buffer: "",
+        errors: [],
+        warnings: []
+    },
+    
+    // 初始化代码生成器
+    initialize: function() {
+        if (this.state.initialized) {
+            return;
+        }
+        
+        log("CodeGenerator", "初始化代码生成器");
+        
+        this.state.initialized = true;
+        log("CodeGenerator", "代码生成器初始化完成");
+    },
+    
+    // 重置代码生成器状态
+    reset: function() {
+        this.state.target_platform = "multiplatform";
+        this.state.include_debug_info = false;
+        this.state.ast = null;
+        this.state.symbol_table = null;
+        this.state.ir = null;
+        this.state.output_buffer = "";
+        this.state.errors = [];
+        this.state.warnings = [];
+    },
+    
+    // 生成目标代码
+    generate: function(ir, target_file, options) {
+        // 确保初始化
+        if (!this.state.initialized) {
+            this.initialize();
+        }
+        
+        // 重置状态
+        this.reset();
+        
+        // 设置IR和选项
+        this.state.ir = ir;
+        this.state.target_platform = options.target_platform || "multiplatform";
+        this.state.include_debug_info = options.include_debug_info || false;
+        
+        log("CodeGenerator", `开始代码生成，目标平台: ${this.state.target_platform}`);
+        
+        try {
+            // 生成代码头部
+            this.generateHeader();
+            
+            // 生成代码主体
+            this.generateBody();
+            
+            // 生成代码尾部
+            this.generateFooter();
+            
+            log("CodeGenerator", "代码生成完成");
+            
+            return {
+                success: this.state.errors.length === 0,
+                code: this.state.output_buffer,
+                errors: this.state.errors,
+                warnings: this.state.warnings
+            };
+            
+        } catch (error) {
+            this.addError(`代码生成异常: ${error.message}`);
+            
+            return {
+                success: false,
+                code: this.state.output_buffer,
+                errors: this.state.errors,
+                warnings: this.state.warnings
+            };
+        }
+    },
+    
+    // 生成代码头部
+    generateHeader: function() {
+        // 添加文件头注释
+        this.emit("/**\n");
+        this.emit(" * 由QEntL编译器生成的代码\n");
+        this.emit(" * 生成时间: " + new Date().toISOString() + "\n");
+        
+        // 添加量子基因编码
+        const quantumGene = "QG-COMPILED-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Date.now();
+        this.emit(" * QuantumGene: " + quantumGene + "\n");
+        this.emit(" * EntanglementStrength: 1.0\n");
+        this.emit(" */\n\n");
+        
+        // 添加平台特定头部
+        switch (this.state.target_platform) {
+            case "quantum":
+                this.generateQuantumHeader();
+                break;
+                
+            case "classical":
+                this.generateClassicalHeader();
+                break;
+                
+            case "multiplatform":
+            default:
+                this.generateMultiplatformHeader();
+                break;
+        }
+    },
+    
+    // 生成量子平台头部
+    generateQuantumHeader: function() {
+        this.emit("// 量子平台特定头部\n");
+        this.emit("quantum_execution_environment {\n");
+        this.emit("    qubit_count: 32,\n");
+        this.emit("    entanglement_channels: true,\n");
+        this.emit("    superposition_support: true\n");
+        this.emit("}\n\n");
+    },
+    
+    // 生成经典平台头部
+    generateClassicalHeader: function() {
+        this.emit("// 经典平台特定头部\n");
+        this.emit("classical_execution_environment {\n");
+        this.emit("    word_size: 64,\n");
+        this.emit("    endianness: \"little\",\n");
+        this.emit("    float_precision: \"ieee754\"\n");
+        this.emit("}\n\n");
+    },
+    
+    // 生成多平台头部
+    generateMultiplatformHeader: function() {
+        this.emit("// 多平台兼容头部\n");
+        this.emit("multiplatform_execution_environment {\n");
+        this.emit("    target_platforms: [\"quantum\", \"classical\"],\n");
+        this.emit("    adaptive_execution: true,\n");
+        this.emit("    platform_detection: true\n");
+        this.emit("}\n\n");
+    },
+    
+    // 生成代码主体
+    generateBody: function() {
+        // 基于IR生成代码
+        if (!this.state.ir) {
+            this.addError("没有中间表示可供生成代码");
+            return;
+        }
+        
+        // 分析IR结构
+        this.analyzeIR();
+        
+        // 生成程序主体
+        this.generateProgramBody();
+        
+        // 生成功能函数
+        this.generateHelperFunctions();
+    },
+    
+    // 分析IR结构
+    analyzeIR: function() {
+        log("CodeGenerator", "分析IR结构");
+        
+        // 分析顶层节点
+        if (this.state.ir.type === "Program") {
+            for (const node of this.state.ir.body) {
+                this.analyzeTopLevelNode(node);
+            }
+        } else {
+            this.addWarning(`预期IR根节点类型为Program，实际为${this.state.ir.type}`);
+        }
+    },
+    
+    // 分析顶层节点
+    analyzeTopLevelNode: function(node) {
+        switch (node.type) {
+            case "QuantumProgram":
+                log("CodeGenerator", `分析量子程序: ${node.name}`);
+                break;
+                
+            case "FunctionDeclaration":
+                log("CodeGenerator", `分析函数: ${node.name}`);
+                break;
+                
+            case "ImportStatement":
+                log("CodeGenerator", `分析导入语句: ${node.path}`);
+                break;
+                
+            case "ExportStatement":
+                log("CodeGenerator", "分析导出语句");
+                break;
+                
+            default:
+                log("CodeGenerator", `分析未知顶层节点类型: ${node.type}`);
+                break;
+        }
+    },
+    
+    // 生成程序主体
+    generateProgramBody: function() {
+        this.emit("// 程序主体\n");
+        
+        // 只有在IR有效时才生成
+        if (!this.state.ir) {
+            return;
+        }
+        
+        // 遍历顶层节点生成代码
+        if (this.state.ir.type === "Program") {
+            for (const node of this.state.ir.body) {
+                this.generateNode(node);
+                this.emit("\n");
+            }
+        }
+    },
+    
+    // 生成节点代码
+    generateNode: function(node) {
+        if (!node) return;
+        
+        switch (node.type) {
+            case "QuantumProgram":
+                this.generateQuantumProgram(node);
+                break;
+                
+            case "FunctionDeclaration":
+                this.generateFunctionDeclaration(node);
+                break;
+                
+            case "VariableDeclaration":
+                this.generateVariableDeclaration(node);
+                break;
+                
+            case "ImportStatement":
+                this.generateImportStatement(node);
+                break;
+                
+            case "ExportStatement":
+                this.generateExportStatement(node);
+                break;
+                
+            case "IfStatement":
+                this.generateIfStatement(node);
+                break;
+                
+            case "ForStatement":
+                this.generateForStatement(node);
+                break;
+                
+            case "WhileStatement":
+                this.generateWhileStatement(node);
+                break;
+                
+            case "ReturnStatement":
+                this.generateReturnStatement(node);
+                break;
+                
+            case "ExpressionStatement":
+                this.generateExpressionStatement(node);
+                break;
+                
+            case "BlockStatement":
+                this.generateBlockStatement(node);
+                break;
+                
+            default:
+                this.addWarning(`未处理的节点类型: ${node.type}`);
+                this.emit(`/* 未生成代码: ${node.type} */\n`);
+                break;
+        }
+    },
+    
+    // 生成量子程序
+    generateQuantumProgram: function(node) {
+        this.emit(`quantum_program ${node.name} {\n`);
+        
+        // 生成元数据
+        if (node.metadata) {
+            this.emit("    metadata: ");
+            this.generateObjectExpression(node.metadata);
+            this.emit(",\n\n");
+        }
+        
+        // 生成状态
+        if (node.state) {
+            this.emit("    state: ");
+            this.generateObjectExpression(node.state);
+            this.emit(",\n\n");
+        }
+        
+        // 生成组件
+        if (node.components && node.components.length > 0) {
+            this.emit("    components: ");
+            this.generateArrayExpression(node.components);
+            this.emit(",\n\n");
+        }
+        
+        // 生成函数
+        for (const func of node.functions) {
+            this.emit("    ");
+            this.generateFunctionDeclaration(func, true);
+            this.emit(",\n\n");
+        }
+        
+        this.emit("};\n");
+        
+        // 如果有导出，添加导出语句
+        this.emit(`export ${node.name};\n`);
+    },
+    
+    // 生成函数声明
+    generateFunctionDeclaration: function(node, isProperty = false) {
+        if (isProperty) {
+            this.emit(`${node.name}: function(`);
+        } else {
+            this.emit(`function ${node.name}(`);
+        }
+        
+        // 生成参数列表
+        if (node.parameters && node.parameters.length > 0) {
+            for (let i = 0; i < node.parameters.length; i++) {
+                if (i > 0) {
+                    this.emit(", ");
+                }
+                this.emit(node.parameters[i].name);
+            }
+        }
+        
+        this.emit(") ");
+        
+        // 生成函数体
+        this.generateBlockStatement(node.body);
+    },
+    
+    // 生成变量声明
+    generateVariableDeclaration: function(node) {
+        this.emit(`${node.kind} ${node.name}`);
+        
+        if (node.initializer) {
+            this.emit(" = ");
+            this.generateExpression(node.initializer);
+        }
+        
+        this.emit(";\n");
+    },
+    
+    // 生成导入语句
+    generateImportStatement: function(node) {
+        if (node.specifiers && node.specifiers.length > 0) {
+            // 具名导入
+            this.emit("import ");
+            
+            if (node.specifiers[0].type === "ImportDefaultSpecifier") {
+                // 默认导入
+                this.emit(node.specifiers[0].local);
+            } else {
+                // 花括号导入
+                this.emit("{ ");
+                
+                for (let i = 0; i < node.specifiers.length; i++) {
+                    if (i > 0) {
+                        this.emit(", ");
+                    }
+                    
+                    this.emit(node.specifiers[i].imported);
+                    
+                    if (node.specifiers[i].imported !== node.specifiers[i].local) {
+                        this.emit(` as ${node.specifiers[i].local}`);
+                    }
+                }
+                
+                this.emit(" }");
+            }
+            
+            this.emit(` from "${node.path}";\n`);
+        } else {
+            // 简单导入
+            this.emit(`import "${node.path}";\n`);
+        }
+    },
+    
+    // 生成导出语句
+    generateExportStatement: function(node) {
+        if (node.type === "ExportDefaultDeclaration") {
+            this.emit("export default ");
+            this.generateExpression(node.declaration);
+            this.emit(";\n");
+        } else if (node.declaration) {
+            this.emit("export ");
+            this.generateNode(node.declaration);
+        } else if (node.specifiers && node.specifiers.length > 0) {
+            this.emit("export { ");
+            
+            for (let i = 0; i < node.specifiers.length; i++) {
+                if (i > 0) {
+                    this.emit(", ");
+                }
+                
+                this.emit(node.specifiers[i].local);
+                
+                if (node.specifiers[i].local !== node.specifiers[i].exported) {
+                    this.emit(` as ${node.specifiers[i].exported}`);
+                }
+            }
+            
+            this.emit(" };\n");
+        }
+    },
+    
+    // 生成IF语句
+    generateIfStatement: function(node) {
+        this.emit("if (");
+        this.generateExpression(node.condition);
+        this.emit(") ");
+        
+        this.generateNode(node.thenBranch);
+        
+        if (node.elseBranch) {
+            this.emit(" else ");
+            this.generateNode(node.elseBranch);
+        }
+    },
+    
+    // 生成for语句
+    generateForStatement: function(node) {
+        this.emit("for (");
+        
+        if (node.initializer) {
+            this.generateNode(node.initializer);
+        } else {
+            this.emit(";");
+        }
+        
+        this.emit(" ");
+        
+        if (node.condition) {
+            this.generateExpression(node.condition);
+        }
+        
+        this.emit("; ");
+        
+        if (node.increment) {
+            this.generateExpression(node.increment);
+        }
+        
+        this.emit(") ");
+        
+        this.generateNode(node.body);
+    },
+    
+    // 生成while语句
+    generateWhileStatement: function(node) {
+        this.emit("while (");
+        this.generateExpression(node.condition);
+        this.emit(") ");
+        
+        this.generateNode(node.body);
+    },
+    
+    // 生成return语句
+    generateReturnStatement: function(node) {
+        this.emit("return");
+        
+        if (node.value) {
+            this.emit(" ");
+            this.generateExpression(node.value);
+        }
+        
+        this.emit(";\n");
+    },
+    
+    // 生成表达式语句
+    generateExpressionStatement: function(node) {
+        this.generateExpression(node.expression);
+        this.emit(";\n");
+    },
+    
+    // 生成代码块
+    generateBlockStatement: function(node) {
+        this.emit("{\n");
+        
+        if (node.body && node.body.length > 0) {
+            for (const statement of node.body) {
+                this.emit("    ");
+                this.generateNode(statement);
+            }
+        }
+        
+        this.emit("}\n");
+    },
+    
+    // 生成表达式
+    generateExpression: function(node) {
+        if (!node) return;
+        
+        switch (node.type) {
+            case "Identifier":
+                this.emit(node.name);
+                break;
+                
+            case "Literal":
+                if (typeof node.value === "string") {
+                    this.emit(`"${node.value}"`);
+                } else {
+                    this.emit(String(node.value));
+                }
+                break;
+                
+            case "BinaryExpression":
+                this.generateExpression(node.left);
+                this.emit(` ${node.operator} `);
+                this.generateExpression(node.right);
+                break;
+                
+            case "LogicalExpression":
+                this.generateExpression(node.left);
+                this.emit(` ${node.operator} `);
+                this.generateExpression(node.right);
+                break;
+                
+            case "UnaryExpression":
+                this.emit(node.operator);
+                this.generateExpression(node.argument);
+                break;
+                
+            case "AssignmentExpression":
+                this.generateExpression(node.left);
+                this.emit(` ${node.operator} `);
+                this.generateExpression(node.right);
+                break;
+                
+            case "CallExpression":
+                this.generateExpression(node.callee);
+                this.emit("(");
+                
+                if (node.arguments && node.arguments.length > 0) {
+                    for (let i = 0; i < node.arguments.length; i++) {
+                        if (i > 0) {
+                            this.emit(", ");
+                        }
+                        this.generateExpression(node.arguments[i]);
+                    }
+                }
+                
+                this.emit(")");
+                break;
+                
+            case "MemberExpression":
+                this.generateExpression(node.object);
+                
+                if (node.computed) {
+                    this.emit("[");
+                    this.generateExpression(node.property);
+                    this.emit("]");
+                } else {
+                    this.emit(".");
+                    this.emit(node.property.name);
+                }
+                break;
+                
+            case "ObjectExpression":
+                this.generateObjectExpression(node);
+                break;
+                
+            case "ArrayExpression":
+                this.generateArrayExpression(node);
+                break;
+                
+            default:
+                this.addWarning(`未处理的表达式类型: ${node.type}`);
+                this.emit(`/* 未生成代码: ${node.type} */`);
+                break;
+        }
+    },
+    
+    // 生成对象表达式
+    generateObjectExpression: function(node) {
+        this.emit("{\n");
+        
+        if (node.properties && node.properties.length > 0) {
+            for (let i = 0; i < node.properties.length; i++) {
+                this.emit("    ");
+                
+                const prop = node.properties[i];
+                
+                if (prop.key.type === "Identifier") {
+                    this.emit(prop.key.name);
+                } else {
+                    this.emit(`"${prop.key.value}"`);
+                }
+                
+                this.emit(": ");
+                this.generateExpression(prop.value);
+                
+                if (i < node.properties.length - 1) {
+                    this.emit(",");
+                }
+                
+                this.emit("\n");
+            }
+        }
+        
+        this.emit("}");
+    },
+    
+    // 生成数组表达式
+    generateArrayExpression: function(node) {
+        this.emit("[\n");
+        
+        if (node.elements && node.elements.length > 0) {
+            for (let i = 0; i < node.elements.length; i++) {
+                this.emit("    ");
+                this.generateExpression(node.elements[i]);
+                
+                if (i < node.elements.length - 1) {
+                    this.emit(",");
+                }
+                
+                this.emit("\n");
+            }
+        }
+        
+        this.emit("]");
+    },
+    
+    // 生成辅助函数
+    generateHelperFunctions: function() {
+        // 生成运行时辅助函数
+        this.emit("\n// 运行时辅助函数\n");
+        
+        // 根据目标平台添加特定的辅助函数
+        switch (this.state.target_platform) {
+            case "quantum":
+                this.generateQuantumHelpers();
+                break;
+                
+            case "classical":
+                this.generateClassicalHelpers();
+                break;
+                
+            case "multiplatform":
+            default:
+                this.generateMultiplatformHelpers();
+                break;
+        }
+    },
+    
+    // 生成量子平台辅助函数
+    generateQuantumHelpers: function() {
+        this.emit(`
+// 量子操作辅助函数
+function applyQuantumGate(gate, qubits) {
+    // 量子门应用逻辑
+    _quantum_apply_gate(gate, qubits);
+}
+
+function createEntanglement(qubit1, qubit2, strength = 1.0) {
+    // 量子纠缠创建逻辑
+    _quantum_entangle(qubit1, qubit2, strength);
+}
+`);
+    },
+    
+    // 生成经典平台辅助函数
+    generateClassicalHelpers: function() {
+        this.emit(`
+// 经典计算辅助函数
+function simulateQuantumGate(gate, qubits) {
+    // 量子门模拟逻辑
+    _classical_simulate_gate(gate, qubits);
+}
+
+function simulateEntanglement(qubit1, qubit2, strength = 1.0) {
+    // 量子纠缠模拟逻辑
+    _classical_simulate_entangle(qubit1, qubit2, strength);
+}
+`);
+    },
+    
+    // 生成多平台辅助函数
+    generateMultiplatformHelpers: function() {
+        this.emit(`
+// 多平台适配辅助函数
+function detectPlatform() {
+    // 检测运行平台
+    return _platform_detection();
+}
+
+function adaptiveExecute(quantumFunc, classicalFunc) {
+    // 根据平台选择执行方式
+    const platform = detectPlatform();
+    if (platform === "quantum") {
+        return quantumFunc();
+    } else {
+        return classicalFunc();
+    }
+}
+`);
+    },
+    
+    // 生成代码尾部
+    generateFooter: function() {
+        this.emit("\n/**\n");
+        this.emit(" * 编译完成\n");
+        this.emit(" */\n");
+    },
+    
+    // 向输出缓冲区添加代码
+    emit: function(code) {
+        this.state.output_buffer += code;
+    },
+    
+    // 添加错误
+    addError: function(message) {
+        const error = {
+            message: message,
+            timestamp: Date.now()
+        };
+        
+        this.state.errors.push(error);
+        log("CodeGenerator", `错误: ${message}`, "ERROR");
+    },
+    
+    // 添加警告
+    addWarning: function(message) {
+        const warning = {
+            message: message,
+            timestamp: Date.now()
+        };
+        
+        this.state.warnings.push(warning);
+        log("CodeGenerator", `警告: ${message}`, "WARNING");
+    }
+};
+
+// 导出代码生成器
+export CodeGenerator; 

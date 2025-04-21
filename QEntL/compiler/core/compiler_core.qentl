@@ -1,0 +1,620 @@
+/**
+ * QEntL编译器核心
+ * QuantumGene: QG-COMPILER-CORE-C4D5-1714043601
+ * EntanglementStrength: 1.0
+ */
+
+quantum_program CompilerCore {
+    // 量子基因编码
+    metadata: {
+        name: "QEntL编译器核心",
+        version: "1.0.0",
+        description: "QEntL语言编译器核心组件",
+        quantum_gene: "QG-COMPILER-CORE-C4D5-1714043601",
+        entanglement_strength: 1.0,
+        node_state: "ACTIVE"
+    },
+    
+    // 编译器配置
+    config: {
+        default_optimization_level: "high",
+        quantum_gate_optimization: true,
+        quantum_circuit_optimization: true,
+        classical_code_optimization: true,
+        debug_info: false,
+        source_mapping: true,
+        quantum_bit_adaptive: true,
+        output_quantum_gene_encoding: true,
+        entanglement_channel_generation: true
+    },
+    
+    // 编译器组件
+    components: {
+        lexer: @import("lexer.qentl"),
+        parser: @import("parser.qentl"),
+        semantic_analyzer: @import("semantic_analyzer.qentl"),
+        code_generator: @import("code_generator.qentl"),
+        ir_generator: @import("ir_generator.qentl"),
+        optimizer: @import("optimizer.qentl"),
+        quantum_encoder: @import("quantum_encoder.qentl")
+    },
+    
+    // 编译器状态
+    state: {
+        initialized: false,
+        compiling: false,
+        source_file: null,
+        target_file: null,
+        options: null,
+        stages: {
+            lexer: null,
+            parser: null,
+            semantic_analyzer: null,
+            ir_generator: null,
+            optimizer: null,
+            code_generator: null
+        },
+        errors: [],
+        warnings: []
+    },
+    
+    // 初始化编译器
+    initialize: function() {
+        if (this.state.initialized) {
+            return true;
+        }
+        
+        log("CompilerCore", "初始化编译器核心");
+        
+        // 初始化各个组件
+        this.components.lexer.initialize();
+        this.components.parser.initialize();
+        this.components.semantic_analyzer.initialize();
+        this.components.ir_generator.initialize();
+        this.components.optimizer.initialize();
+        this.components.code_generator.initialize();
+        
+        // 建立组件间的量子纠缠关系
+        this.establishComponentEntanglement();
+        
+        // 更新状态
+        this.state.initialized = true;
+        this.resetState();
+        
+        return true;
+    },
+    
+    // 建立组件间的量子纠缠关系
+    establishComponentEntanglement: function() {
+        log("CompilerCore", "建立组件间的量子纠缠关系");
+        
+        // 词法分析器和语法分析器
+        entangle(this.components.lexer, this.components.parser, {
+            strength: 0.95,
+            channel: "token_stream_channel"
+        });
+        
+        // 语法分析器和语义分析器
+        entangle(this.components.parser, this.components.semantic_analyzer, {
+            strength: 0.9,
+            channel: "ast_channel"
+        });
+        
+        // 语义分析器和代码生成器
+        entangle(this.components.semantic_analyzer, this.components.code_generator, {
+            strength: 0.85,
+            channel: "validated_ast_channel"
+        });
+        
+        // 代码生成器和优化器
+        entangle(this.components.code_generator, this.components.optimizer, {
+            strength: 0.8,
+            channel: "ir_code_channel"
+        });
+        
+        // 优化器和量子编码器
+        entangle(this.components.optimizer, this.components.quantum_encoder, {
+            strength: 0.9,
+            channel: "optimized_code_channel"
+        });
+        
+        log("CompilerCore", "组件纠缠关系建立完成");
+    },
+    
+    // 重置编译器状态
+    resetState: function() {
+        this.state.compiling = false;
+        this.state.source_file = null;
+        this.state.target_file = null;
+        this.state.options = null;
+        this.state.errors = [];
+        this.state.warnings = [];
+        
+        // 重置各阶段状态
+        for (const stage in this.state.stages) {
+            this.state.stages[stage] = null;
+        }
+        
+        // 重置各组件状态
+        this.components.lexer.reset();
+        this.components.parser.reset();
+        this.components.semantic_analyzer.reset();
+        this.components.ir_generator.reset();
+        this.components.optimizer.reset();
+        this.components.code_generator.reset();
+    },
+    
+    // 编译单个文件
+    compileFile: function(filename, options) {
+        // 确保初始化
+        if (!this.state.initialized) {
+            this.initialize();
+        }
+        
+        // 重置状态
+        this.resetState();
+        
+        // 设置编译状态
+        this.state.compiling = true;
+        this.state.source_file = filename;
+        this.state.target_file = options.output || this.generateOutputPath(filename);
+        this.state.options = options;
+        
+        log("CompilerCore", `开始编译: ${filename} -> ${this.state.target_file}`);
+        
+        try {
+            // 1. 词法分析
+            const lexResult = this.runLexer();
+            if (!lexResult.success) {
+                return this.finishCompilation("lexer", false);
+            }
+            
+            // 2. 语法分析
+            const parseResult = this.runParser(lexResult.tokens);
+            if (!parseResult.success) {
+                return this.finishCompilation("parser", false);
+            }
+            
+            // 3. 语义分析
+            const semanticResult = this.runSemanticAnalyzer(parseResult.ast);
+            if (!semanticResult.success) {
+                return this.finishCompilation("semantic_analyzer", false);
+            }
+            
+            // 4. 中间代码生成
+            const irResult = this.runIRGenerator(semanticResult.ast);
+            if (!irResult.success) {
+                return this.finishCompilation("ir_generator", false);
+            }
+            
+            // 5. 优化
+            const optimizeResult = this.runOptimizer(irResult.ir);
+            if (!optimizeResult.success) {
+                return this.finishCompilation("optimizer", false);
+            }
+            
+            // 6. 目标代码生成
+            const codeGenResult = this.runCodeGenerator(optimizeResult.ir);
+            if (!codeGenResult.success) {
+                return this.finishCompilation("code_generator", false);
+            }
+            
+            // 7. 写入输出文件
+            const writeResult = this.writeOutput(codeGenResult.code);
+            if (!writeResult.success) {
+                return this.finishCompilation("write_output", false);
+            }
+            
+            // 编译成功
+            return this.finishCompilation("complete", true);
+            
+        } catch (error) {
+            // 处理未捕获的异常
+            this.addError("compiler", "未捕获的异常: " + error.message, error.stack);
+            return this.finishCompilation("exception", false);
+        }
+    },
+    
+    // 完成编译并返回结果
+    finishCompilation: function(stage, success) {
+        this.state.compiling = false;
+        
+        const result = {
+            success: success,
+            source: this.state.source_file,
+            output: success ? this.state.target_file : null,
+            stage: stage,
+            errors: this.state.errors,
+            warnings: this.state.warnings
+        };
+        
+        if (success) {
+            log("CompilerCore", `编译成功: ${this.state.source_file} -> ${this.state.target_file}`);
+        } else {
+            log("CompilerCore", `编译失败: ${this.state.source_file}, 阶段: ${stage}`, "ERROR");
+        }
+        
+        return result;
+    },
+    
+    // 添加编译错误
+    addError: function(stage, message, details) {
+        const error = {
+            stage: stage,
+            message: message,
+            details: details || null,
+            line: null,
+            column: null,
+            file: this.state.source_file
+        };
+        
+        this.state.errors.push(error);
+        log("CompilerCore", `错误: ${message}`, "ERROR");
+        
+        return error;
+    },
+    
+    // 添加编译警告
+    addWarning: function(stage, message, details) {
+        const warning = {
+            stage: stage,
+            message: message,
+            details: details || null,
+            line: null,
+            column: null,
+            file: this.state.source_file
+        };
+        
+        this.state.warnings.push(warning);
+        log("CompilerCore", `警告: ${message}`, "WARNING");
+        
+        return warning;
+    },
+    
+    // 运行词法分析器
+    runLexer: function() {
+        log("CompilerCore", "运行词法分析");
+        
+        try {
+            // 读取源文件
+            const source = fs.readFileSync(this.state.source_file, 'utf8');
+            
+            // 执行词法分析
+            const result = this.components.lexer.tokenize(source, this.state.source_file, this.state.options);
+            
+            // 处理结果
+            if (result.success) {
+                this.state.stages.lexer = {
+                    tokens: result.tokens,
+                    timestamp: Date.now()
+                };
+                
+                // 合并警告
+                for (const warning of result.warnings) {
+                    this.addWarning("lexer", warning.message, warning);
+                }
+                
+                return {
+                    success: true,
+                    tokens: result.tokens
+                };
+            } else {
+                // 合并错误
+                for (const error of result.errors) {
+                    this.addError("lexer", error.message, error);
+                }
+                
+                return {
+                    success: false,
+                    stage: "lexer"
+                };
+            }
+        } catch (error) {
+            this.addError("lexer", "词法分析异常: " + error.message, error.stack);
+            
+            return {
+                success: false,
+                stage: "lexer",
+                error: error
+            };
+        }
+    },
+    
+    // 运行语法分析器
+    runParser: function(tokens) {
+        log("CompilerCore", "运行语法分析");
+        
+        try {
+            // 执行语法分析
+            const result = this.components.parser.parse(tokens, this.state.options);
+            
+            // 处理结果
+            if (result.success) {
+                this.state.stages.parser = {
+                    ast: result.ast,
+                    timestamp: Date.now()
+                };
+                
+                // 合并警告
+                for (const warning of result.warnings) {
+                    this.addWarning("parser", warning.message, warning);
+                }
+                
+                return {
+                    success: true,
+                    ast: result.ast
+                };
+            } else {
+                // 合并错误
+                for (const error of result.errors) {
+                    this.addError("parser", error.message, error);
+                }
+                
+                return {
+                    success: false,
+                    stage: "parser"
+                };
+            }
+        } catch (error) {
+            this.addError("parser", "语法分析异常: " + error.message, error.stack);
+            
+            return {
+                success: false,
+                stage: "parser",
+                error: error
+            };
+        }
+    },
+    
+    // 运行语义分析器
+    runSemanticAnalyzer: function(ast) {
+        log("CompilerCore", "运行语义分析");
+        
+        try {
+            // 执行语义分析
+            const result = this.components.semantic_analyzer.analyze(ast, this.state.options);
+            
+            // 处理结果
+            if (result.success) {
+                this.state.stages.semantic_analyzer = {
+                    ast: result.ast,
+                    symbolTable: result.symbolTable,
+                    timestamp: Date.now()
+                };
+                
+                // 合并警告
+                for (const warning of result.warnings) {
+                    this.addWarning("semantic", warning.message, warning);
+                }
+                
+                return {
+                    success: true,
+                    ast: result.ast,
+                    symbolTable: result.symbolTable
+                };
+            } else {
+                // 合并错误
+                for (const error of result.errors) {
+                    this.addError("semantic", error.message, error);
+                }
+                
+                return {
+                    success: false,
+                    stage: "semantic_analyzer"
+                };
+            }
+        } catch (error) {
+            this.addError("semantic", "语义分析异常: " + error.message, error.stack);
+            
+            return {
+                success: false,
+                stage: "semantic_analyzer",
+                error: error
+            };
+        }
+    },
+    
+    // 运行中间代码生成器
+    runIRGenerator: function(ast) {
+        log("CompilerCore", "运行中间代码生成");
+        
+        try {
+            // 生成中间代码
+            const result = this.components.ir_generator.generate(ast, this.state.options);
+            
+            // 处理结果
+            if (result.success) {
+                this.state.stages.ir_generator = {
+                    ir: result.ir,
+                    timestamp: Date.now()
+                };
+                
+                // 合并警告
+                for (const warning of result.warnings) {
+                    this.addWarning("ir_generator", warning.message, warning);
+                }
+                
+                return {
+                    success: true,
+                    ir: result.ir
+                };
+            } else {
+                // 合并错误
+                for (const error of result.errors) {
+                    this.addError("ir_generator", error.message, error);
+                }
+                
+                return {
+                    success: false,
+                    stage: "ir_generator"
+                };
+            }
+        } catch (error) {
+            this.addError("ir_generator", "中间代码生成异常: " + error.message, error.stack);
+            
+            return {
+                success: false,
+                stage: "ir_generator",
+                error: error
+            };
+        }
+    },
+    
+    // 运行优化器
+    runOptimizer: function(ir) {
+        log("CompilerCore", "运行代码优化");
+        
+        // 如果不需要优化，则跳过
+        if (this.state.options.optimization_level === "none") {
+            log("CompilerCore", "跳过优化阶段（优化级别：none）");
+            
+            this.state.stages.optimizer = {
+                ir: ir,
+                optimized: false,
+                timestamp: Date.now()
+            };
+            
+            return {
+                success: true,
+                ir: ir,
+                optimized: false
+            };
+        }
+        
+        try {
+            // 执行优化
+            const result = this.components.optimizer.optimize(ir, this.state.options);
+            
+            // 处理结果
+            if (result.success) {
+                this.state.stages.optimizer = {
+                    ir: result.ir,
+                    optimized: true,
+                    optimizations: result.optimizations,
+                    timestamp: Date.now()
+                };
+                
+                // 合并警告
+                for (const warning of result.warnings) {
+                    this.addWarning("optimizer", warning.message, warning);
+                }
+                
+                return {
+                    success: true,
+                    ir: result.ir,
+                    optimized: true,
+                    optimizations: result.optimizations
+                };
+            } else {
+                // 合并错误
+                for (const error of result.errors) {
+                    this.addError("optimizer", error.message, error);
+                }
+                
+                return {
+                    success: false,
+                    stage: "optimizer"
+                };
+            }
+        } catch (error) {
+            this.addError("optimizer", "优化异常: " + error.message, error.stack);
+            
+            return {
+                success: false,
+                stage: "optimizer",
+                error: error
+            };
+        }
+    },
+    
+    // 运行代码生成器
+    runCodeGenerator: function(ir) {
+        log("CompilerCore", "运行目标代码生成");
+        
+        try {
+            // 生成目标代码
+            const result = this.components.code_generator.generate(ir, this.state.target_file, this.state.options);
+            
+            // 处理结果
+            if (result.success) {
+                this.state.stages.code_generator = {
+                    code: result.code,
+                    timestamp: Date.now()
+                };
+                
+                // 合并警告
+                for (const warning of result.warnings) {
+                    this.addWarning("code_generator", warning.message, warning);
+                }
+                
+                return {
+                    success: true,
+                    code: result.code
+                };
+            } else {
+                // 合并错误
+                for (const error of result.errors) {
+                    this.addError("code_generator", error.message, error);
+                }
+                
+                return {
+                    success: false,
+                    stage: "code_generator"
+                };
+            }
+        } catch (error) {
+            this.addError("code_generator", "代码生成异常: " + error.message, error.stack);
+            
+            return {
+                success: false,
+                stage: "code_generator",
+                error: error
+            };
+        }
+    },
+    
+    // 写入输出文件
+    writeOutput: function(code) {
+        log("CompilerCore", `写入输出文件: ${this.state.target_file}`);
+        
+        try {
+            // 确保输出目录存在
+            const outputDir = path.dirname(this.state.target_file);
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            // 写入文件
+            fs.writeFileSync(this.state.target_file, code);
+            
+            return {
+                success: true,
+                file: this.state.target_file
+            };
+        } catch (error) {
+            this.addError("write_output", "写入输出文件失败: " + error.message, error.stack);
+            
+            return {
+                success: false,
+                stage: "write_output",
+                error: error
+            };
+        }
+    },
+    
+    // 生成输出文件路径
+    generateOutputPath: function(inputPath) {
+        // 获取文件扩展名
+        const extension = this.state.options.default_output_extension || ".qobj";
+        
+        // 替换扩展名
+        if (inputPath.endsWith(".qentl")) {
+            return inputPath.replace(/\.qentl$/, extension);
+        } else {
+            return inputPath + extension;
+        }
+    }
+};
+
+// 导出编译器核心
+export CompilerCore; 
