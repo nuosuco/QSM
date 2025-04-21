@@ -1,0 +1,332 @@
+/**
+ * QEntL虚拟机测试运行脚本
+ * QuantumGene: QG-VM-TEST-RUNNER-E5F6-1714044200
+ * EntanglementStrength: 0.9
+ */
+
+// 获取命令行参数
+const args = process.argv.slice(2);
+const path = require('path');
+const fs = require('fs');
+
+// 设置相对路径
+const compilerRootDir = path.resolve(__dirname, '..');
+const vmRootDir = path.resolve(compilerRootDir, '..', 'vm');
+
+// 检查操作系统类型
+function detectOS() {
+    const platform = process.platform;
+    
+    if (platform === 'win32') {
+        return 'windows';
+    } else if (platform === 'darwin') {
+        return 'macos';
+    } else if (platform === 'linux') {
+        return 'linux';
+    } else {
+        return 'unknown';
+    }
+}
+
+// 检查文件是否存在
+function fileExists(filePath) {
+    try {
+        return fs.existsSync(filePath);
+    } catch (err) {
+        return false;
+    }
+}
+
+// 创建日志目录
+function ensureLogDirExists() {
+    const logDir = path.join(compilerRootDir, '.logs');
+    
+    if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    return logDir;
+}
+
+// 获取当前时间戳
+function getTimestamp() {
+    const now = new Date();
+    
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    
+    return `${year}${month}${day}-${hours}${minutes}${seconds}`;
+}
+
+// 编译程序为目标文件
+function compileToObj(sourceFile, outputFile) {
+    console.log(`[VM Test] 编译程序为目标文件 ${sourceFile} -> ${outputFile}`);
+    
+    const { spawnSync } = require('child_process');
+    
+    const os = detectOS();
+    let command;
+    let cmdArgs;
+    
+    // 完整路径
+    const sourceFilePath = path.join(__dirname, sourceFile);
+    const outputFilePath = path.join(__dirname, outputFile);
+    const runBatPath = path.join(compilerRootDir, 'run.bat');
+    const runShPath = path.join(compilerRootDir, 'run.sh');
+    
+    if (os === 'windows') {
+        command = 'cmd.exe';
+        cmdArgs = ['/c', runBatPath, '-c', sourceFilePath, '-o', outputFilePath];
+    } else {
+        command = 'sh';
+        cmdArgs = [runShPath, '-c', sourceFilePath, '-o', outputFilePath];
+    }
+    
+    console.log(`[VM Test] 执行命令: ${command} ${cmdArgs.join(' ')}`);
+    
+    const result = spawnSync(command, cmdArgs, { 
+        stdio: 'inherit',
+        cwd: compilerRootDir
+    });
+    
+    if (result.status !== 0) {
+        console.error(`[VM Test] 编译失败: ${sourceFile}`);
+        process.exit(1);
+    }
+    
+    return fileExists(outputFilePath);
+}
+
+// 编译程序为可执行文件
+function compileToExe(sourceFile, outputFile) {
+    console.log(`[VM Test] 编译程序为可执行文件 ${sourceFile} -> ${outputFile}`);
+    
+    const { spawnSync } = require('child_process');
+    
+    const os = detectOS();
+    let command;
+    let cmdArgs;
+    
+    // 完整路径
+    const sourceFilePath = path.join(__dirname, sourceFile);
+    const outputFilePath = path.join(__dirname, outputFile);
+    const runBatPath = path.join(compilerRootDir, 'run.bat');
+    const runShPath = path.join(compilerRootDir, 'run.sh');
+    
+    if (os === 'windows') {
+        command = 'cmd.exe';
+        cmdArgs = ['/c', runBatPath, '-c', sourceFilePath, '-o', outputFilePath, '--exe'];
+    } else {
+        command = 'sh';
+        cmdArgs = [runShPath, '-c', sourceFilePath, '-o', outputFilePath, '--exe'];
+    }
+    
+    console.log(`[VM Test] 执行命令: ${command} ${cmdArgs.join(' ')}`);
+    
+    const result = spawnSync(command, cmdArgs, { 
+        stdio: 'inherit',
+        cwd: compilerRootDir
+    });
+    
+    if (result.status !== 0) {
+        console.error(`[VM Test] 编译失败: ${sourceFile}`);
+        process.exit(1);
+    }
+    
+    return fileExists(outputFilePath);
+}
+
+// 运行目标文件
+function runObjFile(objFile, logFile) {
+    console.log(`[VM Test] 运行目标文件 ${objFile}`);
+    
+    const { spawnSync } = require('child_process');
+    
+    const os = detectOS();
+    let command;
+    let cmdArgs;
+    
+    // 完整路径
+    const objFilePath = path.join(__dirname, objFile);
+    const vmRunBatPath = path.join(vmRootDir, 'run.bat');
+    const vmRunShPath = path.join(vmRootDir, 'run.sh');
+    
+    if (os === 'windows') {
+        command = 'cmd.exe';
+        cmdArgs = ['/c', vmRunBatPath, '--obj', objFilePath];
+    } else {
+        command = 'sh';
+        cmdArgs = [vmRunShPath, '--obj', objFilePath];
+    }
+    
+    console.log(`[VM Test] 执行命令: ${command} ${cmdArgs.join(' ')}`);
+    
+    // 创建日志文件流
+    const logStream = fs.createWriteStream(logFile);
+    
+    logStream.write(`===== QEntL虚拟机目标文件运行日志 =====\n`);
+    logStream.write(`时间: ${new Date().toISOString()}\n`);
+    logStream.write(`目标文件: ${objFilePath}\n\n`);
+    logStream.write(`命令: ${command} ${cmdArgs.join(' ')}\n\n`);
+    
+    // 运行命令
+    const result = spawnSync(command, cmdArgs, { 
+        stdio: ['inherit', 'pipe', 'pipe'],
+        encoding: 'utf-8',
+        cwd: vmRootDir
+    });
+    
+    // 写入stdout和stderr到日志
+    if (result.stdout) {
+        logStream.write(`--- 标准输出 ---\n`);
+        logStream.write(result.stdout);
+        logStream.write(`\n`);
+    }
+    
+    if (result.stderr) {
+        logStream.write(`--- 标准错误 ---\n`);
+        logStream.write(result.stderr);
+        logStream.write(`\n`);
+    }
+    
+    logStream.write(`退出代码: ${result.status}\n`);
+    logStream.end();
+    
+    console.log(`[VM Test] 运行结束，日志已写入: ${logFile}`);
+    
+    return result.status === 0;
+}
+
+// 运行可执行文件
+function runExeFile(exeFile, logFile) {
+    console.log(`[VM Test] 运行可执行文件 ${exeFile}`);
+    
+    const { spawnSync } = require('child_process');
+    
+    const os = detectOS();
+    let command;
+    let cmdArgs;
+    
+    // 完整路径
+    const exeFilePath = path.join(__dirname, exeFile);
+    const vmRunBatPath = path.join(vmRootDir, 'run.bat');
+    const vmRunShPath = path.join(vmRootDir, 'run.sh');
+    
+    if (os === 'windows') {
+        command = 'cmd.exe';
+        cmdArgs = ['/c', vmRunBatPath, '--exe', exeFilePath];
+    } else {
+        command = 'sh';
+        cmdArgs = [vmRunShPath, '--exe', exeFilePath];
+    }
+    
+    console.log(`[VM Test] 执行命令: ${command} ${cmdArgs.join(' ')}`);
+    
+    // 创建日志文件流
+    const logStream = fs.createWriteStream(logFile);
+    
+    logStream.write(`===== QEntL虚拟机可执行文件运行日志 =====\n`);
+    logStream.write(`时间: ${new Date().toISOString()}\n`);
+    logStream.write(`可执行文件: ${exeFilePath}\n\n`);
+    logStream.write(`命令: ${command} ${cmdArgs.join(' ')}\n\n`);
+    
+    // 运行命令
+    const result = spawnSync(command, cmdArgs, { 
+        stdio: ['inherit', 'pipe', 'pipe'],
+        encoding: 'utf-8',
+        cwd: vmRootDir
+    });
+    
+    // 写入stdout和stderr到日志
+    if (result.stdout) {
+        logStream.write(`--- 标准输出 ---\n`);
+        logStream.write(result.stdout);
+        logStream.write(`\n`);
+    }
+    
+    if (result.stderr) {
+        logStream.write(`--- 标准错误 ---\n`);
+        logStream.write(result.stderr);
+        logStream.write(`\n`);
+    }
+    
+    logStream.write(`退出代码: ${result.status}\n`);
+    logStream.end();
+    
+    console.log(`[VM Test] 运行结束，日志已写入: ${logFile}`);
+    
+    return result.status === 0;
+}
+
+// 运行完整的测试
+function runFullTest() {
+    console.log('[VM Test] 开始运行QEntL编译和虚拟机测试');
+    
+    // 确保日志目录存在
+    const logDir = ensureLogDirExists();
+    const timestamp = getTimestamp();
+    
+    // 定义文件路径
+    const objSource = 'test_compile_obj.qentl';
+    const objOutput = 'test_compile_obj.qobj';
+    const objLogFile = path.join(logDir, `vm_test_obj_${timestamp}.log`);
+    
+    const exeSource = 'test_compile_exe.qentl';
+    const exeOutput = 'test_compile_exe.qexe';
+    const exeLogFile = path.join(logDir, `vm_test_exe_${timestamp}.log`);
+    
+    // 测试1：编译并运行目标文件
+    console.log('\n===== 测试1：编译并运行目标文件 =====');
+    const objCompiled = compileToObj(objSource, objOutput);
+    
+    if (objCompiled) {
+        console.log(`[VM Test] 目标文件编译成功: ${objOutput}`);
+        
+        const objRunSuccess = runObjFile(objOutput, objLogFile);
+        
+        if (objRunSuccess) {
+            console.log(`[VM Test] 目标文件运行成功`);
+        } else {
+            console.error(`[VM Test] 目标文件运行失败`);
+        }
+    } else {
+        console.error(`[VM Test] 目标文件编译失败`);
+    }
+    
+    // 测试2：编译并运行可执行文件
+    console.log('\n===== 测试2：编译并运行可执行文件 =====');
+    const exeCompiled = compileToExe(exeSource, exeOutput);
+    
+    if (exeCompiled) {
+        console.log(`[VM Test] 可执行文件编译成功: ${exeOutput}`);
+        
+        const exeRunSuccess = runExeFile(exeOutput, exeLogFile);
+        
+        if (exeRunSuccess) {
+            console.log(`[VM Test] 可执行文件运行成功`);
+        } else {
+            console.error(`[VM Test] 可执行文件运行失败`);
+        }
+    } else {
+        console.error(`[VM Test] 可执行文件编译失败`);
+    }
+    
+    console.log('\n===== 测试完成 =====');
+}
+
+// 主函数
+function main() {
+    if (args.length > 0) {
+        console.log(`[VM Test] 特定命令: ${args.join(' ')}`);
+        // 处理特定命令...
+    } else {
+        // 默认运行完整测试
+        runFullTest();
+    }
+}
+
+main(); 

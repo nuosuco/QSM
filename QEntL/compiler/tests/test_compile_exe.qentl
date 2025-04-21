@@ -1,0 +1,196 @@
+/**
+ * QEntL测试程序 - 编译为.qexe
+ * QuantumGene: QG-TEST-COMPILE-EXE-C3D4-1714044100
+ * EntanglementStrength: 0.95
+ */
+
+// TestCompileExe - 测试编译为.qexe文件的程序
+//
+// 版本: 1.0.0
+// 作者: Claude AI
+// 日期: 2023-04-21
+// 描述: 此文件测试QEntL编译器将.qentl文件编译为.qexe可执行文件的功能
+//       包含主函数和可执行结构
+
+quantum_program TestCompileExe {
+    metadata {
+        name: "TestCompileExe",
+        version: "1.0.0",
+        author: "Claude AI",
+        description: "测试QEntL编译器编译.qexe可执行文件的功能",
+        quantum_gene: "QG-TEST-QEXE-C3D4-1714105897",
+        entanglement_strength: 0.82
+    }
+
+    state {
+        initialized: false,
+        test_name: "量子随机数生成器",
+        random_seed: 42,
+        result_count: 5,
+        quantum_results: [],
+        classical_results: [],
+        verbose_mode: false,
+        execution_time: 0,
+        log_entries: []
+    }
+
+    // 初始化程序
+    initialize() {
+        if (this.initialized) {
+            this.addLog("程序已初始化，跳过");
+            return;
+        }
+
+        this.addLog("初始化测试程序...");
+        
+        // 设置随机种子
+        Math.random.seed(this.random_seed);
+        
+        // 初始化结果数组
+        this.quantum_results = new Array(this.result_count);
+        this.classical_results = new Array(this.result_count);
+        
+        this.initialized = true;
+        this.addLog("初始化完成");
+    }
+
+    // 处理命令行参数
+    parseArgs(args) {
+        if (!args || args.length === 0) {
+            return;
+        }
+
+        for (let i = 0; i < args.length; i++) {
+            if (args[i] === "--verbose" || args[i] === "-v") {
+                this.verbose_mode = true;
+                this.addLog("启用详细模式");
+            } else if (args[i] === "--count" && i + 1 < args.length) {
+                this.result_count = parseInt(args[i + 1]);
+                this.addLog(`设置结果数量: ${this.result_count}`);
+                i++;
+            } else if (args[i] === "--seed" && i + 1 < args.length) {
+                this.random_seed = parseInt(args[i + 1]);
+                this.addLog(`设置随机种子: ${this.random_seed}`);
+                i++;
+            }
+        }
+    }
+
+    // 生成量子随机数
+    generateQuantumRandomNumbers() {
+        this.addLog("生成量子随机数...");
+        
+        const startTime = Date.now();
+        
+        for (let i = 0; i < this.result_count; i++) {
+            // 创建单个量子位
+            let qubit = new QuantumRegister(1, "random_bit");
+            
+            // 应用Hadamard门创建叠加态
+            H(qubit[0]);
+            
+            // 测量量子位获得随机位
+            let result = Measure(qubit[0]);
+            
+            // 存储结果
+            this.quantum_results[i] = result;
+            
+            this.addLog(`量子随机数[${i}]: ${result}`);
+        }
+        
+        const endTime = Date.now();
+        this.execution_time = endTime - startTime;
+        
+        this.addLog("量子随机数生成完成");
+    }
+
+    // 生成经典随机数用于比较
+    generateClassicalRandomNumbers() {
+        this.addLog("生成经典随机数进行比较...");
+        
+        for (let i = 0; i < this.result_count; i++) {
+            // 生成0或1的经典随机数
+            let result = Math.floor(Math.random() * 2);
+            
+            // 存储结果
+            this.classical_results[i] = result;
+            
+            this.addLog(`经典随机数[${i}]: ${result}`);
+        }
+        
+        this.addLog("经典随机数生成完成");
+    }
+
+    // 分析和比较结果
+    analyzeResults() {
+        this.addLog("分析结果...");
+        
+        let quantum_ones = 0;
+        let classical_ones = 0;
+        
+        for (let i = 0; i < this.result_count; i++) {
+            if (this.quantum_results[i] === 1) quantum_ones++;
+            if (this.classical_results[i] === 1) classical_ones++;
+        }
+        
+        const quantum_ratio = quantum_ones / this.result_count;
+        const classical_ratio = classical_ones / this.result_count;
+        
+        this.addLog(`量子随机数1的比例: ${quantum_ratio.toFixed(2)}`);
+        this.addLog(`经典随机数1的比例: ${classical_ratio.toFixed(2)}`);
+        this.addLog("分析完成");
+    }
+
+    // 打印程序执行结果
+    printResults() {
+        console.log("==== 量子随机数生成器测试 ====");
+        console.log(`测试名称: ${this.test_name}`);
+        console.log(`随机种子: ${this.random_seed}`);
+        console.log(`结果数量: ${this.result_count}`);
+        console.log(`执行时间: ${this.execution_time}ms`);
+        
+        console.log("\n量子随机数:");
+        for (let i = 0; i < this.result_count; i++) {
+            console.log(`[${i}]: ${this.quantum_results[i]}`);
+        }
+        
+        console.log("\n经典随机数:");
+        for (let i = 0; i < this.result_count; i++) {
+            console.log(`[${i}]: ${this.classical_results[i]}`);
+        }
+        
+        if (this.verbose_mode) {
+            console.log("\n==== 日志记录 ====");
+            for (let i = 0; i < this.log_entries.length; i++) {
+                console.log(`[${i+1}] ${this.log_entries[i]}`);
+            }
+        }
+    }
+
+    // 记录日志
+    addLog(message) {
+        let timestamp = new Date().toISOString();
+        this.log_entries.push(`${timestamp} - ${message}`);
+    }
+
+    // 主函数 - 可执行文件必须包含main函数
+    main(args) {
+        this.addLog("开始执行主函数");
+        this.parseArgs(args);
+        this.initialize();
+        
+        // 执行核心功能
+        this.generateQuantumRandomNumbers();
+        this.generateClassicalRandomNumbers();
+        this.analyzeResults();
+        
+        // 输出结果
+        this.printResults();
+        
+        this.addLog("程序执行完成");
+        return 0;
+    }
+}
+
+// 导出程序
+export TestCompileExe; 

@@ -1,0 +1,768 @@
+/**
+ * QEntL虚拟机设备管理器
+ * QuantumGene: QG-VM-DEVICE-A1B2-1714042500
+ * EntanglementStrength: 1.0
+ */
+
+quantum_module DeviceManager {
+    // 量子基因编码
+    metadata: {
+        name: "QEntL虚拟机设备管理器",
+        version: "1.0.0",
+        description: "管理QEntL虚拟机中的所有设备，包括内部设备和外部连接的设备",
+        quantum_gene: "QG-VM-DEVICE-A1B2-1714042500",
+        entanglement_strength: 1.0,
+        node_state: "ACTIVE"
+    },
+    
+    // 配置选项
+    config: {
+        max_devices: 128,               // 最大设备数量
+        device_poll_interval: 50,       // 设备轮询间隔（毫秒）
+        auto_detect: true,              // 自动检测设备
+        quantum_device_priority: 0,     // 量子设备优先级（最高）
+        virtual_device_priority: 1,     // 虚拟设备优先级
+        physical_device_priority: 2,    // 物理设备优先级
+        device_timeout: 5000,           // 设备超时（毫秒）
+        max_concurrent_operations: 16,  // 最大并发操作数
+        enable_device_cache: true,      // 启用设备缓存
+        device_cache_size: 32           // 设备缓存大小
+    },
+    
+    // 设备类型枚举
+    device_types: {
+        UNKNOWN: "unknown",
+        CPU: "cpu",                    // 处理器
+        GPU: "gpu",                    // 图形处理器
+        QPU: "qpu",                    // 量子处理器
+        MEMORY: "memory",              // 内存
+        STORAGE: "storage",            // 存储
+        DISPLAY: "display",            // 显示设备
+        INPUT: "input",                // 输入设备
+        NETWORK: "network",            // 网络设备
+        AUDIO: "audio",                // 音频设备
+        QUANTUM_MEMORY: "q_memory",    // 量子内存
+        QUANTUM_NETWORK: "q_network",  // 量子网络
+        QUANTUM_SENSOR: "q_sensor",    // 量子传感器
+        ENTANGLEMENT_ENGINE: "ent_engine"  // 纠缠引擎
+    },
+    
+    // 设备接口枚举
+    device_interfaces: {
+        INTERNAL: "internal",              // 内部设备
+        USB: "usb",                        // USB接口
+        PCIE: "pcie",                      // PCIe接口
+        NETWORK: "network",                // 网络接口
+        QUANTUM_LINK: "q_link",            // 量子链接
+        QUANTUM_BRIDGE: "q_bridge",        // 量子桥接
+        ENTANGLEMENT_CHANNEL: "ent_channel" // 纠缠通道
+    },
+    
+    // 状态变量
+    state: {
+        devices: {},                      // 设备列表
+        device_count: 0,                  // 设备计数
+        enabled_devices: {},              // 启用的设备
+        disabled_devices: {},             // 禁用的设备
+        device_events: [],                // 设备事件队列
+        last_poll_time: 0,                // 上次轮询时间
+        device_operations: {},            // 设备操作
+        operation_counter: 0,             // 操作计数器
+        device_handles: {},               // 设备句柄
+        device_cache: {}                  // 设备缓存
+    },
+    
+    // 初始化设备管理器
+    initialize: function() {
+        log("DeviceManager", "初始化设备管理器");
+        
+        // 重置状态
+        this.state.devices = {};
+        this.state.device_count = 0;
+        this.state.enabled_devices = {};
+        this.state.disabled_devices = {};
+        this.state.device_events = [];
+        this.state.last_poll_time = getCurrentTime();
+        this.state.device_operations = {};
+        this.state.operation_counter = 0;
+        this.state.device_handles = {};
+        this.state.device_cache = {};
+        
+        // 创建设备探测器
+        this.device_detector = new QuantumDeviceDetector();
+        
+        // 创建设备处理器
+        this.device_handler = new QuantumDeviceHandler();
+        
+        // 创建设备驱动管理器
+        this.driver_manager = new QuantumDriverManager();
+        
+        // 初始化内部虚拟设备
+        this.initializeVirtualDevices();
+        
+        // 如果启用了自动检测，则开始检测物理设备
+        if (this.config.auto_detect) {
+            this.detectPhysicalDevices();
+        }
+        
+        log("DeviceManager", `设备管理器初始化完成，当前设备数量: ${this.state.device_count}`);
+        return true;
+    },
+    
+    // 初始化虚拟设备
+    initializeVirtualDevices: function() {
+        log("DeviceManager", "初始化虚拟设备");
+        
+        // 创建虚拟CPU
+        this.createVirtualDevice({
+            type: this.device_types.CPU,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual CPU",
+            manufacturer: "QEntL VM",
+            model: "VCPU-1000",
+            cores: 8,
+            frequency: 3.5
+        });
+        
+        // 创建虚拟量子处理器
+        this.createVirtualDevice({
+            type: this.device_types.QPU,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Quantum Processor",
+            manufacturer: "QEntL VM",
+            model: "VQPU-1000",
+            qubits: 28,
+            coherence_time: 3600
+        });
+        
+        // 创建虚拟内存
+        this.createVirtualDevice({
+            type: this.device_types.MEMORY,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Memory",
+            manufacturer: "QEntL VM",
+            model: "VMEM-1000",
+            capacity: 16 * 1024 * 1024 * 1024
+        });
+        
+        // 创建虚拟量子内存
+        this.createVirtualDevice({
+            type: this.device_types.QUANTUM_MEMORY,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Quantum Memory",
+            manufacturer: "QEntL VM",
+            model: "VQMEM-1000",
+            capacity: 1024
+        });
+        
+        // 创建虚拟存储
+        this.createVirtualDevice({
+            type: this.device_types.STORAGE,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Storage",
+            manufacturer: "QEntL VM",
+            model: "VSTO-1000",
+            capacity: 1024 * 1024 * 1024 * 1024
+        });
+        
+        // 创建虚拟显示设备
+        this.createVirtualDevice({
+            type: this.device_types.DISPLAY,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Display",
+            manufacturer: "QEntL VM",
+            model: "VDIS-1000",
+            resolution: { width: 1920, height: 1080 }
+        });
+        
+        // 创建虚拟输入设备
+        this.createVirtualDevice({
+            type: this.device_types.INPUT,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Input",
+            manufacturer: "QEntL VM",
+            model: "VINP-1000"
+        });
+        
+        // 创建虚拟网络设备
+        this.createVirtualDevice({
+            type: this.device_types.NETWORK,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Network",
+            manufacturer: "QEntL VM",
+            model: "VNET-1000",
+            speed: 10000
+        });
+        
+        // 创建虚拟量子网络
+        this.createVirtualDevice({
+            type: this.device_types.QUANTUM_NETWORK,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Quantum Network",
+            manufacturer: "QEntL VM",
+            model: "VQNET-1000",
+            entanglement_rate: 1000
+        });
+        
+        // 创建虚拟纠缠引擎
+        this.createVirtualDevice({
+            type: this.device_types.ENTANGLEMENT_ENGINE,
+            interface: this.device_interfaces.INTERNAL,
+            name: "Virtual Entanglement Engine",
+            manufacturer: "QEntL VM",
+            model: "VENT-1000",
+            capacity: 1000
+        });
+        
+        log("DeviceManager", "虚拟设备初始化完成");
+    },
+    
+    // 检测物理设备
+    detectPhysicalDevices: function() {
+        log("DeviceManager", "开始检测物理设备");
+        
+        // 使用设备探测器查找物理设备
+        let physical_devices = this.device_detector.detect();
+        
+        // 为每个检测到的设备创建相应的虚拟设备
+        for (let device_info of physical_devices) {
+            let device = this.createDevice(device_info);
+            if (device) {
+                log("DeviceManager", `检测到物理设备: ${device.name} (${device.id})`);
+            }
+        }
+        
+        log("DeviceManager", `物理设备检测完成，共检测到 ${physical_devices.length} 个设备`);
+        return physical_devices.length;
+    },
+    
+    // 创建虚拟设备
+    createVirtualDevice: function(device_info) {
+        // 生成设备ID
+        let device_id = this.generateDeviceId(device_info.type, "virtual");
+        
+        // 创建设备对象
+        let device = {
+            id: device_id,
+            type: device_info.type,
+            interface: device_info.interface || this.device_interfaces.INTERNAL,
+            name: device_info.name || `Virtual ${device_info.type} Device`,
+            manufacturer: device_info.manufacturer || "QEntL VM",
+            model: device_info.model || "Unknown",
+            virtual: true,
+            physical: false,
+            enabled: true,
+            state: "ready",
+            created_time: getCurrentTime(),
+            last_accessed: getCurrentTime(),
+            properties: { ...device_info }
+        };
+        
+        // 存储设备
+        this.state.devices[device_id] = device;
+        this.state.enabled_devices[device_id] = true;
+        this.state.device_count++;
+        
+        // 为设备创建驱动程序
+        this.driver_manager.createDriver(device);
+        
+        // 创建设备句柄
+        this.state.device_handles[device_id] = this.device_handler.createHandle(device);
+        
+        // 触发设备添加事件
+        this.triggerDeviceEvent("device_added", device);
+        
+        log("DeviceManager", `创建虚拟设备 ${device.name} (${device_id})`);
+        return device;
+    },
+    
+    // 创建设备（物理或虚拟）
+    createDevice: function(device_info) {
+        // 检查设备限制
+        if (this.state.device_count >= this.config.max_devices) {
+            log("DeviceManager", "已达到最大设备数量限制", "ERROR");
+            return null;
+        }
+        
+        // 确定设备类型（物理或虚拟）
+        let is_virtual = device_info.virtual === true;
+        let is_physical = device_info.physical === true || !is_virtual;
+        
+        // 生成设备ID
+        let device_id = this.generateDeviceId(device_info.type, is_physical ? "physical" : "virtual");
+        
+        // 创建设备对象
+        let device = {
+            id: device_id,
+            type: device_info.type || this.device_types.UNKNOWN,
+            interface: device_info.interface || (is_physical ? this.device_interfaces.USB : this.device_interfaces.INTERNAL),
+            name: device_info.name || `${is_physical ? "Physical" : "Virtual"} ${device_info.type || "Unknown"} Device`,
+            manufacturer: device_info.manufacturer || (is_physical ? "Unknown" : "QEntL VM"),
+            model: device_info.model || "Unknown",
+            virtual: is_virtual,
+            physical: is_physical,
+            enabled: true,
+            state: "initializing",
+            created_time: getCurrentTime(),
+            last_accessed: getCurrentTime(),
+            properties: { ...device_info }
+        };
+        
+        // 存储设备
+        this.state.devices[device_id] = device;
+        this.state.enabled_devices[device_id] = true;
+        this.state.device_count++;
+        
+        // 为设备创建驱动程序
+        let driver = this.driver_manager.createDriver(device);
+        if (!driver) {
+            device.state = "driver_missing";
+            this.state.disabled_devices[device_id] = true;
+            delete this.state.enabled_devices[device_id];
+            log("DeviceManager", `无法为设备 ${device.name} (${device_id}) 创建驱动程序`, "WARNING");
+        } else {
+            device.state = "ready";
+        }
+        
+        // 创建设备句柄
+        this.state.device_handles[device_id] = this.device_handler.createHandle(device);
+        
+        // 触发设备添加事件
+        this.triggerDeviceEvent("device_added", device);
+        
+        log("DeviceManager", `创建${is_physical ? "物理" : "虚拟"}设备 ${device.name} (${device_id})`);
+        return device;
+    },
+    
+    // 生成设备ID
+    generateDeviceId: function(type, source) {
+        // 使用基于类型、源和时间的唯一ID
+        let timestamp = getCurrentTime();
+        let random = Math.floor(Math.random() * 10000);
+        return `${type}_${source}_${timestamp}_${random}`;
+    },
+    
+    // 获取设备
+    getDevice: function(device_id) {
+        // 检查设备缓存
+        if (this.config.enable_device_cache && this.state.device_cache[device_id]) {
+            let cached_device = this.state.device_cache[device_id];
+            // 更新最后访问时间
+            cached_device.last_accessed = getCurrentTime();
+            this.state.devices[device_id].last_accessed = cached_device.last_accessed;
+            return cached_device;
+        }
+        
+        // 检查设备是否存在
+        if (!this.state.devices[device_id]) {
+            return null;
+        }
+        
+        // 获取设备
+        let device = this.state.devices[device_id];
+        
+        // 更新设备缓存
+        if (this.config.enable_device_cache) {
+            this.state.device_cache[device_id] = { ...device };
+            // 如果缓存大小超过限制，则移除最旧的条目
+            let cache_keys = Object.keys(this.state.device_cache);
+            if (cache_keys.length > this.config.device_cache_size) {
+                let oldest_key = cache_keys.reduce((oldest, key) => {
+                    return this.state.device_cache[key].last_accessed < this.state.device_cache[oldest].last_accessed ? key : oldest;
+                }, cache_keys[0]);
+                delete this.state.device_cache[oldest_key];
+            }
+        }
+        
+        // 更新最后访问时间
+        device.last_accessed = getCurrentTime();
+        
+        return device;
+    },
+    
+    // 获取指定类型的设备列表
+    getDevicesByType: function(type) {
+        let devices = [];
+        for (let device_id in this.state.devices) {
+            let device = this.state.devices[device_id];
+            if (device.type === type && this.state.enabled_devices[device_id]) {
+                devices.push(device);
+            }
+        }
+        return devices;
+    },
+    
+    // 获取所有设备列表
+    getAllDevices: function() {
+        let devices = [];
+        for (let device_id in this.state.devices) {
+            let device = this.state.devices[device_id];
+            devices.push(device);
+        }
+        return devices;
+    },
+    
+    // 获取启用的设备列表
+    getEnabledDevices: function() {
+        let devices = [];
+        for (let device_id in this.state.enabled_devices) {
+            if (this.state.enabled_devices[device_id]) {
+                let device = this.state.devices[device_id];
+                if (device) {
+                    devices.push(device);
+                }
+            }
+        }
+        return devices;
+    },
+    
+    // 获取禁用的设备列表
+    getDisabledDevices: function() {
+        let devices = [];
+        for (let device_id in this.state.disabled_devices) {
+            if (this.state.disabled_devices[device_id]) {
+                let device = this.state.devices[device_id];
+                if (device) {
+                    devices.push(device);
+                }
+            }
+        }
+        return devices;
+    },
+    
+    // 启用设备
+    enableDevice: function(device_id) {
+        // 检查设备是否存在
+        if (!this.state.devices[device_id]) {
+            log("DeviceManager", `设备 ${device_id} 不存在`, "ERROR");
+            return false;
+        }
+        
+        // 检查设备是否已启用
+        if (this.state.enabled_devices[device_id]) {
+            return true;
+        }
+        
+        // 获取设备
+        let device = this.state.devices[device_id];
+        
+        // 尝试启用设备
+        try {
+            // 获取设备句柄
+            let handle = this.state.device_handles[device_id];
+            if (!handle) {
+                log("DeviceManager", `设备 ${device_id} 的句柄不存在`, "ERROR");
+                return false;
+            }
+            
+            // 使用句柄启用设备
+            let result = handle.enable();
+            if (!result) {
+                log("DeviceManager", `无法启用设备 ${device.name} (${device_id})`, "ERROR");
+                return false;
+            }
+            
+            // 更新设备状态
+            device.enabled = true;
+            device.state = "ready";
+            this.state.enabled_devices[device_id] = true;
+            delete this.state.disabled_devices[device_id];
+            
+            // 触发设备启用事件
+            this.triggerDeviceEvent("device_enabled", device);
+            
+            log("DeviceManager", `已启用设备 ${device.name} (${device_id})`);
+            return true;
+        } catch (error) {
+            log("DeviceManager", `启用设备 ${device.name} (${device_id}) 时出错: ${error}`, "ERROR");
+            return false;
+        }
+    },
+    
+    // 禁用设备
+    disableDevice: function(device_id) {
+        // 检查设备是否存在
+        if (!this.state.devices[device_id]) {
+            log("DeviceManager", `设备 ${device_id} 不存在`, "ERROR");
+            return false;
+        }
+        
+        // 检查设备是否已禁用
+        if (this.state.disabled_devices[device_id]) {
+            return true;
+        }
+        
+        // 获取设备
+        let device = this.state.devices[device_id];
+        
+        // 尝试禁用设备
+        try {
+            // 获取设备句柄
+            let handle = this.state.device_handles[device_id];
+            if (!handle) {
+                log("DeviceManager", `设备 ${device_id} 的句柄不存在`, "ERROR");
+                return false;
+            }
+            
+            // 使用句柄禁用设备
+            let result = handle.disable();
+            if (!result) {
+                log("DeviceManager", `无法禁用设备 ${device.name} (${device_id})`, "ERROR");
+                return false;
+            }
+            
+            // 更新设备状态
+            device.enabled = false;
+            device.state = "disabled";
+            this.state.disabled_devices[device_id] = true;
+            delete this.state.enabled_devices[device_id];
+            
+            // 触发设备禁用事件
+            this.triggerDeviceEvent("device_disabled", device);
+            
+            log("DeviceManager", `已禁用设备 ${device.name} (${device_id})`);
+            return true;
+        } catch (error) {
+            log("DeviceManager", `禁用设备 ${device.name} (${device_id}) 时出错: ${error}`, "ERROR");
+            return false;
+        }
+    },
+    
+    // 操作设备
+    operateDevice: function(device_id, operation, params) {
+        // 检查设备是否存在
+        if (!this.state.devices[device_id]) {
+            log("DeviceManager", `设备 ${device_id} 不存在`, "ERROR");
+            return null;
+        }
+        
+        // 检查设备是否启用
+        if (!this.state.enabled_devices[device_id]) {
+            log("DeviceManager", `设备 ${device_id} 未启用`, "ERROR");
+            return null;
+        }
+        
+        // 获取设备
+        let device = this.state.devices[device_id];
+        
+        // 生成操作ID
+        let operation_id = this.generateOperationId(device_id, operation);
+        
+        // 检查并发操作数
+        let current_operations = Object.keys(this.state.device_operations).length;
+        if (current_operations >= this.config.max_concurrent_operations) {
+            log("DeviceManager", `已达到最大并发操作数限制`, "ERROR");
+            return null;
+        }
+        
+        // 获取设备句柄
+        let handle = this.state.device_handles[device_id];
+        if (!handle) {
+            log("DeviceManager", `设备 ${device_id} 的句柄不存在`, "ERROR");
+            return null;
+        }
+        
+        // 记录操作
+        this.state.device_operations[operation_id] = {
+            id: operation_id,
+            device_id: device_id,
+            operation: operation,
+            params: params,
+            start_time: getCurrentTime(),
+            status: "pending",
+            result: null
+        };
+        
+        // 执行操作
+        try {
+            // 更新最后访问时间
+            device.last_accessed = getCurrentTime();
+            
+            // 使用句柄执行操作
+            let result = handle.operate(operation, params);
+            
+            // 更新操作状态
+            this.state.device_operations[operation_id].status = "completed";
+            this.state.device_operations[operation_id].result = result;
+            this.state.device_operations[operation_id].end_time = getCurrentTime();
+            
+            // 触发设备操作事件
+            this.triggerDeviceEvent("device_operation", {
+                device: device,
+                operation: operation,
+                params: params,
+                result: result
+            });
+            
+            // 清理旧操作
+            this.cleanupOperations();
+            
+            return result;
+        } catch (error) {
+            // 更新操作状态
+            this.state.device_operations[operation_id].status = "failed";
+            this.state.device_operations[operation_id].error = error.toString();
+            this.state.device_operations[operation_id].end_time = getCurrentTime();
+            
+            log("DeviceManager", `设备 ${device.name} (${device_id}) 操作 ${operation} 失败: ${error}`, "ERROR");
+            
+            // 清理旧操作
+            this.cleanupOperations();
+            
+            return null;
+        }
+    },
+    
+    // 生成操作ID
+    generateOperationId: function(device_id, operation) {
+        // 使用基于设备ID、操作和计数器的唯一ID
+        this.state.operation_counter++;
+        return `${device_id}_${operation}_${this.state.operation_counter}`;
+    },
+    
+    // 轮询设备状态
+    pollDevices: function() {
+        // 检查轮询间隔
+        let current_time = getCurrentTime();
+        let time_since_last_poll = current_time - this.state.last_poll_time;
+        if (time_since_last_poll < this.config.device_poll_interval) {
+            return [];
+        }
+        
+        // 更新上次轮询时间
+        this.state.last_poll_time = current_time;
+        
+        // 轮询启用的设备
+        let events = [];
+        for (let device_id in this.state.enabled_devices) {
+            if (this.state.enabled_devices[device_id]) {
+                let device = this.state.devices[device_id];
+                if (device) {
+                    // 获取设备句柄
+                    let handle = this.state.device_handles[device_id];
+                    if (handle) {
+                        // 轮询设备状态
+                        let device_events = handle.poll();
+                        if (device_events && device_events.length > 0) {
+                            // 添加设备事件
+                            for (let event of device_events) {
+                                events.push({
+                                    device: device,
+                                    event: event
+                                });
+                                
+                                // 触发设备事件
+                                this.triggerDeviceEvent("device_event", {
+                                    device: device,
+                                    event: event
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return events;
+    },
+    
+    // 触发设备事件
+    triggerDeviceEvent: function(event_type, data) {
+        // 创建事件对象
+        let event = {
+            type: event_type,
+            time: getCurrentTime(),
+            data: data
+        };
+        
+        // 添加到事件队列
+        this.state.device_events.push(event);
+        
+        // 限制事件队列大小
+        if (this.state.device_events.length > 100) {
+            this.state.device_events.shift();
+        }
+        
+        // 通知事件监听器
+        // (在实际实现中，这里可能会调用事件处理系统)
+    },
+    
+    // 清理旧操作
+    cleanupOperations: function() {
+        let current_time = getCurrentTime();
+        let keys_to_remove = [];
+        
+        // 查找已完成或失败的操作
+        for (let operation_id in this.state.device_operations) {
+            let operation = this.state.device_operations[operation_id];
+            if (operation.status === "completed" || operation.status === "failed") {
+                // 检查操作是否已经超过保留时间（5分钟）
+                if (current_time - operation.end_time > 300000) {
+                    keys_to_remove.push(operation_id);
+                }
+            } else if (operation.status === "pending") {
+                // 检查操作是否已经超时
+                if (current_time - operation.start_time > this.config.device_timeout) {
+                    // 更新操作状态为失败
+                    operation.status = "failed";
+                    operation.error = "Operation timed out";
+                    operation.end_time = current_time;
+                    
+                    // 触发超时事件
+                    this.triggerDeviceEvent("operation_timeout", {
+                        operation_id: operation_id,
+                        device_id: operation.device_id,
+                        operation: operation.operation
+                    });
+                    
+                    log("DeviceManager", `设备 ${operation.device_id} 操作 ${operation.operation} 超时`, "WARNING");
+                }
+            }
+        }
+        
+        // 移除已标记的操作
+        for (let operation_id of keys_to_remove) {
+            delete this.state.device_operations[operation_id];
+        }
+    },
+    
+    // 关闭设备管理器
+    shutdown: function() {
+        log("DeviceManager", "关闭设备管理器");
+        
+        // 禁用所有设备
+        for (let device_id in this.state.enabled_devices) {
+            if (this.state.enabled_devices[device_id]) {
+                this.disableDevice(device_id);
+            }
+        }
+        
+        // 关闭设备处理器
+        this.device_handler.shutdown();
+        
+        // 关闭驱动管理器
+        this.driver_manager.shutdown();
+        
+        // 清理状态
+        this.state.devices = {};
+        this.state.device_count = 0;
+        this.state.enabled_devices = {};
+        this.state.disabled_devices = {};
+        this.state.device_events = [];
+        this.state.device_operations = {};
+        this.state.operation_counter = 0;
+        this.state.device_handles = {};
+        this.state.device_cache = {};
+        
+        log("DeviceManager", "设备管理器已关闭");
+        return true;
+    }
+};
+
+// 辅助函数：获取当前时间戳（毫秒）
+function getCurrentTime() {
+    return Date.now();
+}
+
+// 导出模块
+export DeviceManager; 

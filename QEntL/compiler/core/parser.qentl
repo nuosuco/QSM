@@ -1,0 +1,1219 @@
+/**
+ * QEntL解析器
+ * QuantumGene: QG-COMPILER-PARSER-G8H9-1714043603
+ * EntanglementStrength: 1.0
+ */
+
+quantum_program Parser {
+    // 量子基因编码
+    metadata: {
+        name: "QEntL解析器",
+        version: "1.0.0",
+        description: "QEntL语言语法分析组件",
+        quantum_gene: "QG-COMPILER-PARSER-G8H9-1714043603",
+        entanglement_strength: 1.0,
+        node_state: "ACTIVE"
+    },
+    
+    // 解析器状态
+    state: {
+        initialized: false,
+        tokens: [],
+        current_token_index: 0,
+        ast: null,
+        errors: [],
+        warnings: []
+    },
+    
+    // 初始化解析器
+    initialize: function() {
+        if (this.state.initialized) {
+            return;
+        }
+        
+        log("Parser", "初始化解析器");
+        
+        this.state.initialized = true;
+        log("Parser", "解析器初始化完成");
+    },
+    
+    // 重置解析器状态
+    reset: function() {
+        this.state.tokens = [];
+        this.state.current_token_index = 0;
+        this.state.ast = null;
+        this.state.errors = [];
+        this.state.warnings = [];
+    },
+    
+    // 执行语法分析
+    parse: function(tokens, options) {
+        // 确保初始化
+        if (!this.state.initialized) {
+            this.initialize();
+        }
+        
+        // 重置状态
+        this.reset();
+        
+        // 设置词元
+        this.state.tokens = tokens;
+        
+        log("Parser", "开始语法分析");
+        
+        try {
+            // 解析程序
+            this.state.ast = this.parseProgram();
+            
+            log("Parser", "语法分析完成");
+            
+            return {
+                success: this.state.errors.length === 0,
+                ast: this.state.ast,
+                errors: this.state.errors,
+                warnings: this.state.warnings
+            };
+            
+        } catch (error) {
+            this.addError(`语法分析异常: ${error.message}`);
+            
+            return {
+                success: false,
+                ast: this.state.ast,
+                errors: this.state.errors,
+                warnings: this.state.warnings
+            };
+        }
+    },
+    
+    // 解析程序
+    parseProgram: function() {
+        const program = {
+            type: "Program",
+            body: []
+        };
+        
+        // 解析程序语句
+        while (!this.isAtEnd()) {
+            // 跳过分号
+            this.skipSemicolons();
+            
+            if (this.isAtEnd()) {
+                break;
+            }
+            
+            try {
+                const statement = this.parseStatement();
+                if (statement) {
+                    program.body.push(statement);
+                }
+            } catch (error) {
+                this.addError(`语法错误: ${error.message}`);
+                this.synchronize();
+            }
+        }
+        
+        return program;
+    },
+    
+    // 解析语句
+    parseStatement: function() {
+        // 查看当前词元
+        const token = this.peek();
+        
+        switch (token.type) {
+            case "QUANTUM_KEYWORD":
+            case "KEYWORD":
+                return this.parseKeywordStatement();
+                
+            default:
+                return this.parseExpressionStatement();
+        }
+    },
+    
+    // 解析关键字语句
+    parseKeywordStatement: function() {
+        const token = this.peek();
+        const keyword = token.value;
+        
+        switch (keyword) {
+            case "quantum_program":
+                return this.parseQuantumProgram();
+                
+            case "import":
+                return this.parseImportStatement();
+                
+            case "export":
+                return this.parseExportStatement();
+                
+            case "function":
+                return this.parseFunctionDeclaration();
+                
+            case "if":
+                return this.parseIfStatement();
+                
+            case "for":
+                return this.parseForStatement();
+                
+            case "while":
+                return this.parseWhileStatement();
+                
+            case "return":
+                return this.parseReturnStatement();
+                
+            case "break":
+                return this.parseBreakStatement();
+                
+            case "continue":
+                return this.parseContinueStatement();
+                
+            default:
+                return this.parseExpressionStatement();
+        }
+    },
+    
+    // 解析量子程序
+    parseQuantumProgram: function() {
+        // 消费quantum_program关键字
+        const quantumToken = this.consume("KEYWORD", "quantum_program");
+        
+        // 消费程序名称
+        const nameToken = this.consume("IDENTIFIER", "期望程序名称");
+        
+        // 消费左大括号
+        this.consume("DELIMITER", "{");
+        
+        // 解析程序体
+        const program = {
+            type: "QuantumProgram",
+            name: nameToken.value,
+            metadata: null,
+            state: null,
+            components: [],
+            functions: []
+        };
+        
+        // 解析程序内容
+        while (!this.check("DELIMITER", "}") && !this.isAtEnd()) {
+            // 跳过分号
+            this.skipSemicolons();
+            
+            if (this.check("DELIMITER", "}")) {
+                break;
+            }
+            
+            // 检查元数据、状态、组件或函数声明
+            if (this.check("IDENTIFIER", "metadata")) {
+                program.metadata = this.parseMetadataDeclaration();
+            } else if (this.check("IDENTIFIER", "state")) {
+                program.state = this.parseStateDeclaration();
+            } else if (this.check("IDENTIFIER", "components")) {
+                program.components = this.parseComponentsDeclaration();
+            } else if (this.check("KEYWORD", "function")) {
+                program.functions.push(this.parseFunctionDeclaration());
+            } else {
+                // 非预期的声明
+                this.addError(`非预期的声明: ${this.peek().value}`);
+                this.advance();
+            }
+        }
+        
+        // 消费右大括号
+        this.consume("DELIMITER", "}");
+        
+        return program;
+    },
+    
+    // 解析元数据声明
+    parseMetadataDeclaration: function() {
+        // 消费metadata标识符
+        this.consume("IDENTIFIER", "metadata");
+        
+        // 消费冒号
+        this.consume("DELIMITER", ":");
+        
+        // 解析对象字面量
+        return this.parseObjectLiteral();
+    },
+    
+    // 解析状态声明
+    parseStateDeclaration: function() {
+        // 消费state标识符
+        this.consume("IDENTIFIER", "state");
+        
+        // 消费冒号
+        this.consume("DELIMITER", ":");
+        
+        // 解析对象字面量
+        return this.parseObjectLiteral();
+    },
+    
+    // 解析组件声明
+    parseComponentsDeclaration: function() {
+        // 消费components标识符
+        this.consume("IDENTIFIER", "components");
+        
+        // 消费冒号
+        this.consume("DELIMITER", ":");
+        
+        // 解析数组字面量
+        return this.parseArrayLiteral();
+    },
+    
+    // 解析函数声明
+    parseFunctionDeclaration: function() {
+        // 消费function关键字
+        const functionToken = this.consume("KEYWORD", "function");
+        
+        // 消费函数名
+        const nameToken = this.consume("IDENTIFIER", "期望函数名");
+        
+        // 解析参数列表
+        this.consume("DELIMITER", "(");
+        const parameters = this.parseParameterList();
+        this.consume("DELIMITER", ")");
+        
+        // 解析函数体
+        const body = this.parseBlock();
+        
+        return {
+            type: "FunctionDeclaration",
+            name: nameToken.value,
+            parameters: parameters,
+            body: body
+        };
+    },
+    
+    // 解析参数列表
+    parseParameterList: function() {
+        const parameters = [];
+        
+        // 如果不是右括号，则解析参数
+        if (!this.check("DELIMITER", ")")) {
+            do {
+                // 解析参数名
+                const nameToken = this.consume("IDENTIFIER", "期望参数名");
+                
+                const parameter = {
+                    type: "Parameter",
+                    name: nameToken.value
+                };
+                
+                parameters.push(parameter);
+                
+                // 如果不是逗号，则结束参数列表
+                if (!this.check("DELIMITER", ",")) {
+                    break;
+                }
+                
+                // 消费逗号
+                this.consume("DELIMITER", ",");
+            } while (true);
+        }
+        
+        return parameters;
+    },
+    
+    // 解析块语句
+    parseBlock: function() {
+        // 消费左大括号
+        this.consume("DELIMITER", "{");
+        
+        const statements = [];
+        
+        // 解析块内语句
+        while (!this.check("DELIMITER", "}") && !this.isAtEnd()) {
+            // 跳过分号
+            this.skipSemicolons();
+            
+            if (this.check("DELIMITER", "}")) {
+                break;
+            }
+            
+            try {
+                const statement = this.parseStatement();
+                if (statement) {
+                    statements.push(statement);
+                }
+            } catch (error) {
+                this.addError(`语法错误: ${error.message}`);
+                this.synchronize();
+            }
+        }
+        
+        // 消费右大括号
+        this.consume("DELIMITER", "}");
+        
+        return {
+            type: "BlockStatement",
+            body: statements
+        };
+    },
+    
+    // 解析IF语句
+    parseIfStatement: function() {
+        // 消费if关键字
+        this.consume("KEYWORD", "if");
+        
+        // 消费左括号
+        this.consume("DELIMITER", "(");
+        
+        // 解析条件表达式
+        const condition = this.parseExpression();
+        
+        // 消费右括号
+        this.consume("DELIMITER", ")");
+        
+        // 解析then分支
+        const thenBranch = this.parseStatement();
+        
+        // 解析可选的else分支
+        let elseBranch = null;
+        if (this.match("KEYWORD", "else")) {
+            elseBranch = this.parseStatement();
+        }
+        
+        return {
+            type: "IfStatement",
+            condition: condition,
+            thenBranch: thenBranch,
+            elseBranch: elseBranch
+        };
+    },
+    
+    // 解析for语句
+    parseForStatement: function() {
+        // 消费for关键字
+        this.consume("KEYWORD", "for");
+        
+        // 消费左括号
+        this.consume("DELIMITER", "(");
+        
+        // 解析初始化语句
+        let initializer;
+        if (this.check("DELIMITER", ";")) {
+            initializer = null;
+            this.advance();
+        } else {
+            initializer = this.parseExpressionStatement();
+        }
+        
+        // 解析条件表达式
+        let condition;
+        if (this.check("DELIMITER", ";")) {
+            condition = null;
+        } else {
+            condition = this.parseExpression();
+        }
+        
+        // 消费分号
+        this.consume("DELIMITER", ";");
+        
+        // 解析增量表达式
+        let increment;
+        if (this.check("DELIMITER", ")")) {
+            increment = null;
+        } else {
+            increment = this.parseExpression();
+        }
+        
+        // 消费右括号
+        this.consume("DELIMITER", ")");
+        
+        // 解析循环体
+        const body = this.parseStatement();
+        
+        return {
+            type: "ForStatement",
+            initializer: initializer,
+            condition: condition,
+            increment: increment,
+            body: body
+        };
+    },
+    
+    // 解析while语句
+    parseWhileStatement: function() {
+        // 消费while关键字
+        this.consume("KEYWORD", "while");
+        
+        // 消费左括号
+        this.consume("DELIMITER", "(");
+        
+        // 解析条件表达式
+        const condition = this.parseExpression();
+        
+        // 消费右括号
+        this.consume("DELIMITER", ")");
+        
+        // 解析循环体
+        const body = this.parseStatement();
+        
+        return {
+            type: "WhileStatement",
+            condition: condition,
+            body: body
+        };
+    },
+    
+    // 解析return语句
+    parseReturnStatement: function() {
+        // 消费return关键字
+        const token = this.consume("KEYWORD", "return");
+        
+        // 解析可选的返回值
+        let value = null;
+        if (!this.check("DELIMITER", ";")) {
+            value = this.parseExpression();
+        }
+        
+        // 消费分号
+        this.consumeSemicolon("return语句后需要分号");
+        
+        return {
+            type: "ReturnStatement",
+            value: value
+        };
+    },
+    
+    // 解析break语句
+    parseBreakStatement: function() {
+        // 消费break关键字
+        const token = this.consume("KEYWORD", "break");
+        
+        // 消费分号
+        this.consumeSemicolon("break语句后需要分号");
+        
+        return {
+            type: "BreakStatement"
+        };
+    },
+    
+    // 解析continue语句
+    parseContinueStatement: function() {
+        // 消费continue关键字
+        const token = this.consume("KEYWORD", "continue");
+        
+        // 消费分号
+        this.consumeSemicolon("continue语句后需要分号");
+        
+        return {
+            type: "ContinueStatement"
+        };
+    },
+    
+    // 解析import语句
+    parseImportStatement: function() {
+        // 消费import关键字
+        this.consume("KEYWORD", "import");
+        
+        // 解析导入内容
+        let importPath;
+        
+        // 检查是否是字符串字面量
+        if (this.check("STRING")) {
+            // 简单导入
+            importPath = this.consume("STRING").value;
+            
+            // 消费分号
+            this.consumeSemicolon("import语句后需要分号");
+            
+            return {
+                type: "ImportStatement",
+                path: importPath,
+                specifiers: []
+            };
+        } else {
+            // 具名导入
+            const specifiers = [];
+            
+            // 检查是否是花括号导入
+            if (this.check("DELIMITER", "{")) {
+                // 消费左大括号
+                this.consume("DELIMITER", "{");
+                
+                // 解析导入名称列表
+                while (!this.check("DELIMITER", "}")) {
+                    // 消费名称
+                    const nameToken = this.consume("IDENTIFIER", "期望导入名称");
+                    
+                    // 检查是否有as别名
+                    let alias = null;
+                    if (this.match("IDENTIFIER", "as")) {
+                        alias = this.consume("IDENTIFIER", "期望别名").value;
+                    }
+                    
+                    specifiers.push({
+                        type: "ImportSpecifier",
+                        imported: nameToken.value,
+                        local: alias || nameToken.value
+                    });
+                    
+                    // 如果不是逗号，则结束列表
+                    if (!this.check("DELIMITER", ",")) {
+                        break;
+                    }
+                    
+                    // 消费逗号
+                    this.consume("DELIMITER", ",");
+                }
+                
+                // 消费右大括号
+                this.consume("DELIMITER", "}");
+            } else {
+                // 默认导入
+                const nameToken = this.consume("IDENTIFIER", "期望导入名称");
+                
+                specifiers.push({
+                    type: "ImportDefaultSpecifier",
+                    local: nameToken.value
+                });
+            }
+            
+            // 消费from关键字
+            this.consume("IDENTIFIER", "from");
+            
+            // 消费模块路径
+            importPath = this.consume("STRING", "期望模块路径").value;
+            
+            // 消费分号
+            this.consumeSemicolon("import语句后需要分号");
+            
+            return {
+                type: "ImportStatement",
+                path: importPath,
+                specifiers: specifiers
+            };
+        }
+    },
+    
+    // 解析export语句
+    parseExportStatement: function() {
+        // 消费export关键字
+        this.consume("KEYWORD", "export");
+        
+        // 检查导出类型
+        if (this.check("KEYWORD", "function")) {
+            // 导出函数声明
+            const declaration = this.parseFunctionDeclaration();
+            
+            return {
+                type: "ExportNamedDeclaration",
+                declaration: declaration
+            };
+        } else if (this.check("IDENTIFIER")) {
+            // 导出标识符
+            const nameToken = this.consume("IDENTIFIER");
+            
+            // 消费分号
+            this.consumeSemicolon("export语句后需要分号");
+            
+            return {
+                type: "ExportNamedDeclaration",
+                specifiers: [{
+                    type: "ExportSpecifier",
+                    exported: nameToken.value
+                }],
+                declaration: null
+            };
+        } else if (this.check("DELIMITER", "{")) {
+            // 导出列表
+            this.consume("DELIMITER", "{");
+            
+            const specifiers = [];
+            
+            // 解析导出名称列表
+            while (!this.check("DELIMITER", "}")) {
+                // 消费名称
+                const nameToken = this.consume("IDENTIFIER", "期望导出名称");
+                
+                // 检查是否有as别名
+                let exported = nameToken.value;
+                if (this.match("IDENTIFIER", "as")) {
+                    exported = this.consume("IDENTIFIER", "期望别名").value;
+                }
+                
+                specifiers.push({
+                    type: "ExportSpecifier",
+                    local: nameToken.value,
+                    exported: exported
+                });
+                
+                // 如果不是逗号，则结束列表
+                if (!this.check("DELIMITER", ",")) {
+                    break;
+                }
+                
+                // 消费逗号
+                this.consume("DELIMITER", ",");
+            }
+            
+            // 消费右大括号
+            this.consume("DELIMITER", "}");
+            
+            // 消费分号
+            this.consumeSemicolon("export语句后需要分号");
+            
+            return {
+                type: "ExportNamedDeclaration",
+                specifiers: specifiers,
+                declaration: null
+            };
+        } else if (this.check("KEYWORD", "default")) {
+            // 导出默认值
+            this.consume("KEYWORD", "default");
+            
+            const expression = this.parseExpression();
+            
+            // 消费分号
+            this.consumeSemicolon("export default语句后需要分号");
+            
+            return {
+                type: "ExportDefaultDeclaration",
+                declaration: expression
+            };
+        } else {
+            this.addError("无效的export语句");
+            this.synchronize();
+            return null;
+        }
+    },
+    
+    // 解析表达式语句
+    parseExpressionStatement: function() {
+        const expr = this.parseExpression();
+        
+        // 消费分号
+        this.consumeSemicolon("表达式语句后需要分号");
+        
+        return {
+            type: "ExpressionStatement",
+            expression: expr
+        };
+    },
+    
+    // 解析表达式
+    parseExpression: function() {
+        return this.parseAssignment();
+    },
+    
+    // 解析赋值表达式
+    parseAssignment: function() {
+        const expr = this.parseLogical();
+        
+        if (this.match("OPERATOR", "=") ||
+            this.match("OPERATOR", "+=") ||
+            this.match("OPERATOR", "-=") ||
+            this.match("OPERATOR", "*=") ||
+            this.match("OPERATOR", "/=") ||
+            this.match("OPERATOR", "%=")) {
+            
+            const operator = this.previous().value;
+            const right = this.parseAssignment();
+            
+            // 检查左侧是否为有效的赋值目标
+            if (expr.type === "Identifier") {
+                return {
+                    type: "AssignmentExpression",
+                    operator: operator,
+                    left: expr,
+                    right: right
+                };
+            } else if (expr.type === "MemberExpression") {
+                return {
+                    type: "AssignmentExpression",
+                    operator: operator,
+                    left: expr,
+                    right: right
+                };
+            }
+            
+            this.addError("无效的赋值目标");
+        }
+        
+        return expr;
+    },
+    
+    // 解析逻辑表达式
+    parseLogical: function() {
+        let expr = this.parseEquality();
+        
+        while (this.match("OPERATOR", "&&") || this.match("OPERATOR", "||")) {
+            const operator = this.previous().value;
+            const right = this.parseEquality();
+            
+            expr = {
+                type: "LogicalExpression",
+                operator: operator,
+                left: expr,
+                right: right
+            };
+        }
+        
+        return expr;
+    },
+    
+    // 解析相等比较表达式
+    parseEquality: function() {
+        let expr = this.parseComparison();
+        
+        while (this.match("OPERATOR", "==") || this.match("OPERATOR", "!=")) {
+            const operator = this.previous().value;
+            const right = this.parseComparison();
+            
+            expr = {
+                type: "BinaryExpression",
+                operator: operator,
+                left: expr,
+                right: right
+            };
+        }
+        
+        return expr;
+    },
+    
+    // 解析比较表达式
+    parseComparison: function() {
+        let expr = this.parseAdditive();
+        
+        while (this.match("OPERATOR", ">") || this.match("OPERATOR", ">=") ||
+               this.match("OPERATOR", "<") || this.match("OPERATOR", "<=")) {
+            
+            const operator = this.previous().value;
+            const right = this.parseAdditive();
+            
+            expr = {
+                type: "BinaryExpression",
+                operator: operator,
+                left: expr,
+                right: right
+            };
+        }
+        
+        return expr;
+    },
+    
+    // 解析加减表达式
+    parseAdditive: function() {
+        let expr = this.parseMultiplicative();
+        
+        while (this.match("OPERATOR", "+") || this.match("OPERATOR", "-")) {
+            const operator = this.previous().value;
+            const right = this.parseMultiplicative();
+            
+            expr = {
+                type: "BinaryExpression",
+                operator: operator,
+                left: expr,
+                right: right
+            };
+        }
+        
+        return expr;
+    },
+    
+    // 解析乘除表达式
+    parseMultiplicative: function() {
+        let expr = this.parseUnary();
+        
+        while (this.match("OPERATOR", "*") || this.match("OPERATOR", "/") || this.match("OPERATOR", "%")) {
+            const operator = this.previous().value;
+            const right = this.parseUnary();
+            
+            expr = {
+                type: "BinaryExpression",
+                operator: operator,
+                left: expr,
+                right: right
+            };
+        }
+        
+        return expr;
+    },
+    
+    // 解析一元表达式
+    parseUnary: function() {
+        if (this.match("OPERATOR", "!") || this.match("OPERATOR", "-") || this.match("OPERATOR", "+")) {
+            const operator = this.previous().value;
+            const right = this.parseUnary();
+            
+            return {
+                type: "UnaryExpression",
+                operator: operator,
+                argument: right
+            };
+        }
+        
+        return this.parseCallOrMember();
+    },
+    
+    // 解析调用或成员表达式
+    parseCallOrMember: function() {
+        let expr = this.parsePrimary();
+        
+        while (true) {
+            if (this.match("DELIMITER", "(")) {
+                // 函数调用
+                expr = this.finishCall(expr);
+            } else if (this.match("DELIMITER", "[")) {
+                // 数组索引
+                const index = this.parseExpression();
+                this.consume("DELIMITER", "]", "期望']'");
+                
+                expr = {
+                    type: "MemberExpression",
+                    object: expr,
+                    property: index,
+                    computed: true
+                };
+            } else if (this.match("DELIMITER", ".")) {
+                // 属性访问
+                const name = this.consume("IDENTIFIER", "期望属性名").value;
+                
+                expr = {
+                    type: "MemberExpression",
+                    object: expr,
+                    property: {
+                        type: "Identifier",
+                        name: name
+                    },
+                    computed: false
+                };
+            } else {
+                break;
+            }
+        }
+        
+        return expr;
+    },
+    
+    // 完成函数调用解析
+    finishCall: function(callee) {
+        const args = [];
+        
+        // 如果不是右括号，则解析参数
+        if (!this.check("DELIMITER", ")")) {
+            do {
+                args.push(this.parseExpression());
+                
+                // 如果不是逗号，则结束参数列表
+                if (!this.check("DELIMITER", ",")) {
+                    break;
+                }
+                
+                // 消费逗号
+                this.consume("DELIMITER", ",");
+            } while (true);
+        }
+        
+        // 消费右括号
+        this.consume("DELIMITER", ")");
+        
+        return {
+            type: "CallExpression",
+            callee: callee,
+            arguments: args
+        };
+    },
+    
+    // 解析主表达式
+    parsePrimary: function() {
+        if (this.match("BOOLEAN")) {
+            return {
+                type: "Literal",
+                value: this.previous().value === "true"
+            };
+        }
+        
+        if (this.match("NUMBER")) {
+            return {
+                type: "Literal",
+                value: parseFloat(this.previous().value)
+            };
+        }
+        
+        if (this.match("STRING")) {
+            return {
+                type: "Literal",
+                value: this.previous().value
+            };
+        }
+        
+        if (this.match("IDENTIFIER")) {
+            return {
+                type: "Identifier",
+                name: this.previous().value
+            };
+        }
+        
+        if (this.match("DELIMITER", "(")) {
+            const expr = this.parseExpression();
+            this.consume("DELIMITER", ")", "期望')'");
+            
+            return {
+                type: "GroupExpression",
+                expression: expr
+            };
+        }
+        
+        if (this.match("DELIMITER", "[")) {
+            return this.parseArrayLiteral();
+        }
+        
+        if (this.match("DELIMITER", "{")) {
+            return this.parseObjectLiteral();
+        }
+        
+        this.addError(`非预期的表达式: ${this.peek().value}`);
+        this.advance();
+        return null;
+    },
+    
+    // 解析数组字面量
+    parseArrayLiteral: function() {
+        const elements = [];
+        
+        // 如果不是右括号，则解析元素
+        if (!this.check("DELIMITER", "]")) {
+            do {
+                elements.push(this.parseExpression());
+                
+                // 如果不是逗号，则结束元素列表
+                if (!this.check("DELIMITER", ",")) {
+                    break;
+                }
+                
+                // 消费逗号
+                this.consume("DELIMITER", ",");
+            } while (true);
+        }
+        
+        // 消费右括号
+        this.consume("DELIMITER", "]");
+        
+        return {
+            type: "ArrayExpression",
+            elements: elements
+        };
+    },
+    
+    // 解析对象字面量
+    parseObjectLiteral: function() {
+        const properties = [];
+        
+        // 消费左大括号
+        if (!this.check("DELIMITER", "{")) {
+            this.consume("DELIMITER", "{");
+        }
+        
+        // 如果不是右大括号，则解析属性
+        if (!this.check("DELIMITER", "}")) {
+            do {
+                // 解析属性键
+                let key;
+                
+                if (this.check("IDENTIFIER")) {
+                    key = {
+                        type: "Identifier",
+                        name: this.consume("IDENTIFIER").value
+                    };
+                } else if (this.check("STRING")) {
+                    key = {
+                        type: "Literal",
+                        value: this.consume("STRING").value
+                    };
+                } else {
+                    this.addError("期望属性名");
+                    this.advance();
+                    continue;
+                }
+                
+                // 消费冒号
+                this.consume("DELIMITER", ":");
+                
+                // 解析属性值
+                const value = this.parseExpression();
+                
+                properties.push({
+                    type: "Property",
+                    key: key,
+                    value: value
+                });
+                
+                // 如果不是逗号，则结束属性列表
+                if (!this.check("DELIMITER", ",")) {
+                    break;
+                }
+                
+                // 消费逗号
+                this.consume("DELIMITER", ",");
+            } while (true);
+        }
+        
+        // 消费右大括号
+        this.consume("DELIMITER", "}");
+        
+        return {
+            type: "ObjectExpression",
+            properties: properties
+        };
+    },
+    
+    // 消费分号
+    consumeSemicolon: function(errorMessage) {
+        if (this.check("DELIMITER", ";")) {
+            this.consume("DELIMITER", ";");
+        } else {
+            // 自动分号插入
+            if (this.checkPreviousLineEnd()) {
+                // 如果前一个词元后面有换行，则不需要分号
+                return;
+            }
+            
+            this.addError(errorMessage || "期望分号");
+        }
+    },
+    
+    // 跳过分号
+    skipSemicolons: function() {
+        while (this.check("DELIMITER", ";")) {
+            this.advance();
+        }
+    },
+    
+    // 检查当前词元类型和值
+    check: function(type, value) {
+        if (this.isAtEnd()) {
+            return false;
+        }
+        
+        const token = this.peek();
+        
+        if (value !== undefined) {
+            return token.type === type && token.value === value;
+        }
+        
+        return token.type === type;
+    },
+    
+    // 匹配当前词元类型和值，如果匹配则消费
+    match: function(type, value) {
+        if (this.check(type, value)) {
+            this.advance();
+            return true;
+        }
+        
+        return false;
+    },
+    
+    // 消费当前词元
+    consume: function(type, expectedMessage) {
+        if (this.check(type)) {
+            return this.advance();
+        }
+        
+        this.addError(expectedMessage || `期望 ${type}`);
+        return null;
+    },
+    
+    // 检查前一个词元后是否有换行
+    checkPreviousLineEnd: function() {
+        if (this.state.current_token_index <= 0) {
+            return false;
+        }
+        
+        const previous = this.state.tokens[this.state.current_token_index - 1];
+        const current = this.peek();
+        
+        return previous.line < current.line;
+    },
+    
+    // 获取当前词元
+    peek: function() {
+        return this.state.tokens[this.state.current_token_index];
+    },
+    
+    // 获取前一个词元
+    previous: function() {
+        return this.state.tokens[this.state.current_token_index - 1];
+    },
+    
+    // 前进到下一个词元
+    advance: function() {
+        if (!this.isAtEnd()) {
+            this.state.current_token_index++;
+        }
+        return this.previous();
+    },
+    
+    // 判断是否到达词元流末尾
+    isAtEnd: function() {
+        return this.peek().type === "EOF";
+    },
+    
+    // 添加错误
+    addError: function(message) {
+        const token = this.peek();
+        
+        const error = {
+            message: message,
+            line: token.line,
+            column: token.column,
+            position: token.position
+        };
+        
+        this.state.errors.push(error);
+        log("Parser", `错误(${token.line}:${token.column}): ${message}`, "ERROR");
+    },
+    
+    // 添加警告
+    addWarning: function(message) {
+        const token = this.peek();
+        
+        const warning = {
+            message: message,
+            line: token.line,
+            column: token.column,
+            position: token.position
+        };
+        
+        this.state.warnings.push(warning);
+        log("Parser", `警告(${token.line}:${token.column}): ${message}`, "WARNING");
+    },
+    
+    // 错误恢复
+    synchronize: function() {
+        this.advance();
+        
+        while (!this.isAtEnd()) {
+            // 如果前一个词元是分号，则可能是语句结束
+            if (this.previous().type === "DELIMITER" && this.previous().value === ";") {
+                return;
+            }
+            
+            // 如果当前词元是关键字，则可能是新语句开始
+            switch (this.peek().type) {
+                case "KEYWORD":
+                    switch (this.peek().value) {
+                        case "function":
+                        case "if":
+                        case "for":
+                        case "while":
+                        case "return":
+                        case "break":
+                        case "continue":
+                        case "import":
+                        case "export":
+                        case "quantum_program":
+                            return;
+                    }
+                    break;
+            }
+            
+            this.advance();
+        }
+    }
+};
+
+// 导出解析器
+export Parser; 

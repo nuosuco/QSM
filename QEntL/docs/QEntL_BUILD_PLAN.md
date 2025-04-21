@@ -1,4 +1,50 @@
+# QEntL构建计划
+
+**量子基因编码**: `QGC-BUILD-PLAN-2024051601`  
+**量子纠缠信道**: `QEC-DOCS-BUILD-01`  
+**纠缠节点列表**:
+- QEntL/docs/qentl_environment_design.md
+- QEntL/docs/syntax.qentl
+- QEntL/src/kernel/process_manager.qentl
+- QEntL/src/kernel/io_scheduler.qentl
+
+## 1. 项目概述
+
 # QEntL操作系统构建步骤规划
+
+## 量子基因编码
+```qentl
+QG-DOC-BUILDPLAN-QENTL-OS-A2B2
+```
+
+## 量子纠缠信道
+```qentl
+// 信道标识
+QE-DOC-BUILDPLAN-20240516
+
+// 纠缠态
+ENTANGLE_STATE: ACTIVE
+
+// 纠缠对象
+ENTANGLED_OBJECTS: [
+  "QEntL/docs/qentl_environment_design.md",
+  "QEntL/src/kernel/microkernel_core.qentl",
+  "QEntL/src/kernel/quantum_processor.qentl",
+  "QEntL/tests/kernel/microkernel_test.qentl"
+]
+
+// 纠缠强度
+ENTANGLE_STRENGTH: 1.0
+
+// 自动节点激活
+NODE_DEFAULT_STATE: ACTIVE
+
+// 自动量子比特扩展
+QUANTUM_BIT_ADAPTIVE: TRUE
+
+// 输出元素量子基因编码
+OUTPUT_QUANTUM_GENE_ENCODING: TRUE
+```
 
 > **重要说明**:
 > 1. 本文档详细规划QEntL操作系统的构建步骤，从准备工作到完整部署
@@ -38,8 +84,8 @@ QEntL操作系统构建分为以下几个阶段：
 1. **核心内核架构设计与实现**：
    ```bash
    # 创建内核源码目录
-   mkdir -p QEntL-env/src/kernel
-   cd QEntL-env/src/kernel
+   mkdir -p QEntL/src/kernel
+   cd QEntL/src/kernel
    
    # 实现核心内核结构
    qentl-compiler -c microkernel_core.qentl -o microkernel_core.qobj
@@ -81,7 +127,7 @@ QEntL操作系统构建分为以下几个阶段：
 6. **内核测试套件**：
    ```bash
    # 构建微内核测试程序
-   cd QEntL-env/tests/kernel
+   cd QEntL/tests/kernel
    qentl-compiler -c microkernel_test.qentl -I../../src -o microkernel_test.qexe
    
    # 运行测试
@@ -93,8 +139,8 @@ QEntL操作系统构建分为以下几个阶段：
 1. **多维索引核心实现**：
    ```bash
    # 创建文件系统源码目录
-   mkdir -p QEntL-env/src/filesystem
-   cd QEntL-env/src/filesystem
+   mkdir -p QEntL/src/filesystem
+   cd QEntL/src/filesystem
    
    # 实现多维索引核心
    qentl-compiler -c multidimensional_index.qentl -o multidimensional_index.qobj
@@ -151,7 +197,7 @@ QEntL操作系统构建分为以下几个阶段：
 7. **文件系统测试套件**：
    ```bash
    # 构建文件系统测试程序
-   cd QEntL-env/tests/filesystem
+   cd QEntL/tests/filesystem
    qentl-compiler -c dynamic_directory_test.qentl -I../../src -o dynamic_directory_test.qexe
    
    # 运行测试
@@ -163,8 +209,8 @@ QEntL操作系统构建分为以下几个阶段：
 1. **核心系统服务**：
    ```bash
    # 创建系统服务源码目录
-   mkdir -p QEntL-env/src/services
-   cd QEntL-env/src/services
+   mkdir -p QEntL/src/services
+   cd QEntL/src/services
    
    # 实现核心系统服务
    qentl-compiler -c security_service.qentl -o security_service.qobj
@@ -207,7 +253,7 @@ QEntL操作系统构建分为以下几个阶段：
 5. **系统服务测试套件**：
    ```bash
    # 构建系统服务测试程序
-   cd QEntL-env/tests/services
+   cd QEntL/tests/services
    qentl-compiler -c services_test.qentl -I../../src -o services_test.qexe
    
    # 运行测试
@@ -219,8 +265,8 @@ QEntL操作系统构建分为以下几个阶段：
 1. **量子GUI框架**：
    ```bash
    # 创建GUI源码目录
-   mkdir -p QEntL-env/src/gui
-   cd QEntL-env/src/gui
+   mkdir -p QEntL/src/gui
+   cd QEntL/src/gui
    
    # 实现量子GUI框架
    qentl-compiler -c intent_ui_engine.qentl -o intent_ui_engine.qobj
@@ -253,7 +299,7 @@ QEntL操作系统构建分为以下几个阶段：
 4. **GUI测试套件**：
    ```bash
    # 构建GUI测试程序
-   cd QEntL-env/tests/gui
+   cd QEntL/tests/gui
    qentl-compiler -c gui_test.qentl -I../../src -o gui_test.qexe
    
    # 运行测试
@@ -265,7 +311,7 @@ QEntL操作系统构建分为以下几个阶段：
 1. **系统集成**：
    ```bash
    # 集成所有组件
-   cd QEntL-env/src
+   cd QEntL/src
    qentl-compiler -c qentl_system.qentl -I. -o qentl_system.qobj
    
    # 构建系统映像
@@ -275,7 +321,7 @@ QEntL操作系统构建分为以下几个阶段：
 2. **性能测试与优化**：
    ```bash
    # 运行性能测试
-   cd QEntL-env/tests/performance
+   cd QEntL/tests/performance
    qentl-compiler -c performance_test.qentl -I../../src -o performance_test.qexe
    
    # 执行负载测试
@@ -288,7 +334,7 @@ QEntL操作系统构建分为以下几个阶段：
 3. **稳定性测试**：
    ```bash
    # 运行稳定性测试
-   cd QEntL-env/tests/stability
+   cd QEntL/tests/stability
    qentl-compiler -c stability_test.qentl -I../../src -o stability_test.qexe
    
    # 执行长时间运行测试
@@ -301,7 +347,7 @@ QEntL操作系统构建分为以下几个阶段：
 4. **用户体验测试**：
    ```bash
    # 运行用户体验测试
-   cd QEntL-env/tests/user_experience
+   cd QEntL/tests/user_experience
    qentl-compiler -c ux_test.qentl -I../../src -o ux_test.qexe
    
    # 执行用户流程测试
@@ -314,7 +360,7 @@ QEntL操作系统构建分为以下几个阶段：
 5. **最终系统验证**：
    ```bash
    # 运行完整系统测试
-   cd QEntL-env/tests/system
+   cd QEntL/tests/system
    qentl-compiler -c system_validation.qentl -I../../src -o system_validation.qexe
    
    # 执行系统验证
@@ -326,31 +372,31 @@ QEntL操作系统构建分为以下几个阶段：
 1. **开发文档生成**：
    ```bash
    # 创建文档目录
-   mkdir -p QEntL-env/docs/developer
+   mkdir -p QEntL/docs/developer
    
    # 生成API文档
-   qentl-doc-gen --source-dir QEntL-env/src --output-dir QEntL-env/docs/developer/api
+   qentl-doc-gen --source-dir QEntL/src --output-dir QEntL/docs/developer/api
    
    # 生成架构文档
-   qentl-doc-gen --architecture --source-dir QEntL-env/src --output-dir QEntL-env/docs/developer/architecture
+   qentl-doc-gen --architecture --source-dir QEntL/src --output-dir QEntL/docs/developer/architecture
    ```
 
 2. **用户文档生成**：
    ```bash
    # 创建用户文档目录
-   mkdir -p QEntL-env/docs/user
+   mkdir -p QEntL/docs/user
    
    # 生成用户手册
-   qentl-doc-gen --user-manual --source-dir QEntL-env/src --output-dir QEntL-env/docs/user/manual
+   qentl-doc-gen --user-manual --source-dir QEntL/src --output-dir QEntL/docs/user/manual
    
    # 生成快速入门指南
-   qentl-doc-gen --quickstart --source-dir QEntL-env/src --output-dir QEntL-env/docs/user/quickstart
+   qentl-doc-gen --quickstart --source-dir QEntL/src --output-dir QEntL/docs/user/quickstart
    ```
 
 3. **开发辅助工具**：
    ```bash
    # 创建工具目录
-   mkdir -p QEntL-env/tools
+   mkdir -p QEntL/tools
    
    # 构建调试工具
    qentl-compiler -c tools/debugger.qentl -I../src -o tools/qentl-debugger.qexe
@@ -365,7 +411,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译量子状态模块**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -c quantum_state.c -I. -std=c99 -Wall -O2
    ```
 
@@ -451,7 +497,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译五蕴状态模块**：
    ```bash
-   cd QEntL-env/src/stdlib/core
+   cd QEntL/src/stdlib/core
    gcc -c five_aggregates.c -I../.. -std=c99 -Wall -O2
    ```
 
@@ -469,7 +515,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译量子区块链模块**：
    ```bash
-   cd QEntL-env/src/stdlib/core
+   cd QEntL/src/stdlib/core
    gcc -c quantum_blockchain.c -I../.. -std=c99 -Wall -O2
    ```
 
@@ -502,7 +548,7 @@ QEntL操作系统构建分为以下几个阶段：
 3. **构建高级内核测试程序**：
    ```bash
    # 构建高级内核测试程序
-   cd QEntL-env/tests/kernel
+   cd QEntL/tests/kernel
    qentl-compiler -c advanced_kernel_test.qentl -I../../src -o advanced_kernel_test.qexe
    
    # 运行测试
@@ -528,7 +574,7 @@ QEntL操作系统构建分为以下几个阶段：
 3. **构建图形界面测试程序**：
    ```bash
    # 构建图形界面测试程序
-   cd QEntL-env/tests/gui
+   cd QEntL/tests/gui
    qentl-compiler -c gui_test.qentl -I../../src -o gui_test.qexe
    
    # 运行测试
@@ -548,7 +594,7 @@ QEntL操作系统构建分为以下几个阶段：
 2. **构建完整服务测试程序**：
    ```bash
    # 构建完整服务测试程序
-   cd QEntL-env/tests/services
+   cd QEntL/tests/services
    qentl-compiler -c complete_services_test.qentl -I../../src -o complete_services_test.qexe
    
    # 运行测试
@@ -561,7 +607,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译平台抽象层**：
    ```bash
-   cd QEntL-env/src/os/platform
+   cd QEntL/src/os/platform
    gcc -c platform_abstraction.c -I../.. -std=c99 -Wall -O2
    ```
 
@@ -632,7 +678,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译核心数学库**：
    ```bash
-   cd QEntL-env/src/stdlib/core
+   cd QEntL/src/stdlib/core
    gcc -c math_library.c -I../.. -std=c99 -Wall -O2
    ```
 
@@ -650,7 +696,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译网络库**：
    ```bash
-   cd QEntL-env/src/stdlib/network
+   cd QEntL/src/stdlib/network
    gcc -c quantum_network.c -I../.. -std=c99 -Wall -O2
    ```
 
@@ -668,7 +714,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译可视化库**：
    ```bash
-   cd QEntL-env/src/stdlib/visualization
+   cd QEntL/src/stdlib/visualization
    gcc -c quantum_visualizer.c -I../.. -std=c99 -Wall -O2
    ```
 
@@ -686,7 +732,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译量子算法库**：
    ```bash
-   cd QEntL-env/src/stdlib
+   cd QEntL/src/stdlib
    gcc -c quantum_algorithms.c -I.. -std=c99 -Wall -O2
    ```
 
@@ -704,13 +750,13 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **创建静态库**：
    ```bash
-   cd QEntL-env/lib
+   cd QEntL/lib
    ar rcs libqentl_stdlib.a ../src/stdlib/core/*.o ../src/stdlib/network/*.o ../src/stdlib/visualization/*.o ../src/stdlib/*.o
    ```
 
 2. **构建整体测试程序**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -o test_stdlib tests/stdlib/test_stdlib.c -I. -L../lib -lqentl_stdlib -std=c99 -Wall
    ```
 
@@ -725,7 +771,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译节点自动激活系统**：
    ```bash
-   cd QEntL-env/src/runtime/quantum_network
+   cd QEntL/src/runtime/quantum_network
    gcc -c node_activator.c -I. -I../../include -std=c99 -Wall -O2
    ```
 
@@ -796,7 +842,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译编辑器组件**：
    ```bash
-   cd QEntL-env/src/tools/editor
+   cd QEntL/src/tools/editor
    gcc -c main.c -I../.. -std=c99 -Wall -O2
    gcc -c editor_core.c -I../.. -std=c99 -Wall -O2
    gcc -c syntax_highlighter.c -I../.. -std=c99 -Wall -O2
@@ -805,7 +851,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 2. **链接编辑器组件**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -o ../bin/qentl_editor tools/editor/*.o -I. -L../lib -lqentl_stdlib -std=c99 -Wall -O2
    ```
 
@@ -813,7 +859,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译可视化工具组件**：
    ```bash
-   cd QEntL-env/src/tools/visualizer
+   cd QEntL/src/tools/visualizer
    gcc -c main.c -I../.. -std=c99 -Wall -O2
    gcc -c visualizer_core.c -I../.. -std=c99 -Wall -O2
    gcc -c state_renderer.c -I../.. -std=c99 -Wall -O2
@@ -822,7 +868,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 2. **链接可视化工具组件**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -o ../bin/qentl_visualizer tools/visualizer/*.o -I. -L../lib -lqentl_stdlib -std=c99 -Wall -O2
    ```
 
@@ -830,7 +876,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译调试器组件**：
    ```bash
-   cd QEntL-env/src/tools/debugger
+   cd QEntL/src/tools/debugger
    gcc -c main.c -I../.. -std=c99 -Wall -O2
    gcc -c debugger_core.c -I../.. -std=c99 -Wall -O2
    gcc -c breakpoint_manager.c -I../.. -std=c99 -Wall -O2
@@ -839,7 +885,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 2. **链接调试器组件**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -o ../bin/qentl_debugger tools/debugger/*.o -I. -L../lib -lqentl_stdlib -std=c99 -Wall -O2
    ```
 
@@ -847,7 +893,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译性能分析器组件**：
    ```bash
-   cd QEntL-env/src/tools/profiler
+   cd QEntL/src/tools/profiler
    gcc -c main.c -I../.. -std=c99 -Wall -O2
    gcc -c profiler_core.c -I../.. -std=c99 -Wall -O2
    gcc -c performance_metrics.c -I../.. -std=c99 -Wall -O2
@@ -856,7 +902,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 2. **链接性能分析器组件**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -o ../bin/qentl_profiler tools/profiler/*.o -I. -L../lib -lqentl_stdlib -std=c99 -Wall -O2
    ```
 
@@ -866,7 +912,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译集成管理器**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -c stdlib/integration/quantum_model_integration.c -I. -std=c99 -Wall -O2
    ```
 
@@ -879,7 +925,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译QSM适配器**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -c stdlib/integration/qsm_adapter.c -I. -std=c99 -Wall -O2
    ```
 
@@ -907,7 +953,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译服务组件**：
    ```bash
-   cd QEntL-env/src/services
+   cd QEntL/src/services
    gcc -c service_manager.c -I.. -std=c99 -Wall -O2
    gcc -c discovery_service.c -I.. -std=c99 -Wall -O2
    gcc -c sync_service.c -I.. -std=c99 -Wall -O2
@@ -915,7 +961,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 2. **链接服务组件**：
    ```bash
-   cd QEntL-env/src
+   cd QEntL/src
    gcc -o ../bin/qentl_services services/*.o stdlib/integration/quantum_model_integration.o -I. -L../lib -lqentl_stdlib -std=c99 -Wall -O2
    ```
 
@@ -925,7 +971,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译量子基因编码器**：
    ```bash
-   cd QEntL-env/src/output
+   cd QEntL/src/output
    gcc -c quantum_gene_encoder.c -I. -I../../include -std=c99 -Wall -O2
    ```
 
@@ -996,7 +1042,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **编译设备能力检测器**：
    ```bash
-   cd QEntL-env/src/runtime/resource
+   cd QEntL/src/runtime/resource
    gcc -c device_capability_detector.c -I. -I../../include -std=c99 -Wall -O2
    ```
 
@@ -1067,7 +1113,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **测试解释器**：
    ```bash
-   cd QEntL-env
+   cd QEntL
    ./bin/qentl --version
    ./bin/qentl ./tests/basic_syntax.qentl
    ```
@@ -1086,7 +1132,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **内存使用测试**：
    ```bash
-   cd QEntL-env/bin
+   cd QEntL/bin
    ./qentl_profiler --memory ../tests/performance_test.qentl
    ```
 
@@ -1110,25 +1156,25 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **内核稳定性测试**：
    ```bash
-   cd QEntL-env/tests/os
+   cd QEntL/tests/os
    ./run_kernel_stability_tests.sh
    ```
 
 2. **动态目录系统测试**：
    ```bash
-   cd QEntL-env/tests/os/filesystem
+   cd QEntL/tests/os/filesystem
    ./run_dynamic_directory_tests.sh
    ```
 
 3. **跨平台兼容性测试**：
    ```bash
-   cd QEntL-env/tests/os/platform
+   cd QEntL/tests/os/platform
    ./run_compatibility_tests.sh
    ```
 
 4. **系统服务测试**：
    ```bash
-   cd QEntL-env/tests/os/services
+   cd QEntL/tests/os/services
    ./run_service_tests.sh
    ```
 
@@ -1138,7 +1184,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **打包QEntL操作系统安装镜像**：
    ```bash
-   cd QEntL-env/packaging
+   cd QEntL/packaging
    ./build_os_installer.sh
    ```
 
@@ -1161,7 +1207,7 @@ QEntL操作系统构建分为以下几个阶段：
 
 1. **安装测试**：
    ```bash
-   cd QEntL-env/tests/deployment
+   cd QEntL/tests/deployment
    ./test_os_installation.sh
    ```
 
