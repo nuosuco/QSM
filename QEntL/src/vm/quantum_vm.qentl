@@ -1,0 +1,302 @@
+// QEntL量子虚拟机
+// 创建者: Claude
+// 功能: 运行QEntL量子指令的虚拟机
+
+#include <quantum_state.h>
+#include <memory_management.h>
+#include <instruction_set.h>
+
+// 量子虚拟机基础结构
+class QuantumVM {
+private:
+    // 量子寄存器
+    QuantumRegister qRegisters[16];
+    
+    // 经典寄存器
+    ClassicalRegister cRegisters[16];
+    
+    // 指令内存
+    InstructionMemory instructionMem;
+    
+    // 数据内存
+    DataMemory dataMem;
+    
+    // 程序计数器
+    ProgramCounter pc;
+    
+    // 量子状态管理器
+    QuantumStateManager stateManager;
+    
+    // 错误处理器
+    ErrorHandler errorHandler;
+    
+    // 调试器接口
+    DebuggerInterface debugger;
+    
+public:
+    // 初始化虚拟机
+    void initialize() {
+        // 清空寄存器
+        for (int i = 0; i < 16; i++) {
+            qRegisters[i].reset();
+            cRegisters[i].reset();
+        }
+        
+        // 初始化内存
+        instructionMem.initialize();
+        dataMem.initialize();
+        
+        // 重置程序计数器
+        pc.reset();
+        
+        // 初始化量子状态管理器
+        stateManager.initialize();
+        
+        // 配置错误处理
+        errorHandler.initialize();
+        
+        // 初始化调试接口
+        debugger.initialize();
+    }
+    
+    // 加载程序
+    bool loadProgram(const char* filename) {
+        return instructionMem.loadFromFile(filename);
+    }
+    
+    // 主执行循环
+    void execute() {
+        bool running = true;
+        
+        while (running) {
+            // 获取当前指令
+            Instruction instr = instructionMem.fetchInstruction(pc.getValue());
+            
+            // 执行指令前检查
+            if (debugger.isBreakpoint(pc.getValue())) {
+                debugger.handleBreakpoint(this, pc.getValue());
+            }
+            
+            // 指令解码和执行
+            try {
+                executeInstruction(instr);
+            } catch (VMException& e) {
+                errorHandler.handleException(e);
+                if (e.isFatal()) {
+                    running = false;
+                }
+            }
+            
+            // 更新程序计数器
+            if (!pc.update()) {
+                running = false; // 程序结束
+            }
+        }
+    }
+    
+    // 执行单个指令
+    void executeInstruction(const Instruction& instr) {
+        switch (instr.getOpcode()) {
+            case Opcode::QH: // 量子Hadamard门
+                executeQHadamard(instr);
+                break;
+            case Opcode::QX: // 量子X门
+                executeQXGate(instr);
+                break;
+            case Opcode::QZ: // 量子Z门
+                executeQZGate(instr);
+                break;
+            case Opcode::QCNOT: // 量子CNOT门
+                executeQCNOT(instr);
+                break;
+            case Opcode::QMEASURE: // 量子测量
+                executeQMeasure(instr);
+                break;
+            case Opcode::QRESET: // 量子重置
+                executeQReset(instr);
+                break;
+            case Opcode::LOAD: // 加载数据
+                executeLoad(instr);
+                break;
+            case Opcode::STORE: // 存储数据
+                executeStore(instr);
+                break;
+            case Opcode::JMP: // 跳转
+                executeJump(instr);
+                break;
+            case Opcode::JEQ: // 条件跳转-相等
+                executeJumpEqual(instr);
+                break;
+            case Opcode::CALL: // 调用函数
+                executeCall(instr);
+                break;
+            case Opcode::RET: // 函数返回
+                executeReturn(instr);
+                break;
+            case Opcode::ADD: // 加法
+                executeAdd(instr);
+                break;
+            case Opcode::SUB: // 减法
+                executeSub(instr);
+                break;
+            case Opcode::MUL: // 乘法
+                executeMul(instr);
+                break;
+            case Opcode::DIV: // 除法
+                executeDiv(instr);
+                break;
+            case Opcode::HALT: // 停止执行
+                executeHalt(instr);
+                break;
+            default:
+                throw VMException("未知的操作码", true);
+        }
+    }
+    
+    // 量子指令实现
+    void executeQHadamard(const Instruction& instr) {
+        int qreg = instr.getQReg();
+        int qubit = instr.getQubit();
+        qRegisters[qreg].applyHadamard(qubit);
+    }
+    
+    void executeQXGate(const Instruction& instr) {
+        int qreg = instr.getQReg();
+        int qubit = instr.getQubit();
+        qRegisters[qreg].applyXGate(qubit);
+    }
+    
+    void executeQZGate(const Instruction& instr) {
+        int qreg = instr.getQReg();
+        int qubit = instr.getQubit();
+        qRegisters[qreg].applyZGate(qubit);
+    }
+    
+    void executeQCNOT(const Instruction& instr) {
+        int qreg = instr.getQReg();
+        int controlQubit = instr.getControlQubit();
+        int targetQubit = instr.getTargetQubit();
+        qRegisters[qreg].applyCNOT(controlQubit, targetQubit);
+    }
+    
+    void executeQMeasure(const Instruction& instr) {
+        int qreg = instr.getQReg();
+        int qubit = instr.getQubit();
+        int creg = instr.getCReg();
+        
+        bool result = qRegisters[qreg].measure(qubit);
+        cRegisters[creg].setValue(result ? 1 : 0);
+    }
+    
+    void executeQReset(const Instruction& instr) {
+        int qreg = instr.getQReg();
+        qRegisters[qreg].reset();
+    }
+    
+    // 经典指令实现
+    void executeLoad(const Instruction& instr) {
+        int creg = instr.getCReg();
+        int addr = instr.getAddress();
+        cRegisters[creg].setValue(dataMem.read(addr));
+    }
+    
+    void executeStore(const Instruction& instr) {
+        int creg = instr.getCReg();
+        int addr = instr.getAddress();
+        dataMem.write(addr, cRegisters[creg].getValue());
+    }
+    
+    void executeJump(const Instruction& instr) {
+        int addr = instr.getAddress();
+        pc.setValue(addr);
+    }
+    
+    void executeJumpEqual(const Instruction& instr) {
+        int creg = instr.getCReg();
+        int value = instr.getValue();
+        int addr = instr.getAddress();
+        
+        if (cRegisters[creg].getValue() == value) {
+            pc.setValue(addr);
+        }
+    }
+    
+    void executeCall(const Instruction& instr) {
+        int addr = instr.getAddress();
+        pc.saveReturnAddress();
+        pc.setValue(addr);
+    }
+    
+    void executeReturn(const Instruction& instr) {
+        pc.restoreReturnAddress();
+    }
+    
+    void executeAdd(const Instruction& instr) {
+        int dstReg = instr.getDstReg();
+        int srcReg1 = instr.getSrcReg1();
+        int srcReg2 = instr.getSrcReg2();
+        
+        int result = cRegisters[srcReg1].getValue() + cRegisters[srcReg2].getValue();
+        cRegisters[dstReg].setValue(result);
+    }
+    
+    void executeSub(const Instruction& instr) {
+        int dstReg = instr.getDstReg();
+        int srcReg1 = instr.getSrcReg1();
+        int srcReg2 = instr.getSrcReg2();
+        
+        int result = cRegisters[srcReg1].getValue() - cRegisters[srcReg2].getValue();
+        cRegisters[dstReg].setValue(result);
+    }
+    
+    void executeMul(const Instruction& instr) {
+        int dstReg = instr.getDstReg();
+        int srcReg1 = instr.getSrcReg1();
+        int srcReg2 = instr.getSrcReg2();
+        
+        int result = cRegisters[srcReg1].getValue() * cRegisters[srcReg2].getValue();
+        cRegisters[dstReg].setValue(result);
+    }
+    
+    void executeDiv(const Instruction& instr) {
+        int dstReg = instr.getDstReg();
+        int srcReg1 = instr.getSrcReg1();
+        int srcReg2 = instr.getSrcReg2();
+        
+        if (cRegisters[srcReg2].getValue() == 0) {
+            throw VMException("除以零错误", false);
+        }
+        
+        int result = cRegisters[srcReg1].getValue() / cRegisters[srcReg2].getValue();
+        cRegisters[dstReg].setValue(result);
+    }
+    
+    void executeHalt(const Instruction& instr) {
+        pc.setHalted();
+    }
+    
+    // 获取调试信息
+    void dumpState() {
+        debugger.dumpVMState(this);
+    }
+};
+
+// 主入口函数
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::cerr << "用法: qentl-vm <程序文件>" << std::endl;
+        return 1;
+    }
+    
+    QuantumVM vm;
+    vm.initialize();
+    
+    if (!vm.loadProgram(argv[1])) {
+        std::cerr << "无法加载程序: " << argv[1] << std::endl;
+        return 2;
+    }
+    
+    vm.execute();
+    
+    return 0;
+} 

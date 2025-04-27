@@ -1,0 +1,705 @@
+/**
+ * QEntL索引更新器实现
+ * QuantumGene: QG-IUPDATE-H9J4-1714046800
+ * EntanglementStrength: 0.7
+ */
+
+import { MultidimensionalIndex } from "./multidimensional_index.qentl";
+import { DistributedIndex } from "./distributed_index.qentl";
+
+quantum_module IndexUpdater {
+    // 模块元数据
+    metadata: {
+        name: "索引更新器",
+        version: "1.0.0",
+        description: "QEntL文件系统的索引更新和维护工具",
+        author: "QEntL开发团队",
+        quantum_gene: "QG-IUPDATE-H9J4-1714046800",
+        entanglement_strength: 0.7
+    },
+    
+    // 更新器配置
+    config: {
+        update_interval: 5000,        // 更新间隔(毫秒)
+        rebuild_interval: 3600000,    // 重建间隔(毫秒)
+        batch_size: 100,              // 批处理大小
+        parallel_updates: true,       // 是否并行更新
+        max_parallel_workers: 8,      // 最大并行工作线程数
+        log_level: "info",            // 日志级别
+        update_timeout: 30000,        // 更新超时(毫秒)
+        consistency_check: true,      // 是否检查一致性
+        retry_count: 3                // 重试次数
+    },
+    
+    // 更新任务类型
+    types: {
+        // 更新操作
+        UpdateOperation: {
+            id: String,               // 操作ID
+            type: String,             // 操作类型
+            target: String,           // 目标
+            data: Object,             // 数据
+            timestamp: Number,        // 时间戳
+            status: String,           // 状态
+            retries: Number,          // 重试次数
+            priority: Number,         // 优先级
+            dependencies: Array       // 依赖操作
+        },
+        
+        // 更新批次
+        UpdateBatch: {
+            id: String,               // 批次ID
+            operations: Array,        // 操作列表
+            timestamp: Number,        // 创建时间戳
+            status: String,           // 状态
+            progress: Number,         // 进度
+            result: Object            // 结果
+        }
+    },
+    
+    // 更新器状态
+    state: {
+        active: false,                // 是否活动
+        pending_operations: [],       // 待处理操作
+        active_batches: [],           // 活动批次
+        completed_operations: 0,      // 已完成操作数
+        last_update_time: 0,          // 最后更新时间
+        last_rebuild_time: 0,         // 最后重建时间
+        update_in_progress: false,    // 是否正在更新
+        errors: [],                   // 错误列表
+        statistics: {                 // 统计信息
+            total_operations: 0,      // 总操作数
+            successful_operations: 0, // 成功操作数
+            failed_operations: 0,     // 失败操作数
+            average_batch_time: 0,    // 平均批处理时间
+            max_batch_size: 0         // 最大批处理大小
+        }
+    },
+    
+    /**
+     * 初始化索引更新器
+     * @param {Object} options 初始化选项
+     * @returns {Boolean} 是否成功初始化
+     */
+    initialize: function(options) {
+        log("索引更新器", "初始化索引更新器");
+        
+        // 合并选项
+        this.config = Object.assign({}, this.config, options || {});
+        
+        // 检查依赖模块
+        if (!MultidimensionalIndex || !DistributedIndex) {
+            log("索引更新器", "缺少必要的依赖模块", "ERROR");
+            return false;
+        }
+        
+        // 重置状态
+        this.state.active = true;
+        this.state.pending_operations = [];
+        this.state.active_batches = [];
+        this.state.completed_operations = 0;
+        this.state.last_update_time = 0;
+        this.state.last_rebuild_time = 0;
+        this.state.update_in_progress = false;
+        this.state.errors = [];
+        
+        // 重置统计信息
+        this.state.statistics = {
+            total_operations: 0,
+            successful_operations: 0,
+            failed_operations: 0,
+            average_batch_time: 0,
+            max_batch_size: 0
+        };
+        
+        log("索引更新器", `索引更新器初始化完成，更新间隔: ${this.config.update_interval}ms`);
+        return true;
+    },
+    
+    /**
+     * 启动索引更新器
+     * @returns {Boolean} 是否成功启动
+     */
+    start: function() {
+        if (this.state.active) {
+            log("索引更新器", "索引更新器已经处于活动状态");
+            return true;
+        }
+        
+        log("索引更新器", "启动索引更新器");
+        this.state.active = true;
+        
+        // 安排定期更新
+        this._scheduleNextUpdate();
+        
+        // 安排定期重建
+        this._scheduleNextRebuild();
+        
+        log("索引更新器", "索引更新器已启动");
+        return true;
+    },
+    
+    /**
+     * 停止索引更新器
+     * @returns {Boolean} 是否成功停止
+     */
+    stop: function() {
+        if (!this.state.active) {
+            log("索引更新器", "索引更新器已经处于停止状态");
+            return true;
+        }
+        
+        log("索引更新器", "停止索引更新器");
+        this.state.active = false;
+        
+        // 等待当前更新完成
+        if (this.state.update_in_progress) {
+            log("索引更新器", "等待当前更新完成");
+        }
+        
+        log("索引更新器", "索引更新器已停止");
+        return true;
+    },
+    
+    /**
+     * 提交更新操作
+     * @param {String} type 操作类型
+     * @param {String} target 目标
+     * @param {Object} data 数据
+     * @param {Number} priority 优先级
+     * @returns {String} 操作ID
+     */
+    submitOperation: function(type, target, data, priority = 5) {
+        // 创建操作ID
+        const operationId = `op_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        
+        // 创建操作对象
+        const operation = {
+            id: operationId,
+            type: type,
+            target: target,
+            data: data,
+            timestamp: Date.now(),
+            status: "PENDING",
+            retries: 0,
+            priority: priority,
+            dependencies: []
+        };
+        
+        // 添加到待处理队列
+        this.state.pending_operations.push(operation);
+        
+        // 更新统计信息
+        this.state.statistics.total_operations++;
+        
+        // 如果队列满足批处理大小并且没有更新在进行中，则触发更新
+        if (this.state.pending_operations.length >= this.config.batch_size && !this.state.update_in_progress) {
+            this._processUpdates();
+        }
+        
+        log("索引更新器", `提交更新操作: ${type}, ID: ${operationId}`);
+        return operationId;
+    },
+    
+    /**
+     * 检查操作状态
+     * @param {String} operationId 操作ID
+     * @returns {Object} 操作状态
+     */
+    checkOperationStatus: function(operationId) {
+        // 在待处理队列中查找
+        const pendingOp = this.state.pending_operations.find(op => op.id === operationId);
+        if (pendingOp) {
+            return {
+                id: pendingOp.id,
+                status: pendingOp.status,
+                timestamp: pendingOp.timestamp
+            };
+        }
+        
+        // 在活动批次中查找
+        for (const batch of this.state.active_batches) {
+            const batchOp = batch.operations.find(op => op.id === operationId);
+            if (batchOp) {
+                return {
+                    id: batchOp.id,
+                    status: batchOp.status,
+                    timestamp: batchOp.timestamp,
+                    batch: batch.id,
+                    batch_status: batch.status
+                };
+            }
+        }
+        
+        // 操作未找到
+        return { id: operationId, status: "UNKNOWN" };
+    },
+    
+    /**
+     * 强制触发更新
+     * @returns {Boolean} 是否成功触发
+     */
+    forceUpdate: function() {
+        if (this.state.update_in_progress) {
+            log("索引更新器", "更新已在进行中，无法强制触发新的更新");
+            return false;
+        }
+        
+        if (this.state.pending_operations.length === 0) {
+            log("索引更新器", "没有待处理的操作，无需更新");
+            return false;
+        }
+        
+        log("索引更新器", "强制触发索引更新");
+        return this._processUpdates();
+    },
+    
+    /**
+     * 强制重建索引
+     * @returns {Boolean} 是否成功触发
+     */
+    forceRebuild: function() {
+        if (this.state.update_in_progress) {
+            log("索引更新器", "更新已在进行中，无法重建索引");
+            return false;
+        }
+        
+        log("索引更新器", "强制触发索引重建");
+        return this._rebuildIndices();
+    },
+    
+    /**
+     * 获取更新统计信息
+     * @returns {Object} 统计信息
+     */
+    getStatistics: function() {
+        // 计算成功率
+        const successRate = this.state.statistics.total_operations > 0 
+            器 this.state.statistics.successful_operations / this.state.statistics.total_operations 
+            : 0;
+        
+        // 构建统计信息对象
+        return {
+            total_operations: this.state.statistics.total_operations,
+            successful_operations: this.state.statistics.successful_operations,
+            failed_operations: this.state.statistics.failed_operations,
+            success_rate: successRate,
+            average_batch_time: this.state.statistics.average_batch_time,
+            max_batch_size: this.state.statistics.max_batch_size,
+            pending_operations: this.state.pending_operations.length,
+            active_batches: this.state.active_batches.length,
+            last_update_time: this.state.last_update_time,
+            last_rebuild_time: this.state.last_rebuild_time,
+            update_in_progress: this.state.update_in_progress
+        };
+    },
+    
+    /**
+     * 应用多维索引更新
+     * @param {Object} operation 操作
+     * @returns {Boolean} 是否成功应用
+     */
+    applyMultidimensionalIndexUpdate: function(operation) {
+        log("索引更新器", `应用多维索引更新: ${operation.type}, 目标: ${operation.target}`);
+        
+        try {
+            switch (operation.type) {
+                case "ADD_ENTRY":
+                    return MultidimensionalIndex.addEntry(operation.data);
+                    
+                case "REMOVE_ENTRY":
+                    return MultidimensionalIndex.removeEntry(operation.data.key);
+                    
+                case "REBUILD":
+                    return MultidimensionalIndex.rebuildIndex();
+                    
+                default:
+                    log("索引更新器", `未知的多维索引操作类型: ${operation.type}`, "ERROR");
+                    return false;
+            }
+        } catch (error) {
+            log("索引更新器", `应用多维索引更新出错: ${error.message}`, "ERROR");
+            return false;
+        }
+    },
+    
+    /**
+     * 应用分布式索引更新
+     * @param {Object} operation 操作
+     * @returns {Promise<Boolean>} 是否成功应用
+     */
+    applyDistributedIndexUpdate: async function(operation) {
+        log("索引更新器", `应用分布式索引更新: ${operation.type}, 目标: ${operation.target}`);
+        
+        try {
+            switch (operation.type) {
+                case "PUT":
+                    return await DistributedIndex.put(operation.data.key, operation.data.value);
+                    
+                case "DELETE":
+                    return await DistributedIndex.delete(operation.data.key);
+                    
+                case "SYNC":
+                    return await DistributedIndex.sync();
+                    
+                default:
+                    log("索引更新器", `未知的分布式索引操作类型: ${operation.type}`, "ERROR");
+                    return false;
+            }
+        } catch (error) {
+            log("索引更新器", `应用分布式索引更新出错: ${error.message}`, "ERROR");
+            return false;
+        }
+    },
+    
+    // 内部方法
+    
+    /**
+     * 安排下一次更新
+     * @private
+     */
+    _scheduleNextUpdate: function() {
+        if (!this.state.active) return;
+        
+        // 模拟定期更新调度
+        // 在实际实现中，这里应该使用定时器或事件循环
+        setTimeout(() => {
+            if (this.state.active && !this.state.update_in_progress && this.state.pending_operations.length > 0) {
+                this._processUpdates();
+            }
+            this._scheduleNextUpdate();
+        }, this.config.update_interval);
+    },
+    
+    /**
+     * 安排下一次重建
+     * @private
+     */
+    _scheduleNextRebuild: function() {
+        if (!this.state.active) return;
+        
+        // 模拟定期重建调度
+        // 在实际实现中，这里应该使用定时器或事件循环
+        setTimeout(() => {
+            if (this.state.active && !this.state.update_in_progress) {
+                this._rebuildIndices();
+            }
+            this._scheduleNextRebuild();
+        }, this.config.rebuild_interval);
+    },
+    
+    /**
+     * 处理更新
+     * @private
+     */
+    _processUpdates: function() {
+        if (this.state.update_in_progress) {
+            log("索引更新器", "更新已在进行中，跳过此次更新");
+            return false;
+        }
+        
+        if (this.state.pending_operations.length === 0) {
+            log("索引更新器", "没有待处理的操作，跳过此次更新");
+            return false;
+        }
+        
+        this.state.update_in_progress = true;
+        this.state.last_update_time = Date.now();
+        
+        log("索引更新器", `开始处理更新，待处理操作: ${this.state.pending_operations.length}`);
+        
+        // 创建新的批次
+        const batchId = `batch_${Date.now()}`;
+        const batchSize = Math.min(this.config.batch_size, this.state.pending_operations.length);
+        
+        // 按优先级排序操作
+        this.state.pending_operations.sort((a, b) => b.priority - a.priority);
+        
+        // 选择操作
+        const batchOperations = this.state.pending_operations.splice(0, batchSize);
+        
+        // 创建批次对象
+        const batch = {
+            id: batchId,
+            operations: batchOperations,
+            timestamp: Date.now(),
+            status: "PROCESSING",
+            progress: 0,
+            result: {}
+        };
+        
+        // 添加到活动批次
+        this.state.active_batches.push(batch);
+        
+        // 更新统计信息
+        this.state.statistics.max_batch_size = Math.max(this.state.statistics.max_batch_size, batchSize);
+        
+        // 处理批次
+        this._processBatch(batch)
+            .then(() => {
+                // 批次处理完成
+                batch.status = "COMPLETED";
+                batch.progress = 1;
+                
+                // 从活动批次中移除
+                this.state.active_batches = this.state.active_batches.filter(b => b.id !== batch.id);
+                
+                // 更新统计信息
+                const batchTime = Date.now() - batch.timestamp;
+                this.state.statistics.average_batch_time = (this.state.statistics.average_batch_time + batchTime) / 2;
+                
+                log("索引更新器", `批次 ${batchId} 处理完成，耗时: ${batchTime}ms`);
+            })
+            .catch(error => {
+                // 批次处理失败
+                batch.status = "FAILED";
+                batch.result.error = error.message;
+                
+                // 从活动批次中移除
+                this.state.active_batches = this.state.active_batches.filter(b => b.id !== batch.id);
+                
+                // 记录错误
+                this.state.errors.push({
+                    time: Date.now(),
+                    batch: batchId,
+                    message: error.message
+                });
+                
+                log("索引更新器", `批次 ${batchId} 处理失败: ${error.message}`, "ERROR");
+            })
+            .finally(() => {
+                // 更新完成
+                this.state.update_in_progress = false;
+                
+                // 如果还有待处理操作，再次处理
+                if (this.state.active && this.state.pending_operations.length >= this.config.batch_size) {
+                    // 安排下一次更新
+                    setTimeout(() => this._processUpdates(), 100);
+                }
+            });
+        
+        return true;
+    },
+    
+    /**
+     * 处理批次
+     * @param {Object} batch 批次对象
+     * @private
+     */
+    _processBatch: async function(batch) {
+        log("索引更新器", `处理批次 ${batch.id}, 操作数: ${batch.operations.length}`);
+        
+        // 操作结果
+        const results = {
+            successful: 0,
+            failed: 0,
+            operations: {}
+        };
+        
+        // 根据配置选择并行或串行处理
+        if (this.config.parallel_updates) {
+            // 并行处理
+            const operationPromises = batch.operations.map(operation => this._processOperation(operation));
+            const operationResults = await Promise.all(operationPromises);
+            
+            // 统计结果
+            for (let i = 0; i < operationResults.length; i++) {
+                const operationId = batch.operations[i].id;
+                const success = operationResults[i];
+                
+                results.operations[operationId] = success;
+                if (success) {
+                    results.successful++;
+                    this.state.statistics.successful_operations++;
+                } else {
+                    results.failed++;
+                    this.state.statistics.failed_operations++;
+                }
+            }
+        } else {
+            // 串行处理
+            for (let i = 0; i < batch.operations.length; i++) {
+                const operation = batch.operations[i];
+                const operationId = operation.id;
+                
+                // 更新进度
+                batch.progress = i / batch.operations.length;
+                
+                // 处理操作
+                const success = await this._processOperation(operation);
+                
+                // 记录结果
+                results.operations[operationId] = success;
+                if (success) {
+                    results.successful++;
+                    this.state.statistics.successful_operations++;
+                } else {
+                    results.failed++;
+                    this.state.statistics.failed_operations++;
+                }
+            }
+        }
+        
+        // 更新批次结果
+        batch.result = results;
+        
+        // 更新完成的操作数
+        this.state.completed_operations += batch.operations.length;
+        
+        log("索引更新器", `批次 ${batch.id} 处理结果: 成功 ${results.successful}, 失败 ${results.failed}`);
+        
+        return results;
+    },
+    
+    /**
+     * 处理单个操作
+     * @param {Object} operation 操作对象
+     * @returns {Promise<Boolean>} 是否成功
+     * @private
+     */
+    _processOperation: async function(operation) {
+        log("索引更新器", `处理操作: ${operation.type}, ID: ${operation.id}`);
+        
+        // 更新操作状态
+        operation.status = "PROCESSING";
+        
+        // 根据目标选择合适的处理方法
+        let success = false;
+        
+        try {
+            switch (operation.target) {
+                case "multidimensional":
+                    success = this.applyMultidimensionalIndexUpdate(operation);
+                    break;
+                    
+                case "distributed":
+                    success = await this.applyDistributedIndexUpdate(operation);
+                    break;
+                    
+                default:
+                    log("索引更新器", `未知的目标类型: ${operation.target}`, "ERROR");
+                    success = false;
+                    break;
+            }
+            
+            // 更新操作状态
+            operation.status = success 器 "COMPLETED" : "FAILED";
+            
+            if (!success && operation.retries < this.config.retry_count) {
+                // 重试操作
+                operation.retries++;
+                operation.status = "PENDING";
+                this.state.pending_operations.push(operation);
+                log("索引更新器", `操作 ${operation.id} 失败，将重试 (${operation.retries}/${this.config.retry_count})`);
+            }
+            
+            return success;
+        } catch (error) {
+            // 记录错误
+            operation.status = "ERROR";
+            log("索引更新器", `处理操作 ${operation.id} 出错: ${error.message}`, "ERROR");
+            
+            return false;
+        }
+    },
+    
+    /**
+     * 重建索引
+     * @returns {Boolean} 是否成功触发
+     * @private
+     */
+    _rebuildIndices: function() {
+        if (this.state.update_in_progress) {
+            log("索引更新器", "更新已在进行中，无法重建索引");
+            return false;
+        }
+        
+        log("索引更新器", "开始重建索引");
+        this.state.update_in_progress = true;
+        this.state.last_rebuild_time = Date.now();
+        
+        // 创建重建操作
+        const operations = [
+            {
+                id: `rebuild_multi_${Date.now()}`,
+                type: "REBUILD",
+                target: "multidimensional",
+                data: {},
+                timestamp: Date.now(),
+                status: "PENDING",
+                retries: 0,
+                priority: 10,
+                dependencies: []
+            },
+            {
+                id: `rebuild_dist_${Date.now()}`,
+                type: "SYNC",
+                target: "distributed",
+                data: {},
+                timestamp: Date.now(),
+                status: "PENDING",
+                retries: 0,
+                priority: 10,
+                dependencies: []
+            }
+        ];
+        
+        // 创建批次
+        const batch = {
+            id: `rebuild_batch_${Date.now()}`,
+            operations: operations,
+            timestamp: Date.now(),
+            status: "PROCESSING",
+            progress: 0,
+            result: {}
+        };
+        
+        // 添加到活动批次
+        this.state.active_batches.push(batch);
+        
+        // 处理批次
+        this._processBatch(batch)
+            .then(results => {
+                // 批次处理完成
+                batch.status = "COMPLETED";
+                batch.progress = 1;
+                batch.result = results;
+                
+                // 从活动批次中移除
+                this.state.active_batches = this.state.active_batches.filter(b => b.id !== batch.id);
+                
+                // 重建成功
+                if (results.successful === operations.length) {
+                    log("索引更新器", "索引重建成功");
+                } else {
+                    log("索引更新器", "索引重建部分成功", "WARNING");
+                }
+            })
+            .catch(error => {
+                // 批次处理失败
+                batch.status = "FAILED";
+                batch.result.error = error.message;
+                
+                // 从活动批次中移除
+                this.state.active_batches = this.state.active_batches.filter(b => b.id !== batch.id);
+                
+                // 记录错误
+                this.state.errors.push({
+                    time: Date.now(),
+                    batch: batch.id,
+                    message: error.message
+                });
+                
+                log("索引更新器", `索引重建失败: ${error.message}`, "ERROR");
+            })
+            .finally(() => {
+                // 更新完成
+                this.state.update_in_progress = false;
+            });
+        
+        return true;
+    }
+};
+
+// 导出模块
+export IndexUpdater; 
