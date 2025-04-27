@@ -122,14 +122,15 @@ qentl_engine.log
 qentl_cli.log
 qentl_watcher.log
 
-# 忽略Qwen模型文件
+# 排除所有模型文件夹
 LM/Qwen/
 QSM/Qwen/
 Ref/Qwen/
 SOM/Qwen/
 WeQ/Qwen/
 
-# 忽略日志文件
+# 排除通用的临时文件
 *.log
-logs/
-.logs/ 
+*.tmp
+.DS_Store
+Thumbs.db 
