@@ -4,10 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-<<<<<<< HEAD
 env/
-=======
->>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 build/
 develop-eggs/
 dist/
@@ -19,15 +16,11 @@ lib64/
 parts/
 sdist/
 var/
-<<<<<<< HEAD
-=======
 wheels/
->>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 *.egg-info/
 .installed.cfg
 *.egg
 
-<<<<<<< HEAD
 # IDE 
 .idea/
 .vscode/
@@ -58,8 +51,6 @@ Desktop.ini
 # 项目特定文件
 python.bat
 
-=======
->>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 # 虚拟环境
 .venv/
 venv/
@@ -120,4 +111,24 @@ Desktop.ini
 # QEntL特定文件
 qentl_engine.log
 qentl_cli.log
-qentl_watcher.log 
+qentl_watcher.log
+
+# 排除所有Qwen模型文件夹
+LM/Qwen/
+QSM/Qwen/
+Ref/Qwen/
+SOM/Qwen/
+WeQ/Qwen/
+
+# 常规排除的文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+.logs/
+logs/ 
