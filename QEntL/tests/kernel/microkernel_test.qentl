@@ -1,0 +1,139 @@
+/*
+ * QEntL操作系统 - 微内核测试套件
+ * 量子基因编码: QG-TEST-KERNEL-CORE-A1B1
+ */
+
+// 导入内核模块
+#import "../../src/kernel/microkernel_core.qentl"
+#import "../../src/kernel/quantum_processor.qentl"
+#import "../../src/kernel/quantum_memory.qentl"
+#import "../../src/kernel/quantum_process.qentl"
+#import "../../src/kernel/system_calls.qentl"
+
+// 测试模块定义
+module MicrokernelTest {
+    // 测试函数: 测试内核初始化
+    function testKernelInitialization() -> bool {
+        print("测试内核初始化...");
+        
+        // 创建模拟内核环境
+        var kernel = Microkernel.create();
+        
+        // 验证内核状态
+        assert(kernel.isInitialized(), "内核初始化失败");
+        assert(kernel.getStatus() == KernelStatus.READY, "内核状态不正确");
+        
+        print("内核初始化测试通过");
+        return true;
+    }
+    
+    // 测试函数: 测试量子内存管理
+    function testQuantumMemoryManagement() -> bool {
+        print("测试量子内存管理...");
+        
+        // 初始化内存管理器
+        var memoryManager = QuantumMemoryManager.initialize();
+        
+        // 分配内存
+        var memBlock1 = memoryManager.allocate(1024);
+        var memBlock2 = memoryManager.allocate(2048);
+        
+        // 验证内存分配
+        assert(memBlock1 != null, "内存分配失败");
+        assert(memBlock2 != null, "内存分配失败");
+        assert(memBlock1.size() == 1024, "内存块大小不正确");
+        assert(memBlock2.size() == 2048, "内存块大小不正确");
+        
+        // 检查内存状态
+        assert(memoryManager.getTotalAllocated() == 3072, "总分配内存不正确");
+        
+        // 释放内存
+        memoryManager.free(memBlock1);
+        assert(memoryManager.getTotalAllocated() == 2048, "内存释放后总分配不正确");
+        
+        print("量子内存管理测试通过");
+        return true;
+    }
+    
+    // 测试函数: 测试量子进程管理
+    function testQuantumProcessManagement() -> bool {
+        print("测试量子进程管理...");
+        
+        // 初始化进程管理器
+        var processManager = QuantumProcessManager.initialize();
+        
+        // 创建测试进程
+        var process1 = processManager.createProcess("TestProcess1");
+        var process2 = processManager.createProcess("TestProcess2");
+        
+        // 验证进程创建
+        assert(process1 != null, "进程1创建失败");
+        assert(process2 != null, "进程2创建失败");
+        assert(process1.getState() == ProcessState.READY, "进程1状态不正确");
+        assert(process2.getState() == ProcessState.READY, "进程2状态不正确");
+        
+        // 测试进程调度
+        processManager.schedule(process1);
+        assert(process1.getState() == ProcessState.RUNNING, "进程1未正确调度运行");
+        
+        // 测试进程暂停和恢复
+        processManager.suspend(process1);
+        assert(process1.getState() == ProcessState.SUSPENDED, "进程1未正确暂停");
+        processManager.resume(process1);
+        assert(process1.getState() == ProcessState.READY, "进程1未正确恢复");
+        
+        // 测试进程终止
+        processManager.terminate(process1);
+        assert(process1.getState() == ProcessState.TERMINATED, "进程1未正确终止");
+        
+        print("量子进程管理测试通过");
+        return true;
+    }
+    
+    // 测试函数: 测试系统调用
+    function testSystemCalls() -> bool {
+        print("测试系统调用...");
+        
+        // 初始化系统调用处理器
+        var syscallHandler = SystemCallHandler.initialize();
+        
+        // 模拟系统调用
+        var result1 = syscallHandler.handle(SystemCall.ALLOCATE_MEMORY, [1024]);
+        assert(result1.isSuccess(), "内存分配系统调用失败");
+        
+        var result2 = syscallHandler.handle(SystemCall.CREATE_PROCESS, ["TestProcess"]);
+        assert(result2.isSuccess(), "进程创建系统调用失败");
+        
+        print("系统调用测试通过");
+        return true;
+    }
+    
+    // 运行所有测试
+    function runAllTests() -> bool {
+        print("开始微内核测试套件...");
+        
+        var allPassed = true;
+        
+        allPassed = allPassed && testKernelInitialization();
+        allPassed = allPassed && testQuantumMemoryManagement();
+        allPassed = allPassed && testQuantumProcessManagement();
+        allPassed = allPassed && testSystemCalls();
+        
+        if (allPassed) {
+            print("所有测试通过!");
+        } else {
+            print("测试失败!");
+        }
+        
+        return allPassed;
+    }
+}
+
+// 主函数入口
+function main() -> int {
+    // 运行测试套件
+    var testResult = MicrokernelTest.runAllTests();
+    
+    // 返回测试结果
+    return testResult ? 0 : 1;
+} 

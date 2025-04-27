@@ -1,0 +1,508 @@
+/**
+ * QEntL量子任务调度器
+ * QuantumGene: QG-SERVICES-SCHEDULER-2024042701
+ * EntanglementStrength: 0.95
+ */
+
+namespace QEntL.Services {
+
+    using System;
+    using System.Collections.Generic;
+    using System.Threading;
+    using QEntL.VM.Devices;
+    using QEntL.VM.Core.Instruction;
+    using QEntL.Compiler.IR;
+    
+    /**
+     * 量子任务优先级
+     * 定义任务的调度优先级
+     */
+    enum QuantumTaskPriority {
+        LOWEST = 0,     // 最低优先级
+        LOW = 1,        // 低优先级
+        NORMAL = 2,     // 标准优先级 (默认)
+        HIGH = 3,       // 高优先级
+        HIGHEST = 4,    // 最高优先级
+        REALTIME = 5    // 实时优先级 (立即执行)
+    }
+    
+    /**
+     * 量子任务状态
+     * 定义任务生命周期中的各个状态
+     */
+    enum QuantumTaskStatus {
+        CREATED,        // 已创建
+        QUEUED,         // 已排队
+        RUNNING,        // 运行中
+        PAUSED,         // 已暂停
+        COMPLETED,      // 已完成
+        FAILED,         // 执行失败
+        CANCELED        // 已取消
+    }
+    
+    /**
+     * 量子任务
+     * 表示一个可调度的量子计算任务
+     */
+    class QuantumTask {
+        public string id;                      // 任务ID
+        public string name;                    // 任务名称
+        public QuantumTaskPriority priority;   // 任务优先级
+        public QuantumTaskStatus status;       // 任务状态
+        public List<QuantumInstruction> circuit; // 量子电路
+        public List<int> resultQubits;         // 需要读取结果的量子比特
+        public Dictionary<string, object> parameters; // 任务参数
+        public Dictionary<string, object> results;    // 任务结果
+        public DateTime createdTime;           // 创建时间
+        public DateTime startTime;             // 开始时间
+        public DateTime endTime;               // 结束时间
+        public int retryCount;                 // 重试次数
+        public int maxRetries;                 // 最大重试次数
+        public string deviceName;              // 目标设备名称
+        public Action<QuantumTask> onCompleted; // 完成回调
+        public Action<QuantumTask, Exception> onError; // 错误回调
+        
+        // 构造函数
+        public QuantumTask(string name, List<QuantumInstruction> circuit, List<int> resultQubits = null) {
+            this.id = Guid.NewGuid().ToString();
+            this.name = name;
+            this.priority = QuantumTaskPriority.NORMAL;
+            this.status = QuantumTaskStatus.CREATED;
+            this.circuit = circuit;
+            this.resultQubits = resultQubits ?? new List<int>();
+            this.parameters = new Dictionary<string, object>();
+            this.results = new Dictionary<string, object>();
+            this.createdTime = DateTime.Now;
+            this.startTime = DateTime.MinValue;
+            this.endTime = DateTime.MinValue;
+            this.retryCount = 0;
+            this.maxRetries = 3;
+            this.deviceName = "default";
+        }
+        
+        // 获取任务执行时间（毫秒）
+        public double getExecutionTime() {
+            if (this.startTime == DateTime.MinValue) {
+                return 0;
+            }
+            
+            if (this.endTime == DateTime.MinValue) {
+                return (DateTime.Now - this.startTime).TotalMilliseconds;
+            }
+            
+            return (this.endTime - this.startTime).TotalMilliseconds;
+        }
+        
+        // 获取任务等待时间（毫秒）
+        public double getWaitTime() {
+            if (this.startTime == DateTime.MinValue) {
+                return (DateTime.Now - this.createdTime).TotalMilliseconds;
+            }
+            
+            return (this.startTime - this.createdTime).TotalMilliseconds;
+        }
+        
+        // 设置参数
+        public void setParameter(string key, object value) {
+            this.parameters[key] = value;
+        }
+        
+        // 获取参数
+        public T getParameter<T>(string key, T defaultValue = default(T)) {
+            if (this.parameters.ContainsKey(key)) {
+                return (T)this.parameters[key];
+            }
+            return defaultValue;
+        }
+        
+        // 设置结果
+        public void setResult(string key, object value) {
+            this.results[key] = value;
+        }
+        
+        // 获取结果
+        public T getResult<T>(string key, T defaultValue = default(T)) {
+            if (this.results.ContainsKey(key)) {
+                return (T)this.results[key];
+            }
+            return defaultValue;
+        }
+        
+        // 获取任务详细信息
+        public string getInfo() {
+            return $"任务ID: {this.id}\n" +
+                   $"名称: {this.name}\n" +
+                   $"优先级: {this.priority}\n" +
+                   $"状态: {this.status}\n" +
+                   $"创建时间: {this.createdTime}\n" +
+                   $"指令数量: {this.circuit?.Count ?? 0}\n" +
+                   $"目标设备: {this.deviceName}";
+        }
+    }
+    
+    /**
+     * 量子任务调度器
+     * 管理量子任务的执行、调度和资源分配
+     */
+    class QuantumTaskScheduler {
+        private static QuantumTaskScheduler instance;  // 单例实例
+        private List<QuantumTask> taskQueue;           // 任务队列
+        private Dictionary<string, QuantumTask> activeTasks; // 活动任务
+        private Dictionary<string, QuantumTask> completedTasks; // 已完成任务
+        private Thread schedulerThread;                // 调度线程
+        private bool isRunning;                        // 是否正在运行
+        private int maxConcurrentTasks;                // 最大并发任务数
+        private int currentConcurrentTasks;            // 当前并发任务数
+        private object lockObject;                     // 锁对象
+        private Dictionary<string, IQuantumDevice> devices; // 可用的量子设备
+        
+        // 私有构造函数
+        private QuantumTaskScheduler() {
+            this.taskQueue = new List<QuantumTask>();
+            this.activeTasks = new Dictionary<string, QuantumTask>();
+            this.completedTasks = new Dictionary<string, QuantumTask>();
+            this.isRunning = false;
+            this.maxConcurrentTasks = 4;
+            this.currentConcurrentTasks = 0;
+            this.lockObject = new object();
+            this.devices = new Dictionary<string, IQuantumDevice>();
+            
+            // 添加默认设备
+            this.devices["default"] = QuantumDeviceFactory.getDefaultDevice();
+        }
+        
+        // 获取单例实例
+        public static QuantumTaskScheduler getInstance() {
+            if (instance == null) {
+                instance = new QuantumTaskScheduler();
+            }
+            return instance;
+        }
+        
+        // 启动调度器
+        public void start() {
+            if (!this.isRunning) {
+                this.isRunning = true;
+                this.schedulerThread = new Thread(schedulerLoop);
+                this.schedulerThread.Start();
+            }
+        }
+        
+        // 停止调度器
+        public void stop() {
+            this.isRunning = false;
+            if (this.schedulerThread != null) {
+                this.schedulerThread.Join(5000); // 等待最多5秒
+            }
+        }
+        
+        // 提交任务
+        public string submitTask(QuantumTask task) {
+            lock (this.lockObject) {
+                task.status = QuantumTaskStatus.QUEUED;
+                this.taskQueue.Add(task);
+                
+                // 按优先级排序队列
+                this.taskQueue.Sort((a, b) => b.priority.CompareTo(a.priority));
+            }
+            
+            // 如果是实时优先级，立即尝试调度
+            if (task.priority == QuantumTaskPriority.REALTIME) {
+                tryScheduleNextTask();
+            }
+            
+            return task.id;
+        }
+        
+        // 取消任务
+        public bool cancelTask(string taskId) {
+            lock (this.lockObject) {
+                // 检查队列中的任务
+                for (int i = 0; i < this.taskQueue.Count; i++) {
+                    if (this.taskQueue[i].id == taskId) {
+                        QuantumTask task = this.taskQueue[i];
+                        task.status = QuantumTaskStatus.CANCELED;
+                        this.taskQueue.RemoveAt(i);
+                        this.completedTasks[taskId] = task;
+                        return true;
+                    }
+                }
+                
+                // 检查活动任务
+                if (this.activeTasks.ContainsKey(taskId)) {
+                    QuantumTask task = this.activeTasks[taskId];
+                    task.status = QuantumTaskStatus.CANCELED;
+                    // 注意：活动任务可能无法立即取消，需要等待其完成
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        // 暂停任务
+        public bool pauseTask(string taskId) {
+            lock (this.lockObject) {
+                // 仅支持暂停队列中的任务
+                for (int i = 0; i < this.taskQueue.Count; i++) {
+                    if (this.taskQueue[i].id == taskId) {
+                        this.taskQueue[i].status = QuantumTaskStatus.PAUSED;
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
+        // 恢复任务
+        public bool resumeTask(string taskId) {
+            lock (this.lockObject) {
+                // 恢复暂停的任务
+                for (int i = 0; i < this.taskQueue.Count; i++) {
+                    if (this.taskQueue[i].id == taskId && this.taskQueue[i].status == QuantumTaskStatus.PAUSED) {
+                        this.taskQueue[i].status = QuantumTaskStatus.QUEUED;
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
+        // 获取任务状态
+        public QuantumTaskStatus getTaskStatus(string taskId) {
+            lock (this.lockObject) {
+                // 检查队列中的任务
+                foreach (QuantumTask task in this.taskQueue) {
+                    if (task.id == taskId) {
+                        return task.status;
+                    }
+                }
+                
+                // 检查活动任务
+                if (this.activeTasks.ContainsKey(taskId)) {
+                    return this.activeTasks[taskId].status;
+                }
+                
+                // 检查已完成任务
+                if (this.completedTasks.ContainsKey(taskId)) {
+                    return this.completedTasks[taskId].status;
+                }
+            }
+            
+            throw new KeyNotFoundException($"任务ID {taskId} 不存在");
+        }
+        
+        // 获取任务结果
+        public Dictionary<string, object> getTaskResults(string taskId) {
+            lock (this.lockObject) {
+                if (this.completedTasks.ContainsKey(taskId)) {
+                    QuantumTask task = this.completedTasks[taskId];
+                    if (task.status == QuantumTaskStatus.COMPLETED) {
+                        return task.results;
+                    }
+                }
+            }
+            
+            throw new InvalidOperationException($"任务ID {taskId} 尚未完成或不存在");
+        }
+        
+        // 添加量子设备
+        public void addDevice(string name, IQuantumDevice device) {
+            lock (this.lockObject) {
+                if (!this.devices.ContainsKey(name)) {
+                    this.devices[name] = device;
+                }
+            }
+        }
+        
+        // 移除量子设备
+        public void removeDevice(string name) {
+            lock (this.lockObject) {
+                if (name != "default" && this.devices.ContainsKey(name)) {
+                    this.devices.Remove(name);
+                }
+            }
+        }
+        
+        // 获取设备列表
+        public List<string> getDeviceNames() {
+            lock (this.lockObject) {
+                return new List<string>(this.devices.Keys);
+            }
+        }
+        
+        // 设置最大并发任务数
+        public void setMaxConcurrentTasks(int count) {
+            if (count > 0) {
+                this.maxConcurrentTasks = count;
+            }
+        }
+        
+        // 获取队列统计信息
+        public Dictionary<string, object> getQueueStatistics() {
+            lock (this.lockObject) {
+                Dictionary<string, object> stats = new Dictionary<string, object>();
+                stats["queued_tasks"] = this.taskQueue.Count;
+                stats["active_tasks"] = this.activeTasks.Count;
+                stats["completed_tasks"] = this.completedTasks.Count;
+                stats["max_concurrent"] = this.maxConcurrentTasks;
+                stats["current_concurrent"] = this.currentConcurrentTasks;
+                
+                // 优先级分布
+                Dictionary<QuantumTaskPriority, int> priorityDistribution = new Dictionary<QuantumTaskPriority, int>();
+                foreach (QuantumTask task in this.taskQueue) {
+                    priorityDistribution[task.priority] = priorityDistribution.GetValueOrDefault(task.priority, 0) + 1;
+                }
+                stats["priority_distribution"] = priorityDistribution;
+                
+                return stats;
+            }
+        }
+        
+        // 清理已完成的任务历史
+        public void clearCompletedTasks(DateTime olderThan) {
+            lock (this.lockObject) {
+                List<string> keysToRemove = new List<string>();
+                
+                foreach (var entry in this.completedTasks) {
+                    if (entry.Value.endTime < olderThan) {
+                        keysToRemove.Add(entry.Key);
+                    }
+                }
+                
+                foreach (string key in keysToRemove) {
+                    this.completedTasks.Remove(key);
+                }
+            }
+        }
+        
+        // 调度器循环
+        private void schedulerLoop() {
+            while (this.isRunning) {
+                tryScheduleNextTask();
+                
+                // 检查已完成的任务
+                checkCompletedTasks();
+                
+                // 休眠一段时间
+                Thread.Sleep(100);
+            }
+        }
+        
+        // 尝试调度下一个任务
+        private void tryScheduleNextTask() {
+            lock (this.lockObject) {
+                if (this.taskQueue.Count == 0 || this.currentConcurrentTasks >= this.maxConcurrentTasks) {
+                    return;
+                }
+                
+                // 获取下一个待执行的任务
+                QuantumTask nextTask = null;
+                for (int i = 0; i < this.taskQueue.Count; i++) {
+                    if (this.taskQueue[i].status == QuantumTaskStatus.QUEUED) {
+                        nextTask = this.taskQueue[i];
+                        this.taskQueue.RemoveAt(i);
+                        break;
+                    }
+                }
+                
+                if (nextTask != null) {
+                    // 获取设备
+                    IQuantumDevice device = null;
+                    if (this.devices.ContainsKey(nextTask.deviceName)) {
+                        device = this.devices[nextTask.deviceName];
+                    } else {
+                        device = this.devices["default"];
+                    }
+                    
+                    // 启动任务
+                    nextTask.status = QuantumTaskStatus.RUNNING;
+                    nextTask.startTime = DateTime.Now;
+                    this.activeTasks[nextTask.id] = nextTask;
+                    this.currentConcurrentTasks++;
+                    
+                    // 异步执行任务
+                    ThreadPool.QueueUserWorkItem(state => executeTask(nextTask, device));
+                }
+            }
+        }
+        
+        // 执行任务
+        private void executeTask(QuantumTask task, IQuantumDevice device) {
+            try {
+                // 确保设备已初始化
+                if (!device.isInitialized()) {
+                    device.initialize();
+                }
+                
+                // 重置设备
+                device.reset();
+                
+                // 执行量子电路
+                if (task.resultQubits != null && task.resultQubits.Count > 0) {
+                    List<int> results = device.executeAndMeasure(task.circuit, task.resultQubits);
+                    task.setResult("measurements", results);
+                } else {
+                    device.executeCircuit(task.circuit);
+                }
+                
+                // 获取状态向量
+                List<Complex> stateVector = device.getStateVector();
+                task.setResult("state_vector", stateVector);
+                
+                // 获取执行统计信息
+                Dictionary<string, object> stats = device.getStatistics();
+                task.setResult("statistics", stats);
+                
+                // 设置任务状态为已完成
+                task.status = QuantumTaskStatus.COMPLETED;
+            }
+            catch (Exception ex) {
+                // 处理执行失败
+                task.status = QuantumTaskStatus.FAILED;
+                task.setResult("error", ex.Message);
+                task.setResult("stack_trace", ex.StackTrace);
+                
+                // 调用错误回调
+                if (task.onError != null) {
+                    try {
+                        task.onError(task, ex);
+                    } catch {
+                        // 忽略回调中的异常
+                    }
+                }
+            }
+            finally {
+                // 记录结束时间
+                task.endTime = DateTime.Now;
+                
+                // 通知调度器任务已完成
+                lock (this.lockObject) {
+                    if (this.activeTasks.ContainsKey(task.id)) {
+                        this.activeTasks.Remove(task.id);
+                        this.completedTasks[task.id] = task;
+                        this.currentConcurrentTasks--;
+                    }
+                }
+                
+                // 执行成功回调
+                if (task.status == QuantumTaskStatus.COMPLETED && task.onCompleted != null) {
+                    try {
+                        task.onCompleted(task);
+                    } catch {
+                        // 忽略回调中的异常
+                    }
+                }
+            }
+        }
+        
+        // 检查已完成的任务
+        private void checkCompletedTasks() {
+            // 这里可以实现一些策略，比如清理太旧的已完成任务
+            DateTime threshold = DateTime.Now.AddDays(-1);
+            clearCompletedTasks(threshold);
+        }
+    }
+} 

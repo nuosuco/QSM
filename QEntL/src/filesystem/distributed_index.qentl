@@ -1,0 +1,889 @@
+/**
+ * QEntL分布式索引实现
+ * QuantumGene: QG-DINDEX-E5G2-1714046500
+ * EntanglementStrength: 0.85
+ */
+
+quantum_module DistributedIndex {
+    // 模块元数据
+    metadata: {
+        name: "分布式索引核心",
+        version: "1.0.0",
+        description: "QEntL文件系统的分布式索引核心实现",
+        author: "QEntL开发团队",
+        quantum_gene: "QG-DINDEX-E5G2-1714046500",
+        entanglement_strength: 0.85
+    },
+    
+    // 分布式索引配置
+    config: {
+        replication_factor: 3,         // 复制因子
+        consistency_level: "quorum",   // 一致性级别
+        partition_count: 16,           // 分区数量
+        node_count: 5,                 // 节点数量
+        sync_interval: 5000,           // 同步间隔(毫秒)
+        timeout: 10000,                // 超时(毫秒)
+        retry_count: 3,                // 重试次数
+        parallel_operations: true,     // 并行操作
+        parallel_workers: 8            // 并行工作线程数
+    },
+    
+    // 分布式节点类型
+    types: {
+        // 节点信息
+        NodeInfo: {
+            id: String,             // 节点ID
+            name: String,           // 节点名称
+            address: String,        // 节点地址
+            port: Number,           // 节点端口
+            status: String,         // 节点状态
+            load: Number,           // 节点负载
+            partitions: Array,      // 负责的分区列表
+            lastHeartbeat: Number,  // 最后心跳时间
+            statistics: Object      // 节点统计信息
+        },
+        
+        // 分区信息
+        PartitionInfo: {
+            id: String,             // 分区ID
+            range: {                // 分区范围
+                min: String,        // 最小键
+                max: String         // 最大键
+            },
+            nodes: Array,           // 负责的节点列表
+            primaryNode: String,    // 主节点
+            entryCount: Number,     // 条目数量
+            lastSync: Number        // 最后同步时间
+        },
+        
+        // 索引操作
+        IndexOperation: {
+            type: String,           // 操作类型
+            key: String,            // 键
+            value: Object,          // 值
+            timestamp: Number,      // 时间戳
+            node: String,           // 发起操作的节点
+            status: String,         // 操作状态
+            retries: Number         // 重试次数
+        }
+    },
+    
+    // 分布式索引状态
+    state: {
+        nodes: [],                  // 节点列表
+        partitions: [],             // 分区列表
+        operationQueue: [],         // 操作队列
+        pendingOperations: {},      // 待处理操作
+        inSyncOperations: 0,        // 同步中的操作数
+        localNodeId: "",            // 本地节点ID
+        isCoordinator: false,       // 是否是协调者
+        lastPartitionBalanceTime: 0 // 最后分区平衡时间
+    },
+    
+    /**
+     * 初始化分布式索引
+     * @param {Object} options 初始化选项
+     * @returns {Boolean} 是否成功初始化
+     */
+    initialize: function(options) {
+        log("分布式索引", "初始化分布式索引系统");
+        
+        // 合并选项
+        const config = Object.assign({}, this.config, options || {});
+        
+        // 初始化本地节点
+        this.state.localNodeId = options器.localNodeId || `node_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        
+        // 创建节点列表
+        this.state.nodes = this._createInitialNodes(config.node_count);
+        
+        // 设置本地节点
+        const localNodeIndex = 0; // 假设第一个是本地节点
+        this.state.nodes[localNodeIndex].id = this.state.localNodeId;
+        
+        // 创建分区
+        this.state.partitions = this._createPartitions(config.partition_count);
+        
+        // 分配分区到节点
+        this._assignPartitionsToNodes();
+        
+        // 确定协调者节点
+        this.state.isCoordinator = this._determineCoordinator();
+        
+        log("分布式索引", `分布式索引初始化完成，本地节点ID: ${this.state.localNodeId}, 是否协调者: ${this.state.isCoordinator}`);
+        return true;
+    },
+    
+    /**
+     * 添加键值对到分布式索引
+     * @param {String} key 键
+     * @param {Object} value 值
+     * @returns {Promise<Boolean>} 是否成功添加
+     */
+    put: async function(key, value) {
+        log("分布式索引", `添加键值对: ${key}`);
+        
+        // 创建操作
+        const operation = {
+            type: "PUT",
+            key: key,
+            value: value,
+            timestamp: Date.now(),
+            node: this.state.localNodeId,
+            status: "PENDING",
+            retries: 0
+        };
+        
+        // 提交操作
+        return await this._submitOperation(operation);
+    },
+    
+    /**
+     * 获取键对应的值
+     * @param {String} key 键
+     * @returns {Promise<Object>} 值
+     */
+    get: async function(key) {
+        log("分布式索引", `获取键值对: ${key}`);
+        
+        // 找到键所在的分区
+        const partition = this._findPartitionForKey(key);
+        if (!partition) {
+            log("分布式索引", `未找到键 ${key} 所在的分区`, "ERROR");
+            return null;
+        }
+        
+        // 根据一致性级别选择需要查询的节点
+        const nodesToQuery = this._selectNodesForRead(partition);
+        
+        // 结果数组
+        const results = [];
+        
+        // 查询节点
+        for (const nodeId of nodesToQuery) {
+            const result = await this._queryNode(nodeId, key);
+            if (result) {
+                results.push(result);
+            }
+        }
+        
+        // 根据时间戳选择最新的结果
+        if (results.length > 0) {
+            results.sort((a, b) => b.timestamp - a.timestamp);
+            return results[0].value;
+        }
+        
+        return null;
+    },
+    
+    /**
+     * 删除键值对
+     * @param {String} key 键
+     * @returns {Promise<Boolean>} 是否成功删除
+     */
+    delete: async function(key) {
+        log("分布式索引", `删除键值对: ${key}`);
+        
+        // 创建删除操作
+        const operation = {
+            type: "DELETE",
+            key: key,
+            value: null,
+            timestamp: Date.now(),
+            node: this.state.localNodeId,
+            status: "PENDING",
+            retries: 0
+        };
+        
+        // 提交操作
+        return await this._submitOperation(operation);
+    },
+    
+    /**
+     * 同步分布式索引
+     * @returns {Promise<Boolean>} 是否成功同步
+     */
+    sync: async function() {
+        if (!this.state.isCoordinator) {
+            log("分布式索引", "只有协调者节点可以初始化同步", "WARNING");
+            return false;
+        }
+        
+        log("分布式索引", "开始同步分布式索引");
+        
+        // 获取所有节点状态
+        const nodeStatuses = await this._getAllNodeStatuses();
+        
+        // 检查节点健康状态
+        const unhealthyNodes = nodeStatuses.filter(s => s.status !== "HEALTHY");
+        if (unhealthyNodes.length > 0) {
+            log("分布式索引", `检测到 ${unhealthyNodes.length} 个不健康的节点`, "WARNING");
+            
+            // 处理不健康的节点
+            for (const nodeStatus of unhealthyNodes) {
+                await this._handleUnhealthyNode(nodeStatus.node);
+            }
+        }
+        
+        // 同步分区
+        await this._syncPartitions();
+        
+        // 更新同步时间
+        for (const partition of this.state.partitions) {
+            partition.lastSync = Date.now();
+        }
+        
+        log("分布式索引", "分布式索引同步完成");
+        return true;
+    },
+    
+    /**
+     * 加入分布式索引集群
+     * @param {String} bootstrapNodeAddress 引导节点地址
+     * @returns {Promise<Boolean>} 是否成功加入
+     */
+    join: async function(bootstrapNodeAddress) {
+        log("分布式索引", `尝试加入集群，引导节点: ${bootstrapNodeAddress}`);
+        
+        // 在实际实现中，这里应该联系引导节点获取集群信息
+        // 简化为模拟成功加入
+        
+        // 随机生成节点列表（模拟）
+        this.state.nodes = this._createInitialNodes(this.config.node_count);
+        
+        // 使用自己的节点ID
+        const localNode = {
+            id: this.state.localNodeId,
+            name: `节点${this.state.localNodeId.substring(0, 8)}`,
+            address: "127.0.0.1",
+            port: 9000 + Math.floor(Math.random() * 1000),
+            status: "JOINING",
+            load: 0,
+            partitions: [],
+            lastHeartbeat: Date.now(),
+            statistics: {}
+        };
+        
+        // 添加自己到节点列表
+        this.state.nodes.push(localNode);
+        
+        // 模拟获取分区信息
+        this.state.partitions = this._createPartitions(this.config.partition_count);
+        
+        // 重新分配分区
+        this._assignPartitionsToNodes();
+        
+        // 设置状态为已加入
+        localNode.status = "HEALTHY";
+        
+        // 确定是否是协调者
+        this.state.isCoordinator = this._determineCoordinator();
+        
+        log("分布式索引", `成功加入集群，本地节点ID: ${this.state.localNodeId}, 是否协调者: ${this.state.isCoordinator}`);
+        return true;
+    },
+    
+    /**
+     * 离开分布式索引集群
+     * @returns {Promise<Boolean>} 是否成功离开
+     */
+    leave: async function() {
+        log("分布式索引", "准备离开集群");
+        
+        // 如果是协调者，需要先选举新的协调者
+        if (this.state.isCoordinator) {
+            await this._electNewCoordinator();
+        }
+        
+        // 将自己负责的分区转移给其他节点
+        await this._transferPartitions();
+        
+        // 通知其他节点自己离开
+        await this._notifyLeaving();
+        
+        // 清理状态
+        this.state.nodes = [];
+        this.state.partitions = [];
+        this.state.operationQueue = [];
+        this.state.pendingOperations = {};
+        this.state.inSyncOperations = 0;
+        this.state.isCoordinator = false;
+        
+        log("分布式索引", "已成功离开集群");
+        return true;
+    },
+    
+    /**
+     * 获取节点列表
+     * @returns {Array} 节点列表
+     */
+    getNodes: function() {
+        return this.state.nodes.map(node => ({
+            id: node.id,
+            name: node.name,
+            status: node.status,
+            partitionCount: node.partitions.length,
+            lastHeartbeat: node.lastHeartbeat
+        }));
+    },
+    
+    /**
+     * 获取分区列表
+     * @returns {Array} 分区列表
+     */
+    getPartitions: function() {
+        return this.state.partitions.map(partition => ({
+            id: partition.id,
+            range: partition.range,
+            nodeCount: partition.nodes.length,
+            primaryNode: partition.primaryNode,
+            entryCount: partition.entryCount,
+            lastSync: partition.lastSync
+        }));
+    },
+    
+    // 内部方法
+    
+    /**
+     * 创建初始节点列表
+     * @private
+     */
+    _createInitialNodes: function(count) {
+        const nodes = [];
+        
+        for (let i = 0; i < count; i++) {
+            nodes.push({
+                id: `node_${Date.now()}_${i}`,
+                name: `节点${i+1}`,
+                address: `192.168.1.${100+i}`,
+                port: 9000 + i,
+                status: "HEALTHY",
+                load: Math.random() * 0.5,
+                partitions: [],
+                lastHeartbeat: Date.now(),
+                statistics: {
+                    operationsCount: 0,
+                    successRate: 0.99,
+                    averageResponseTime: 10 + Math.random() * 20
+                }
+            });
+        }
+        
+        return nodes;
+    },
+    
+    /**
+     * 创建分区
+     * @private
+     */
+    _createPartitions: function(count) {
+        const partitions = [];
+        
+        // 计算每个分区的键范围
+        const keySpace = 2**32; // 假设键空间为32位整数范围
+        const partitionSize = keySpace / count;
+        
+        for (let i = 0; i < count; i++) {
+            const min = Math.floor(i * partitionSize).toString(16).padStart(8, '0');
+            const max = Math.floor((i+1) * partitionSize - 1).toString(16).padStart(8, '0');
+            
+            partitions.push({
+                id: `partition_${i}`,
+                range: {
+                    min: min,
+                    max: max
+                },
+                nodes: [],
+                primaryNode: null,
+                entryCount: 0,
+                lastSync: Date.now()
+            });
+        }
+        
+        return partitions;
+    },
+    
+    /**
+     * 分配分区到节点
+     * @private
+     */
+    _assignPartitionsToNodes: function() {
+        log("分布式索引", "分配分区到节点");
+        
+        // 清除节点上的分区记录
+        for (const node of this.state.nodes) {
+            node.partitions = [];
+        }
+        
+        // 为每个分区分配节点
+        for (const partition of this.state.partitions) {
+            // 清除分区上的节点记录
+            partition.nodes = [];
+            
+            // 选择复制因子个节点
+            const selectedNodeIndices = new Set();
+            while (selectedNodeIndices.size < this.config.replication_factor && 
+                   selectedNodeIndices.size < this.state.nodes.length) {
+                const index = Math.floor(Math.random() * this.state.nodes.length);
+                selectedNodeIndices.add(index);
+            }
+            
+            // 分配节点到分区
+            const selectedNodes = Array.from(selectedNodeIndices).map(i => this.state.nodes[i]);
+            for (const node of selectedNodes) {
+                partition.nodes.push(node.id);
+                node.partitions.push(partition.id);
+            }
+            
+            // 选择主节点
+            if (partition.nodes.length > 0) {
+                partition.primaryNode = partition.nodes[0];
+            }
+        }
+        
+        log("分布式索引", "分区分配完成");
+    },
+    
+    /**
+     * 确定协调者节点
+     * @private
+     */
+    _determineCoordinator: function() {
+        // 简单地使用第一个节点作为协调者
+        if (this.state.nodes.length > 0) {
+            const coordinatorId = this.state.nodes[0].id;
+            return coordinatorId === this.state.localNodeId;
+        }
+        return false;
+    },
+    
+    /**
+     * 提交操作
+     * @private
+     */
+    _submitOperation: async function(operation) {
+        // 添加到操作队列
+        this.state.operationQueue.push(operation);
+        this.state.pendingOperations[operation.key] = operation;
+        
+        // 找到键所在的分区
+        const partition = this._findPartitionForKey(operation.key);
+        if (!partition) {
+            log("分布式索引", `未找到键 ${operation.key} 所在的分区`, "ERROR");
+            delete this.state.pendingOperations[operation.key];
+            return false;
+        }
+        
+        // 根据一致性级别选择需要写入的节点
+        const nodesToWrite = this._selectNodesForWrite(partition);
+        
+        // 成功写入的节点数
+        let successCount = 0;
+        
+        // 并行或串行写入
+        if (this.config.parallel_operations) {
+            // 并行写入
+            const writePromises = nodesToWrite.map(nodeId => 
+                this._writeToNode(nodeId, operation)
+                    .then(success => {
+                        if (success) successCount++;
+                        return success;
+                    })
+            );
+            
+            await Promise.all(writePromises);
+        } else {
+            // 串行写入
+            for (const nodeId of nodesToWrite) {
+                const success = await this._writeToNode(nodeId, operation);
+                if (success) successCount++;
+            }
+        }
+        
+        // 根据一致性级别确定操作是否成功
+        const isSuccess = this._checkWriteConsistency(successCount, nodesToWrite.length);
+        
+        // 更新操作状态
+        operation.status = isSuccess 器 "COMPLETED" : "FAILED";
+        
+        // 清理待处理操作
+        delete this.state.pendingOperations[operation.key];
+        
+        // 操作完成结果
+        if (isSuccess) {
+            log("分布式索引", `操作成功完成: ${operation.type} ${operation.key}`);
+        } else {
+            log("分布式索引", `操作失败: ${operation.type} ${operation.key}`, "ERROR");
+        }
+        
+        return isSuccess;
+    },
+    
+    /**
+     * 写入到节点
+     * @private
+     */
+    _writeToNode: async function(nodeId, operation) {
+        // 检查是否是本地节点
+        if (nodeId === this.state.localNodeId) {
+            // 模拟本地存储
+            return true;
+        }
+        
+        // 模拟远程写入
+        // 在实际实现中，这里应该使用网络通信
+        const randomSuccess = Math.random() > 0.1; // 90%的成功率
+        
+        // 模拟网络延迟
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 20));
+        
+        return randomSuccess;
+    },
+    
+    /**
+     * 查询节点
+     * @private
+     */
+    _queryNode: async function(nodeId, key) {
+        // 模拟查询操作
+        // 在实际实现中，这里应该使用网络通信
+        
+        // 模拟网络延迟
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 20));
+        
+        // 随机决定是否成功
+        const isSuccess = Math.random() > 0.1; // 90%的成功率
+        
+        if (isSuccess) {
+            // 构造模拟结果
+            return {
+                key: key,
+                value: { data: `值-${key}`, timestamp: Date.now() - Math.floor(Math.random() * 10000) },
+                timestamp: Date.now() - Math.floor(Math.random() * 10000)
+            };
+        }
+        
+        return null;
+    },
+    
+    /**
+     * 根据键查找分区
+     * @private
+     */
+    _findPartitionForKey: function(key) {
+        // 计算键的哈希值
+        const hash = this._hashKey(key);
+        
+        // 找到键所属的分区
+        for (const partition of this.state.partitions) {
+            if (hash >= partition.range.min && hash <= partition.range.max) {
+                return partition;
+            }
+        }
+        
+        return null;
+    },
+    
+    /**
+     * 计算键的哈希值
+     * @private
+     */
+    _hashKey: function(key) {
+        // 简单的哈希函数，将键转为十六进制字符串
+        let hash = 0;
+        for (let i = 0; i < key.length; i++) {
+            hash = ((hash << 5) - hash) + key.charCodeAt(i);
+            hash |= 0; // 转为32位整数
+        }
+        return (hash >>> 0).toString(16).padStart(8, '0');
+    },
+    
+    /**
+     * 选择读取操作的节点
+     * @private
+     */
+    _selectNodesForRead: function(partition) {
+        // 根据一致性级别选择节点
+        switch (this.config.consistency_level) {
+            case "all":
+                // 所有节点
+                return partition.nodes;
+                
+            case "quorum":
+                // 大多数节点
+                const quorumCount = Math.floor(partition.nodes.length / 2) + 1;
+                return partition.nodes.slice(0, quorumCount);
+                
+            case "one":
+                // 单个节点
+                return [partition.primaryNode];
+                
+            default:
+                // 默认为主节点
+                return [partition.primaryNode];
+        }
+    },
+    
+    /**
+     * 选择写入操作的节点
+     * @private
+     */
+    _selectNodesForWrite: function(partition) {
+        // 根据一致性级别选择节点
+        switch (this.config.consistency_level) {
+            case "all":
+                // 所有节点
+                return partition.nodes;
+                
+            case "quorum":
+                // 大多数节点
+                const quorumCount = Math.floor(partition.nodes.length / 2) + 1;
+                return partition.nodes.slice(0, quorumCount);
+                
+            case "one":
+                // 单个节点
+                return [partition.primaryNode];
+                
+            default:
+                // 默认为所有节点
+                return partition.nodes;
+        }
+    },
+    
+    /**
+     * 检查写入一致性
+     * @private
+     */
+    _checkWriteConsistency: function(successCount, totalCount) {
+        // 根据一致性级别检查写入是否成功
+        switch (this.config.consistency_level) {
+            case "all":
+                // 所有节点必须成功
+                return successCount === totalCount;
+                
+            case "quorum":
+                // 大多数节点必须成功
+                const quorumCount = Math.floor(totalCount / 2) + 1;
+                return successCount >= quorumCount;
+                
+            case "one":
+                // 至少一个节点成功
+                return successCount >= 1;
+                
+            default:
+                // 默认为所有节点
+                return successCount === totalCount;
+        }
+    },
+    
+    /**
+     * 获取所有节点状态
+     * @private
+     */
+    _getAllNodeStatuses: async function() {
+        // 模拟获取节点状态
+        return this.state.nodes.map(node => ({
+            node: node.id,
+            status: node.status,
+            lastHeartbeat: node.lastHeartbeat,
+            load: node.load
+        }));
+    },
+    
+    /**
+     * 处理不健康的节点
+     * @private
+     */
+    _handleUnhealthyNode: async function(nodeId) {
+        log("分布式索引", `处理不健康的节点: ${nodeId}`);
+        
+        // 找到节点
+        const nodeIndex = this.state.nodes.findIndex(n => n.id === nodeId);
+        if (nodeIndex < 0) {
+            log("分布式索引", `未找到节点: ${nodeId}`, "ERROR");
+            return;
+        }
+        
+        // 标记节点为不可用
+        this.state.nodes[nodeIndex].status = "UNAVAILABLE";
+        
+        // 重新分配该节点负责的分区
+        await this._reassignPartitions(nodeId);
+    },
+    
+    /**
+     * 重新分配分区
+     * @private
+     */
+    _reassignPartitions: async function(nodeId) {
+        log("分布式索引", `重新分配节点 ${nodeId} 的分区`);
+        
+        // 找到此节点负责的分区
+        const affectedPartitions = this.state.partitions.filter(p => p.nodes.includes(nodeId));
+        
+        // 找到健康的节点
+        const healthyNodes = this.state.nodes.filter(n => n.status === "HEALTHY" && n.id !== nodeId);
+        
+        if (healthyNodes.length === 0) {
+            log("分布式索引", "没有健康的节点可用于重新分配", "ERROR");
+            return;
+        }
+        
+        // 重新分配每个受影响的分区
+        for (const partition of affectedPartitions) {
+            // 从分区中移除不健康的节点
+            partition.nodes = partition.nodes.filter(n => n !== nodeId);
+            
+            // 如果主节点是不健康的节点，选择新的主节点
+            if (partition.primaryNode === nodeId && partition.nodes.length > 0) {
+                partition.primaryNode = partition.nodes[0];
+            }
+            
+            // 如果复制因子不满足，添加新节点
+            while (partition.nodes.length < this.config.replication_factor && 
+                   partition.nodes.length < healthyNodes.length) {
+                // 选择负载最小的健康节点
+                healthyNodes.sort((a, b) => a.load - b.load);
+                
+                // 找到一个不在该分区的节点
+                const newNode = healthyNodes.find(n => !partition.nodes.includes(n.id));
+                if (!newNode) break;
+                
+                // 添加新节点到分区
+                partition.nodes.push(newNode.id);
+                newNode.partitions.push(partition.id);
+                newNode.load += 0.1; // 增加节点负载
+            }
+        }
+        
+        log("分布式索引", `重新分配了 ${affectedPartitions.length} 个分区`);
+    },
+    
+    /**
+     * 同步分区
+     * @private
+     */
+    _syncPartitions: async function() {
+        log("分布式索引", "开始同步分区");
+        
+        // 在实际实现中，这里应该进行实际的分区同步
+        // 简化为模拟同步过程
+        
+        // 模拟同步延迟
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        log("分布式索引", "分区同步完成");
+    },
+    
+    /**
+     * 选举新的协调者
+     * @private
+     */
+    _electNewCoordinator: async function() {
+        log("分布式索引", "开始选举新的协调者");
+        
+        // 在实际实现中，这里应该实现一个协调者选举算法
+        // 简化为选择下一个健康的节点
+        
+        const healthyNodes = this.state.nodes.filter(n => 
+            n.status === "HEALTHY" && n.id !== this.state.localNodeId
+        );
+        
+        if (healthyNodes.length > 0) {
+            // 选择第一个健康节点
+            const newCoordinator = healthyNodes[0];
+            log("分布式索引", `选举节点 ${newCoordinator.id} 为新的协调者`);
+        } else {
+            log("分布式索引", "没有可用的节点作为新的协调者", "WARNING");
+        }
+    },
+    
+    /**
+     * 转移分区
+     * @private
+     */
+    _transferPartitions: async function() {
+        log("分布式索引", "开始转移分区");
+        
+        // 找到本地节点
+        const localNode = this.state.nodes.find(n => n.id === this.state.localNodeId);
+        if (!localNode) {
+            log("分布式索引", "未找到本地节点", "ERROR");
+            return;
+        }
+        
+        // 找到本地节点负责的分区
+        const localPartitions = this.state.partitions.filter(p => 
+            p.nodes.includes(this.state.localNodeId)
+        );
+        
+        // 找到可用的健康节点
+        const healthyNodes = this.state.nodes.filter(n => 
+            n.status === "HEALTHY" && n.id !== this.state.localNodeId
+        );
+        
+        if (healthyNodes.length === 0) {
+            log("分布式索引", "没有可用的健康节点接收分区", "WARNING");
+            return;
+        }
+        
+        // 转移每个分区
+        for (const partition of localPartitions) {
+            // 如果是主节点，需要选择新的主节点
+            if (partition.primaryNode === this.state.localNodeId) {
+                // 找到分区中的其他节点
+                const otherNodes = partition.nodes.filter(n => n !== this.state.localNodeId);
+                if (otherNodes.length > 0) {
+                    partition.primaryNode = otherNodes[0];
+                    log("分布式索引", `分区 ${partition.id} 的主节点变更为 ${partition.primaryNode}`);
+                } else {
+                    // 没有其他节点，选择一个健康节点
+                    partition.primaryNode = healthyNodes[0].id;
+                    log("分布式索引", `分区 ${partition.id} 的主节点变更为 ${partition.primaryNode}`);
+                }
+            }
+            
+            // 从分区节点列表中移除本地节点
+            partition.nodes = partition.nodes.filter(n => n !== this.state.localNodeId);
+            
+            // 如果需要，添加新节点以满足复制因子
+            while (partition.nodes.length < this.config.replication_factor && 
+                   partition.nodes.length < healthyNodes.length) {
+                // 选择负载最小的健康节点
+                healthyNodes.sort((a, b) => a.load - b.load);
+                
+                // 找到一个不在该分区的节点
+                const newNode = healthyNodes.find(n => !partition.nodes.includes(n.id));
+                if (!newNode) break;
+                
+                // 添加新节点到分区
+                partition.nodes.push(newNode.id);
+                newNode.partitions.push(partition.id);
+                newNode.load += 0.1; // 增加节点负载
+                
+                log("分布式索引", `将分区 ${partition.id} 分配给节点 ${newNode.id}`);
+            }
+        }
+        
+        log("分布式索引", "分区转移完成");
+    },
+    
+    /**
+     * 通知其他节点本地节点正在离开
+     * @private
+     */
+    _notifyLeaving: async function() {
+        log("分布式索引", "通知其他节点本地节点正在离开");
+        
+        // 在实际实现中，这里应该向其他节点发送通知
+        // 简化为模拟通知过程
+        
+        // 模拟通知延迟
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        log("分布式索引", "已通知其他节点");
+    }
+};
+
+// 导出模块
+export DistributedIndex; 
