@@ -1,0 +1,552 @@
+/**
+ * @file quantum_bytecode_generator.qentl
+ * @brief 量子字节码生成器实现
+ * 
+ * 量子基因编码: QGC-QUANTUM-BYTECODE-GEN-2024062801
+ * 量子纠缠信道: QEC-COMPILER-BYTECODE-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/set.qentl";
+import "QEntL/compiler/src/frontend/parser/ast.qentl";
+import "QEntL/compiler/src/backend/ir/ir_node.qentl";
+import "QEntL/compiler/src/utils/binary_writer.qentl";
+
+/**
+ * @class QuantumBytecodeGenerator
+ * @brief 负责将IR节点转换为量子字节码
+ */
+quantum_class QuantumBytecodeGenerator {
+    private {
+        binaryWriter: BinaryWriter;                // 二进制写入器
+        constantPool: Map<String, Number>;         // 常量池
+        nextConstantId: Number;                    // 下一个常量ID
+        
+        quantumStatePool: Map<String, Number>;     // 量子状态池
+        quantumGatePool: Map<String, Number>;      // 量子门池
+        
+        labelTable: Map<String, Number>;           // 标签表
+        pendingLabels: Map<String, Array<Number>>; // 待解析标签
+        
+        currentPosition: Number;                   // 当前位置
+        metadataSection: Array<Uint8Array>;        // 元数据段
+        debugInfoSection: Array<Uint8Array>;       // 调试信息段
+        
+        quantumEntanglementInfo: Map<String, any>; // 量子纠缠信息
+        quantumGeneEncoding: String;               // 量子基因编码
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.binaryWriter = new BinaryWriter();
+        this.constantPool = new Map<String, Number>();
+        this.nextConstantId = 0;
+        
+        this.quantumStatePool = new Map<String, Number>();
+        this.quantumGatePool = new Map<String, Number>();
+        
+        this.labelTable = new Map<String, Number>();
+        this.pendingLabels = new Map<String, Array<Number>>();
+        
+        this.currentPosition = 0;
+        this.metadataSection = [];
+        this.debugInfoSection = [];
+        
+        this.quantumEntanglementInfo = new Map<String, any>();
+        this.quantumGeneEncoding = this.generateQuantumGeneEncoding();
+        
+        // 初始化字节码格式
+        this.initializeBytecodeFormat();
+    }
+    
+    /**
+     * @brief 生成量子基因编码
+     * @return 生成的量子基因编码字符串
+     */
+    private function generateQuantumGeneEncoding(): String {
+        const timestamp = Date.now().toString(16);
+        const random = Math.floor(Math.random() * 10000).toString(16).padStart(4, '0');
+        return `QGC-BYTECODE-${timestamp}-${random}`;
+    }
+    
+    /**
+     * @brief 初始化字节码格式
+     */
+    private function initializeBytecodeFormat(): void {
+        // 写入魔数 "QBCF" (QEntL ByteCode Format)
+        this.binaryWriter.writeUint8(0x51); // 'Q'
+        this.binaryWriter.writeUint8(0x42); // 'B'
+        this.binaryWriter.writeUint8(0x43); // 'C'
+        this.binaryWriter.writeUint8(0x46); // 'F'
+        
+        // 写入版本 (1.0)
+        this.binaryWriter.writeUint16(1); // 主版本
+        this.binaryWriter.writeUint16(0); // 次版本
+        
+        // 占位，后续更新常量池数量
+        this.binaryWriter.writeUint32(0);
+        
+        // 占位，后续更新量子状态池大小
+        this.binaryWriter.writeUint32(0);
+        
+        // 占位，后续更新量子门池大小
+        this.binaryWriter.writeUint32(0);
+        
+        // 占位，后续更新代码长度
+        this.binaryWriter.writeUint32(0);
+        
+        // 占位，后续更新元数据段偏移
+        this.binaryWriter.writeUint32(0);
+        
+        // 占位，后续更新调试信息段偏移
+        this.binaryWriter.writeUint32(0);
+        
+        // 更新当前位置
+        this.currentPosition = this.binaryWriter.getPosition();
+    }
+    
+    /**
+     * @brief 添加常量到常量池
+     * @param value 常量值
+     * @return 常量ID
+     */
+    public function addConstant(value: String): Number {
+        if (this.constantPool.has(value)) {
+            return this.constantPool.get(value);
+        }
+        
+        const id = this.nextConstantId++;
+        this.constantPool.set(value, id);
+        
+        return id;
+    }
+    
+    /**
+     * @brief 添加量子状态到状态池
+     * @param stateName 状态名称
+     * @return 状态ID
+     */
+    public function addQuantumState(stateName: String): Number {
+        if (this.quantumStatePool.has(stateName)) {
+            return this.quantumStatePool.get(stateName);
+        }
+        
+        const id = this.quantumStatePool.size;
+        this.quantumStatePool.set(stateName, id);
+        
+        return id;
+    }
+    
+    /**
+     * @brief 添加量子门到门池
+     * @param gateName 门名称
+     * @return 门ID
+     */
+    public function addQuantumGate(gateName: String): Number {
+        if (this.quantumGatePool.has(gateName)) {
+            return this.quantumGatePool.get(gateName);
+        }
+        
+        const id = this.quantumGatePool.size;
+        this.quantumGatePool.set(gateName, id);
+        
+        return id;
+    }
+    
+    /**
+     * @brief 定义标签
+     * @param label 标签名
+     */
+    public function defineLabel(label: String): void {
+        this.labelTable.set(label, this.currentPosition);
+        
+        // 解析待处理的标签引用
+        if (this.pendingLabels.has(label)) {
+            const positions = this.pendingLabels.get(label);
+            for (const pos of positions) {
+                // 返回并更新字节码中的位置，填入正确的偏移
+                const jumpOffset = this.currentPosition - pos - 4; // 减去跳转指令的大小
+                this.binaryWriter.patchInt32(pos, jumpOffset);
+            }
+            this.pendingLabels.delete(label);
+        }
+    }
+    
+    /**
+     * @brief 引用标签
+     * @param label 标签名
+     */
+    public function referenceLabel(label: String): void {
+        if (this.labelTable.has(label)) {
+            // 标签已定义，计算跳转偏移
+            const targetPos = this.labelTable.get(label);
+            const jumpOffset = targetPos - this.currentPosition - 4; // 减去跳转指令的大小
+            this.binaryWriter.writeInt32(jumpOffset);
+        } else {
+            // 标签未定义，记录当前位置并写入占位符
+            if (!this.pendingLabels.has(label)) {
+                this.pendingLabels.set(label, []);
+            }
+            this.pendingLabels.get(label).push(this.currentPosition);
+            this.binaryWriter.writeInt32(0); // 占位符
+        }
+        
+        this.currentPosition += 4;
+    }
+    
+    /**
+     * @brief 设置量子纠缠信息
+     * @param key 键
+     * @param value 值
+     */
+    public function setQuantumEntanglementInfo(key: String, value: any): void {
+        this.quantumEntanglementInfo.set(key, value);
+    }
+    
+    /**
+     * @brief 添加元数据
+     * @param metadata 元数据
+     */
+    public function addMetadata(metadata: Uint8Array): void {
+        this.metadataSection.push(metadata);
+    }
+    
+    /**
+     * @brief 添加调试信息
+     * @param debugInfo 调试信息
+     */
+    public function addDebugInfo(debugInfo: Uint8Array): void {
+        this.debugInfoSection.push(debugInfo);
+    }
+    
+    /**
+     * @brief 写入字节码指令
+     * @param opcode 操作码
+     */
+    public function writeOpcode(opcode: Number): void {
+        this.binaryWriter.writeUint8(opcode);
+        this.currentPosition += 1;
+    }
+    
+    /**
+     * @brief 写入8位整数
+     * @param value 整数值
+     */
+    public function writeInt8(value: Number): void {
+        this.binaryWriter.writeInt8(value);
+        this.currentPosition += 1;
+    }
+    
+    /**
+     * @brief 写入16位整数
+     * @param value 整数值
+     */
+    public function writeInt16(value: Number): void {
+        this.binaryWriter.writeInt16(value);
+        this.currentPosition += 2;
+    }
+    
+    /**
+     * @brief 写入32位整数
+     * @param value 整数值
+     */
+    public function writeInt32(value: Number): void {
+        this.binaryWriter.writeInt32(value);
+        this.currentPosition += 4;
+    }
+    
+    /**
+     * @brief 写入64位浮点数
+     * @param value 浮点数值
+     */
+    public function writeFloat64(value: Number): void {
+        this.binaryWriter.writeFloat64(value);
+        this.currentPosition += 8;
+    }
+    
+    /**
+     * @brief 从IR节点生成量子字节码
+     * @param irNodes IR节点数组
+     * @return 生成的字节码
+     */
+    public function generateBytecodeFromIR(irNodes: Array<IRNode>): Uint8Array {
+        // 处理IR节点，生成指令
+        for (const node of irNodes) {
+            this.processIRNode(node);
+        }
+        
+        // 检查是否有未解析的标签
+        if (this.pendingLabels.size > 0) {
+            const unresolvedLabels = [];
+            for (const [label, _] of this.pendingLabels) {
+                unresolvedLabels.push(label);
+            }
+            throw new Error(`编译错误：存在未定义的标签: ${unresolvedLabels.join(', ')}`);
+        }
+        
+        // 更新常量池大小
+        this.binaryWriter.patchUint32(8, this.constantPool.size);
+        
+        // 更新量子状态池大小
+        this.binaryWriter.patchUint32(12, this.quantumStatePool.size);
+        
+        // 更新量子门池大小
+        this.binaryWriter.patchUint32(16, this.quantumGatePool.size);
+        
+        // 写入常量池
+        for (const [value, id] of this.constantPool) {
+            // 写入常量类型（字符串）
+            this.binaryWriter.writeUint8(1);
+            
+            // 写入字符串长度
+            const bytes = this.stringToUTF8(value);
+            this.binaryWriter.writeUint16(bytes.length);
+            
+            // 写入字符串数据
+            for (const byte of bytes) {
+                this.binaryWriter.writeUint8(byte);
+            }
+        }
+        
+        // 写入量子状态池
+        for (const [stateName, id] of this.quantumStatePool) {
+            // 写入状态名称（索引到常量池）
+            const nameId = this.addConstant(stateName);
+            this.binaryWriter.writeUint16(nameId);
+            
+            // 写入状态属性（预留）
+            this.binaryWriter.writeUint16(0);
+        }
+        
+        // 写入量子门池
+        for (const [gateName, id] of this.quantumGatePool) {
+            // 写入门名称（索引到常量池）
+            const nameId = this.addConstant(gateName);
+            this.binaryWriter.writeUint16(nameId);
+            
+            // 写入门类型（预留）
+            this.binaryWriter.writeUint8(0);
+            
+            // 写入参数数量（预留）
+            this.binaryWriter.writeUint8(0);
+        }
+        
+        // 更新代码长度
+        const codeLength = this.currentPosition - 28; // 减去头部大小
+        this.binaryWriter.patchUint32(20, codeLength);
+        
+        // 写入元数据段
+        const metadataOffset = this.binaryWriter.getPosition();
+        this.binaryWriter.patchUint32(24, metadataOffset);
+        
+        // 写入量子基因编码
+        const geneEncodingBytes = this.stringToUTF8(this.quantumGeneEncoding);
+        this.binaryWriter.writeUint16(geneEncodingBytes.length);
+        for (const byte of geneEncodingBytes) {
+            this.binaryWriter.writeUint8(byte);
+        }
+        
+        // 写入量子纠缠信息
+        this.binaryWriter.writeUint16(this.quantumEntanglementInfo.size);
+        for (const [key, value] of this.quantumEntanglementInfo) {
+            // 写入键
+            const keyBytes = this.stringToUTF8(key);
+            this.binaryWriter.writeUint16(keyBytes.length);
+            for (const byte of keyBytes) {
+                this.binaryWriter.writeUint8(byte);
+            }
+            
+            // 写入值（字符串形式）
+            const valueStr = JSON.stringify(value);
+            const valueBytes = this.stringToUTF8(valueStr);
+            this.binaryWriter.writeUint16(valueBytes.length);
+            for (const byte of valueBytes) {
+                this.binaryWriter.writeUint8(byte);
+            }
+        }
+        
+        // 写入自定义元数据
+        this.binaryWriter.writeUint16(this.metadataSection.length);
+        for (const metadata of this.metadataSection) {
+            this.binaryWriter.writeUint16(metadata.length);
+            for (const byte of metadata) {
+                this.binaryWriter.writeUint8(byte);
+            }
+        }
+        
+        // 写入调试信息段
+        const debugInfoOffset = this.binaryWriter.getPosition();
+        this.binaryWriter.patchUint32(28, debugInfoOffset);
+        
+        this.binaryWriter.writeUint16(this.debugInfoSection.length);
+        for (const debugInfo of this.debugInfoSection) {
+            this.binaryWriter.writeUint16(debugInfo.length);
+            for (const byte of debugInfo) {
+                this.binaryWriter.writeUint8(byte);
+            }
+        }
+        
+        // 返回生成的字节码
+        return this.binaryWriter.getBuffer();
+    }
+    
+    /**
+     * @brief 处理IR节点
+     * @param node IR节点
+     */
+    private function processIRNode(node: IRNode): void {
+        switch (node.type) {
+            case "Instruction":
+                this.processInstruction(node);
+                break;
+            case "Label":
+                this.defineLabel(node.name);
+                break;
+            case "QuantumOperation":
+                this.processQuantumOperation(node);
+                break;
+            case "Constant":
+                this.processConstant(node);
+                break;
+            case "DebugInfo":
+                this.processDebugInfo(node);
+                break;
+            default:
+                throw new Error(`不支持的IR节点类型: ${node.type}`);
+        }
+    }
+    
+    /**
+     * @brief 处理指令节点
+     * @param node 指令节点
+     */
+    private function processInstruction(node: IRNode): void {
+        const opcode = node.opcode;
+        this.writeOpcode(opcode);
+        
+        // 处理操作数
+        if (node.operands) {
+            for (const operand of node.operands) {
+                switch (operand.type) {
+                    case "Int8":
+                        this.writeInt8(operand.value);
+                        break;
+                    case "Int16":
+                        this.writeInt16(operand.value);
+                        break;
+                    case "Int32":
+                        this.writeInt32(operand.value);
+                        break;
+                    case "Float64":
+                        this.writeFloat64(operand.value);
+                        break;
+                    case "ConstantRef":
+                        this.writeInt16(operand.value);
+                        break;
+                    case "LabelRef":
+                        this.referenceLabel(operand.value);
+                        break;
+                    default:
+                        throw new Error(`不支持的操作数类型: ${operand.type}`);
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 处理量子操作节点
+     * @param node 量子操作节点
+     */
+    private function processQuantumOperation(node: IRNode): void {
+        switch (node.operation) {
+            case "CreateState":
+                this.writeOpcode(0x80); // 自定义量子操作码
+                this.writeInt16(this.addQuantumState(node.stateName));
+                this.writeInt8(node.numQubits);
+                break;
+            case "ApplyGate":
+                this.writeOpcode(0x81);
+                this.writeInt16(this.addQuantumState(node.stateName));
+                this.writeInt16(this.addQuantumGate(node.gateName));
+                this.writeInt8(node.targetQubits.length);
+                for (const qubit of node.targetQubits) {
+                    this.writeInt8(qubit);
+                }
+                break;
+            case "MeasureQubit":
+                this.writeOpcode(0x82);
+                this.writeInt16(this.addQuantumState(node.stateName));
+                this.writeInt8(node.qubitIndex);
+                break;
+            default:
+                throw new Error(`不支持的量子操作: ${node.operation}`);
+        }
+    }
+    
+    /**
+     * @brief 处理常量节点
+     * @param node 常量节点
+     */
+    private function processConstant(node: IRNode): void {
+        const id = this.addConstant(node.value);
+        this.writeOpcode(0x10); // 加载常量
+        this.writeInt16(id);
+    }
+    
+    /**
+     * @brief 处理调试信息节点
+     * @param node 调试信息节点
+     */
+    private function processDebugInfo(node: IRNode): void {
+        // 创建调试信息
+        const infoArray = new Uint8Array(4 + node.sourceInfo.length);
+        
+        // 写入源代码位置
+        infoArray[0] = (node.line >> 8) & 0xFF;
+        infoArray[1] = node.line & 0xFF;
+        infoArray[2] = (node.column >> 8) & 0xFF;
+        infoArray[3] = node.column & 0xFF;
+        
+        // 写入源代码信息
+        for (let i = 0; i < node.sourceInfo.length; i++) {
+            infoArray[4 + i] = node.sourceInfo.charCodeAt(i);
+        }
+        
+        this.addDebugInfo(infoArray);
+    }
+    
+    /**
+     * @brief 将字符串转换为UTF-8字节数组
+     * @param str 字符串
+     * @return UTF-8字节数组
+     */
+    private function stringToUTF8(str: String): Array<Number> {
+        const result = [];
+        for (let i = 0; i < str.length; i++) {
+            const c = str.charCodeAt(i);
+            
+            if (c < 128) {
+                result.push(c);
+            } else if (c < 2048) {
+                result.push((c >> 6) | 192);
+                result.push((c & 63) | 128);
+            } else if (c < 65536) {
+                result.push((c >> 12) | 224);
+                result.push(((c >> 6) & 63) | 128);
+                result.push((c & 63) | 128);
+            } else {
+                result.push((c >> 18) | 240);
+                result.push(((c >> 12) & 63) | 128);
+                result.push(((c >> 6) & 63) | 128);
+                result.push((c & 63) | 128);
+            }
+        }
+        
+        return result;
+    }
+}
+
+export { QuantumBytecodeGenerator }; 

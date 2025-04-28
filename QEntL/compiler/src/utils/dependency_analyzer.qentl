@@ -1,0 +1,797 @@
+/**
+ * @file dependency_analyzer.qentl
+ * @brief 源文件依赖分析实现
+ * 
+ * 量子基因编码: QGC-COMPILER-DEP-ANALYZER-2024061901
+ * 量子纠缠信道: QEC-COMPILER-SRC-02
+ */
+
+import "QEntL/core/error.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/system.qentl";
+import "QEntL/vm/src/core/os_interface/logger.qentl";
+import "QEntL/compiler/src/frontend/lexer/simple_tokenizer.qentl";
+
+/**
+ * 依赖关系类型
+ */
+export quantum_enum DependencyType {
+    IMPORT = 0,          // 导入依赖
+    INCLUDE = 1,         // 包含依赖
+    QUANTUM_ENTANGLE = 2 // 量子纠缠依赖
+}
+
+/**
+ * 依赖项
+ */
+export quantum_class Dependency {
+    public {
+        type: DependencyType;     // 依赖类型
+        sourcePath: String;       // 源文件路径
+        targetPath: String;       // 目标文件路径
+        isResolved: Boolean;      // 是否已解析
+        lineNumber: Integer;      // 行号
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param type 依赖类型
+     * @param sourcePath 源文件路径
+     * @param targetPath 目标文件路径
+     * @param lineNumber 行号
+     */
+    constructor(
+        type: DependencyType,
+        sourcePath: String,
+        targetPath: String,
+        lineNumber: Integer = 0
+    ) {
+        this.type = type;
+        this.sourcePath = sourcePath;
+        this.targetPath = targetPath;
+        this.isResolved = false;
+        this.lineNumber = lineNumber;
+    }
+    
+    /**
+     * @brief 获取依赖类型字符串表示
+     * @return 类型字符串
+     */
+    public function getTypeString(): String {
+        switch (this.type) {
+            case DependencyType.IMPORT:
+                return "import";
+            case DependencyType.INCLUDE:
+                return "include";
+            case DependencyType.QUANTUM_ENTANGLE:
+                return "quantum_entangle";
+            default:
+                return "unknown";
+        }
+    }
+}
+
+/**
+ * 模块依赖信息
+ */
+export quantum_class ModuleDependencyInfo {
+    public {
+        filePath: String;                    // 文件路径
+        dependencies: Array<Dependency>;     // 依赖项
+        dependents: Array<String>;           // 依赖该模块的文件
+        isAnalyzed: Boolean;                 // 是否已分析
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param filePath 文件路径
+     */
+    constructor(filePath: String) {
+        this.filePath = filePath;
+        this.dependencies = new Array<Dependency>();
+        this.dependents = new Array<String>();
+        this.isAnalyzed = false;
+    }
+    
+    /**
+     * @brief 添加依赖项
+     * @param dependency 依赖项
+     */
+    public function addDependency(dependency: Dependency): void {
+        this.dependencies.push(dependency);
+    }
+    
+    /**
+     * @brief 添加依赖此模块的文件
+     * @param dependent 依赖此模块的文件路径
+     */
+    public function addDependent(dependent: String): void {
+        if (!this.dependents.includes(dependent)) {
+            this.dependents.push(dependent);
+        }
+    }
+    
+    /**
+     * @brief 获取依赖项数量
+     * @return 依赖项数量
+     */
+    public function getDependencyCount(): Integer {
+        return this.dependencies.length;
+    }
+    
+    /**
+     * @brief 获取依赖此模块的文件数量
+     * @return 依赖文件数量
+     */
+    public function getDependentCount(): Integer {
+        return this.dependents.length;
+    }
+}
+
+/**
+ * @class DependencyAnalyzer
+ * @brief 源文件依赖分析器
+ */
+export quantum_class DependencyAnalyzer {
+    private {
+        logger: Logger;                                  // 日志记录器
+        modules: Map<String, ModuleDependencyInfo>;      // 模块依赖信息
+        searchPaths: Array<String>;                     // 搜索路径
+        fileExtensions: Array<String>;                  // 文件扩展名
+        
+        // 循环依赖检测
+        visitStack: Array<String>;                      // 访问栈
+        cyclicDependencies: Array<Array<String>>;       // 循环依赖
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param logger 日志记录器
+     */
+    constructor(logger: Logger) {
+        this.logger = logger;
+        this.modules = new Map<String, ModuleDependencyInfo>();
+        this.searchPaths = [".", "./lib", "./include"];
+        this.fileExtensions = [".qentl", ".qent", ".h"];
+        this.visitStack = new Array<String>();
+        this.cyclicDependencies = new Array<Array<String>>();
+    }
+    
+    /**
+     * @brief 设置搜索路径
+     * @param paths 搜索路径数组
+     */
+    public function setSearchPaths(paths: Array<String>): void {
+        this.searchPaths = paths;
+    }
+    
+    /**
+     * @brief 添加搜索路径
+     * @param path 搜索路径
+     */
+    public function addSearchPath(path: String): void {
+        if (!this.searchPaths.includes(path)) {
+            this.searchPaths.push(path);
+        }
+    }
+    
+    /**
+     * @brief 设置文件扩展名
+     * @param extensions 扩展名数组
+     */
+    public function setFileExtensions(extensions: Array<String>): void {
+        this.fileExtensions = extensions;
+    }
+    
+    /**
+     * @brief 分析文件依赖
+     * @param filePath 文件路径
+     * @return 是否成功分析
+     */
+    public function analyzeFile(filePath: String): Boolean {
+        if (!File.exists(filePath)) {
+            this.logger.log(LogLevel.ERROR, `文件不存在: ${filePath}`);
+            return false;
+        }
+        
+        // 检查文件是否已经分析过
+        let normalizedPath = this.normalizePath(filePath);
+        if (this.modules.has(normalizedPath) && this.modules.get(normalizedPath).isAnalyzed) {
+            return true;
+        }
+        
+        // 创建或获取模块信息
+        let moduleInfo = this.getOrCreateModule(normalizedPath);
+        
+        try {
+            // 读取文件内容
+            let content = File.readAllText(filePath);
+            
+            // 解析文件中的依赖
+            this.parseDependencies(normalizedPath, content);
+            
+            // 标记为已分析
+            moduleInfo.isAnalyzed = true;
+            
+            // 添加相互依赖关系
+            for (let i = 0; i < moduleInfo.dependencies.length; i++) {
+                let dep = moduleInfo.dependencies[i];
+                if (dep.isResolved) {
+                    let targetModule = this.getOrCreateModule(dep.targetPath);
+                    targetModule.addDependent(normalizedPath);
+                }
+            }
+            
+            return true;
+        } catch (error) {
+            this.logger.log(LogLevel.ERROR, `分析文件依赖失败: ${filePath}: ${error}`);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 构建依赖图
+     * @param sourceFiles 源文件数组
+     */
+    public function buildDependencyGraph(sourceFiles: Array<String>): void {
+        this.logger.log(LogLevel.INFO, "开始构建依赖图...");
+        
+        // 清空之前的分析结果
+        this.modules.clear();
+        this.cyclicDependencies = new Array<Array<String>>();
+        
+        // 分析每个源文件
+        for (let i = 0; i < sourceFiles.length; i++) {
+            this.analyzeFile(sourceFiles[i]);
+        }
+        
+        // 检测循环依赖
+        this.detectCyclicDependencies();
+        
+        this.logger.log(LogLevel.INFO, 
+            `依赖图构建完成。共分析 ${this.modules.size} 个模块，` +
+            `发现 ${this.cyclicDependencies.length} 个循环依赖。`
+        );
+    }
+    
+    /**
+     * @brief 解析文件中的依赖
+     * @param filePath 文件路径
+     * @param content 文件内容
+     */
+    private function parseDependencies(filePath: String, content: String): void {
+        let lines = content.split("\n");
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            
+            // 查找import语句
+            if (line.startsWith("import ")) {
+                this.parseImportStatement(filePath, line, i + 1);
+            } 
+            // 查找include语句
+            else if (line.startsWith("#include ")) {
+                this.parseIncludeStatement(filePath, line, i + 1);
+            }
+            // 查找量子纠缠声明
+            else if (line.includes("quantum_entangle") && line.includes("@")) {
+                this.parseQuantumEntangleStatement(filePath, line, i + 1);
+            }
+        }
+    }
+    
+    /**
+     * @brief 解析import语句
+     * @param sourcePath 源文件路径
+     * @param line 代码行
+     * @param lineNumber 行号
+     */
+    private function parseImportStatement(sourcePath: String, line: String, lineNumber: Integer): void {
+        // import "module/path.qentl";
+        // 或 import module from "module/path.qentl";
+        
+        // 提取引号中的路径
+        let matches = line.match("\"([^\"]+)\"");
+        if (!matches || matches.length < 2) {
+            // 尝试提取单引号的路径
+            matches = line.match("'([^']+)'");
+            if (!matches || matches.length < 2) {
+                return;
+            }
+        }
+        
+        let importPath = matches[1];
+        let resolvedPath = this.resolvePath(importPath, sourcePath);
+        
+        if (resolvedPath) {
+            let dependency = new Dependency(
+                DependencyType.IMPORT,
+                sourcePath,
+                resolvedPath,
+                lineNumber
+            );
+            dependency.isResolved = true;
+            
+            let moduleInfo = this.getOrCreateModule(sourcePath);
+            moduleInfo.addDependency(dependency);
+            
+            // 递归分析依赖
+            if (!this.modules.has(resolvedPath) || !this.modules.get(resolvedPath).isAnalyzed) {
+                this.analyzeFile(resolvedPath);
+            }
+        } else {
+            this.logger.log(LogLevel.WARNING, 
+                `无法解析导入路径: ${importPath} (在 ${sourcePath}:${lineNumber})`
+            );
+            
+            let dependency = new Dependency(
+                DependencyType.IMPORT,
+                sourcePath,
+                importPath,
+                lineNumber
+            );
+            dependency.isResolved = false;
+            
+            let moduleInfo = this.getOrCreateModule(sourcePath);
+            moduleInfo.addDependency(dependency);
+        }
+    }
+    
+    /**
+     * @brief 解析include语句
+     * @param sourcePath 源文件路径
+     * @param line 代码行
+     * @param lineNumber 行号
+     */
+    private function parseIncludeStatement(sourcePath: String, line: String, lineNumber: Integer): void {
+        // #include "header.h"
+        // 或 #include <header.h>
+        
+        // 提取引号中的路径
+        let matches = line.match("\"([^\"]+)\"");
+        if (!matches || matches.length < 2) {
+            // 尝试提取尖括号的路径
+            matches = line.match("<([^>]+)>");
+            if (!matches || matches.length < 2) {
+                return;
+            }
+        }
+        
+        let includePath = matches[1];
+        let resolvedPath = this.resolvePath(includePath, sourcePath);
+        
+        if (resolvedPath) {
+            let dependency = new Dependency(
+                DependencyType.INCLUDE,
+                sourcePath,
+                resolvedPath,
+                lineNumber
+            );
+            dependency.isResolved = true;
+            
+            let moduleInfo = this.getOrCreateModule(sourcePath);
+            moduleInfo.addDependency(dependency);
+            
+            // 递归分析依赖
+            if (!this.modules.has(resolvedPath) || !this.modules.get(resolvedPath).isAnalyzed) {
+                this.analyzeFile(resolvedPath);
+            }
+        } else {
+            this.logger.log(LogLevel.WARNING, 
+                `无法解析包含路径: ${includePath} (在 ${sourcePath}:${lineNumber})`
+            );
+            
+            let dependency = new Dependency(
+                DependencyType.INCLUDE,
+                sourcePath,
+                includePath,
+                lineNumber
+            );
+            dependency.isResolved = false;
+            
+            let moduleInfo = this.getOrCreateModule(sourcePath);
+            moduleInfo.addDependency(dependency);
+        }
+    }
+    
+    /**
+     * @brief 解析量子纠缠声明
+     * @param sourcePath 源文件路径
+     * @param line 代码行
+     * @param lineNumber 行号
+     */
+    private function parseQuantumEntangleStatement(sourcePath: String, line: String, lineNumber: Integer): void {
+        // quantum_entangle: @QGC-MODULE-ABC-12345
+        // 或 quantum_entangle(@MODULE/PATH)
+        
+        // 提取@之后的路径或标识符
+        let matches = line.match("@([a-zA-Z0-9_\\-/]+)");
+        if (!matches || matches.length < 2) {
+            return;
+        }
+        
+        let entanglePath = matches[1];
+        
+        // 量子纠缠依赖可能不是实际文件路径
+        // 在这里我们只记录依赖关系
+        let dependency = new Dependency(
+            DependencyType.QUANTUM_ENTANGLE,
+            sourcePath,
+            entanglePath,
+            lineNumber
+        );
+        dependency.isResolved = false;
+        
+        let moduleInfo = this.getOrCreateModule(sourcePath);
+        moduleInfo.addDependency(dependency);
+    }
+    
+    /**
+     * @brief 解析路径
+     * @param path 原始路径
+     * @param sourcePath 源文件路径
+     * @return 解析后的路径
+     */
+    private function resolvePath(path: String, sourcePath: String): String? {
+        // 如果是绝对路径,直接返回
+        if (File.isAbsolutePath(path)) {
+            if (File.exists(path)) {
+                return this.normalizePath(path);
+            }
+            return null;
+        }
+        
+        // 尝试相对于源文件目录解析
+        let sourceDir = File.getDirectoryName(sourcePath);
+        let relativePath = File.combinePath(sourceDir, path);
+        
+        if (File.exists(relativePath)) {
+            return this.normalizePath(relativePath);
+        }
+        
+        // 如果路径已经包含扩展名,仅尝试此路径
+        if (this.hasValidExtension(path)) {
+            // 在搜索路径中查找
+            for (let i = 0; i < this.searchPaths.length; i++) {
+                let searchPath = this.searchPaths[i];
+                let fullPath = File.combinePath(searchPath, path);
+                
+                if (File.exists(fullPath)) {
+                    return this.normalizePath(fullPath);
+                }
+            }
+        } else {
+            // 尝试添加不同的扩展名
+            for (let i = 0; i < this.fileExtensions.length; i++) {
+                let ext = this.fileExtensions[i];
+                let pathWithExt = path + ext;
+                
+                // 相对于源文件目录
+                let relativeWithExt = File.combinePath(sourceDir, pathWithExt);
+                if (File.exists(relativeWithExt)) {
+                    return this.normalizePath(relativeWithExt);
+                }
+                
+                // 在搜索路径中查找
+                for (let j = 0; j < this.searchPaths.length; j++) {
+                    let searchPath = this.searchPaths[j];
+                    let fullPath = File.combinePath(searchPath, pathWithExt);
+                    
+                    if (File.exists(fullPath)) {
+                        return this.normalizePath(fullPath);
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * @brief 检查路径是否有有效的扩展名
+     * @param path 路径
+     * @return 是否有有效扩展名
+     */
+    private function hasValidExtension(path: String): Boolean {
+        for (let i = 0; i < this.fileExtensions.length; i++) {
+            if (path.endsWith(this.fileExtensions[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * @brief 标准化路径
+     * @param path 路径
+     * @return 标准化的路径
+     */
+    private function normalizePath(path: String): String {
+        // 将路径转换为标准格式,以便比较
+        path = File.normalizePath(path);
+        return path;
+    }
+    
+    /**
+     * @brief 获取或创建模块信息
+     * @param filePath 文件路径
+     * @return 模块信息
+     */
+    private function getOrCreateModule(filePath: String): ModuleDependencyInfo {
+        if (!this.modules.has(filePath)) {
+            this.modules.set(filePath, new ModuleDependencyInfo(filePath));
+        }
+        
+        return this.modules.get(filePath);
+    }
+    
+    /**
+     * @brief 检测循环依赖
+     */
+    private function detectCyclicDependencies(): void {
+        this.cyclicDependencies = new Array<Array<String>>();
+        this.visitStack = new Array<String>();
+        
+        // 对每个模块进行深度优先搜索
+        this.modules.forEach((path, module) => {
+            if (!module.isAnalyzed) {
+                return;
+            }
+            
+            this.visitStack = new Array<String>();
+            this.dfsVisit(path);
+        });
+    }
+    
+    /**
+     * @brief 深度优先搜索访问
+     * @param filePath 文件路径
+     */
+    private function dfsVisit(filePath: String): void {
+        // 检查是否已在访问栈中(循环依赖)
+        let index = this.visitStack.indexOf(filePath);
+        if (index >= 0) {
+            // 找到循环依赖
+            let cycle = new Array<String>();
+            for (let i = index; i < this.visitStack.length; i++) {
+                cycle.push(this.visitStack[i]);
+            }
+            cycle.push(filePath);
+            
+            // 检查是否已经记录过这个循环
+            let found = false;
+            for (let i = 0; i < this.cyclicDependencies.length; i++) {
+                if (this.isSameCycle(this.cyclicDependencies[i], cycle)) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                this.cyclicDependencies.push(cycle);
+                this.logger.log(LogLevel.WARNING, 
+                    `发现循环依赖: ${cycle.join(" -> ")}`
+                );
+            }
+            
+            return;
+        }
+        
+        // 将当前模块加入访问栈
+        this.visitStack.push(filePath);
+        
+        // 访问所有依赖
+        if (this.modules.has(filePath)) {
+            let module = this.modules.get(filePath);
+            
+            for (let i = 0; i < module.dependencies.length; i++) {
+                let dep = module.dependencies[i];
+                
+                if (dep.isResolved) {
+                    this.dfsVisit(dep.targetPath);
+                }
+            }
+        }
+        
+        // 移出访问栈
+        this.visitStack.pop();
+    }
+    
+    /**
+     * @brief 检查两个循环是否相同
+     * @param cycle1 循环1
+     * @param cycle2 循环2
+     * @return 是否相同
+     */
+    private function isSameCycle(cycle1: Array<String>, cycle2: Array<String>): Boolean {
+        if (cycle1.length != cycle2.length) {
+            return false;
+        }
+        
+        // 检查cycle2是否是cycle1的循环移位
+        for (let offset = 0; offset < cycle1.length; offset++) {
+            let match = true;
+            
+            for (let i = 0; i < cycle1.length; i++) {
+                let j = (i + offset) % cycle1.length;
+                if (cycle1[i] != cycle2[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            
+            if (match) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * @brief 获取受变更影响的文件
+     * @param changedFiles 变更的文件数组
+     * @return 受影响的文件数组
+     */
+    public function getAffectedFiles(changedFiles: Array<String>): Array<String> {
+        let affected = new Map<String, Boolean>();
+        
+        // 将变更的文件添加到结果中
+        for (let i = 0; i < changedFiles.length; i++) {
+            let normalized = this.normalizePath(changedFiles[i]);
+            affected.set(normalized, true);
+        }
+        
+        // 递归查找所有依赖于变更文件的文件
+        let added = true;
+        while (added) {
+            added = false;
+            
+            affected.forEach((flag, filePath) => {
+                if (this.modules.has(filePath)) {
+                    let module = this.modules.get(filePath);
+                    
+                    for (let i = 0; i < module.dependents.length; i++) {
+                        let dependent = module.dependents[i];
+                        
+                        if (!affected.has(dependent)) {
+                            affected.set(dependent, true);
+                            added = true;
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 转换为数组
+        let result = new Array<String>();
+        affected.forEach((flag, filePath) => {
+            result.push(filePath);
+        });
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取模块信息
+     * @param filePath 文件路径
+     * @return 模块信息
+     */
+    public function getModuleInfo(filePath: String): ModuleDependencyInfo? {
+        let normalized = this.normalizePath(filePath);
+        return this.modules.has(normalized) ? this.modules.get(normalized) : null;
+    }
+    
+    /**
+     * @brief 获取所有模块
+     * @return 模块数组
+     */
+    public function getAllModules(): Array<ModuleDependencyInfo> {
+        let result = new Array<ModuleDependencyInfo>();
+        
+        this.modules.forEach((path, module) => {
+            result.push(module);
+        });
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取循环依赖
+     * @return 循环依赖数组
+     */
+    public function getCyclicDependencies(): Array<Array<String>> {
+        return this.cyclicDependencies;
+    }
+    
+    /**
+     * @brief 生成依赖图的DOT表示
+     * @return DOT格式字符串
+     */
+    public function generateDotGraph(): String {
+        let dot = "digraph DependencyGraph {\n";
+        dot += "  node [shape=box];\n";
+        
+        // 添加节点
+        this.modules.forEach((path, module) => {
+            if (module.isAnalyzed) {
+                let label = File.getBaseName(module.filePath);
+                dot += `  "${module.filePath}" [label="${label}"];\n`;
+            }
+        });
+        
+        // 添加边
+        this.modules.forEach((path, module) => {
+            if (module.isAnalyzed) {
+                for (let i = 0; i < module.dependencies.length; i++) {
+                    let dep = module.dependencies[i];
+                    
+                    if (dep.isResolved) {
+                        let color = "";
+                        
+                        // 检查是否为循环依赖的一部分
+                        for (let j = 0; j < this.cyclicDependencies.length; j++) {
+                            let cycle = this.cyclicDependencies[j];
+                            for (let k = 0; k < cycle.length - 1; k++) {
+                                if (cycle[k] == dep.sourcePath && cycle[k + 1] == dep.targetPath) {
+                                    color = " [color=red]";
+                                    break;
+                                }
+                            }
+                            
+                            if (color != "") {
+                                break;
+                            }
+                        }
+                        
+                        dot += `  "${dep.sourcePath}" -> "${dep.targetPath}"${color};\n`;
+                    }
+                }
+            }
+        });
+        
+        dot += "}\n";
+        return dot;
+    }
+}
+
+/**
+ * @class DependencyAnalyzerFactory
+ * @brief 依赖分析器工厂类
+ */
+export quantum_class DependencyAnalyzerFactory {
+    /**
+     * @brief 创建依赖分析器
+     * @param logger 日志记录器
+     * @return 依赖分析器实例
+     */
+    public static function create(logger: Logger): DependencyAnalyzer {
+        return new DependencyAnalyzer(logger);
+    }
+    
+    /**
+     * @brief 创建带默认搜索路径的依赖分析器
+     * @param logger 日志记录器
+     * @param projectRoot 项目根路径
+     * @return 依赖分析器实例
+     */
+    public static function createWithDefaultPaths(
+        logger: Logger,
+        projectRoot: String
+    ): DependencyAnalyzer {
+        let analyzer = new DependencyAnalyzer(logger);
+        
+        // 设置常用的搜索路径
+        analyzer.setSearchPaths([
+            projectRoot,
+            File.combinePath(projectRoot, "include"),
+            File.combinePath(projectRoot, "src"),
+            File.combinePath(projectRoot, "lib")
+        ]);
+        
+        return analyzer;
+    }
+} 

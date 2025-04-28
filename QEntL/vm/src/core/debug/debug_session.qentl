@@ -1,0 +1,800 @@
+/**
+ * @file debug_session.qentl
+ * @brief QEntL虚拟机调试会话管理器
+ * 
+ * 量子基因编码: QGC-VM-DEBUGSESSION-2024062801
+ * 量子纠缠信道: QEC-VM-DEBUG-06
+ */
+
+import { Debugger, DebuggerState, BreakpointType } from "./debugger.qentl";
+import { DebugConfig } from "./debug_config.qentl";
+import { DebugVisualizer, VisualizationMode } from "./debug_visualizer.qentl";
+import { 
+    DebugProtocol, DebugCommand, DebugMessage, DebugRequest,
+    DebugResponse, DebugNotification, DebugMessageType, DebugErrorCode,
+    StopReason
+} from "./debug_protocol.qentl";
+
+import { Interpreter } from "../interpreter/interpreter.qentl";
+import { Memory } from "../memory/memory.qentl";
+import { Logger, LogLevel } from "../os_interface/logger.qentl";
+import { FileSystem } from "../os_interface/file_system.qentl";
+import { Console } from "../os_interface/console.qentl";
+
+// 调试会话管理器类
+export class DebugSession {
+    // 调试器实例
+    private debugger: Debugger;
+    
+    // 配置管理器
+    private config: DebugConfig;
+    
+    // 可视化器
+    private visualizer: DebugVisualizer;
+    
+    // 日志记录器
+    private logger: Logger;
+    
+    // 是否为远程会话
+    private isRemote: boolean;
+    
+    // 消息处理器映射
+    private messageHandlers: Map<DebugCommand, (request: DebugRequest) => DebugResponse>;
+    
+    // 消息回调函数
+    private messageCallback?: (message: DebugMessage) => void;
+    
+    // 构造函数
+    constructor(
+        interpreter: Interpreter,
+        memory: Memory,
+        logger: Logger,
+        fileSystem: FileSystem,
+        console: Console,
+        isRemote: boolean = false
+    ) {
+        this.logger = logger;
+        this.isRemote = isRemote;
+        
+        // 创建调试器
+        this.debugger = new Debugger(
+            interpreter,
+            memory,
+            logger,
+            fileSystem,
+            console
+        );
+        
+        // 创建配置管理器
+        this.config = new DebugConfig(
+            fileSystem,
+            logger
+        );
+        
+        // 创建可视化器
+        this.visualizer = new DebugVisualizer(
+            this.debugger,
+            logger,
+            fileSystem,
+            isRemote ? VisualizationMode.JSON : VisualizationMode.TEXT
+        );
+        
+        // 初始化消息处理器
+        this.messageHandlers = new Map();
+        this.initializeMessageHandlers();
+    }
+    
+    // 初始化消息处理器
+    private initializeMessageHandlers(): void {
+        // 通用命令
+        this.messageHandlers.set(DebugCommand.INITIALIZE, this.handleInitialize.bind(this));
+        this.messageHandlers.set(DebugCommand.TERMINATE, this.handleTerminate.bind(this));
+        
+        // 执行控制
+        this.messageHandlers.set(DebugCommand.START, this.handleStart.bind(this));
+        this.messageHandlers.set(DebugCommand.PAUSE, this.handlePause.bind(this));
+        this.messageHandlers.set(DebugCommand.CONTINUE, this.handleContinue.bind(this));
+        this.messageHandlers.set(DebugCommand.STEP_OVER, this.handleStepOver.bind(this));
+        this.messageHandlers.set(DebugCommand.STEP_INTO, this.handleStepInto.bind(this));
+        this.messageHandlers.set(DebugCommand.STEP_OUT, this.handleStepOut.bind(this));
+        this.messageHandlers.set(DebugCommand.RESTART, this.handleRestart.bind(this));
+        
+        // 断点管理
+        this.messageHandlers.set(DebugCommand.SET_BREAKPOINT, this.handleSetBreakpoint.bind(this));
+        this.messageHandlers.set(DebugCommand.REMOVE_BREAKPOINT, this.handleRemoveBreakpoint.bind(this));
+        this.messageHandlers.set(DebugCommand.ENABLE_BREAKPOINT, this.handleEnableBreakpoint.bind(this));
+        this.messageHandlers.set(DebugCommand.DISABLE_BREAKPOINT, this.handleDisableBreakpoint.bind(this));
+        this.messageHandlers.set(DebugCommand.LIST_BREAKPOINTS, this.handleListBreakpoints.bind(this));
+        this.messageHandlers.set(DebugCommand.CLEAR_BREAKPOINTS, this.handleClearBreakpoints.bind(this));
+        
+        // 状态查询
+        this.messageHandlers.set(DebugCommand.GET_VARIABLES, this.handleGetVariables.bind(this));
+        this.messageHandlers.set(DebugCommand.GET_CALLSTACK, this.handleGetCallStack.bind(this));
+        this.messageHandlers.set(DebugCommand.GET_SOURCE, this.handleGetSource.bind(this));
+        this.messageHandlers.set(DebugCommand.EVALUATE_EXPRESSION, this.handleEvaluateExpression.bind(this));
+        this.messageHandlers.set(DebugCommand.GET_MEMORY, this.handleGetMemory.bind(this));
+        this.messageHandlers.set(DebugCommand.GET_REGISTERS, this.handleGetRegisters.bind(this));
+        
+        // 配置操作
+        this.messageHandlers.set(DebugCommand.GET_CONFIG, this.handleGetConfig.bind(this));
+        this.messageHandlers.set(DebugCommand.SET_CONFIG, this.handleSetConfig.bind(this));
+        this.messageHandlers.set(DebugCommand.RESET_CONFIG, this.handleResetConfig.bind(this));
+    }
+    
+    // 设置消息回调
+    public setMessageCallback(callback: (message: DebugMessage) => void): void {
+        this.messageCallback = callback;
+    }
+    
+    // 处理接收到的消息
+    public handleMessage(message: DebugMessage): void {
+        if (message.type === DebugMessageType.REQUEST) {
+            const request = message as DebugRequest;
+            
+            // 查找处理器
+            const handler = this.messageHandlers.get(request.command);
+            
+            if (handler) {
+                try {
+                    // 处理请求并获取响应
+                    const response = handler(request);
+                    this.sendMessage(response);
+                } catch (error) {
+                    // 发送错误响应
+                    const errorResponse = DebugProtocol.createErrorResponse(
+                        request,
+                        DebugErrorCode.INTERNAL_ERROR,
+                        `处理请求时发生错误: ${error}`
+                    );
+                    this.sendMessage(errorResponse);
+                }
+            } else {
+                // 未知命令
+                const errorResponse = DebugProtocol.createErrorResponse(
+                    request,
+                    DebugErrorCode.INVALID_COMMAND,
+                    `未知命令: ${request.command}`
+                );
+                this.sendMessage(errorResponse);
+            }
+        }
+    }
+    
+    // 发送消息
+    private sendMessage(message: DebugMessage): void {
+        if (this.messageCallback) {
+            this.messageCallback(message);
+        } else {
+            this.logger.log(LogLevel.WARN, "消息回调未设置，消息未发送");
+        }
+    }
+    
+    // 发送通知
+    private sendNotification(command: DebugCommand, body?: any): void {
+        const notification = DebugProtocol.createNotification(command, body);
+        this.sendMessage(notification);
+    }
+    
+    // 初始化处理器
+    private handleInitialize(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "初始化调试会话");
+        
+        // 加载配置
+        this.config.load();
+        
+        // 初始化调试器
+        const success = this.debugger.initialize();
+        
+        if (!success) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INTERNAL_ERROR,
+                "调试器初始化失败"
+            );
+        }
+        
+        return DebugProtocol.createResponse(request, {
+            initialized: true
+        });
+    }
+    
+    // 终止处理器
+    private handleTerminate(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "终止调试会话");
+        
+        // 停止调试器
+        this.debugger.stop();
+        
+        return DebugProtocol.createResponse(request, {
+            terminated: true
+        });
+    }
+    
+    // 启动处理器
+    private handleStart(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "启动调试目标");
+        
+        // 启动调试器
+        this.debugger.start();
+        
+        // 如果配置了启动时暂停，则暂停执行
+        if (this.config.get("breakOnStart")) {
+            this.debugger.pause();
+            
+            // 发送停止事件
+            this.sendNotification(DebugCommand.EVENT_STOPPED, {
+                reason: StopReason.ENTRY,
+                description: "程序启动暂停"
+            });
+        }
+        
+        return DebugProtocol.createResponse(request, {
+            started: true
+        });
+    }
+    
+    // 暂停处理器
+    private handlePause(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "暂停调试目标");
+        
+        // 暂停调试器
+        this.debugger.pause();
+        
+        // 发送停止事件
+        this.sendNotification(DebugCommand.EVENT_STOPPED, {
+            reason: StopReason.PAUSE,
+            description: "用户请求暂停"
+        });
+        
+        return DebugProtocol.createResponse(request, {
+            paused: true
+        });
+    }
+    
+    // 继续处理器
+    private handleContinue(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "继续执行调试目标");
+        
+        // 继续执行
+        this.debugger.continue();
+        
+        // 发送继续事件
+        this.sendNotification(DebugCommand.EVENT_CONTINUED);
+        
+        return DebugProtocol.createResponse(request, {
+            continued: true
+        });
+    }
+    
+    // 单步执行（跳过）处理器
+    private handleStepOver(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "单步执行（跳过）");
+        
+        // 单步执行（跳过）
+        this.debugger.stepOver();
+        
+        return DebugProtocol.createResponse(request, {
+            stepping: true
+        });
+    }
+    
+    // 单步执行（进入）处理器
+    private handleStepInto(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "单步执行（进入）");
+        
+        // 单步执行（进入）
+        this.debugger.stepInto();
+        
+        return DebugProtocol.createResponse(request, {
+            stepping: true
+        });
+    }
+    
+    // 单步执行（跳出）处理器
+    private handleStepOut(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "单步执行（跳出）");
+        
+        // 单步执行（跳出）
+        this.debugger.stepOut();
+        
+        return DebugProtocol.createResponse(request, {
+            stepping: true
+        });
+    }
+    
+    // 重启处理器
+    private handleRestart(request: DebugRequest): DebugResponse {
+        this.logger.log(LogLevel.INFO, "重启调试目标");
+        
+        // 重启调试器
+        this.debugger.restart();
+        
+        return DebugProtocol.createResponse(request, {
+            restarted: true
+        });
+    }
+    
+    // 设置断点处理器
+    private handleSetBreakpoint(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        if (!args || typeof args.location === 'undefined' || typeof args.type === 'undefined') {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                "缺少必要的断点参数"
+            );
+        }
+        
+        try {
+            // 添加断点
+            const breakpointId = this.debugger.addBreakpoint(
+                args.type,
+                args.location,
+                args.condition,
+                args.hitCountLimit || 0
+            );
+            
+            this.logger.log(LogLevel.INFO, `设置断点 #${breakpointId} 在 ${args.location}`);
+            
+            // 获取断点信息
+            const breakpoint = this.debugger.getBreakpoint(breakpointId);
+            
+            if (!breakpoint) {
+                return DebugProtocol.createErrorResponse(
+                    request,
+                    DebugErrorCode.INTERNAL_ERROR,
+                    "断点创建失败"
+                );
+            }
+            
+            return DebugProtocol.createResponse(request, {
+                breakpointId: breakpointId,
+                breakpoint: {
+                    id: breakpoint.id,
+                    type: breakpoint.type,
+                    location: breakpoint.location,
+                    enabled: breakpoint.enabled,
+                    hitCount: breakpoint.hitCount,
+                    condition: breakpoint.condition
+                }
+            });
+        } catch (error) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INTERNAL_ERROR,
+                `设置断点失败: ${error}`
+            );
+        }
+    }
+    
+    // 移除断点处理器
+    private handleRemoveBreakpoint(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        if (!args || typeof args.breakpointId === 'undefined') {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                "缺少断点ID参数"
+            );
+        }
+        
+        // 移除断点
+        const success = this.debugger.removeBreakpoint(args.breakpointId);
+        
+        if (!success) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.RESOURCE_NOT_FOUND,
+                `断点 #${args.breakpointId} 不存在`
+            );
+        }
+        
+        this.logger.log(LogLevel.INFO, `移除断点 #${args.breakpointId}`);
+        
+        return DebugProtocol.createResponse(request, {
+            removed: true
+        });
+    }
+    
+    // 启用断点处理器
+    private handleEnableBreakpoint(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        if (!args || typeof args.breakpointId === 'undefined') {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                "缺少断点ID参数"
+            );
+        }
+        
+        // 启用断点
+        const success = this.debugger.enableBreakpoint(args.breakpointId);
+        
+        if (!success) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.RESOURCE_NOT_FOUND,
+                `断点 #${args.breakpointId} 不存在`
+            );
+        }
+        
+        this.logger.log(LogLevel.INFO, `启用断点 #${args.breakpointId}`);
+        
+        return DebugProtocol.createResponse(request, {
+            enabled: true
+        });
+    }
+    
+    // 禁用断点处理器
+    private handleDisableBreakpoint(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        if (!args || typeof args.breakpointId === 'undefined') {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                "缺少断点ID参数"
+            );
+        }
+        
+        // 禁用断点
+        const success = this.debugger.disableBreakpoint(args.breakpointId);
+        
+        if (!success) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.RESOURCE_NOT_FOUND,
+                `断点 #${args.breakpointId} 不存在`
+            );
+        }
+        
+        this.logger.log(LogLevel.INFO, `禁用断点 #${args.breakpointId}`);
+        
+        return DebugProtocol.createResponse(request, {
+            disabled: true
+        });
+    }
+    
+    // 列出断点处理器
+    private handleListBreakpoints(request: DebugRequest): DebugResponse {
+        // 获取所有断点
+        const breakpoints = this.debugger.getAllBreakpoints();
+        
+        // 转换为返回格式
+        const breakpointsInfo = breakpoints.map(bp => ({
+            id: bp.id,
+            type: bp.type,
+            location: bp.location,
+            enabled: bp.enabled,
+            hitCount: bp.hitCount,
+            hitCountLimit: bp.hitCountLimit,
+            condition: bp.condition
+        }));
+        
+        return DebugProtocol.createResponse(request, {
+            breakpoints: breakpointsInfo
+        });
+    }
+    
+    // 清除所有断点处理器
+    private handleClearBreakpoints(request: DebugRequest): DebugResponse {
+        // 清除所有断点
+        this.debugger.clearAllBreakpoints();
+        
+        this.logger.log(LogLevel.INFO, "清除所有断点");
+        
+        return DebugProtocol.createResponse(request, {
+            cleared: true
+        });
+    }
+    
+    // 获取变量处理器
+    private handleGetVariables(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        const scope = args && args.scope ? args.scope : "local";
+        
+        let variables;
+        
+        if (scope === "local") {
+            variables = this.debugger.getLocalVariables();
+        } else if (scope === "global") {
+            variables = this.debugger.getGlobalVariables();
+        } else {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                `未知的变量作用域: ${scope}`
+            );
+        }
+        
+        // 转换为返回格式
+        const variablesInfo = variables.map(v => ({
+            name: v.name,
+            type: v.type,
+            value: v.value,
+            address: v.address
+        }));
+        
+        return DebugProtocol.createResponse(request, {
+            variables: variablesInfo
+        });
+    }
+    
+    // 获取调用栈处理器
+    private handleGetCallStack(request: DebugRequest): DebugResponse {
+        // 获取调用栈
+        const stack = this.debugger.getCallStack();
+        
+        // 转换为返回格式
+        const stackFrames = stack.map((frame, index) => ({
+            id: index,
+            name: frame
+        }));
+        
+        return DebugProtocol.createResponse(request, {
+            stack: stackFrames
+        });
+    }
+    
+    // 获取源码处理器
+    private handleGetSource(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        let filePath;
+        let line;
+        let contextLines = 5;
+        
+        if (args) {
+            filePath = args.filePath;
+            line = args.line;
+            if (typeof args.contextLines !== 'undefined') {
+                contextLines = args.contextLines;
+            }
+        }
+        
+        // 如果没有指定文件和行，使用当前位置
+        if (!filePath || typeof line === 'undefined') {
+            const sourceLocation = this.debugger.getCurrentSourceLocation();
+            
+            if (!sourceLocation) {
+                return DebugProtocol.createErrorResponse(
+                    request,
+                    DebugErrorCode.RESOURCE_NOT_FOUND,
+                    "当前没有活动的源文件位置"
+                );
+            }
+            
+            filePath = sourceLocation.filePath;
+            line = sourceLocation.currentLine;
+        }
+        
+        // 获取源码
+        const sourceLines = this.debugger.viewSource(filePath, line, contextLines);
+        
+        if (sourceLines.length === 0) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.RESOURCE_NOT_FOUND,
+                `无法读取文件 ${filePath}`
+            );
+        }
+        
+        return DebugProtocol.createResponse(request, {
+            source: {
+                filePath: filePath,
+                currentLine: line,
+                content: sourceLines
+            }
+        });
+    }
+    
+    // 求值表达式处理器
+    private handleEvaluateExpression(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        if (!args || typeof args.expression === 'undefined') {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                "缺少表达式参数"
+            );
+        }
+        
+        try {
+            // 求值表达式
+            const result = this.debugger.evaluateExpression(args.expression);
+            
+            return DebugProtocol.createResponse(request, {
+                result: result
+            });
+        } catch (error) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INTERNAL_ERROR,
+                `表达式求值失败: ${error}`
+            );
+        }
+    }
+    
+    // 获取内存处理器
+    private handleGetMemory(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        if (!args || typeof args.address === 'undefined') {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                "缺少地址参数"
+            );
+        }
+        
+        const size = args.size || 64;
+        
+        try {
+            // 获取内存值
+            const memoryData = this.debugger.getMemoryValue(args.address, size);
+            
+            // 转换为十六进制字符串
+            let hexString = "";
+            for (let i = 0; i < memoryData.length; i++) {
+                hexString += memoryData[i].toString(16).padStart(2, '0');
+                if (i % 16 === 15) {
+                    hexString += "\n";
+                } else {
+                    hexString += " ";
+                }
+            }
+            
+            return DebugProtocol.createResponse(request, {
+                memory: {
+                    address: args.address,
+                    size: memoryData.length,
+                    content: hexString.trim()
+                }
+            });
+        } catch (error) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INTERNAL_ERROR,
+                `获取内存值失败: ${error}`
+            );
+        }
+    }
+    
+    // 获取寄存器处理器
+    private handleGetRegisters(request: DebugRequest): DebugResponse {
+        // TODO: 实现获取寄存器功能
+        
+        return DebugProtocol.createErrorResponse(
+            request,
+            DebugErrorCode.INTERNAL_ERROR,
+            "获取寄存器功能尚未实现"
+        );
+    }
+    
+    // 获取配置处理器
+    private handleGetConfig(request: DebugRequest): DebugResponse {
+        // 获取配置
+        const configData = this.config.getAll();
+        
+        return DebugProtocol.createResponse(request, {
+            config: configData
+        });
+    }
+    
+    // 设置配置处理器
+    private handleSetConfig(request: DebugRequest): DebugResponse {
+        const args = request.arguments;
+        
+        if (!args || !args.config) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INVALID_PARAMETER,
+                "缺少配置参数"
+            );
+        }
+        
+        try {
+            // 应用新配置
+            this.config.apply(args.config);
+            
+            // 保存配置
+            if (args.save) {
+                this.config.save();
+            }
+            
+            return DebugProtocol.createResponse(request, {
+                applied: true
+            });
+        } catch (error) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INTERNAL_ERROR,
+                `应用配置失败: ${error}`
+            );
+        }
+    }
+    
+    // 重置配置处理器
+    private handleResetConfig(request: DebugRequest): DebugResponse {
+        try {
+            // 重置配置
+            this.config.reset();
+            
+            // 保存配置
+            const args = request.arguments;
+            if (args && args.save) {
+                this.config.save();
+            }
+            
+            return DebugProtocol.createResponse(request, {
+                reset: true
+            });
+        } catch (error) {
+            return DebugProtocol.createErrorResponse(
+                request,
+                DebugErrorCode.INTERNAL_ERROR,
+                `重置配置失败: ${error}`
+            );
+        }
+    }
+    
+    // 直接调用方法（适用于本地使用）
+    
+    // 初始化调试会话
+    public initialize(): boolean {
+        // 加载配置
+        this.config.load();
+        
+        // 初始化调试器
+        return this.debugger.initialize();
+    }
+    
+    // 开始调试
+    public start(): void {
+        this.debugger.start();
+    }
+    
+    // 暂停调试
+    public pause(): void {
+        this.debugger.pause();
+    }
+    
+    // 继续调试
+    public continue(): void {
+        this.debugger.continue();
+    }
+    
+    // 单步执行（跳过）
+    public stepOver(): void {
+        this.debugger.stepOver();
+    }
+    
+    // 单步执行（进入）
+    public stepInto(): void {
+        this.debugger.stepInto();
+    }
+    
+    // 单步执行（跳出）
+    public stepOut(): void {
+        this.debugger.stepOut();
+    }
+    
+    // 停止调试
+    public stop(): void {
+        this.debugger.stop();
+    }
+    
+    // 生成调试状态可视化
+    public visualizeDebugState(): string {
+        return this.visualizer.visualizeDebugState();
+    }
+    
+    // 获取调试器状态
+    public getState(): DebuggerState {
+        return this.debugger.getState();
+    }
+} 

@@ -1,0 +1,507 @@
+/**
+ * @file debugger.qentl
+ * @brief QEntL虚拟机调试器接口
+ * 
+ * 量子基因编码: QGC-VM-DEBUGGER-2024062801
+ * 量子纠缠信道: QEC-VM-DEBUG-01
+ */
+
+import { Interpreter } from "../interpreter/interpreter.qentl";
+import { Memory } from "../memory/memory.qentl";
+import { Logger, LogLevel } from "../os_interface/logger.qentl";
+import { FileSystem } from "../os_interface/file_system.qentl";
+import { Console } from "../os_interface/console.qentl";
+
+// 断点类型
+export enum BreakpointType {
+    // 源码位置断点
+    SOURCE_LOCATION,
+    // 内存地址断点
+    MEMORY_ADDRESS,
+    // 指令地址断点
+    INSTRUCTION_ADDRESS,
+    // 符号断点
+    SYMBOL,
+    // 条件断点
+    CONDITIONAL
+}
+
+// 断点类
+export class Breakpoint {
+    // 断点ID
+    public readonly id: number;
+    
+    // 断点类型
+    public readonly type: BreakpointType;
+    
+    // 断点位置 (文件:行:列 或 地址)
+    public readonly location: string | number;
+    
+    // 断点条件 (用于条件断点)
+    public readonly condition?: string;
+    
+    // 断点是否启用
+    public enabled: boolean;
+    
+    // 断点命中次数
+    public hitCount: number;
+    
+    // 断点命中计数限制（0表示无限制）
+    public readonly hitCountLimit: number;
+    
+    // 构造函数
+    constructor(
+        id: number,
+        type: BreakpointType,
+        location: string | number,
+        condition?: string,
+        hitCountLimit: number = 0
+    ) {
+        this.id = id;
+        this.type = type;
+        this.location = location;
+        this.condition = condition;
+        this.enabled = true;
+        this.hitCount = 0;
+        this.hitCountLimit = hitCountLimit;
+    }
+    
+    // 检查是否应该触发断点
+    public shouldBreak(): boolean {
+        if (!this.enabled) {
+            return false;
+        }
+        
+        this.hitCount++;
+        
+        // 如果设置了命中次数限制，检查是否达到限制
+        if (this.hitCountLimit > 0 && this.hitCount > this.hitCountLimit) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // 重置断点命中计数
+    public reset(): void {
+        this.hitCount = 0;
+    }
+    
+    // 启用断点
+    public enable(): void {
+        this.enabled = true;
+    }
+    
+    // 禁用断点
+    public disable(): void {
+        this.enabled = false;
+    }
+    
+    // 转换为字符串表示
+    public toString(): string {
+        const status = this.enabled ? "启用" : "禁用";
+        const hitInfo = this.hitCountLimit > 0 
+            ? `命中: ${this.hitCount}/${this.hitCountLimit}` 
+            : `命中: ${this.hitCount}`;
+        
+        let typeStr = "";
+        switch (this.type) {
+            case BreakpointType.SOURCE_LOCATION:
+                typeStr = "源码";
+                break;
+            case BreakpointType.MEMORY_ADDRESS:
+                typeStr = "内存";
+                break;
+            case BreakpointType.INSTRUCTION_ADDRESS:
+                typeStr = "指令";
+                break;
+            case BreakpointType.SYMBOL:
+                typeStr = "符号";
+                break;
+            case BreakpointType.CONDITIONAL:
+                typeStr = "条件";
+                break;
+        }
+        
+        let conditionInfo = "";
+        if (this.condition) {
+            conditionInfo = ` 条件: ${this.condition}`;
+        }
+        
+        return `#${this.id} [${typeStr}] ${this.location} [${status}] ${hitInfo}${conditionInfo}`;
+    }
+}
+
+// 调试变量值
+export class VariableValue {
+    // 变量名
+    public readonly name: string;
+    
+    // 变量类型
+    public readonly type: string;
+    
+    // 变量值（可能是基本类型或复杂对象）
+    public readonly value: any;
+    
+    // 变量地址（如果可用）
+    public readonly address?: number;
+    
+    // 构造函数
+    constructor(
+        name: string,
+        type: string,
+        value: any,
+        address?: number
+    ) {
+        this.name = name;
+        this.type = type;
+        this.value = value;
+        this.address = address;
+    }
+    
+    // 转换为字符串表示
+    public toString(): string {
+        const addressStr = this.address !== undefined ? `@0x${this.address.toString(16)}` : '';
+        return `${this.name}: ${this.type} = ${JSON.stringify(this.value)} ${addressStr}`;
+    }
+}
+
+// 调试器状态
+export enum DebuggerState {
+    // 未启动
+    NOT_STARTED,
+    // 运行中
+    RUNNING,
+    // 已暂停
+    PAUSED,
+    // 单步执行
+    STEPPING,
+    // 已终止
+    TERMINATED
+}
+
+// 源代码查看范围
+export interface SourceViewRange {
+    filePath: string;    // 文件路径
+    startLine: number;   // 起始行
+    endLine: number;     // 结束行
+    currentLine: number; // 当前行
+}
+
+// 调试器接口类
+export class Debugger {
+    // 关联的解释器
+    private interpreter: Interpreter;
+    
+    // 关联的内存管理器
+    private memory: Memory;
+    
+    // 日志记录器
+    private logger: Logger;
+    
+    // 文件系统接口
+    private fileSystem: FileSystem;
+    
+    // 控制台接口
+    private console: Console;
+    
+    // 断点列表
+    private breakpoints: Map<number, Breakpoint>;
+    
+    // 下一个断点ID
+    private nextBreakpointId: number;
+    
+    // 当前调试器状态
+    private state: DebuggerState;
+    
+    // 当前暂停的源码位置
+    private currentSourceLocation?: {
+        filePath: string,
+        line: number,
+        column: number
+    };
+    
+    // 当前暂停的指令地址
+    private currentInstructionAddress?: number;
+    
+    // 调试信息是否已加载
+    private debugInfoLoaded: boolean;
+    
+    // 构造函数
+    constructor(
+        interpreter: Interpreter,
+        memory: Memory,
+        logger: Logger,
+        fileSystem: FileSystem,
+        console: Console
+    ) {
+        this.interpreter = interpreter;
+        this.memory = memory;
+        this.logger = logger;
+        this.fileSystem = fileSystem;
+        this.console = console;
+        this.breakpoints = new Map<number, Breakpoint>();
+        this.nextBreakpointId = 1;
+        this.state = DebuggerState.NOT_STARTED;
+        this.debugInfoLoaded = false;
+    }
+    
+    // 初始化调试器
+    public initialize(): boolean {
+        try {
+            this.logger.log(LogLevel.INFO, "初始化调试器...");
+            // 加载调试信息
+            const success = this.loadDebugInfo();
+            this.state = DebuggerState.PAUSED;
+            return success;
+        } catch (error) {
+            this.logger.log(LogLevel.ERROR, `调试器初始化失败: ${error}`);
+            return false;
+        }
+    }
+    
+    // 加载调试信息
+    private loadDebugInfo(): boolean {
+        try {
+            this.logger.log(LogLevel.INFO, "加载调试信息...");
+            // TODO: 实现从调试信息文件加载源码映射和符号信息
+            this.debugInfoLoaded = true;
+            return true;
+        } catch (error) {
+            this.logger.log(LogLevel.ERROR, `加载调试信息失败: ${error}`);
+            this.debugInfoLoaded = false;
+            return false;
+        }
+    }
+    
+    // 启动程序执行
+    public start(): void {
+        if (this.state === DebuggerState.NOT_STARTED) {
+            this.initialize();
+        }
+        
+        this.state = DebuggerState.RUNNING;
+        this.logger.log(LogLevel.INFO, "开始执行程序...");
+        
+        try {
+            // 启动解释器并设置断点处理
+            // TODO: 实现与解释器的通信，使其在断点处暂停
+        } catch (error) {
+            this.logger.log(LogLevel.ERROR, `程序执行失败: ${error}`);
+            this.state = DebuggerState.TERMINATED;
+        }
+    }
+    
+    // 暂停程序执行
+    public pause(): void {
+        if (this.state === DebuggerState.RUNNING) {
+            this.state = DebuggerState.PAUSED;
+            this.logger.log(LogLevel.INFO, "程序已暂停");
+            // TODO: 实现暂停解释器执行
+        }
+    }
+    
+    // 继续程序执行
+    public continue(): void {
+        if (this.state === DebuggerState.PAUSED || this.state === DebuggerState.STEPPING) {
+            this.state = DebuggerState.RUNNING;
+            this.logger.log(LogLevel.INFO, "继续执行程序...");
+            // TODO: 实现恢复解释器执行
+        }
+    }
+    
+    // 单步执行（源码级别）
+    public stepOver(): void {
+        if (this.state === DebuggerState.PAUSED) {
+            this.state = DebuggerState.STEPPING;
+            this.logger.log(LogLevel.INFO, "单步执行（跳过）...");
+            // TODO: 实现单步执行（跳过）
+        }
+    }
+    
+    // 单步执行（进入函数）
+    public stepInto(): void {
+        if (this.state === DebuggerState.PAUSED) {
+            this.state = DebuggerState.STEPPING;
+            this.logger.log(LogLevel.INFO, "单步执行（进入）...");
+            // TODO: 实现单步执行（进入）
+        }
+    }
+    
+    // 单步执行（跳出函数）
+    public stepOut(): void {
+        if (this.state === DebuggerState.PAUSED) {
+            this.state = DebuggerState.STEPPING;
+            this.logger.log(LogLevel.INFO, "单步执行（跳出）...");
+            // TODO: 实现单步执行（跳出）
+        }
+    }
+    
+    // 停止程序执行
+    public stop(): void {
+        if (this.state !== DebuggerState.TERMINATED && this.state !== DebuggerState.NOT_STARTED) {
+            this.state = DebuggerState.TERMINATED;
+            this.logger.log(LogLevel.INFO, "停止程序执行");
+            // TODO: 实现停止解释器执行
+        }
+    }
+    
+    // 重启程序
+    public restart(): void {
+        this.stop();
+        // 重置所有断点的命中计数
+        for (const breakpoint of this.breakpoints.values()) {
+            breakpoint.reset();
+        }
+        this.start();
+    }
+    
+    // 添加断点
+    public addBreakpoint(
+        type: BreakpointType,
+        location: string | number,
+        condition?: string,
+        hitCountLimit: number = 0
+    ): number {
+        const id = this.nextBreakpointId++;
+        const breakpoint = new Breakpoint(id, type, location, condition, hitCountLimit);
+        this.breakpoints.set(id, breakpoint);
+        this.logger.log(LogLevel.INFO, `添加断点: ${breakpoint.toString()}`);
+        return id;
+    }
+    
+    // 获取断点
+    public getBreakpoint(id: number): Breakpoint | undefined {
+        return this.breakpoints.get(id);
+    }
+    
+    // 获取所有断点
+    public getAllBreakpoints(): Breakpoint[] {
+        return Array.from(this.breakpoints.values());
+    }
+    
+    // 启用断点
+    public enableBreakpoint(id: number): boolean {
+        const breakpoint = this.breakpoints.get(id);
+        if (breakpoint) {
+            breakpoint.enable();
+            this.logger.log(LogLevel.INFO, `启用断点 #${id}`);
+            return true;
+        }
+        return false;
+    }
+    
+    // 禁用断点
+    public disableBreakpoint(id: number): boolean {
+        const breakpoint = this.breakpoints.get(id);
+        if (breakpoint) {
+            breakpoint.disable();
+            this.logger.log(LogLevel.INFO, `禁用断点 #${id}`);
+            return true;
+        }
+        return false;
+    }
+    
+    // 删除断点
+    public removeBreakpoint(id: number): boolean {
+        const removed = this.breakpoints.delete(id);
+        if (removed) {
+            this.logger.log(LogLevel.INFO, `移除断点 #${id}`);
+        }
+        return removed;
+    }
+    
+    // 清除所有断点
+    public clearAllBreakpoints(): void {
+        this.breakpoints.clear();
+        this.logger.log(LogLevel.INFO, "清除所有断点");
+    }
+    
+    // 获取局部变量
+    public getLocalVariables(): VariableValue[] {
+        // TODO: 实现从当前作用域获取局部变量
+        return [];
+    }
+    
+    // 获取全局变量
+    public getGlobalVariables(): VariableValue[] {
+        // TODO: 实现获取全局变量
+        return [];
+    }
+    
+    // 获取调用栈
+    public getCallStack(): string[] {
+        // TODO: 实现获取调用栈
+        return [];
+    }
+    
+    // 获取当前源码位置
+    public getCurrentSourceLocation(): SourceViewRange | null {
+        if (!this.currentSourceLocation) {
+            return null;
+        }
+        
+        return {
+            filePath: this.currentSourceLocation.filePath,
+            startLine: Math.max(1, this.currentSourceLocation.line - 5),
+            endLine: this.currentSourceLocation.line + 5,
+            currentLine: this.currentSourceLocation.line
+        };
+    }
+    
+    // 查看源码
+    public viewSource(filePath: string, line: number, contextLines: number = 5): string[] {
+        try {
+            const fileContent = this.fileSystem.readFile(filePath);
+            const lines = fileContent.split('\n');
+            
+            const startLine = Math.max(0, line - contextLines);
+            const endLine = Math.min(lines.length, line + contextLines);
+            
+            const result: string[] = [];
+            for (let i = startLine; i < endLine; i++) {
+                const lineNumber = i + 1;
+                const prefix = lineNumber === line ? '>' : ' ';
+                result.push(`${prefix} ${lineNumber}: ${lines[i]}`);
+            }
+            
+            return result;
+        } catch (error) {
+            this.logger.log(LogLevel.ERROR, `无法读取源文件 ${filePath}: ${error}`);
+            return [];
+        }
+    }
+    
+    // 计算表达式
+    public evaluateExpression(expression: string): any {
+        // TODO: 实现表达式求值
+        return null;
+    }
+    
+    // 获取内存值
+    public getMemoryValue(address: number, size: number): Uint8Array {
+        // TODO: 实现获取内存值
+        return new Uint8Array(size);
+    }
+    
+    // 获取当前调试器状态
+    public getState(): DebuggerState {
+        return this.state;
+    }
+    
+    // 获取当前状态的字符串表示
+    public getStateString(): string {
+        switch (this.state) {
+            case DebuggerState.NOT_STARTED:
+                return "未启动";
+            case DebuggerState.RUNNING:
+                return "运行中";
+            case DebuggerState.PAUSED:
+                return "已暂停";
+            case DebuggerState.STEPPING:
+                return "单步执行";
+            case DebuggerState.TERMINATED:
+                return "已终止";
+        }
+    }
+} 

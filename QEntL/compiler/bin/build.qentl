@@ -1,0 +1,604 @@
+/**
+ * @file build.qentl
+ * @brief QEntL编译器项目的构建脚本
+ * 
+ * 量子基因编码: QGC-BUILD-SCRIPT-2024062001
+ * 量子纠缠信道: QEC-COMPILER-BUILD-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/process.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/fs.qentl";
+
+/**
+ * @enum BuildTarget
+ * @brief 构建目标枚举
+ */
+quantum_enum BuildTarget {
+    ALL,              // 所有组件
+    COMPILER,         // 编译器
+    BYTECODE_GEN,     // 字节码生成器
+    BYTECODE_OPT,     // 字节码优化器
+    LINKER,           // 链接器
+    CLI               // 命令行工具集
+}
+
+/**
+ * @class BuildConfig
+ * @brief 构建配置
+ */
+quantum_class BuildConfig {
+    public {
+        srcDir: String;            // 源代码目录
+        buildDir: String;          // 构建输出目录
+        debug: Boolean;            // 是否为调试构建
+        verbose: Boolean;          // 是否详细输出
+        optimizationLevel: Integer; // 优化级别
+        target: BuildTarget;       // 构建目标
+        clean: Boolean;            // 清理构建目录
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.srcDir = Path.join(Process.getCurrentDirectory(), "src");
+        this.buildDir = Path.join(Process.getCurrentDirectory(), "build");
+        this.debug = false;
+        this.verbose = false;
+        this.optimizationLevel = 1;
+        this.target = BuildTarget.ALL;
+        this.clean = false;
+    }
+}
+
+/**
+ * @class ArgumentParser
+ * @brief 命令行参数解析器
+ */
+quantum_class ArgumentParser {
+    private {
+        args: Array<String>;            // 原始参数列表
+        options: Map<String, String>;   // 解析后的选项
+        positionalArgs: Array<String>;  // 位置参数
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(args: Array<String>) {
+        this.args = args;
+        this.options = new Map<String, String>();
+        this.positionalArgs = new Array<String>();
+        this.parse();
+    }
+    
+    /**
+     * @brief 解析参数
+     */
+    private function parse(): void {
+        for (let i = 0; i < this.args.length; i++) {
+            let arg = this.args[i];
+            
+            if (arg.startsWith("--")) {
+                // 长选项
+                let optionName = arg.substring(2);
+                let optionValue = "";
+                
+                // 检查是否有等号分隔的值
+                let equalsPos = optionName.indexOf("=");
+                if (equalsPos >= 0) {
+                    optionValue = optionName.substring(equalsPos + 1);
+                    optionName = optionName.substring(0, equalsPos);
+                } else if (i + 1 < this.args.length && !this.args[i + 1].startsWith("-")) {
+                    // 下一个参数不是选项，作为值
+                    optionValue = this.args[++i];
+                } else {
+                    // 布尔标志
+                    optionValue = "true";
+                }
+                
+                this.options.set(optionName, optionValue);
+            } else if (arg.startsWith("-")) {
+                // 短选项
+                let optionName = arg.substring(1);
+                let optionValue = "";
+                
+                if (i + 1 < this.args.length && !this.args[i + 1].startsWith("-")) {
+                    // 下一个参数不是选项，作为值
+                    optionValue = this.args[++i];
+                } else {
+                    // 布尔标志
+                    optionValue = "true";
+                }
+                
+                this.options.set(optionName, optionValue);
+            } else {
+                // 位置参数
+                this.positionalArgs.push(arg);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取选项值
+     */
+    public function getOption(name: String, defaultValue: String = ""): String {
+        if (this.options.has(name)) {
+            return this.options.get(name);
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * @brief 获取布尔选项值
+     */
+    public function getBoolOption(name: String, defaultValue: Boolean = false): Boolean {
+        if (this.options.has(name)) {
+            let value = this.options.get(name).toLowerCase();
+            return value === "true" || value === "yes" || value === "1";
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * @brief 获取整数选项值
+     */
+    public function getIntOption(name: String, defaultValue: Integer = 0): Integer {
+        if (this.options.has(name)) {
+            try {
+                return parseInt(this.options.get(name));
+            } catch (e) {
+                return defaultValue;
+            }
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * @brief 获取位置参数
+     */
+    public function getPositionalArgs(): Array<String> {
+        return this.positionalArgs;
+    }
+    
+    /**
+     * @brief 是否包含选项
+     */
+    public function hasOption(name: String): Boolean {
+        return this.options.has(name);
+    }
+}
+
+/**
+ * @class Builder
+ * @brief 构建管理器
+ */
+quantum_class Builder {
+    private {
+        config: BuildConfig;       // 构建配置
+        sources: Array<String>;    // 源文件列表
+        headers: Array<String>;    // 头文件列表
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(config: BuildConfig) {
+        this.config = config;
+        this.sources = new Array<String>();
+        this.headers = new Array<String>();
+    }
+    
+    /**
+     * @brief 运行构建过程
+     */
+    public function run(): Boolean {
+        // 准备构建环境
+        if (!this.prepareBuildEnvironment()) {
+            return false;
+        }
+        
+        // 收集源文件
+        this.collectSourceFiles();
+        
+        // 根据目标选择要构建的组件
+        switch (this.config.target) {
+            case BuildTarget.ALL:
+                return this.buildAll();
+            case BuildTarget.COMPILER:
+                return this.buildCompiler();
+            case BuildTarget.BYTECODE_GEN:
+                return this.buildBytecodeGenerator();
+            case BuildTarget.BYTECODE_OPT:
+                return this.buildBytecodeOptimizer();
+            case BuildTarget.LINKER:
+                return this.buildLinker();
+            case BuildTarget.CLI:
+                return this.buildCLI();
+            default:
+                Console.writeErrorLine("错误: 未知的构建目标");
+                return false;
+        }
+    }
+    
+    /**
+     * @brief 准备构建环境
+     */
+    private function prepareBuildEnvironment(): Boolean {
+        // 如果需要清理构建目录
+        if (this.config.clean) {
+            if (this.config.verbose) {
+                Console.writeLine(`清理构建目录: ${this.config.buildDir}`);
+            }
+            
+            if (FS.existsSync(this.config.buildDir)) {
+                try {
+                    FS.rmSync(this.config.buildDir, { recursive: true, force: true });
+                } catch (e) {
+                    Console.writeErrorLine(`错误: 无法清理构建目录: ${e.message}`);
+                    return false;
+                }
+            }
+        }
+        
+        // 创建构建目录
+        if (!FS.existsSync(this.config.buildDir)) {
+            try {
+                FS.mkdirSync(this.config.buildDir, { recursive: true });
+            } catch (e) {
+                Console.writeErrorLine(`错误: 无法创建构建目录: ${e.message}`);
+                return false;
+            }
+        }
+        
+        // 创建各个组件的输出目录
+        let directories = [
+            Path.join(this.config.buildDir, "compiler"),
+            Path.join(this.config.buildDir, "bytecode_gen"),
+            Path.join(this.config.buildDir, "bytecode_opt"),
+            Path.join(this.config.buildDir, "linker"),
+            Path.join(this.config.buildDir, "cli")
+        ];
+        
+        for (let dir of directories) {
+            if (!FS.existsSync(dir)) {
+                try {
+                    FS.mkdirSync(dir, { recursive: true });
+                } catch (e) {
+                    Console.writeErrorLine(`错误: 无法创建目录: ${dir}: ${e.message}`);
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief 收集源文件
+     */
+    private function collectSourceFiles(): void {
+        if (this.config.verbose) {
+            Console.writeLine("收集源文件...");
+        }
+        
+        // 递归查找所有.qentl文件
+        function findFiles(dir: String, extension: String): Array<String> {
+            let results = new Array<String>();
+            let entries = FS.readdirSync(dir, { withFileTypes: true });
+            
+            for (let entry of entries) {
+                let fullPath = Path.join(dir, entry.name);
+                
+                if (entry.isDirectory()) {
+                    let subDirFiles = findFiles(fullPath, extension);
+                    results = results.concat(subDirFiles);
+                } else if (entry.isFile() && entry.name.endsWith(extension)) {
+                    results.push(fullPath);
+                }
+            }
+            
+            return results;
+        }
+        
+        // 收集源文件和头文件
+        this.sources = findFiles(this.config.srcDir, ".qentl");
+        this.headers = findFiles(this.config.srcDir, ".h.qentl");
+        
+        if (this.config.verbose) {
+            Console.writeLine(`找到 ${this.sources.length} 个源文件和 ${this.headers.length} 个头文件`);
+        }
+    }
+    
+    /**
+     * @brief 构建所有组件
+     */
+    private function buildAll(): Boolean {
+        if (this.config.verbose) {
+            Console.writeLine("构建所有组件...");
+        }
+        
+        return this.buildCompiler() &&
+               this.buildBytecodeGenerator() &&
+               this.buildBytecodeOptimizer() &&
+               this.buildLinker() &&
+               this.buildCLI();
+    }
+    
+    /**
+     * @brief 构建编译器
+     */
+    private function buildCompiler(): Boolean {
+        if (this.config.verbose) {
+            Console.writeLine("构建编译器...");
+        }
+        
+        let compilerSources = this.filterSourcesByDir("src/frontend") 
+                           .concat(this.filterSourcesByDir("src/backend/ir"))
+                           .concat(this.filterSourcesByDir("src/backend/optimizer"))
+                           .concat(this.filterSourcesByFile("bin/cli/compiler_cli.qentl"));
+        
+        return this.compileComponent("compiler", compilerSources);
+    }
+    
+    /**
+     * @brief 构建字节码生成器
+     */
+    private function buildBytecodeGenerator(): Boolean {
+        if (this.config.verbose) {
+            Console.writeLine("构建字节码生成器...");
+        }
+        
+        let bcGenSources = this.filterSourcesByDir("src/backend/bytecode/generator")
+                          .concat(this.filterSourcesByFile("bin/cli/bytecode_generator_cli.qentl"));
+        
+        return this.compileComponent("bytecode_gen", bcGenSources);
+    }
+    
+    /**
+     * @brief 构建字节码优化器
+     */
+    private function buildBytecodeOptimizer(): Boolean {
+        if (this.config.verbose) {
+            Console.writeLine("构建字节码优化器...");
+        }
+        
+        let bcOptSources = this.filterSourcesByDir("src/backend/bytecode/optimizer")
+                         .concat(this.filterSourcesByFile("bin/cli/bytecode_optimizer_cli.qentl"));
+        
+        return this.compileComponent("bytecode_opt", bcOptSources);
+    }
+    
+    /**
+     * @brief 构建链接器
+     */
+    private function buildLinker(): Boolean {
+        if (this.config.verbose) {
+            Console.writeLine("构建链接器...");
+        }
+        
+        let linkerSources = this.filterSourcesByDir("src/backend/linker")
+                          .concat(this.filterSourcesByFile("bin/cli/linker_cli.qentl"));
+        
+        return this.compileComponent("linker", linkerSources);
+    }
+    
+    /**
+     * @brief 构建命令行工具集
+     */
+    private function buildCLI(): Boolean {
+        if (this.config.verbose) {
+            Console.writeLine("构建命令行工具集...");
+        }
+        
+        let cliSources = [
+            Path.join(this.config.srcDir, "../bin/cli/qentl_cli.qentl")
+        ];
+        
+        return this.compileComponent("cli", cliSources);
+    }
+    
+    /**
+     * @brief 按目录过滤源文件
+     */
+    private function filterSourcesByDir(dir: String): Array<String> {
+        let filteredSources = new Array<String>();
+        let normalizedDir = dir.replace(/\\/g, "/");
+        
+        for (let source of this.sources) {
+            let normalizedSource = source.replace(/\\/g, "/");
+            if (normalizedSource.includes(normalizedDir)) {
+                filteredSources.push(source);
+            }
+        }
+        
+        return filteredSources;
+    }
+    
+    /**
+     * @brief 按文件名过滤源文件
+     */
+    private function filterSourcesByFile(filename: String): Array<String> {
+        let filteredSources = new Array<String>();
+        let normalizedFilename = filename.replace(/\\/g, "/");
+        
+        for (let source of this.sources) {
+            let normalizedSource = source.replace(/\\/g, "/");
+            if (normalizedSource.endsWith(normalizedFilename)) {
+                filteredSources.push(source);
+            }
+        }
+        
+        return filteredSources;
+    }
+    
+    /**
+     * @brief 编译组件
+     */
+    private function compileComponent(componentName: String, sources: Array<String>): Boolean {
+        if (sources.length === 0) {
+            Console.writeErrorLine(`警告: 未找到${componentName}的源文件`);
+            return true;
+        }
+        
+        let outputFile = Path.join(this.config.buildDir, componentName, `${componentName}.qobj`);
+        
+        // 构建编译命令
+        let command = "qentlc";
+        
+        // 添加源文件
+        for (let source of sources) {
+            command += ` "${source}"`;
+        }
+        
+        // 添加输出文件
+        command += ` -o "${outputFile}"`;
+        
+        // 添加优化级别
+        command += ` -O${this.config.optimizationLevel}`;
+        
+        // 如果是调试构建，添加调试信息
+        if (this.config.debug) {
+            command += " -g";
+        }
+        
+        // 执行命令
+        if (this.config.verbose) {
+            Console.writeLine(`执行: ${command}`);
+        }
+        
+        try {
+            let result = Process.execSync(command);
+            
+            if (result.status !== 0) {
+                Console.writeErrorLine(`错误: ${componentName}构建失败`);
+                Console.writeErrorLine(result.stderr);
+                return false;
+            }
+            
+            if (this.config.verbose) {
+                Console.writeLine(`${componentName}构建成功: ${outputFile}`);
+            }
+            
+            return true;
+        } catch (e) {
+            Console.writeErrorLine(`错误: 执行编译命令失败: ${e.message}`);
+            return false;
+        }
+    }
+}
+
+/**
+ * @brief 打印帮助信息
+ */
+function printHelp(): void {
+    Console.writeLine("QEntL编译器构建工具");
+    Console.writeLine("");
+    Console.writeLine("用法: qentl build [选项]");
+    Console.writeLine("");
+    Console.writeLine("选项:");
+    Console.writeLine("  -h, --help               显示帮助信息");
+    Console.writeLine("  -t, --target=TARGET      指定构建目标（默认为all）");
+    Console.writeLine("                           可选值: all, compiler, bytecode-gen, bytecode-opt, linker, cli");
+    Console.writeLine("  -s, --src-dir=DIR        指定源代码目录");
+    Console.writeLine("  -b, --build-dir=DIR      指定构建输出目录");
+    Console.writeLine("  -d, --debug              生成调试构建");
+    Console.writeLine("  -O, --optimize=LEVEL     设置优化级别 (0-3)，默认为1");
+    Console.writeLine("  -c, --clean              清理构建目录");
+    Console.writeLine("  -v, --verbose            详细输出");
+    Console.writeLine("");
+    Console.writeLine("示例:");
+    Console.writeLine("  qentl build");
+    Console.writeLine("  qentl build --target=compiler --debug");
+    Console.writeLine("  qentl build -O3 -c -v");
+}
+
+/**
+ * @brief 解析构建目标
+ */
+function parseBuildTarget(target: String): BuildTarget {
+    let lowercaseTarget = target.toLowerCase();
+    
+    if (lowercaseTarget === "all") {
+        return BuildTarget.ALL;
+    } else if (lowercaseTarget === "compiler") {
+        return BuildTarget.COMPILER;
+    } else if (lowercaseTarget === "bytecode-gen" || lowercaseTarget === "bytecode_gen") {
+        return BuildTarget.BYTECODE_GEN;
+    } else if (lowercaseTarget === "bytecode-opt" || lowercaseTarget === "bytecode_opt") {
+        return BuildTarget.BYTECODE_OPT;
+    } else if (lowercaseTarget === "linker") {
+        return BuildTarget.LINKER;
+    } else if (lowercaseTarget === "cli") {
+        return BuildTarget.CLI;
+    } else {
+        Console.writeErrorLine(`警告: 未知的构建目标 '${target}'，使用默认值 'all'`);
+        return BuildTarget.ALL;
+    }
+}
+
+/**
+ * @brief 主函数
+ */
+function main(args: Array<String>): Integer {
+    // 检查是否为帮助选项
+    if (args.length > 0 && (args[0] === "--help" || args[0] === "-h")) {
+        printHelp();
+        return 0;
+    }
+    
+    // 创建构建配置
+    let config = new BuildConfig();
+    
+    // 解析命令行参数
+    let parser = new ArgumentParser(args);
+    
+    // 源代码目录
+    if (parser.hasOption("src-dir") || parser.hasOption("s")) {
+        config.srcDir = parser.getOption("src-dir", parser.getOption("s", config.srcDir));
+    }
+    
+    // 构建输出目录
+    if (parser.hasOption("build-dir") || parser.hasOption("b")) {
+        config.buildDir = parser.getOption("build-dir", parser.getOption("b", config.buildDir));
+    }
+    
+    // 是否为调试构建
+    config.debug = parser.getBoolOption("debug") || parser.getBoolOption("d");
+    
+    // 是否详细输出
+    config.verbose = parser.getBoolOption("verbose") || parser.getBoolOption("v");
+    
+    // 优化级别
+    config.optimizationLevel = parser.getIntOption("optimize", parser.getIntOption("O", 1));
+    
+    // 是否清理构建目录
+    config.clean = parser.getBoolOption("clean") || parser.getBoolOption("c");
+    
+    // 构建目标
+    if (parser.hasOption("target") || parser.hasOption("t")) {
+        let targetStr = parser.getOption("target", parser.getOption("t", "all"));
+        config.target = parseBuildTarget(targetStr);
+    }
+    
+    // 验证优化级别有效
+    if (config.optimizationLevel < 0 || config.optimizationLevel > 3) {
+        Console.writeErrorLine(`错误: 无效的优化级别: ${config.optimizationLevel}, 应在0-3范围内`);
+        return 1;
+    }
+    
+    // 创建并运行构建器
+    let builder = new Builder(config);
+    let success = builder.run();
+    
+    return success ? 0 : 1;
+}
+
+// 运行主函数并传递命令行参数
+let exitCode = main(Process.getCommandLineArgs().slice(1));
+Process.exit(exitCode); 

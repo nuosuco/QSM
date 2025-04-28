@@ -1,0 +1,246 @@
+/**
+ * @file binary_writer.qentl
+ * @brief 二进制数据写入器
+ * 
+ * 量子基因编码: QGC-BINARY-WRITER-2024062801
+ * 量子纠缠信道: QEC-COMPILER-UTILS-01
+ */
+
+/**
+ * @class BinaryWriter
+ * @brief 用于生成二进制数据的工具类
+ */
+quantum_class BinaryWriter {
+    private {
+        buffer: Array<Number>;  // 存储二进制数据的缓冲区
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param initialCapacity 初始容量
+     */
+    constructor(initialCapacity: Number = 1024) {
+        this.buffer = new Array<Number>(initialCapacity);
+        // 初始化为0
+        for (let i = 0; i < initialCapacity; i++) {
+            this.buffer[i] = 0;
+        }
+    }
+    
+    /**
+     * @brief 确保缓冲区有足够空间
+     * @param additionalBytes 需要的额外字节数
+     */
+    private function ensureCapacity(additionalBytes: Number): void {
+        const requiredSize = this.buffer.length;
+        if (requiredSize + additionalBytes > this.buffer.length) {
+            // 计算新容量 (当前容量的2倍或当前容量+额外字节，取较大值)
+            const newCapacity = Math.max(this.buffer.length * 2, this.buffer.length + additionalBytes);
+            
+            // 创建新缓冲区
+            const newBuffer = new Array<Number>(newCapacity);
+            
+            // 复制现有数据
+            for (let i = 0; i < this.buffer.length; i++) {
+                newBuffer[i] = this.buffer[i];
+            }
+            
+            // 初始化新分配的空间
+            for (let i = this.buffer.length; i < newCapacity; i++) {
+                newBuffer[i] = 0;
+            }
+            
+            // 替换缓冲区
+            this.buffer = newBuffer;
+        }
+    }
+    
+    /**
+     * @brief 写入8位无符号整数
+     * @param value 整数值
+     */
+    public function writeUint8(value: Number): void {
+        this.ensureCapacity(1);
+        this.buffer.push(value & 0xFF);
+    }
+    
+    /**
+     * @brief 写入8位有符号整数
+     * @param value 整数值
+     */
+    public function writeInt8(value: Number): void {
+        // 处理负数
+        if (value < 0) {
+            value = 256 + value;
+        }
+        this.writeUint8(value);
+    }
+    
+    /**
+     * @brief 写入16位无符号整数
+     * @param value 整数值
+     */
+    public function writeUint16(value: Number): void {
+        this.ensureCapacity(2);
+        this.buffer.push((value >> 8) & 0xFF);
+        this.buffer.push(value & 0xFF);
+    }
+    
+    /**
+     * @brief 写入16位有符号整数
+     * @param value 整数值
+     */
+    public function writeInt16(value: Number): void {
+        // 处理负数
+        if (value < 0) {
+            value = 65536 + value;
+        }
+        this.writeUint16(value);
+    }
+    
+    /**
+     * @brief 写入32位无符号整数
+     * @param value 整数值
+     */
+    public function writeUint32(value: Number): void {
+        this.ensureCapacity(4);
+        this.buffer.push((value >> 24) & 0xFF);
+        this.buffer.push((value >> 16) & 0xFF);
+        this.buffer.push((value >> 8) & 0xFF);
+        this.buffer.push(value & 0xFF);
+    }
+    
+    /**
+     * @brief 写入32位有符号整数
+     * @param value 整数值
+     */
+    public function writeInt32(value: Number): void {
+        // 处理负数
+        if (value < 0) {
+            value = 4294967296 + value;
+        }
+        this.writeUint32(value);
+    }
+    
+    /**
+     * @brief 写入64位浮点数
+     * @param value 浮点数值
+     */
+    public function writeFloat64(value: Number): void {
+        // 注意：这里简化处理，实际实现需要IEEE-754编码
+        // 在实际项目中，应实现完整的IEEE-754双精度浮点数转换
+        
+        // 临时实现：将浮点数分解为高32位和低32位整数
+        const highWord = Math.floor(value / 4294967296);
+        const lowWord = value % 4294967296;
+        
+        this.writeInt32(highWord);
+        this.writeUint32(lowWord);
+    }
+    
+    /**
+     * @brief 在指定位置修改8位有符号整数
+     * @param position 位置
+     * @param value 新值
+     */
+    public function patchInt8(position: Number, value: Number): void {
+        if (position < 0 || position >= this.buffer.length) {
+            throw new Error(`位置越界: ${position}`);
+        }
+        
+        // 处理负数
+        if (value < 0) {
+            value = 256 + value;
+        }
+        
+        this.buffer[position] = value & 0xFF;
+    }
+    
+    /**
+     * @brief 在指定位置修改16位有符号整数
+     * @param position 位置
+     * @param value 新值
+     */
+    public function patchInt16(position: Number, value: Number): void {
+        if (position < 0 || position + 1 >= this.buffer.length) {
+            throw new Error(`位置越界: ${position}`);
+        }
+        
+        // 处理负数
+        if (value < 0) {
+            value = 65536 + value;
+        }
+        
+        this.buffer[position] = (value >> 8) & 0xFF;
+        this.buffer[position + 1] = value & 0xFF;
+    }
+    
+    /**
+     * @brief 在指定位置修改32位有符号整数
+     * @param position 位置
+     * @param value 新值
+     */
+    public function patchInt32(position: Number, value: Number): void {
+        if (position < 0 || position + 3 >= this.buffer.length) {
+            throw new Error(`位置越界: ${position}`);
+        }
+        
+        // 处理负数
+        if (value < 0) {
+            value = 4294967296 + value;
+        }
+        
+        this.buffer[position] = (value >> 24) & 0xFF;
+        this.buffer[position + 1] = (value >> 16) & 0xFF;
+        this.buffer[position + 2] = (value >> 8) & 0xFF;
+        this.buffer[position + 3] = value & 0xFF;
+    }
+    
+    /**
+     * @brief 在指定位置修改32位无符号整数
+     * @param position 位置
+     * @param value 新值
+     */
+    public function patchUint32(position: Number, value: Number): void {
+        if (value < 0) {
+            throw new Error("无符号整数不能为负数");
+        }
+        this.patchInt32(position, value);
+    }
+    
+    /**
+     * @brief 获取当前位置
+     * @return 当前位置
+     */
+    public function getPosition(): Number {
+        return this.buffer.length;
+    }
+    
+    /**
+     * @brief 获取缓冲区大小
+     * @return 缓冲区大小
+     */
+    public function getSize(): Number {
+        return this.buffer.length;
+    }
+    
+    /**
+     * @brief 获取二进制数据
+     * @return 二进制数据数组
+     */
+    public function getBuffer(): Uint8Array {
+        return new Uint8Array(this.buffer);
+    }
+    
+    /**
+     * @brief 重置缓冲区
+     */
+    public function reset(): void {
+        this.buffer = new Array<Number>(1024);
+        for (let i = 0; i < 1024; i++) {
+            this.buffer[i] = 0;
+        }
+    }
+}
+
+export { BinaryWriter }; 

@@ -1,0 +1,159 @@
+/**
+ * @file qentl_cli.qentl
+ * @brief QEntL命令行工具集入口点
+ * 
+ * 量子基因编码: QGC-QENTL-CLI-2024062001
+ * 量子纠缠信道: QEC-COMPILER-TOOLS-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/process.qentl";
+import "QEntL/core/path.qentl";
+
+/**
+ * @enum CommandType
+ * @brief 命令类型枚举
+ */
+quantum_enum CommandType {
+    COMPILER,           // 编译器
+    BYTECODE_GENERATOR, // 字节码生成器
+    BYTECODE_OPTIMIZER, // 字节码优化器
+    LINKER,             // 链接器
+    UNKNOWN             // 未知命令
+}
+
+/**
+ * @brief 获取命令类型
+ */
+function getCommandType(command: String): CommandType {
+    let lowercaseCommand = command.toLowerCase();
+    
+    if (lowercaseCommand === "compile" || lowercaseCommand === "c") {
+        return CommandType.COMPILER;
+    } else if (lowercaseCommand === "bytecode" || lowercaseCommand === "bc") {
+        return CommandType.BYTECODE_GENERATOR;
+    } else if (lowercaseCommand === "optimize" || lowercaseCommand === "opt") {
+        return CommandType.BYTECODE_OPTIMIZER;
+    } else if (lowercaseCommand === "link" || lowercaseCommand === "l") {
+        return CommandType.LINKER;
+    } else {
+        return CommandType.UNKNOWN;
+    }
+}
+
+/**
+ * @brief 打印帮助信息
+ */
+function printHelp(): void {
+    Console.writeLine("QEntL命令行工具集 - 量子纠缠式语言编译工具");
+    Console.writeLine("");
+    Console.writeLine("用法: qentl <命令> [选项]");
+    Console.writeLine("");
+    Console.writeLine("可用命令:");
+    Console.writeLine("  compile, c       编译QEntL源代码");
+    Console.writeLine("  bytecode, bc     生成字节码");
+    Console.writeLine("  optimize, opt    优化字节码");
+    Console.writeLine("  link, l          链接字节码文件");
+    Console.writeLine("");
+    Console.writeLine("每个命令的选项:");
+    Console.writeLine("  qentl <命令> --help");
+    Console.writeLine("");
+    Console.writeLine("示例:");
+    Console.writeLine("  qentl compile -o program.qobj program.qentl");
+    Console.writeLine("  qentl bytecode -o program.qobj program.ir");
+    Console.writeLine("  qentl optimize -O3 program.qobj");
+    Console.writeLine("  qentl link -o program.exe program.qobj");
+}
+
+/**
+ * @brief 打印版本信息
+ */
+function printVersion(): void {
+    Console.writeLine("QEntL命令行工具集 版本 1.0.0");
+    Console.writeLine("量子基因编码: QGC-QENTL-CLI-2024062001");
+    Console.writeLine("量子纠缠信道: QEC-COMPILER-TOOLS-01");
+}
+
+/**
+ * @brief 主函数
+ */
+function main(args: Array<String>): Integer {
+    // 检查是否有足够的参数
+    if (args.length < 1) {
+        printHelp();
+        return 1;
+    }
+    
+    // 检查是否为帮助或版本选项
+    if (args[0] === "--help" || args[0] === "-h") {
+        printHelp();
+        return 0;
+    }
+    
+    if (args[0] === "--version" || args[0] === "-v") {
+        printVersion();
+        return 0;
+    }
+    
+    // 获取命令类型
+    let command = args[0];
+    let commandType = getCommandType(command);
+    
+    // 移除第一个参数（命令）
+    let commandArgs = args.slice(1);
+    
+    // 根据命令类型调用相应的程序
+    let exitCode = 0;
+    
+    switch (commandType) {
+        case CommandType.COMPILER:
+            // 导入编译器模块
+            import "QEntL/compiler/bin/cli/compiler_cli.qentl";
+            
+            // 调用编译器主函数
+            let compilerCli = new CompilerCLI(commandArgs);
+            exitCode = compilerCli.run();
+            break;
+            
+        case CommandType.BYTECODE_GENERATOR:
+            // 导入字节码生成器模块
+            import "QEntL/compiler/bin/cli/bytecode_generator_cli.qentl";
+            
+            // 调用字节码生成器主函数
+            let bcGenCli = new BytecodeGeneratorCLI(commandArgs);
+            exitCode = bcGenCli.run();
+            break;
+            
+        case CommandType.BYTECODE_OPTIMIZER:
+            // 导入字节码优化器模块
+            import "QEntL/compiler/bin/cli/bytecode_optimizer_cli.qentl";
+            
+            // 调用字节码优化器主函数
+            let bcOptCli = new BytecodeOptimizerCLI(commandArgs);
+            exitCode = bcOptCli.run();
+            break;
+            
+        case CommandType.LINKER:
+            // 导入链接器模块
+            import "QEntL/compiler/bin/cli/linker_cli.qentl";
+            
+            // 调用链接器主函数
+            let linkerCli = new LinkerCLI(commandArgs);
+            exitCode = linkerCli.run();
+            break;
+            
+        case CommandType.UNKNOWN:
+            Console.writeErrorLine(`错误: 未知命令 '${command}'`);
+            printHelp();
+            exitCode = 1;
+            break;
+    }
+    
+    return exitCode;
+}
+
+// 运行主函数并传递命令行参数
+let exitCode = main(Process.getCommandLineArgs().slice(1));
+Process.exit(exitCode); 
