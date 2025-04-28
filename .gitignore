@@ -94,6 +94,10 @@ build/
 temp/
 tmp/
 
+# 例外规则 - 这些目录不会被忽略
+!QEntL/compiler/src/backend/build/
+!QEntL/compiler/src/backend/build/*
+
 # 临时文件
 *.tmp
 *.bak
