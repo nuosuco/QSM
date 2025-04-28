@@ -1,0 +1,307 @@
+/**
+ * @file QEntL/compiler/src/QEntL/ast.qentl
+ * @brief 抽象语法树定义文件
+ * @quantum_gene_coding QGC-COMPILER-AST-2024061901
+ * @entanglement_channel EC-COMPILER-AST-20240619-01
+ */
+
+namespace QEntL.Compiler.AST {
+    
+    /**
+     * 节点类型枚举
+     */
+    enum NodeType {
+        // 表达式
+        EXPR_LITERAL,        // 字面量
+        EXPR_IDENTIFIER,     // 标识符
+        EXPR_BINARY,         // 二元表达式
+        EXPR_UNARY,          // 一元表达式
+        EXPR_CALL,           // 函数调用
+        EXPR_GET,            // 属性获取
+        EXPR_SET,            // 属性设置
+        EXPR_ARRAY,          // 数组表达式
+        EXPR_OBJECT,         // 对象表达式
+        EXPR_ASSIGNMENT,     // 赋值表达式
+        EXPR_LOGICAL,        // 逻辑表达式
+        EXPR_CONDITIONAL,    // 条件表达式
+        
+        // 量子表达式
+        EXPR_QUANTUM_NEW,    // 量子比特创建
+        EXPR_QUANTUM_MEASURE,// 量子比特测量
+        EXPR_QUANTUM_ENTANGLE,// 量子纠缠
+        EXPR_QUANTUM_SUPERPOS,// 量子叠加
+        
+        // 语句
+        STMT_BLOCK,          // 块语句
+        STMT_EXPRESSION,     // 表达式语句
+        STMT_IF,             // if语句
+        STMT_WHILE,          // while循环
+        STMT_FOR,            // for循环
+        STMT_FUNCTION,       // 函数声明
+        STMT_RETURN,         // return语句
+        STMT_VAR,            // 变量声明
+        STMT_CLASS,          // 类声明
+        
+        // 量子语句
+        STMT_QUANTUM_GATE,   // 量子门操作
+        STMT_QUANTUM_CIRCUIT,// 量子电路
+        
+        // 其他
+        TYPE_ANNOTATION,     // 类型注解
+        PARAMETER,           // 参数
+        CLASS_PROPERTY,      // 类属性
+        MODULE               // 模块
+    }
+    
+    /**
+     * 位置信息类
+     */
+    class Location {
+        property string file;
+        property int line;
+        property int column;
+        property int length;
+        
+        method Location(string file, int line, int column, int length) {
+            this.file = file;
+            this.line = line;
+            this.column = column;
+            this.length = length;
+        }
+        
+        method toString() -> string {
+            return file + ":" + line + ":" + column;
+        }
+    }
+    
+    /**
+     * 基础节点类
+     */
+    abstract class Node {
+        property NodeType type;
+        property Location location;
+        
+        method Node(NodeType type, Location location) {
+            this.type = type;
+            this.location = location;
+        }
+        
+        method virtual <T> accept(Visitor<T> visitor) -> T {
+            // 由子类实现
+            throw new Error("Abstract method");
+        }
+    }
+    
+    /**
+     * 表达式基类
+     */
+    abstract class Expr extends Node {
+        method Expr(NodeType type, Location location) {
+            super(type, location);
+        }
+    }
+    
+    /**
+     * 语句基类
+     */
+    abstract class Stmt extends Node {
+        method Stmt(NodeType type, Location location) {
+            super(type, location);
+        }
+    }
+    
+    /**
+     * 字面量表达式
+     */
+    class Literal : Expr {
+        property any value;
+        property string valueType;
+        
+        method Literal(any value, string valueType, Location location) {
+            super(NodeType.EXPR_LITERAL, location);
+            this.value = value;
+            this.valueType = valueType;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitLiteral(this);
+        }
+    }
+    
+    /**
+     * 标识符表达式
+     */
+    class Identifier : Expr {
+        property string name;
+        
+        method Identifier(string name, Location location) {
+            super(NodeType.EXPR_IDENTIFIER, location);
+            this.name = name;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitIdentifier(this);
+        }
+    }
+    
+    /**
+     * 二元表达式
+     */
+    class Binary : Expr {
+        property Expr left;
+        property string operator;
+        property Expr right;
+        
+        method Binary(Expr left, string operator, Expr right, Location location) {
+            super(NodeType.EXPR_BINARY, location);
+            this.left = left;
+            this.operator = operator;
+            this.right = right;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitBinary(this);
+        }
+    }
+    
+    /**
+     * 一元表达式
+     */
+    class Unary : Expr {
+        property string operator;
+        property Expr right;
+        
+        method Unary(string operator, Expr right, Location location) {
+            super(NodeType.EXPR_UNARY, location);
+            this.operator = operator;
+            this.right = right;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitUnary(this);
+        }
+    }
+    
+    /**
+     * 量子新建表达式
+     */
+    class QuantumNew : Expr {
+        property int numQubits;
+        property Expr? initialState;
+        
+        method QuantumNew(int numQubits, Expr? initialState, Location location) {
+            super(NodeType.EXPR_QUANTUM_NEW, location);
+            this.numQubits = numQubits;
+            this.initialState = initialState;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitQuantumNew(this);
+        }
+    }
+    
+    /**
+     * 量子测量表达式
+     */
+    class QuantumMeasure : Expr {
+        property Expr qbits;
+        
+        method QuantumMeasure(Expr qbits, Location location) {
+            super(NodeType.EXPR_QUANTUM_MEASURE, location);
+            this.qbits = qbits;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitQuantumMeasure(this);
+        }
+    }
+    
+    /**
+     * 量子纠缠表达式
+     */
+    class QuantumEntangle : Expr {
+        property Expr left;
+        property Expr right;
+        
+        method QuantumEntangle(Expr left, Expr right, Location location) {
+            super(NodeType.EXPR_QUANTUM_ENTANGLE, location);
+            this.left = left;
+            this.right = right;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitQuantumEntangle(this);
+        }
+    }
+    
+    /**
+     * 量子叠加表达式
+     */
+    class QuantumSuperpos : Expr {
+        property Expr qbit;
+        property List<double> weights;
+        
+        method QuantumSuperpos(Expr qbit, List<double> weights, Location location) {
+            super(NodeType.QUANTUM_SUPERPOS, location);
+            this.qbit = qbit;
+            this.weights = weights;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitQuantumSuperpos(this);
+        }
+    }
+    
+    /**
+     * 量子声明语句
+     */
+    class QuantumDeclaration : Stmt {
+        property string name;
+        property int numQubits;
+        property Expr? initializer;
+        
+        method QuantumDeclaration(string name, int numQubits, Expr? initializer, Location location) {
+            super(NodeType.QUANTUM_DECLARATION, location);
+            this.name = name;
+            this.numQubits = numQubits;
+            this.initializer = initializer;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitQuantumDeclaration(this);
+        }
+    }
+    
+    /**
+     * 程序根节点
+     */
+    class Program : Node {
+        property List<Stmt> statements;
+        
+        method Program(List<Stmt> statements, Location location) {
+            super(NodeType.PROGRAM, location);
+            this.statements = statements;
+        }
+        
+        method override <T> accept(Visitor<T> visitor) -> T {
+            return visitor.visitProgram(this);
+        }
+    }
+    
+    /**
+     * 访问者接口
+     */
+    interface Visitor<T> {
+        method visitProgram(Program node) -> T;
+        method visitLiteral(Literal node) -> T;
+        method visitIdentifier(Identifier node) -> T;
+        method visitBinary(Binary node) -> T;
+        method visitUnary(Unary node) -> T;
+        method visitQuantumNew(QuantumNew node) -> T;
+        method visitQuantumMeasure(QuantumMeasure node) -> T;
+        method visitQuantumEntangle(QuantumEntangle node) -> T;
+        method visitQuantumSuperpos(QuantumSuperpos node) -> T;
+        method visitQuantumDeclaration(QuantumDeclaration node) -> T;
+        // 其他访问方法...
+    }
+} 

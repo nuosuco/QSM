@@ -1,0 +1,616 @@
+/**
+ * @file lexer.qentl
+ * @brief QEntL词法分析器实现
+ * 
+ * 量子基因编码: QGC-COMPILER-LEXER-2024061901
+ * 量子纠缠信道: QEC-COMPILER-FRONTEND-01
+ */
+
+// 导入基础模块
+import "QEntL/core/file.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/error.qentl";
+import "QEntL/compiler/token.qentl";
+
+/**
+ * @class Lexer
+ * @brief 词法分析器实现，将源代码转换为标记流
+ */
+quantum_class Lexer {
+    // 私有属性
+    private {
+        source: String;         // 源代码
+        tokens: Array<Token>;   // 标记流
+        errors: Array<String>;  // 错误列表
+        
+        current: Integer = 0;   // 当前位置
+        start: Integer = 0;     // 当前标记起始位置
+        line: Integer = 1;      // 当前行号
+        column: Integer = 1;    // 当前列号
+        
+        // 关键字映射表
+        static keywords: Map<String, TokenType> = createKeywordMap();
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param source 源代码
+     */
+    constructor(source: String) {
+        this.source = source;
+        this.tokens = new Array<Token>();
+        this.errors = new Array<String>();
+    }
+    
+    /**
+     * @brief 扫描标记
+     * @return 标记流
+     */
+    public function scanTokens(): Array<Token> {
+        while (!this.isAtEnd()) {
+            // 开始下一个标记
+            this.start = this.current;
+            this.scanToken();
+        }
+        
+        // 添加EOF标记
+        this.tokens.push(new Token(TokenType.EOF, "", null, this.line, this.column));
+        return this.tokens;
+    }
+    
+    /**
+     * @brief 扫描一个标记
+     */
+    private function scanToken(): void {
+        let c = this.advance();
+        
+        // 根据字符类型进行处理
+        switch (c) {
+            // 单字符标记
+            case '(': this.addToken(TokenType.LEFT_PAREN); break;
+            case ')': this.addToken(TokenType.RIGHT_PAREN); break;
+            case '{': this.addToken(TokenType.LEFT_BRACE); break;
+            case '}': this.addToken(TokenType.RIGHT_BRACE); break;
+            case '[': this.addToken(TokenType.LEFT_BRACKET); break;
+            case ']': this.addToken(TokenType.RIGHT_BRACKET); break;
+            case ',': this.addToken(TokenType.COMMA); break;
+            case '.': this.addToken(TokenType.DOT); break;
+            case ';': this.addToken(TokenType.SEMICOLON); break;
+            case ':': this.addToken(TokenType.COLON); break;
+            
+            // 可能是单字符或双字符的标记
+            case '+': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.PLUS_EQUAL);
+                } else {
+                    this.addToken(TokenType.PLUS);
+                }
+                break;
+                
+            case '-': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.MINUS_EQUAL);
+                } else if (this.match('>')) {
+                    this.addToken(TokenType.ARROW);
+                } else {
+                    this.addToken(TokenType.MINUS);
+                }
+                break;
+                
+            case '*': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.STAR_EQUAL);
+                } else {
+                    this.addToken(TokenType.STAR);
+                }
+                break;
+                
+            case '/': 
+                if (this.match('/')) {
+                    // 单行注释
+                    while (this.peek() != '\n' && !this.isAtEnd()) {
+                        this.advance();
+                    }
+                } else if (this.match('*')) {
+                    // 多行注释
+                    this.multiLineComment();
+                } else if (this.match('=')) {
+                    this.addToken(TokenType.SLASH_EQUAL);
+                } else {
+                    this.addToken(TokenType.SLASH);
+                }
+                break;
+                
+            case '%': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.PERCENT_EQUAL);
+                } else {
+                    this.addToken(TokenType.PERCENT);
+                }
+                break;
+                
+            case '=': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.EQUAL_EQUAL);
+                } else {
+                    this.addToken(TokenType.EQUAL);
+                }
+                break;
+                
+            case '!': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.BANG_EQUAL);
+                } else {
+                    this.addToken(TokenType.BANG);
+                }
+                break;
+                
+            case '<': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.LESS_EQUAL);
+                } else {
+                    this.addToken(TokenType.LESS);
+                }
+                break;
+                
+            case '>': 
+                if (this.match('=')) {
+                    this.addToken(TokenType.GREATER_EQUAL);
+                } else {
+                    this.addToken(TokenType.GREATER);
+                }
+                break;
+                
+            case '&': 
+                if (this.match('&')) {
+                    this.addToken(TokenType.AND);
+                } else {
+                    this.addToken(TokenType.BITWISE_AND);
+                }
+                break;
+                
+            case '|': 
+                if (this.match('|')) {
+                    this.addToken(TokenType.OR);
+                } else {
+                    this.addToken(TokenType.BITWISE_OR);
+                }
+                break;
+                
+            // 量子特有操作符
+            case '~': 
+                this.addToken(TokenType.OP_ENTANGLE);
+                break;
+                
+            case '?': 
+                this.addToken(TokenType.OP_SUPERPOS);
+                break;
+                
+            case '@': 
+                this.addToken(TokenType.AT);
+                break;
+                
+            // 字符串
+            case '"': this.string(); break;
+            case '\'': this.charString(); break;
+            
+            // 空白字符
+            case ' ':
+            case '\r':
+            case '\t':
+                // 忽略空白字符
+                break;
+                
+            case '\n':
+                this.line++;
+                this.column = 1;
+                break;
+                
+            default:
+                // 数字
+                if (this.isDigit(c)) {
+                    this.number();
+                } 
+                // 标识符
+                else if (this.isAlpha(c)) {
+                    this.identifier();
+                } 
+                // 非法字符
+                else {
+                    this.error(`意外字符 '${c}'`);
+                }
+                break;
+        }
+    }
+    
+    /**
+     * @brief 处理标识符
+     */
+    private function identifier(): void {
+        while (this.isAlphaNumeric(this.peek())) {
+            this.advance();
+        }
+        
+        // 获取标识符文本
+        let text = this.source.substring(this.start, this.current);
+        
+        // 检查是否是关键字
+        let type = Lexer.keywords.get(text);
+        if (!type) {
+            type = TokenType.IDENTIFIER;
+        }
+        
+        this.addToken(type);
+    }
+    
+    /**
+     * @brief 处理数字
+     */
+    private function number(): void {
+        // 整数部分
+        while (this.isDigit(this.peek())) {
+            this.advance();
+        }
+        
+        // 小数部分
+        if (this.peek() == '.' && this.isDigit(this.peekNext())) {
+            // 消耗小数点
+            this.advance();
+            
+            // 小数点后的数字
+            while (this.isDigit(this.peek())) {
+                this.advance();
+            }
+        }
+        
+        // 指数部分
+        if (this.peek() == 'e' || this.peek() == 'E') {
+            let next = this.peekNext();
+            if (this.isDigit(next) || next == '+' || next == '-') {
+                // 消耗'e'或'E'
+                this.advance();
+                
+                // 消耗可能的符号
+                if (this.peek() == '+' || this.peek() == '-') {
+                    this.advance();
+                }
+                
+                // 指数部分的数字
+                if (!this.isDigit(this.peek())) {
+                    this.error("指数表示缺少数字");
+                    return;
+                }
+                
+                while (this.isDigit(this.peek())) {
+                    this.advance();
+                }
+            }
+        }
+        
+        // 获取数字文本并转换为数值
+        let text = this.source.substring(this.start, this.current);
+        let value = parseFloat(text);
+        
+        // 检查是否是整数
+        if (text.indexOf('.') == -1 && text.indexOf('e') == -1 && text.indexOf('E') == -1) {
+            this.addToken(TokenType.INTEGER, parseInt(text));
+        } else {
+            this.addToken(TokenType.FLOAT, value);
+        }
+    }
+    
+    /**
+     * @brief 处理字符串
+     */
+    private function string(): void {
+        // 查找字符串的结束引号
+        while (this.peek() != '"' && !this.isAtEnd()) {
+            if (this.peek() == '\n') {
+                this.line++;
+                this.column = 1;
+            }
+            
+            // 处理转义字符
+            if (this.peek() == '\\' && this.peekNext() == '"') {
+                this.advance(); // 消耗反斜杠
+            }
+            
+            this.advance();
+        }
+        
+        // 未闭合的字符串
+        if (this.isAtEnd()) {
+            this.error("未闭合的字符串");
+            return;
+        }
+        
+        // 消耗结束引号
+        this.advance();
+        
+        // 获取字符串内容(不包括引号)
+        let value = this.source.substring(this.start + 1, this.current - 1);
+        
+        // 处理转义字符
+        value = this.unescapeString(value);
+        
+        this.addToken(TokenType.STRING, value);
+    }
+    
+    /**
+     * @brief 处理单引号字符串
+     */
+    private function charString(): void {
+        // 查找字符串的结束引号
+        while (this.peek() != '\'' && !this.isAtEnd()) {
+            if (this.peek() == '\n') {
+                this.line++;
+                this.column = 1;
+            }
+            
+            // 处理转义字符
+            if (this.peek() == '\\' && this.peekNext() == '\'') {
+                this.advance(); // 消耗反斜杠
+            }
+            
+            this.advance();
+        }
+        
+        // 未闭合的字符串
+        if (this.isAtEnd()) {
+            this.error("未闭合的字符串");
+            return;
+        }
+        
+        // 消耗结束引号
+        this.advance();
+        
+        // 获取字符串内容(不包括引号)
+        let value = this.source.substring(this.start + 1, this.current - 1);
+        
+        // 处理转义字符
+        value = this.unescapeString(value);
+        
+        this.addToken(TokenType.STRING, value);
+    }
+    
+    /**
+     * @brief 处理多行注释
+     */
+    private function multiLineComment(): void {
+        let nesting = 1;
+        
+        while (nesting > 0 && !this.isAtEnd()) {
+            if (this.peek() == '/' && this.peekNext() == '*') {
+                this.advance(); // 消耗'/'
+                this.advance(); // 消耗'*'
+                nesting++;
+            } else if (this.peek() == '*' && this.peekNext() == '/') {
+                this.advance(); // 消耗'*'
+                this.advance(); // 消耗'/'
+                nesting--;
+            } else {
+                if (this.peek() == '\n') {
+                    this.line++;
+                    this.column = 1;
+                }
+                this.advance();
+            }
+        }
+        
+        // 未闭合的注释
+        if (this.isAtEnd() && nesting > 0) {
+            this.error("未闭合的多行注释");
+        }
+    }
+    
+    /**
+     * @brief 处理转义字符
+     * @param str 包含转义字符的字符串
+     * @return 处理后的字符串
+     */
+    private function unescapeString(str: String): String {
+        let result = "";
+        let i = 0;
+        
+        while (i < str.length()) {
+            if (str.charAt(i) == '\\') {
+                i++;
+                
+                if (i >= str.length()) {
+                    break;
+                }
+                
+                let c = str.charAt(i);
+                switch (c) {
+                    case 'n': result += '\n'; break;
+                    case 'r': result += '\r'; break;
+                    case 't': result += '\t'; break;
+                    case '\\': result += '\\'; break;
+                    case '"': result += '"'; break;
+                    case '\'': result += '\''; break;
+                    default: result += c; break;
+                }
+            } else {
+                result += str.charAt(i);
+            }
+            
+            i++;
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 添加标记
+     * @param type 标记类型
+     * @param literal 标记字面值
+     */
+    private function addToken(type: TokenType, literal: Any = null): void {
+        let text = this.source.substring(this.start, this.current);
+        this.tokens.push(new Token(type, text, literal, this.line, this.column));
+        this.column += (this.current - this.start);
+    }
+    
+    /**
+     * @brief 检查当前字符是否匹配预期字符
+     * @param expected 预期字符
+     * @return 是否匹配
+     */
+    private function match(expected: Char): Boolean {
+        if (this.isAtEnd()) {
+            return false;
+        }
+        
+        if (this.source.charAt(this.current) != expected) {
+            return false;
+        }
+        
+        this.current++;
+        return true;
+    }
+    
+    /**
+     * @brief 查看当前字符但不消耗
+     * @return 当前字符
+     */
+    private function peek(): Char {
+        if (this.isAtEnd()) {
+            return '\0';
+        }
+        
+        return this.source.charAt(this.current);
+    }
+    
+    /**
+     * @brief 查看下一个字符但不消耗
+     * @return 下一个字符
+     */
+    private function peekNext(): Char {
+        if (this.current + 1 >= this.source.length()) {
+            return '\0';
+        }
+        
+        return this.source.charAt(this.current + 1);
+    }
+    
+    /**
+     * @brief 检查是否为字母或下划线
+     * @param c 字符
+     * @return 是否为字母或下划线
+     */
+    private function isAlpha(c: Char): Boolean {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+    }
+    
+    /**
+     * @brief 检查是否为数字
+     * @param c 字符
+     * @return 是否为数字
+     */
+    private function isDigit(c: Char): Boolean {
+        return c >= '0' && c <= '9';
+    }
+    
+    /**
+     * @brief 检查是否为字母、数字或下划线
+     * @param c 字符
+     * @return 是否为字母、数字或下划线
+     */
+    private function isAlphaNumeric(c: Char): Boolean {
+        return this.isAlpha(c) || this.isDigit(c);
+    }
+    
+    /**
+     * @brief 消耗当前字符并返回
+     * @return 当前字符
+     */
+    private function advance(): Char {
+        let c = this.source.charAt(this.current);
+        this.current++;
+        return c;
+    }
+    
+    /**
+     * @brief 检查是否到达源码末尾
+     * @return 是否到达末尾
+     */
+    private function isAtEnd(): Boolean {
+        return this.current >= this.source.length();
+    }
+    
+    /**
+     * @brief 添加错误
+     * @param message 错误消息
+     */
+    private function error(message: String): void {
+        let err = `第${this.line}行第${this.column}列: ${message}`;
+        this.errors.push(err);
+    }
+    
+    /**
+     * @brief 获取错误列表
+     * @return 错误列表
+     */
+    public function getErrors(): Array<String> {
+        return this.errors;
+    }
+    
+    /**
+     * @brief 创建关键字映射表
+     * @return 关键字映射表
+     */
+    private static function createKeywordMap(): Map<String, TokenType> {
+        let map = new Map<String, TokenType>();
+        
+        // 基本关键字
+        map.set("function", TokenType.KW_FUNCTION);
+        map.set("var", TokenType.KW_VAR);
+        map.set("let", TokenType.KW_LET);
+        map.set("const", TokenType.KW_CONST);
+        map.set("if", TokenType.KW_IF);
+        map.set("else", TokenType.KW_ELSE);
+        map.set("for", TokenType.KW_FOR);
+        map.set("while", TokenType.KW_WHILE);
+        map.set("do", TokenType.KW_DO);
+        map.set("break", TokenType.KW_BREAK);
+        map.set("continue", TokenType.KW_CONTINUE);
+        map.set("return", TokenType.KW_RETURN);
+        map.set("true", TokenType.KW_TRUE);
+        map.set("false", TokenType.KW_FALSE);
+        map.set("null", TokenType.KW_NULL);
+        map.set("this", TokenType.KW_THIS);
+        map.set("super", TokenType.KW_SUPER);
+        map.set("import", TokenType.KW_IMPORT);
+        map.set("export", TokenType.KW_EXPORT);
+        map.set("class", TokenType.KW_CLASS);
+        map.set("extends", TokenType.KW_EXTENDS);
+        map.set("public", TokenType.KW_PUBLIC);
+        map.set("private", TokenType.KW_PRIVATE);
+        map.set("protected", TokenType.KW_PROTECTED);
+        map.set("static", TokenType.KW_STATIC);
+        map.set("new", TokenType.KW_NEW);
+        map.set("delete", TokenType.KW_DELETE);
+        map.set("try", TokenType.KW_TRY);
+        map.set("catch", TokenType.KW_CATCH);
+        map.set("finally", TokenType.KW_FINALLY);
+        map.set("throw", TokenType.KW_THROW);
+        
+        // 量子关键字
+        map.set("quantum", TokenType.KW_QUANTUM);
+        map.set("qnew", TokenType.KW_QNEW);
+        map.set("qmeasure", TokenType.KW_QMEASURE);
+        map.set("qentangle", TokenType.KW_QENTANGLE);
+        map.set("superpos", TokenType.KW_SUPERPOS);
+        map.set("qstate", TokenType.KW_QSTATE);
+        map.set("qbit", TokenType.KW_QBIT);
+        map.set("quantum_entity", TokenType.KW_QUANTUM_ENTITY);
+        map.set("quantum_class", TokenType.KW_QUANTUM_CLASS);
+        map.set("quantum_function", TokenType.KW_QUANTUM_FUNCTION);
+        map.set("quantum_program", TokenType.KW_QUANTUM_PROGRAM);
+        map.set("entangle", TokenType.KW_ENTANGLE);
+        
+        return map;
+    }
+} 

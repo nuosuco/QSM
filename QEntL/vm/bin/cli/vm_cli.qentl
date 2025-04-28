@@ -1,0 +1,293 @@
+/**
+ * @file vm_cli.qentl
+ * @brief QEntL虚拟机命令行接口
+ * 
+ * 量子基因编码: QGC-VM-CLI-2024061901
+ * 量子纠缠信道: QEC-VM-CLI-01
+ */
+
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/error.qentl";
+import "QEntL/vm/src/core/interpreter/interpreter.qentl";
+import "QEntL/vm/src/core/os_interface/file_system.qentl";
+import "QEntL/vm/src/core/os_interface/process.qentl";
+
+/**
+ * @class VMCommand
+ * @brief 虚拟机命令行参数
+ */
+class VMCommand {
+    public {
+        action: String;           // 操作类型: run, compile, help
+        filename: String;         // 文件名
+        outputFilename: String;   // 输出文件名
+        args: Array<String>;      // 程序参数
+        verbose: Boolean;         // 是否详细输出
+        debug: Boolean;           // 是否开启调试
+        memoryLimit: Integer;     // 内存限制(MB)
+        optimizationLevel: Integer; // 优化级别
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.action = "help";
+        this.filename = "";
+        this.outputFilename = "";
+        this.args = new Array<String>();
+        this.verbose = false;
+        this.debug = false;
+        this.memoryLimit = 1024;  // 默认1GB内存限制
+        this.optimizationLevel = 1;  // 默认优化级别1
+    }
+    
+    /**
+     * @brief 解析命令行参数
+     * @param args 命令行参数数组
+     * @return 是否成功解析
+     */
+    public function parse(args: Array<String>): Boolean {
+        if (args.length < 1) {
+            return false;
+        }
+        
+        let i = 0;
+        
+        // 跳过程序名称
+        i++;
+        
+        if (i >= args.length) {
+            return false;
+        }
+        
+        // 解析操作类型
+        if (args[i] === "run" || args[i] === "compile" || args[i] === "help") {
+            this.action = args[i];
+            i++;
+        } else {
+            // 如果没有指定操作类型，默认为run
+            this.action = "run";
+        }
+        
+        if (this.action === "help") {
+            return true;
+        }
+        
+        // 解析文件名
+        if (i < args.length && !args[i].startsWith("--")) {
+            this.filename = args[i];
+            i++;
+        } else {
+            return false;
+        }
+        
+        // 解析选项
+        while (i < args.length && args[i].startsWith("--")) {
+            let option = args[i];
+            
+            if (option === "--verbose" || option === "-v") {
+                this.verbose = true;
+            } else if (option === "--debug" || option === "-d") {
+                this.debug = true;
+            } else if (option.startsWith("--memory=")) {
+                let value = option.substr(9);
+                this.memoryLimit = parseInt(value);
+            } else if (option.startsWith("--optimize=") || option.startsWith("-O")) {
+                let value = option.startsWith("--optimize=") ? option.substr(11) : option.substr(2);
+                this.optimizationLevel = parseInt(value);
+            } else if (option.startsWith("--output=") || option === "-o") {
+                if (option === "-o") {
+                    i++;
+                    if (i < args.length) {
+                        this.outputFilename = args[i];
+                    } else {
+                        return false;
+                    }
+                } else {
+                    this.outputFilename = option.substr(9);
+                }
+            } else if (option === "--") {
+                // 后面的参数都作为程序参数
+                i++;
+                break;
+            } else {
+                // 未知选项
+                console.error("未知选项: " + option);
+                return false;
+            }
+            
+            i++;
+        }
+        
+        // 剩余的参数作为程序参数
+        while (i < args.length) {
+            this.args.push(args[i]);
+            i++;
+        }
+        
+        return true;
+    }
+}
+
+/**
+ * @class VMCLI
+ * @brief 虚拟机命令行接口
+ */
+quantum_class VMCLI {
+    /**
+     * @brief 主函数
+     * @param args 命令行参数
+     * @return 退出代码
+     */
+    public static function main(args: Array<String>): Integer {
+        let command = new VMCommand();
+        
+        if (!command.parse(args)) {
+            printUsage();
+            return 1;
+        }
+        
+        if (command.action === "help") {
+            printUsage();
+            return 0;
+        } else if (command.action === "run") {
+            return runFile(command);
+        } else if (command.action === "compile") {
+            return compileFile(command);
+        }
+        
+        return 0;
+    }
+    
+    /**
+     * @brief 打印使用说明
+     */
+    private static function printUsage(): void {
+        console.log("QEntL虚拟机 v1.0.0");
+        console.log("使用方法: qentl-vm [run|compile|help] [options] filename [-- args...]");
+        console.log("");
+        console.log("操作:");
+        console.log("  run               运行QEntL程序(默认)");
+        console.log("  compile           编译QEntL程序到字节码");
+        console.log("  help              显示帮助信息");
+        console.log("");
+        console.log("选项:");
+        console.log("  --verbose, -v     输出详细信息");
+        console.log("  --debug, -d       开启调试模式");
+        console.log("  --memory=SIZE     设置内存限制(MB)");
+        console.log("  --optimize=LEVEL  设置优化级别(0-3)");
+        console.log("  --output=FILE, -o FILE");
+        console.log("                    指定输出文件");
+        console.log("  --                分隔虚拟机选项和程序参数");
+    }
+    
+    /**
+     * @brief 运行QEntL文件
+     * @param command 命令行参数
+     * @return 退出代码
+     */
+    private static function runFile(command: VMCommand): Integer {
+        try {
+            if (command.verbose) {
+                console.log("运行文件: " + command.filename);
+                console.log("内存限制: " + command.memoryLimit + "MB");
+                console.log("优化级别: " + command.optimizationLevel);
+                console.log("调试模式: " + (command.debug ? "开启" : "关闭"));
+                console.log("程序参数: " + command.args.join(" "));
+            }
+            
+            // 检查文件是否存在
+            if (!FileSystem.exists(command.filename)) {
+                console.error("错误: 文件不存在: " + command.filename);
+                return 1;
+            }
+            
+            // 配置解释器
+            let interpreter = new Interpreter();
+            interpreter.setMemoryLimit(command.memoryLimit * 1024 * 1024);
+            interpreter.setOptimizationLevel(command.optimizationLevel);
+            interpreter.setDebugMode(command.debug);
+            interpreter.setProgramArguments(command.args);
+            
+            // 加载并运行程序
+            let result = interpreter.runFile(command.filename);
+            
+            if (command.verbose) {
+                console.log("程序执行完成，退出代码: " + result);
+            }
+            
+            return result;
+        } catch (e) {
+            console.error("运行错误: " + e.message);
+            if (command.debug) {
+                console.error(e.stack);
+            }
+            return 1;
+        }
+    }
+    
+    /**
+     * @brief 编译QEntL文件
+     * @param command 命令行参数
+     * @return 退出代码
+     */
+    private static function compileFile(command: VMCommand): Integer {
+        try {
+            if (command.verbose) {
+                console.log("编译文件: " + command.filename);
+                console.log("优化级别: " + command.optimizationLevel);
+            }
+            
+            // 检查文件是否存在
+            if (!FileSystem.exists(command.filename)) {
+                console.error("错误: 文件不存在: " + command.filename);
+                return 1;
+            }
+            
+            // 确定输出文件名
+            let outputFilename = command.outputFilename;
+            if (outputFilename === "") {
+                // 默认输出文件名
+                let dotPos = command.filename.lastIndexOf(".");
+                if (dotPos > 0) {
+                    outputFilename = command.filename.substr(0, dotPos) + ".qobj";
+                } else {
+                    outputFilename = command.filename + ".qobj";
+                }
+            }
+            
+            // 配置解释器进行编译
+            let interpreter = new Interpreter();
+            interpreter.setOptimizationLevel(command.optimizationLevel);
+            interpreter.setDebugMode(command.debug);
+            
+            // 编译程序
+            let success = interpreter.compileFile(command.filename, outputFilename);
+            
+            if (success) {
+                if (command.verbose) {
+                    console.log("编译成功: " + outputFilename);
+                }
+                return 0;
+            } else {
+                console.error("编译失败");
+                return 1;
+            }
+        } catch (e) {
+            console.error("编译错误: " + e.message);
+            if (command.debug) {
+                console.error(e.stack);
+            }
+            return 1;
+        }
+    }
+}
+
+// 程序入口
+function main(args: Array<String>): Integer {
+    return VMCLI.main(args);
+}
+
+export { VMCLI, main }; 

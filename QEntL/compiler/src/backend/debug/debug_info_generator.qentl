@@ -1,0 +1,653 @@
+/**
+ * @file debug_info_generator.qentl
+ * @brief QEntL调试信息生成器
+ * 
+ * 量子基因编码: QGC-COMPILER-DBGI-2024061902
+ * 量子纠缠信道: QEC-COMPILER-DEBUG-01
+ */
+
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/set.qentl";
+import "QEntL/core/system.qentl";
+import "QEntL/compiler/src/frontend/semantic/symbol_table.qentl";
+import "QEntL/compiler/src/frontend/parser/ast.qentl";
+
+/**
+ * @class SourceLocation
+ * @brief 源代码位置信息
+ */
+class SourceLocation {
+    public {
+        filePath: String;  // 源文件路径
+        line: Integer;     // 行号
+        column: Integer;   // 列号
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param filePath 源文件路径
+     * @param line 行号
+     * @param column 列号
+     */
+    constructor(filePath: String, line: Integer, column: Integer) {
+        this.filePath = filePath;
+        this.line = line;
+        this.column = column;
+    }
+    
+    /**
+     * @brief 获取格式化的位置字符串
+     * @return 格式化的位置字符串
+     */
+    public function toString(): String {
+        return this.filePath + ":" + this.line + ":" + this.column;
+    }
+    
+    /**
+     * @brief 比较两个位置是否相等
+     * @param other 另一个位置对象
+     * @return 是否相等
+     */
+    public function equals(other: SourceLocation): Boolean {
+        return this.filePath == other.filePath &&
+               this.line == other.line &&
+               this.column == other.column;
+    }
+}
+
+/**
+ * @class SourceRange
+ * @brief 源代码范围信息
+ */
+class SourceRange {
+    public {
+        start: SourceLocation;  // 起始位置
+        end: SourceLocation;    // 结束位置
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param start 起始位置
+     * @param end 结束位置
+     */
+    constructor(start: SourceLocation, end: SourceLocation) {
+        this.start = start;
+        this.end = end;
+    }
+    
+    /**
+     * @brief 获取格式化的范围字符串
+     * @return 格式化的范围字符串
+     */
+    public function toString(): String {
+        return this.start.toString() + " - " + this.end.toString();
+    }
+    
+    /**
+     * @brief 比较两个范围是否相等
+     * @param other 另一个范围对象
+     * @return 是否相等
+     */
+    public function equals(other: SourceRange): Boolean {
+        return this.start.equals(other.start) && this.end.equals(other.end);
+    }
+}
+
+/**
+ * @class DebugSymbol
+ * @brief 调试符号信息
+ */
+class DebugSymbol {
+    public {
+        id: Integer;          // 符号ID
+        name: String;         // 符号名称
+        type: String;         // 符号类型
+        sourceRange: SourceRange; // 源代码范围
+        scope: Integer;       // 作用域ID
+        parentId: Integer;    // 父符号ID
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param id 符号ID
+     * @param name 符号名称
+     * @param type 符号类型
+     * @param sourceRange 源代码范围
+     * @param scope 作用域ID
+     * @param parentId 父符号ID
+     */
+    constructor(id: Integer, name: String, type: String, sourceRange: SourceRange, scope: Integer, parentId: Integer = -1) {
+        this.id = id;
+        this.name = name;
+        this.type = type;
+        this.sourceRange = sourceRange;
+        this.scope = scope;
+        this.parentId = parentId;
+    }
+}
+
+/**
+ * @class SourceMap
+ * @brief 源代码映射信息
+ */
+class SourceMap {
+    public {
+        originalLocation: SourceRange;  // 原始源代码位置
+        generatedAddress: Integer;      // 生成的代码地址
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param originalLocation 原始源代码位置
+     * @param generatedAddress 生成的代码地址
+     */
+    constructor(originalLocation: SourceRange, generatedAddress: Integer) {
+        this.originalLocation = originalLocation;
+        this.generatedAddress = generatedAddress;
+    }
+}
+
+/**
+ * @class DebugScope
+ * @brief 调试作用域信息
+ */
+class DebugScope {
+    public {
+        id: Integer;                // 作用域ID
+        name: String;               // 作用域名称
+        type: String;               // 作用域类型
+        sourceRange: SourceRange;   // 源代码范围
+        parentId: Integer;          // 父作用域ID
+        symbols: Array<Integer>;    // 此作用域中的符号ID
+        childScopes: Array<Integer>; // 子作用域ID
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param id 作用域ID
+     * @param name 作用域名称
+     * @param type 作用域类型
+     * @param sourceRange 源代码范围
+     * @param parentId 父作用域ID
+     */
+    constructor(id: Integer, name: String, type: String, sourceRange: SourceRange, parentId: Integer = -1) {
+        this.id = id;
+        this.name = name;
+        this.type = type;
+        this.sourceRange = sourceRange;
+        this.parentId = parentId;
+        this.symbols = new Array<Integer>();
+        this.childScopes = new Array<Integer>();
+    }
+    
+    /**
+     * @brief 添加符号到作用域
+     * @param symbolId 符号ID
+     */
+    public function addSymbol(symbolId: Integer): void {
+        if (!this.symbols.contains(symbolId)) {
+            this.symbols.push(symbolId);
+        }
+    }
+    
+    /**
+     * @brief 添加子作用域
+     * @param scopeId 子作用域ID
+     */
+    public function addChildScope(scopeId: Integer): void {
+        if (!this.childScopes.contains(scopeId)) {
+            this.childScopes.push(scopeId);
+        }
+    }
+}
+
+/**
+ * @class DebugInfoGenerator
+ * @brief 调试信息生成器
+ */
+class DebugInfoGenerator {
+    private {
+        sourceMaps: Array<SourceMap>;       // 源代码映射数组
+        symbols: Map<Integer, DebugSymbol>; // 符号映射
+        scopes: Map<Integer, DebugScope>;   // 作用域映射
+        nextSymbolId: Integer;              // 下一个符号ID
+        nextScopeId: Integer;               // 下一个作用域ID
+        globalScopeId: Integer;             // 全局作用域ID
+        currentScopeId: Integer;            // 当前作用域ID
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.sourceMaps = new Array<SourceMap>();
+        this.symbols = new Map<Integer, DebugSymbol>();
+        this.scopes = new Map<Integer, DebugScope>();
+        this.nextSymbolId = 1;
+        this.nextScopeId = 1;
+        
+        // 创建全局作用域
+        let globalSourceLoc = new SourceLocation("", 0, 0);
+        let globalSourceRange = new SourceRange(globalSourceLoc, globalSourceLoc);
+        this.globalScopeId = this.createScope("global", "global", globalSourceRange);
+        this.currentScopeId = this.globalScopeId;
+    }
+    
+    /**
+     * @brief 创建新的作用域
+     * @param name 作用域名称
+     * @param type 作用域类型
+     * @param sourceRange 源代码范围
+     * @param parentId 父作用域ID，默认为当前作用域
+     * @return 新作用域ID
+     */
+    public function createScope(name: String, type: String, sourceRange: SourceRange, parentId: Integer = -1): Integer {
+        if (parentId == -1) {
+            parentId = this.currentScopeId;
+        }
+        
+        let scopeId = this.nextScopeId++;
+        let scope = new DebugScope(scopeId, name, type, sourceRange, parentId);
+        this.scopes.set(scopeId, scope);
+        
+        // 如果有父作用域，将此作用域添加为子作用域
+        if (parentId != -1 && this.scopes.containsKey(parentId)) {
+            this.scopes.get(parentId).addChildScope(scopeId);
+        }
+        
+        return scopeId;
+    }
+    
+    /**
+     * @brief 创建新的符号
+     * @param name 符号名称
+     * @param type 符号类型
+     * @param sourceRange 源代码范围
+     * @param scopeId 作用域ID，默认为当前作用域
+     * @param parentId 父符号ID
+     * @return 新符号ID
+     */
+    public function createSymbol(name: String, type: String, sourceRange: SourceRange, scopeId: Integer = -1, parentId: Integer = -1): Integer {
+        if (scopeId == -1) {
+            scopeId = this.currentScopeId;
+        }
+        
+        let symbolId = this.nextSymbolId++;
+        let symbol = new DebugSymbol(symbolId, name, type, sourceRange, scopeId, parentId);
+        this.symbols.set(symbolId, symbol);
+        
+        // 将符号添加到对应的作用域
+        if (this.scopes.containsKey(scopeId)) {
+            this.scopes.get(scopeId).addSymbol(symbolId);
+        }
+        
+        return symbolId;
+    }
+    
+    /**
+     * @brief 设置当前作用域
+     * @param scopeId 作用域ID
+     */
+    public function setCurrentScope(scopeId: Integer): void {
+        if (this.scopes.containsKey(scopeId)) {
+            this.currentScopeId = scopeId;
+        }
+    }
+    
+    /**
+     * @brief 获取当前作用域ID
+     * @return 当前作用域ID
+     */
+    public function getCurrentScopeId(): Integer {
+        return this.currentScopeId;
+    }
+    
+    /**
+     * @brief 添加源代码映射
+     * @param originalLocation 原始源代码位置
+     * @param generatedAddress 生成的代码地址
+     */
+    public function addSourceMap(originalLocation: SourceRange, generatedAddress: Integer): void {
+        let sourceMap = new SourceMap(originalLocation, generatedAddress);
+        this.sourceMaps.push(sourceMap);
+    }
+    
+    /**
+     * @brief 从AST节点创建源代码范围
+     * @param node AST节点
+     * @return 源代码范围
+     */
+    public function createSourceRangeFromNode(node: ASTNode): SourceRange {
+        let startLoc = new SourceLocation(node.sourceFile, node.startLine, node.startColumn);
+        let endLoc = new SourceLocation(node.sourceFile, node.endLine, node.endColumn);
+        return new SourceRange(startLoc, endLoc);
+    }
+    
+    /**
+     * @brief 从符号表条目创建调试符号
+     * @param entry 符号表条目
+     * @param sourceRange 源代码范围
+     * @return 符号ID
+     */
+    public function createSymbolFromTableEntry(entry: SymbolTableEntry, sourceRange: SourceRange): Integer {
+        let symbolType = "";
+        
+        // 根据符号类型设置类型字符串
+        if (entry.kind == SymbolKind.VARIABLE) {
+            symbolType = "variable";
+        } else if (entry.kind == SymbolKind.FUNCTION) {
+            symbolType = "function";
+        } else if (entry.kind == SymbolKind.CLASS) {
+            symbolType = "class";
+        } else if (entry.kind == SymbolKind.ENUM) {
+            symbolType = "enum";
+        } else if (entry.kind == SymbolKind.PARAMETER) {
+            symbolType = "parameter";
+        } else {
+            symbolType = "unknown";
+        }
+        
+        return this.createSymbol(entry.name, symbolType, sourceRange);
+    }
+    
+    /**
+     * @brief 从符号表创建调试信息
+     * @param symbolTable 符号表
+     */
+    public function createDebugInfoFromSymbolTable(symbolTable: SymbolTable): void {
+        // 遍历所有作用域
+        for (let i = 0; i < symbolTable.scopes.length; i++) {
+            let scope = symbolTable.scopes[i];
+            let scopeName = "scope_" + i;
+            let scopeType = "block";
+            
+            // 为作用域创建一个源代码范围（这里使用一个默认值）
+            let startLoc = new SourceLocation(scope.filePath || "", scope.startLine || 0, scope.startColumn || 0);
+            let endLoc = new SourceLocation(scope.filePath || "", scope.endLine || 0, scope.endColumn || 0);
+            let sourceRange = new SourceRange(startLoc, endLoc);
+            
+            // 创建作用域
+            let scopeId = this.createScope(scopeName, scopeType, sourceRange, scope.parentScope);
+            
+            // 遍历作用域中的所有符号
+            let symbols = scope.getSymbols();
+            for (let j = 0; j < symbols.length; j++) {
+                let symbol = symbols[j];
+                
+                // 为符号创建一个源代码范围
+                startLoc = new SourceLocation(symbol.declarationFile || "", symbol.declarationLine || 0, symbol.declarationColumn || 0);
+                endLoc = new SourceLocation(symbol.declarationFile || "", symbol.declarationEndLine || 0, symbol.declarationEndColumn || 0);
+                sourceRange = new SourceRange(startLoc, endLoc);
+                
+                // 创建符号
+                this.createSymbolFromTableEntry(symbol, sourceRange, scopeId);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取指定地址的源代码位置
+     * @param address 代码地址
+     * @return 源代码位置，如果找不到则返回null
+     */
+    public function getSourceLocationForAddress(address: Integer): SourceRange {
+        // 查找最接近但不超过指定地址的映射
+        let bestMatch = null;
+        let bestDiff = Integer.MAX_VALUE;
+        
+        for (let i = 0; i < this.sourceMaps.length; i++) {
+            let map = this.sourceMaps[i];
+            if (map.generatedAddress <= address) {
+                let diff = address - map.generatedAddress;
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestMatch = map;
+                }
+            }
+        }
+        
+        return bestMatch ? bestMatch.originalLocation : null;
+    }
+    
+    /**
+     * @brief 获取指定源代码位置的符号
+     * @param location 源代码位置
+     * @return 符号ID数组，如果找不到则返回空数组
+     */
+    public function getSymbolsAtLocation(location: SourceLocation): Array<Integer> {
+        let result = new Array<Integer>();
+        let symbolIds = this.symbols.keys();
+        
+        for (let i = 0; i < symbolIds.length; i++) {
+            let symbolId = symbolIds[i];
+            let symbol = this.symbols.get(symbolId);
+            
+            let range = symbol.sourceRange;
+            
+            // 检查位置是否在范围内
+            if (range.start.filePath == location.filePath &&
+                ((range.start.line < location.line) ||
+                 (range.start.line == location.line && range.start.column <= location.column)) &&
+                ((range.end.line > location.line) ||
+                 (range.end.line == location.line && range.end.column >= location.column))) {
+                result.push(symbolId);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取指定作用域中的所有符号
+     * @param scopeId 作用域ID
+     * @return 符号ID数组
+     */
+    public function getSymbolsInScope(scopeId: Integer): Array<Integer> {
+        if (this.scopes.containsKey(scopeId)) {
+            return this.scopes.get(scopeId).symbols;
+        }
+        return new Array<Integer>();
+    }
+    
+    /**
+     * @brief 获取符号
+     * @param symbolId 符号ID
+     * @return 符号对象，如果不存在则返回null
+     */
+    public function getSymbol(symbolId: Integer): DebugSymbol {
+        if (this.symbols.containsKey(symbolId)) {
+            return this.symbols.get(symbolId);
+        }
+        return null;
+    }
+    
+    /**
+     * @brief 获取作用域
+     * @param scopeId 作用域ID
+     * @return 作用域对象，如果不存在则返回null
+     */
+    public function getScope(scopeId: Integer): DebugScope {
+        if (this.scopes.containsKey(scopeId)) {
+            return this.scopes.get(scopeId);
+        }
+        return null;
+    }
+    
+    /**
+     * @brief 获取全局作用域ID
+     * @return 全局作用域ID
+     */
+    public function getGlobalScopeId(): Integer {
+        return this.globalScopeId;
+    }
+    
+    /**
+     * @brief 获取所有源代码映射
+     * @return 源代码映射数组
+     */
+    public function getAllSourceMaps(): Array<SourceMap> {
+        return this.sourceMaps;
+    }
+    
+    /**
+     * @brief 获取所有符号ID
+     * @return 符号ID数组
+     */
+    public function getAllSymbolIds(): Array<Integer> {
+        return this.symbols.keys();
+    }
+    
+    /**
+     * @brief 获取所有作用域ID
+     * @return 作用域ID数组
+     */
+    public function getAllScopeIds(): Array<Integer> {
+        return this.scopes.keys();
+    }
+    
+    /**
+     * @brief 将调试信息保存到JSON格式字符串
+     * @return JSON格式的调试信息
+     */
+    public function saveToJSON(): String {
+        // 构建JSON对象
+        let json = "{\n";
+        
+        // 添加源代码映射
+        json += "  \"sourceMaps\": [\n";
+        for (let i = 0; i < this.sourceMaps.length; i++) {
+            let map = this.sourceMaps[i];
+            json += "    {\n";
+            json += "      \"originalLocation\": {\n";
+            json += "        \"start\": {\n";
+            json += "          \"filePath\": \"" + map.originalLocation.start.filePath + "\",\n";
+            json += "          \"line\": " + map.originalLocation.start.line + ",\n";
+            json += "          \"column\": " + map.originalLocation.start.column + "\n";
+            json += "        },\n";
+            json += "        \"end\": {\n";
+            json += "          \"filePath\": \"" + map.originalLocation.end.filePath + "\",\n";
+            json += "          \"line\": " + map.originalLocation.end.line + ",\n";
+            json += "          \"column\": " + map.originalLocation.end.column + "\n";
+            json += "        }\n";
+            json += "      },\n";
+            json += "      \"generatedAddress\": " + map.generatedAddress + "\n";
+            json += "    }";
+            if (i < this.sourceMaps.length - 1) {
+                json += ",";
+            }
+            json += "\n";
+        }
+        json += "  ],\n";
+        
+        // 添加符号
+        json += "  \"symbols\": {\n";
+        let symbolIds = this.symbols.keys();
+        for (let i = 0; i < symbolIds.length; i++) {
+            let id = symbolIds[i];
+            let symbol = this.symbols.get(id);
+            
+            json += "    \"" + id + "\": {\n";
+            json += "      \"name\": \"" + symbol.name + "\",\n";
+            json += "      \"type\": \"" + symbol.type + "\",\n";
+            json += "      \"sourceRange\": {\n";
+            json += "        \"start\": {\n";
+            json += "          \"filePath\": \"" + symbol.sourceRange.start.filePath + "\",\n";
+            json += "          \"line\": " + symbol.sourceRange.start.line + ",\n";
+            json += "          \"column\": " + symbol.sourceRange.start.column + "\n";
+            json += "        },\n";
+            json += "        \"end\": {\n";
+            json += "          \"filePath\": \"" + symbol.sourceRange.end.filePath + "\",\n";
+            json += "          \"line\": " + symbol.sourceRange.end.line + ",\n";
+            json += "          \"column\": " + symbol.sourceRange.end.column + "\n";
+            json += "        }\n";
+            json += "      },\n";
+            json += "      \"scope\": " + symbol.scope + ",\n";
+            json += "      \"parentId\": " + symbol.parentId + "\n";
+            json += "    }";
+            if (i < symbolIds.length - 1) {
+                json += ",";
+            }
+            json += "\n";
+        }
+        json += "  },\n";
+        
+        // 添加作用域
+        json += "  \"scopes\": {\n";
+        let scopeIds = this.scopes.keys();
+        for (let i = 0; i < scopeIds.length; i++) {
+            let id = scopeIds[i];
+            let scope = this.scopes.get(id);
+            
+            json += "    \"" + id + "\": {\n";
+            json += "      \"name\": \"" + scope.name + "\",\n";
+            json += "      \"type\": \"" + scope.type + "\",\n";
+            json += "      \"sourceRange\": {\n";
+            json += "        \"start\": {\n";
+            json += "          \"filePath\": \"" + scope.sourceRange.start.filePath + "\",\n";
+            json += "          \"line\": " + scope.sourceRange.start.line + ",\n";
+            json += "          \"column\": " + scope.sourceRange.start.column + "\n";
+            json += "        },\n";
+            json += "        \"end\": {\n";
+            json += "          \"filePath\": \"" + scope.sourceRange.end.filePath + "\",\n";
+            json += "          \"line\": " + scope.sourceRange.end.line + ",\n";
+            json += "          \"column\": " + scope.sourceRange.end.column + "\n";
+            json += "        }\n";
+            json += "      },\n";
+            json += "      \"parentId\": " + scope.parentId + ",\n";
+            json += "      \"symbols\": [";
+            for (let j = 0; j < scope.symbols.length; j++) {
+                json += scope.symbols[j];
+                if (j < scope.symbols.length - 1) {
+                    json += ", ";
+                }
+            }
+            json += "],\n";
+            json += "      \"childScopes\": [";
+            for (let j = 0; j < scope.childScopes.length; j++) {
+                json += scope.childScopes[j];
+                if (j < scope.childScopes.length - 1) {
+                    json += ", ";
+                }
+            }
+            json += "]\n";
+            json += "    }";
+            if (i < scopeIds.length - 1) {
+                json += ",";
+            }
+            json += "\n";
+        }
+        json += "  },\n";
+        
+        // 添加元数据
+        json += "  \"metadata\": {\n";
+        json += "    \"globalScopeId\": " + this.globalScopeId + ",\n";
+        json += "    \"nextSymbolId\": " + this.nextSymbolId + ",\n";
+        json += "    \"nextScopeId\": " + this.nextScopeId + "\n";
+        json += "  }\n";
+        
+        json += "}";
+        
+        return json;
+    }
+    
+    /**
+     * @brief 从JSON格式字符串加载调试信息
+     * @param json JSON格式的调试信息
+     */
+    public function loadFromJSON(json: String): void {
+        // 这里应该实现从JSON解析调试信息的逻辑
+        // 由于QEntL语言限制，暂时省略实现
+        System.println("警告: 从JSON加载调试信息的功能暂未实现");
+    }
+}
+
+export {
+    SourceLocation,
+    SourceRange,
+    DebugSymbol,
+    SourceMap,
+    DebugScope,
+    DebugInfoGenerator
+}; 

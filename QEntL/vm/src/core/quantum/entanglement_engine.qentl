@@ -1,0 +1,941 @@
+/**
+ * @file entanglement_engine.qentl
+ * @brief 量子纠缠引擎，用于建立和管理对象间的量子纠缠关系
+ * 
+ * 量子基因编码: QGC-VM-QUANTUM-ENTANGLEMENT-2024062201
+ * 量子纠缠信道: QEC-VM-QUANTUM-02
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/set.qentl";
+import "QEntL/core/graph.qentl";
+import "QEntL/core/math.qentl";
+import "QEntL/vm/src/core/quantum/quantum_state_processor.qentl";
+
+/**
+ * @enum EntanglementType
+ * @brief 量子纠缠类型
+ */
+enum EntanglementType {
+    WEAK = 1,       // 弱纠缠：实时性要求低，可能有延迟
+    MEDIUM = 2,     // 中等纠缠：实时性要求中等
+    STRONG = 3,     // 强纠缠：高实时性要求
+    MAXIMUM = 4     // 最大纠缠：即时同步，最高优先级
+}
+
+/**
+ * @class EntanglementNode
+ * @brief 纠缠节点，表示可被纠缠的对象
+ */
+quantum_class EntanglementNode {
+    private {
+        id: String;                      // 节点唯一标识符
+        objectRef: any;                  // 对象引用
+        stateId: String;                 // 关联的量子状态ID
+        properties: Map<String, any>;    // 节点属性
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(objectRef: any, stateId: String = "") {
+        this.id = "node_" + Math.randomUUID();
+        this.objectRef = objectRef;
+        this.stateId = stateId;
+        this.properties = new Map<String, any>();
+    }
+    
+    /**
+     * @brief 获取节点ID
+     */
+    public function getId(): String {
+        return this.id;
+    }
+    
+    /**
+     * @brief 获取对象引用
+     */
+    public function getObjectRef(): any {
+        return this.objectRef;
+    }
+    
+    /**
+     * @brief 设置对象引用
+     */
+    public function setObjectRef(ref: any): void {
+        this.objectRef = ref;
+    }
+    
+    /**
+     * @brief 获取关联的量子状态ID
+     */
+    public function getStateId(): String {
+        return this.stateId;
+    }
+    
+    /**
+     * @brief 设置关联的量子状态ID
+     */
+    public function setStateId(stateId: String): void {
+        this.stateId = stateId;
+    }
+    
+    /**
+     * @brief 设置节点属性
+     */
+    public function setProperty(key: String, value: any): void {
+        this.properties.set(key, value);
+    }
+    
+    /**
+     * @brief 获取节点属性
+     */
+    public function getProperty(key: String): any {
+        return this.properties.get(key);
+    }
+    
+    /**
+     * @brief 检查是否存在属性
+     */
+    public function hasProperty(key: String): Boolean {
+        return this.properties.has(key);
+    }
+    
+    /**
+     * @brief 移除属性
+     */
+    public function removeProperty(key: String): void {
+        this.properties.delete(key);
+    }
+}
+
+/**
+ * @class EntanglementEdge
+ * @brief 纠缠边，表示两个对象之间的纠缠关系
+ */
+quantum_class EntanglementEdge {
+    private {
+        id: String;                      // 边唯一标识符
+        sourceId: String;                // 源节点ID
+        targetId: String;                // 目标节点ID
+        type: EntanglementType;          // 纠缠类型
+        strength: Number;                // 纠缠强度（0.0-1.0）
+        properties: Map<String, any>;    // 边属性
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(sourceId: String, targetId: String, type: EntanglementType = EntanglementType.MEDIUM, strength: Number = 0.5) {
+        this.id = "edge_" + Math.randomUUID();
+        this.sourceId = sourceId;
+        this.targetId = targetId;
+        this.type = type;
+        
+        // 验证强度范围
+        if (strength < 0.0 || strength > 1.0) {
+            throw new Error("纠缠强度必须在0.0到1.0范围内");
+        }
+        this.strength = strength;
+        
+        this.properties = new Map<String, any>();
+    }
+    
+    /**
+     * @brief 获取边ID
+     */
+    public function getId(): String {
+        return this.id;
+    }
+    
+    /**
+     * @brief 获取源节点ID
+     */
+    public function getSourceId(): String {
+        return this.sourceId;
+    }
+    
+    /**
+     * @brief 获取目标节点ID
+     */
+    public function getTargetId(): String {
+        return this.targetId;
+    }
+    
+    /**
+     * @brief 获取纠缠类型
+     */
+    public function getType(): EntanglementType {
+        return this.type;
+    }
+    
+    /**
+     * @brief 设置纠缠类型
+     */
+    public function setType(type: EntanglementType): void {
+        this.type = type;
+    }
+    
+    /**
+     * @brief 获取纠缠强度
+     */
+    public function getStrength(): Number {
+        return this.strength;
+    }
+    
+    /**
+     * @brief 设置纠缠强度
+     */
+    public function setStrength(strength: Number): void {
+        if (strength < 0.0 || strength > 1.0) {
+            throw new Error("纠缠强度必须在0.0到1.0范围内");
+        }
+        this.strength = strength;
+    }
+    
+    /**
+     * @brief 设置边属性
+     */
+    public function setProperty(key: String, value: any): void {
+        this.properties.set(key, value);
+    }
+    
+    /**
+     * @brief 获取边属性
+     */
+    public function getProperty(key: String): any {
+        return this.properties.get(key);
+    }
+    
+    /**
+     * @brief 检查是否存在属性
+     */
+    public function hasProperty(key: String): Boolean {
+        return this.properties.has(key);
+    }
+    
+    /**
+     * @brief 移除属性
+     */
+    public function removeProperty(key: String): void {
+        this.properties.delete(key);
+    }
+}
+
+/**
+ * @class EntanglementPropagationEvent
+ * @brief 纠缠传播事件
+ * 
+ * 表示纠缠关系传播过程中的事件，用于跟踪传播路径和结果
+ */
+quantum_class EntanglementPropagationEvent {
+    private {
+        id: String;                      // 事件唯一标识符
+        sourceNodeId: String;            // 源节点ID
+        targetNodeIds: Array<String>;    // 目标节点ID列表
+        propagationPath: Array<String>;  // 传播路径（边ID列表）
+        strength: Number;                // 传播强度
+        timestamp: Number;               // 事件时间戳
+        completed: Boolean;              // 是否完成
+        success: Boolean;                // 是否成功
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(sourceNodeId: String, targetNodeIds: Array<String>) {
+        this.id = "event_" + Math.randomUUID();
+        this.sourceNodeId = sourceNodeId;
+        this.targetNodeIds = targetNodeIds;
+        this.propagationPath = new Array<String>();
+        this.strength = 1.0;
+        this.timestamp = Date.now();
+        this.completed = false;
+        this.success = false;
+    }
+    
+    /**
+     * @brief 获取事件ID
+     */
+    public function getId(): String {
+        return this.id;
+    }
+    
+    /**
+     * @brief 获取源节点ID
+     */
+    public function getSourceNodeId(): String {
+        return this.sourceNodeId;
+    }
+    
+    /**
+     * @brief 获取目标节点ID列表
+     */
+    public function getTargetNodeIds(): Array<String> {
+        return this.targetNodeIds;
+    }
+    
+    /**
+     * @brief 添加传播路径边
+     */
+    public function addPathEdge(edgeId: String): void {
+        this.propagationPath.push(edgeId);
+    }
+    
+    /**
+     * @brief 获取传播路径
+     */
+    public function getPropagationPath(): Array<String> {
+        return this.propagationPath;
+    }
+    
+    /**
+     * @brief 设置传播强度
+     */
+    public function setStrength(strength: Number): void {
+        this.strength = strength;
+    }
+    
+    /**
+     * @brief 获取传播强度
+     */
+    public function getStrength(): Number {
+        return this.strength;
+    }
+    
+    /**
+     * @brief 获取时间戳
+     */
+    public function getTimestamp(): Number {
+        return this.timestamp;
+    }
+    
+    /**
+     * @brief 标记为完成
+     */
+    public function markCompleted(success: Boolean): void {
+        this.completed = true;
+        this.success = success;
+    }
+    
+    /**
+     * @brief 检查是否完成
+     */
+    public function isCompleted(): Boolean {
+        return this.completed;
+    }
+    
+    /**
+     * @brief 检查是否成功
+     */
+    public function isSuccess(): Boolean {
+        return this.success;
+    }
+}
+
+/**
+ * @class EntanglementGraph
+ * @brief 纠缠图
+ * 
+ * 表示整个纠缠网络结构，使用图来管理节点和边
+ */
+quantum_class EntanglementGraph {
+    private {
+        nodes: Map<String, EntanglementNode>;    // 节点集合
+        edges: Map<String, EntanglementEdge>;    // 边集合
+        adjList: Map<String, Set<String>>;       // 邻接表（节点ID -> 边ID集合）
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.nodes = new Map<String, EntanglementNode>();
+        this.edges = new Map<String, EntanglementEdge>();
+        this.adjList = new Map<String, Set<String>>();
+    }
+    
+    /**
+     * @brief 添加节点
+     * @return 添加的节点ID
+     */
+    public function addNode(node: EntanglementNode): String {
+        let nodeId = node.getId();
+        this.nodes.set(nodeId, node);
+        this.adjList.set(nodeId, new Set<String>());
+        return nodeId;
+    }
+    
+    /**
+     * @brief 移除节点
+     */
+    public function removeNode(nodeId: String): void {
+        if (!this.nodes.has(nodeId)) {
+            throw new Error("节点不存在：" + nodeId);
+        }
+        
+        // 移除与该节点相关的所有边
+        if (this.adjList.has(nodeId)) {
+            let edgeIds = this.adjList.get(nodeId);
+            let edgeIdsArray = Array.from(edgeIds);
+            
+            for (let edgeId of edgeIdsArray) {
+                this.removeEdge(edgeId);
+            }
+            
+            this.adjList.delete(nodeId);
+        }
+        
+        this.nodes.delete(nodeId);
+    }
+    
+    /**
+     * @brief 添加边
+     * @return 添加的边ID
+     */
+    public function addEdge(edge: EntanglementEdge): String {
+        let sourceId = edge.getSourceId();
+        let targetId = edge.getTargetId();
+        
+        if (!this.nodes.has(sourceId)) {
+            throw new Error("源节点不存在：" + sourceId);
+        }
+        
+        if (!this.nodes.has(targetId)) {
+            throw new Error("目标节点不存在：" + targetId);
+        }
+        
+        let edgeId = edge.getId();
+        this.edges.set(edgeId, edge);
+        
+        // 更新邻接表
+        this.adjList.get(sourceId).add(edgeId);
+        this.adjList.get(targetId).add(edgeId);
+        
+        return edgeId;
+    }
+    
+    /**
+     * @brief 移除边
+     */
+    public function removeEdge(edgeId: String): void {
+        if (!this.edges.has(edgeId)) {
+            throw new Error("边不存在：" + edgeId);
+        }
+        
+        let edge = this.edges.get(edgeId);
+        let sourceId = edge.getSourceId();
+        let targetId = edge.getTargetId();
+        
+        // 更新邻接表
+        if (this.adjList.has(sourceId)) {
+            this.adjList.get(sourceId).delete(edgeId);
+        }
+        
+        if (this.adjList.has(targetId)) {
+            this.adjList.get(targetId).delete(edgeId);
+        }
+        
+        this.edges.delete(edgeId);
+    }
+    
+    /**
+     * @brief 获取节点
+     */
+    public function getNode(nodeId: String): EntanglementNode {
+        if (!this.nodes.has(nodeId)) {
+            throw new Error("节点不存在：" + nodeId);
+        }
+        
+        return this.nodes.get(nodeId);
+    }
+    
+    /**
+     * @brief 获取边
+     */
+    public function getEdge(edgeId: String): EntanglementEdge {
+        if (!this.edges.has(edgeId)) {
+            throw new Error("边不存在：" + edgeId);
+        }
+        
+        return this.edges.get(edgeId);
+    }
+    
+    /**
+     * @brief 获取节点数量
+     */
+    public function getNodeCount(): Integer {
+        return this.nodes.size();
+    }
+    
+    /**
+     * @brief 获取边数量
+     */
+    public function getEdgeCount(): Integer {
+        return this.edges.size();
+    }
+    
+    /**
+     * @brief 获取节点的所有相邻边
+     */
+    public function getAdjacentEdges(nodeId: String): Array<String> {
+        if (!this.adjList.has(nodeId)) {
+            throw new Error("节点不存在：" + nodeId);
+        }
+        
+        return Array.from(this.adjList.get(nodeId));
+    }
+    
+    /**
+     * @brief 获取两个节点之间的边
+     */
+    public function getEdgeBetween(sourceId: String, targetId: String): String {
+        if (!this.adjList.has(sourceId) || !this.adjList.has(targetId)) {
+            return null;
+        }
+        
+        let sourceEdges = this.adjList.get(sourceId);
+        
+        for (let edgeId of sourceEdges) {
+            let edge = this.edges.get(edgeId);
+            if ((edge.getSourceId() === sourceId && edge.getTargetId() === targetId) ||
+                (edge.getSourceId() === targetId && edge.getTargetId() === sourceId)) {
+                return edgeId;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * @brief 查找从源节点到目标节点的所有路径
+     */
+    public function findAllPaths(sourceId: String, targetId: String, maxDepth: Integer = 10): Array<Array<String>> {
+        if (!this.nodes.has(sourceId) || !this.nodes.has(targetId)) {
+            return [];
+        }
+        
+        let paths = new Array<Array<String>>();
+        let visited = new Set<String>();
+        let currentPath = new Array<String>();
+        
+        function dfs(graph: EntanglementGraph, current: String, target: String, depth: Integer): void {
+            if (depth <= 0) {
+                return;
+            }
+            
+            visited.add(current);
+            currentPath.push(current);
+            
+            if (current === target) {
+                paths.push(currentPath.slice());
+            } else {
+                let adjacentEdges = graph.getAdjacentEdges(current);
+                
+                for (let edgeId of adjacentEdges) {
+                    let edge = graph.getEdge(edgeId);
+                    let nextNode = edge.getSourceId() === current ? edge.getTargetId() : edge.getSourceId();
+                    
+                    if (!visited.has(nextNode)) {
+                        dfs(graph, nextNode, target, depth - 1);
+                    }
+                }
+            }
+            
+            visited.delete(current);
+            currentPath.pop();
+        }
+        
+        dfs(this, sourceId, targetId, maxDepth);
+        return paths;
+    }
+    
+    /**
+     * @brief 计算两个节点之间的纠缠强度
+     * 
+     * 如果两个节点直接相连，返回边的强度
+     * 如果有多条路径，返回最强路径的强度
+     */
+    public function calculateEntanglementStrength(sourceId: String, targetId: String): Number {
+        // 检查直接连接
+        let directEdgeId = this.getEdgeBetween(sourceId, targetId);
+        if (directEdgeId) {
+            return this.edges.get(directEdgeId).getStrength();
+        }
+        
+        // 查找所有路径
+        let paths = this.findAllPaths(sourceId, targetId);
+        if (paths.length === 0) {
+            return 0.0;  // 无路径，无纠缠
+        }
+        
+        // 计算每条路径的强度并找出最强路径
+        let maxStrength = 0.0;
+        
+        for (let path of paths) {
+            let pathStrength = 1.0;
+            
+            for (let i = 0; i < path.length - 1; i++) {
+                let node1 = path[i];
+                let node2 = path[i + 1];
+                let edgeId = this.getEdgeBetween(node1, node2);
+                
+                if (edgeId) {
+                    // 路径强度是所有边强度的乘积
+                    pathStrength *= this.edges.get(edgeId).getStrength();
+                } else {
+                    pathStrength = 0.0;
+                    break;
+                }
+            }
+            
+            maxStrength = Math.max(maxStrength, pathStrength);
+        }
+        
+        return maxStrength;
+    }
+}
+
+/**
+ * @class EntanglementEngine
+ * @brief 量子纠缠引擎
+ * 
+ * 负责建立和管理对象之间的量子纠缠关系
+ */
+quantum_class EntanglementEngine {
+    private {
+        graph: EntanglementGraph;                                // 纠缠关系图
+        stateProcessor: QuantumStateProcessor;                   // 量子状态处理器
+        propagationEvents: Map<String, EntanglementPropagationEvent>; // 传播事件映射
+        synchronizationCallbacks: Map<String, Function>;         // 同步回调函数
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(stateProcessor: QuantumStateProcessor) {
+        this.graph = new EntanglementGraph();
+        this.stateProcessor = stateProcessor;
+        this.propagationEvents = new Map<String, EntanglementPropagationEvent>();
+        this.synchronizationCallbacks = new Map<String, Function>();
+    }
+    
+    /**
+     * @brief 注册对象为纠缠节点
+     * @return 创建的节点ID
+     */
+    public function registerNode(object: any): String {
+        // 创建纠缠节点
+        let node = new EntanglementNode(object);
+        
+        // 创建1量子比特的量子状态
+        let stateId = this.stateProcessor.createState(1);
+        node.setStateId(stateId);
+        
+        // 添加到图中
+        return this.graph.addNode(node);
+    }
+    
+    /**
+     * @brief 注销纠缠节点
+     */
+    public function unregisterNode(nodeId: String): void {
+        // 获取节点
+        let node = this.graph.getNode(nodeId);
+        
+        // 销毁关联的量子状态
+        let stateId = node.getStateId();
+        if (stateId) {
+            this.stateProcessor.destroyState(stateId);
+        }
+        
+        // 从图中移除节点
+        this.graph.removeNode(nodeId);
+    }
+    
+    /**
+     * @brief 创建纠缠关系
+     * @return 创建的边ID
+     */
+    public function createEntanglement(sourceId: String, targetId: String, type: EntanglementType, strength: Number): String {
+        if (sourceId === targetId) {
+            throw new Error("无法创建自身的纠缠关系");
+        }
+        
+        // 检查节点是否存在
+        let sourceNode = this.graph.getNode(sourceId);
+        let targetNode = this.graph.getNode(targetId);
+        
+        // 检查是否已经存在纠缠关系
+        let existingEdgeId = this.graph.getEdgeBetween(sourceId, targetId);
+        if (existingEdgeId) {
+            // 更新现有边
+            let edge = this.graph.getEdge(existingEdgeId);
+            edge.setType(type);
+            edge.setStrength(strength);
+            return existingEdgeId;
+        }
+        
+        // 创建新的纠缠边
+        let edge = new EntanglementEdge(sourceId, targetId, type, strength);
+        
+        // 设置量子态纠缠
+        let sourceStateId = sourceNode.getStateId();
+        let targetStateId = targetNode.getStateId();
+        
+        if (sourceStateId && targetStateId) {
+            // 实现量子纠缠
+            this.entangleQuantumStates(sourceStateId, targetStateId, strength);
+        }
+        
+        // 添加到图中
+        return this.graph.addEdge(edge);
+    }
+    
+    /**
+     * @brief 移除纠缠关系
+     */
+    public function removeEntanglement(edgeId: String): void {
+        let edge = this.graph.getEdge(edgeId);
+        let sourceId = edge.getSourceId();
+        let targetId = edge.getTargetId();
+        
+        // 解除量子态纠缠
+        let sourceNode = this.graph.getNode(sourceId);
+        let targetNode = this.graph.getNode(targetId);
+        
+        let sourceStateId = sourceNode.getStateId();
+        let targetStateId = targetNode.getStateId();
+        
+        if (sourceStateId && targetStateId) {
+            // 解除量子纠缠
+            this.disentangleQuantumStates(sourceStateId, targetStateId);
+        }
+        
+        // 从图中移除边
+        this.graph.removeEdge(edgeId);
+    }
+    
+    /**
+     * @brief 纠缠两个量子状态
+     */
+    private function entangleQuantumStates(stateId1: String, stateId2: String, strength: Number): void {
+        // 获取两个量子状态
+        let state1 = this.stateProcessor.getState(stateId1);
+        let state2 = this.stateProcessor.getState(stateId2);
+        
+        // 创建Bell态或部分纠缠态
+        
+        // 对第一个比特应用Hadamard门
+        this.stateProcessor.applyHadamard(stateId1, 0);
+        
+        // 对两个比特应用CNOT门（简化模拟）
+        // 根据强度调整纠缠程度
+        
+        // 这里简化处理，实际应根据强度创建不同程度的纠缠态
+    }
+    
+    /**
+     * @brief 解除两个量子状态的纠缠
+     */
+    private function disentangleQuantumStates(stateId1: String, stateId2: String): void {
+        // 重置两个量子状态
+        this.stateProcessor.resetState(stateId1);
+        this.stateProcessor.resetState(stateId2);
+    }
+    
+    /**
+     * @brief 计算两个节点之间的纠缠强度
+     */
+    public function getEntanglementStrength(nodeId1: String, nodeId2: String): Number {
+        return this.graph.calculateEntanglementStrength(nodeId1, nodeId2);
+    }
+    
+    /**
+     * @brief 通过纠缠关系传播状态变化
+     */
+    public function propagateChange(sourceNodeId: String, targetNodeIds: Array<String> = null): String {
+        // 如果没有指定目标节点，传播到所有相连节点
+        if (!targetNodeIds) {
+            targetNodeIds = new Array<String>();
+            let adjacentEdges = this.graph.getAdjacentEdges(sourceNodeId);
+            
+            for (let edgeId of adjacentEdges) {
+                let edge = this.graph.getEdge(edgeId);
+                let otherNodeId = edge.getSourceId() === sourceNodeId ? edge.getTargetId() : edge.getSourceId();
+                targetNodeIds.push(otherNodeId);
+            }
+        }
+        
+        // 创建传播事件
+        let event = new EntanglementPropagationEvent(sourceNodeId, targetNodeIds);
+        let eventId = event.getId();
+        this.propagationEvents.set(eventId, event);
+        
+        // 执行传播
+        this.executePropagation(event);
+        
+        return eventId;
+    }
+    
+    /**
+     * @brief 执行传播过程
+     */
+    private function executePropagation(event: EntanglementPropagationEvent): void {
+        let sourceNodeId = event.getSourceNodeId();
+        let targetNodeIds = event.getTargetNodeIds();
+        let success = true;
+        
+        for (let targetNodeId of targetNodeIds) {
+            // 查找最强路径
+            let paths = this.graph.findAllPaths(sourceNodeId, targetNodeId);
+            if (paths.length === 0) {
+                success = false;
+                continue;
+            }
+            
+            // 找到最强路径
+            let strongestPath = null;
+            let maxStrength = 0.0;
+            
+            for (let path of paths) {
+                let pathStrength = 1.0;
+                let pathEdges = new Array<String>();
+                
+                for (let i = 0; i < path.length - 1; i++) {
+                    let node1 = path[i];
+                    let node2 = path[i + 1];
+                    let edgeId = this.graph.getEdgeBetween(node1, node2);
+                    
+                    if (edgeId) {
+                        pathEdges.push(edgeId);
+                        pathStrength *= this.graph.getEdge(edgeId).getStrength();
+                    } else {
+                        pathStrength = 0.0;
+                        break;
+                    }
+                }
+                
+                if (pathStrength > maxStrength) {
+                    maxStrength = pathStrength;
+                    strongestPath = pathEdges;
+                }
+            }
+            
+            if (!strongestPath) {
+                success = false;
+                continue;
+            }
+            
+            // 记录传播路径
+            for (let edgeId of strongestPath) {
+                event.addPathEdge(edgeId);
+            }
+            
+            // 在实际传播中，可能会根据纠缠类型和强度计算状态同步的延迟
+            
+            // 执行状态同步回调
+            this.triggerSynchronization(sourceNodeId, targetNodeId, maxStrength);
+        }
+        
+        // 更新事件状态
+        event.setStrength(success ? 1.0 : 0.0);
+        event.markCompleted(success);
+    }
+    
+    /**
+     * @brief 触发同步回调
+     */
+    private function triggerSynchronization(sourceNodeId: String, targetNodeId: String, strength: Number): void {
+        // 获取节点对象
+        let sourceNode = this.graph.getNode(sourceNodeId);
+        let targetNode = this.graph.getNode(targetNodeId);
+        
+        let sourceObj = sourceNode.getObjectRef();
+        let targetObj = targetNode.getObjectRef();
+        
+        // 寻找并执行同步回调
+        let callbackKey = sourceNodeId + "_" + targetNodeId;
+        if (this.synchronizationCallbacks.has(callbackKey)) {
+            try {
+                let callback = this.synchronizationCallbacks.get(callbackKey);
+                callback(sourceObj, targetObj, strength);
+            } catch (e) {
+                console.error("同步回调执行错误:", e);
+            }
+        }
+        
+        // 双向回调
+        callbackKey = targetNodeId + "_" + sourceNodeId;
+        if (this.synchronizationCallbacks.has(callbackKey)) {
+            try {
+                let callback = this.synchronizationCallbacks.get(callbackKey);
+                callback(targetObj, sourceObj, strength);
+            } catch (e) {
+                console.error("同步回调执行错误:", e);
+            }
+        }
+    }
+    
+    /**
+     * @brief 设置同步回调
+     */
+    public function setSynchronizationCallback(sourceNodeId: String, targetNodeId: String, callback: Function): void {
+        let callbackKey = sourceNodeId + "_" + targetNodeId;
+        this.synchronizationCallbacks.set(callbackKey, callback);
+    }
+    
+    /**
+     * @brief 移除同步回调
+     */
+    public function removeSynchronizationCallback(sourceNodeId: String, targetNodeId: String): void {
+        let callbackKey = sourceNodeId + "_" + targetNodeId;
+        this.synchronizationCallbacks.delete(callbackKey);
+    }
+    
+    /**
+     * @brief 获取纠缠图
+     */
+    public function getGraph(): EntanglementGraph {
+        return this.graph;
+    }
+    
+    /**
+     * @brief 获取传播事件
+     */
+    public function getPropagationEvent(eventId: String): EntanglementPropagationEvent {
+        if (!this.propagationEvents.has(eventId)) {
+            throw new Error("找不到传播事件：" + eventId);
+        }
+        
+        return this.propagationEvents.get(eventId);
+    }
+    
+    /**
+     * @brief 清理完成的传播事件
+     */
+    public function cleanupCompletedEvents(maxAgeMs: Number = 3600000): Integer {
+        let now = Date.now();
+        let count = 0;
+        
+        for (let [eventId, event] of this.propagationEvents.entries()) {
+            if (event.isCompleted() && (now - event.getTimestamp() > maxAgeMs)) {
+                this.propagationEvents.delete(eventId);
+                count++;
+            }
+        }
+        
+        return count;
+    }
+}
+
+// 导出类和枚举
+export {
+    EntanglementType,
+    EntanglementNode,
+    EntanglementEdge,
+    EntanglementPropagationEvent,
+    EntanglementGraph,
+    EntanglementEngine
+}; 

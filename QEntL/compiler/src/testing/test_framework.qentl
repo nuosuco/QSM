@@ -1,0 +1,768 @@
+/**
+ * @file test_framework.qentl
+ * @brief QEntL编译器测试框架
+ * 
+ * 量子基因编码: QGC-COMPILER-TEST-2024062001
+ * 量子纠缠信道: QEC-COMPILER-CORE-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/debug.qentl";
+import "QEntL/core/time.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+
+/**
+ * @enum TestStatus
+ * @brief 测试状态枚举
+ */
+quantum_enum TestStatus {
+    PASS,      // 测试通过
+    FAIL,      // 测试失败
+    ERROR,     // 测试错误
+    SKIP,      // 测试跳过
+    PENDING    // 测试待执行
+}
+
+/**
+ * @class TestResult
+ * @brief 测试结果类
+ */
+quantum_class TestResult {
+    public {
+        name: String;           // 测试名称
+        status: TestStatus;     // 测试状态
+        message: String;        // 结果消息
+        duration: Integer;      // 执行时间（毫秒）
+        stackTrace: String;     // 堆栈跟踪（如果失败）
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(name: String, status: TestStatus = TestStatus.PENDING, 
+                message: String = "", duration: Integer = 0, stackTrace: String = "") {
+        this.name = name;
+        this.status = status;
+        this.message = message;
+        this.duration = duration;
+        this.stackTrace = stackTrace;
+    }
+    
+    /**
+     * @brief 获取状态字符串
+     */
+    public function getStatusString(): String {
+        switch (this.status) {
+            case TestStatus.PASS: return "通过";
+            case TestStatus.FAIL: return "失败";
+            case TestStatus.ERROR: return "错误";
+            case TestStatus.SKIP: return "跳过";
+            case TestStatus.PENDING: return "待执行";
+            default: return "未知";
+        }
+    }
+    
+    /**
+     * @brief 格式化为字符串
+     */
+    public function toString(): String {
+        let result = `${this.name} - ${this.getStatusString()}`;
+        
+        if (this.message.length > 0) {
+            result += `: ${this.message}`;
+        }
+        
+        if (this.duration > 0) {
+            result += ` (${this.duration}ms)`;
+        }
+        
+        if (this.stackTrace.length > 0) {
+            result += `\n堆栈跟踪:\n${this.stackTrace}`;
+        }
+        
+        return result;
+    }
+}
+
+/**
+ * @class TestSuite
+ * @brief 测试套件类
+ */
+quantum_class TestSuite {
+    public {
+        name: String;           // 套件名称
+        tests: Array<Test>;     // 测试列表
+        beforeAllFn: Function?; // 套件前置函数
+        afterAllFn: Function?;  // 套件后置函数
+        beforeEachFn: Function?; // 每个测试前置函数
+        afterEachFn: Function?;  // 每个测试后置函数
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(name: String) {
+        this.name = name;
+        this.tests = new Array<Test>();
+        this.beforeAllFn = null;
+        this.afterAllFn = null;
+        this.beforeEachFn = null;
+        this.afterEachFn = null;
+    }
+    
+    /**
+     * @brief 添加测试
+     */
+    public function addTest(test: Test): void {
+        this.tests.push(test);
+    }
+    
+    /**
+     * @brief 设置套件前置函数
+     */
+    public function beforeAll(fn: Function): void {
+        this.beforeAllFn = fn;
+    }
+    
+    /**
+     * @brief 设置套件后置函数
+     */
+    public function afterAll(fn: Function): void {
+        this.afterAllFn = fn;
+    }
+    
+    /**
+     * @brief 设置每个测试前置函数
+     */
+    public function beforeEach(fn: Function): void {
+        this.beforeEachFn = fn;
+    }
+    
+    /**
+     * @brief 设置每个测试后置函数
+     */
+    public function afterEach(fn: Function): void {
+        this.afterEachFn = fn;
+    }
+    
+    /**
+     * @brief 运行测试套件
+     */
+    public function run(): Array<TestResult> {
+        let results = new Array<TestResult>();
+        
+        Console.writeLine(`\n运行测试套件: ${this.name}`);
+        Console.writeLine("--------------------------------");
+        
+        let startTime = Time.currentTimeMillis();
+        
+        // 运行套件前置函数
+        if (this.beforeAllFn != null) {
+            try {
+                this.beforeAllFn();
+            } catch (e) {
+                Console.writeLine(`套件前置函数失败: ${e.message}`);
+                
+                // 套件前置失败，将所有测试标记为跳过
+                for (let test of this.tests) {
+                    results.push(new TestResult(test.name, TestStatus.SKIP, 
+                        "套件前置失败，测试跳过"));
+                }
+                
+                return results;
+            }
+        }
+        
+        // 运行所有测试
+        for (let test of this.tests) {
+            // 运行每个测试前置函数
+            if (this.beforeEachFn != null) {
+                try {
+                    this.beforeEachFn();
+                } catch (e) {
+                    results.push(new TestResult(test.name, TestStatus.SKIP, 
+                        `每个测试前置失败: ${e.message}`));
+                    continue;
+                }
+            }
+            
+            // 运行测试
+            let result = test.run();
+            results.push(result);
+            
+            // 输出结果
+            Console.writeLine(`${result.getStatusString()}: ${test.name}`);
+            if (result.status === TestStatus.FAIL || result.status === TestStatus.ERROR) {
+                Console.writeLine(`  ${result.message}`);
+                if (result.stackTrace.length > 0) {
+                    Console.writeLine(`  堆栈跟踪: ${result.stackTrace}`);
+                }
+            }
+            
+            // 运行每个测试后置函数
+            if (this.afterEachFn != null) {
+                try {
+                    this.afterEachFn();
+                } catch (e) {
+                    Console.writeLine(`每个测试后置失败: ${e.message}`);
+                }
+            }
+        }
+        
+        // 运行套件后置函数
+        if (this.afterAllFn != null) {
+            try {
+                this.afterAllFn();
+            } catch (e) {
+                Console.writeLine(`套件后置函数失败: ${e.message}`);
+            }
+        }
+        
+        let endTime = Time.currentTimeMillis();
+        let totalTime = endTime - startTime;
+        
+        // 汇总结果
+        let passed = 0;
+        let failed = 0;
+        let errors = 0;
+        let skipped = 0;
+        
+        for (let result of results) {
+            switch (result.status) {
+                case TestStatus.PASS: passed++; break;
+                case TestStatus.FAIL: failed++; break;
+                case TestStatus.ERROR: errors++; break;
+                case TestStatus.SKIP: skipped++; break;
+            }
+        }
+        
+        Console.writeLine("--------------------------------");
+        Console.writeLine(`总计: ${results.length}, 通过: ${passed}, 失败: ${failed}, 错误: ${errors}, 跳过: ${skipped}`);
+        Console.writeLine(`总用时: ${totalTime}ms`);
+        
+        return results;
+    }
+}
+
+/**
+ * @class Test
+ * @brief 测试类
+ */
+quantum_class Test {
+    public {
+        name: String;          // 测试名称
+        fn: Function;          // 测试函数
+        timeout: Integer;      // 超时时间（毫秒）
+        skip: Boolean;         // 是否跳过
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(name: String, fn: Function, timeout: Integer = 5000, skip: Boolean = false) {
+        this.name = name;
+        this.fn = fn;
+        this.timeout = timeout;
+        this.skip = skip;
+    }
+    
+    /**
+     * @brief 运行测试
+     */
+    public function run(): TestResult {
+        if (this.skip) {
+            return new TestResult(this.name, TestStatus.SKIP, "测试被标记为跳过");
+        }
+        
+        let startTime = Time.currentTimeMillis();
+        
+        try {
+            // 执行测试函数
+            this.fn();
+            
+            let endTime = Time.currentTimeMillis();
+            let duration = endTime - startTime;
+            
+            // 检查超时
+            if (duration > this.timeout) {
+                return new TestResult(this.name, TestStatus.FAIL, 
+                    `测试超时 (${duration}ms > ${this.timeout}ms)`, duration);
+            }
+            
+            return new TestResult(this.name, TestStatus.PASS, "", duration);
+        } catch (e) {
+            let endTime = Time.currentTimeMillis();
+            let duration = endTime - startTime;
+            
+            // 区分断言失败和其他错误
+            if (e.name === "AssertionError") {
+                return new TestResult(this.name, TestStatus.FAIL, e.message, duration, e.stack);
+            } else {
+                return new TestResult(this.name, TestStatus.ERROR, e.message, duration, e.stack);
+            }
+        }
+    }
+}
+
+/**
+ * @class Assert
+ * @brief 断言类
+ */
+quantum_class Assert {
+    /**
+     * @brief 断言表达式为真
+     */
+    public static function isTrue(expression: Boolean, message: String = ""): void {
+        if (!expression) {
+            throw new AssertionError(message || "表达式应为真");
+        }
+    }
+    
+    /**
+     * @brief 断言表达式为假
+     */
+    public static function isFalse(expression: Boolean, message: String = ""): void {
+        if (expression) {
+            throw new AssertionError(message || "表达式应为假");
+        }
+    }
+    
+    /**
+     * @brief 断言相等
+     */
+    public static function areEqual(actual: Any, expected: Any, message: String = ""): void {
+        if (!this.equals(actual, expected)) {
+            throw new AssertionError(message || `期望 ${this.stringify(expected)}, 实际 ${this.stringify(actual)}`);
+        }
+    }
+    
+    /**
+     * @brief 断言不相等
+     */
+    public static function areNotEqual(actual: Any, expected: Any, message: String = ""): void {
+        if (this.equals(actual, expected)) {
+            throw new AssertionError(message || `期望不等于 ${this.stringify(expected)}`);
+        }
+    }
+    
+    /**
+     * @brief 断言对象相同（引用相同）
+     */
+    public static function areSame(actual: Any, expected: Any, message: String = ""): void {
+        if (actual !== expected) {
+            throw new AssertionError(message || "对象应为同一引用");
+        }
+    }
+    
+    /**
+     * @brief 断言对象不同（引用不同）
+     */
+    public static function areNotSame(actual: Any, expected: Any, message: String = ""): void {
+        if (actual === expected) {
+            throw new AssertionError(message || "对象应为不同引用");
+        }
+    }
+    
+    /**
+     * @brief 断言为空
+     */
+    public static function isNull(value: Any, message: String = ""): void {
+        if (value !== null) {
+            throw new AssertionError(message || `期望为null，实际为 ${this.stringify(value)}`);
+        }
+    }
+    
+    /**
+     * @brief 断言不为空
+     */
+    public static function isNotNull(value: Any, message: String = ""): void {
+        if (value === null) {
+            throw new AssertionError(message || "期望不为null");
+        }
+    }
+    
+    /**
+     * @brief 断言未定义
+     */
+    public static function isUndefined(value: Any, message: String = ""): void {
+        if (value !== undefined) {
+            throw new AssertionError(message || `期望为undefined，实际为 ${this.stringify(value)}`);
+        }
+    }
+    
+    /**
+     * @brief 断言已定义
+     */
+    public static function isDefined(value: Any, message: String = ""): void {
+        if (value === undefined) {
+            throw new AssertionError(message || "期望已定义");
+        }
+    }
+    
+    /**
+     * @brief 断言抛出异常
+     */
+    public static function throws(fn: Function, expectedErrorType: Any = null, message: String = ""): void {
+        try {
+            fn();
+            throw new AssertionError(message || "期望抛出异常，但未抛出");
+        } catch (e) {
+            if (expectedErrorType !== null && !(e instanceof expectedErrorType)) {
+                throw new AssertionError(message || `期望抛出 ${expectedErrorType.name} 类型异常，实际抛出 ${e.name}`);
+            }
+        }
+    }
+    
+    /**
+     * @brief 断言不抛出异常
+     */
+    public static function doesNotThrow(fn: Function, message: String = ""): void {
+        try {
+            fn();
+        } catch (e) {
+            throw new AssertionError(message || `期望不抛出异常，但抛出了 ${e.name}: ${e.message}`);
+        }
+    }
+    
+    /**
+     * @brief 断言字符串包含子串
+     */
+    public static function stringContains(str: String, substring: String, message: String = ""): void {
+        if (str.indexOf(substring) === -1) {
+            throw new AssertionError(message || `字符串 "${str}" 应包含 "${substring}"`);
+        }
+    }
+    
+    /**
+     * @brief 断言字符串不包含子串
+     */
+    public static function stringDoesNotContain(str: String, substring: String, message: String = ""): void {
+        if (str.indexOf(substring) !== -1) {
+            throw new AssertionError(message || `字符串 "${str}" 不应包含 "${substring}"`);
+        }
+    }
+    
+    /**
+     * @brief 断言数组长度
+     */
+    public static function arrayLength(arr: Array<Any>, expectedLength: Integer, message: String = ""): void {
+        if (arr.length !== expectedLength) {
+            throw new AssertionError(message || `数组长度应为 ${expectedLength}，实际为 ${arr.length}`);
+        }
+    }
+    
+    /**
+     * @brief 对象比较
+     */
+    private static function equals(a: Any, b: Any): Boolean {
+        // 处理基本类型
+        if (a === b) return true;
+        
+        // 处理null和undefined
+        if (a == null || b == null) return a === b;
+        
+        // 获取类型
+        let typeA = typeof a;
+        let typeB = typeof b;
+        
+        // 类型不同
+        if (typeA !== typeB) return false;
+        
+        // 处理日期
+        if (a instanceof Date && b instanceof Date) {
+            return a.getTime() === b.getTime();
+        }
+        
+        // 处理正则表达式
+        if (a instanceof RegExp && b instanceof RegExp) {
+            return a.toString() === b.toString();
+        }
+        
+        // 处理数组
+        if (Array.isArray(a) && Array.isArray(b)) {
+            if (a.length !== b.length) return false;
+            
+            for (let i = 0; i < a.length; i++) {
+                if (!this.equals(a[i], b[i])) return false;
+            }
+            
+            return true;
+        }
+        
+        // 处理对象
+        if (typeA === 'object') {
+            let keysA = Object.keys(a);
+            let keysB = Object.keys(b);
+            
+            if (keysA.length !== keysB.length) return false;
+            
+            for (let key of keysA) {
+                if (!b.hasOwnProperty(key)) return false;
+                if (!this.equals(a[key], b[key])) return false;
+            }
+            
+            return true;
+        }
+        
+        // 默认为不相等
+        return false;
+    }
+    
+    /**
+     * @brief 将值转换为字符串形式
+     */
+    private static function stringify(value: Any): String {
+        if (value === null) return "null";
+        if (value === undefined) return "undefined";
+        
+        if (typeof value === "string") return `"${value}"`;
+        if (typeof value !== "object") return String(value);
+        
+        if (Array.isArray(value)) {
+            let items = [];
+            for (let i = 0; i < value.length; i++) {
+                items.push(this.stringify(value[i]));
+            }
+            return `[${items.join(", ")}]`;
+        }
+        
+        if (value instanceof Date) {
+            return value.toISOString();
+        }
+        
+        if (value instanceof RegExp) {
+            return value.toString();
+        }
+        
+        try {
+            return JSON.stringify(value);
+        } catch (e) {
+            return "[对象]";
+        }
+    }
+}
+
+/**
+ * @class AssertionError
+ * @brief 断言错误类
+ */
+quantum_class AssertionError extends Error {
+    /**
+     * @brief 构造函数
+     */
+    constructor(message: String = "断言失败") {
+        super(message);
+        this.name = "AssertionError";
+    }
+}
+
+/**
+ * @class TestRunner
+ * @brief 测试运行器
+ */
+quantum_class TestRunner {
+    private {
+        suites: Array<TestSuite>;  // 测试套件列表
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.suites = new Array<TestSuite>();
+    }
+    
+    /**
+     * @brief 添加测试套件
+     */
+    public function addSuite(suite: TestSuite): void {
+        this.suites.push(suite);
+    }
+    
+    /**
+     * @brief 运行所有测试
+     */
+    public function runAll(): void {
+        let startTime = Time.currentTimeMillis();
+        
+        Console.writeLine("\n开始运行所有测试");
+        Console.writeLine("================================");
+        
+        let totalResults = new Array<TestResult>();
+        
+        // 运行每个测试套件
+        for (let suite of this.suites) {
+            let results = suite.run();
+            
+            for (let result of results) {
+                totalResults.push(result);
+            }
+            
+            Console.writeLine("");
+        }
+        
+        // 汇总全部结果
+        let endTime = Time.currentTimeMillis();
+        let totalTime = endTime - startTime;
+        
+        let passed = 0;
+        let failed = 0;
+        let errors = 0;
+        let skipped = 0;
+        
+        for (let result of totalResults) {
+            switch (result.status) {
+                case TestStatus.PASS: passed++; break;
+                case TestStatus.FAIL: failed++; break;
+                case TestStatus.ERROR: errors++; break;
+                case TestStatus.SKIP: skipped++; break;
+            }
+        }
+        
+        Console.writeLine("================================");
+        Console.writeLine("测试运行完成");
+        Console.writeLine(`总计: ${totalResults.length}, 通过: ${passed}, 失败: ${failed}, 错误: ${errors}, 跳过: ${skipped}`);
+        Console.writeLine(`总用时: ${totalTime}ms`);
+        
+        // 如果有失败或错误，列出它们
+        if (failed > 0 || errors > 0) {
+            Console.writeLine("\n失败和错误测试列表:");
+            
+            for (let result of totalResults) {
+                if (result.status === TestStatus.FAIL || result.status === TestStatus.ERROR) {
+                    Console.writeLine(`- ${result.name}: ${result.message}`);
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 从测试目录自动加载测试
+     */
+    public function loadTestsFromDirectory(directory: String): void {
+        Debug.log(`从目录加载测试: ${directory}`);
+        
+        // 递归遍历目录
+        function scanDirectory(dir: String): void {
+            let entries = File.listDirectory(dir);
+            
+            for (let entry of entries) {
+                let fullPath = Path.join(dir, entry.name);
+                
+                if (entry.isDirectory) {
+                    // 递归处理子目录
+                    scanDirectory(fullPath);
+                } else if (entry.name.endsWith("_test.qentl")) {
+                    // 加载测试文件
+                    Debug.log(`加载测试文件: ${fullPath}`);
+                    
+                    try {
+                        // 这里假设每个测试文件都会导出一个或多个测试套件
+                        let testModule = require(fullPath);
+                        
+                        // 添加导出的测试套件
+                        if (Array.isArray(testModule.suites)) {
+                            for (let suite of testModule.suites) {
+                                this.addSuite(suite);
+                            }
+                        } else if (testModule.suite instanceof TestSuite) {
+                            this.addSuite(testModule.suite);
+                        }
+                    } catch (e) {
+                        Debug.log(`加载测试文件失败: ${fullPath}, 错误: ${e.message}`);
+                    }
+                }
+            }
+        }
+        
+        scanDirectory(directory);
+    }
+    
+    /**
+     * @brief 运行特定标记的测试
+     */
+    public function runWithTag(tag: String): void {
+        let taggedSuites = new Array<TestSuite>();
+        
+        // 查找带有指定标记的测试
+        for (let suite of this.suites) {
+            let taggedTests = new Array<Test>();
+            
+            for (let test of suite.tests) {
+                // 检查测试名称是否包含标记
+                if (test.name.indexOf(tag) !== -1) {
+                    taggedTests.push(test);
+                }
+            }
+            
+            if (taggedTests.length > 0) {
+                // 创建新的套件，只包含带标记的测试
+                let taggedSuite = new TestSuite(`${suite.name} [tagged: ${tag}]`);
+                
+                for (let test of taggedTests) {
+                    taggedSuite.addTest(test);
+                }
+                
+                // 复制钩子函数
+                taggedSuite.beforeAllFn = suite.beforeAllFn;
+                taggedSuite.afterAllFn = suite.afterAllFn;
+                taggedSuite.beforeEachFn = suite.beforeEachFn;
+                taggedSuite.afterEachFn = suite.afterEachFn;
+                
+                taggedSuites.push(taggedSuite);
+            }
+        }
+        
+        // 替换原套件列表并运行
+        let originalSuites = this.suites;
+        this.suites = taggedSuites;
+        
+        this.runAll();
+        
+        // 恢复原套件列表
+        this.suites = originalSuites;
+    }
+}
+
+/**
+ * @brief 创建测试套件的辅助函数
+ */
+function describe(name: String, fn: Function): TestSuite {
+    let suite = new TestSuite(name);
+    
+    // 执行定义套件的函数
+    fn(suite);
+    
+    return suite;
+}
+
+/**
+ * @brief 创建测试用例的辅助函数
+ */
+function test(name: String, fn: Function, timeout: Integer = 5000): Test {
+    return new Test(name, fn, timeout);
+}
+
+/**
+ * @brief 创建要跳过的测试用例的辅助函数
+ */
+function skip(name: String, fn: Function): Test {
+    return new Test(name, fn, 5000, true);
+}
+
+// 导出所有类和函数
+export {
+    TestStatus,
+    TestResult,
+    TestSuite,
+    Test,
+    Assert,
+    AssertionError,
+    TestRunner,
+    describe,
+    test,
+    skip
+}; 

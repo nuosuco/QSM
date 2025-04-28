@@ -1,0 +1,621 @@
+/**
+ * @file enhanced_error_reporter.qentl
+ * @brief 增强型错误报告实现
+ * 
+ * 量子基因编码: QGC-COMPILER-ERROR-REPORTER-2024061901
+ * 量子纠缠信道: QEC-COMPILER-DIAG-01
+ */
+
+import "QEntL/core/error.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/system.qentl";
+import "QEntL/vm/src/core/os_interface/logger.qentl";
+
+/**
+ * 错误类型枚举
+ */
+export quantum_enum ErrorLevel {
+    INFO = 0,      // 信息性提示
+    WARNING = 1,   // 警告,不会阻止编译
+    ERROR = 2,     // 错误,会阻止编译
+    FATAL = 3      // 致命错误,立即终止编译
+}
+
+/**
+ * 错误类别枚举
+ */
+export quantum_enum ErrorCategory {
+    SYNTAX = 0,        // 语法错误
+    SEMANTIC = 1,      // 语义错误
+    TYPE = 2,          // 类型错误
+    LINKER = 3,        // 链接错误
+    QUANTUM = 4,       // 量子相关错误
+    SYSTEM = 5,        // 系统/IO错误
+    INTERNAL = 6       // 内部编译器错误
+}
+
+/**
+ * 错误消息组件,用于构建具有颜色的错误消息
+ */
+export quantum_class ErrorMessageFormatter {
+    private {
+        supportsColor: Boolean;
+        
+        // ANSI颜色代码
+        colorCodes: Map<String, String>;
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param enableColors 是否启用颜色输出
+     */
+    constructor(enableColors: Boolean = true) {
+        this.supportsColor = enableColors && System.supportsAnsiColors();
+        this.initColorCodes();
+    }
+    
+    /**
+     * @brief 初始化颜色代码映射
+     */
+    private function initColorCodes(): void {
+        this.colorCodes = new Map<String, String>();
+        
+        // 前景色
+        this.colorCodes.set("red", "\u001b[31m");
+        this.colorCodes.set("green", "\u001b[32m");
+        this.colorCodes.set("yellow", "\u001b[33m");
+        this.colorCodes.set("blue", "\u001b[34m");
+        this.colorCodes.set("magenta", "\u001b[35m");
+        this.colorCodes.set("cyan", "\u001b[36m");
+        this.colorCodes.set("white", "\u001b[37m");
+        this.colorCodes.set("brightRed", "\u001b[91m");
+        this.colorCodes.set("brightGreen", "\u001b[92m");
+        this.colorCodes.set("brightYellow", "\u001b[93m");
+        this.colorCodes.set("brightBlue", "\u001b[94m");
+        this.colorCodes.set("brightMagenta", "\u001b[95m");
+        this.colorCodes.set("brightCyan", "\u001b[96m");
+        this.colorCodes.set("brightWhite", "\u001b[97m");
+        
+        // 样式
+        this.colorCodes.set("bold", "\u001b[1m");
+        this.colorCodes.set("underline", "\u001b[4m");
+        this.colorCodes.set("reversed", "\u001b[7m");
+        
+        // 重置
+        this.colorCodes.set("reset", "\u001b[0m");
+    }
+    
+    /**
+     * @brief 获取带颜色的文本
+     * @param text 原始文本
+     * @param color 颜色名称
+     * @return 带颜色的文本
+     */
+    public function colored(text: String, color: String): String {
+        if (!this.supportsColor || !this.colorCodes.has(color)) {
+            return text;
+        }
+        
+        let colorCode = this.colorCodes.get(color);
+        let resetCode = this.colorCodes.get("reset");
+        
+        return colorCode + text + resetCode;
+    }
+    
+    /**
+     * @brief 获取带样式的文本
+     * @param text 原始文本
+     * @param style 样式名称(bold, underline, reversed)
+     * @return 带样式的文本
+     */
+    public function styled(text: String, style: String): String {
+        if (!this.supportsColor || !this.colorCodes.has(style)) {
+            return text;
+        }
+        
+        let styleCode = this.colorCodes.get(style);
+        let resetCode = this.colorCodes.get("reset");
+        
+        return styleCode + text + resetCode;
+    }
+    
+    /**
+     * @brief 获取错误级别对应的颜色
+     * @param level 错误级别
+     * @return 颜色名称
+     */
+    public function getLevelColor(level: ErrorLevel): String {
+        switch (level) {
+            case ErrorLevel.INFO:
+                return "brightBlue";
+            case ErrorLevel.WARNING:
+                return "brightYellow";
+            case ErrorLevel.ERROR:
+                return "brightRed";
+            case ErrorLevel.FATAL:
+                return "red";
+            default:
+                return "white";
+        }
+    }
+    
+    /**
+     * @brief 获取错误级别的文本表示
+     * @param level 错误级别
+     * @return 文本表示
+     */
+    public function getLevelText(level: ErrorLevel): String {
+        switch (level) {
+            case ErrorLevel.INFO:
+                return "信息";
+            case ErrorLevel.WARNING:
+                return "警告";
+            case ErrorLevel.ERROR:
+                return "错误";
+            case ErrorLevel.FATAL:
+                return "致命错误";
+            default:
+                return "未知";
+        }
+    }
+}
+
+/**
+ * 诊断信息类
+ */
+export quantum_class Diagnostic {
+    public {
+        level: ErrorLevel;         // 错误级别
+        category: ErrorCategory;   // 错误类别
+        message: String;           // 错误消息
+        sourceFile: String;        // 源文件路径
+        line: Integer;             // 行号
+        column: Integer;           // 列号
+        errorCode: String;         // 错误代码
+        suggestions: Array<String>; // 修复建议
+        context: String;           // 错误上下文代码
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param level 错误级别
+     * @param category 错误类别
+     * @param message 错误消息
+     * @param sourceFile 源文件路径
+     * @param line 行号
+     * @param column 列号
+     * @param errorCode 错误代码
+     */
+    constructor(
+        level: ErrorLevel,
+        category: ErrorCategory,
+        message: String,
+        sourceFile: String = "",
+        line: Integer = 0,
+        column: Integer = 0,
+        errorCode: String = ""
+    ) {
+        this.level = level;
+        this.category = category;
+        this.message = message;
+        this.sourceFile = sourceFile;
+        this.line = line;
+        this.column = column;
+        this.errorCode = errorCode;
+        this.suggestions = new Array<String>();
+        this.context = "";
+    }
+    
+    /**
+     * @brief 添加修复建议
+     * @param suggestion 建议文本
+     */
+    public function addSuggestion(suggestion: String): void {
+        this.suggestions.push(suggestion);
+    }
+    
+    /**
+     * @brief 设置错误上下文代码
+     * @param context 上下文代码
+     */
+    public function setContext(context: String): void {
+        this.context = context;
+    }
+}
+
+/**
+ * @class EnhancedErrorReporter
+ * @brief 增强型错误报告器
+ */
+export quantum_class EnhancedErrorReporter {
+    private {
+        logger: Logger;
+        formatter: ErrorMessageFormatter;
+        diagnostics: Array<Diagnostic>;
+        
+        // 是否显示行号
+        showLineNumbers: Boolean;
+        
+        // 上下文的行数
+        contextLines: Integer;
+        
+        // 文件缓存,避免重复读取
+        fileCache: Map<String, Array<String>>;
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param logger 日志记录器
+     * @param enableColors 是否启用颜色
+     * @param showLineNumbers 是否显示行号
+     * @param contextLines 上下文行数
+     */
+    constructor(
+        logger: Logger,
+        enableColors: Boolean = true,
+        showLineNumbers: Boolean = true,
+        contextLines: Integer = 2
+    ) {
+        this.logger = logger;
+        this.formatter = new ErrorMessageFormatter(enableColors);
+        this.diagnostics = new Array<Diagnostic>();
+        this.showLineNumbers = showLineNumbers;
+        this.contextLines = contextLines;
+        this.fileCache = new Map<String, Array<String>>();
+    }
+    
+    /**
+     * @brief 报告错误
+     * @param level 错误级别
+     * @param category 错误类别
+     * @param message 错误消息
+     * @param sourceFile 源文件路径
+     * @param line 行号
+     * @param column 列号
+     * @param errorCode 错误代码
+     * @param suggestions 修复建议
+     * @return 创建的诊断信息
+     */
+    public function reportError(
+        level: ErrorLevel,
+        category: ErrorCategory,
+        message: String,
+        sourceFile: String = "",
+        line: Integer = 0,
+        column: Integer = 0,
+        errorCode: String = "",
+        suggestions: Array<String> = []
+    ): Diagnostic {
+        // 创建诊断信息
+        let diagnostic = new Diagnostic(
+            level,
+            category,
+            message,
+            sourceFile,
+            line,
+            column,
+            errorCode
+        );
+        
+        // 添加修复建议
+        for (let i = 0; i < suggestions.length; i++) {
+            diagnostic.addSuggestion(suggestions[i]);
+        }
+        
+        // 如果有源文件和行号,生成错误上下文
+        if (sourceFile != "" && line > 0) {
+            let context = this.generateErrorContext(sourceFile, line, column);
+            diagnostic.setContext(context);
+        }
+        
+        // 添加到诊断列表
+        this.diagnostics.push(diagnostic);
+        
+        // 构造并输出格式化的错误消息
+        let formattedError = this.formatDiagnostic(diagnostic);
+        
+        switch (level) {
+            case ErrorLevel.INFO:
+                this.logger.log(LogLevel.INFO, formattedError);
+                break;
+            case ErrorLevel.WARNING:
+                this.logger.log(LogLevel.WARNING, formattedError);
+                break;
+            case ErrorLevel.ERROR:
+            case ErrorLevel.FATAL:
+                this.logger.log(LogLevel.ERROR, formattedError);
+                break;
+        }
+        
+        return diagnostic;
+    }
+    
+    /**
+     * @brief 格式化诊断信息
+     * @param diagnostic 诊断信息
+     * @return 格式化后的错误消息
+     */
+    private function formatDiagnostic(diagnostic: Diagnostic): String {
+        // 准备消息组件
+        let levelColor = this.formatter.getLevelColor(diagnostic.level);
+        let levelText = this.formatter.getLevelText(diagnostic.level);
+        let levelPart = this.formatter.styled(
+            this.formatter.colored(levelText, levelColor),
+            "bold"
+        );
+        
+        let locationPart = "";
+        if (diagnostic.sourceFile != "") {
+            let locationText = diagnostic.sourceFile;
+            if (diagnostic.line > 0) {
+                locationText += ":" + diagnostic.line;
+                if (diagnostic.column > 0) {
+                    locationText += ":" + diagnostic.column;
+                }
+            }
+            locationPart = this.formatter.colored(locationText, "cyan") + ": ";
+        }
+        
+        let codePart = "";
+        if (diagnostic.errorCode != "") {
+            codePart = this.formatter.colored("[" + diagnostic.errorCode + "]", "magenta") + " ";
+        }
+        
+        // 构造基本错误消息
+        let result = levelPart + ": " + locationPart + codePart + diagnostic.message + "\n";
+        
+        // 添加错误上下文(如果有)
+        if (diagnostic.context != "") {
+            result += "\n" + diagnostic.context + "\n";
+        }
+        
+        // 添加修复建议(如果有)
+        if (diagnostic.suggestions.length > 0) {
+            result += "\n" + this.formatter.colored("建议修复:", "brightGreen") + "\n";
+            for (let i = 0; i < diagnostic.suggestions.length; i++) {
+                result += "  " + this.formatter.colored("•", "brightGreen") + " " + 
+                          diagnostic.suggestions[i] + "\n";
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 生成错误上下文
+     * @param sourceFile 源文件路径
+     * @param line 行号
+     * @param column 列号
+     * @return 格式化的错误上下文
+     */
+    public function generateErrorContext(
+        sourceFile: String,
+        line: Integer,
+        column: Integer
+    ): String {
+        // 尝试读取文件
+        let lines = this.getFileLines(sourceFile);
+        if (lines.length == 0 || line > lines.length) {
+            return "";
+        }
+        
+        // 计算要显示的行范围
+        let startLine = Math.max(1, line - this.contextLines);
+        let endLine = Math.min(lines.length, line + this.contextLines);
+        
+        // 构建上下文字符串
+        let context = "";
+        let lineNumberWidth = this.showLineNumbers ? endLine.toString().length : 0;
+        
+        for (let i = startLine; i <= endLine; i++) {
+            let lineContent = lines[i - 1];
+            
+            // 添加行号
+            if (this.showLineNumbers) {
+                let lineNumStr = i.toString();
+                while (lineNumStr.length < lineNumberWidth) {
+                    lineNumStr = " " + lineNumStr;
+                }
+                
+                if (i == line) {
+                    lineNumStr = this.formatter.colored(lineNumStr, "brightYellow");
+                }
+                
+                context += " " + lineNumStr + " | ";
+            } else {
+                context += "| ";
+            }
+            
+            // 添加行内容
+            if (i == line) {
+                // 错误行使用高亮
+                context += this.formatter.colored(lineContent, "brightWhite") + "\n";
+                
+                // 添加错误标记行
+                if (column > 0) {
+                    let markerLine = "";
+                    if (this.showLineNumbers) {
+                        markerLine += " ".repeat(lineNumberWidth + 3);
+                    } else {
+                        markerLine += "| ";
+                    }
+                    
+                    // 在错误位置添加标记
+                    markerLine += " ".repeat(column - 1) + 
+                                  this.formatter.colored("^", "brightRed");
+                    
+                    context += markerLine + "\n";
+                }
+            } else {
+                context += lineContent + "\n";
+            }
+        }
+        
+        return context;
+    }
+    
+    /**
+     * @brief 获取文件的所有行
+     * @param filePath 文件路径
+     * @return 行数组
+     */
+    private function getFileLines(filePath: String): Array<String> {
+        // 检查缓存
+        if (this.fileCache.has(filePath)) {
+            return this.fileCache.get(filePath);
+        }
+        
+        // 读取文件
+        try {
+            let content = File.readAllText(filePath);
+            let lines = content.split("\n");
+            
+            // 缓存结果
+            this.fileCache.set(filePath, lines);
+            
+            return lines;
+        } catch (error) {
+            this.logger.log(LogLevel.WARNING, "无法读取文件 " + filePath + ": " + error);
+            return [];
+        }
+    }
+    
+    /**
+     * @brief 获取所有诊断信息
+     * @return 诊断信息数组
+     */
+    public function getAllDiagnostics(): Array<Diagnostic> {
+        return this.diagnostics;
+    }
+    
+    /**
+     * @brief 获取特定级别的诊断信息
+     * @param level 错误级别
+     * @return 诊断信息数组
+     */
+    public function getDiagnosticsByLevel(level: ErrorLevel): Array<Diagnostic> {
+        let result = new Array<Diagnostic>();
+        
+        for (let i = 0; i < this.diagnostics.length; i++) {
+            if (this.diagnostics[i].level == level) {
+                result.push(this.diagnostics[i]);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取来自特定文件的诊断信息
+     * @param sourceFile 源文件路径
+     * @return 诊断信息数组
+     */
+    public function getDiagnosticsByFile(sourceFile: String): Array<Diagnostic> {
+        let result = new Array<Diagnostic>();
+        
+        for (let i = 0; i < this.diagnostics.length; i++) {
+            if (this.diagnostics[i].sourceFile == sourceFile) {
+                result.push(this.diagnostics[i]);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 清空所有诊断信息
+     */
+    public function clearDiagnostics(): void {
+        this.diagnostics = new Array<Diagnostic>();
+    }
+    
+    /**
+     * @brief 清空文件缓存
+     */
+    public function clearFileCache(): void {
+        this.fileCache.clear();
+    }
+    
+    /**
+     * @brief 获取错误统计信息
+     * @return 统计信息映射
+     */
+    public function getStatistics(): any {
+        let stats = {
+            totalCount: this.diagnostics.length,
+            byLevel: new Map<ErrorLevel, Integer>(),
+            byCategory: new Map<ErrorCategory, Integer>(),
+            byFile: new Map<String, Integer>()
+        };
+        
+        // 初始化计数器
+        for (let level = ErrorLevel.INFO; level <= ErrorLevel.FATAL; level++) {
+            stats.byLevel.set(level, 0);
+        }
+        
+        for (let category = ErrorCategory.SYNTAX; category <= ErrorCategory.INTERNAL; category++) {
+            stats.byCategory.set(category, 0);
+        }
+        
+        // 统计每个诊断信息
+        for (let i = 0; i < this.diagnostics.length; i++) {
+            let diag = this.diagnostics[i];
+            
+            // 按级别统计
+            let levelCount = stats.byLevel.get(diag.level);
+            stats.byLevel.set(diag.level, levelCount + 1);
+            
+            // 按类别统计
+            let categoryCount = stats.byCategory.get(diag.category);
+            stats.byCategory.set(diag.category, categoryCount + 1);
+            
+            // 按文件统计
+            if (diag.sourceFile != "") {
+                if (stats.byFile.has(diag.sourceFile)) {
+                    let fileCount = stats.byFile.get(diag.sourceFile);
+                    stats.byFile.set(diag.sourceFile, fileCount + 1);
+                } else {
+                    stats.byFile.set(diag.sourceFile, 1);
+                }
+            }
+        }
+        
+        return stats;
+    }
+}
+
+/**
+ * @class EnhancedErrorReporterFactory
+ * @brief 错误报告器工厂类
+ */
+export quantum_class EnhancedErrorReporterFactory {
+    /**
+     * @brief 创建标准错误报告器
+     * @param logger 日志记录器
+     * @return 错误报告器实例
+     */
+    public static function createStandard(logger: Logger): EnhancedErrorReporter {
+        return new EnhancedErrorReporter(logger, true, true, 2);
+    }
+    
+    /**
+     * @brief 创建简化错误报告器(无颜色,无行号)
+     * @param logger 日志记录器
+     * @return 错误报告器实例
+     */
+    public static function createSimple(logger: Logger): EnhancedErrorReporter {
+        return new EnhancedErrorReporter(logger, false, false, 0);
+    }
+    
+    /**
+     * @brief 创建详细错误报告器(更多上下文行)
+     * @param logger 日志记录器
+     * @return 错误报告器实例
+     */
+    public static function createVerbose(logger: Logger): EnhancedErrorReporter {
+        return new EnhancedErrorReporter(logger, true, true, 5);
+    }
+} 

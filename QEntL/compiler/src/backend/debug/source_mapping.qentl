@@ -1,0 +1,395 @@
+/**
+ * @file source_mapping.qentl
+ * @brief QEntL源代码映射类
+ * 
+ * 量子基因编码: QGC-COMPILER-SRCMAP-2024061905
+ * 量子纠缠信道: QEC-COMPILER-DEBUG-01
+ */
+
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+
+/**
+ * @class SourcePosition
+ * @brief 源代码位置类
+ */
+class SourcePosition {
+    public {
+        line: Integer;      // 行号（从1开始）
+        column: Integer;    // 列号（从1开始）
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param line 行号
+     * @param column 列号
+     */
+    constructor(line: Integer, column: Integer) {
+        this.line = line;
+        this.column = column;
+    }
+    
+    /**
+     * @brief 获取源代码位置的字符串表示
+     * @return 字符串表示
+     */
+    public function toString(): String {
+        return line + ":" + column;
+    }
+    
+    /**
+     * @brief 比较两个源代码位置
+     * @param other 另一个源代码位置
+     * @return 是否相等
+     */
+    public function equals(other: SourcePosition): Boolean {
+        return this.line == other.line && this.column == other.column;
+    }
+    
+    /**
+     * @brief 检查此位置是否在另一个位置之前
+     * @param other 另一个源代码位置
+     * @return 是否在之前
+     */
+    public function isBefore(other: SourcePosition): Boolean {
+        if (this.line < other.line) {
+            return true;
+        }
+        if (this.line == other.line && this.column < other.column) {
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * @brief 检查此位置是否在另一个位置之后
+     * @param other 另一个源代码位置
+     * @return 是否在之后
+     */
+    public function isAfter(other: SourcePosition): Boolean {
+        if (this.line > other.line) {
+            return true;
+        }
+        if (this.line == other.line && this.column > other.column) {
+            return true;
+        }
+        return false;
+    }
+}
+
+/**
+ * @class SourceSpan
+ * @brief 源代码范围类，表示源代码中的一个范围
+ */
+class SourceSpan {
+    public {
+        start: SourcePosition;  // 起始位置
+        end: SourcePosition;    // 结束位置
+        file: String;           // 源文件路径
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param file 源文件路径
+     * @param startLine 起始行
+     * @param startColumn 起始列
+     * @param endLine 结束行
+     * @param endColumn 结束列
+     */
+    constructor(file: String, startLine: Integer, startColumn: Integer, endLine: Integer, endColumn: Integer) {
+        this.file = file;
+        this.start = new SourcePosition(startLine, startColumn);
+        this.end = new SourcePosition(endLine, endColumn);
+    }
+    
+    /**
+     * @brief 构造函数（使用SourcePosition对象）
+     * @param file 源文件路径
+     * @param start 起始位置
+     * @param end 结束位置
+     */
+    constructor(file: String, start: SourcePosition, end: SourcePosition) {
+        this.file = file;
+        this.start = start;
+        this.end = end;
+    }
+    
+    /**
+     * @brief 获取源代码范围的字符串表示
+     * @return 字符串表示
+     */
+    public function toString(): String {
+        return this.file + ":" + this.start.toString() + "-" + this.end.toString();
+    }
+    
+    /**
+     * @brief 比较两个源代码范围
+     * @param other 另一个源代码范围
+     * @return 是否相等
+     */
+    public function equals(other: SourceSpan): Boolean {
+        return this.file == other.file && 
+               this.start.equals(other.start) && 
+               this.end.equals(other.end);
+    }
+    
+    /**
+     * @brief 检查指定位置是否在此范围内
+     * @param position 要检查的位置
+     * @return 是否在范围内
+     */
+    public function contains(position: SourcePosition): Boolean {
+        // 检查位置是否在起始位置之后或相等
+        let afterStart = position.isAfter(this.start) || position.equals(this.start);
+        // 检查位置是否在结束位置之前或相等
+        let beforeEnd = position.isBefore(this.end) || position.equals(this.end);
+        
+        return afterStart && beforeEnd;
+    }
+    
+    /**
+     * @brief 检查指定范围是否与此范围重叠
+     * @param other 要检查的范围
+     * @return 是否重叠
+     */
+    public function overlaps(other: SourceSpan): Boolean {
+        // 检查文件是否相同
+        if (this.file != other.file) {
+            return false;
+        }
+        
+        // 检查是否有重叠
+        return !(this.end.isBefore(other.start) || this.start.isAfter(other.end));
+    }
+}
+
+/**
+ * @class SourceMapping
+ * @brief 源代码映射类，用于将目标代码位置映射回源代码位置
+ */
+class SourceMapping {
+    private {
+        // 目标位置到源代码范围的映射
+        targetToSource: Map<Integer, SourceSpan>;
+        // 文件路径到源代码行的映射
+        sourceLines: Map<String, Array<String>>;
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.targetToSource = new Map<Integer, SourceSpan>();
+        this.sourceLines = new Map<String, Array<String>>();
+    }
+    
+    /**
+     * @brief 添加映射
+     * @param targetPosition 目标代码中的位置（如字节码偏移）
+     * @param sourceSpan 对应的源代码范围
+     */
+    public function addMapping(targetPosition: Integer, sourceSpan: SourceSpan): void {
+        this.targetToSource.set(targetPosition, sourceSpan);
+    }
+    
+    /**
+     * @brief 加载源文件内容
+     * @param filePath 源文件路径
+     * @param content 文件内容（行分隔）
+     */
+    public function loadSourceFile(filePath: String, content: Array<String>): void {
+        this.sourceLines.set(filePath, content);
+    }
+    
+    /**
+     * @brief 获取目标位置对应的源代码范围
+     * @param targetPosition 目标位置
+     * @return 源代码范围，若不存在则返回null
+     */
+    public function getSourceSpan(targetPosition: Integer): SourceSpan {
+        return this.targetToSource.get(targetPosition);
+    }
+    
+    /**
+     * @brief 获取目标位置对应的源代码行
+     * @param targetPosition 目标位置
+     * @return 源代码行内容，若不存在则返回null
+     */
+    public function getSourceLine(targetPosition: Integer): String {
+        let span = this.getSourceSpan(targetPosition);
+        if (span == null) {
+            return null;
+        }
+        
+        let lines = this.sourceLines.get(span.file);
+        if (lines == null || span.start.line > lines.length) {
+            return null;
+        }
+        
+        return lines[span.start.line - 1]; // 行号从1开始，数组索引从0开始
+    }
+    
+    /**
+     * @brief 获取目标位置对应的源代码上下文
+     * @param targetPosition 目标位置
+     * @param contextLines 上下文行数
+     * @return 源代码上下文，包含行号和内容
+     */
+    public function getSourceContext(targetPosition: Integer, contextLines: Integer): Array<String> {
+        let span = this.getSourceSpan(targetPosition);
+        if (span == null) {
+            return null;
+        }
+        
+        let lines = this.sourceLines.get(span.file);
+        if (lines == null) {
+            return null;
+        }
+        
+        let result = new Array<String>();
+        
+        // 计算上下文的起始和结束行
+        let startLine = Math.max(1, span.start.line - contextLines);
+        let endLine = Math.min(lines.length, span.end.line + contextLines);
+        
+        // 添加上下文行
+        for (let i = startLine; i <= endLine; i++) {
+            let prefix = i == span.start.line ? "-> " : "   ";
+            result.push(prefix + i + " | " + lines[i - 1]);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取所有的映射条目
+     * @return 所有目标位置及其对应的源代码范围
+     */
+    public function getAllMappings(): Map<Integer, SourceSpan> {
+        return this.targetToSource.clone();
+    }
+    
+    /**
+     * @brief 清除所有映射
+     */
+    public function clearMappings(): void {
+        this.targetToSource.clear();
+    }
+}
+
+/**
+ * @class SourceMapGenerator
+ * @brief 源代码映射生成器
+ */
+class SourceMapGenerator {
+    private {
+        mapping: SourceMapping;  // 源代码映射
+        currentFile: String;     // 当前处理的文件
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.mapping = new SourceMapping();
+        this.currentFile = "";
+    }
+    
+    /**
+     * @brief 设置当前处理的文件
+     * @param filePath 文件路径
+     * @param content 文件内容
+     */
+    public function setCurrentFile(filePath: String, content: String): void {
+        this.currentFile = filePath;
+        
+        // 将文件内容按行分割
+        let lines = content.split("\n");
+        this.mapping.loadSourceFile(filePath, lines);
+    }
+    
+    /**
+     * @brief 添加映射
+     * @param targetPosition 目标位置
+     * @param startLine 起始行
+     * @param startColumn 起始列
+     * @param endLine 结束行
+     * @param endColumn 结束列
+     */
+    public function addMapping(targetPosition: Integer, startLine: Integer, startColumn: Integer, 
+                              endLine: Integer, endColumn: Integer): void {
+        let span = new SourceSpan(this.currentFile, startLine, startColumn, endLine, endColumn);
+        this.mapping.addMapping(targetPosition, span);
+    }
+    
+    /**
+     * @brief 获取生成的源代码映射
+     * @return 源代码映射
+     */
+    public function getMapping(): SourceMapping {
+        return this.mapping;
+    }
+}
+
+/**
+ * @class SourceMapConsumer
+ * @brief 源代码映射消费者
+ */
+class SourceMapConsumer {
+    private {
+        mapping: SourceMapping;  // 源代码映射
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param mapping 源代码映射
+     */
+    constructor(mapping: SourceMapping) {
+        this.mapping = mapping;
+    }
+    
+    /**
+     * @brief 获取目标位置对应的源代码位置
+     * @param targetPosition 目标位置
+     * @return 源代码位置描述
+     */
+    public function locate(targetPosition: Integer): String {
+        let span = this.mapping.getSourceSpan(targetPosition);
+        if (span == null) {
+            return "未知位置";
+        }
+        
+        return span.toString();
+    }
+    
+    /**
+     * @brief 获取目标位置对应的源代码上下文
+     * @param targetPosition 目标位置
+     * @param contextLines 上下文行数
+     * @return 源代码上下文
+     */
+    public function getContext(targetPosition: Integer, contextLines: Integer = 2): Array<String> {
+        return this.mapping.getSourceContext(targetPosition, contextLines);
+    }
+    
+    /**
+     * @brief 打印目标位置对应的源代码上下文
+     * @param targetPosition 目标位置
+     * @param contextLines 上下文行数
+     */
+    public function printContext(targetPosition: Integer, contextLines: Integer = 2): void {
+        let context = this.getContext(targetPosition, contextLines);
+        if (context == null) {
+            System.println("无法找到位置 " + targetPosition + " 对应的源代码上下文");
+            return;
+        }
+        
+        let span = this.mapping.getSourceSpan(targetPosition);
+        System.println("位置: " + span.toString());
+        
+        for (let i = 0; i < context.length; i++) {
+            System.println(context[i]);
+        }
+    }
+} 
