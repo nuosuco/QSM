@@ -4,10 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-<<<<<<< HEAD
-env/
-=======
->>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 build/
 develop-eggs/
 dist/
@@ -19,47 +15,11 @@ lib64/
 parts/
 sdist/
 var/
-<<<<<<< HEAD
-=======
 wheels/
->>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 *.egg-info/
 .installed.cfg
 *.egg
 
-<<<<<<< HEAD
-# IDE 
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# 日志文件
-.logs/
-logs/
-*.log
-
-# 备份文件
-*.bak
-.backups/
-backup/
-
-# 临时文件
-.temp/
-.tmp/
-tmp/
-
-# 操作系统文件
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# 项目特定文件
-python.bat
-
-=======
->>>>>>> c8ee4fc6e39ad3985ce941a8efbcb072b6ba0eea
 # 虚拟环境
 .venv/
 venv/
@@ -85,10 +45,11 @@ QSM_backup/
 # 系统文件
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # 项目特定
 node_modules/
-.git/
 dist/
 build/
 temp/
@@ -109,17 +70,8 @@ local.properties
 .recommenders
 
 # IDE相关
-.idea/
-.vscode/
-.cursor/
 *.sublime-workspace
 *.sublime-project
-
-# 操作系统相关
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
 
 # QEntL特定文件
 qentl_engine.log
@@ -133,8 +85,14 @@ Ref/Qwen/
 SOM/Qwen/
 WeQ/Qwen/
 
-# 排除通用的临时文件
+# 排除用户数据目录
+QEntL/Data/Yi\ Wen/
+"QEntL/Data/Yi Wen/"
+QEntL/Data/.Yi\ Wen/
+"QEntL/Data/.Yi Wen/"
+
+# 通用的临时文件
 *.log
 *.tmp
 .DS_Store
-Thumbs.db 
+Thumbs.db

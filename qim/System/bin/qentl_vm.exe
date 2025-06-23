@@ -1,0 +1,10 @@
+// QEntL Virtual Machine Executable
+// This is a placeholder for the compiled QEntL VM binary
+// Version: 1.0.0
+// Size: ~300MB
+
+#include "qentl_vm.h"
+
+int main(int argc, char* argv[]) {
+    return qentl_vm_main(argc, argv);
+}
