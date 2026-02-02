@@ -25,6 +25,8 @@ wheels/
 venv/
 env/
 ENV/
+.qsm_venv/
+.qsm_venv/*
 
 # IDE和编辑器
 .idea/
@@ -99,3 +101,17 @@ widowns10/
 *.tmp
 .DS_Store
 Thumbs.db
+
+# 大文件类型（不上传Git）
+*.pth
+*.pt
+*.bin
+*.h5
+*.ckpt
+*.pdf
+*.zip
+*.tar.gz
+*.7z
+*.dll
+*.so
+*.dylib
