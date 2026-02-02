@@ -115,3 +115,8 @@ Thumbs.db
 *.dll
 *.so
 *.dylib
+
+# 例外：核心模型文件（启用本地跟踪）
+!Models/QEntL/bin/qentl_model.pth
+!Models/SOM/bin/som_model.pth
+!Models/training_data/source/Yi\ Wen/《通用彝文字典》.pdf
