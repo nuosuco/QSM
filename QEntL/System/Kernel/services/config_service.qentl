@@ -1,0 +1,506 @@
+/**
+ * QEntL配置服务
+ * 版本: 1.0.0
+ * 作者: QEntL团队
+ * 描述: 提供系统级配置管理、加载和保存功能
+ * 量子基因编码: QG-CONFIG-SERVICE-H9I0-1714130300
+ * 纠缠强度: 1.0
+ */
+
+import "../utils/file_system.qentl";
+import "../utils/json.qentl";
+import "../utils/logger.qentl";
+import "../utils/path.qentl";
+import "./security_service.qentl";
+
+/**
+ * 配置服务配置
+ */
+export const ConfigServiceConfig = {
+  // 配置文件路径
+  configFilePath: "./config/qentl.config.json",
+  
+  // 备份配置文件数量
+  maxConfigBackups: 5,
+  
+  // 是否自动保存更改
+  autoSave: true,
+  
+  // 自动保存延迟 (毫秒)
+  autoSaveDelay: 1000,
+  
+  // 是否加密配置文件
+  encryptConfig: false,
+  
+  // 是否在启动时验证配置
+  validateOnStartup: true,
+  
+  // 是否监视配置文件变化
+  watchConfigFile: true,
+  
+  // 是否启用热重载
+  enableHotReload: true,
+  
+  // 默认配置
+  defaultConfig: {
+    system: {
+      name: "QEntL操作系统",
+      version: "1.0.0",
+      description: "量子纠缠语言操作系统",
+      mode: "standard", // standard, safe, performance, debug
+      language: "zh_CN"
+    },
+    logging: {
+      level: "info",
+      consoleOutput: true,
+      fileOutput: true,
+      maxLogSize: 10485760,
+      maxLogFiles: 10
+    },
+    security: {
+      encryptionEnabled: true,
+      encryptionAlgorithm: "hybrid",
+      sessionTimeout: 1800000,
+      loginAttempts: 5
+    },
+    performance: {
+      threadPoolSize: 8,
+      maxConcurrentOperations: 16,
+      useQuantumAcceleration: true
+    },
+    storage: {
+      defaultLocation: "./data",
+      maxCacheSize: 104857600,
+      autoCompaction: true
+    },
+    network: {
+      port: 9000,
+      enableRemoteAccess: false,
+      maxConnections: 100
+    },
+    ui: {
+      theme: "dark",
+      fontFamily: "QEntL Sans",
+      fontSize: 14
+    }
+  }
+};
+
+/**
+ * 配置服务状态
+ */
+export const ConfigServiceState = {
+  // 服务是否已初始化
+  initialized: false,
+  
+  // 当前配置
+  currentConfig: {},
+  
+  // 配置是否已修改
+  configModified: false,
+  
+  // 自动保存定时器
+  autoSaveTimer: null,
+  
+  // 配置文件监视器
+  configFileWatcher: null,
+  
+  // 事件监听器
+  eventListeners: {
+    change: [],
+    save: [],
+    load: [],
+    error: []
+  }
+};
+
+/**
+ * 初始化配置服务
+ * 
+ * @param {Object} config - 配置服务配置参数
+ * @returns {boolean} - 是否初始化成功
+ */
+export function initialize(config = {}) {
+  logger.info("[配置服务] 正在初始化配置服务...");
+  
+  // 合并配置
+  const mergedConfig = { ...ConfigServiceConfig, ...config };
+  Object.assign(ConfigServiceConfig, mergedConfig);
+  
+  try {
+    // 确保配置目录存在
+    const configDir = path.dirname(ConfigServiceConfig.configFilePath);
+    file_system.ensureDirectoryExists(configDir);
+    
+    // 加载配置
+    if (file_system.fileExists(ConfigServiceConfig.configFilePath)) {
+      loadConfig();
+    } else {
+      // 使用默认配置
+      ConfigServiceState.currentConfig = { ...ConfigServiceConfig.defaultConfig };
+      saveConfig();
+    }
+    
+    // 设置热重载
+    if (ConfigServiceConfig.watchConfigFile && ConfigServiceConfig.enableHotReload) {
+      setupConfigWatcher();
+    }
+    
+    // 验证配置
+    if (ConfigServiceConfig.validateOnStartup) {
+      validateConfig();
+    }
+    
+    ConfigServiceState.initialized = true;
+    logger.info("[配置服务] 配置服务初始化成功");
+    
+    return true;
+  } catch (error) {
+    logger.error(`[配置服务] 配置服务初始化失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 获取配置项值
+ * 
+ * @param {string} key - 配置键名，使用点号分隔嵌套属性
+ * @param {any} defaultValue - 默认值
+ * @returns {any} - 配置值
+ */
+export function get(key, defaultValue = undefined) {
+  checkInitialized();
+  
+  const parts = key.split(".");
+  let current = ConfigServiceState.currentConfig;
+  
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (current === undefined || current === null || typeof current !== "object") {
+      return defaultValue;
+    }
+    current = current[part];
+  }
+  
+  return current !== undefined 器 current : defaultValue;
+}
+
+/**
+ * 设置配置项值
+ * 
+ * @param {string} key - 配置键名，使用点号分隔嵌套属性
+ * @param {any} value - 配置值
+ * @returns {boolean} - 是否设置成功
+ */
+export function set(key, value) {
+  checkInitialized();
+  
+  try {
+    const parts = key.split(".");
+    let current = ConfigServiceState.currentConfig;
+    
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (current[part] === undefined || current[part] === null) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    
+    const lastPart = parts[parts.length - 1];
+    const oldValue = current[lastPart];
+    current[lastPart] = value;
+    
+    ConfigServiceState.configModified = true;
+    
+    // 触发变更事件
+    triggerEvent("change", { key, oldValue, newValue: value });
+    
+    // 如果启用自动保存，设置定时器
+    if (ConfigServiceConfig.autoSave) {
+      if (ConfigServiceState.autoSaveTimer) {
+        clearTimeout(ConfigServiceState.autoSaveTimer);
+      }
+      
+      ConfigServiceState.autoSaveTimer = setTimeout(
+        saveConfig,
+        ConfigServiceConfig.autoSaveDelay
+      );
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error(`[配置服务] 设置配置项失败: ${error.message}`);
+    triggerEvent("error", { key, value, error });
+    return false;
+  }
+}
+
+/**
+ * 加载配置文件
+ * 
+ * @returns {boolean} - 是否加载成功
+ */
+export function loadConfig() {
+  checkInitialized();
+  
+  try {
+    let configData = file_system.readFile(ConfigServiceConfig.configFilePath);
+    
+    // 如果配置文件已加密，则解密
+    if (ConfigServiceConfig.encryptConfig) {
+      configData = security_service.decrypt(configData);
+    }
+    
+    const config = json.parse(configData);
+    
+    ConfigServiceState.currentConfig = config;
+    ConfigServiceState.configModified = false;
+    
+    logger.info("[配置服务] 配置已加载");
+    triggerEvent("load", { config });
+    
+    return true;
+  } catch (error) {
+    logger.error(`[配置服务] 加载配置失败: ${error.message}`);
+    triggerEvent("error", { action: "load", error });
+    
+    // 如果加载失败，使用默认配置
+    ConfigServiceState.currentConfig = { ...ConfigServiceConfig.defaultConfig };
+    
+    return false;
+  }
+}
+
+/**
+ * 保存配置到文件
+ * 
+ * @returns {boolean} - 是否保存成功
+ */
+export function saveConfig() {
+  checkInitialized();
+  
+  try {
+    // 清除自动保存定时器
+    if (ConfigServiceState.autoSaveTimer) {
+      clearTimeout(ConfigServiceState.autoSaveTimer);
+      ConfigServiceState.autoSaveTimer = null;
+    }
+    
+    // 如果配置已修改，则备份当前配置文件
+    if (ConfigServiceState.configModified && file_system.fileExists(ConfigServiceConfig.configFilePath)) {
+      backupConfig();
+    }
+    
+    // 序列化配置
+    let configData = json.stringify(ConfigServiceState.currentConfig, null, 2);
+    
+    // 如果配置需要加密，则加密
+    if (ConfigServiceConfig.encryptConfig) {
+      configData = security_service.encrypt(configData);
+    }
+    
+    // 写入配置文件
+    file_system.writeFile(ConfigServiceConfig.configFilePath, configData);
+    
+    ConfigServiceState.configModified = false;
+    logger.info("[配置服务] 配置已保存");
+    triggerEvent("save", { config: ConfigServiceState.currentConfig });
+    
+    return true;
+  } catch (error) {
+    logger.error(`[配置服务] 保存配置失败: ${error.message}`);
+    triggerEvent("error", { action: "save", error });
+    return false;
+  }
+}
+
+/**
+ * 重置配置为默认值
+ * 
+ * @returns {boolean} - 是否重置成功
+ */
+export function resetToDefault() {
+  checkInitialized();
+  
+  try {
+    ConfigServiceState.currentConfig = { ...ConfigServiceConfig.defaultConfig };
+    ConfigServiceState.configModified = true;
+    
+    logger.info("[配置服务] 配置已重置为默认值");
+    triggerEvent("change", { key: "*", oldValue: null, newValue: ConfigServiceState.currentConfig });
+    
+    // 保存新配置
+    if (ConfigServiceConfig.autoSave) {
+      saveConfig();
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error(`[配置服务] 重置配置失败: ${error.message}`);
+    triggerEvent("error", { action: "reset", error });
+    return false;
+  }
+}
+
+/**
+ * 添加事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否添加成功
+ */
+export function addEventListener(event, listener) {
+  checkInitialized();
+  
+  if (!ConfigServiceState.eventListeners[event]) {
+    ConfigServiceState.eventListeners[event] = [];
+  }
+  
+  ConfigServiceState.eventListeners[event].push(listener);
+  return true;
+}
+
+/**
+ * 移除事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否移除成功
+ */
+export function removeEventListener(event, listener) {
+  checkInitialized();
+  
+  if (!ConfigServiceState.eventListeners[event]) {
+    return false;
+  }
+  
+  const index = ConfigServiceState.eventListeners[event].indexOf(listener);
+  if (index !== -1) {
+    ConfigServiceState.eventListeners[event].splice(index, 1);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * 获取服务状态
+ * 
+ * @returns {Object} - 服务状态信息
+ */
+export function getStatus() {
+  return {
+    initialized: ConfigServiceState.initialized,
+    configModified: ConfigServiceState.configModified,
+    configPath: ConfigServiceConfig.configFilePath,
+    watcherActive: !!ConfigServiceState.configFileWatcher
+  };
+}
+
+// ============= 内部函数 =============
+
+/**
+ * 检查服务是否已初始化
+ */
+function checkInitialized() {
+  if (!ConfigServiceState.initialized) {
+    throw new Error("配置服务尚未初始化");
+  }
+}
+
+/**
+ * 备份配置文件
+ */
+function backupConfig() {
+  try {
+    // 基础文件路径
+    const basePath = ConfigServiceConfig.configFilePath;
+    
+    // 移动现有备份
+    for (let i = ConfigServiceConfig.maxConfigBackups - 1; i > 0; i--) {
+      const oldFile = `${basePath}.backup.${i - 1}`;
+      const newFile = `${basePath}.backup.${i}`;
+      
+      if (file_system.fileExists(oldFile)) {
+        file_system.moveFile(oldFile, newFile, true);
+      }
+    }
+    
+    // 创建新备份
+    file_system.copyFile(basePath, `${basePath}.backup.1`);
+    
+    logger.debug("[配置服务] 已创建配置文件备份");
+  } catch (error) {
+    logger.warn(`[配置服务] 创建配置文件备份失败: ${error.message}`);
+  }
+}
+
+/**
+ * 验证配置
+ * 
+ * @returns {boolean} - 配置是否有效
+ */
+function validateConfig() {
+  // 此处可实现配置架构验证
+  // 目前仅返回true
+  return true;
+}
+
+/**
+ * 设置配置文件监视器
+ */
+function setupConfigWatcher() {
+  try {
+    // 如果已有监视器，先清除
+    if (ConfigServiceState.configFileWatcher) {
+      ConfigServiceState.configFileWatcher.close();
+    }
+    
+    // 设置新监视器
+    ConfigServiceState.configFileWatcher = file_system.watchFile(
+      ConfigServiceConfig.configFilePath,
+      () => {
+        logger.info("[配置服务] 检测到配置文件变更，正在重新加载");
+        loadConfig();
+      }
+    );
+    
+    logger.debug("[配置服务] 已设置配置文件监视器");
+  } catch (error) {
+    logger.warn(`[配置服务] 设置配置文件监视器失败: ${error.message}`);
+  }
+}
+
+/**
+ * 触发事件
+ * 
+ * @param {string} eventName - 事件名称
+ * @param {Object} eventData - 事件数据
+ */
+function triggerEvent(eventName, eventData) {
+  if (!ConfigServiceState.eventListeners[eventName]) {
+    return;
+  }
+  
+  for (const listener of ConfigServiceState.eventListeners[eventName]) {
+    try {
+      listener(eventData);
+    } catch (error) {
+      logger.warn(`[配置服务] 事件监听器执行失败: ${error.message}`);
+    }
+  }
+}
+
+// 导出配置服务模块
+export default {
+  initialize,
+  get,
+  set,
+  loadConfig,
+  saveConfig,
+  resetToDefault,
+  addEventListener,
+  removeEventListener,
+  getStatus
+}; 

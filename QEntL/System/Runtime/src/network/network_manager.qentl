@@ -1,0 +1,1207 @@
+# QEntL Network Manager
+# 网络通信管理模块
+# 版本：1.0.0
+# 作者：QEntL Network Team
+
+module NetworkManager {
+    # 网络协议枚举
+    enum NetworkProtocol {
+        TCP,
+        UDP,
+        QUANTUM_ENTANGLEMENT,
+        HTTP,
+        HTTPS,
+        WEBSOCKET
+    }
+    
+    # 套接字类型枚举
+    enum SocketType {
+        STREAM,      # TCP
+        DATAGRAM,    # UDP
+        QUANTUM      # 量子纠缠通信
+    }
+    
+    # 连接状态枚举
+    enum ConnectionState {
+        CLOSED,
+        LISTEN,
+        SYN_SENT,
+        SYN_RECEIVED,
+        ESTABLISHED,
+        FIN_WAIT1,
+        FIN_WAIT2,
+        CLOSE_WAIT,
+        CLOSING,
+        LAST_ACK,
+        TIME_WAIT
+    }
+    
+    # 网络地址结构
+    class NetworkAddress {
+        field ip_address: string
+        field port: int
+        field protocol: NetworkProtocol
+        
+        method init(ip: string, port_num: int, proto: NetworkProtocol = NetworkProtocol.TCP) {
+            self.ip_address = ip
+            self.port = port_num
+            self.protocol = proto
+        }
+        
+        method to_string() -> string {
+            return self.ip_address + ":" + self.port + " (" + self.protocol + ")"
+        }
+        
+        method equals(other: NetworkAddress) -> bool {
+            return self.ip_address == other.ip_address && 
+                   self.port == other.port && 
+                   self.protocol == other.protocol
+        }
+    }
+    
+    # 网络数据包
+    class NetworkPacket {
+        field source: NetworkAddress
+        field destination: NetworkAddress
+        field protocol: NetworkProtocol
+        field sequence_number: int
+        field acknowledgment_number: int
+        field flags: int
+        field window_size: int
+        field checksum: int
+        field data: list<byte>
+        field timestamp: timestamp
+        field quantum_state: QuantumState  # 用于量子通信
+        
+        method init(src: NetworkAddress, dest: NetworkAddress) {
+            self.source = src
+            self.destination = dest
+            self.protocol = src.protocol
+            self.sequence_number = 0
+            self.acknowledgment_number = 0
+            self.flags = 0
+            self.window_size = 65535
+            self.checksum = 0
+            self.data = []
+            self.timestamp = SystemClock.now()
+            self.quantum_state = null
+        }
+        
+        # 计算校验和
+        method calculate_checksum() -> int {
+            checksum = 0
+            
+            # 简化的校验和算法
+            for byte_val in self.data {
+                checksum += byte_val
+            }
+            
+            checksum += self.source.port
+            checksum += self.destination.port
+            checksum += self.sequence_number
+            checksum += self.acknowledgment_number
+            
+            return checksum & 0xFFFF
+        }
+        
+        # 验证校验和
+        method verify_checksum() -> bool {
+            return self.checksum == calculate_checksum()
+        }
+        
+        # 设置数据
+        method set_data(data_bytes: list<byte>) {
+            self.data = data_bytes
+            self.checksum = calculate_checksum()
+        }
+        
+        # 序列化数据包
+        method serialize() -> list<byte> {
+            packet_data = []
+            
+            # 添加头部信息
+            packet_data.extend(string_to_bytes(self.source.to_string()))
+            packet_data.extend(string_to_bytes(self.destination.to_string()))
+            packet_data.extend(int_to_bytes(self.sequence_number))
+            packet_data.extend(int_to_bytes(self.acknowledgment_number))
+            packet_data.extend(int_to_bytes(self.flags))
+            packet_data.extend(int_to_bytes(self.window_size))
+            packet_data.extend(int_to_bytes(self.checksum))
+            
+            # 添加数据
+            packet_data.extend(self.data)
+            
+            return packet_data
+        }
+    }
+    
+    # 套接字基类
+    abstract class Socket {
+        field socket_id: int
+        field local_address: NetworkAddress
+        field remote_address: NetworkAddress
+        field socket_type: SocketType
+        field state: ConnectionState
+        field receive_buffer: list<byte>
+        field send_buffer: list<byte>
+        field process_id: int
+        
+        method init(sock_id: int, sock_type: SocketType) {
+            self.socket_id = sock_id
+            self.socket_type = sock_type
+            self.state = ConnectionState.CLOSED
+            self.receive_buffer = []
+            self.send_buffer = []
+            self.process_id = ProcessManager.get_current_process().process_id
+            self.local_address = null
+            self.remote_address = null
+        }
+        
+        # 绑定地址
+        abstract method bind(address: NetworkAddress) -> bool
+        
+        # 监听连接
+        abstract method listen(backlog: int) -> bool
+        
+        # 接受连接
+        abstract method accept() -> Socket
+        
+        # 连接到远程地址
+        abstract method connect(address: NetworkAddress) -> bool
+        
+        # 发送数据
+        abstract method send(data: list<byte>) -> int
+        
+        # 接收数据
+        abstract method receive(buffer: list<byte>, size: int) -> int
+        
+        # 关闭套接字
+        abstract method close() -> bool
+        
+        # 获取套接字状态
+        method get_state() -> ConnectionState {
+            return self.state
+        }
+        
+        # 设置套接字选项
+        method set_option(option: string, value: any) {
+            # 实现套接字选项设置
+        }
+    }
+    
+    # TCP套接字
+    class TCPSocket extends Socket {
+        field connection_queue: list<TCPSocket>
+        field max_connections: int
+        field sequence_number: int
+        field acknowledgment_number: int
+        field window_size: int
+        
+        method init(sock_id: int) {
+            super.init(sock_id, SocketType.STREAM)
+            self.connection_queue = []
+            self.max_connections = 10
+            self.sequence_number = QuantumRandom.random_int(1000000)
+            self.acknowledgment_number = 0
+            self.window_size = 65535
+        }
+        
+        method bind(address: NetworkAddress) -> bool {
+            if self.state != ConnectionState.CLOSED {
+                return false
+            }
+            
+            self.local_address = address
+            self.state = ConnectionState.CLOSED
+            
+            # 注册到网络管理器
+            NetworkManager.register_socket(self)
+            
+            QuantumLogger.debug("TCP socket bound to " + address.to_string())
+            return true
+        }
+        
+        method listen(backlog: int) -> bool {
+            if self.state != ConnectionState.CLOSED || self.local_address == null {
+                return false
+            }
+            
+            self.max_connections = backlog
+            self.state = ConnectionState.LISTEN
+            
+            QuantumLogger.log("TCP socket listening on " + self.local_address.to_string())
+            return true
+        }
+        
+        method accept() -> Socket {
+            if self.state != ConnectionState.LISTEN {
+                return null
+            }
+            
+            # 等待连接队列中有新连接
+            while self.connection_queue.is_empty() {
+                SystemThread.sleep(10)
+            }
+            
+            new_connection = self.connection_queue.remove(0)
+            new_connection.state = ConnectionState.ESTABLISHED
+            
+            QuantumLogger.debug("Accepted connection from " + new_connection.remote_address.to_string())
+            
+            return new_connection
+        }
+        
+        method connect(address: NetworkAddress) -> bool {
+            if self.state != ConnectionState.CLOSED {
+                return false
+            }
+            
+            self.remote_address = address
+            self.state = ConnectionState.SYN_SENT
+            
+            # 发送SYN包
+            syn_packet = NetworkPacket(self.local_address, address)
+            syn_packet.sequence_number = self.sequence_number
+            syn_packet.flags = TCP_SYN
+            
+            if !NetworkManager.send_packet(syn_packet) {
+                self.state = ConnectionState.CLOSED
+                return false
+            }
+            
+            # 等待SYN-ACK响应
+            timeout = SystemClock.now() + 5000  # 5秒超时
+            while self.state == ConnectionState.SYN_SENT && SystemClock.now() < timeout {
+                SystemThread.sleep(10)
+            }
+            
+            if self.state == ConnectionState.ESTABLISHED {
+                QuantumLogger.log("Connected to " + address.to_string())
+                return true
+            } else {
+                self.state = ConnectionState.CLOSED
+                return false
+            }
+        }
+        
+        method send(data: list<byte>) -> int {
+            if self.state != ConnectionState.ESTABLISHED {
+                return -1
+            }
+            
+            # 将数据分割成数据包
+            bytes_sent = 0
+            max_packet_size = 1460  # 标准TCP MSS
+            
+            while bytes_sent < data.size() {
+                packet_size = min(max_packet_size, data.size() - bytes_sent)
+                packet_data = data.slice(bytes_sent, bytes_sent + packet_size)
+                
+                # 创建TCP数据包
+                tcp_packet = NetworkPacket(self.local_address, self.remote_address)
+                tcp_packet.sequence_number = self.sequence_number
+                tcp_packet.acknowledgment_number = self.acknowledgment_number
+                tcp_packet.flags = TCP_PSH | TCP_ACK
+                tcp_packet.window_size = self.window_size
+                tcp_packet.set_data(packet_data)
+                
+                if NetworkManager.send_packet(tcp_packet) {
+                    bytes_sent += packet_size
+                    self.sequence_number += packet_size
+                } else {
+                    break
+                }
+            }
+            
+            return bytes_sent
+        }
+        
+        method receive(buffer: list<byte>, size: int) -> int {
+            if self.state != ConnectionState.ESTABLISHED {
+                return -1
+            }
+            
+            # 从接收缓冲区读取数据
+            bytes_to_read = min(size, self.receive_buffer.size())
+            
+            for i in range(bytes_to_read) {
+                buffer[i] = self.receive_buffer.remove(0)
+            }
+            
+            return bytes_to_read
+        }
+        
+        method close() -> bool {
+            if self.state == ConnectionState.CLOSED {
+                return true
+            }
+            
+            if self.state == ConnectionState.ESTABLISHED {
+                # 发送FIN包
+                fin_packet = NetworkPacket(self.local_address, self.remote_address)
+                fin_packet.sequence_number = self.sequence_number
+                fin_packet.acknowledgment_number = self.acknowledgment_number
+                fin_packet.flags = TCP_FIN | TCP_ACK
+                
+                NetworkManager.send_packet(fin_packet)
+                self.state = ConnectionState.FIN_WAIT1
+                
+                # 等待连接关闭
+                timeout = SystemClock.now() + 2000  # 2秒超时
+                while self.state != ConnectionState.CLOSED && SystemClock.now() < timeout {
+                    SystemThread.sleep(10)
+                }
+            }
+            
+            self.state = ConnectionState.CLOSED
+            NetworkManager.unregister_socket(self)
+            
+            QuantumLogger.debug("TCP socket closed")
+            return true
+        }
+        
+        # 处理接收到的数据包
+        method handle_packet(packet: NetworkPacket) {
+            if packet.flags & TCP_SYN {
+                handle_syn_packet(packet)
+            } else if packet.flags & TCP_ACK {
+                handle_ack_packet(packet)
+            } else if packet.flags & TCP_FIN {
+                handle_fin_packet(packet)
+            } else if packet.data.size() > 0 {
+                handle_data_packet(packet)
+            }
+        }
+        
+        # 处理SYN包
+        method handle_syn_packet(packet: NetworkPacket) {
+            if self.state == ConnectionState.LISTEN {
+                # 创建新连接
+                new_socket = TCPSocket(NetworkManager.get_next_socket_id())
+                new_socket.local_address = self.local_address
+                new_socket.remote_address = packet.source
+                new_socket.acknowledgment_number = packet.sequence_number + 1
+                new_socket.state = ConnectionState.SYN_RECEIVED
+                
+                # 发送SYN-ACK
+                syn_ack = NetworkPacket(new_socket.local_address, new_socket.remote_address)
+                syn_ack.sequence_number = new_socket.sequence_number
+                syn_ack.acknowledgment_number = new_socket.acknowledgment_number
+                syn_ack.flags = TCP_SYN | TCP_ACK
+                
+                NetworkManager.send_packet(syn_ack)
+                self.connection_queue.append(new_socket)
+            }
+        }
+        
+        # 处理ACK包
+        method handle_ack_packet(packet: NetworkPacket) {
+            if self.state == ConnectionState.SYN_SENT {
+                if packet.flags & TCP_SYN {
+                    # 收到SYN-ACK
+                    self.acknowledgment_number = packet.sequence_number + 1
+                    self.state = ConnectionState.ESTABLISHED
+                    
+                    # 发送ACK
+                    ack_packet = NetworkPacket(self.local_address, self.remote_address)
+                    ack_packet.sequence_number = self.sequence_number
+                    ack_packet.acknowledgment_number = self.acknowledgment_number
+                    ack_packet.flags = TCP_ACK
+                    
+                    NetworkManager.send_packet(ack_packet)
+                }
+            }
+        }
+        
+        # 处理FIN包
+        method handle_fin_packet(packet: NetworkPacket) {
+            if self.state == ConnectionState.ESTABLISHED {
+                self.state = ConnectionState.CLOSE_WAIT
+                
+                # 发送ACK
+                ack_packet = NetworkPacket(self.local_address, self.remote_address)
+                ack_packet.sequence_number = self.sequence_number
+                ack_packet.acknowledgment_number = packet.sequence_number + 1
+                ack_packet.flags = TCP_ACK
+                
+                NetworkManager.send_packet(ack_packet)
+                
+                # 关闭连接
+                self.state = ConnectionState.CLOSED
+            }
+        }
+        
+        # 处理数据包
+        method handle_data_packet(packet: NetworkPacket) {
+            if self.state == ConnectionState.ESTABLISHED {
+                # 将数据添加到接收缓冲区
+                self.receive_buffer.extend(packet.data)
+                
+                # 发送ACK
+                ack_packet = NetworkPacket(self.local_address, self.remote_address)
+                ack_packet.sequence_number = self.sequence_number
+                ack_packet.acknowledgment_number = packet.sequence_number + packet.data.size()
+                ack_packet.flags = TCP_ACK
+                
+                NetworkManager.send_packet(ack_packet)
+            }
+        }
+    }
+    
+    # UDP套接字
+    class UDPSocket extends Socket {
+        method init(sock_id: int) {
+            super.init(sock_id, SocketType.DATAGRAM)
+        }
+        
+        method bind(address: NetworkAddress) -> bool {
+            self.local_address = address
+            NetworkManager.register_socket(self)
+            QuantumLogger.debug("UDP socket bound to " + address.to_string())
+            return true
+        }
+        
+        method listen(backlog: int) -> bool {
+            # UDP不需要监听
+            return true
+        }
+        
+        method accept() -> Socket {
+            # UDP不支持accept
+            return null
+        }
+        
+        method connect(address: NetworkAddress) -> bool {
+            self.remote_address = address
+            return true
+        }
+        
+        method send(data: list<byte>) -> int {
+            if self.remote_address == null {
+                return -1
+            }
+            
+            # 创建UDP数据包
+            udp_packet = NetworkPacket(self.local_address, self.remote_address)
+            udp_packet.set_data(data)
+            
+            if NetworkManager.send_packet(udp_packet) {
+                return data.size()
+            }
+            
+            return -1
+        }
+        
+        method receive(buffer: list<byte>, size: int) -> int {
+            bytes_to_read = min(size, self.receive_buffer.size())
+            
+            for i in range(bytes_to_read) {
+                buffer[i] = self.receive_buffer.remove(0)
+            }
+            
+            return bytes_to_read
+        }
+        
+        method close() -> bool {
+            NetworkManager.unregister_socket(self)
+            QuantumLogger.debug("UDP socket closed")
+            return true
+        }
+        
+        # 处理接收到的数据包
+        method handle_packet(packet: NetworkPacket) {
+            self.receive_buffer.extend(packet.data)
+        }
+    }
+    
+    # 量子套接字
+    class QuantumSocket extends Socket {
+        field quantum_channel: QuantumChannel
+        field entangled_qubits: list<int>
+        
+        method init(sock_id: int) {
+            super.init(sock_id, SocketType.QUANTUM)
+            self.quantum_channel = null
+            self.entangled_qubits = []
+        }
+        
+        method bind(address: NetworkAddress) -> bool {
+            self.local_address = address
+            
+            # 初始化量子通道
+            self.quantum_channel = QuantumChannel(address)
+            
+            NetworkManager.register_socket(self)
+            QuantumLogger.log("Quantum socket bound to " + address.to_string())
+            return true
+        }
+        
+        method listen(backlog: int) -> bool {
+            if self.quantum_channel == null {
+                return false
+            }
+            
+            self.quantum_channel.start_listening()
+            return true
+        }
+        
+        method accept() -> Socket {
+            if self.quantum_channel == null {
+                return null
+            }
+            
+            return self.quantum_channel.accept_connection()
+        }
+        
+        method connect(address: NetworkAddress) -> bool {
+            self.remote_address = address
+            
+            if self.quantum_channel == null {
+                self.quantum_channel = QuantumChannel(self.local_address)
+            }
+            
+            return self.quantum_channel.establish_entanglement(address)
+        }
+        
+        method send(data: list<byte>) -> int {
+            if self.quantum_channel == null || self.entangled_qubits.is_empty() {
+                return -1
+            }
+            
+            # 将经典数据编码为量子态
+            quantum_state = encode_classical_to_quantum(data)
+            
+            # 通过量子纠缠传输
+            return self.quantum_channel.transmit_quantum_state(quantum_state)
+        }
+        
+        method receive(buffer: list<byte>, size: int) -> int {
+            if self.quantum_channel == null {
+                return -1
+            }
+            
+            # 接收量子态
+            quantum_state = self.quantum_channel.receive_quantum_state()
+            if quantum_state == null {
+                return 0
+            }
+            
+            # 解码为经典数据
+            decoded_data = decode_quantum_to_classical(quantum_state)
+            
+            bytes_to_read = min(size, decoded_data.size())
+            for i in range(bytes_to_read) {
+                buffer[i] = decoded_data[i]
+            }
+            
+            return bytes_to_read
+        }
+        
+        method close() -> bool {
+            if self.quantum_channel != null {
+                self.quantum_channel.close()
+            }
+            
+            NetworkManager.unregister_socket(self)
+            QuantumLogger.log("Quantum socket closed")
+            return true
+        }
+        
+        # 编码经典数据为量子态
+        method encode_classical_to_quantum(data: list<byte>) -> QuantumState {
+            # 简化的量子编码实现
+            num_qubits = data.size() * 8  # 每个字节8位
+            quantum_state = QuantumState(num_qubits)
+            
+            for i in range(data.size()) {
+                byte_val = data[i]
+                for bit in range(8) {
+                    qubit_index = i * 8 + bit
+                    bit_value = (byte_val >> bit) & 1
+                    
+                    if bit_value == 1 {
+                        # 应用X门将|0⟩翻转为|1⟩
+                        QuantumRuntime.quantum_processor.apply_gate("X", [qubit_index], [])
+                    }
+                }
+            }
+            
+            return quantum_state
+        }
+        
+        # 解码量子态为经典数据
+        method decode_quantum_to_classical(quantum_state: QuantumState) -> list<byte> {
+            num_bytes = quantum_state.num_qubits / 8
+            result = []
+            
+            for i in range(num_bytes) {
+                byte_val = 0
+                
+                for bit in range(8) {
+                    qubit_index = i * 8 + bit
+                    bit_value = QuantumRuntime.quantum_processor.measure(qubit_index)
+                    
+                    if bit_value == 1 {
+                        byte_val |= (1 << bit)
+                    }
+                }
+                
+                result.append(byte_val)
+            }
+            
+            return result
+        }
+    }
+    
+    # 量子通道
+    class QuantumChannel {
+        field local_address: NetworkAddress
+        field remote_address: NetworkAddress
+        field entangled_pairs: list<EntangledPair>
+        field is_listening: bool
+        
+        method init(address: NetworkAddress) {
+            self.local_address = address
+            self.remote_address = null
+            self.entangled_pairs = []
+            self.is_listening = false
+        }
+        
+        # 建立量子纠缠
+        method establish_entanglement(remote_addr: NetworkAddress) -> bool {
+            self.remote_address = remote_addr
+            
+            # 创建纠缠对
+            num_pairs = 32  # 创建32对纠缠量子比特
+            for i in range(num_pairs) {
+                local_qubit = QuantumRuntime.quantum_processor.qubit_register.size() - 1 - i
+                remote_qubit = i
+                
+                # 创建Bell态
+                QuantumRuntime.quantum_processor.create_entanglement(local_qubit, remote_qubit)
+                
+                pair = EntangledPair {
+                    local_qubit: local_qubit,
+                    remote_qubit: remote_qubit,
+                    established_time: SystemClock.now()
+                }
+                
+                self.entangled_pairs.append(pair)
+            }
+            
+            QuantumLogger.log("Quantum entanglement established with " + remote_addr.to_string())
+            return true
+        }
+        
+        # 传输量子态
+        method transmit_quantum_state(state: QuantumState) -> int {
+            if self.entangled_pairs.is_empty() {
+                return -1
+            }
+            
+            # 使用量子传态协议
+            bytes_transmitted = 0
+            
+            for i in range(min(state.num_qubits, self.entangled_pairs.size())) {
+                pair = self.entangled_pairs[i]
+                
+                # 量子传态
+                QuantumRuntime.quantum_processor.quantum_teleportation(
+                    i,  # 源量子比特
+                    pair.local_qubit,  # 辅助量子比特
+                    pair.remote_qubit  # 目标量子比特
+                )
+                
+                bytes_transmitted += 1
+            }
+            
+            return bytes_transmitted
+        }
+        
+        # 接收量子态
+        method receive_quantum_state() -> QuantumState {
+            if self.entangled_pairs.is_empty() {
+                return null
+            }
+            
+            # 从纠缠量子比特中恢复量子态
+            received_state = QuantumState(self.entangled_pairs.size())
+            
+            for i in range(self.entangled_pairs.size()) {
+                pair = self.entangled_pairs[i]
+                
+                # 测量纠缠量子比特获得信息
+                measurement = QuantumRuntime.quantum_processor.measure(pair.remote_qubit)
+                
+                if measurement == 1 {
+                    QuantumRuntime.quantum_processor.apply_gate("X", [i], [])
+                }
+            }
+            
+            return received_state
+        }
+        
+        method start_listening() {
+            self.is_listening = true
+        }
+        
+        method accept_connection() -> Socket {
+            # 等待量子纠缠建立请求
+            # 简化实现
+            return null
+        }
+        
+        method close() {
+            self.is_listening = false
+            self.entangled_pairs.clear()
+        }
+    }
+    
+    # 纠缠对结构
+    class EntangledPair {
+        field local_qubit: int
+        field remote_qubit: int
+        field established_time: timestamp
+    }
+    
+    # 网络管理器主类
+    class NetworkManagerImpl {
+        field active_sockets: map<int, Socket>
+        field address_to_socket: map<string, Socket>
+        field next_socket_id: int
+        field packet_queue: list<NetworkPacket>
+        field routing_table: map<string, NetworkAddress>
+        field network_interfaces: list<NetworkInterface>
+        field is_running: bool
+        
+        method init() {
+            self.active_sockets = map<int, Socket>()
+            self.address_to_socket = map<string, Socket>()
+            self.next_socket_id = 1
+            self.packet_queue = []
+            self.routing_table = map<string, NetworkAddress>()
+            self.network_interfaces = []
+            self.is_running = false
+            
+            initialize_network_interfaces()
+        }
+        
+        # 初始化网络接口
+        method initialize_network_interfaces() {
+            # 创建本地回环接口
+            loopback = NetworkInterface("lo", "127.0.0.1", "255.0.0.0")
+            self.network_interfaces.append(loopback)
+            
+            # 创建以太网接口（模拟）
+            ethernet = NetworkInterface("eth0", "192.168.1.100", "255.255.255.0")
+            self.network_interfaces.append(ethernet)
+            
+            # 创建量子网络接口
+            quantum_interface = NetworkInterface("qnet0", "quantum.local", "")
+            self.network_interfaces.append(quantum_interface)
+        }
+        
+        # 创建套接字
+        method create_socket(socket_type: SocketType, protocol: NetworkProtocol) -> int {
+            socket_id = self.next_socket_id
+            self.next_socket_id += 1
+            
+            socket = null
+            
+            if socket_type == SocketType.STREAM {
+                socket = TCPSocket(socket_id)
+            } else if socket_type == SocketType.DATAGRAM {
+                socket = UDPSocket(socket_id)
+            } else if socket_type == SocketType.QUANTUM {
+                socket = QuantumSocket(socket_id)
+            }
+            
+            if socket != null {
+                self.active_sockets[socket_id] = socket
+                QuantumLogger.debug("Created socket " + socket_id + " (" + socket_type + ")")
+            }
+            
+            return socket_id
+        }
+        
+        # 获取套接字
+        method get_socket(socket_id: int) -> Socket {
+            return self.active_sockets.get(socket_id, null)
+        }
+        
+        # 注册套接字
+        method register_socket(socket: Socket) {
+            if socket.local_address != null {
+                address_key = socket.local_address.to_string()
+                self.address_to_socket[address_key] = socket
+            }
+        }
+        
+        # 注销套接字
+        method unregister_socket(socket: Socket) {
+            self.active_sockets.remove(socket.socket_id)
+            
+            if socket.local_address != null {
+                address_key = socket.local_address.to_string()
+                self.address_to_socket.remove(address_key)
+            }
+        }
+        
+        # 发送数据包
+        method send_packet(packet: NetworkPacket) -> bool {
+            # 检查是否为本地地址
+            if is_local_address(packet.destination) {
+                return deliver_local_packet(packet)
+            }
+            
+            # 查找路由
+            route = find_route(packet.destination)
+            if route == null {
+                QuantumLogger.error("No route to " + packet.destination.to_string())
+                return false
+            }
+            
+            # 发送到网络接口
+            return transmit_packet(packet, route)
+        }
+        
+        # 检查是否为本地地址
+        method is_local_address(address: NetworkAddress) -> bool {
+            for interface in self.network_interfaces {
+                if interface.ip_address == address.ip_address {
+                    return true
+                }
+            }
+            return false
+        }
+        
+        # 投递本地数据包
+        method deliver_local_packet(packet: NetworkPacket) -> bool {
+            address_key = packet.destination.to_string()
+            target_socket = self.address_to_socket.get(address_key, null)
+            
+            if target_socket == null {
+                QuantumLogger.debug("No socket listening on " + address_key)
+                return false
+            }
+            
+            # 投递到目标套接字
+            if target_socket instanceof TCPSocket {
+                (target_socket as TCPSocket).handle_packet(packet)
+            } else if target_socket instanceof UDPSocket {
+                (target_socket as UDPSocket).handle_packet(packet)
+            }
+            
+            return true
+        }
+        
+        # 查找路由
+        method find_route(destination: NetworkAddress) -> NetworkAddress {
+            # 简化的路由查找
+            dest_key = destination.ip_address
+            
+            # 检查直接路由
+            for interface in self.network_interfaces {
+                if is_same_network(destination.ip_address, interface.ip_address, interface.netmask) {
+                    return NetworkAddress(interface.ip_address, 0)
+                }
+            }
+            
+            # 检查路由表
+            route = self.routing_table.get(dest_key, null)
+            if route != null {
+                return route
+            }
+            
+            # 默认路由
+            return self.routing_table.get("default", null)
+        }
+        
+        # 检查是否在同一网络
+        method is_same_network(ip1: string, ip2: string, netmask: string) -> bool {
+            # 简化的网络检查
+            return ip1.starts_with(ip2.substring(0, ip2.last_index_of(".")))
+        }
+        
+        # 传输数据包
+        method transmit_packet(packet: NetworkPacket, next_hop: NetworkAddress) -> bool {
+            if packet.protocol == NetworkProtocol.QUANTUM_ENTANGLEMENT {
+                return transmit_quantum_packet(packet)
+            } else {
+                return transmit_classical_packet(packet, next_hop)
+            }
+        }
+        
+        # 传输经典数据包
+        method transmit_classical_packet(packet: NetworkPacket, next_hop: NetworkAddress) -> bool {
+            # 模拟网络传输延迟
+            network_delay = QuantumRandom.random_int(10) + 1  # 1-10ms
+            
+            Timer.set_timeout(network_delay, () => {
+                # 模拟数据包可能丢失
+                if QuantumRandom.random() < 0.01 {  # 1%丢包率
+                    QuantumLogger.debug("Packet lost during transmission")
+                    return
+                }
+                
+                # 投递数据包
+                deliver_local_packet(packet)
+            })
+            
+            return true
+        }
+        
+        # 传输量子数据包
+        method transmit_quantum_packet(packet: NetworkPacket) -> bool {
+            # 量子通信是瞬时的（量子纠缠）
+            if packet.quantum_state != null {
+                return deliver_local_packet(packet)
+            }
+            
+            return false
+        }
+        
+        # 启动网络服务
+        method start() {
+            if self.is_running {
+                return
+            }
+            
+            self.is_running = true
+            
+            # 启动数据包处理线程
+            packet_thread = SystemThread.create(process_packets)
+            packet_thread.start()
+            
+            QuantumLogger.log("Network manager started")
+        }
+        
+        # 停止网络服务
+        method stop() {
+            self.is_running = false
+            
+            # 关闭所有套接字
+            for socket_id, socket in self.active_sockets {
+                socket.close()
+            }
+            
+            self.active_sockets.clear()
+            self.address_to_socket.clear()
+            
+            QuantumLogger.log("Network manager stopped")
+        }
+        
+        # 处理数据包队列
+        method process_packets() {
+            while self.is_running {
+                if !self.packet_queue.is_empty() {
+                    packet = self.packet_queue.remove(0)
+                    send_packet(packet)
+                }
+                
+                SystemThread.sleep(1)
+            }
+        }
+        
+        # 获取网络统计信息
+        method get_network_statistics() -> NetworkStatistics {
+            return NetworkStatistics {
+                active_sockets: self.active_sockets.size(),
+                tcp_connections: count_sockets_by_type(SocketType.STREAM),
+                udp_sockets: count_sockets_by_type(SocketType.DATAGRAM),
+                quantum_channels: count_sockets_by_type(SocketType.QUANTUM),
+                pending_packets: self.packet_queue.size(),
+                network_interfaces: self.network_interfaces.size()
+            }
+        }
+        
+        # 按类型统计套接字数量
+        method count_sockets_by_type(socket_type: SocketType) -> int {
+            count = 0
+            for socket_id, socket in self.active_sockets {
+                if socket.socket_type == socket_type {
+                    count += 1
+                }
+            }
+            return count
+        }
+        
+        method get_next_socket_id() -> int {
+            return self.next_socket_id
+        }
+    }
+    
+    # 网络接口
+    class NetworkInterface {
+        field name: string
+        field ip_address: string
+        field netmask: string
+        field is_up: bool
+        field bytes_sent: int
+        field bytes_received: int
+        field packets_sent: int
+        field packets_received: int
+        
+        method init(iface_name: string, ip: string, mask: string) {
+            self.name = iface_name
+            self.ip_address = ip
+            self.netmask = mask
+            self.is_up = true
+            self.bytes_sent = 0
+            self.bytes_received = 0
+            self.packets_sent = 0
+            self.packets_received = 0
+        }
+        
+        method get_interface_stats() -> InterfaceStatistics {
+            return InterfaceStatistics {
+                name: self.name,
+                ip_address: self.ip_address,
+                is_up: self.is_up,
+                bytes_sent: self.bytes_sent,
+                bytes_received: self.bytes_received,
+                packets_sent: self.packets_sent,
+                packets_received: self.packets_received
+            }
+        }
+    }
+    
+    # 网络统计信息
+    class NetworkStatistics {
+        field active_sockets: int
+        field tcp_connections: int
+        field udp_sockets: int
+        field quantum_channels: int
+        field pending_packets: int
+        field network_interfaces: int
+    }
+    
+    # 接口统计信息
+    class InterfaceStatistics {
+        field name: string
+        field ip_address: string
+        field is_up: bool
+        field bytes_sent: int
+        field bytes_received: int
+        field packets_sent: int
+        field packets_received: int
+    }
+    
+    # TCP标志常量
+    const TCP_FIN = 1
+    const TCP_SYN = 2
+    const TCP_RST = 4
+    const TCP_PSH = 8
+    const TCP_ACK = 16
+    const TCP_URG = 32
+    
+    # 辅助函数
+    function string_to_bytes(str: string) -> list<byte> {
+        result = []
+        for char in str {
+            result.append(char.to_byte())
+        }
+        return result
+    }
+    
+    function int_to_bytes(value: int) -> list<byte> {
+        result = []
+        result.append((value >> 24) & 0xFF)
+        result.append((value >> 16) & 0xFF)
+        result.append((value >> 8) & 0xFF)
+        result.append(value & 0xFF)
+        return result
+    }
+    
+    # 全局网络管理器实例
+    global network_manager: NetworkManagerImpl
+    
+    # 初始化网络管理器
+    function init_network() {
+        network_manager = NetworkManagerImpl()
+        network_manager.start()
+    }
+    
+    # 创建套接字
+    function socket(type: SocketType, protocol: NetworkProtocol = NetworkProtocol.TCP) -> int {
+        return network_manager.create_socket(type, protocol)
+    }
+    
+    # 绑定套接字
+    function bind(socket_id: int, address: NetworkAddress) -> bool {
+        socket = network_manager.get_socket(socket_id)
+        if socket != null {
+            return socket.bind(address)
+        }
+        return false
+    }
+    
+    # 监听连接
+    function listen(socket_id: int, backlog: int = 10) -> bool {
+        socket = network_manager.get_socket(socket_id)
+        if socket != null {
+            return socket.listen(backlog)
+        }
+        return false
+    }
+    
+    # 接受连接
+    function accept(socket_id: int) -> int {
+        socket = network_manager.get_socket(socket_id)
+        if socket != null {
+            new_socket = socket.accept()
+            if new_socket != null {
+                return new_socket.socket_id
+            }
+        }
+        return -1
+    }
+    
+    # 连接到远程地址
+    function connect(socket_id: int, address: NetworkAddress) -> bool {
+        socket = network_manager.get_socket(socket_id)
+        if socket != null {
+            return socket.connect(address)
+        }
+        return false
+    }
+    
+    # 发送数据
+    function send(socket_id: int, data: list<byte>) -> int {
+        socket = network_manager.get_socket(socket_id)
+        if socket != null {
+            return socket.send(data)
+        }
+        return -1
+    }
+    
+    # 接收数据
+    function recv(socket_id: int, buffer: list<byte>, size: int) -> int {
+        socket = network_manager.get_socket(socket_id)
+        if socket != null {
+            return socket.receive(buffer, size)
+        }
+        return -1
+    }
+    
+    # 关闭套接字
+    function close_socket(socket_id: int) -> bool {
+        socket = network_manager.get_socket(socket_id)
+        if socket != null {
+            return socket.close()
+        }
+        return false
+    }
+    
+    # 获取网络统计
+    function get_network_statistics() -> NetworkStatistics {
+        return network_manager.get_network_statistics()
+    }
+    
+    # 关闭网络管理器
+    function shutdown() {
+        if network_manager != null {
+            network_manager.stop()
+        }
+    }
+}

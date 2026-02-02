@@ -1,0 +1,1010 @@
+// QEntL存储保护服务
+// 版本: 1.0.0
+// 作者: QEntL开发团队
+// 量子基因码: SPS-QS4-583-ZW9
+
+// 类型定义
+enum ProtectionLevel {
+    BASIC,        // 基本保护
+    ENHANCED,     // 增强保护
+    HIGH,         // 高级保护
+    QUANTUM,      // 量子保护
+    CUSTOM        // 自定义保护
+}
+
+enum EncryptionType {
+    NONE,         // 无加密
+    SYMMETRIC,    // 对称加密
+    ASYMMETRIC,   // 非对称加密
+    QUANTUM,      // 量子加密
+    HYBRID        // 混合加密
+}
+
+enum AccessControlType {
+    NONE,         // 无访问控制
+    BASIC,        // 基本访问控制
+    ROLE_BASED,   // 基于角色的访问控制
+    ATTRIBUTE,    // 基于属性的访问控制
+    QUANTUM       // 量子访问控制
+}
+
+// 配置
+const config = {
+    // 默认保护级别
+    defaultProtectionLevel: ProtectionLevel.ENHANCED,
+    
+    // 加密配置
+    defaultEncryption: EncryptionType.HYBRID,
+    keyRotationInterval: 30 * 24 * 60 * 60 * 1000, // 30天
+    
+    // 访问控制配置
+    defaultAccessControl: AccessControlType.ROLE_BASED,
+    enforceAccessControl: true,
+    
+    // 完整性设置
+    integrityCheckingEnabled: true,
+    
+    // 审计设置
+    auditLoggingEnabled: true,
+    auditLogRetention: 90, // 天
+    
+    // 量子安全设置
+    quantumResistantEnabled: true,
+    
+    // 高级设置
+    sensitiveDataDetection: true,
+    automaticClassification: true
+};
+
+// 服务状态
+const state = {
+    // 初始化状态
+    initialized: false,
+    
+    // 保护状态追踪
+    protectedDataRegistry: {},  // 数据ID到保护信息的映射
+    encryptionKeys: {},         // 密钥管理
+    accessPolicies: {},         // 访问策略
+    
+    // 操作跟踪
+    auditLogs: [],              // 审计日志
+    keyRotationTimer: null,     // 密钥轮换定时器
+    
+    // 监听器
+    eventListeners: {},
+    
+    // 指标
+    metrics: {
+        protectedItemsCount: 0,
+        accessGranted: 0,
+        accessDenied: 0,
+        encryptionOperations: 0,
+        integrityChecks: 0
+    }
+};
+
+// 公共函数
+
+// 初始化服务
+function initialize(customConfig = {}) {
+    if (state.initialized) {
+        return { success: true, message: "已初始化" };
+    }
+    
+    // 合并配置
+    mergeConfig(customConfig);
+    
+    // 设置初始状态
+    setupInitialState();
+    
+    // 设置密钥轮换定时器
+    if (config.keyRotationInterval > 0) {
+        scheduleKeyRotation();
+    }
+    
+    state.initialized = true;
+    return { success: true, message: "存储保护服务已初始化" };
+}
+
+// 保护数据项
+function protectData(dataId, protectionOptions = {}) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否已受保护
+        if (state.protectedDataRegistry[dataId]) {
+            return { 
+                success: false, 
+                message: "数据项已受保护", 
+                currentProtection: state.protectedDataRegistry[dataId].level
+            };
+        }
+        
+        // 确定保护级别和选项
+        const protectionLevel = protectionOptions.level || config.defaultProtectionLevel;
+        const encryptionType = protectionOptions.encryption || config.defaultEncryption;
+        const accessControl = protectionOptions.accessControl || config.defaultAccessControl;
+        
+        // 为数据生成密钥（如果需要加密）
+        let keyInfo = null;
+        if (encryptionType !== EncryptionType.NONE) {
+            keyInfo = generateEncryptionKey(encryptionType);
+            state.encryptionKeys[dataId] = keyInfo;
+        }
+        
+        // 设置访问策略
+        if (accessControl !== AccessControlType.NONE) {
+            state.accessPolicies[dataId] = protectionOptions.accessPolicy || {
+                type: accessControl,
+                rules: protectionOptions.accessRules || []
+            };
+        }
+        
+        // 注册保护信息
+        state.protectedDataRegistry[dataId] = {
+            id: dataId,
+            level: protectionLevel,
+            encryption: encryptionType,
+            accessControl: accessControl,
+            hashAlgorithm: determineHashAlgorithm(protectionLevel),
+            metadata: protectionOptions.metadata || {},
+            created: Date.now(),
+            lastAccessed: Date.now(),
+            keyId: keyInfo 器 keyInfo.id : null
+        };
+        
+        // 更新指标
+        state.metrics.protectedItemsCount++;
+        
+        // 记录审计条目
+        if (config.auditLoggingEnabled) {
+            logAuditEvent('dataProtected', {
+                dataId: dataId,
+                level: protectionLevel,
+                actor: protectionOptions.actorId || "system"
+            });
+        }
+        
+        // 通知监听器
+        notifyEvent('dataProtected', {
+            dataId: dataId,
+            level: protectionLevel,
+            timestamp: Date.now()
+        });
+        
+        return {
+            success: true,
+            message: "数据已保护",
+            dataId: dataId,
+            level: protectionLevel,
+            keyId: keyInfo 器 keyInfo.id : null
+        };
+        
+    } catch (error) {
+        logError(`保护数据失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `保护失败: ${error.message}`, 
+            error: error.message 
+        };
+    }
+}
+
+// 取消对数据项的保护
+function unprotectData(dataId, options = {}) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否受保护
+        if (!state.protectedDataRegistry[dataId]) {
+            return { success: false, message: "数据项未受保护" };
+        }
+        
+        // 验证权限
+        if (!verifyAuthorization(dataId, 'unprotect', options.actorId)) {
+            logAuditEvent('unauthorizedAccess', {
+                dataId: dataId,
+                action: 'unprotect',
+                actor: options.actorId || "unknown"
+            });
+            
+            return { success: false, message: "未授权的操作" };
+        }
+        
+        // 移除保护信息
+        const protectionInfo = state.protectedDataRegistry[dataId];
+        delete state.protectedDataRegistry[dataId];
+        
+        // 移除密钥
+        if (state.encryptionKeys[dataId]) {
+            delete state.encryptionKeys[dataId];
+        }
+        
+        // 移除访问策略
+        if (state.accessPolicies[dataId]) {
+            delete state.accessPolicies[dataId];
+        }
+        
+        // 更新指标
+        state.metrics.protectedItemsCount--;
+        
+        // 记录审计条目
+        if (config.auditLoggingEnabled) {
+            logAuditEvent('dataUnprotected', {
+                dataId: dataId,
+                actor: options.actorId || "system"
+            });
+        }
+        
+        // 通知监听器
+        notifyEvent('dataUnprotected', {
+            dataId: dataId,
+            timestamp: Date.now()
+        });
+        
+        return {
+            success: true,
+            message: "数据保护已移除",
+            dataId: dataId
+        };
+        
+    } catch (error) {
+        logError(`移除保护失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `移除保护失败: ${error.message}`, 
+            error: error.message 
+        };
+    }
+}
+
+// 检查数据访问权限
+function checkAccess(dataId, actorId, accessType) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    if (!actorId) {
+        return { success: false, message: "访问者ID不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否受保护
+        if (!state.protectedDataRegistry[dataId]) {
+            // 未保护的数据，如果强制访问控制，默认拒绝
+            return { 
+                success: !config.enforceAccessControl,
+                message: config.enforceAccessControl 器 
+                    "未保护的数据在强制访问控制下无法访问" : "数据未受保护，允许访问",
+                authorized: !config.enforceAccessControl
+            };
+        }
+        
+        // 获取保护信息
+        const protectionInfo = state.protectedDataRegistry[dataId];
+        
+        // 如果没有访问控制，允许访问
+        if (protectionInfo.accessControl === AccessControlType.NONE) {
+            // 更新访问记录
+            protectionInfo.lastAccessed = Date.now();
+            
+            // 更新指标
+            state.metrics.accessGranted++;
+            
+            return { success: true, message: "允许访问，无访问控制", authorized: true };
+        }
+        
+        // 验证访问权限
+        const isAuthorized = verifyAuthorization(dataId, accessType, actorId);
+        
+        // 记录审计条目
+        if (config.auditLoggingEnabled) {
+            logAuditEvent(isAuthorized 器 'accessGranted' : 'accessDenied', {
+                dataId: dataId,
+                accessType: accessType,
+                actor: actorId
+            });
+        }
+        
+        // 更新指标
+        if (isAuthorized) {
+            state.metrics.accessGranted++;
+            // 更新访问记录
+            protectionInfo.lastAccessed = Date.now();
+        } else {
+            state.metrics.accessDenied++;
+        }
+        
+        return {
+            success: true,
+            message: isAuthorized 器 "允许访问" : "拒绝访问",
+            authorized: isAuthorized,
+            level: protectionInfo.level,
+            accessControl: protectionInfo.accessControl
+        };
+        
+    } catch (error) {
+        logError(`检查访问权限失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `检查访问失败: ${error.message}`, 
+            error: error.message,
+            authorized: false
+        };
+    }
+}
+
+// 加密数据
+function encryptData(dataId, data, options = {}) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否受保护
+        if (!state.protectedDataRegistry[dataId]) {
+            return { success: false, message: "数据项未受保护" };
+        }
+        
+        const protectionInfo = state.protectedDataRegistry[dataId];
+        
+        // 如果没有配置加密，返回原始数据
+        if (protectionInfo.encryption === EncryptionType.NONE) {
+            return { 
+                success: true, 
+                message: "数据未加密（无加密配置）", 
+                data: data 
+            };
+        }
+        
+        // 获取加密密钥
+        const keyInfo = state.encryptionKeys[dataId];
+        
+        if (!keyInfo) {
+            return { success: false, message: "找不到加密密钥" };
+        }
+        
+        // 执行加密（根据加密类型）
+        const encryptedData = performEncryption(data, keyInfo, protectionInfo.encryption);
+        
+        // 更新指标
+        state.metrics.encryptionOperations++;
+        
+        // 记录审计条目（如果启用）
+        if (config.auditLoggingEnabled) {
+            logAuditEvent('dataEncrypted', {
+                dataId: dataId,
+                actor: options.actorId || "system"
+            });
+        }
+        
+        return {
+            success: true,
+            message: "数据已加密",
+            data: encryptedData,
+            keyId: keyInfo.id,
+            encryptionType: protectionInfo.encryption
+        };
+        
+    } catch (error) {
+        logError(`加密数据失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `加密失败: ${error.message}`, 
+            error: error.message 
+        };
+    }
+}
+
+// 解密数据
+function decryptData(dataId, encryptedData, options = {}) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否受保护
+        if (!state.protectedDataRegistry[dataId]) {
+            return { success: false, message: "数据项未受保护" };
+        }
+        
+        // 检查访问权限
+        const accessCheck = checkAccess(dataId, options.actorId || "system", "decrypt");
+        
+        if (!accessCheck.authorized) {
+            return { 
+                success: false, 
+                message: "未授权解密", 
+                authorized: false 
+            };
+        }
+        
+        const protectionInfo = state.protectedDataRegistry[dataId];
+        
+        // 如果没有加密，返回原始数据
+        if (protectionInfo.encryption === EncryptionType.NONE) {
+            return { 
+                success: true, 
+                message: "数据未加密（无加密配置）", 
+                data: encryptedData 
+            };
+        }
+        
+        // 获取加密密钥
+        const keyInfo = state.encryptionKeys[dataId];
+        
+        if (!keyInfo) {
+            return { success: false, message: "找不到解密密钥" };
+        }
+        
+        // 执行解密（根据加密类型）
+        const decryptedData = performDecryption(encryptedData, keyInfo, protectionInfo.encryption);
+        
+        // 更新指标
+        state.metrics.encryptionOperations++;
+        
+        // 记录审计条目（如果启用）
+        if (config.auditLoggingEnabled) {
+            logAuditEvent('dataDecrypted', {
+                dataId: dataId,
+                actor: options.actorId || "system"
+            });
+        }
+        
+        return {
+            success: true,
+            message: "数据已解密",
+            data: decryptedData
+        };
+        
+    } catch (error) {
+        logError(`解密数据失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `解密失败: ${error.message}`, 
+            error: error.message 
+        };
+    }
+}
+
+// 验证数据完整性
+function verifyIntegrity(dataId, data, hash, options = {}) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    if (!hash) {
+        return { success: false, message: "哈希值不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否受保护
+        if (!state.protectedDataRegistry[dataId]) {
+            return { success: false, message: "数据项未受保护" };
+        }
+        
+        const protectionInfo = state.protectedDataRegistry[dataId];
+        
+        // 计算数据哈希
+        const calculatedHash = calculateHash(data, protectionInfo.hashAlgorithm);
+        
+        // 验证哈希匹配
+        const isValid = calculatedHash === hash;
+        
+        // 更新指标
+        state.metrics.integrityChecks++;
+        
+        // 记录审计条目（如果启用）
+        if (config.auditLoggingEnabled) {
+            logAuditEvent('integrityChecked', {
+                dataId: dataId,
+                isValid: isValid,
+                actor: options.actorId || "system"
+            });
+        }
+        
+        return {
+            success: true,
+            message: isValid 器 "数据完整性验证成功" : "数据完整性验证失败",
+            isValid: isValid,
+            algorithm: protectionInfo.hashAlgorithm
+        };
+        
+    } catch (error) {
+        logError(`验证数据完整性失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `验证失败: ${error.message}`, 
+            error: error.message 
+        };
+    }
+}
+
+// 计算数据哈希
+function calculateDataHash(dataId, data, options = {}) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否受保护
+        if (!state.protectedDataRegistry[dataId]) {
+            // 使用默认哈希算法
+            const algorithm = options.algorithm || "SHA-256";
+            const hash = calculateHash(data, algorithm);
+            
+            return {
+                success: true,
+                message: "使用默认算法计算哈希（数据未受保护）",
+                hash: hash,
+                algorithm: algorithm
+            };
+        }
+        
+        const protectionInfo = state.protectedDataRegistry[dataId];
+        
+        // 计算数据哈希
+        const hash = calculateHash(data, protectionInfo.hashAlgorithm);
+        
+        // 更新指标
+        state.metrics.integrityChecks++;
+        
+        return {
+            success: true,
+            message: "已计算数据哈希",
+            hash: hash,
+            algorithm: protectionInfo.hashAlgorithm
+        };
+        
+    } catch (error) {
+        logError(`计算数据哈希失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `计算哈希失败: ${error.message}`, 
+            error: error.message 
+        };
+    }
+}
+
+// 更新访问策略
+function updateAccessPolicy(dataId, newPolicy, options = {}) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    if (!newPolicy) {
+        return { success: false, message: "新策略不能为空" };
+    }
+    
+    try {
+        // 检查数据项是否受保护
+        if (!state.protectedDataRegistry[dataId]) {
+            return { success: false, message: "数据项未受保护" };
+        }
+        
+        // 验证权限
+        if (!verifyAuthorization(dataId, 'updatePolicy', options.actorId)) {
+            logAuditEvent('unauthorizedAccess', {
+                dataId: dataId,
+                action: 'updatePolicy',
+                actor: options.actorId || "unknown"
+            });
+            
+            return { success: false, message: "未授权的操作" };
+        }
+        
+        // 更新访问策略
+        state.accessPolicies[dataId] = newPolicy;
+        
+        // 更新保护信息
+        state.protectedDataRegistry[dataId].accessControl = newPolicy.type;
+        
+        // 记录审计条目
+        if (config.auditLoggingEnabled) {
+            logAuditEvent('policyUpdated', {
+                dataId: dataId,
+                actor: options.actorId || "system"
+            });
+        }
+        
+        // 通知监听器
+        notifyEvent('policyUpdated', {
+            dataId: dataId,
+            timestamp: Date.now()
+        });
+        
+        return {
+            success: true,
+            message: "访问策略已更新",
+            dataId: dataId
+        };
+        
+    } catch (error) {
+        logError(`更新访问策略失败: ${dataId}`, error);
+        return { 
+            success: false, 
+            message: `更新失败: ${error.message}`, 
+            error: error.message 
+        };
+    }
+}
+
+// 获取保护状态
+function getProtectionStatus(dataId) {
+    checkInitialized();
+    
+    if (!dataId) {
+        return { success: false, message: "数据ID不能为空" };
+    }
+    
+    if (!state.protectedDataRegistry[dataId]) {
+        return {
+            success: true,
+            message: "数据项未受保护",
+            isProtected: false
+        };
+    }
+    
+    const protectionInfo = state.protectedDataRegistry[dataId];
+    
+    return {
+        success: true,
+        message: "找到保护信息",
+        isProtected: true,
+        level: protectionInfo.level,
+        encryption: protectionInfo.encryption,
+        accessControl: protectionInfo.accessControl,
+        hashAlgorithm: protectionInfo.hashAlgorithm,
+        created: protectionInfo.created,
+        lastAccessed: protectionInfo.lastAccessed
+    };
+}
+
+// 获取保护指标
+function getProtectionMetrics() {
+    checkInitialized();
+    
+    return {
+        success: true,
+        metrics: state.metrics,
+        protectedItems: Object.keys(state.protectedDataRegistry).length,
+        auditLogEntries: state.auditLogs.length
+    };
+}
+
+// 注册事件监听器
+function addEventListener(eventName, callback) {
+    checkInitialized();
+    
+    if (!callback || typeof callback !== 'function') {
+        return { success: false, message: "无效的回调函数" };
+    }
+    
+    // 生成监听器ID
+    const listenerId = generateListenerId();
+    
+    // 初始化监听器数组（如果需要）
+    if (!state.eventListeners[eventName]) {
+        state.eventListeners[eventName] = {};
+    }
+    
+    // 添加监听器
+    state.eventListeners[eventName][listenerId] = callback;
+    
+    return { 
+        success: true, 
+        message: "事件监听器已注册", 
+        listenerId: listenerId 
+    };
+}
+
+// 移除事件监听器
+function removeEventListener(eventName, listenerId) {
+    checkInitialized();
+    
+    if (!state.eventListeners[eventName] || !state.eventListeners[eventName][listenerId]) {
+        return { success: false, message: "未找到监听器" };
+    }
+    
+    // 移除监听器
+    delete state.eventListeners[eventName][listenerId];
+    
+    return { success: true, message: "事件监听器已移除" };
+}
+
+// 内部函数
+
+// 检查服务是否初始化
+function checkInitialized() {
+    if (!state.initialized) {
+        throw new Error("存储保护服务未初始化");
+    }
+}
+
+// 合并配置
+function mergeConfig(customConfig) {
+    Object.keys(customConfig).forEach(key => {
+        if (config.hasOwnProperty(key)) {
+            config[key] = customConfig[key];
+        }
+    });
+}
+
+// 设置初始状态
+function setupInitialState() {
+    state.protectedDataRegistry = {};
+    state.encryptionKeys = {};
+    state.accessPolicies = {};
+    state.auditLogs = [];
+    
+    state.eventListeners = {
+        dataProtected: {},
+        dataUnprotected: {},
+        accessGranted: {},
+        accessDenied: {},
+        policyUpdated: {},
+        keyRotated: {}
+    };
+}
+
+// 计划密钥轮换
+function scheduleKeyRotation() {
+    if (state.keyRotationTimer) {
+        clearTimeout(state.keyRotationTimer);
+    }
+    
+    state.keyRotationTimer = setTimeout(() => {
+        if (state.initialized) {
+            rotateEncryptionKeys();
+        }
+        scheduleKeyRotation();
+    }, config.keyRotationInterval);
+}
+
+// 生成监听器ID
+function generateListenerId() {
+    return 'listener_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// 生成加密密钥
+function generateEncryptionKey(encryptionType) {
+    // 实际实现会根据加密类型生成适当的密钥
+    // 占位实现
+    return {
+        id: 'key_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        type: encryptionType,
+        created: Date.now(),
+        key: "placeholder_key_data" // 实际实现会生成真实密钥
+    };
+}
+
+// 根据保护级别确定哈希算法
+function determineHashAlgorithm(protectionLevel) {
+    switch (protectionLevel) {
+        case ProtectionLevel.BASIC:
+            return "SHA-256";
+        case ProtectionLevel.ENHANCED:
+            return "SHA-384";
+        case ProtectionLevel.HIGH:
+            return "SHA-512";
+        case ProtectionLevel.QUANTUM:
+            return "QUANTUM-RESISTANT-HASH";
+        default:
+            return "SHA-256";
+    }
+}
+
+// 验证授权
+function verifyAuthorization(dataId, accessType, actorId) {
+    // 检查是否有访问策略
+    if (!state.accessPolicies[dataId]) {
+        // 没有策略，如果强制访问控制，默认拒绝
+        return !config.enforceAccessControl;
+    }
+    
+    const policy = state.accessPolicies[dataId];
+    
+    // 根据访问控制类型验证
+    switch (policy.type) {
+        case AccessControlType.BASIC:
+            // 基本访问控制：检查允许的参与者列表
+            return policy.allowedActors && policy.allowedActors.includes(actorId);
+            
+        case AccessControlType.ROLE_BASED:
+            // 基于角色的访问控制：检查角色权限
+            return checkRolePermissions(policy, actorId, accessType);
+            
+        case AccessControlType.ATTRIBUTE:
+            // 基于属性的访问控制：检查属性
+            return checkAttributeConditions(policy, actorId, accessType);
+            
+        case AccessControlType.QUANTUM:
+            // 量子访问控制：特殊处理
+            return checkQuantumAccessControl(policy, actorId, accessType);
+            
+        case AccessControlType.NONE:
+            // 无访问控制
+            return true;
+            
+        default:
+            // 未知类型，如果强制访问控制，默认拒绝
+            return !config.enforceAccessControl;
+    }
+}
+
+// 检查角色权限
+function checkRolePermissions(policy, actorId, accessType) {
+    // 实际实现会检查 actorId 的角色和对应权限
+    // 占位实现
+    return policy.rules && policy.rules.some(rule => 
+        rule.accessType === accessType &&
+        rule.allowedRoles && rule.allowedRoles.includes('admin')
+    );
+}
+
+// 检查属性条件
+function checkAttributeConditions(policy, actorId, accessType) {
+    // 实际实现会根据 actorId 的属性和策略条件进行检查
+    // 占位实现
+    return policy.rules && policy.rules.some(rule => 
+        rule.accessType === accessType
+    );
+}
+
+// 检查量子访问控制
+function checkQuantumAccessControl(policy, actorId, accessType) {
+    // 实际实现会执行量子特定的访问控制检查
+    // 占位实现
+    return true;
+}
+
+// 执行加密
+function performEncryption(data, keyInfo, encryptionType) {
+    // 实际实现会根据加密类型执行加密
+    // 占位实现
+    return "encrypted_" + data;
+}
+
+// 执行解密
+function performDecryption(encryptedData, keyInfo, encryptionType) {
+    // 实际实现会根据加密类型执行解密
+    // 占位实现
+    if (typeof encryptedData === "string" && encryptedData.startsWith("encrypted_")) {
+        return encryptedData.substring(10);
+    }
+    return encryptedData;
+}
+
+// 计算哈希
+function calculateHash(data, algorithm) {
+    // 实际实现会使用指定算法计算哈希
+    // 占位实现
+    return `${algorithm}_hash_of_${typeof data}`;
+}
+
+// 轮换加密密钥
+function rotateEncryptionKeys() {
+    logInfo("开始密钥轮换");
+    
+    // 通知监听器
+    notifyEvent('keyRotationStarted', {
+        timestamp: Date.now()
+    });
+    
+    let rotatedCount = 0;
+    
+    // 轮换每个数据项的密钥
+    Object.keys(state.encryptionKeys).forEach(dataId => {
+        try {
+            const oldKeyInfo = state.encryptionKeys[dataId];
+            
+            // 如果数据不再受保护，移除密钥
+            if (!state.protectedDataRegistry[dataId]) {
+                delete state.encryptionKeys[dataId];
+                return;
+            }
+            
+            // 生成新密钥
+            const newKeyInfo = generateEncryptionKey(oldKeyInfo.type);
+            
+            // 替换密钥
+            state.encryptionKeys[dataId] = newKeyInfo;
+            
+            // 更新保护信息中的密钥ID
+            if (state.protectedDataRegistry[dataId]) {
+                state.protectedDataRegistry[dataId].keyId = newKeyInfo.id;
+            }
+            
+            rotatedCount++;
+            
+        } catch (error) {
+            logError(`轮换密钥失败: ${dataId}`, error);
+        }
+    });
+    
+    // 通知监听器
+    notifyEvent('keyRotationCompleted', {
+        timestamp: Date.now(),
+        rotatedKeys: rotatedCount
+    });
+    
+    logInfo(`密钥轮换完成，已轮换 ${rotatedCount} 个密钥`);
+}
+
+// 记录审计事件
+function logAuditEvent(eventType, eventData) {
+    // 添加到审计日志
+    const auditEntry = {
+        type: eventType,
+        timestamp: Date.now(),
+        ...eventData
+    };
+    
+    state.auditLogs.push(auditEntry);
+    
+    // 限制审计日志大小
+    while (state.auditLogs.length > config.auditLogRetention * 100) { // 假设每天100条
+        state.auditLogs.shift();
+    }
+}
+
+// 通知事件
+function notifyEvent(eventName, data) {
+    const listeners = state.eventListeners[eventName] || {};
+    
+    Object.values(listeners).forEach(callback => {
+        try {
+            callback(data);
+        } catch (error) {
+            logError(`事件监听器错误 (${eventName})`, error);
+        }
+    });
+}
+
+// 日志工具函数
+function logInfo(message) {
+    // 与系统日志服务集成
+    console.log(`[StorageProtection] INFO: ${message}`);
+}
+
+function logError(message, error) {
+    // 与系统错误服务集成
+    console.error(`[StorageProtection] ERROR: ${message}`, error);
+}
+
+// 导出服务函数
+export {
+    initialize,
+    protectData,
+    unprotectData,
+    checkAccess,
+    encryptData,
+    decryptData,
+    verifyIntegrity,
+    calculateDataHash,
+    updateAccessPolicy,
+    getProtectionStatus,
+    getProtectionMetrics,
+    addEventListener,
+    removeEventListener
+}; 
