@@ -1,0 +1,601 @@
+# QEntL Process Manager
+# 进程和线程管理模块
+# 版本：1.0.0
+# 作者：QEntL Process Team
+
+module ProcessManager {
+    # 进程状态枚举
+    enum ProcessState {
+        CREATED,
+        READY,
+        RUNNING,
+        BLOCKED,
+        TERMINATED
+    }
+    
+    # 进程优先级枚举
+    enum ProcessPriority {
+        LOW = 1,
+        NORMAL = 5,
+        HIGH = 10,
+        CRITICAL = 20
+    }
+    
+    # 进程控制块
+    class ProcessControlBlock {
+        field process_id: int
+        field parent_id: int
+        field name: string
+        field state: ProcessState
+        field priority: ProcessPriority
+        field program_counter: int
+        field stack_pointer: ptr
+        field memory_base: ptr
+        field memory_limit: int
+        field file_descriptors: list<FileDescriptor>
+        field quantum_time: int
+        field cpu_time_used: int
+        field creation_time: timestamp
+        field last_run_time: timestamp
+        field context: ProcessContext
+        
+        method init(pid: int, name: string, parent_pid: int) {
+            self.process_id = pid
+            self.parent_id = parent_pid
+            self.name = name
+            self.state = ProcessState.CREATED
+            self.priority = ProcessPriority.NORMAL
+            self.program_counter = 0
+            self.stack_pointer = null
+            self.memory_base = null
+            self.memory_limit = 0
+            self.file_descriptors = []
+            self.quantum_time = 10  # 默认时间片10ms
+            self.cpu_time_used = 0
+            self.creation_time = SystemClock.now()
+            self.last_run_time = 0
+            self.context = ProcessContext()
+        }
+        
+        # 设置内存空间
+        method set_memory_space(base: ptr, limit: int) {
+            self.memory_base = base
+            self.memory_limit = limit
+        }
+        
+        # 添加文件描述符
+        method add_file_descriptor(fd: FileDescriptor) {
+            self.file_descriptors.append(fd)
+        }
+        
+        # 获取进程统计信息
+        method get_statistics() -> ProcessStatistics {
+            return ProcessStatistics {
+                pid: self.process_id,
+                name: self.name,
+                state: self.state,
+                priority: self.priority,
+                cpu_time: self.cpu_time_used,
+                memory_usage: get_memory_usage(),
+                creation_time: self.creation_time,
+                last_run_time: self.last_run_time
+            }
+        }
+        
+        # 获取内存使用量
+        method get_memory_usage() -> int {
+            if self.memory_base != null {
+                return MemoryManager.get_allocated_size(self.memory_base)
+            }
+            return 0
+        }
+    }
+    
+    # 进程上下文
+    class ProcessContext {
+        field registers: map<string, int>
+        field floating_point_registers: map<string, float>
+        field quantum_registers: list<complex>
+        field flags: int
+        
+        method init() {
+            self.registers = map<string, int>()
+            self.floating_point_registers = map<string, float>()
+            self.quantum_registers = []
+            self.flags = 0
+            
+            # 初始化通用寄存器
+            for i in range(16) {
+                self.registers["R" + i] = 0
+            }
+            
+            # 初始化浮点寄存器
+            for i in range(16) {
+                self.floating_point_registers["F" + i] = 0.0
+            }
+            
+            # 初始化量子寄存器
+            for i in range(32) {
+                self.quantum_registers.append(complex(0.0, 0.0))
+            }
+        }
+        
+        # 保存上下文
+        method save_context() {
+            # 保存CPU寄存器状态
+            self.registers["PC"] = SystemCPU.get_program_counter()
+            self.registers["SP"] = SystemCPU.get_stack_pointer()
+            self.flags = SystemCPU.get_flags()
+            
+            # 保存浮点寄存器
+            for i in range(16) {
+                self.floating_point_registers["F" + i] = SystemCPU.get_float_register(i)
+            }
+            
+            # 保存量子寄存器状态
+            if QuantumRuntime.quantum_processor != null {
+                quantum_state = QuantumRuntime.quantum_processor.quantum_state
+                self.quantum_registers = quantum_state.amplitudes.copy()
+            }
+        }
+        
+        # 恢复上下文
+        method restore_context() {
+            # 恢复CPU寄存器
+            SystemCPU.set_program_counter(self.registers["PC"])
+            SystemCPU.set_stack_pointer(self.registers["SP"])
+            SystemCPU.set_flags(self.flags)
+            
+            # 恢复浮点寄存器
+            for i in range(16) {
+                SystemCPU.set_float_register(i, self.floating_point_registers["F" + i])
+            }
+            
+            # 恢复量子寄存器状态
+            if QuantumRuntime.quantum_processor != null {
+                quantum_state = QuantumRuntime.quantum_processor.quantum_state
+                quantum_state.amplitudes = self.quantum_registers.copy()
+            }
+        }
+    }
+    
+    # 进程调度器
+    class ProcessScheduler {
+        field ready_queue: PriorityQueue<ProcessControlBlock>
+        field running_process: ProcessControlBlock
+        field blocked_processes: list<ProcessControlBlock>
+        field time_slice: int
+        field current_time: int
+        field scheduling_algorithm: string
+        
+        method init() {
+            self.ready_queue = PriorityQueue<ProcessControlBlock>()
+            self.running_process = null
+            self.blocked_processes = []
+            self.time_slice = 10  # 默认时间片10ms
+            self.current_time = 0
+            self.scheduling_algorithm = "RoundRobin"
+        }
+        
+        # 添加进程到就绪队列
+        method add_process(pcb: ProcessControlBlock) {
+            pcb.state = ProcessState.READY
+            self.ready_queue.enqueue(pcb, pcb.priority)
+            
+            QuantumLogger.debug("Process " + pcb.name + " (PID: " + pcb.process_id + ") added to ready queue")
+        }
+        
+        # 调度下一个进程
+        method schedule() -> ProcessControlBlock {
+            if self.scheduling_algorithm == "RoundRobin" {
+                return round_robin_schedule()
+            } else if self.scheduling_algorithm == "Priority" {
+                return priority_schedule()
+            } else if self.scheduling_algorithm == "FCFS" {
+                return fcfs_schedule()
+            } else {
+                return round_robin_schedule()  # 默认使用轮转调度
+            }
+        }
+        
+        # 轮转调度算法
+        method round_robin_schedule() -> ProcessControlBlock {
+            if self.ready_queue.is_empty() {
+                return null
+            }
+            
+            # 如果当前有运行进程且时间片未用完
+            if self.running_process != null && self.current_time < self.time_slice {
+                return self.running_process
+            }
+            
+            # 时间片用完，切换进程
+            if self.running_process != null {
+                self.running_process.state = ProcessState.READY
+                self.ready_queue.enqueue(self.running_process, self.running_process.priority)
+            }
+            
+            # 选择下一个进程
+            next_process = self.ready_queue.dequeue()
+            next_process.state = ProcessState.RUNNING
+            self.running_process = next_process
+            self.current_time = 0
+            
+            return next_process
+        }
+        
+        # 优先级调度算法
+        method priority_schedule() -> ProcessControlBlock {
+            if self.ready_queue.is_empty() {
+                return null
+            }
+            
+            # 选择优先级最高的进程
+            next_process = self.ready_queue.dequeue()
+            
+            # 如果有更高优先级的进程，抢占当前进程
+            if self.running_process != null {
+                if next_process.priority > self.running_process.priority {
+                    self.running_process.state = ProcessState.READY
+                    self.ready_queue.enqueue(self.running_process, self.running_process.priority)
+                } else {
+                    # 当前进程优先级更高，放回队列
+                    self.ready_queue.enqueue(next_process, next_process.priority)
+                    return self.running_process
+                }
+            }
+            
+            next_process.state = ProcessState.RUNNING
+            self.running_process = next_process
+            
+            return next_process
+        }
+        
+        # 先来先服务调度算法
+        method fcfs_schedule() -> ProcessControlBlock {
+            if self.ready_queue.is_empty() {
+                return null
+            }
+            
+            # 如果当前有运行进程，继续运行
+            if self.running_process != null && self.running_process.state == ProcessState.RUNNING {
+                return self.running_process
+            }
+            
+            # 选择队列中的第一个进程
+            next_process = self.ready_queue.dequeue()
+            next_process.state = ProcessState.RUNNING
+            self.running_process = next_process
+            
+            return next_process
+        }
+        
+        # 进程阻塞
+        method block_process(pcb: ProcessControlBlock) {
+            pcb.state = ProcessState.BLOCKED
+            self.blocked_processes.append(pcb)
+            
+            if self.running_process == pcb {
+                self.running_process = null
+            }
+            
+            QuantumLogger.debug("Process " + pcb.name + " blocked")
+        }
+        
+        # 进程唤醒
+        method unblock_process(pcb: ProcessControlBlock) {
+            self.blocked_processes.remove(pcb)
+            add_process(pcb)
+            
+            QuantumLogger.debug("Process " + pcb.name + " unblocked")
+        }
+        
+        # 时间片递增
+        method tick() {
+            self.current_time += 1
+            
+            if self.running_process != null {
+                self.running_process.cpu_time_used += 1
+                self.running_process.last_run_time = SystemClock.now()
+            }
+        }
+        
+        # 设置调度算法
+        method set_scheduling_algorithm(algorithm: string) {
+            self.scheduling_algorithm = algorithm
+            QuantumLogger.log("Scheduling algorithm changed to: " + algorithm)
+        }
+    }
+    
+    # 进程管理器主类
+    class ProcessManagerImpl {
+        field processes: map<int, ProcessControlBlock>
+        field scheduler: ProcessScheduler
+        field next_pid: int
+        field idle_process: ProcessControlBlock
+        field context_switch_count: int
+        
+        method init() {
+            self.processes = map<int, ProcessControlBlock>()
+            self.scheduler = ProcessScheduler()
+            self.next_pid = 1
+            self.context_switch_count = 0
+            
+            # 创建空闲进程
+            create_idle_process()
+        }
+        
+        # 创建空闲进程
+        method create_idle_process() {
+            self.idle_process = ProcessControlBlock(0, "idle", -1)
+            self.idle_process.priority = ProcessPriority.LOW
+            self.idle_process.state = ProcessState.READY
+            self.processes[0] = self.idle_process
+        }
+        
+        # 创建新进程
+        method create_process(program_name: string, parent_pid: int) -> int {
+            pid = self.next_pid
+            self.next_pid += 1
+            
+            pcb = ProcessControlBlock(pid, program_name, parent_pid)
+            
+            # 分配内存空间
+            memory_size = 1024 * 1024  # 1MB默认内存
+            memory_base = MemoryManager.allocate(memory_size)
+            if memory_base == null {
+                QuantumLogger.error("Failed to allocate memory for process " + program_name)
+                return -1
+            }
+            
+            pcb.set_memory_space(memory_base, memory_size)
+            
+            # 初始化栈指针
+            pcb.stack_pointer = memory_base + memory_size - 1024  # 栈从高地址开始
+            
+            self.processes[pid] = pcb
+            self.scheduler.add_process(pcb)
+            
+            QuantumLogger.log("Created process: " + program_name + " (PID: " + pid + ")")
+            
+            return pid
+        }
+        
+        # 终止进程
+        method terminate_process(pid: int) {
+            pcb = self.processes.get(pid, null)
+            if pcb == null {
+                QuantumLogger.error("Process not found: " + pid)
+                return
+            }
+            
+            pcb.state = ProcessState.TERMINATED
+            
+            # 释放内存
+            if pcb.memory_base != null {
+                MemoryManager.deallocate(pcb.memory_base)
+            }
+            
+            # 关闭文件描述符
+            for fd in pcb.file_descriptors {
+                fd.close()
+            }
+            
+            # 从调度器中移除
+            if self.scheduler.running_process == pcb {
+                self.scheduler.running_process = null
+            }
+            
+            self.processes.remove(pid)
+            
+            QuantumLogger.log("Terminated process: " + pcb.name + " (PID: " + pid + ")")
+        }
+        
+        # 获取进程信息
+        method get_process(pid: int) -> ProcessControlBlock {
+            return self.processes.get(pid, null)
+        }
+        
+        # 获取所有进程列表
+        method get_all_processes() -> list<ProcessControlBlock> {
+            result = []
+            for pid, pcb in self.processes {
+                result.append(pcb)
+            }
+            return result
+        }
+        
+        # 进程调度
+        method schedule() {
+            next_process = self.scheduler.schedule()
+            
+            if next_process == null {
+                # 没有可运行的进程，运行空闲进程
+                next_process = self.idle_process
+            }
+            
+            current_process = self.scheduler.running_process
+            
+            # 如果需要切换进程
+            if current_process != next_process {
+                context_switch(current_process, next_process)
+            }
+        }
+        
+        # 上下文切换
+        method context_switch(from_process: ProcessControlBlock, to_process: ProcessControlBlock) {
+            self.context_switch_count += 1
+            
+            # 保存当前进程的上下文
+            if from_process != null {
+                from_process.context.save_context()
+                QuantumLogger.debug("Saved context for process " + from_process.name)
+            }
+            
+            # 恢复目标进程的上下文
+            to_process.context.restore_context()
+            self.scheduler.running_process = to_process
+            
+            QuantumLogger.debug("Context switch: " + 
+                (if from_process != null then from_process.name else "null") + 
+                " -> " + to_process.name)
+        }
+        
+        # 进程睡眠
+        method sleep_process(pid: int, milliseconds: int) {
+            pcb = self.processes.get(pid, null)
+            if pcb != null {
+                self.scheduler.block_process(pcb)
+                
+                # 设置定时器唤醒进程
+                Timer.set_timeout(milliseconds, () => {
+                    self.scheduler.unblock_process(pcb)
+                })
+            }
+        }
+        
+        # 获取系统统计信息
+        method get_system_statistics() -> SystemStatistics {
+            return SystemStatistics {
+                total_processes: self.processes.size(),
+                running_processes: count_processes_by_state(ProcessState.RUNNING),
+                ready_processes: count_processes_by_state(ProcessState.READY),
+                blocked_processes: count_processes_by_state(ProcessState.BLOCKED),
+                context_switches: self.context_switch_count,
+                scheduler_algorithm: self.scheduler.scheduling_algorithm
+            }
+        }
+        
+        # 按状态统计进程数量
+        method count_processes_by_state(state: ProcessState) -> int {
+            count = 0
+            for pid, pcb in self.processes {
+                if pcb.state == state {
+                    count += 1
+                }
+            }
+            return count
+        }
+        
+        # 时钟中断处理
+        method handle_timer_interrupt() {
+            self.scheduler.tick()
+            schedule()
+        }
+    }
+    
+    # 进程统计信息
+    class ProcessStatistics {
+        field pid: int
+        field name: string
+        field state: ProcessState
+        field priority: ProcessPriority
+        field cpu_time: int
+        field memory_usage: int
+        field creation_time: timestamp
+        field last_run_time: timestamp
+    }
+    
+    # 系统统计信息
+    class SystemStatistics {
+        field total_processes: int
+        field running_processes: int
+        field ready_processes: int
+        field blocked_processes: int
+        field context_switches: int
+        field scheduler_algorithm: string
+    }
+    
+    # 优先级队列实现
+    class PriorityQueue<T> {
+        field items: list<PriorityItem<T>>
+        
+        method init() {
+            self.items = []
+        }
+        
+        method enqueue(item: T, priority: int) {
+            priority_item = PriorityItem<T> {
+                item: item,
+                priority: priority
+            }
+            
+            # 按优先级插入（优先级高的在前）
+            inserted = false
+            for i in range(self.items.size()) {
+                if priority > self.items[i].priority {
+                    self.items.insert(i, priority_item)
+                    inserted = true
+                    break
+                }
+            }
+            
+            if !inserted {
+                self.items.append(priority_item)
+            }
+        }
+        
+        method dequeue() -> T {
+            if self.items.is_empty() {
+                return null
+            }
+            
+            return self.items.remove(0).item
+        }
+        
+        method is_empty() -> bool {
+            return self.items.is_empty()
+        }
+        
+        method size() -> int {
+            return self.items.size()
+        }
+    }
+    
+    # 优先级项
+    class PriorityItem<T> {
+        field item: T
+        field priority: int
+    }
+    
+    # 全局进程管理器实例
+    global process_manager: ProcessManagerImpl
+    
+    # 初始化进程管理器
+    function init_process_manager() {
+        process_manager = ProcessManagerImpl()
+        
+        # 注册时钟中断处理器
+        SystemInterrupt.register_handler("timer", process_manager.handle_timer_interrupt)
+        
+        QuantumLogger.log("Process manager initialized")
+    }
+    
+    # 创建进程
+    function create_process(program_name: string, parent_pid: int = 0) -> int {
+        return process_manager.create_process(program_name, parent_pid)
+    }
+    
+    # 终止进程
+    function terminate_process(pid: int) {
+        process_manager.terminate_process(pid)
+    }
+    
+    # 获取当前运行进程
+    function get_current_process() -> ProcessControlBlock {
+        return process_manager.scheduler.running_process
+    }
+    
+    # 进程睡眠
+    function sleep(milliseconds: int) {
+        current_process = get_current_process()
+        if current_process != null {
+            process_manager.sleep_process(current_process.process_id, milliseconds)
+        }
+    }
+    
+    # 获取系统统计
+    function get_system_statistics() -> SystemStatistics {
+        return process_manager.get_system_statistics()
+    }
+}

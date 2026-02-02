@@ -1,0 +1,747 @@
+# QEntL Runtime Bootstrap
+# QEntL运行时系统引导程序
+# 版本：1.0.0
+# 作者：QEntL Runtime Team
+
+module RuntimeBootstrap {
+    # 引导阶段枚举
+    enum BootstrapPhase {
+        INIT,           # 初始化阶段
+        MEMORY_SETUP,   # 内存设置
+        KERNEL_LOAD,    # 内核加载
+        QUANTUM_INIT,   # 量子系统初始化
+        SERVICES_START, # 服务启动
+        FILESYSTEM_MOUNT, # 文件系统挂载
+        NETWORK_START,  # 网络启动
+        USER_READY,     # 用户环境就绪
+        COMPLETED       # 完成
+    }
+    
+    # 引导状态
+    class BootstrapState {
+        field current_phase: BootstrapPhase
+        field start_time: timestamp
+        field phase_start_time: timestamp
+        field errors: list<string>
+        field warnings: list<string>
+        field progress_percentage: float
+        field is_safe_mode: bool
+        field recovery_mode: bool
+        
+        method init() {
+            self.current_phase = BootstrapPhase.INIT
+            self.start_time = SystemClock.now()
+            self.phase_start_time = self.start_time
+            self.errors = []
+            self.warnings = []
+            self.progress_percentage = 0.0
+            self.is_safe_mode = false
+            self.recovery_mode = false
+        }
+        
+        # 进入下一个阶段
+        method advance_to_phase(next_phase: BootstrapPhase) {
+            current_time = SystemClock.now()
+            phase_duration = current_time - self.phase_start_time
+            
+            SystemConsole.println("[BOOTSTRAP] Completed phase: " + 
+                get_phase_name(self.current_phase) + 
+                " (took " + phase_duration + "ms)")
+            
+            self.current_phase = next_phase
+            self.phase_start_time = current_time
+            self.progress_percentage = calculate_progress()
+            
+            SystemConsole.println("[BOOTSTRAP] Starting phase: " + 
+                get_phase_name(next_phase) + 
+                " (progress: " + self.progress_percentage + "%)")
+        }
+        
+        # 添加错误
+        method add_error(error_message: string) {
+            self.errors.append(error_message)
+            SystemConsole.println("[BOOTSTRAP ERROR] " + error_message)
+        }
+        
+        # 添加警告
+        method add_warning(warning_message: string) {
+            self.warnings.append(warning_message)
+            SystemConsole.println("[BOOTSTRAP WARNING] " + warning_message)
+        }
+        
+        # 计算进度
+        method calculate_progress() -> float {
+            total_phases = 8  # 总共8个阶段
+            current_phase_index = self.current_phase as int
+            return (current_phase_index * 100.0) / total_phases
+        }
+        
+        # 获取阶段名称
+        method get_phase_name(phase: BootstrapPhase) -> string {
+            if phase == BootstrapPhase.INIT { return "INITIALIZATION" }
+            else if phase == BootstrapPhase.MEMORY_SETUP { return "MEMORY_SETUP" }
+            else if phase == BootstrapPhase.KERNEL_LOAD { return "KERNEL_LOADING" }
+            else if phase == BootstrapPhase.QUANTUM_INIT { return "QUANTUM_INITIALIZATION" }
+            else if phase == BootstrapPhase.SERVICES_START { return "SERVICES_STARTUP" }
+            else if phase == BootstrapPhase.FILESYSTEM_MOUNT { return "FILESYSTEM_MOUNTING" }
+            else if phase == BootstrapPhase.NETWORK_START { return "NETWORK_STARTUP" }
+            else if phase == BootstrapPhase.USER_READY { return "USER_ENVIRONMENT_READY" }
+            else if phase == BootstrapPhase.COMPLETED { return "BOOTSTRAP_COMPLETED" }
+            else { return "UNKNOWN_PHASE" }
+        }
+        
+        # 检查是否有严重错误
+        method has_critical_errors() -> bool {
+            for error in self.errors {
+                if error.contains("CRITICAL") || error.contains("FATAL") {
+                    return true
+                }
+            }
+            return false
+        }
+        
+        # 获取总执行时间
+        method get_total_runtime() -> int {
+            return SystemClock.now() - self.start_time
+        }
+    }
+    
+    # 系统配置
+    class SystemConfig {
+        field heap_size: int
+        field num_qubits: int
+        field max_processes: int
+        field log_level: string
+        field safe_mode: bool
+        field debug_mode: bool
+        field quantum_simulation: bool
+        field network_enabled: bool
+        field config_file_path: string
+        
+        method init() {
+            # 默认配置
+            self.heap_size = 128 * 1024 * 1024  # 128MB
+            self.num_qubits = 32
+            self.max_processes = 1024
+            self.log_level = "INFO"
+            self.safe_mode = false
+            self.debug_mode = false
+            self.quantum_simulation = true  # 默认使用量子模拟
+            self.network_enabled = true
+            self.config_file_path = "System/config/qentl.conf"
+        }
+        
+        # 从文件加载配置
+        method load_from_file(file_path: string) -> bool {
+            try {
+                # 这里应该实现配置文件解析
+                # 简化版本，使用默认配置
+                SystemConsole.println("[CONFIG] Using default configuration")
+                return true
+            } catch (error: Exception) {
+                SystemConsole.println("[CONFIG ERROR] Failed to load config: " + error.message)
+                return false
+            }
+        }
+        
+        # 检测硬件能力
+        method detect_hardware_capabilities() {
+            # 检测内存大小
+            available_memory = SystemHardware.get_available_memory()
+            if available_memory > 0 {
+                self.heap_size = min(self.heap_size, available_memory / 2)
+            }
+            
+            # 检测量子硬件
+            if SystemHardware.has_quantum_processor() {
+                self.quantum_simulation = false
+                self.num_qubits = SystemHardware.get_quantum_processor_qubits()
+                SystemConsole.println("[CONFIG] Quantum hardware detected: " + self.num_qubits + " qubits")
+            } else {
+                SystemConsole.println("[CONFIG] Using quantum simulation with " + self.num_qubits + " qubits")
+            }
+            
+            # 检测网络接口
+            if !SystemHardware.has_network_interface() {
+                self.network_enabled = false
+                SystemConsole.println("[CONFIG] No network interface detected, disabling network")
+            }
+        }
+        
+        # 验证配置
+        method validate() -> bool {
+            valid = true
+            
+            if self.heap_size < 1024 * 1024 {  # 最小1MB
+                SystemConsole.println("[CONFIG ERROR] Heap size too small: " + self.heap_size)
+                valid = false
+            }
+            
+            if self.num_qubits < 1 || self.num_qubits > 1024 {
+                SystemConsole.println("[CONFIG ERROR] Invalid qubit count: " + self.num_qubits)
+                valid = false
+            }
+            
+            if self.max_processes < 1 {
+                SystemConsole.println("[CONFIG ERROR] Invalid max processes: " + self.max_processes)
+                valid = false
+            }
+            
+            return valid
+        }
+    }
+    
+    # 运行时引导器主类
+    class RuntimeBootstrapper {
+        field bootstrap_state: BootstrapState
+        field system_config: SystemConfig
+        field initialized_modules: list<string>
+        field start_time: timestamp
+        
+        method init() {
+            self.bootstrap_state = BootstrapState()
+            self.system_config = SystemConfig()
+            self.initialized_modules = []
+            self.start_time = SystemClock.now()
+        }
+        
+        # 主引导流程
+        method bootstrap() -> bool {
+            SystemConsole.println("=== QEntL Runtime System Bootstrap ===")
+            SystemConsole.println("Version: 1.0.0")
+            SystemConsole.println("Starting at: " + format_timestamp(self.start_time))
+            SystemConsole.println("======================================")
+            
+            try {
+                # 阶段1: 初始化
+                if !initialize_basic_systems() {
+                    return handle_bootstrap_failure("Basic systems initialization failed")
+                }
+                
+                # 阶段2: 内存设置
+                if !setup_memory_management() {
+                    return handle_bootstrap_failure("Memory management setup failed")
+                }
+                
+                # 阶段3: 内核加载
+                if !load_kernel_systems() {
+                    return handle_bootstrap_failure("Kernel systems loading failed")
+                }
+                
+                # 阶段4: 量子系统初始化
+                if !initialize_quantum_systems() {
+                    return handle_bootstrap_failure("Quantum systems initialization failed")
+                }
+                
+                # 阶段5: 服务启动
+                if !start_system_services() {
+                    return handle_bootstrap_failure("System services startup failed")
+                }
+                
+                # 阶段6: 文件系统挂载
+                if !mount_filesystems() {
+                    return handle_bootstrap_failure("Filesystem mounting failed")
+                }
+                
+                # 阶段7: 网络启动
+                if !start_network_systems() {
+                    return handle_bootstrap_failure("Network systems startup failed")
+                }
+                
+                # 阶段8: 用户环境准备
+                if !prepare_user_environment() {
+                    return handle_bootstrap_failure("User environment preparation failed")
+                }
+                
+                # 完成引导
+                complete_bootstrap()
+                return true
+                
+            } catch (error: Exception) {
+                return handle_bootstrap_failure("Unexpected error: " + error.message)
+            }
+        }
+        
+        # 阶段1: 初始化基本系统
+        method initialize_basic_systems() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.INIT)
+            
+            try {
+                # 初始化系统时钟
+                SystemClock.initialize()
+                self.initialized_modules.append("SystemClock")
+                
+                # 初始化基本控制台输出
+                SystemConsole.initialize()
+                self.initialized_modules.append("SystemConsole")
+                
+                # 加载系统配置
+                if !self.system_config.load_from_file(self.system_config.config_file_path) {
+                    self.bootstrap_state.add_warning("Using default configuration")
+                }
+                
+                # 检测硬件能力
+                self.system_config.detect_hardware_capabilities()
+                
+                # 验证配置
+                if !self.system_config.validate() {
+                    self.bootstrap_state.add_error("Invalid system configuration")
+                    return false
+                }
+                
+                # 初始化日志系统
+                QuantumLogger.init_quantum_logger()
+                self.initialized_modules.append("QuantumLogger")
+                
+                QuantumLogger.info("Basic systems initialization completed")
+                return true
+                
+            } catch (error: Exception) {
+                self.bootstrap_state.add_error("CRITICAL: Basic systems init failed - " + error.message)
+                return false
+            }
+        }
+        
+        # 阶段2: 设置内存管理
+        method setup_memory_management() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.MEMORY_SETUP)
+            
+            try {
+                # 初始化内存管理器
+                MemoryManager.init_memory_manager(self.system_config.heap_size)
+                self.initialized_modules.append("MemoryManager")
+                
+                # 获取内存统计
+                memory_stats = MemoryManager.get_memory_stats()
+                QuantumLogger.info("Memory manager initialized with " + 
+                    memory_stats.total_heap + " bytes heap")
+                
+                # 设置垃圾回收参数
+                if self.system_config.debug_mode {
+                    # 在调试模式下更频繁的垃圾回收
+                    MemoryManager.memory_allocator.collect_garbage()
+                }
+                
+                return true
+                
+            } catch (error: Exception) {
+                self.bootstrap_state.add_error("CRITICAL: Memory setup failed - " + error.message)
+                return false
+            }
+        }
+        
+        # 阶段3: 加载内核系统
+        method load_kernel_systems() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.KERNEL_LOAD)
+            
+            try {
+                # 初始化内核加载器
+                KernelLoader.initialize()
+                self.initialized_modules.append("KernelLoader")
+                
+                # 初始化进程管理器
+                ProcessManager.init_process_manager()
+                self.initialized_modules.append("ProcessManager")
+                
+                # 创建初始进程
+                init_process_id = ProcessManager.create_process("init", 0)
+                if init_process_id <= 0 {
+                    self.bootstrap_state.add_error("Failed to create init process")
+                    return false
+                }
+                
+                QuantumLogger.info("Kernel systems loaded, init process PID: " + init_process_id)
+                return true
+                
+            } catch (error: Exception) {
+                self.bootstrap_state.add_error("CRITICAL: Kernel loading failed - " + error.message)
+                return false
+            }
+        }
+        
+        # 阶段4: 初始化量子系统
+        method initialize_quantum_systems() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.QUANTUM_INIT)
+            
+            try {
+                # 初始化量子运行时
+                QuantumRuntime.init_quantum_runtime(self.system_config.num_qubits)
+                self.initialized_modules.append("QuantumRuntime")
+                
+                # 测试量子处理器
+                quantum_processor = QuantumRuntime.get_quantum_processor()
+                if quantum_processor != null {
+                    # 执行简单的量子门操作测试
+                    quantum_processor.apply_gate("H", [0], [])
+                    measurement = quantum_processor.measure(0)
+                    
+                    QuantumLogger.quantum("Quantum processor test completed, measurement: " + measurement)
+                } else {
+                    self.bootstrap_state.add_error("Failed to initialize quantum processor")
+                    return false
+                }
+                
+                # 如果是量子模拟，显示相关信息
+                if self.system_config.quantum_simulation {
+                    QuantumLogger.info("Quantum systems initialized in simulation mode")
+                } else {
+                    QuantumLogger.info("Quantum systems initialized with hardware acceleration")
+                }
+                
+                return true
+                
+            } catch (error: Exception) {
+                if self.system_config.quantum_simulation {
+                    self.bootstrap_state.add_warning("Quantum simulation failed, continuing: " + error.message)
+                    return true  # 量子模拟失败不是致命错误
+                } else {
+                    self.bootstrap_state.add_error("CRITICAL: Quantum hardware init failed - " + error.message)
+                    return false
+                }
+            }
+        }
+        
+        # 阶段5: 启动系统服务
+        method start_system_services() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.SERVICES_START)
+            
+            try {
+                # 初始化系统服务管理器
+                SystemServices.init_system_services()
+                self.initialized_modules.append("SystemServices")
+                
+                # 启动核心服务
+                SystemServices.start_system_services()
+                
+                # 等待关键服务启动
+                timeout = SystemClock.now() + 10000  # 10秒超时
+                while SystemClock.now() < timeout {
+                    kernel_service = SystemServices.ServiceManager.get_service("Kernel")
+                    if kernel_service != null && 
+                       kernel_service.get_status() == SystemServices.ServiceStatus.RUNNING {
+                        break
+                    }
+                    SystemThread.sleep(100)
+                }
+                
+                # 检查服务状态
+                services_status = SystemServices.ServiceManager.get_all_services_status()
+                running_services = 0
+                
+                for service_info in services_status {
+                    if service_info.status == SystemServices.ServiceStatus.RUNNING {
+                        running_services += 1
+                    } else if service_info.status == SystemServices.ServiceStatus.ERROR {
+                        self.bootstrap_state.add_warning("Service failed to start: " + service_info.name)
+                    }
+                }
+                
+                QuantumLogger.info("System services started: " + running_services + " services running")
+                
+                if running_services == 0 {
+                    self.bootstrap_state.add_error("No system services started")
+                    return false
+                }
+                
+                return true
+                
+            } catch (error: Exception) {
+                self.bootstrap_state.add_error("CRITICAL: Services startup failed - " + error.message)
+                return false
+            }
+        }
+        
+        # 阶段6: 挂载文件系统
+        method mount_filesystems() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.FILESYSTEM_MOUNT)
+            
+            try {
+                # 初始化文件系统管理器
+                FileSystemManager.init_filesystem()
+                self.initialized_modules.append("FileSystemManager")
+                
+                # 创建基本目录结构
+                create_basic_directories()
+                
+                # 获取文件系统统计
+                fs_stats = FileSystemManager.get_filesystem_stats()
+                QuantumLogger.info("Filesystem mounted: " + fs_stats.total_files + 
+                    " files, " + fs_stats.total_directories + " directories")
+                
+                return true
+                
+            } catch (error: Exception) {
+                self.bootstrap_state.add_error("CRITICAL: Filesystem mounting failed - " + error.message)
+                return false
+            }
+        }
+        
+        # 创建基本目录结构
+        method create_basic_directories() {
+            try {
+                basic_dirs = [
+                    "/System",
+                    "/System/Logs",
+                    "/System/Config",
+                    "/System/Runtime",
+                    "/Users",
+                    "/Programs",
+                    "/Data",
+                    "/Temp"
+                ]
+                
+                for dir_path in basic_dirs {
+                    FileSystemManager.mkdir(dir_path)
+                }
+                
+                QuantumLogger.debug("Basic directory structure created")
+                
+            } catch (error: Exception) {
+                QuantumLogger.warn("Some directories could not be created: " + error.message)
+            }
+        }
+        
+        # 阶段7: 启动网络系统
+        method start_network_systems() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.NETWORK_START)
+            
+            if !self.system_config.network_enabled {
+                QuantumLogger.info("Network disabled by configuration")
+                return true
+            }
+            
+            try {
+                # 初始化网络管理器
+                NetworkManager.init_network()
+                self.initialized_modules.append("NetworkManager")
+                
+                # 等待网络服务启动
+                SystemThread.sleep(1000)  # 等待1秒
+                
+                # 获取网络统计
+                network_stats = NetworkManager.get_network_statistics()
+                QuantumLogger.info("Network systems started: " + 
+                    network_stats.network_interfaces + " interfaces")
+                
+                return true
+                
+            } catch (error: Exception) {
+                if self.system_config.safe_mode {
+                    self.bootstrap_state.add_warning("Network startup failed in safe mode: " + error.message)
+                    return true  # 安全模式下网络失败不是致命错误
+                } else {
+                    self.bootstrap_state.add_error("Network startup failed: " + error.message)
+                    return false
+                }
+            }
+        }
+        
+        # 阶段8: 准备用户环境
+        method prepare_user_environment() -> bool {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.USER_READY)
+            
+            try {
+                # 设置默认用户目录
+                default_user_path = "/Users/Default"
+                if FileSystemManager.filesystem_manager.find_file(default_user_path) == null {
+                    FileSystemManager.mkdir(default_user_path)
+                    FileSystemManager.mkdir(default_user_path + "/Documents")
+                    FileSystemManager.mkdir(default_user_path + "/Programs")
+                    FileSystemManager.mkdir(default_user_path + "/Data")
+                }
+                
+                # 设置当前工作目录
+                FileSystemManager.chdir(default_user_path)
+                
+                # 创建默认用户进程
+                user_process_id = ProcessManager.create_process("user_shell", 1)
+                if user_process_id <= 0 {
+                    self.bootstrap_state.add_warning("Failed to create user shell process")
+                }
+                
+                QuantumLogger.info("User environment prepared, current directory: " + 
+                    FileSystemManager.getcwd())
+                
+                return true
+                
+            } catch (error: Exception) {
+                self.bootstrap_state.add_error("User environment preparation failed: " + error.message)
+                return false
+            }
+        }
+        
+        # 完成引导
+        method complete_bootstrap() {
+            self.bootstrap_state.advance_to_phase(BootstrapPhase.COMPLETED)
+            
+            total_time = self.bootstrap_state.get_total_runtime()
+            
+            SystemConsole.println("======================================")
+            SystemConsole.println("QEntL Runtime Bootstrap Completed!")
+            SystemConsole.println("Total time: " + total_time + "ms")
+            SystemConsole.println("Initialized modules: " + self.initialized_modules.size())
+            SystemConsole.println("Warnings: " + self.bootstrap_state.warnings.size())
+            SystemConsole.println("Errors: " + self.bootstrap_state.errors.size())
+            SystemConsole.println("======================================")
+            
+            # 记录启动统计
+            QuantumLogger.info("QEntL Runtime bootstrap completed in " + total_time + "ms")
+            
+            for module_name in self.initialized_modules {
+                QuantumLogger.debug("Module initialized: " + module_name)
+            }
+            
+            if !self.bootstrap_state.warnings.is_empty() {
+                QuantumLogger.warn("Bootstrap completed with " + 
+                    self.bootstrap_state.warnings.size() + " warnings")
+                for warning in self.bootstrap_state.warnings {
+                    QuantumLogger.warn("Warning: " + warning)
+                }
+            }
+            
+            if !self.bootstrap_state.errors.is_empty() {
+                QuantumLogger.error("Bootstrap completed with " + 
+                    self.bootstrap_state.errors.size() + " errors")
+                for error in self.bootstrap_state.errors {
+                    QuantumLogger.error("Error: " + error)
+                }
+            }
+            
+            # 系统就绪通知
+            SystemConsole.println("QEntL Runtime System is ready.")
+            SystemConsole.println("Type 'help' for available commands.")
+        }
+        
+        # 处理引导失败
+        method handle_bootstrap_failure(failure_reason: string) -> bool {
+            self.bootstrap_state.add_error("BOOTSTRAP FAILED: " + failure_reason)
+            
+            total_time = self.bootstrap_state.get_total_runtime()
+            
+            SystemConsole.println("======================================")
+            SystemConsole.println("QEntL Runtime Bootstrap FAILED!")
+            SystemConsole.println("Reason: " + failure_reason)
+            SystemConsole.println("Failed at phase: " + 
+                self.bootstrap_state.get_phase_name(self.bootstrap_state.current_phase))
+            SystemConsole.println("Total time: " + total_time + "ms")
+            SystemConsole.println("======================================")
+            
+            # 尝试安全模式引导
+            if !self.system_config.safe_mode && !self.bootstrap_state.recovery_mode {
+                SystemConsole.println("Attempting safe mode bootstrap...")
+                return attempt_safe_mode_bootstrap()
+            }
+            
+            # 清理已初始化的模块
+            cleanup_initialized_modules()
+            
+            return false
+        }
+        
+        # 尝试安全模式引导
+        method attempt_safe_mode_bootstrap() -> bool {
+            self.system_config.safe_mode = true
+            self.bootstrap_state.recovery_mode = true
+            
+            # 重置引导状态
+            self.bootstrap_state = BootstrapState()
+            self.bootstrap_state.is_safe_mode = true
+            self.bootstrap_state.recovery_mode = true
+            
+            SystemConsole.println("Starting safe mode bootstrap...")
+            
+            # 简化的安全模式引导
+            try {
+                # 只初始化最基本的系统
+                initialize_basic_systems()
+                setup_memory_management()
+                
+                SystemConsole.println("Safe mode bootstrap completed")
+                SystemConsole.println("Limited functionality available")
+                
+                return true
+                
+            } catch (error: Exception) {
+                SystemConsole.println("Safe mode bootstrap also failed: " + error.message)
+                return false
+            }
+        }
+        
+        # 清理已初始化的模块
+        method cleanup_initialized_modules() {
+            SystemConsole.println("Cleaning up initialized modules...")
+            
+            # 按相反顺序清理模块
+            for i in range(self.initialized_modules.size() - 1, -1, -1) {
+                module_name = self.initialized_modules[i]
+                
+                try {
+                    if module_name == "NetworkManager" {
+                        NetworkManager.shutdown()
+                    } else if module_name == "SystemServices" {
+                        SystemServices.stop_system_services()
+                    } else if module_name == "FileSystemManager" {
+                        FileSystemManager.shutdown()
+                    } else if module_name == "ProcessManager" {
+                        # 进程管理器清理
+                    } else if module_name == "MemoryManager" {
+                        MemoryManager.collect_garbage()
+                    } else if module_name == "QuantumLogger" {
+                        QuantumLogger.shutdown_logging()
+                    }
+                    
+                    SystemConsole.println("Cleaned up: " + module_name)
+                    
+                } catch (error: Exception) {
+                    SystemConsole.println("Error cleaning up " + module_name + ": " + error.message)
+                }
+            }
+        }
+        
+        # 获取引导状态
+        method get_bootstrap_state() -> BootstrapState {
+            return self.bootstrap_state
+        }
+        
+        # 获取系统配置
+        method get_system_config() -> SystemConfig {
+            return self.system_config
+        }
+    }
+    
+    # 辅助函数
+    function format_timestamp(timestamp: timestamp) -> string {
+        return SystemClock.format_time(timestamp, "yyyy-MM-dd HH:mm:ss")
+    }
+    
+    # 全局引导器实例
+    global runtime_bootstrapper: RuntimeBootstrapper
+    
+    # 主引导入口点
+    function bootstrap_qentl_runtime() -> bool {
+        runtime_bootstrapper = RuntimeBootstrapper()
+        return runtime_bootstrapper.bootstrap()
+    }
+    
+    # 获取引导状态
+    function get_bootstrap_state() -> BootstrapState {
+        if runtime_bootstrapper != null {
+            return runtime_bootstrapper.get_bootstrap_state()
+        }
+        return null
+    }
+    
+    # 检查系统是否已准备就绪
+    function is_system_ready() -> bool {
+        state = get_bootstrap_state()
+        return state != null && state.current_phase == BootstrapPhase.COMPLETED
+    }
+    
+    # 获取系统配置
+    function get_system_config() -> SystemConfig {
+        if runtime_bootstrapper != null {
+            return runtime_bootstrapper.get_system_config()
+        }
+        return null
+    }
+}

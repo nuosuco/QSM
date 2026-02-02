@@ -1,0 +1,52 @@
+@echo off
+REM QEntL System Diagnostic Tool
+REM Version: 1.0.0
+
+echo ================================================
+echo QEntL System Diagnostic Tool v1.0.0
+echo ================================================
+echo.
+
+echo [INFO] Checking system compatibility...
+
+REM Check Windows version
+echo [CHECK] Operating System:
+ver
+echo.
+
+REM Check processor architecture
+echo [CHECK] Processor Architecture:
+echo %PROCESSOR_ARCHITECTURE%
+echo.
+
+REM Check available memory
+echo [CHECK] Available Memory:
+wmic computersystem get TotalPhysicalMemory /value | find "TotalPhysicalMemory"
+echo.
+
+REM Check disk space
+echo [CHECK] Disk Space (C: Drive):
+dir C:\ | find "bytes free"
+echo.
+
+REM Check for virtualization support
+echo [CHECK] Virtualization Support:
+wmic cpu get VirtualizationFirmwareEnabled /value | find "VirtualizationFirmwareEnabled"
+echo.
+
+REM Check for quantum hardware (simulated)
+echo [CHECK] Quantum Hardware Compatibility:
+echo Checking for quantum processors...
+timeout /t 2 /nobreak >nul
+echo [SIMULATED] No quantum hardware detected - will use simulator
+echo.
+
+echo [CHECK] Hardware requirements:
+echo - Minimum RAM: 4GB
+echo - Recommended RAM: 8GB+
+echo - Minimum Disk: 20GB
+echo - Recommended Disk: 50GB+
+echo.
+
+echo [INFO] Diagnostic complete
+pause

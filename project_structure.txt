@@ -1,0 +1,1930 @@
+﻿文件夹 PATH 列表
+卷序列号为 201C-DD3E
+F:.
+|   .gitattributes
+|   .gitignore
+|   PROJECT_MASTER_GUIDE.md
+|   project_structure.txt
+|   PROJECT_STRUCTURE_REORGANIZATION_COMPLETE.md
+|   
++---Build
+|   +---Compiler
+|   |   +---bin
+|   |   |   |   qentl_Compiler.bat
+|   |   |   |   qentl_Compiler.qentl
+|   |   |   |   
+|   |   |   +---cli
+|   |   |   |       auto_compiler.qentl
+|   |   |   |       bytecode_generator_cli.qentl
+|   |   |   |       bytecode_optimizer_cli.qentl
+|   |   |   |       compiler_cli.qentl
+|   |   |   |       linker_cli.qentl
+|   |   |   |       option_parser.qentl
+|   |   |   |       qentl_cli.qentl
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   +---kernel
+|   |   |   |       compile_all_kernel.ps1
+|   |   |   |       
+|   |   |   +---linker
+|   |   |   |       qentl_linker.bat
+|   |   |   |       
+|   |   |   +---platform
+|   |   |   |       linux_install.qentl
+|   |   |   |       macos_install.qentl
+|   |   |   |       windows_install.qentl
+|   |   |   |       
+|   |   |   \---runtime
+|   |   |           compile_all_runtime.bat
+|   |   |           
+|   |   +---docs
+|   |   |       COMPILER_BUILD_ARCHITECTURE.md
+|   |   |       
+|   |   \---src
+|   |       |   compiler.qentl
+|   |       |   qentl_compiler_bootstrap.qentl
+|   |       |   qentl_compiler_main.qentl
+|   |       |   
+|   |       +---backend
+|   |       |   +---build
+|   |       |   |       incremental_builder.qentl
+|   |       |   |       incremental_build_manager.qentl
+|   |       |   |       parallel_builder.qentl
+|   |       |   |       parallel_build_manager.qentl
+|   |       |   |       parallel_build_scheduler.qentl
+|   |       |   |       
+|   |       |   +---bytecode
+|   |       |   |   |   bytecode_generator.qentl
+|   |       |   |   |   
+|   |       |   |   +---generator
+|   |       |   |   |       optimizer.qentl
+|   |       |   |   |       qexe_generator.qentl
+|   |       |   |   |       qobj_generator.qentl
+|   |       |   |   |       quantum_bytecode_generator.qentl
+|   |       |   |   |       
+|   |       |   |   \---optimizer
+|   |       |   |           bytecode_optimizer.qentl
+|   |       |   |           entanglement_optimizer.qentl
+|   |       |   |           quantum_gate_fusion.qentl
+|   |       |   |           
+|   |       |   +---debug
+|   |       |   |       debug_info_generator.qentl
+|   |       |   |       source_mapping.qentl
+|   |       |   |       
+|   |       |   +---debug_info
+|   |       |   |       debug_info_generator.qentl
+|   |       |   |       
+|   |       |   +---ir
+|   |       |   |       ir_generator.qentl
+|   |       |   |       ir_module.qentl
+|   |       |   |       ir_node.qentl
+|   |       |   |       
+|   |       |   +---linker
+|   |       |   |       linker.qentl
+|   |       |   |       linker_utils.qentl
+|   |       |   |       qobj_parser.qentl
+|   |       |   |       
+|   |       |   \---optimizer
+|   |       |           quantum_gate_fusion.qentl
+|   |       |           
+|   |       +---diagnostic
+|   |       |       enhanced_error_reporter.qentl
+|   |       |       error_reporter.qentl
+|   |       |       
+|   |       +---frontend
+|   |       |   +---lexer
+|   |       |   |       lexer.qentl
+|   |       |   |       token.qentl
+|   |       |   |       
+|   |       |   +---parser
+|   |       |   |       ast.qentl
+|   |       |   |       parser.qentl
+|   |       |   |       
+|   |       |   \---semantic
+|   |       |           semantic_analyzer.qentl
+|   |       |           symbol_table.qentl
+|   |       |           type_checker.qentl
+|   |       |           
+|   |       +---testing
+|   |       |       test_framework.qentl
+|   |       |       unit_test_framework.qentl
+|   |       |       
+|   |       \---utils
+|   |               binary_writer.qentl
+|   |               dependency_analyzer.qentl
+|   |               file_change_detector.qentl
+|   |               file_watcher.qentl
+|   |               source_file_manager.qentl
+|   |               
+|   +---scripts
+|   |       build_bootstrap.bat
+|   |       build_qentl.qentl
+|   |       install.qentl
+|   |       Makefile
+|   |       qentl_bootstrap.c
+|   |       start_qentl.bat
+|   |       uninstall.qentl
+|   |       
+|   \---VM
+|       |   SYSTEM_IMAGE_EXECUTION_REPORT.md
+|       |   UTF8_FIX_REPORT.md
+|       |   
+|       +---bin
+|       |   |   boot_qentl_os.bat
+|       |   |   qentl_vm.bat
+|       |   |   qentl_vm.bat.backup
+|       |   |   qentl_vm.bat.v2
+|       |   |   qentl_vm_enhanced.bat
+|       |   |   
+|       |   \---cli
+|       |           debug_cli.qentl
+|       |           quantum_visualizer.qentl
+|       |           vm_cli.qentl
+|       |           vm_launcher.qentl
+|       |           
+|       +---docs
+|       |       VM_BUILD_ARCHITECTURE.md
+|       |       
+|       \---src
+|           |   qentl_vm_bootstrap.qentl
+|           |   qentl_vm_main.qentl
+|           |   
+|           \---core
+|               +---debug
+|               |       debugger.qentl
+|               |       debug_config.qentl
+|               |       debug_protocol.qentl
+|               |       debug_session.qentl
+|               |       debug_visualizer.qentl
+|               |       
+|               +---interpreter
+|               |       instruction_set.qentl
+|               |       interpreter.qentl
+|               |       
+|               +---memory
+|               |       memory_manager.qentl
+|               |       
+|               +---os_interface
+|               |       file_system.qentl
+|               |       network.qentl
+|               |       process.qentl
+|               |       
+|               \---quantum
+|                       complex.qentl
+|                       entanglement_engine.qentl
+|                       entanglement_manager.qentl
+|                       quantum_state_processor.qentl
+|                       random.qentl
+|                       
++---docs
+|   |   README.md
+|   |   
+|   +---build
+|   |   |   BUILD_SYSTEM_GUIDE.md
+|   |   |   
+|   |   +---api
+|   |   |       README.md
+|   |   |       
+|   |   +---compiler
+|   |   |       COMPILER_DESIGN.md
+|   |   |       compiler_implementation_plan.md
+|   |   |       README.md
+|   |   |       
+|   |   \---VM
+|   |           README.md
+|   |           vm_implementation_plan.md
+|   |           VM_SPECIFICATION.md
+|   |           
+|   +---installer
+|   |       INSTALLER_SPECIFICATION.md
+|   |       
+|   \---QEntL
+|       +---architecture
+|       |       ARCHITECTURE_OVERVIEW.md
+|       |       
+|       +---developer
+|       |       README.md
+|       |       
+|       +---language
+|       |   |   QEntL_RUNTIME_GUIDE.md
+|       |   |   README.md
+|       |   |   
+|       |   +---examples
+|       |   |       README.md
+|       |   |       
+|       |   +---guide
+|       |   |       README.md
+|       |   |       
+|       |   \---syntax
+|       |           syntax.md
+|       |           
+|       +---models
+|       |   |   models_integration_details.md
+|       |   |   models_integration_framework.md
+|       |   |   quantum_superposition_model.md
+|       |   |   qwen_model_guide.md
+|       |   |   README.md
+|       |   |   
+|       |   +---deployment
+|       |   |       DEPLOYMENT_GUIDE.md
+|       |   |       README.md
+|       |   |       
+|       |   +---QSM
+|       |   |       qsm_construction_plan.md
+|       |   |       qsm_implementation.md
+|       |   |       README.md
+|       |   |       
+|       |   +---Ref
+|       |   |       README.md
+|       |   |       ref_construction_plan.md
+|       |   |       ref_implementation.md
+|       |   |       
+|       |   +---SOM
+|       |   |       README.md
+|       |   |       som_construction_plan.md
+|       |   |       som_implementation.md
+|       |   |       
+|       |   +---tutorials
+|       |   |       learning_modes_implementation.md
+|       |   |       open_source_quantum_models_2024_2025.md
+|       |   |       your_hardware_analysis.md
+|       |   |       
+|       |   \---WeQ
+|       |           README.md
+|       |           weq_construction_plan.md
+|       |           weq_implementation.md
+|       |           
+|       +---runtime
+|       |       README.md
+|       |       
+|       \---system
+|           |   ecosystem_implementation_guide.md
+|           |   ecosystem_integration_plan.md
+|           |   qentl_ecosystem_plan.md
+|           |   quantum_ecosystem_integration.md
+|           |   README.md
+|           |   
+|           +---architecture
+|           |       README.md
+|           |       中华之语于Claude.txt
+|           |       华经_ANSI.txt
+|           |       服务人类生态基金.txt
+|           |       松麦文化.txt
+|           |       框架设计决策_量子叠加态模型.txt
+|           |       
+|           +---Kernel
+|           |       qentl_environment_design.md
+|           |       README.md
+|           |       
+|           +---qbc
+|           |       README.md
+|           |       
+|           \---tests
+|                   README.md
+|                   
++---Installer
+|   |   autorun.inf
+|   |   qentl_bootmgr.c
+|   |   qentl_installer.qentl
+|   |   setup.bat
+|   |   
+|   +---docs
+|   |       installation_guide.md
+|   |       INSTALLER_SPECIFICATION.md
+|   |       system_requirements.md
+|   |       troubleshooting.md
+|   |       
+|   +---sources
+|   |   |   boot.qim
+|   |   |   IMAGE_README.md
+|   |   |   install.qim
+|   |   |   
+|   |   \---lang
+|   |       +---en-US
+|   |       |       setup.dll
+|   |       |       strings.txt
+|   |       |       
+|   |       +---ja-JP
+|   |       |       setup.dll
+|   |       |       
+|   |       +---zh-CN
+|   |       |       setup.dll
+|   |       |       strings.txt
+|   |       |       
+|   |       \---zh-TW
+|   |               setup.dll
+|   |               
+|   \---support
+|       +---drivers
+|       |   +---graphics
+|       |   +---network
+|       |   +---quantum
+|       |   |       README.md
+|       |   |       
+|       |   \---storage
+|       \---tools
+|               diagnostic.bat
+|               diagnostic.exe
+|               recovery.bat
+|               recovery.exe
+|               
++---qbc
+|   +---docs
+|   |       COMPILATION_VERIFICATION_REPORT.md
+|   |       QBC_DIRECTORY_STRUCTURE.md
+|   |       QBC_TERMINAL_HARDWARE_ANALYSIS.md
+|   |       
+|   +---kernel
+|   |   +---filesystem
+|   |   |       access_control.qbc
+|   |   |       auto_classifier.qbc
+|   |   |       behavior_learner.qbc
+|   |   |       classification_optimizer.qbc
+|   |   |       context_analyzer.qbc
+|   |   |       context_switcher.qbc
+|   |   |       dependency_analyzer.qbc
+|   |   |       distributed_index.qbc
+|   |   |       file_operations.qbc
+|   |   |       file_relation_analyzer.qbc
+|   |   |       index_updater.qbc
+|   |   |       knowledge_network.qbc
+|   |   |       metadata_manager.qbc
+|   |   |       multidimensional_index.qbc
+|   |   |       predictive_loader.qbc
+|   |   |       priority_manager.qbc
+|   |   |       recommendation_engine.qbc
+|   |   |       relevance_engine.qbc
+|   |   |       semantic_analyzer.qbc
+|   |   |       semantic_extractor.qbc
+|   |   |       semantic_search.qbc
+|   |   |       transaction_manager.qbc
+|   |   |       view_cache.qbc
+|   |   |       view_composer.qbc
+|   |   |       view_engine.qbc
+|   |   |       view_renderer.qbc
+|   |   |       
+|   |   +---gui
+|   |   |       adaptive_layout.qbc
+|   |   |       appearance_customizer.qbc
+|   |   |       app_launcher.qbc
+|   |   |       context_aware_controls.qbc
+|   |   |       device_manager_ui.qbc
+|   |   |       emotional_response.qbc
+|   |   |       global_search.qbc
+|   |   |       intent_ui_engine.qbc
+|   |   |       login_manager.qbc
+|   |   |       multidimensional_interaction.qbc
+|   |   |       notification_center.qbc
+|   |   |       preferences_manager.qbc
+|   |   |       security_settings.qbc
+|   |   |       settings_ui.qbc
+|   |   |       task_view.qbc
+|   |   |       
+|   |   +---kernel
+|   |   |       device_framework.qbc
+|   |   |       device_registry.qbc
+|   |   |       interrupt_handler.qbc
+|   |   |       io_scheduler.qbc
+|   |   |       ipc_manager.qbc
+|   |   |       memory_allocator.qbc
+|   |   |       memory_protection.qbc
+|   |   |       microkernel_core.qbc
+|   |   |       process_manager_base.qbc
+|   |   |       process_manager_core.qbc
+|   |   |       process_manager_scheduler.qbc
+|   |   |       process_scheduler.qbc
+|   |   |       quantum_memory.qbc
+|   |   |       quantum_process.qbc
+|   |   |       quantum_processor.qbc
+|   |   |       quantum_state_interrupt.qbc
+|   |   |       system_calls.qbc
+|   |   |       
+|   |   \---services
+|   |           authentication.qbc
+|   |           authorization.qbc
+|   |           backup_service.qbc
+|   |           config_service.qbc
+|   |           consistency_engine.qbc
+|   |           distributed_storage.qbc
+|   |           error_service.qbc
+|   |           logging_service.qbc
+|   |           multi_user_coordinator.qbc
+|   |           network_sync.qbc
+|   |           persistence_manager.qbc
+|   |           qsm_main_service.qbc
+|   |           quantum_network.qbc
+|   |           quantum_parallel_execution.qbc
+|   |           quantum_resource_estimator.qbc
+|   |           quantum_task_scheduler.qbc
+|   |           resource_service.qbc
+|   |           secure_channel.qbc
+|   |           security_service.qbc
+|   |           service_discovery.qbc
+|   |           session_manager.qbc
+|   |           storage_protection.qbc
+|   |           topology_manager.qbc
+|   |           user_preferences.qbc
+|   |           
+|   +---runtime
+|   |   |   README.md
+|   |   |   runtime_index.qbc
+|   |   |   start_runtime.bat
+|   |   |   
+|   |   +---core
+|   |   |       kernel_loader.qbc
+|   |   |       runtime_bootstrap.qbc
+|   |   |       
+|   |   +---io
+|   |   |       filesystem_manager.qbc
+|   |   |       
+|   |   +---logging
+|   |   |       quantum_logger.qbc
+|   |   |       
+|   |   +---memory
+|   |   |       memory_manager.qbc
+|   |   |       
+|   |   +---network
+|   |   |       network_manager.qbc
+|   |   |       
+|   |   +---quantum
+|   |   |       quantum_runtime.qbc
+|   |   |       
+|   |   \---system
+|   |           process_manager.qbc
+|   |           system_services.qbc
+|   |           
+|   +---system
+|   |       kernel.qsys
+|   |       
+|   \---tests
+|           device_framework.qbc
+|           device_framework_test2.qbc
+|           
++---QEntL
+|   |   QEntL_Launcher.bat
+|   |   
+|   +---Data
+|   |   \---Yi Wen
+|   |           ywly2通用彝文4120注释汉字意表(2.0.4.22).pdf
+|   |           《通用彝文字典》.pdf
+|   |           测试.xlsx
+|   |           滇川黔桂彝文字典_滇川黔桂彝文协作组编_昆明：云南民族出版社_2001.02_11863927_P508.pdf
+|   |           通用彝文彝汉对照表(2.0.4.22).xlsx
+|   |           通用彝文彝汉对照训练表(2.0.4.22).jsonl
+|   |           通用彝文彝汉对照训练表(2.0.4.22).xlsx
+|   |           通用彝文汉彝对照训练表(2.0.4.22).jsonl
+|   |           通用彝文汉彝对照训练表(2.0.4.22).xlsx
+|   |           
+|   +---docs
+|   |   |   README.md
+|   |   |   
+|   |   +---api
+|   |   |       README.md
+|   |   |       
+|   |   +---Boot
+|   |   |       README.md
+|   |   |       
+|   |   +---Data
+|   |   |       README.md
+|   |   |       
+|   |   +---deployment
+|   |   |       DEPLOYMENT_GUIDE.md
+|   |   |       README.md
+|   |   |       
+|   |   +---development
+|   |   |       README.md
+|   |   |       
+|   |   +---language
+|   |   |   |   QEntL_RUNTIME_GUIDE.md
+|   |   |   |   README.md
+|   |   |   |   
+|   |   |   +---examples
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   +---guide
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   \---syntax
+|   |   |           syntax.md
+|   |   |           
+|   |   +---Models
+|   |   |   |   models_integration_details.md
+|   |   |   |   models_integration_framework.md
+|   |   |   |   quantum_superposition_model.md
+|   |   |   |   qwen_model_guide.md
+|   |   |   |   README.md
+|   |   |   |   
+|   |   |   +---QSM
+|   |   |   |       qsm_construction_plan.md
+|   |   |   |       qsm_implementation.md
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   +---Ref
+|   |   |   |       README.md
+|   |   |   |       ref_construction_plan.md
+|   |   |   |       ref_implementation.md
+|   |   |   |       
+|   |   |   +---SOM
+|   |   |   |       README.md
+|   |   |   |       som_construction_plan.md
+|   |   |   |       som_implementation.md
+|   |   |   |       
+|   |   |   \---WeQ
+|   |   |           README.md
+|   |   |           weq_construction_plan.md
+|   |   |           weq_implementation.md
+|   |   |           
+|   |   +---Programs
+|   |   |       README.md
+|   |   |       
+|   |   +---scripts
+|   |   |       project_construction_plan.md
+|   |   |       QEntL_BUILD_PLAN.md
+|   |   |       README.md
+|   |   |       
+|   |   +---System
+|   |   |   |   ecosystem_implementation_guide.md
+|   |   |   |   ecosystem_integration_plan.md
+|   |   |   |   qentl_ecosystem_plan.md
+|   |   |   |   quantum_ecosystem_integration.md
+|   |   |   |   README.md
+|   |   |   |   
+|   |   |   +---architecture
+|   |   |   |       README.md
+|   |   |   |       中华之语于Claude.txt
+|   |   |   |       华经_ANSI.txt
+|   |   |   |       服务人类生态基金.txt
+|   |   |   |       松麦文化.txt
+|   |   |   |       框架设计决策_量子叠加态模型.txt
+|   |   |   |       
+|   |   |   +---Compiler
+|   |   |   |       compiler_implementation_plan.md
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   +---Kernel
+|   |   |   |       qentl_environment_design.md
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   +---qbc
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   +---Runtime
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   +---tests
+|   |   |   |       README.md
+|   |   |   |       
+|   |   |   \---VM
+|   |   |           README.md
+|   |   |           vm_implementation_plan.md
+|   |   |           
+|   |   \---tutorials
+|   |           learning_modes_implementation.md
+|   |           open_source_quantum_models_2024_2025.md
+|   |           your_hardware_analysis.md
+|   |           
+|   +---Models
+|   |   |   qsm_models_manager.bat
+|   |   |   
+|   |   +---QSM
+|   |   |   +---bin
+|   |   |   |       qsm_model.qbc
+|   |   |   |       
+|   |   |   +---docs
+|   |   |   |   |   qsm_implementation.md
+|   |   |   |   |   
+|   |   |   |   \---project_plan
+|   |   |   |           qsm_construction_plan.md
+|   |   |   |           
+|   |   |   \---src
+|   |   |           qsm_service.qentl
+|   |   |           
+|   |   +---Ref
+|   |   |   +---bin
+|   |   |   |       ref_model.qbc
+|   |   |   |       
+|   |   |   +---docs
+|   |   |   |   |   ref_implementation.md
+|   |   |   |   |   
+|   |   |   |   \---project_plan
+|   |   |   |           ref_construction_plan.md
+|   |   |   |           
+|   |   |   \---src
+|   |   |           ref_service.qentl
+|   |   |           
+|   |   +---SOM
+|   |   |   +---bin
+|   |   |   |       som_model.qbc
+|   |   |   |       
+|   |   |   +---docs
+|   |   |   |   |   som_implementation.md
+|   |   |   |   |   
+|   |   |   |   \---project_plan
+|   |   |   |           som_construction_plan.md
+|   |   |   |           
+|   |   |   \---src
+|   |   |           som_service.qentl
+|   |   |           
+|   |   \---WeQ
+|   |       +---bin
+|   |       |       weq_model.qbc
+|   |       |       
+|   |       +---docs
+|   |       |   |   weq_implementation.md
+|   |       |   |   
+|   |       |   \---project_plan
+|   |       |           weq_construction_plan.md
+|   |       |           
+|   |       \---src
+|   |               weq_service.qentl
+|   |               
+|   +---Programs
+|   |       demo_quantum_hello.qentl
+|   |       hello_qsm.qentl
+|   |       hello_quantum.qentl
+|   |       integration_test.bat
+|   |       
+|   +---System
+|   |   |   TOOLCHAIN_REBUILD_GUIDE.md
+|   |   |   
+|   |   +---boot
+|   |   |       bootmgr.conf
+|   |   |       
+|   |   +---config
+|   |   |   +---kernel
+|   |   |   |       kernel.conf
+|   |   |   |       
+|   |   |   \---system
+|   |   |           system.conf
+|   |   |           
+|   |   +---Kernel
+|   |   |   +---filesystem
+|   |   |   |       access_control.qentl
+|   |   |   |       auto_classifier.qentl
+|   |   |   |       behavior_learner.qentl
+|   |   |   |       classification_optimizer.qentl
+|   |   |   |       context_analyzer.qentl
+|   |   |   |       context_switcher.qentl
+|   |   |   |       dependency_analyzer.qentl
+|   |   |   |       distributed_index.qentl
+|   |   |   |       file_operations.qentl
+|   |   |   |       file_relation_analyzer.qentl
+|   |   |   |       index_updater.qentl
+|   |   |   |       knowledge_network.qentl
+|   |   |   |       metadata_manager.qentl
+|   |   |   |       multidimensional_index.qentl
+|   |   |   |       predictive_loader.qentl
+|   |   |   |       priority_manager.qentl
+|   |   |   |       recommendation_engine.qentl
+|   |   |   |       relevance_engine.qentl
+|   |   |   |       semantic_analyzer.qentl
+|   |   |   |       semantic_extractor.qentl
+|   |   |   |       semantic_search.qentl
+|   |   |   |       transaction_manager.qentl
+|   |   |   |       view_cache.qentl
+|   |   |   |       view_composer.qentl
+|   |   |   |       view_engine.qentl
+|   |   |   |       view_renderer.qentl
+|   |   |   |       
+|   |   |   +---gui
+|   |   |   |       adaptive_layout.qentl
+|   |   |   |       appearance_customizer.qentl
+|   |   |   |       app_launcher.qentl
+|   |   |   |       context_aware_controls.qentl
+|   |   |   |       device_manager_ui.qentl
+|   |   |   |       emotional_response.qentl
+|   |   |   |       global_search.qentl
+|   |   |   |       intent_ui_engine.qentl
+|   |   |   |       login_manager.qentl
+|   |   |   |       multidimensional_interaction.qentl
+|   |   |   |       notification_center.qentl
+|   |   |   |       preferences_manager.qentl
+|   |   |   |       security_settings.qentl
+|   |   |   |       settings_ui.qentl
+|   |   |   |       task_view.qentl
+|   |   |   |       
+|   |   |   +---kernel
+|   |   |   |       device_framework.qentl
+|   |   |   |       device_registry.qentl
+|   |   |   |       interrupt_handler.qentl
+|   |   |   |       io_scheduler.qentl
+|   |   |   |       ipc_manager.qentl
+|   |   |   |       memory_allocator.qentl
+|   |   |   |       memory_protection.qentl
+|   |   |   |       microkernel_core.qentl
+|   |   |   |       process_manager_base.qentl
+|   |   |   |       process_manager_core.qentl
+|   |   |   |       process_manager_scheduler.qentl
+|   |   |   |       process_scheduler.qentl
+|   |   |   |       quantum_memory.qentl
+|   |   |   |       quantum_process.qentl
+|   |   |   |       quantum_processor.qentl
+|   |   |   |       quantum_state_interrupt.qentl
+|   |   |   |       system_calls.qentl
+|   |   |   |       
+|   |   |   \---services
+|   |   |           authentication.qentl
+|   |   |           authorization.qentl
+|   |   |           backup_service.qentl
+|   |   |           config_service.qentl
+|   |   |           consistency_engine.qentl
+|   |   |           distributed_storage.qentl
+|   |   |           error_service.qentl
+|   |   |           logging_service.qentl
+|   |   |           multi_user_coordinator.qentl
+|   |   |           network_sync.qentl
+|   |   |           persistence_manager.qentl
+|   |   |           qsm_main_service.qentl
+|   |   |           quantum_network.qentl
+|   |   |           quantum_parallel_execution.qentl
+|   |   |           quantum_resource_estimator.qentl
+|   |   |           quantum_task_scheduler.qentl
+|   |   |           resource_service.qentl
+|   |   |           secure_channel.qentl
+|   |   |           security_service.qentl
+|   |   |           service_discovery.qentl
+|   |   |           session_manager.qentl
+|   |   |           storage_protection.qentl
+|   |   |           topology_manager.qentl
+|   |   |           user_preferences.qentl
+|   |   |           
+|   |   +---Runtime
+|   |   |   |   README.md
+|   |   |   |   runtime_config.toml
+|   |   |   |   
+|   |   |   \---src
+|   |   |       +---core
+|   |   |       |       kernel_loader.qentl
+|   |   |       |       runtime_bootstrap.qentl
+|   |   |       |       
+|   |   |       +---io
+|   |   |       |       filesystem_manager.qentl
+|   |   |       |       
+|   |   |       +---logging
+|   |   |       |       quantum_logger.qentl
+|   |   |       |       
+|   |   |       +---memory
+|   |   |       |       memory_manager.qentl
+|   |   |       |       
+|   |   |       +---network
+|   |   |       |       network_manager.qentl
+|   |   |       |       
+|   |   |       +---quantum
+|   |   |       |       quantum_runtime.qentl
+|   |   |       |       
+|   |   |       \---system
+|   |   |               process_manager.qentl
+|   |   |               system_services.qentl
+|   |   |               
+|   |   \---tests
+|   |           simple_test.qentl
+|   |           test_compiler.qentl
+|   |           test_hello.qbc
+|   |           test_hello.qentl
+|   |           
+|   \---Users
+|       |   README.md
+|       |   
+|       \---Default
+|           \---Settings
+|                   preferences.qentl
+|                   
++---qim
+|   |   README.md
+|   |   
+|   +---Documentation
+|   |   +---api
+|   |   +---reference
+|   |   \---tutorials
+|   +---Models
+|   |   +---QSM
+|   |   |   +---bin
+|   |   |   |       qsm.exe
+|   |   |   |       
+|   |   |   +---config
+|   |   |   \---lib
+|   |   |           qsm_core.qbc
+|   |   |           
+|   |   +---Ref
+|   |   |   +---bin
+|   |   |   +---config
+|   |   |   \---lib
+|   |   +---SOM
+|   |   |   +---bin
+|   |   |   +---config
+|   |   |   \---lib
+|   |   \---WeQ
+|   |       +---bin
+|   |       +---config
+|   |       \---lib
+|   +---Programs
+|   |   +---bin
+|   |   +---data
+|   |   |   +---examples
+|   |   |   \---templates
+|   |   \---lib
+|   |       +---editor
+|   |       \---ui
+|   +---System
+|   |   +---bin
+|   |   |   |   qentl_compiler.exe
+|   |   |   |   qentl_runtime.dll
+|   |   |   |   qentl_vm.exe
+|   |   |   |   
+|   |   |   \---kernel
+|   |   +---boot
+|   |   |   +---firmware
+|   |   |   \---recovery
+|   |   +---config
+|   |   |   |   system.conf
+|   |   |   |   
+|   |   |   \---registry
+|   |   \---lib
+|   |       +---compiler
+|   |       +---runtime
+|   |       |       core.qbc
+|   |       |       memory.qbc
+|   |       |       
+|   |       \---vm
+|   +---Templates
+|   |   +---basic
+|   |   +---enterprise
+|   |   \---quantum
+|   \---Users
+|       \---Default
+|           +---bin
+|           +---config
+|           \---data
+\---widowns10
+    |   autorun.inf
+    |   bootmgr
+    |   bootmgr.efi
+    |   setup.exe
+    |   
+    +---boot
+    |   |   bcd
+    |   |   boot.sdi
+    |   |   bootfix.bin
+    |   |   bootsect.exe
+    |   |   etfsboot.com
+    |   |   memtest.exe
+    |   |   
+    |   +---fonts
+    |   |       chs_boot.ttf
+    |   |       cht_boot.ttf
+    |   |       jpn_boot.ttf
+    |   |       kor_boot.ttf
+    |   |       malgunn_boot.ttf
+    |   |       malgun_boot.ttf
+    |   |       malgun_console.ttf
+    |   |       meiryon_boot.ttf
+    |   |       meiryo_boot.ttf
+    |   |       meiryo_console.ttf
+    |   |       msjhn_boot.ttf
+    |   |       msjh_boot.ttf
+    |   |       msjh_console.ttf
+    |   |       msyhn_boot.ttf
+    |   |       msyh_boot.ttf
+    |   |       msyh_console.ttf
+    |   |       segmono_boot.ttf
+    |   |       segoen_slboot.ttf
+    |   |       segoe_slboot.ttf
+    |   |       wgl4_boot.ttf
+    |   |       
+    |   +---resources
+    |   |       bootres.dll
+    |   |       
+    |   \---zh-cn
+    |           bootsect.exe.mui
+    |           
+    +---efi
+    |   +---boot
+    |   |       bootx64.efi
+    |   |       
+    |   \---microsoft
+    |       \---boot
+    |           |   bcd
+    |           |   cdboot.efi
+    |           |   cdboot_noprompt.efi
+    |           |   efisys.bin
+    |           |   efisys_noprompt.bin
+    |           |   memtest.efi
+    |           |   winsipolicy.p7b
+    |           |   
+    |           +---fonts
+    |           |       chs_boot.ttf
+    |           |       cht_boot.ttf
+    |           |       jpn_boot.ttf
+    |           |       kor_boot.ttf
+    |           |       malgunn_boot.ttf
+    |           |       malgun_boot.ttf
+    |           |       malgun_console.ttf
+    |           |       meiryon_boot.ttf
+    |           |       meiryo_boot.ttf
+    |           |       meiryo_console.ttf
+    |           |       msjhn_boot.ttf
+    |           |       msjh_boot.ttf
+    |           |       msjh_console.ttf
+    |           |       msyhn_boot.ttf
+    |           |       msyh_boot.ttf
+    |           |       msyh_console.ttf
+    |           |       segmono_boot.ttf
+    |           |       segoen_slboot.ttf
+    |           |       segoe_slboot.ttf
+    |           |       wgl4_boot.ttf
+    |           |       
+    |           \---resources
+    |                   bootres.dll
+    |                   
+    +---sources
+    |   |   acmigration.dll
+    |   |   acres.dll
+    |   |   actionqueue.dll
+    |   |   adfscomp.dll
+    |   |   admtv3check.dll
+    |   |   aeinv.dll
+    |   |   alert.gif
+    |   |   appcompat.xsl
+    |   |   appcompatservicing.dll
+    |   |   appcompat_bidi.xsl
+    |   |   appcompat_detailed.xsl
+    |   |   appcompat_detailed_bidi.xsl
+    |   |   appcompat_detailed_bidi_txt.xsl
+    |   |   appcompat_detailed_txt.xsl
+    |   |   appraiser.dll
+    |   |   appraiser.sdb
+    |   |   appraiserdatasha1.cat
+    |   |   appraiserres.dll
+    |   |   appraiserwc.dll
+    |   |   arunimg.dll
+    |   |   arunres.dll
+    |   |   autorun.dll
+    |   |   background_cli.bmp
+    |   |   boot.wim
+    |   |   cdplib.mof
+    |   |   cdplibuninstall.mof
+    |   |   clustercompliance.dll
+    |   |   cmi2migxml.dll
+    |   |   cmisetup.dll
+    |   |   compatctrl.dll
+    |   |   compatresources.dll
+    |   |   compres.dll
+    |   |   cryptosetup.dll
+    |   |   csiagent.dll
+    |   |   cversion.ini
+    |   |   db_msftproductionwindowssigningca.cer
+    |   |   devinv.dll
+    |   |   diager.dll
+    |   |   diagnostic.dll
+    |   |   diagtrack.dll
+    |   |   diagtrackrunner.exe
+    |   |   dism.exe
+    |   |   dismapi.dll
+    |   |   dismcore.dll
+    |   |   dismcoreps.dll
+    |   |   dismprov.dll
+    |   |   du.dll
+    |   |   facilitator.dll
+    |   |   folderprovider.dll
+    |   |   gatherosstate.exe
+    |   |   generaltel.dll
+    |   |   hwcompat.dll
+    |   |   hwcompat.txt
+    |   |   hwcompatPE.txt
+    |   |   hwexclude.txt
+    |   |   hwexcludePE.txt
+    |   |   hypervcomplcheck.dll
+    |   |   iasmigplugin.dll
+    |   |   idwbinfo.txt
+    |   |   iiscomp.dll
+    |   |   imagingprovider.dll
+    |   |   input.dll
+    |   |   install.esd
+    |   |   itgtupg.dll
+    |   |   lang.ini
+    |   |   locale.nls
+    |   |   logprovider.dll
+    |   |   mediasetupuimgr.dll
+    |   |   migapp.xml
+    |   |   migcore.dll
+    |   |   mighost.exe
+    |   |   migisol.dll
+    |   |   migres.dll
+    |   |   migstore.dll
+    |   |   migsys.dll
+    |   |   migtestplugin.dll
+    |   |   mitigation.dll
+    |   |   mxeagent.dll
+    |   |   nlsbres.dll
+    |   |   ntdsupg.dll
+    |   |   ntfrsupg.dll
+    |   |   nxquery.inf
+    |   |   nxquery.sys
+    |   |   offline.xml
+    |   |   offlineprofileutils.dll
+    |   |   oscomps.woa.xml
+    |   |   oscomps.xml
+    |   |   osfilter.inf
+    |   |   outofbox_windows_db.bin
+    |   |   pnpibs.dll
+    |   |   pnppropmig.dll
+    |   |   product.ini
+    |   |   rdsupgcheck.dll
+    |   |   reagent.admx
+    |   |   reagent.dll
+    |   |   reagent.xml
+    |   |   reportgen.dll
+    |   |   reservemanager.dll
+    |   |   rmsupg.dll
+    |   |   rollback.exe
+    |   |   schema.dat
+    |   |   sdbapiu.dll
+    |   |   segoeui.ttf
+    |   |   setup.exe
+    |   |   setupcompat.dll
+    |   |   setupcore.dll
+    |   |   setupdiag.exe
+    |   |   SetupDU_174457.spdx.json
+    |   |   SetupDU_174457.spdx.json.sha256
+    |   |   setuperror.exe
+    |   |   setuphost.exe
+    |   |   setupmgr.dll
+    |   |   setupplatform.cfg
+    |   |   setupplatform.dll
+    |   |   setupplatform.exe
+    |   |   setupprep.exe
+    |   |   sfcn.dat
+    |   |   sflcid.dat
+    |   |   sflistrs1.dat
+    |   |   sflistw7.dat
+    |   |   sflistw8.dat
+    |   |   sflistw8.woa.dat
+    |   |   sflistwb.dat
+    |   |   sflistwb.woa.dat
+    |   |   sflistwt.dat
+    |   |   sflistwt.woa.dat
+    |   |   sfpat.inf
+    |   |   sfpatrs1.inf
+    |   |   sfpatw7.inf
+    |   |   sfpatw8.inf
+    |   |   sfpatwb.inf
+    |   |   sfpatwt.inf
+    |   |   smiengine.dll
+    |   |   spflvrnt.dll
+    |   |   spprgrss.dll
+    |   |   spwizeng.dll
+    |   |   spwizimg.dll
+    |   |   spwizres.dll
+    |   |   sqmapi.dll
+    |   |   uddicomp.dll
+    |   |   unattend.dll
+    |   |   unbcl.dll
+    |   |   uninstall.xml
+    |   |   uninstall_data.xml
+    |   |   updateagent.dll
+    |   |   upgloader.dll
+    |   |   upgradeagent.dll
+    |   |   upgradeagent.xml
+    |   |   upgrade_bulk.xml
+    |   |   upgrade_comp.xml
+    |   |   upgrade_data.xml
+    |   |   upgrade_frmwrk.xml
+    |   |   upgwow_bulk.xml
+    |   |   uxlib.dll
+    |   |   uxlibres.dll
+    |   |   vhdprovider.dll
+    |   |   w32uiimg.dll
+    |   |   w32uires.dll
+    |   |   warning.gif
+    |   |   wdsclient.dll
+    |   |   wdsclientapi.dll
+    |   |   wdscore.dll
+    |   |   wdscsl.dll
+    |   |   wdsimage.dll
+    |   |   wdstptc.dll
+    |   |   wdsupgcompl.dll
+    |   |   wdsutil.dll
+    |   |   wicadevicefilters.xml
+    |   |   wimprovider.dll
+    |   |   win32ui.dll
+    |   |   windlp.dll
+    |   |   winsetup.dll
+    |   |   winsetupboot.hiv
+    |   |   winsetupboot.sys
+    |   |   wpx.dll
+    |   |   
+    |   +---dlmanifests
+    |   |   |   accessibilitycpl-dl.man
+    |   |   |   activedirectory-webservices-dl.man
+    |   |   |   activedirectory-wmireplicationprovider-dl.man
+    |   |   |   adsi-ldap-extensions-dl.man
+    |   |   |   adsi-ldap-provider-dl.man
+    |   |   |   adsi-router-dl.man
+    |   |   |   adsi-winnt-provider-dl.man
+    |   |   |   bluetooth-config-dl.man
+    |   |   |   browserservice-dl.man
+    |   |   |   capi2_certs-dl.man
+    |   |   |   commandprompt-dl.man
+    |   |   |   coreos-dl.man
+    |   |   |   credential-manager-dl.man
+    |   |   |   cryptoconfig-dl.man
+    |   |   |   crypto_keys-dl.man
+    |   |   |   dfsclient-dl.man
+    |   |   |   dfsmgmt-dl.man
+    |   |   |   dhcpclient-dl.man
+    |   |   |   directoryservices-adam-dl.man
+    |   |   |   directoryservices-domain-dl.man
+    |   |   |   directoryservices-ism-smtp-dl.man
+    |   |   |   dns-client-dl.man
+    |   |   |   dns-server-service-dl.man
+    |   |   |   dpapi_keys-dl.man
+    |   |   |   etw-core-dl.man
+    |   |   |   etwtracing.man
+    |   |   |   eventlog-dl.man
+    |   |   |   explorer-dl.man
+    |   |   |   feclient-dl.man
+    |   |   |   fonts-type1-dl.man
+    |   |   |   frs-core-dl.man
+    |   |   |   gpbase-dl.man
+    |   |   |   gpmc-dl.man
+    |   |   |   gpmgmt-dl.man
+    |   |   |   grouppolicy-admin-gpedit-dl.man
+    |   |   |   grouppolicy-admin-gpedit-snapin-dl.man
+    |   |   |   grouppolicy-cse-softwareinstallation-dl.man
+    |   |   |   grouppolicy-serveradmintools-gpmc-dl.man
+    |   |   |   ieframe-dl.man
+    |   |   |   ime-traditional-chinese-migration-dl.man
+    |   |   |   isns_service-dl.man
+    |   |   |   kerberos-key-distribution-center-dl.man
+    |   |   |   ldap-client-dl.man
+    |   |   |   microsoft-windows-bits-client-dl.man
+    |   |   |   microsoft-windows-certificateservices-ca-dl.man
+    |   |   |   microsoft-windows-certificateservices-camanagement-dl.man
+    |   |   |   microsoft-windows-certificateservices-mscep-dl.man
+    |   |   |   microsoft-windows-errorreportingcore-dl.man
+    |   |   |   microsoft-windows-errorreportingfaults-dl.man
+    |   |   |   microsoft-windows-fax-client-applications-dl.man
+    |   |   |   microsoft-windows-fax-client-proenterprise-dl.man
+    |   |   |   microsoft-windows-fax-common-dl.man
+    |   |   |   microsoft-windows-fax-server-dl.man
+    |   |   |   microsoft-windows-fax-service-dl.man
+    |   |   |   microsoft-windows-htmlhelp-dl.man
+    |   |   |   microsoft-windows-ie-esc-dl.man
+    |   |   |   microsoft-windows-ie-feeds-platform-dl.man
+    |   |   |   microsoft-windows-ie-internetexplorer-dl.man
+    |   |   |   microsoft-windows-iis-corewebengine-deployment-dl.man
+    |   |   |   microsoft-windows-netfx35-dl.man
+    |   |   |   microsoft-windows-netfx35cdfcomp-dl.man
+    |   |   |   microsoft-windows-netfxcorecomp-dl.man
+    |   |   |   microsoft-windows-storagemigration-dl.man
+    |   |   |   microsoft-windows-tapisetup-dl.man
+    |   |   |   microsoft-windows-terminalservices-clientactivexcore-dl.man
+    |   |   |   microsoft-windows-wab-dl.man
+    |   |   |   microsoft-windows-wcfcorecomp-dl.man
+    |   |   |   microsoft.windows.com.base-dl.man
+    |   |   |   microsoft.windows.com.complus.setup.dl.man
+    |   |   |   msmq-dcom-dl.man
+    |   |   |   msmq-domain-ic-dl.man
+    |   |   |   msmq-http-dl.man
+    |   |   |   msmq-messagingcoreservice-dl.man
+    |   |   |   msmq-multicast-dl.man
+    |   |   |   msmq-routing-dl.man
+    |   |   |   msmq-triggers-dl.man
+    |   |   |   mup-dl.man
+    |   |   |   netfx-wcf-http-activation-dl.man
+    |   |   |   netfx-wcf-msmqactivation-registration-dl.man
+    |   |   |   netfx-wcf-pipeactivation-registration-dl.man
+    |   |   |   netfx-wcf-tcpactivation-registration-dl.man
+    |   |   |   netfx-wcf-tcpportsharing-dl.man
+    |   |   |   netfx3-dl.man
+    |   |   |   netfx4-wcf-client-dl.man
+    |   |   |   netfx4-wcf-extended-dl.man
+    |   |   |   netfx4clientcorecomp-dl.man
+    |   |   |   netlogon-dl.man
+    |   |   |   ntfs-dl.man
+    |   |   |   ntoskrnl-dl.man
+    |   |   |   odbc32dll-dl.man
+    |   |   |   partmgr-dl.man
+    |   |   |   printing-spooler-core-dl.man
+    |   |   |   printing-spooler-networkclient-dl.man
+    |   |   |   rights-management-client-v1-api-dl.man
+    |   |   |   rights-management-services-server-dl.man
+    |   |   |   rpc-http-dl.man
+    |   |   |   rpc-http_proxy-dl.man
+    |   |   |   rpc-local-dl.man
+    |   |   |   rpc-remote-dl.man
+    |   |   |   schannel-dl.man
+    |   |   |   schedsvc-dl.man
+    |   |   |   security-digest-dl.man
+    |   |   |   security-kerberos-dl.man
+    |   |   |   security-ntlm-dl.man
+    |   |   |   security-ntlm-lmc.man
+    |   |   |   shutdown-event-tracker-dl.man
+    |   |   |   smartcardsubsystem-dl.man
+    |   |   |   smbserver-dl.man
+    |   |   |   smss-dl.man
+    |   |   |   smtpsvc-admin-dl.man
+    |   |   |   smtpsvc-service-dl.man
+    |   |   |   speechcommon-dl.man
+    |   |   |   tabletpc-tabbtn-dl.man
+    |   |   |   tabletpcinputpanel-dl.man
+    |   |   |   tabletpcjournal-dl.man
+    |   |   |   tabletpcplatforminput-core-dl.man
+    |   |   |   terminalservices-appserver-dl.man
+    |   |   |   terminalservices-appserver-licensing-dl.man
+    |   |   |   terminalservices-drivers-dl.man
+    |   |   |   terminalservices-licenseserver-dl.man
+    |   |   |   terminalservices-localsessionmanager-dl.man
+    |   |   |   terminalservices-rdp-winstationextensions-dl.man
+    |   |   |   terminalservices-remoteconnectionmanager-dl.man
+    |   |   |   terminalservices-sessiondirectory-client-dl.man
+    |   |   |   terminalservices-sessiondirectory-server-dl.man
+    |   |   |   terminalservices-terminalservicesclient-dl.man
+    |   |   |   textservicesframework-migration-dl.man
+    |   |   |   video-tvvideocontrol-dl.man
+    |   |   |   volsnap-dl.man
+    |   |   |   wcf-http-activation-dl.man
+    |   |   |   wcf-http-activation-postapply-dl.man
+    |   |   |   wcf-nonhttp-activation-dl.man
+    |   |   |   web-services-for-management-core-dl.man
+    |   |   |   webenroll-dl.man
+    |   |   |   win32k-settings-dl.man
+    |   |   |   windowssearchengine-dl.man
+    |   |   |   winlogon-dl.man
+    |   |   |   wmi-core-dl.man
+    |   |   |   workstationservice-dl.man
+    |   |   |   
+    |   |   +---microsoft-activedirectory-webservices-dl
+    |   |   |       adwsmigrate.dll
+    |   |   |       
+    |   |   +---microsoft-windows-bluetooth-config
+    |   |   |       bthmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-com-complus-setup-dl
+    |   |   |       commig.dll
+    |   |   |       
+    |   |   +---microsoft-windows-com-dtc-setup-dl
+    |   |   |       msdtcstp.dll
+    |   |   |       
+    |   |   +---microsoft-windows-dhcpservermigplugin-dl
+    |   |   |       dhcpsrvmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-directoryservices-adam-dl
+    |   |   |       adammigrate.dll
+    |   |   |       
+    |   |   +---microsoft-windows-iasserver-migplugin
+    |   |   |       iasmigplugin.dll
+    |   |   |       iasmigreader.exe
+    |   |   |       
+    |   |   +---microsoft-windows-ie-clientnetworkprotocolimplementation-migration
+    |   |   |       wininetplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-internet-naming-service-runtime
+    |   |   |       winsplgn.dll
+    |   |   |       
+    |   |   +---microsoft-windows-msmq-messagingcoreservice
+    |   |   |       mqmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-networkbridge
+    |   |   |       bridgemigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-networkloadbalancing-core
+    |   |   |       nlbmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-rasconnectionmanager
+    |   |   |       cmmigr.dll
+    |   |   |       
+    |   |   +---microsoft-windows-rasserver-migplugin
+    |   |   |       rasmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-tapisetup
+    |   |   |       tapimigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-terminalservices-licenseserver
+    |   |   |       tlsmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-textservicesframework-migration-dl
+    |   |   |       chxmig.dll
+    |   |   |       imjpmig.dll
+    |   |   |       imkrmig.dll
+    |   |   |       msctfmig.dll
+    |   |   |       tabletextservicemig.dll
+    |   |   |       
+    |   |   +---microsoft-windows-unimodem-config
+    |   |   |       modemmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-winsock-core-infrastructure-upgrade
+    |   |   |       wsupgrade.dll
+    |   |   |       
+    |   |   +---microsoft-windows-wmi-core
+    |   |   |       wmimigrationplugin.dll
+    |   |   |       
+    |   |   \---networking-mpssvc-svc
+    |   |           icfupgd.dll
+    |   |           
+    |   +---etwproviders
+    |   |   |   actionqueueetw.dll
+    |   |   |   auditetw.dll
+    |   |   |   cmisetupetw.dll
+    |   |   |   etwproviderinstall.vbs
+    |   |   |   oobeldretw.dll
+    |   |   |   setupcletw.dll
+    |   |   |   setupetw.dll
+    |   |   |   setupugcetw.dll
+    |   |   |   sysprepetw.dll
+    |   |   |   windeployetw.dll
+    |   |   |   winsetupetw.dll
+    |   |   |   
+    |   |   \---zh-cn
+    |   |           actionqueueetw.dll.mui
+    |   |           
+    |   +---inf
+    |   |       setup.cfg
+    |   |       
+    |   +---migration
+    |   |   \---wtr
+    |   |           adminpack_en-us.inf
+    |   |           adminpack_en-us_noloc.inf
+    |   |           adobe_flash.inf
+    |   |           appmanwtr.inf
+    |   |           browserchoice_win7.inf
+    |   |           browserchoice_win8.inf
+    |   |           compattelemetry.inf
+    |   |           dtumig.inf
+    |   |           ftp_7.0.inf
+    |   |           ftp_7.5_en-us_noloc.inf
+    |   |           ftp_7.5_loc.inf
+    |   |           gwxmig.inf
+    |   |           powershell_en-us_noloc.inf
+    |   |           powershell_loc.inf
+    |   |           standardcollector.inf
+    |   |           unpmig.inf
+    |   |           webdav_7.0.inf
+    |   |           webdav_7.5_en-us_noloc.inf
+    |   |           webdav_7.5_loc.inf
+    |   |           
+    |   +---replacementmanifests
+    |   |   |   activedirectory-webservices-replacement.man
+    |   |   |   adsi-router-replacement.man
+    |   |   |   application-experience-program-compatibility-assistant-replacement.man
+    |   |   |   appmanmigration-replacement.man
+    |   |   |   appxalluserstore-replacement.man
+    |   |   |   appxdeploymentserver-replacement.man
+    |   |   |   audiommecore-mm-other-migration-replacement.man
+    |   |   |   authui-migration-replacement.man
+    |   |   |   authui-migration-win8-replacement.man
+    |   |   |   bisrv-replacement.man
+    |   |   |   bthmig-replacement.man
+    |   |   |   capi2_certs-repl.man
+    |   |   |   certificateenrollment-replacement.man
+    |   |   |   cliplicensemigration-replacement.man
+    |   |   |   cloudapreplacement.man
+    |   |   |   cloudexperiencehostonecore-replacement.man
+    |   |   |   codeintegrity-repl.man
+    |   |   |   commandprompt-win7-replacement.man
+    |   |   |   commandprompt-win8-replacement.man
+    |   |   |   contentdeliverymanager.utilities-replacement.man
+    |   |   |   coreos-repl.man
+    |   |   |   credential-manager-replacement.man
+    |   |   |   crypto_keys-repl.man
+    |   |   |   dataintegrityscan-replacement.man
+    |   |   |   dcb-repl.man
+    |   |   |   desktopux-replacement.man
+    |   |   |   deviceassociationframework-replacement.man
+    |   |   |   devicedirectory-devicedirectoryclient-desktop-replacement.man
+    |   |   |   deviceregistration-replacement.man
+    |   |   |   dhcpclientdll-repl.man
+    |   |   |   dhcpserver-tools-replacement.man
+    |   |   |   dhcpservermigplugin-rep.man
+    |   |   |   dhcpservermigpluginwin8-replacement.man
+    |   |   |   directaccessservermanagement-repl.man
+    |   |   |   directoryservices-adam-client-replacement.man
+    |   |   |   directoryservices-adam-tools-replacement.man
+    |   |   |   directoryservices-administrativecenter-replacement.man
+    |   |   |   directoryservices-domaincontroller-servercoreupg-replacement.man
+    |   |   |   directoryservices-domaincontroller-tools-replacement.man
+    |   |   |   directoryservices-sm-plugin.registration-replacement.man
+    |   |   |   displayconfigsettings_win7update.man
+    |   |   |   dmrcwin7replacement.man
+    |   |   |   dns-client-mw-replacement.man
+    |   |   |   dns-client-replacement.man
+    |   |   |   dns-server-role-replacement.man
+    |   |   |   dns-server-tools-replacement.man
+    |   |   |   dpapi_keys-repl.man
+    |   |   |   dsreg-replacement.man
+    |   |   |   edgemigrationplugin.man
+    |   |   |   edpnotify-replacement.man
+    |   |   |   elam-replacement.man
+    |   |   |   etw-core-replacement.man
+    |   |   |   eudcedit-replacement.man
+    |   |   |   explorer-repl.man
+    |   |   |   extensibleauthenticationprotocolhostservice-rep.man
+    |   |   |   failovercluster-core-wow64-rm.man
+    |   |   |   feclient-replacement-th.man
+    |   |   |   fidocredprov_dll_repl.man
+    |   |   |   fileserver-replacement.man
+    |   |   |   font-truetype-fontsregistrysettingsmigration-replacement.man
+    |   |   |   fonts-type1-replacement.man
+    |   |   |   fundisc-replacement.man
+    |   |   |   fveapi-replacement.man
+    |   |   |   gpbase-replacement.man
+    |   |   |   gpiobuttons-replacement.man
+    |   |   |   hal-repl.man
+    |   |   |   helpandsupport-replacement.man
+    |   |   |   http-replacement.man
+    |   |   |   hwvid-migration-replacement-2.man
+    |   |   |   identityserver-migration-replacement.man
+    |   |   |   identityserver-proxymigration-replacement.man
+    |   |   |   identitystore-replacement.man
+    |   |   |   iis-adminservice-rm.man
+    |   |   |   iis-appwarmup-rm.man
+    |   |   |   iis-ftpsvc-rm.man
+    |   |   |   iis-managementconsole-rm.man
+    |   |   |   iis-sharedlibraries-rm.man
+    |   |   |   iis-w3logsvc-rm.man
+    |   |   |   iis-w3svc-rm.man
+    |   |   |   ime-eashared-migration-replacement.man
+    |   |   |   international-core-replacement.man
+    |   |   |   international-timezones-replacement.man
+    |   |   |   internet-naming-service-runtime-rep.man
+    |   |   |   internet-naming-tools-replacement.man
+    |   |   |   ipv4ipv6coexistencemigration-net-replacement.man
+    |   |   |   kernel-pnp-repl.man
+    |   |   |   kernel-server-replacement.man
+    |   |   |   kernel32-replacement.man
+    |   |   |   kernel32-server-replacement.man
+    |   |   |   keyboardfilter-replacement.man
+    |   |   |   legacy-sapi-repl.man
+    |   |   |   mdm_migration-replacement.man
+    |   |   |   media-settings-migration-replacement.man
+    |   |   |   mfmpeg2srcsnk-migration-replacement.man
+    |   |   |   mfplat-migration-replacement.man
+    |   |   |   mfsrcsnk-migration-replacement.man
+    |   |   |   microsoft-activedirectory-powershell-replacement.man
+    |   |   |   microsoft-certificateauthority-enrollment-serverupgrade-replacement.man
+    |   |   |   microsoft-certificateservices-ca-serverupgrade-replacement.man
+    |   |   |   microsoft-certificateservices-mscep-serverupgrade-replacement.man
+    |   |   |   microsoft-certificateservices-ocsp-serverupgrade-replacement.man
+    |   |   |   microsoft-certificateservices-policy-serverupgrade-replacement.man
+    |   |   |   microsoft-certificateservices-webenrollment-serverupgrade-replacement.man
+    |   |   |   microsoft-hyper-v-client-migration-replacement.man
+    |   |   |   microsoft-hyper-v-drivers-migration-replacement.man
+    |   |   |   microsoft-hyper-v-migration-replacement.man
+    |   |   |   microsoft-onecore-tiledatarepository-replacement.man
+    |   |   |   microsoft-windows-advertisingid-replacement.man
+    |   |   |   microsoft-windows-container-manager.man
+    |   |   |   microsoft-windows-credentialmanagementrole-replacement.man
+    |   |   |   microsoft-windows-credentialmanagementrole-tools-replacement.man
+    |   |   |   microsoft-windows-deployment-services-admin-pack-replacement.man
+    |   |   |   microsoft-windows-deviceaccess-replacement.man
+    |   |   |   microsoft-windows-enterprisemgmt-replacement.man
+    |   |   |   microsoft-windows-errorreportingcore-replacement.man
+    |   |   |   microsoft-windows-errorreportingfaults-replacement.man
+    |   |   |   microsoft-windows-failovercluster-adminpak-replacement.man
+    |   |   |   microsoft-windows-fax-service-replacement.man
+    |   |   |   microsoft-windows-feedback-service-replacement.man
+    |   |   |   microsoft-windows-flighting-settings.replacement.man
+    |   |   |   microsoft-windows-geolocation-replacement.man
+    |   |   |   microsoft-windows-identity-foundation-migration-replacement.man
+    |   |   |   microsoft-windows-ie-adminkitbranding-repl.man
+    |   |   |   microsoft-windows-ie-clientnetworkprotocolimplementation-repl.man
+    |   |   |   microsoft-windows-ie-internetexplorer-repl-2.man
+    |   |   |   microsoft-windows-ie-internetexplorer-repl.man
+    |   |   |   microsoft-windows-ie-pdm-replacement.man
+    |   |   |   microsoft-windows-netfx35cdfcomp-replacement.man
+    |   |   |   microsoft-windows-netfxcorecomp-repl.man
+    |   |   |   microsoft-windows-network-setup-replacement.man
+    |   |   |   microsoft-windows-networkbridge-replacement.man
+    |   |   |   microsoft-windows-offlinefiles-replacement.man
+    |   |   |   microsoft-windows-parentalcontrolssettings-replacement.man
+    |   |   |   microsoft-windows-powershell-replacement.man
+    |   |   |   microsoft-windows-powershell-ws08-replacement.man
+    |   |   |   microsoft-windows-powershellwebaccess-commands-powershell-migration-replacement.man
+    |   |   |   microsoft-windows-rmapi-replacement.man
+    |   |   |   microsoft-windows-securestartup-filterdriver-replacement.man
+    |   |   |   microsoft-windows-security-ngc-credprov-replacement.man
+    |   |   |   microsoft-windows-security-ngc-ctnrsvc-repl.man
+    |   |   |   microsoft-windows-servermanager-rsat-featuretools-replacement.man
+    |   |   |   microsoft-windows-servermanager-rsat-replacement.man
+    |   |   |   microsoft-windows-servermanager-rsat-roletools-replacement.man
+    |   |   |   microsoft-windows-servermanager-shell-replacement.man
+    |   |   |   microsoft-windows-services-targetedcontent-replacement.man
+    |   |   |   microsoft-windows-slb-mux-replacement.man
+    |   |   |   microsoft-windows-smb1-replacement.man
+    |   |   |   microsoft-windows-softwareinventorylogging-scheduledtasks-replacement.man
+    |   |   |   microsoft-windows-storagemigration-od-replacement.man
+    |   |   |   microsoft-windows-storagemigration-replacement.man
+    |   |   |   microsoft-windows-sxs-replacement.man
+    |   |   |   microsoft-windows-virtualization-vmswitch-migration-replacement.man
+    |   |   |   microsoft-windows-wcfcorecomp-replacement.man
+    |   |   |   microsoft-windows-workstationservice-replacement.man
+    |   |   |   microsoft.windows.com.complus.setup-replacement.man
+    |   |   |   microsoft.windows.com.dtc.setup-replacement.man
+    |   |   |   microsoftwindowsdefragcore-replacement.man
+    |   |   |   mmdeviceapi-migration-replacement.man
+    |   |   |   mmsys-migration-replacement.man
+    |   |   |   mpr-replacement.man
+    |   |   |   msmpeg2vdec-migration-replacement.man
+    |   |   |   muisettings-replacement.man
+    |   |   |   mup-replacement.man
+    |   |   |   ndis-repl.man
+    |   |   |   netfx-wcf-http-activation-replacement.man
+    |   |   |   netfx-wcf-msmqactivation-registration-replacement.man
+    |   |   |   netfx-wcf-pipeactivation-registration-replacement.man
+    |   |   |   netfx-wcf-tcpactivation-registration-replacement.man
+    |   |   |   netfx3-replacement.man
+    |   |   |   netfx4-policy-replacement.man
+    |   |   |   netfx4-replacement.man
+    |   |   |   netfx4-wcf-client-replacement.man
+    |   |   |   netfx4-wcf-extended-replacement.man
+    |   |   |   netfx4clientcorecomp-replacement.man
+    |   |   |   networking-mpssvc-svc.replacement.man
+    |   |   |   networkloadbalancingmanagementclient-replacement.man
+    |   |   |   networkloadbalancingmanagementheadlessserver-replacement.man
+    |   |   |   networkprofile-replacement.man
+    |   |   |   networksecurity.replacement.man
+    |   |   |   nfs-admincore-repl.man
+    |   |   |   nfs-clientcore-repl.man
+    |   |   |   nfs-servercore-repl.man
+    |   |   |   nfs-servercoreupg-clientcore-repl.man
+    |   |   |   nfs-servercoreupg-servercore-repl.man
+    |   |   |   ngclocalaccountmigplugin-replacement.man
+    |   |   |   ngcpopkeysrv_dll-repl.man
+    |   |   |   nlasvc-replace.man
+    |   |   |   notepad-repl.man
+    |   |   |   npas-role-replacement.man
+    |   |   |   npsui-replacement.man
+    |   |   |   odbc32dll-repl.man
+    |   |   |   onecore_speechcommon-rep.man
+    |   |   |   pcpksp_dll-repl.man
+    |   |   |   peerdist-client-migration-replacement.man
+    |   |   |   peerdist-server-migration-replacement.man
+    |   |   |   peerdist-upgrade-replacement.man
+    |   |   |   peertopeergrouping-replacement.man
+    |   |   |   performancecounterinfrastructurenonexecutable-replacement.man
+    |   |   |   personalizationcsp-repl.man
+    |   |   |   pnpmigration-replacement.man
+    |   |   |   posproviders-replacement.man
+    |   |   |   power-energyestimationengine-replacement.man
+    |   |   |   powercpl-replacement.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v1019h1.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v1119h1.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v12vb.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v4rs1.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v5rs1.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v6rs2.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v7rs2.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v8rs4.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-v9rs5.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-vista.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-win10.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-win7.man
+    |   |   |   powermanagement-powerpolicy-definitions-replacement-win8.man
+    |   |   |   powermanagement-powerpolicy-migration-replacement.man
+    |   |   |   ppipolicies-encryption-replacement.man
+    |   |   |   ppipolicies-general-replacement.man
+    |   |   |   ppipolicies-miracast-replacement.man
+    |   |   |   ppipolicies-power-replacement.man
+    |   |   |   printing-localprinting-replacement.man
+    |   |   |   printing-server-foundation-features-upgrade.man
+    |   |   |   printing-servercore-wow64-rm.man
+    |   |   |   printing-spooler-core-replacement.man
+    |   |   |   processmodel-cpt-rm.man
+    |   |   |   profsvcreplacement.man
+    |   |   |   propsys-replacement.man
+    |   |   |   quickactions-windows-replacement.man
+    |   |   |   rasapi-repl.man
+    |   |   |   rasbase-rassstp-repl.man
+    |   |   |   rasbase-repl.man
+    |   |   |   rasddm-repl.man
+    |   |   |   rasmanservice-repl.man
+    |   |   |   rasmanservice-replv2.man
+    |   |   |   rasmanservice-replv3.man
+    |   |   |   rasppp-repl.man
+    |   |   |   rasrqs-repl.man
+    |   |   |   rasserver-repl.man
+    |   |   |   rasserveradmintools-replacement.man
+    |   |   |   refs-replacement.man
+    |   |   |   refs-v1-replacement.man
+    |   |   |   retaildemo.deployment.replacement.man
+    |   |   |   rights-management-client-v1-api-replacement.man
+    |   |   |   rights-management-services-admin-tools-replacement.man
+    |   |   |   rights-management-services-management-tools-replacement.man
+    |   |   |   rights-management-services-role-replacement.man
+    |   |   |   schedsvc-replacement.man
+    |   |   |   security-spp-migration-replacement.man
+    |   |   |   securitycenter-core-replacement.man
+    |   |   |   servercore-wow64-rm.man
+    |   |   |   settingsync-repl.man
+    |   |   |   sharedpccsp-repl.man
+    |   |   |   sharemgmt-rsatclient-tools-replacement.man
+    |   |   |   shmig-replacement.man
+    |   |   |   signalmanager-replacement.man
+    |   |   |   signature-replacement.man
+    |   |   |   smartcardsubsystem-repl.man
+    |   |   |   snmp-gui-tools-replacement.man
+    |   |   |   sounds-migration-replacement.man
+    |   |   |   spectrum-replacement.man
+    |   |   |   srm-cbadriver-repl.man
+    |   |   |   srm-datascrndriver-repl.man
+    |   |   |   srm-infrastructure-repl.man
+    |   |   |   srm-management-repl.man
+    |   |   |   srm-quotadriver-repl.man
+    |   |   |   srm-service-repl.man
+    |   |   |   srm-service-reports-repl.man
+    |   |   |   srm-ui-repl.man
+    |   |   |   srumon-replacement.man
+    |   |   |   starttiledata-replacement.man
+    |   |   |   sysdm-replacement.man
+    |   |   |   sysmain-replacement.man
+    |   |   |   systemsettingsthreshold-replacement.man
+    |   |   |   tabletpcplatforminput-core-replacement.man
+    |   |   |   tcblaunch-replacement.man
+    |   |   |   tcpip-replacement.man
+    |   |   |   terminalservices-appserver-licensing-replacement.man
+    |   |   |   terminalservices-gateway-package-r-replacement.man
+    |   |   |   terminalservices-gateway-package-replacement.man
+    |   |   |   terminalservices-gateway-ui-package-r-replacement.man
+    |   |   |   terminalservices-gateway-ui-package-replacement.man
+    |   |   |   terminalservices-licenseserver-replacement.man
+    |   |   |   terminalservices-localsessionmanager-replacement.man
+    |   |   |   terminalservices-publishing-wmiprovider-replacement.man
+    |   |   |   terminalservices-rapweb-replacement.man
+    |   |   |   terminalservices-rapwebpart-replacement.man
+    |   |   |   terminalservices-rdp-winstationextensions-replacement.man
+    |   |   |   terminalservices-remoteconnectionmanager-replacement.man
+    |   |   |   terminalservices-role-package-r-replacement.man
+    |   |   |   terminalservices-role-package-replacement.man
+    |   |   |   terminalservices-sessiondirectory-client-replacement.man
+    |   |   |   terminalservices-sessiondirectory-server-replacement.man
+    |   |   |   terminalservices-tsv-vmhostagent-replacement.man
+    |   |   |   tetheringservice-repl.man
+    |   |   |   textservicesframework-migration-replacement.man
+    |   |   |   time-service-replacement.man
+    |   |   |   tpmdriverwmi-replacement.man
+    |   |   |   tpmvsc-repl.man
+    |   |   |   twinui-replacement.man
+    |   |   |   udfs-replacement.man
+    |   |   |   updateservices-common-replacement.man
+    |   |   |   updateservices-services-replacement.man
+    |   |   |   upnpdevicehost-replacement.man
+    |   |   |   upnpdevicehost-server-replacement.man
+    |   |   |   upnpssdp-replacement.man
+    |   |   |   upnpssdp-server-replacement.man
+    |   |   |   usbmigration-replacement.man
+    |   |   |   video-tvvideocontrol-replacement.man
+    |   |   |   virtualdiskservice-repl.man
+    |   |   |   volsnap-repl.man
+    |   |   |   vssservice-repl.man
+    |   |   |   wbiosrvc-replacement.man
+    |   |   |   wcf-http-activation-replacement.man
+    |   |   |   wcf-nonhttp-activation-replacement.man
+    |   |   |   web-services-for-management-core-replacement.man
+    |   |   |   webdavredir-clientonly-replacement.man
+    |   |   |   webdavredir-serveronly-replacement.man
+    |   |   |   wia-coreservices-replacement.man
+    |   |   |   wicamigrationav-rl.man
+    |   |   |   wid8-migration.man
+    |   |   |   win32k-settings-repl.man
+    |   |   |   windows-senseclient-service-rep.man
+    |   |   |   windows.cortana.desktop-repl.man
+    |   |   |   windows.holographic.displaythrottling-replacement.man
+    |   |   |   windows.media-migration-replacement.man
+    |   |   |   windows.sharedpc.accountmanager-repl.man
+    |   |   |   windows.ui.shell-repl.man
+    |   |   |   windowspushnotifications-platform-library-replacement.man
+    |   |   |   windowssearchengine-replacement.man
+    |   |   |   windowsstoreapi-replacement.man
+    |   |   |   windowsupdate-replacement.man
+    |   |   |   windowswebapphost-replacement.man
+    |   |   |   winlogon-replacement.man
+    |   |   |   winmde-migration-replacement.man
+    |   |   |   winnat-replacement.man
+    |   |   |   winsat-cmi-replacement.man
+    |   |   |   wlidsvc.vista-win7.man
+    |   |   |   wmdmigration-replacement.man
+    |   |   |   wmi-core-replacement.man
+    |   |   |   wmiacpi-replacement.man
+    |   |   |   wmpnsservice-migration-replacement.man
+    |   |   |   wmpplayer-migration-replacement.man
+    |   |   |   wsinfra-other-mw-replacement.man
+    |   |   |   wsinfra-upgrade-replacement.man
+    |   |   |   wwansvc-servercfg-repl.man
+    |   |   |   
+    |   |   +---hwvid-migration-2
+    |   |   |       hwvidmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-activedirectory-webservices
+    |   |   |       adwsmigrate.dll
+    |   |   |       
+    |   |   +---microsoft-client-license-platform-service-migration
+    |   |   |       clipmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-edge-migration-plugin
+    |   |   |       edge.dat
+    |   |   |       edgemigrationplugin.dll
+    |   |   |       edgeupdate.dat
+    |   |   |       
+    |   |   +---microsoft-onecore-tiledatarepository
+    |   |   |       tilestoremigrationplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-appmanagement-migration
+    |   |   |       appmanmigrationplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-appx-deployment-server
+    |   |   |       appxprovisioning.xml
+    |   |   |       appxupgrademigrationplugin.dll
+    |   |   |       microsoft.windows.secondarytileexperience_10.0.0.0_neutral__cw5n1h2txyewy.xml
+    |   |   |       windows.miracastview_6.3.0.0_neutral_neutral_cw5n1h2txyewy.xml
+    |   |   |       
+    |   |   +---microsoft-windows-audio-mmecore-other
+    |   |   |       audmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-bth-user
+    |   |   |       bthmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-com-complus-setup
+    |   |   |       commig.dll
+    |   |   |       
+    |   |   +---microsoft-windows-deviceassociationframeworkmigration
+    |   |   |       dafmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-directoryservices-adam-client
+    |   |   |       adammigrate.dll
+    |   |   |       
+    |   |   +---microsoft-windows-iis-rm
+    |   |   |       iismig.dll
+    |   |   |       
+    |   |   +---microsoft-windows-mapscontrol-migration
+    |   |   |       mapsmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-mup
+    |   |   |       mupmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-network-setup
+    |   |   |       netsetupapi.dll
+    |   |   |       netsetupengine.dll
+    |   |   |       networkbindingenginemigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-offlinefiles-core
+    |   |   |   |   cscmig.dll
+    |   |   |   |   
+    |   |   |   \---zh-cn
+    |   |   |           cscmig.dll.mui
+    |   |   |           
+    |   |   +---microsoft-windows-pnpmigration
+    |   |   |       pnpmig.dll
+    |   |   |       pnpmig.inf
+    |   |   |       
+    |   |   +---microsoft-windows-rasapi-mig
+    |   |   |       pbkmigr.dll
+    |   |   |       
+    |   |   +---microsoft-windows-rasserver-migplugin
+    |   |   |       rasmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-security-ngc-localaccountmigplugin
+    |   |   |       ngclocalaccountmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-shmig
+    |   |   |   |   shmig.dll
+    |   |   |   |   
+    |   |   |   \---zh-cn
+    |   |   |           shmig.dll.mui
+    |   |   |           
+    |   |   +---microsoft-windows-sxs
+    |   |   |   |   sxsmigplugin.dll
+    |   |   |   |   
+    |   |   |   \---zh-cn
+    |   |   |           sxsmigplugin.dll.mui
+    |   |   |           
+    |   |   +---microsoft-windows-tcpip
+    |   |   |       netiomig.dll
+    |   |   |       
+    |   |   +---microsoft-windows-terminalservices-appserver-licensing
+    |   |   |       tsmigplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-terminalservices-licenseserver
+    |   |   |       tlsrepplugin.dll
+    |   |   |       
+    |   |   +---microsoft-windows-textservicesframework-migration
+    |   |   |       chxmig.dll
+    |   |   |       imjpmig.dll
+    |   |   |       imkrmig.dll
+    |   |   |       msctfmig.dll
+    |   |   |       tabletextservicemig.dll
+    |   |   |       
+    |   |   +---microsoft-windows-virtualization-vmswitch
+    |   |   |       vmswitchmigrationplugin.dll
+    |   |   |       
+    |   |   +---networkbridge
+    |   |   |       bridgemigplugin.dll
+    |   |   |       
+    |   |   +---networking-mpssvc-svc
+    |   |   |       icfupgd.dll
+    |   |   |       
+    |   |   +---printing-localprinting-replacement
+    |   |   |       apmonportmig.dll
+    |   |   |       usbportmig.dll
+    |   |   |       
+    |   |   +---sppmig
+    |   |   |       sppmig.dll
+    |   |   |       
+    |   |   +---windowssearchengine
+    |   |   |       wsearchmigplugin.dll
+    |   |   |       
+    |   |   \---wpc
+    |   |           wpcmigration.downlevel.dll
+    |   |           wpcmigration.uplevel.dll
+    |   |           
+    |   +---sxs
+    |   |       Microsoft-Windows-InternetExplorer-Optional-Package~31bf3856ad364e35~amd64~zh-CN~.cab
+    |   |       microsoft-windows-internetexplorer-optional-package~31bf3856ad364e35~amd64~~.cab
+    |   |       microsoft-windows-netfx3-ondemand-package~31bf3856ad364e35~amd64~~.cab
+    |   |       
+    |   +---uup
+    |   |   \---metadata
+    |   |           desktoptargetcompdb_neutral.xml.cab
+    |   |           
+    |   +---vista
+    |   |       webservices.dll
+    |   |       
+    |   +---xp
+    |   |       webservices.dll
+    |   |       
+    |   \---zh-cn
+    |           acres.dll.mui
+    |           actionqueue.dll.mui
+    |           appraiser.dll.mui
+    |           appraiserwc.dll.mui
+    |           arunres.dll.mui
+    |           cmisetup.dll.mui
+    |           compatctrl.dll.mui
+    |           compatresources.dll.mui
+    |           compres.dll.mui
+    |           credits.rtf
+    |           dism.exe.mui
+    |           dismapi.dll.mui
+    |           dismcore.dll.mui
+    |           dismprov.dll.mui
+    |           erofflps.txt
+    |           folderprovider.dll.mui
+    |           imagingprovider.dll.mui
+    |           input.dll.mui
+    |           logprovider.dll.mui
+    |           mediasetupuimgr.dll.mui
+    |           migres.dll.mui
+    |           nlsbres.dll.mui
+    |           oobe_help_opt_in_details.rtf
+    |           pnpibs.dll.mui
+    |           privacy.rtf
+    |           reagent.adml
+    |           reagent.dll.mui
+    |           rollback.exe.mui
+    |           setup.exe.mui
+    |           setupcompat.dll.mui
+    |           setupcore.dll.mui
+    |           setuperror.exe.mui
+    |           setupplatform.exe.mui
+    |           setupprep.exe.mui
+    |           setup_help_upgrade_or_custom.rtf
+    |           setup_help_whattokeep.rtf
+    |           smiengine.dll.mui
+    |           spwizres.dll.mui
+    |           upgloader.dll.mui
+    |           uxlibres.dll.mui
+    |           vhdprovider.dll.mui
+    |           vofflps.rtf
+    |           w32uires.dll.mui
+    |           wdsclient.dll.mui
+    |           wdsimage.dll.mui
+    |           wimprovider.dll.mui
+    |           windlp.dll.mui
+    |           winsetup.dll.mui
+    |           
+    \---support
+        \---logging
+            |   actionqueueetw.dll
+            |   auditetw.dll
+            |   cmisetupetw.dll
+            |   etwproviderinstall.vbs
+            |   microsoft-windows-actionqueue-instrumentation.man
+            |   microsoft-windows-audit-instrumentation.man
+            |   microsoft-windows-cmisetup-instrumentation.man
+            |   microsoft-windows-oobeldr-instrumentation.man
+            |   microsoft-windows-setup-events.man
+            |   microsoft-windows-setup-instrumentation.man
+            |   microsoft-windows-setupcl-instrumentation.man
+            |   microsoft-windows-setupugc-instrumentation.man
+            |   microsoft-windows-sysprep-instrumentation.man
+            |   microsoft-windows-windeploy-instrumentation.man
+            |   oobeldretw.dll
+            |   setupcletw.dll
+            |   setupetw.dll
+            |   setupugcetw.dll
+            |   sysprepetw.dll
+            |   windeployetw.dll
+            |   winsetupetw.dll
+            |   
+            \---zh-cn
+                    actionqueueetw.dll.mui
+                    

@@ -1,0 +1,758 @@
+/**
+ * QEntL内存保护模块
+ * QuantumGene: QG-KERNEL-MEMPROT-H8I9-1714187425
+ * EntanglementStrength: 0.91
+ */
+
+quantum_program MemoryProtection {
+    metadata {
+        name: "QEntL内存保护器",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的内存保护模块，提供访问控制和内存隔离",
+        quantum_gene: "QG-KERNEL-MEMPROT-H8I9-1714187425",
+        entanglement_strength: 0.91
+    }
+
+    state {
+        initialized: false,
+        kernel_reference: null,
+        
+        // 保护位定义
+        protection_flags: {
+            READ: 1,           // 读权限
+            WRITE: 2,          // 写权限
+            EXECUTE: 4,        // 执行权限
+            QUANTUM: 8,        // 量子访问权限
+            USER: 16,          // 用户态可访问
+            KERNEL: 32,        // 内核态可访问
+            SHARED: 64,        // 共享内存
+            COHERENT: 128,     // 量子相干性保护
+            ENTANGLED: 256,    // 量子纠缠保护
+            COPY_ON_WRITE: 512 // 写时复制
+        },
+        
+        // 内存段类型
+        segment_types: {
+            CODE: 0,           // 代码段
+            DATA: 1,           // 数据段
+            HEAP: 2,           // 堆段
+            STACK: 3,          // 栈段
+            SHARED: 4,         // 共享段
+            QUANTUM: 5,        // 量子段
+            DEVICE: 6,         // 设备映射段
+            KERNEL: 7          // 内核段
+        },
+        
+        // 内存映射表
+        memory_maps: {},
+        
+        // 页表
+        page_tables: {},
+        
+        // 异常处理器
+        fault_handlers: {
+            segmentation_fault: null,
+            write_protection: null,
+            quantum_access_violation: null,
+            page_fault: null
+        },
+        
+        // 访问控制矩阵
+        access_control_matrix: {},
+        
+        // 权限检查缓存
+        permission_cache: {},
+        
+        // 违规访问日志
+        violation_log: [],
+        
+        // 统计信息
+        statistics: {
+            permission_checks: 0,
+            granted_accesses: 0,
+            denied_accesses: 0,
+            page_faults: 0,
+            segmentation_faults: 0,
+            write_protection_violations: 0,
+            quantum_access_violations: 0
+        }
+    }
+
+    // 初始化内存保护系统
+    initialize(kernel_ref) {
+        if (this.initialized) {
+            kernel_log("内存保护系统已经初始化");
+            return true;
+        }
+
+        kernel_log("初始化内存保护系统...");
+        
+        // 保存内核引用
+        this.kernel_reference = kernel_ref;
+        
+        // 注册默认异常处理器
+        this.register_default_handlers();
+        
+        this.initialized = true;
+        kernel_log("内存保护系统初始化完成");
+        
+        return true;
+    }
+
+    // 注册默认异常处理器
+    register_default_handlers() {
+        kernel_log("注册默认内存异常处理器...");
+        
+        this.fault_handlers.segmentation_fault = this.default_segmentation_fault_handler;
+        this.fault_handlers.write_protection = this.default_write_protection_handler;
+        this.fault_handlers.quantum_access_violation = this.default_quantum_access_violation_handler;
+        this.fault_handlers.page_fault = this.default_page_fault_handler;
+        
+        kernel_log("默认内存异常处理器注册完成");
+    }
+
+    // 创建内存映射
+    create_memory_map(pid) {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        kernel_log(`为进程${pid}创建内存映射表`);
+        
+        // 检查是否已经存在
+        if (this.memory_maps[pid]) {
+            kernel_log(`警告：进程${pid}的内存映射表已存在`);
+            return { success: true, memory_map: this.memory_maps[pid] };
+        }
+        
+        // 创建新的内存映射表
+        this.memory_maps[pid] = {
+            pid: pid,
+            segments: [],
+            page_table_root: null,
+            creation_time: Date.now(),
+            last_update: Date.now()
+        };
+        
+        // 创建页表
+        this.create_page_table(pid);
+        
+        kernel_log(`进程${pid}的内存映射表创建成功`);
+        
+        return { success: true, memory_map: this.memory_maps[pid] };
+    }
+
+    // 创建页表
+    create_page_table(pid) {
+        kernel_log(`为进程${pid}创建页表`);
+        
+        // 在实际系统中，这里会分配物理内存，创建页目录和页表
+        // 这里简化为创建一个空对象
+        this.page_tables[pid] = {
+            directory: {},
+            tables: {}
+        };
+        
+        // 设置内存映射表的页表根
+        if (this.memory_maps[pid]) {
+            this.memory_maps[pid].page_table_root = `pgdir_${pid}`;
+        }
+        
+        kernel_log(`进程${pid}的页表创建成功`);
+    }
+
+    // 添加内存段
+    add_segment(pid, address, size, type, protection) {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        // 检查进程内存映射表是否存在
+        if (!this.memory_maps[pid]) {
+            const create_result = this.create_memory_map(pid);
+            if (!create_result.success) {
+                return create_result;
+            }
+        }
+        
+        kernel_log(`为进程${pid}添加内存段：类型=${this.get_segment_type_name(type)}, 地址=0x${address.toString(16)}, 大小=${size}`);
+        
+        // 处理保护标志
+        const protect_flags = this.process_protection_flags(protection);
+        
+        // 创建新的段记录
+        const segment = {
+            address: address,
+            size: size,
+            end: address + size - 1,
+            type: type,
+            protection: protect_flags,
+            creation_time: Date.now(),
+            name: protection.name || this.get_segment_type_name(type),
+            mapped_file: protection.mapped_file || null,
+            file_offset: protection.file_offset || 0
+        };
+        
+        // 将段添加到内存映射表
+        this.memory_maps[pid].segments.push(segment);
+        this.memory_maps[pid].last_update = Date.now();
+        
+        // 更新页表映射
+        this.map_segment_to_pages(pid, segment);
+        
+        kernel_log(`进程${pid}的内存段添加成功`);
+        
+        return { success: true, segment: segment };
+    }
+
+    // 处理保护标志
+    process_protection_flags(protection) {
+        let flags = 0;
+        
+        if (!protection) {
+            // 默认为只读
+            return this.protection_flags.READ | this.protection_flags.USER;
+        }
+        
+        if (protection.read) {
+            flags |= this.protection_flags.READ;
+        }
+        
+        if (protection.write) {
+            flags |= this.protection_flags.WRITE;
+        }
+        
+        if (protection.execute) {
+            flags |= this.protection_flags.EXECUTE;
+        }
+        
+        if (protection.quantum) {
+            flags |= this.protection_flags.QUANTUM;
+        }
+        
+        if (protection.user !== false) {
+            flags |= this.protection_flags.USER;
+        }
+        
+        if (protection.kernel) {
+            flags |= this.protection_flags.KERNEL;
+        }
+        
+        if (protection.shared) {
+            flags |= this.protection_flags.SHARED;
+        }
+        
+        if (protection.coherent) {
+            flags |= this.protection_flags.COHERENT;
+        }
+        
+        if (protection.entangled) {
+            flags |= this.protection_flags.ENTANGLED;
+        }
+        
+        if (protection.copy_on_write) {
+            flags |= this.protection_flags.COPY_ON_WRITE;
+        }
+        
+        return flags;
+    }
+
+    // 获取段类型名称
+    get_segment_type_name(type) {
+        for (const name in this.segment_types) {
+            if (this.segment_types[name] === type) {
+                return name;
+            }
+        }
+        return "UNKNOWN";
+    }
+
+    // 将段映射到页表
+    map_segment_to_pages(pid, segment) {
+        // 检查页表是否存在
+        if (!this.page_tables[pid]) {
+            this.create_page_table(pid);
+        }
+        
+        kernel_log(`将进程${pid}的内存段映射到页表：地址范围=0x${segment.address.toString(16)}-0x${segment.end.toString(16)}`);
+        
+        // 获取页大小
+        const page_size = 4096; // 默认4KB页
+        
+        // 计算起始页和结束页
+        const start_page = Math.floor(segment.address / page_size);
+        const end_page = Math.floor(segment.end / page_size);
+        
+        // 依次映射每一页
+        for (let page_num = start_page; page_num <= end_page; page_num++) {
+            const virtual_address = page_num * page_size;
+            
+            // 在真实系统中，这里会为每个虚拟页分配物理页框，并建立映射
+            // 这里简化为记录映射信息
+            this.page_tables[pid].tables[virtual_address] = {
+                virtual_address: virtual_address,
+                physical_address: virtual_address, // 简化：假设物理地址等于虚拟地址
+                protection: segment.protection,
+                segment_type: segment.type,
+                present: true,
+                accessed: false,
+                dirty: false
+            };
+        }
+        
+        kernel_log(`进程${pid}的内存段已映射到页表，映射了${end_page - start_page + 1}页`);
+    }
+
+    // 更改内存段保护
+    protect_segment(pid, address, size, protection) {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        // 检查进程内存映射表是否存在
+        if (!this.memory_maps[pid]) {
+            kernel_log(`错误：进程${pid}的内存映射表不存在`);
+            return { success: false, error: "进程内存映射表不存在" };
+        }
+        
+        kernel_log(`修改进程${pid}内存段保护：地址=0x${address.toString(16)}, 大小=${size}`);
+        
+        // 查找相关的段
+        const segments = this.find_segments_in_range(pid, address, address + size - 1);
+        
+        if (segments.length === 0) {
+            kernel_log(`错误：在进程${pid}中找不到地址范围内的内存段`);
+            return { success: false, error: "找不到指定地址范围内的内存段" };
+        }
+        
+        // 处理保护标志
+        const protect_flags = this.process_protection_flags(protection);
+        
+        // 更新每个相关段的保护
+        for (const segment of segments) {
+            // 如果段完全包含在指定范围内，直接更新整个段
+            if (segment.address >= address && segment.end <= address + size - 1) {
+                segment.protection = protect_flags;
+            } 
+            // 如果段部分包含在范围内，可能需要拆分段（这里简化为更新整个段）
+            else {
+                segment.protection = protect_flags;
+            }
+            
+            // 更新页表映射的保护
+            this.update_page_protection(pid, segment.address, segment.size, protect_flags);
+        }
+        
+        // 更新内存映射表的最后更新时间
+        this.memory_maps[pid].last_update = Date.now();
+        
+        // 清除此进程的权限缓存
+        delete this.permission_cache[pid];
+        
+        kernel_log(`进程${pid}的内存段保护已更新`);
+        
+        return { success: true };
+    }
+
+    // 更新页表中的页保护
+    update_page_protection(pid, address, size, protection) {
+        // 检查页表是否存在
+        if (!this.page_tables[pid]) {
+            return;
+        }
+        
+        // 获取页大小
+        const page_size = 4096;
+        
+        // 计算起始页和结束页
+        const start_page = Math.floor(address / page_size);
+        const end_page = Math.floor((address + size - 1) / page_size);
+        
+        // 更新每一页的保护
+        for (let page_num = start_page; page_num <= end_page; page_num++) {
+            const virtual_address = page_num * page_size;
+            
+            if (this.page_tables[pid].tables[virtual_address]) {
+                this.page_tables[pid].tables[virtual_address].protection = protection;
+            }
+        }
+    }
+
+    // 在指定范围内查找内存段
+    find_segments_in_range(pid, start, end) {
+        const result = [];
+        
+        if (!this.memory_maps[pid]) {
+            return result;
+        }
+        
+        // 遍历进程的所有内存段
+        for (const segment of this.memory_maps[pid].segments) {
+            // 检查段是否与指定范围重叠
+            if (segment.address <= end && segment.end >= start) {
+                result.push(segment);
+            }
+        }
+        
+        return result;
+    }
+
+    // 检查内存访问权限
+    check_access(pid, address, size, access_type) {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        // 更新统计
+        this.statistics.permission_checks++;
+        
+        // 检查缓存
+        const cache_key = `${pid}_${address}_${access_type}`;
+        if (this.permission_cache[cache_key]) {
+            return this.permission_cache[cache_key];
+        }
+        
+        // 检查进程内存映射表是否存在
+        if (!this.memory_maps[pid]) {
+            kernel_log(`错误：进程${pid}的内存映射表不存在`);
+            this.statistics.denied_accesses++;
+            return { success: false, error: "进程内存映射表不存在" };
+        }
+        
+        // 查找相关的段
+        const segments = this.find_segments_in_range(pid, address, address + size - 1);
+        
+        if (segments.length === 0) {
+            kernel_log(`错误：进程${pid}尝试访问未映射的内存地址0x${address.toString(16)}`);
+            this.statistics.denied_accesses++;
+            this.statistics.segmentation_faults++;
+            
+            // 记录违规访问
+            this.log_violation(pid, address, size, access_type, "SEGMENTATION_FAULT");
+            
+            // 调用段错误处理器
+            if (this.fault_handlers.segmentation_fault) {
+                this.fault_handlers.segmentation_fault(pid, address, size, access_type);
+            }
+            
+            return { success: false, error: "段错误：访问未映射的内存" };
+        }
+        
+        // 检查每个相关段的权限
+        for (const segment of segments) {
+            const result = this.check_segment_permission(segment, access_type);
+            if (!result.success) {
+                // 更新统计
+                this.statistics.denied_accesses++;
+                
+                // 记录违规访问
+                this.log_violation(pid, address, size, access_type, result.violation_type);
+                
+                // 调用相应的异常处理器
+                if (result.violation_type === "WRITE_PROTECTION" && this.fault_handlers.write_protection) {
+                    this.fault_handlers.write_protection(pid, address, size, access_type);
+                } else if (result.violation_type === "QUANTUM_ACCESS_VIOLATION" && this.fault_handlers.quantum_access_violation) {
+                    this.fault_handlers.quantum_access_violation(pid, address, size, access_type);
+                }
+                
+                return result;
+            }
+        }
+        
+        // 访问允许
+        this.statistics.granted_accesses++;
+        
+        // 缓存结果
+        this.permission_cache[cache_key] = { success: true };
+        
+        return { success: true };
+    }
+
+    // 检查段权限
+    check_segment_permission(segment, access_type) {
+        // 转换访问类型为相应的标志
+        let required_flag = 0;
+        
+        switch (access_type) {
+            case "READ":
+                required_flag = this.protection_flags.READ;
+                break;
+            case "WRITE":
+                required_flag = this.protection_flags.WRITE;
+                break;
+            case "EXECUTE":
+                required_flag = this.protection_flags.EXECUTE;
+                break;
+            case "QUANTUM":
+                required_flag = this.protection_flags.QUANTUM;
+                break;
+            default:
+                return { success: false, error: "未知的访问类型", violation_type: "UNKNOWN" };
+        }
+        
+        // 检查权限标志
+        if ((segment.protection & required_flag) === 0) {
+            // 确定违规类型
+            let violation_type = "PERMISSION_DENIED";
+            
+            if (access_type === "WRITE") {
+                violation_type = "WRITE_PROTECTION";
+                this.statistics.write_protection_violations++;
+            } else if (access_type === "QUANTUM") {
+                violation_type = "QUANTUM_ACCESS_VIOLATION";
+                this.statistics.quantum_access_violations++;
+            }
+            
+            return { 
+                success: false, 
+                error: `权限被拒绝：${access_type}访问不允许`, 
+                violation_type: violation_type 
+            };
+        }
+        
+        return { success: true };
+    }
+
+    // 记录违规访问
+    log_violation(pid, address, size, access_type, violation_type) {
+        this.violation_log.push({
+            timestamp: Date.now(),
+            pid: pid,
+            address: address,
+            size: size,
+            access_type: access_type,
+            violation_type: violation_type
+        });
+        
+        // 限制日志大小
+        if (this.violation_log.length > 1000) {
+            this.violation_log.shift();
+        }
+        
+        kernel_log(`记录内存访问违规：进程${pid}，地址0x${address.toString(16)}，访问类型${access_type}，违规类型${violation_type}`);
+    }
+
+    // 默认段错误处理器
+    default_segmentation_fault_handler(pid, address, size, access_type) {
+        kernel_log(`段错误：进程${pid}尝试${access_type}访问地址0x${address.toString(16)}（大小${size}字节）`);
+        
+        // 在实际系统中，这里会向进程发送SIGSEGV信号
+        // 这里简化为记录日志
+        kernel_log(`向进程${pid}发送SIGSEGV信号`);
+    }
+
+    // 默认写保护错误处理器
+    default_write_protection_handler(pid, address, size, access_type) {
+        kernel_log(`写保护错误：进程${pid}尝试写入只读内存地址0x${address.toString(16)}（大小${size}字节）`);
+        
+        // 在实际系统中，这里会向进程发送SIGBUS信号
+        // 这里简化为记录日志
+        kernel_log(`向进程${pid}发送SIGBUS信号`);
+    }
+
+    // 默认量子访问违规处理器
+    default_quantum_access_violation_handler(pid, address, size, access_type) {
+        kernel_log(`量子访问违规：进程${pid}尝试进行非法量子访问，地址0x${address.toString(16)}（大小${size}字节）`);
+        
+        // 在实际系统中，这里会向进程发送自定义信号
+        // 这里简化为记录日志
+        kernel_log(`向进程${pid}发送SIGQACC信号`);
+    }
+
+    // 默认页错误处理器
+    default_page_fault_handler(pid, address, error_code) {
+        kernel_log(`页错误：进程${pid}访问地址0x${address.toString(16)}，错误码${error_code}`);
+        
+        // 更新统计
+        this.statistics.page_faults++;
+        
+        // 在实际系统中，这里会尝试加载页面或向进程发送SIGSEGV信号
+        // 这里简化为记录日志
+        kernel_log(`向进程${pid}发送SIGSEGV信号`);
+    }
+
+    // 删除内存映射
+    delete_memory_map(pid) {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        kernel_log(`删除进程${pid}的内存映射表`);
+        
+        // 检查是否存在
+        if (!this.memory_maps[pid]) {
+            kernel_log(`警告：进程${pid}的内存映射表不存在`);
+            return { success: true };
+        }
+        
+        // 删除内存映射表和页表
+        delete this.memory_maps[pid];
+        delete this.page_tables[pid];
+        
+        // 清除权限缓存
+        for (const key in this.permission_cache) {
+            if (key.startsWith(`${pid}_`)) {
+                delete this.permission_cache[key];
+            }
+        }
+        
+        kernel_log(`进程${pid}的内存映射表已删除`);
+        
+        return { success: true };
+    }
+
+    // 获取进程内存映射信息
+    get_memory_map(pid) {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        // 检查是否存在
+        if (!this.memory_maps[pid]) {
+            kernel_log(`警告：进程${pid}的内存映射表不存在`);
+            return { success: false, error: "进程内存映射表不存在" };
+        }
+        
+        // 构建内存映射信息
+        const segments = this.memory_maps[pid].segments.map(segment => {
+            return {
+                address: segment.address,
+                end: segment.end,
+                size: segment.size,
+                type: this.get_segment_type_name(segment.type),
+                protection: this.format_protection_flags(segment.protection),
+                name: segment.name,
+                mapped_file: segment.mapped_file,
+                file_offset: segment.file_offset
+            };
+        });
+        
+        return {
+            success: true,
+            memory_map: {
+                pid: pid,
+                segments: segments,
+                creation_time: this.memory_maps[pid].creation_time,
+                last_update: this.memory_maps[pid].last_update
+            }
+        };
+    }
+
+    // 格式化保护标志
+    format_protection_flags(flags) {
+        const result = [];
+        
+        if (flags & this.protection_flags.READ) result.push("READ");
+        if (flags & this.protection_flags.WRITE) result.push("WRITE");
+        if (flags & this.protection_flags.EXECUTE) result.push("EXECUTE");
+        if (flags & this.protection_flags.QUANTUM) result.push("QUANTUM");
+        if (flags & this.protection_flags.USER) result.push("USER");
+        if (flags & this.protection_flags.KERNEL) result.push("KERNEL");
+        if (flags & this.protection_flags.SHARED) result.push("SHARED");
+        if (flags & this.protection_flags.COHERENT) result.push("COHERENT");
+        if (flags & this.protection_flags.ENTANGLED) result.push("ENTANGLED");
+        if (flags & this.protection_flags.COPY_ON_WRITE) result.push("COPY_ON_WRITE");
+        
+        return result.join("|");
+    }
+
+    // 获取保护统计信息
+    get_statistics() {
+        return {
+            permission_checks: this.statistics.permission_checks,
+            granted_accesses: this.statistics.granted_accesses,
+            denied_accesses: this.statistics.denied_accesses,
+            page_faults: this.statistics.page_faults,
+            segmentation_faults: this.statistics.segmentation_faults,
+            write_protection_violations: this.statistics.write_protection_violations,
+            quantum_access_violations: this.statistics.quantum_access_violations,
+            violation_log_size: this.violation_log.length,
+            recent_violations: this.violation_log.slice(-5) // 最近的5条违规记录
+        };
+    }
+
+    // 注册自定义异常处理器
+    register_fault_handler(fault_type, handler) {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        // 检查故障类型是否有效
+        if (!this.fault_handlers.hasOwnProperty(fault_type)) {
+            kernel_log(`错误：无效的故障类型 ${fault_type}`);
+            return { success: false, error: "无效的故障类型" };
+        }
+        
+        // 注册处理器
+        this.fault_handlers[fault_type] = handler;
+        
+        kernel_log(`为${fault_type}注册了新的异常处理器`);
+        
+        return { success: true };
+    }
+
+    // 重置为默认异常处理器
+    reset_fault_handlers() {
+        if (!this.initialized) {
+            kernel_log("错误：内存保护系统未初始化");
+            return { success: false, error: "内存保护系统未初始化" };
+        }
+        
+        // 重新注册默认处理器
+        this.register_default_handlers();
+        
+        kernel_log("已恢复所有默认异常处理器");
+        
+        return { success: true };
+    }
+
+    // 清除权限缓存
+    clear_permission_cache() {
+        this.permission_cache = {};
+        kernel_log("权限缓存已清除");
+        
+        return { success: true };
+    }
+
+    // 重置内存保护系统
+    reset() {
+        kernel_log("重置内存保护系统...");
+        
+        // 保存内核引用
+        const kernel_ref = this.kernel_reference;
+        
+        // 重置状态
+        this.initialized = false;
+        this.memory_maps = {};
+        this.page_tables = {};
+        this.permission_cache = {};
+        this.violation_log = [];
+        this.statistics = {
+            permission_checks: 0,
+            granted_accesses: 0,
+            denied_accesses: 0,
+            page_faults: 0,
+            segmentation_faults: 0,
+            write_protection_violations: 0,
+            quantum_access_violations: 0
+        };
+        
+        // 重新初始化
+        this.initialize(kernel_ref);
+        
+        kernel_log("内存保护系统已重置");
+        
+        return { success: true };
+    }
+}
+
+// 导出内存保护模块
+export MemoryProtection; 

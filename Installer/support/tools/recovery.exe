@@ -1,0 +1,74 @@
+@echo off
+REM QEntL System Recovery Tool
+REM Version: 1.0.0
+
+echo ================================================
+echo QEntL System Recovery Tool v1.0.0
+echo ================================================
+echo.
+
+echo [INFO] Starting QEntL system recovery...
+
+echo Select recovery option:
+echo 1. Repair boot configuration
+echo 2. Restore system files
+echo 3. Reset user settings
+echo 4. Full system restore
+echo 5. Create recovery point
+echo.
+
+set /p choice="Enter your choice (1-5): "
+
+if %choice%==1 goto repair_boot
+if %choice%==2 goto restore_files
+if %choice%==3 goto reset_settings
+if %choice%==4 goto full_restore
+if %choice%==5 goto create_recovery
+goto invalid_choice
+
+:repair_boot
+echo [INFO] Repairing boot configuration...
+echo [SIMULATED] Checking boot sector...
+echo [SIMULATED] Rebuilding boot entries...
+echo [SUCCESS] Boot configuration repaired
+goto end
+
+:restore_files
+echo [INFO] Restoring system files...
+echo [SIMULATED] Scanning for corrupted files...
+echo [SIMULATED] Restoring files from backup...
+echo [SUCCESS] System files restored
+goto end
+
+:reset_settings
+echo [INFO] Resetting user settings...
+echo [SIMULATED] Clearing user configuration...
+echo [SIMULATED] Restoring default settings...
+echo [SUCCESS] User settings reset
+goto end
+
+:full_restore
+echo [INFO] Performing full system restore...
+echo [WARNING] This will restore QEntL to factory settings
+set /p confirm="Are you sure? (Y/N): "
+if /i %confirm%==Y (
+    echo [SIMULATED] Restoring system image...
+    echo [SUCCESS] Full system restore completed
+) else (
+    echo [CANCELLED] Full restore cancelled
+)
+goto end
+
+:create_recovery
+echo [INFO] Creating recovery point...
+echo [SIMULATED] Backing up system state...
+echo [SUCCESS] Recovery point created
+goto end
+
+:invalid_choice
+echo [ERROR] Invalid choice
+
+:end
+echo.
+echo [INFO] Recovery operation completed
+pause
