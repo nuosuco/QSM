@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QSM - QEntL量子虚拟机模拟器</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* 虚拟机专用样式 */
+        .qvm-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .qvm-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .qvm-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .qvm-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .quantum-bits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .qubit-card {
+            background: rgba(138, 135, 255, 0.1);
+            border: 1px solid rgba(138, 135, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .qubit-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(138, 135, 255, 0.2) 0%, transparent 70%);
+            animation: quantumFlux 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+        
+        /* 量子脉冲动画 - 让量子比特看起来像在"呼吸" */
+        .qubit-card::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid rgba(138, 135, 255, 0.3);
+            animation: quantumPulse 2s ease-out infinite;
+        }
+        
+        @keyframes quantumPulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+                border-width: 2px;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.8);
+                opacity: 0;
+                border-width: 1px;
+            }
+        }
+        
+        @keyframes quantumFlux {
+            0%, 100% {
+                transform: translate(0, 0);
+            }
+            25% {
+                transform: translate(5px, 5px);
+            }
+            50% {
+                transform: translate(-5px, -3px);
+            }
+            75% {
+                transform: translate(-3px, 5px);
+            }
+        }
+        
+        /* 叠加态动画 - 当量子比特处于叠加态时 */
+        .qubit-card.superposition {
+            animation: superpositionGlow 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes superpositionGlow {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(138, 135, 255, 0.5),
+                            0 0 20px rgba(138, 135, 255, 0.3),
+                            inset 0 0 10px rgba(138, 135, 255, 0.1);
+            }
+            50% {
+                box-shadow: 0 0 20px rgba(138, 135, 255, 0.8),
+                            0 0 40px rgba(138, 135, 255, 0.5),
+                            inset 0 0 20px rgba(138, 135, 255, 0.2);
+            }
+        }
+        
+        /* 纠缠态动画 */
+        .qubit-card.entangled {
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.15) 0%, rgba(255, 107, 107, 0.05) 100%);
+            animation: entanglePulse 1s ease-in-out infinite;
+        }
+        
+        .qubit-card.entangled::after {
+            border-color: rgba(255, 107, 107, 0.6);
+            animation: entanglePulse 0.5s ease-out infinite;
+        }
+        
+        @keyframes entanglePulse {
+            0%, 100% {
+                box-shadow: 0 0 15px rgba(255, 107, 107, 0.5),
+                            0 0 30px rgba(255, 107, 107, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 25px rgba(255, 107, 107, 0.8),
+                            0 0 50px rgba(255, 107, 107, 0.5);
+            }
+        }
+        
+        /* 测量后态动画 */
+        .qubit-card.measured {
+            border-color: #4ecdc4;
+            background: linear-gradient(135deg, rgba(78, 205, 196, 0.15) 0%, rgba(78, 205, 196, 0.05) 100%);
+        }
+        
+        .qubit-card.measured::before,
+        .qubit-card.measured::after {
+            animation: none;
+            display: none;
+        }
+        
+        /* 状态变化时的闪烁动画 */
+        .qubit-card.state-changing {
+            animation: stateFlash 0.3s ease-out;
+        }
+        
+        @keyframes stateFlash {
+            0% {
+                background: rgba(255, 255, 255, 0.3);
+                transform: scale(1.05);
+            }
+            100% {
+                background: rgba(138, 135, 255, 0.1);
+                transform: scale(1);
+            }
+        }
+        
+        /* 量子比特名称动画 */
+        .qubit-name {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* 量子状态文本动画 */
+        .qubit-state {
+            font-family: monospace;
+            color: #8a87ff;
+            font-size: 14px;
+            position: relative;
+            z-index: 1;
+            transition: all 0.2s ease;
+        }
+        
+        .qubit-state.updating {
+            animation: textGlow 0.5s ease-out;
+        }
+        
+        @keyframes textGlow {
+            0% {
+                color: #fff;
+                text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            }
+            100% {
+                color: #8a87ff;
+                text-shadow: none;
+            }
+        }
+        
+        .qubit-name {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        
+        .qubit-state {
+            font-family: monospace;
+            color: #8a87ff;
+            font-size: 14px;
+        }
+        
+        .qubit-amplitude {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 5px;
+        }
+        
+        .qbc-editor {
+            width: 100%;
+            height: 300px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #4ecdc4;
+            font-family: monospace;
+            font-size: 13px;
+            padding: 15px;
+            resize: none;
+        }
+        
+        .qbc-editor:focus {
+            outline: none;
+            border-color: #8a87ff;
+        }
+        
+        .qvm-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .qvm-btn {
+            background: linear-gradient(135deg, #8a87ff 0%, #7068ff 100%);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .qvm-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(138, 135, 255, 0.4);
+        }
+        
+        .qvm-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .qvm-btn.danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+        }
+        
+        .execution-log {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-timestamp {
+            color: rgba(255, 255, 255, 0.5);
+            margin-right: 10px;
+        }
+        
+        .log-message {
+            color: #4ecdc4;
+        }
+        
+        .status-bar {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.running {
+            background: #8a87ff;
+        }
+        
+        .status-dot.stopped {
+            background: #ff6b6b;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .help-panel {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .help-title {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        
+        .instruction-table {
+            width: 100%;
+            font-size: 12px;
+        }
+        
+        .instruction-table th,
+        .instruction-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .instruction-table th {
+            color: #8a87ff;
+        }
+        
+        .instruction-table td {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        /* 算法演示样式 */
+        .algorithm-demos {
+            background: rgba(138, 135, 255, 0.1);
+            border: 1px solid rgba(138, 135, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .demos-title {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .demo-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+        }
+        
+        .demo-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(138, 135, 255, 0.3);
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .demo-btn:hover {
+            background: rgba(138, 135, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(138, 135, 255, 0.3);
+        }
+        
+        .demo-btn.active {
+            background: linear-gradient(135deg, #8a87ff 0%, #7068ff 100%);
+            border-color: #8a87ff;
+            box-shadow: 0 0 10px rgba(138, 135, 255, 0.5);
+        }
+        
+        .demo-btn-icon {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        
+        .demo-btn-name {
+            font-weight: bold;
+            display: block;
+        }
+        
+        .demo-btn-cat {
+            font-size: 10px;
+            opacity: 0.7;
+            display: block;
+            margin-top: 2px;
+        }
+        
+        .demo-result {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 12px;
+            display: none;
+        }
+        
+        .demo-result.show {
+            display: block;
+            animation: fadeInUp 0.3s ease-out;
+        }
+        
+        .demo-result-title {
+            font-weight: bold;
+            color: #4ecdc4;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .demo-result-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .demo-stat-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            border-radius: 5px;
+        }
+        
+        .demo-stat-label {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-bottom: 2px;
+        }
+        
+        .demo-stat-value {
+            font-weight: bold;
+            color: #8a87ff;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .entanglement-viz {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            height: 150px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            /* 主容器改单列布局 */
+            .qvm-container {
+                grid-template-columns: 1fr;
+                padding: 10px;
+                gap: 15px;
+            }
+            
+            /* 区块内边距减小 */
+            .qvm-section {
+                padding: 15px;
+                border-radius: 12px;
+            }
+            
+            /* 标题字体减小 */
+            .qvm-title {
+                font-size: 16px;
+            }
+            
+            /* 量子比特卡片网格优化 */
+            .quantum-bits-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            
+            /* 卡片内边距减小 */
+            .qubit-card {
+                padding: 10px 8px;
+            }
+            
+            /* 字体大小调整 */
+            .qubit-state {
+                font-size: 12px;
+            }
+            
+            .qubit-amplitude {
+                font-size: 10px;
+            }
+            
+            /* 编辑器优化 */
+            .qbc-editor {
+                height: 250px;
+                font-size: 12px;
+                padding: 10px;
+            }
+            
+            /* 按钮布局优化 */
+            .qvm-controls {
+                flex-wrap: wrap;
+            }
+            
+            .qvm-btn {
+                flex: 1;
+                min-width: 80px;
+                padding: 12px 15px;
+                font-size: 14px;
+                justify-content: center;
+            }
+            
+            .qvm-btn span {
+                display: none; /* 下载荷符号，节省空间 */
+            }
+            
+            /* 执行日志调整 */
+            .execution-log {
+                height: 150px;
+                font-size: 11px;
+            }
+            
+            /* 状态栏优化 */
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            /* 纠缠可视化高度调整 */
+            .entanglement-viz {
+                height: 100px;
+            }
+            
+            /* 帮助面板表格优化 */
+            .instruction-table {
+                font-size: 11px;
+            }
+            
+            .instruction-table th,
+            .instruction-table td {
+                padding: 5px;
+            }
+            
+            /* 量子脉冲动画缩小 */
+            .qubit-card::after {
+                width: 30px;
+                height: 30px;
+            }
+            
+            /* 标题栏优化 */
+            .quantum-header h1 {
+                font-size: 24px;
+            }
+            
+            .quantum-header .subtitle {
+                font-size: 12px;
+            }
+        }
+        
+        /* 超小屏幕适配（手机竖屏） */
+        @media (max-width: 480px) {
+            .quantum-bits-grid {
+                grid-template-columns: 1fr; /* 改为单列 */
+            }
+            
+            .qubit-card {
+                padding: 12px;
+            }
+            
+            .qubit-title {
+                font-size: 14px;
+            }
+            
+            .qvm-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .quantum-header {
+                padding: 15px 10px;
+            }
+            
+            .qvm-controls {
+                gap: 8px;
+            }
+            
+            .qvm-btn {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+            
+            /* 添加触摸优化 */
+            .qvm-btn,
+            .qubit-card,
+            .nav-btn {
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
+            }
+            
+            /* 滚动优化 */
+            .execution-log {
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+        
+        /* 打印样式优化 */
+        @media print {
+            .quantum-nav,
+            .qvm-controls,
+            .entanglement-viz,
+            .quantum-overlay {
+                display: none !important;
+            }
+            
+            .qvm-container {
+                grid-template-columns: 1fr;
+            }
+        }
+/* 算法统计面板样式 */
+.stats-panel {
+  background: rgba(138, 135, 255, 0.1);
+  border: 1px solid rgba(138, 135, 255, 0.3);
+  border-radius: 12px;
+  padding: 15px;
+  margin-top: 15px;
+}
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.stats-title {
+  font-weight: bold;
+  color: #4ecdc4;
+  font-size: 14px;
+}
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.stats-item {
+  background: rgba(0,0,0,0.2);
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+}
+.stats-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #8a87ff;
+}
+.stats-label {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+.stats-list {
+  max-height: 150px;
+  overflow-y: auto;
+}
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 12px;
+}
+.stats-algo-name {
+  color: #fff;
+}
+.stats-algo-rate {
+  color: #4ecdc4;
+  font-weight: bold;
+}
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 量子态信息叠加显示 -->
+        <div class="quantum-overlay" id="quantumOverlay"></div>
+        
+        <header class="quantum-header">
+            <h1 class="quantum-title">
+                <span class="quantum-particle">⚛</span> QSM
+                <div class="subtitle">QEntL量子虚拟机模拟器 v0.2.0</div>
+            </h1>
+            <div class="quantum-state-indicator">
+                <span class="state-dot active"></span>
+                <span>量子模拟运行中</span>
+            </div>
+        </header>
+
+        <nav class="quantum-nav">
+            <button class="nav-btn" onclick="window.location.href='index.html'">← 返回主页</button>
+        </nav>
+
+        <main class="quantum-main">
+            <div class="qvm-container">
+                <!-- 左侧：量子比特状态 -->
+                <div class="qvm-section">
+                    <div class="qvm-header">
+                        <div class="qvm-title">
+                            <span>🔮</span> 量子比特状态
+                        </div>
+                    </div>
+                    
+                    <div class="quantum-bits-grid" id="quantumBitsGrid">
+                        <!-- 动态生成量子比特卡片 -->
+                    </div>
+                    
+                    <div class="entanglement-viz" id="entanglementViz">
+                        <canvas id="entanglementCanvas"></canvas>
+                    </div>
+                    
+                    <div class="help-panel">
+                        <div class="help-title">💡 QBC指令帮助</div>
+                        <table class="instruction-table">
+                            <thead>
+                                <tr>
+                                    <th>指令</th>
+                                    <th>说明</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instructionTable">
+                                <!-- 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 右侧：QBC字节码编辑器 -->
+                <div class="qvm-section">
+                    <div class="qvm-header">
+                        <div class="qvm-title">
+                            <span>💻</span> QBC字节码编辑器
+                        </div>
+                        <span class="execution-status" id="executionState">空闲</span>
+                    </div>
+                    
+                    <textarea class="qbc-editor" id="qbcEditor" spellcheck="false"></textarea>
+                    
+                    <div class="qvm-controls">
+                        <button class="qvm-btn" id="loadExampleBtn">
+                            <span>📝</span> 加载示例
+                        </button>
+                        <button class="qvm-btn" id="loadQBCBtn">
+                            <span>📤</span> 加载QBC
+                        </button>
+                        <button class="qvm-btn" id="runQBCBtn">
+                            <span>▶️</span> 运行
+                        </button>
+                        <button class="qvm-btn danger" id="resetBtn">
+                            <span>🔄</span> 重置
+                        </button>
+                    </div>
+                    
+                    <!-- 算法演示按钮 -->
+<!-- 量子电路可视化 -->
+<div class="circuit-viz-section" style="margin-top: 15px;">
+<div style="font-weight: bold; color: #fff; margin-bottom: 10px; font-size: 14px;">🔮 量子电路可视化</div>
+<div id="circuitViz" style="min-height: 120px; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px;"></div>
+</div>
+                    <div class="algorithm-demos">
+                        <div class="demos-title">⚛️ 量子算法演示</div>
+                        <div class="demo-buttons" id="demoButtons">
+                            <!-- 动态生成 -->
+                        </div>
+                    </div>
+                    
+                    <div class="stats-panel" id="statsPanel">
+<div class="stats-header">
+<div class="stats-title">📊 算法成功率统计</div>
+<button class="qvm-btn" style="padding:4px 8px;font-size:11px" onclick="resetStats()">重置</button>
+</div>
+<div class="stats-summary" id="statsSummary">
+<div class="stats-item"><div class="stats-value" id="totalRuns">0</div><div class="stats-label">总执行次数</div></div>
+<div class="stats-item"><div class="stats-value" id="successRate">--</div><div class="stats-label">成功率</div></div>
+<div class="stats-item"><div class="stats-value" id="algoCount">0</div><div class="stats-label">算法种类</div></div>
+</div>
+<div class="stats-list" id="statsList">
+<div style="text-align:center;opacity:0.5;font-size:12px;padding:10px">运行算法后显示统计</div>
+</div>
+</div>
+<div class="execution-log" id="executionLog">
+                        <div class="log-entry">
+                            <span class="log-timestamp">系统</span>
+                            <span class="log-message">量子虚拟机已就绪，开始编写QBC字节码...</span>
+                        </div>
+                    </div>
+                    
+                    <div class="status-bar">
+                        <div class="status-indicator">
+                            <div class="status-dot" id="statusDot"></div>
+                            <span id="statusText">系统就绪</span>
+                        </div>
+                        <div>
+                            <span>量子比特: <strong>8</strong></span>
+                            <span style="margin-left: 20px;">寄存器: <strong>4</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="qsm-core.js"></script>
+    <script src="qvm-simulator.js"></script>
+<script src="quantum-circuit-viz.js"></script>
+<script src="algorithm-stats-tracker.js"></script>
+    <script>
+        // 初始化QVM模拟器
+        const qvm = new QVMSimulator();
+const algoStats = new AlgorithmStatsTracker();
+        
+        // 初始化UI
+        document.addEventListener('DOMContentLoaded', () => {
+            initQVMUI();
+            updateQuantumBitsDisplay();
+            initEntanglementCanvas();
+            updateInstructionTable();
+            initAlgorithmDemos();
+    initCircuitVisualizer();
+        });
+        
+        // 初始化UI
+        function initQVMUI() {
+            // 设置示例QBC代码
+            const editor = document.getElementById('qbcEditor');
+            editor.value = qvm.getExampleQBC();
+            
+            // 按钮事件
+            document.getElementById('loadExampleBtn').addEventListener('click', () => {
+                editor.value = qvm.getExampleQBC();
+                logMessage('已加载示例QBC字节码');
+            });
+            
+            document.getElementById('loadQBCBtn').addEventListener('click', async () => {
+                const code = editor.value;
+                const result = await qvm.loadQBC(code);
+                if (result.success) {
+                    logMessage(`✓ ${result.message}`);
+                    updateExecutionState('已加载');
+                } else {
+                    logMessage(`✗ 加载失败: ${result.error}`);
+                }
+            });
+            
+            document.getElementById('runQBCBtn').addEventListener('click', async () => {
+                const code = editor.value;
+                const loadResult = await qvm.loadQBC(code);
+                
+                if (loadResult.success) {
+                    runQBC();
+                } else {
+                    logMessage(`✗ ${loadResult.error}`);
+                }
+            });
+            
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                qvm.resetSystem();
+                updateQuantumBitsDisplay();
+                logMessage('量子系统已重置');
+                updateExecutionState('空闲');
+            });
+        }
+        
+        // 运行QBC
+        async function runQBC() {
+            updateExecutionState('运行中');
+            logMessage('开始执行QBC字节码...');
+            
+            const result = await qvm.runQBC();
+            
+            if (result.success) {
+                logMessage(`✓ ${result.message}`);
+            } else {
+                logMessage(`✗ 执行失败: ${result.error}`);
+            }
+            
+            updateExecutionState(result.success ? '完成' : '停止');
+            updateQuantumBitsDisplay();
+        }
+        
+        // 存储旧的量子比特状态以便检测变化
+        let previousQubits = {};
+        
+        // 更新量子比特显示
+        function updateQuantumBitsDisplay() {
+            const grid = document.getElementById('quantumBitsGrid');
+            const state = qvm.getQuantumState();
+            
+            // 检测叠加态（当|α|和|β|都不为0时）
+            const isSuperposition = (alpha, beta) => {
+                return Math.abs(alpha) > 0.1 && Math.abs(beta) > 0.1;
+            };
+            
+            const cardsHtml = state.quantumBits.map(qubit => {
+                // 检测状态是否发生变化
+                const prevQubit = previousQubits[qubit.name];
+                const stateChanged = prevQubit && (
+                    prevQubit.state !== qubit.state ||
+                    Math.abs(prevQubit.amplitude.alpha - qubit.amplitude.alpha) > 0.01 ||
+                    Math.abs(prevQubit.amplitude.beta - qubit.amplitude.beta) > 0.01
+                );
+                
+                // 根据状态添加相应的CSS类
+                const classes = [
+                    'qubit-card',
+                    qubit.entangled.length > 0 ? 'entangled' : '',
+                    qubit.measured ? 'measured' : '',
+                    isSuperposition(qubit.amplitude.alpha, qubit.amplitude.beta) && !qubit.measured ? 'superposition' : '',
+                    stateChanged ? 'state-changing' : ''
+                ].filter(Boolean).join(' ');
+                
+                // 更新前一个状态
+                previousQubits[qubit.name] = {
+                    state: qubit.state,
+                    amplitude: qubit.amplitude
+                };
+                
+                return `
+                <div class="${classes}" data-qubit="${qubit.name}">
+                    <div class="qubit-name">${qubit.name}</div>
+                    <div class="qubit-state ${stateChanged ? 'updating' : ''}">${qubit.state}</div>
+                    <div class="qubit-amplitude">
+                        α=${qubit.amplitude.alpha.toFixed(3)}, β=${qubit.amplitude.beta.toFixed(3)}
+                    </div>
+                </div>
+                `;
+            }).join('');
+            
+            grid.innerHTML = cardsHtml;
+            
+            // 为有状态变化的量子比特添加一次性动画
+            setTimeout(() => {
+                const changingCards = grid.querySelectorAll('.state-changing, .updating');
+                changingCards.forEach(card => {
+                    card.classList.remove('state-changing');
+                    card.querySelector('.qubit-state')?.classList.remove('updating');
+                });
+            }, 500);
+        }
+        
+        // 更新执行状态
+        function updateExecutionState(state) {
+            document.getElementById('executionState').textContent = state;
+            document.getElementById('statusText').textContent = state;
+            
+            const dot = document.getElementById('statusDot');
+            dot.className = 'status-dot';
+            if (state === '运行中') dot.classList.add('running');
+            else if (state === '停止') dot.classList.add('stopped');
+        }
+        
+        // 记录日志
+        function logMessage(message) {
+            const log = document.getElementById('executionLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
+                <span class="log-message">${message}</span>
+            `;
+            log.insertBefore(entry, log.firstChild);
+        }
+        
+        // 更新指令表
+        function updateInstructionTable() {
+            const help = qvm.getHelp();
+            const tbody = document.getElementById('instructionTable');
+            
+            tbody.innerHTML = help.instructions.map(inst => `
+                <tr>
+                    <td><code>${inst.opcode}</code></td>
+                    <td>${inst.description}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // 初始化纠缠可视化
+        function initEntanglementCanvas() {
+            const canvas = document.getElementById('entanglementCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            function drawEntanglements() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                const state = qvm.getQuantumState();
+                const entanglements = state.entanglements;
+                
+                if (entanglements.length === 0) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('暂无量子纠缠', canvas.width / 2, canvas.height / 2);
+                    return;
+                }
+                
+                // 绘制纠缠连线
+                entanglements.forEach(ent => {
+                    const [q1, q2] = ent.pair;
+                    const x1 = (parseInt(q1.replace('q', '')) + 1) * (canvas.width / 9);
+                    const x2 = (parseInt(q2.replace('q', '')) + 1) * (canvas.width / 9);
+                    const y = canvas.height / 2;
+                    
+                    // 绘制连线
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y - 10);
+                    ctx.lineTo(x2, y - 10);
+                    ctx.strokeStyle = 'rgba(255, 107, 107, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // 绘制节点
+                    ctx.beginPath();
+                    ctx.arc(x1, y - 10, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(x2, y - 10, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.fill();
+                });
+            }
+            
+            drawEntanglements();
+            
+            // 定时更新
+            setInterval(() => {
+                drawEntanglements();
+            }, 1000);
+        }
+        
+        // 初始化算法演示
+        function initAlgorithmDemos() {
+            const demos = qvm.getAlgorithmDemos();
+            const demoButtons = document.getElementById('demoButtons');
+            
+            demoButtons.innerHTML = demos.map((demo, index) => `
+                <button class="demo-btn" data-demo="${index}">
+                    <div class="demo-btn-icon">${getDemoIcon(demo.category)}</div>
+                    <span class="demo-btn-name">${demo.name}</span>
+                    <span class="demo-btn-cat">${getCategoryName(demo.category)}</span>
+                </button>
+            `).join('');
+            
+            // 绑定按钮事件
+            demoButtons.querySelectorAll('.demo-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const index = parseInt(btn.dataset.demo);
+                    await runAlgorithmDemo(demos[index], btn);
+                });
+            });
+        }
+        
+        // 获取演示图标
+        function getDemoIcon(category) {
+            const icons = {
+                'search': '🔍',
+                'transform': '🌊',
+                'communication': '💬'
+            };
+            return icons[category] || '⚛️';
+        }
+        
+        // 获取类别名称
+        function getCategoryName(category) {
+            const names = {
+                'search': '搜索',
+                'transform': '变换',
+                'communication': '通信'
+            };
+            return names[category] || '算法';
+        }
+        
+        // 运行算法演示
+        async function runAlgorithmDemo(demo, button) {
+            // 更新按钮状态
+            document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+            
+            // 加载演示代码到编辑器
+            const editor = document.getElementById('qbcEditor');
+            editor.value = demo.qbc;
+            
+            logMessage(`🚀 启动${demo.name}演示...`);
+            updateExecutionState('运行中');
+            
+            // 解析并执行
+            const result = await qvm.loadQBC(demo.qbc);
+            
+            if (result.success) {
+                // 执行第一行（应该是算法调用）
+                const firstLine = demo.qbc.split('\n')[1].trim();
+                
+                if (firstLine.startsWith('GROVER')) {
+                    const parts = firstLine.split(/\s+/);
+                    const target = parseInt(parts[1]);
+                    const bits = parseInt(parts[2]);
+                    await runGroverDemo(target, bits);
+                } else if (firstLine.startsWith('QFT')) {
+                    const bits = parseInt(firstLine.split(/\s+/)[1]);
+                    await runQFTDemo(bits);
+                } else if (firstLine.startsWith('SUPERDENSE')) {
+                    const message = firstLine.split(/\s+/)[1];
+                    await runSuperdenseDemo(message);
+                } else {
+                    await qvm.runQBC();
+                }
+            } else {
+                logMessage(`✗ 加载失败: ${result.error}`);
+                updateExecutionState('停止');
+            }
+            
+            updateQuantumBitsDisplay();
+            button.classList.remove('active');
+        }
+        
+        // 运行Grover演示
+        async function runGroverDemo(target, bits) {
+            logMessage(`🔍 Grover搜索: 目标=${target}, 比特=${bits}`);
+            
+            const result = await qvm.groverSearch(target, bits);
+            
+            if (result.success) {
+                showDemoResult('Grover搜索结果', {
+                    '搜索空间': `2^${bits} = ${Math.pow(2, bits)} 个元素`,
+                    '目标索引': target,
+                    '迭代次数': result.result.iterations,
+                    '成功率': `${result.result.successRate}%`,
+                    '执行次数': '100 trials'
+});
+updateStatsPanel('Grover搜索', result.success, 0, { target, bits, successRate: result.result.successRate })
+                });
+            }
+        }
+        
+        // 运行QFT演示
+        async function runQFTDemo(bits) {
+            logMessage(`🌊 量子傅里叶变换: 比特=${bits}`);
+            
+            const result = await qvm.quantumFourierTransform(bits);
+            
+            if (result.success) {
+                showDemoResult('QFT变换结果', {
+                    '量子比特数': bits,
+                    '变换状态': result.message,
+                    '效果': '频谱变换完成'
+});
+updateStatsPanel('QFT变换', true, 0, { bits })
+                });
+            }
+        }
+        
+        // 运行超密编码演示
+        async function runSuperdenseDemo(message) {
+            logMessage(`💬 超密编码: 消息="${message}"`);
+            
+            const result = await qvm.superdenseCoding(message);
+            
+            if (result.success) {
+                showDemoResult('超密编码结果', {
+                    '发送消息': message,
+                    '接收消息': result.received,
+                    '传输状态': result.success,
+                    '优势': '1个量子比特传输2位信息'
+});
+updateStatsPanel('超密编码', true, 0, { message })
+                });
+            }
+        }
+        
+        // 显示演示结果
+
+// ========== 新增算法演示函数 ==========
+
+// 运行Deutsch演示
+async function runDeutschDemo(type) {
+  logMessage('🔬 Deutsch算法: 类型=' + type);
+  const result = await qvm.deutschAlgorithm(type);
+  if (result) {
+    showDemoResult('Deutsch算法结果', {
+      '函数类型': type,
+      '判断结果': result.isConstant ? '常数型' : '平衡型',
+      '量子优势': '1次查询判断函数性质'
+    });
+    updateStatsPanel('Deutsch算法', true, 0, { type, result: result.isConstant });
+  }
+}
+
+// 运行量子隐形传态演示
+async function runTeleportDemo() {
+  logMessage('📡 量子隐形传态启动');
+  const result = await qvm.quantumTeleportation();
+  if (result) {
+    showDemoResult('量子隐形传态结果', {
+      '经典比特': result.classicalBits || '--',
+      'Bob测量': result.bobResult || '--',
+      '状态': '量子态成功传送'
+    });
+    updateStatsPanel('量子隐形传态', true, 0, {});
+  }
+}
+
+// 运行Bernstein-Vazirani演示
+async function runBVDemo(secret) {
+  logMessage('🔐 Bernstein-Vazirani: 密串=' + secret);
+  const result = await qvm.bernsteinVazirani(secret);
+  if (result) {
+    showDemoResult('Bernstein-Vazirani结果', {
+      '隐藏密串': secret,
+      '找到结果': result.result || '--',
+      '量子优势': '1次查询找出密串'
+    });
+    updateStatsPanel('Bernstein-Vazirani', true, 0, { secret, result: result.result });
+  }
+}
+
+// 运行量子随机数演示
+async function runRandomDemo() {
+  logMessage('🎲 量子随机数生成');
+  const result = qvm.quantumRandomInt(0, 100);
+  showDemoResult('量子随机数结果', {
+    '随机数': result,
+    '范围': '0-100',
+    '特性': '真随机，不可预测'
+  });
+  updateStatsPanel('量子随机数', true, 0, { result });
+}
+
+// 运行量子掷骰子演示
+async function runDiceDemo(sides) {
+  logMessage('🎲 量子掷骰子: 面数=' + sides);
+  const result = qvm.quantumDice(sides);
+  showDemoResult('量子掷骰子结果', {
+    '点数': result,
+    '骰子面数': sides,
+    '特性': '量子真随机'
+  });
+  updateStatsPanel('量子掷骰子', true, 0, { sides, result });
+}
+
+        function showDemoResult(title, stats) {
+            // 检查是否已有结果显示区
+            let resultDiv = document.querySelector('.demo-result');
+            
+            if (!resultDiv) {
+                // 创建结果显示区
+                resultDiv = document.createElement('div');
+                resultDiv.className = 'demo-result';
+                const controlsDiv = document.querySelector('.algorithm-demos');
+                controlsDiv.after(resultDiv);
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="demo-result-title">
+                    <span>📊</span> ${title}
+                </div>
+                <div class="demo-result-stats">
+                    ${Object.entries(stats).map(([label, value]) => `
+                        <div class="demo-stat-item">
+                            <div class="demo-stat-label">${label}</div>
+                            <div class="demo-stat-value">${value}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            resultDiv.classList.add('show');
+            
+            updateExecutionState('完成');
+        }
+        
+        // 创建Grover示例代码
+        qvm.groverExample = function(target = 5, bits = 4) {
+            return `# Grover搜索算法演示
+# 在${Math.pow(2, bits)}个元素中搜索目标=${target}
+
+# 算法参数
+TARGET = ${target}
+BITS = ${bits}
+ITERATIONS = ${Math.floor((Math.PI / 4) * Math.sqrt(Math.pow(2, bits)))}
+
+# 执行Grover搜索
+GROVER ${target} ${bits}`;
+        };
+        
+        // 创建QFT示例代码
+        qvm.qftExample = function(bits = 4) {
+            return `# 量子傅里叶变换演示
+# 对${bits}个量子比特应用QFT
+
+# 执行QFT
+QFT ${bits}`;
+        };
+        
+        // 创建超密编码示例代码
+        qvm.superdenseExample = function(message = '11') {
+            return `# 超密编码演示
+# 用1个量子比特传输2位信息
+
+# 消息选项: 00, 01, 10, 11
+SUPERDENSE ${message}`;
+        };
+        
+        // 更新示例QBC
+        qvm.getExampleQBC = function() {
+            return `# QBC量子字节码示例
+# Grover搜索演示
+
+# 在16个元素中搜索索引5
+GROVER 5 4`;
+        };
+// ========== 算法统计追踪功能 ==========
+function updateStatsPanel(algorithmName, success, executionTime, details) {
+    algoStats.recordExecution(algorithmName, success, executionTime, details);
+    const summary = algoStats.getSummary();
+    document.getElementById('totalRuns').textContent = summary.totalExecutions;
+    document.getElementById('successRate').textContent = summary.overallSuccessRate;
+    document.getElementById('algoCount').textContent = summary.algorithmsUsed;
+    const statsList = document.getElementById('statsList');
+    const allStats = algoStats.getAllStats();
+    if (allStats.length === 0) {
+        statsList.innerHTML = '<div style="text-align:center;opacity:0.5;font-size:12px;padding:10px">运行算法后显示统计</div>';
+    } else {
+        statsList.innerHTML = allStats.map(s => `
+            <div class="stats-row">
+                <span class="stats-algo-name">${s.name}</span>
+                <span class="stats-algo-rate">${s.successRate} (${s.totalRuns}次)</span>
+            </div>
+        `).join('');
+    }
+}
+function resetStats() {
+    algoStats.reset();
+    document.getElementById('totalRuns').textContent = '0';
+    document.getElementById('successRate').textContent = '--';
+    document.getElementById('algoCount').textContent = '0';
+    document.getElementById('statsList').innerHTML = '<div style="text-align:center;opacity:0.5;font-size:12px;padding:10px">运行算法后显示统计</div>';
+    logMessage('📊 统计已重置');
+}
+    </script>
+</body>
+</html>
+
+// 初始化量子电路可视化
+let circuitViz = null;
+function initCircuitVisualizer() {
+    const container = document.getElementById('circuitViz');
+    if (!container) return;
+    
+    circuitViz = new QuantumCircuitVisualizer('circuitViz');
+    circuitViz.qubits = 4;
+    circuitViz.render();
+    
+    logMessage('🔮 量子电路可视化已初始化');
+}
+
+// 当用户在编辑器输入QBC时，自动更新电路可视化
+document.getElementById('qbcEditor')?.addEventListener('input', function(e) {
+    if (circuitViz) {
+        circuitViz.parseQBC(e.target.value);
+    }
+});
+
+// 运行算法后更新可视化
+const originalRunAlgorithmDemo = window.runAlgorithmDemo;
+window.runAlgorithmDemo = async function(demo, button) {
+    if (circuitViz) {
+        circuitViz.parseQBC(demo.qbc);
+    }
+    return originalRunAlgorithmDemo(demo, button);
+};
+
