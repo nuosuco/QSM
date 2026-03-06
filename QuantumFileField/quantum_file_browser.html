@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量子文件浏览器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh; color: white;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .quantum-gene { background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+        .browser-layout { display: grid; grid-template-columns: 250px 1fr 300px; gap: 20px; height: 70vh; }
+        .sidebar { background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 15px; overflow-y: auto; }
+        .main-area { background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 15px; overflow-y: auto; }
+        .properties { background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 15px; overflow-y: auto; }
+        .folder-tree { list-style: none; }
+        .folder-item { padding: 5px; cursor: pointer; border-radius: 5px; transition: all 0.3s; }
+        .folder-item:hover { background: rgba(255, 255, 255, 0.2); }
+        .folder-item.selected { background: rgba(0, 255, 136, 0.3); }
+        .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
+        .file-item { text-align: center; padding: 10px; border-radius: 10px; cursor: pointer; transition: all 0.3s; background: rgba(255, 255, 255, 0.1); }
+        .file-item:hover { transform: translateY(-5px); background: rgba(255, 255, 255, 0.2); }
+        .file-icon { font-size: 3rem; margin-bottom: 10px; }
+        .file-name { font-size: 0.9rem; word-break: break-all; }
+        .breadcrumb { background: rgba(0, 0, 0, 0.3); border-radius: 5px; padding: 10px; margin-bottom: 15px; font-family: monospace; }
+        .search-box { width: 100%; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 5px; background: rgba(255, 255, 255, 0.1); color: white; margin-bottom: 15px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 5px; background: linear-gradient(45deg, #667eea, #764ba2); color: white; cursor: pointer; margin: 5px; }
+        .toolbar { background: rgba(0, 0, 0, 0.3); border-radius: 5px; padding: 10px; margin-bottom: 15px; }
+        .quantum-info { background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); border-radius: 5px; padding: 10px; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📁 量子文件浏览器</h1>
+            <p>Quantum File Browser - 跨维度文件管理系统</p>
+        </div>
+
+        <div class="quantum-gene">
+            <strong>量子基因编码:</strong> QGC-FILE-BROWSER-2025061901<br>
+            <strong>量子纠缠信道:</strong> QEC-FILE-SYSTEM-01<br>
+            <strong>当前路径:</strong> <span id="currentPath">/QuantumFileField</span>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn" onclick="goBack()">← 后退</button>
+            <button class="btn" onclick="goForward()">前进 →</button>
+            <button class="btn" onclick="goUp()">↑ 上级</button>
+            <button class="btn" onclick="refreshView()">🔄 刷新</button>
+            <button class="btn" onclick="newFolder()">📁 新建文件夹</button>
+            <button class="btn" onclick="uploadFile()">📤 上传</button>
+            <button class="btn" onclick="quantumSearch()">🔍 量子搜索</button>
+        </div>
+
+        <div class="browser-layout">
+            <!-- 左侧文件夹树 -->
+            <div class="sidebar">
+                <h3>📂 量子目录树</h3>
+                <input type="text" class="search-box" placeholder="搜索文件夹..." id="folderSearch">
+                <ul class="folder-tree" id="folderTree">
+                    <li class="folder-item selected" onclick="selectFolder(this, '/QuantumFileField')">
+                        📁 QuantumFileField
+                        <ul style="margin-left: 20px;">
+                            <li class="folder-item" onclick="selectFolder(this, '/Models')">📁 Models</li>
+                            <li class="folder-item" onclick="selectFolder(this, '/System')">📁 System</li>
+                            <li class="folder-item" onclick="selectFolder(this, '/Services')">📁 Services</li>
+                            <li class="folder-item" onclick="selectFolder(this, '/GUI')">📁 GUI</li>
+                            <li class="folder-item" onclick="selectFolder(this, '/Programs')">📁 Programs</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 主文件显示区域 -->
+            <div class="main-area">
+                <div class="breadcrumb" id="breadcrumb">
+                    /QuantumFileField
+                </div>
+                
+                <input type="text" class="search-box" placeholder="搜索文件..." id="fileSearch">
+                
+                <div class="file-grid" id="fileGrid">
+                    <div class="file-item" onclick="selectFile(this, 'qsm_model.html')">
+                        <div class="file-icon">🌌</div>
+                        <div class="file-name">qsm_model.html</div>
+                    </div>
+                    <div class="file-item" onclick="selectFile(this, 'som_model.html')">
+                        <div class="file-icon">💰</div>
+                        <div class="file-name">som_model.html</div>
+                    </div>
+                    <div class="file-item" onclick="selectFile(this, 'weq_model.html')">
+                        <div class="file-icon">🌐</div>
+                        <div class="file-name">weq_model.html</div>
+                    </div>
+                    <div class="file-item" onclick="selectFile(this, 'ref_model.html')">
+                        <div class="file-icon">🔍</div>
+                        <div class="file-name">ref_model.html</div>
+                    </div>
+                    <div class="file-item" onclick="selectFile(this, 'quantum_bridge.html')">
+                        <div class="file-icon">🌉</div>
+                        <div class="file-name">quantum_bridge.html</div>
+                    </div>
+                    <div class="file-item" onclick="selectFile(this, 'qsm_neural_network.html')">
+                        <div class="file-icon">🧠</div>
+                        <div class="file-name">qsm_neural_network.html</div>
+                    </div>
+                    <div class="file-item" onclick="selectFile(this, 'semantic_search.html')">
+                        <div class="file-icon">🔎</div>
+                        <div class="file-name">semantic_search.html</div>
+                    </div>
+                    <div class="file-item" onclick="selectFile(this, 'app_launcher.html')">
+                        <div class="file-icon">🚀</div>
+                        <div class="file-name">app_launcher.html</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧属性面板 -->
+            <div class="properties">
+                <h3>📋 文件属性</h3>
+                <div id="fileProperties">
+                    <p>请选择一个文件查看属性</p>
+                </div>
+                
+                <div class="quantum-info">
+                    <h4>🔬 量子信息</h4>
+                    <div id="quantumInfo">
+                        <div>量子基因: <span id="quantumGene">未选择</span></div>
+                        <div>纠缠状态: <span id="entanglementState">无</span></div>
+                        <div>相干时间: <span id="coherenceTime">N/A</span></div>
+                        <div>量子完整性: <span id="quantumIntegrity">100%</span></div>
+                    </div>
+                </div>
+
+                <div class="quantum-info">
+                    <h4>🌟 量子操作</h4>
+                    <button class="btn" onclick="quantumEntangle()" style="width: 100%; margin: 5px 0;">建立量子纠缠</button>
+                    <button class="btn" onclick="quantumTeleport()" style="width: 100%; margin: 5px 0;">量子传输</button>
+                    <button class="btn" onclick="quantumClone()" style="width: 100%; margin: 5px 0;">量子克隆</button>
+                    <button class="btn" onclick="quantumAnalyze()" style="width: 100%; margin: 5px 0;">量子分析</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 15px; margin-top: 20px;">
+            <h3>📊 量子文件系统状态</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                <div>
+                    <strong>总文件数:</strong> <span id="totalFiles">32</span><br>
+                    <strong>量子文件:</strong> <span id="quantumFiles">32</span><br>
+                    <strong>纠缠连接:</strong> <span id="entanglements">156</span>
+                </div>
+                <div>
+                    <strong>存储空间:</strong> <span id="storageUsed">2.1 GB</span><br>
+                    <strong>量子压缩率:</strong> <span id="compressionRatio">85.3%</span><br>
+                    <strong>访问速度:</strong> <span id="accessSpeed">光速</span>
+                </div>
+                <div>
+                    <strong>系统状态:</strong> <span id="systemStatus">量子稳定</span><br>
+                    <strong>同步状态:</strong> <span id="syncStatus">实时同步</span><br>
+                    <strong>备份状态:</strong> <span id="backupStatus">量子备份</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const QUANTUM_GENE = "QGC-FILE-BROWSER-2025061901";
+        const ENTANGLEMENT_CHANNEL = "QEC-FILE-SYSTEM-01";
+
+        let currentPath = "/QuantumFileField";
+        let selectedFile = null;
+        let navigationHistory = ["/QuantumFileField"];
+        let historyIndex = 0;
+
+        const fileDatabase = {
+            "/QuantumFileField": [
+                { name: "qsm_model.html", type: "html", size: "19KB", icon: "🌌", gene: "QGC-QSM-MODEL-2025061801" },
+                { name: "som_model.html", type: "html", size: "27KB", icon: "💰", gene: "QGC-SOM-MODEL-2025061801" },
+                { name: "weq_model.html", type: "html", size: "28KB", icon: "🌐", gene: "QGC-WEQ-MODEL-2025061801" },
+                { name: "ref_model.html", type: "html", size: "30KB", icon: "🔍", gene: "QGC-REF-MODEL-2025061801" },
+                { name: "quantum_bridge.html", type: "html", size: "24KB", icon: "🌉", gene: "QGC-QUANTUM-BRIDGE-2025061801" },
+                { name: "qsm_neural_network.html", type: "html", size: "31KB", icon: "🧠", gene: "QGC-QSM-NEURAL-2025061801" },
+                { name: "semantic_search.html", type: "html", size: "42KB", icon: "🔎", gene: "QGC-SEMANTIC-SEARCH-2025061801" },
+                { name: "app_launcher.html", type: "html", size: "39KB", icon: "🚀", gene: "QGC-APP-LAUNCHER-2025061801" }
+            ],
+            "/Models": [
+                { name: "qsm_service.html", type: "html", size: "28KB", icon: "🌌", gene: "QGC-QSM-SERVICE-2025061801" },
+                { name: "som_service.html", type: "html", size: "13KB", icon: "💰", gene: "QGC-SOM-SERVICE-2025061801" }
+            ]
+        };
+
+        function updateBreadcrumb() {
+            document.getElementById('breadcrumb').textContent = currentPath;
+            document.getElementById('currentPath').textContent = currentPath;
+        }
+
+        function loadFiles(path) {
+            const fileGrid = document.getElementById('fileGrid');
+            const files = fileDatabase[path] || [];
+            
+            fileGrid.innerHTML = '';
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.onclick = () => selectFile(fileItem, file.name);
+                fileItem.innerHTML = `
+                    <div class="file-icon">${file.icon}</div>
+                    <div class="file-name">${file.name}</div>
+                `;
+                fileGrid.appendChild(fileItem);
+            });
+        }
+
+        function selectFolder(element, path) {
+            // 清除之前的选择
+            document.querySelectorAll('.folder-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // 选择当前文件夹
+            element.classList.add('selected');
+            
+            // 更新路径和加载文件
+            currentPath = path;
+            updateBreadcrumb();
+            loadFiles(path);
+            
+            // 添加到导航历史
+            if (historyIndex < navigationHistory.length - 1) {
+                navigationHistory = navigationHistory.slice(0, historyIndex + 1);
+            }
+            navigationHistory.push(path);
+            historyIndex = navigationHistory.length - 1;
+        }
+
+        function selectFile(element, fileName) {
+            // 清除之前的选择
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.style.background = 'rgba(255, 255, 255, 0.1)';
+            });
+            
+            // 选择当前文件
+            element.style.background = 'rgba(0, 255, 136, 0.3)';
+            selectedFile = fileName;
+            
+            // 查找文件信息
+            const files = fileDatabase[currentPath] || [];
+            const fileInfo = files.find(f => f.name === fileName);
+            
+            if (fileInfo) {
+                updateFileProperties(fileInfo);
+            }
+        }
+
+        function updateFileProperties(fileInfo) {
+            const propertiesDiv = document.getElementById('fileProperties');
+            propertiesDiv.innerHTML = `
+                <div><strong>文件名:</strong> ${fileInfo.name}</div>
+                <div><strong>类型:</strong> ${fileInfo.type.toUpperCase()}</div>
+                <div><strong>大小:</strong> ${fileInfo.size}</div>
+                <div><strong>创建时间:</strong> 2025-01-18 10:30:15</div>
+                <div><strong>修改时间:</strong> 2025-01-18 10:30:15</div>
+                <div><strong>访问权限:</strong> 读写执行</div>
+            `;
+            
+            // 更新量子信息
+            document.getElementById('quantumGene').textContent = fileInfo.gene;
+            document.getElementById('entanglementState').textContent = '已纠缠';
+            document.getElementById('coherenceTime').textContent = '∞';
+            document.getElementById('quantumIntegrity').textContent = '100%';
+        }
+
+        function goBack() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                currentPath = navigationHistory[historyIndex];
+                updateBreadcrumb();
+                loadFiles(currentPath);
+            }
+        }
+
+        function goForward() {
+            if (historyIndex < navigationHistory.length - 1) {
+                historyIndex++;
+                currentPath = navigationHistory[historyIndex];
+                updateBreadcrumb();
+                loadFiles(currentPath);
+            }
+        }
+
+        function goUp() {
+            if (currentPath !== "/") {
+                const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
+                selectFolder(document.querySelector('.folder-item'), parentPath);
+            }
+        }
+
+        function refreshView() {
+            loadFiles(currentPath);
+            console.log("视图已刷新");
+        }
+
+        function newFolder() {
+            const folderName = prompt("请输入新文件夹名称:");
+            if (folderName) {
+                console.log(`创建文件夹: ${folderName}`);
+                // 这里可以添加创建文件夹的逻辑
+            }
+        }
+
+        function uploadFile() {
+            console.log("打开文件上传对话框");
+            // 这里可以添加文件上传的逻辑
+        }
+
+        function quantumSearch() {
+            const searchTerm = prompt("请输入量子搜索关键词:");
+            if (searchTerm) {
+                console.log(`量子搜索: ${searchTerm}`);
+                // 这里可以添加量子搜索的逻辑
+            }
+        }
+
+        function quantumEntangle() {
+            if (selectedFile) {
+                console.log(`建立量子纠缠: ${selectedFile}`);
+                alert(`已与 ${selectedFile} 建立量子纠缠连接`);
+            } else {
+                alert("请先选择一个文件");
+            }
+        }
+
+        function quantumTeleport() {
+            if (selectedFile) {
+                console.log(`量子传输: ${selectedFile}`);
+                alert(`正在进行量子传输: ${selectedFile}`);
+            } else {
+                alert("请先选择一个文件");
+            }
+        }
+
+        function quantumClone() {
+            if (selectedFile) {
+                console.log(`量子克隆: ${selectedFile}`);
+                alert(`已创建 ${selectedFile} 的量子克隆`);
+            } else {
+                alert("请先选择一个文件");
+            }
+        }
+
+        function quantumAnalyze() {
+            if (selectedFile) {
+                console.log(`量子分析: ${selectedFile}`);
+                alert(`正在分析 ${selectedFile} 的量子特性...`);
+            } else {
+                alert("请先选择一个文件");
+            }
+        }
+
+        function sendQuantumMessage(message) {
+            window.parent.postMessage({
+                type: 'quantum_entanglement',
+                channel: ENTANGLEMENT_CHANNEL,
+                gene: QUANTUM_GENE,
+                data: message,
+                timestamp: Date.now()
+            }, '*');
+        }
+
+        // 搜索功能
+        document.getElementById('fileSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const fileItems = document.querySelectorAll('.file-item');
+            
+            fileItems.forEach(item => {
+                const fileName = item.querySelector('.file-name').textContent.toLowerCase();
+                if (fileName.includes(searchTerm)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateBreadcrumb();
+            loadFiles(currentPath);
+            
+            console.log("量子文件浏览器启动完成");
+            sendQuantumMessage({service: 'FILE_BROWSER', status: 'READY'});
+        });
+    </script>
+</body>
+</html> 

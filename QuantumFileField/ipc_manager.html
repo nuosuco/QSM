@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量子进程间通信管理器 - QEntL IPC Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .quantum-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            margin-bottom: 10px;
+        }
+
+        .ipc-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .ipc-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .ipc-card:hover {
+            transform: translateY(-5px);
+            border-color: #00ff88;
+        }
+
+        .ipc-type {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .ipc-icon {
+            margin-right: 10px;
+            font-size: 24px;
+        }
+
+        .ipc-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .ipc-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00ff88, #0088ff);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 10px;
+        }
+
+        .resource-monitor {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .resource-list {
+            display: grid;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .resource-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #00ff88;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .resource-item.pipe { border-left-color: #3498db; }
+        .resource-item.queue { border-left-color: #e74c3c; }
+        .resource-item.shmem { border-left-color: #f39c12; }
+        .resource-item.semaphore { border-left-color: #9b59b6; }
+
+        .resource-info {
+            flex: 1;
+        }
+
+        .resource-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .resource-details {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .resource-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            height: 250px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-info { color: #00ff88; }
+        .log-warning { color: #f39c12; }
+        .log-error { color: #e74c3c; }
+        .log-quantum { color: #9b59b6; }
+
+        .quantum-entanglement {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #00ff88;
+            z-index: 1000;
+        }
+
+        .create-resource {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .create-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #00ff88;
+        }
+
+        .form-input, .form-select {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            color: white;
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+    </style>
+</head>
+<body>
+    <div class="quantum-entanglement">
+        <div style="color: #00ff88; font-weight: bold;">量子纠缠状态</div>
+        <div id="entanglement-status">ACTIVE</div>
+        <div style="font-size: 12px; margin-top: 5px;">
+            强度: <span id="entanglement-strength">0.85</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="quantum-header">
+            <div class="quantum-gene">QIPC-8721-4632-9510</div>
+            <h1>量子进程间通信管理器</h1>
+            <h2>QEntL IPC Manager</h2>
+            <p>管理量子进程间通信机制 - 管道、消息队列、共享内存和信号量</p>
+        </div>
+
+        <div class="ipc-dashboard">
+            <div class="ipc-card">
+                <div class="ipc-type">
+                    <span class="ipc-icon">🔗</span>
+                    管道 (Pipes)
+                </div>
+                <div class="ipc-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="pipeCount">0</div>
+                        <div class="stat-label">活跃管道</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="pipeData">0KB</div>
+                        <div class="stat-label">数据传输</div>
+                    </div>
+                </div>
+                <div class="ipc-controls">
+                    <button class="btn btn-small" onclick="createPipe()">创建管道</button>
+                    <button class="btn btn-small" onclick="showPipes()">查看管道</button>
+                </div>
+            </div>
+
+            <div class="ipc-card">
+                <div class="ipc-type">
+                    <span class="ipc-icon">📬</span>
+                    消息队列 (Message Queues)
+                </div>
+                <div class="ipc-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="queueCount">0</div>
+                        <div class="stat-label">活跃队列</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="queueMessages">0</div>
+                        <div class="stat-label">待处理消息</div>
+                    </div>
+                </div>
+                <div class="ipc-controls">
+                    <button class="btn btn-small" onclick="createQueue()">创建队列</button>
+                    <button class="btn btn-small" onclick="showQueues()">查看队列</button>
+                </div>
+            </div>
+
+            <div class="ipc-card">
+                <div class="ipc-type">
+                    <span class="ipc-icon">🧠</span>
+                    共享内存 (Shared Memory)
+                </div>
+                <div class="ipc-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="shmemCount">0</div>
+                        <div class="stat-label">共享段</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="shmemSize">0MB</div>
+                        <div class="stat-label">总大小</div>
+                    </div>
+                </div>
+                <div class="ipc-controls">
+                    <button class="btn btn-small" onclick="createSharedMemory()">创建共享内存</button>
+                    <button class="btn btn-small" onclick="showSharedMemory()">查看内存</button>
+                </div>
+            </div>
+
+            <div class="ipc-card">
+                <div class="ipc-type">
+                    <span class="ipc-icon">🚦</span>
+                    信号量 (Semaphores)
+                </div>
+                <div class="ipc-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="semCount">0</div>
+                        <div class="stat-label">信号量</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="semWaiting">0</div>
+                        <div class="stat-label">等待进程</div>
+                    </div>
+                </div>
+                <div class="ipc-controls">
+                    <button class="btn btn-small" onclick="createSemaphore()">创建信号量</button>
+                    <button class="btn btn-small" onclick="showSemaphores()">查看信号量</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="create-resource">
+            <h3>创建IPC资源</h3>
+            <div class="create-form">
+                <div class="form-group">
+                    <label class="form-label">资源类型</label>
+                    <select class="form-select" id="resourceType">
+                        <option value="pipe">管道</option>
+                        <option value="queue">消息队列</option>
+                        <option value="shmem">共享内存</option>
+                        <option value="semaphore">信号量</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">资源名称</label>
+                    <input type="text" class="form-input" id="resourceName" placeholder="输入资源名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">大小/值</label>
+                    <input type="number" class="form-input" id="resourceSize" placeholder="4096" value="4096">
+                </div>
+                <div class="form-group">
+                    <button class="btn" onclick="createResource()">创建资源</button>
+                    <button class="btn" onclick="cleanupResources()">清理资源</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="resource-monitor">
+            <h3>IPC资源监控</h3>
+            <div class="resource-list" id="resourceList">
+                <!-- 资源项将通过JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <div class="log-container">
+            <h4>IPC管理器日志</h4>
+            <div id="logOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        let ipcState = {
+            initialized: false,
+            pipes: new Map(),
+            queues: new Map(),
+            sharedMemory: new Map(),
+            semaphores: new Map(),
+            nextPipeId: 1,
+            nextQueueId: 1,
+            nextShmemId: 1,
+            nextSemId: 1,
+            quantumGenes: 'QIPC-8721-4632-9510'
+        };
+
+        function initializeIPC() {
+            if (ipcState.initialized) {
+                addLog('IPC管理器已经初始化', 'warning');
+                return;
+            }
+
+            ipcState.initialized = true;
+            addLog('IPC管理器初始化完成', 'info');
+            updateStats();
+        }
+
+        function createPipe() {
+            if (!ipcState.initialized) {
+                addLog('尝试在未初始化的IPC管理器中创建管道', 'error');
+                return;
+            }
+
+            const pipeId = ipcState.nextPipeId++;
+            const pipe = {
+                id: pipeId,
+                name: `pipe_${pipeId}`,
+                type: 'pipe',
+                buffer: new ArrayBuffer(4096),
+                readPos: 0,
+                writePos: 0,
+                size: 4096,
+                readers: [],
+                writers: [],
+                isClosed: false,
+                createTime: new Date()
+            };
+
+            ipcState.pipes.set(pipeId, pipe);
+            addLog(`创建管道成功: ${pipe.name} (ID: ${pipeId})`, 'info');
+            updateStats();
+            updateResourceList();
+            return pipeId;
+        }
+
+        function createQueue() {
+            const queueId = ipcState.nextQueueId++;
+            const queue = {
+                id: queueId,
+                name: `queue_${queueId}`,
+                type: 'queue',
+                messages: [],
+                maxSize: 100,
+                size: 0,
+                createTime: new Date()
+            };
+
+            ipcState.queues.set(queueId, queue);
+            addLog(`创建消息队列成功: ${queue.name} (ID: ${queueId})`, 'info');
+            updateStats();
+            updateResourceList();
+            return queueId;
+        }
+
+        function createSharedMemory() {
+            const shmemId = ipcState.nextShmemId++;
+            const shmem = {
+                id: shmemId,
+                name: `shmem_${shmemId}`,
+                type: 'shmem',
+                buffer: new ArrayBuffer(1024 * 1024), // 1MB
+                size: 1024 * 1024,
+                attachedProcesses: [],
+                createTime: new Date()
+            };
+
+            ipcState.sharedMemory.set(shmemId, shmem);
+            addLog(`创建共享内存成功: ${shmem.name} (ID: ${shmemId}, 大小: 1MB)`, 'info');
+            updateStats();
+            updateResourceList();
+            return shmemId;
+        }
+
+        function createSemaphore() {
+            const semId = ipcState.nextSemId++;
+            const semaphore = {
+                id: semId,
+                name: `sem_${semId}`,
+                type: 'semaphore',
+                value: 1,
+                maxValue: 10,
+                waitingProcesses: [],
+                createTime: new Date()
+            };
+
+            ipcState.semaphores.set(semId, semaphore);
+            addLog(`创建信号量成功: ${semaphore.name} (ID: ${semId})`, 'info');
+            updateStats();
+            updateResourceList();
+            return semId;
+        }
+
+        function createResource() {
+            const type = document.getElementById('resourceType').value;
+            const name = document.getElementById('resourceName').value;
+            const size = parseInt(document.getElementById('resourceSize').value) || 4096;
+
+            if (!name) {
+                addLog('请输入资源名称', 'error');
+                return;
+            }
+
+            switch (type) {
+                case 'pipe':
+                    createPipe();
+                    break;
+                case 'queue':
+                    createQueue();
+                    break;
+                case 'shmem':
+                    createSharedMemory();
+                    break;
+                case 'semaphore':
+                    createSemaphore();
+                    break;
+            }
+
+            // 清空表单
+            document.getElementById('resourceName').value = '';
+        }
+
+        function deleteResource(type, id) {
+            let resource;
+            switch (type) {
+                case 'pipe':
+                    resource = ipcState.pipes.get(id);
+                    if (resource) {
+                        ipcState.pipes.delete(id);
+                        addLog(`删除管道: ${resource.name}`, 'info');
+                    }
+                    break;
+                case 'queue':
+                    resource = ipcState.queues.get(id);
+                    if (resource) {
+                        ipcState.queues.delete(id);
+                        addLog(`删除消息队列: ${resource.name}`, 'info');
+                    }
+                    break;
+                case 'shmem':
+                    resource = ipcState.sharedMemory.get(id);
+                    if (resource) {
+                        ipcState.sharedMemory.delete(id);
+                        addLog(`删除共享内存: ${resource.name}`, 'info');
+                    }
+                    break;
+                case 'semaphore':
+                    resource = ipcState.semaphores.get(id);
+                    if (resource) {
+                        ipcState.semaphores.delete(id);
+                        addLog(`删除信号量: ${resource.name}`, 'info');
+                    }
+                    break;
+            }
+            updateStats();
+            updateResourceList();
+        }
+
+        function cleanupResources() {
+            ipcState.pipes.clear();
+            ipcState.queues.clear();
+            ipcState.sharedMemory.clear();
+            ipcState.semaphores.clear();
+            
+            addLog('清理所有IPC资源', 'info');
+            updateStats();
+            updateResourceList();
+        }
+
+        function updateStats() {
+            document.getElementById('pipeCount').textContent = ipcState.pipes.size;
+            document.getElementById('queueCount').textContent = ipcState.queues.size;
+            document.getElementById('shmemCount').textContent = ipcState.sharedMemory.size;
+            document.getElementById('semCount').textContent = ipcState.semaphores.size;
+
+            // 计算数据传输量
+            let totalPipeData = 0;
+            ipcState.pipes.forEach(pipe => {
+                totalPipeData += pipe.writePos;
+            });
+            document.getElementById('pipeData').textContent = Math.round(totalPipeData / 1024) + 'KB';
+
+            // 计算消息数量
+            let totalMessages = 0;
+            ipcState.queues.forEach(queue => {
+                totalMessages += queue.messages.length;
+            });
+            document.getElementById('queueMessages').textContent = totalMessages;
+
+            // 计算共享内存大小
+            let totalShmemSize = 0;
+            ipcState.sharedMemory.forEach(shmem => {
+                totalShmemSize += shmem.size;
+            });
+            document.getElementById('shmemSize').textContent = Math.round(totalShmemSize / (1024 * 1024)) + 'MB';
+
+            // 计算等待进程数
+            let totalWaiting = 0;
+            ipcState.semaphores.forEach(sem => {
+                totalWaiting += sem.waitingProcesses.length;
+            });
+            document.getElementById('semWaiting').textContent = totalWaiting;
+        }
+
+        function updateResourceList() {
+            const resourceList = document.getElementById('resourceList');
+            resourceList.innerHTML = '';
+
+            // 添加管道
+            ipcState.pipes.forEach(pipe => {
+                const item = createResourceItem(pipe);
+                resourceList.appendChild(item);
+            });
+
+            // 添加消息队列
+            ipcState.queues.forEach(queue => {
+                const item = createResourceItem(queue);
+                resourceList.appendChild(item);
+            });
+
+            // 添加共享内存
+            ipcState.sharedMemory.forEach(shmem => {
+                const item = createResourceItem(shmem);
+                resourceList.appendChild(item);
+            });
+
+            // 添加信号量
+            ipcState.semaphores.forEach(sem => {
+                const item = createResourceItem(sem);
+                resourceList.appendChild(item);
+            });
+        }
+
+        function createResourceItem(resource) {
+            const item = document.createElement('div');
+            item.className = `resource-item ${resource.type}`;
+
+            const info = document.createElement('div');
+            info.className = 'resource-info';
+
+            const name = document.createElement('div');
+            name.className = 'resource-name';
+            name.textContent = resource.name;
+
+            const details = document.createElement('div');
+            details.className = 'resource-details';
+            
+            switch (resource.type) {
+                case 'pipe':
+                    details.textContent = `大小: ${resource.size}B, 读取位置: ${resource.readPos}, 写入位置: ${resource.writePos}`;
+                    break;
+                case 'queue':
+                    details.textContent = `消息数: ${resource.messages.length}/${resource.maxSize}`;
+                    break;
+                case 'shmem':
+                    details.textContent = `大小: ${Math.round(resource.size / 1024)}KB, 附加进程: ${resource.attachedProcesses.length}`;
+                    break;
+                case 'semaphore':
+                    details.textContent = `值: ${resource.value}/${resource.maxValue}, 等待: ${resource.waitingProcesses.length}`;
+                    break;
+            }
+
+            info.appendChild(name);
+            info.appendChild(details);
+
+            const actions = document.createElement('div');
+            actions.className = 'resource-actions';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn btn-small';
+            deleteBtn.textContent = '删除';
+            deleteBtn.onclick = () => deleteResource(resource.type, resource.id);
+
+            actions.appendChild(deleteBtn);
+
+            item.appendChild(info);
+            item.appendChild(actions);
+
+            return item;
+        }
+
+        function addLog(message, type = 'info') {
+            const logOutput = document.getElementById('logOutput');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+
+            while (logOutput.children.length > 100) {
+                logOutput.removeChild(logOutput.firstChild);
+            }
+        }
+
+        function sendQuantumMessage(type, data) {
+            const message = {
+                type: type,
+                source: 'ipc_manager.html',
+                quantumGenes: ipcState.quantumGenes,
+                timestamp: Date.now(),
+                data: data
+            };
+
+            if (window.parent !== window) {
+                window.parent.postMessage(message, '*');
+            }
+
+            if (typeof BroadcastChannel !== 'undefined') {
+                const channel = new BroadcastChannel('quantum-entanglement');
+                channel.postMessage(message);
+            }
+        }
+
+        function receiveQuantumMessage(event) {
+            if (event.data && event.data.quantumGenes && event.data.source !== 'ipc_manager.html') {
+                addLog(`收到量子纠缠消息: ${event.data.type} from ${event.data.source}`, 'quantum');
+                
+                if (event.data.type === 'CREATE_IPC_RESOURCE') {
+                    const { resourceType } = event.data.data;
+                    switch (resourceType) {
+                        case 'pipe':
+                            createPipe();
+                            break;
+                        case 'queue':
+                            createQueue();
+                            break;
+                        case 'shmem':
+                            createSharedMemory();
+                            break;
+                        case 'semaphore':
+                            createSemaphore();
+                            break;
+                    }
+                }
+            }
+        }
+
+        // 显示特定类型资源
+        function showPipes() {
+            addLog(`当前管道数量: ${ipcState.pipes.size}`, 'info');
+        }
+
+        function showQueues() {
+            addLog(`当前消息队列数量: ${ipcState.queues.size}`, 'info');
+        }
+
+        function showSharedMemory() {
+            addLog(`当前共享内存段数量: ${ipcState.sharedMemory.size}`, 'info');
+        }
+
+        function showSemaphores() {
+            addLog(`当前信号量数量: ${ipcState.semaphores.size}`, 'info');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeIPC();
+            addLog('量子进程间通信管理器已启动', 'quantum');
+            addLog('量子基因编码: ' + ipcState.quantumGenes, 'info');
+
+            // 设置消息监听
+            window.addEventListener('message', receiveQuantumMessage);
+            
+            if (typeof BroadcastChannel !== 'undefined') {
+                const channel = new BroadcastChannel('quantum-entanglement');
+                channel.onmessage = receiveQuantumMessage;
+            }
+
+            // 定期更新统计信息
+            setInterval(updateStats, 2000);
+
+            // 发送初始化完成消息
+            setTimeout(() => {
+                sendQuantumMessage('COMPONENT_READY', {
+                    component: 'ipc_manager',
+                    capabilities: ['pipes', 'queues', 'shared_memory', 'semaphores']
+                });
+            }, 1000);
+
+            // 创建一些示例资源
+            setTimeout(() => {
+                createPipe();
+                createQueue();
+                createSharedMemory();
+                createSemaphore();
+            }, 2000);
+        });
+    </script>
+</body>
+</html> 

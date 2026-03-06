@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL 授权服务 - 量子权限管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #FFD700;
+            background: rgba(0,0,0,0.2);
+            padding: 5px 15px;
+            border-radius: 15px;
+            display: inline-block;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #FFD700;
+        }
+
+        .permission-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .permission-item {
+            background: rgba(255,255,255,0.05);
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .role-badge {
+            background: #00FF88;
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-active { background: #00FF88; }
+        .status-pending { background: #FFD700; }
+        .status-denied { background: #ff6b6b; }
+
+        .btn {
+            background: linear-gradient(45deg, #00FF88, #00CC6A);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,255,136,0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
+        .access-log {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #00FF88;
+            padding-left: 10px;
+        }
+
+        .log-denied {
+            border-left-color: #ff6b6b;
+        }
+
+        .quantum-security {
+            background: linear-gradient(45deg, rgba(255,215,0,0.2), rgba(0,255,136,0.2));
+            border: 2px solid #FFD700;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quantum-security::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,215,0,0.1), transparent);
+            animation: quantum-spin 3s linear infinite;
+        }
+
+        @keyframes quantum-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🔐 QEntL 授权服务</h1>
+            <p>量子权限管理与访问控制系统</p>
+            <div class="quantum-gene">量子基因码: QSM-AUTHZ-2056-Y892</div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3 class="card-title">👥 用户角色管理</h3>
+                <div id="rolesList">
+                    <div class="permission-item">
+                        <span>管理员 <span class="role-badge">ADMIN</span></span>
+                        <button class="btn" onclick="editRole('admin')">编辑</button>
+                    </div>
+                    <div class="permission-item">
+                        <span>普通用户 <span class="role-badge">USER</span></span>
+                        <button class="btn" onclick="editRole('user')">编辑</button>
+                    </div>
+                    <div class="permission-item">
+                        <span>访客 <span class="role-badge">GUEST</span></span>
+                        <button class="btn" onclick="editRole('guest')">编辑</button>
+                    </div>
+                </div>
+                <button class="btn" onclick="addRole()">➕ 添加角色</button>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">🛡️ 权限列表</h3>
+                <div class="permission-list" id="permissionsList">
+                    <div class="permission-item">
+                        <span><span class="status-indicator status-active"></span>系统管理</span>
+                        <small>system.admin</small>
+                    </div>
+                    <div class="permission-item">
+                        <span><span class="status-indicator status-active"></span>查看用户</span>
+                        <small>user.view</small>
+                    </div>
+                    <div class="permission-item">
+                        <span><span class="status-indicator status-active"></span>编辑用户</span>
+                        <small>user.edit</small>
+                    </div>
+                    <div class="permission-item">
+                        <span><span class="status-indicator status-active"></span>创建资源</span>
+                        <small>resource.create</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card quantum-security">
+                <h3 class="card-title">⚛️ 量子安全状态</h3>
+                <div style="position: relative; z-index: 10;">
+                    <p><strong>量子纠缠加密:</strong> <span style="color: #00FF88;">已启用</span></p>
+                    <p><strong>安全级别:</strong> <span style="color: #FFD700;">高级</span></p>
+                    <p><strong>活跃会话:</strong> <span id="activeSessions">12</span></p>
+                    <p><strong>威胁检测:</strong> <span style="color: #00FF88;">正常</span></p>
+                    <button class="btn" onclick="refreshSecurity()">🔄 刷新状态</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">📊 访问统计</h3>
+                <div>
+                    <p>今日访问请求: <span style="color: #00FF88;" id="todayRequests">1,247</span></p>
+                    <p>成功授权: <span style="color: #00FF88;" id="successAuth">1,198</span></p>
+                    <p>拒绝访问: <span style="color: #ff6b6b;" id="deniedAuth">49</span></p>
+                    <p>平均响应时间: <span style="color: #FFD700;" id="avgResponse">2.3ms</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 class="card-title">📋 访问日志</h3>
+            <div class="access-log" id="accessLog">
+                <div class="log-entry">[2024-01-15 10:30:15] 用户 admin 访问 system.config - 允许</div>
+                <div class="log-entry log-denied">[2024-01-15 10:29:42] 用户 guest 访问 user.edit - 拒绝</div>
+                <div class="log-entry">[2024-01-15 10:28:33] 用户 user001 访问 resource.view - 允许</div>
+                <div class="log-entry">[2024-01-15 10:27:18] 用户 admin 访问 system.backup - 允许</div>
+                <div class="log-entry log-denied">[2024-01-15 10:26:05] 未知用户访问 system.admin - 拒绝</div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn" onclick="testAccess()">🧪 测试访问</button>
+            <button class="btn" onclick="exportLogs()">📤 导出日志</button>
+            <button class="btn btn-danger" onclick="emergencyLock()">🚨 紧急锁定</button>
+        </div>
+    </div>
+
+    <script>
+        const QUANTUM_GENE = 'QSM-AUTHZ-2056-Y892';
+        const QUANTUM_ENTANGLEMENT_CHANNEL = 'quantum-authorization-service';
+
+        // 量子纠缠通信
+        function sendQuantumMessage(type, data) {
+            const message = {
+                gene: QUANTUM_GENE,
+                channel: QUANTUM_ENTANGLEMENT_CHANNEL,
+                type: type,
+                data: data,
+                timestamp: Date.now()
+            };
+            window.postMessage(message, '*');
+            console.log(`[量子纠缠] 发送消息:`, message);
+        }
+
+        // 模拟数据
+        let accessRequests = 1247;
+        let successfulAuth = 1198;
+        let deniedAuth = 49;
+        let activeSessions = 12;
+
+        // 角色管理
+        function editRole(roleId) {
+            const roleName = roleId === 'admin' ? '管理员' : 
+                           roleId === 'user' ? '普通用户' : '访客';
+            alert(`编辑角色: ${roleName}`);
+            sendQuantumMessage('role_edit_requested', { roleId: roleId });
+        }
+
+        function addRole() {
+            const roleName = prompt('请输入新角色名称:');
+            if (roleName) {
+                sendQuantumMessage('role_added', { roleName: roleName });
+                alert(`角色 "${roleName}" 已添加`);
+            }
+        }
+
+        // 测试访问
+        function testAccess() {
+            const userId = prompt('请输入用户ID:') || 'test_user';
+            const resource = prompt('请输入资源ID:') || 'test_resource';
+            const permission = prompt('请输入权限ID:') || 'test.permission';
+            
+            // 模拟访问检查
+            const allowed = Math.random() > 0.2; // 80%成功率
+            const result = {
+                userId: userId,
+                resource: resource,
+                permission: permission,
+                allowed: allowed,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            // 添加到日志
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${allowed ? '' : 'log-denied'}`;
+            logEntry.textContent = `[${result.timestamp}] 用户 ${userId} 访问 ${resource} - ${allowed ? '允许' : '拒绝'}`;
+            
+            const accessLog = document.getElementById('accessLog');
+            accessLog.insertBefore(logEntry, accessLog.firstChild);
+            
+            // 更新统计
+            if (allowed) {
+                successfulAuth++;
+                document.getElementById('successAuth').textContent = successfulAuth.toLocaleString();
+            } else {
+                deniedAuth++;
+                document.getElementById('deniedAuth').textContent = deniedAuth.toLocaleString();
+            }
+            
+            accessRequests++;
+            document.getElementById('todayRequests').textContent = accessRequests.toLocaleString();
+            
+            sendQuantumMessage('access_tested', result);
+        }
+
+        // 刷新安全状态
+        function refreshSecurity() {
+            activeSessions = Math.floor(Math.random() * 20) + 5;
+            document.getElementById('activeSessions').textContent = activeSessions;
+            
+            const avgResponse = (Math.random() * 5 + 1).toFixed(1);
+            document.getElementById('avgResponse').textContent = avgResponse + 'ms';
+            
+            sendQuantumMessage('security_refreshed', {
+                activeSessions: activeSessions,
+                avgResponse: avgResponse
+            });
+        }
+
+        // 导出日志
+        function exportLogs() {
+            const logs = Array.from(document.querySelectorAll('.log-entry'))
+                .map(entry => entry.textContent)
+                .join('\n');
+            
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'qentl_access_logs.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            sendQuantumMessage('logs_exported', { timestamp: Date.now() });
+        }
+
+        // 紧急锁定
+        function emergencyLock() {
+            if (confirm('确定要启动紧急锁定模式吗？这将阻止所有非管理员访问。')) {
+                alert('🚨 紧急锁定模式已启动！');
+                sendQuantumMessage('emergency_lock_activated', { timestamp: Date.now() });
+                
+                // 视觉效果
+                document.body.style.filter = 'hue-rotate(60deg)';
+                setTimeout(() => {
+                    document.body.style.filter = '';
+                }, 3000);
+            }
+        }
+
+        // 定期更新统计
+        setInterval(() => {
+            // 模拟新的访问请求
+            if (Math.random() > 0.7) {
+                accessRequests++;
+                if (Math.random() > 0.2) {
+                    successfulAuth++;
+                } else {
+                    deniedAuth++;
+                }
+                
+                document.getElementById('todayRequests').textContent = accessRequests.toLocaleString();
+                document.getElementById('successAuth').textContent = successfulAuth.toLocaleString();
+                document.getElementById('deniedAuth').textContent = deniedAuth.toLocaleString();
+            }
+        }, 5000);
+
+        // 监听量子纠缠消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.gene && event.data.gene !== QUANTUM_GENE) {
+                console.log(`[量子纠缠] 接收消息:`, event.data);
+                
+                if (event.data.type === 'request_auth_status') {
+                    sendQuantumMessage('auth_status_response', {
+                        active: true,
+                        sessions: activeSessions,
+                        security_level: 'high'
+                    });
+                }
+            }
+        });
+
+        // 初始化
+        window.addEventListener('load', function() {
+            sendQuantumMessage('authorization_service_ready', {
+                version: '1.0.0',
+                features: ['roles', 'permissions', 'access_control', 'quantum_security'],
+                status: 'active'
+            });
+        });
+
+        console.log(`[QEntL 授权服务] 量子基因码: ${QUANTUM_GENE} 已激活`);
+    </script>
+</body>
+</html> 
