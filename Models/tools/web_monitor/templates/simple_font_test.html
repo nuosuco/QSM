@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单彝文字体测试</title>
+    <style>
+        @font-face {
+            font-family: 'YiFont';
+            src: url('/fonts/msyi.ttf') format('truetype');
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+
+        .yi-text {
+            font-family: 'YiFont', Arial, sans-serif;
+            font-size: 24px;
+            color: #000;
+            background: #ffffcc;
+            padding: 10px;
+            margin: 5px 0;
+        }
+
+        .normal-text {
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .debug-info {
+            background: #e8f4f8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>简单彝文字体测试</h1>
+    
+    <div class="test-box">
+        <h2>测试1: 单个彝文字符</h2>
+        <div class="yi-text">󲜐</div>
+        <div class="yi-text">󲜑</div>
+        <div class="yi-text">󲜒</div>
+        <div class="yi-text">󲜓</div>
+        <div class="yi-text">󲜔</div>
+    </div>
+
+    <div class="test-box">
+        <h2>测试2: 彝文文本</h2>
+        <div class="yi-text">这是彝文：󲜐󲜑󲜒󲜓󲜔</div>
+    </div>
+
+    <div class="test-box">
+        <h2>测试3: 混合文本</h2>
+        <div class="yi-text">中文：你好 彝文：󲜐󲜑󲜒 英文：Hello</div>
+    </div>
+
+    <div class="test-box">
+        <h2>测试4: 不同字体大小</h2>
+        <div class="yi-text" style="font-size: 16px;">小字体：󲜐󲜑󲜒</div>
+        <div class="yi-text" style="font-size: 24px;">中字体：󲜐󲜑󲜒</div>
+        <div class="yi-text" style="font-size: 32px;">大字体：󲜐󲜑󲜒</div>
+    </div>
+
+    <div class="test-box">
+        <h2>调试信息</h2>
+        <div class="debug-info" id="debug-info">
+            正在检测字体加载状态...
+        </div>
+    </div>
+
+    <script>
+        function updateDebugInfo() {
+            const debugDiv = document.getElementById('debug-info');
+            let info = '';
+            
+            // 检查字体API
+            if (document.fonts) {
+                info += 'Fonts API: 可用\n';
+                if (document.fonts.check) {
+                    const fontLoaded = document.fonts.check('16px YiFont');
+                    info += `字体加载状态: ${fontLoaded ? '已加载' : '未加载'}\n`;
+                }
+            } else {
+                info += 'Fonts API: 不可用\n';
+            }
+            
+            // 检查字符编码
+            const testChar = '󲜐';
+            info += `测试字符: ${testChar}\n`;
+            info += `字符长度: ${testChar.length}\n`;
+            info += `字符编码: ${testChar.charCodeAt(0).toString(16)}\n`;
+            
+            // 检查字体文件
+            info += `当前时间: ${new Date().toLocaleString()}\n`;
+            
+            debugDiv.textContent = info;
+        }
+
+        // 页面加载时检查
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDebugInfo();
+            
+            // 延迟检查
+            setTimeout(updateDebugInfo, 1000);
+            setTimeout(updateDebugInfo, 3000);
+        });
+
+        // 监听字体加载
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                console.log('字体加载完成');
+                updateDebugInfo();
+            });
+        }
+    </script>
+</body>
+</html> 

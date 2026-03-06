@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文字体显示修复方案</title>
+    <style>
+        @font-face {
+            font-family: 'YiWenFont';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'YiWenFont', 'Microsoft YaHei', Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        .section {
+            background: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #3498db;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .yi-char {
+            display: inline-block;
+            margin: 8px;
+            padding: 15px;
+            border: 2px solid #e74c3c;
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+            font-size: 28px;
+            min-width: 60px;
+            text-align: center;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        
+        .yi-char:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .canvas-char {
+            display: inline-block;
+            margin: 8px;
+            border: 2px solid #27ae60;
+            background: linear-gradient(45deg, #d5f4e6, #a8e6cf);
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .info-box {
+            background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            border: 1px solid #2196f3;
+        }
+        
+        .test-input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'YiWenFont', 'Microsoft YaHei', Arial, sans-serif;
+        }
+        
+        .test-button {
+            padding: 12px 25px;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .test-button:hover {
+            background: linear-gradient(45deg, #2980b9, #1f5f8b);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .result-box {
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background-color: #27ae60; }
+        .status-warning { background-color: #f39c12; }
+        .status-error { background-color: #e74c3c; }
+        
+        .font-test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .font-test-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        
+        .font-test-item h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .font-test-item .yi-sample {
+            font-size: 24px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌏 彝文字体显示修复方案</h1>
+        
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案1: 自定义字体加载</h2>
+            <p>使用项目中的 <code>msyi.ttf</code> 字体文件：</p>
+            <div class="yi-char">󲜐</div>
+            <div class="yi-char">󲜑</div>
+            <div class="yi-char">󲜒</div>
+            <div class="yi-char">󲜓</div>
+            <div class="yi-char">󲜔</div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案2: Canvas渲染</h2>
+            <p>通过Canvas生成彝文字符图片，确保在所有浏览器中都能显示：</p>
+            <div id="canvas-container"></div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-warning"></span>方案3: 字体回退测试</h2>
+            <div class="font-test-grid">
+                <div class="font-test-item">
+                    <h4>YiWenFont (自定义)</h4>
+                    <div class="yi-sample" style="font-family: 'YiWenFont';">󲜐 󲜑 󲜒</div>
+                </div>
+                <div class="font-test-item">
+                    <h4>Microsoft YaHei</h4>
+                    <div class="yi-sample" style="font-family: 'Microsoft YaHei';">󲜐 󲜑 󲜒</div>
+                </div>
+                <div class="font-test-item">
+                    <h4>Arial</h4>
+                    <div class="yi-sample" style="font-family: Arial;">󲜐 󲜑 󲜒</div>
+                </div>
+                <div class="font-test-item">
+                    <h4>SimSun</h4>
+                    <div class="yi-sample" style="font-family: SimSun;">󲜐 󲜑 󲜒</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案4: 彝文聊天测试</h2>
+            <input type="text" class="test-input" id="chat-input" placeholder="输入彝文字符或关键词进行测试...">
+            <button class="test-button" id="chat-btn">发送测试</button>
+            <div id="chat-result" class="result-box" style="display: none;">
+                <strong>响应:</strong> <span id="response-text"></span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-warning"></span>方案5: 字符编码分析</h2>
+            <div class="info-box" id="char-analysis">
+                正在分析字符编码...
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案6: 浏览器兼容性检测</h2>
+            <div class="info-box" id="browser-info">
+                正在获取浏览器信息...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 创建Canvas字符图片
+        function createCanvasChar(char, size = 60) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.className = 'canvas-char';
+            
+            const ctx = canvas.getContext('2d');
+            
+            // 渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#d5f4e6');
+            gradient.addColorStop(1, '#a8e6cf');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // 边框
+            ctx.strokeStyle = '#27ae60';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, size, size);
+            
+            // 文字
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = `bold ${size * 0.5}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, size/2, size/2);
+            
+            return canvas;
+        }
+
+        // 分析字符编码
+        function analyzeCharacters() {
+            const analysis = document.getElementById('char-analysis');
+            let text = '';
+            
+            const testChars = ['󲜐', '󲜑', '󲜒', '😀', '🌍', '🚀', '你', '好', 'A', '1'];
+            
+            text += '字符编码分析报告:\n';
+            text += '='.repeat(50) + '\n\n';
+            
+            testChars.forEach((char, i) => {
+                const code = char.charCodeAt(0);
+                const isYiWen = code >= 0xF0000 && code <= 0xFFFFF;
+                const status = isYiWen ? '✅ 彝文字符' : '❌ 非彝文字符';
+                
+                text += `字符 ${i+1}: "${char}"\n`;
+                text += `  长度: ${char.length}\n`;
+                text += `  Unicode: U+${code.toString(16).toUpperCase()}\n`;
+                text += `  十进制: ${code}\n`;
+                text += `  状态: ${status}\n`;
+                text += '\n';
+            });
+            
+            analysis.textContent = text;
+        }
+
+        // 获取浏览器信息
+        function getBrowserInfo() {
+            const info = document.getElementById('browser-info');
+            let text = '';
+            
+            text += '浏览器兼容性检测:\n';
+            text += '='.repeat(40) + '\n';
+            text += `User Agent: ${navigator.userAgent}\n`;
+            text += `平台: ${navigator.platform}\n`;
+            text += `语言: ${navigator.language}\n`;
+            text += `Cookie启用: ${navigator.cookieEnabled ? '✅' : '❌'}\n`;
+            text += `在线状态: ${navigator.onLine ? '✅' : '❌'}\n`;
+            text += `当前时间: ${new Date().toLocaleString()}\n`;
+            
+            // 检查Canvas支持
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            text += `Canvas支持: ${ctx ? '✅' : '❌'}\n`;
+            
+            // 检查字体API支持
+            if (document.fonts) {
+                text += `字体API: ✅ 支持\n`;
+            } else {
+                text += `字体API: ❌ 不支持\n`;
+            }
+            
+            // 检查WebGL支持
+            const canvas3d = document.createElement('canvas');
+            const gl = canvas3d.getContext('webgl') || canvas3d.getContext('experimental-webgl');
+            text += `WebGL支持: ${gl ? '✅' : '❌'}\n`;
+            
+            info.textContent = text;
+        }
+
+        // 创建Canvas字符
+        function createCanvasChars() {
+            const container = document.getElementById('canvas-container');
+            const chars = ['󲜐', '󲜑', '󲜒', '󲜓', '󲜔'];
+            
+            chars.forEach(char => {
+                const canvas = createCanvasChar(char);
+                container.appendChild(canvas);
+            });
+        }
+
+        // 测试聊天功能
+        async function testChat() {
+            const input = document.getElementById('chat-input');
+            const responseDiv = document.getElementById('chat-result');
+            const responseText = document.getElementById('response-text');
+            const testBtn = document.getElementById('chat-btn');
+            
+            const message = input.value.trim();
+            if (!message) return;
+            
+            testBtn.disabled = true;
+            testBtn.textContent = '测试中...';
+            
+            try {
+                const response = await fetch('/chat/qsm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                responseText.textContent = data.reply;
+                responseDiv.style.display = 'block';
+            } catch (err) {
+                responseText.textContent = `错误: ${err.message}`;
+                responseDiv.style.display = 'block';
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '发送测试';
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 创建Canvas字符
+            createCanvasChars();
+            
+            // 分析字符
+            analyzeCharacters();
+            
+            // 获取浏览器信息
+            getBrowserInfo();
+            
+            // 绑定聊天测试事件
+            document.getElementById('chat-btn').addEventListener('click', testChat);
+            document.getElementById('chat-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    testChat();
+                }
+            });
+            
+            // 检查字体加载状态
+            if (document.fonts) {
+                document.fonts.ready.then(function() {
+                    console.log('所有字体已加载完成');
+                });
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文字符回退测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+
+        .char-display {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #f9f9f9;
+            font-size: 20px;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .system-font {
+            font-family: "Microsoft YaHei", "SimSun", Arial, sans-serif;
+        }
+
+        .arial-font {
+            font-family: Arial, sans-serif;
+        }
+
+        .times-font {
+            font-family: "Times New Roman", serif;
+        }
+
+        .debug-box {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>彝文字符回退测试</h1>
+    
+    <div class="test-section">
+        <h2>测试1: 不同字体的彝文字符</h2>
+        <div>
+            <strong>系统字体:</strong>
+            <div class="char-display system-font">󲜐</div>
+            <div class="char-display system-font">󲜑</div>
+            <div class="char-display system-font">󲜒</div>
+        </div>
+        <div>
+            <strong>Arial字体:</strong>
+            <div class="char-display arial-font">󲜐</div>
+            <div class="char-display arial-font">󲜑</div>
+            <div class="char-display arial-font">󲜒</div>
+        </div>
+        <div>
+            <strong>Times字体:</strong>
+            <div class="char-display times-font">󲜐</div>
+            <div class="char-display times-font">󲜑</div>
+            <div class="char-display times-font">󲜒</div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试2: 字符编码信息</h2>
+        <div class="debug-box" id="char-info">
+            正在分析字符编码...
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试3: 不同Unicode范围的字符</h2>
+        <div>
+            <strong>彝文字符 (0xF0000-0xFFFFF):</strong>
+            <div class="char-display">󲜐</div>
+            <div class="char-display">󲜑</div>
+            <div class="char-display">󲜒</div>
+        </div>
+        <div>
+            <strong>其他Unicode字符:</strong>
+            <div class="char-display">😀</div>
+            <div class="char-display">🌍</div>
+            <div class="char-display">🚀</div>
+        </div>
+    </div>
+
+    <script>
+        function analyzeCharacters() {
+            const charInfo = document.getElementById('char-info');
+            let info = '';
+            
+            const testChars = ['󲜐', '󲜑', '󲜒', '😀', '🌍', '🚀'];
+            
+            testChars.forEach((char, index) => {
+                info += `字符 ${index + 1}: "${char}"\n`;
+                info += `  长度: ${char.length}\n`;
+                info += `  编码: ${char.charCodeAt(0).toString(16)}\n`;
+                info += `  是否在彝文范围: ${char.charCodeAt(0) >= 0xF0000 && char.charCodeAt(0) <= 0xFFFFF}\n`;
+                info += '\n';
+            });
+            
+            // 检查浏览器支持
+            info += `浏览器信息: ${navigator.userAgent}\n`;
+            info += `当前时间: ${new Date().toLocaleString()}\n`;
+            
+            charInfo.textContent = info;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            analyzeCharacters();
+        });
+    </script>
+</body>
+</html> 

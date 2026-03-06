@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset=UTF-8meta name=viewport" content="width=device-width, initial-scale=10
+    <title>彝文图片显示测试</title>
+    <style>
+        body [object Object]       font-family: Microsoft YaHei', Arial, sans-serif;
+            margin:20        background: #f5f5f5;
+        }
+        
+        .container[object Object]         max-width: 800            margin: 0 auto;
+            background: white;
+            padding:30            border-radius:10x;
+            box-shadow: 0 5px 15 rgba(0,0,0       }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin: 20           padding:20            border:2px solid #3498            border-radius: 8px;
+            background: #ecf0f1;
+        }
+        
+        .yi-image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1);
+            gap:15            margin: 20       }
+        
+        .yi-image-item [object Object]        text-align: center;
+            padding:15            border:2px solid #3498            border-radius: 8px;
+            background: white;
+        }
+        
+        .yi-image-item img {
+            width:64            height:64            margin-bottom: 10px;
+        }
+        
+        .yi-image-item .meaning [object Object]         font-size:14
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
+        .yi-image-item .code [object Object]         font-size:12
+            color: #7f8c8d;
+            font-family: Courier New', monospace;
+        }
+        
+        .btn {
+            background: #3498
+            color: white;
+            border: none;
+            padding: 10px20            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            background: #2980       }
+        
+        .status {
+            padding:10            margin: 10            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .success {
+            background: #d4
+            color: #155724       }
+        
+        .input-group {
+            margin: 15       }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2       }
+        
+        .input-group input, .input-group textarea {
+            width:100           padding:10            border:2px solid #3498            border-radius: 5px;
+            font-size:16x;
+            box-sizing: border-box;
+        }
+        
+        .input-group textarea {
+            height: 100            resize: vertical;
+        }
+        
+        .text-display {
+            background: white;
+            padding:15            border:2px solid #3498            border-radius: 5px;
+            margin: 100        min-height: 60;
+        }
+    </style>
+</head>
+<body>
+    <div class="container>
+        <h1🖼️ 彝文图片显示测试</h1>
+        
+        <div class="test-section>
+            <h2>✅ 成功生成彝文PUA字符图片</h2>
+            <div class=status success>
+                ✓ 已成功生成15彝文PUA字符的PNG图片，完全绕过浏览器字体限制！
+            </div>
+        </div>
+        
+        <div class="test-section>
+            <h2>1. 彝文字符图片展示</h2>
+            <div class=yi-image-grid" id="yi-image-grid>              <!-- 彝文图片将在这里动态生成 -->
+            </div>
+        </div>
+        
+        <div class="test-section>
+            <h2>2. 文本转换测试</h2>
+            <div class="input-group>
+                <label>输入彝文文本（使用图片显示）:</label>
+                <input type=text id="yi-text-inputplaceholder="输入彝文字符..." value="󲜐󲜑󲜒󲜓󲜔">
+            </div>
+            <div class="input-group>
+                <label>多行彝文:</label>
+                <textarea id=yi-textarea-input placeholder=输入多行彝文...">这是第一行：󲜐󲜑󲜒
+这是第二行：󲜕󲜖󲜗
+这是第三行：󲜘󲜙󲜚</textarea>
+            </div>
+            <button class="btn onclick="convertTextToImages()">将文本转换为图片显示</button>
+            <div id="text-to-images" class="text-display>              <!-- 转换后的图片将在这里显示 -->
+            </div>
+        </div>
+        
+        <div class="test-section>
+            <h2>3. 解决方案说明</h2>
+            <div>
+                <h3>问题根源：</h3
+                <ul>
+                    <li>浏览器对Unicode私有使用区（PUA）字符的字体渲染支持极差</li>
+                    <li>即使本地有字体文件，浏览器也不会用它渲染PUA字符</li>
+                    <li>@font-face、Canvas等都无法绕过这个限制</li>
+                </ul>
+                
+                <h3>解决方案：</h3
+                <ul>
+                    <li>✅ 使用Python + Pillow将彝文PUA字符渲染为PNG图片</li>
+                    <li>✅ 网页端用img标签显示图片，100%兼容所有浏览器</li>
+                    <li>✅ 完全绕过浏览器字体渲染限制</li>
+                </ul>
+                
+                <h3>使用方法：</h3
+                <ul>
+                    <li>1运行yi_pua_to_png.py生成所有需要的彝文字符图片</li>
+                    <li>2 网页端用img标签引用图片：&lt;img src=/yi_pua_png/yi_F1D10ngalt="陷害"&gt;</li>
+                    <li>3. 对于动态文本，可以用JavaScript将字符映射到对应的图片</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 彝文PUA字符映射表
+        const yiCharMap =[object Object]
+            󲜐': { meaning: 陷害', code: F110, image: /yi_pua_png/yi_F1D10.png'},
+            󲜑': { meaning: 兔子', code: F111, image: /yi_pua_png/yi_F1D11.png'},
+            󲜒: {meaning:卷', code: F112, image: /yi_pua_png/yi_F1D12.png'},
+            󲜓: {meaning:舔', code: F113, image: /yi_pua_png/yi_F1D13.png'},
+            󲜔': { meaning: 便宜', code: F114, image: /yi_pua_png/yi_F1D14.png'},
+            󲜕': { meaning: 埋怨', code: F115, image: /yi_pua_png/yi_F1D15.png'},
+            󲜖': { meaning: 裱褙', code: F116, image: /yi_pua_png/yi_F1D16.png'},
+            󲜗: {meaning:渣', code: F117, image: /yi_pua_png/yi_F1D17.png'},
+            󲜘: {meaning:尾', code: F118, image: /yi_pua_png/yi_F1D18.png'},
+            󲜙': { meaning: 分开', code: F119, image: /yi_pua_png/yi_F1D19.png'},
+            󲜚: {meaning:雪', code: F11, image: /yi_pua_png/yi_F1D1A.png'},
+            󲜛: {meaning:绊', code: F11, image: /yi_pua_png/yi_F1D1B.png'},
+            󲜜: {meaning:指', code: F11, image: /yi_pua_png/yi_F1D1C.png'},
+            󲜝: {meaning:包', code: F11, image: /yi_pua_png/yi_F1D1D.png'},
+            󲜞': { meaning: 锐利', code: F11, image: /yi_pua_png/yi_F1.png'}
+        };
+        
+        // 生成彝文图片网格
+        function generateYiImageGrid() {
+            const grid = document.getElementById(yi-image-grid');
+            let html = '';
+            Object.entries(yiCharMap).forEach(([char, info]) =>[object Object]              html += `
+                    <div class="yi-image-item">
+                        <img src="${info.image}" alt="${info.meaning}" title="${char}">
+                        <div class="meaning">${info.meaning}</div>
+                        <div class=code">${info.code}</div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+        
+        // 将文本转换为图片显示
+        function convertTextToImages() {
+            const input = document.getElementById('yi-text-input').value;
+            const textarea = document.getElementById(yi-textarea-input').value;
+            const output = document.getElementById('text-to-images');
+            
+            let html = <h4>单行文本转换结果：</h4>';
+            html += '<div style=margin: 10px 0;>';      
+            // 处理单行文本
+            for (let char of input)[object Object]                if (yiCharMap[char]) {
+                    const info = yiCharMap[char];
+                    html += `<img src="${info.image}" alt="${info.meaning}" title="${char}style="width: 32ight:32px; margin: 2px;">`;
+                } else {
+                    html += `<span style="font-size:24px; margin: 2px;">${char}</span>`;
+                }
+            }
+            html += '</div>';
+            
+            // 处理多行文本
+            if (textarea.trim())[object Object]              html += <h4>多行文本转换结果：</h4>;             const lines = textarea.split('\n');
+                lines.forEach((line, index) => {
+                    html += '<div style="margin: 10px 0 line-height: 32px;">';
+                    for (let char of line) {
+                        if (yiCharMap[char]) {
+                            const info = yiCharMap[char];
+                            html += `<img src="${info.image}" alt="${info.meaning}" title="${char}style="width: 24ight: 24gin: 1px; vertical-align: middle;">`;
+                        } else {
+                            html += `<span style="font-size: 16gin: 1px; vertical-align: middle;">${char}</span>`;
+                        }
+                    }
+                    html += '</div>;              });
+            }
+            
+            output.innerHTML = html;
+        }
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            generateYiImageGrid();
+        };
+    </script>
+</body>
+</html> 

@@ -1,0 +1,32 @@
+{
+  "model_info": {
+    "name": "量子通讯协调模型",
+    "description": "Quantum Communication Coordination Model",
+    "vocabulary_size": 110000,
+    "specialization": [
+      "网络协议",
+      "分布式计算",
+      "协作机制",
+      "通信理论"
+    ],
+    "training_data": "trilingual_weq_data.jsonl",
+    "model_path": "F:\\QSM\\Models\\WeQ",
+    "languages": {
+      "中文": 55000,
+      "英文": 44000,
+      "滇川黔贵通用彝文": 11000
+    }
+  },
+  "training_config": {
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "num_epochs": 10,
+    "max_seq_length": 512,
+    "warmup_steps": 1000,
+    "gradient_accumulation_steps": 8,
+    "fp16": true,
+    "dataloader_num_workers": 4
+  },
+  "timestamp": "2025-07-03T15:25:14.132479",
+  "status": "training_started"
+}

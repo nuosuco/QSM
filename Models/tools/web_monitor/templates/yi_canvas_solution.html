@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas彝文显示解决方案</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: #ecf0f1;
+        }
+        
+        .canvas-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .yi-canvas {
+            border: 2px solid #3498db;
+            border-radius: 5px;
+            background: white;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn:hover { background: #2980b9; }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #3498db;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .input-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Canvas彝文显示解决方案</h1>
+        
+        <div class="test-section">
+            <h2>1. 输入彝文文本</h2>
+            <div class="input-group">
+                <label>彝文文本:</label>
+                <input type="text" id="yi-input" placeholder="输入彝文字符..." value="󲜐󲜑󲜒󲜓󲜔">
+            </div>
+            <div class="input-group">
+                <label>多行彝文:</label>
+                <textarea id="yi-textarea" placeholder="输入多行彝文...">󲜐󲜑󲜒󲜓󲜔
+这是第二行：󲜕󲜖󲜗
+这是第三行：󲜘󲜙󲜚</textarea>
+            </div>
+            <button class="btn" onclick="renderInputText()">渲染输入文本</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. Canvas渲染结果</h2>
+            <div id="canvas-output" class="canvas-container">
+                <!-- Canvas元素将在这里动态生成 -->
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. 预设彝文测试</h2>
+            <div id="preset-canvases" class="canvas-container">
+                <!-- 预设的Canvas将在这里生成 -->
+            </div>
+            <button class="btn" onclick="generatePresetCanvases()">生成预设Canvas</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>4. 状态信息</h2>
+            <div id="status-info" class="status">正在初始化...</div>
+        </div>
+    </div>
+
+    <script>
+        // 私有使用区彝文字符
+        const privateYiChars = [
+            { char: '󲜐', meaning: '陷害' },
+            { char: '󲜑', meaning: '兔子' },
+            { char: '󲜒', meaning: '卷' },
+            { char: '󲜓', meaning: '舔' },
+            { char: '󲜔', meaning: '便宜' },
+            { char: '󲜕', meaning: '埋怨' },
+            { char: '󲜖', meaning: '裱褙' },
+            { char: '󲜗', meaning: '渣' },
+            { char: '󲜘', meaning: '尾' },
+            { char: '󲜙', meaning: '分开' },
+            { char: '󲜚', meaning: '雪' },
+            { char: '󲜛', meaning: '绊' },
+            { char: '󲜜', meaning: '指' },
+            { char: '󲜝', meaning: '包' },
+            { char: '󲜞', meaning: '锐利' }
+        ];
+        
+        // 渲染文本到Canvas
+        function renderTextToCanvas(text, width = 300, height = 60) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            canvas.className = 'yi-canvas';
+            
+            const ctx = canvas.getContext('2d');
+            
+            // 设置背景
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            
+            // 设置字体和样式
+            ctx.font = '24px Arial, sans-serif';
+            ctx.fillStyle = '#2c3e50';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            
+            // 渲染文本
+            const lines = text.split('\n');
+            const lineHeight = 30;
+            const startY = height / 2 - (lines.length - 1) * lineHeight / 2;
+            
+            lines.forEach((line, index) => {
+                const y = startY + index * lineHeight;
+                ctx.fillText(line, 10, y);
+            });
+            
+            return canvas;
+        }
+        
+        // 渲染输入文本
+        function renderInputText() {
+            const input = document.getElementById('yi-input').value;
+            const textarea = document.getElementById('yi-textarea').value;
+            const output = document.getElementById('canvas-output');
+            
+            output.innerHTML = '';
+            
+            // 渲染单行文本
+            if (input.trim()) {
+                const canvas1 = renderTextToCanvas(input, 400, 60);
+                output.appendChild(canvas1);
+            }
+            
+            // 渲染多行文本
+            if (textarea.trim()) {
+                const canvas2 = renderTextToCanvas(textarea, 400, 120);
+                output.appendChild(canvas2);
+            }
+            
+            updateStatus('文本已渲染到Canvas');
+        }
+        
+        // 生成预设Canvas
+        function generatePresetCanvases() {
+            const container = document.getElementById('preset-canvases');
+            container.innerHTML = '';
+            
+            // 生成单个字符的Canvas
+            privateYiChars.forEach((item, index) => {
+                const canvas = renderTextToCanvas(item.char, 80, 60);
+                canvas.title = `${item.char} - ${item.meaning}`;
+                container.appendChild(canvas);
+            });
+            
+            // 生成组合文本的Canvas
+            const combinedText = privateYiChars.slice(0, 5).map(item => item.char).join('');
+            const combinedCanvas = renderTextToCanvas(combinedText, 400, 60);
+            combinedCanvas.title = '组合彝文';
+            container.appendChild(combinedCanvas);
+            
+            updateStatus('预设Canvas已生成');
+        }
+        
+        // 更新状态信息
+        function updateStatus(message) {
+            const statusDiv = document.getElementById('status-info');
+            statusDiv.className = 'status success';
+            statusDiv.textContent = `✓ ${message}`;
+        }
+        
+        // 检查Canvas支持
+        function checkCanvasSupport() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (ctx) {
+                updateStatus('Canvas支持正常');
+                return true;
+            } else {
+                const statusDiv = document.getElementById('status-info');
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '✗ 浏览器不支持Canvas';
+                return false;
+            }
+        }
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            if (checkCanvasSupport()) {
+                generatePresetCanvases();
+            }
+        };
+    </script>
+</body>
+</html> 

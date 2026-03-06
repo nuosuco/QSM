@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字体加载调试页面</title>
+    <style>
+        /* 多种字体定义方式 */
+        @font-face {
+            font-family: 'LSTY-Yi-Black';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        
+        @font-face {
+            font-family: 'YiWenFont';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        
+        @font-face {
+            font-family: 'YiWenFont2';
+            src: url('data:font/truetype;base64,') url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .char-test {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px;
+            border: 2px solid #333;
+            background: #f9f9f9;
+            font-size: 24px;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .font-test {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        .font-test h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .font-test .sample {
+            font-size: 20px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+        
+        .info-box {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background-color: #27ae60; }
+        .status-warning { background-color: #f39c12; }
+        .status-error { background-color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 字体加载调试页面</h1>
+        
+        <div class="test-section">
+            <h2><span class="status status-error"></span>问题诊断</h2>
+            <div class="info-box" id="diagnosis">
+                正在诊断字体加载问题...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status status-warning"></span>字体加载测试</h2>
+            <div class="font-test">
+                <h4>1. LSTY-Yi-Black 字体</h4>
+                <div class="sample" style="font-family: 'LSTY-Yi-Black';">󲜐 󲜑 󲜒 测试字符</div>
+            </div>
+            <div class="font-test">
+                <h4>2. YiWenFont 字体</h4>
+                <div class="sample" style="font-family: 'YiWenFont';">󲜐 󲜑 󲜒 测试字符</div>
+            </div>
+            <div class="font-test">
+                <h4>3. YiWenFont2 字体</h4>
+                <div class="sample" style="font-family: 'YiWenFont2';">󲜐 󲜑 󲜒 测试字符</div>
+            </div>
+            <div class="font-test">
+                <h4>4. 系统默认字体</h4>
+                <div class="sample" style="font-family: Arial;">󲜐 󲜑 󲜒 测试字符</div>
+            </div>
+            <div class="font-test">
+                <h4>5. 微软雅黑</h4>
+                <div class="sample" style="font-family: 'Microsoft YaHei';">󲜐 󲜑 󲜒 测试字符</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status status-warning"></span>字符编码测试</h2>
+            <div class="char-test">󲜐</div>
+            <div class="char-test">󲜑</div>
+            <div class="char-test">󲜒</div>
+            <div class="char-test">你</div>
+            <div class="char-test">好</div>
+            <div class="char-test">A</div>
+            <div class="char-test">1</div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status status-success"></span>字体加载状态</h2>
+            <div class="info-box" id="font-status">
+                正在检测字体加载状态...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2><span class="status status-success"></span>浏览器信息</h2>
+            <div class="info-box" id="browser-info">
+                正在获取浏览器信息...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 诊断字体加载问题
+        function diagnoseFontIssues() {
+            const diagnosis = document.getElementById('diagnosis');
+            let text = '';
+            
+            text += '字体加载问题诊断:\n';
+            text += '='.repeat(50) + '\n\n';
+            
+            // 检查字体API支持
+            if (document.fonts) {
+                text += '✅ 浏览器支持字体API\n';
+            } else {
+                text += '❌ 浏览器不支持字体API\n';
+            }
+            
+            // 检查字体文件是否存在
+            const testFont = new FontFace('TestFont', 'url(/fonts/msyi.ttf)');
+            testFont.load().then(() => {
+                text += '✅ 字体文件可以加载\n';
+                diagnosis.textContent = text;
+            }).catch(() => {
+                text += '❌ 字体文件无法加载\n';
+                diagnosis.textContent = text;
+            });
+            
+            // 检查Unicode范围
+            const testChar = '󲜐';
+            const code = testChar.charCodeAt(0);
+            text += `字符编码: U+${code.toString(16).toUpperCase()}\n`;
+            text += `是否在彝文范围: ${code >= 0xF0000 && code <= 0xFFFFF ? '是' : '否'}\n`;
+            text += `是否在私有使用区域: ${code >= 0xE000 && code <= 0xF8FF || code >= 0xF0000 && code <= 0xFFFFF ? '是' : '否'}\n`;
+            
+            diagnosis.textContent = text;
+        }
+
+        // 检测字体加载状态
+        function checkFontStatus() {
+            const status = document.getElementById('font-status');
+            let text = '';
+            
+            text += '字体加载状态检测:\n';
+            text += '='.repeat(40) + '\n\n';
+            
+            if (document.fonts) {
+                const fonts = ['LSTY-Yi-Black', 'YiWenFont', 'YiWenFont2'];
+                
+                fonts.forEach(font => {
+                    const loaded = document.fonts.check(`12px "${font}"`);
+                    text += `${font}: ${loaded ? '✅ 已加载' : '❌ 未加载'}\n`;
+                });
+                
+                // 等待字体加载
+                document.fonts.ready.then(() => {
+                    text += '\n所有字体加载完成！\n';
+                    status.textContent = text;
+                });
+            } else {
+                text += '无法检测字体加载状态（浏览器不支持字体API）\n';
+            }
+            
+            status.textContent = text;
+        }
+
+        // 获取浏览器信息
+        function getBrowserInfo() {
+            const info = document.getElementById('browser-info');
+            let text = '';
+            
+            text += '浏览器信息:\n';
+            text += '='.repeat(30) + '\n';
+            text += `User Agent: ${navigator.userAgent}\n`;
+            text += `平台: ${navigator.platform}\n`;
+            text += `语言: ${navigator.language}\n`;
+            text += `Cookie启用: ${navigator.cookieEnabled}\n`;
+            text += `在线状态: ${navigator.onLine}\n`;
+            text += `当前时间: ${new Date().toLocaleString()}\n`;
+            
+            // 检查Canvas支持
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            text += `Canvas支持: ${ctx ? '是' : '否'}\n`;
+            
+            // 检查字体API支持
+            if (document.fonts) {
+                text += `字体API: 支持\n`;
+            } else {
+                text += `字体API: 不支持\n`;
+            }
+            
+            info.textContent = text;
+        }
+
+        // 测试字体加载
+        function testFontLoading() {
+            console.log('开始测试字体加载...');
+            
+            // 测试字体文件是否存在
+            fetch('/fonts/msyi.ttf')
+                .then(response => {
+                    if (response.ok) {
+                        console.log('字体文件存在');
+                    } else {
+                        console.log('字体文件不存在');
+                    }
+                })
+                .catch(error => {
+                    console.log('字体文件加载失败:', error);
+                });
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('页面加载完成，开始诊断...');
+            
+            // 诊断字体问题
+            diagnoseFontIssues();
+            
+            // 检测字体状态
+            checkFontStatus();
+            
+            // 获取浏览器信息
+            getBrowserInfo();
+            
+            // 测试字体加载
+            testFontLoading();
+            
+            // 延迟重新检测
+            setTimeout(() => {
+                console.log('延迟检测字体状态...');
+                checkFontStatus();
+            }, 2000);
+        });
+    </script>
+</body>
+</html> 
