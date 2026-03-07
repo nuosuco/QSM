@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL Web操作系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+        .desktop {
+            width: 100vw;
+            height: calc(100vh - 48px);
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 100px);
+            grid-template-rows: repeat(auto-fill, 100px);
+            gap: 20px;
+            align-content: start;
+        }
+        .desktop-icon {
+            width: 90px; height: 90px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            cursor: pointer; border-radius: 10px;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid transparent;
+        }
+        .desktop-icon:hover {
+            background: rgba(138,135,255,0.2);
+            border-color: rgba(138,135,255,0.5);
+            transform: scale(1.05);
+        }
+        .desktop-icon .icon { font-size: 40px; margin-bottom: 8px; }
+        .desktop-icon .label { font-size: 12px; color: #fff; text-align: center; }
+        .taskbar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 48px;
+            background: rgba(10,10,26,0.95);
+            border-top: 1px solid rgba(138,135,255,0.3);
+            display: flex; align-items: center;
+            padding: 0 10px; z-index: 1000;
+        }
+        .start-btn {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #8a87ff, #6c63ff);
+            border: none; cursor: pointer;
+            font-size: 20px; color: #fff;
+        }
+        .start-btn:hover { transform: scale(1.1); }
+        .taskbar-apps { display: flex; gap: 5px; margin-left: 10px; flex: 1; }
+        .taskbar-app {
+            height: 36px; padding: 0 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 5px; color: #fff;
+            font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .taskbar-app:hover { background: rgba(138,135,255,0.3); }
+        .system-tray { display: flex; align-items: center; gap: 15px; padding: 0 10px; }
+        .quantum-indicator {
+            display: flex; align-items: center; gap: 5px;
+            padding: 5px 10px;
+            background: rgba(138,135,255,0.2);
+            border-radius: 15px; font-size: 12px; color: #8a87ff;
+        }
+        .quantum-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #4ecdc4;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .clock { font-size: 12px; color: #fff; text-align: right; line-height: 1.4; }
+        .lang-switch { position: fixed; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 1001; }
+        .lang-btn {
+            padding: 5px 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 5px; color: #fff;
+            font-size: 12px; cursor: pointer;
+        }
+        .lang-btn:hover, .lang-btn.active { background: rgba(138,135,255,0.3); }
+    </style>
+</head>
+<body>
+    <div class="lang-switch">
+        <button class="lang-btn active" onclick="setLang('zh')">中文</button>
+        <button class="lang-btn" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('yi')">ꆈꌠ</button>
+    </div>
+    <div class="desktop" id="desktop"></div>
+    <div class="taskbar">
+        <button class="start-btn" onclick="alert('开始菜单')">⚛</button>
+        <div class="taskbar-apps" id="taskbar-apps"></div>
+        <div class="system-tray">
+            <div class="quantum-indicator"><div class="quantum-dot"></div><span id="qstat">量子态运行中</span></div>
+            <div class="clock" id="clock"></div>
+        </div>
+    </div>
+    <script>
+        const apps = [
+            {id:'qvm',icon:'⚛️',zh:'量子虚拟机',en:'Quantum VM',yi:'ꇇꃀꈌꐥ',url:'/apps/qvm/'},
+            {id:'compiler',icon:'🔧',zh:'编译器',en:'Compiler',yi:'ꃅꊿꄂ',url:'/apps/compiler/'},
+            {id:'files',icon:'📁',zh:'文件管理',en:'Files',yi:'ꎭꂷ',url:'/apps/files/'},
+            {id:'settings',icon:'⚙️',zh:'设置',en:'Settings',yi:'ꀀꀋ',url:'#'}
+        ];
+        let lang='zh';
+        function render() {
+            const d=document.getElementById('desktop');
+            d.innerHTML=apps.map(a=>'<div class="desktop-icon" onclick="openApp(\''+a.id+'\')"><div class="icon">'+a.icon+'</div><div class="label">'+a[lang]+'</div></div>').join('');
+        }
+        function openApp(id) {
+            const a=apps.find(x=>x.id===id);
+            if(a && a.url!=='#') window.open(a.url,'_blank');
+            else alert('开发中: '+a[lang]);
+        }
+        function setLang(l){lang=l;document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent.includes(l==='zh'?'中文':l==='en'?'EN':'ꆈꌠ')));render();}
+        function clock(){const n=new Date();document.getElementById('clock').innerHTML=n.toLocaleTimeString()+'<br>'+n.toLocaleDateString();}
+        render();clock();setInterval(clock,1000);
+    </script>
+</body>
+</html>
