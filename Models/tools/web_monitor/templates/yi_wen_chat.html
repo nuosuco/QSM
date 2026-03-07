@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文聊天界面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .chat-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .chat-history {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 7px;
+            max-width: 80%;
+            line-height: 1.4;
+        }
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #e9ecef;
+            color: #333;
+            margin-right: auto;
+        }
+        .message-sender {
+            font-weight: bold;
+            margin-bottom: 4px;
+            font-size: 0.9em;
+        }
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .chat-input button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .chat-input button:hover {
+            background-color: #0056b3;
+        }
+        .yi-char-canvas {
+            display: inline-block;
+            margin: 2px;
+            vertical-align: middle;
+        }
+        .yi-text-container {
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <h1>彝文聊天界面</h1>
+    
+    <div class="chat-container">
+        <div class="chat-history" id="chat-history">
+            <div class="message bot-message">
+                <div class="message-sender">QSM</div>
+                <div>欢迎使用彝文聊天！请输入彝文字符或包含"彝文"关键词的请求。</div>
+            </div>
+        </div>
+        
+        <div class="chat-input">
+            <input type="text" id="chat-input" placeholder="输入消息...">
+            <button id="send-btn">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // 创建彝文字符Canvas图片
+        function createYiCharCanvas(char, size = 20) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.className = 'yi-char-canvas';
+            
+            const ctx = canvas.getContext('2d');
+            
+            // 设置背景
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+            
+            // 设置文字
+            ctx.fillStyle = '#000000';
+            ctx.font = `${size * 0.8}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, size/2, size/2);
+            
+            return canvas;
+        }
+
+        // 处理文本中的彝文字符
+        function processYiText(text) {
+            const container = document.createElement('div');
+            container.className = 'yi-text-container';
+            
+            let currentText = '';
+            let result = document.createDocumentFragment();
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const code = char.charCodeAt(0);
+                
+                // 检查是否是彝文字符 (0xF0000-0xFFFFF)
+                if (code >= 0xF0000 && code <= 0xFFFFF) {
+                    // 如果有累积的文本，先添加
+                    if (currentText) {
+                        const textNode = document.createTextNode(currentText);
+                        result.appendChild(textNode);
+                        currentText = '';
+                    }
+                    // 添加彝文字符Canvas
+                    const canvas = createYiCharCanvas(char);
+                    result.appendChild(canvas);
+                } else {
+                    currentText += char;
+                }
+            }
+            
+            // 添加剩余的文本
+            if (currentText) {
+                const textNode = document.createTextNode(currentText);
+                result.appendChild(textNode);
+            }
+            
+            container.appendChild(result);
+            return container;
+        }
+
+        // 添加消息到聊天历史
+        function addMessage(sender, text, isUser = false) {
+            const chatHistory = document.getElementById('chat-history');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            
+            const senderDiv = document.createElement('div');
+            senderDiv.className = 'message-sender';
+            senderDiv.textContent = sender;
+            messageDiv.appendChild(senderDiv);
+            
+            // 处理彝文字符
+            const processedText = processYiText(text);
+            messageDiv.appendChild(processedText);
+            
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // 添加用户消息
+            addMessage('You', message, true);
+            input.value = '';
+            
+            // 禁用发送按钮
+            const sendBtn = document.getElementById('send-btn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = '发送中...';
+            
+            try {
+                const response = await fetch('/chat/qsm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                addMessage('QSM', data.reply, false);
+            } catch (err) {
+                addMessage('Error', '无法连接到服务器', false);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送';
+                input.focus();
+            }
+        }
+
+        // 事件监听
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html> 

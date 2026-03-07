@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL进程管理器 - 量子文件场</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%);
+            color: #2d3436;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #e17055;
+            font-size: 14px;
+        }
+
+        .process-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .process-section {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #e17055;
+        }
+
+        .process-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+
+        .process-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.3s ease;
+        }
+
+        .process-item:hover {
+            background: #e3f2fd;
+        }
+
+        .process-item.critical {
+            border-left: 4px solid #e17055;
+        }
+
+        .process-item.quantum {
+            border-left: 4px solid #fd79a8;
+            background: linear-gradient(90deg, rgba(253, 121, 168, 0.1), transparent);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #fd79a8, #e84393);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 12px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(253, 121, 168, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #e17055, #d63031);
+        }
+
+        .resource-monitor {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .resource-item {
+            background: rgba(253, 121, 168, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .resource-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #e17055;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fd79a8, #fdcb6e);
+            transition: width 0.3s ease;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ QEntL进程管理器</h1>
+            <div class="quantum-gene">量子基因: 0xPM1234 | 管理效率: 0.94</div>
+            <p>智能进程监控与资源管理系统</p>
+        </div>
+
+        <div class="process-panel">
+            <!-- 进程列表 -->
+            <div class="process-section">
+                <div class="section-title">📋 运行进程</div>
+                <div class="process-list" id="processList"></div>
+                <div style="margin-top: 10px;">
+                    <input type="text" class="input-field" id="processName" placeholder="进程名称">
+                    <button class="btn" onclick="startProcess()">启动进程</button>
+                    <button class="btn btn-danger" onclick="killAllProcesses()">结束所有</button>
+                </div>
+            </div>
+
+            <!-- 资源监控 -->
+            <div class="process-section">
+                <div class="section-title">📊 资源监控</div>
+                <div class="resource-monitor">
+                    <div class="resource-item">
+                        <div class="resource-value" id="cpuUsage">0%</div>
+                        <div>CPU使用率</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="cpuProgress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" id="memoryUsage">0%</div>
+                        <div>内存使用率</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="memoryProgress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" id="processCount">0</div>
+                        <div>进程数量</div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" id="quantumProcesses">0</div>
+                        <div>量子进程</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进程间通信 -->
+            <div class="process-section">
+                <div class="section-title">🔗 进程间通信</div>
+                <div>
+                    <p>活跃IPC连接: <span id="ipcConnections">0</span></p>
+                    <p>消息队列: <span id="messageQueue">0</span></p>
+                    <p>共享内存: <span id="sharedMemory">0 MB</span></p>
+                    <button class="btn" onclick="testIPC()">测试IPC</button>
+                    <button class="btn" onclick="clearIPC()">清理IPC</button>
+                </div>
+            </div>
+
+            <!-- 量子进程 -->
+            <div class="process-section">
+                <div class="section-title">⚛️ 量子进程管理</div>
+                <div>
+                    <p>量子叠加态进程: <span id="superpositionProcesses">0</span></p>
+                    <p>量子纠缠进程对: <span id="entangledProcesses">0</span></p>
+                    <p>量子计算单元: <span id="quantumUnits">未激活</span></p>
+                    <button class="btn" onclick="createQuantumProcess()">创建量子进程</button>
+                    <button class="btn" onclick="activateQuantumUnits()">激活量子单元</button>
+                </div>
+            </div>
+
+            <!-- 性能优化 -->
+            <div class="process-section">
+                <div class="section-title">🚀 性能优化</div>
+                <div>
+                    <p>自动优化: <span id="autoOptimization">关闭</span></p>
+                    <p>负载均衡: <span id="loadBalancing">关闭</span></p>
+                    <p>优化级别: <span id="optimizationLevel">标准</span></p>
+                    <button class="btn" onclick="optimizePerformance()">优化性能</button>
+                    <button class="btn" onclick="balanceLoad()">负载均衡</button>
+                </div>
+            </div>
+
+            <!-- 系统监控 -->
+            <div class="process-section">
+                <div class="section-title">🖥️ 系统监控</div>
+                <div>
+                    <p>系统运行时间: <span id="systemUptime">0天0时0分</span></p>
+                    <p>平均负载: <span id="avgLoad">0.00</span></p>
+                    <p>网络连接: <span id="networkConnections">0</span></p>
+                    <p>磁盘I/O: <span id="diskIO">0 MB/s</span></p>
+                    <button class="btn" onclick="refreshSystemInfo()">刷新信息</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class QuantumProcessManager {
+            constructor() {
+                this.quantumGene = '0xPM1234';
+                this.managementEfficiency = 0.94;
+                this.processes = new Map();
+                this.resources = {
+                    cpuUsage: 0,
+                    memoryUsage: 0,
+                    processCount: 0,
+                    quantumProcesses: 0
+                };
+                this.ipcStats = {
+                    connections: 0,
+                    messageQueue: 0,
+                    sharedMemory: 0
+                };
+                this.systemInfo = {
+                    uptime: 0,
+                    avgLoad: 0,
+                    networkConnections: 0,
+                    diskIO: 0
+                };
+                this.quantumUnitsActive = false;
+                this.init();
+            }
+
+            init() {
+                this.createSystemProcesses();
+                this.updateUI();
+                this.startResourceMonitoring();
+                this.startSystemMonitoring();
+            }
+
+            createSystemProcesses() {
+                this.createProcess('QEntL内核', 'SYSTEM', 'CRITICAL', 15.2, 128);
+                this.createProcess('量子文件系统', 'QUANTUM', 'HIGH', 8.5, 64);
+                this.createProcess('网络管理器', 'SYSTEM', 'NORMAL', 3.2, 32);
+                this.createProcess('GUI渲染器', 'USER', 'NORMAL', 12.8, 256);
+                this.createProcess('量子神经网络', 'QUANTUM', 'HIGH', 25.6, 512);
+            }
+
+            createProcess(name, type, priority, cpuUsage, memoryUsage) {
+                const process = {
+                    id: 'proc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    name: name,
+                    type: type, // SYSTEM, USER, QUANTUM
+                    priority: priority, // LOW, NORMAL, HIGH, CRITICAL
+                    status: 'RUNNING',
+                    cpuUsage: cpuUsage,
+                    memoryUsage: memoryUsage,
+                    startTime: new Date(),
+                    pid: Math.floor(Math.random() * 65535) + 1000,
+                    parentPid: type === 'SYSTEM' ? 1 : Math.floor(Math.random() * 1000) + 1
+                };
+                
+                this.processes.set(process.id, process);
+                this.updateResourceStats();
+                return process.id;
+            }
+
+            startProcess() {
+                const name = document.getElementById('processName').value;
+                if (!name) {
+                    alert('请输入进程名称');
+                    return;
+                }
+
+                const type = Math.random() > 0.7 ? 'QUANTUM' : 'USER';
+                const priority = ['LOW', 'NORMAL', 'HIGH'][Math.floor(Math.random() * 3)];
+                const cpuUsage = Math.random() * 20;
+                const memoryUsage = Math.random() * 100 + 10;
+
+                this.createProcess(name, type, priority, cpuUsage, memoryUsage);
+                this.updateUI();
+                
+                document.getElementById('processName').value = '';
+            }
+
+            killProcess(processId) {
+                const process = this.processes.get(processId);
+                if (process && process.type !== 'SYSTEM') {
+                    this.processes.delete(processId);
+                    this.updateResourceStats();
+                    this.updateUI();
+                }
+            }
+
+            killAllProcesses() {
+                const userProcesses = Array.from(this.processes.values())
+                    .filter(p => p.type === 'USER');
+                
+                userProcesses.forEach(p => this.processes.delete(p.id));
+                this.updateResourceStats();
+                this.updateUI();
+            }
+
+            createQuantumProcess() {
+                const quantumNames = [
+                    '量子叠加态计算器',
+                    '量子纠缠通信器',
+                    '量子并行处理器',
+                    '量子状态监控器',
+                    '量子错误纠正器'
+                ];
+                
+                const name = quantumNames[Math.floor(Math.random() * quantumNames.length)];
+                this.createProcess(name, 'QUANTUM', 'HIGH', Math.random() * 30 + 10, Math.random() * 200 + 50);
+                this.updateUI();
+            }
+
+            activateQuantumUnits() {
+                this.quantumUnitsActive = !this.quantumUnitsActive;
+                document.getElementById('quantumUnits').textContent = 
+                    this.quantumUnitsActive ? '已激活' : '未激活';
+                
+                if (this.quantumUnitsActive) {
+                    // 量子单元激活后提升性能
+                    this.managementEfficiency = 0.98;
+                }
+            }
+
+            testIPC() {
+                this.ipcStats.connections += Math.floor(Math.random() * 5) + 1;
+                this.ipcStats.messageQueue += Math.floor(Math.random() * 10) + 1;
+                this.ipcStats.sharedMemory += Math.random() * 10;
+                this.updateIPCStats();
+            }
+
+            clearIPC() {
+                this.ipcStats.connections = Math.max(0, this.ipcStats.connections - 5);
+                this.ipcStats.messageQueue = 0;
+                this.ipcStats.sharedMemory = Math.max(0, this.ipcStats.sharedMemory - 5);
+                this.updateIPCStats();
+            }
+
+            optimizePerformance() {
+                document.getElementById('autoOptimization').textContent = '开启';
+                document.getElementById('optimizationLevel').textContent = '高级';
+                
+                // 优化所有进程
+                this.processes.forEach(process => {
+                    process.cpuUsage *= 0.8;
+                    process.memoryUsage *= 0.9;
+                });
+                
+                this.updateResourceStats();
+                this.updateUI();
+            }
+
+            balanceLoad() {
+                document.getElementById('loadBalancing').textContent = '开启';
+                
+                // 平衡CPU负载
+                const totalCpu = Array.from(this.processes.values())
+                    .reduce((sum, p) => sum + p.cpuUsage, 0);
+                const avgCpu = totalCpu / this.processes.size;
+                
+                this.processes.forEach(process => {
+                    if (process.cpuUsage > avgCpu * 1.5) {
+                        process.cpuUsage = avgCpu * 1.2;
+                    }
+                });
+                
+                this.updateResourceStats();
+                this.updateUI();
+            }
+
+            updateResourceStats() {
+                let totalCpu = 0;
+                let totalMemory = 0;
+                let quantumCount = 0;
+                
+                this.processes.forEach(process => {
+                    totalCpu += process.cpuUsage;
+                    totalMemory += process.memoryUsage;
+                    if (process.type === 'QUANTUM') {
+                        quantumCount++;
+                    }
+                });
+                
+                this.resources.cpuUsage = Math.min(100, totalCpu);
+                this.resources.memoryUsage = Math.min(100, totalMemory / 10);
+                this.resources.processCount = this.processes.size;
+                this.resources.quantumProcesses = quantumCount;
+            }
+
+            startResourceMonitoring() {
+                setInterval(() => {
+                    // 模拟资源使用变化
+                    this.processes.forEach(process => {
+                        process.cpuUsage += (Math.random() - 0.5) * 2;
+                        process.cpuUsage = Math.max(0, Math.min(50, process.cpuUsage));
+                        
+                        process.memoryUsage += (Math.random() - 0.5) * 5;
+                        process.memoryUsage = Math.max(10, Math.min(500, process.memoryUsage));
+                    });
+                    
+                    this.updateResourceStats();
+                    this.updateResourceUI();
+                }, 2000);
+            }
+
+            startSystemMonitoring() {
+                setInterval(() => {
+                    this.systemInfo.uptime += 1;
+                    this.systemInfo.avgLoad = (this.resources.cpuUsage / 100 * 4).toFixed(2);
+                    this.systemInfo.networkConnections = Math.floor(Math.random() * 50) + 10;
+                    this.systemInfo.diskIO = (Math.random() * 100).toFixed(1);
+                    
+                    this.updateSystemInfoUI();
+                }, 1000);
+            }
+
+            updateUI() {
+                this.updateProcessList();
+                this.updateResourceUI();
+                this.updateIPCStats();
+            }
+
+            updateProcessList() {
+                const processList = document.getElementById('processList');
+                processList.innerHTML = '';
+                
+                Array.from(this.processes.values())
+                    .sort((a, b) => b.cpuUsage - a.cpuUsage)
+                    .forEach(process => {
+                        const item = document.createElement('div');
+                        item.className = `process-item ${process.type.toLowerCase()} ${process.priority.toLowerCase()}`;
+                        
+                        const typeIcon = {
+                            'SYSTEM': '⚙️',
+                            'USER': '👤',
+                            'QUANTUM': '⚛️'
+                        };
+                        
+                        item.innerHTML = `
+                            <div>
+                                <div><strong>${typeIcon[process.type]} ${process.name}</strong></div>
+                                <small>PID: ${process.pid} | CPU: ${process.cpuUsage.toFixed(1)}% | 内存: ${process.memoryUsage.toFixed(0)}MB</small>
+                            </div>
+                            <div>
+                                ${process.type !== 'SYSTEM' ? 
+                                    `<button class="btn btn-danger" onclick="processManager.killProcess('${process.id}')">结束</button>` : 
+                                    '<span style="color: #666;">系统进程</span>'
+                                }
+                            </div>
+                        `;
+                        
+                        processList.appendChild(item);
+                    });
+            }
+
+            updateResourceUI() {
+                document.getElementById('cpuUsage').textContent = this.resources.cpuUsage.toFixed(1) + '%';
+                document.getElementById('memoryUsage').textContent = this.resources.memoryUsage.toFixed(1) + '%';
+                document.getElementById('processCount').textContent = this.resources.processCount;
+                document.getElementById('quantumProcesses').textContent = this.resources.quantumProcesses;
+                
+                document.getElementById('cpuProgress').style.width = this.resources.cpuUsage + '%';
+                document.getElementById('memoryProgress').style.width = this.resources.memoryUsage + '%';
+            }
+
+            updateIPCStats() {
+                document.getElementById('ipcConnections').textContent = this.ipcStats.connections;
+                document.getElementById('messageQueue').textContent = this.ipcStats.messageQueue;
+                document.getElementById('sharedMemory').textContent = this.ipcStats.sharedMemory.toFixed(1) + ' MB';
+            }
+
+            updateSystemInfoUI() {
+                const days = Math.floor(this.systemInfo.uptime / 86400);
+                const hours = Math.floor((this.systemInfo.uptime % 86400) / 3600);
+                const minutes = Math.floor((this.systemInfo.uptime % 3600) / 60);
+                
+                document.getElementById('systemUptime').textContent = `${days}天${hours}时${minutes}分`;
+                document.getElementById('avgLoad').textContent = this.systemInfo.avgLoad;
+                document.getElementById('networkConnections').textContent = this.systemInfo.networkConnections;
+                document.getElementById('diskIO').textContent = this.systemInfo.diskIO + ' MB/s';
+            }
+
+            refreshSystemInfo() {
+                this.updateSystemInfoUI();
+            }
+        }
+
+        const processManager = new QuantumProcessManager();
+
+        // UI事件处理函数
+        function startProcess() {
+            processManager.startProcess();
+        }
+
+        function killAllProcesses() {
+            processManager.killAllProcesses();
+        }
+
+        function testIPC() {
+            processManager.testIPC();
+        }
+
+        function clearIPC() {
+            processManager.clearIPC();
+        }
+
+        function createQuantumProcess() {
+            processManager.createQuantumProcess();
+        }
+
+        function activateQuantumUnits() {
+            processManager.activateQuantumUnits();
+        }
+
+        function optimizePerformance() {
+            processManager.optimizePerformance();
+        }
+
+        function balanceLoad() {
+            processManager.balanceLoad();
+        }
+
+        function refreshSystemInfo() {
+            processManager.refreshSystemInfo();
+        }
+
+        // 量子纠缠通信
+        setInterval(() => {
+            window.parent.postMessage({
+                type: 'quantum-entanglement',
+                source: 'process-manager',
+                gene: processManager.quantumGene,
+                message: '进程管理器运行正常',
+                stats: processManager.resources
+            }, '*');
+        }, 5000);
+    </script>
+</body>
+</html> 

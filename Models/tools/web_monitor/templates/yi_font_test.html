@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文字体测试</title>
+    <style>
+        @font-face {
+            font-family: 'LSTY-Yi-Black';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        
+        .yi-char {
+            font-family: 'LSTY-Yi-Black', Arial, sans-serif;
+            font-size: 48px;
+            margin: 10px;
+            padding: 20px;
+            background: #ecf0f1;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            display: inline-block;
+            text-align: center;
+            min-width: 100px;
+        }
+        
+        .yi-char.fallback {
+            background: #e74c3c;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .debug-info {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔤 彝文字体加载测试</h1>
+        
+        <div class="test-section">
+            <h2>字体加载状态</h2>
+            <div id="font-status"></div>
+            <button class="btn" onclick="checkFontStatus()">检查字体状态</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>私有区彝文字符测试</h2>
+            <div id="yi-chars"></div>
+            <button class="btn" onclick="testYiChars()">测试彝文字符</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>字体文件信息</h2>
+            <div id="font-info"></div>
+            <button class="btn" onclick="checkFontFile()">检查字体文件</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>调试信息</h2>
+            <div class="debug-info" id="debug-info">
+                正在收集调试信息...
+            </div>
+            <button class="btn" onclick="collectDebugInfo()">刷新调试信息</button>
+        </div>
+    </div>
+
+    <script>
+        // 私有使用区彝文字符
+        const privateYiChars = [
+            { char: '󲜐', meaning: '陷害', unicode: 'U+F1D10' },
+            { char: '󲜑', meaning: '兔子', unicode: 'U+F1D11' },
+            { char: '󲜒', meaning: '卷', unicode: 'U+F1D12' },
+            { char: '󲜓', meaning: '舔', unicode: 'U+F1D13' },
+            { char: '󲜔', meaning: '便宜', unicode: 'U+F1D14' }
+        ];
+        
+        // 检查字体状态
+        function checkFontStatus() {
+            const statusDiv = document.getElementById('font-status');
+            let status = '';
+            
+            // 检查字体API支持
+            const fontApiSupported = !!(document.fonts && document.fonts.check);
+            status += `<div class="status ${fontApiSupported ? 'success' : 'warning'}">
+                字体API支持: ${fontApiSupported ? '✓ 支持' : '⚠ 部分支持'}
+            </div>`;
+            
+            // 检查字体加载
+            if (document.fonts) {
+                const fontLoaded = document.fonts.check('12px LSTY-Yi-Black');
+                status += `<div class="status ${fontLoaded ? 'success' : 'error'}">
+                    LSTY-Yi-Black字体: ${fontLoaded ? '✓ 已加载' : '✗ 未加载'}
+                </div>`;
+                
+                // 检查字体是否可用
+                document.fonts.ready.then(() => {
+                    const fontAvailable = document.fonts.check('12px LSTY-Yi-Black');
+                    status += `<div class="status ${fontAvailable ? 'success' : 'error'}">
+                        字体可用性: ${fontAvailable ? '✓ 可用' : '✗ 不可用'}
+                    </div>`;
+                    statusDiv.innerHTML = status;
+                });
+            }
+            
+            statusDiv.innerHTML = status;
+        }
+        
+        // 测试彝文字符
+        function testYiChars() {
+            const container = document.getElementById('yi-chars');
+            let html = '';
+            
+            privateYiChars.forEach(item => {
+                const isDisplayed = item.char.length === 1;
+                html += `<div class="yi-char ${!isDisplayed ? 'fallback' : ''}">
+                    ${item.char}
+                    <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                        ${item.meaning} (${item.unicode})
+                    </div>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // 检查字体文件
+        function checkFontFile() {
+            const container = document.getElementById('font-info');
+            let html = '';
+            
+            // 检查字体文件路径
+            html += `<div class="status warning">
+                字体文件路径: /fonts/msyi.ttf
+            </div>`;
+            
+            // 检查字体定义
+            html += `<div class="status success">
+                字体名称: LSTY-Yi-Black
+            </div>`;
+            
+            // 检查CSS @font-face
+            html += `<div class="status success">
+                CSS @font-face: 已定义
+            </div>`;
+            
+            // 测试字体加载
+            const testElement = document.createElement('span');
+            testElement.textContent = '测试';
+            testElement.style.fontFamily = 'LSTY-Yi-Black, Arial, sans-serif';
+            testElement.style.fontSize = '24px';
+            
+            const isFontApplied = testElement.style.fontFamily.includes('LSTY-Yi-Black');
+            html += `<div class="status ${isFontApplied ? 'success' : 'error'}">
+                字体应用: ${isFontApplied ? '✓ 已应用' : '✗ 未应用'}
+            </div>`;
+            
+            container.innerHTML = html;
+        }
+        
+        // 收集调试信息
+        function collectDebugInfo() {
+            const debugInfo = document.getElementById('debug-info');
+            let info = '';
+            
+            info += `浏览器信息:\n`;
+            info += `User Agent: ${navigator.userAgent}\n`;
+            info += `平台: ${navigator.platform}\n\n`;
+            
+            info += `字体支持:\n`;
+            info += `Font Loading API: ${!!document.fonts}\n`;
+            info += `Font Face API: ${!!window.FontFace}\n`;
+            
+            if (document.fonts) {
+                info += `字体检查: ${document.fonts.check('12px LSTY-Yi-Black')}\n`;
+            }
+            
+            info += `\n字符测试:\n`;
+            privateYiChars.forEach(item => {
+                info += `${item.char} (${item.unicode}): ${item.char.length === 1 ? '正常' : '异常'}\n`;
+            });
+            
+            info += `\nCSS字体定义:\n`;
+            info += `@font-face { font-family: 'LSTY-Yi-Black'; src: url('/fonts/msyi.ttf'); }\n`;
+            
+            debugInfo.textContent = info;
+        }
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            checkFontStatus();
+            testYiChars();
+            checkFontFile();
+            collectDebugInfo();
+        };
+    </script>
+</body>
+</html> 

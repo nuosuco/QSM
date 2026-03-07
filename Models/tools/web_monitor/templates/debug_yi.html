@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文字符调试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .debug-section {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+        .char-display {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px;
+            border: 2px solid #000;
+            background: #ffffcc;
+            font-size: 24px;
+            min-width: 60px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .canvas-display {
+            display: inline-block;
+            margin: 5px;
+            border: 2px solid #000;
+            background: #ffffcc;
+        }
+        .info-box {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            border: 1px solid #ccc;
+        }
+        .test-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #007bff;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .test-button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result-box {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <h1>彝文字符调试页面</h1>
+    
+    <div class="debug-section">
+        <h2>1. 直接显示彝文字符</h2>
+        <p>如果下面显示方框，说明浏览器无法渲染这些Unicode字符：</p>
+        <div class="char-display">󲜐</div>
+        <div class="char-display">󲜑</div>
+        <div class="char-display">󲜒</div>
+        <div class="char-display">󲜓</div>
+        <div class="char-display">󲜔</div>
+    </div>
+
+    <div class="debug-section">
+        <h2>2. Canvas生成彝文字符图片</h2>
+        <p>这些是通过Canvas生成的图片，应该能正常显示：</p>
+        <div id="canvas-container"></div>
+    </div>
+
+    <div class="debug-section">
+        <h2>3. 字符编码分析</h2>
+        <div class="info-box" id="char-analysis">
+            正在分析字符编码...
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2>4. 聊天功能测试</h2>
+        <input type="text" class="test-input" id="chat-input" placeholder="输入彝文字符或关键词进行测试...">
+        <button class="test-button" id="chat-btn">发送测试</button>
+        <div id="chat-result" class="result-box" style="display: none;">
+            <strong>响应:</strong> <span id="response-text"></span>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h2>5. 浏览器信息</h2>
+        <div class="info-box" id="browser-info">
+            正在获取浏览器信息...
+        </div>
+    </div>
+
+    <script>
+        // 创建Canvas字符图片
+        function createCanvasChar(char, size = 50) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.className = 'canvas-display';
+            
+            const ctx = canvas.getContext('2d');
+            
+            // 背景
+            ctx.fillStyle = '#ffffcc';
+            ctx.fillRect(0, 0, size, size);
+            
+            // 边框
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, size, size);
+            
+            // 文字
+            ctx.fillStyle = '#000';
+            ctx.font = `bold ${size * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, size/2, size/2);
+            
+            return canvas;
+        }
+
+        // 分析字符编码
+        function analyzeCharacters() {
+            const analysis = document.getElementById('char-analysis');
+            let text = '';
+            
+            const testChars = ['󲜐', '󲜑', '󲜒', '😀', '🌍', '🚀', '你', '好', 'A', '1'];
+            
+            text += '字符编码分析:\n';
+            text += '='.repeat(50) + '\n\n';
+            
+            testChars.forEach((char, i) => {
+                text += `字符 ${i+1}: "${char}"\n`;
+                text += `  长度: ${char.length}\n`;
+                text += `  Unicode: U+${char.charCodeAt(0).toString(16).toUpperCase()}\n`;
+                text += `  十进制: ${char.charCodeAt(0)}\n`;
+                text += `  是否彝文范围: ${char.charCodeAt(0) >= 0xF0000 && char.charCodeAt(0) <= 0xFFFFF}\n`;
+                text += `  显示状态: ${char.charCodeAt(0) >= 0xF0000 && char.charCodeAt(0) <= 0xFFFFF ? '彝文字符' : '普通字符'}\n`;
+                text += '\n';
+            });
+            
+            analysis.textContent = text;
+        }
+
+        // 获取浏览器信息
+        function getBrowserInfo() {
+            const info = document.getElementById('browser-info');
+            let text = '';
+            
+            text += '浏览器信息:\n';
+            text += '='.repeat(30) + '\n';
+            text += `User Agent: ${navigator.userAgent}\n`;
+            text += `平台: ${navigator.platform}\n`;
+            text += `语言: ${navigator.language}\n`;
+            text += `Cookie启用: ${navigator.cookieEnabled}\n`;
+            text += `在线状态: ${navigator.onLine}\n`;
+            text += `当前时间: ${new Date().toLocaleString()}\n`;
+            
+            // 检查字体支持
+            if (document.fonts) {
+                text += `字体API: 支持\n`;
+            } else {
+                text += `字体API: 不支持\n`;
+            }
+            
+            info.textContent = text;
+        }
+
+        // 创建Canvas字符
+        function createCanvasChars() {
+            const container = document.getElementById('canvas-container');
+            const chars = ['󲜐', '󲜑', '󲜒', '󲜓', '󲜔'];
+            
+            chars.forEach(char => {
+                const canvas = createCanvasChar(char);
+                container.appendChild(canvas);
+            });
+        }
+
+        // 测试聊天功能
+        async function testChat() {
+            const input = document.getElementById('chat-input');
+            const resultDiv = document.getElementById('chat-result');
+            const responseText = document.getElementById('response-text');
+            const chatBtn = document.getElementById('chat-btn');
+            
+            const message = input.value.trim();
+            if (!message) return;
+            
+            chatBtn.disabled = true;
+            chatBtn.textContent = '发送中...';
+            
+            try {
+                const response = await fetch('/chat/qsm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                responseText.textContent = data.reply;
+                resultDiv.style.display = 'block';
+            } catch (err) {
+                responseText.textContent = '连接错误: ' + err.message;
+                resultDiv.style.display = 'block';
+            } finally {
+                chatBtn.disabled = false;
+                chatBtn.textContent = '发送测试';
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            analyzeCharacters();
+            getBrowserInfo();
+            createCanvasChars();
+            
+            document.getElementById('chat-btn').addEventListener('click', testChat);
+            document.getElementById('chat-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    testChat();
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

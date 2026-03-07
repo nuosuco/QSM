@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文字符图片显示测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+        .char-display {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #ffffcc;
+            font-size: 24px;
+            min-width: 50px;
+            text-align: center;
+        }
+        .image-char {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #ffffcc;
+            width: 50px;
+            height: 50px;
+            text-align: center;
+            line-height: 50px;
+            font-size: 20px;
+        }
+        .info {
+            background: #e8f4f8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>彝文字符图片显示测试</h1>
+    
+    <div class="test-box">
+        <h2>测试1: 直接显示彝文字符</h2>
+        <div class="char-display">󲜐</div>
+        <div class="char-display">󲜑</div>
+        <div class="char-display">󲜒</div>
+        <div class="char-display">󲜓</div>
+        <div class="char-display">󲜔</div>
+    </div>
+
+    <div class="test-box">
+        <h2>测试2: 使用Canvas生成彝文字符图片</h2>
+        <div id="canvas-chars"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>测试3: 字符信息分析</h2>
+        <div class="info" id="char-info">
+            正在分析字符...
+        </div>
+    </div>
+
+    <script>
+        function createCanvasChar(char, size = 50) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // 设置背景
+            ctx.fillStyle = '#ffffcc';
+            ctx.fillRect(0, 0, size, size);
+            
+            // 设置边框
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, size, size);
+            
+            // 设置文字
+            ctx.fillStyle = '#000';
+            ctx.font = `${size * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, size/2, size/2);
+            
+            return canvas;
+        }
+
+        function analyzeChars() {
+            const info = document.getElementById('char-info');
+            let text = '';
+            
+            const chars = ['󲜐', '󲜑', '󲜒', '😀', '🌍', '🚀', '你', '好'];
+            
+            chars.forEach((char, i) => {
+                text += `字符 ${i+1}: "${char}"\n`;
+                text += `  长度: ${char.length}\n`;
+                text += `  Unicode: ${char.charCodeAt(0).toString(16)}\n`;
+                text += `  十进制: ${char.charCodeAt(0)}\n`;
+                text += `  是否彝文范围: ${char.charCodeAt(0) >= 0xF0000 && char.charCodeAt(0) <= 0xFFFFF}\n`;
+                text += '\n';
+            });
+            
+            text += `浏览器: ${navigator.userAgent}\n`;
+            text += `时间: ${new Date().toLocaleString()}\n`;
+            
+            info.textContent = text;
+        }
+
+        function createCanvasChars() {
+            const container = document.getElementById('canvas-chars');
+            const chars = ['󲜐', '󲜑', '󲜒', '󲜓', '󲜔'];
+            
+            chars.forEach(char => {
+                const canvas = createCanvasChar(char);
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'inline-block';
+                wrapper.style.margin = '5px';
+                wrapper.appendChild(canvas);
+                container.appendChild(wrapper);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            analyzeChars();
+            createCanvasChars();
+        });
+    </script>
+</body>
+</html> 

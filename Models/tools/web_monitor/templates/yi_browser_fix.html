@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浏览器彝文显示修复方案</title>
+    <style>
+        /* 字体定义 - 使用多种方式确保字体加载 */
+        @font-face {
+            font-family: 'LSTY-Yi-Black';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap; /* 确保字体快速显示 */
+        }
+        
+        @font-face {
+            font-family: 'YiWenFont';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        
+        body {
+            font-family: 'LSTY-Yi-Black', 'YiWenFont', 'Microsoft YaHei', Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        .section {
+            background: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #3498db;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .yi-char {
+            display: inline-block;
+            margin: 8px;
+            padding: 15px;
+            border: 2px solid #e74c3c;
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+            font-size: 28px;
+            min-width: 60px;
+            text-align: center;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        
+        .yi-char:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .canvas-char {
+            display: inline-block;
+            margin: 8px;
+            border: 2px solid #27ae60;
+            background: linear-gradient(45deg, #d5f4e6, #a8e6cf);
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chat-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .chat-message {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+        
+        .bot-message {
+            background: #e9ecef;
+            color: #333;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .chat-input {
+            flex-grow: 1;
+            padding: 12px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'LSTY-Yi-Black', 'YiWenFont', 'Microsoft YaHei', Arial, sans-serif;
+        }
+        
+        .send-button {
+            padding: 12px 25px;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .send-button:hover {
+            background: linear-gradient(45deg, #2980b9, #1f5f8b);
+        }
+        
+        .info-box {
+            background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .font-test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .font-test-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        
+        .font-test-item h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .font-test-item .yi-sample {
+            font-size: 24px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background-color: #27ae60; }
+        .status-warning { background-color: #f39c12; }
+        .status-error { background-color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌏 浏览器彝文显示修复方案</h1>
+        
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案1: 强制字体加载</h2>
+            <p>使用 <code>font-display: swap</code> 确保字体快速显示：</p>
+            <div class="yi-char">󲜐</div>
+            <div class="yi-char">󲜑</div>
+            <div class="yi-char">󲜒</div>
+            <div class="yi-char">󲜓</div>
+            <div class="yi-char">󲜔</div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案2: Canvas渲染</h2>
+            <p>通过Canvas生成彝文字符图片，确保在所有浏览器中都能显示：</p>
+            <div id="canvas-container"></div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-warning"></span>方案3: 字体回退测试</h2>
+            <div class="font-test-grid">
+                <div class="font-test-item">
+                    <h4>LSTY-Yi-Black (主要)</h4>
+                    <div class="yi-sample" style="font-family: 'LSTY-Yi-Black';">󲜐 󲜑 󲜒</div>
+                </div>
+                <div class="font-test-item">
+                    <h4>YiWenFont (备用)</h4>
+                    <div class="yi-sample" style="font-family: 'YiWenFont';">󲜐 󲜑 󲜒</div>
+                </div>
+                <div class="font-test-item">
+                    <h4>Microsoft YaHei</h4>
+                    <div class="yi-sample" style="font-family: 'Microsoft YaHei';">󲜐 󲜑 󲜒</div>
+                </div>
+                <div class="font-test-item">
+                    <h4>Arial</h4>
+                    <div class="yi-sample" style="font-family: Arial;">󲜐 󲜑 󲜒</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案4: 彝文聊天测试</h2>
+            <div class="chat-container">
+                <div id="chat-messages">
+                    <div class="chat-message bot-message">
+                        <strong>QSM:</strong> 欢迎使用彝文聊天系统！
+                    </div>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="chat-input" id="chat-input" placeholder="输入消息...">
+                    <button class="send-button" id="send-button">发送</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-warning"></span>方案5: 字体加载检测</h2>
+            <div class="info-box" id="font-loading-info">
+                正在检测字体加载状态...
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><span class="status-indicator status-success"></span>方案6: 浏览器兼容性检测</h2>
+            <div class="info-box" id="browser-info">
+                正在获取浏览器信息...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 彝文字符到中文含义的映射
+        const yiCharMap = {
+            '󲜐': '陷害',
+            '󲜑': '兔子',
+            '󲜒': '卷',
+            '󲜓': '舔',
+            '󲜔': '便宜',
+            '󲜕': '埋怨',
+            '󲜖': '裱褙',
+            '󲜗': '渣',
+            '󲜘': '尾',
+            '󲜙': '分开'
+        };
+
+        // 创建Canvas字符图片
+        function createCanvasChar(char, size = 60) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.className = 'canvas-char';
+            
+            const ctx = canvas.getContext('2d');
+            
+            // 渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#d5f4e6');
+            gradient.addColorStop(1, '#a8e6cf');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // 边框
+            ctx.strokeStyle = '#27ae60';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, size, size);
+            
+            // 文字
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = `bold ${size * 0.4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // 显示彝文字符和对应的中文含义
+            const meaning = yiCharMap[char] || '未知';
+            ctx.fillText(char, size/2, size/2 - 8);
+            ctx.font = `${size * 0.2}px Arial`;
+            ctx.fillText(meaning, size/2, size/2 + 12);
+            
+            return canvas;
+        }
+
+        // 检测字体加载状态
+        function checkFontLoading() {
+            const info = document.getElementById('font-loading-info');
+            let text = '';
+            
+            text += '字体加载状态检测:\n';
+            text += '='.repeat(40) + '\n\n';
+            
+            // 检查字体API支持
+            if (document.fonts) {
+                text += '字体API: ✅ 支持\n';
+                
+                // 检查特定字体是否加载
+                const fonts = ['LSTY-Yi-Black', 'YiWenFont'];
+                fonts.forEach(font => {
+                    const loaded = document.fonts.check(`12px "${font}"`);
+                    text += `${font}: ${loaded ? '✅ 已加载' : '❌ 未加载'}\n`;
+                });
+                
+                // 等待字体加载完成
+                document.fonts.ready.then(() => {
+                    text += '\n所有字体加载完成！\n';
+                    info.textContent = text;
+                });
+            } else {
+                text += '字体API: ❌ 不支持\n';
+                text += '无法检测字体加载状态\n';
+            }
+            
+            info.textContent = text;
+        }
+
+        // 获取浏览器信息
+        function getBrowserInfo() {
+            const info = document.getElementById('browser-info');
+            let text = '';
+            
+            text += '浏览器兼容性检测:\n';
+            text += '='.repeat(40) + '\n';
+            text += `User Agent: ${navigator.userAgent}\n`;
+            text += `平台: ${navigator.platform}\n`;
+            text += `语言: ${navigator.language}\n`;
+            text += `Cookie启用: ${navigator.cookieEnabled ? '✅' : '❌'}\n`;
+            text += `在线状态: ${navigator.onLine ? '✅' : '❌'}\n`;
+            text += `当前时间: ${new Date().toLocaleString()}\n`;
+            
+            // 检查Canvas支持
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            text += `Canvas支持: ${ctx ? '✅' : '❌'}\n`;
+            
+            // 检查字体API支持
+            if (document.fonts) {
+                text += `字体API: ✅ 支持\n`;
+            } else {
+                text += `字体API: ❌ 不支持\n`;
+            }
+            
+            // 检查WebGL支持
+            const canvas3d = document.createElement('canvas');
+            const gl = canvas3d.getContext('webgl') || canvas3d.getContext('experimental-webgl');
+            text += `WebGL支持: ${gl ? '✅' : '❌'}\n`;
+            
+            info.textContent = text;
+        }
+
+        // 创建Canvas字符
+        function createCanvasChars() {
+            const container = document.getElementById('canvas-container');
+            const chars = ['󲜐', '󲜑', '󲜒', '󲜓', '󲜔'];
+            
+            chars.forEach(char => {
+                const canvas = createCanvasChar(char);
+                container.appendChild(canvas);
+            });
+        }
+
+        // 添加聊天消息
+        function addChatMessage(message, isUser = false) {
+            const chatContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user-message' : 'bot-message'}`;
+            
+            if (isUser) {
+                messageDiv.innerHTML = `<strong>你:</strong> ${message}`;
+            } else {
+                messageDiv.innerHTML = `<strong>QSM:</strong> ${message}`;
+            }
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 发送聊天消息
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // 添加用户消息
+            addChatMessage(message, true);
+            input.value = '';
+            
+            try {
+                const response = await fetch('/chat/qsm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                addChatMessage(data.reply, false);
+            } catch (err) {
+                addChatMessage(`错误: ${err.message}`, false);
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 创建Canvas字符
+            createCanvasChars();
+            
+            // 检测字体加载
+            checkFontLoading();
+            
+            // 获取浏览器信息
+            getBrowserInfo();
+            
+            // 绑定发送按钮事件
+            document.getElementById('send-button').addEventListener('click', sendMessage);
+            document.getElementById('chat-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // 强制字体加载
+            if (document.fonts) {
+                document.fonts.ready.then(() => {
+                    console.log('所有字体已加载完成');
+                    // 重新检测字体加载状态
+                    setTimeout(checkFontLoading, 1000);
+                });
+            }
+        });
+    </script>
+</body>
+</html> 

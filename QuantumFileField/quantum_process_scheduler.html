@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>QEntL Quantum Process Scheduler</title>
+    <style>
+        body { font-family: Consolas; background: linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e); color: #00ff88; margin: 0; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; background: rgba(0,255,136,0.1); padding: 20px; border-radius: 10px; margin-bottom: 30px; }
+        .title { font-size: 2.5em; text-shadow: 0 0 20px #00ff88; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .process-section { background: rgba(0,255,136,0.05); border: 1px solid #00ff88; border-radius: 10px; padding: 20px; margin: 20px 0; }
+        .process-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin: 5px 0; background: rgba(0,255,136,0.05); border-radius: 5px; border-left: 3px solid #00ff88; }
+        .process-name { font-weight: bold; color: #00ffaa; }
+        .process-details { font-size: 0.8em; color: #88ffaa; }
+        .process-status { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
+        .status-running { background: #00ff88; color: #000; }
+        .status-waiting { background: #ffaa00; color: #000; }
+        .status-sleeping { background: #666; color: #fff; }
+        .status-zombie { background: #ff4444; color: #fff; }
+        .control-btn { background: linear-gradient(135deg, #00ff88, #00ffaa); color: #000; border: none; padding: 10px 20px; border-radius: 20px; margin: 5px; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin: 20px 0; }
+        .stat-item { background: rgba(0,255,136,0.1); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #00ff88; }
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #00ffaa; display: block; }
+        .cpu-usage { width: 100%; height: 100px; background: rgba(0,0,0,0.5); border-radius: 5px; position: relative; overflow: hidden; }
+        .cpu-bar { position: absolute; bottom: 0; background: linear-gradient(to top, #00ff88, #00ffaa); transition: height 0.5s ease; }
+        @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">QEntL Quantum Process Scheduler</h1>
+            <p>量子基因编码: QGC-SCHEDULER-2025-∞∞∞</p>
+        </div>
+        <div class="process-section">
+            <h3>系统统计</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-value" id="totalProcesses">0</span>
+                    <span>总进程数</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="runningProcesses">0</span>
+                    <span>运行中</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="waitingProcesses">0</span>
+                    <span>等待中</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="cpuUsage">0%</span>
+                    <span>CPU使用率</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="memoryUsage">0%</span>
+                    <span>内存使用率</span>
+                </div>
+            </div>
+            <div class="cpu-usage">
+                <div class="cpu-bar" id="cpuBar"></div>
+            </div>
+        </div>
+        <div class="process-section">
+            <h3>进程列表</h3>
+            <button class="control-btn" onclick="refreshProcesses()">刷新进程</button>
+            <button class="control-btn" onclick="killZombies()">清理僵尸进程</button>
+            <button class="control-btn" onclick="optimizeScheduler()">优化调度</button>
+            <div id="processList"></div>
+        </div>
+    </div>
+    <script>
+        const processes = [
+            { pid: 1, name: 'qentl_kernel', status: 'running', cpu: 5.2, memory: 128, priority: 0, user: 'system' },
+            { pid: 2, name: 'quantum_processor', status: 'running', cpu: 15.8, memory: 512, priority: -10, user: 'system' },
+            { pid: 3, name: 'memory_manager', status: 'running', cpu: 2.1, memory: 64, priority: -5, user: 'system' },
+            { pid: 4, name: 'filesystem_daemon', status: 'running', cpu: 1.5, memory: 32, priority: 0, user: 'system' },
+            { pid: 5, name: 'network_stack', status: 'running', cpu: 3.2, memory: 96, priority: 0, user: 'system' },
+            { pid: 6, name: 'gui_compositor', status: 'running', cpu: 8.7, memory: 256, priority: 0, user: 'user' },
+            { pid: 7, name: 'quantum_app_1', status: 'waiting', cpu: 0.0, memory: 128, priority: 10, user: 'user' },
+            { pid: 8, name: 'quantum_app_2', status: 'sleeping', cpu: 0.1, memory: 64, priority: 15, user: 'user' },
+            { pid: 9, name: 'background_task', status: 'running', cpu: 0.5, memory: 16, priority: 20, user: 'system' }
+        ];
+
+        function renderProcesses() {
+            const container = document.getElementById('processList');
+            container.innerHTML = '';
+            processes.forEach(process => {
+                const processEl = document.createElement('div');
+                processEl.className = 'process-item';
+                const statusText = { running: '运行中', waiting: '等待中', sleeping: '休眠中', zombie: '僵尸' }[process.status];
+                processEl.innerHTML = `
+                    <div>
+                        <div class="process-name">PID ${process.pid}: ${process.name}</div>
+                        <div class="process-details">CPU: ${process.cpu}% | 内存: ${process.memory}MB | 优先级: ${process.priority} | 用户: ${process.user}</div>
+                    </div>
+                    <div class="process-status status-${process.status}">${statusText}</div>
+                `;
+                container.appendChild(processEl);
+            });
+        }
+
+        function updateStats() {
+            const totalProcesses = processes.length;
+            const runningProcesses = processes.filter(p => p.status === 'running').length;
+            const waitingProcesses = processes.filter(p => p.status === 'waiting').length;
+            const totalCpu = processes.reduce((sum, p) => sum + p.cpu, 0);
+            const totalMemory = processes.reduce((sum, p) => sum + p.memory, 0);
+            
+            document.getElementById('totalProcesses').textContent = totalProcesses;
+            document.getElementById('runningProcesses').textContent = runningProcesses;
+            document.getElementById('waitingProcesses').textContent = waitingProcesses;
+            document.getElementById('cpuUsage').textContent = Math.round(totalCpu) + '%';
+            document.getElementById('memoryUsage').textContent = Math.round(totalMemory / 1024 * 100) + '%';
+            
+            document.getElementById('cpuBar').style.height = Math.min(100, totalCpu) + '%';
+        }
+
+        function refreshProcesses() {
+            processes.forEach(process => {
+                process.cpu = Math.max(0, process.cpu + (Math.random() - 0.5) * 2);
+                if (Math.random() < 0.1) {
+                    const statuses = ['running', 'waiting', 'sleeping'];
+                    process.status = statuses[Math.floor(Math.random() * statuses.length)];
+                }
+            });
+            renderProcesses();
+            updateStats();
+        }
+
+        function killZombies() {
+            const zombieCount = processes.filter(p => p.status === 'zombie').length;
+            processes.forEach(p => {
+                if (p.status === 'zombie') p.status = 'running';
+            });
+            console.log(`清理了 ${zombieCount} 个僵尸进程`);
+            renderProcesses();
+            updateStats();
+        }
+
+        function optimizeScheduler() {
+            console.log('优化量子进程调度器...');
+            processes.forEach(process => {
+                if (process.status === 'waiting') {
+                    process.status = 'running';
+                    process.cpu = Math.random() * 5;
+                }
+            });
+            renderProcesses();
+            updateStats();
+        }
+
+        renderProcesses();
+        updateStats();
+        setInterval(() => {
+            refreshProcesses();
+        }, 3000);
+        console.log('QEntL Quantum Process Scheduler initialized');
+    </script>
+</body>
+</html> 

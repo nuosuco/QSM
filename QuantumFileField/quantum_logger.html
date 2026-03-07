@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL Quantum Logger - 量子增强日志系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e);
+            color: #00ff88;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .quantum-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: quantumFloat 8s infinite linear;
+        }
+
+        @keyframes quantumFloat {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-10px) rotate(360deg); opacity: 0; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .title {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px #00ff88;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            color: #88ffaa;
+            margin-bottom: 15px;
+        }
+
+        .quantum-signature {
+            font-size: 0.9em;
+            color: #aaffcc;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+        }
+
+        .logger-dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .logger-section {
+            background: rgba(0, 255, 136, 0.05);
+            border: 1px solid #00ff88;
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            color: #00ffaa;
+            text-align: center;
+            border-bottom: 1px solid #00ff88;
+            padding-bottom: 10px;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, #00ff88, #00ffaa);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8em;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+        }
+
+        .control-btn.active {
+            background: linear-gradient(135deg, #ffaa00, #ff8800);
+        }
+
+        .log-level-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .level-filter {
+            padding: 5px 10px;
+            border: 1px solid #00ff88;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8em;
+        }
+
+        .level-filter.active {
+            background: rgba(0, 255, 136, 0.3);
+        }
+
+        .level-trace { color: #888; }
+        .level-debug { color: #00aaff; }
+        .level-info { color: #00ff88; }
+        .level-warn { color: #ffaa00; }
+        .level-error { color: #ff4444; }
+        .level-fatal { color: #ff0000; }
+        .level-quantum { color: #ff88aa; }
+
+        .log-console {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ff88;
+            border-radius: 10px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .log-entry {
+            margin: 3px 0;
+            padding: 5px 8px;
+            border-radius: 3px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .log-entry:hover {
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .log-entry.trace { 
+            color: #888; 
+            border-left-color: #888;
+        }
+        .log-entry.debug { 
+            color: #00aaff; 
+            border-left-color: #00aaff;
+        }
+        .log-entry.info { 
+            color: #00ff88; 
+            border-left-color: #00ff88;
+        }
+        .log-entry.warn { 
+            color: #ffaa00; 
+            background: rgba(255, 170, 0, 0.1);
+            border-left-color: #ffaa00;
+        }
+        .log-entry.error { 
+            color: #ff4444; 
+            background: rgba(255, 68, 68, 0.1);
+            border-left-color: #ff4444;
+        }
+        .log-entry.fatal { 
+            color: #ff0000; 
+            background: rgba(255, 0, 0, 0.2);
+            border-left-color: #ff0000;
+            font-weight: bold;
+        }
+        .log-entry.quantum { 
+            color: #ff88aa; 
+            background: rgba(255, 136, 170, 0.1);
+            border-left-color: #ff88aa;
+            animation: quantumGlow 2s infinite;
+        }
+
+        @keyframes quantumGlow {
+            0%, 100% { box-shadow: 0 0 5px rgba(255, 136, 170, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(255, 136, 170, 0.6); }
+        }
+
+        .log-timestamp {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .log-level {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+
+        .log-message {
+            margin-left: 10px;
+        }
+
+        .quantum-signature-inline {
+            color: #ff88aa;
+            font-size: 0.7em;
+            opacity: 0.8;
+        }
+
+        .logger-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            background: rgba(0, 255, 136, 0.1);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #00ff88;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #00ffaa;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #88ffaa;
+            margin-top: 3px;
+        }
+
+        .log-input-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 136, 0.05);
+            border: 1px solid #00ff88;
+            border-radius: 10px;
+        }
+
+        .log-input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00ff88;
+            border-radius: 5px;
+            color: #00ff88;
+            font-family: inherit;
+            margin-bottom: 10px;
+        }
+
+        .log-input:focus {
+            outline: none;
+            border-color: #00ffaa;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        .log-level-select {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .level-btn {
+            padding: 5px 10px;
+            border: 1px solid #00ff88;
+            background: transparent;
+            color: #00ff88;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8em;
+        }
+
+        .level-btn.selected {
+            background: rgba(0, 255, 136, 0.3);
+        }
+
+        .quantum-entanglement-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border: 2px solid #00ff88;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 255, 136, 0.1);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+
+        .entanglement-pulse {
+            width: 30px;
+            height: 30px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: entanglementPulse 2s infinite;
+        }
+
+        @keyframes entanglementPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            .logger-dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .title {
+                font-size: 2em;
+            }
+            
+            .log-controls {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="quantum-particles" id="quantumParticles"></div>
+    
+    <div class="quantum-entanglement-indicator">
+        <div class="entanglement-pulse"></div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1 class="title">QEntL Quantum Logger</h1>
+            <p class="subtitle">量子增强日志系统 v1.0.0</p>
+            <div class="quantum-signature" id="quantumSignature">
+                量子基因编码: QLog-2024-∞∞∞-LOGGER-CORE
+            </div>
+        </div>
+
+        <div class="logger-dashboard">
+            <div class="logger-section">
+                <h3 class="section-title">日志控制台</h3>
+                <div class="log-controls">
+                    <button class="control-btn" id="clearLogs">清空日志</button>
+                    <button class="control-btn" id="pauseLogs">暂停</button>
+                    <button class="control-btn" id="exportLogs">导出</button>
+                    <button class="control-btn" id="quantumMode">量子模式</button>
+                </div>
+                
+                <div class="log-level-filters">
+                    <div class="level-filter active" data-level="all">全部</div>
+                    <div class="level-filter level-trace" data-level="trace">TRACE</div>
+                    <div class="level-filter level-debug" data-level="debug">DEBUG</div>
+                    <div class="level-filter level-info" data-level="info">INFO</div>
+                    <div class="level-filter level-warn" data-level="warn">WARN</div>
+                    <div class="level-filter level-error" data-level="error">ERROR</div>
+                    <div class="level-filter level-fatal" data-level="fatal">FATAL</div>
+                    <div class="level-filter level-quantum" data-level="quantum">QUANTUM</div>
+                </div>
+                
+                <div class="log-console" id="logConsole">
+                    <!-- 日志条目将在这里显示 -->
+                </div>
+            </div>
+
+            <div class="logger-section">
+                <h3 class="section-title">日志统计</h3>
+                <div class="logger-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="totalLogs">0</span>
+                        <span class="stat-label">总日志数</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="errorCount">0</span>
+                        <span class="stat-label">错误数</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="warnCount">0</span>
+                        <span class="stat-label">警告数</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="quantumLogs">0</span>
+                        <span class="stat-label">量子日志</span>
+                    </div>
+                </div>
+                
+                <div class="log-input-section">
+                    <h4 style="color: #00ffaa; margin-bottom: 10px;">手动添加日志</h4>
+                    <div class="log-level-select">
+                        <button class="level-btn" data-level="trace">TRACE</button>
+                        <button class="level-btn" data-level="debug">DEBUG</button>
+                        <button class="level-btn selected" data-level="info">INFO</button>
+                        <button class="level-btn" data-level="warn">WARN</button>
+                        <button class="level-btn" data-level="error">ERROR</button>
+                        <button class="level-btn" data-level="fatal">FATAL</button>
+                        <button class="level-btn" data-level="quantum">QUANTUM</button>
+                    </div>
+                    <input type="text" class="log-input" id="logInput" placeholder="输入日志消息...">
+                    <button class="control-btn" id="addLog">添加日志</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class QuantumLogger {
+            constructor() {
+                this.quantumGeneCode = 'QLog-2024-∞∞∞-LOGGER-CORE';
+                this.entanglementChannel = `logger_${Date.now()}`;
+                this.logs = [];
+                this.isPaused = false;
+                this.isQuantumMode = false;
+                this.currentFilter = 'all';
+                this.selectedLevel = 'info';
+                this.stats = {
+                    total: 0,
+                    error: 0,
+                    warn: 0,
+                    quantum: 0
+                };
+                
+                this.initializeQuantumParticles();
+                this.bindEvents();
+                this.startQuantumEntanglement();
+                this.updateQuantumSignature();
+                this.startAutoLogging();
+                this.initializeWithSampleLogs();
+            }
+
+            initializeQuantumParticles() {
+                const container = document.getElementById('quantumParticles');
+                const particleCount = 50;
+
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.animationDelay = Math.random() * 8 + 's';
+                    particle.style.animationDuration = (8 + Math.random() * 4) + 's';
+                    container.appendChild(particle);
+                }
+            }
+
+            bindEvents() {
+                document.getElementById('clearLogs').addEventListener('click', () => this.clearLogs());
+                document.getElementById('pauseLogs').addEventListener('click', () => this.togglePause());
+                document.getElementById('exportLogs').addEventListener('click', () => this.exportLogs());
+                document.getElementById('quantumMode').addEventListener('click', () => this.toggleQuantumMode());
+                document.getElementById('addLog').addEventListener('click', () => this.addManualLog());
+                
+                // 日志级别过滤器
+                document.querySelectorAll('.level-filter').forEach(filter => {
+                    filter.addEventListener('click', () => this.setFilter(filter.dataset.level));
+                });
+                
+                // 手动日志级别选择
+                document.querySelectorAll('.level-btn').forEach(btn => {
+                    btn.addEventListener('click', () => this.selectLevel(btn.dataset.level));
+                });
+                
+                // 回车键添加日志
+                document.getElementById('logInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.addManualLog();
+                    }
+                });
+
+                // 量子纠缠通信监听
+                window.addEventListener('message', (event) => {
+                    if (event.data.type === 'quantum_entanglement' && event.data.channel === this.entanglementChannel) {
+                        this.handleQuantumMessage(event.data);
+                    }
+                });
+            }
+
+            startQuantumEntanglement() {
+                setInterval(() => {
+                    this.sendQuantumMessage({
+                        type: 'heartbeat',
+                        timestamp: Date.now(),
+                        logCount: this.stats.total,
+                        errorCount: this.stats.error
+                    });
+                }, 3000);
+            }
+
+            sendQuantumMessage(data) {
+                const message = {
+                    type: 'quantum_entanglement',
+                    channel: this.entanglementChannel,
+                    geneCode: this.quantumGeneCode,
+                    data: data,
+                    timestamp: Date.now()
+                };
+                
+                window.postMessage(message, '*');
+                if (window.parent !== window) {
+                    window.parent.postMessage(message, '*');
+                }
+            }
+
+            handleQuantumMessage(message) {
+                console.log('收到量子纠缠消息:', message);
+                // 可以接收其他组件的日志消息
+                if (message.data.type === 'external_log') {
+                    this.addLog(message.data.level, message.data.message, message.data.source);
+                }
+            }
+
+            updateQuantumSignature() {
+                const signature = document.getElementById('quantumSignature');
+                setInterval(() => {
+                    const timestamp = Date.now().toString(36);
+                    const quantum = Math.random().toString(36).substr(2, 8).toUpperCase();
+                    signature.textContent = `量子基因编码: ${this.quantumGeneCode}-${timestamp}-${quantum}`;
+                }, 5000);
+            }
+
+            initializeWithSampleLogs() {
+                this.addLog('info', 'QEntL Quantum Logger 系统启动', 'system');
+                this.addLog('info', '量子日志系统初始化完成', 'system');
+                this.addLog('debug', '量子粒子背景效果已激活', 'ui');
+                this.addLog('quantum', '量子纠缠通信信道已建立', 'quantum');
+                this.addLog('info', '等待日志消息...', 'system');
+            }
+
+            startAutoLogging() {
+                setInterval(() => {
+                    if (!this.isPaused && this.isQuantumMode) {
+                        this.generateQuantumLog();
+                    }
+                }, 5000);
+                
+                // 模拟系统日志
+                setInterval(() => {
+                    if (!this.isPaused) {
+                        this.generateSystemLog();
+                    }
+                }, 8000);
+            }
+
+            generateQuantumLog() {
+                const quantumMessages = [
+                    '量子态叠加检测到异常波动',
+                    '量子纠缠信道数据传输完成',
+                    '量子比特相干性保持稳定',
+                    '量子门操作执行成功',
+                    '量子测量结果已记录',
+                    '量子随机数生成器活跃',
+                    '量子错误纠正算法运行中'
+                ];
+                
+                const message = quantumMessages[Math.floor(Math.random() * quantumMessages.length)];
+                this.addLog('quantum', message, 'quantum_core');
+            }
+
+            generateSystemLog() {
+                const systemMessages = [
+                    { level: 'info', message: '系统状态检查完成', source: 'system' },
+                    { level: 'debug', message: '内存使用率: 45%', source: 'memory' },
+                    { level: 'warn', message: 'CPU温度略高: 72°C', source: 'hardware' },
+                    { level: 'info', message: '网络连接稳定', source: 'network' },
+                    { level: 'debug', message: '文件系统同步完成', source: 'filesystem' }
+                ];
+                
+                const log = systemMessages[Math.floor(Math.random() * systemMessages.length)];
+                this.addLog(log.level, log.message, log.source);
+            }
+
+            addLog(level, message, source = 'user') {
+                const timestamp = new Date();
+                const quantumSignature = this.generateQuantumSignature(message);
+                
+                const logEntry = {
+                    id: Date.now() + Math.random(),
+                    timestamp: timestamp,
+                    level: level,
+                    message: message,
+                    source: source,
+                    quantumSignature: quantumSignature,
+                    threadId: Math.floor(Math.random() * 1000),
+                    processId: Math.floor(Math.random() * 10000)
+                };
+                
+                this.logs.push(logEntry);
+                this.updateStats(level);
+                
+                if (!this.isPaused) {
+                    this.renderLog(logEntry);
+                }
+                
+                // 限制日志数量
+                if (this.logs.length > 1000) {
+                    this.logs = this.logs.slice(-500);
+                }
+                
+                this.sendQuantumMessage({
+                    type: 'log_added',
+                    log: logEntry
+                });
+            }
+
+            renderLog(logEntry) {
+                if (this.currentFilter !== 'all' && this.currentFilter !== logEntry.level) {
+                    return;
+                }
+                
+                const console = document.getElementById('logConsole');
+                const logElement = document.createElement('div');
+                logElement.className = `log-entry ${logEntry.level}`;
+                
+                const timestamp = logEntry.timestamp.toLocaleTimeString();
+                const levelBadge = `<span class="log-level">${logEntry.level.toUpperCase()}</span>`;
+                const quantumSig = logEntry.quantumSignature ? 
+                    `<span class="quantum-signature-inline">[${logEntry.quantumSignature}]</span>` : '';
+                
+                logElement.innerHTML = `
+                    <span class="log-timestamp">[${timestamp}]</span>
+                    ${levelBadge}
+                    [PID:${logEntry.processId} TID:${logEntry.threadId}]
+                    <span class="log-message">${logEntry.message}</span>
+                    ${quantumSig}
+                    <span style="color: #666; font-size: 0.7em;">(${logEntry.source})</span>
+                `;
+                
+                console.appendChild(logElement);
+                console.scrollTop = console.scrollHeight;
+                
+                // 限制显示的日志条目数量
+                const entries = console.querySelectorAll('.log-entry');
+                if (entries.length > 200) {
+                    entries[0].remove();
+                }
+            }
+
+            generateQuantumSignature(message) {
+                if (!this.isQuantumMode) return null;
+                
+                let hash = 0;
+                for (let i = 0; i < message.length; i++) {
+                    hash = (hash * 31 + message.charCodeAt(i)) % 1000000;
+                }
+                
+                const quantumRandom = Math.floor(Math.random() * 1000000);
+                hash = (hash + quantumRandom) % 1000000;
+                
+                return 'Q' + hash.toString(16).toUpperCase();
+            }
+
+            updateStats(level) {
+                this.stats.total++;
+                if (level === 'error' || level === 'fatal') {
+                    this.stats.error++;
+                } else if (level === 'warn') {
+                    this.stats.warn++;
+                } else if (level === 'quantum') {
+                    this.stats.quantum++;
+                }
+                
+                document.getElementById('totalLogs').textContent = this.stats.total;
+                document.getElementById('errorCount').textContent = this.stats.error;
+                document.getElementById('warnCount').textContent = this.stats.warn;
+                document.getElementById('quantumLogs').textContent = this.stats.quantum;
+            }
+
+            setFilter(level) {
+                this.currentFilter = level;
+                
+                // 更新过滤器UI
+                document.querySelectorAll('.level-filter').forEach(filter => {
+                    filter.classList.remove('active');
+                });
+                document.querySelector(`[data-level="${level}"]`).classList.add('active');
+                
+                // 重新渲染日志
+                this.renderAllLogs();
+            }
+
+            renderAllLogs() {
+                const console = document.getElementById('logConsole');
+                console.innerHTML = '';
+                
+                this.logs.forEach(log => {
+                    this.renderLog(log);
+                });
+            }
+
+            selectLevel(level) {
+                this.selectedLevel = level;
+                
+                document.querySelectorAll('.level-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                document.querySelector(`[data-level="${level}"]`).classList.add('selected');
+            }
+
+            addManualLog() {
+                const input = document.getElementById('logInput');
+                const message = input.value.trim();
+                
+                if (message) {
+                    this.addLog(this.selectedLevel, message, 'manual');
+                    input.value = '';
+                }
+            }
+
+            clearLogs() {
+                this.logs = [];
+                this.stats = { total: 0, error: 0, warn: 0, quantum: 0 };
+                
+                document.getElementById('logConsole').innerHTML = '';
+                document.getElementById('totalLogs').textContent = '0';
+                document.getElementById('errorCount').textContent = '0';
+                document.getElementById('warnCount').textContent = '0';
+                document.getElementById('quantumLogs').textContent = '0';
+                
+                this.addLog('info', '日志已清空', 'system');
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+                const btn = document.getElementById('pauseLogs');
+                
+                if (this.isPaused) {
+                    btn.textContent = '继续';
+                    btn.classList.add('active');
+                    this.addLog('warn', '日志记录已暂停', 'system');
+                } else {
+                    btn.textContent = '暂停';
+                    btn.classList.remove('active');
+                    this.addLog('info', '日志记录已恢复', 'system');
+                }
+            }
+
+            toggleQuantumMode() {
+                this.isQuantumMode = !this.isQuantumMode;
+                const btn = document.getElementById('quantumMode');
+                
+                if (this.isQuantumMode) {
+                    btn.textContent = '退出量子模式';
+                    btn.classList.add('active');
+                    this.addLog('quantum', '量子模式已启用 - 量子签名生成激活', 'quantum');
+                } else {
+                    btn.textContent = '量子模式';
+                    btn.classList.remove('active');
+                    this.addLog('info', '量子模式已关闭', 'system');
+                }
+            }
+
+            exportLogs() {
+                const logsData = {
+                    exportTime: new Date().toISOString(),
+                    quantumGeneCode: this.quantumGeneCode,
+                    totalLogs: this.logs.length,
+                    stats: this.stats,
+                    logs: this.logs
+                };
+                
+                const dataStr = JSON.stringify(logsData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `quantum_logs_${Date.now()}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+                this.addLog('info', `日志已导出 (${this.logs.length} 条记录)`, 'export');
+            }
+        }
+
+        // 启动量子日志系统
+        document.addEventListener('DOMContentLoaded', () => {
+            window.quantumLogger = new QuantumLogger();
+            console.log('QEntL Quantum Logger initialized');
+        });
+    </script>
+</body>
+</html> 

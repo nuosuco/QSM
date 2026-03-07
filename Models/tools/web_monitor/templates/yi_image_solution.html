@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset=UTF-8>
+    <meta name=viewport" content="width=device-width, initial-scale=1.0>
+    <title>图片彝文显示解决方案</title>
+    <style>
+        body [object Object]       font-family: Microsoft YaHei', Arial, sans-serif;
+            margin:20        background: #f5f5f5;
+        }
+        
+        .container[object Object]         max-width: 1200            margin: 0 auto;
+            background: white;
+            padding:30            border-radius:10x;
+            box-shadow: 0 5px 15 rgba(0,0,0       }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin: 20           padding:20            border:2px solid #3498            border-radius: 8px;
+            background: #ecf0f1;
+        }
+        
+        .yi-image {
+            display: inline-block;
+            margin:10           padding:15            border:2px solid #3498            border-radius: 8px;
+            background: white;
+            text-align: center;
+            min-width:100       }
+        
+        .yi-image img[object Object]         max-width:100            height: auto;
+        }
+        
+        .btn {
+            background: #3498
+            color: white;
+            border: none;
+            padding: 10px20            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn:hover [object Object] background: #2980}
+        
+        .status {
+            padding:10            margin: 10            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .success[object Object] background: #d4da; color: #155724; }
+        .error [object Object] background: #f8d7da; color: #721}
+        .warning [object Object] background: #fff3cd; color: #856404}
+        
+        .input-group {
+            margin: 15       }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2       }
+        
+        .input-group input, .input-group textarea {
+            width:100           padding:10            border:2px solid #3498            border-radius: 5px;
+            font-size:16x;
+            box-sizing: border-box;
+        }
+        
+        .input-group textarea {
+            height: 100            resize: vertical;
+        }
+        
+        .debug-info {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding:15            border-radius: 8px;
+            font-family: Courier New', monospace;
+            font-size:12          overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container>
+        <h1>🖼️ 图片彝文显示解决方案</h1>
+        
+        <div class="test-section>
+            <h2>1. 字符编码分析</h2>
+            <div id=encoding-analysis" class="debug-info">
+                正在分析字符编码...
+            </div>
+            <button class="btn onclick=analyzeEncoding()>分析字符编码</button>
+        </div>
+        
+        <div class="test-section>
+            <h2>2. 字体文件检查</h2>
+            <div id=font-check" class="status>正在检查字体文件...</div>
+            <button class="btn" onclick=checkFontFile()>检查字体文件</button>
+        </div>
+        
+        <div class="test-section>
+            <h2>3. 字符显示测试</h2>
+            <div id=char-display-test>
+                <h3>私有使用区字符测试</h3
+                <div style="font-size:24px; padding:15 border: 2id #3498db; border-radius: 5px; background: white; margin: 10px 0;">
+                    <span id="test-chars>󲜐󲜑󲜒󲜓󲜔</span>
+                </div>
+                <p>如果上面显示为方框，说明浏览器不支持私有使用区字符</p>
+            </div>
+        </div>
+        
+        <div class="test-section>
+            <h2>4. 解决方案选择</h2>
+            <div id="solutions>
+                <div class="yi-image">
+                    <h4>方案1: Canvas渲染</h4>
+                    <p>将彝文渲染为图片</p>
+                    <button class="btn" onclick="generateCanvasImages()">生成Canvas图片</button>
+                    <div id=canvas-images"></div>
+                </div>
+                
+                <div class="yi-image">
+                    <h4                   <p>使用SVG显示彝文</p>
+                    <button class="btn" onclick=generateSvgImages()">生成SVG图片</button>
+                    <div id=svg-images"></div>
+                </div>
+                
+                <div class="yi-image">
+                    <h4                   <p>使用预生成的彝文字符图片</p>
+                    <button class="btn" onclick=generatePreImages()">生成预图片</button>
+                    <div id=pre-images"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section>
+            <h2>5. 输入测试</h2>
+            <div class="input-group>
+                <label>输入彝文字符:</label>
+                <input type="text" id="yi-inputplaceholder="输入彝文字符..." value="󲜐󲜑󲜒󲜓󲜔">
+            </div>
+            <div class="input-group>
+                <label>多行彝文:</label>
+                <textarea id="yi-textarea placeholder=输入多行彝文...>󲜐󲜑󲜒󲜓󲜔
+这是第二行：󲜕󲜖󲜗
+这是第三行：󲜘󲜙󲜚</textarea>
+            </div>
+            <button class="btn" onclick="renderInputAsImages()>将输入渲染为图片</button>
+            <div id="input-images"></div>
+        </div>
+    </div>
+
+    <script>
+        // 私有使用区彝文字符
+        const privateYiChars = [
+            { char: 󲜐', meaning:陷害, unicode: 'U+F1D10 },            { char: 󲜑', meaning:兔子, unicode: 'U+F1D11 },            { char:󲜒', meaning: 卷, unicode: 'U+F1D12 },            { char:󲜓', meaning: 舔, unicode: 'U+F1D13 },            { char: 󲜔', meaning:便宜, unicode: 'U+F1D14 },            { char: 󲜕', meaning:埋怨, unicode: 'U+F1D15 },            { char: 󲜖', meaning:裱褙, unicode: 'U+F1D16 },            { char:󲜗', meaning: 渣, unicode: 'U+F1D17 },            { char:󲜘', meaning: 尾, unicode: 'U+F1D18 },            { char: 󲜙', meaning:分开, unicode: 'U+F1D19' }
+        ];
+        
+        // 分析字符编码
+        function analyzeEncoding() {
+            const debugDiv = document.getElementById(encoding-analysis');
+            let info =      
+            info += `=== 字符编码分析 ===\n\n`;
+            
+            privateYiChars.forEach((item, index) =>[object Object]             const char = item.char;
+                info += `${index + 1}. ${item.meaning} (${item.unicode}):\n`;
+                info += `   字符: ${char}\n`;
+                info += `   长度: ${char.length}\n`;
+                info += `   编码: ${Array.from(char).map(c => c.charCodeAt(0ng(16oUpperCase()).join(' ')}\n`;
+                
+                if (char.length === 2) {
+                    const high = char.charCodeAt(0);
+                    const low = char.charCodeAt(1);
+                    const codePoint = ((high - 0D800 * 0400) + (low -0xDC00) + 0x10000;
+                    info += `   Unicode码点: U+${codePoint.toString(16).toUpperCase()}\n`;
+                }
+                info += `\n`;
+            });
+            
+            debugDiv.textContent = info;
+        }
+        
+        // 检查字体文件
+        function checkFontFile() {
+            const statusDiv = document.getElementById('font-check');
+            
+            // 检查字体文件是否存在
+            const fontUrl = '/fonts/msyi.ttf';
+            
+            fetch(fontUrl, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        statusDiv.className = status success                   statusDiv.textContent = '✓ 字体文件存在且可访问';
+                    } else {
+                        statusDiv.className = 'status error';
+                        statusDiv.textContent = ✗ 字体文件不存在或无法访问                   }
+                })
+                .catch(error => {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = `✗ 字体文件检查失败: ${error.message}`;
+                });
+        }
+        
+        // 生成Canvas图片
+        function generateCanvasImages() {
+            const container = document.getElementById(canvas-images');
+            container.innerHTML =      
+            privateYiChars.slice(0,5rEach((item, index) =>[object Object]             const canvas = document.createElement('canvas');
+                canvas.width = 60            canvas.height = 60;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff;               ctx.fillRect(0, 0, 60, 60);
+                
+                ctx.font =32px Arial, sans-serif;               ctx.fillStyle = '#2c3e50;               ctx.textAlign = 'center;               ctx.textBaseline = 'middle;               ctx.fillText(item.char, 30, 30);
+                
+                const div = document.createElement('div');
+                div.style.display = 'inline-block;               div.style.margin = '5px;               div.style.padding = '10px;               div.style.border = 1px solid #3498db;               div.style.borderRadius = '5px;               div.style.textAlign = 'center';
+                
+                div.appendChild(canvas);
+                div.innerHTML += `<br><small>${item.meaning}</small>`;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        // 生成SVG图片
+        function generateSvgImages() {
+            const container = document.getElementById('svg-images');
+            container.innerHTML =      
+            privateYiChars.slice(0,5rEach((item, index) =>[object Object]             const svg = document.createElementNS(http://www.w3rg/20);
+                svg.setAttribute('width', '60');
+                svg.setAttribute('height', '60');
+                svg.setAttribute(viewBox', '0 0 60 60');
+                
+                const text = document.createElementNS(http://www.w3g/200);
+                text.setAttribute('x', '30');
+                text.setAttribute('y', '35');
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-family', Arial, sans-serif');
+                text.setAttribute('font-size', '32');
+                text.setAttribute('fill', '#2c3e50');
+                text.textContent = item.char;
+                
+                svg.appendChild(text);
+                
+                const div = document.createElement('div');
+                div.style.display = 'inline-block;               div.style.margin = '5px;               div.style.padding = '10px;               div.style.border = 1px solid #3498db;               div.style.borderRadius = '5px;               div.style.textAlign = 'center';
+                
+                div.appendChild(svg);
+                div.innerHTML += `<br><small>${item.meaning}</small>`;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        // 生成预图片（使用Canvas生成base64）
+        function generatePreImages() {
+            const container = document.getElementById('pre-images');
+            container.innerHTML =      
+            privateYiChars.slice(0,5rEach((item, index) =>[object Object]             const canvas = document.createElement('canvas');
+                canvas.width = 60            canvas.height = 60;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff;               ctx.fillRect(0, 0, 60, 60);
+                
+                ctx.font =32px Arial, sans-serif;               ctx.fillStyle = '#2c3e50;               ctx.textAlign = 'center;               ctx.textBaseline = 'middle;               ctx.fillText(item.char, 30, 30);
+                
+                const img = document.createElement('img');
+                img.src = canvas.toDataURL();
+                img.style.width = '60px;               img.style.height = '60px';
+                
+                const div = document.createElement('div');
+                div.style.display = 'inline-block;               div.style.margin = '5px;               div.style.padding = '10px;               div.style.border = 1px solid #3498db;               div.style.borderRadius = '5px;               div.style.textAlign = 'center';
+                
+                div.appendChild(img);
+                div.innerHTML += `<br><small>${item.meaning}</small>`;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        // 将输入渲染为图片
+        function renderInputAsImages() {
+            const input = document.getElementById('yi-input').value;
+            const textarea = document.getElementById('yi-textarea').value;
+            const container = document.getElementById('input-images');
+            
+            container.innerHTML =      
+            // 渲染单行输入
+            if (input.trim())[object Object]             const canvas = document.createElement('canvas');
+                canvas.width = 400            canvas.height = 60;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff;               ctx.fillRect(0, 0, 400, 60);
+                
+                ctx.font =24px Arial, sans-serif;               ctx.fillStyle = '#2c3e50;               ctx.textAlign = 'left;               ctx.textBaseline = 'middle;               ctx.fillText(input, 10, 30);
+                
+                const div = document.createElement('div');
+                div.style.margin = '10px 0;               div.style.padding = '10px;               div.style.border = 2px solid #3498db;               div.style.borderRadius = '5px;               div.style.background = 'white;               div.appendChild(canvas);
+                div.innerHTML += <br><small>单行输入渲染</small>';
+                
+                container.appendChild(div);
+            }
+            
+            // 渲染多行输入
+            if (textarea.trim())[object Object]             const canvas = document.createElement('canvas');
+                canvas.width = 400            canvas.height = 120;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff;               ctx.fillRect(0, 0, 400, 120);
+                
+                ctx.font =16px Arial, sans-serif;               ctx.fillStyle = '#2c3e50;               ctx.textAlign = 'left;               ctx.textBaseline = 'top';
+                
+                const lines = textarea.split('\n');
+                lines.forEach((line, index) => {
+                    ctx.fillText(line,1010);
+                });
+                
+                const div = document.createElement('div');
+                div.style.margin = '10px 0;               div.style.padding = '10px;               div.style.border = 2px solid #3498db;               div.style.borderRadius = '5px;               div.style.background = 'white;               div.appendChild(canvas);
+                div.innerHTML += <br><small>多行输入渲染</small>';
+                
+                container.appendChild(div);
+            }
+        }
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            analyzeEncoding();
+            checkFontFile();
+        };
+    </script>
+</body>
+</html> 

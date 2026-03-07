@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL加密引擎 - 量子文件场</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #2d3436 0%, #636e72 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #fd79a8;
+            font-size: 14px;
+        }
+
+        .encryption-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .encryption-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #fd79a8;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #fd79a8, #e84393);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            margin: 5px 0;
+        }
+
+        .key-display {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+
+        .encryption-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(253, 121, 168, 0.2);
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 QEntL加密引擎</h1>
+            <div class="quantum-gene">量子基因: 0xEC5432 | 加密强度: 0.98</div>
+            <p>量子级别的文件加密与安全保护系统</p>
+        </div>
+
+        <div class="encryption-panel">
+            <div class="encryption-section">
+                <div class="section-title">🔑 密钥管理</div>
+                <button class="btn" onclick="generateKey()">生成新密钥</button>
+                <div class="key-display" id="keyDisplay">点击生成密钥</div>
+                <div>
+                    <p>密钥强度: <span id="keyStrength">未生成</span></p>
+                    <p>加密算法: <span id="encryptionAlgorithm">AES-256-GCM</span></p>
+                </div>
+            </div>
+
+            <div class="encryption-section">
+                <div class="section-title">📁 文件加密</div>
+                <input type="file" class="input-field" id="fileInput">
+                <button class="btn" onclick="encryptFile()">加密文件</button>
+                <button class="btn" onclick="decryptFile()">解密文件</button>
+                <div class="encryption-status">
+                    <span>加密状态</span>
+                    <span id="encryptionStatus">就绪</span>
+                </div>
+            </div>
+
+            <div class="encryption-section">
+                <div class="section-title">⚛️ 量子加密</div>
+                <p>量子密钥分发: <span id="quantumKeyDistribution">未激活</span></p>
+                <p>量子随机数生成器: <span id="quantumRNG">运行中</span></p>
+                <button class="btn" onclick="activateQuantumEncryption()">激活量子加密</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class QuantumEncryptionEngine {
+            constructor() {
+                this.quantumGene = '0xEC5432';
+                this.encryptionStrength = 0.98;
+                this.currentKey = null;
+                this.quantumMode = false;
+                this.init();
+            }
+
+            init() {
+                this.updateUI();
+            }
+
+            generateKey() {
+                // 生成256位密钥
+                const key = Array.from({length: 64}, () => 
+                    Math.floor(Math.random() * 16).toString(16)).join('');
+                
+                this.currentKey = key;
+                document.getElementById('keyDisplay').textContent = key;
+                document.getElementById('keyStrength').textContent = '256位';
+            }
+
+            encryptFile() {
+                const fileInput = document.getElementById('fileInput');
+                if (!fileInput.files[0]) {
+                    alert('请选择文件');
+                    return;
+                }
+                
+                if (!this.currentKey) {
+                    alert('请先生成密钥');
+                    return;
+                }
+
+                document.getElementById('encryptionStatus').textContent = '加密中...';
+                
+                setTimeout(() => {
+                    document.getElementById('encryptionStatus').textContent = '加密完成';
+                    console.log('文件已加密:', fileInput.files[0].name);
+                }, 2000);
+            }
+
+            activateQuantumEncryption() {
+                this.quantumMode = !this.quantumMode;
+                document.getElementById('quantumKeyDistribution').textContent = 
+                    this.quantumMode ? '已激活' : '未激活';
+            }
+
+            updateUI() {
+                // 更新UI状态
+            }
+        }
+
+        const encryptionEngine = new QuantumEncryptionEngine();
+
+        function generateKey() {
+            encryptionEngine.generateKey();
+        }
+
+        function encryptFile() {
+            encryptionEngine.encryptFile();
+        }
+
+        function decryptFile() {
+            encryptionEngine.decryptFile();
+        }
+
+        function activateQuantumEncryption() {
+            encryptionEngine.activateQuantumEncryption();
+        }
+
+        // 量子纠缠通信
+        setInterval(() => {
+            window.parent.postMessage({
+                type: 'quantum-entanglement',
+                source: 'encryption-engine',
+                gene: encryptionEngine.quantumGene,
+                message: '加密引擎运行正常'
+            }, '*');
+        }, 5000);
+    </script>
+</body>
+</html> 

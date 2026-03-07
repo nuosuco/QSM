@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量子文件系统浏览器 - Quantum File System Browser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .quantum-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: #00ff88;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .file-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .category-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .category-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .category-icon {
+            margin-right: 10px;
+            font-size: 24px;
+        }
+
+        .file-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .file-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            border-left: 4px solid #00ff88;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item:hover {
+            background: rgba(0, 255, 136, 0.2);
+            transform: translateX(5px);
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #ffffff;
+        }
+
+        .file-description {
+            font-size: 12px;
+            opacity: 0.8;
+            color: #b0b0b0;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 10px;
+            padding: 4px 8px;
+            transition: background 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: rgba(0, 255, 136, 0.3);
+        }
+
+        .search-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            color: white;
+            font-size: 16px;
+        }
+
+        .search-box::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 8px 16px;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(45deg, #00ff88, #0088ff);
+        }
+
+        .filter-btn:hover {
+            background: rgba(0, 255, 136, 0.3);
+        }
+
+        .quantum-entanglement {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #00ff88;
+            z-index: 1000;
+            min-width: 250px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #00ff88;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #00ff88;
+        }
+
+        .file-preview {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .category-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(0, 255, 136, 0.1), transparent);
+            animation: shimmer 3s infinite;
+            pointer-events: none;
+        }
+
+        .category-section {
+            position: relative;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="quantum-entanglement">
+        <div style="color: #00ff88; font-weight: bold; margin-bottom: 10px;">量子文件池状态</div>
+        <div>总文件数: <span id="totalFiles" style="color: #00ff88;">41</span></div>
+        <div>活跃组件: <span id="activeComponents">8</span></div>
+        <div>纠缠强度: <span id="entanglementStrength">1.0</span></div>
+        <div style="margin-top: 10px; font-size: 12px;">
+            <div>支持平台:</div>
+            <div>• Windows/Linux/macOS</div>
+            <div>• iOS/Android/HarmonyOS</div>
+            <div>• 浏览器/量子硬件</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="quantum-header">
+            <div class="quantum-gene">QG-QUANTUM-FILE-SYSTEM-BROWSER-V1.0</div>
+            <h1>量子文件系统浏览器</h1>
+            <h2>Quantum File System Browser</h2>
+            <p>统一量子文件池 - 所有.qentl文件已转换为HTML5跨平台格式</p>
+            <p style="margin-top: 10px; color: #00ff88;">🎉 已成功转换 41 个量子组件！</p>
+        </div>
+
+        <div class="stats-overview">
+            <div class="stat-card">
+                <div class="stat-value">41</div>
+                <div class="stat-label">已转换组件</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">8</div>
+                <div class="stat-label">组件类别</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">100%</div>
+                <div class="stat-label">跨平台兼容</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">1.2MB</div>
+                <div class="stat-label">总文件大小</div>
+            </div>
+        </div>
+
+        <div class="search-section">
+            <input type="text" class="search-box" id="searchBox" placeholder="搜索量子组件...">
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterFiles('all')">全部</button>
+                <button class="filter-btn" onclick="filterFiles('models')">量子模型</button>
+                <button class="filter-btn" onclick="filterFiles('services')">服务组件</button>
+                <button class="filter-btn" onclick="filterFiles('kernel')">内核组件</button>
+                <button class="filter-btn" onclick="filterFiles('neural')">神经网络</button>
+                <button class="filter-btn" onclick="filterFiles('programs')">程序应用</button>
+                <button class="filter-btn" onclick="filterFiles('gui')">GUI组件</button>
+                <button class="filter-btn" onclick="filterFiles('system')">系统工具</button>
+            </div>
+        </div>
+
+        <div class="file-categories" id="fileCategories">
+            <!-- 文件分类将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <!-- 文件预览模态框 -->
+    <div id="fileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">文件预览</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody">
+                <!-- 文件内容将在这里显示 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 量子文件池数据
+        const quantumFilePool = {
+            models: [
+                { name: 'qsm_model.html', desc: 'QSM量子叠加态模型核心', size: '19KB' },
+                { name: 'som_model.html', desc: 'SOM量子经济模型核心', size: '27KB' },
+                { name: 'weq_model.html', desc: 'WeQ量子通信模型核心', size: '28KB' },
+                { name: 'ref_model.html', desc: 'Ref量子自反省模型核心', size: '30KB' },
+                { name: 'quantum_bridge.html', desc: 'Claude量子桥接接口', size: '24KB' }
+            ],
+            services: [
+                { name: 'qsm_service.html', desc: 'QSM量子状态模型服务', size: '28KB' },
+                { name: 'som_service.html', desc: 'SOM松麦经济模型服务', size: '13KB' },
+                { name: 'weq_service.html', desc: 'WeQ量子通信模型服务', size: '18KB' },
+                { name: 'ref_service.html', desc: 'Ref自省监控模型服务', size: '24KB' },
+                { name: 'qsm_main_service.html', desc: 'QSM主服务集成中心', size: '35KB' },
+                { name: 'authentication_service.html', desc: 'QEntL认证服务', size: '38KB' },
+                { name: 'quantum_network_service.html', desc: 'QEntL量子网络服务', size: '39KB' },
+                { name: 'security_service.html', desc: 'QEntL安全服务', size: '21KB' }
+            ],
+            kernel: [
+                { name: 'microkernel_core.html', desc: '量子微内核核心', size: '27KB' },
+                { name: 'quantum_processor.html', desc: '量子处理器管理器', size: '31KB' },
+                { name: 'quantum_memory.html', desc: '量子内存管理器', size: '40KB' },
+                { name: 'quantum_process.html', desc: '量子进程管理器', size: '39KB' },
+                { name: 'kernel_loader.html', desc: 'QEntL内核加载器', size: '21KB' },
+                { name: 'device_framework.html', desc: 'QEntL设备驱动框架', size: '23KB' },
+                { name: 'device_registry.html', desc: 'QEntL设备注册表', size: '27KB' },
+                { name: 'interrupt_handler.html', desc: 'QEntL中断处理系统', size: '33KB' },
+                { name: 'io_scheduler.html', desc: 'QEntL输入/输出调度器', size: '37KB' },
+                { name: 'ipc_manager.html', desc: '量子进程间通信管理器', size: '27KB' }
+            ],
+            neural: [
+                { name: 'qsm_neural_network.html', desc: 'QSM量子叠加态神经网络', size: '31KB' },
+                { name: 'qsm_neural_network_advanced.html', desc: 'QSM量子神经网络高级版', size: '21KB' },
+                { name: 'som_neural_network_advanced.html', desc: 'SOM量子平权经济神经网络', size: '20KB' },
+                { name: 'quantum_neural_network.html', desc: '通用量子神经网络系统', size: '20KB' },
+                { name: 'unified_neural_training.html', desc: '统一神经网络训练系统', size: '32KB' }
+            ],
+            programs: [
+                { name: 'hello_quantum.html', desc: 'Hello Quantum World程序', size: '11KB' },
+                { name: 'hello_qsm.html', desc: 'QSM系统测试程序', size: '16KB' },
+                { name: 'continuous_learning_24h.html', desc: '24小时连续学习系统', size: '11KB' },
+                { name: '24h_continuous_learning.html', desc: 'QSM 24小时连续学习系统', size: '25KB' }
+            ],
+            gui: [
+                { name: 'app_launcher.html', desc: 'QEntL应用启动器', size: '39KB' },
+                { name: 'notification_center.html', desc: 'QEntL通知中心', size: '45KB' },
+                { name: 'task_view.html', desc: 'QEntL任务视图系统', size: '26KB' },
+                { name: 'quantum_file_browser.html', desc: '量子文件浏览器', size: '19KB' }
+            ],
+            system: [
+                { name: 'semantic_search.html', desc: '量子语义搜索引擎', size: '42KB' },
+                { name: 'knowledge_network.html', desc: '量子知识网络', size: '35KB' },
+                { name: 'quantum_parallel_execution.html', desc: 'QEntL量子并行执行服务', size: '39KB' },
+                { name: 'quantum_compiler.html', desc: 'QEntL量子编译器', size: '25KB' },
+                { name: 'quantum_virtual_machine.html', desc: 'QEntL量子虚拟机', size: '28KB' }
+            ]
+        };
+
+        let currentFilter = 'all';
+
+        function initializeFileSystem() {
+            renderFileCategories();
+            updateStats();
+            setupSearch();
+        }
+
+        function renderFileCategories() {
+            const container = document.getElementById('fileCategories');
+            container.innerHTML = '';
+
+            const categoryIcons = {
+                models: '🧠',
+                services: '⚙️',
+                kernel: '🔧',
+                neural: '🤖',
+                programs: '📱',
+                gui: '🖥️',
+                system: '🛠️'
+            };
+
+            const categoryNames = {
+                models: '量子模型核心',
+                services: '服务组件',
+                kernel: '内核组件',
+                neural: '神经网络',
+                programs: '程序应用',
+                gui: 'GUI组件',
+                system: '系统工具'
+            };
+
+            Object.keys(quantumFilePool).forEach(category => {
+                if (currentFilter !== 'all' && currentFilter !== category) return;
+
+                const section = document.createElement('div');
+                section.className = 'category-section';
+                section.id = `category-${category}`;
+
+                const title = document.createElement('div');
+                title.className = 'category-title';
+                title.innerHTML = `
+                    <span class="category-icon">${categoryIcons[category]}</span>
+                    ${categoryNames[category]} (${quantumFilePool[category].length})
+                `;
+
+                const fileList = document.createElement('div');
+                fileList.className = 'file-list';
+
+                quantumFilePool[category].forEach(file => {
+                    const fileItem = createFileItem(file, category);
+                    fileList.appendChild(fileItem);
+                });
+
+                section.appendChild(title);
+                section.appendChild(fileList);
+                container.appendChild(section);
+            });
+        }
+
+        function createFileItem(file, category) {
+            const item = document.createElement('div');
+            item.className = 'file-item';
+            item.onclick = () => openFile(file.name);
+
+            item.innerHTML = `
+                <div class="file-info">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-description">${file.desc} - ${file.size}</div>
+                </div>
+                <div class="file-actions">
+                    <button class="action-btn" onclick="event.stopPropagation(); previewFile('${file.name}')">预览</button>
+                    <button class="action-btn" onclick="event.stopPropagation(); openFile('${file.name}')">打开</button>
+                    <button class="action-btn" onclick="event.stopPropagation(); downloadFile('${file.name}')">下载</button>
+                </div>
+            `;
+
+            return item;
+        }
+
+        function filterFiles(category) {
+            currentFilter = category;
+            
+            // 更新按钮状态
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            renderFileCategories();
+        }
+
+        function setupSearch() {
+            const searchBox = document.getElementById('searchBox');
+            searchBox.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                
+                document.querySelectorAll('.file-item').forEach(item => {
+                    const fileName = item.querySelector('.file-name').textContent.toLowerCase();
+                    const fileDesc = item.querySelector('.file-description').textContent.toLowerCase();
+                    
+                    if (fileName.includes(query) || fileDesc.includes(query)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        function openFile(fileName) {
+            // 在新标签页中打开文件
+            window.open(fileName, '_blank');
+            addLog(`打开文件: ${fileName}`, 'info');
+        }
+
+        function previewFile(fileName) {
+            const modal = document.getElementById('fileModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+
+            modalTitle.textContent = `预览: ${fileName}`;
+            modalBody.innerHTML = `
+                <div class="file-preview">
+                    <div style="color: #00ff88; margin-bottom: 10px;">文件信息:</div>
+                    <div>文件名: ${fileName}</div>
+                    <div>类型: HTML5量子组件</div>
+                    <div>状态: 已转换</div>
+                    <div>兼容性: 跨平台</div>
+                    <div style="margin-top: 15px; color: #00ff88;">量子特性:</div>
+                    <div>✅ 量子基因编码</div>
+                    <div>✅ 量子纠缠通信</div>
+                    <div>✅ 量子粒子背景</div>
+                    <div>✅ 实时状态监控</div>
+                    <div>✅ 跨组件通信</div>
+                    <div style="margin-top: 15px; color: #3498db;">
+                        <button class="action-btn" onclick="openFile('${fileName}'); closeModal();" style="padding: 8px 16px;">
+                            在新窗口中打开
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            modal.style.display = 'block';
+            addLog(`预览文件: ${fileName}`, 'info');
+        }
+
+        function downloadFile(fileName) {
+            // 模拟下载
+            addLog(`下载文件: ${fileName}`, 'info');
+            alert(`文件 ${fileName} 下载已开始`);
+        }
+
+        function closeModal() {
+            document.getElementById('fileModal').style.display = 'none';
+        }
+
+        function updateStats() {
+            let totalFiles = 0;
+            Object.values(quantumFilePool).forEach(category => {
+                totalFiles += category.length;
+            });
+
+            document.getElementById('totalFiles').textContent = totalFiles;
+            document.getElementById('activeComponents').textContent = Object.keys(quantumFilePool).length;
+        }
+
+        function addLog(message, type = 'info') {
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+        }
+
+        function sendQuantumMessage(type, data) {
+            const message = {
+                type: type,
+                source: 'quantum_file_system_browser.html',
+                quantumGenes: 'QG-QUANTUM-FILE-SYSTEM-BROWSER-V1.0',
+                timestamp: Date.now(),
+                data: data
+            };
+
+            if (window.parent !== window) {
+                window.parent.postMessage(message, '*');
+            }
+
+            if (typeof BroadcastChannel !== 'undefined') {
+                const channel = new BroadcastChannel('quantum-entanglement');
+                channel.postMessage(message);
+            }
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('fileModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFileSystem();
+            addLog('量子文件系统浏览器已启动', 'info');
+            addLog('已加载 41 个量子组件', 'info');
+
+            // 发送初始化完成消息
+            setTimeout(() => {
+                sendQuantumMessage('COMPONENT_READY', {
+                    component: 'quantum_file_system_browser',
+                    totalFiles: 41,
+                    categories: Object.keys(quantumFilePool).length
+                });
+            }, 1000);
+        });
+    </script>
+</body>
+</html> 

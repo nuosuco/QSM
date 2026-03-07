@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文字体测试</title>
+    <style>
+        @font-face {
+            font-family: 'LSTY-Yi-Black';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-display: swap;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .yi-font {
+            font-family: 'LSTY-Yi-Black', "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 18px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .test-char {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+
+        .font-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .font-loaded {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .font-not-loaded {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>彝文字体测试页面</h1>
+    
+    <div class="test-section">
+        <h2>字体加载状态</h2>
+        <div id="font-status" class="font-status">检测中...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>彝文字符测试</h2>
+        <div class="yi-font">
+            <div class="test-char">󲜐</div>
+            <div class="test-char">󲜑</div>
+            <div class="test-char">󲜒</div>
+            <div class="test-char">󲜓</div>
+            <div class="test-char">󲜔</div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>彝文文本测试</h2>
+        <div class="yi-font">
+            这是彝文测试文本：󲜐󲜑󲜒󲜓��56789
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>混合文本测试</h2>
+        <div class="yi-font">
+            中文：你好 彝文：󲜐󲜑󲜒 英文：Hello
+        </div>
+    </div>
+
+    <script>
+        function checkFontLoading() {
+            const statusDiv = document.getElementById('font-status');
+            
+            if (document.fonts && document.fonts.check) {
+                const fontLoaded = document.fonts.check('16px LSTY-Yi-Black');
+                console.log('彝文字体加载状态:', fontLoaded);
+                
+                if (fontLoaded) {
+                    statusDiv.textContent = '✓ 彝文字体已成功加载';
+                    statusDiv.className = 'font-status font-loaded';
+                } else {
+                    statusDiv.textContent = '✗ 彝文字体加载失败';
+                    statusDiv.className = 'font-status font-not-loaded';
+                }
+            } else {
+                statusDiv.textContent = '⚠ 无法检测字体加载状态';
+                statusDiv.className = 'font-status font-not-loaded';
+            }
+        }
+
+        // 页面加载完成后检查字体
+        document.addEventListener('DOMContentLoaded', function() {
+            // 立即检查
+            checkFontLoading();
+            
+            // 延迟检查（给字体更多时间加载）
+            setTimeout(() => {
+                checkFontLoading();
+            }, 2000);
+            
+            // 再次延迟检查
+            setTimeout(() => {
+                checkFontLoading();
+            }, 5000);
+        });
+
+        // 监听字体加载事件
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                console.log('所有字体加载完成');
+                checkFontLoading();
+            });
+        }
+    </script>
+</body>
+</html> 
