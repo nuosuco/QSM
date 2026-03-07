@@ -120,3 +120,12 @@ Thumbs.db
 !Models/QEntL/bin/qentl_model.pth
 !Models/SOM/bin/som_model.pth
 !Models/training_data/source/Yi\ Wen/《通用彝文字典》.pdf
+# 大文件（模型和PDF）
+Models/QEntL/bin/*.pth
+Models/SOM/bin/*.pth
+Models/WeQ/bin/*.pth
+Models/Ref/bin/*.pth
+Models/QSM/bin/*.pth
+Models/training_data/source/Yi\ Wen/*.pdf
+*.pth
+*.pdf
