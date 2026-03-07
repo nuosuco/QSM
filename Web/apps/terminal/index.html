@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>终端 - QEntL</title>
+    <style>
+        body { font-family: monospace; background: #0a0a0a; color: #00ff88; margin: 0; padding: 15px; height: 100vh; }
+        .terminal-output { height: calc(100% - 30px); overflow-y: auto; }
+        .output-line { margin-bottom: 5px; white-space: pre-wrap; }
+        .prompt { color: #8a87ff; }
+        .output { color: #00ff88; }
+        .error { color: #ff6b6b; }
+        .info { color: #ffd700; }
+        .terminal-input { background: transparent; border: none; color: #00ff88; font-family: inherit; width: calc(100% - 60px); outline: none; }
+    </style>
+</head>
+<body>
+    <div class="terminal-output" id="output">
+        <div class="output-line info">QEntL量子操作系统终端 v0.3.0</div>
+        <div class="output-line">输入 'help' 查看命令</div>
+    </div>
+    <div><span class="prompt">QEntL&gt;</span> <input type="text" class="terminal-input" id="input" autofocus></div>
+    <script>
+        const output = document.getElementById('output');
+        const input = document.getElementById('input');
+        const commands = {
+            'help': () => 'Commands: help, version, quantum, models, clear, about',
+            'version': () => 'QEntL v0.3.0',
+            'quantum': () => '量子态: 叠加态 | 相干性: 0.954',
+            'models': () => 'QSM✅ SOM✅ WeQ✅ Ref✅',
+            'clear': () => { output.innerHTML = ''; return ''; },
+            'about': () => 'QEntL量子操作系统\n服务人类，为每个人服务！'
+        };
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = input.value.trim();
+                input.value = '';
+                output.innerHTML += '<div class="output-line"><span class="prompt">QEntL&gt;</span> ' + cmd + '</div>';
+                if (commands[cmd]) {
+                    const r = commands[cmd]();
+                    if (r) output.innerHTML += '<div class="output-line output">' + r + '</div>';
+                } else if (cmd) {
+                    output.innerHTML += '<div class="output-line error">未知命令: ' + cmd + '</div>';
+                }
+                output.scrollTop = output.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
