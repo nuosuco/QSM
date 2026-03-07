@@ -1,0 +1,32 @@
+{
+  "model_info": {
+    "name": "量子叠加态模型",
+    "description": "Quantum Superposition Model",
+    "vocabulary_size": 120000,
+    "specialization": [
+      "量子物理概念",
+      "意识哲学",
+      "五阴理论",
+      "量子叠加态"
+    ],
+    "training_data": "trilingual_qsm_data.jsonl",
+    "model_path": "F:\\QSM\\Models\\QSM",
+    "languages": {
+      "中文": 60000,
+      "英文": 48000,
+      "滇川黔贵通用彝文": 12000
+    }
+  },
+  "training_config": {
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "num_epochs": 10,
+    "max_seq_length": 512,
+    "warmup_steps": 1000,
+    "gradient_accumulation_steps": 8,
+    "fp16": true,
+    "dataloader_num_workers": 4
+  },
+  "timestamp": "2025-07-03T15:25:14.127190",
+  "status": "training_started"
+}

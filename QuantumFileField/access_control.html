@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL访问控制系统 - 量子文件场</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            font-size: 14px;
+        }
+
+        .controls-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #00ff88;
+        }
+
+        .user-list, .audit-log {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00ff88, #00cc6a);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 QEntL访问控制系统</h1>
+            <div class="quantum-gene">量子基因: 0xF3C418 | 纠缠强度: 0.87</div>
+            <p>量子级别的文件系统访问控制与权限管理</p>
+        </div>
+
+        <div class="controls-panel">
+            <div class="control-section">
+                <div class="section-title">用户管理</div>
+                <input type="text" class="input-field" id="userName" placeholder="用户名">
+                <select class="input-field" id="userRole">
+                    <option value="标准">标准用户</option>
+                    <option value="管理员">管理员</option>
+                    <option value="系统">系统用户</option>
+                </select>
+                <button class="btn" onclick="createUser()">创建用户</button>
+                <div class="user-list" id="userList"></div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">权限管理</div>
+                <input type="text" class="input-field" id="resourcePath" placeholder="资源路径">
+                <div>
+                    <label><input type="checkbox" id="permRead"> 读取</label>
+                    <label><input type="checkbox" id="permWrite"> 写入</label>
+                    <label><input type="checkbox" id="permExecute"> 执行</label>
+                </div>
+                <button class="btn" onclick="setPermissions()">设置权限</button>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">安全监控</div>
+                <p>活跃用户: <span id="activeUsers">0</span></p>
+                <p>失败尝试: <span id="failedAttempts">0</span></p>
+                <p>量子授权强度: <span id="quantumAuthStrength">0.85</span></p>
+                <button class="btn" onclick="refreshStatus()">刷新状态</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <div class="section-title">审计日志</div>
+            <div class="audit-log" id="auditLog"></div>
+        </div>
+    </div>
+
+    <script>
+        class QuantumAccessControl {
+            constructor() {
+                this.quantumGene = '0xF3C418';
+                this.entanglementStrength = 0.87;
+                this.users = new Map();
+                this.auditLog = [];
+                this.failedAttempts = 0;
+                this.init();
+            }
+
+            init() {
+                this.createSystemDefaults();
+                this.updateUI();
+                this.logAudit('系统', '系统启动', '/', '成功', '量子访问控制系统初始化');
+            }
+
+            createSystemDefaults() {
+                this.createUser('root', '系统');
+                this.createUser('admin', '管理员');
+                this.createUser('guest', '标准');
+            }
+
+            createUser(name, role) {
+                const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                const user = {
+                    id: userId,
+                    name: name,
+                    role: role,
+                    createdTime: new Date(),
+                    status: '活跃'
+                };
+                
+                this.users.set(userId, user);
+                this.logAudit('系统', '创建用户', userId, '成功', `创建用户: ${name}`);
+                return userId;
+            }
+
+            checkAccess(userId, operation, resourcePath) {
+                const user = this.users.get(userId);
+                if (!user) {
+                    this.failedAttempts++;
+                    return false;
+                }
+
+                const quantumAuth = Math.random() * this.entanglementStrength > 0.3;
+                if (!quantumAuth) {
+                    this.failedAttempts++;
+                    this.logAudit(userId, operation, resourcePath, '失败', '量子授权失败');
+                    return false;
+                }
+
+                this.logAudit(userId, operation, resourcePath, '成功', '访问授权');
+                return true;
+            }
+
+            logAudit(userId, operation, resource, result, details) {
+                const entry = {
+                    timestamp: new Date(),
+                    userId: userId,
+                    operation: operation,
+                    resource: resource,
+                    result: result,
+                    details: details
+                };
+                
+                this.auditLog.unshift(entry);
+                if (this.auditLog.length > 50) {
+                    this.auditLog.pop();
+                }
+                
+                this.updateAuditLogUI();
+            }
+
+            updateUI() {
+                const userList = document.getElementById('userList');
+                userList.innerHTML = '';
+                this.users.forEach((user) => {
+                    const userItem = document.createElement('div');
+                    userItem.innerHTML = `${user.name} (${user.role}) - ${user.status}`;
+                    userList.appendChild(userItem);
+                });
+
+                document.getElementById('activeUsers').textContent = this.users.size;
+                document.getElementById('failedAttempts').textContent = this.failedAttempts;
+                document.getElementById('quantumAuthStrength').textContent = this.entanglementStrength.toFixed(3);
+            }
+
+            updateAuditLogUI() {
+                const auditLog = document.getElementById('auditLog');
+                auditLog.innerHTML = '';
+                
+                this.auditLog.slice(0, 10).forEach(entry => {
+                    const logEntry = document.createElement('div');
+                    logEntry.innerHTML = `
+                        [${entry.timestamp.toLocaleString()}] ${entry.result} - 
+                        ${entry.userId} -> ${entry.operation} -> ${entry.resource}
+                    `;
+                    auditLog.appendChild(logEntry);
+                });
+            }
+        }
+
+        const accessControl = new QuantumAccessControl();
+
+        function createUser() {
+            const name = document.getElementById('userName').value;
+            const role = document.getElementById('userRole').value;
+            
+            if (name) {
+                accessControl.createUser(name, role);
+                accessControl.updateUI();
+                document.getElementById('userName').value = '';
+            }
+        }
+
+        function setPermissions() {
+            const path = document.getElementById('resourcePath').value;
+            if (path) {
+                accessControl.logAudit('系统', '设置权限', path, '成功', '权限已更新');
+                document.getElementById('resourcePath').value = '';
+            }
+        }
+
+        function refreshStatus() {
+            accessControl.updateUI();
+            accessControl.logAudit('系统', '刷新状态', '/', '成功', '状态已刷新');
+        }
+
+        // 量子纠缠通信
+        setInterval(() => {
+            window.parent.postMessage({
+                type: 'quantum-entanglement',
+                source: 'access-control',
+                gene: accessControl.quantumGene,
+                message: '访问控制系统运行正常'
+            }, '*');
+        }, 5000);
+    </script>
+</body>
+</html> 

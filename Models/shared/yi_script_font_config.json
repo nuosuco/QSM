@@ -1,0 +1,247 @@
+{
+  "yi_script_font_configuration": {
+    "metadata": {
+      "name": "滇川黔贵通用彝文量子计算字体配置",
+      "version": "2.0.4.22",
+      "quantum_gene": "QG-YI-SCRIPT-FONT-2025-A1B1",
+      "creation_date": "2025-01-01",
+      "script_type": "滇川黔贵通用彝文",
+      "total_character_count": 87046,
+      "training_subset_count": 4120,
+      "unicode_range": "U+A000-U+A48F",
+      "font_family": "LSTY-Yi-Black",
+      "description": "滇川黔贵通用彝文字体配置，用于QEntL量子模型系统"
+    },
+
+    "font_properties": {
+      "primary_font": "LSTY-Yi-Black",
+      "fallback_fonts": [
+        "Microsoft Yi Baiti",
+        "Nuosu SIL",
+        "Arial Unicode MS"
+      ],
+      "font_weight": "bold",
+      "font_style": "normal",
+      "default_size": "16px",
+      "line_height": "1.5",
+      "letter_spacing": "0.05em"
+    },
+
+    "unicode_ranges": {
+      "yi_syllables": {
+        "range": "U+A000-U+A48C",
+        "description": "彝文音节字符",
+        "count": 1165
+      },
+      "yi_radicals": {
+        "range": "U+A490-U+A4C6", 
+        "description": "彝文部首字符",
+        "count": 55
+      },
+      "yi_extended": {
+        "range": "U+A4D0-U+A4FF",
+        "description": "扩展彝文字符",
+        "count": 48
+      },
+      "traditional_yi_dian_chuan_qian_gui": {
+        "range": "U+A500-U+A63F",
+        "description": "滇川黔贵通用彝文字符",
+        "count": 85778,
+        "note": "这是滇川黔贵通用彝文的主要字符集"
+      }
+    },
+
+    "rendering_settings": {
+      "antialiasing": true,
+      "subpixel_rendering": true,
+      "hinting": "auto",
+      "kerning": true,
+      "ligatures": true,
+      "direction": "ltr",
+      "text_rendering": "optimizeLegibility"
+    },
+
+    "quantum_computing_vocabulary": {
+      "basic_concepts": {
+        "󲜐": {"meaning": "陷害", "english": "frame, trap, set up"},
+        "󲜑": {"meaning": "兔子", "english": "rabbit"},
+        "󲜒": {"meaning": "（刀刃含钢不足而）卷", "english": "(blade with insufficient steel) curl, bend"},
+        "󲜓": {"meaning": "1、舔；2、（专指母羊对出生羊崽的舔）", "english": "1. lick; 2. (specifically mother sheep licking newborn lamb)"},
+        "󲜔": {"meaning": "便宜", "english": "cheap, inexpensive"},
+        "󲜕": {"meaning": "埋怨", "english": "complain, blame"}
+      },
+      
+      "computing_terms": {
+        "󲜷": {"meaning": "心", "english": "heart, mind"},
+        "󲜵": {"meaning": "1、乾坤；宇宙空间的）上下，2、开辟3、一个地名、人名", "english": "1. heaven and earth; (universe) up and down; 2. open up; 3. place name, person name"},
+        "󲜶": {"meaning": "（地）区", "english": "(geo) region, district"},
+        "󲞭": {"meaning": "天", "english": "sky, heaven"},
+        "󲞮": {"meaning": "火", "english": "fire"},
+        "󲞰": {"meaning": "王", "english": "king"}
+      },
+
+      "philosophical_terms": {
+        "󲜽": {"meaning": "总是", "english": "always"},
+        "󲜾": {"meaning": "计较", "english": "argue, care about"},
+        "󲞞": {"meaning": "1、和睦，友好；2、爱好", "english": "1. harmonious, friendly; 2. hobby"},
+        "󲞵": {"meaning": "1、人；2、他们；3、（领导）", "english": "1. person; 2. they; 3. (leader)"},
+        "󲜼": {"meaning": "供奉", "english": "offer, worship"},
+        "󲟍": {"meaning": "祷告", "english": "pray"}
+      },
+
+      "programming_keywords": {
+        "󲜜": {"meaning": "1、指（人、物）；2、指向", "english": "1. point to (person, object); 2. point towards"},
+        "󲜽": {"meaning": "总是", "english": "always"},
+        "󲝑": {"meaning": "选择", "english": "choose, select"},
+        "󲞦": {"meaning": "连接", "english": "connect"},
+        "󲞧": {"meaning": "凑在一起", "english": "gather together"},
+        "󲞤": {"meaning": "升", "english": "rise, ascend"}
+      }
+    },
+
+    "data_sources": {
+      "training_data": {
+        "primary_source": "Models/Data/Yi Wen/通用彝文彝汉对照训练表(2.0.4.22).jsonl",
+        "trilingual_source": "Models/Data/Yi Wen/滇川黔贵通用彝文三语对照表.jsonl",
+        "dictionary_source": "Models/Data/Yi Wen/《通用彝文字典》.pdf",
+        "additional_source": "Models/Data/Yi Wen/滇川黔桂彝文字典_滇川黔桂彝文协作组编_昆明：云南民族出版社_2001.02_11863927_P508.pdf"
+      },
+      "character_count": {
+        "total_characters": 87046,
+        "training_subset": 4120,
+        "coverage_percentage": 4.73
+      }
+    },
+
+    "css_integration": {
+      "font_face_declaration": "@font-face { font-family: 'LSTY-Yi-Black'; src: url('fonts/LSTY-Yi-Black.woff2') format('woff2'), url('fonts/LSTY-Yi-Black.woff') format('woff'), url('fonts/LSTY-Yi-Black.ttf') format('truetype'); font-weight: bold; font-style: normal; font-display: swap; }",
+      
+      "css_classes": {
+        ".yi-text": {
+          "font-family": "LSTY-Yi-Black, 'Microsoft Yi Baiti', 'Nuosu SIL', sans-serif",
+          "font-weight": "bold",
+          "font-size": "16px",
+          "line-height": "1.5",
+          "letter-spacing": "0.05em",
+          "text-rendering": "optimizeLegibility"
+        },
+        
+        ".yi-code": {
+          "font-family": "LSTY-Yi-Black, 'Courier New', monospace",
+          "font-weight": "bold",
+          "font-size": "14px",
+          "line-height": "1.4",
+          "background-color": "#f5f5f5",
+          "padding": "2px 4px",
+          "border-radius": "3px"
+        },
+        
+        ".yi-quantum-term": {
+          "font-family": "LSTY-Yi-Black, 'Microsoft Yi Baiti', sans-serif",
+          "font-weight": "bold",
+          "font-size": "18px",
+          "color": "#2c3e50",
+          "text-shadow": "1px 1px 2px rgba(0,0,0,0.1)"
+        }
+      }
+    },
+
+    "input_method_support": {
+      "ime_configuration": {
+        "input_method": "yi_pinyin",
+        "keyboard_layout": "yi_traditional",
+        "auto_completion": true,
+        "prediction": true
+      },
+      
+      "character_input_mapping": {
+        "xian hai": "󲜐",
+        "tu zi": "󲜑", 
+        "juan": "󲜒",
+        "tian": "󲜓",
+        "pian yi": "󲜔",
+        "mai yuan": "󲜕"
+      }
+    },
+
+    "development_tools": {
+      "code_highlighting": {
+        "syntax_highlighter": "yi_qentl",
+        "color_scheme": {
+          "yi_keywords": "#d73a49",
+          "yi_strings": "#032f62", 
+          "yi_comments": "#6a737d",
+          "yi_functions": "#6f42c1",
+          "yi_variables": "#e36209"
+        }
+      },
+      
+      "editor_support": {
+        "vscode_extension": "qentl-yi-script",
+        "atom_package": "language-qentl-yi",
+        "sublime_syntax": "QEntL-Yi.sublime-syntax"
+      }
+    },
+
+    "training_data_format": {
+      "tokenizer_format": {
+        "vocabulary_entry": {
+          "token": "󲜐",
+          "id": 50001,
+          "frequency": 1000,
+          "language": "yi_script_dian_chuan_qian_gui",
+          "category": "general_vocabulary",
+          "meaning": "陷害",
+          "english": "frame, trap, set up",
+          "context_examples": [
+            "󲜐󲜑 (陷害兔子)",
+            "󲜐󲞵 (陷害人)",
+            "󲜐󲜷 (陷害之心)"
+          ]
+        }
+      },
+      
+      "training_corpus_structure": {
+        "yi_quantum_texts": "滇川黔贵通用彝文量子计算理论文档",
+        "yi_programming_examples": "彝文编程代码示例",
+        "yi_philosophical_wisdom": "彝族传统智慧文献",
+        "trilingual_mappings": "中英彝三语对照词典"
+      }
+    },
+
+    "quality_assurance": {
+      "character_validation": {
+        "unicode_compliance": true,
+        "font_coverage_check": true,
+        "rendering_test": true,
+        "script_type_verification": "滇川黔贵通用彝文"
+      },
+      
+      "data_integrity": {
+        "character_count_verification": 87046,
+        "training_subset_verification": 4120,
+        "translation_quality_check": true,
+        "trilingual_consistency": true
+      }
+    },
+
+    "version_history": {
+      "2.0.4.22": {
+        "date": "2025-01-01",
+        "changes": [
+          "更新为滇川黔贵通用彝文",
+          "支持87046个字符",
+          "包含4120个训练数据",
+          "添加三语对照表",
+          "优化字体渲染配置"
+        ]
+      },
+      "1.0.0": {
+        "date": "2024-12-31",
+        "changes": [
+          "初始版本创建"
+        ]
+      }
+    }
+  }
+} 

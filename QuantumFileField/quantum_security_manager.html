@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>QEntL Quantum Security Manager</title>
+    <style>
+        body { font-family: Consolas; background: linear-gradient(135deg, #0a0a0a, #1a1a2e, #16213e); color: #00ff88; margin: 0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; background: rgba(0,255,136,0.1); padding: 20px; border-radius: 10px; margin-bottom: 30px; }
+        .title { font-size: 2.5em; text-shadow: 0 0 20px #00ff88; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .security-section { background: rgba(0,255,136,0.05); border: 1px solid #00ff88; border-radius: 10px; padding: 20px; margin: 20px 0; }
+        .threat-item { display: flex; justify-content: space-between; padding: 10px; margin: 5px 0; background: rgba(0,255,136,0.05); border-radius: 5px; border-left: 3px solid #ff4444; }
+        .security-status { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
+        .status-secure { background: #00ff88; color: #000; }
+        .status-warning { background: #ffaa00; color: #000; }
+        .status-critical { background: #ff4444; color: #fff; }
+        .control-btn { background: linear-gradient(135deg, #00ff88, #00ffaa); color: #000; border: none; padding: 12px 24px; border-radius: 25px; margin: 10px; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .stat-item { background: rgba(0,255,136,0.1); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #00ff88; }
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #00ffaa; display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">QEntL Quantum Security Manager</h1>
+            <p>量子基因编码: QGC-SECURITY-2025-∞∞∞</p>
+        </div>
+        <div class="security-section">
+            <h3>安全状态</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-value" id="securityLevel">HIGH</span>
+                    <span>安全等级</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="threatCount">0</span>
+                    <span>威胁数量</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="encryptionStatus">AES-256</span>
+                    <span>加密状态</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="lastScan">刚刚</span>
+                    <span>上次扫描</span>
+                </div>
+            </div>
+            <button class="control-btn" onclick="startScan()">开始扫描</button>
+            <button class="control-btn" onclick="updateFirewall()">更新防火墙</button>
+            <button class="control-btn" onclick="generateKeys()">生成密钥</button>
+        </div>
+        <div class="security-section">
+            <h3>威胁检测</h3>
+            <div id="threatList"></div>
+        </div>
+    </div>
+    <script>
+        const threats = [
+            { name: '量子解密攻击', level: 'critical', status: '已阻止', time: '2分钟前' },
+            { name: '非法访问尝试', level: 'warning', status: '监控中', time: '5分钟前' },
+            { name: '异常网络流量', level: 'warning', status: '分析中', time: '10分钟前' }
+        ];
+
+        function renderThreats() {
+            const container = document.getElementById('threatList');
+            container.innerHTML = '';
+            threats.forEach(threat => {
+                const threatEl = document.createElement('div');
+                threatEl.className = 'threat-item';
+                threatEl.innerHTML = `
+                    <div>
+                        <strong>${threat.name}</strong><br>
+                        <small>${threat.time}</small>
+                    </div>
+                    <div class="security-status status-${threat.level}">${threat.status}</div>
+                `;
+                container.appendChild(threatEl);
+            });
+        }
+
+        function startScan() {
+            console.log('开始安全扫描...');
+            document.getElementById('lastScan').textContent = '扫描中...';
+            setTimeout(() => {
+                document.getElementById('lastScan').textContent = '刚刚';
+                document.getElementById('threatCount').textContent = threats.length;
+            }, 2000);
+        }
+
+        function updateFirewall() {
+            console.log('更新防火墙规则...');
+        }
+
+        function generateKeys() {
+            console.log('生成量子加密密钥...');
+            const key = 'QK-' + Math.random().toString(36).substr(2, 16).toUpperCase();
+            console.log('新密钥:', key);
+        }
+
+        renderThreats();
+        document.getElementById('threatCount').textContent = threats.length;
+        console.log('QEntL Quantum Security Manager initialized');
+    </script>
+</body>
+</html> 

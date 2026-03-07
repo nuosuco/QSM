@@ -1,0 +1,86 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "generated_time": "2025-07-03T20:04:47.287303",
+    "quantum_models": [
+      "QSM",
+      "SOM",
+      "WeQ",
+      "Ref",
+      "QEntL"
+    ],
+    "total_instructions": 5
+  },
+  "operating_system_instructions": {
+    "process_management": {
+      "量子进程创建": {
+        "id": "OS_1001",
+        "models": [
+          "QEntL",
+          "QSM"
+        ],
+        "system_call": "qentl_quantum_process_create",
+        "hardware_target": "quantum_cpu",
+        "quantum_state": "󲞰󲜷",
+        "description": "创建量子叠加态进程"
+      },
+      "量子进程调度": {
+        "id": "OS_1002",
+        "models": [
+          "QEntL",
+          "SOM"
+        ],
+        "system_call": "qentl_quantum_scheduler",
+        "hardware_target": "cpu",
+        "quantum_state": "󲞰󲞧",
+        "description": "量子进程智能调度"
+      }
+    },
+    "memory_management": {
+      "量子内存分配": {
+        "id": "OS_2001",
+        "models": [
+          "QEntL",
+          "QSM"
+        ],
+        "system_call": "qentl_quantum_malloc",
+        "hardware_target": "quantum_memory",
+        "quantum_state": "󲞰󲜵",
+        "description": "量子叠加态内存分配"
+      }
+    }
+  },
+  "application_instructions": {
+    "quantum_applications": {
+      "量子计算器": {
+        "id": "APP_5001",
+        "models": [
+          "QSM",
+          "SOM"
+        ],
+        "system_calls": [
+          "qentl_quantum_math_init"
+        ],
+        "hardware_target": "quantum_processor",
+        "quantum_state": "󲜷󲞧",
+        "description": "量子叠加态计算器应用"
+      },
+      "量子文本编辑器": {
+        "id": "APP_5002",
+        "models": [
+          "QSM",
+          "WeQ"
+        ],
+        "system_calls": [
+          "qentl_quantum_text_init"
+        ],
+        "hardware_target": [
+          "memory",
+          "storage"
+        ],
+        "quantum_state": "󲜷󲞦",
+        "description": "三语量子文本编辑器"
+      }
+    }
+  }
+}

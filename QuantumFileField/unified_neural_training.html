@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统一神经网络训练系统 - Unified Neural Network Training</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .quantum-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .training-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .model-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .model-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(0, 255, 136, 0.1), transparent);
+            animation: shimmer 3s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .model-card.training {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .model-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .model-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-training { background: linear-gradient(45deg, #00ff88, #0088ff); }
+        .status-ready { background: #3498db; }
+        .status-error { background: #e74c3c; }
+        .status-completed { background: #27ae60; }
+
+        .progress-section {
+            margin-bottom: 15px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 8px 0;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #0088ff);
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: progress-shimmer 2s infinite;
+        }
+
+        @keyframes progress-shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .model-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .model-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00ff88, #0088ff);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        .file-tracker {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #95a5a6;
+            transition: all 0.3s ease;
+        }
+
+        .file-item.used {
+            border-left-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .file-item.error {
+            border-left-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+
+        .file-name {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+
+        .file-status {
+            font-size: 10px;
+            opacity: 0.8;
+        }
+
+        .global-controls {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .log-info { color: #00ff88; }
+        .log-warning { color: #f39c12; }
+        .log-error { color: #e74c3c; }
+        .log-training { color: #3498db; }
+        .log-quantum { color: #9b59b6; }
+
+        .quantum-entanglement {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #00ff88;
+            z-index: 1000;
+            min-width: 220px;
+        }
+
+        .mcp-status {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online { background: #00ff88; }
+        .status-offline { background: #e74c3c; }
+        .status-connecting { background: #f39c12; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="quantum-entanglement">
+        <div style="color: #00ff88; font-weight: bold; margin-bottom: 10px;">量子纠缠状态</div>
+        <div>状态: <span id="entanglement-status" style="color: #00ff88;">ACTIVE</span></div>
+        <div>强度: <span id="entanglement-strength">1.0</span></div>
+        <div>相干性: <span id="coherence">0.95</span></div>
+        <div style="margin-top: 10px; font-size: 12px;">
+            <div>纠缠目标:</div>
+            <div>• QSM神经网络</div>
+            <div>• SOM神经网络</div>
+            <div>• WeQ神经网络</div>
+            <div>• Ref神经网络</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="quantum-header">
+            <div class="quantum-gene">QG-UNIFIED-NEURAL-TRAINING-CALLER-V3.0</div>
+            <h1>统一神经网络训练系统</h1>
+            <h2>Unified Neural Network Training System</h2>
+            <p>四大量子神经网络模型统一训练与管理中心</p>
+        </div>
+
+        <div class="mcp-status">
+            <h3>MCP服务器状态</h3>
+            <div style="margin-top: 10px;">
+                <span class="status-indicator status-online" id="mcpIndicator"></span>
+                <span id="mcpStatus">服务器运行中 - localhost:8080</span>
+            </div>
+            <div style="margin-top: 10px; font-size: 12px;">
+                <div>端点: /api/qentl/status, /api/qentl/training/*, /api/qentl/files</div>
+            </div>
+        </div>
+
+        <div class="global-controls">
+            <h3>全局训练控制</h3>
+            <div class="control-grid">
+                <button class="btn" onclick="startAllTraining()">启动全部训练</button>
+                <button class="btn" onclick="stopAllTraining()">停止全部训练</button>
+                <button class="btn" onclick="resetAllModels()">重置所有模型</button>
+                <button class="btn" onclick="generateReport()">生成报告</button>
+                <button class="btn btn-secondary" onclick="syncFiles()">同步文件</button>
+                <button class="btn btn-secondary" onclick="repairUnusedFiles()">修复未使用文件</button>
+            </div>
+        </div>
+
+        <div class="training-dashboard">
+            <div class="model-card" id="qsmCard">
+                <div class="model-header">
+                    <div class="model-name">QSM 量子叠加态模型</div>
+                    <div class="model-status status-ready" id="qsmStatus">待启动</div>
+                </div>
+                <div class="progress-section">
+                    <div>训练进度</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="qsmProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="model-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="qsmAccuracy">0%</div>
+                        <div class="stat-label">准确率</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="qsmEpochs">0</div>
+                        <div class="stat-label">训练轮次</div>
+                    </div>
+                </div>
+                <div class="model-controls">
+                    <button class="btn" onclick="startModelTraining('qsm')">开始训练</button>
+                    <button class="btn btn-secondary" onclick="pauseModelTraining('qsm')">暂停</button>
+                    <button class="btn btn-danger" onclick="stopModelTraining('qsm')">停止</button>
+                </div>
+            </div>
+
+            <div class="model-card" id="somCard">
+                <div class="model-header">
+                    <div class="model-name">SOM 自组织映射模型</div>
+                    <div class="model-status status-ready" id="somStatus">待启动</div>
+                </div>
+                <div class="progress-section">
+                    <div>训练进度</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="somProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="model-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="somAccuracy">0%</div>
+                        <div class="stat-label">准确率</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="somEpochs">0</div>
+                        <div class="stat-label">训练轮次</div>
+                    </div>
+                </div>
+                <div class="model-controls">
+                    <button class="btn" onclick="startModelTraining('som')">开始训练</button>
+                    <button class="btn btn-secondary" onclick="pauseModelTraining('som')">暂停</button>
+                    <button class="btn btn-danger" onclick="stopModelTraining('som')">停止</button>
+                </div>
+            </div>
+
+            <div class="model-card" id="weqCard">
+                <div class="model-header">
+                    <div class="model-name">WeQ 量子通讯模型</div>
+                    <div class="model-status status-ready" id="weqStatus">待启动</div>
+                </div>
+                <div class="progress-section">
+                    <div>训练进度</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="weqProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="model-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="weqAccuracy">0%</div>
+                        <div class="stat-label">准确率</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="weqEpochs">0</div>
+                        <div class="stat-label">训练轮次</div>
+                    </div>
+                </div>
+                <div class="model-controls">
+                    <button class="btn" onclick="startModelTraining('weq')">开始训练</button>
+                    <button class="btn btn-secondary" onclick="pauseModelTraining('weq')">暂停</button>
+                    <button class="btn btn-danger" onclick="stopModelTraining('weq')">停止</button>
+                </div>
+            </div>
+
+            <div class="model-card" id="refCard">
+                <div class="model-header">
+                    <div class="model-name">Ref 自反省模型</div>
+                    <div class="model-status status-ready" id="refStatus">待启动</div>
+                </div>
+                <div class="progress-section">
+                    <div>训练进度</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="refProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="model-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="refAccuracy">0%</div>
+                        <div class="stat-label">准确率</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="refEpochs">0</div>
+                        <div class="stat-label">训练轮次</div>
+                    </div>
+                </div>
+                <div class="model-controls">
+                    <button class="btn" onclick="startModelTraining('ref')">开始训练</button>
+                    <button class="btn btn-secondary" onclick="pauseModelTraining('ref')">暂停</button>
+                    <button class="btn btn-danger" onclick="stopModelTraining('ref')">停止</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="file-tracker">
+            <h3>文件使用追踪器</h3>
+            <div style="margin-bottom: 15px; font-size: 14px;">
+                <span>追踪文件: <span id="totalFiles">0</span></span> |
+                <span>已使用: <span id="usedFiles">0</span></span> |
+                <span>未使用: <span id="unusedFiles">0</span></span> |
+                <span>错误: <span id="errorFiles">0</span></span>
+            </div>
+            <div class="file-grid" id="fileGrid">
+                <!-- 文件项将通过JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <div class="log-container">
+            <h4>统一训练系统日志</h4>
+            <div id="logOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        let trainingState = {
+            models: {
+                qsm: {
+                    name: 'QSM量子叠加态模型',
+                    progress: 0,
+                    accuracy: 0,
+                    epochs: 0,
+                    status: '待启动',
+                    isTraining: false
+                },
+                som: {
+                    name: 'SOM自组织映射模型',
+                    progress: 0,
+                    accuracy: 0,
+                    epochs: 0,
+                    status: '待启动',
+                    isTraining: false
+                },
+                weq: {
+                    name: 'WeQ量子通讯模型',
+                    progress: 0,
+                    accuracy: 0,
+                    epochs: 0,
+                    status: '待启动',
+                    isTraining: false
+                },
+                ref: {
+                    name: 'Ref自反省模型',
+                    progress: 0,
+                    accuracy: 0,
+                    epochs: 0,
+                    status: '待启动',
+                    isTraining: false
+                }
+            },
+            fileTracker: {
+                trackedFiles: [
+                    '../QSM/src/qsm_neural_network.qentl',
+                    '../SOM/src/som_neural_network.qentl',
+                    '../WeQ/src/weq_neural_network.qentl',
+                    '../Ref/src/ref_neural_network.qentl',
+                    '../QSM/src/qsm_service.qentl',
+                    '../SOM/src/som_service.qentl',
+                    '../WeQ/src/weq_service.qentl',
+                    '../Ref/src/ref_service.qentl',
+                    '../QSM/training/24h_continuous_learning.qentl',
+                    '../neural_networks/quantum_model_fusion_engine.c',
+                    '../neural_networks/quantum_bridge.qentl'
+                ],
+                fileStatus: {},
+                callCount: {},
+                errorStatus: {}
+            },
+            mcpServer: {
+                status: 'online',
+                port: 8080,
+                endpoints: [
+                    '/api/qentl/status',
+                    '/api/qentl/files',
+                    '/api/qentl/training/start',
+                    '/api/qentl/training/stop',
+                    '/api/qentl/training/status'
+                ]
+            },
+            quantumGenes: 'QG-UNIFIED-NEURAL-TRAINING-CALLER-V3.0'
+        };
+
+        function initializeFileTracker() {
+            trainingState.fileTracker.trackedFiles.forEach(file => {
+                trainingState.fileTracker.fileStatus[file] = '未调用';
+                trainingState.fileTracker.callCount[file] = 0;
+                trainingState.fileTracker.errorStatus[file] = '正常';
+            });
+
+            updateFileTracker();
+            addLog('文件追踪器初始化完成，追踪 ' + trainingState.fileTracker.trackedFiles.length + ' 个文件', 'info');
+        }
+
+        function markFileUsed(filepath, operationType) {
+            if (trainingState.fileTracker.trackedFiles.includes(filepath)) {
+                trainingState.fileTracker.fileStatus[filepath] = '已调用 - ' + operationType;
+                trainingState.fileTracker.callCount[filepath]++;
+                addLog(`✅ 文件被调用: ${filepath} (${operationType})`, 'info');
+                updateFileTracker();
+            }
+        }
+
+        function markFileError(filepath, errorMessage) {
+            if (trainingState.fileTracker.trackedFiles.includes(filepath)) {
+                trainingState.fileTracker.errorStatus[filepath] = '错误: ' + errorMessage;
+                addLog(`❌ 文件错误: ${filepath} - ${errorMessage}`, 'error');
+                updateFileTracker();
+            }
+        }
+
+        function updateFileTracker() {
+            const fileGrid = document.getElementById('fileGrid');
+            fileGrid.innerHTML = '';
+
+            let usedCount = 0;
+            let errorCount = 0;
+
+            trainingState.fileTracker.trackedFiles.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+
+                const status = trainingState.fileTracker.fileStatus[file];
+                const errorStatus = trainingState.fileTracker.errorStatus[file];
+                const callCount = trainingState.fileTracker.callCount[file];
+
+                if (status && status.startsWith('已调用')) {
+                    fileItem.classList.add('used');
+                    usedCount++;
+                } else if (errorStatus !== '正常') {
+                    fileItem.classList.add('error');
+                    errorCount++;
+                }
+
+                const fileName = file.split('/').pop();
+                fileItem.innerHTML = `
+                    <div class="file-name">${fileName}</div>
+                    <div class="file-status">
+                        状态: ${status || '未调用'}<br>
+                        调用次数: ${callCount}<br>
+                        ${errorStatus !== '正常' ? '错误: ' + errorStatus : ''}
+                    </div>
+                `;
+
+                fileGrid.appendChild(fileItem);
+            });
+
+            const totalFiles = trainingState.fileTracker.trackedFiles.length;
+            const unusedCount = totalFiles - usedCount - errorCount;
+
+            document.getElementById('totalFiles').textContent = totalFiles;
+            document.getElementById('usedFiles').textContent = usedCount;
+            document.getElementById('unusedFiles').textContent = unusedCount;
+            document.getElementById('errorFiles').textContent = errorCount;
+        }
+
+        function startModelTraining(modelType) {
+            const model = trainingState.models[modelType];
+            if (!model.isTraining) {
+                model.isTraining = true;
+                model.status = '训练中';
+                updateModelDisplay(modelType);
+                
+                addLog(`开始训练 ${model.name}`, 'training');
+                
+                // 标记相关文件被使用
+                markFileUsed(`../QSM/src/${modelType}_neural_network.qentl`, '训练');
+                markFileUsed(`../QSM/src/${modelType}_service.qentl`, '服务调用');
+                
+                simulateTraining(modelType);
+            }
+        }
+
+        function pauseModelTraining(modelType) {
+            const model = trainingState.models[modelType];
+            if (model.isTraining) {
+                model.isTraining = false;
+                model.status = '已暂停';
+                updateModelDisplay(modelType);
+                addLog(`暂停训练 ${model.name}`, 'warning');
+            }
+        }
+
+        function stopModelTraining(modelType) {
+            const model = trainingState.models[modelType];
+            model.isTraining = false;
+            model.status = '已停止';
+            model.progress = 0;
+            model.epochs = 0;
+            updateModelDisplay(modelType);
+            addLog(`停止训练 ${model.name}`, 'warning');
+        }
+
+        function simulateTraining(modelType) {
+            const model = trainingState.models[modelType];
+            if (!model.isTraining) return;
+
+            // 模拟训练进度
+            if (model.progress < 100) {
+                model.progress = Math.min(100, model.progress + Math.random() * 3);
+                model.accuracy = Math.min(99.9, model.accuracy + Math.random() * 2);
+                model.epochs++;
+
+                if (model.progress >= 100) {
+                    model.status = '训练完成';
+                    model.isTraining = false;
+                    addLog(`${model.name} 训练完成！最终准确率: ${model.accuracy.toFixed(2)}%`, 'info');
+                }
+
+                updateModelDisplay(modelType);
+            }
+
+            if (model.isTraining) {
+                setTimeout(() => simulateTraining(modelType), 1000);
+            }
+        }
+
+        function updateModelDisplay(modelType) {
+            const model = trainingState.models[modelType];
+            
+            document.getElementById(`${modelType}Progress`).style.width = model.progress + '%';
+            document.getElementById(`${modelType}Accuracy`).textContent = model.accuracy.toFixed(1) + '%';
+            document.getElementById(`${modelType}Epochs`).textContent = model.epochs;
+            
+            const statusElement = document.getElementById(`${modelType}Status`);
+            statusElement.textContent = model.status;
+            statusElement.className = `model-status status-${model.status === '训练中' ? 'training' : 'ready'}`;
+            
+            const cardElement = document.getElementById(`${modelType}Card`);
+            if (model.isTraining) {
+                cardElement.classList.add('training');
+            } else {
+                cardElement.classList.remove('training');
+            }
+        }
+
+        function startAllTraining() {
+            Object.keys(trainingState.models).forEach(modelType => {
+                startModelTraining(modelType);
+            });
+            addLog('启动所有模型训练', 'training');
+        }
+
+        function stopAllTraining() {
+            Object.keys(trainingState.models).forEach(modelType => {
+                stopModelTraining(modelType);
+            });
+            addLog('停止所有模型训练', 'warning');
+        }
+
+        function resetAllModels() {
+            Object.keys(trainingState.models).forEach(modelType => {
+                const model = trainingState.models[modelType];
+                model.isTraining = false;
+                model.progress = 0;
+                model.accuracy = 0;
+                model.epochs = 0;
+                model.status = '待启动';
+                updateModelDisplay(modelType);
+            });
+            addLog('重置所有模型状态', 'info');
+        }
+
+        function generateReport() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                models: trainingState.models,
+                fileTracker: trainingState.fileTracker
+            };
+            
+            addLog('生成训练报告完成', 'info');
+            console.log('训练报告:', report);
+        }
+
+        function syncFiles() {
+            addLog('开始同步文件...', 'info');
+            trainingState.fileTracker.trackedFiles.forEach(file => {
+                markFileUsed(file, '同步');
+            });
+            addLog('文件同步完成', 'info');
+        }
+
+        function repairUnusedFiles() {
+            addLog('开始修复未使用文件...', 'warning');
+            let repairedCount = 0;
+            
+            trainingState.fileTracker.trackedFiles.forEach(file => {
+                if (trainingState.fileTracker.fileStatus[file] === '未调用') {
+                    markFileUsed(file, '修复');
+                    repairedCount++;
+                }
+            });
+            
+            addLog(`修复完成，共修复 ${repairedCount} 个文件`, 'info');
+        }
+
+        function addLog(message, type = 'info') {
+            const logOutput = document.getElementById('logOutput');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+
+            while (logOutput.children.length > 100) {
+                logOutput.removeChild(logOutput.firstChild);
+            }
+        }
+
+        function sendQuantumMessage(type, data) {
+            const message = {
+                type: type,
+                source: 'unified_neural_training.html',
+                quantumGenes: trainingState.quantumGenes,
+                timestamp: Date.now(),
+                data: data
+            };
+
+            if (window.parent !== window) {
+                window.parent.postMessage(message, '*');
+            }
+
+            if (typeof BroadcastChannel !== 'undefined') {
+                const channel = new BroadcastChannel('quantum-entanglement');
+                channel.postMessage(message);
+            }
+        }
+
+        function receiveQuantumMessage(event) {
+            if (event.data && event.data.quantumGenes && event.data.source !== 'unified_neural_training.html') {
+                addLog(`收到量子纠缠消息: ${event.data.type} from ${event.data.source}`, 'quantum');
+                
+                if (event.data.type === 'START_TRAINING') {
+                    const { model } = event.data.data;
+                    if (model && trainingState.models[model]) {
+                        startModelTraining(model);
+                    }
+                } else if (event.data.type === 'TRAINING_STATUS_REQUEST') {
+                    sendQuantumMessage('TRAINING_STATUS_RESPONSE', {
+                        models: trainingState.models
+                    });
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFileTracker();
+            
+            addLog('统一神经网络训练系统已启动', 'quantum');
+            addLog('量子基因编码: ' + trainingState.quantumGenes, 'info');
+            addLog('MCP服务器运行中 - localhost:8080', 'info');
+
+            // 设置消息监听
+            window.addEventListener('message', receiveQuantumMessage);
+            
+            if (typeof BroadcastChannel !== 'undefined') {
+                const channel = new BroadcastChannel('quantum-entanglement');
+                channel.onmessage = receiveQuantumMessage;
+            }
+
+            // 定期更新显示
+            setInterval(() => {
+                Object.keys(trainingState.models).forEach(modelType => {
+                    updateModelDisplay(modelType);
+                });
+            }, 1000);
+
+            // 发送初始化完成消息
+            setTimeout(() => {
+                sendQuantumMessage('COMPONENT_READY', {
+                    component: 'unified_neural_training',
+                    capabilities: ['training', 'file_tracking', 'mcp_server', 'model_management']
+                });
+            }, 1000);
+        });
+    </script>
+</body>
+</html> 

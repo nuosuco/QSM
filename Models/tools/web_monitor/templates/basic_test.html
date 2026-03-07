@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基础彝文测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+        }
+        .char {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #ffffcc;
+            font-size: 24px;
+            min-width: 50px;
+            text-align: center;
+        }
+        .info {
+            background: #e8f4f8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>基础彝文测试</h1>
+    
+    <div class="test-box">
+        <h2>测试1: 直接显示彝文字符</h2>
+        <div class="char">󲜐</div>
+        <div class="char">󲜑</div>
+        <div class="char">󲜒</div>
+        <div class="char">󲜓</div>
+        <div class="char">󲜔</div>
+    </div>
+
+    <div class="test-box">
+        <h2>测试2: 字符信息</h2>
+        <div class="info" id="char-info">
+            正在分析字符...
+        </div>
+    </div>
+
+    <div class="test-box">
+        <h2>测试3: 对比其他字符</h2>
+        <div>
+            <strong>彝文字符:</strong>
+            <div class="char">󲜐</div>
+            <div class="char">󲜑</div>
+            <div class="char">󲜒</div>
+        </div>
+        <div>
+            <strong>表情符号:</strong>
+            <div class="char">😀</div>
+            <div class="char">🌍</div>
+            <div class="char">🚀</div>
+        </div>
+        <div>
+            <strong>中文字符:</strong>
+            <div class="char">你好</div>
+            <div class="char">世界</div>
+        </div>
+    </div>
+
+    <script>
+        function analyzeChars() {
+            const info = document.getElementById('char-info');
+            let text = '';
+            
+            const chars = ['󲜐', '󲜑', '󲜒', '😀', '🌍', '🚀', '你', '好'];
+            
+            chars.forEach((char, i) => {
+                text += `字符 ${i+1}: "${char}"\n`;
+                text += `  长度: ${char.length}\n`;
+                text += `  Unicode: ${char.charCodeAt(0).toString(16)}\n`;
+                text += `  十进制: ${char.charCodeAt(0)}\n`;
+                text += `  是否彝文范围: ${char.charCodeAt(0) >= 0xF0000 && char.charCodeAt(0) <= 0xFFFFF}\n`;
+                text += '\n';
+            });
+            
+            text += `浏览器: ${navigator.userAgent}\n`;
+            text += `时间: ${new Date().toLocaleString()}\n`;
+            
+            info.textContent = text;
+        }
+
+        document.addEventListener('DOMContentLoaded', analyzeChars);
+    </script>
+</body>
+</html> 

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量子Hello World演示</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #00ff88;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .header {
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid #00ff88;
+            border-radius: 15px;
+            position: relative;
+        }
+        .quantum-gene {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 12px;
+            color: #00aaff;
+            opacity: 0.8;
+        }
+        .title {
+            font-size: 3em;
+            margin-bottom: 15px;
+            text-shadow: 0 0 30px #00ff88;
+            animation: quantum-glow 3s infinite;
+        }
+        @keyframes quantum-glow {
+            0%, 100% { text-shadow: 0 0 30px #00ff88; }
+            50% { text-shadow: 0 0 50px #00ff88, 0 0 70px #00aaff; }
+        }
+        .quantum-output {
+            font-size: 2em;
+            margin: 40px 0;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00ff88;
+            border-radius: 10px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .quantum-states {
+            display: flex;
+            justify-content: space-around;
+            margin: 30px 0;
+        }
+        .quantum-state {
+            padding: 20px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            border-radius: 10px;
+            min-width: 150px;
+        }
+        .btn {
+            padding: 15px 30px;
+            background: linear-gradient(45deg, #00ff88, #00aa66);
+            color: #000;
+            border: none;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.5);
+        }
+        .code-display {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="quantum-gene">量子基因: 0xHELLO1</div>
+            <h1 class="title">量子Hello World</h1>
+            <p>QEntL量子编程语言演示程序</p>
+        </div>
+
+        <div class="quantum-output" id="quantumOutput">
+            Hello, Quantum World! 🌌
+        </div>
+
+        <div class="quantum-states">
+            <div class="quantum-state">
+                <h3>叠加态</h3>
+                <div id="superposition">|0⟩ + |1⟩</div>
+            </div>
+            <div class="quantum-state">
+                <h3>纠缠态</h3>
+                <div id="entanglement">|00⟩ + |11⟩</div>
+            </div>
+            <div class="quantum-state">
+                <h3>测量结果</h3>
+                <div id="measurement">50% |0⟩, 50% |1⟩</div>
+            </div>
+        </div>
+
+        <div>
+            <button class="btn" onclick="runQuantumHello()">运行量子程序</button>
+            <button class="btn" onclick="measureQuantumState()">测量量子态</button>
+            <button class="btn" onclick="createEntanglement()">创建纠缠</button>
+        </div>
+
+        <div class="code-display" id="codeDisplay">
+// QEntL量子Hello World程序
+quantum_program hello_world {
+    // 初始化量子比特
+    qubit q1 = |0⟩;
+    qubit q2 = |0⟩;
+    
+    // 创建叠加态
+    hadamard(q1);
+    
+    // 创建纠缠态
+    cnot(q1, q2);
+    
+    // 输出量子问候
+    quantum_print("Hello, Quantum World!");
+    
+    // 测量并输出结果
+    measure(q1, q2);
+}
+        </div>
+    </div>
+
+    <script>
+        const QUANTUM_GENE = '0xHELLO1';
+        let quantumState = { q1: 0, q2: 0, entangled: false };
+
+        function runQuantumHello() {
+            const output = document.getElementById('quantumOutput');
+            const messages = [
+                'Hello, Quantum World! 🌌',
+                '你好，量子世界！⚛️',
+                'Quantum Greetings! 🔮',
+                '量子问候！✨',
+                'Hello from Superposition! 🌊'
+            ];
+            
+            let index = 0;
+            const interval = setInterval(() => {
+                output.textContent = messages[index];
+                index = (index + 1) % messages.length;
+            }, 1000);
+            
+            setTimeout(() => {
+                clearInterval(interval);
+                output.textContent = 'Hello, Quantum World! 🌌';
+            }, 5000);
+            
+            console.log('[量子Hello] 程序执行完成');
+            sendQuantumMessage('hello_executed', { message: 'Hello, Quantum World!' });
+        }
+
+        function measureQuantumState() {
+            const measurement = document.getElementById('measurement');
+            const result = Math.random() > 0.5 ? '|1⟩' : '|0⟩';
+            measurement.textContent = `测量结果: ${result}`;
+            
+            console.log('[量子Hello] 量子态测量:', result);
+            sendQuantumMessage('quantum_measured', { result });
+        }
+
+        function createEntanglement() {
+            const entanglement = document.getElementById('entanglement');
+            quantumState.entangled = true;
+            entanglement.textContent = '🔗 |00⟩ + |11⟩ (已纠缠)';
+            
+            console.log('[量子Hello] 量子纠缠已创建');
+            sendQuantumMessage('entanglement_created', { entangled: true });
+        }
+
+        function sendQuantumMessage(type, data) {
+            const message = {
+                source: 'demo_quantum_hello',
+                type: type,
+                quantumGene: QUANTUM_GENE,
+                timestamp: Date.now(),
+                data: data
+            };
+            window.postMessage(message, '*');
+        }
+
+        // 自动演示
+        setInterval(() => {
+            if (Math.random() > 0.8) {
+                const superposition = document.getElementById('superposition');
+                superposition.style.color = Math.random() > 0.5 ? '#00ff88' : '#00aaff';
+            }
+        }, 2000);
+
+        console.log('[量子Hello] 演示程序已就绪');
+    </script>
+</body>
+</html>

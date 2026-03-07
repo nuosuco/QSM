@@ -1,0 +1,32 @@
+{
+  "model_info": {
+    "name": "量子操作系统核心模型",
+    "description": "Quantum Operating System Core Model",
+    "vocabulary_size": 150000,
+    "specialization": [
+      "操作系统内核",
+      "编译器技术",
+      "虚拟机架构",
+      "硬件抽象层"
+    ],
+    "training_data": "trilingual_qentl_data.jsonl",
+    "model_path": "F:\\QSM\\Models\\QEntL",
+    "languages": {
+      "中文": 75000,
+      "英文": 60000,
+      "滇川黔贵通用彝文": 15000
+    }
+  },
+  "training_config": {
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "num_epochs": 10,
+    "max_seq_length": 512,
+    "warmup_steps": 1000,
+    "gradient_accumulation_steps": 8,
+    "fp16": true,
+    "dataloader_num_workers": 4
+  },
+  "timestamp": "2025-07-03T15:25:14.140345",
+  "status": "training_started"
+}

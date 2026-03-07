@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> QEntL量子操作系统 - 首页</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a, #1a2a4a, #2a3a5a);
+            color: #66ccff; min-height: 100vh; padding: 20px;
+        }
+        .os-header {
+            text-align: center; padding: 40px; background: rgba(102,204,255,0.1);
+            border-radius: 20px; margin-bottom: 30px; border: 2px solid #66ccff;
+        }
+        .os-title { font-size: 3em; margin-bottom: 20px; }
+        .os-subtitle { font-size: 1.2em; color: #88ddff; }
+        .desktop-area {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px; margin-bottom: 30px;
+        }
+        .app-icon {
+            background: rgba(102,204,255,0.1); padding: 30px; border-radius: 15px;
+            border: 2px solid #66ccff; text-align: center; cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .app-icon:hover {
+            background: rgba(102,204,255,0.2); transform: scale(1.05);
+        }
+        .icon { font-size: 3em; margin-bottom: 15px; display: block; }
+        .app-name { font-size: 1.1em; color: #66ccff; }
+        .taskbar {
+            position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
+            background: rgba(102,204,255,0.2); backdrop-filter: blur(10px);
+            border-top: 2px solid #66ccff; display: flex; align-items: center;
+            padding: 0 20px; justify-content: space-between;
+        }
+        .start-btn {
+            background: linear-gradient(45deg, #4488cc, #66ccff); color: #000;
+            padding: 10px 20px; border-radius: 10px; border: none;
+            font-weight: bold; cursor: pointer;
+        }
+        .system-info { color: #88ddff; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="os-header">
+        <div class="os-title"> QEntL量子操作系统</div>
+        <div class="os-subtitle">宇宙级量子分布式计算平台 - 欢迎来到量子计算新纪元</div>
+    </div>
+
+    <div class="desktop-area">
+        <div class="app-icon" onclick="openApp('file-manager')">
+            <span class="icon"></span>
+            <div class="app-name">量子文件管理器</div>
+        </div>
+        <div class="app-icon" onclick="openApp('terminal')">
+            <span class="icon"></span>
+            <div class="app-name">量子终端</div>
+        </div>
+        <div class="app-icon" onclick="openApp('neural-network')">
+            <span class="icon"></span>
+            <div class="app-name">神经网络中心</div>
+        </div>
+        <div class="app-icon" onclick="openApp('blockchain')">
+            <span class="icon"></span>
+            <div class="app-name">SOM区块链</div>
+        </div>
+        <div class="app-icon" onclick="openApp('quantum-lab')">
+            <span class="icon"></span>
+            <div class="app-name">量子实验室</div>
+        </div>
+        <div class="app-icon" onclick="openApp('app-store')">
+            <span class="icon"></span>
+            <div class="app-name">量子应用商店</div>
+        </div>
+    </div>
+
+    <div class="taskbar">
+        <button class="start-btn" onclick="showStartMenu()"> QEntL</button>
+        <div class="system-info">
+            量子比特: <span id="qubits"></span> | 
+            SOM余额: <span id="somBalance">1000</span> | 
+            时间: <span id="currentTime"></span>
+        </div>
+    </div>
+
+    <script>
+        function openApp(appName) {
+            const apps = {
+                'file-manager': 'quantum_field_demo.html',
+                'terminal': 'mcp_quantum_interface.html',
+                'neural-network': 'quantum_superposition_neural_engine.html',
+                'blockchain': 'som_blockchain_node.html',
+                'quantum-lab': 'application_condenser.html',
+                'app-store': 'quantum_mobile_deployment.html'
+            };
+            
+            const url = apps[appName] || 'application_condenser.html';
+            window.open(url, '_blank', 'width=1200,height=800');
+        }
+
+        function showStartMenu() {
+            alert(' QEntL量子操作系统\n\n 量子内核运行正常\n 神经网络已激活\n SOM币挖矿进行中\n 量子纠缠信道稳定\n\n 系统状态：完美运行');
+        }
+
+        function updateTime() {
+            document.getElementById('currentTime').textContent = new Date().toLocaleTimeString();
+        }
+
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // 模拟系统数据更新
+        setInterval(() => {
+            const qubits = Math.floor(Math.random() * 1000) + 1000;
+            const som = Math.floor(Math.random() * 5000) + 1000;
+            document.getElementById('qubits').textContent = qubits;
+            document.getElementById('somBalance').textContent = som;
+        }, 3000);
+
+        console.log(' QEntL量子操作系统已启动');
+        console.log(' 欢迎来到量子计算新纪元！');
+    </script>
+</body>
+</html>

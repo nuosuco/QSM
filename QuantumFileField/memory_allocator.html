@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量子内存分配器</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #2a1a2a 50%, #1a2a3a 100%);
+            color: #88aaff;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(136, 170, 255, 0.1);
+            border: 1px solid #88aaff;
+            border-radius: 10px;
+            position: relative;
+        }
+        .quantum-gene {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 12px;
+            color: #aaccff;
+            opacity: 0.8;
+        }
+        .title {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px #88aaff;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .memory-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .panel-section {
+            background: rgba(136, 170, 255, 0.05);
+            border: 1px solid #88aaff;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .memory-blocks {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+            margin: 15px 0;
+        }
+        .memory-block {
+            height: 30px;
+            border: 1px solid #333;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .memory-block.free {
+            background: rgba(136, 170, 255, 0.2);
+            color: #88aaff;
+        }
+        .memory-block.allocated {
+            background: rgba(255, 136, 136, 0.3);
+            color: #ff8888;
+        }
+        .memory-block.quantum {
+            background: rgba(136, 255, 136, 0.3);
+            color: #88ff88;
+            animation: quantum-glow 2s infinite;
+        }
+        @keyframes quantum-glow {
+            0%, 100% { box-shadow: 0 0 5px #88ff88; }
+            50% { box-shadow: 0 0 15px #88ff88; }
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #88aaff, #6688cc);
+            color: #000;
+            border: none;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(136, 170, 255, 0.4);
+        }
+        .memory-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(136, 170, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid #88aaff;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #88aaff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="quantum-gene">量子基因: 0xMEM4D7</div>
+        <h1 class="title">量子内存分配器</h1>
+        <p>QEntL量子内存管理系统</p>
+    </div>
+
+    <div class="memory-panel">
+        <div class="panel-section">
+            <h3>🧠 内存块状态</h3>
+            <div class="memory-blocks" id="memoryBlocks">
+                <!-- 动态生成的内存块 -->
+            </div>
+            <div style="margin-top: 15px; font-size: 12px;">
+                <span style="color: #88aaff;">■ 空闲</span>
+                <span style="color: #ff8888; margin-left: 15px;">■ 已分配</span>
+                <span style="color: #88ff88; margin-left: 15px;">■ 量子态</span>
+            </div>
+        </div>
+        <div class="panel-section">
+            <h3>📊 分配日志</h3>
+            <div id="allocationLog" style="height: 200px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; font-size: 12px;">
+                <div>系统启动 - 初始化内存池</div>
+                <div>分配64KB量子内存块</div>
+                <div>创建量子叠加态缓存</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="allocateMemory()">分配内存</button>
+        <button class="btn" onclick="freeMemory()">释放内存</button>
+        <button class="btn" onclick="createQuantumBlock()">创建量子块</button>
+        <button class="btn" onclick="defragmentMemory()">内存整理</button>
+        <button class="btn" onclick="exportMemoryMap()">导出内存映射</button>
+    </div>
+
+    <div class="memory-stats">
+        <div class="stat-item">
+            <div class="stat-value" id="totalMemory">1024MB</div>
+            <div>总内存</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="freeMemory">768MB</div>
+            <div>空闲内存</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="allocatedMemory">256MB</div>
+            <div>已分配</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="quantumMemory">128MB</div>
+            <div>量子内存</div>
+        </div>
+    </div>
+
+    <script>
+        const QUANTUM_GENE = '0xMEM4D7';
+        const memoryState = {
+            blocks: [],
+            totalBlocks: 64,
+            allocatedCount: 0,
+            quantumCount: 0
+        };
+
+        function initializeMemoryBlocks() {
+            const container = document.getElementById('memoryBlocks');
+            
+            for (let i = 0; i < memoryState.totalBlocks; i++) {
+                const block = document.createElement('div');
+                block.className = 'memory-block free';
+                block.textContent = i.toString(16).toUpperCase().padStart(2, '0');
+                block.onclick = () => toggleBlock(i);
+                container.appendChild(block);
+                
+                memoryState.blocks.push({
+                    element: block,
+                    status: 'free',
+                    address: i * 16
+                });
+            }
+            
+            // 预分配一些内存块
+            for (let i = 0; i < 8; i++) {
+                if (Math.random() > 0.7) {
+                    allocateBlock(i);
+                }
+            }
+        }
+
+        function toggleBlock(index) {
+            const block = memoryState.blocks[index];
+            if (block.status === 'free') {
+                allocateBlock(index);
+            } else if (block.status === 'allocated') {
+                freeBlock(index);
+            }
+        }
+
+        function allocateBlock(index) {
+            const block = memoryState.blocks[index];
+            block.status = 'allocated';
+            block.element.className = 'memory-block allocated';
+            memoryState.allocatedCount++;
+            
+            addLog(`分配内存块 0x${index.toString(16).toUpperCase().padStart(2, '0')}`);
+            updateStats();
+        }
+
+        function freeBlock(index) {
+            const block = memoryState.blocks[index];
+            if (block.status === 'quantum') {
+                memoryState.quantumCount--;
+            } else if (block.status === 'allocated') {
+                memoryState.allocatedCount--;
+            }
+            
+            block.status = 'free';
+            block.element.className = 'memory-block free';
+            
+            addLog(`释放内存块 0x${index.toString(16).toUpperCase().padStart(2, '0')}`);
+            updateStats();
+        }
+
+        function allocateMemory() {
+            const freeBlocks = memoryState.blocks.filter(b => b.status === 'free');
+            if (freeBlocks.length > 0) {
+                const randomBlock = freeBlocks[Math.floor(Math.random() * freeBlocks.length)];
+                const index = memoryState.blocks.indexOf(randomBlock);
+                allocateBlock(index);
+            }
+        }
+
+        function freeMemory() {
+            const allocatedBlocks = memoryState.blocks.filter(b => b.status === 'allocated');
+            if (allocatedBlocks.length > 0) {
+                const randomBlock = allocatedBlocks[Math.floor(Math.random() * allocatedBlocks.length)];
+                const index = memoryState.blocks.indexOf(randomBlock);
+                freeBlock(index);
+            }
+        }
+
+        function createQuantumBlock() {
+            const freeBlocks = memoryState.blocks.filter(b => b.status === 'free');
+            if (freeBlocks.length > 0) {
+                const randomBlock = freeBlocks[Math.floor(Math.random() * freeBlocks.length)];
+                const index = memoryState.blocks.indexOf(randomBlock);
+                
+                randomBlock.status = 'quantum';
+                randomBlock.element.className = 'memory-block quantum';
+                memoryState.quantumCount++;
+                
+                addLog(`创建量子内存块 0x${index.toString(16).toUpperCase().padStart(2, '0')}`);
+                updateStats();
+            }
+        }
+
+        function defragmentMemory() {
+            addLog('开始内存碎片整理...');
+            
+            // 模拟整理过程
+            setTimeout(() => {
+                addLog('内存碎片整理完成');
+                updateStats();
+            }, 2000);
+        }
+
+        function exportMemoryMap() {
+            const memoryMap = {
+                timestamp: Date.now(),
+                quantumGene: QUANTUM_GENE,
+                totalBlocks: memoryState.totalBlocks,
+                allocatedCount: memoryState.allocatedCount,
+                quantumCount: memoryState.quantumCount,
+                blocks: memoryState.blocks.map((block, index) => ({
+                    address: `0x${index.toString(16).toUpperCase().padStart(2, '0')}`,
+                    status: block.status
+                }))
+            };
+            
+            console.log('[量子内存分配器] 内存映射已导出:', memoryMap);
+            addLog('内存映射已导出到控制台');
+        }
+
+        function addLog(message) {
+            const log = document.getElementById('allocationLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function updateStats() {
+            const freeCount = memoryState.blocks.filter(b => b.status === 'free').length;
+            const allocatedMB = Math.round(memoryState.allocatedCount * 16);
+            const freeMB = Math.round(freeCount * 16);
+            const quantumMB = Math.round(memoryState.quantumCount * 16);
+            
+            document.getElementById('freeMemory').textContent = freeMB + 'MB';
+            document.getElementById('allocatedMemory').textContent = allocatedMB + 'MB';
+            document.getElementById('quantumMemory').textContent = quantumMB + 'MB';
+        }
+
+        function sendQuantumMessage(type, data) {
+            const message = {
+                source: 'memory_allocator',
+                type: type,
+                quantumGene: QUANTUM_GENE,
+                timestamp: Date.now(),
+                data: data
+            };
+            window.postMessage(message, '*');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMemoryBlocks();
+            addLog('量子内存分配器已初始化');
+        });
+
+        // 自动内存管理
+        setInterval(() => {
+            if (Math.random() > 0.9) {
+                if (Math.random() > 0.5) {
+                    allocateMemory();
+                } else {
+                    freeMemory();
+                }
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
