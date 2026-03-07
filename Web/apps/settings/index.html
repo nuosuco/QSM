@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - QEntL</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: rgba(10,10,26,0.95);
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        .settings-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .settings-section {
+            background: rgba(138,135,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(138,135,255,0.3);
+        }
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+        }
+        .setting-label {
+            color: #aaa;
+        }
+        .setting-value {
+            color: #fff;
+        }
+        .lang-select {
+            display: flex;
+            gap: 10px;
+        }
+        .lang-option {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .lang-option:hover {
+            background: rgba(138,135,255,0.2);
+        }
+        .lang-option.active {
+            background: rgba(138,135,255,0.3);
+            border-color: #8a87ff;
+        }
+        .toggle {
+            width: 50px;
+            height: 26px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 13px;
+            cursor: pointer;
+            position: relative;
+        }
+        .toggle.active {
+            background: #8a87ff;
+        }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all 0.2s;
+        }
+        .toggle.active::after {
+            left: 27px;
+        }
+        .quantum-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(78,205,196,0.1);
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+        .quantum-dot {
+            width: 12px;
+            height: 12px;
+            background: #4ecdc4;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <h1>⚙️ 系统设置</h1>
+        
+        <div class="settings-section">
+            <div class="section-title">🌍 语言设置 / Language / ꀂꏂ</div>
+            <div class="setting-item">
+                <div class="setting-label">界面语言</div>
+                <div class="lang-select">
+                    <div class="lang-option active" onclick="setLang('zh')">🇨🇳 中文</div>
+                    <div class="lang-option" onclick="setLang('en')">🇺🇸 English</div>
+                    <div class="lang-option" onclick="setLang('yi')">⛰️ ꆈꌠ</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <div class="section-title">⚛️ 量子系统</div>
+            <div class="setting-item">
+                <div class="setting-label">量子态指示器</div>
+                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">量子相干性显示</div>
+                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+            </div>
+            <div class="quantum-status">
+                <div class="quantum-dot"></div>
+                <span>量子态: 叠加态运行中 | 相干性: 0.954</span>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <div class="section-title">🎨 显示设置</div>
+            <div class="setting-item">
+                <div class="setting-label">暗色主题</div>
+                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">动画效果</div>
+                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">桌面图标大小</div>
+                <div class="setting-value">中等</div>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <div class="section-title">📊 系统信息</div>
+            <div class="setting-item">
+                <div class="setting-label">系统版本</div>
+                <div class="setting-value">QEntL v0.3.0</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">量子比特数</div>
+                <div class="setting-value">8 qubits</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">模型状态</div>
+                <div class="setting-value">QSM/SOM/WeQ/Ref ✅</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        function setLang(lang) {
+            document.querySelectorAll('.lang-option').forEach(o => o.classList.remove('active'));
+            event.target.classList.add('active');
+            localStorage.setItem('qentl-lang', lang);
+            // 这里可以调用i18n模块切换语言
+        }
+        
+        // 加载保存的设置
+        const savedLang = localStorage.getItem('qentl-lang');
+        if (savedLang) {
+            document.querySelectorAll('.lang-option').forEach(o => {
+                o.classList.toggle('active', o.textContent.includes(savedLang==='zh'?'中文':savedLang==='en'?'English':'ꆈꌠ'));
+            });
+        }
+    </script>
+</body>
+</html>
