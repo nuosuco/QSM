@@ -4,18 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QEntL量子操作系统</title>
-    <link rel="stylesheet" href="/assets/css/desktop.css">
-    <script src="/assets/js/i18n.js"></script>
-    <script src="/assets/js/runtime-api.js"></script>
+    <!-- 加载滇川黔贵通用彝文字体 -->
+    <link rel="stylesheet" href="/fonts/yi-fonts.css">
+    <script src="/fonts/install-yi.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Microsoft YaHei', sans-serif;
+            font-family: 'Microsoft YaHei', 'YiTongyong', sans-serif;
             background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
             min-height: 100vh;
             overflow: hidden;
             user-select: none;
         }
+        /* 彝文字体 */
+        .yi-text { font-family: 'YiTongyong', sans-serif !important; }
         .desktop {
             width: 100vw;
             height: calc(100vh - 48px);
@@ -67,8 +69,7 @@
             font-size: 12px; cursor: pointer;
         }
         .lang-btn:hover, .lang-btn.active { background: rgba(138,135,255,0.3); }
-        .taskbar-apps { display: flex; gap: 5px; margin-left: 15px; flex: 1; }
-        .system-tray { display: flex; align-items: center; gap: 15px; padding: 0 10px; }
+        .system-tray { display: flex; align-items: center; gap: 15px; padding: 0 10px; margin-left: auto; }
         .quantum-indicator {
             display: flex; align-items: center; gap: 5px;
             padding: 5px 10px;
@@ -91,46 +92,56 @@
         <div class="lang-switch">
             <button class="lang-btn active" onclick="setLang('zh')">中文</button>
             <button class="lang-btn" onclick="setLang('en')">EN</button>
-            <button class="lang-btn" onclick="setLang('yi')">ꆈꌠ</button>
+            <button class="lang-btn yi-text" onclick="setLang('yi')">ꆈꌠ</button>
         </div>
-        <div class="taskbar-apps" id="taskbar-apps"></div>
         <div class="system-tray">
             <div class="quantum-indicator"><div class="quantum-dot"></div><span id="qstat">量子态运行</span></div>
             <div class="clock" id="clock"></div>
         </div>
     </div>
     <script>
+        // 滇川黔贵通用彝文应用名称
         const apps = [
-            {id:'qvm',icon:'⚛️',zh:'量子虚拟机',en:'Quantum VM',yi:'ꇇꃀꈌꐥ',url:'/apps/qvm/'},
-            {id:'compiler',icon:'🔧',zh:'编译器',en:'Compiler',yi:'ꃅꊿꄂ',url:'/apps/compiler/'},
-            {id:'files',icon:'📁',zh:'文件管理',en:'Files',yi:'ꎭꂷ',url:'/apps/files/'},
-            {id:'terminal',icon:'💻',zh:'终端',en:'Terminal',yi:'ꁱꄂ',url:'/apps/terminal/'},
-            {id:'settings',icon:'⚙️',zh:'设置',en:'Settings',yi:'ꀀꀋ',url:'/apps/settings/'},
-            {id:'economy',icon:'💰',zh:'经济系统',en:'Economy',yi:'ꑌꑌ',url:'/apps/economy/'},
-            {id:'social',icon:'💬',zh:'社交网络',en:'Social',yi:'ꈌꄂ',url:'/apps/social/'},
-            {id:'monitor',icon:'🪞',zh:'系统监控',en:'Monitor',yi:'ꁉꇁ',url:'/apps/monitor/'},
-            {id:'store',icon:'🏪',zh:'应用商店',en:'Store',yi:'ꐥꌊ',url:'/apps/store/'},
-            {id:'help',icon:'📖',zh:'帮助',en:'Help',yi:'ꆏꌠ',url:'/apps/help/'}
+            {id:'qvm',icon:'⚛️',zh:'量子虚拟机',en:'Quantum VM',yi:'\uf1d10\uf1d11',url:'/apps/qvm/'},
+            {id:'compiler',icon:'🔧',zh:'编译器',en:'Compiler',yi:'\uf1d12\uf1d13',url:'/apps/compiler/'},
+            {id:'files',icon:'📁',zh:'文件管理',en:'Files',yi:'\uf1d14\uf1d15',url:'/apps/files/'},
+            {id:'terminal',icon:'💻',zh:'终端',en:'Terminal',yi:'\uf1d16\uf1d17',url:'/apps/terminal/'},
+            {id:'settings',icon:'⚙️',zh:'设置',en:'Settings',yi:'\uf1d18\uf1d19',url:'/apps/settings/'},
+            {id:'economy',icon:'💰',zh:'经济系统',en:'Economy',yi:'\uf1d1a\uf1d1b',url:'/apps/economy/'},
+            {id:'social',icon:'💬',zh:'社交网络',en:'Social',yi:'\uf1d1c\uf1d1d',url:'/apps/social/'},
+            {id:'monitor',icon:'🪞',zh:'系统监控',en:'Monitor',yi:'\uf1d1e',url:'/apps/monitor/'},
+            {id:'store',icon:'🏪',zh:'应用商店',en:'Store',yi:'',url:'/apps/store/'},
+            {id:'help',icon:'📖',zh:'帮助',en:'Help',yi:'',url:'/apps/help/'}
         ];
         let lang='zh';
+        
         function render() {
             const d=document.getElementById('desktop');
-            d.innerHTML=apps.map(a=>'<div class="desktop-icon" ondblclick="openApp(\''+a.id+'\')"><div class="icon">'+a.icon+'</div><div class="label">'+a[lang]+'</div></div>').join('');
+            d.innerHTML=apps.map(a=>{
+                const label = lang==='yi' ? `<span class="yi-text">${a.yi}</span>` : a[lang];
+                return `<div class="desktop-icon" ondblclick="openApp('${a.id}')"><div class="icon">${a.icon}</div><div class="label">${label}</div></div>`;
+            }).join('');
         }
+        
         function openApp(id) {
             const a=apps.find(x=>x.id===id);
             if(a) window.open(a.url,'_blank');
         }
+        
         function setLang(l) {
             lang=l;
-            document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent.includes(l==='zh'?'中文':l==='en'?'EN':'ꆈꌠ')));
+            document.querySelectorAll('.lang-btn').forEach(b=>{
+                b.classList.toggle('active', (l==='zh' && b.textContent==='中文') || (l==='en' && b.textContent==='EN') || (l==='yi' && b.classList.contains('yi-text')));
+            });
             render();
             localStorage.setItem('qentl-lang',l);
         }
+        
         function clock() {
             const n=new Date();
             document.getElementById('clock').innerHTML=n.toLocaleTimeString()+'<br>'+n.toLocaleDateString();
         }
+        
         const savedLang=localStorage.getItem('qentl-lang');
         if(savedLang) setLang(savedLang);
         render();clock();setInterval(clock,1000);
