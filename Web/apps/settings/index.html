@@ -4,107 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>设置 - QEntL</title>
+    <link rel="stylesheet" href="/fonts/yi-fonts.css">
     <style>
-        body {
-            font-family: 'Microsoft YaHei', sans-serif;
-            background: rgba(10,10,26,0.95);
-            color: #fff;
-            margin: 0;
-            padding: 20px;
-        }
-        .settings-container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        .settings-section {
-            background: rgba(138,135,255,0.1);
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .section-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(138,135,255,0.3);
-        }
-        .setting-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-        }
-        .setting-label {
-            color: #aaa;
-        }
-        .setting-value {
-            color: #fff;
-        }
-        .lang-select {
-            display: flex;
-            gap: 10px;
-        }
-        .lang-option {
-            padding: 10px 20px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .lang-option:hover {
-            background: rgba(138,135,255,0.2);
-        }
-        .lang-option.active {
-            background: rgba(138,135,255,0.3);
-            border-color: #8a87ff;
-        }
-        .toggle {
-            width: 50px;
-            height: 26px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 13px;
-            cursor: pointer;
-            position: relative;
-        }
-        .toggle.active {
-            background: #8a87ff;
-        }
-        .toggle::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: #fff;
-            border-radius: 50%;
-            top: 3px;
-            left: 3px;
-            transition: all 0.2s;
-        }
-        .toggle.active::after {
-            left: 27px;
-        }
-        .quantum-status {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 15px;
-            background: rgba(78,205,196,0.1);
-            border-radius: 10px;
-            margin-top: 10px;
-        }
-        .quantum-dot {
-            width: 12px;
-            height: 12px;
-            background: #4ecdc4;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        body { font-family: 'Microsoft YaHei', 'YiTongyong', sans-serif; background: rgba(10,10,26,0.95); color: #fff; margin: 0; padding: 20px; }
+        .yi-text { font-family: 'YiTongyong', sans-serif !important; }
+        .settings-container { max-width: 800px; margin: 0 auto; }
+        .settings-section { background: rgba(138,135,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .section-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(138,135,255,0.3); }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; }
+        .setting-label { color: #aaa; }
+        .setting-value { color: #fff; }
+        .lang-select { display: flex; gap: 10px; }
+        .lang-option { padding: 10px 20px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .lang-option:hover { background: rgba(138,135,255,0.2); }
+        .lang-option.active { background: rgba(138,135,255,0.3); border-color: #8a87ff; }
+        .toggle { width: 50px; height: 26px; background: rgba(255,255,255,0.2); border-radius: 13px; cursor: pointer; position: relative; }
+        .toggle.active { background: #8a87ff; }
+        .toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: all 0.2s; }
+        .toggle.active::after { left: 27px; }
+        .quantum-status { display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(78,205,196,0.1); border-radius: 10px; margin-top: 10px; }
+        .quantum-dot { width: 12px; height: 12px; background: #4ecdc4; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
@@ -112,13 +32,13 @@
         <h1>⚙️ 系统设置</h1>
         
         <div class="settings-section">
-            <div class="section-title">🌍 语言设置 / Language / ꀂꏂ</div>
+            <div class="section-title">🌍 语言设置 / Language / <span class="yi-text">通用彝文</span></div>
             <div class="setting-item">
                 <div class="setting-label">界面语言</div>
                 <div class="lang-select">
                     <div class="lang-option active" onclick="setLang('zh')">🇨🇳 中文</div>
                     <div class="lang-option" onclick="setLang('en')">🇺🇸 English</div>
-                    <div class="lang-option" onclick="setLang('yi')">⛰️ ꆈꌠ</div>
+                    <div class="lang-option yi-text" onclick="setLang('yi')">⛰️ 滇川黔贵通用彝文</div>
                 </div>
             </div>
         </div>
@@ -176,14 +96,11 @@
             document.querySelectorAll('.lang-option').forEach(o => o.classList.remove('active'));
             event.target.classList.add('active');
             localStorage.setItem('qentl-lang', lang);
-            // 这里可以调用i18n模块切换语言
         }
-        
-        // 加载保存的设置
         const savedLang = localStorage.getItem('qentl-lang');
         if (savedLang) {
             document.querySelectorAll('.lang-option').forEach(o => {
-                o.classList.toggle('active', o.textContent.includes(savedLang==='zh'?'中文':savedLang==='en'?'English':'ꆈꌠ'));
+                o.classList.toggle('active', (savedLang==='zh' && o.textContent.includes('中文')) || (savedLang==='en' && o.textContent.includes('English')) || (savedLang==='yi' && o.classList.contains('yi-text')));
             });
         }
     </script>
