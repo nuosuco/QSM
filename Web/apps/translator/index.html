@@ -14,9 +14,10 @@ h1 { text-align: center; margin-bottom: 20px; font-size: 28px; }
 .dict-status { text-align: center; padding: 8px; background: rgba(78,205,196,0.1); border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
 .dict-status.loaded { color: #4ecdc4; }
 .translator-box { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 20px; margin-bottom: 20px; }
-.lang-selector { margin-bottom: 15px; }
-.lang-btn { padding: 10px 20px; background: rgba(138,135,255,0.2); border: 1px solid rgba(138,135,255,0.3); border-radius: 8px; color: #fff; cursor: pointer; font-size: 14px; margin-right: 8px; }
-.lang-btn:hover, .lang-btn.active { background: rgba(138,135,255,0.4); }
+.lang-selector { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+.lang-btn { padding: 10px 20px; background: rgba(138,135,255,0.2); border: 1px solid rgba(138,135,255,0.3); border-radius: 8px; color: #fff; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+.lang-btn:hover { background: rgba(138,135,255,0.3); }
+.lang-btn.active { background: rgba(138,135,255,0.6) !important; border-color: #8a87ff; box-shadow: 0 0 10px rgba(138,135,255,0.5); }
 textarea { width: 100%; height: 120px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; color: #fff; font-size: 16px; resize: none; }
 textarea:focus { outline: none; border-color: rgba(138,135,255,0.5); }
 .translate-btn { display: block; width: 100%; padding: 15px; background: linear-gradient(135deg, #4ecdc4, #44a08d); border: none; border-radius: 10px; color: #fff; font-size: 18px; cursor: pointer; margin: 20px 0; }
@@ -40,12 +41,12 @@ textarea:focus { outline: none; border-color: rgba(138,135,255,0.5); }
 <h1>🔤 通用彝文翻译器</h1>
 <div class="dict-status" id="dictStatus">正在加载字典...</div>
 
-<div class="translator-box" id="sourceBox">
+<div class="translator-box">
 <div class="lang-selector">
 <span>源语言：</span>
-<button class="lang-btn active" onclick="setSourceLang('zh')">中文</button>
-<button class="lang-btn" onclick="setSourceLang('en')">English</button>
-<button class="lang-btn yi-text" onclick="setSourceLang('yi')">󲥰󲥡</button>
+<button class="lang-btn active" data-lang="zh" onclick="setSourceLang('zh')">中文</button>
+<button class="lang-btn" data-lang="en" onclick="setSourceLang('en')">English</button>
+<button class="lang-btn yi-text" data-lang="yi" onclick="setSourceLang('yi')">󲥰󲥡</button>
 </div>
 <textarea id="inputText" placeholder="请输入要翻译的内容..."></textarea>
 </div>
@@ -54,12 +55,12 @@ textarea:focus { outline: none; border-color: rgba(138,135,255,0.5); }
 <button onclick="swapLanguages()">⇅ 交换语言</button>
 </div>
 
-<div class="translator-box" id="targetBox">
+<div class="translator-box">
 <div class="lang-selector">
 <span>目标语言：</span>
-<button class="lang-btn" onclick="setTargetLang('zh')">中文</button>
-<button class="lang-btn" onclick="setTargetLang('en')">English</button>
-<button class="lang-btn active yi-text" onclick="setTargetLang('yi')">󲥰󲥡</button>
+<button class="lang-btn" data-lang="zh" onclick="setTargetLang('zh')">中文</button>
+<button class="lang-btn" data-lang="en" onclick="setTargetLang('en')">English</button>
+<button class="lang-btn active yi-text" data-lang="yi" onclick="setTargetLang('yi')">󲥰󲥡</button>
 </div>
 <div class="result-box">
 <div class="result-label">翻译结果：</div>
@@ -76,16 +77,14 @@ textarea:focus { outline: none; border-color: rgba(138,135,255,0.5); }
 </div>
 
 <div class="footer">
-<p>QEntL量子操作系统 - 通用彝文翻译器 v3.0</p>
+<p>QEntL量子操作系统 - 通用彝文翻译器 v3.1</p>
 <p>三大圣律：为每个人服务，服务人类！</p>
 </div>
 </div>
 
 <script>
-// 正确的通用彝文编码
-// 彝 = U+F2A70, 文 = U+F2A61, 语 = U+F36BB
-// 语言 = U+F3640 U+F3596, 文字 = U+F3224 U+F3596
-// 彝文 = U+F2A70 U+F2A61, 彝语 = U+F2A70 U+F36BB
+// 正确的通用彝文编码：彝=U+F2A70, 文=U+F2A61, 语=U+F36BB
+// 语言=U+F3640 U+F3596, 文字=U+F3224 U+F3596, 彝文=U+F2A70 U+F2A61
 
 let yiDict = {};
 let sourceLang = 'zh';
@@ -143,24 +142,35 @@ loadFullDict();
 
 function setSourceLang(lang) {
 sourceLang = lang;
-document.querySelectorAll('#sourceBox .lang-btn').forEach(btn => btn.classList.remove('active'));
-event.target.classList.add('active');
+document.querySelectorAll('.translator-box:first-of-type .lang-btn').forEach(btn => {
+btn.classList.toggle('active', btn.dataset.lang === lang);
+});
 }
 
 function setTargetLang(lang) {
 targetLang = lang;
-document.querySelectorAll('#targetBox .lang-btn').forEach(btn => btn.classList.remove('active'));
-event.target.classList.add('active');
+document.querySelectorAll('.translator-box:last-of-type .lang-btn').forEach(btn => {
+btn.classList.toggle('active', btn.dataset.lang === lang);
+});
 }
 
 function swapLanguages() {
 const temp = sourceLang;
 sourceLang = targetLang;
 targetLang = temp;
+
+// 更新按钮状态
+document.querySelectorAll('.translator-box:first-of-type .lang-btn').forEach(btn => {
+btn.classList.toggle('active', btn.dataset.lang === sourceLang);
+});
+document.querySelectorAll('.translator-box:last-of-type .lang-btn').forEach(btn => {
+btn.classList.toggle('active', btn.dataset.lang === targetLang);
+});
+
 const input = document.getElementById('inputText');
 const result = document.getElementById('resultText');
 if (result.innerText && result.innerText !== '等待输入...') {
-input.value = result.innerText;
+input.value = result.innerText.replace(/<[^>]*>/g, '');
 }
 }
 
@@ -169,38 +179,60 @@ const input = document.getElementById('inputText').value.trim();
 const resultEl = document.getElementById('resultText');
 
 if (!input) {
-resultEl.innerHTML = '请输入要翻译的内容';
+resultEl.textContent = '请输入要翻译的内容';
+return;
+}
+
+// 相同语言不翻译
+if (sourceLang === targetLang) {
+resultEl.textContent = '源语言和目标语言相同，无需翻译';
 return;
 }
 
 let result = input;
 const sortedKeys = Object.keys(yiDict).sort((a, b) => b.length - a.length);
 
+// 中文到彝文
 if (sourceLang === 'zh' && targetLang === 'yi') {
 for (const zh of sortedKeys) {
 if (result.includes(zh)) {
-result = result.split(zh).join('<span class="yi-text">' + yiDict[zh].yi + '</span>');
+result = result.split(zh).join('[[YI:' + zh + ']]');
 }
 }
-} else if (sourceLang === 'yi' && targetLang === 'zh') {
+for (const zh of sortedKeys) {
+result = result.split('[[YI:' + zh + ']]').join('<span class="yi-text">' + yiDict[zh].yi + '</span>');
+}
+}
+// 彝文到中文
+else if (sourceLang === 'yi' && targetLang === 'zh') {
 for (const zh of sortedKeys) {
 result = result.split(yiDict[zh].yi).join(zh);
 }
-} else if (sourceLang === 'zh' && targetLang === 'en') {
+}
+// 中文到英文
+else if (sourceLang === 'zh' && targetLang === 'en') {
 for (const zh of sortedKeys) {
 if (result.includes(zh)) {
 result = result.split(zh).join(yiDict[zh].en);
 }
 }
-} else if (sourceLang === 'en' && targetLang === 'zh') {
-for (const zh of sortedKeys) {
-result = result.split(new RegExp(yiDict[zh].en, 'gi')).join(zh);
 }
-} else if (sourceLang === 'en' && targetLang === 'yi') {
+// 英文到中文
+else if (sourceLang === 'en' && targetLang === 'zh') {
 for (const zh of sortedKeys) {
-result = result.split(new RegExp(yiDict[zh].en, 'gi')).join('<span class="yi-text">' + yiDict[zh].yi + '</span>');
+const re = new RegExp('\\b' + yiDict[zh].en + '\\b', 'gi');
+result = result.replace(re, zh);
 }
-} else if (sourceLang === 'yi' && targetLang === 'en') {
+}
+// 英文到彝文
+else if (sourceLang === 'en' && targetLang === 'yi') {
+for (const zh of sortedKeys) {
+const re = new RegExp('\\b' + yiDict[zh].en + '\\b', 'gi');
+result = result.replace(re, '<span class="yi-text">' + yiDict[zh].yi + '</span>');
+}
+}
+// 彝文到英文
+else if (sourceLang === 'yi' && targetLang === 'en') {
 for (const zh of sortedKeys) {
 result = result.split(yiDict[zh].yi).join(yiDict[zh].en);
 }
