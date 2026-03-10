@@ -5,124 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>通用彝文翻译器 - 中英彝三语互译</title>
 <style>
-@font-face {
-font-family: 'LSTY-Yi-Black';
-src: url('/fonts/lingyi.ttf') format('truetype');
-font-display: swap;
-}
+@font-face { font-family: 'LSTY-Yi-Black'; src: url('/fonts/lingyi.ttf') format('truetype'); font-display: swap; }
 * { margin:0; padding:0; box-sizing:border-box; }
-body {
-font-family: 'Microsoft YaHei', sans-serif;
-background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
-min-height: 100vh;
-padding: 20px;
-color: #fff;
-}
+body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%); min-height: 100vh; padding: 20px; color: #fff; }
 .yi-text { font-family: 'LSTY-Yi-Black', sans-serif !important; }
 .container { max-width: 900px; margin: 0 auto; }
 h1 { text-align: center; margin-bottom: 20px; font-size: 28px; }
-.dict-status {
-text-align: center;
-padding: 8px;
-background: rgba(78,205,196,0.1);
-border-radius: 8px;
-margin-bottom: 20px;
-font-size: 14px;
-}
+.dict-status { text-align: center; padding: 8px; background: rgba(78,205,196,0.1); border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
 .dict-status.loaded { color: #4ecdc4; }
-.dict-status.loading { color: #ffe66d; }
-.translator-box {
-background: rgba(255,255,255,0.05);
-border-radius: 15px;
-padding: 20px;
-margin-bottom: 20px;
-}
-.lang-selector { display: flex; justify-content: space-between; margin-bottom: 15px; }
-.lang-btn {
-padding: 10px 20px;
-background: rgba(138,135,255,0.2);
-border: 1px solid rgba(138,135,255,0.3);
-border-radius: 8px;
-color: #fff;
-cursor: pointer;
-font-size: 14px;
-}
+.translator-box { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 20px; margin-bottom: 20px; }
+.lang-selector { margin-bottom: 15px; }
+.lang-btn { padding: 10px 20px; background: rgba(138,135,255,0.2); border: 1px solid rgba(138,135,255,0.3); border-radius: 8px; color: #fff; cursor: pointer; font-size: 14px; margin-right: 8px; }
 .lang-btn:hover, .lang-btn.active { background: rgba(138,135,255,0.4); }
-textarea {
-width: 100%;
-height: 120px;
-background: rgba(0,0,0,0.3);
-border: 1px solid rgba(255,255,255,0.1);
-border-radius: 10px;
-padding: 15px;
-color: #fff;
-font-size: 16px;
-resize: none;
-}
+textarea { width: 100%; height: 120px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; color: #fff; font-size: 16px; resize: none; }
 textarea:focus { outline: none; border-color: rgba(138,135,255,0.5); }
-.translate-btn {
-display: block;
-width: 100%;
-padding: 15px;
-background: linear-gradient(135deg, #4ecdc4, #44a08d);
-border: none;
-border-radius: 10px;
-color: #fff;
-font-size: 18px;
-cursor: pointer;
-margin: 20px 0;
-}
+.translate-btn { display: block; width: 100%; padding: 15px; background: linear-gradient(135deg, #4ecdc4, #44a08d); border: none; border-radius: 10px; color: #fff; font-size: 18px; cursor: pointer; margin: 20px 0; }
 .translate-btn:hover { transform: scale(1.02); }
-.result-box {
-background: rgba(78,205,196,0.1);
-border: 1px solid rgba(78,205,196,0.3);
-border-radius: 10px;
-padding: 20px;
-min-height: 100px;
-font-size: 18px;
-line-height: 1.8;
-}
+.result-box { background: rgba(78,205,196,0.1); border: 1px solid rgba(78,205,196,0.3); border-radius: 10px; padding: 20px; min-height: 100px; font-size: 18px; line-height: 1.8; }
 .result-label { font-size: 14px; color: #4ecdc4; margin-bottom: 10px; }
 .swap-btn { display: flex; justify-content: center; margin: 15px 0; }
-.swap-btn button {
-padding: 10px 30px;
-background: rgba(255,230,109,0.2);
-border: 1px solid rgba(255,230,109,0.3);
-border-radius: 20px;
-color: #ffe66d;
-cursor: pointer;
-}
-.search-box {
-margin: 20px 0;
-padding: 15px;
-background: rgba(255,255,255,0.03);
-border-radius: 10px;
-}
-.search-box input {
-width: 100%;
-padding: 12px;
-background: rgba(0,0,0,0.3);
-border: 1px solid rgba(255,255,255,0.1);
-border-radius: 8px;
-color: #fff;
-font-size: 16px;
-}
-.search-results {
-margin-top: 15px;
-display: grid;
-grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-gap: 10px;
-max-height: 300px;
-overflow-y: auto;
-}
-.search-item {
-background: rgba(255,255,255,0.05);
-padding: 12px;
-border-radius: 8px;
-text-align: center;
-cursor: pointer;
-transition: background 0.2s;
-}
+.swap-btn button { padding: 10px 30px; background: rgba(255,230,109,0.2); border: 1px solid rgba(255,230,109,0.3); border-radius: 20px; color: #ffe66d; cursor: pointer; }
+.search-box { margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.03); border-radius: 10px; }
+.search-box input { width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 16px; }
+.search-results { margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; }
+.search-item { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; text-align: center; cursor: pointer; }
 .search-item:hover { background: rgba(78,205,196,0.2); }
 .search-item .yi-char { font-size: 36px; margin-bottom: 5px; }
 .search-item .zh-char { font-size: 14px; color: #aaa; }
@@ -134,14 +40,12 @@ transition: background 0.2s;
 <h1>🔤 通用彝文翻译器</h1>
 <div class="dict-status" id="dictStatus">正在加载字典...</div>
 
-<div class="translator-box">
+<div class="translator-box" id="sourceBox">
 <div class="lang-selector">
-<div>
 <span>源语言：</span>
-<button class="lang-btn active" data-lang="zh" onclick="setSourceLang('zh')">中文</button>
-<button class="lang-btn" data-lang="en" onclick="setSourceLang('en')">English</button>
-<button class="lang-btn yi-text" data-lang="yi" onclick="setSourceLang('yi')">ꆈꌠ</button>
-</div>
+<button class="lang-btn active" onclick="setSourceLang('zh')">中文</button>
+<button class="lang-btn" onclick="setSourceLang('en')">English</button>
+<button class="lang-btn yi-text" onclick="setSourceLang('yi')">󲥰󲥡</button>
 </div>
 <textarea id="inputText" placeholder="请输入要翻译的内容..."></textarea>
 </div>
@@ -150,14 +54,12 @@ transition: background 0.2s;
 <button onclick="swapLanguages()">⇅ 交换语言</button>
 </div>
 
-<div class="translator-box">
+<div class="translator-box" id="targetBox">
 <div class="lang-selector">
-<div>
 <span>目标语言：</span>
-<button class="lang-btn" data-lang="zh" onclick="setTargetLang('zh')">中文</button>
-<button class="lang-btn" data-lang="en" onclick="setTargetLang('en')">English</button>
-<button class="lang-btn active yi-text" data-lang="yi" onclick="setTargetLang('yi')">ꆈꌠ</button>
-</div>
+<button class="lang-btn" onclick="setTargetLang('zh')">中文</button>
+<button class="lang-btn" onclick="setTargetLang('en')">English</button>
+<button class="lang-btn active yi-text" onclick="setTargetLang('yi')">󲥰󲥡</button>
 </div>
 <div class="result-box">
 <div class="result-label">翻译结果：</div>
@@ -165,7 +67,7 @@ transition: background 0.2s;
 </div>
 </div>
 
-<button class="translate-btn" onclick="translate()">🌐 翻译</button>
+<button class="translate-btn" onclick="doTranslate()">🌐 翻译</button>
 
 <div class="search-box">
 <h3 style="margin-bottom:10px;color:#8a87ff;">📖 字典搜索（已加载 <span id="dictCount">0</span> 词）</h3>
@@ -174,34 +76,43 @@ transition: background 0.2s;
 </div>
 
 <div class="footer">
-<p>QEntL量子操作系统 - 通用彝文翻译器 v2.0</p>
+<p>QEntL量子操作系统 - 通用彝文翻译器 v3.0</p>
 <p>三大圣律：为每个人服务，服务人类！</p>
 </div>
 </div>
 
 <script>
-// 完整彝文字典
-let yiDict = {};
-let dictArray = [];
+// 正确的通用彝文编码
+// 彝 = U+F2A70, 文 = U+F2A61, 语 = U+F36BB
+// 语言 = U+F3640 U+F3596, 文字 = U+F3224 U+F3596
+// 彝文 = U+F2A70 U+F2A61, 彝语 = U+F2A70 U+F36BB
 
-// 基础字典（备用）
+let yiDict = {};
+let sourceLang = 'zh';
+let targetLang = 'yi';
+
+// 基础字典（正确通用彝文编码）
 const baseDict = {
-'彝': {yi: '\uF2970', en: 'Yi'},
-'文': {yi: '\uF2A61', en: 'script'},
-'语': {yi: '\uF36BB', en: 'language'},
-'心': {yi: '\uF2737', en: 'heart'},
-'天': {yi: '\uF27AD', en: 'sky'},
-'火': {yi: '\uF27AE', en: 'fire'},
-'王': {yi: '\uF27B0', en: 'king'},
-'人': {yi: '\uF27B5', en: 'person'},
-'水': {yi: '\uF2AF5', en: 'water'},
-'山': {yi: '\uF3556', en: 'mountain'},
-'日': {yi: '\uF28A4', en: 'sun'},
-'月': {yi: '\uF311D', en: 'moon'},
-'雪': {yi: '\uF271A', en: 'snow'}
+'语言': {yi: '󳛠󳘖', en: 'language'},
+'文字': {yi: '󳌤󳘖', en: 'script'},
+'彝语': {yi: '󲥰󳎻', en: 'Yi language'},
+'彝文': {yi: '󲥰󲥡', en: 'Yi script'},
+'彝': {yi: '󲥰', en: 'Yi'},
+'文': {yi: '󲥡', en: 'script'},
+'语': {yi: '󳎻', en: 'language'},
+'心': {yi: '󲜷', en: 'heart'},
+'天': {yi: '󲮭', en: 'sky'},
+'火': {yi: '󲮮', en: 'fire'},
+'王': {yi: '󲮰', en: 'king'},
+'人': {yi: '󲮵', en: 'person'},
+'水': {yi: '󲯵', en: 'water'},
+'山': {yi: '󳕖', en: 'mountain'},
+'日': {yi: '󲢤', en: 'sun'},
+'月': {yi: '󳄝', en: 'moon'},
+'雪': {yi: '󲜚', en: 'snow'}
 };
 
-yiDict = {...baseDict};
+yiDict = Object.assign({}, baseDict);
 
 // 加载完整字典
 async function loadFullDict() {
@@ -210,12 +121,11 @@ try {
 const response = await fetch('/data/通用彝文4120字学习表.json');
 if (response.ok) {
 const data = await response.json();
-dictArray = data;
 data.forEach(item => {
 const zh = item.zh.split('1、')[0].split('；')[0].split('（')[0].trim();
 const en = item.en.split(';')[0].split(',')[0].split('(')[0].trim();
-if (zh && zh.length <= 6 && en) {
-yiDict[zh] = {yi: item.yi, en: en, unicode: item.unicode};
+if (zh && zh.length <= 6 && en && !yiDict[zh]) {
+yiDict[zh] = {yi: item.yi, en: en};
 }
 });
 statusEl.className = 'dict-status loaded';
@@ -223,101 +133,94 @@ statusEl.textContent = '✅ 字典加载完成：共 ' + Object.keys(yiDict).len
 document.getElementById('dictCount').textContent = Object.keys(yiDict).length;
 }
 } catch (e) {
-statusEl.className = 'dict-status loading';
+statusEl.className = 'dict-status loaded';
 statusEl.textContent = '⚠️ 使用基础字典（' + Object.keys(yiDict).length + ' 词）';
-console.log('字典加载失败，使用基础字典', e);
+console.error('字典加载失败:', e);
 }
 }
 
 loadFullDict();
 
-let sourceLang = 'zh';
-let targetLang = 'yi';
-
 function setSourceLang(lang) {
 sourceLang = lang;
-document.querySelectorAll('.translator-box:first-child .lang-btn').forEach(btn => {
-btn.classList.toggle('active', btn.dataset.lang === lang);
-});
+document.querySelectorAll('#sourceBox .lang-btn').forEach(btn => btn.classList.remove('active'));
+event.target.classList.add('active');
 }
 
 function setTargetLang(lang) {
 targetLang = lang;
-document.querySelectorAll('.translator-box:last-child .lang-btn').forEach(btn => {
-btn.classList.toggle('active', btn.dataset.lang === lang);
-});
+document.querySelectorAll('#targetBox .lang-btn').forEach(btn => btn.classList.remove('active'));
+event.target.classList.add('active');
 }
 
 function swapLanguages() {
 const temp = sourceLang;
 sourceLang = targetLang;
 targetLang = temp;
-document.querySelectorAll('.translator-box:first-child .lang-btn').forEach(btn => {
-btn.classList.toggle('active', btn.dataset.lang === sourceLang);
-});
-document.querySelectorAll('.translator-box:last-child .lang-btn').forEach(btn => {
-btn.classList.toggle('active', btn.dataset.lang === targetLang);
-});
 const input = document.getElementById('inputText');
 const result = document.getElementById('resultText');
+if (result.innerText && result.innerText !== '等待输入...') {
 input.value = result.innerText;
 }
+}
 
-function translate() {
+function doTranslate() {
 const input = document.getElementById('inputText').value.trim();
 const resultEl = document.getElementById('resultText');
+
 if (!input) {
 resultEl.innerHTML = '请输入要翻译的内容';
 return;
 }
-let result = input;
 
-// 按词长度降序排列，先匹配长词
-const sortedKeys = Object.keys(yiDict).sort((a,b) => b.length - a.length);
+let result = input;
+const sortedKeys = Object.keys(yiDict).sort((a, b) => b.length - a.length);
 
 if (sourceLang === 'zh' && targetLang === 'yi') {
 for (const zh of sortedKeys) {
-result = result.replace(new RegExp(zh, 'g'), `<span class="yi-text">${yiDict[zh].yi}</span>`);
+if (result.includes(zh)) {
+result = result.split(zh).join('<span class="yi-text">' + yiDict[zh].yi + '</span>');
+}
 }
 } else if (sourceLang === 'yi' && targetLang === 'zh') {
 for (const zh of sortedKeys) {
-result = result.replace(new RegExp(yiDict[zh].yi, 'g'), zh);
+result = result.split(yiDict[zh].yi).join(zh);
 }
 } else if (sourceLang === 'zh' && targetLang === 'en') {
 for (const zh of sortedKeys) {
-result = result.replace(new RegExp(zh, 'g'), yiDict[zh].en);
+if (result.includes(zh)) {
+result = result.split(zh).join(yiDict[zh].en);
+}
 }
 } else if (sourceLang === 'en' && targetLang === 'zh') {
 for (const zh of sortedKeys) {
-result = result.replace(new RegExp(yiDict[zh].en, 'gi'), zh);
+result = result.split(new RegExp(yiDict[zh].en, 'gi')).join(zh);
 }
 } else if (sourceLang === 'en' && targetLang === 'yi') {
 for (const zh of sortedKeys) {
-result = result.replace(new RegExp(yiDict[zh].en, 'gi'), `<span class="yi-text">${yiDict[zh].yi}</span>`);
+result = result.split(new RegExp(yiDict[zh].en, 'gi')).join('<span class="yi-text">' + yiDict[zh].yi + '</span>');
 }
 } else if (sourceLang === 'yi' && targetLang === 'en') {
 for (const zh of sortedKeys) {
-result = result.replace(new RegExp(yiDict[zh].yi, 'g'), yiDict[zh].en);
+result = result.split(yiDict[zh].yi).join(yiDict[zh].en);
 }
 }
+
 resultEl.innerHTML = result;
 }
 
 function searchDict() {
 const query = document.getElementById('searchInput').value.trim().toLowerCase();
 const resultsEl = document.getElementById('searchResults');
-if (!query) {
-resultsEl.innerHTML = '';
-return;
-}
+if (!query) { resultsEl.innerHTML = ''; return; }
+
 let html = '';
 let count = 0;
 for (const [zh, data] of Object.entries(yiDict)) {
 if (zh.toLowerCase().includes(query) || data.en.toLowerCase().includes(query)) {
-html += `<div class="search-item" onclick="insertWord('${zh}')">
-<div class="yi-char yi-text">${data.yi}</div>
-<div class="zh-char">${zh} / ${data.en}</div>
-</div>`;
+html += '<div class="search-item" onclick="insertWord(\'' + zh + '\')">';
+html += '<div class="yi-char yi-text">' + data.yi + '</div>';
+html += '<div class="zh-char">' + zh + ' / ' + data.en + '</div></div>';
 count++;
 if (count >= 50) break;
 }
