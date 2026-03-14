@@ -1,0 +1,32 @@
+{
+  "model_info": {
+    "name": "量子自反省模型",
+    "description": "Quantum Self-Reflection Model",
+    "vocabulary_size": 90000,
+    "specialization": [
+      "系统监控",
+      "自我优化",
+      "反馈控制",
+      "性能分析"
+    ],
+    "training_data": "trilingual_ref_data.jsonl",
+    "model_path": "F:\\QSM\\Models\\Ref",
+    "languages": {
+      "中文": 45000,
+      "英文": 36000,
+      "滇川黔贵通用彝文": 9000
+    }
+  },
+  "training_config": {
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "num_epochs": 10,
+    "max_seq_length": 512,
+    "warmup_steps": 1000,
+    "gradient_accumulation_steps": 8,
+    "fp16": true,
+    "dataloader_num_workers": 4
+  },
+  "timestamp": "2025-07-03T15:25:14.137638",
+  "status": "training_started"
+}

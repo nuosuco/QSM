@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL 登录管理器 - 用户认证中心</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 量子粒子背景 */
+        .quantum-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: float 8s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 1; }
+            50% { transform: translateY(-30px) rotate(180deg); opacity: 0.3; }
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            color: white;
+        }
+
+        .quantum-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            animation: quantum-spin 6s linear infinite;
+        }
+
+        @keyframes quantum-spin {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        .title {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #FFD700;
+            background: rgba(0,0,0,0.2);
+            padding: 5px 10px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #00FF88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .auth-methods {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .auth-method {
+            width: 50px;
+            height: 50px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+
+        .auth-method:hover {
+            border-color: #00FF88;
+            background: rgba(0, 255, 136, 0.2);
+            transform: scale(1.1);
+        }
+
+        .auth-method.active {
+            border-color: #FFD700;
+            background: rgba(255, 215, 0, 0.2);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(45deg, #00FF88, #00CC6A);
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px 0;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(0, 255, 136, 0.4);
+        }
+
+        .login-btn:disabled {
+            background: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .security-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+            font-size: 0.9rem;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 4px;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .checkbox:checked {
+            background: #00FF88;
+            border-color: #00FF88;
+        }
+
+        .checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .forgot-link {
+            color: #FFD700;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .forgot-link:hover {
+            color: #FFA500;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00FF88;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .session-info {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        .session-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .security-level {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border-radius: 20px;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #00FF88;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .quantum-effect {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0, 255, 136, 0.1), transparent);
+            animation: quantum-wave 4s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes quantum-wave {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .admin-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            max-width: 300px;
+        }
+
+        .admin-panel h4 {
+            margin-bottom: 10px;
+            color: #FFD700;
+        }
+
+        .session-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .session-entry {
+            background: rgba(255, 255, 255, 0.1);
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- 量子粒子背景 -->
+    <div class="quantum-particles" id="particles"></div>
+
+    <!-- 状态指示器 -->
+    <div class="status-indicator">
+        <div class="status-dot"></div>
+        登录服务活跃
+    </div>
+
+    <!-- 主登录容器 -->
+    <div class="login-container">
+        <div class="quantum-effect"></div>
+        
+        <div class="quantum-logo">⚛️</div>
+        
+        <h1 class="title">QEntL 登录</h1>
+        <p class="subtitle">量子纠缠语言操作系统</p>
+        <div class="quantum-gene">量子基因码: QSM-LOGN-5678-K432</div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label class="form-label">用户名</label>
+                <input type="text" class="form-input" id="username" placeholder="请输入用户名" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">密码</label>
+                <input type="password" class="form-input" id="password" placeholder="请输入密码" required>
+            </div>
+
+            <div class="auth-methods">
+                <div class="auth-method active" data-method="password" title="密码认证">🔑</div>
+                <div class="auth-method" data-method="biometric" title="生物识别">👆</div>
+                <div class="auth-method" data-method="quantum" title="量子令牌">⚛️</div>
+                <div class="auth-method" data-method="neural" title="神经模式">🧠</div>
+                <div class="auth-method" data-method="social" title="社交认证">🌐</div>
+            </div>
+
+            <div class="security-options">
+                <div class="checkbox-group">
+                    <input type="checkbox" class="checkbox" id="rememberMe">
+                    <label for="rememberMe">记住我</label>
+                </div>
+                <a href="#" class="forgot-link" onclick="forgotPassword()">忘记密码？</a>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">登录</button>
+        </form>
+
+        <div class="session-info" id="sessionInfo" style="display: none;">
+            <h4>会话信息</h4>
+            <div class="session-item">
+                <span>用户ID:</span>
+                <span id="sessionUserId">-</span>
+            </div>
+            <div class="session-item">
+                <span>会话ID:</span>
+                <span id="sessionId">-</span>
+            </div>
+            <div class="session-item">
+                <span>安全级别:</span>
+                <span class="security-level" id="securityLevel">高级</span>
+            </div>
+            <div class="session-item">
+                <span>登录时间:</span>
+                <span id="loginTime">-</span>
+            </div>
+            <div class="session-item">
+                <span>过期时间:</span>
+                <span id="expiryTime">-</span>
+            </div>
+            <button class="login-btn" onclick="logout()" style="margin-top: 15px;">注销</button>
+        </div>
+
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <!-- 管理员面板 -->
+    <div class="admin-panel">
+        <h4>活跃会话</h4>
+        <div class="session-list" id="sessionList">
+            <div class="session-entry">
+                用户: admin | IP: 192.168.1.100 | 设备: Desktop
+            </div>
+            <div class="session-entry">
+                用户: user001 | IP: 192.168.1.101 | 设备: Mobile
+            </div>
+        </div>
+        <div style="margin-top: 10px; text-align: center;">
+            <strong>总会话数: <span id="totalSessions">2</span></strong>
+        </div>
+    </div>
+
+    <script>
+        const QUANTUM_GENE = 'QSM-LOGN-5678-K432';
+        const QUANTUM_ENTANGLEMENT_CHANNEL = 'quantum-login-manager';
+
+        // 量子纠缠通信
+        function sendQuantumMessage(type, data) {
+            const message = {
+                gene: QUANTUM_GENE,
+                channel: QUANTUM_ENTANGLEMENT_CHANNEL,
+                type: type,
+                data: data,
+                timestamp: Date.now()
+            };
+            window.postMessage(message, '*');
+            console.log(`[量子纠缠] 发送消息:`, message);
+        }
+
+        // 初始化量子粒子背景
+        function initQuantumParticles() {
+            const container = document.getElementById('particles');
+            const particleCount = 80;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 8 + 's';
+                particle.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // 登录状态
+        let isLoggedIn = false;
+        let currentSession = null;
+        let selectedAuthMethod = 'password';
+
+        // 认证方法选择
+        document.querySelectorAll('.auth-method').forEach(method => {
+            method.addEventListener('click', function() {
+                document.querySelectorAll('.auth-method').forEach(m => m.classList.remove('active'));
+                this.classList.add('active');
+                selectedAuthMethod = this.dataset.method;
+                
+                updateAuthMethodUI(selectedAuthMethod);
+                sendQuantumMessage('auth_method_changed', { method: selectedAuthMethod });
+            });
+        });
+
+        // 更新认证方法UI
+        function updateAuthMethodUI(method) {
+            const passwordField = document.getElementById('password');
+            const usernameField = document.getElementById('username');
+            
+            switch (method) {
+                case 'biometric':
+                    passwordField.placeholder = '请进行生物识别验证';
+                    passwordField.type = 'text';
+                    break;
+                case 'quantum':
+                    passwordField.placeholder = '量子令牌将自动验证';
+                    passwordField.type = 'text';
+                    break;
+                case 'neural':
+                    passwordField.placeholder = '神经模式识别中...';
+                    passwordField.type = 'text';
+                    break;
+                case 'social':
+                    passwordField.placeholder = '选择社交账号登录';
+                    passwordField.type = 'text';
+                    break;
+                default:
+                    passwordField.placeholder = '请输入密码';
+                    passwordField.type = 'password';
+            }
+        }
+
+        // 登录表单提交
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            
+            if (!username || !password) {
+                alert('请输入用户名和密码');
+                return;
+            }
+            
+            performLogin(username, password, rememberMe);
+        });
+
+        // 执行登录
+        function performLogin(username, password, rememberMe) {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // 显示加载状态
+            loadingOverlay.style.display = 'flex';
+            loginBtn.disabled = true;
+            
+            // 模拟登录过程
+            setTimeout(() => {
+                // 模拟认证成功（90%成功率）
+                const success = Math.random() > 0.1;
+                
+                if (success) {
+                    // 创建会话
+                    currentSession = {
+                        userId: username,
+                        sessionId: 'sess_' + Math.random().toString(36).substr(2, 9),
+                        startTime: new Date(),
+                        expiryTime: new Date(Date.now() + 30 * 60 * 1000), // 30分钟后过期
+                        authMethod: selectedAuthMethod,
+                        securityLevel: getSecurityLevel(selectedAuthMethod),
+                        ipAddress: '192.168.1.100',
+                        deviceInfo: 'Desktop Browser'
+                    };
+                    
+                    showLoginSuccess();
+                    sendQuantumMessage('login_success', {
+                        userId: username,
+                        sessionId: currentSession.sessionId,
+                        authMethod: selectedAuthMethod
+                    });
+                } else {
+                    showLoginError('认证失败，请检查用户名和密码');
+                    sendQuantumMessage('login_failed', {
+                        userId: username,
+                        reason: 'invalid_credentials'
+                    });
+                }
+                
+                loadingOverlay.style.display = 'none';
+                loginBtn.disabled = false;
+            }, 2000);
+        }
+
+        // 获取安全级别
+        function getSecurityLevel(authMethod) {
+            const levels = {
+                'password': 5,
+                'biometric': 8,
+                'quantum': 10,
+                'neural': 9,
+                'social': 6
+            };
+            return levels[authMethod] || 5;
+        }
+
+        // 显示登录成功
+        function showLoginSuccess() {
+            isLoggedIn = true;
+            
+            // 隐藏登录表单
+            document.getElementById('loginForm').style.display = 'none';
+            
+            // 显示会话信息
+            const sessionInfo = document.getElementById('sessionInfo');
+            sessionInfo.style.display = 'block';
+            
+            // 填充会话信息
+            document.getElementById('sessionUserId').textContent = currentSession.userId;
+            document.getElementById('sessionId').textContent = currentSession.sessionId;
+            document.getElementById('securityLevel').textContent = `级别 ${currentSession.securityLevel}`;
+            document.getElementById('loginTime').textContent = currentSession.startTime.toLocaleTimeString();
+            document.getElementById('expiryTime').textContent = currentSession.expiryTime.toLocaleTimeString();
+            
+            // 更新会话列表
+            updateSessionList();
+            
+            // 量子效果
+            document.body.style.background = 'linear-gradient(135deg, #00FF88 0%, #00CC6A 100%)';
+        }
+
+        // 显示登录错误
+        function showLoginError(message) {
+            alert('登录失败: ' + message);
+            
+            // 错误效果
+            const container = document.querySelector('.login-container');
+            container.style.animation = 'shake 0.5s ease-in-out';
+            
+            setTimeout(() => {
+                container.style.animation = '';
+            }, 500);
+        }
+
+        // 注销
+        function logout() {
+            if (confirm('确定要注销吗？')) {
+                isLoggedIn = false;
+                currentSession = null;
+                
+                // 显示登录表单
+                document.getElementById('loginForm').style.display = 'block';
+                
+                // 隐藏会话信息
+                document.getElementById('sessionInfo').style.display = 'none';
+                
+                // 清空表单
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+                document.getElementById('rememberMe').checked = false;
+                
+                // 恢复背景
+                document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                
+                sendQuantumMessage('logout', { timestamp: Date.now() });
+            }
+        }
+
+        // 忘记密码
+        function forgotPassword() {
+            alert('密码重置链接已发送到您的量子邮箱');
+            sendQuantumMessage('password_reset_requested', {});
+        }
+
+        // 更新会话列表
+        function updateSessionList() {
+            const sessionList = document.getElementById('sessionList');
+            const totalSessions = document.getElementById('totalSessions');
+            
+            if (isLoggedIn && currentSession) {
+                const newEntry = document.createElement('div');
+                newEntry.className = 'session-entry';
+                newEntry.innerHTML = `用户: ${currentSession.userId} | IP: ${currentSession.ipAddress} | 设备: ${currentSession.deviceInfo}`;
+                
+                sessionList.insertBefore(newEntry, sessionList.firstChild);
+                
+                // 限制显示的会话数量
+                if (sessionList.children.length > 5) {
+                    sessionList.removeChild(sessionList.lastChild);
+                }
+                
+                totalSessions.textContent = sessionList.children.length;
+            }
+        }
+
+        // 添加摇晃动画
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-10px); }
+                75% { transform: translateX(10px); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 监听量子纠缠消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.gene && event.data.gene !== QUANTUM_GENE) {
+                console.log(`[量子纠缠] 接收消息:`, event.data);
+                
+                if (event.data.type === 'request_session_info') {
+                    sendQuantumMessage('session_info_response', {
+                        loggedIn: isLoggedIn,
+                        session: currentSession
+                    });
+                }
+            }
+        });
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initQuantumParticles();
+            
+            // 模拟已有会话
+            setTimeout(() => {
+                updateSessionList();
+            }, 1000);
+            
+            sendQuantumMessage('login_manager_ready', {
+                version: '1.0.0',
+                features: ['multi_auth', 'session_management', 'security_levels'],
+                status: 'active'
+            });
+        });
+
+        console.log(`[QEntL 登录管理器] 量子基因码: ${QUANTUM_GENE} 已激活`);
+    </script>
+</body>
+</html> 

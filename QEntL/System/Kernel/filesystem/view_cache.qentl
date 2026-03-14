@@ -1,0 +1,679 @@
+/**
+ * QEntL视图缓存实现
+ * QuantumGene: QG-VCACHE-E5H1-1714047200
+ * EntanglementStrength: 0.65
+ */
+
+quantum_module ViewCache {
+    // 模块元数据
+    metadata: {
+        name: "视图缓存",
+        version: "1.0.0",
+        description: "QEntL文件系统的视图缓存实现",
+        author: "QEntL开发团队",
+        quantum_gene: "QG-VCACHE-E5H1-1714047200",
+        entanglement_strength: 0.65
+    },
+    
+    // 缓存配置
+    config: {
+        enabled: true,                // 是否启用缓存
+        ttl: 3600,                    // 默认缓存有效期(秒)
+        max_size: 1000,               // 最大缓存项数
+        memory_limit: 52428800,       // 内存限制(字节)，默认50MB
+        prune_interval: 300,          // 清理间隔(秒)
+        compression: true,            // 是否压缩缓存内容
+        compression_level: 6,         // 压缩级别(0-9)
+        memory_first: true,           // 优先使用内存缓存
+        persistent: true,             // 是否持久化缓存
+        storage_path: "/cache/views", // 持久化存储路径
+        allow_stale: true,            // 允许返回过期数据(刷新缓存时)
+        prefetch: false               // 是否预获取缓存
+    },
+    
+    // 缓存类型
+    types: {
+        // 缓存项
+        CacheItem: {
+            key: String,             // 缓存键
+            value: String,           // 缓存值
+            compressed: Boolean,     // 是否已压缩
+            size: Number,            // 原始大小(字节)
+            compressed_size: Number, // 压缩后大小(字节)
+            created: Number,         // 创建时间
+            expires: Number,         // 过期时间
+            hits: Number,            // 命中次数
+            metadata: Object,        // 元数据
+            tags: Array              // 标签
+        }
+    },
+    
+    // 缓存状态
+    state: {
+        cache: {},                   // 内存缓存对象
+        stats: {                     // 统计信息
+            hits: 0,                 // 命中次数
+            misses: 0,               // 未命中次数
+            writes: 0,               // 写入次数
+            deletes: 0,              // 删除次数
+            pruned: 0,               // 清理次数
+            memory_usage: 0,         // 内存使用量(字节)
+            persistent_usage: 0,     // 持久化存储使用量(字节)
+            hit_ratio: 0             // 命中率
+        },
+        pruning: false,              // 是否正在清理
+        last_prune: 0,               // 最后清理时间
+        initialized: false           // 是否已初始化
+    },
+    
+    /**
+     * 初始化视图缓存
+     * @param {Object} options 初始化选项
+     * @returns {Boolean} 是否成功初始化
+     */
+    initialize: function(options) {
+        log("视图缓存", "初始化视图缓存");
+        
+        // 合并选项
+        this.config = Object.assign({}, this.config, options || {});
+        
+        // 重置缓存和统计信息
+        this.state.cache = {};
+        this.state.stats = {
+            hits: 0,
+            misses: 0,
+            writes: 0,
+            deletes: 0,
+            pruned: 0,
+            memory_usage: 0,
+            persistent_usage: 0,
+            hit_ratio: 0
+        };
+        
+        this.state.last_prune = Date.now();
+        this.state.initialized = true;
+        
+        // 设置定期清理
+        this._schedulePrune();
+        
+        // 如果启用持久化缓存，则加载持久化数据
+        if (this.config.persistent) {
+            this._loadPersistentCache();
+        }
+        
+        log("视图缓存", "视图缓存初始化完成");
+        return true;
+    },
+    
+    /**
+     * 获取缓存项
+     * @param {String} key 缓存键
+     * @returns {Promise<String|null>} 缓存值或null
+     */
+    get: async function(key) {
+        if (!this.state.initialized || !this.config.enabled) {
+            return null;
+        }
+        
+        // 生成正规化的缓存键
+        const cacheKey = this._normalizeKey(key);
+        
+        // 检查内存缓存
+        const item = this.state.cache[cacheKey];
+        
+        if (item) {
+            // 检查过期
+            if (Date.now() < item.expires || this.config.allow_stale) {
+                // 更新命中统计和命中次数
+                this.state.stats.hits++;
+                item.hits++;
+                
+                // 计算命中率
+                this._updateHitRatio();
+                
+                // 如果过期但允许返回过期数据，则在后台刷新
+                if (Date.now() >= item.expires && this.config.allow_stale) {
+                    log("视图缓存", `返回过期数据，后台刷新: ${cacheKey}`);
+                    this._refreshStaleItem(cacheKey, item);
+                }
+                
+                // 解压缩如果需要
+                if (item.compressed) {
+                    return this._decompress(item.value);
+                }
+                
+                return item.value;
+            } else {
+                // 已过期，删除并视为未命中
+                delete this.state.cache[cacheKey];
+                this.state.stats.memory_usage -= (item.compressed 器 item.compressed_size : item.size);
+                this.state.stats.misses++;
+                this._updateHitRatio();
+            }
+        } else {
+            // 如果内存中没有，检查持久化存储(如果启用)
+            if (this.config.persistent) {
+                const persistentItem = await this._loadFromPersistentStorage(cacheKey);
+                if (persistentItem) {
+                    // 加载到内存并返回
+                    this.state.cache[cacheKey] = persistentItem;
+                    this.state.stats.memory_usage += (persistentItem.compressed 器 persistentItem.compressed_size : persistentItem.size);
+                    this.state.stats.hits++;
+                    persistentItem.hits++;
+                    this._updateHitRatio();
+                    
+                    // 检查是否过期
+                    if (Date.now() >= persistentItem.expires && this.config.allow_stale) {
+                        this._refreshStaleItem(cacheKey, persistentItem);
+                    }
+                    
+                    // 解压缩如果需要
+                    if (persistentItem.compressed) {
+                        return this._decompress(persistentItem.value);
+                    }
+                    
+                    return persistentItem.value;
+                }
+            }
+            
+            // 未命中
+            this.state.stats.misses++;
+            this._updateHitRatio();
+        }
+        
+        return null;
+    },
+    
+    /**
+     * 设置缓存项
+     * @param {String} key 缓存键
+     * @param {String} value 缓存值
+     * @param {Object} options 缓存选项
+     * @returns {Promise<Boolean>} 是否成功设置
+     */
+    set: async function(key, value, options = {}) {
+        if (!this.state.initialized || !this.config.enabled) {
+            return false;
+        }
+        
+        // 生成正规化的缓存键
+        const cacheKey = this._normalizeKey(key);
+        
+        // 计算过期时间
+        const ttl = options.ttl || this.config.ttl;
+        const expires = Date.now() + (ttl * 1000);
+        
+        // 计算原始大小
+        const size = this._calculateSize(value);
+        
+        // 处理值，决定是否压缩
+        let compressedValue = value;
+        let compressed = false;
+        let compressedSize = size;
+        
+        if (this.config.compression && size > 1024) { // 只压缩大于1KB的数据
+            try {
+                compressedValue = await this._compress(value);
+                compressedSize = this._calculateSize(compressedValue);
+                compressed = true;
+            } catch (error) {
+                log("视图缓存", `压缩缓存项 ${cacheKey} 失败: ${error.message}`, "WARNING");
+                // 压缩失败，使用原始值
+            }
+        }
+        
+        // 创建缓存项
+        const cacheItem = {
+            key: cacheKey,
+            value: compressedValue,
+            compressed: compressed,
+            size: size,
+            compressed_size: compressedSize,
+            created: Date.now(),
+            expires: expires,
+            hits: 0,
+            metadata: options.metadata || {},
+            tags: options.tags || []
+        };
+        
+        // 检查内存限制，如果超出则清理
+        if (this.state.stats.memory_usage + compressedSize > this.config.memory_limit) {
+            await this._pruneCache();
+        }
+        
+        // 如果仍然超出，尝试移除最老或最少使用的缓存项
+        if (this.state.stats.memory_usage + compressedSize > this.config.memory_limit) {
+            this._removeOldestOrLeastUsed();
+        }
+        
+        // 存储到缓存
+        const oldItem = this.state.cache[cacheKey];
+        if (oldItem) {
+            // 先减去旧项的大小
+            this.state.stats.memory_usage -= (oldItem.compressed 器 oldItem.compressed_size : oldItem.size);
+        }
+        
+        this.state.cache[cacheKey] = cacheItem;
+        this.state.stats.memory_usage += compressedSize;
+        this.state.stats.writes++;
+        
+        // 如果启用持久化，则保存到持久化存储
+        if (this.config.persistent) {
+            try {
+                await this._saveToPersistentStorage(cacheItem);
+            } catch (error) {
+                log("视图缓存", `持久化缓存项 ${cacheKey} 失败: ${error.message}`, "WARNING");
+            }
+        }
+        
+        // 检查缓存大小限制
+        if (Object.keys(this.state.cache).length > this.config.max_size) {
+            this._removeOldestOrLeastUsed();
+        }
+        
+        return true;
+    },
+    
+    /**
+     * 删除缓存项
+     * @param {String} key 缓存键
+     * @returns {Promise<Boolean>} 是否成功删除
+     */
+    delete: async function(key) {
+        if (!this.state.initialized) {
+            return false;
+        }
+        
+        // 生成正规化的缓存键
+        const cacheKey = this._normalizeKey(key);
+        
+        // 检查缓存
+        const item = this.state.cache[cacheKey];
+        if (item) {
+            // 从内存中删除
+            delete this.state.cache[cacheKey];
+            this.state.stats.memory_usage -= (item.compressed 器 item.compressed_size : item.size);
+            this.state.stats.deletes++;
+            
+            // 从持久化存储中删除
+            if (this.config.persistent) {
+                try {
+                    await this._deleteFromPersistentStorage(cacheKey);
+                } catch (error) {
+                    log("视图缓存", `从持久化存储删除缓存项 ${cacheKey} 失败: ${error.message}`, "WARNING");
+                }
+            }
+            
+            return true;
+        }
+        
+        return false;
+    },
+    
+    /**
+     * 清除所有缓存
+     * @returns {Promise<Boolean>} 是否成功清除
+     */
+    clear: async function() {
+        if (!this.state.initialized) {
+            return false;
+        }
+        
+        // 清除内存缓存
+        this.state.cache = {};
+        this.state.stats.memory_usage = 0;
+        
+        // 清除持久化存储
+        if (this.config.persistent) {
+            try {
+                await this._clearPersistentStorage();
+            } catch (error) {
+                log("视图缓存", `清除持久化存储失败: ${error.message}`, "WARNING");
+            }
+        }
+        
+        log("视图缓存", "已清除所有缓存");
+        return true;
+    },
+    
+    /**
+     * 按标签删除缓存项
+     * @param {String} tag 标签
+     * @returns {Promise<Number>} 删除的缓存项数量
+     */
+    deleteByTag: async function(tag) {
+        if (!this.state.initialized) {
+            return 0;
+        }
+        
+        let count = 0;
+        const keysToDelete = [];
+        
+        // 查找包含标签的缓存项
+        for (const key in this.state.cache) {
+            if (this.state.cache[key].tags.includes(tag)) {
+                keysToDelete.push(key);
+            }
+        }
+        
+        // 删除找到的缓存项
+        for (const key of keysToDelete) {
+            if (await this.delete(key)) {
+                count++;
+            }
+        }
+        
+        log("视图缓存", `按标签 ${tag} 删除了 ${count} 个缓存项`);
+        return count;
+    },
+    
+    /**
+     * 获取缓存统计信息
+     * @returns {Object} 统计信息
+     */
+    getStatistics: function() {
+        if (!this.state.initialized) {
+            return null;
+        }
+        
+        // 更新内存用量统计
+        this._updateMemoryUsage();
+        
+        return {
+            items: Object.keys(this.state.cache).length,
+            memory_usage: this.state.stats.memory_usage,
+            memory_usage_formatted: this._formatSize(this.state.stats.memory_usage),
+            persistent_usage: this.state.stats.persistent_usage,
+            persistent_usage_formatted: this._formatSize(this.state.stats.persistent_usage),
+            hits: this.state.stats.hits,
+            misses: this.state.stats.misses,
+            writes: this.state.stats.writes,
+            deletes: this.state.stats.deletes,
+            pruned: this.state.stats.pruned,
+            hit_ratio: this.state.stats.hit_ratio.toFixed(2) + '%',
+            last_prune: new Date(this.state.last_prune).toISOString()
+        };
+    },
+    
+    /**
+     * 检查缓存项是否存在
+     * @param {String} key 缓存键
+     * @returns {Boolean} 是否存在
+     */
+    has: function(key) {
+        if (!this.state.initialized || !this.config.enabled) {
+            return false;
+        }
+        
+        const cacheKey = this._normalizeKey(key);
+        return cacheKey in this.state.cache;
+    },
+    
+    /**
+     * 批量获取缓存项
+     * @param {Array} keys 缓存键数组
+     * @returns {Promise<Object>} 缓存值映射
+     */
+    getMany: async function(keys) {
+        if (!this.state.initialized || !this.config.enabled) {
+            return {};
+        }
+        
+        const result = {};
+        
+        // 并行获取多个缓存项
+        const promises = keys.map(async key => {
+            const value = await this.get(key);
+            if (value !== null) {
+                result[key] = value;
+            }
+        });
+        
+        await Promise.all(promises);
+        return result;
+    },
+    
+    /**
+     * 批量设置缓存项
+     * @param {Object} items 缓存项映射
+     * @param {Object} options 缓存选项
+     * @returns {Promise<Boolean>} 是否成功设置
+     */
+    setMany: async function(items, options = {}) {
+        if (!this.state.initialized || !this.config.enabled) {
+            return false;
+        }
+        
+        const promises = Object.entries(items).map(([key, value]) => 
+            this.set(key, value, options)
+        );
+        
+        const results = await Promise.all(promises);
+        return results.every(result => result === true);
+    },
+    
+    // 内部方法
+    
+    /**
+     * 正规化缓存键
+     * @private
+     */
+    _normalizeKey: function(key) {
+        // 简单地移除空格并转为小写
+        return String(key).trim().toLowerCase();
+    },
+    
+    /**
+     * 安排定期清理
+     * @private
+     */
+    _schedulePrune: function() {
+        // 模拟定时器
+        setTimeout(() => {
+            if (this.state.initialized) {
+                this._pruneCache();
+                this._schedulePrune();
+            }
+        }, this.config.prune_interval * 1000);
+    },
+    
+    /**
+     * 清理过期缓存项
+     * @private
+     */
+    _pruneCache: async function() {
+        if (this.state.pruning) {
+            return;
+        }
+        
+        this.state.pruning = true;
+        const now = Date.now();
+        const expiredKeys = [];
+        
+        // 查找过期的缓存项
+        for (const key in this.state.cache) {
+            if (this.state.cache[key].expires < now) {
+                expiredKeys.push(key);
+            }
+        }
+        
+        // 删除过期的缓存项
+        for (const key of expiredKeys) {
+            await this.delete(key);
+        }
+        
+        this.state.last_prune = now;
+        this.state.stats.pruned += expiredKeys.length;
+        this.state.pruning = false;
+        
+        if (expiredKeys.length > 0) {
+            log("视图缓存", `清理了 ${expiredKeys.length} 个过期缓存项`);
+        }
+    },
+    
+    /**
+     * 移除最老或最少使用的缓存项
+     * @private
+     */
+    _removeOldestOrLeastUsed: function() {
+        if (Object.keys(this.state.cache).length === 0) {
+            return;
+        }
+        
+        // 将缓存项转换为数组
+        const items = Object.values(this.state.cache);
+        
+        // 按命中次数和创建时间排序
+        items.sort((a, b) => {
+            // 首先按命中次数排序
+            if (a.hits !== b.hits) {
+                return a.hits - b.hits;
+            }
+            // 如果命中次数相同，则按创建时间排序
+            return a.created - b.created;
+        });
+        
+        // 移除前20%或至少一个
+        const removeCount = Math.max(1, Math.floor(items.length * 0.2));
+        
+        for (let i = 0; i < removeCount; i++) {
+            if (i < items.length) {
+                this.delete(items[i].key);
+            }
+        }
+        
+        log("视图缓存", `因内存限制移除了 ${removeCount} 个缓存项`);
+    },
+    
+    /**
+     * 更新命中率
+     * @private
+     */
+    _updateHitRatio: function() {
+        const total = this.state.stats.hits + this.state.stats.misses;
+        if (total > 0) {
+            this.state.stats.hit_ratio = (this.state.stats.hits / total) * 100;
+        } else {
+            this.state.stats.hit_ratio = 0;
+        }
+    },
+    
+    /**
+     * 更新内存用量统计
+     * @private
+     */
+    _updateMemoryUsage: function() {
+        let usage = 0;
+        for (const key in this.state.cache) {
+            const item = this.state.cache[key];
+            usage += (item.compressed 器 item.compressed_size : item.size);
+        }
+        this.state.stats.memory_usage = usage;
+    },
+    
+    /**
+     * 计算数据大小
+     * @private
+     */
+    _calculateSize: function(data) {
+        // 简单估计字符串大小
+        return String(data).length * 2; // Unicode字符大约2字节
+    },
+    
+    /**
+     * 格式化大小显示
+     * @private
+     */
+    _formatSize: function(bytes) {
+        if (bytes === 0) return '0 B';
+        
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        
+        return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+    },
+    
+    /**
+     * 压缩数据
+     * @private
+     */
+    _compress: async function(data) {
+        // 在实际实现中，这里应该使用适当的压缩算法
+        // 简化实现，返回原始数据
+        return data;
+    },
+    
+    /**
+     * 解压缩数据
+     * @private
+     */
+    _decompress: async function(data) {
+        // 在实际实现中，这里应该使用适当的解压缩算法
+        // 简化实现，返回原始数据
+        return data;
+    },
+    
+    /**
+     * 从持久化存储加载缓存项
+     * @private
+     */
+    _loadFromPersistentStorage: async function(key) {
+        // 在实际实现中，这里应该从文件系统或数据库加载
+        // 简化实现，返回null
+        return null;
+    },
+    
+    /**
+     * 保存缓存项到持久化存储
+     * @private
+     */
+    _saveToPersistentStorage: async function(item) {
+        // 在实际实现中，这里应该保存到文件系统或数据库
+        // 简化实现，仅更新统计信息
+        this.state.stats.persistent_usage += item.compressed 器 item.compressed_size : item.size;
+        return true;
+    },
+    
+    /**
+     * 从持久化存储删除缓存项
+     * @private
+     */
+    _deleteFromPersistentStorage: async function(key) {
+        // 在实际实现中，这里应该从文件系统或数据库删除
+        // 简化实现，返回true
+        return true;
+    },
+    
+    /**
+     * 清除持久化存储
+     * @private
+     */
+    _clearPersistentStorage: async function() {
+        // 在实际实现中，这里应该清除文件系统或数据库中的所有缓存
+        // 简化实现，仅重置统计信息
+        this.state.stats.persistent_usage = 0;
+        return true;
+    },
+    
+    /**
+     * 加载持久化缓存
+     * @private
+     */
+    _loadPersistentCache: async function() {
+        // 在实际实现中，这里应该从文件系统或数据库加载所有缓存
+        // 简化实现，不做任何操作
+    },
+    
+    /**
+     * 刷新过期但允许返回的缓存项
+     * @private
+     */
+    _refreshStaleItem: async function(key, item) {
+        // 这个方法应该实现在后台刷新缓存
+        // 简化实现，仅记录日志
+        log("视图缓存", `需要在后台刷新缓存项: ${key}`);
+    }
+};
+
+// 导出模块
+export ViewCache; 

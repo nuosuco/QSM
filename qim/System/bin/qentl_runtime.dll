@@ -1,0 +1,10 @@
+// QEntL Runtime Dynamic Library
+// This is a placeholder for the QEntL runtime DLL
+// Version: 1.0.0
+// Size: ~100MB
+
+#include "qentl_runtime.h"
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+    return TRUE;
+}

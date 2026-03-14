@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文对话框测试</title>
+    <style>
+        @font-face {
+            font-family: 'LSTY-Yi-Black';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: #ecf0f1;
+        }
+        
+        .test-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        input, textarea, div {
+            font-family: 'LSTY-Yi-Black', Arial, sans-serif;
+            font-size: 24px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #3498db;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        
+        .yi-display {
+            background: #fff;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔤 彝文对话框测试</h1>
+        
+        <div id="font-status" class="status">正在检查字体状态...</div>
+        
+        <div class="test-section">
+            <h3>1. 输入框测试</h3>
+            <input type="text" id="yi-input" placeholder="在此输入彝文..." value="󲜐󲜑󲜒">
+            <p>说明：这是一个普通的文本输入框，应该能显示彝文字符</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. 文本域测试</h3>
+            <textarea id="yi-textarea" placeholder="在此输入彝文...">󲜐󲜑󲜒󲜓󲜔
+这是多行彝文测试
+第二行：󲜕󲜖󲜗</textarea>
+            <p>说明：这是一个多行文本域，应该能显示多行彝文</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. 显示区域测试</h3>
+            <div class="yi-display" id="yi-display">󲜐󲜑󲜒󲜓󲜔󲜕󲜖󲜗󲜘󲜙</div>
+            <p>说明：这是一个div显示区域，用于展示彝文字符</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. 交互测试</h3>
+            <button class="btn" onclick="addYiChar()">添加彝文字符</button>
+            <button class="btn" onclick="clearAll()">清空所有</button>
+            <button class="btn" onclick="checkFont()">检查字体</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>5. 字符测试</h3>
+            <div id="char-test">
+                <p>测试字符：</p>
+                <div style="font-size: 20px; line-height: 1.5;">
+                    <span>󲜐</span> <span>󲜑</span> <span>󲜒</span> <span>󲜓</span> <span>󲜔</span><br>
+                    <span>󲜕</span> <span>󲜖</span> <span>󲜗</span> <span>󲜘</span> <span>󲜙</span><br>
+                    <span>󲜚</span> <span>󲜛</span> <span>󲜜</span> <span>󲜝</span> <span>󲜞</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 私有使用区彝文字符
+        const yiChars = ['󲜐', '󲜑', '󲜒', '󲜓', '󲜔', '󲜕', '󲜖', '󲜗', '󲜘', '󲜙', '󲜚', '󲜛', '󲜜', '󲜝', '󲜞'];
+        let charIndex = 0;
+        
+        // 检查字体加载状态
+        function checkFont() {
+            const statusDiv = document.getElementById('font-status');
+            
+            // 检查字体API支持
+            if (document.fonts) {
+                document.fonts.ready.then(() => {
+                    const isLoaded = document.fonts.check('12px LSTY-Yi-Black');
+                    if (isLoaded) {
+                        statusDiv.className = 'status success';
+                        statusDiv.textContent = '✓ 字体已成功加载！';
+                    } else {
+                        statusDiv.className = 'status error';
+                        statusDiv.textContent = '✗ 字体加载失败，请检查字体文件路径';
+                    }
+                });
+            } else {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '✗ 浏览器不支持字体API';
+            }
+        }
+        
+        // 添加彝文字符
+        function addYiChar() {
+            const input = document.getElementById('yi-input');
+            const textarea = document.getElementById('yi-textarea');
+            const display = document.getElementById('yi-display');
+            
+            const char = yiChars[charIndex % yiChars.length];
+            
+            input.value += char;
+            textarea.value += char;
+            display.textContent += char;
+            
+            charIndex++;
+        }
+        
+        // 清空所有内容
+        function clearAll() {
+            document.getElementById('yi-input').value = '';
+            document.getElementById('yi-textarea').value = '';
+            document.getElementById('yi-display').textContent = '';
+        }
+        
+        // 页面加载时检查字体
+        window.onload = function() {
+            setTimeout(checkFont, 1000);
+        };
+    </script>
+</body>
+</html> 

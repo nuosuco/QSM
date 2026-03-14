@@ -1,0 +1,461 @@
+/**
+ * QEntL 安装程序
+ * 量子编程系统主安装器
+ */
+
+import System.IO;
+import System.Environment;
+import System.Registry;
+import System.Security;
+
+class QEntLInstaller {
+    private const String PRODUCT_NAME = "QEntL Quantum Programming System";
+    private const String VERSION = "1.2.0";
+    private const String PUBLISHER = "QEntL Development Team";
+    
+    private String installPath;
+    private String sourcePath;
+    private Bool quietMode = false;
+    private Bool serverMode = false;
+    private Bool clusterMode = false;
+    
+    // 安装配置
+    private struct InstallConfig {
+        String targetPath;
+        Bool createDesktopShortcut;
+        Bool createStartMenuItems;
+        Bool addToPath;
+        Bool installSystemService;
+        Bool enableQuantumAcceleration;
+        List[String] selectedComponents;
+    }
+    
+    // 主安装函数
+    public function install(config: InstallConfig) -> Result[Void, InstallError] {
+        print("===========================================");
+        print("   QEntL 量子编程系统安装程序");
+        print("   版本: " + VERSION);
+        print("===========================================\n");
+        
+        try {
+            // 1. 系统检查
+            let checkResult = performSystemCheck();
+            if (!checkResult.success) {
+                return Error(InstallError.SystemCheckFailed(checkResult.message));
+            }
+            
+            // 2. 准备安装
+            prepareInstallation(config);
+            
+            // 3. 复制文件
+            let copyResult = copySystemFiles(config.targetPath);
+            if (!copyResult.success) {
+                return Error(InstallError.FileCopyFailed(copyResult.message));
+            }
+            
+            // 4. 配置系统
+            configureSystem(config);
+            
+            // 5. 注册服务
+            if (config.installSystemService) {
+                registerSystemServices(config.targetPath);
+            }
+            
+            // 6. 创建快捷方式
+            if (config.createDesktopShortcut) {
+                createDesktopShortcuts(config.targetPath);
+            }
+            
+            if (config.createStartMenuItems) {
+                createStartMenuItems(config.targetPath);
+            }  
+            
+            // 7. 更新环境变量
+            if (config.addToPath) {
+                updateEnvironmentPath(config.targetPath);
+            }
+            
+            // 8. 完成安装
+            finalizeInstallation(config);
+            
+            print("安装成功完成！");
+            return Ok(());
+            
+        } catch (Exception ex) {
+            print("安装过程中发生错误: " + ex.message);
+            rollbackInstallation(config.targetPath);
+            return Error(InstallError.GeneralError(ex.message));
+        }
+    }
+    
+    // 系统检查
+    private function performSystemCheck() -> CheckResult {
+        print("正在检查系统兼容性...");
+        
+        // 检查操作系统版本
+        let osVersion = Environment.getOSVersion();
+        if (!isOSSupported(osVersion)) {
+            return CheckResult.failed("不支持的操作系统版本: " + osVersion);
+        }
+        
+        // 检查内存
+        let availableMemory = Environment.getAvailableMemory();
+        if (availableMemory < 8 * 1024 * 1024 * 1024) { // 8GB
+            return CheckResult.failed("内存不足，需要至少8GB RAM");
+        }
+        
+        // 检查磁盘空间
+        let availableSpace = Environment.getAvailableDiskSpace(installPath);
+        if (availableSpace < 10 * 1024 * 1024 * 1024) { // 10GB
+            return CheckResult.failed("磁盘空间不足，需要至少10GB空间");
+        }
+        
+        // 检查管理员权限
+        if (!Environment.isAdministrator()) {
+            return CheckResult.failed("需要管理员权限进行安装");
+        }
+        
+        print("系统检查通过");
+        return CheckResult.success();
+    }
+      // 准备安装
+    private function prepareInstallation(config: InstallConfig) -> Void {
+        print("准备安装环境...");
+        
+        // 创建安装目录
+        Directory.createDirectory(config.targetPath);
+        Directory.createDirectory(config.targetPath + "\\System");
+        Directory.createDirectory(config.targetPath + "\\Models");  
+        Directory.createDirectory(config.targetPath + "\\Programs");
+        Directory.createDirectory(config.targetPath + "\\Data");
+        Directory.createDirectory(config.targetPath + "\\Users");
+        Directory.createDirectory(config.targetPath + "\\Logs");
+        Directory.createDirectory(config.targetPath + "\\Config");
+        Directory.createDirectory(config.targetPath + "\\Temp");
+        
+        // 创建用户目录结构
+        createUserDirectories(config.targetPath);
+        
+        print("安装目录创建完成");
+    }
+    
+    // 创建用户目录结构
+    private function createUserDirectories(installPath: String) -> Void {
+        print("创建用户目录结构...");
+        
+        let usersPath = installPath + "\\Users";
+        let defaultUserPath = usersPath + "\\Default";
+        
+        // 创建默认用户目录结构
+        Directory.createDirectory(defaultUserPath);
+        Directory.createDirectory(defaultUserPath + "\\Documents");
+        Directory.createDirectory(defaultUserPath + "\\Documents\\QEntL_Projects");
+        Directory.createDirectory(defaultUserPath + "\\Documents\\Scripts");
+        Directory.createDirectory(defaultUserPath + "\\Documents\\Templates");
+        Directory.createDirectory(defaultUserPath + "\\Programs");
+        Directory.createDirectory(defaultUserPath + "\\Programs\\Custom");
+        Directory.createDirectory(defaultUserPath + "\\Programs\\Extensions");
+        Directory.createDirectory(defaultUserPath + "\\Settings");
+        Directory.createDirectory(defaultUserPath + "\\Data");
+        Directory.createDirectory(defaultUserPath + "\\Data\\Cache");
+        Directory.createDirectory(defaultUserPath + "\\Data\\Temp");
+        Directory.createDirectory(defaultUserPath + "\\Data\\Quantum");
+        Directory.createDirectory(defaultUserPath + "\\Desktop");
+        Directory.createDirectory(defaultUserPath + "\\Desktop\\Shortcuts");
+        Directory.createDirectory(defaultUserPath + "\\Desktop\\Widgets");
+        
+        // 创建用户模板目录
+        Directory.createDirectory(usersPath + "\\Templates");
+        Directory.createDirectory(usersPath + "\\Templates\\NewUser");
+        Directory.createDirectory(usersPath + "\\Templates\\UserProfile");
+        
+        // 创建默认用户配置文件
+        let defaultPreferences = createDefaultUserPreferences();
+        File.writeAllText(defaultUserPath + "\\Settings\\preferences.qentl", defaultPreferences);
+        
+        // 创建用户环境变量配置
+        let userEnvConfig = createUserEnvironmentConfig(installPath);
+        File.writeAllText(defaultUserPath + "\\Settings\\environment.qentl", userEnvConfig);
+        
+        // 创建量子配置文件
+        let quantumConfig = createQuantumUserConfig();
+        File.writeAllText(defaultUserPath + "\\Settings\\quantum_config.qentl", quantumConfig);
+        
+        print("用户目录结构创建完成");
+    }
+    
+    // 创建默认用户配置
+    private function createDefaultUserPreferences() -> String {
+        return """
+# QEntL 默认用户配置
+# 用户偏好设置文件
+
+[USER_PROFILE]
+USERNAME=default
+DISPLAY_NAME=Default User
+USER_TYPE=standard
+CREATED_DATE=""" + getCurrentDate() + """
+LAST_LOGIN=auto
+
+[INTERFACE_SETTINGS]
+THEME=quantum_blue
+LANGUAGE=zh-CN
+FONT_SIZE=12
+TERMINAL_THEME=dark
+ANIMATION_ENABLED=true
+TRANSPARENCY=0.95
+
+[QUANTUM_PREFERENCES]
+DEFAULT_CORES=4
+MEMORY_POOL_SIZE=64MB
+ENTANGLEMENT_LIMIT=1024
+SUPERPOSITION_STATES=16
+COHERENCE_TIME=1000ms
+AUTO_COLLAPSE=false
+
+[DEVELOPMENT_SETTINGS]
+DEFAULT_EDITOR=qentl_editor
+AUTO_COMPILE=true
+DEBUG_MODE=false
+SHOW_WARNINGS=true
+AUTO_BACKUP=true
+BACKUP_INTERVAL=300s
+
+[SECURITY_SETTINGS]
+QUANTUM_ENCRYPTION=enabled
+AUTO_LOCK_TIMEOUT=1800s
+REQUIRE_PASSWORD=false
+AUDIT_LOGGING=enabled
+SAFE_MODE=false
+
+[STARTUP_PROGRAMS]
+AUTO_START_VM=true
+AUTO_START_DEBUGGER=false
+AUTO_START_MONITOR=true
+
+[NOTIFICATIONS]
+ENABLE_NOTIFICATIONS=true
+NOTIFICATION_SOUND=quantum_chime
+SHOW_SYSTEM_ALERTS=true
+SHOW_COMPILE_STATUS=true
+SHOW_VM_STATUS=true
+""";
+    }
+    
+    // 创建用户环境变量配置
+    private function createUserEnvironmentConfig(installPath: String) -> String {
+        return """
+# QEntL 用户环境变量配置
+
+[ENVIRONMENT_VARIABLES]
+QENTL_USER_HOME=""" + installPath + """\\Users\\Default
+QENTL_USER_DOCS=""" + installPath + """\\Users\\Default\\Documents
+QENTL_USER_PROGRAMS=""" + installPath + """\\Users\\Default\\Programs
+QENTL_USER_SETTINGS=""" + installPath + """\\Users\\Default\\Settings
+QENTL_USER_DATA=""" + installPath + """\\Users\\Default\\Data
+QENTL_USER_DESKTOP=""" + installPath + """\\Users\\Default\\Desktop
+
+[PATH_EXTENSIONS]
+USER_BIN=""" + installPath + """\\Users\\Default\\Programs\\bin
+USER_SCRIPTS=""" + installPath + """\\Users\\Default\\Documents\\Scripts
+
+[QUANTUM_ENVIRONMENT]
+QUANTUM_WORKSPACE=""" + installPath + """\\Users\\Default\\Data\\Quantum
+QUANTUM_CACHE=""" + installPath + """\\Users\\Default\\Data\\Cache\\quantum
+""";
+    }
+    
+    // 创建量子用户配置
+    private function createQuantumUserConfig() -> String {
+        return """
+# QEntL 量子计算用户配置
+
+[QUANTUM_HARDWARE]
+PREFERRED_BACKEND=simulator
+MAX_QUBITS=32
+COHERENCE_TIME=1000ms
+GATE_FIDELITY=0.99
+
+[QUANTUM_ALGORITHMS]
+OPTIMIZATION_LEVEL=2
+PARALLEL_EXECUTION=true
+ERROR_CORRECTION=auto
+NOISE_MITIGATION=true
+
+[QUANTUM_NETWORKING]
+ENABLE_QUANTUM_INTERNET=false
+QUANTUM_KEY_DISTRIBUTION=true
+ENTANGLEMENT_SWAPPING=false
+
+[SIMULATION_SETTINGS]
+SIMULATOR_CORES=4
+MEMORY_LIMIT=4GB
+PRECISION=double
+DEBUG_QUANTUM_STATES=false
+""";
+    }
+    
+    // 复制系统文件
+    private function copySystemFiles(targetPath: String) -> CopyResult {
+        print("正在复制系统文件...");
+        
+        try {            
+            // 解压QEntL安装镜像 (install.qim)
+            let imagePath = sourcePath + "\\sources\\install.qim";
+            if (File.exists(imagePath)) {
+                extractInstallImage(imagePath, targetPath);
+            } else {
+                return CopyResult.failed("找不到安装镜像文件");
+            }
+            
+            // 复制引导文件
+            let bootImagePath = sourcePath + "\\sources\\boot.qim";
+            if (File.exists(bootImagePath)) {
+                extractBootImage(bootImagePath, targetPath + "\\System");
+            }
+            
+            print("系统文件复制完成");
+            return CopyResult.success();
+            
+        } catch (Exception ex) {
+            return CopyResult.failed("文件复制失败: " + ex.message);
+        }
+    }
+    
+    // 配置系统
+    private function configureSystem(config: InstallConfig) -> Void {
+        print("配置系统环境...");
+        
+        // 创建系统配置文件
+        let systemConfig = createSystemConfig(config);
+        File.writeAllText(config.targetPath + "\\Config\\system.json", systemConfig);
+        
+        // 配置用户环境
+        let userConfigPath = config.targetPath + "\\Users\\Default\\.qentl";
+        Directory.createDirectory(userConfigPath);
+        
+        // 生成量子密钥
+        if (config.enableQuantumAcceleration) {
+            generateQuantumKeys(userConfigPath + "\\keys");
+        }
+        
+        print("系统配置完成");
+    }
+    
+    // 注册系统服务
+    private function registerSystemServices(installPath: String) -> Void {
+        print("注册系统服务...");
+        
+        // 注册QEntL内核服务
+        let kernelService = ServiceDefinition {
+            name: "QEntLKernel",
+            displayName: "QEntL Quantum Kernel",
+            description: "QEntL量子内核服务",
+            executablePath: installPath + "\\System\\Kernel\\qentl-kernel.exe",
+            startType: ServiceStartType.Automatic
+        };
+        ServiceManager.installService(kernelService);
+        
+        // 注册编译器服务
+        let compilerService = ServiceDefinition {
+            name: "QEntLCompiler", 
+            displayName: "QEntL Compiler Service",
+            description: "QEntL编译器服务",
+            executablePath: installPath + "\\System\\Compiler\\qentl-compiler-service.exe",
+            startType: ServiceStartType.Manual
+        };
+        ServiceManager.installService(compilerService);
+        
+        print("系统服务注册完成");
+    }
+    
+    // 创建桌面快捷方式
+    private function createDesktopShortcuts(installPath: String) -> Void {
+        print("创建桌面快捷方式...");
+        
+        let desktopPath = Environment.getDesktopPath();
+        
+        // QEntL开发环境快捷方式
+        let devShortcut = ShortcutDefinition {
+            name: "QEntL开发环境",
+            targetPath: installPath + "\\System\\qentl-ide.exe",
+            iconPath: installPath + "\\System\\icons\\qentl-ide.ico",
+            workingDirectory: installPath
+        };
+        ShortcutManager.createShortcut(desktopPath + "\\QEntL开发环境.lnk", devShortcut);
+        
+        print("桌面快捷方式创建完成");
+    }
+    
+    // 完成安装
+    private function finalizeInstallation(config: InstallConfig) -> Void {
+        print("完成安装设置...");
+        
+        // 写入卸载信息
+        let uninstallInfo = UninstallInfo {
+            productName: PRODUCT_NAME,
+            version: VERSION,
+            publisher: PUBLISHER,
+            installPath: config.targetPath,
+            uninstallCommand: config.targetPath + "\\uninstall.exe"
+        };
+        RegistryManager.writeUninstallInfo(uninstallInfo);
+        
+        // 创建系统启动脚本
+        let startupScript = createStartupScript(config.targetPath);
+        File.writeAllText(config.targetPath + "\\start-qentl.bat", startupScript);
+        
+        print("安装完成设置完成");
+    }
+    
+    // 回滚安装
+    private function rollbackInstallation(installPath: String) -> Void {
+        print("正在回滚安装...");
+        
+        try {
+            // 停止已启动的服务
+            ServiceManager.stopService("QEntLKernel");
+            ServiceManager.stopService("QEntLCompiler");
+            
+            // 删除已注册的服务
+            ServiceManager.uninstallService("QEntLKernel");
+            ServiceManager.uninstallService("QEntLCompiler");
+            
+            // 删除安装目录
+            if (Directory.exists(installPath)) {
+                Directory.delete(installPath, recursive: true);
+            }
+            
+            // 清理注册表
+            RegistryManager.deleteUninstallInfo(PRODUCT_NAME);
+            
+            print("安装回滚完成");
+            
+        } catch (Exception ex) {
+            print("回滚过程中发生错误: " + ex.message);
+        }
+    }
+}
+
+// 程序入口点
+function main(args: List[String]) -> Int {
+    let installer = QEntLInstaller();
+    
+    // 解析命令行参数
+    let config = parseCommandLineArgs(args);
+    
+    // 执行安装
+    let result = installer.install(config);
+    
+    match result {
+        Ok(_) => {
+            print("\n安装成功完成！");
+            print("QEntL量子编程系统已准备就绪");
+            return 0;
+        },
+        Error(err) => {
+            print("\n安装失败: " + err.toString());
+            return 1;
+        }
+    }
+}

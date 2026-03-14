@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>简单彝文测试</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .canvas { border: 1px solid #ccc; margin: 10px 0; }
+        button { padding: 10px 20px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>简单彝文测试</h1>
+    
+    <h2>Canvas 渲染彝文（推荐）</h2>
+    <canvas id="yiCanvas" width="800" height="200" class="canvas"></canvas>
+    <button onclick="renderYi()">渲染彝文</button>
+    
+    <h2>图片生成</h2>
+    <div id="imageOutput"></div>
+    <button onclick="generateImage()">生成图片</button>
+    
+    <script>
+        // 彝文字符
+        const yiChars = '󲜐󲜑󲜒󲜓󲜔56789ABCDEF';
+        
+        function renderYi() {
+            const canvas = document.getElementById('yiCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 设置背景
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 设置字体
+            ctx.font = '24px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textBaseline = 'top';
+            
+            // 渲染彝文
+            let x = 10;
+            let y = 10;
+            
+            for (let i = 0; i < yiChars.length; i++) {
+                ctx.fillText(yiChars[i], x, y);
+                x += 40;
+                
+                if (x > 750) {
+                    x = 10;
+                    y += 40;
+                }
+            }
+        }
+        
+        function generateImage() {
+            const container = document.getElementById('imageOutput');
+            
+            // 创建临时 canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            
+            // 设置背景
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 设置字体
+            ctx.font = '24px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textBaseline = 'top';
+            
+            // 渲染彝文
+            let x = 10;
+            let y = 10;
+            
+            for (let i = 0; i < yiChars.length; i++) {
+                ctx.fillText(yiChars[i], x, y);
+                x += 40;
+                
+                if (x > 750) {
+                    x = 10;
+                    y += 40;
+                }
+            }
+            
+            // 转换为图片
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL();
+            img.style.border = '1px solid #ccc';
+            img.style.margin = '10px 0';
+            
+            container.innerHTML = '';
+            container.appendChild(img);
+        }
+        
+        // 页面加载时自动渲染
+        window.onload = function() {
+            renderYi();
+        };
+    </script>
+</body>
+</html> 

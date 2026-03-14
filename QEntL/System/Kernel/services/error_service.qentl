@@ -1,0 +1,980 @@
+/**
+ * QEntL错误服务
+ * 版本: 1.0.0
+ * 作者: QEntL团队
+ * 描述: 提供系统级错误处理、诊断和恢复功能
+ * 量子基因编码: QG-ERROR-SERVICE-L3M4-1714130500
+ * 纠缠强度: 1.0
+ */
+
+import "../utils/logger.qentl";
+import "../utils/time.qentl";
+import "../utils/system_info.qentl";
+import "./logging_service.qentl";
+
+/**
+ * 错误级别
+ */
+export const ErrorLevels = {
+  INFO: 1,     // 信息级别，不影响系统运行
+  WARNING: 2,  // 警告级别，可能影响部分功能
+  ERROR: 3,    // 错误级别，影响特定功能
+  CRITICAL: 4, // 严重错误，影响主要功能
+  FATAL: 5     // 致命错误，导致系统不可用
+};
+
+/**
+ * 错误类型
+ */
+export const ErrorTypes = {
+  VALIDATION: "validation",       // 验证错误
+  PERMISSION: "permission",       // 权限错误
+  RESOURCE: "resource",           // 资源错误
+  RUNTIME: "runtime",             // 运行时错误
+  NETWORK: "network",             // 网络错误
+  STORAGE: "storage",             // 存储错误
+  CONFIGURATION: "configuration", // 配置错误
+  DEPENDENCY: "dependency",       // 依赖错误
+  QUANTUM: "quantum",             // 量子处理错误
+  SECURITY: "security",           // 安全错误
+  SYSTEM: "system"                // 系统错误
+};
+
+/**
+ * 错误服务配置
+ */
+export const ErrorServiceConfig = {
+  // 错误日志文件路径
+  errorLogPath: "./logs/errors.log",
+  
+  // 最小记录错误级别
+  minLogLevel: ErrorLevels.INFO,
+  
+  // 最大错误历史记录数
+  maxErrorHistory: 1000,
+  
+  // 是否发送系统错误通知
+  enableNotifications: true,
+  
+  // 错误重试策略
+  retryStrategy: {
+    maxRetries: 3,
+    initialDelay: 1000,
+    maxDelay: 30000,
+    backoffFactor: 2
+  },
+  
+  // 是否启用自动恢复
+  enableAutoRecovery: true,
+  
+  // 自动诊断
+  enableAutoDiagnosis: true,
+  
+  // 收集堆栈跟踪
+  collectStackTrace: true,
+  
+  // 是否收集系统状态
+  collectSystemState: true,
+  
+  // 是否收集用户上下文
+  collectUserContext: true,
+  
+  // 关联错误窗口时间 (毫秒)
+  correlationWindowTime: 5000
+};
+
+/**
+ * 错误服务状态
+ */
+export const ErrorServiceState = {
+  // 服务是否已初始化
+  initialized: false,
+  
+  // 错误历史
+  errorHistory: [],
+  
+  // 当前错误数量（按类型）
+  errorCounts: {
+    total: 0,
+    byLevel: {},
+    byType: {}
+  },
+  
+  // 错误相关性映射
+  errorCorrelations: {},
+  
+  // 活动恢复任务
+  activeRecoveryTasks: {},
+  
+  // 错误处理器映射
+  errorHandlers: {},
+  
+  // 事件监听器
+  eventListeners: {
+    error: [],
+    recovered: [],
+    failed: []
+  }
+};
+
+/**
+ * 错误对象结构
+ */
+export type ErrorObject = {
+  id: string;
+  timestamp: number;
+  level: number;
+  type: string;
+  message: string;
+  moduleName: string;
+  fileName: string;
+  functionName: string;
+  lineNumber器: number;
+  columnNumber器: number;
+  stackTrace器: string;
+  context器: any;
+  systemState器: any;
+  relatedErrors器: string[];
+  retryCount器: number;
+  resolved器: boolean;
+  resolvedAt器: number;
+  recoveryStrategy器: string;
+};
+
+/**
+ * 初始化错误服务
+ * 
+ * @param {Object} config - 错误服务配置参数
+ * @returns {boolean} - 是否初始化成功
+ */
+export function initialize(config = {}) {
+  logger.info("[错误服务] 正在初始化错误服务...");
+  
+  // 合并配置
+  const mergedConfig = { ...ErrorServiceConfig, ...config };
+  Object.assign(ErrorServiceConfig, mergedConfig);
+  
+  try {
+    // 注册默认错误处理器
+    registerDefaultHandlers();
+    
+    // 重置错误计数
+    resetErrorCounts();
+    
+    // 覆盖全局错误处理
+    overrideGlobalErrorHandling();
+    
+    ErrorServiceState.initialized = true;
+    logger.info("[错误服务] 错误服务初始化成功");
+    
+    return true;
+  } catch (error) {
+    console.error(`[错误服务] 错误服务初始化失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 报告错误
+ * 
+ * @param {number} level - 错误级别
+ * @param {string} type - 错误类型
+ * @param {string} message - 错误消息
+ * @param {string} moduleName - 模块名称
+ * @param {Object} options - 附加选项
+ * @returns {string} - 错误ID
+ */
+export function reportError(
+  level,
+  type,
+  message,
+  moduleName,
+  options = {}
+) {
+  checkInitialized();
+  
+  // 检查最小记录级别
+  if (level < ErrorServiceConfig.minLogLevel) {
+    return null;
+  }
+  
+  try {
+    // 创建错误对象
+    const errorObject = createErrorObject(level, type, message, moduleName, options);
+    
+    // 添加到历史记录
+    addErrorToHistory(errorObject);
+    
+    // 更新错误计数
+    updateErrorCounts(errorObject);
+    
+    // 记录到日志
+    logError(errorObject);
+    
+    // 检查错误相关性
+    analyzeErrorCorrelation(errorObject);
+    
+    // 触发错误事件
+    triggerEvent("error", errorObject);
+    
+    // 处理错误
+    handleError(errorObject);
+    
+    return errorObject.id;
+  } catch (e) {
+    console.error(`[错误服务] 报告错误时发生异常: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * 创建错误对象
+ */
+function createErrorObject(level, type, message, moduleName, options) {
+  const timestamp = Date.now();
+  const id = generateErrorId(timestamp);
+  
+  const errorObject = {
+    id,
+    timestamp,
+    level,
+    type,
+    message,
+    moduleName,
+    fileName: options.fileName || "",
+    functionName: options.functionName || "",
+    lineNumber: options.lineNumber,
+    columnNumber: options.columnNumber,
+    retryCount: 0,
+    resolved: false
+  };
+  
+  // 收集堆栈跟踪
+  if (ErrorServiceConfig.collectStackTrace && options.error instanceof Error) {
+    errorObject.stackTrace = options.error.stack;
+  }
+  
+  // 收集上下文
+  if (ErrorServiceConfig.collectUserContext && options.context) {
+    errorObject.context = options.context;
+  }
+  
+  // 收集系统状态
+  if (ErrorServiceConfig.collectSystemState) {
+    errorObject.systemState = collectSystemState();
+  }
+  
+  return errorObject;
+}
+
+/**
+ * 添加错误到历史记录
+ */
+function addErrorToHistory(errorObject) {
+  ErrorServiceState.errorHistory.push(errorObject);
+  
+  // 限制历史记录大小
+  if (ErrorServiceState.errorHistory.length > ErrorServiceConfig.maxErrorHistory) {
+    ErrorServiceState.errorHistory.shift();
+  }
+}
+
+/**
+ * 更新错误计数
+ */
+function updateErrorCounts(errorObject) {
+  // 更新总数
+  ErrorServiceState.errorCounts.total++;
+  
+  // 更新级别计数
+  if (!ErrorServiceState.errorCounts.byLevel[errorObject.level]) {
+    ErrorServiceState.errorCounts.byLevel[errorObject.level] = 0;
+  }
+  ErrorServiceState.errorCounts.byLevel[errorObject.level]++;
+  
+  // 更新类型计数
+  if (!ErrorServiceState.errorCounts.byType[errorObject.type]) {
+    ErrorServiceState.errorCounts.byType[errorObject.type] = 0;
+  }
+  ErrorServiceState.errorCounts.byType[errorObject.type]++;
+}
+
+/**
+ * 分析错误相关性
+ */
+function analyzeErrorCorrelation(errorObject) {
+  const now = Date.now();
+  const correlationWindow = ErrorServiceConfig.correlationWindowTime;
+  
+  // 查找相关错误
+  const relatedErrors = ErrorServiceState.errorHistory.filter(err => {
+    // 排除当前错误
+    if (err.id === errorObject.id) return false;
+    
+    // 检查时间窗口
+    if (now - err.timestamp > correlationWindow) return false;
+    
+    // 检查相同类型或模块
+    return err.type === errorObject.type || err.moduleName === errorObject.moduleName;
+  }).map(err => err.id);
+  
+  // 添加相关错误
+  if (relatedErrors.length > 0) {
+    errorObject.relatedErrors = relatedErrors;
+    
+    // 更新错误相关性映射
+    relatedErrors.forEach(relatedId => {
+      if (!ErrorServiceState.errorCorrelations[relatedId]) {
+        ErrorServiceState.errorCorrelations[relatedId] = [];
+      }
+      ErrorServiceState.errorCorrelations[relatedId].push(errorObject.id);
+    });
+  }
+}
+
+/**
+ * 处理错误
+ */
+function handleError(errorObject) {
+  // 检查是否有对应类型的处理器
+  const handler = ErrorServiceState.errorHandlers[errorObject.type];
+  
+  if (handler) {
+    try {
+      handler(errorObject);
+    } catch (e) {
+      logger.error(`[错误服务] 执行错误处理器时发生异常: ${e.message}`);
+    }
+  } else {
+    // 使用默认处理
+    defaultErrorHandler(errorObject);
+  }
+  
+  // 如果启用自动恢复，尝试恢复
+  if (ErrorServiceConfig.enableAutoRecovery && errorObject.level < ErrorLevels.FATAL) {
+    scheduleRecovery(errorObject);
+  }
+}
+
+/**
+ * 默认错误处理器
+ */
+function defaultErrorHandler(errorObject) {
+  const levelName = getErrorLevelName(errorObject.level);
+  
+  switch (errorObject.level) {
+    case ErrorLevels.INFO:
+      logger.info(`[${errorObject.moduleName}] ${errorObject.message}`);
+      break;
+    case ErrorLevels.WARNING:
+      logger.warn(`[${errorObject.moduleName}] ${errorObject.message}`);
+      break;
+    case ErrorLevels.ERROR:
+      logger.error(`[${errorObject.moduleName}] ${errorObject.message}`);
+      break;
+    case ErrorLevels.CRITICAL:
+    case ErrorLevels.FATAL:
+      logger.error(`[${errorObject.moduleName}] 严重错误: ${errorObject.message}`);
+      
+      // 对于致命错误，记录附加信息
+      if (errorObject.stackTrace) {
+        logger.error(`堆栈跟踪: ${errorObject.stackTrace}`);
+      }
+      break;
+  }
+}
+
+/**
+ * 安排错误恢复
+ */
+function scheduleRecovery(errorObject) {
+  // 如果已经解决，不进行恢复
+  if (errorObject.resolved) {
+    return;
+  }
+  
+  // 如果超过最大重试次数，标记为失败
+  if (errorObject.retryCount >= ErrorServiceConfig.retryStrategy.maxRetries) {
+    markErrorAsFailed(errorObject);
+    return;
+  }
+  
+  // 计算延迟时间
+  const delay = calculateBackoffDelay(errorObject.retryCount);
+  
+  // 创建恢复任务
+  ErrorServiceState.activeRecoveryTasks[errorObject.id] = setTimeout(() => {
+    attemptRecovery(errorObject);
+  }, delay);
+}
+
+/**
+ * 尝试恢复错误
+ */
+function attemptRecovery(errorObject) {
+  logger.info(`[错误服务] 尝试恢复错误: ${errorObject.id} (重试 ${errorObject.retryCount + 1}/${ErrorServiceConfig.retryStrategy.maxRetries})`);
+  
+  // 增加重试计数
+  errorObject.retryCount++;
+  
+  // 执行恢复策略
+  const recoveryStrategy = determineRecoveryStrategy(errorObject);
+  errorObject.recoveryStrategy = recoveryStrategy;
+  
+  let recovered = false;
+  
+  try {
+    // 基于错误类型执行不同的恢复策略
+    switch (recoveryStrategy) {
+      case "restart_module":
+        recovered = restartModule(errorObject.moduleName);
+        break;
+      case "reload_configuration":
+        recovered = reloadConfiguration();
+        break;
+      case "clear_cache":
+        recovered = clearCache();
+        break;
+      case "reconnect":
+        recovered = reconnect(errorObject.context);
+        break;
+      case "default":
+      default:
+        // 基本恢复，只标记为已恢复
+        recovered = true;
+        break;
+    }
+    
+    // 如果恢复成功
+    if (recovered) {
+      markErrorAsResolved(errorObject);
+    } else {
+      // 如果恢复失败，安排下一次尝试
+      scheduleRecovery(errorObject);
+    }
+  } catch (e) {
+    logger.error(`[错误服务] 恢复错误时发生异常: ${e.message}`);
+    
+    // 安排下一次尝试
+    scheduleRecovery(errorObject);
+  }
+}
+
+/**
+ * 确定恢复策略
+ */
+function determineRecoveryStrategy(errorObject) {
+  switch (errorObject.type) {
+    case ErrorTypes.NETWORK:
+      return "reconnect";
+    case ErrorTypes.CONFIGURATION:
+      return "reload_configuration";
+    case ErrorTypes.RESOURCE:
+    case ErrorTypes.STORAGE:
+      return "clear_cache";
+    case ErrorTypes.RUNTIME:
+    case ErrorTypes.QUANTUM:
+      return "restart_module";
+    default:
+      return "default";
+  }
+}
+
+/**
+ * 标记错误为已解决
+ */
+function markErrorAsResolved(errorObject) {
+  errorObject.resolved = true;
+  errorObject.resolvedAt = Date.now();
+  
+  // 清除活动恢复任务
+  if (ErrorServiceState.activeRecoveryTasks[errorObject.id]) {
+    clearTimeout(ErrorServiceState.activeRecoveryTasks[errorObject.id]);
+    delete ErrorServiceState.activeRecoveryTasks[errorObject.id];
+  }
+  
+  logger.info(`[错误服务] 错误已解决: ${errorObject.id}`);
+  
+  // 触发恢复事件
+  triggerEvent("recovered", errorObject);
+}
+
+/**
+ * 标记错误为失败
+ */
+function markErrorAsFailed(errorObject) {
+  // 清除活动恢复任务
+  if (ErrorServiceState.activeRecoveryTasks[errorObject.id]) {
+    clearTimeout(ErrorServiceState.activeRecoveryTasks[errorObject.id]);
+    delete ErrorServiceState.activeRecoveryTasks[errorObject.id];
+  }
+  
+  logger.warn(`[错误服务] 无法恢复错误: ${errorObject.id} (超过最大重试次数)`);
+  
+  // 触发失败事件
+  triggerEvent("failed", errorObject);
+}
+
+/**
+ * 注册错误处理器
+ * 
+ * @param {string} errorType - 错误类型
+ * @param {Function} handler - 处理器函数
+ * @returns {boolean} - 是否注册成功
+ */
+export function registerErrorHandler(errorType, handler) {
+  checkInitialized();
+  
+  if (typeof handler !== "function") {
+    logger.warn(`[错误服务] 注册错误处理器失败: 处理器必须是函数`);
+    return false;
+  }
+  
+  ErrorServiceState.errorHandlers[errorType] = handler;
+  logger.info(`[错误服务] 已注册错误处理器: ${errorType}`);
+  
+  return true;
+}
+
+/**
+ * 获取错误历史
+ * 
+ * @param {Object} filters - 过滤条件
+ * @param {number} limit - 最大数量
+ * @returns {Array} - 错误历史
+ */
+export function getErrorHistory(filters = {}, limit = 100) {
+  checkInitialized();
+  
+  let result = [...ErrorServiceState.errorHistory];
+  
+  // 应用过滤器
+  if (filters.level) {
+    result = result.filter(err => err.level === filters.level);
+  }
+  
+  if (filters.type) {
+    result = result.filter(err => err.type === filters.type);
+  }
+  
+  if (filters.moduleName) {
+    result = result.filter(err => err.moduleName === filters.moduleName);
+  }
+  
+  if (filters.resolved !== undefined) {
+    result = result.filter(err => err.resolved === filters.resolved);
+  }
+  
+  if (filters.startTime) {
+    result = result.filter(err => err.timestamp >= filters.startTime);
+  }
+  
+  if (filters.endTime) {
+    result = result.filter(err => err.timestamp <= filters.endTime);
+  }
+  
+  // 按时间排序（最新优先）
+  result.sort((a, b) => b.timestamp - a.timestamp);
+  
+  // 限制数量
+  if (limit && result.length > limit) {
+    result = result.slice(0, limit);
+  }
+  
+  return result;
+}
+
+/**
+ * 获取错误统计
+ * 
+ * @returns {Object} - 错误统计信息
+ */
+export function getErrorStatistics() {
+  checkInitialized();
+  
+  const now = Date.now();
+  const last24Hours = now - 24 * 60 * 60 * 1000;
+  const lastHour = now - 60 * 60 * 1000;
+  
+  // 计算时间范围内的错误数量
+  const last24HoursCount = ErrorServiceState.errorHistory.filter(
+    err => err.timestamp >= last24Hours
+  ).length;
+  
+  const lastHourCount = ErrorServiceState.errorHistory.filter(
+    err => err.timestamp >= lastHour
+  ).length;
+  
+  // 计算解决率
+  const totalErrors = ErrorServiceState.errorCounts.total;
+  const resolvedErrors = ErrorServiceState.errorHistory.filter(
+    err => err.resolved
+  ).length;
+  
+  const resolutionRate = totalErrors > 0 器 resolvedErrors / totalErrors : 1;
+  
+  // 计算平均解决时间
+  let avgResolutionTime = 0;
+  const resolvedWithTime = ErrorServiceState.errorHistory.filter(
+    err => err.resolved && err.resolvedAt
+  );
+  
+  if (resolvedWithTime.length > 0) {
+    const totalResolutionTime = resolvedWithTime.reduce(
+      (sum, err) => sum + (err.resolvedAt - err.timestamp),
+      0
+    );
+    avgResolutionTime = totalResolutionTime / resolvedWithTime.length;
+  }
+  
+  return {
+    total: ErrorServiceState.errorCounts.total,
+    byLevel: { ...ErrorServiceState.errorCounts.byLevel },
+    byType: { ...ErrorServiceState.errorCounts.byType },
+    lastHour: lastHourCount,
+    last24Hours: last24HoursCount,
+    resolutionRate,
+    avgResolutionTime,
+    activeRecoveryTasks: Object.keys(ErrorServiceState.activeRecoveryTasks).length
+  };
+}
+
+/**
+ * 手动解决错误
+ * 
+ * @param {string} errorId - 错误ID
+ * @param {string} resolution - 解决方案说明
+ * @returns {boolean} - 是否解决成功
+ */
+export function resolveError(errorId, resolution = "") {
+  checkInitialized();
+  
+  const errorIdx = ErrorServiceState.errorHistory.findIndex(
+    err => err.id === errorId
+  );
+  
+  if (errorIdx === -1) {
+    logger.warn(`[错误服务] 解决错误失败: 找不到错误 ${errorId}`);
+    return false;
+  }
+  
+  const errorObject = ErrorServiceState.errorHistory[errorIdx];
+  
+  if (errorObject.resolved) {
+    logger.warn(`[错误服务] 解决错误失败: 错误已解决 ${errorId}`);
+    return false;
+  }
+  
+  errorObject.resolution = resolution;
+  markErrorAsResolved(errorObject);
+  
+  return true;
+}
+
+/**
+ * 添加事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否添加成功
+ */
+export function addEventListener(event, listener) {
+  checkInitialized();
+  
+  if (!ErrorServiceState.eventListeners[event]) {
+    ErrorServiceState.eventListeners[event] = [];
+  }
+  
+  ErrorServiceState.eventListeners[event].push(listener);
+  return true;
+}
+
+/**
+ * 移除事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否移除成功
+ */
+export function removeEventListener(event, listener) {
+  checkInitialized();
+  
+  if (!ErrorServiceState.eventListeners[event]) {
+    return false;
+  }
+  
+  const index = ErrorServiceState.eventListeners[event].indexOf(listener);
+  if (index !== -1) {
+    ErrorServiceState.eventListeners[event].splice(index, 1);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * 获取服务状态
+ * 
+ * @returns {Object} - 服务状态信息
+ */
+export function getStatus() {
+  return {
+    initialized: ErrorServiceState.initialized,
+    totalErrors: ErrorServiceState.errorCounts.total,
+    activeRecoveryTasks: Object.keys(ErrorServiceState.activeRecoveryTasks).length
+  };
+}
+
+// ============= 内部函数 =============
+
+/**
+ * 检查服务是否已初始化
+ */
+function checkInitialized() {
+  if (!ErrorServiceState.initialized) {
+    throw new Error("错误服务尚未初始化");
+  }
+}
+
+/**
+ * 重置错误计数
+ */
+function resetErrorCounts() {
+  ErrorServiceState.errorCounts = {
+    total: 0,
+    byLevel: {},
+    byType: {}
+  };
+  
+  // 初始化级别计数
+  Object.values(ErrorLevels).forEach(level => {
+    if (typeof level === "number") {
+      ErrorServiceState.errorCounts.byLevel[level] = 0;
+    }
+  });
+  
+  // 初始化类型计数
+  Object.values(ErrorTypes).forEach(type => {
+    if (typeof type === "string") {
+      ErrorServiceState.errorCounts.byType[type] = 0;
+    }
+  });
+}
+
+/**
+ * 注册默认错误处理器
+ */
+function registerDefaultHandlers() {
+  // 网络错误处理器
+  registerErrorHandler(ErrorTypes.NETWORK, (error) => {
+    logger.warn(`[错误服务] 网络错误: ${error.message}`);
+    // 特定的网络错误处理逻辑
+  });
+  
+  // 资源错误处理器
+  registerErrorHandler(ErrorTypes.RESOURCE, (error) => {
+    logger.warn(`[错误服务] 资源错误: ${error.message}`);
+    // 特定的资源错误处理逻辑
+  });
+  
+  // 其他错误类型的处理器...
+}
+
+/**
+ * 覆盖全局错误处理
+ */
+function overrideGlobalErrorHandling() {
+  // 注册全局未捕获异常处理器
+  // 这里是伪代码，实际实现取决于运行环境
+  if (typeof globalErrorHandler === "function") {
+    globalErrorHandler((error, source) => {
+      reportError(
+        ErrorLevels.ERROR,
+        ErrorTypes.RUNTIME,
+        error.message || "未知错误",
+        source || "system",
+        { error }
+      );
+      
+      // 返回true表示错误已处理
+      return true;
+    });
+  }
+}
+
+/**
+ * 生成错误ID
+ * 
+ * @param {number} timestamp - 时间戳
+ * @returns {string} - 错误ID
+ */
+function generateErrorId(timestamp) {
+  const random = Math.floor(Math.random() * 1000000);
+  return `err-${timestamp}-${random}`;
+}
+
+/**
+ * 获取错误级别名称
+ * 
+ * @param {number} level - 错误级别
+ * @returns {string} - 级别名称
+ */
+function getErrorLevelName(level) {
+  for (const [name, value] of Object.entries(ErrorLevels)) {
+    if (value === level) {
+      return name;
+    }
+  }
+  return "UNKNOWN";
+}
+
+/**
+ * 计算退避延迟
+ * 
+ * @param {number} retryCount - 重试次数
+ * @returns {number} - 延迟时间 (毫秒)
+ */
+function calculateBackoffDelay(retryCount) {
+  const { initialDelay, maxDelay, backoffFactor } = ErrorServiceConfig.retryStrategy;
+  
+  const delay = initialDelay * Math.pow(backoffFactor, retryCount);
+  return Math.min(delay, maxDelay);
+}
+
+/**
+ * 收集系统状态
+ * 
+ * @returns {Object} - 系统状态信息
+ */
+function collectSystemState() {
+  try {
+    return {
+      memory: system_info.getMemoryInfo(),
+      cpu: system_info.getCpuInfo(),
+      storage: system_info.getStorageInfo(),
+      timestamp: Date.now()
+    };
+  } catch (e) {
+    logger.warn(`[错误服务] 收集系统状态失败: ${e.message}`);
+    return {
+      timestamp: Date.now(),
+      error: e.message
+    };
+  }
+}
+
+/**
+ * 记录错误到日志
+ * 
+ * @param {Object} errorObject - 错误对象
+ */
+function logError(errorObject) {
+  const levelName = getErrorLevelName(errorObject.level);
+  
+  let logMessage = `[${time.formatTimestamp(errorObject.timestamp)}] [${levelName}] `;
+  logMessage += `[${errorObject.moduleName}] [${errorObject.type}] ${errorObject.message}`;
+  
+  if (errorObject.fileName) {
+    logMessage += ` (${errorObject.fileName}`;
+    if (errorObject.functionName) {
+      logMessage += `:${errorObject.functionName}`;
+    }
+    if (errorObject.lineNumber) {
+      logMessage += `:${errorObject.lineNumber}`;
+    }
+    logMessage += ")";
+  }
+  
+  // 记录到专用错误日志
+  try {
+    logging_service.appendToFile(ErrorServiceConfig.errorLogPath, logMessage + "\n");
+  } catch (e) {
+    logger.warn(`[错误服务] 写入错误日志失败: ${e.message}`);
+  }
+  
+  // 同时记录到系统日志
+  switch (errorObject.level) {
+    case ErrorLevels.INFO:
+      logger.info(logMessage);
+      break;
+    case ErrorLevels.WARNING:
+      logger.warn(logMessage);
+      break;
+    case ErrorLevels.ERROR:
+    case ErrorLevels.CRITICAL:
+    case ErrorLevels.FATAL:
+      logger.error(logMessage);
+      break;
+  }
+}
+
+/**
+ * 触发事件
+ * 
+ * @param {string} eventName - 事件名称
+ * @param {Object} eventData - 事件数据
+ */
+function triggerEvent(eventName, eventData) {
+  if (!ErrorServiceState.eventListeners[eventName]) {
+    return;
+  }
+  
+  for (const listener of ErrorServiceState.eventListeners[eventName]) {
+    try {
+      listener(eventData);
+    } catch (e) {
+      logger.warn(`[错误服务] 事件监听器执行失败: ${e.message}`);
+    }
+  }
+}
+
+/**
+ * 恢复函数: 重启模块
+ */
+function restartModule(moduleName) {
+  logger.info(`[错误服务] 尝试重启模块: ${moduleName}`);
+  // 实际重启模块的逻辑
+  return true; // 假设总是成功
+}
+
+/**
+ * 恢复函数: 重新加载配置
+ */
+function reloadConfiguration() {
+  logger.info("[错误服务] 尝试重新加载配置");
+  // 实际重新加载配置的逻辑
+  return true; // 假设总是成功
+}
+
+/**
+ * 恢复函数: 清理缓存
+ */
+function clearCache() {
+  logger.info("[错误服务] 尝试清理缓存");
+  // 实际清理缓存的逻辑
+  return true; // 假设总是成功
+}
+
+/**
+ * 恢复函数: 重新连接
+ */
+function reconnect(context) {
+  logger.info("[错误服务] 尝试重新连接");
+  // 实际重新连接的逻辑
+  return true; // 假设总是成功
+}
+
+// 导出错误服务模块
+export default {
+  initialize,
+  reportError,
+  registerErrorHandler,
+  getErrorHistory,
+  getErrorStatistics,
+  resolveError,
+  addEventListener,
+  removeEventListener,
+  getStatus,
+  ErrorLevels,
+  ErrorTypes
+}; 

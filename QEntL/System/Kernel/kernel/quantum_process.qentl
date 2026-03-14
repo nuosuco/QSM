@@ -1,0 +1,1183 @@
+/**
+ * QEntL量子进程管理模块
+ * QuantumGene: QG-KERNEL-QUANTPROC-M9X5-1714327650
+ * EntanglementStrength: 0.95
+ */
+
+quantum_program QuantumProcessManager {
+    metadata {
+        name: "QEntL量子进程管理器",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的量子进程管理模块，提供量子进程的创建、管理和调度功能",
+        quantum_gene: "QG-KERNEL-QUANTPROC-M9X5-1714327650",
+        entanglement_strength: 0.95
+    }
+
+    // 导入依赖模块
+    import ProcessManagerBase from "./process_manager_base.qentl";
+    import ProcessManagerCore from "./process_manager_core.qentl";
+    import QuantumMemory from "./quantum_memory.qentl";
+
+    state {
+        // 内核引用
+        kernel_reference: null,
+        
+        // 基础模块引用
+        base_module: null,
+        
+        // 核心模块引用
+        core_module: null,
+        
+        // 量子内存管理器引用
+        quantum_memory: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 量子进程配置
+        config: {
+            default_qubits: 8,              // 默认分配的量子比特数
+            max_qubits_per_process: 64,     // 每个进程最大量子比特数
+            entanglement_threshold: 0.75,   // 纠缠阈值
+            decoherence_check_interval: 500, // 退相干检查间隔(毫秒)
+            error_correction_enabled: true,  // 是否启用量子纠错
+            simulation_mode: false           // 是否使用模拟模式
+        },
+        
+        // 量子进程ID计数器
+        next_quantum_pid: 1,
+        
+        // 量子进程表 - 存储额外的量子相关信息
+        quantum_processes: {},
+        
+        // 退相干定时器ID
+        decoherence_timer_id: null,
+        
+        // 纠缠组信息
+        entanglement_groups: {},
+        
+        // 量子操作统计
+        statistics: {
+            total_quantum_operations: 0,
+            successful_operations: 0,
+            failed_operations: 0,
+            error_corrections: 0,
+            entanglement_operations: 0,
+            decoherence_events: 0
+        },
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化量子进程管理器
+    initialize(kernel_ref, base, core, quantum_mem, config) {
+        kernel_log("初始化量子进程管理器...");
+        
+        // 保存模块引用
+        this.kernel_reference = kernel_ref;
+        this.base_module = base || ProcessManagerBase;
+        this.core_module = core || ProcessManagerCore;
+        this.quantum_memory = quantum_mem || QuantumMemory;
+        
+        // 验证依赖模块已初始化
+        if (!this.base_module || !this.base_module.initialized) {
+            this.add_error("无法初始化量子进程管理器：基础模块未初始化");
+            return false;
+        }
+        
+        if (!this.core_module || !this.core_module.initialized) {
+            this.add_error("无法初始化量子进程管理器：核心模块未初始化");
+            return false;
+        }
+        
+        if (!this.quantum_memory || !this.quantum_memory.initialized) {
+            this.add_error("无法初始化量子进程管理器：量子内存管理器未初始化");
+            return false;
+        }
+        
+        // 应用配置
+        if (config) {
+            if (config.default_qubits !== undefined) {
+                this.config.default_qubits = config.default_qubits;
+            }
+            
+            if (config.max_qubits_per_process !== undefined) {
+                this.config.max_qubits_per_process = config.max_qubits_per_process;
+            }
+            
+            if (config.entanglement_threshold !== undefined) {
+                this.config.entanglement_threshold = config.entanglement_threshold;
+            }
+            
+            if (config.decoherence_check_interval !== undefined) {
+                this.config.decoherence_check_interval = config.decoherence_check_interval;
+            }
+            
+            if (config.error_correction_enabled !== undefined) {
+                this.config.error_correction_enabled = config.error_correction_enabled;
+            }
+            
+            if (config.simulation_mode !== undefined) {
+                this.config.simulation_mode = config.simulation_mode;
+            }
+        }
+        
+        // 启动退相干检查定时器
+        this.start_decoherence_timer();
+        
+        this.initialized = true;
+        kernel_log("量子进程管理器初始化完成");
+        
+        return true;
+    }
+
+    // 重置量子进程管理器
+    reset() {
+        kernel_log("重置量子进程管理器...");
+        
+        // 保存模块引用
+        const kernel_ref = this.kernel_reference;
+        const base = this.base_module;
+        const core = this.core_module;
+        const quantum_mem = this.quantum_memory;
+        
+        // 停止定时器
+        this.stop_decoherence_timer();
+        
+        // 清理所有量子进程资源
+        for (const qpid in this.quantum_processes) {
+            this.cleanup_quantum_process(qpid);
+        }
+        
+        // 重置状态
+        this.next_quantum_pid = 1;
+        this.quantum_processes = {};
+        this.entanglement_groups = {};
+        
+        // 重置统计信息
+        this.statistics = {
+            total_quantum_operations: 0,
+            successful_operations: 0,
+            failed_operations: 0,
+            error_corrections: 0,
+            entanglement_operations: 0,
+            decoherence_events: 0
+        };
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 恢复模块引用
+        this.kernel_reference = kernel_ref;
+        this.base_module = base;
+        this.core_module = core;
+        this.quantum_memory = quantum_mem;
+        
+        kernel_log("量子进程管理器已重置");
+    }
+
+    // 启动退相干检查定时器
+    start_decoherence_timer() {
+        // 如果定时器已存在，先停止
+        if (this.decoherence_timer_id !== null) {
+            clearInterval(this.decoherence_timer_id);
+        }
+        
+        // 创建新的定时器，定期检查量子态退相干
+        this.decoherence_timer_id = setInterval(() => {
+            this.check_decoherence();
+        }, this.config.decoherence_check_interval);
+        
+        kernel_log(`退相干检查定时器已启动，间隔：${this.config.decoherence_check_interval}毫秒`);
+    }
+
+    // 停止退相干检查定时器
+    stop_decoherence_timer() {
+        if (this.decoherence_timer_id !== null) {
+            clearInterval(this.decoherence_timer_id);
+            this.decoherence_timer_id = null;
+            kernel_log("退相干检查定时器已停止");
+        }
+    }
+
+    // 检查退相干
+    check_decoherence() {
+        if (!this.initialized) return;
+        
+        for (const qpid in this.quantum_processes) {
+            const qprocess = this.quantum_processes[qpid];
+            
+            // 检查每个量子进程的量子寄存器
+            if (qprocess && qprocess.quantum_registers) {
+                for (const reg_id in qprocess.quantum_registers) {
+                    const register = qprocess.quantum_registers[reg_id];
+                    
+                    // 计算退相干概率 - 与上次操作的时间差和寄存器状态复杂度相关
+                    const time_factor = (Date.now() - register.last_operation_time) / 10000; // 10秒为基准
+                    const complexity_factor = register.state_complexity / 10;
+                    
+                    const decoherence_probability = Math.min(0.95, time_factor * complexity_factor);
+                    
+                    // 随机判断是否发生退相干
+                    if (Math.random() < decoherence_probability) {
+                        this.handle_decoherence(qpid, reg_id);
+                    }
+                }
+            }
+        }
+    }
+
+    // 处理退相干事件
+    handle_decoherence(qpid, register_id) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return;
+        
+        const register = qprocess.quantum_registers[register_id];
+        if (!register) return;
+        
+        kernel_log(`检测到退相干：量子进程 ${qpid}，寄存器 ${register_id}`);
+        
+        // 更新统计信息
+        this.statistics.decoherence_events++;
+        
+        // 尝试量子纠错
+        if (this.config.error_correction_enabled && register.error_correction_enabled) {
+            // 执行量子纠错
+            const correction_success = this.apply_error_correction(qpid, register_id);
+            
+            if (correction_success) {
+                this.statistics.error_corrections++;
+                kernel_log(`成功对量子进程 ${qpid} 的寄存器 ${register_id} 应用量子纠错`);
+                return;
+            }
+        }
+        
+        // 如果没有纠错或纠错失败，状态崩溃为经典态
+        register.state = "|0>";  // 重置为基态
+        register.entangled_with = null;
+        register.state_complexity = 1;
+        
+        // 如果该寄存器属于纠缠组，需要更新整个纠缠组
+        if (register.entanglement_group_id) {
+            this.update_entanglement_group(register.entanglement_group_id);
+        }
+        
+        // 通知进程
+        this.notify_quantum_process(qpid, {
+            type: "decoherence",
+            register_id: register_id,
+            error: "量子态退相干导致状态崩溃"
+        });
+    }
+
+    // 应用量子纠错
+    apply_error_correction(qpid, register_id) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return false;
+        
+        const register = qprocess.quantum_registers[register_id];
+        if (!register) return false;
+        
+        // 模拟量子纠错过程
+        // 在实际量子计算机中，这将依赖于特定的纠错码和硬件实现
+        
+        // 简化模型：基于量子纠错码的冗余和校验位检测和修复错误
+        const error_correction_success_rate = 0.75; // 75%的纠错成功率
+        
+        if (Math.random() < error_correction_success_rate) {
+            // 纠错成功
+            register.last_operation_time = Date.now();
+            register.error_rate = Math.max(0, register.error_rate - 0.1);
+            return true;
+        } else {
+            // 纠错失败
+            register.error_rate = Math.min(1, register.error_rate + 0.1);
+            return false;
+        }
+    }
+
+    // 更新纠缠组
+    update_entanglement_group(group_id) {
+        const group = this.entanglement_groups[group_id];
+        if (!group) return;
+        
+        // 检查组中所有量子寄存器是否仍然有效
+        const valid_members = [];
+        
+        for (const member of group.members) {
+            const qpid = member.qpid;
+            const reg_id = member.register_id;
+            
+            // 验证量子进程和寄存器仍然存在
+            if (this.quantum_processes[qpid] && 
+                this.quantum_processes[qpid].quantum_registers[reg_id]) {
+                valid_members.push(member);
+            }
+        }
+        
+        // 更新组成员
+        group.members = valid_members;
+        
+        // 如果只剩一个或没有成员，解散纠缠组
+        if (group.members.length <= 1) {
+            this.dissolve_entanglement_group(group_id);
+        }
+    }
+
+    // 解散纠缠组
+    dissolve_entanglement_group(group_id) {
+        const group = this.entanglement_groups[group_id];
+        if (!group) return;
+        
+        kernel_log(`解散纠缠组: ${group_id}`);
+        
+        // 清除所有成员的纠缠组引用
+        for (const member of group.members) {
+            const qpid = member.qpid;
+            const reg_id = member.register_id;
+            
+            if (this.quantum_processes[qpid] && 
+                this.quantum_processes[qpid].quantum_registers[reg_id]) {
+                
+                this.quantum_processes[qpid].quantum_registers[reg_id].entanglement_group_id = null;
+                this.quantum_processes[qpid].quantum_registers[reg_id].entangled_with = null;
+            }
+        }
+        
+        // 删除纠缠组
+        delete this.entanglement_groups[group_id];
+    }
+
+    // 创建量子进程
+    create_quantum_process(image_path, args, flags, quantum_config) {
+        if (!this.initialized) {
+            this.add_error("无法创建量子进程：量子进程管理器未初始化");
+            return null;
+        }
+        
+        kernel_log(`创建量子进程: ${image_path}`);
+        
+        // 为进程添加量子标志
+        const process_flags = (flags || 0) | this.base_module.process_creation_flags.QUANTUM;
+        
+        // 使用核心模块创建基础进程
+        const pid = this.core_module.create_process(image_path, args, process_flags);
+        if (pid === null) {
+            this.add_error(`创建量子进程失败: ${image_path}`);
+            return null;
+        }
+        
+        // 为量子进程分配量子ID
+        const qpid = this.next_quantum_pid++;
+        
+        // 获取进程对象
+        const process = this.base_module.process_table[pid];
+        if (!process) {
+            this.add_error(`无法获取进程对象: PID ${pid}`);
+            return null;
+        }
+        
+        // 决定分配的量子比特数
+        const qubits_count = quantum_config && quantum_config.qubits 
+            器 Math.min(quantum_config.qubits, this.config.max_qubits_per_process)
+            : this.config.default_qubits;
+        
+        // 分配量子内存
+        const quantum_segment = this.quantum_memory.allocate_quantum_segment(qubits_count, {
+            pid: pid,
+            qpid: qpid,
+            type: "quantum_registers"
+        });
+        
+        if (!quantum_segment) {
+            this.add_error(`无法为量子进程 ${pid} 分配量子内存`);
+            // 回滚常规进程创建
+            this.core_module.terminate_process(pid, -1, "QUANTUM_MEMORY_ALLOCATION_FAILED");
+            return null;
+        }
+        
+        // 更新进程内存映射，添加量子段
+        process.memory_map.quantum_segment = quantum_segment;
+        
+        // 创建量子寄存器
+        const quantum_registers = this.initialize_quantum_registers(qubits_count);
+        
+        // 创建量子进程信息
+        this.quantum_processes[qpid] = {
+            pid: pid,
+            qpid: qpid,
+            quantum_registers: quantum_registers,
+            creation_time: Date.now(),
+            last_quantum_operation: Date.now(),
+            quantum_operation_count: 0,
+            error_rate: 0,
+            entanglement_count: 0,
+            quantum_segment: quantum_segment,
+            status: "initialized",
+            flags: {
+                error_correction: this.config.error_correction_enabled,
+                simulation_mode: this.config.simulation_mode,
+                isolated: quantum_config 器 !!quantum_config.isolated : false,
+                priority_boost: quantum_config 器 !!quantum_config.priority_boost : true
+            }
+        };
+        
+        // 设置进程的量子ID
+        process.quantum_id = qpid;
+        
+        kernel_log(`量子进程创建成功: PID ${pid}, QPID ${qpid}, 量子比特: ${qubits_count}`);
+        
+        return {
+            pid: pid,
+            qpid: qpid
+        };
+    }
+
+    // 初始化量子寄存器
+    initialize_quantum_registers(count) {
+        const registers = {};
+        
+        for (let i = 0; i < count; i++) {
+            registers[`q${i}`] = {
+                id: `q${i}`,
+                state: "|0>",                    // 初始状态为|0>
+                entangled_with: null,            // 纠缠的其他寄存器
+                entanglement_group_id: null,     // 纠缠组ID
+                last_operation_time: Date.now(), // 上次操作时间
+                error_rate: 0,                   // 错误率
+                state_complexity: 1,             // 状态复杂度
+                error_correction_enabled: this.config.error_correction_enabled
+            };
+        }
+        
+        return registers;
+    }
+
+    // 终止量子进程
+    terminate_quantum_process(qpid, exit_code, reason) {
+        if (!this.initialized) {
+            this.add_error("无法终止量子进程：量子进程管理器未初始化");
+            return false;
+        }
+        
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) {
+            this.add_error(`无法终止量子进程：QPID ${qpid} 不存在`);
+            return false;
+        }
+        
+        const pid = qprocess.pid;
+        
+        kernel_log(`终止量子进程: QPID ${qpid}, PID ${pid}`);
+        
+        // 清理量子资源
+        this.cleanup_quantum_process(qpid);
+        
+        // 使用核心模块终止基础进程
+        const result = this.core_module.terminate_process(pid, exit_code, reason);
+        
+        return result;
+    }
+
+    // 清理量子进程资源
+    cleanup_quantum_process(qpid) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return;
+        
+        kernel_log(`清理量子进程资源: QPID ${qpid}`);
+        
+        // 解除所有纠缠
+        for (const reg_id in qprocess.quantum_registers) {
+            const register = qprocess.quantum_registers[reg_id];
+            
+            if (register.entanglement_group_id) {
+                this.remove_from_entanglement_group(qpid, reg_id, register.entanglement_group_id);
+            }
+        }
+        
+        // 释放量子内存
+        if (qprocess.quantum_segment && this.quantum_memory) {
+            this.quantum_memory.free_quantum_segment(qprocess.quantum_segment.id);
+        }
+        
+        // 删除量子进程记录
+        delete this.quantum_processes[qpid];
+    }
+
+    // 获取量子进程信息
+    get_quantum_process_info(qpid) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) {
+            this.add_warning(`无法获取量子进程信息：QPID ${qpid} 不存在`);
+            return null;
+        }
+        
+        // 获取基础进程信息
+        const process = this.base_module.process_table[qprocess.pid];
+        if (!process) {
+            this.add_warning(`无法获取量子进程的基础进程信息：PID ${qprocess.pid} 不存在`);
+            return null;
+        }
+        
+        // 返回量子进程的公开信息
+        return {
+            pid: process.pid,
+            qpid: qprocess.qpid,
+            name: process.name,
+            state: process.state,
+            state_name: this.base_module.get_state_name(process.state),
+            priority: process.priority,
+            priority_name: this.base_module.get_priority_name(process.priority),
+            creation_time: qprocess.creation_time,
+            quantum_operation_count: qprocess.quantum_operation_count,
+            qubit_count: Object.keys(qprocess.quantum_registers).length,
+            entanglement_count: qprocess.entanglement_count,
+            error_rate: qprocess.error_rate,
+            flags: { ...qprocess.flags },
+            status: qprocess.status
+        };
+    }
+
+    // 列出所有量子进程
+    list_quantum_processes() {
+        const result = [];
+        
+        for (const qpid in this.quantum_processes) {
+            const process_info = this.get_quantum_process_info(Number(qpid));
+            if (process_info) {
+                result.push(process_info);
+            }
+        }
+        
+        return result;
+    }
+
+    // 获取量子寄存器状态
+    get_quantum_register_state(qpid, register_id) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) {
+            this.add_warning(`无法获取量子寄存器状态：QPID ${qpid} 不存在`);
+            return null;
+        }
+        
+        const register = qprocess.quantum_registers[register_id];
+        if (!register) {
+            this.add_warning(`无法获取量子寄存器状态：寄存器 ${register_id} 不存在`);
+            return null;
+        }
+        
+        // 返回寄存器状态（不包括内部实现细节）
+        return {
+            id: register.id,
+            state: register.state,
+            entangled: !!register.entangled_with,
+            entanglement_group_id: register.entanglement_group_id,
+            error_rate: register.error_rate,
+            error_correction_enabled: register.error_correction_enabled
+        };
+    }
+
+    // 从纠缠组中移除
+    remove_from_entanglement_group(qpid, register_id, group_id) {
+        const group = this.entanglement_groups[group_id];
+        if (!group) return;
+        
+        // 从组中移除
+        const index = group.members.findIndex(m => m.qpid === qpid && m.register_id === register_id);
+        if (index !== -1) {
+            group.members.splice(index, 1);
+        }
+        
+        // 更新寄存器状态
+        if (this.quantum_processes[qpid] && this.quantum_processes[qpid].quantum_registers[register_id]) {
+            this.quantum_processes[qpid].quantum_registers[register_id].entanglement_group_id = null;
+            this.quantum_processes[qpid].quantum_registers[register_id].entangled_with = null;
+        }
+        
+        // 如果组为空或只有一个成员，解散组
+        if (group.members.length <= 1) {
+            this.dissolve_entanglement_group(group_id);
+        }
+    }
+
+    // 通知量子进程发生的事件
+    notify_quantum_process(qpid, event) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return;
+        
+        // 获取基础进程
+        const process = this.base_module.process_table[qprocess.pid];
+        if (!process) return;
+        
+        // 在实际系统中，这将向进程发送事件通知
+        kernel_log(`向量子进程 ${qpid} 发送事件: ${event.type}`);
+        
+        // 模拟事件处理
+        switch (event.type) {
+            case "decoherence":
+                // 量子状态退相干
+                qprocess.error_rate = Math.min(1, qprocess.error_rate + 0.05);
+                break;
+                
+            case "entanglement_change":
+                // 纠缠状态变化
+                break;
+                
+            case "error_correction":
+                // 量子纠错事件
+                qprocess.error_rate = Math.max(0, qprocess.error_rate - 0.02);
+                break;
+        }
+    }
+
+    // 执行量子操作
+    execute_quantum_operation(qpid, operation) {
+        if (!this.initialized) {
+            this.add_error("无法执行量子操作：量子进程管理器未初始化");
+            return { success: false, error: "量子进程管理器未初始化" };
+        }
+        
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) {
+            this.add_error(`无法执行量子操作：QPID ${qpid} 不存在`);
+            return { success: false, error: "量子进程不存在" };
+        }
+        
+        // 增加操作计数
+        qprocess.quantum_operation_count++;
+        this.statistics.total_quantum_operations++;
+        
+        // 记录操作时间
+        qprocess.last_quantum_operation = Date.now();
+        
+        // 验证操作类型
+        if (!operation || !operation.type) {
+            this.add_error(`无效的量子操作：缺少操作类型`);
+            this.statistics.failed_operations++;
+            return { success: false, error: "无效的操作类型" };
+        }
+        
+        // 根据操作类型执行不同的量子操作
+        let result;
+        
+        switch (operation.type) {
+            case "gate":
+                result = this.apply_quantum_gate(qpid, operation);
+                break;
+                
+            case "measure":
+                result = this.measure_qubit(qpid, operation);
+                break;
+                
+            case "reset":
+                result = this.reset_qubit(qpid, operation);
+                break;
+                
+            case "entangle":
+                result = this.entangle_qubits(qpid, operation);
+                break;
+                
+            case "error_correction":
+                result = this.apply_quantum_error_correction(qpid, operation);
+                break;
+                
+            default:
+                this.add_error(`未知的量子操作类型: ${operation.type}`);
+                this.statistics.failed_operations++;
+                return { success: false, error: `未知的操作类型: ${operation.type}` };
+        }
+        
+        // 更新操作统计
+        if (result.success) {
+            this.statistics.successful_operations++;
+        } else {
+            this.statistics.failed_operations++;
+        }
+        
+        return result;
+    }
+
+    // 应用量子门操作
+    apply_quantum_gate(qpid, operation) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return { success: false, error: "量子进程不存在" };
+        
+        // 验证必要参数
+        if (!operation.gate || !operation.targets) {
+            return { success: false, error: "缺少必要参数: gate 或 targets" };
+        }
+        
+        // 获取目标寄存器
+        const targets = Array.isArray(operation.targets) 器 operation.targets : [operation.targets];
+        const registers = [];
+        
+        for (const target of targets) {
+            const register = qprocess.quantum_registers[target];
+            if (!register) {
+                return { success: false, error: `目标量子寄存器不存在: ${target}` };
+            }
+            registers.push(register);
+        }
+        
+        // 检查控制位（如果有）
+        let control_registers = [];
+        if (operation.controls) {
+            const controls = Array.isArray(operation.controls) 器 operation.controls : [operation.controls];
+            
+            for (const control of controls) {
+                const register = qprocess.quantum_registers[control];
+                if (!register) {
+                    return { success: false, error: `控制量子寄存器不存在: ${control}` };
+                }
+                control_registers.push(register);
+            }
+        }
+        
+        // 检查是否在模拟模式
+        if (qprocess.flags.simulation_mode) {
+            return this.simulate_quantum_gate(qprocess, operation.gate, registers, control_registers);
+        }
+        
+        // 实际执行量子门操作
+        kernel_log(`执行量子门: ${operation.gate} 在量子进程 ${qpid} 的寄存器 ${operation.targets} 上`);
+        
+        try {
+            // 应用量子门
+            for (const register of registers) {
+                // 更新寄存器状态
+                switch (operation.gate.toUpperCase()) {
+                    case "X":
+                        // NOT门 - 翻转状态
+                        if (register.state === "|0>") register.state = "|1>";
+                        else if (register.state === "|1>") register.state = "|0>";
+                        else register.state = `X(${register.state})`;
+                        break;
+                        
+                    case "H":
+                        // Hadamard门 - 创建叠加态
+                        if (register.state === "|0>") register.state = "|+>";
+                        else if (register.state === "|1>") register.state = "|->";
+                        else register.state = `H(${register.state})`;
+                        break;
+                        
+                    case "Z":
+                        // Z门 - 相位翻转
+                        if (register.state === "|1>") register.state = "-|1>";
+                        else if (register.state !== "|0>") register.state = `Z(${register.state})`;
+                        break;
+                        
+                    // 其他门类型...
+                    default:
+                        register.state = `${operation.gate}(${register.state})`;
+                }
+                
+                // 更新状态复杂度
+                register.state_complexity = Math.min(10, register.state_complexity + 0.5);
+                
+                // 更新操作时间
+                register.last_operation_time = Date.now();
+                
+                // 如果寄存器在纠缠组中，更新整个组
+                if (register.entanglement_group_id) {
+                    this.propagate_entanglement_effects(register.entanglement_group_id, operation.gate);
+                }
+            }
+            
+            return { success: true };
+            
+        } catch (error) {
+            this.add_error(`执行量子门操作时出错: ${error.message || "未知错误"}`);
+            return { success: false, error: `量子门操作失败: ${error.message || "未知错误"}` };
+        }
+    }
+
+    // 测量量子比特
+    measure_qubit(qpid, operation) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return { success: false, error: "量子进程不存在" };
+        
+        // 验证必要参数
+        if (!operation.target) {
+            return { success: false, error: "缺少必要参数: target" };
+        }
+        
+        // 获取目标寄存器
+        const register = qprocess.quantum_registers[operation.target];
+        if (!register) {
+            return { success: false, error: `目标量子寄存器不存在: ${operation.target}` };
+        }
+        
+        kernel_log(`测量量子比特: 量子进程 ${qpid} 的寄存器 ${operation.target}`);
+        
+        try {
+            // 判断测量结果
+            let result;
+            
+            // 基于当前状态确定测量结果概率
+            if (register.state === "|0>") {
+                result = 0;
+            } else if (register.state === "|1>") {
+                result = 1;
+            } else if (register.state === "|+>") {
+                // |+> 状态有50%概率测量为0或1
+                result = Math.random() < 0.5 器 0 : 1;
+            } else if (register.state === "|->") {
+                // |-> 状态有50%概率测量为0或1
+                result = Math.random() < 0.5 器 0 : 1;
+            } else {
+                // 复杂状态 - 简化为随机结果
+                // 在真实量子计算机上，这将基于量子态的振幅计算概率
+                result = Math.random() < 0.5 器 0 : 1;
+            }
+            
+            // 测量后状态坍缩
+            register.state = result === 0 器 "|0>" : "|1>";
+            register.state_complexity = 1;
+            
+            // 更新操作时间
+            register.last_operation_time = Date.now();
+            
+            // 如果该比特与其他比特纠缠，需要处理纠缠效应
+            if (register.entanglement_group_id) {
+                this.handle_entanglement_collapse(register.entanglement_group_id, operation.target, result);
+            }
+            
+            return {
+                success: true,
+                value: result
+            };
+            
+        } catch (error) {
+            this.add_error(`测量量子比特时出错: ${error.message || "未知错误"}`);
+            return { success: false, error: `量子比特测量失败: ${error.message || "未知错误"}` };
+        }
+    }
+
+    // 重置量子比特
+    reset_qubit(qpid, operation) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return { success: false, error: "量子进程不存在" };
+        
+        // 验证必要参数
+        if (!operation.target) {
+            return { success: false, error: "缺少必要参数: target" };
+        }
+        
+        // 获取目标寄存器
+        const register = qprocess.quantum_registers[operation.target];
+        if (!register) {
+            return { success: false, error: `目标量子寄存器不存在: ${operation.target}` };
+        }
+        
+        kernel_log(`重置量子比特: 量子进程 ${qpid} 的寄存器 ${operation.target}`);
+        
+        try {
+            // 如果该比特与其他比特纠缠，需要先解除纠缠
+            if (register.entanglement_group_id) {
+                this.remove_from_entanglement_group(qpid, operation.target, register.entanglement_group_id);
+            }
+            
+            // 重置为基态 |0>
+            register.state = "|0>";
+            register.entangled_with = null;
+            register.state_complexity = 1;
+            register.error_rate = 0;
+            
+            // 更新操作时间
+            register.last_operation_time = Date.now();
+            
+            return { success: true };
+            
+        } catch (error) {
+            this.add_error(`重置量子比特时出错: ${error.message || "未知错误"}`);
+            return { success: false, error: `量子比特重置失败: ${error.message || "未知错误"}` };
+        }
+    }
+
+    // 纠缠量子比特
+    entangle_qubits(qpid, operation) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return { success: false, error: "量子进程不存在" };
+        
+        // 验证必要参数
+        if (!operation.qubits || !Array.isArray(operation.qubits) || operation.qubits.length < 2) {
+            return { success: false, error: "缺少必要参数: qubits (至少需要两个量子比特)" };
+        }
+        
+        kernel_log(`纠缠量子比特: 量子进程 ${qpid} 的寄存器 ${operation.qubits.join(", ")}`);
+        
+        this.statistics.entanglement_operations++;
+        
+        try {
+            // 获取目标寄存器
+            const registers = [];
+            for (const qubit of operation.qubits) {
+                const register = qprocess.quantum_registers[qubit];
+                if (!register) {
+                    return { success: false, error: `量子寄存器不存在: ${qubit}` };
+                }
+                registers.push({
+                    qpid: qpid,
+                    register_id: qubit,
+                    register: register
+                });
+            }
+            
+            // 创建一个新的纠缠组
+            const group_id = `entg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            
+            this.entanglement_groups[group_id] = {
+                id: group_id,
+                creation_time: Date.now(),
+                members: registers.map(r => ({
+                    qpid: r.qpid,
+                    register_id: r.register_id
+                })),
+                state: "bell" // 默认创建Bell态
+            };
+            
+            // 更新每个寄存器的纠缠信息
+            for (const reg of registers) {
+                reg.register.entanglement_group_id = group_id;
+                reg.register.entangled_with = registers
+                    .filter(r => r.register_id !== reg.register_id)
+                    .map(r => r.register_id);
+                
+                // 更新状态为纠缠态
+                reg.register.state = "|bell>";
+                reg.register.state_complexity = 5;
+                reg.register.last_operation_time = Date.now();
+            }
+            
+            // 更新进程的纠缠计数
+            qprocess.entanglement_count++;
+            
+            return {
+                success: true,
+                entanglement_group_id: group_id
+            };
+            
+        } catch (error) {
+            this.add_error(`纠缠量子比特时出错: ${error.message || "未知错误"}`);
+            return { success: false, error: `量子比特纠缠失败: ${error.message || "未知错误"}` };
+        }
+    }
+
+    // 应用量子纠错
+    apply_quantum_error_correction(qpid, operation) {
+        const qprocess = this.quantum_processes[qpid];
+        if (!qprocess) return { success: false, error: "量子进程不存在" };
+        
+        // 验证必要参数
+        if (!operation.target) {
+            return { success: false, error: "缺少必要参数: target" };
+        }
+        
+        // 获取目标寄存器
+        const register = qprocess.quantum_registers[operation.target];
+        if (!register) {
+            return { success: false, error: `目标量子寄存器不存在: ${operation.target}` };
+        }
+        
+        // 检查量子纠错是否启用
+        if (!this.config.error_correction_enabled || !register.error_correction_enabled) {
+            return { success: false, error: "量子纠错未启用" };
+        }
+        
+        kernel_log(`应用量子纠错: 量子进程 ${qpid} 的寄存器 ${operation.target}`);
+        
+        // 应用量子纠错
+        const correction_success = this.apply_error_correction(qpid, operation.target);
+        
+        if (correction_success) {
+            this.statistics.error_corrections++;
+            
+            return {
+                success: true,
+                message: "量子纠错成功应用"
+            };
+        } else {
+            return {
+                success: false,
+                error: "量子纠错失败"
+            };
+        }
+    }
+
+    // 处理纠缠态坍缩
+    handle_entanglement_collapse(group_id, measured_qubit, result) {
+        const group = this.entanglement_groups[group_id];
+        if (!group) return;
+        
+        kernel_log(`处理纠缠态坍缩: 组 ${group_id}, 测量比特 ${measured_qubit}, 结果 ${result}`);
+        
+        // 处理纠缠态坍缩
+        // 在Bell态中，一个比特的测量会确定另一个比特的状态
+        
+        for (const member of group.members) {
+            const qpid = member.qpid;
+            const reg_id = member.register_id;
+            
+            // 跳过已测量的比特
+            if (reg_id === measured_qubit) continue;
+            
+            // 获取纠缠的寄存器
+            if (this.quantum_processes[qpid] && this.quantum_processes[qpid].quantum_registers[reg_id]) {
+                const register = this.quantum_processes[qpid].quantum_registers[reg_id];
+                
+                // 根据纠缠类型和测量结果更新状态
+                if (group.state === "bell") {
+                    // Bell态 - 对于Bell态 |Φ+⟩，测量结果应该相同
+                    register.state = result === 0 器 "|0>" : "|1>";
+                } else if (group.state === "anti_bell") {
+                    // 反Bell态 |Φ-⟩ - 测量结果应该相反
+                    register.state = result === 0 器 "|1>" : "|0>";
+                } else {
+                    // 其他纠缠态 - 简化处理
+                    register.state = result === 0 器 "|0>" : "|1>";
+                }
+                
+                register.state_complexity = 1;
+                register.last_operation_time = Date.now();
+                
+                // 通知量子进程
+                this.notify_quantum_process(qpid, {
+                    type: "entanglement_change",
+                    register_id: reg_id,
+                    cause: "entangled_qubit_measured",
+                    result: register.state
+                });
+            }
+        }
+        
+        // 测量后解散纠缠组
+        this.dissolve_entanglement_group(group_id);
+    }
+
+    // 传播纠缠效应
+    propagate_entanglement_effects(group_id, gate) {
+        const group = this.entanglement_groups[group_id];
+        if (!group) return;
+        
+        // 对于某些门操作，需要传播效应到纠缠的其他量子比特
+        // 这是量子纠缠的核心特性之一
+        
+        // 不同门类型对纠缠态的影响不同
+        // 这里是简化处理，真实量子计算机会按量子力学规则处理
+        
+        if (["X", "Z", "H"].includes(gate.toUpperCase())) {
+            kernel_log(`传播纠缠效应: 组 ${group_id}, 门 ${gate}`);
+            
+            for (const member of group.members) {
+                const qpid = member.qpid;
+                const reg_id = member.register_id;
+                
+                // 获取纠缠的寄存器
+                if (this.quantum_processes[qpid] && this.quantum_processes[qpid].quantum_registers[reg_id]) {
+                    const register = this.quantum_processes[qpid].quantum_registers[reg_id];
+                    
+                    // 更新操作时间
+                    register.last_operation_time = Date.now();
+                    
+                    // 复杂度随着门操作增加
+                    register.state_complexity = Math.min(10, register.state_complexity + 0.3);
+                }
+            }
+        }
+    }
+
+    // 在模拟模式下模拟量子门操作
+    simulate_quantum_gate(qprocess, gate, targets, controls) {
+        kernel_log(`模拟量子门: ${gate}`);
+        
+        // 在模拟模式下，使用经典计算模拟量子操作
+        // 这是对量子计算的简化模拟
+        
+        for (const register of targets) {
+            // 更新寄存器状态
+            switch (gate.toUpperCase()) {
+                case "X":
+                    // NOT门 - 翻转状态
+                    if (register.state === "|0>") register.state = "|1>";
+                    else if (register.state === "|1>") register.state = "|0>";
+                    else register.state = `X(${register.state})`;
+                    break;
+                    
+                case "H":
+                    // Hadamard门 - 创建叠加态
+                    if (register.state === "|0>") register.state = "|+>";
+                    else if (register.state === "|1>") register.state = "|->";
+                    else register.state = `H(${register.state})`;
+                    break;
+                    
+                case "Z":
+                    // Z门 - 相位翻转
+                    if (register.state === "|1>") register.state = "-|1>";
+                    else if (register.state !== "|0>") register.state = `Z(${register.state})`;
+                    break;
+                    
+                // 其他门类型...
+                default:
+                    register.state = `${gate}(${register.state})`;
+            }
+            
+            // 更新操作时间和复杂度
+            register.last_operation_time = Date.now();
+            register.state_complexity = Math.min(10, register.state_complexity + 0.5);
+        }
+        
+        return { success: true, simulated: true };
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`量子进程管理器错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`量子进程管理器警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+
+    // 获取统计信息
+    get_statistics() {
+        return {
+            ...this.statistics,
+            quantum_processes_count: Object.keys(this.quantum_processes).length,
+            entanglement_groups_count: Object.keys(this.entanglement_groups).length,
+            error_correction_enabled: this.config.error_correction_enabled,
+            simulation_mode: this.config.simulation_mode
+        };
+    }
+}
+
+// 导出量子进程管理器模块
+export QuantumProcessManager; 

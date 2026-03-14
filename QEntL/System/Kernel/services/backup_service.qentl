@@ -1,0 +1,918 @@
+/* 
+ * QEntL Backup Service
+ * Version: 1.0.0
+ * Author: Quantum Systems Team
+ * Description: 提供系统数据的备份、恢复和管理功能
+ * Quantum Gene: QNTL-BKP-SVC-10293
+ */
+
+// 备份类型定义
+enum BackupType {
+    FULL,       // 完整备份
+    INCREMENTAL, // 增量备份
+    DIFFERENTIAL, // 差异备份
+    SELECTIVE   // 选择性备份
+}
+
+// 备份状态定义
+enum BackupStatus {
+    PENDING,    // 等待中
+    IN_PROGRESS, // 进行中
+    COMPLETED,   // 已完成
+    FAILED,      // 失败
+    CANCELED,    // 已取消
+    RESTORING    // 恢复中
+}
+
+// 备份目标类型
+enum BackupTargetType {
+    LOCAL_DISK,  // 本地磁盘
+    REMOTE_SERVER, // 远程服务器
+    CLOUD_STORAGE, // 云存储
+    QUANTUM_STORAGE, // 量子存储
+    DISTRIBUTED_NETWORK // 分布式网络
+}
+
+// 配置
+config {
+    // 备份计划设置
+    backupSchedule: {
+        enabled: true,
+        fullBackupInterval: "7d", // 每周一次完整备份
+        incrementalInterval: "1d", // 每天一次增量备份
+        differentialInterval: "3d", // 每三天一次差异备份
+        maxConcurrentBackups: 2
+    },
+    
+    // 存储设置
+    storage: {
+        compressionLevel: 7, // 0-9，0表示不压缩
+        encryptBackups: true,
+        encryptionAlgorithm: "AES-256-GCM",
+        defaultTargetType: BackupTargetType.LOCAL_DISK,
+        localBackupPath: "./backups",
+        remoteBackupSettings: {
+            urls: ["backup-server-1.qentl.net", "backup-server-2.qentl.net"],
+            port: 8443,
+            useSSL: true
+        },
+        cloudBackupSettings: {
+            provider: "quantum-cloud",
+            region: "global",
+            bucketName: "qentl-system-backups"
+        }
+    },
+    
+    // 保留策略
+    retentionPolicy: {
+        keepFullBackups: 4, // 保留4个完整备份
+        keepIncrementalBackups: 14, // 保留14个增量备份
+        keepDifferentialBackups: 7, // 保留7个差异备份
+        minTotalBackups: 10, // 至少保留10个总备份
+        maxBackupAge: "30d" // 最长保留30天
+    },
+    
+    // 恢复设置
+    recovery: {
+        verifyBeforeRestore: true,
+        autoRecoveryAttempts: 3,
+        recoveryPriorities: {
+            systemSettings: 1,
+            userAccounts: 2,
+            applicationData: 3,
+            temporaryData: 4
+        }
+    },
+    
+    // 通知设置
+    notifications: {
+        onBackupStart: true,
+        onBackupComplete: true,
+        onBackupFail: true,
+        onRestoreStart: true,
+        onRestoreComplete: true,
+        onRestoreFail: true,
+        notifyChannels: ["system", "admin", "log"]
+    },
+    
+    // 性能设置
+    performance: {
+        maxBackupSpeed: "500MB/s", // 最大备份速度
+        useMultiThreading: true,
+        threadCount: 4,
+        backupDuringLowLoad: true,
+        pauseThreshold: 0.8 // 系统负载超过80%时暂停备份
+    }
+}
+
+// 状态
+state {
+    // 初始化状态
+    initialized: false,
+    
+    // 当前备份状态
+    currentBackups: {}, // 正在进行的备份映射 {backupId: BackupStatus}
+    
+    // 备份历史
+    backupHistory: [], // 按时间排序的备份历史记录
+    
+    // 备份统计
+    stats: {
+        totalBackupsCreated: 0,
+        totalBackupsRestored: 0,
+        totalDataBackedUp: 0, // 字节数
+        totalBackupsFailed: 0,
+        averageBackupTime: 0,
+        averageRestoreTime: 0
+    },
+    
+    // 计划任务
+    scheduledTasks: [], // {id, type, nextRunTime, interval}
+    
+    // 备份目标
+    configuredTargets: [], // 配置的备份目标列表
+    
+    // 事件监听器
+    eventListeners: {}
+}
+
+// 公共函数 - 服务接口
+function initialize(customConfig = null) {
+    if (state.initialized) {
+        return { success: true, message: "备份服务已经初始化" };
+    }
+    
+    try {
+        // 合并自定义配置
+        if (customConfig) {
+            config = mergeConfigs(config, customConfig);
+        }
+        
+        // 初始化备份目标
+        initializeBackupTargets();
+        
+        // 设置备份计划
+        if (config.backupSchedule.enabled) {
+            scheduleBackups();
+        }
+        
+        // 加载备份历史
+        loadBackupHistory();
+        
+        state.initialized = true;
+        triggerEvent("initialized", { timestamp: getCurrentTime() });
+        
+        return { success: true, message: "备份服务初始化成功" };
+    } catch (error) {
+        return { 
+            success: false, 
+            message: "备份服务初始化失败", 
+            error: error 
+        };
+    }
+}
+
+function createBackup(options = {}) {
+    checkInitialized();
+    
+    const backupType = options.type || BackupType.FULL;
+    const targetType = options.targetType || config.storage.defaultTargetType;
+    const backupName = options.name || `backup_${backupType}_${getCurrentTime(true)}`;
+    const backupId = generateBackupId();
+    
+    // 检查是否已达到最大并发备份数
+    if (Object.keys(state.currentBackups).length >= config.backupSchedule.maxConcurrentBackups) {
+        return {
+            success: false,
+            message: "已达到最大并发备份数",
+            code: "MAX_CONCURRENT_BACKUPS_REACHED"
+        };
+    }
+    
+    // 创建备份元数据
+    const backupMetadata = {
+        id: backupId,
+        name: backupName,
+        type: backupType,
+        status: BackupStatus.PENDING,
+        targetType: targetType,
+        startTime: getCurrentTime(),
+        endTime: null,
+        size: 0,
+        files: 0,
+        source: options.source || "all",
+        dependencies: getDependenciesForBackupType(backupType),
+        creator: options.creator || "system"
+    };
+    
+    // 更新状态
+    state.currentBackups[backupId] = BackupStatus.PENDING;
+    
+    // 启动异步备份过程
+    startBackupProcess(backupMetadata, options);
+    
+    return {
+        success: true,
+        message: "备份过程已启动",
+        backupId: backupId
+    };
+}
+
+function restoreBackup(backupId, options = {}) {
+    checkInitialized();
+    
+    // 查找备份
+    const backupInfo = findBackupById(backupId);
+    if (!backupInfo) {
+        return {
+            success: false,
+            message: "找不到指定的备份",
+            code: "BACKUP_NOT_FOUND"
+        };
+    }
+    
+    // 检查备份状态
+    if (backupInfo.status !== BackupStatus.COMPLETED) {
+        return {
+            success: false,
+            message: "只能恢复已完成的备份",
+            code: "INVALID_BACKUP_STATUS"
+        };
+    }
+    
+    // 验证备份完整性
+    if (config.recovery.verifyBeforeRestore) {
+        const verificationResult = verifyBackup(backupId);
+        if (!verificationResult.success) {
+            return {
+                success: false,
+                message: "备份验证失败，无法恢复",
+                code: "BACKUP_VERIFICATION_FAILED",
+                details: verificationResult.details
+            };
+        }
+    }
+    
+    // 更新备份状态
+    updateBackupStatus(backupId, BackupStatus.RESTORING);
+    
+    // 启动异步恢复过程
+    startRestoreProcess(backupInfo, options);
+    
+    return {
+        success: true,
+        message: "恢复过程已启动",
+        restoreId: generateRestoreId()
+    };
+}
+
+function getBackupStatus(backupId) {
+    checkInitialized();
+    
+    if (state.currentBackups[backupId]) {
+        return {
+            success: true,
+            status: state.currentBackups[backupId]
+        };
+    }
+    
+    // 检查历史记录
+    const backupInfo = findBackupById(backupId);
+    if (backupInfo) {
+        return {
+            success: true,
+            status: backupInfo.status,
+            details: backupInfo
+        };
+    }
+    
+    return {
+        success: false,
+        message: "找不到指定的备份",
+        code: "BACKUP_NOT_FOUND"
+    };
+}
+
+function listBackups(filters = {}) {
+    checkInitialized();
+    
+    let filteredBackups = [...state.backupHistory];
+    
+    // 应用过滤器
+    if (filters.type) {
+        filteredBackups = filteredBackups.filter(backup => backup.type === filters.type);
+    }
+    
+    if (filters.status) {
+        filteredBackups = filteredBackups.filter(backup => backup.status === filters.status);
+    }
+    
+    if (filters.startDate) {
+        const startDate = new Date(filters.startDate).getTime();
+        filteredBackups = filteredBackups.filter(backup => new Date(backup.startTime).getTime() >= startDate);
+    }
+    
+    if (filters.endDate) {
+        const endDate = new Date(filters.endDate).getTime();
+        filteredBackups = filteredBackups.filter(backup => new Date(backup.startTime).getTime() <= endDate);
+    }
+    
+    // 排序
+    const sortField = filters.sortBy || "startTime";
+    const sortOrder = filters.sortOrder || "desc";
+    
+    filteredBackups.sort((a, b) => {
+        if (sortOrder === "asc") {
+            return a[sortField] < b[sortField] 器 -1 : 1;
+        } else {
+            return a[sortField] > b[sortField] 器 -1 : 1;
+        }
+    });
+    
+    // 分页
+    const page = filters.page || 1;
+    const pageSize = filters.pageSize || 20;
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    
+    return {
+        success: true,
+        total: filteredBackups.length,
+        page: page,
+        pageSize: pageSize,
+        backups: filteredBackups.slice(start, end)
+    };
+}
+
+function cancelBackup(backupId) {
+    checkInitialized();
+    
+    if (state.currentBackups[backupId]) {
+        if (state.currentBackups[backupId] === BackupStatus.PENDING || 
+            state.currentBackups[backupId] === BackupStatus.IN_PROGRESS) {
+            
+            updateBackupStatus(backupId, BackupStatus.CANCELED);
+            stopBackupProcess(backupId);
+            
+            return {
+                success: true,
+                message: "备份已取消"
+            };
+        } else {
+            return {
+                success: false,
+                message: "无法取消当前状态的备份",
+                code: "INVALID_BACKUP_STATE"
+            };
+        }
+    }
+    
+    return {
+        success: false,
+        message: "找不到指定的备份",
+        code: "BACKUP_NOT_FOUND"
+    };
+}
+
+function getBackupStatistics() {
+    checkInitialized();
+    
+    // 计算额外统计信息
+    const recentBackups = state.backupHistory.slice(0, 10);
+    const successRate = state.stats.totalBackupsCreated > 0 
+        器 (state.stats.totalBackupsCreated - state.stats.totalBackupsFailed) / state.stats.totalBackupsCreated 
+        : 0;
+    
+    return {
+        success: true,
+        stats: {
+            ...state.stats,
+            successRate: successRate,
+            recentBackups: recentBackups
+        }
+    };
+}
+
+function configureBackupSchedule(scheduleConfig) {
+    checkInitialized();
+    
+    try {
+        // 更新配置
+        config.backupSchedule = mergeConfigs(config.backupSchedule, scheduleConfig);
+        
+        // 清除现有计划
+        clearBackupSchedules();
+        
+        // 重新设置备份计划
+        if (config.backupSchedule.enabled) {
+            scheduleBackups();
+        }
+        
+        return {
+            success: true,
+            message: "备份计划已更新",
+            newSchedule: config.backupSchedule
+        };
+    } catch (error) {
+        return {
+            success: false,
+            message: "更新备份计划失败",
+            error: error
+        };
+    }
+}
+
+function addEventListener(eventName, callback) {
+    checkInitialized();
+    
+    const listenerId = generateListenerId();
+    
+    if (!state.eventListeners[eventName]) {
+        state.eventListeners[eventName] = {};
+    }
+    
+    state.eventListeners[eventName][listenerId] = callback;
+    
+    return {
+        success: true,
+        listenerId: listenerId
+    };
+}
+
+function removeEventListener(eventName, listenerId) {
+    checkInitialized();
+    
+    if (state.eventListeners[eventName] && state.eventListeners[eventName][listenerId]) {
+        delete state.eventListeners[eventName][listenerId];
+        return {
+            success: true,
+            message: "事件监听器已移除"
+        };
+    }
+    
+    return {
+        success: false,
+        message: "找不到指定的事件监听器",
+        code: "LISTENER_NOT_FOUND"
+    };
+}
+
+// 内部函数
+function checkInitialized() {
+    if (!state.initialized) {
+        throw new Error("备份服务尚未初始化");
+    }
+}
+
+function mergeConfigs(baseConfig, newConfig) {
+    // 递归合并配置对象
+    return { ...baseConfig, ...newConfig };
+}
+
+function initializeBackupTargets() {
+    state.configuredTargets = [];
+    
+    // 添加本地磁盘目标
+    state.configuredTargets.push({
+        type: BackupTargetType.LOCAL_DISK,
+        path: config.storage.localBackupPath,
+        available: true
+    });
+    
+    // 添加远程服务器目标
+    if (config.storage.remoteBackupSettings && config.storage.remoteBackupSettings.urls) {
+        for (const url of config.storage.remoteBackupSettings.urls) {
+            state.configuredTargets.push({
+                type: BackupTargetType.REMOTE_SERVER,
+                url: url,
+                port: config.storage.remoteBackupSettings.port,
+                useSSL: config.storage.remoteBackupSettings.useSSL,
+                available: checkTargetAvailability(BackupTargetType.REMOTE_SERVER, url)
+            });
+        }
+    }
+    
+    // 添加云存储目标
+    if (config.storage.cloudBackupSettings) {
+        state.configuredTargets.push({
+            type: BackupTargetType.CLOUD_STORAGE,
+            provider: config.storage.cloudBackupSettings.provider,
+            region: config.storage.cloudBackupSettings.region,
+            bucket: config.storage.cloudBackupSettings.bucketName,
+            available: checkTargetAvailability(BackupTargetType.CLOUD_STORAGE)
+        });
+    }
+}
+
+function checkTargetAvailability(targetType, target) {
+    // 实际实现应检查目标是否可用
+    // 这里简单返回true表示可用
+    return true;
+}
+
+function scheduleBackups() {
+    // 安排完整备份
+    if (config.backupSchedule.fullBackupInterval) {
+        const fullBackupTask = {
+            id: generateTaskId(),
+            type: BackupType.FULL,
+            nextRunTime: calculateNextRunTime(config.backupSchedule.fullBackupInterval),
+            interval: config.backupSchedule.fullBackupInterval
+        };
+        state.scheduledTasks.push(fullBackupTask);
+    }
+    
+    // 安排增量备份
+    if (config.backupSchedule.incrementalInterval) {
+        const incrementalBackupTask = {
+            id: generateTaskId(),
+            type: BackupType.INCREMENTAL,
+            nextRunTime: calculateNextRunTime(config.backupSchedule.incrementalInterval),
+            interval: config.backupSchedule.incrementalInterval
+        };
+        state.scheduledTasks.push(incrementalBackupTask);
+    }
+    
+    // 安排差异备份
+    if (config.backupSchedule.differentialInterval) {
+        const differentialBackupTask = {
+            id: generateTaskId(),
+            type: BackupType.DIFFERENTIAL,
+            nextRunTime: calculateNextRunTime(config.backupSchedule.differentialInterval),
+            interval: config.backupSchedule.differentialInterval
+        };
+        state.scheduledTasks.push(differentialBackupTask);
+    }
+}
+
+function loadBackupHistory() {
+    // 实际实现应从持久化存储加载备份历史
+    // 这里模拟空的历史记录
+    state.backupHistory = [];
+}
+
+function generateBackupId() {
+    return `bkp-${getCurrentTime(true)}-${Math.random().toString(36).substring(2, 10)}`;
+}
+
+function generateRestoreId() {
+    return `rst-${getCurrentTime(true)}-${Math.random().toString(36).substring(2, 10)}`;
+}
+
+function generateTaskId() {
+    return `task-${Math.random().toString(36).substring(2, 10)}`;
+}
+
+function generateListenerId() {
+    return `listener-${Math.random().toString(36).substring(2, 10)}`;
+}
+
+function getCurrentTime(asString = false) {
+    const now = new Date();
+    return asString 器 now.toISOString().replace(/[:.]/g, '-') : now.toISOString();
+}
+
+function calculateNextRunTime(interval) {
+    // 解析间隔字符串，如"7d"表示7天
+    const value = parseInt(interval);
+    const unit = interval.replace(/[0-9]/g, '');
+    
+    const now = new Date();
+    const nextRun = new Date(now);
+    
+    switch (unit) {
+        case 'm':
+            nextRun.setMinutes(now.getMinutes() + value);
+            break;
+        case 'h':
+            nextRun.setHours(now.getHours() + value);
+            break;
+        case 'd':
+            nextRun.setDate(now.getDate() + value);
+            break;
+        case 'w':
+            nextRun.setDate(now.getDate() + (value * 7));
+            break;
+        default:
+            nextRun.setHours(now.getHours() + 24); // 默认为24小时
+    }
+    
+    return nextRun.toISOString();
+}
+
+function startBackupProcess(backupMetadata, options) {
+    // 更新状态为进行中
+    updateBackupStatus(backupMetadata.id, BackupStatus.IN_PROGRESS);
+    triggerEvent("backupStarted", { backupId: backupMetadata.id, metadata: backupMetadata });
+    
+    // 在实际实现中，这里应该启动异步备份过程
+    // 此处仅简单模拟
+    processBackup(backupMetadata, options);
+}
+
+function processBackup(backupMetadata, options) {
+    // 实际应用中应异步执行，这里为了示例表示同步
+    try {
+        // 准备备份目标
+        const target = prepareBackupTarget(backupMetadata.targetType);
+        
+        // 收集要备份的数据
+        const dataToBackup = collectBackupData(backupMetadata.type, backupMetadata.source);
+        
+        // 创建备份
+        const result = createBackupArchive(dataToBackup, target, backupMetadata);
+        
+        // 更新备份元数据
+        backupMetadata.endTime = getCurrentTime();
+        backupMetadata.size = result.size;
+        backupMetadata.files = result.fileCount;
+        backupMetadata.checksum = result.checksum;
+        
+        // 应用保留策略
+        applyRetentionPolicy();
+        
+        // 更新状态
+        updateBackupStatus(backupMetadata.id, BackupStatus.COMPLETED);
+        
+        // 更新统计信息
+        updateBackupStatistics(backupMetadata, true);
+        
+        // 触发事件
+        triggerEvent("backupCompleted", { 
+            backupId: backupMetadata.id, 
+            metadata: backupMetadata 
+        });
+    } catch (error) {
+        // 更新状态为失败
+        updateBackupStatus(backupMetadata.id, BackupStatus.FAILED);
+        
+        // 更新统计信息
+        updateBackupStatistics(backupMetadata, false);
+        
+        // 触发事件
+        triggerEvent("backupFailed", { 
+            backupId: backupMetadata.id, 
+            error: error 
+        });
+    }
+}
+
+function prepareBackupTarget(targetType) {
+    // 查找配置的目标
+    const target = state.configuredTargets.find(t => t.type === targetType && t.available);
+    
+    if (!target) {
+        throw new Error(`没有可用的备份目标： ${targetType}`);
+    }
+    
+    return target;
+}
+
+function collectBackupData(backupType, source) {
+    // 在实际实现中，应根据备份类型和源收集数据
+    // 这里返回模拟数据
+    return {
+        files: [],
+        size: 0
+    };
+}
+
+function createBackupArchive(data, target, metadata) {
+    // 在实际实现中，应创建备份文件/归档
+    // 这里返回模拟结果
+    return {
+        success: true,
+        size: 1024 * 1024 * 10, // 10MB
+        fileCount: 100,
+        checksum: "0123456789abcdef0123456789abcdef"
+    };
+}
+
+function updateBackupStatus(backupId, status) {
+    // 更新当前备份状态
+    state.currentBackups[backupId] = status;
+    
+    // 如果状态是终态，更新历史记录并从当前备份中移除
+    if (status === BackupStatus.COMPLETED || 
+        status === BackupStatus.FAILED || 
+        status === BackupStatus.CANCELED) {
+        
+        // 查找备份元数据
+        const backupIndex = state.backupHistory.findIndex(b => b.id === backupId);
+        
+        if (backupIndex >= 0) {
+            // 更新现有记录
+            state.backupHistory[backupIndex].status = status;
+            state.backupHistory[backupIndex].endTime = getCurrentTime();
+        } else {
+            // 添加新记录（如果不存在）
+            state.backupHistory.unshift({
+                id: backupId,
+                status: status,
+                endTime: getCurrentTime()
+            });
+        }
+        
+        // 从当前备份中移除
+        delete state.currentBackups[backupId];
+    }
+}
+
+function updateBackupStatistics(metadata, success) {
+    // 更新总体统计信息
+    state.stats.totalBackupsCreated++;
+    
+    if (!success) {
+        state.stats.totalBackupsFailed++;
+        return;
+    }
+    
+    // 更新成功备份的统计信息
+    state.stats.totalDataBackedUp += metadata.size || 0;
+    
+    // 计算平均备份时间
+    if (metadata.startTime && metadata.endTime) {
+        const backupTime = new Date(metadata.endTime) - new Date(metadata.startTime);
+        state.stats.averageBackupTime = 
+            (state.stats.averageBackupTime * (state.stats.totalBackupsCreated - 1) + backupTime) / 
+            state.stats.totalBackupsCreated;
+    }
+}
+
+function startRestoreProcess(backupInfo, options) {
+    triggerEvent("restoreStarted", { backupId: backupInfo.id, options: options });
+    
+    // 在实际实现中，这里应该启动异步恢复过程
+    // 此处仅简单模拟
+    processRestore(backupInfo, options);
+}
+
+function processRestore(backupInfo, options) {
+    try {
+        // 验证备份
+        const verification = verifyBackup(backupInfo.id);
+        if (!verification.success) {
+            throw new Error("备份验证失败，无法恢复");
+        }
+        
+        // 检索备份数据
+        const backupData = retrieveBackupData(backupInfo);
+        
+        // 执行恢复操作
+        const result = performRestore(backupData, options);
+        
+        // 更新统计信息
+        state.stats.totalBackupsRestored++;
+        
+        // 触发事件
+        triggerEvent("restoreCompleted", {
+            backupId: backupInfo.id,
+            result: result
+        });
+    } catch (error) {
+        // 触发事件
+        triggerEvent("restoreFailed", {
+            backupId: backupInfo.id,
+            error: error
+        });
+    }
+}
+
+function verifyBackup(backupId) {
+    // 实际实现应检查备份完整性
+    return { success: true };
+}
+
+function retrieveBackupData(backupInfo) {
+    // 实际实现应从存储中检索备份数据
+    return { files: [] };
+}
+
+function performRestore(backupData, options) {
+    // 实际实现应执行实际的恢复操作
+    return { success: true };
+}
+
+function findBackupById(backupId) {
+    return state.backupHistory.find(b => b.id === backupId);
+}
+
+function applyRetentionPolicy() {
+    // 根据保留策略清理旧备份
+    const fullBackups = state.backupHistory.filter(b => b.type === BackupType.FULL);
+    const incrementalBackups = state.backupHistory.filter(b => b.type === BackupType.INCREMENTAL);
+    const differentialBackups = state.backupHistory.filter(b => b.type === BackupType.DIFFERENTIAL);
+    
+    // 根据配置的保留数量修剪备份
+    if (fullBackups.length > config.retentionPolicy.keepFullBackups) {
+        // 保留最新的备份，删除多余的
+        const toDelete = fullBackups.slice(config.retentionPolicy.keepFullBackups);
+        deleteBackups(toDelete.map(b => b.id));
+    }
+    
+    // 对增量和差异备份同理
+    if (incrementalBackups.length > config.retentionPolicy.keepIncrementalBackups) {
+        const toDelete = incrementalBackups.slice(config.retentionPolicy.keepIncrementalBackups);
+        deleteBackups(toDelete.map(b => b.id));
+    }
+    
+    if (differentialBackups.length > config.retentionPolicy.keepDifferentialBackups) {
+        const toDelete = differentialBackups.slice(config.retentionPolicy.keepDifferentialBackups);
+        deleteBackups(toDelete.map(b => b.id));
+    }
+    
+    // 根据备份年龄清理
+    if (config.retentionPolicy.maxBackupAge) {
+        const cutoffDate = new Date();
+        const maxAge = parseInt(config.retentionPolicy.maxBackupAge);
+        const unit = config.retentionPolicy.maxBackupAge.replace(/[0-9]/g, '');
+        
+        switch (unit) {
+            case 'd':
+                cutoffDate.setDate(cutoffDate.getDate() - maxAge);
+                break;
+            case 'w':
+                cutoffDate.setDate(cutoffDate.getDate() - (maxAge * 7));
+                break;
+            case 'm':
+                cutoffDate.setMonth(cutoffDate.getMonth() - maxAge);
+                break;
+            case 'y':
+                cutoffDate.setFullYear(cutoffDate.getFullYear() - maxAge);
+                break;
+        }
+        
+        const oldBackups = state.backupHistory.filter(b => 
+            new Date(b.startTime) < cutoffDate
+        );
+        
+        deleteBackups(oldBackups.map(b => b.id));
+    }
+}
+
+function deleteBackups(backupIds) {
+    for (const backupId of backupIds) {
+        // 从历史记录中移除
+        state.backupHistory = state.backupHistory.filter(b => b.id !== backupId);
+        
+        // 实际实现应从存储中删除备份文件
+        triggerEvent("backupDeleted", { backupId: backupId });
+    }
+}
+
+function getDependenciesForBackupType(backupType) {
+    switch (backupType) {
+        case BackupType.FULL:
+            return [];
+        case BackupType.INCREMENTAL:
+            // 增量备份依赖上一次完整备份
+            return [findLastFullBackup()器.id].filter(Boolean);
+        case BackupType.DIFFERENTIAL:
+            // 差异备份依赖最近一次完整备份
+            return [findLastFullBackup()器.id].filter(Boolean);
+        default:
+            return [];
+    }
+}
+
+function findLastFullBackup() {
+    return state.backupHistory.find(b => 
+        b.type === BackupType.FULL && 
+        b.status === BackupStatus.COMPLETED
+    );
+}
+
+function clearBackupSchedules() {
+    // 清除现有计划
+    state.scheduledTasks = [];
+}
+
+function stopBackupProcess(backupId) {
+    // 实际实现应停止正在进行的备份过程
+    // 此处仅为占位符
+}
+
+function triggerEvent(eventName, data) {
+    if (state.eventListeners[eventName]) {
+        for (const listenerId in state.eventListeners[eventName]) {
+            try {
+                state.eventListeners[eventName][listenerId](data);
+            } catch (error) {
+                // 忽略错误
+            }
+        }
+    }
+    
+    // 发送通知（如配置）
+    if (eventName.startsWith("backup") || eventName.startsWith("restore")) {
+        const notifyKey = `on${eventName.charAt(0).toUpperCase() + eventName.slice(1)}`;
+        if (config.notifications[notifyKey]) {
+            sendNotification(eventName, data);
+        }
+    }
+}
+
+function sendNotification(eventName, data) {
+    // 实际实现应发送通知
+    // 此处仅为占位符
+} 

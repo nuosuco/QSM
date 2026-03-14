@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL 外观自定义器 - 量子主题管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 量子粒子背景 */
+        .quantum-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: float 6s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 1; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.5; }
+        }
+
+        /* 主容器 */
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* 标题区域 */
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #FFD700;
+            background: rgba(0,0,0,0.2);
+            padding: 5px 15px;
+            border-radius: 15px;
+            display: inline-block;
+        }
+
+        /* 主要内容区域 */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            color: white;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* 主题选择器 */
+        .theme-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .theme-option {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+        }
+
+        .theme-option:hover {
+            border-color: #FFD700;
+            transform: scale(1.05);
+        }
+
+        .theme-option.active {
+            border-color: #00FF88;
+            background: rgba(0,255,136,0.2);
+        }
+
+        .theme-preview {
+            width: 60px;
+            height: 40px;
+            border-radius: 8px;
+            margin: 0 auto 10px;
+            position: relative;
+        }
+
+        .theme-light { background: linear-gradient(45deg, #f0f0f0, #ffffff); }
+        .theme-dark { background: linear-gradient(45deg, #1a1a1a, #333333); }
+        .theme-contrast { background: linear-gradient(45deg, #000000, #ffffff); }
+        .theme-custom { background: linear-gradient(45deg, #ff6b6b, #4ecdc4); }
+
+        /* 颜色配置 */
+        .color-config {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .color-group {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .color-group h4 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .color-input {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .color-input label {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+            width: 80px;
+            flex-shrink: 0;
+        }
+
+        .color-input input[type="color"] {
+            width: 40px;
+            height: 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .color-input input[type="text"] {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 5px;
+            padding: 5px 10px;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        /* 设置控件 */
+        .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .setting-label {
+            color: white;
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .setting-control {
+            width: 100%;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .setting-control:focus {
+            outline: none;
+            border-color: #00FF88;
+            box-shadow: 0 0 10px rgba(0,255,136,0.3);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider {
+            flex: 1;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00FF88;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-value {
+            color: #FFD700;
+            font-weight: bold;
+            min-width: 40px;
+        }
+
+        /* 开关控件 */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255,255,255,0.2);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .switch-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .switch-slider {
+            background-color: #00FF88;
+        }
+
+        input:checked + .switch-slider:before {
+            transform: translateX(26px);
+        }
+
+        /* 预览区域 */
+        .preview-area {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .preview-title {
+            color: white;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .preview-demo {
+            background: var(--demo-bg, rgba(255,255,255,0.1));
+            border-radius: 10px;
+            padding: 20px;
+            color: var(--demo-text, white);
+            text-align: center;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            background: linear-gradient(45deg, #00FF88, #00CC6A);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,255,136,0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
+        /* 状态指示器 */
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            z-index: 1000;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-active { background: #00FF88; }
+        .status-processing { background: #FFD700; }
+        .status-error { background: #ff6b6b; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* 量子纠缠效果 */
+        .quantum-entangled {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quantum-entangled::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0,255,136,0.1), transparent);
+            animation: quantum-spin 3s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes quantum-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 量子粒子背景 -->
+    <div class="quantum-particles" id="particles"></div>
+
+    <!-- 状态指示器 -->
+    <div class="status-indicator">
+        <span class="status-dot status-active"></span>
+        外观自定义器已激活
+    </div>
+
+    <div class="container">
+        <!-- 标题区域 -->
+        <div class="header">
+            <h1 class="title">QEntL 外观自定义器</h1>
+            <p class="subtitle">量子主题管理与界面定制系统</p>
+            <div class="quantum-gene">量子基因码: QSM-APPR-3456-D654</div>
+        </div>
+
+        <!-- 主要内容 -->
+        <div class="main-content">
+            <!-- 主题选择 -->
+            <div class="card quantum-entangled">
+                <h3 class="card-title">🎨 主题选择</h3>
+                <div class="theme-selector">
+                    <div class="theme-option active" data-theme="light">
+                        <div class="theme-preview theme-light"></div>
+                        <div>亮色主题</div>
+                    </div>
+                    <div class="theme-option" data-theme="dark">
+                        <div class="theme-preview theme-dark"></div>
+                        <div>暗色主题</div>
+                    </div>
+                    <div class="theme-option" data-theme="contrast">
+                        <div class="theme-preview theme-contrast"></div>
+                        <div>高对比度</div>
+                    </div>
+                    <div class="theme-option" data-theme="custom">
+                        <div class="theme-preview theme-custom"></div>
+                        <div>自定义</div>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">🌓 自动切换主题</label>
+                    <label class="switch">
+                        <input type="checkbox" id="autoSwitch" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">⏰ 切换时间</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="time" class="setting-control" value="07:00" style="flex: 1;">
+                        <span style="color: white; align-self: center;">到</span>
+                        <input type="time" class="setting-control" value="19:00" style="flex: 1;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 颜色配置 -->
+            <div class="card quantum-entangled">
+                <h3 class="card-title">🌈 颜色配置</h3>
+                <div class="color-config">
+                    <div class="color-group">
+                        <h4>基础颜色</h4>
+                        <div class="color-input">
+                            <label>主色:</label>
+                            <input type="color" value="#667eea">
+                            <input type="text" value="#667eea">
+                        </div>
+                        <div class="color-input">
+                            <label>辅助色:</label>
+                            <input type="color" value="#764ba2">
+                            <input type="text" value="#764ba2">
+                        </div>
+                        <div class="color-input">
+                            <label>强调色:</label>
+                            <input type="color" value="#00FF88">
+                            <input type="text" value="#00FF88">
+                        </div>
+                    </div>
+                    <div class="color-group">
+                        <h4>量子颜色</h4>
+                        <div class="color-input">
+                            <label>量子主色:</label>
+                            <input type="color" value="#FFD700">
+                            <input type="text" value="#FFD700">
+                        </div>
+                        <div class="color-input">
+                            <label>处理色:</label>
+                            <input type="color" value="#FF6B6B">
+                            <input type="text" value="#FF6B6B">
+                        </div>
+                        <div class="color-input">
+                            <label>纠缠色:</label>
+                            <input type="color" value="#4ECDC4">
+                            <input type="text" value="#4ECDC4">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 字体与动画设置 -->
+        <div class="main-content">
+            <div class="card quantum-entangled">
+                <h3 class="card-title">🔤 字体设置</h3>
+                <div class="setting-group">
+                    <label class="setting-label">字体族</label>
+                    <select class="setting-control">
+                        <option>Microsoft YaHei</option>
+                        <option>SimHei</option>
+                        <option>Arial</option>
+                        <option>Helvetica</option>
+                        <option>Courier New</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">字体大小</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider" min="10" max="24" value="14" id="fontSize">
+                        <span class="slider-value">14px</span>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">行高</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider" min="1.0" max="2.0" step="0.1" value="1.5" id="lineHeight">
+                        <span class="slider-value">1.5</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card quantum-entangled">
+                <h3 class="card-title">✨ 动画效果</h3>
+                <div class="setting-group">
+                    <label class="setting-label">🎭 启用动画</label>
+                    <label class="switch">
+                        <input type="checkbox" id="enableAnimations" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">⚡ 量子过渡</label>
+                    <label class="switch">
+                        <input type="checkbox" id="quantumTransitions" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">🌟 粒子效果</label>
+                    <label class="switch">
+                        <input type="checkbox" id="particleEffects" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">动画速度</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider" min="0.1" max="2.0" step="0.1" value="1.0" id="animationSpeed">
+                        <span class="slider-value">1.0x</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 预览区域 -->
+        <div class="card quantum-entangled">
+            <h3 class="card-title">👁️ 实时预览</h3>
+            <div class="preview-area">
+                <div class="preview-title">主题预览</div>
+                <div class="preview-demo" id="previewDemo">
+                    <h4>这是预览文本</h4>
+                    <p>量子叠加态界面效果展示</p>
+                    <button class="btn">示例按钮</button>
+                    <button class="btn btn-secondary">次要按钮</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn" onclick="saveTheme()">💾 保存主题</button>
+            <button class="btn btn-secondary" onclick="exportTheme()">📤 导出主题</button>
+            <button class="btn btn-secondary" onclick="importTheme()">📥 导入主题</button>
+            <button class="btn btn-danger" onclick="resetTheme()">🔄 重置默认</button>
+        </div>
+    </div>
+
+    <script>
+        // 量子基因编码
+        const QUANTUM_GENE = 'QSM-APPR-3456-D654';
+        const QUANTUM_ENTANGLEMENT_CHANNEL = 'quantum-appearance-customizer';
+
+        // 量子纠缠通信
+        function sendQuantumMessage(type, data) {
+            const message = {
+                gene: QUANTUM_GENE,
+                channel: QUANTUM_ENTANGLEMENT_CHANNEL,
+                type: type,
+                data: data,
+                timestamp: Date.now(),
+                universe_id: Math.random().toString(36).substr(2, 9)
+            };
+            
+            // 发送到其他量子组件
+            window.postMessage(message, '*');
+            console.log(`[量子纠缠] 发送消息:`, message);
+        }
+
+        // 初始化量子粒子背景
+        function initQuantumParticles() {
+            const container = document.getElementById('particles');
+            const particleCount = 50;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // 主题选择处理
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化粒子背景
+            initQuantumParticles();
+
+            // 主题选择器事件
+            const themeOptions = document.querySelectorAll('.theme-option');
+            themeOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    themeOptions.forEach(opt => opt.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    const theme = this.dataset.theme;
+                    applyTheme(theme);
+                    sendQuantumMessage('theme_changed', { theme: theme });
+                });
+            });
+
+            // 滑块事件处理
+            const sliders = document.querySelectorAll('.slider');
+            sliders.forEach(slider => {
+                slider.addEventListener('input', function() {
+                    const valueSpan = this.nextElementSibling;
+                    let value = this.value;
+                    
+                    if (this.id === 'fontSize') {
+                        valueSpan.textContent = value + 'px';
+                        document.body.style.fontSize = value + 'px';
+                    } else if (this.id === 'lineHeight') {
+                        valueSpan.textContent = value;
+                        document.body.style.lineHeight = value;
+                    } else if (this.id === 'animationSpeed') {
+                        valueSpan.textContent = value + 'x';
+                        document.documentElement.style.setProperty('--animation-speed', value);
+                    }
+                    
+                    sendQuantumMessage('setting_changed', {
+                        setting: this.id,
+                        value: value
+                    });
+                });
+            });
+
+            // 开关事件处理
+            const switches = document.querySelectorAll('.switch input');
+            switches.forEach(switchInput => {
+                switchInput.addEventListener('change', function() {
+                    const setting = this.id;
+                    const enabled = this.checked;
+                    
+                    if (setting === 'particleEffects') {
+                        const particles = document.getElementById('particles');
+                        particles.style.display = enabled ? 'block' : 'none';
+                    }
+                    
+                    sendQuantumMessage('switch_changed', {
+                        setting: setting,
+                        enabled: enabled
+                    });
+                });
+            });
+
+            // 颜色输入事件处理
+            const colorInputs = document.querySelectorAll('input[type="color"]');
+            colorInputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    const textInput = this.nextElementSibling;
+                    textInput.value = this.value;
+                    updatePreview();
+                    sendQuantumMessage('color_changed', {
+                        color: this.value
+                    });
+                });
+            });
+
+            const textInputs = document.querySelectorAll('.color-input input[type="text"]');
+            textInputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    const colorInput = this.previousElementSibling;
+                    colorInput.value = this.value;
+                    updatePreview();
+                    sendQuantumMessage('color_changed', {
+                        color: this.value
+                    });
+                });
+            });
+        });
+
+        // 应用主题
+        function applyTheme(theme) {
+            const body = document.body;
+            body.className = body.className.replace(/theme-\w+/g, '');
+            body.classList.add(`theme-${theme}`);
+            
+            // 根据主题调整颜色
+            switch (theme) {
+                case 'light':
+                    document.documentElement.style.setProperty('--demo-bg', 'rgba(255,255,255,0.9)');
+                    document.documentElement.style.setProperty('--demo-text', '#333');
+                    break;
+                case 'dark':
+                    document.documentElement.style.setProperty('--demo-bg', 'rgba(0,0,0,0.7)');
+                    document.documentElement.style.setProperty('--demo-text', '#fff');
+                    break;
+                case 'contrast':
+                    document.documentElement.style.setProperty('--demo-bg', '#000');
+                    document.documentElement.style.setProperty('--demo-text', '#fff');
+                    break;
+                default:
+                    document.documentElement.style.setProperty('--demo-bg', 'rgba(255,255,255,0.1)');
+                    document.documentElement.style.setProperty('--demo-text', '#fff');
+            }
+            
+            updatePreview();
+        }
+
+        // 更新预览
+        function updatePreview() {
+            const preview = document.getElementById('previewDemo');
+            // 这里可以添加更多预览更新逻辑
+            console.log('预览已更新');
+        }
+
+        // 保存主题
+        function saveTheme() {
+            const themeData = {
+                theme: document.querySelector('.theme-option.active').dataset.theme,
+                colors: {},
+                settings: {},
+                timestamp: Date.now()
+            };
+            
+            // 收集颜色设置
+            const colorInputs = document.querySelectorAll('.color-input input[type="text"]');
+            colorInputs.forEach((input, index) => {
+                themeData.colors[`color_${index}`] = input.value;
+            });
+            
+            // 收集其他设置
+            const sliders = document.querySelectorAll('.slider');
+            sliders.forEach(slider => {
+                themeData.settings[slider.id] = slider.value;
+            });
+            
+            localStorage.setItem('qentl_theme', JSON.stringify(themeData));
+            sendQuantumMessage('theme_saved', themeData);
+            
+            // 显示保存成功提示
+            showNotification('主题已保存', 'success');
+        }
+
+        // 导出主题
+        function exportTheme() {
+            const themeData = localStorage.getItem('qentl_theme');
+            if (themeData) {
+                const blob = new Blob([themeData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'qentl_theme.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                sendQuantumMessage('theme_exported', { success: true });
+                showNotification('主题已导出', 'success');
+            }
+        }
+
+        // 导入主题
+        function importTheme() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const themeData = JSON.parse(e.target.result);
+                            localStorage.setItem('qentl_theme', JSON.stringify(themeData));
+                            location.reload(); // 重新加载页面以应用主题
+                        } catch (error) {
+                            showNotification('主题文件格式错误', 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        // 重置主题
+        function resetTheme() {
+            if (confirm('确定要重置为默认主题吗？')) {
+                localStorage.removeItem('qentl_theme');
+                location.reload();
+                sendQuantumMessage('theme_reset', { timestamp: Date.now() });
+            }
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${type === 'success' ? '#00FF88' : type === 'error' ? '#ff6b6b' : '#FFD700'};
+                color: white;
+                padding: 15px 25px;
+                border-radius: 25px;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // 监听来自其他量子组件的消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.gene && event.data.gene !== QUANTUM_GENE) {
+                console.log(`[量子纠缠] 接收到来自 ${event.data.gene} 的消息:`, event.data);
+                
+                // 处理来自其他组件的消息
+                if (event.data.type === 'request_theme_info') {
+                    const currentTheme = document.querySelector('.theme-option.active').dataset.theme;
+                    sendQuantumMessage('theme_info_response', {
+                        currentTheme: currentTheme,
+                        available: true
+                    });
+                }
+            }
+        });
+
+        // 页面加载完成后发送初始化消息
+        window.addEventListener('load', function() {
+            sendQuantumMessage('appearance_customizer_ready', {
+                version: '1.0.0',
+                features: ['themes', 'colors', 'fonts', 'animations'],
+                status: 'active'
+            });
+        });
+
+        console.log(`[QEntL 外观自定义器] 量子基因码: ${QUANTUM_GENE} 已激活`);
+        console.log('[量子纠缠] 外观自定义器已建立量子纠缠信道');
+    </script>
+</body>
+</html> 

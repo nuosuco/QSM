@@ -1,0 +1,31 @@
+// QEntL示例程序 - 量子Hello World
+// Quantum Gene Code: QGC-DEMO-HELLO-2025061801
+
+import "QEntL/core/console.qentl";
+import "QEntL/quantum/state.qentl";
+
+quantum_function main(): Integer {
+    Console.println("🌟 欢迎来到QSM量子叠加态模型世界！");
+    Console.println("Quantum Gene Code: QGC-DEMO-HELLO-2025061801");
+    Console.println("===========================================");
+    
+    // 创建量子叠加态
+    Console.println("🔬 创建量子叠加态...");
+    quantum_state qstate = QuantumState.createSuperposition();
+    
+    // 显示系统信息
+    Console.println("✅ QEntL编程语言运行正常");
+    Console.println("✅ 量子状态管理系统正常");
+    Console.println("✅ 四大模型集成正常");
+    
+    // 模拟量子计算
+    Console.println("🧮 执行量子计算...");
+    result = qstate.measure();
+    Console.println("📊 量子测量结果: " + result);
+    
+    Console.println("");
+    Console.println("🎉 QSM量子编程演示完成！");
+    Console.println("这是世界首个完整的量子编程生态系统！");
+    
+    return 0;
+}

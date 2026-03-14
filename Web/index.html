@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QEntL量子操作系统</title>
+<style>
+@font-face {
+font-family: 'LSTY-Yi-Black';
+src: url('/fonts/lingyi.ttf') format('truetype');
+font-display: swap;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+font-family:'Microsoft YaHei', sans-serif;
+background:linear-gradient(135deg,#0a0a1a 0%,#1a1a2e 50%,#16213e 100%);
+min-height:100vh;
+overflow:hidden;
+user-select:none;
+}
+.yi-text { font-family:'LSTY-Yi-Black', sans-serif !important; }
+.desktop {
+width:100vw;
+height:calc(100vh - 48px);
+padding:20px;
+display:grid;
+grid-template-columns:repeat(auto-fill,100px);
+grid-template-rows:repeat(auto-fill,100px);
+gap:20px;
+align-content:start;
+}
+.desktop-icon {
+width:90px;
+height:90px;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+cursor:pointer;
+border-radius:10px;
+transition:all 0.3s ease;
+background:rgba(255,255,255,0.05);
+border:1px solid transparent;
+}
+.desktop-icon:hover {
+background:rgba(138,135,255,0.2);
+border-color:rgba(138,135,255,0.5);
+transform:scale(1.05);
+}
+.desktop-icon .icon { font-size:40px; margin-bottom:8px; }
+.desktop-icon .label { font-size:12px; color:#fff; text-align:center; }
+.taskbar {
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+height:48px;
+background:rgba(10,10,26,0.95);
+border-top:1px solid rgba(138,135,255,0.3);
+display:flex;
+align-items:center;
+padding:0 10px;
+z-index:1000;
+}
+.start-btn {
+width:40px;
+height:40px;
+border-radius:8px;
+background:linear-gradient(135deg,#8a87ff,#6c63ff);
+border:none;
+cursor:pointer;
+font-size:20px;
+color:#fff;
+}
+.start-btn:hover { transform:scale(1.1); }
+.lang-switch { display:flex; gap:5px; margin-left:10px; }
+.lang-btn {
+padding:5px 10px;
+background:rgba(255,255,255,0.1);
+border:1px solid rgba(255,255,255,0.2);
+border-radius:5px;
+color:#fff;
+font-size:12px;
+cursor:pointer;
+}
+.lang-btn:hover, .lang-btn.active { background:rgba(138,135,255,0.3); }
+.system-tray {
+display:flex;
+align-items:center;
+gap:15px;
+padding:0 10px;
+margin-left:auto;
+}
+.quantum-indicator {
+display:flex;
+align-items:center;
+gap:5px;
+padding:5px 10px;
+background:rgba(138,135,255,0.2);
+border-radius:15px;
+font-size:12px;
+color:#8a87ff;
+}
+.quantum-dot {
+width:8px;
+height:8px;
+border-radius:50%;
+background:#4ecdc4;
+animation:pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.clock { font-size:12px; color:#fff; text-align:right; line-height:1.4; }
+.font-link {
+position:fixed;
+top:10px;
+right:10px;
+background:rgba(255,230,109,0.2);
+border:1px solid rgba(255,230,109,0.5);
+border-radius:5px;
+padding:5px 10px;
+font-size:12px;
+color:#ffe66d;
+text-decoration:none;
+z-index:1001;
+}
+.font-link:hover { background:rgba(255,230,109,0.3); }
+</style>
+</head>
+<body>
+<a href="/font-installer.html" class="font-link">🔤 安装字体</a>
+<div class="desktop" id="desktop"></div>
+<div class="taskbar">
+<button class="start-btn" onclick="showInfo()">⚛</button>
+<div class="lang-switch">
+<button class="lang-btn active" onclick="setLang('zh')">中文</button>
+<button class="lang-btn" onclick="setLang('en')">EN</button>
+<button class="lang-btn" onclick="setLang('yi')"><span class="yi-text">󲥰󳘖</span></button>
+</div>
+<div class="system-tray">
+<div class="quantum-indicator"><div class="quantum-dot"></div><span id="qstat">量子态运行</span></div>
+<div class="clock" id="clock"></div>
+</div>
+</div>
+<script>
+var apps = [
+{id:'qvm', icon:'⚛️', zh:'量子虚拟机', en:'Quantum VM', yi:'󲥰󳘖', url:'/apps/qvm/'},
+{id:'compiler', icon:'🔧', zh:'编译器', en:'Compiler', yi:'󳈤󳖖', url:'/apps/compiler/'},
+{id:'translator', icon:'🔤', zh:'彝文翻译器', en:'Yi Translator', yi:'󲥰󳘖󳙀󳖖', url:'/apps/translator/'},
+{id:'files', icon:'📁', zh:'文件管理', en:'Files', yi:'󳈤󳖖', url:'/apps/files/'},
+{id:'terminal', icon:'💻', zh:'终端', en:'Terminal', yi:'󲩰󳚻', url:'/apps/terminal/'},
+{id:'settings', icon:'⚙️', zh:'设置', en:'Settings', yi:'󲩰', url:'/apps/settings/'},
+{id:'economy', icon:'💰', zh:'经济系统', en:'Economy', yi:'󲩡', url:'/apps/economy/'},
+{id:'social', icon:'💬', zh:'社交网络', en:'Social', yi:'󳙀󳖖', url:'/apps/social/'},
+{id:'monitor', icon:'🪞', zh:'系统监控', en:'Monitor', yi:'󲩰', url:'/apps/monitor/'},
+{id:'store', icon:'🏪', zh:'应用商店', en:'Store', yi:'󲥰󳘖', url:'/apps/store/'},
+{id:'help', icon:'📖', zh:'帮助', en:'Help', yi:'󲩡', url:'/apps/help/'}
+];
+var lang = 'zh';
+
+function showInfo() {
+alert('QEntL v0.3.0 量子叠加态操作系统\n\n如需显示彝文，请先安装字体：\n/fonts/lingyi.ttf');
+}
+
+function render() {
+var d = document.getElementById('desktop');
+var html = '';
+for (var i = 0; i < apps.length; i++) {
+var a = apps[i];
+var label = lang === 'yi' ? '<span class="yi-text">' + a.yi + '</span>' : a[lang];
+html += '<div class="desktop-icon" ondblclick="openApp(\'' + a.id + '\')">';
+html += '<div class="icon">' + a.icon + '</div>';
+html += '<div class="label">' + label + '</div></div>';
+}
+d.innerHTML = html;
+}
+
+function openApp(id) {
+for (var i = 0; i < apps.length; i++) {
+if (apps[i].id === id) {
+window.open(apps[i].url, '_blank');
+break;
+}
+}
+}
+
+function setLang(l) {
+lang = l;
+var btns = document.querySelectorAll('.lang-btn');
+for (var i = 0; i < btns.length; i++) {
+btns[i].classList.toggle('active', (l === 'zh' && i === 0) || (l === 'en' && i === 1) || (l === 'yi' && i === 2));
+}
+render();
+localStorage.setItem('qentl-lang', l);
+}
+
+function clock() {
+var n = new Date();
+document.getElementById('clock').innerHTML = n.toLocaleTimeString() + '<br>' + n.toLocaleDateString();
+}
+
+var savedLang = localStorage.getItem('qentl-lang');
+if (savedLang) setLang(savedLang);
+render();
+clock();
+setInterval(clock, 1000);
+</script>
+</body>
+</html>

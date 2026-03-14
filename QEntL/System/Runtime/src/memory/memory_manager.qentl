@@ -1,0 +1,238 @@
+# QEntL Memory Manager
+# 负责管理QEntL系统的内存分配和回收
+# 版本：1.0.0
+# 作者：QEntL Runtime Team
+
+module MemoryManager {
+    # 内存分配器
+    class MemoryAllocator {
+        field heap_size: int
+        field heap_base: ptr
+        field free_blocks: list<MemoryBlock>
+        field used_blocks: list<MemoryBlock>
+        
+        # 初始化内存分配器
+        method init(heap_size: int) {
+            self.heap_size = heap_size
+            self.heap_base = SystemKernel.allocate_physical_memory(heap_size)
+            self.free_blocks = []
+            self.used_blocks = []
+            
+            # 创建初始空闲块
+            initial_block = MemoryBlock {
+                address: self.heap_base,
+                size: heap_size,
+                is_free: true,
+                next: null,
+                prev: null
+            }
+            self.free_blocks.append(initial_block)
+            
+            QuantumLogger.log("Memory allocator initialized with " + heap_size + " bytes")
+        }
+        
+        # 分配内存
+        method allocate(size: int) -> ptr {
+            # 对齐内存大小
+            aligned_size = align_size(size, 8)
+            
+            # 查找合适的空闲块
+            for block in self.free_blocks {
+                if block.size >= aligned_size {
+                    return allocate_from_block(block, aligned_size)
+                }
+            }
+            
+            # 没有找到合适的块，尝试垃圾回收
+            collect_garbage()
+            
+            # 重新尝试分配
+            for block in self.free_blocks {
+                if block.size >= aligned_size {
+                    return allocate_from_block(block, aligned_size)
+                }
+            }
+            
+            # 扩展堆
+            return expand_heap_and_allocate(aligned_size)
+        }
+        
+        # 释放内存
+        method deallocate(ptr: ptr) {
+            # 查找对应的内存块
+            for block in self.used_blocks {
+                if block.address == ptr {
+                    block.is_free = true
+                    self.used_blocks.remove(block)
+                    self.free_blocks.append(block)
+                    
+                    # 尝试合并相邻的空闲块
+                    merge_adjacent_blocks(block)
+                    return
+                }
+            }
+            
+            QuantumLogger.error("Attempted to deallocate invalid pointer: " + ptr)
+        }
+        
+        # 从块中分配内存
+        method allocate_from_block(block: MemoryBlock, size: int) -> ptr {
+            if block.size == size {
+                # 完全使用这个块
+                block.is_free = false
+                self.free_blocks.remove(block)
+                self.used_blocks.append(block)
+                return block.address
+            } else {
+                # 分割块
+                new_block = MemoryBlock {
+                    address: block.address + size,
+                    size: block.size - size,
+                    is_free: true,
+                    next: block.next,
+                    prev: block
+                }
+                
+                block.size = size
+                block.is_free = false
+                block.next = new_block
+                
+                self.free_blocks.remove(block)
+                self.used_blocks.append(block)
+                self.free_blocks.append(new_block)
+                
+                return block.address
+            }
+        }
+        
+        # 合并相邻的空闲块
+        method merge_adjacent_blocks(block: MemoryBlock) {
+            # 向后合并
+            if block.next != null && block.next.is_free {
+                next_block = block.next
+                block.size += next_block.size
+                block.next = next_block.next
+                if next_block.next != null {
+                    next_block.next.prev = block
+                }
+                self.free_blocks.remove(next_block)
+            }
+            
+            # 向前合并
+            if block.prev != null && block.prev.is_free {
+                prev_block = block.prev
+                prev_block.size += block.size
+                prev_block.next = block.next
+                if block.next != null {
+                    block.next.prev = prev_block
+                }
+                self.free_blocks.remove(block)
+            }
+        }
+        
+        # 对齐内存大小
+        method align_size(size: int, alignment: int) -> int {
+            return (size + alignment - 1) & ~(alignment - 1)
+        }
+        
+        # 垃圾回收
+        method collect_garbage() {
+            # 标记-清除算法
+            mark_phase()
+            sweep_phase()
+            compact_phase()
+        }
+        
+        # 标记阶段
+        method mark_phase() {
+            # 标记所有可达对象
+            for root in GCRoots.get_roots() {
+                mark_object(root)
+            }
+        }
+        
+        # 清除阶段
+        method sweep_phase() {
+            # 清除未标记的对象
+            for block in self.used_blocks {
+                if !block.is_marked {
+                    deallocate(block.address)
+                }
+            }
+        }
+        
+        # 压缩阶段
+        method compact_phase() {
+            # 压缩内存，减少碎片
+            # 实现移动式垃圾收集器
+        }
+        
+        # 获取内存使用统计
+        method get_memory_stats() -> MemoryStats {
+            total_free = 0
+            total_used = 0
+            
+            for block in self.free_blocks {
+                total_free += block.size
+            }
+            
+            for block in self.used_blocks {
+                total_used += block.size
+            }
+            
+            return MemoryStats {
+                total_heap: self.heap_size,
+                total_free: total_free,
+                total_used: total_used,
+                fragmentation: calculate_fragmentation()
+            }
+        }
+    }
+    
+    # 内存块结构
+    class MemoryBlock {
+        field address: ptr
+        field size: int
+        field is_free: bool
+        field is_marked: bool
+        field next: MemoryBlock
+        field prev: MemoryBlock
+    }
+    
+    # 内存统计
+    class MemoryStats {
+        field total_heap: int
+        field total_free: int
+        field total_used: int
+        field fragmentation: float
+    }
+    
+    # 全局内存管理器实例
+    global memory_allocator: MemoryAllocator
+    
+    # 初始化内存管理器
+    function init_memory_manager(heap_size: int) {
+        memory_allocator = MemoryAllocator()
+        memory_allocator.init(heap_size)
+    }
+    
+    # 分配内存
+    function allocate(size: int) -> ptr {
+        return memory_allocator.allocate(size)
+    }
+    
+    # 释放内存
+    function deallocate(ptr: ptr) {
+        memory_allocator.deallocate(ptr)
+    }
+    
+    # 获取内存统计
+    function get_memory_stats() -> MemoryStats {
+        return memory_allocator.get_memory_stats()
+    }
+    
+    # 强制垃圾回收
+    function collect_garbage() {
+        memory_allocator.collect_garbage()
+    }
+}

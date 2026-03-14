@@ -1,0 +1,766 @@
+// QEntL 用户偏好设置服务
+// 版本: 1.0.0
+// 作者: QSM团队
+// 量子基因码: QSM-PREF-3284-Z571
+// 描述: 实现用户偏好设置管理，提供个性化配置存储和检索功能
+
+// 类型定义
+type PreferenceCategory {
+    APPEARANCE,        // 外观设置
+    NOTIFICATIONS,     // 通知设置
+    SECURITY,          // 安全设置
+    WORKFLOW,          // 工作流设置
+    QUANTUM,           // 量子参数设置
+    SYSTEM,            // 系统设置
+    LANGUAGE,          // 语言设置
+    CUSTOM             // 自定义设置
+}
+
+type PreferenceScope {
+    USER,              // 用户级别
+    DEVICE,            // 设备级别
+    SESSION,           // 会话级别
+    APPLICATION,       // 应用级别
+    GLOBAL             // 全局级别
+}
+
+type PreferenceValue {
+    stringValue: String,      // 字符串值
+    numberValue: Float,       // 数值
+    boolValue: Bool,          // 布尔值
+    listValue: List<String>,  // 列表值
+    objectValue: Object,      // 对象值
+    type: String              // 值类型 (string, number, boolean, list, object)
+}
+
+type Preference {
+    userId: String,           // 用户ID
+    key: String,              // 偏好键
+    value: PreferenceValue,   // 偏好值
+    category: PreferenceCategory, // 类别
+    scope: PreferenceScope,   // 作用域
+    deviceId: String,         // 设备ID(对设备级别)
+    sessionId: String,        // 会话ID(对会话级别)
+    applicationId: String,    // 应用ID(对应用级别)
+    lastModified: DateTime,   // 最后修改时间
+    createdAt: DateTime       // 创建时间
+}
+
+type UserPreferenceSet {
+    userId: String,                        // 用户ID
+    preferences: Map<String, Preference>,  // 偏好映射
+    lastSync: DateTime                     // 最后同步时间
+}
+
+// 配置
+config {
+    // 存储设置
+    storageMode: "persistent",       // 存储模式: persistent, memory, hybrid
+    syncInterval: 60,                // 同步间隔(秒)
+    maxPreferencesPerUser: 1000,     // 每用户最大偏好数
+    
+    // 缓存设置
+    cacheEnabled: true,              // 启用缓存
+    cacheTimeout: 300,               // 缓存超时(秒)
+    
+    // 默认偏好
+    defaultPreferences: {
+        "appearance.theme": {
+            type: "string",
+            value: "system"
+        },
+        "appearance.fontSize": {
+            type: "number",
+            value: 14
+        },
+        "notifications.enabled": {
+            type: "boolean",
+            value: true
+        },
+        "notifications.sound": {
+            type: "boolean",
+            value: true
+        },
+        "security.autoLock": {
+            type: "boolean",
+            value: true
+        },
+        "security.autoLockDelay": {
+            type: "number",
+            value: 10
+        },
+        "language.locale": {
+            type: "string",
+            value: "zh-CN"
+        },
+        "quantum.precision": {
+            type: "number",
+            value: 0.001
+        }
+    },
+    
+    // 量子特性
+    useQuantumStorage: true,         // 使用量子存储增强
+    quantumCompressionEnabled: true  // 启用量子压缩
+}
+
+// 服务状态
+state {
+    initialized: Bool = false,               // 服务是否已初始化
+    userPreferences: Map<String, UserPreferenceSet> = {}, // 用户偏好集合
+    preferenceCache: Map<String, PreferenceValue> = {}, // 偏好缓存
+    
+    // 同步状态
+    syncTimers: Map<String, Int> = {},       // 用户同步计时器
+    pendingChanges: Map<String, Bool> = {},  // 待处理变更
+    
+    // 事件监听器
+    onChangeListeners: List<Object> = [],    // 更改事件监听器
+    onSyncListeners: List<Object> = []       // 同步事件监听器
+}
+
+// 公共函数
+function initialize(customConfig: Object = null): Bool {
+    if (state.initialized) {
+        return true; // 已经初始化
+    }
+    
+    // 合并自定义配置(如果有)
+    if (customConfig != null) {
+        config = _mergeConfigs(config, customConfig);
+    }
+    
+    // 初始化量子存储(如果启用)
+    if (config.useQuantumStorage) {
+        _initializeQuantumStorage();
+    }
+    
+    // 从持久存储加载用户偏好
+    _loadAllUserPreferences();
+    
+    state.initialized = true;
+    return true;
+}
+
+// 获取用户偏好值
+function getPreference(userId: String, key: String, defaultValue: Any = null): Any {
+    _checkInitialized();
+    
+    // 检查缓存
+    if (config.cacheEnabled) {
+        let cacheKey = userId + ":" + key;
+        if (state.preferenceCache.hasKey(cacheKey)) {
+            return _extractValue(state.preferenceCache[cacheKey]);
+        }
+    }
+    
+    // 检查用户偏好是否存在
+    if (!state.userPreferences.hasKey(userId)) {
+        return _getDefaultValue(key, defaultValue);
+    }
+    
+    let userPrefs = state.userPreferences[userId];
+    
+    // 检查偏好键是否存在
+    if (!userPrefs.preferences.hasKey(key)) {
+        return _getDefaultValue(key, defaultValue);
+    }
+    
+    let preference = userPrefs.preferences[key];
+    let value = _extractValue(preference.value);
+    
+    // 更新缓存
+    if (config.cacheEnabled) {
+        let cacheKey = userId + ":" + key;
+        state.preferenceCache[cacheKey] = preference.value;
+    }
+    
+    return value;
+}
+
+// 设置用户偏好值
+function setPreference(userId: String, key: String, value: Any, category: PreferenceCategory = PreferenceCategory.CUSTOM, scope: PreferenceScope = PreferenceScope.USER, metadata: Object = null): Bool {
+    _checkInitialized();
+    
+    // 检查用户是否已达到最大偏好数
+    if (!state.userPreferences.hasKey(userId)) {
+        // 创建新的用户偏好集合
+        state.userPreferences[userId] = UserPreferenceSet {
+            userId: userId,
+            preferences: {},
+            lastSync: DateTime.now()
+        };
+    }
+    
+    let userPrefs = state.userPreferences[userId];
+    
+    // 检查是否超过最大偏好数
+    if (!userPrefs.preferences.hasKey(key) && userPrefs.preferences.size() >= config.maxPreferencesPerUser) {
+        return false;
+    }
+    
+    // 创建偏好值
+    let prefValue = _createPreferenceValue(value);
+    
+    // 创建或更新偏好
+    let now = DateTime.now();
+    let preference = null;
+    
+    if (userPrefs.preferences.hasKey(key)) {
+        preference = userPrefs.preferences[key];
+        preference.value = prefValue;
+        preference.lastModified = now;
+    } else {
+        preference = Preference {
+            userId: userId,
+            key: key,
+            value: prefValue,
+            category: category,
+            scope: scope,
+            deviceId: metadata器.deviceId 器器 "",
+            sessionId: metadata器.sessionId 器器 "",
+            applicationId: metadata器.applicationId 器器 "",
+            lastModified: now,
+            createdAt: now
+        };
+    }
+    
+    // 更新偏好
+    userPrefs.preferences[key] = preference;
+    
+    // 更新缓存
+    if (config.cacheEnabled) {
+        let cacheKey = userId + ":" + key;
+        state.preferenceCache[cacheKey] = prefValue;
+    }
+    
+    // 标记待同步
+    state.pendingChanges[userId] = true;
+    
+    // 如果没有计时器，创建同步计时器
+    if (!state.syncTimers.hasKey(userId)) {
+        state.syncTimers[userId] = _createSyncTimer(userId);
+    }
+    
+    // 触发更改事件
+    _triggerEvent("change", {
+        userId: userId,
+        key: key,
+        value: value,
+        category: category,
+        scope: scope
+    });
+    
+    return true;
+}
+
+// 删除用户偏好
+function deletePreference(userId: String, key: String): Bool {
+    _checkInitialized();
+    
+    // 检查用户偏好是否存在
+    if (!state.userPreferences.hasKey(userId)) {
+        return false;
+    }
+    
+    let userPrefs = state.userPreferences[userId];
+    
+    // 检查偏好键是否存在
+    if (!userPrefs.preferences.hasKey(key)) {
+        return false;
+    }
+    
+    // 删除偏好
+    userPrefs.preferences.remove(key);
+    
+    // 删除缓存
+    if (config.cacheEnabled) {
+        let cacheKey = userId + ":" + key;
+        state.preferenceCache.remove(cacheKey);
+    }
+    
+    // 标记待同步
+    state.pendingChanges[userId] = true;
+    
+    // 如果没有计时器，创建同步计时器
+    if (!state.syncTimers.hasKey(userId)) {
+        state.syncTimers[userId] = _createSyncTimer(userId);
+    }
+    
+    // 触发更改事件
+    _triggerEvent("change", {
+        userId: userId,
+        key: key,
+        value: null,
+        action: "delete"
+    });
+    
+    return true;
+}
+
+// 获取用户所有偏好
+function getAllPreferences(userId: String, category: PreferenceCategory = null): Map<String, Any> {
+    _checkInitialized();
+    
+    let result = {};
+    
+    // 先添加默认偏好
+    for (let key in config.defaultPreferences) {
+        let defaultPref = config.defaultPreferences[key];
+        result[key] = defaultPref.value;
+    }
+    
+    // 检查用户偏好是否存在
+    if (!state.userPreferences.hasKey(userId)) {
+        return result;
+    }
+    
+    let userPrefs = state.userPreferences[userId];
+    
+    // 遍历用户偏好
+    for (let key in userPrefs.preferences) {
+        let pref = userPrefs.preferences[key];
+        
+        // 如果指定了类别，则筛选
+        if (category != null && pref.category != category) {
+            continue;
+        }
+        
+        result[key] = _extractValue(pref.value);
+    }
+    
+    return result;
+}
+
+// 获取特定类别的偏好
+function getCategoryPreferences(userId: String, category: PreferenceCategory): Map<String, Any> {
+    _checkInitialized();
+    
+    return getAllPreferences(userId, category);
+}
+
+// 批量设置偏好
+function setBulkPreferences(userId: String, preferences: Map<String, Any>, category: PreferenceCategory = PreferenceCategory.CUSTOM, scope: PreferenceScope = PreferenceScope.USER): Bool {
+    _checkInitialized();
+    
+    let success = true;
+    
+    for (let key in preferences) {
+        let result = setPreference(userId, key, preferences[key], category, scope);
+        if (!result) {
+            success = false;
+        }
+    }
+    
+    return success;
+}
+
+// 重置用户偏好到默认值
+function resetToDefaults(userId: String, category: PreferenceCategory = null): Bool {
+    _checkInitialized();
+    
+    // 检查用户偏好是否存在
+    if (!state.userPreferences.hasKey(userId)) {
+        return true; // 已经是默认值
+    }
+    
+    let userPrefs = state.userPreferences[userId];
+    let keysToRemove = [];
+    
+    // 遍历用户偏好
+    for (let key in userPrefs.preferences) {
+        let pref = userPrefs.preferences[key];
+        
+        // 如果指定了类别，则筛选
+        if (category != null && pref.category != category) {
+            continue;
+        }
+        
+        keysToRemove.push(key);
+    }
+    
+    // 删除偏好
+    for (let i = 0; i < keysToRemove.length; i++) {
+        let key = keysToRemove[i];
+        userPrefs.preferences.remove(key);
+        
+        // 删除缓存
+        if (config.cacheEnabled) {
+            let cacheKey = userId + ":" + key;
+            state.preferenceCache.remove(cacheKey);
+        }
+        
+        // 触发更改事件
+        _triggerEvent("change", {
+            userId: userId,
+            key: key,
+            value: null,
+            action: "reset"
+        });
+    }
+    
+    // 标记待同步
+    state.pendingChanges[userId] = true;
+    
+    // 如果没有计时器，创建同步计时器
+    if (!state.syncTimers.hasKey(userId)) {
+        state.syncTimers[userId] = _createSyncTimer(userId);
+    }
+    
+    return true;
+}
+
+// 导出用户偏好
+function exportPreferences(userId: String): String {
+    _checkInitialized();
+    
+    // 检查用户偏好是否存在
+    if (!state.userPreferences.hasKey(userId)) {
+        return "{}";
+    }
+    
+    let userPrefs = state.userPreferences[userId];
+    let exportData = {
+        userId: userId,
+        preferences: {},
+        timestamp: DateTime.now().toISOString()
+    };
+    
+    // 遍历用户偏好
+    for (let key in userPrefs.preferences) {
+        let pref = userPrefs.preferences[key];
+        exportData.preferences[key] = {
+            value: _extractValue(pref.value),
+            category: pref.category.toString(),
+            scope: pref.scope.toString(),
+            lastModified: pref.lastModified.toISOString()
+        };
+    }
+    
+    // 将对象转换为JSON字符串
+    return JSON.stringify(exportData);
+}
+
+// 导入用户偏好
+function importPreferences(userId: String, jsonData: String, overwrite: Bool = false): Bool {
+    _checkInitialized();
+    
+    try {
+        // 解析JSON数据
+        let importData = JSON.parse(jsonData);
+        
+        // 验证数据
+        if (!importData.hasKey("preferences")) {
+            return false;
+        }
+        
+        // 如果选择覆盖，则先清除现有偏好
+        if (overwrite) {
+            if (state.userPreferences.hasKey(userId)) {
+                state.userPreferences[userId].preferences = {};
+            }
+        }
+        
+        // 导入偏好
+        let importedPrefs = importData.preferences;
+        for (let key in importedPrefs) {
+            let prefData = importedPrefs[key];
+            
+            // 设置偏好
+            setPreference(
+                userId,
+                key,
+                prefData.value,
+                _getCategoryFromString(prefData.category),
+                _getScopeFromString(prefData.scope)
+            );
+        }
+        
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// 强制同步
+function syncPreferences(userId: String): Bool {
+    _checkInitialized();
+    
+    // 检查用户偏好是否存在
+    if (!state.userPreferences.hasKey(userId)) {
+        return true; // 没有偏好需要同步
+    }
+    
+    // 执行同步
+    return _syncUserPreferences(userId);
+}
+
+// 清除缓存
+function clearCache(userId: String = null): Bool {
+    _checkInitialized();
+    
+    if (userId) {
+        // 清除特定用户的缓存
+        let keysToRemove = [];
+        for (let cacheKey in state.preferenceCache) {
+            if (cacheKey.startsWith(userId + ":")) {
+                keysToRemove.push(cacheKey);
+            }
+        }
+        
+        for (let i = 0; i < keysToRemove.length; i++) {
+            state.preferenceCache.remove(keysToRemove[i]);
+        }
+    } else {
+        // 清除所有缓存
+        state.preferenceCache = {};
+    }
+    
+    return true;
+}
+
+// 添加事件监听器
+function addEventListener(eventName: String, callback: Function): String {
+    _checkInitialized();
+    
+    let listenerId = _generateId();
+    
+    // 根据事件类型添加监听器
+    switch (eventName) {
+        case "change":
+            state.onChangeListeners.push({id: listenerId, callback: callback});
+            break;
+        case "sync":
+            state.onSyncListeners.push({id: listenerId, callback: callback});
+            break;
+        default:
+            return "";
+    }
+    
+    return listenerId;
+}
+
+// 移除事件监听器
+function removeEventListener(eventName: String, listenerId: String): Bool {
+    _checkInitialized();
+    
+    // 根据事件类型移除监听器
+    switch (eventName) {
+        case "change":
+            state.onChangeListeners = state.onChangeListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "sync":
+            state.onSyncListeners = state.onSyncListeners.filter(listener => listener.id != listenerId);
+            break;
+        default:
+            return false;
+    }
+    
+    return true;
+}
+
+// 内部函数
+
+// 检查服务是否已初始化
+function _checkInitialized() {
+    if (!state.initialized) {
+        throw "用户偏好设置服务尚未初始化";
+    }
+}
+
+// 合并配置
+function _mergeConfigs(baseConfig: Object, customConfig: Object): Object {
+    // 简单合并对象
+    let result = baseConfig.clone();
+    
+    for (let key in customConfig) {
+        if (result.hasKey(key)) {
+            if (typeof result[key] == "object" && typeof customConfig[key] == "object") {
+                result[key] = _mergeConfigs(result[key], customConfig[key]);
+            } else {
+                result[key] = customConfig[key];
+            }
+        }
+    }
+    
+    return result;
+}
+
+// 初始化量子存储
+function _initializeQuantumStorage() {
+    // 初始化量子存储功能
+    // 实际实现会与量子处理模块交互
+}
+
+// 加载所有用户偏好
+function _loadAllUserPreferences() {
+    // 从持久存储加载所有用户偏好
+    // 实际实现会与存储服务交互
+}
+
+// 获取默认值
+function _getDefaultValue(key: String, userDefault: Any): Any {
+    // 检查配置中是否有默认值
+    if (config.defaultPreferences.hasKey(key)) {
+        return config.defaultPreferences[key].value;
+    }
+    
+    // 使用用户提供的默认值
+    return userDefault;
+}
+
+// 创建偏好值对象
+function _createPreferenceValue(value: Any): PreferenceValue {
+    let type = typeof value;
+    let result = PreferenceValue {
+        stringValue: "",
+        numberValue: 0,
+        boolValue: false,
+        listValue: [],
+        objectValue: {},
+        type: type
+    };
+    
+    switch (type) {
+        case "string":
+            result.stringValue = value;
+            break;
+        case "number":
+            result.numberValue = value;
+            break;
+        case "boolean":
+            result.boolValue = value;
+            break;
+        case "list":
+        case "array":
+            result.listValue = value;
+            result.type = "list";
+            break;
+        case "object":
+            result.objectValue = value;
+            break;
+    }
+    
+    return result;
+}
+
+// 从偏好值对象提取值
+function _extractValue(prefValue: PreferenceValue): Any {
+    switch (prefValue.type) {
+        case "string":
+            return prefValue.stringValue;
+        case "number":
+            return prefValue.numberValue;
+        case "boolean":
+            return prefValue.boolValue;
+        case "list":
+        case "array":
+            return prefValue.listValue;
+        case "object":
+            return prefValue.objectValue;
+        default:
+            return null;
+    }
+}
+
+// 创建同步计时器
+function _createSyncTimer(userId: String): Int {
+    // 创建同步计时器
+    // 实际实现会创建一个定时任务
+    return 1; // 返回计时器ID
+}
+
+// 同步用户偏好
+function _syncUserPreferences(userId: String): Bool {
+    // 检查是否有待同步的更改
+    if (!state.pendingChanges.hasKey(userId) || !state.pendingChanges[userId]) {
+        return true;
+    }
+    
+    // 获取用户偏好
+    let userPrefs = state.userPreferences[userId];
+    
+    // 执行同步操作
+    // 实际实现会与存储服务交互
+    
+    // 更新最后同步时间
+    userPrefs.lastSync = DateTime.now();
+    
+    // 清除待同步标记
+    state.pendingChanges[userId] = false;
+    
+    // 触发同步事件
+    _triggerEvent("sync", {
+        userId: userId,
+        timestamp: userPrefs.lastSync
+    });
+    
+    return true;
+}
+
+// 从字符串获取类别枚举
+function _getCategoryFromString(categoryStr: String): PreferenceCategory {
+    switch (categoryStr) {
+        case "APPEARANCE":
+            return PreferenceCategory.APPEARANCE;
+        case "NOTIFICATIONS":
+            return PreferenceCategory.NOTIFICATIONS;
+        case "SECURITY":
+            return PreferenceCategory.SECURITY;
+        case "WORKFLOW":
+            return PreferenceCategory.WORKFLOW;
+        case "QUANTUM":
+            return PreferenceCategory.QUANTUM;
+        case "SYSTEM":
+            return PreferenceCategory.SYSTEM;
+        case "LANGUAGE":
+            return PreferenceCategory.LANGUAGE;
+        default:
+            return PreferenceCategory.CUSTOM;
+    }
+}
+
+// 从字符串获取作用域枚举
+function _getScopeFromString(scopeStr: String): PreferenceScope {
+    switch (scopeStr) {
+        case "USER":
+            return PreferenceScope.USER;
+        case "DEVICE":
+            return PreferenceScope.DEVICE;
+        case "SESSION":
+            return PreferenceScope.SESSION;
+        case "APPLICATION":
+            return PreferenceScope.APPLICATION;
+        default:
+            return PreferenceScope.GLOBAL;
+    }
+}
+
+// 触发事件
+function _triggerEvent(eventName: String, eventData: Object) {
+    // 根据事件类型触发相应的事件
+    let listeners = [];
+    
+    switch (eventName) {
+        case "change":
+            listeners = state.onChangeListeners;
+            break;
+        case "sync":
+            listeners = state.onSyncListeners;
+            break;
+    }
+    
+    // 调用所有监听器
+    for (let i = 0; i < listeners.length; i++) {
+        try {
+            listeners[i].callback(eventData);
+        } catch (e) {
+            // 记录错误但不中断执行
+        }
+    }
+}
+
+// 生成随机ID
+function _generateId(): String {
+    return "id_" + Math.random().toString(36).substring(2, 15);
+} 

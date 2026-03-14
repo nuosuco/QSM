@@ -1,0 +1,10 @@
+// QEntL Compiler Executable
+// This is a placeholder for the compiled QEntL compiler binary
+// Version: 1.0.0
+// Size: ~200MB
+
+#include "qentl_compiler.h"
+
+int main(int argc, char* argv[]) {
+    return qentl_compiler_main(argc, argv);
+}

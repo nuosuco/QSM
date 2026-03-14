@@ -1,0 +1,12 @@
+// QSM - Quantum Superposition Model Executable
+// Version: 1.0.0
+// Description: Quantum Superposition Model main executable
+
+#include "qsm_core.h"
+
+int main(int argc, char* argv[]) {
+    printf("QSM - Quantum Superposition Model v1.0.0\n");
+    printf("Initializing quantum superposition environment...\n");
+    
+    return qsm_main(argc, argv);
+}

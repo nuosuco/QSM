@@ -1,0 +1,15 @@
+QIM2.0-BOOT 
+TIMESTAMP:2025/06/19 ÷‹Àƒ_16:59:37.31 
+TYPE:Boot_and_Recovery 
+SIZE:500MB 
+COMPRESSION:STANDARD 
+--- BOOT_MANIFEST --- 
+bootmgr/bin/=50MB=Boot_Manager_Binary 
+bootmgr/config/=50MB=Boot_Configuration 
+recovery/bin/=100MB=Recovery_Tools_Binary 
+recovery/lib/=100MB=Recovery_Libraries 
+diagnostics/bin/=50MB=Diagnostic_Tools_Binary 
+diagnostics/lib/=50MB=Diagnostic_Libraries 
+drivers/=80MB=Basic_System_Drivers 
+firmware/=20MB=Firmware_Update_Tools 
+--- END_BOOT_MANIFEST --- 

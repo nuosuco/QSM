@@ -1,0 +1,324 @@
+{
+  "multilingual_training_configuration": {
+    "metadata": {
+      "name": "QEntL量子模型三语训练配置",
+      "version": "2.0.4.22",
+      "quantum_gene": "QG-MULTILINGUAL-TRAINING-2025-A1B1",
+      "creation_date": "2025-01-01",
+      "description": "中文、英文、滇川黔贵通用彝文三语训练配置",
+      "total_vocabulary_capacity": 570000,
+      "training_languages": ["中文", "英文", "滇川黔贵通用彝文"]
+    },
+
+    "language_distribution": {
+      "中文": {
+        "weight": 0.50,
+        "description": "主要语言，量子哲学、东方智慧概念",
+        "character_encoding": "UTF-8",
+        "total_vocabulary_targets": {
+          "QSM": 60000,
+          "SOM": 50000,
+          "WeQ": 55000,
+          "Ref": 45000,
+          "QEntL": 75000
+        }
+      },
+      "英文": {
+        "weight": 0.40,
+        "description": "国际标准语言，技术精确性",
+        "character_encoding": "UTF-8",
+        "total_vocabulary_targets": {
+          "QSM": 48000,
+          "SOM": 40000,
+          "WeQ": 44000,
+          "Ref": 36000,
+          "QEntL": 60000
+        }
+      },
+      "滇川黔贵通用彝文": {
+        "weight": 0.10,
+        "description": "传统智慧语言，独特计算思维",
+        "character_encoding": "UTF-8",
+        "font_family": "LSTY-Yi-Black",
+        "total_characters": 87046,
+        "training_subset": 4120,
+        "coverage_percentage": 4.73,
+        "total_vocabulary_targets": {
+          "QSM": 12000,
+          "SOM": 10000,
+          "WeQ": 11000,
+          "Ref": 9000,
+          "QEntL": 15000
+        }
+      }
+    },
+
+    "yi_script_configuration": {
+      "script_type": "滇川黔贵通用彝文",
+      "total_character_count": 87046,
+      "training_subset_count": 4120,
+      "data_sources": {
+        "primary_training_data": "Models/Data/Yi Wen/通用彝文彝汉对照训练表(2.0.4.22).jsonl",
+        "trilingual_data": "Models/Data/Yi Wen/滇川黔贵通用彝文三语对照表.jsonl",
+        "dictionary_reference": "Models/Data/Yi Wen/《通用彝文字典》.pdf",
+        "historical_reference": "Models/Data/Yi Wen/滇川黔桂彝文字典_滇川黔桂彝文协作组编_昆明：云南民族出版社_2001.02_11863927_P508.pdf"
+      },
+      "vocabulary_examples": {
+        "基础词汇": {
+          "󲜐": {"中文": "陷害", "英文": "frame, trap, set up"},
+          "󲜑": {"中文": "兔子", "英文": "rabbit"},
+          "󲜒": {"中文": "（刀刃含钢不足而）卷", "英文": "(blade with insufficient steel) curl, bend"},
+          "󲜓": {"中文": "1、舔；2、（专指母羊对出生羊崽的舔）", "英文": "1. lick; 2. (specifically mother sheep licking newborn lamb)"},
+          "󲜔": {"中文": "便宜", "英文": "cheap, inexpensive"},
+          "󲜕": {"中文": "埋怨", "英文": "complain, blame"}
+        },
+        "计算概念": {
+          "󲜷": {"中文": "心", "英文": "heart, mind"},
+          "󲜵": {"中文": "1、乾坤；宇宙空间的）上下，2、开辟3、一个地名、人名", "英文": "1. heaven and earth; (universe) up and down; 2. open up; 3. place name, person name"},
+          "󲜶": {"中文": "（地）区", "英文": "(geo) region, district"},
+          "󲞭": {"中文": "天", "英文": "sky, heaven"},
+          "󲞮": {"中文": "火", "英文": "fire"},
+          "󲞰": {"中文": "王", "英文": "king"}
+        },
+        "量子概念": {
+          "󲜽": {"中文": "总是", "英文": "always"},
+          "󲜾": {"中文": "计较", "英文": "argue, care about"},
+          "󲞞": {"中文": "1、和睦，友好；2、爱好", "英文": "1. harmonious, friendly; 2. hobby"},
+          "󲞵": {"中文": "1、人；2、他们；3、（领导）", "英文": "1. person; 2. they; 3. (leader)"},
+          "󲜼": {"中文": "供奉", "英文": "offer, worship"},
+          "󲟍": {"中文": "祷告", "英文": "pray"}
+        }
+      }
+    },
+
+    "model_specific_configurations": {
+      "QSM": {
+        "quantum_superposition_model": {
+          "total_vocabulary": 120000,
+          "language_breakdown": {
+            "中文": 60000,
+            "英文": 48000,
+            "滇川黔贵通用彝文": 12000
+          },
+          "specialized_domains": [
+            "量子物理概念",
+            "意识哲学",
+            "五阴理论",
+            "量子叠加态"
+          ]
+        }
+      },
+      "SOM": {
+        "quantum_equality_economy_model": {
+          "total_vocabulary": 100000,
+          "language_breakdown": {
+            "中文": 50000,
+            "英文": 40000,
+            "滇川黔贵通用彝文": 10000
+          },
+          "specialized_domains": [
+            "经济学理论",
+            "资源分配",
+            "平权概念",
+            "社会公平"
+          ]
+        }
+      },
+      "WeQ": {
+        "quantum_communication_coordination_model": {
+          "total_vocabulary": 110000,
+          "language_breakdown": {
+            "中文": 55000,
+            "英文": 44000,
+            "滇川黔贵通用彝文": 11000
+          },
+          "specialized_domains": [
+            "网络协议",
+            "分布式计算",
+            "协作机制",
+            "通信理论"
+          ]
+        }
+      },
+      "Ref": {
+        "quantum_self_reflection_model": {
+          "total_vocabulary": 90000,
+          "language_breakdown": {
+            "中文": 45000,
+            "英文": 36000,
+            "滇川黔贵通用彝文": 9000
+          },
+          "specialized_domains": [
+            "系统监控",
+            "自我优化",
+            "反馈控制",
+            "性能分析"
+          ]
+        }
+      },
+      "QEntL": {
+        "quantum_operating_system_core_model": {
+          "total_vocabulary": 150000,
+          "language_breakdown": {
+            "中文": 75000,
+            "英文": 60000,
+            "滇川黔贵通用彝文": 15000
+          },
+          "specialized_domains": [
+            "操作系统内核",
+            "编译器技术",
+            "虚拟机架构",
+            "硬件抽象层"
+          ]
+        }
+      }
+    },
+
+    "training_methodology": {
+      "tokenization": {
+        "approach": "trilingual_unified_tokenizer",
+        "special_tokens": {
+          "pad_token": "[PAD]",
+          "unknown_token": "[UNK]",
+          "cls_token": "[CLS]",
+          "sep_token": "[SEP]",
+          "mask_token": "[MASK]",
+          "yi_script_marker": "[YI]",
+          "chinese_marker": "[ZH]",
+          "english_marker": "[EN]"
+        },
+        "vocabulary_size": 570000,
+        "subword_algorithm": "BPE",
+        "minimum_frequency": 5
+      },
+      
+      "training_phases": {
+        "phase_1": {
+          "name": "单语言预训练",
+          "duration": "1-2周",
+          "description": "分别训练三种语言的基础词汇",
+          "data_sources": [
+            "中文语料库",
+            "英文语料库",
+            "滇川黔贵通用彝文语料库"
+          ]
+        },
+        "phase_2": {
+          "name": "双语对照训练",
+          "duration": "2-3周",
+          "description": "中英对照、中彝对照、英彝对照训练",
+          "data_sources": [
+            "中英对照词典",
+            "中彝对照词典",
+            "英彝对照词典"
+          ]
+        },
+        "phase_3": {
+          "name": "三语融合训练",
+          "duration": "1-2周",
+          "description": "三语同时训练，建立统一语义空间",
+          "data_sources": [
+            "三语对照表",
+            "混合语言文本",
+            "量子概念三语表达"
+          ]
+        },
+        "phase_4": {
+          "name": "持续学习优化",
+          "duration": "持续进行",
+          "description": "24小时持续学习，不断优化模型",
+          "data_sources": [
+            "实时反馈数据",
+            "用户交互数据",
+            "系统运行数据"
+          ]
+        }
+      }
+    },
+
+    "evaluation_metrics": {
+      "trilingual_consistency": {
+        "metric": "三语一致性评分",
+        "target_score": 0.95,
+        "evaluation_method": "语义相似度对比"
+      },
+      "cultural_appropriateness": {
+        "metric": "文化适应性评分",
+        "target_score": 0.90,
+        "evaluation_method": "文化专家评审"
+      },
+      "technical_accuracy": {
+        "metric": "技术准确性评分",
+        "target_score": 0.98,
+        "evaluation_method": "专业术语验证"
+      },
+      "yi_script_rendering": {
+        "metric": "彝文渲染质量评分",
+        "target_score": 0.95,
+        "evaluation_method": "字体渲染测试"
+      }
+    },
+
+    "data_augmentation": {
+      "strategies": [
+        "同义词替换",
+        "语法变换",
+        "代码混合",
+        "上下文增强"
+      ],
+      "yi_script_specific": {
+        "character_variations": "支持不同书写风格",
+        "dialectal_variations": "支持方言差异",
+        "historical_forms": "支持历史字形"
+      }
+    },
+
+    "quality_assurance": {
+      "data_validation": {
+        "character_encoding_check": true,
+        "translation_quality_check": true,
+        "cultural_sensitivity_review": true,
+        "technical_accuracy_validation": true
+      },
+      "model_validation": {
+        "cross_validation": true,
+        "holdout_testing": true,
+        "a_b_testing": true,
+        "user_acceptance_testing": true
+      }
+    },
+
+    "deployment_configuration": {
+      "model_size_optimization": {
+        "compression_ratio": 0.3,
+        "quantization": "int8",
+        "pruning_threshold": 0.01
+      },
+      "runtime_optimization": {
+        "batch_processing": true,
+        "gpu_acceleration": true,
+        "memory_mapping": true,
+        "cache_optimization": true
+      }
+    },
+
+    "version_history": {
+      "2.0.4.22": {
+        "date": "2025-01-01",
+        "changes": [
+          "更新为滇川黔贵通用彝文",
+          "调整词汇量分配",
+          "优化训练方法",
+          "增加质量保证机制",
+          "支持87046个彝文字符"
+        ]
+      },
+      "1.0.0": {
+        "date": "2024-12-31",
+        "changes": [
+          "初始版本创建"
+        ]
+      }
+    }
+  }
+} 

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文显示解决方案</title>
+    <style>
+        @font-face {
+            font-family: 'msyi';
+            src: url('/fonts/msyi.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .yi-display {
+            font-family: 'msyi', Arial, sans-serif;
+            font-size: 24px;
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .canvas-display {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        canvas {
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: white;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .info-box {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 彝文显示解决方案</h1>
+        
+        <div class="info-box">
+            <h3>问题说明</h3>
+            <p>彝文字符使用Unicode私有使用区（U+F0000到U+FFFFF），大多数浏览器不支持该范围的字符显示，导致显示为方框。</p>
+        </div>
+        
+        <div id="status-display"></div>
+        
+        <h2>方法一：字体文件加载</h2>
+        <div class="yi-display" id="font-display">
+            正在加载彝文字体...
+        </div>
+        <button class="btn" onclick="testFontDisplay()">测试字体显示</button>
+        
+        <h2>方法二：Canvas渲染</h2>
+        <div class="canvas-display">
+            <canvas id="yi-canvas" width="600" height="100"></canvas>
+        </div>
+        <button class="btn" onclick="renderYiCanvas()">渲染彝文</button>
+        
+        <h2>方法三：图片生成</h2>
+        <div class="canvas-display">
+            <canvas id="image-canvas" width="400" height="80"></canvas>
+        </div>
+        <button class="btn" onclick="generateYiImage()">生成彝文图片</button>
+        
+        <h2>方法四：SVG渲染</h2>
+        <div id="svg-display"></div>
+        <button class="btn" onclick="renderYiSVG()">SVG渲染</button>
+        
+        <div class="info-box">
+            <h3>推荐解决方案</h3>
+            <p><strong>Canvas渲染</strong>是最可靠的方案，因为它不依赖系统字体，可以在任何浏览器中正确显示彝文字符。</p>
+        </div>
+    </div>
+
+    <script>
+        // 彝文字符数据
+        const yiCharacters = [
+            { char: 'ꀀ', name: '彝文1', unicode: 'U+A000' },
+            { char: 'ꀁ', name: '彝文2', unicode: 'U+A001' },
+            { char: 'ꀂ', name: '彝文3', unicode: 'U+A002' },
+            { char: 'ꀃ', name: '彝文4', unicode: 'U+A003' },
+            { char: 'ꀄ', name: '彝文5', unicode: 'U+A004' }
+        ];
+        
+        // 私有使用区彝文字符
+        const privateYiChars = [
+            { char: '\uF0000', name: '私有彝文1', unicode: 'U+F0000' },
+            { char: '\uF0001', name: '私有彝文2', unicode: 'U+F0001' },
+            { char: '\uF0002', name: '私有彝文3', unicode: 'U+F0002' }
+        ];
+        
+        // 检查字体加载状态
+        function checkFontStatus() {
+            const statusDisplay = document.getElementById('status-display');
+            let status = '';
+            
+            // 检查Canvas支持
+            const canvas = document.createElement('canvas');
+            const canvasSupported = !!(canvas.getContext && canvas.getContext('2d'));
+            status += `<div class="status ${canvasSupported ? 'success' : 'error'}">
+                Canvas支持: ${canvasSupported ? '✓ 支持' : '✗ 不支持'}
+            </div>`;
+            
+            // 检查字体API支持
+            const fontApiSupported = !!(document.fonts && document.fonts.check);
+            status += `<div class="status ${fontApiSupported ? 'success' : 'warning'}">
+                字体API支持: ${fontApiSupported ? '✓ 支持' : '⚠ 部分支持'}
+            </div>`;
+            
+            // 检查Unicode支持
+            const unicodeSupported = '\uF0000'.length === 1;
+            status += `<div class="status ${unicodeSupported ? 'success' : 'error'}">
+                Unicode私有区支持: ${unicodeSupported ? '✓ 支持' : '✗ 不支持'}
+            </div>`;
+            
+            statusDisplay.innerHTML = status;
+        }
+        
+        // 测试字体显示
+        function testFontDisplay() {
+            const fontDisplay = document.getElementById('font-display');
+            let text = '';
+            
+            // 尝试显示标准彝文
+            yiCharacters.forEach(yi => {
+                text += `${yi.char} `;
+            });
+            
+            // 尝试显示私有区彝文
+            privateYiChars.forEach(yi => {
+                text += `${yi.char} `;
+            });
+            
+            fontDisplay.textContent = text || '彝文字符显示测试';
+            fontDisplay.style.fontFamily = 'msyi, Arial, sans-serif';
+        }
+        
+        // Canvas渲染彝文
+        function renderYiCanvas() {
+            const canvas = document.getElementById('yi-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 设置高分辨率
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            // 尝试使用字体渲染
+            ctx.font = '24px msyi, Arial, sans-serif';
+            ctx.fillStyle = '#2c3e50';
+            ctx.textBaseline = 'top';
+            
+            let x = 20;
+            let y = 20;
+            
+            // 渲染标准彝文
+            yiCharacters.forEach((yi, index) => {
+                ctx.fillText(yi.char, x, y);
+                x += 40;
+                
+                if (x > canvas.width - 100) {
+                    x = 20;
+                    y += 40;
+                }
+            });
+            
+            // 如果标准彝文不显示，使用自定义绘制
+            if (!ctx.measureText(yiCharacters[0].char).width) {
+                drawCustomYiCharacters(ctx);
+            }
+        }
+        
+        // 自定义绘制彝文字符
+        function drawCustomYiCharacters(ctx) {
+            ctx.clearRect(0, 0, 600, 100);
+            
+            // 绘制简化的彝文字符
+            const patterns = [
+                { x: 20, y: 20, color: '#e74c3c', pattern: '彝1' },
+                { x: 80, y: 20, color: '#3498db', pattern: '彝2' },
+                { x: 140, y: 20, color: '#27ae60', pattern: '彝3' },
+                { x: 200, y: 20, color: '#f39c12', pattern: '彝4' },
+                { x: 260, y: 20, color: '#9b59b6', pattern: '彝5' }
+            ];
+            
+            patterns.forEach((item, index) => {
+                // 绘制背景框
+                ctx.fillStyle = item.color;
+                ctx.fillRect(item.x, item.y, 50, 30);
+                
+                // 绘制文字
+                ctx.fillStyle = 'white';
+                ctx.font = '16px Arial';
+                ctx.fillText(item.pattern, item.x + 5, item.y + 8);
+                
+                // 添加装饰
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(item.x + 5, item.y + 25);
+                ctx.lineTo(item.x + 45, item.y + 25);
+                ctx.stroke();
+            });
+        }
+        
+        // 生成彝文图片
+        function generateYiImage() {
+            const canvas = document.getElementById('image-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 设置背景
+            ctx.fillStyle = '#ecf0f1';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制彝文标题
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('彝文显示测试', canvas.width / 2, 30);
+            
+            // 绘制彝文字符
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillText('ꀀ ꀁ ꀂ ꀃ ꀄ', canvas.width / 2, 55);
+            
+            // 添加边框
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+        }
+        
+        // SVG渲染彝文
+        function renderYiSVG() {
+            const svgDisplay = document.getElementById('svg-display');
+            
+            const svg = `
+                <svg width="600" height="100" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <style>
+                            .yi-text { font-family: msyi, Arial, sans-serif; font-size: 24px; }
+                            .yi-bg { fill: #ecf0f1; }
+                            .yi-border { stroke: #3498db; stroke-width: 2; fill: none; }
+                        </style>
+                    </defs>
+                    <rect class="yi-bg" x="10" y="10" width="580" height="80" rx="5"/>
+                    <rect class="yi-border" x="10" y="10" width="580" height="80" rx="5"/>
+                    <text x="300" y="45" text-anchor="middle" class="yi-text" fill="#2c3e50">
+                        ${yiCharacters.map(yi => yi.char).join(' ')}
+                    </text>
+                    <text x="300" y="75" text-anchor="middle" font-family="Arial" font-size="14" fill="#7f8c8d">
+                        彝文字符SVG渲染
+                    </text>
+                </svg>
+            `;
+            
+            svgDisplay.innerHTML = svg;
+        }
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            checkFontStatus();
+            testFontDisplay();
+            renderYiCanvas();
+            generateYiImage();
+            renderYiSVG();
+        };
+    </script>
+</body>
+</html> 

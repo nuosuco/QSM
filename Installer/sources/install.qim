@@ -1,0 +1,37 @@
+QIM2.0-STANDARD 
+TIMESTAMP:2025/06/19 ÷‹Àƒ_16:59:37.24 
+REFERENCE:Windows_10_File_Organization 
+COMPRESSION:QUANTUM 
+INTEGRITY:SHA256+QUANTUM 
+SIZE_ORIGINAL:4200MB 
+SIZE_COMPRESSED:2730MB 
+RATIO:65% 
+--- STANDARD_MANIFEST --- 
+# System Core (2.8GB) 
+System/bin/=800MB=Binary_Executables 
+System/lib/=400MB=QBC_Bytecode_Libraries 
+System/config/=100MB=Configuration_Files 
+System/boot/=1500MB=Boot_and_Recovery 
+# Quantum Models (1.0GB) 
+Models/QSM/bin/=50MB=QSM_Binary 
+Models/QSM/lib/=200MB=QSM_Bytecode 
+Models/QSM/config/=50MB=QSM_Config 
+Models/WeQ/bin/=40MB=WeQ_Binary 
+Models/WeQ/lib/=170MB=WeQ_Bytecode 
+Models/WeQ/config/=40MB=WeQ_Config 
+Models/SOM/bin/=40MB=SOM_Binary 
+Models/SOM/lib/=170MB=SOM_Bytecode 
+Models/SOM/config/=40MB=SOM_Config 
+Models/Ref/bin/=30MB=Ref_Binary 
+Models/Ref/lib/=140MB=Ref_Bytecode 
+Models/Ref/config/=30MB=Ref_Config 
+# Applications (200MB) 
+Programs/bin/=80MB=Application_Binaries 
+Programs/lib/=100MB=Application_Bytecode 
+Programs/data/=20MB=Application_Data 
+# User Environment (50MB) 
+Users/Default/=50MB=User_Template 
+# Templates and Docs (200MB) 
+Templates/=100MB=Project_Templates 
+Documentation/=100MB=System_Documentation 
+--- END_STANDARD_MANIFEST --- 

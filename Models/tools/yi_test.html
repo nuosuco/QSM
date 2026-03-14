@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>彝文字符测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .char-box { 
+            display: inline-block; 
+            margin: 10px; 
+            padding: 15px; 
+            border: 2px solid #333; 
+            background: #f0f0f0;
+            font-size: 24px;
+            text-align: center;
+            min-width: 60px;
+        }
+        .canvas-box {
+            display: inline-block;
+            margin: 10px;
+            border: 2px solid #666;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+    <h1>彝文字符显示测试</h1>
+    
+    <h2>直接显示彝文字符</h2>
+    <div id="direct-chars"></div>
+    
+    <h2>Canvas渲染彝文字符</h2>
+    <div id="canvas-chars"></div>
+    
+    <script>
+        // 彝文字符列表
+        const yiChars = ['󲜐', '󲜑', '󲜒', '󲜓', '4'];
+        
+        // 直接显示
+        const directContainer = document.getElementById('direct-chars');
+        yiChars.forEach(char => {
+            const div = document.createElement('div');
+            div.className = 'char-box';
+            div.textContent = char;
+            directContainer.appendChild(div);
+        });
+        
+        // Canvas渲染
+        const canvasContainer = document.getElementById('canvas-chars');
+        yiChars.forEach(char => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 60;
+            canvas.height = 60;
+            canvas.className = 'canvas-box';
+            
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, 60, 60);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, 60, 60);
+            
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, 30, 30);
+            
+            canvasContainer.appendChild(canvas);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL自动分类器 - 量子文件场</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+            font-size: 14px;
+        }
+
+        .controls-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #00ff88;
+        }
+
+        .file-list, .category-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .file-item, .category-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .confidence-bar {
+            width: 100px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4757, #ffa502, #2ed573);
+            transition: width 0.3s ease;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00ff88, #00cc6a);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            margin: 5px 0;
+        }
+
+        .learning-progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 QEntL自动分类器</h1>
+            <div class="quantum-gene">量子基因: 0xAC7519 | 学习强度: 0.92</div>
+            <p>智能文件分类与机器学习系统</p>
+        </div>
+
+        <div class="controls-panel">
+            <div class="control-section">
+                <div class="section-title">文件分类</div>
+                <input type="file" class="input-field" id="fileInput" multiple>
+                <button class="btn" onclick="classifyFiles()">开始分类</button>
+                <div>
+                    <label><input type="checkbox" id="enableLearning"> 启用学习模式</label>
+                    <label><input type="checkbox" id="autoCreateCategory"> 自动创建类别</label>
+                </div>
+                <div class="file-list" id="fileList"></div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">类别管理</div>
+                <input type="text" class="input-field" id="categoryName" placeholder="类别名称">
+                <input type="text" class="input-field" id="categoryKeywords" placeholder="关键词(逗号分隔)">
+                <button class="btn" onclick="createCategory()">创建类别</button>
+                <div class="category-list" id="categoryList"></div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">学习状态</div>
+                <p>学习模式: <span id="learningMode">智能学习</span></p>
+                <p>总文件数: <span id="totalFiles">0</span></p>
+                <p>已分类: <span id="classifiedFiles">0</span></p>
+                <p>平均置信度: <span id="avgConfidence">0%</span></p>
+                <div class="learning-progress">
+                    <div class="progress-fill" id="learningProgress" style="width: 0%">0%</div>
+                </div>
+                <button class="btn" onclick="startLearning()">开始学习</button>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">分类统计</div>
+                <canvas id="statisticsChart" width="280" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class QuantumAutoClassifier {
+            constructor() {
+                this.quantumGene = '0xAC7519';
+                this.learningStrength = 0.92;
+                this.categories = new Map();
+                this.files = new Map();
+                this.statistics = {
+                    totalFiles: 0,
+                    classifiedFiles: 0,
+                    avgConfidence: 0
+                };
+                this.learningProgress = 0;
+                this.init();
+            }
+
+            init() {
+                this.createDefaultCategories();
+                this.updateUI();
+                this.startQuantumLearning();
+            }
+
+            createDefaultCategories() {
+                this.createCategory('文档', ['doc', 'pdf', 'txt', '文档', '报告']);
+                this.createCategory('图片', ['jpg', 'png', 'gif', '图片', '照片']);
+                this.createCategory('音频', ['mp3', 'wav', 'flac', '音乐', '声音']);
+                this.createCategory('视频', ['mp4', 'avi', 'mkv', '视频', '电影']);
+                this.createCategory('代码', ['js', 'py', 'java', '代码', '程序']);
+                this.createCategory('压缩包', ['zip', 'rar', '7z', '压缩', '打包']);
+            }
+
+            createCategory(name, keywords = []) {
+                const categoryId = 'cat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                const category = {
+                    id: categoryId,
+                    name: name,
+                    keywords: keywords,
+                    fileCount: 0,
+                    createdTime: new Date(),
+                    confidence: 0.8
+                };
+                
+                this.categories.set(categoryId, category);
+                return categoryId;
+            }
+
+            classifyFile(file) {
+                const fileName = file.name;
+                const fileExtension = fileName.split('.').pop().toLowerCase();
+                const fileSize = file.size;
+                
+                let bestMatch = null;
+                let bestConfidence = 0;
+                
+                // 分析每个类别
+                this.categories.forEach((category) => {
+                    let confidence = this.calculateConfidence(fileName, fileExtension, category);
+                    
+                    if (confidence > bestConfidence && confidence > 0.65) {
+                        bestMatch = category;
+                        bestConfidence = confidence;
+                    }
+                });
+
+                // 创建文件分类结果
+                const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                const classification = {
+                    id: fileId,
+                    name: fileName,
+                    size: fileSize,
+                    extension: fileExtension,
+                    category: bestMatch ? bestMatch.name : '未分类',
+                    categoryId: bestMatch ? bestMatch.id : null,
+                    confidence: bestConfidence,
+                    classifiedTime: new Date()
+                };
+
+                this.files.set(fileId, classification);
+                
+                if (bestMatch) {
+                    bestMatch.fileCount++;
+                    this.statistics.classifiedFiles++;
+                }
+                
+                this.statistics.totalFiles++;
+                this.updateStatistics();
+                
+                return classification;
+            }
+
+            calculateConfidence(fileName, extension, category) {
+                let confidence = 0;
+                const lowerName = fileName.toLowerCase();
+                
+                // 扩展名匹配
+                if (category.keywords.includes(extension)) {
+                    confidence += 0.4;
+                }
+                
+                // 关键词匹配
+                category.keywords.forEach(keyword => {
+                    if (lowerName.includes(keyword.toLowerCase())) {
+                        confidence += 0.3;
+                    }
+                });
+                
+                // 量子增强计算
+                const quantumFactor = Math.random() * this.learningStrength;
+                confidence = Math.min(1.0, confidence + quantumFactor * 0.2);
+                
+                return confidence;
+            }
+
+            startQuantumLearning() {
+                setInterval(() => {
+                    if (this.learningProgress < 100) {
+                        this.learningProgress += Math.random() * 5;
+                        this.learningProgress = Math.min(100, this.learningProgress);
+                        
+                        // 提升学习强度
+                        this.learningStrength = Math.min(0.99, this.learningStrength + 0.001);
+                        
+                        this.updateLearningUI();
+                    }
+                }, 1000);
+            }
+
+            updateUI() {
+                // 更新类别列表
+                const categoryList = document.getElementById('categoryList');
+                categoryList.innerHTML = '';
+                this.categories.forEach((category) => {
+                    const categoryItem = document.createElement('div');
+                    categoryItem.className = 'category-item';
+                    categoryItem.innerHTML = `
+                        <span>${category.name} (${category.fileCount})</span>
+                        <span>${(category.confidence * 100).toFixed(1)}%</span>
+                    `;
+                    categoryList.appendChild(categoryItem);
+                });
+
+                // 更新文件列表
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+                this.files.forEach((file) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <div>
+                            <div>${file.name}</div>
+                            <small>${file.category}</small>
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${file.confidence * 100}%"></div>
+                        </div>
+                    `;
+                    fileList.appendChild(fileItem);
+                });
+
+                this.updateStatistics();
+                this.drawStatisticsChart();
+            }
+
+            updateStatistics() {
+                document.getElementById('totalFiles').textContent = this.statistics.totalFiles;
+                document.getElementById('classifiedFiles').textContent = this.statistics.classifiedFiles;
+                
+                let totalConfidence = 0;
+                let count = 0;
+                this.files.forEach((file) => {
+                    if (file.confidence > 0) {
+                        totalConfidence += file.confidence;
+                        count++;
+                    }
+                });
+                
+                this.statistics.avgConfidence = count > 0 ? (totalConfidence / count * 100) : 0;
+                document.getElementById('avgConfidence').textContent = this.statistics.avgConfidence.toFixed(1) + '%';
+            }
+
+            updateLearningUI() {
+                const progressElement = document.getElementById('learningProgress');
+                progressElement.style.width = this.learningProgress + '%';
+                progressElement.textContent = this.learningProgress.toFixed(1) + '%';
+            }
+
+            drawStatisticsChart() {
+                const canvas = document.getElementById('statisticsChart');
+                const ctx = canvas.getContext('2d');
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制类别统计饼图
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const radius = 80;
+                
+                let total = 0;
+                this.categories.forEach(category => total += category.fileCount);
+                
+                if (total > 0) {
+                    let startAngle = 0;
+                    const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dda0dd'];
+                    let colorIndex = 0;
+                    
+                    this.categories.forEach((category) => {
+                        if (category.fileCount > 0) {
+                            const angle = (category.fileCount / total) * 2 * Math.PI;
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(centerX, centerY);
+                            ctx.arc(centerX, centerY, radius, startAngle, startAngle + angle);
+                            ctx.fillStyle = colors[colorIndex % colors.length];
+                            ctx.fill();
+                            
+                            // 绘制标签
+                            const labelAngle = startAngle + angle / 2;
+                            const labelX = centerX + Math.cos(labelAngle) * (radius + 20);
+                            const labelY = centerY + Math.sin(labelAngle) * (radius + 20);
+                            
+                            ctx.fillStyle = '#ffffff';
+                            ctx.font = '12px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(category.name, labelX, labelY);
+                            
+                            startAngle += angle;
+                            colorIndex++;
+                        }
+                    });
+                }
+            }
+        }
+
+        const classifier = new QuantumAutoClassifier();
+
+        function classifyFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            
+            for (let i = 0; i < files.length; i++) {
+                classifier.classifyFile(files[i]);
+            }
+            
+            classifier.updateUI();
+        }
+
+        function createCategory() {
+            const name = document.getElementById('categoryName').value;
+            const keywords = document.getElementById('categoryKeywords').value.split(',').map(k => k.trim());
+            
+            if (name) {
+                classifier.createCategory(name, keywords);
+                classifier.updateUI();
+                document.getElementById('categoryName').value = '';
+                document.getElementById('categoryKeywords').value = '';
+            }
+        }
+
+        function startLearning() {
+            classifier.learningProgress = 0;
+            classifier.startQuantumLearning();
+        }
+
+        // 量子纠缠通信
+        setInterval(() => {
+            window.parent.postMessage({
+                type: 'quantum-entanglement',
+                source: 'auto-classifier',
+                gene: classifier.quantumGene,
+                message: '自动分类器运行正常',
+                stats: classifier.statistics
+            }, '*');
+        }, 5000);
+    </script>
+</body>
+</html> 

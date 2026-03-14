@@ -1,0 +1,541 @@
+// QEntL最小化运行时 - 虚拟机模块
+// 实现字节码执行引擎
+
+#include "runtime.h"
+#include "bytecode.h"
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+
+// ==================== 虚拟机实现 ====================
+
+// 创建虚拟机
+VM* vm_create(void) {
+    VM* vm = (VM*)runtime_alloc(sizeof(VM));
+    if (vm == NULL) return NULL;
+    
+    // 初始化栈
+    size_t initial_stack_size = 1024; // 1KB初始栈
+    vm->stack = runtime_alloc_value_array(initial_stack_size);
+    if (vm->stack == NULL) {
+        runtime_free(vm);
+        return NULL;
+    }
+    
+    vm->stack_size = initial_stack_size;
+    vm->stack_top = 0;
+    
+    // 初始化常量池
+    size_t initial_constant_size = 64;
+    vm->constants = runtime_alloc_value_array(initial_constant_size);
+    if (vm->constants == NULL) {
+        runtime_free(vm->stack);
+        runtime_free(vm);
+        return NULL;
+    }
+    
+    vm->constant_count = 0;
+    
+    // 初始化其他字段
+    vm->bytecode = NULL;
+    vm->bytecode_size = 0;
+    vm->ip = 0;
+    vm->allocator = NULL; // 暂时使用全局分配器
+    vm->gc = NULL;        // 暂时不使用垃圾收集器
+    vm->running = false;
+    vm->exit_code = 0;
+    
+    return vm;
+}
+
+// 释放虚拟机
+void vm_free(VM* vm) {
+    if (vm == NULL) return;
+    
+    // 只释放栈中的值（常量池中的值不应在这里释放）
+    for (size_t i = 0; i < vm->stack_top; i++) {
+        // 临时解决方案：检查值是否来自常量池
+        Value* stack_value = &vm->stack[i];
+        bool is_from_constants = false;
+        
+        // 检查这个值是否在常量池中（简化检查）
+        for (size_t j = 0; j < vm->constant_count; j++) {
+            if (stack_value->type == vm->constants[j].type) {
+                if (stack_value->type == TYPE_STRING) {
+                    if (stack_value->as.string.chars == vm->constants[j].as.string.chars) {
+                        is_from_constants = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // 如果不是来自常量池，才释放
+        if (!is_from_constants) {
+            value_free(stack_value);
+        } else {
+            // 来自常量池，只清空类型标记
+            stack_value->type = TYPE_NIL;
+        }
+    }
+    
+    // 常量池中的值需要特殊处理：标记为已释放但不实际释放内存
+    // （因为这些值可能被其他地方引用）
+    for (size_t i = 0; i < vm->constant_count; i++) {
+        // 只标记类型，不释放内存
+        vm->constants[i].type = TYPE_NIL;
+    }
+    
+    if (vm->stack != NULL) runtime_free(vm->stack);
+    if (vm->constants != NULL) runtime_free(vm->constants);
+    if (vm->bytecode != NULL) runtime_free(vm->bytecode);
+    
+    runtime_free(vm);
+}
+
+// 加载字节码
+void vm_load_bytecode(VM* vm, uint8_t* bytecode, size_t size) {
+    // 安全检查：如果已经有字节码，先记录警告
+    if (vm->bytecode != NULL) {
+        fprintf(stderr, "警告：虚拟机字节码已加载，将重新分配\n");
+        runtime_free(vm->bytecode);
+        vm->bytecode = NULL;
+        vm->bytecode_size = 0;
+    }
+    
+    vm->bytecode = (uint8_t*)runtime_alloc(size);
+    if (vm->bytecode == NULL) {
+        vm->bytecode_size = 0;
+        fprintf(stderr, "错误：分配字节码内存失败\n");
+        return;
+    }
+    
+    memcpy(vm->bytecode, bytecode, size);
+    vm->bytecode_size = size;
+    vm->ip = 0;
+}
+
+// 栈操作
+void vm_push(VM* vm, Value value) {
+    // 检查栈是否需要扩容
+    if (vm->stack_top >= vm->stack_size) {
+        size_t new_size = vm->stack_size * 2;
+        Value* new_stack = runtime_realloc_value_array(vm->stack, new_size);
+        if (new_stack == NULL) {
+            fprintf(stderr, "虚拟机栈溢出\n");
+            vm->running = false;
+            vm->exit_code = 1;
+            return;
+        }
+        vm->stack = new_stack;
+        vm->stack_size = new_size;
+    }
+    
+    vm->stack[vm->stack_top++] = value;
+}
+
+Value vm_pop(VM* vm) {
+    if (vm->stack_top == 0) {
+        fprintf(stderr, "虚拟机栈下溢\n");
+        vm->running = false;
+        vm->exit_code = 1;
+        return value_nil();
+    }
+    
+    return vm->stack[--vm->stack_top];
+}
+
+Value vm_peek(VM* vm, size_t depth) {
+    if (depth >= vm->stack_top) {
+        return value_nil();
+    }
+    return vm->stack[vm->stack_top - 1 - depth];
+}
+
+// 读取操作数
+static uint8_t vm_read_u8(VM* vm) {
+    if (vm->ip >= vm->bytecode_size) {
+        return 0;
+    }
+    return vm->bytecode[vm->ip++];
+}
+
+/* static uint16_t vm_read_u16(VM* vm) {
+    uint16_t value = 0;
+    if (vm->ip + 2 > vm->bytecode_size) {
+        return 0;
+    }
+    value = vm->bytecode[vm->ip] | (vm->bytecode[vm->ip + 1] << 8);
+    vm->ip += 2;
+    return value;
+} */
+
+static uint32_t vm_read_u32(VM* vm) {
+    uint32_t value = 0;
+    if (vm->ip + 4 > vm->bytecode_size) {
+        return 0;
+    }
+    value = vm->bytecode[vm->ip] | 
+            (vm->bytecode[vm->ip + 1] << 8) | 
+            (vm->bytecode[vm->ip + 2] << 16) | 
+            (vm->bytecode[vm->ip + 3] << 24);
+    vm->ip += 4;
+    return value;
+}
+
+// 获取常量
+Value vm_get_constant(VM* vm, uint32_t index) {
+    if (index >= vm->constant_count) {
+        fprintf(stderr, "常量索引越界: %u >= %zu\n", index, vm->constant_count);
+        return value_nil();
+    }
+    return vm->constants[index];
+}
+
+// 添加常量
+uint32_t vm_add_constant(VM* vm, Value value) {
+    // 检查常量池是否需要扩容
+    if (vm->constant_count >= 1024) { // 简单限制
+        fprintf(stderr, "常量池已满\n");
+        return 0;
+    }
+    
+    // 这里简化：直接添加，实际应该去重
+    vm->constants[vm->constant_count] = value;
+    return vm->constant_count++;
+}
+
+// ==================== 指令执行 ====================
+
+// 执行单个指令
+static bool vm_execute_instruction(VM* vm) {
+    uint8_t opcode = vm_read_u8(vm);
+    
+    switch (opcode) {
+        case OP_NOP:
+            // 空操作
+            break;
+            
+        case OP_HALT:
+            vm->running = false;
+            return false;
+            
+        case OP_PUSH_NIL:
+            vm_push(vm, value_nil());
+            break;
+            
+        case OP_PUSH_TRUE:
+            vm_push(vm, value_bool(true));
+            break;
+            
+        case OP_PUSH_FALSE:
+            vm_push(vm, value_bool(false));
+            break;
+            
+        case OP_PUSH_INT: {
+            uint32_t const_index = vm_read_u32(vm);
+            Value constant = vm_get_constant(vm, const_index);
+            vm_push(vm, constant);
+            break;
+        }
+            
+        case OP_PUSH_STRING: {
+            uint32_t const_index = vm_read_u32(vm);
+            Value constant = vm_get_constant(vm, const_index);
+            vm_push(vm, constant);
+            break;
+        }
+            
+        case OP_POP:
+            vm_pop(vm);
+            break;
+            
+        case OP_ADD: {
+            Value b = vm_pop(vm);
+            Value a = vm_pop(vm);
+            
+            if (value_is_int(a) && value_is_int(b)) {
+                int64_t result = a.as.integer + b.as.integer;
+                vm_push(vm, value_int(result));
+            } else if (value_is_float(a) || value_is_float(b)) {
+                double a_val = value_is_int(a) ? (double)a.as.integer : a.as.number;
+                double b_val = value_is_int(b) ? (double)b.as.integer : b.as.number;
+                vm_push(vm, value_float(a_val + b_val));
+            } else {
+                fprintf(stderr, "加法操作数类型错误\n");
+                vm_push(vm, value_nil());
+            }
+            break;
+        }
+            
+        case OP_SUB: {
+            Value b = vm_pop(vm);
+            Value a = vm_pop(vm);
+            
+            if (value_is_int(a) && value_is_int(b)) {
+                int64_t result = a.as.integer - b.as.integer;
+                vm_push(vm, value_int(result));
+            } else if (value_is_float(a) || value_is_float(b)) {
+                double a_val = value_is_int(a) ? (double)a.as.integer : a.as.number;
+                double b_val = value_is_int(b) ? (double)b.as.integer : b.as.number;
+                vm_push(vm, value_float(a_val - b_val));
+            } else {
+                fprintf(stderr, "减法操作数类型错误\n");
+                vm_push(vm, value_nil());
+            }
+            break;
+        }
+            
+        case OP_MUL: {
+            Value b = vm_pop(vm);
+            Value a = vm_pop(vm);
+            
+            if (value_is_int(a) && value_is_int(b)) {
+                int64_t result = a.as.integer * b.as.integer;
+                vm_push(vm, value_int(result));
+            } else if (value_is_float(a) || value_is_float(b)) {
+                double a_val = value_is_int(a) ? (double)a.as.integer : a.as.number;
+                double b_val = value_is_int(b) ? (double)b.as.integer : b.as.number;
+                vm_push(vm, value_float(a_val * b_val));
+            } else {
+                fprintf(stderr, "乘法操作数类型错误\n");
+                vm_push(vm, value_nil());
+            }
+            break;
+        }
+            
+        case OP_DIV: {
+            Value b = vm_pop(vm);
+            Value a = vm_pop(vm);
+            
+            if (value_is_int(a) && value_is_int(b)) {
+                if (b.as.integer == 0) {
+                    fprintf(stderr, "除零错误\n");
+                    vm_push(vm, value_nil());
+                } else {
+                    int64_t result = a.as.integer / b.as.integer;
+                    vm_push(vm, value_int(result));
+                }
+            } else if (value_is_float(a) || value_is_float(b)) {
+                double a_val = value_is_int(a) ? (double)a.as.integer : a.as.number;
+                double b_val = value_is_int(b) ? (double)b.as.integer : b.as.number;
+                if (b_val == 0.0) {
+                    fprintf(stderr, "除零错误\n");
+                    vm_push(vm, value_nil());
+                } else {
+                    vm_push(vm, value_float(a_val / b_val));
+                }
+            } else {
+                fprintf(stderr, "除法操作数类型错误\n");
+                vm_push(vm, value_nil());
+            }
+            break;
+        }
+            
+        case OP_EQ: {
+            Value b = vm_pop(vm);
+            Value a = vm_pop(vm);
+            vm_push(vm, value_bool(value_equals(a, b)));
+            break;
+        }
+            
+        case OP_NEQ: {
+            Value b = vm_pop(vm);
+            Value a = vm_pop(vm);
+            vm_push(vm, value_bool(!value_equals(a, b)));
+            break;
+        }
+            
+        case OP_NOT: {
+            Value a = vm_pop(vm);
+            if (value_is_bool(a)) {
+                vm_push(vm, value_bool(!a.as.boolean));
+            } else {
+                fprintf(stderr, "非操作操作数类型错误\n");
+                vm_push(vm, value_nil());
+            }
+            break;
+        }
+            
+        case OP_JUMP: {
+            uint32_t offset = vm_read_u32(vm);
+            vm->ip = offset;
+            break;
+        }
+            
+        case OP_JUMP_IF_TRUE: {
+            uint32_t offset = vm_read_u32(vm);
+            Value condition = vm_peek(vm, 0);
+            if (value_is_bool(condition) && condition.as.boolean) {
+                vm->ip = offset;
+            }
+            break;
+        }
+            
+        case OP_JUMP_IF_FALSE: {
+            uint32_t offset = vm_read_u32(vm);
+            Value condition = vm_peek(vm, 0);
+            if (value_is_bool(condition) && !condition.as.boolean) {
+                vm->ip = offset;
+            }
+            break;
+        }
+            
+        case OP_PRINT: {
+            Value value = vm_peek(vm, 0);
+            const char* str = value_to_string(value);
+            printf("%s\n", str);
+            break;
+        }
+            
+        case OP_DUMP_STACK: {
+            printf("=== 虚拟机栈转储 (大小: %zu) ===\n", vm->stack_top);
+            for (size_t i = 0; i < vm->stack_top; i++) {
+                printf("[%zu] %s\n", i, value_to_string(vm->stack[i]));
+            }
+            printf("=============================\n");
+            break;
+        }
+            
+        case OP_QUANTUM_SUPERPOSITION:
+            // 量子叠加态操作（占位实现）
+            printf("[量子] 创建叠加态\n");
+            vm_push(vm, value_string("量子叠加态", strlen("量子叠加态")));
+            break;
+            
+        case OP_QUANTUM_MEASURE:
+            // 量子测量操作（占位实现）
+            printf("[量子] 测量量子态\n");
+            vm_push(vm, value_bool(true)); // 测量结果：真
+            break;
+            
+        case OP_QUANTUM_ENTANGLE:
+            // 量子纠缠操作（占位实现）
+            printf("[量子] 创建纠缠\n");
+            vm_push(vm, value_string("量子纠缠态", strlen("量子纠缠态")));
+            break;
+            
+        default:
+            fprintf(stderr, "未知操作码: %d (%s)\n", 
+                   opcode, bytecode_opcode_name(opcode));
+            vm->running = false;
+            vm->exit_code = 1;
+            return false;
+    }
+    
+    return true;
+}
+
+// 执行虚拟机
+int vm_execute(VM* vm) {
+    if (vm->bytecode == NULL || vm->bytecode_size == 0) {
+        fprintf(stderr, "没有加载字节码\n");
+        return 1;
+    }
+    
+    vm->running = true;
+    vm->ip = 0;
+    
+    while (vm->running && vm->ip < vm->bytecode_size) {
+        if (!vm_execute_instruction(vm)) {
+            break;
+        }
+        
+        // 安全检查：防止无限循环
+        if (vm->ip >= vm->bytecode_size) {
+            break;
+        }
+    }
+    
+    if (vm->ip >= vm->bytecode_size && vm->running) {
+        printf("字节码执行完成\n");
+    }
+    
+    return vm->exit_code;
+}
+
+// ==================== 测试辅助 ====================
+
+// 创建测试字节码
+uint8_t* create_test_bytecode(size_t* out_size) {
+    // 简单测试：计算 2 + 3 * 4
+    // 对应字节码：
+    // PUSH_INT 0 (常量0: 整数2)
+    // PUSH_INT 1 (常量1: 整数3)
+    // PUSH_INT 2 (常量2: 整数4)
+    // MUL
+    // ADD
+    // PRINT
+    // HALT
+    
+    BytecodeBuilder* builder = bytecode_builder_create(32);
+    if (builder == NULL) {
+        return NULL;
+    }
+    
+    // 生成测试字节码
+    bytecode_builder_emit_opcode(builder, OP_PUSH_INT);
+    bytecode_builder_emit_u32(builder, 0); // 常量索引0
+    
+    bytecode_builder_emit_opcode(builder, OP_PUSH_INT);
+    bytecode_builder_emit_u32(builder, 1); // 常量索引1
+    
+    bytecode_builder_emit_opcode(builder, OP_PUSH_INT);
+    bytecode_builder_emit_u32(builder, 2); // 常量索引2
+    
+    bytecode_builder_emit_opcode(builder, OP_MUL);
+    bytecode_builder_emit_opcode(builder, OP_ADD);
+    bytecode_builder_emit_opcode(builder, OP_PRINT);
+    bytecode_builder_emit_opcode(builder, OP_HALT);
+    
+    uint8_t* code = bytecode_builder_get_code(builder, out_size);
+    uint8_t* copy = (uint8_t*)runtime_alloc(*out_size);
+    if (copy != NULL) {
+        memcpy(copy, code, *out_size);
+    }
+    
+    bytecode_builder_free(builder);
+    return copy;
+}
+
+// 运行测试
+void vm_run_test(void) {
+    printf("=== QEntL虚拟机测试 ===\n");
+    
+    VM* vm = vm_create();
+    if (vm == NULL) {
+        printf("创建虚拟机失败\n");
+        return;
+    }
+    
+    // 添加测试常量
+    vm_add_constant(vm, value_int(2));
+    vm_add_constant(vm, value_int(3));
+    vm_add_constant(vm, value_int(4));
+    
+    // 加载测试字节码
+    size_t code_size;
+    uint8_t* code = create_test_bytecode(&code_size);
+    if (code == NULL) {
+        printf("创建测试字节码失败\n");
+        vm_free(vm);
+        return;
+    }
+    
+    vm_load_bytecode(vm, code, code_size);
+    
+    // 反汇编
+    printf("测试字节码反汇编:\n");
+    bytecode_disassemble(code, code_size);
+    
+    // 执行
+    printf("\n执行结果:\n");
+    int result = vm_execute(vm);
+    printf("退出代码: %d\n", result);
+    
+    // 清理
+    runtime_free(code);
+    vm_free(vm);
+    
+    printf("=== 测试完成 ===\n");
+}

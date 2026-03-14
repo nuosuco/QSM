@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QEntL量子并行执行服务 - 并行计算中心</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #8360c3 0%, #2ebf91 100%);
+            background-attachment: fixed;
+            color: #ffffff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .quantum-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: #2ebf91;
+            border-radius: 50%;
+            animation: parallelFlow 5s infinite ease-in-out;
+        }
+
+        @keyframes parallelFlow {
+            0%, 100% { 
+                transform: translateX(0) translateY(0) scale(1); 
+                opacity: 0.7; 
+                box-shadow: 0 0 10px #2ebf91;
+            }
+            25% { 
+                transform: translateX(40px) translateY(-20px) scale(1.2); 
+                opacity: 1; 
+                box-shadow: 0 0 20px #2ebf91;
+            }
+            50% { 
+                transform: translateX(80px) translateY(0) scale(1.5); 
+                opacity: 0.8; 
+                box-shadow: 0 0 15px #2ebf91;
+            }
+            75% { 
+                transform: translateX(40px) translateY(20px) scale(1.2); 
+                opacity: 1; 
+                box-shadow: 0 0 20px #2ebf91;
+            }
+        }
+
+        .quantum-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .quantum-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(46, 191, 145, 0.1);
+            border-radius: 20px;
+            border: 1px solid rgba(46, 191, 145, 0.3);
+            backdrop-filter: blur(15px);
+        }
+
+        .quantum-title {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #2ebf91, #8360c3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(46, 191, 145, 0.5);
+        }
+
+        .quantum-gene {
+            font-family: 'Courier New', monospace;
+            color: #2ebf91;
+            font-size: 1.1em;
+            margin: 10px 0;
+        }
+
+        .parallel-dashboard {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .parallel-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(46, 191, 145, 0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .parallel-panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(46, 191, 145, 0.3);
+            border-color: rgba(46, 191, 145, 0.5);
+        }
+
+        .panel-title {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #2ebf91;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .task-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: rgba(46, 191, 145, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #2ebf91;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            animation: taskPulse 4s infinite;
+        }
+
+        @keyframes taskPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .task-group:hover {
+            background: rgba(46, 191, 145, 0.2);
+            transform: translateX(8px);
+        }
+
+        .task-group.running {
+            border-left-color: #32cd32;
+            animation: runningGlow 2s infinite;
+        }
+
+        @keyframes runningGlow {
+            0%, 100% { border-left-color: #32cd32; }
+            50% { border-left-color: #2ebf91; }
+        }
+
+        .task-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .task-name {
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .task-details {
+            color: #ccc;
+            font-size: 0.9em;
+        }
+
+        .task-status {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-pending {
+            background: #ffd93d;
+            color: #000;
+        }
+
+        .status-running {
+            background: #32cd32;
+            color: #000;
+            animation: statusPulse 2s infinite;
+        }
+
+        .status-completed {
+            background: #2ebf91;
+            color: #000;
+        }
+
+        .status-failed {
+            background: #ff6b6b;
+            color: #fff;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .strategy-selector {
+            background: rgba(46, 191, 145, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .strategy-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .strategy-option:hover {
+            background: rgba(46, 191, 145, 0.2);
+        }
+
+        .strategy-option.active {
+            background: rgba(46, 191, 145, 0.3);
+            border: 1px solid #2ebf91;
+        }
+
+        .strategy-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .strategy-option.active .strategy-indicator {
+            background: #2ebf91;
+            animation: strategyActive 2s infinite;
+        }
+
+        @keyframes strategyActive {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .quantum-controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .quantum-button {
+            padding: 12px 25px;
+            background: linear-gradient(45deg, #2ebf91, #8360c3);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .quantum-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(46, 191, 145, 0.4);
+        }
+
+        .quantum-button:active {
+            transform: scale(0.95);
+        }
+
+        .parallel-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+            background: rgba(46, 191, 145, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(46, 191, 145, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(46, 191, 145, 0.2);
+        }
+
+        .stat-value {
+            font-size: 2.2em;
+            font-weight: bold;
+            color: #2ebf91;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #ccc;
+            font-size: 0.9em;
+        }
+
+        .progress-visualization {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(46, 191, 145, 0.2);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2ebf91, #8360c3);
+            border-radius: 6px;
+            transition: width 0.3s ease;
+            animation: progressFlow 3s infinite;
+        }
+
+        @keyframes progressFlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        .parallel-cores {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            margin: 15px 0;
+        }
+
+        .core-indicator {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(46, 191, 145, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            transition: all 0.3s ease;
+        }
+
+        .core-indicator.active {
+            background: #2ebf91;
+            color: #000;
+            animation: coreActive 2s infinite;
+        }
+
+        @keyframes coreActive {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .log-panel {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid rgba(46, 191, 145, 0.2);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .log-info { color: #2ebf91; }
+        .log-success { color: #32cd32; background: rgba(50, 205, 50, 0.1); }
+        .log-warning { color: #ffd93d; background: rgba(255, 217, 61, 0.1); }
+        .log-error { color: #ff6b6b; background: rgba(255, 107, 107, 0.1); }
+        .log-parallel { color: #8360c3; background: rgba(131, 96, 195, 0.1); }
+
+        @media (max-width: 768px) {
+            .quantum-container {
+                padding: 10px;
+            }
+            
+            .quantum-title {
+                font-size: 2.2em;
+            }
+            
+            .parallel-dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .parallel-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .parallel-cores {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="quantum-particles" id="particles"></div>
+    
+    <div class="quantum-container">
+        <div class="quantum-header">
+            <h1 class="quantum-title">QEntL量子并行执行服务</h1>
+            <div class="quantum-gene">量子基因: QG-SERVICES-PARALLEL-2024050801</div>
+            <div class="quantum-gene">纠缠强度: 0.97 | 并行计算中心</div>
+        </div>
+
+        <div class="parallel-stats">
+            <div class="stat-card">
+                <span class="stat-value" id="totalGroups">0</span>
+                <div class="stat-label">任务组</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="runningTasks">0</span>
+                <div class="stat-label">运行任务</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="completedTasks">0</span>
+                <div class="stat-label">已完成</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="parallelEfficiency">0%</span>
+                <div class="stat-label">并行效率</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="avgExecutionTime">0ms</span>
+                <div class="stat-label">平均执行时间</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="peakParallelism">0</span>
+                <div class="stat-label">峰值并行度</div>
+            </div>
+        </div>
+
+        <div class="quantum-controls">
+            <button class="quantum-button" onclick="initializeParallel()">初始化服务</button>
+            <button class="quantum-button" onclick="createTaskGroup()">创建任务组</button>
+            <button class="quantum-button" onclick="executeParallel()">并行执行</button>
+            <button class="quantum-button" onclick="optimizeExecution()">优化执行</button>
+            <button class="quantum-button" onclick="showCoreStatus()">核心状态</button>
+        </div>
+
+        <div class="parallel-dashboard">
+            <div class="parallel-panel">
+                <div class="panel-title">
+                    <span>⚡</span> 任务组队列
+                </div>
+                <div id="taskGroups" style="max-height: 300px; overflow-y: auto;">
+                    <!-- 任务组将在这里动态生成 -->
+                </div>
+            </div>
+
+            <div class="parallel-panel">
+                <div class="panel-title">
+                    <span>🔧</span> 执行策略
+                </div>
+                <div class="strategy-selector">
+                    <div class="strategy-option active" onclick="selectStrategy('AUTO')">
+                        <span>自动选择</span>
+                        <span class="strategy-indicator"></span>
+                    </div>
+                    <div class="strategy-option" onclick="selectStrategy('DATA_PARALLEL')">
+                        <span>数据并行</span>
+                        <span class="strategy-indicator"></span>
+                    </div>
+                    <div class="strategy-option" onclick="selectStrategy('TASK_PARALLEL')">
+                        <span>任务并行</span>
+                        <span class="strategy-indicator"></span>
+                    </div>
+                    <div class="strategy-option" onclick="selectStrategy('PIPELINE')">
+                        <span>流水线并行</span>
+                        <span class="strategy-indicator"></span>
+                    </div>
+                    <div class="strategy-option" onclick="selectStrategy('HYBRID')">
+                        <span>混合策略</span>
+                        <span class="strategy-indicator"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="parallel-panel">
+                <div class="panel-title">
+                    <span>📊</span> 执行统计
+                </div>
+                <div id="executionStats">
+                    <div style="margin: 10px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>CPU利用率</span>
+                            <span id="cpuUsage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="cpuProgress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div style="margin: 10px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>内存使用</span>
+                            <span id="memoryUsage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="memoryProgress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div style="margin: 10px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>量子纠缠优化</span>
+                            <span id="quantumOptimization">97%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="quantumProgress" style="width: 97%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="progress-visualization">
+            <div class="panel-title">
+                <span>🔄</span> 并行核心状态
+            </div>
+            <div class="parallel-cores" id="parallelCores">
+                <!-- 核心状态指示器将在这里动态生成 -->
+            </div>
+        </div>
+
+        <div class="log-panel">
+            <div style="color: #2ebf91; font-weight: bold; margin-bottom: 10px;">量子并行执行服务日志</div>
+            <div id="logOutput">
+                <div class="log-entry log-info">[系统] QEntL量子并行执行服务已加载</div>
+                <div class="log-entry log-info">[并行] 等待初始化...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // QEntL量子并行执行服务量子组件
+        class QuantumParallelExecution {
+            constructor() {
+                this.quantumGene = "QG-SERVICES-PARALLEL-2024050801";
+                this.entanglementStrength = 0.97;
+                this.initialized = false;
+                
+                this.executionStrategies = {
+                    AUTO: 0, DATA_PARALLEL: 1, TASK_PARALLEL: 2, 
+                    PIPELINE: 3, HYBRID: 4
+                };
+                
+                this.executionPriorities = {
+                    LOW: 0, NORMAL: 1, HIGH: 2, CRITICAL: 3
+                };
+                
+                this.executionStates = {
+                    PENDING: 0, RUNNING: 1, COMPLETED: 2, FAILED: 3, CANCELLED: 4
+                };
+                
+                this.currentStrategy = this.executionStrategies.AUTO;
+                this.nextGroupId = 1;
+                this.taskGroups = new Map();
+                this.completedGroups = new Map();
+                this.coreCount = 8;
+                this.activeCores = new Set();
+                
+                this.config = {
+                    maxParallelGroups: 8,
+                    maxTasksPerGroup: 32,
+                    minTasksForParallel: 4,
+                    resourceThreshold: 0.8,
+                    dynamicAdjustment: true,
+                    entanglementOptimization: true,
+                    executionTimeout: 60000
+                };
+                
+                this.statistics = {
+                    totalGroupsCreated: 0,
+                    totalGroupsCompleted: 0,
+                    totalGroupsFailed: 0,
+                    totalTasksProcessed: 0,
+                    parallelEfficiency: 0.0,
+                    averageExecutionTime: 0.0,
+                    peakParallelism: 0
+                };
+                
+                this.performance = {
+                    cpuUsage: 0,
+                    memoryUsage: 0,
+                    quantumOptimization: 97
+                };
+            }
+
+            initialize() {
+                this.log("初始化量子并行执行服务...", "info");
+                
+                // 初始化并行核心
+                this.initializeParallelCores();
+                
+                // 启动性能监控
+                this.startPerformanceMonitoring();
+                
+                this.initialized = true;
+                this.log("量子并行执行服务初始化完成", "success");
+                this.updateDisplay();
+                
+                return true;
+            }
+
+            initializeParallelCores() {
+                const coresContainer = document.getElementById('parallelCores');
+                coresContainer.innerHTML = '';
+                
+                for (let i = 0; i < this.coreCount; i++) {
+                    const coreElement = document.createElement('div');
+                    coreElement.className = 'core-indicator';
+                    coreElement.id = `core-${i}`;
+                    coreElement.textContent = i + 1;
+                    coreElement.title = `核心 ${i + 1}`;
+                    coresContainer.appendChild(coreElement);
+                }
+                
+                this.log(`初始化 ${this.coreCount} 个并行核心`, "parallel");
+            }
+
+            createTaskGroup(name = null, strategy = null, priority = null) {
+                if (!this.initialized) {
+                    this.log("错误: 并行执行服务未初始化", "error");
+                    return null;
+                }
+
+                const groupId = this.getNewGroupId();
+                const groupName = name || `任务组-${groupId}`;
+                const groupStrategy = strategy !== null ? strategy : this.currentStrategy;
+                const groupPriority = priority !== null ? priority : this.executionPriorities.NORMAL;
+                
+                const taskGroup = {
+                    id: groupId,
+                    name: groupName,
+                    strategy: groupStrategy,
+                    priority: groupPriority,
+                    status: this.executionStates.PENDING,
+                    taskIds: [],
+                    taskCount: Math.floor(Math.random() * 16) + 4, // 4-20个任务
+                    options: {},
+                    results: {},
+                    createdTime: Date.now(),
+                    startTime: null,
+                    endTime: null,
+                    estimatedTime: Math.random() * 10000 + 5000 // 5-15秒
+                };
+
+                // 生成任务ID
+                for (let i = 0; i < taskGroup.taskCount; i++) {
+                    taskGroup.taskIds.push(`TASK-${groupId}-${i + 1}`);
+                }
+
+                this.taskGroups.set(groupId, taskGroup);
+                this.statistics.totalGroupsCreated++;
+                
+                this.log(`创建任务组: ${groupName} (${taskGroup.taskCount}个任务)`, "success");
+                this.updateDisplay();
+                
+                return groupId;
+            }
+
+            executeParallel() {
+                if (!this.initialized) {
+                    this.log("错误: 并行执行服务未初始化", "error");
+                    return;
+                }
+
+                const pendingGroups = Array.from(this.taskGroups.values())
+                    .filter(group => group.status === this.executionStates.PENDING);
+
+                if (pendingGroups.length === 0) {
+                    this.log("没有待执行的任务组", "warning");
+                    return;
+                }
+
+                // 按优先级排序
+                pendingGroups.sort((a, b) => b.priority - a.priority);
+                
+                // 选择要执行的任务组
+                const maxGroups = Math.min(pendingGroups.length, this.config.maxParallelGroups);
+                const selectedGroups = pendingGroups.slice(0, maxGroups);
+                
+                this.log(`开始并行执行 ${selectedGroups.length} 个任务组`, "parallel");
+                
+                selectedGroups.forEach((group, index) => {
+                    setTimeout(() => {
+                        this.executeTaskGroup(group.id);
+                    }, index * 500); // 错开启动时间
+                });
+            }
+
+            executeTaskGroup(groupId) {
+                const group = this.taskGroups.get(groupId);
+                if (!group) return;
+
+                group.status = this.executionStates.RUNNING;
+                group.startTime = Date.now();
+                
+                // 分配核心
+                const requiredCores = Math.min(group.taskCount, this.coreCount);
+                const allocatedCores = this.allocateCores(requiredCores);
+                
+                this.log(`执行任务组: ${group.name} (分配${allocatedCores.length}个核心)`, "parallel");
+                this.updateDisplay();
+                
+                // 模拟并行执行
+                setTimeout(() => {
+                    this.completeTaskGroup(groupId, allocatedCores);
+                }, group.estimatedTime);
+            }
+
+            completeTaskGroup(groupId, allocatedCores) {
+                const group = this.taskGroups.get(groupId);
+                if (!group) return;
+
+                const executionTime = Date.now() - group.startTime;
+                
+                // 模拟成功/失败概率
+                const success = Math.random() > 0.1; // 90% 成功率
+                
+                if (success) {
+                    group.status = this.executionStates.COMPLETED;
+                    group.endTime = Date.now();
+                    this.statistics.totalGroupsCompleted++;
+                    this.statistics.totalTasksProcessed += group.taskCount;
+                    
+                    this.log(`任务组完成: ${group.name} (耗时: ${executionTime}ms)`, "success");
+                } else {
+                    group.status = this.executionStates.FAILED;
+                    this.statistics.totalGroupsFailed++;
+                    
+                    this.log(`任务组失败: ${group.name}`, "error");
+                }
+
+                // 释放核心
+                this.releaseCores(allocatedCores);
+                
+                // 移动到已完成列表
+                this.completedGroups.set(groupId, group);
+                this.taskGroups.delete(groupId);
+                
+                // 更新统计信息
+                this.updateStatistics();
+                this.updateDisplay();
+            }
+
+            allocateCores(count) {
+                const availableCores = [];
+                for (let i = 0; i < this.coreCount; i++) {
+                    if (!this.activeCores.has(i)) {
+                        availableCores.push(i);
+                    }
+                }
+                
+                const allocated = availableCores.slice(0, count);
+                allocated.forEach(coreId => {
+                    this.activeCores.add(coreId);
+                    const coreElement = document.getElementById(`core-${coreId}`);
+                    if (coreElement) {
+                        coreElement.classList.add('active');
+                    }
+                });
+                
+                return allocated;
+            }
+
+            releaseCores(coreIds) {
+                coreIds.forEach(coreId => {
+                    this.activeCores.delete(coreId);
+                    const coreElement = document.getElementById(`core-${coreId}`);
+                    if (coreElement) {
+                        coreElement.classList.remove('active');
+                    }
+                });
+            }
+
+            selectStrategy(strategyName) {
+                this.currentStrategy = this.executionStrategies[strategyName];
+                this.log(`选择执行策略: ${strategyName}`, "info");
+                
+                // 更新UI显示
+                document.querySelectorAll('.strategy-option').forEach(el => el.classList.remove('active'));
+                event.currentTarget.classList.add('active');
+            }
+
+            optimizeExecution() {
+                this.log("执行并行优化...", "info");
+                
+                setTimeout(() => {
+                    // 模拟优化效果
+                    this.performance.cpuUsage = Math.max(10, this.performance.cpuUsage - 15);
+                    this.performance.memoryUsage = Math.max(5, this.performance.memoryUsage - 10);
+                    this.performance.quantumOptimization = Math.min(100, this.performance.quantumOptimization + 2);
+                    
+                    this.statistics.parallelEfficiency += 5;
+                    
+                    this.log("并行优化完成，性能提升", "success");
+                    this.updatePerformanceDisplay();
+                    this.updateDisplay();
+                }, 2000);
+            }
+
+            showCoreStatus() {
+                const activeCount = this.activeCores.size;
+                const totalCount = this.coreCount;
+                const utilization = (activeCount / totalCount * 100).toFixed(1);
+                
+                this.log(`核心状态: ${activeCount}/${totalCount} 活跃 (利用率: ${utilization}%)`, "info");
+            }
+
+            startPerformanceMonitoring() {
+                setInterval(() => {
+                    this.updatePerformanceMetrics();
+                }, 2000);
+            }
+
+            updatePerformanceMetrics() {
+                // 模拟性能指标变化
+                const runningGroups = Array.from(this.taskGroups.values())
+                    .filter(group => group.status === this.executionStates.RUNNING).length;
+                
+                this.performance.cpuUsage = Math.min(100, runningGroups * 15 + Math.random() * 20);
+                this.performance.memoryUsage = Math.min(100, runningGroups * 12 + Math.random() * 15);
+                
+                // 更新峰值并行度
+                this.statistics.peakParallelism = Math.max(this.statistics.peakParallelism, runningGroups);
+                
+                this.updatePerformanceDisplay();
+            }
+
+            updateStatistics() {
+                const totalGroups = this.statistics.totalGroupsCreated;
+                if (totalGroups > 0) {
+                    this.statistics.parallelEfficiency = 
+                        (this.statistics.totalGroupsCompleted / totalGroups * 100);
+                }
+                
+                // 计算平均执行时间
+                const completedGroups = Array.from(this.completedGroups.values())
+                    .filter(group => group.status === this.executionStates.COMPLETED);
+                
+                if (completedGroups.length > 0) {
+                    const totalTime = completedGroups.reduce((sum, group) => 
+                        sum + (group.endTime - group.startTime), 0);
+                    this.statistics.averageExecutionTime = totalTime / completedGroups.length;
+                }
+            }
+
+            getNewGroupId() {
+                return this.nextGroupId++;
+            }
+
+            updateDisplay() {
+                document.getElementById('totalGroups').textContent = this.statistics.totalGroupsCreated;
+                document.getElementById('runningTasks').textContent = 
+                    Array.from(this.taskGroups.values())
+                        .filter(group => group.status === this.executionStates.RUNNING).length;
+                document.getElementById('completedTasks').textContent = this.statistics.totalGroupsCompleted;
+                document.getElementById('parallelEfficiency').textContent = 
+                    Math.round(this.statistics.parallelEfficiency) + '%';
+                document.getElementById('avgExecutionTime').textContent = 
+                    Math.round(this.statistics.averageExecutionTime) + 'ms';
+                document.getElementById('peakParallelism').textContent = this.statistics.peakParallelism;
+
+                this.updateTaskGroupsList();
+            }
+
+            updatePerformanceDisplay() {
+                document.getElementById('cpuUsage').textContent = Math.round(this.performance.cpuUsage) + '%';
+                document.getElementById('cpuProgress').style.width = this.performance.cpuUsage + '%';
+                
+                document.getElementById('memoryUsage').textContent = Math.round(this.performance.memoryUsage) + '%';
+                document.getElementById('memoryProgress').style.width = this.performance.memoryUsage + '%';
+                
+                document.getElementById('quantumOptimization').textContent = Math.round(this.performance.quantumOptimization) + '%';
+                document.getElementById('quantumProgress').style.width = this.performance.quantumOptimization + '%';
+            }
+
+            updateTaskGroupsList() {
+                const container = document.getElementById('taskGroups');
+                container.innerHTML = '';
+
+                if (this.taskGroups.size === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">暂无任务组</div>';
+                    return;
+                }
+
+                this.taskGroups.forEach((group, groupId) => {
+                    const groupElement = document.createElement('div');
+                    groupElement.className = `task-group ${group.status === this.executionStates.RUNNING ? 'running' : ''}`;
+                    groupElement.onclick = () => this.showGroupDetails(groupId);
+                    
+                    const statusClass = Object.keys(this.executionStates)[group.status].toLowerCase();
+                    const strategyName = Object.keys(this.executionStrategies)[group.strategy];
+                    
+                    groupElement.innerHTML = `
+                        <div class="task-info">
+                            <div class="task-name">${group.name}</div>
+                            <div class="task-details">${group.taskCount}个任务 | ${strategyName}</div>
+                        </div>
+                        <div class="task-status status-${statusClass}">${Object.keys(this.executionStates)[group.status]}</div>
+                    `;
+                    
+                    container.appendChild(groupElement);
+                });
+            }
+
+            showGroupDetails(groupId) {
+                const group = this.taskGroups.get(groupId);
+                if (group) {
+                    const strategyName = Object.keys(this.executionStrategies)[group.strategy];
+                    this.log(`任务组详情: ${group.name} - ${group.taskCount}个任务 (${strategyName})`, "info");
+                }
+            }
+
+            log(message, type = "info") {
+                const logOutput = document.getElementById('logOutput');
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry log-${type}`;
+                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logOutput.appendChild(logEntry);
+                logOutput.scrollTop = logOutput.scrollHeight;
+            }
+
+            // 量子纠缠通信
+            sendQuantumMessage(targetGene, message) {
+                const entangledMessage = {
+                    from: this.quantumGene,
+                    to: targetGene,
+                    message: message,
+                    timestamp: Date.now(),
+                    entanglementStrength: this.entanglementStrength,
+                    parallelContext: "QUANTUM_PARALLEL_EXECUTION"
+                };
+
+                window.postMessage({
+                    type: 'QUANTUM_ENTANGLEMENT',
+                    data: entangledMessage
+                }, '*');
+
+                this.log(`量子消息发送至 ${targetGene}`, "parallel");
+            }
+        }
+
+        // 全局量子并行执行服务实例
+        const quantumParallelExecution = new QuantumParallelExecution();
+
+        // 界面控制函数
+        function initializeParallel() {
+            quantumParallelExecution.initialize();
+        }
+
+        function createTaskGroup() {
+            quantumParallelExecution.createTaskGroup();
+        }
+
+        function executeParallel() {
+            quantumParallelExecution.executeParallel();
+        }
+
+        function optimizeExecution() {
+            quantumParallelExecution.optimizeExecution();
+        }
+
+        function showCoreStatus() {
+            quantumParallelExecution.showCoreStatus();
+        }
+
+        function selectStrategy(strategyName) {
+            quantumParallelExecution.selectStrategy(strategyName);
+        }
+
+        // 创建量子粒子效果
+        function createQuantumParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 60;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 5 + 's';
+                particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        // 监听量子纠缠消息
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'QUANTUM_ENTANGLEMENT') {
+                const data = event.data.data;
+                if (data.to === quantumParallelExecution.quantumGene) {
+                    quantumParallelExecution.log(`收到量子纠缠消息: ${data.message}`, "parallel");
+                }
+            }
+        });
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            createQuantumParticles();
+            quantumParallelExecution.log("QEntL量子并行执行服务已加载", "info");
+            
+            // 定期更新显示
+            setInterval(() => {
+                quantumParallelExecution.updateDisplay();
+            }, 3000);
+
+            // 定期自动创建任务组用于演示
+            setInterval(() => {
+                if (Math.random() < 0.3) { // 30% 概率
+                    quantumParallelExecution.createTaskGroup();
+                }
+            }, 8000);
+        });
+
+        // 导出到全局作用域
+        window.QuantumParallelExecution = quantumParallelExecution;
+    </script>
+</body>
+</html> 

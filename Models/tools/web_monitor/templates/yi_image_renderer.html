@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>彝文字符图片渲染器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            background: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #3498db;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .yi-image {
+            display: inline-block;
+            margin: 8px;
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+        }
+        
+        .chat-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .chat-message {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+        
+        .bot-message {
+            background: #e9ecef;
+            color: #333;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .chat-input {
+            flex-grow: 1;
+            padding: 12px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .send-button {
+            padding: 12px 25px;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .send-button:hover {
+            background: linear-gradient(45deg, #2980b9, #1f5f8b);
+        }
+        
+        .info-box {
+            background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌏 彝文字符图片渲染器</h1>
+        
+        <div class="section">
+            <h2>彝文字符图片显示</h2>
+            <p>这些是通过Canvas生成的彝文字符图片，应该能正常显示：</p>
+            <div id="yi-images-container"></div>
+        </div>
+
+        <div class="section">
+            <h2>彝文聊天测试</h2>
+            <div class="chat-container">
+                <div id="chat-messages">
+                    <div class="chat-message bot-message">
+                        <strong>QSM:</strong> 欢迎使用彝文聊天系统！
+                    </div>
+                </div>
+                <div class="input-container">
+                    <input type="text" class="chat-input" id="chat-input" placeholder="输入消息...">
+                    <button class="send-button" id="send-button">发送</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>字符信息</h2>
+            <div class="info-box" id="char-info">
+                正在分析字符...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 彝文字符到图片的映射
+        const yiCharMap = {
+            '󲜐': '陷害',
+            '󲜑': '兔子', 
+            '󲜒': '卷',
+            '󲜓': '舔',
+            '󲜔': '便宜',
+            '󲜕': '埋怨',
+            '󲜖': '裱褙',
+            '󲜗': '渣',
+            '󲜘': '尾',
+            '󲜙': '分开',
+            '󲜚': '雪',
+            '󲜛': '绊',
+            '󲜜': '指',
+            '󲜝': '包',
+            '󲜞': '锐利',
+            '󲜟': '这里',
+            '󲜠': '惊恐',
+            '󲜡': '爬',
+            '󲜢': '飘',
+            '󲜣': '惊',
+            '󲜤': '禁闭',
+            '󲜥': '八角',
+            '󲜦': '幼',
+            '󲜧': '膨胀',
+            '󲜨': '高祖',
+            '󲜩': '特地',
+            '󲜪': '翻',
+            '󲜫': '爆',
+            '󲜬': '翻开',
+            '󲜭': '逃',
+            '󲜮': '象声词',
+            '󲜯': '宝剑',
+            '󲜰': '长者',
+            '󲜱': '唱',
+            '󲜲': '放牧',
+            '󲜳': '熄灭',
+            '󲜴': '缝',
+            '󲜵': '乾坤',
+            '󲜶': '区',
+            '󲜷': '心',
+            '󲜸': '透',
+            '󲜹': '焦',
+            '󲜺': '股',
+            '󲜻': '咳',
+            '󲜼': '供奉',
+            '󲜽': '总是',
+            '󲜾': '计较',
+            '󲜿': '靠',
+            '󲝀': '煞气',
+            '󲝁': '语气助词',
+            '󲝂': '笑声',
+            '󲝃': '呛',
+            '󲝄': '灰色',
+            '󲝅': '胛骨',
+            '󲝆': '锄头',
+            '󲝇': '草',
+            '󲝈': '吹嘘',
+            '󲝉': '威胁',
+            '󲝊': '蝙蝠',
+            '󲝋': '瞪',
+            '󲝌': '钹',
+            '󲝍': '匪',
+            '󲝎': '研究',
+            '󲝏': '商议',
+            '󲝐': '象声词',
+            '󲝑': '选择',
+            '󲝒': '蠕动',
+            '󲝓': '下方',
+            '󲝔': '惬意草',
+            '󲝕': '钻',
+            '󲝖': '土蚕子',
+            '󲝗': '制度',
+            '󲝘': '白杨树',
+            '󲝙': '向',
+            '󲝚': '鹰',
+            '󲝛': '寒冷',
+            '󲝜': '管',
+            '󲝝': '发音词',
+            '󲝞': '玩',
+            '󲝟': '摇动',
+            '󲝠': '锯',
+            '󲝡': '右',
+            '󲝢': '凹',
+            '󲝣': '认真',
+            '󲝤': '笔管草',
+            '󲝥': '毛',
+            '󲝦': '蹲',
+            '󲝧': '野葱',
+            '󲝨': '丰盛',
+            '󲝩': '松球',
+            '󲝪': '葵花',
+            '󲝫': '麻',
+            '󲝬': '纱',
+            '󲝭': '像',
+            '󲝮': '额头',
+            '󲝯': '晒',
+            '󲝰': '行走',
+            '󲝱': '承受',
+            '󲝲': '开车',
+            '󲝳': '土茯苓',
+            '󲝴': '松弛',
+            '󲝵': '耕',
+            '󲝶': '叛',
+            '󲝷': '萌',
+            '󲝸': '末',
+            '󲝹': '稗',
+            '󲝺': '形容词缀',
+            '󲝻': '流星',
+            '󲝼': '豹',
+            '󲝽': '光',
+            '󲝾': '起疹子',
+            '󲝿': '山楂鸟',
+            '󲞀': '歧视',
+            '󲞁': '轻快',
+            '󲞂': '成活',
+            '󲞃': '滑',
+            '󲞄': '地名',
+            '󲞅': '传递',
+            '󲞆': '恨',
+            '󲞇': '手镯',
+            '󲞈': '蜘蛛',
+            '󲞉': '纽扣',
+            '󲞊': '稳当',
+            '󲞋': '清洁',
+            '󲞌': '蒿枝',
+            '󲞍': '连续',
+            '󲞎': '添补',
+            '󲞏': '水蒸气',
+            '󲞐': '犀牛',
+            '󲞑': '手巧',
+            '󲞒': '拥挤',
+            '󲞓': '增添',
+            '󲞔': '重叠词缀',
+            '󲞕': '箍',
+            '󲞖': '沉淀物',
+            '󲞗': '雄性',
+            '󲞘': '墙',
+            '󲞙': '搂',
+            '󲞚': '麻木',
+            '󲞛': '小跑',
+            '󲞜': '君',
+            '󲞝': '条',
+            '󲞞': '和睦',
+            '󲞟': '担',
+            '󲞠': '向后仰',
+            '󲞡': '吃草',
+            '󲞢': '谎',
+            '󲞣': '甲',
+            '󲞤': '升',
+            '󲞥': '悬挂',
+            '󲞦': '连接',
+            '󲞧': '凑在一起',
+            '󲞨': '镰刀',
+            '󲞩': '边',
+            '󲞪': '噗',
+            '󲞫': '面颊',
+            '󲞬': '果断',
+            '󲞭': '天',
+            '󲞮': '火',
+            '󲞯': '穿衣',
+            '󲞰': '王',
+            '󲞱': '蚱蜢',
+            '󲞲': '板栗',
+            '󲞳': '二十',
+            '󲞴': '晴',
+            '󲞵': '人',
+            '󲞶': '丛',
+            '󲞷': '蛾子',
+            '󲞸': '下',
+            '󲞹': '兄',
+            '󲞺': '抵',
+            '󲞻': '害羞',
+            '󲞼': '争夺',
+            '󲞽': '埋葬',
+            '󲞾': '就丛',
+            '󲞿': '单',
+            '󲟀': '晃荡',
+            '󲟁': '搾',
+            '󲟂': '魔芋',
+            '󲟃': '祖母',
+            '󲟄': '产',
+            '󲟅': '纯净',
+            '󲟆': '缝',
+            '󲟇': '络绎不绝',
+            '󲟈': '起泡',
+            '󲟉': '火草',
+            '󲟊': '涂',
+            '󲟋': '大后天',
+            '󲟌': '宽',
+            '󲟍': '祷告',
+            '󲟎': '脱落',
+            '󲟏': '幼',
+            '󲟐': '源',
+            '󲟑': '跟',
+            '󲟒': '相信',
+            '󲟓': '绞痛',
+            '󲟔': '酒',
+            '󲟕': '沾',
+            '󲟖': '拧',
+            '󲟗': '前'
+        };
+
+        // 创建彝文字符图片
+        function createYiCharImage(char, size = 60) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.className = 'yi-image';
+            
+            const ctx = canvas.getContext('2d');
+            
+            // 渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#fff3cd');
+            gradient.addColorStop(1, '#ffeaa7');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // 边框
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, size, size);
+            
+            // 文字
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = `bold ${size * 0.4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // 显示彝文字符和对应的中文含义
+            const meaning = yiCharMap[char] || '未知';
+            ctx.fillText(char, size/2, size/2 - 8);
+            ctx.font = `${size * 0.2}px Arial`;
+            ctx.fillText(meaning, size/2, size/2 + 12);
+            
+            return canvas;
+        }
+
+        // 渲染彝文字符为图片
+        function renderYiChars() {
+            const container = document.getElementById('yi-images-container');
+            const chars = Object.keys(yiCharMap).slice(0, 20); // 显示前20个字符
+            
+            chars.forEach(char => {
+                const canvas = createYiCharImage(char);
+                container.appendChild(canvas);
+            });
+        }
+
+        // 将彝文字符转换为图片
+        function convertYiTextToImages(text) {
+            const images = [];
+            for (let char of text) {
+                if (yiCharMap[char]) {
+                    const canvas = createYiCharImage(char, 40);
+                    images.push(canvas);
+                }
+            }
+            return images;
+        }
+
+        // 添加聊天消息
+        function addChatMessage(message, isUser = false) {
+            const chatContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user-message' : 'bot-message'}`;
+            
+            if (isUser) {
+                messageDiv.innerHTML = `<strong>你:</strong> ${message}`;
+            } else {
+                // 检查是否包含彝文字符
+                const hasYiChars = /[\uF0000-\uFFFFF]/.test(message);
+                if (hasYiChars) {
+                    // 创建图片容器
+                    const imageContainer = document.createElement('div');
+                    imageContainer.style.marginTop = '10px';
+                    
+                    // 转换彝文字符为图片
+                    const images = convertYiTextToImages(message);
+                    images.forEach(img => imageContainer.appendChild(img));
+                    
+                    messageDiv.innerHTML = `<strong>QSM:</strong> ${message}`;
+                    messageDiv.appendChild(imageContainer);
+                } else {
+                    messageDiv.innerHTML = `<strong>QSM:</strong> ${message}`;
+                }
+            }
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 发送聊天消息
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // 添加用户消息
+            addChatMessage(message, true);
+            input.value = '';
+            
+            try {
+                const response = await fetch('/chat/qsm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                addChatMessage(data.reply, false);
+            } catch (err) {
+                addChatMessage(`错误: ${err.message}`, false);
+            }
+        }
+
+        // 分析字符信息
+        function analyzeChars() {
+            const info = document.getElementById('char-info');
+            let text = '';
+            
+            const sampleChars = ['󲜐', '󲜑', '󲜒', '你', '好', 'A', '1'];
+            
+            text += '字符分析:\n';
+            text += '='.repeat(30) + '\n\n';
+            
+            sampleChars.forEach((char, i) => {
+                const code = char.charCodeAt(0);
+                const isYiWen = code >= 0xF0000 && code <= 0xFFFFF;
+                const meaning = yiCharMap[char] || '无对应含义';
+                
+                text += `字符 ${i+1}: "${char}"\n`;
+                text += `  Unicode: U+${code.toString(16).toUpperCase()}\n`;
+                text += `  十进制: ${code}\n`;
+                text += `  彝文字符: ${isYiWen ? '是' : '否'}\n`;
+                text += `  含义: ${meaning}\n`;
+                text += '\n';
+            });
+            
+            info.textContent = text;
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 渲染彝文字符图片
+            renderYiChars();
+            
+            // 分析字符
+            analyzeChars();
+            
+            // 绑定发送按钮事件
+            document.getElementById('send-button').addEventListener('click', sendMessage);
+            document.getElementById('chat-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
