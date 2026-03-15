@@ -57,13 +57,14 @@ class QuantumSimulator:
     
     def apply_cnot(self, control: int, target: int):
         """应用CNOT门"""
-        # CNOT门的实现
+        # CNOT门的实现：控制为1时翻转目标比特
+        new_state = self.state.copy()
         for i in range(2 ** self.num_qubits):
-            # 检查控制比特是否为1
             if (i >> control) & 1:
-                # 翻转目标比特
                 j = i ^ (1 << target)
-                self.state[i], self.state[j] = self.state[j], self.state[i]
+                new_state[i] = self.state[j]
+                new_state[j] = self.state[i]
+        self.state = new_state
     
     def measure(self, qubit: int) -> int:
         """测量指定量子比特"""
