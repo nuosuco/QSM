@@ -1,0 +1,469 @@
+/**
+ * QEntL量子动态文件系统核心
+ * QuantumGene: QG-QFS-CORE-20260318
+ * EntanglementStrength: 0.94
+ * 
+ * 功能：
+ * - 量子哈希索引
+ * - 智能文件分类
+ * - 动态目录管理
+ * - 文件搜索系统
+ */
+
+import "QEntL/core/console.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/time.qentl";
+
+// ==================== 文件元数据 ====================
+
+/**
+ * 文件元数据结构
+ */
+quantum_class FileMetadata {
+    field file_hash: string;        // 量子哈希值
+    field file_path: string;        // 文件路径
+    field file_size: int;           // 文件大小
+    field file_type: string;        // 文件类型
+    field tags: list<string>;       // 标签列表
+    field created_time: int;        // 创建时间戳
+    field modified_time: int;       // 修改时间戳
+    field access_count: int;        // 访问次数
+    field entangled_files: list<string>; // 纠缠文件列表
+    
+    method constructor() {
+        this.file_hash = "";
+        this.file_path = "";
+        this.file_size = 0;
+        this.file_type = "";
+        this.tags = [];
+        this.created_time = Time.now_millis();
+        this.modified_time = this.created_time;
+        this.access_count = 0;
+        this.entangled_files = [];
+    }
+    
+    // 添加标签
+    method add_tag(tag: string) {
+        if (!this.tags.contains(tag)) {
+            this.tags.append(tag);
+        }
+    }
+    
+    // 增加访问次数
+    method increment_access() {
+        this.access_count += 1;
+    }
+    
+    // 添加纠缠文件
+    method add_entanglement(file_hash: string) {
+        if (!this.entangled_files.contains(file_hash)) {
+            this.entangled_files.append(file_hash);
+        }
+    }
+}
+
+// ==================== 量子哈希索引 ====================
+
+/**
+ * 量子哈希索引系统
+ */
+quantum_class QuantumHashIndex {
+    field hash_to_file: map<string, FileMetadata>;
+    field path_to_hash: map<string, string>;
+    field tag_index: map<string, list<string>>;
+    field type_index: map<string, list<string>>;
+    
+    method constructor() {
+        this.hash_to_file = {};
+        this.path_to_hash = {};
+        this.tag_index = {};
+        this.type_index = {};
+    }
+    
+    // 计算量子哈希
+    method compute_quantum_hash(filepath: string) -> string {
+        // 结合路径、大小、内容的哈希
+        path_hash = String.hash_md5(filepath)[0..15];
+        
+        if (FileSystem.exists(filepath)) {
+            file_size = FileSystem.file_size(filepath);
+            size_hash = String.hash_md5(file_size.toString())[0..7];
+            
+            // 对于小文件，计算内容哈希
+            if (file_size < 10 * 1024 * 1024) {
+                content = FileSystem.read_bytes(filepath);
+                content_hash = String.hash_md5(content)[0..15];
+            } else {
+                content_hash = "0" * 15;
+            }
+        } else {
+            content_hash = "0" * 15;
+        }
+        
+        return "QH-" + path_hash + "-" + content_hash;
+    }
+    
+    // 添加文件索引
+    method add_file(metadata: FileMetadata) {
+        this.hash_to_file[metadata.file_hash] = metadata;
+        this.path_to_hash[metadata.file_path] = metadata.file_hash;
+        
+        // 更新标签索引
+        for tag in metadata.tags {
+            if (!this.tag_index.contains(tag)) {
+                this.tag_index[tag] = [];
+            }
+            if (!this.tag_index[tag].contains(metadata.file_hash)) {
+                this.tag_index[tag].append(metadata.file_hash);
+            }
+        }
+        
+        // 更新类型索引
+        if (!this.type_index.contains(metadata.file_type)) {
+            this.type_index[metadata.file_type] = [];
+        }
+        this.type_index[metadata.file_type].append(metadata.file_hash);
+    }
+    
+    // 按标签搜索
+    method search_by_tag(tag: string) -> list<FileMetadata> {
+        results = [];
+        hashes = this.tag_index.get(tag, []);
+        for hash_val in hashes {
+            if (this.hash_to_file.contains(hash_val)) {
+                results.append(this.hash_to_file[hash_val]);
+            }
+        }
+        return results;
+    }
+    
+    // 按类型搜索
+    method search_by_type(file_type: string) -> list<FileMetadata> {
+        results = [];
+        hashes = this.type_index.get(file_type, []);
+        for hash_val in hashes {
+            if (this.hash_to_file.contains(hash_val)) {
+                results.append(this.hash_to_file[hash_val]);
+            }
+        }
+        return results;
+    }
+    
+    // 按关键词搜索
+    method search(query: string) -> list<FileMetadata> {
+        results = [];
+        query_lower = query.to_lower();
+        
+        for metadata in this.hash_to_file.values() {
+            filename = String.filename(metadata.file_path).to_lower();
+            if (filename.contains(query_lower)) {
+                results.append(metadata);
+            } else {
+                for tag in metadata.tags {
+                    if (tag.to_lower().contains(query_lower)) {
+                        results.append(metadata);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        return results;
+    }
+}
+
+// ==================== 智能分类引擎 ====================
+
+/**
+ * 智能文件分类引擎
+ */
+quantum_class IntelligentClassifier {
+    field type_mapping: map<string, string>;
+    field keyword_rules: map<string, list<string>>;
+    
+    method constructor() {
+        // 文件类型映射
+        this.type_mapping = {
+            ".txt": "文本文件",
+            ".doc": "文档", ".docx": "文档", ".pdf": "文档",
+            ".jpg": "图片", ".png": "图片", ".gif": "图片",
+            ".mp3": "音频", ".wav": "音频", ".ogg": "音频",
+            ".mp4": "视频", ".avi": "视频", ".mkv": "视频",
+            ".py": "代码", ".js": "代码", ".qentl": "代码",
+            ".json": "数据", ".xml": "数据", ".yaml": "数据",
+            ".zip": "压缩包", ".tar": "压缩包", ".gz": "压缩包"
+        };
+        
+        // 关键词分类规则
+        this.keyword_rules = {
+            "项目": ["项目", "工程"],
+            "报告": ["报告", "总结", "汇报"],
+            "设计": ["设计", "design", "ui", "ux"],
+            "代码": ["代码", "code", "源码", "程序"],
+            "测试": ["测试", "test", "检验"],
+            "文档": ["文档", "说明", "readme"],
+            "配置": ["配置", "config", "设置", "setting"]
+        };
+    }
+    
+    // 分类文件
+    method classify(filepath: string) -> map<string, any> {
+        ext = String.extension(filepath).to_lower();
+        file_type = this.type_mapping.get(ext, "其他");
+        
+        tags = [file_type];
+        filename = String.filename(filepath);
+        
+        // 从文件名提取标签
+        for category, keywords in this.keyword_rules {
+            for kw in keywords {
+                if (filename.to_lower().contains(kw.to_lower())) {
+                    if (!tags.contains(category)) {
+                        tags.append(category);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // 添加时间标签
+        if (FileSystem.exists(filepath)) {
+            mtime = FileSystem.modified_time(filepath);
+            time_tag = Time.format(mtime, "YYYY-MM");
+            tags.append(time_tag);
+        }
+        
+        return {
+            "file_type": file_type,
+            "tags": tags
+        };
+    }
+    
+    // 查找相关文件
+    method find_related(file_hash: string, index: QuantumHashIndex) -> list<string> {
+        metadata = index.hash_to_file.get(file_hash);
+        if (metadata == null) {
+            return [];
+        }
+        
+        related = [];
+        for tag in metadata.tags {
+            for related_hash in index.tag_index.get(tag, []) {
+                if (related_hash != file_hash && !related.contains(related_hash)) {
+                    related.append(related_hash);
+                }
+            }
+        }
+        
+        return related;
+    }
+}
+
+// ==================== 动态目录 ====================
+
+/**
+ * 动态目录结构
+ */
+quantum_class DynamicDirectory {
+    field name: string;              // 目录名称
+    field rule: string;              // 分类规则
+    field files: list<string>;       // 文件哈希列表
+    field children: map<string, DynamicDirectory>;
+    field created_time: int;
+    field last_access: int;
+    
+    method constructor(name: string, rule: string) {
+        this.name = name;
+        this.rule = rule;
+        this.files = [];
+        this.children = {};
+        this.created_time = Time.now_millis();
+        this.last_access = this.created_time;
+    }
+    
+    // 添加文件
+    method add_file(file_hash: string) {
+        if (!this.files.contains(file_hash)) {
+            this.files.append(file_hash);
+        }
+        this.last_access = Time.now_millis();
+    }
+    
+    // 移除文件
+    method remove_file(file_hash: string) {
+        this.files.remove(file_hash);
+    }
+    
+    // 获取文件数量
+    method file_count() -> int {
+        return this.files.size();
+    }
+    
+    // 更新访问时间
+    method touch() {
+        this.last_access = Time.now_millis();
+    }
+}
+
+// ==================== 量子动态文件系统 ====================
+
+/**
+ * QEntL量子动态文件系统主类
+ */
+quantum_class QuantumDynamicFS {
+    field storage_root: string;
+    field index: QuantumHashIndex;
+    field classifier: IntelligentClassifier;
+    field dynamic_dirs: map<string, DynamicDirectory>;
+    
+    method constructor(storage_root: string) {
+        this.storage_root = storage_root;
+        this.index = QuantumHashIndex();
+        this.classifier = IntelligentClassifier();
+        this.dynamic_dirs = {};
+        
+        // 创建存储目录
+        FileSystem.mkdir(storage_root);
+        FileSystem.mkdir(storage_root + "/pool");
+        FileSystem.mkdir(storage_root + "/index");
+        
+        Console.println("🔮 QEntL量子动态文件系统初始化完成");
+        Console.println("   存储根目录: " + storage_root);
+    }
+    
+    // 添加文件
+    method add_file(filepath: string) -> string {
+        if (!FileSystem.exists(filepath)) {
+            Console.println("❌ 文件不存在: " + filepath);
+            return "";
+        }
+        
+        // 计算量子哈希
+        qhash = this.index.compute_quantum_hash(filepath);
+        
+        // 分类文件
+        classification = this.classifier.classify(filepath);
+        
+        // 创建元数据
+        metadata = FileMetadata();
+        metadata.file_hash = qhash;
+        metadata.file_path = filepath;
+        metadata.file_size = FileSystem.file_size(filepath);
+        metadata.file_type = classification["file_type"];
+        metadata.tags = classification["tags"];
+        metadata.modified_time = FileSystem.modified_time(filepath);
+        
+        // 添加到索引
+        this.index.add_file(metadata);
+        
+        // 更新动态目录
+        this.update_dynamic_dirs(metadata);
+        
+        Console.println("✅ 文件添加: " + String.filename(filepath));
+        Console.println("   类型: " + metadata.file_type);
+        Console.println("   标签: " + metadata.tags.join(", "));
+        
+        return qhash;
+    }
+    
+    // 添加目录
+    method add_directory(dirpath: string) -> int {
+        count = 0;
+        files = FileSystem.list_files(dirpath, true);
+        for filepath in files {
+            if (this.add_file(filepath) != "") {
+                count += 1;
+            }
+        }
+        Console.println("✅ 共添加 " + count + " 个文件");
+        return count;
+    }
+    
+    // 更新动态目录
+    method update_dynamic_dirs(metadata: FileMetadata) {
+        for tag in metadata.tags {
+            if (!this.dynamic_dirs.contains(tag)) {
+                this.dynamic_dirs[tag] = DynamicDirectory(tag, "tag:" + tag);
+            }
+            this.dynamic_dirs[tag].add_file(metadata.file_hash);
+        }
+    }
+    
+    // 搜索文件
+    method search(query: string) -> list<FileMetadata> {
+        return this.index.search(query);
+    }
+    
+    // 按标签搜索
+    method search_by_tags(tags: list<string>) -> list<FileMetadata> {
+        results = [];
+        for tag in tags {
+            tag_results = this.index.search_by_tag(tag);
+            for metadata in tag_results {
+                if (!results.contains(metadata)) {
+                    results.append(metadata);
+                }
+            }
+        }
+        return results;
+    }
+    
+    // 获取动态目录
+    method get_dynamic_dir(name: string) -> DynamicDirectory {
+        return this.dynamic_dirs.get(name);
+    }
+    
+    // 列出所有动态目录
+    method list_dynamic_dirs() -> list<string> {
+        return this.dynamic_dirs.keys();
+    }
+    
+    // 获取状态
+    method get_status() -> map<string, any> {
+        return {
+            "total_files": this.index.hash_to_file.size(),
+            "total_tags": this.index.tag_index.size(),
+            "dynamic_dirs": this.dynamic_dirs.size(),
+            "storage_root": this.storage_root
+        };
+    }
+    
+    // 保存索引
+    method save_index(filepath: string) {
+        data = {
+            "files": {},
+            "dynamic_dirs": {}
+        };
+        
+        for hash_val, metadata in this.index.hash_to_file {
+            data["files"][hash_val] = {
+                "file_path": metadata.file_path,
+                "file_size": metadata.file_size,
+                "file_type": metadata.file_type,
+                "tags": metadata.tags,
+                "access_count": metadata.access_count
+            };
+        }
+        
+        for name, dir_obj in this.dynamic_dirs {
+            data["dynamic_dirs"][name] = {
+                "name": dir_obj.name,
+                "rule": dir_obj.rule,
+                "files": dir_obj.files
+            };
+        }
+        
+        FileSystem.write_json(filepath, data);
+        Console.println("✅ 索引已保存: " + filepath);
+    }
+}
+
+// ==================== 导出 ====================
+
+export QuantumDynamicFS;
+export QuantumHashIndex;
+export IntelligentClassifier;
+export FileMetadata;
+export DynamicDirectory;

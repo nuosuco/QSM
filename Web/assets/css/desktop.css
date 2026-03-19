@@ -1,0 +1,81 @@
+/* QEntL Web操作系统 - 桌面样式 */
+
+/* 量子粒子背景 */
+.quantum-bg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+    z-index: -1;
+}
+
+/* 窗口系统 */
+.q-window {
+    position: absolute;
+    background: rgba(26, 26, 46, 0.98);
+    border: 1px solid rgba(138, 135, 255, 0.3);
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.q-window-header {
+    height: 36px;
+    background: linear-gradient(90deg, rgba(138,135,255,0.2), rgba(108,99,255,0.1));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    cursor: move;
+    user-select: none;
+}
+
+.q-window-title {
+    font-size: 13px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.q-window-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.q-window-btn {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.q-window-btn.close { background: #ff5f57; }
+.q-window-btn.minimize { background: #ffbd2e; }
+.q-window-btn.maximize { background: #28ca42; }
+
+.q-window-btn:hover { transform: scale(1.2); }
+
+.q-window-content {
+    flex: 1;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* 量子态动画 */
+@keyframes quantumGlow {
+    0%, 100% { box-shadow: 0 0 5px rgba(138, 135, 255, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(138, 135, 255, 0.8); }
+}
+
+.q-window:focus-within {
+    animation: quantumGlow 2s infinite;
+}
+
+/* 彝文字体支持 */
+.yi-font {
+    font-family: 'LSTY-Yi-Black', 'Microsoft Yi Balti', sans-serif;
+}

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理器 - QEntL</title>
+    <link rel="stylesheet" href="/assets/css/desktop.css">
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: rgba(10,10,26,0.95);
+            color: #fff;
+            margin: 0;
+            padding: 10px;
+        }
+        .file-manager {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 10px;
+            height: 100vh;
+        }
+        .sidebar {
+            background: rgba(138,135,255,0.1);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .sidebar-item {
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sidebar-item:hover {
+            background: rgba(138,135,255,0.2);
+        }
+        .sidebar-item.active {
+            background: rgba(138,135,255,0.3);
+        }
+        .main-content {
+            display: flex;
+            flex-direction: column;
+        }
+        .toolbar {
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        .toolbar-btn {
+            padding: 8px 15px;
+            background: rgba(138,135,255,0.2);
+            border: 1px solid rgba(138,135,255,0.3);
+            border-radius: 5px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .toolbar-btn:hover {
+            background: rgba(138,135,255,0.3);
+        }
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 10px;
+            flex: 1;
+            overflow: auto;
+        }
+        .file-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .file-item:hover {
+            background: rgba(138,135,255,0.2);
+        }
+        .file-icon {
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+        .file-name {
+            font-size: 12px;
+            text-align: center;
+            max-width: 90px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <div class="file-manager">
+        <div class="sidebar">
+            <div class="sidebar-item active" data-i18n="nav.home">🏠 主目录</div>
+            <div class="sidebar-item" data-i18n="nav.documents">📄 文档</div>
+            <div class="sidebar-item" data-i18n="nav.downloads">📥 下载</div>
+            <div class="sidebar-item" data-i18n="nav.apps">📦 应用</div>
+            <div class="sidebar-item" data-i18n="nav.qbc">⚛️ QBC字节码</div>
+            <div class="sidebar-item" data-i18n="nav.qim">💿 QIM镜像</div>
+            <div class="sidebar-item" data-i18n="nav.models">🧠 模型</div>
+        </div>
+        <div class="main-content">
+            <div class="toolbar">
+                <button class="toolbar-btn" data-i18n="action.open">打开</button>
+                <button class="toolbar-btn" data-i18n="action.upload">上传</button>
+                <button class="toolbar-btn" data-i18n="action.new">新建</button>
+                <button class="toolbar-btn" data-i18n="action.delete">删除</button>
+            </div>
+            <div class="file-grid" id="fileGrid">
+                <!-- 文件列表将动态生成 -->
+            </div>
+        </div>
+    </div>
+    <script src="/assets/js/i18n.js"></script>
+    <script>
+        // 模拟文件系统
+        const files = {
+            home: [
+                { name: '文档', icon: '📁', type: 'folder' },
+                { name: '下载', icon: '📥', type: 'folder' },
+                { name: 'QEntL', icon: '⚛️', type: 'folder' },
+                { name: '配置.json', icon: '⚙️', type: 'file' }
+            ],
+            qbc: [
+                { name: 'kernel.qbc', icon: '⚛️', type: 'qbc' },
+                { name: 'runtime.qbc', icon: '⚛️', type: 'qbc' },
+                { name: 'quantum_vm.qbc', icon: '⚛️', type: 'qbc' }
+            ],
+            models: [
+                { name: 'QSM', icon: '🧠', type: 'folder' },
+                { name: 'SOM', icon: '💰', type: 'folder' },
+                { name: 'WeQ', icon: '💬', type: 'folder' },
+                { name: 'Ref', icon: '🪞', type: 'folder' }
+            ]
+        };
+        
+        let currentPath = 'home';
+        
+        function renderFiles() {
+            const grid = document.getElementById('fileGrid');
+            const currentFiles = files[currentPath] || files.home;
+            
+            grid.innerHTML = currentFiles.map(f => `
+                <div class="file-item" ondblclick="openItem('${f.name}', '${f.type}')">
+                    <div class="file-icon">${f.icon}</div>
+                    <div class="file-name">${f.name}</div>
+                </div>
+            `).join('');
+        }
+        
+        function openItem(name, type) {
+            if (type === 'folder' || type === 'qbc') {
+                if (files[name.toLowerCase()]) {
+                    currentPath = name.toLowerCase();
+                    renderFiles();
+                }
+            } else {
+                alert('打开: ' + name);
+            }
+        }
+        
+        // 侧边栏点击
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                currentPath = this.textContent.toLowerCase();
+                renderFiles();
+            });
+        });
+        
+        renderFiles();
+    </script>
+</body>
+</html>
