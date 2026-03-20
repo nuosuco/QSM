@@ -48,17 +48,32 @@ class ShortTermMemory:
         """记录一次迭代"""
         memory = self._load_memory()
         
+        # 深度清理非序列化数据
+        clean_data = self._clean_for_json(iteration_data)
+        
         iteration = {
             "timestamp": datetime.now().isoformat(),
             "iteration_num": len(memory["iterations"]) + 1,
-            **iteration_data
+            **clean_data
         }
         
         memory["iterations"].append(iteration)
-        memory["current_state"] = iteration_data.get("state", "running")
+        memory["current_state"] = clean_data.get("state", "running")
         
         self._save_memory(memory)
         return iteration
+    
+    def _clean_for_json(self, data):
+        """清理数据使其可JSON序列化"""
+        import numpy as np
+        if isinstance(data, dict):
+            return {k: self._clean_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._clean_for_json(item) for item in data]
+        elif isinstance(data, (np.ndarray, np.generic)):
+            return data.tolist()
+        else:
+            return data
     
     def get_all_iterations(self) -> list:
         """获取所有历史迭代"""
