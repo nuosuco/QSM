@@ -1,0 +1,20 @@
+{
+  "model_name": "QSM-YiWen-v1",
+  "training_data": {
+    "trilingual": "/root/QSM/Models/training_data/datasets/yi_wen/滇川黔贵通用彝文三语对照表.jsonl",
+    "vocab_size": 4120,
+    "languages": [
+      "yi",
+      "zh",
+      "en"
+    ]
+  },
+  "training_params": {
+    "epochs": 10,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "max_seq_length": 128
+  },
+  "output_dir": "/root/QSM/Models/training_output",
+  "created_at": "2026-03-22T03:44:43.338315"
+}
