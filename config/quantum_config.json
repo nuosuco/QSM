@@ -1,59 +1,35 @@
 {
-  "system": {
-    "name": "QSM Quantum System",
-    "version": "1.0.0",
-    "log_level": "INFO",
-    "max_qubits": 32,
-    "default_shots": 1024
-  },
   "simulator": {
-    "backend": "aer_simulator",
-    "noise_model": null,
-    "coupling_map": null,
-    "basis_gates": null
-  },
-  "algorithms": {
-    "grover": {
-      "iterations": 2,
-      "default_qubits": 3
-    },
-    "qft": {
-      "default_qubits": 3,
-      "inverse": false
-    },
-    "shor": {
-      "max_attempts": 10,
-      "classical_fallback": true
-    }
-  },
-  "error_correction": {
-    "enabled": true,
-    "code_type": "shor",
-    "threshold": 0.1
-  },
-  "cryptography": {
-    "qkd_protocol": "BB84",
-    "key_length": 256,
-    "security_level": "high"
-  },
-  "ml": {
-    "n_qubits": 4,
-    "depth": 2,
-    "learning_rate": 0.01
+    "max_qubits": 32,
+    "default_shots": 1024,
+    "seed": null
   },
   "optimization": {
-    "qaoa_layers": 2,
-    "max_iterations": 50,
-    "convergence_threshold": 0.001
+    "level": 2,
+    "remove_redundant": true,
+    "merge_gates": true
+  },
+  "error_correction": {
+    "enabled": false,
+    "code": "surface",
+    "distance": 3
+  },
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8765,
+    "cors": true
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "/var/log/quantum.log",
+    "console": true
+  },
+  "cryptography": {
+    "key_length": 256,
+    "protocol": "BB84"
   },
   "network": {
-    "topology": "star",
-    "n_nodes": 5,
-    "fidelity_threshold": 0.7
-  },
-  "output": {
-    "docs_dir": "/root/QSM/docs/quantum_modules",
-    "results_dir": "/root/QSM/results",
-    "export_format": "json"
+    "max_connections": 10,
+    "timeout_ms": 5000
   }
 }
