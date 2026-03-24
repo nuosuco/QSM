@@ -1,0 +1,322 @@
+{
+  "generated_at": "2026-03-22T14:07:08.977843",
+  "modules": {
+    "quantum_simulator_integration.py": {
+      "module": "quantum_simulator_integration.py",
+      "docstring": "QSM与真实量子模拟器集成\n使用Qiskit作为后端，实现真实量子算法测试\n\n集成内容：\n1. Grover搜索算法 - Qiskit实现\n2. QFT量子傅里叶变换 - Qiskit实现\n3. 量子隐形传态 - Qiskit实现\n4. 四模型协作与量子模拟器对接",
+      "classes": [
+        "QiskitGrover",
+        "QiskitQFT",
+        "QiskitTeleportation",
+        "QuantumSimulatorIntegration"
+      ],
+      "functions": [
+        "create_oracle",
+        "create_diffuser",
+        "search",
+        "create_qft_circuit",
+        "create_inverse_qft_circuit",
+        "transform",
+        "teleport",
+        "initialize",
+        "run_all_tests",
+        "get_summary",
+        "test_quantum_simulator_integration"
+      ],
+      "status": "success",
+      "line_count": 441
+    },
+    "quantum_model_integration.py": {
+      "module": "quantum_model_integration.py",
+      "docstring": "QSM四模型与量子模拟器深度集成\n\n将四大量子模型（QSM/SOM/WeQ/Ref）与真实量子算法对接\n实现：\n1. QSM意识核心 - 量子态处理\n2. SOM经济模型 - 量子资源分配\n3. WeQ通信模型 - 量子纠缠通信\n4. Ref监控模型 - 量子态监控与纠错",
+      "classes": [
+        "QuantumQSMCore",
+        "QuantumSOMManager",
+        "QuantumWeQChannel",
+        "QuantumRefMonitor",
+        "QuantumFourModelIntegration"
+      ],
+      "functions": [
+        "process_query",
+        "learn_pattern",
+        "allocate_resources",
+        "create_entanglement",
+        "send_quantum_message",
+        "monitor_quantum_state",
+        "detect_and_correct",
+        "initialize",
+        "run_integrated_task",
+        "get_status",
+        "test_quantum_four_model_integration"
+      ],
+      "status": "success",
+      "line_count": 409
+    },
+    "shor_algorithm.py": {
+      "module": "shor_algorithm.py",
+      "docstring": "QSM Shor算法实现\n使用Qiskit实现量子因数分解算法\n\nShor算法是量子计算最重要的算法之一：\n- 能够在多项式时间内分解大整数\n- 对RSA等加密系统构成威胁\n- 展示量子计算的指数级加速",
+      "classes": [
+        "QiskitShor",
+        "ShorBenchmark"
+      ],
+      "functions": [
+        "classical_gcd",
+        "classical_modexp",
+        "find_period_classical",
+        "create_qft_circuit",
+        "create_inverse_qft_circuit",
+        "create_modexp_circuit",
+        "quantum_period_finding",
+        "factorize",
+        "batch_factorize",
+        "run_benchmark",
+        "test_shor_algorithm"
+      ],
+      "status": "success",
+      "line_count": 326
+    },
+    "quantum_error_correction.py": {
+      "module": "quantum_error_correction.py",
+      "docstring": "QSM量子纠错系统\n实现量子错误检测与纠正编码\n\n量子纠错是量子计算的关键技术：\n- 保护量子信息免受噪声干扰\n- 实现可靠的量子计算\n- 支持四模型系统的稳定运行",
+      "classes": [
+        "BitFlipCode",
+        "PhaseFlipCode",
+        "ShorCode",
+        "QuantumErrorCorrectionSystem"
+      ],
+      "functions": [
+        "encode",
+        "detect_error",
+        "correct",
+        "encode",
+        "detect_and_correct",
+        "encode",
+        "test_error_correction",
+        "protect_state",
+        "run_all_tests",
+        "test_quantum_error_correction"
+      ],
+      "status": "success",
+      "line_count": 440
+    },
+    "quantum_rng.py": {
+      "module": "quantum_rng.py",
+      "docstring": "QSM量子随机数生成器\n使用量子态测量产生真随机数\n\n量子随机数的优势：\n- 基于量子力学原理的真随机性\n- 不可预测、不可复现\n- 为加密和仿真提供高质量熵源",
+      "classes": [
+        "QuantumRNG",
+        "QuantumEntropyPool",
+        "QuantumSeedGenerator",
+        "QuantumRNGBenchmark"
+      ],
+      "functions": [
+        "generate_bit",
+        "generate_byte",
+        "generate_int",
+        "generate_float",
+        "generate_bytes",
+        "generate_hex",
+        "refill_pool",
+        "get_random_bytes",
+        "get_random_int",
+        "generate_seed",
+        "generate_uuid_like",
+        "run_benchmark",
+        "test_quantum_rng"
+      ],
+      "status": "success",
+      "line_count": 355
+    },
+    "quantum_cryptography.py": {
+      "module": "quantum_cryptography.py",
+      "docstring": "QSM量子密码学模块\n实现量子密钥分发和量子加密功能\n\n主要功能：\n1. BB84量子密钥分发协议\n2. 量子一次一密加密\n3. 量子哈希函数",
+      "classes": [
+        "BB84Protocol",
+        "QuantumOneTimePad",
+        "QuantumHash",
+        "QuantumCryptographySuite"
+      ],
+      "functions": [
+        "generate_basis_choices",
+        "encode_qubit",
+        "measure_qubit",
+        "simulate_transmission",
+        "generate_key",
+        "perform_qkd",
+        "encrypt",
+        "decrypt",
+        "perform_encryption",
+        "hash_message",
+        "verify_hash",
+        "run_demonstration",
+        "test_quantum_cryptography"
+      ],
+      "status": "success",
+      "line_count": 443
+    },
+    "quantum_ml.py": {
+      "module": "quantum_ml.py",
+      "docstring": "QSM量子机器学习模块\n实现量子变分电路和量子神经网络\n\n主要功能：\n1. 量子变分电路\n2. 参数化量子门\n3. 量子特征映射\n4. 量子分类器",
+      "classes": [
+        "QuantumVariationalCircuit",
+        "QuantumFeatureMap",
+        "QuantumClassifier",
+        "QuantumMLDemo"
+      ],
+      "functions": [
+        "create_parameterized_circuit",
+        "bind_parameters",
+        "get_expectation",
+        "encode_data",
+        "compute_kernel",
+        "initialize_weights",
+        "forward",
+        "predict",
+        "train_step",
+        "fit",
+        "evaluate",
+        "run_demonstration",
+        "test_quantum_ml"
+      ],
+      "status": "success",
+      "line_count": 421
+    },
+    "quantum_optimization.py": {
+      "module": "quantum_optimization.py",
+      "docstring": "QSM量子优化算法模块\n实现量子优化算法求解组合优化问题\n\n主要功能：\n1. QAOA (Quantum Approximate Optimization Algorithm)\n2. VQE (Variational Quantum Eigensolver)\n3. 量子退火模拟\n4. 组合优化问题求解器",
+      "classes": [
+        "MaxCutProblem",
+        "QAOASolver",
+        "VQESolver",
+        "QuantumOptimizer",
+        "QuantumOptimizationDemo"
+      ],
+      "functions": [
+        "generate_random_graph",
+        "compute_cut_value",
+        "classical_solve",
+        "create_cost_hamiltonian_layer",
+        "create_mixer_layer",
+        "create_qaoa_circuit",
+        "evaluate_solution",
+        "optimize",
+        "create_ansatz",
+        "measure_expectation",
+        "optimize",
+        "solve_maxcut",
+        "find_ground_state",
+        "run_demonstration",
+        "test_quantum_optimization"
+      ],
+      "status": "success",
+      "line_count": 397
+    },
+    "quantum_simulation.py": {
+      "module": "quantum_simulation.py",
+      "docstring": "QSM量子模拟模块\n实现量子物理和量子化学模拟\n\n主要功能：\n1. 量子态演化模拟\n2. 量子谐振子\n3. 量子隧穿效应\n4. 简单分子模拟",
+      "classes": [
+        "QuantumStateEvolution",
+        "QuantumHarmonicOscillator",
+        "QuantumTunneling",
+        "SimpleMoleculeSimulation",
+        "QuantumSimulationDemo"
+      ],
+      "functions": [
+        "evolve_under_hamiltonian",
+        "simulate_oscillation",
+        "get_energy_levels",
+        "simulate_zero_point_energy",
+        "create_coherent_state",
+        "calculate_transmission_probability",
+        "simulate_tunneling",
+        "quantum_walk_simulation",
+        "simulate_h2_ground_state",
+        "simulate_lih",
+        "run_demonstration",
+        "test_quantum_simulation"
+      ],
+      "status": "success",
+      "line_count": 405
+    },
+    "quantum_network.py": {
+      "module": "quantum_network.py",
+      "docstring": "QSM量子网络模块\n实现量子网络通信和量子纠缠分发\n\n主要功能：\n1. 量子纠缠分发\n2. 量子中继器模拟\n3. 量子网络拓扑\n4. 量子通信协议",
+      "classes": [
+        "QuantumEntanglementDistribution",
+        "QuantumRepeater",
+        "QuantumNetworkTopology",
+        "QuantumCommunicationProtocol",
+        "QuantumNetworkDemo"
+      ],
+      "functions": [
+        "create_bell_pair",
+        "distribute_entanglement",
+        "entanglement_swapping",
+        "simulate_repeater_chain",
+        "create_star_topology",
+        "create_mesh_topology",
+        "find_shortest_path",
+        "quantum_teleportation_protocol",
+        "superdense_coding_protocol",
+        "entanglement_swapping_protocol",
+        "run_demonstration",
+        "test_quantum_network"
+      ],
+      "status": "success",
+      "line_count": 409
+    },
+    "quantum_toolkit.py": {
+      "module": "quantum_toolkit.py",
+      "docstring": "QSM量子计算工具库\n提供量子计算常用工具和辅助函数\n\n主要功能：\n1. 量子门操作工具\n2. 量子态可视化\n3. 量子电路分析\n4. 性能测量工具",
+      "classes": [
+        "QuantumGateLibrary",
+        "QuantumStateTools",
+        "QuantumCircuitAnalyzer",
+        "QuantumPerformanceMeasurer",
+        "QuantumVisualizationTools",
+        "QuantumToolkitDemo"
+      ],
+      "functions": [
+        "get_gate_matrix",
+        "list_all_gates",
+        "create_basis_state",
+        "create_superposition_state",
+        "create_bell_state",
+        "compute_probability",
+        "compute_entropy",
+        "compute_fidelity",
+        "count_gates",
+        "estimate_resources",
+        "analyze_circuit",
+        "measure_gate_time",
+        "benchmark_circuit",
+        "measure_fidelity",
+        "format_state_vector",
+        "format_probabilities",
+        "create_text_histogram",
+        "run_demonstration",
+        "test_quantum_toolkit"
+      ],
+      "status": "success",
+      "line_count": 411
+    },
+    "quantum_integration_test.py": {
+      "module": "quantum_integration_test.py",
+      "docstring": "QSM量子系统集成测试\n测试所有量子模块的集成运行\n\n功能：\n1. 全模块集成测试\n2. 端到端测试流程\n3. 性能回归测试\n4. 系统健康检查",
+      "classes": [
+        "QuantumSystemIntegrationTest"
+      ],
+      "functions": [
+        "run_all_tests",
+        "run_integration_tests"
+      ],
+      "status": "success",
+      "line_count": 308
+    }
+  },
+  "summary": {
+    "total_modules": 12,
+    "total_classes": 49,
+    "total_functions": 142,
+    "total_lines": 4765
+  }
+}
