@@ -1,0 +1,146 @@
+{
+  "grammar_rules": {
+    "word_order": "SOV",
+    "description": "彝语是SOV语言，动词在句末",
+    "adjective_position": "before_noun",
+    "numeral_position": "before_noun",
+    "adverb_position": "before_verb",
+    "negative_position": "after_verb",
+    "question_marker": "sentence_end",
+    "particles": {
+      "genitive": "的",
+      "accusative": "把",
+      "topic": "呢",
+      "question": "吗"
+    }
+  },
+  "sentence_patterns": [
+    {
+      "chinese": "主语 + 动词 + 宾语",
+      "yi": "主语 + 宾语 + 动词",
+      "example_cn": "我吃饭",
+      "example_yi": "我饭吃",
+      "note": "动词移到句末"
+    },
+    {
+      "chinese": "形容词 + 名词",
+      "yi": "形容词 + (助词) + 名词",
+      "example_cn": "红花",
+      "example_yi": "红的花",
+      "note": "形容词在名词前，可加助词"
+    },
+    {
+      "chinese": "数词 + 量词 + 名词",
+      "yi": "数词 + 名词 + (量词)",
+      "example_cn": "三个人",
+      "example_yi": "三人(个)",
+      "note": "数词直接修饰名词"
+    },
+    {
+      "chinese": "主语 + 不 + 动词",
+      "yi": "主语 + 动词 + 不",
+      "example_cn": "我不去",
+      "example_yi": "我去不",
+      "note": "否定词在动词后"
+    },
+    {
+      "chinese": "主语 + 谓语 + 吗？",
+      "yi": "主语 + 谓语 + 吗",
+      "example_cn": "你好吗？",
+      "example_yi": "你好吗",
+      "note": "疑问助词在句末"
+    }
+  ],
+  "common_sentences": {
+    "greeting": {
+      "chinese": "你好",
+      "yi_word_order": "你好",
+      "note": "问候语保持原序"
+    },
+    "thanks": {
+      "chinese": "谢谢",
+      "yi_word_order": "谢谢",
+      "note": "感谢语保持原序"
+    },
+    "goodbye": {
+      "chinese": "再见",
+      "yi_word_order": "再见",
+      "note": "告别语保持原序"
+    },
+    "question": {
+      "chinese": "这是什么？",
+      "yi_word_order": "这什么是？",
+      "note": "疑问词在句末"
+    }
+  },
+  "pos_tags": {
+    "noun": [
+      "人",
+      "心",
+      "天",
+      "地",
+      "水",
+      "火",
+      "山",
+      "河"
+    ],
+    "verb": [
+      "吃",
+      "喝",
+      "看",
+      "走",
+      "来",
+      "去",
+      "说",
+      "听"
+    ],
+    "adj": [
+      "大",
+      "小",
+      "好",
+      "坏",
+      "红",
+      "白",
+      "黑",
+      "新"
+    ],
+    "num": [
+      "一",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六",
+      "七",
+      "八",
+      "九",
+      "十"
+    ],
+    "pron": [
+      "我",
+      "你",
+      "他",
+      "她",
+      "们",
+      "这",
+      "那"
+    ],
+    "adv": [
+      "很",
+      "也",
+      "都",
+      "就",
+      "还",
+      "又"
+    ],
+    "neg": [
+      "不",
+      "没",
+      "别",
+      "勿"
+    ]
+  },
+  "created_at": "2026-03-25T09:22:14.081132",
+  "version": "通用彝文专用版 v1.0",
+  "note": "基于彝语SOV语序规则，适用于滇川黔桂通用彝文"
+}

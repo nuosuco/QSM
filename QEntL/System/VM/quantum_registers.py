@@ -289,3 +289,50 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    def apply_gate(self, gate_name, qubit_id, angle=None):
+        """应用量子门"""
+        if qubit_id not in self.qubits:
+            return False
+        
+        qubit = self.qubits[qubit_id]
+        
+        if gate_name == 'H' or gate_name == 'HADAMARD':
+            # Hadamard门: 创建叠加态
+            H = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
+            qubit.state = H @ qubit.state
+            
+        elif gate_name == 'RY':
+            # RY旋转门
+            if angle is None:
+                angle = 0
+            c = np.cos(angle / 2)
+            s = np.sin(angle / 2)
+            RY = np.array([[c, -s], [s, c]])
+            qubit.state = RY @ qubit.state
+            
+        elif gate_name == 'RX':
+            # RX旋转门
+            if angle is None:
+                angle = 0
+            c = np.cos(angle / 2)
+            s = np.sin(angle / 2)
+            RX = np.array([[c, -1j*s], [1j*s, c]])
+            qubit.state = RX @ qubit.state
+            
+        elif gate_name == 'X' or gate_name == 'PAULI_X':
+            # Pauli-X门（NOT门）
+            X = np.array([[0, 1], [1, 0]])
+            qubit.state = X @ qubit.state
+            
+        elif gate_name == 'Z' or gate_name == 'PAULI_Z':
+            # Pauli-Z门
+            Z = np.array([[1, 0], [0, -1]])
+            qubit.state = Z @ qubit.state
+        
+        # 归一化
+        norm = np.sqrt(np.sum(np.abs(qubit.state) ** 2))
+        if norm > 0:
+            qubit.state = qubit.state / norm
+        
+        return True

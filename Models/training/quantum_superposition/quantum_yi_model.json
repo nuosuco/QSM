@@ -1,0 +1,155 @@
+{
+  "vocab_map": {
+    "心": {
+      "yi_common": "󲜷",
+      "english": "heart",
+      "learned_at": "2026-03-25T09:49:58.975140"
+    },
+    "天": {
+      "yi_common": "󲜭",
+      "english": "sky",
+      "learned_at": "2026-03-25T09:49:58.975146"
+    },
+    "地": {
+      "yi_common": "󲜯",
+      "english": "earth",
+      "learned_at": "2026-03-25T09:49:58.975148"
+    },
+    "火": {
+      "yi_common": "󲜮",
+      "english": "fire",
+      "learned_at": "2026-03-25T09:49:58.975149"
+    },
+    "水": {
+      "yi_common": "󲜚",
+      "english": "water",
+      "learned_at": "2026-03-25T09:49:58.975155"
+    },
+    "山": {
+      "yi_common": "󲜏",
+      "english": "mountain",
+      "learned_at": "2026-03-25T09:49:58.975157"
+    },
+    "河": {
+      "yi_common": "󲜛",
+      "english": "river",
+      "learned_at": "2026-03-25T09:49:58.975158"
+    },
+    "人": {
+      "yi_common": "󲜐",
+      "english": "person",
+      "learned_at": "2026-03-25T09:49:58.975162"
+    },
+    "手": {
+      "yi_common": "󲜺",
+      "english": "hand",
+      "learned_at": "2026-03-25T09:49:58.975164"
+    },
+    "眼": {
+      "yi_common": "󲜼",
+      "english": "eye",
+      "learned_at": "2026-03-25T09:49:58.975166"
+    },
+    "吃": {
+      "yi_common": "󲜀",
+      "english": "eat",
+      "learned_at": "2026-03-25T09:49:58.975170"
+    },
+    "喝": {
+      "yi_common": "󲜁",
+      "english": "drink",
+      "learned_at": "2026-03-25T09:49:58.975171"
+    },
+    "看": {
+      "yi_common": "󲜂",
+      "english": "see",
+      "learned_at": "2026-03-25T09:49:58.975173"
+    },
+    "走": {
+      "yi_common": "󲜃",
+      "english": "walk",
+      "learned_at": "2026-03-25T09:49:58.975174"
+    },
+    "来": {
+      "yi_common": "󲜄",
+      "english": "come",
+      "learned_at": "2026-03-25T09:49:58.975175"
+    },
+    "去": {
+      "yi_common": "󲜅",
+      "english": "go",
+      "learned_at": "2026-03-25T09:49:58.975177"
+    },
+    "说": {
+      "yi_common": "󲜆",
+      "english": "speak",
+      "learned_at": "2026-03-25T09:49:58.975178"
+    },
+    "听": {
+      "yi_common": "󲜇",
+      "english": "listen",
+      "learned_at": "2026-03-25T09:49:58.975180"
+    },
+    "我": {
+      "yi_common": "󲝭",
+      "english": "I",
+      "learned_at": "2026-03-25T09:49:58.975181"
+    },
+    "你": {
+      "yi_common": "󲝬",
+      "english": "you",
+      "learned_at": "2026-03-25T09:49:58.975182"
+    },
+    "他": {
+      "yi_common": "󲝮",
+      "english": "he",
+      "learned_at": "2026-03-25T09:49:58.975184"
+    },
+    "不": {
+      "yi_common": "󲮤",
+      "english": "not",
+      "learned_at": "2026-03-25T09:49:58.975185"
+    },
+    "饭": {
+      "yi_common": "󲝷",
+      "english": "rice",
+      "learned_at": "2026-03-25T09:49:58.975187"
+    },
+    "书": {
+      "yi_common": "󲝸",
+      "english": "book",
+      "learned_at": "2026-03-25T09:49:58.975188"
+    }
+  },
+  "grammar": {
+    "word_order": "SOV",
+    "negative_position": "before_verb",
+    "rules": [
+      {
+        "type": "肯定句",
+        "order": "主语+宾语+动词"
+      },
+      {
+        "type": "否定句",
+        "order": "主语+不+动词",
+        "note": "不字在动词前"
+      },
+      {
+        "type": "否定+宾语",
+        "order": "主语+宾语+不+动词"
+      },
+      {
+        "type": "形容词",
+        "order": "形容词+名词"
+      }
+    ]
+  },
+  "coefficients": {
+    "chinese": 0.4,
+    "yi_common": 0.4,
+    "english": 0.2
+  },
+  "version": "v2.0 通用彝文专用版",
+  "correction": "否定词位置已修正为动词之前",
+  "created_at": "2026-03-25T09:49:58.975219"
+}
