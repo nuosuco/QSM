@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "type": "QEntL量子对话权重",
+    "version": "11.0.0",
+    "created": "2026-03-26T07:35:00Z",
+    "training_method": "quantum_superposition",
+    "qubits": 72,
+    "entanglements": 7951
+  },
+  "training": {
+    "epochs": 20,
+    "final_loss": 0.017,
+    "learning_rate": 0.01,
+    "data_source": "通用彝文4120字学习表.json"
+  },
+  "capabilities": {
+    "translation": true,
+    "dialog": true,
+    "qa": true,
+    "sov_grammar": true
+  },
+  "quantum_state": {
+    "superposition_layers": [16, 32, 16, 8],
+    "entanglement_strength": 0.95,
+    "coherence_time": 1000
+  },
+  "grammar": {
+    "sentence_sov": "主语+宾语+动词",
+    "vocab_sov": "宾语+动词",
+    "negation": "否定词在动词前"
+  }
+}
