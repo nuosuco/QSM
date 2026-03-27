@@ -1,0 +1,5100 @@
+{
+  "magic": "QBC\u0001",
+  "metadata": {
+    "version": "2.0.0",
+    "compiled": "2026-03-27T02:42:28.654Z",
+    "sourceLines": 264,
+    "instructions": 1272
+  },
+  "source": "// QEntL量子神经网络架构\n// 真正的量子训练系统\n// 运行在量子虚拟机上\n\nimport quantum.core as qcore;\nimport quantum.register as qreg;\nimport quantum.gate as qgate;\nimport quantum.learn as qlearn;\n\n配置 {\n    量子比特数: 64,\n    层数: 4,\n    学习率: 0.01,\n    训练轮数: 100,\n    输出目录: \"/root/QSM/Models/QSM/bin/\"\n}\n\n// 量子神经元\nquantum_class 量子神经元 {\n    量子比特索引: 整数,\n    振幅: 浮点,\n    相位: 浮点,\n    纠缠伙伴: [整数],\n    权重: 浮点,\n    \n    函数 构造函数(索引: 整数) {\n        这.量子比特索引 = 索引\n        这.振幅 = 1.0\n        这.相位 = 0.0\n        这.纠缠伙伴 = []\n        这.权重 = 随机.浮点(-1, 1)\n    }\n    \n    函数 量子旋转(角度: 浮点) {\n        // 应用量子旋转门\n        qgate.RY(这.量子比特索引, 角度)\n        这.相位 += 角度\n    }\n    \n    函数 量子叠加(角度: 浮点) {\n        // 创建叠加态\n        qgate.Hadamard(这.量子比特索引)\n        这.振幅 = 这.振幅 * math.cos(角度)\n    }\n    \n    函数 与...纠缠(目标索引: 整数) {\n        // 创建纠缠关系\n        qgate.CNOT(这.量子比特索引, 目标索引)\n        这.纠缠伙伴.添加(目标索引)\n    }\n    \n    函数 测量() {\n        // 量子测量，返回经典值\n        返回 qreg.测量(这.量子比特索引)\n    }\n}\n\n// 量子神经网络层\nquantum_class 量子神经网络层 {\n    神经元列表: [量子神经元],\n    层索引: 整数,\n    \n    函数 构造函数(索引: 整数, 神经元数量: 整数) {\n        这.层索引 = 索引\n        这.神经元列表 = []\n        \n        对于 i 在 范围(神经元数量) {\n            神经元 = 量子神经元(i)\n            这.神经元列表.添加(神经元)\n        }\n    }\n    \n    函数 前向传播(输入: [浮点]) {\n        // 量子前向传播\n        输出 = []\n        \n        对于 索引, 神经元 在 这.神经元列表 {\n            如果 索引 < 长度(输入) {\n                // 编码输入到量子态\n                神经元.量子旋转(输入[索引] * π)\n            }\n            \n            // 应用权重\n            神经元.量子旋转(神经元.权重 * π / 2)\n            \n            // 测量输出\n            输出.添加(神经元.测量())\n        }\n        \n        返回 输出\n    }\n    \n    函数 创建纠缠() {\n        // 层内纠缠\n        对于 i 在 范围(长度(这.神经元列表) - 1) {\n            这.神经元列表[i].与...纠缠(这.神经元列表[i + 1].量子比特索引)\n        }\n    }\n}\n\n// 量子神经网络\nquantum_class 量子神经网络 {\n    输入层: 量子神经网络层,\n    隐藏层1: 量子神经网络层,\n    隐藏层2: 量子神经网络层,\n    输出层: 量子神经网络层,\n    \n    函数 构造函数() {\n        这.输入层 = 量子神经网络层(0, 16)\n        这.隐藏层1 = 量子神经网络层(1, 32)\n        这.隐藏层2 = 量子神经网络层(2, 16)\n        这.输出层 = 量子神经网络层(3, 8)\n        \n        这.初始化纠缠()\n    }\n    \n    函数 初始化纠缠() {\n        // 创建层间纠缠\n        这.输入层.创建纠缠()\n        这.隐藏层1.创建纠缠()\n        这.隐藏层2.创建纠缠()\n        这.输出层.创建纠缠()\n        \n        输出(\"量子纠缠已建立\")\n    }\n    \n    函数 前向传播(输入: [浮点]) {\n        // 完整前向传播\n        x1 = 这.输入层.前向传播(输入)\n        x2 = 这.隐藏层1.前向传播(x1)\n        x3 = 这.隐藏层2.前向传播(x2)\n        输出 = 这.输出层.前向传播(x3)\n        \n        返回 输出\n    }\n    \n    函数 训练(输入数据: [映射], 轮数: 整数) {\n        对于 轮 在 范围(轮数) {\n            总损失 = 0.0\n            \n            对于 样本 在 输入数据 {\n                输入 = 样本.输入\n                期望输出 = 样本.输出\n                \n                // 前向传播\n                实际输出 = 这.前向传播(输入)\n                \n                // 计算损失\n                损失 = qlearn.量子损失(实际输出, 期望输出)\n                总损失 += 损失\n                \n                // 反向传播（量子梯度下降）\n                这.反向传播(损失)\n            }\n            \n            平均损失 = 总损失 / 长度(输入数据)\n            如果 (轮 + 1) % 10 == 0 {\n                输出(\"轮 \" + (轮 + 1) + \"/\" + 轮数 + \", 损失: \" + 平均损失)\n            }\n        }\n    }\n    \n    函数 反向传播(损失: 浮点) {\n        // 量子梯度下降\n        梯度 = qlearn.量子梯度(损失)\n        \n        // 更新所有神经元权重\n        这.更新权重(梯度)\n    }\n    \n    函数 更新权重(梯度: 浮点) {\n        对于 神经元 在 这.输入层.神经元列表 {\n            神经元.权重 -= 0.01 * 梯度\n        }\n        对于 神经元 在 这.隐藏层1.神经元列表 {\n            神经元.权重 -= 0.01 * 梯度\n        }\n        对于 神经元 在 这.隐藏层2.神经元列表 {\n            神经元.权重 -= 0.01 * 梯度\n        }\n        对于 神经元 在 这.输出层.神经元列表 {\n            神经元.权重 -= 0.01 * 梯度\n        }\n    }\n    \n    函数 保存模型(路径: 字符串) {\n        模型数据 = {\n            \"元数据\": {\n                \"类型\": \"QEntL量子神经网络\",\n                \"版本\": \"1.0.0\",\n                \"创建时间\": 当前时间(),\n                \"量子比特数\": 64,\n                \"层数\": 4\n            },\n            \"架构\": {\n                \"输入层\": 长度(这.输入层.神经元列表),\n                \"隐藏层1\": 长度(这.隐藏层1.神经元列表),\n                \"隐藏层2\": 长度(这.隐藏层2.神经元列表),\n                \"输出层\": 长度(这.输出层.神经元列表)\n            },\n            \"权重\": 这.导出权重()\n        }\n        \n        qcore.保存JSON(路径, 模型数据)\n        输出(\"模型已保存: \" + 路径)\n    }\n    \n    函数 导出权重() {\n        权重字典 = {}\n        \n        对于 索引, 神经元 在 这.输入层.神经元列表 {\n            权重字典[\"输入_\" + 索引] = 神经元.权重\n        }\n        对于 索引, 神经元 在 这.隐藏层1.神经元列表 {\n            权重字典[\"隐藏1_\" + 索引] = 神经元.权重\n        }\n        对于 索引, 神经元 在 这.隐藏层2.神经元列表 {\n            权重字典[\"隐藏2_\" + 索引] = 神经元.权重\n        }\n        对于 索引, 神经元 在 这.输出层.神经元列表 {\n            权重字典[\"输出_\" + 索引] = 神经元.权重\n        }\n        \n        返回 权重字典\n    }\n}\n\n// 主程序\n函数 主程序() {\n    输出(\"=\" * 60)\n    输出(\"QEntL量子神经网络训练\")\n    输出(\"=\" * 60)\n    \n    // 创建网络\n    网络 = 量子神经网络()\n    \n    // 准备训练数据\n    训练数据 = [\n        {输入: [1.0, 0.0], 输出: [0.5, 0.5]},\n        {输入: [0.0, 1.0], 输出: [0.3, 0.7]},\n        {输入: [1.0, 1.0], 输出: [0.8, 0.2]}\n    ]\n    \n    // 训练\n    网络.训练(训练数据, 100)\n    \n    // 测试\n    输出(\"\\n测试:\")\n    测试输入 = [1.0, 0.0]\n    输出 = 网络.前向传播(测试输入)\n    输出(\"输入: \" + 测试输入)\n    输出(\"输出: \" + 输出)\n    \n    // 保存\n    网络.保存模型(\"/root/QSM/Models/QSM/bin/qsm_quantum_neural_network.json\")\n    \n    输出(\"=\" * 60)\n    输出(\"量子神经网络训练完成!\")\n    输出(\"=\" * 60)\n}\n\n// 执行\n主程序()\n",
+  "bytecode": [
+    {
+      "opcode": "NOP",
+      "operand": "// QEntL量子神经网络架构"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "QEntL量子神经网络架构"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 真正的量子训练系统"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "真正的量子训练系统"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 运行在量子虚拟机上"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "运行在量子虚拟机上"
+    },
+    {
+      "opcode": "ID",
+      "operand": "import"
+    },
+    {
+      "opcode": "ID",
+      "operand": "quantum"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "core"
+    },
+    {
+      "opcode": "ID",
+      "operand": "as"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qcore"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ";"
+    },
+    {
+      "opcode": "ID",
+      "operand": "import"
+    },
+    {
+      "opcode": "ID",
+      "operand": "quantum"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "register"
+    },
+    {
+      "opcode": "ID",
+      "operand": "as"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qreg"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ";"
+    },
+    {
+      "opcode": "ID",
+      "operand": "import"
+    },
+    {
+      "opcode": "ID",
+      "operand": "quantum"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "gate"
+    },
+    {
+      "opcode": "ID",
+      "operand": "as"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qgate"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ";"
+    },
+    {
+      "opcode": "ID",
+      "operand": "import"
+    },
+    {
+      "opcode": "ID",
+      "operand": "quantum"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "learn"
+    },
+    {
+      "opcode": "ID",
+      "operand": "as"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qlearn"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ";"
+    },
+    {
+      "opcode": "ID",
+      "operand": "配置"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特数"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "64"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "层数"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "4"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "学习率"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.01"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "训练轮数"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "100"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出目录"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"/root/QSM/Models/QSM/bin/\""
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "root"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "QSM"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "Models"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "QSM"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "bin"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 量子神经元"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经元"
+    },
+    {
+      "opcode": "KW",
+      "operand": "quantum_class"
+    },
+    {
+      "opcode": "ID",
+      "operand": "quantum_class"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特索引"
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "振幅"
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "相位"
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "纠缠伙伴"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "构造函数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特索引"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "振幅"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "相位"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "纠缠伙伴"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "随机"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "OP",
+      "operand": "-"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子旋转"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "角度"
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 应用量子旋转门"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "应用量子旋转门"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qgate"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "RY"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "角度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "相位"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+="
+    },
+    {
+      "opcode": "ID",
+      "operand": "角度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子叠加"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "角度"
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 创建叠加态"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建叠加态"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qgate"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "Hadamard"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "振幅"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "振幅"
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "ID",
+      "operand": "math"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "cos"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "角度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "与"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "目标索引"
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 创建纠缠关系"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建纠缠关系"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qgate"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "CNOT"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "目标索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "纠缠伙伴"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "添加"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "目标索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "测量"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 量子测量，返回经典值"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子测量"
+    },
+    {
+      "opcode": "ID",
+      "operand": "返回经典值"
+    },
+    {
+      "opcode": "ID",
+      "operand": "返回"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qreg"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "测量"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 量子神经网络层"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "KW",
+      "operand": "quantum_class"
+    },
+    {
+      "opcode": "ID",
+      "operand": "quantum_class"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "层索引"
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "构造函数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元数量"
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "层索引"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "i"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "范围"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元数量"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "i"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "添加"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 量子前向传播"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子前向传播"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "如果"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "OP",
+      "operand": "<"
+    },
+    {
+      "opcode": "ID",
+      "operand": "长度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 编码输入到量子态"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "编码输入到量子态"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子旋转"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 应用权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "应用权重"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子旋转"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 测量输出"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "测量输出"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "添加"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "测量"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "返回"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 层内纠缠"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "层内纠缠"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "i"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "范围"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "长度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "OP",
+      "operand": "-"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "i"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "与"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "i"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 量子神经网络"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络"
+    },
+    {
+      "opcode": "KW",
+      "operand": "quantum_class"
+    },
+    {
+      "opcode": "ID",
+      "operand": "quantum_class"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "构造函数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "16"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "32"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "16"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "NUM",
+      "operand": "3"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "8"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "初始化纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "初始化纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 创建层间纠缠"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建层间纠缠"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建纠缠"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"量子纠缠已建立\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子纠缠已建立"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 完整前向传播"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "完整前向传播"
+    },
+    {
+      "opcode": "ID",
+      "operand": "x1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "x2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "x1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "x3"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "3"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "x2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "x3"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "3"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "返回"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "训练"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入数据"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "ID",
+      "operand": "映射"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "轮数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "整数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "轮"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "范围"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "轮数"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "总损失"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "样本"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入数据"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "样本"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "ID",
+      "operand": "期望输出"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "样本"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 前向传播"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "ID",
+      "operand": "实际输出"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 计算损失"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "计算损失"
+    },
+    {
+      "opcode": "ID",
+      "operand": "损失"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "qlearn"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子损失"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "实际输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "期望输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "总损失"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+="
+    },
+    {
+      "opcode": "ID",
+      "operand": "损失"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 反向传播（量子梯度下降）"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "反向传播"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子梯度下降"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "反向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "损失"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "平均损失"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "总损失"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "长度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入数据"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "如果"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "轮"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "10"
+    },
+    {
+      "opcode": "OP",
+      "operand": "=="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"轮 \""
+    },
+    {
+      "opcode": "ID",
+      "operand": "轮"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "轮"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"/\""
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "轮数"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\", 损失: \""
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "损失"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "平均损失"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "反向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "损失"
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 量子梯度下降"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子梯度下降"
+    },
+    {
+      "opcode": "ID",
+      "operand": "梯度"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "qlearn"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子梯度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "损失"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 更新所有神经元权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "更新所有神经元权重"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "更新权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "梯度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "更新权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "梯度"
+    },
+    {
+      "opcode": "ID",
+      "operand": "浮点"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "-="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.01"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "ID",
+      "operand": "梯度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "-="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.01"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "ID",
+      "operand": "梯度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "-="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.01"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "ID",
+      "operand": "梯度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "OP",
+      "operand": "-="
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.01"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "ID",
+      "operand": "梯度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "保存模型"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "路径"
+    },
+    {
+      "opcode": "ID",
+      "operand": "字符串"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "模型数据"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"元数据\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "元数据"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"类型\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "类型"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"QEntL量子神经网络\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "QEntL量子神经网络"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"版本\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "版本"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"1.0.0\""
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"创建时间\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建时间"
+    },
+    {
+      "opcode": "ID",
+      "operand": "当前时间"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"量子比特数\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子比特数"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "64"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"层数\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "层数"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "4"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"架构\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "架构"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"输入层\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "ID",
+      "operand": "长度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"隐藏层1\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "ID",
+      "operand": "长度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"隐藏层2\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "ID",
+      "operand": "长度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"输出层\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "ID",
+      "operand": "长度"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"权重\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "导出权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qcore"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "保存JSON"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "路径"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "模型数据"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"模型已保存: \""
+    },
+    {
+      "opcode": "ID",
+      "operand": "模型已保存"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "路径"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "导出权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重字典"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重字典"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"输入_\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入_"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层1"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重字典"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"隐藏1_\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏1_"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏层2"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重字典"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"隐藏2_\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "隐藏2_"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "2"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "对于"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "ID",
+      "operand": "在"
+    },
+    {
+      "opcode": "ID",
+      "operand": "这"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出层"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元列表"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重字典"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"输出_\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出_"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "索引"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "神经元"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "ID",
+      "operand": "返回"
+    },
+    {
+      "opcode": "ID",
+      "operand": "权重字典"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 主程序"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "主程序"
+    },
+    {
+      "opcode": "ID",
+      "operand": "函数"
+    },
+    {
+      "opcode": "ID",
+      "operand": "主程序"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"=\""
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "60"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"QEntL量子神经网络训练\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "QEntL量子神经网络训练"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"=\""
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "60"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 创建网络"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "创建网络"
+    },
+    {
+      "opcode": "ID",
+      "operand": "网络"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 准备训练数据"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "准备训练数据"
+    },
+    {
+      "opcode": "ID",
+      "operand": "训练数据"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.5"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.5"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.3"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.7"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "SEP",
+      "operand": "{"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.8"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.2"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 训练"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "训练"
+    },
+    {
+      "opcode": "ID",
+      "operand": "网络"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "训练"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "训练数据"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "100"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 测试"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "测试"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"\\n测试:\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "n测试"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "测试输入"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "SEP",
+      "operand": "["
+    },
+    {
+      "opcode": "NUM",
+      "operand": "1.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": ","
+    },
+    {
+      "opcode": "NUM",
+      "operand": "0.0"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "SEP",
+      "operand": "]"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "ID",
+      "operand": "网络"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "前向传播"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "ID",
+      "operand": "测试输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"输入: \""
+    },
+    {
+      "opcode": "ID",
+      "operand": "输入"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "测试输入"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"输出: \""
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "OP",
+      "operand": "+"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 保存"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "保存"
+    },
+    {
+      "opcode": "ID",
+      "operand": "网络"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "保存模型"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"/root/QSM/Models/QSM/bin/qsm_quantum_neural_network.json\""
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "root"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "QSM"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "Models"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "QSM"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "bin"
+    },
+    {
+      "opcode": "OP",
+      "operand": "/"
+    },
+    {
+      "opcode": "ID",
+      "operand": "qsm_quantum_neural_network"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "."
+    },
+    {
+      "opcode": "ID",
+      "operand": "json"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"=\""
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "60"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"量子神经网络训练完成!\""
+    },
+    {
+      "opcode": "ID",
+      "operand": "量子神经网络训练完成"
+    },
+    {
+      "opcode": "OP",
+      "operand": "!"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "ID",
+      "operand": "输出"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "STR",
+      "operand": "\"=\""
+    },
+    {
+      "opcode": "OP",
+      "operand": "="
+    },
+    {
+      "opcode": "OP",
+      "operand": "*"
+    },
+    {
+      "opcode": "NUM",
+      "operand": "60"
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "}"
+    },
+    {
+      "opcode": "NOP",
+      "operand": "// 执行"
+    },
+    {
+      "opcode": "OP",
+      "operand": "//"
+    },
+    {
+      "opcode": "ID",
+      "operand": "执行"
+    },
+    {
+      "opcode": "ID",
+      "operand": "主程序"
+    },
+    {
+      "opcode": "SEP",
+      "operand": "("
+    },
+    {
+      "opcode": "SEP",
+      "operand": ")"
+    }
+  ]
+}

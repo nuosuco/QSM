@@ -1,0 +1,955 @@
+{
+  "metadata": {
+    "type": "QEntL-Quantum-Neural-Network",
+    "version": "2.0.0",
+    "runtime": "qentl-vm-qvm",
+    "model": "QSM",
+    "layers": [
+      16,
+      32,
+      16,
+      8
+    ],
+    "qubits": 72,
+    "trained": true,
+    "created": "2026-03-27T02:42:28.657Z"
+  },
+  "quantum_states": [
+    {
+      "index": 0,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.118888766943412,
+      "entangled": []
+    },
+    {
+      "index": 1,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.9233207731142956,
+      "entangled": []
+    },
+    {
+      "index": 2,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.7338312520052637,
+      "entangled": []
+    },
+    {
+      "index": 3,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.2891970735316214,
+      "entangled": []
+    },
+    {
+      "index": 4,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.14781139232584728,
+      "entangled": []
+    },
+    {
+      "index": 5,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.04617841353189789,
+      "entangled": []
+    },
+    {
+      "index": 6,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.08926114772185745,
+      "entangled": []
+    },
+    {
+      "index": 7,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.39807111354363256,
+      "entangled": []
+    },
+    {
+      "index": 8,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.5684256417339566,
+      "entangled": []
+    },
+    {
+      "index": 9,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.16233278907467286,
+      "entangled": []
+    },
+    {
+      "index": 10,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.9806498601127571,
+      "entangled": []
+    },
+    {
+      "index": 11,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.8076237308459766,
+      "entangled": []
+    },
+    {
+      "index": 12,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.4027079729648295,
+      "entangled": []
+    },
+    {
+      "index": 13,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.9322680567838217,
+      "entangled": []
+    },
+    {
+      "index": 14,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.958161653506195,
+      "entangled": []
+    },
+    {
+      "index": 15,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.41730768176906796,
+      "entangled": []
+    },
+    {
+      "index": 16,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.030268002240199987,
+      "entangled": []
+    },
+    {
+      "index": 17,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.39500462615111154,
+      "entangled": []
+    },
+    {
+      "index": 18,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.9043514156419628,
+      "entangled": []
+    },
+    {
+      "index": 19,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.04172653341493637,
+      "entangled": []
+    },
+    {
+      "index": 20,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.009074218805399603,
+      "entangled": []
+    },
+    {
+      "index": 21,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.5941340405934765,
+      "entangled": []
+    },
+    {
+      "index": 22,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.8034395388783695,
+      "entangled": []
+    },
+    {
+      "index": 23,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.8259095581487967,
+      "entangled": []
+    },
+    {
+      "index": 24,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.1963421313622331,
+      "entangled": []
+    },
+    {
+      "index": 25,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.7868841698581845,
+      "entangled": []
+    },
+    {
+      "index": 26,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.9048529730231083,
+      "entangled": []
+    },
+    {
+      "index": 27,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.902370001269241,
+      "entangled": []
+    },
+    {
+      "index": 28,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.10891972702097652,
+      "entangled": []
+    },
+    {
+      "index": 29,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.5493667795083366,
+      "entangled": []
+    },
+    {
+      "index": 30,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.908906996279359,
+      "entangled": []
+    },
+    {
+      "index": 31,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.44913948651731195,
+      "entangled": []
+    },
+    {
+      "index": 32,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.07476120746320225,
+      "entangled": []
+    },
+    {
+      "index": 33,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.7865013668803527,
+      "entangled": []
+    },
+    {
+      "index": 34,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.6028896869051756,
+      "entangled": []
+    },
+    {
+      "index": 35,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.377904033433238,
+      "entangled": []
+    },
+    {
+      "index": 36,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.29302266895750995,
+      "entangled": []
+    },
+    {
+      "index": 37,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.5171740428327807,
+      "entangled": []
+    },
+    {
+      "index": 38,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.9811452870676329,
+      "entangled": []
+    },
+    {
+      "index": 39,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.08059937696956032,
+      "entangled": []
+    },
+    {
+      "index": 40,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.3137356936330473,
+      "entangled": []
+    },
+    {
+      "index": 41,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.38499222393722965,
+      "entangled": []
+    },
+    {
+      "index": 42,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.7549631653319007,
+      "entangled": []
+    },
+    {
+      "index": 43,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.8414133243824251,
+      "entangled": []
+    },
+    {
+      "index": 44,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.1544820301636527,
+      "entangled": []
+    },
+    {
+      "index": 45,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.038214680336585705,
+      "entangled": []
+    },
+    {
+      "index": 46,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.9047596202472694,
+      "entangled": []
+    },
+    {
+      "index": 47,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.2041881261046079,
+      "entangled": []
+    },
+    {
+      "index": 48,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.2469756692250522,
+      "entangled": []
+    },
+    {
+      "index": 49,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.15583000490571086,
+      "entangled": []
+    },
+    {
+      "index": 50,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.3491195745343645,
+      "entangled": []
+    },
+    {
+      "index": 51,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.5350792453361088,
+      "entangled": []
+    },
+    {
+      "index": 52,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.0754742338162786,
+      "entangled": []
+    },
+    {
+      "index": 53,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.8913517596527001,
+      "entangled": []
+    },
+    {
+      "index": 54,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.45020836789130847,
+      "entangled": []
+    },
+    {
+      "index": 55,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.0326659228666899,
+      "entangled": []
+    },
+    {
+      "index": 56,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.24171391454884938,
+      "entangled": []
+    },
+    {
+      "index": 57,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.7206296388886262,
+      "entangled": []
+    },
+    {
+      "index": 58,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.1988449434340671,
+      "entangled": []
+    },
+    {
+      "index": 59,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.007481282327048255,
+      "entangled": []
+    },
+    {
+      "index": 60,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.3779707756773627,
+      "entangled": []
+    },
+    {
+      "index": 61,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.1364727896728617,
+      "entangled": []
+    },
+    {
+      "index": 62,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.41110835453597483,
+      "entangled": []
+    },
+    {
+      "index": 63,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.4353491238483338,
+      "entangled": []
+    },
+    {
+      "index": 64,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.805090078238488,
+      "entangled": []
+    },
+    {
+      "index": 65,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.6083813248641059,
+      "entangled": []
+    },
+    {
+      "index": 66,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.9914606025194304,
+      "entangled": []
+    },
+    {
+      "index": 67,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.4431172716989322,
+      "entangled": []
+    },
+    {
+      "index": 68,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.55804216746197,
+      "entangled": []
+    },
+    {
+      "index": 69,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.14419295114441955,
+      "entangled": []
+    },
+    {
+      "index": 70,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": 0.261366594980609,
+      "entangled": []
+    },
+    {
+      "index": 71,
+      "alpha": [
+        1,
+        0
+      ],
+      "beta": [
+        0,
+        0
+      ],
+      "weight": -0.8208884839636119,
+      "entangled": []
+    }
+  ]
+}

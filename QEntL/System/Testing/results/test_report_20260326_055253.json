@@ -1,0 +1,69 @@
+{
+  "timestamp": "2026-03-26T05:52:53.208121",
+  "total_tests": 12,
+  "passed": 11,
+  "failed": 1,
+  "pass_rate": 0.9166666666666666,
+  "tests": [
+    {
+      "name": "Hadamard Gate",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "CNOT Gate",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "Pauli-X Gate",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "Grover Single Item",
+      "status": "FAIL",
+      "passed": false
+    },
+    {
+      "name": "Grover Multi Item",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "QFT Basic",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "QFT Inverse",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "Quantum Perceptron",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "Quantum Neural Layer",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "Bell State",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "GHZ State",
+      "status": "PASS",
+      "passed": true
+    },
+    {
+      "name": "BB84 Protocol",
+      "status": "PASS",
+      "passed": true
+    }
+  ]
+}

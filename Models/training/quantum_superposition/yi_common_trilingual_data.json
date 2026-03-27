@@ -1,0 +1,528 @@
+{
+  "description": "通用彝文三语训练数据（中-通用彝文-英文）",
+  "yi_script_type": "通用彝文（滇川黔桂规范彝文）",
+  "unicode_range": "U+F000 - U+F900",
+  "languages": [
+    "chinese",
+    "yi_common",
+    "english"
+  ],
+  "grammar": {
+    "word_order": "SOV",
+    "description": "彝语是SOV语言，动词在句末",
+    "adjective_position": "before_noun",
+    "numeral_position": "before_noun",
+    "adverb_position": "before_verb",
+    "negative_position": "after_verb",
+    "question_marker": "sentence_end",
+    "particles": {
+      "genitive": "的",
+      "accusative": "把",
+      "topic": "呢",
+      "question": "吗"
+    }
+  },
+  "vocabulary_count": 81,
+  "categories": [
+    "pronoun",
+    "color",
+    "adjective",
+    "common",
+    "action",
+    "number",
+    "nature",
+    "time",
+    "animal",
+    "body"
+  ],
+  "data": [
+    {
+      "chinese": "心",
+      "yi_common": "󲜷",
+      "english": "heart",
+      "category": "nature"
+    },
+    {
+      "chinese": "天",
+      "yi_common": "󲜭",
+      "english": "sky",
+      "category": "nature"
+    },
+    {
+      "chinese": "地",
+      "yi_common": "󲜯",
+      "english": "earth",
+      "category": "nature"
+    },
+    {
+      "chinese": "火",
+      "yi_common": "󲜮",
+      "english": "fire",
+      "category": "nature"
+    },
+    {
+      "chinese": "水",
+      "yi_common": "󲜚",
+      "english": "water",
+      "category": "nature"
+    },
+    {
+      "chinese": "风",
+      "yi_common": "󲜰",
+      "english": "wind",
+      "category": "nature"
+    },
+    {
+      "chinese": "山",
+      "yi_common": "󲜏",
+      "english": "mountain",
+      "category": "nature"
+    },
+    {
+      "chinese": "河",
+      "yi_common": "󲜛",
+      "english": "river",
+      "category": "nature"
+    },
+    {
+      "chinese": "日",
+      "yi_common": "󲞭",
+      "english": "sun",
+      "category": "nature"
+    },
+    {
+      "chinese": "月",
+      "yi_common": "󲞮",
+      "english": "moon",
+      "category": "nature"
+    },
+    {
+      "chinese": "星",
+      "yi_common": "󲞯",
+      "english": "star",
+      "category": "nature"
+    },
+    {
+      "chinese": "云",
+      "yi_common": "󲜱",
+      "english": "cloud",
+      "category": "nature"
+    },
+    {
+      "chinese": "雨",
+      "yi_common": "󲜜",
+      "english": "rain",
+      "category": "nature"
+    },
+    {
+      "chinese": "雪",
+      "yi_common": "󲜝",
+      "english": "snow",
+      "category": "nature"
+    },
+    {
+      "chinese": "树",
+      "yi_common": "󲝠",
+      "english": "tree",
+      "category": "nature"
+    },
+    {
+      "chinese": "花",
+      "yi_common": "󲝡",
+      "english": "flower",
+      "category": "nature"
+    },
+    {
+      "chinese": "草",
+      "yi_common": "󲝢",
+      "english": "grass",
+      "category": "nature"
+    },
+    {
+      "chinese": "人",
+      "yi_common": "󲜐",
+      "english": "person",
+      "category": "body"
+    },
+    {
+      "chinese": "男",
+      "yi_common": "󲜲",
+      "english": "man",
+      "category": "body"
+    },
+    {
+      "chinese": "女",
+      "yi_common": "󲜳",
+      "english": "woman",
+      "category": "body"
+    },
+    {
+      "chinese": "子",
+      "yi_common": "󲜴",
+      "english": "child",
+      "category": "body"
+    },
+    {
+      "chinese": "父",
+      "yi_common": "󲜶",
+      "english": "father",
+      "category": "body"
+    },
+    {
+      "chinese": "母",
+      "yi_common": "󲜸",
+      "english": "mother",
+      "category": "body"
+    },
+    {
+      "chinese": "头",
+      "yi_common": "󲜹",
+      "english": "head",
+      "category": "body"
+    },
+    {
+      "chinese": "手",
+      "yi_common": "󲜺",
+      "english": "hand",
+      "category": "body"
+    },
+    {
+      "chinese": "脚",
+      "yi_common": "󲜻",
+      "english": "foot",
+      "category": "body"
+    },
+    {
+      "chinese": "眼",
+      "yi_common": "󲜼",
+      "english": "eye",
+      "category": "body"
+    },
+    {
+      "chinese": "耳",
+      "yi_common": "󲜽",
+      "english": "ear",
+      "category": "body"
+    },
+    {
+      "chinese": "口",
+      "yi_common": "󲜾",
+      "english": "mouth",
+      "category": "body"
+    },
+    {
+      "chinese": "鼻",
+      "yi_common": "󲜿",
+      "english": "nose",
+      "category": "body"
+    },
+    {
+      "chinese": "吃",
+      "yi_common": "󲜀",
+      "english": "eat",
+      "category": "action"
+    },
+    {
+      "chinese": "喝",
+      "yi_common": "󲜁",
+      "english": "drink",
+      "category": "action"
+    },
+    {
+      "chinese": "看",
+      "yi_common": "󲜂",
+      "english": "see",
+      "category": "action"
+    },
+    {
+      "chinese": "走",
+      "yi_common": "󲜃",
+      "english": "walk",
+      "category": "action"
+    },
+    {
+      "chinese": "来",
+      "yi_common": "󲜄",
+      "english": "come",
+      "category": "action"
+    },
+    {
+      "chinese": "去",
+      "yi_common": "󲜅",
+      "english": "go",
+      "category": "action"
+    },
+    {
+      "chinese": "说",
+      "yi_common": "󲜆",
+      "english": "speak",
+      "category": "action"
+    },
+    {
+      "chinese": "听",
+      "yi_common": "󲜇",
+      "english": "listen",
+      "category": "action"
+    },
+    {
+      "chinese": "做",
+      "yi_common": "󲜈",
+      "english": "do",
+      "category": "action"
+    },
+    {
+      "chinese": "想",
+      "yi_common": "󲜉",
+      "english": "think",
+      "category": "action"
+    },
+    {
+      "chinese": "爱",
+      "yi_common": "󲜊",
+      "english": "love",
+      "category": "action"
+    },
+    {
+      "chinese": "买",
+      "yi_common": "󲜋",
+      "english": "buy",
+      "category": "action"
+    },
+    {
+      "chinese": "卖",
+      "yi_common": "󲜌",
+      "english": "sell",
+      "category": "action"
+    },
+    {
+      "chinese": "写",
+      "yi_common": "󲜍",
+      "english": "write",
+      "category": "action"
+    },
+    {
+      "chinese": "读",
+      "yi_common": "󲜎",
+      "english": "read",
+      "category": "action"
+    },
+    {
+      "chinese": "一",
+      "yi_common": "󲝆",
+      "english": "one",
+      "category": "number"
+    },
+    {
+      "chinese": "二",
+      "yi_common": "󲝇",
+      "english": "two",
+      "category": "number"
+    },
+    {
+      "chinese": "三",
+      "yi_common": "󲝈",
+      "english": "three",
+      "category": "number"
+    },
+    {
+      "chinese": "四",
+      "yi_common": "󲝉",
+      "english": "four",
+      "category": "number"
+    },
+    {
+      "chinese": "五",
+      "yi_common": "󲝊",
+      "english": "five",
+      "category": "number"
+    },
+    {
+      "chinese": "六",
+      "yi_common": "󲝋",
+      "english": "six",
+      "category": "number"
+    },
+    {
+      "chinese": "七",
+      "yi_common": "󲝌",
+      "english": "seven",
+      "category": "number"
+    },
+    {
+      "chinese": "八",
+      "yi_common": "󲝍",
+      "english": "eight",
+      "category": "number"
+    },
+    {
+      "chinese": "九",
+      "yi_common": "󲝎",
+      "english": "nine",
+      "category": "number"
+    },
+    {
+      "chinese": "十",
+      "yi_common": "󲝏",
+      "english": "ten",
+      "category": "number"
+    },
+    {
+      "chinese": "大",
+      "yi_common": "󲝐",
+      "english": "big",
+      "category": "adjective"
+    },
+    {
+      "chinese": "小",
+      "yi_common": "󲝑",
+      "english": "small",
+      "category": "adjective"
+    },
+    {
+      "chinese": "好",
+      "yi_common": "󲝒",
+      "english": "good",
+      "category": "adjective"
+    },
+    {
+      "chinese": "新",
+      "yi_common": "󲝓",
+      "english": "new",
+      "category": "adjective"
+    },
+    {
+      "chinese": "红",
+      "yi_common": "󲝦",
+      "english": "red",
+      "category": "color"
+    },
+    {
+      "chinese": "白",
+      "yi_common": "󲝩",
+      "english": "white",
+      "category": "color"
+    },
+    {
+      "chinese": "黑",
+      "yi_common": "󲝪",
+      "english": "black",
+      "category": "color"
+    },
+    {
+      "chinese": "绿",
+      "yi_common": "󲝫",
+      "english": "green",
+      "category": "color"
+    },
+    {
+      "chinese": "我",
+      "yi_common": "󲝭",
+      "english": "I",
+      "category": "pronoun"
+    },
+    {
+      "chinese": "你",
+      "yi_common": "󲝬",
+      "english": "you",
+      "category": "pronoun"
+    },
+    {
+      "chinese": "他",
+      "yi_common": "󲝮",
+      "english": "he",
+      "category": "pronoun"
+    },
+    {
+      "chinese": "她",
+      "yi_common": "󲝯",
+      "english": "she",
+      "category": "pronoun"
+    },
+    {
+      "chinese": "这",
+      "yi_common": "󲝰",
+      "english": "this",
+      "category": "pronoun"
+    },
+    {
+      "chinese": "那",
+      "yi_common": "󲝱",
+      "english": "that",
+      "category": "pronoun"
+    },
+    {
+      "chinese": "牛",
+      "yi_common": "󲝘",
+      "english": "cow",
+      "category": "animal"
+    },
+    {
+      "chinese": "羊",
+      "yi_common": "󲝙",
+      "english": "sheep",
+      "category": "animal"
+    },
+    {
+      "chinese": "马",
+      "yi_common": "󲝚",
+      "english": "horse",
+      "category": "animal"
+    },
+    {
+      "chinese": "狗",
+      "yi_common": "󲝛",
+      "english": "dog",
+      "category": "animal"
+    },
+    {
+      "chinese": "鸡",
+      "yi_common": "󲝜",
+      "english": "chicken",
+      "category": "animal"
+    },
+    {
+      "chinese": "是",
+      "yi_common": "󲝔",
+      "english": "is",
+      "category": "common"
+    },
+    {
+      "chinese": "不",
+      "yi_common": "󲝕",
+      "english": "not",
+      "category": "common"
+    },
+    {
+      "chinese": "有",
+      "yi_common": "󲝖",
+      "english": "have",
+      "category": "common"
+    },
+    {
+      "chinese": "家",
+      "yi_common": "󲝱",
+      "english": "home",
+      "category": "common"
+    },
+    {
+      "chinese": "年",
+      "yi_common": "󲝃",
+      "english": "year",
+      "category": "time"
+    },
+    {
+      "chinese": "今",
+      "yi_common": "󲝀",
+      "english": "today",
+      "category": "time"
+    },
+    {
+      "chinese": "明",
+      "yi_common": "󲝁",
+      "english": "tomorrow",
+      "category": "time"
+    }
+  ],
+  "created_at": "2026-03-25T09:26:12.503376",
+  "note": "只包含通用彝文，不包含凉山彝文，避免混淆"
+}
