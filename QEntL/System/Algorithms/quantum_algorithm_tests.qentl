@@ -1,0 +1,143 @@
+# 量子算法测试套件
+# Quantum Algorithm Test Suite
+# 测试：Grover、QFT、Shor、量子门、量子机器学习
+
+# === 测试配置 ===
+@test_suite "quantum_algorithms"
+@version "1.0"
+@author "QSM System"
+
+# === 量子门基础测试 ===
+@module "quantum_gates"
+  @test "hadamard_gate"
+    # H|0⟩ = (|0⟩ + |1⟩)/√2
+    @input qubit = |0⟩
+    @apply H
+    @expected superposition(|0⟩, |1⟩)
+    @assert amplitude_equal
+  @end_test
+  
+  @test "cnot_gate"
+    # CNOT|00⟩ = |00⟩, CNOT|10⟩ = |11⟩
+    @input qubits = |00⟩
+    @apply CNOT
+    @expected |00⟩
+    @assert state_equal
+    
+    @input qubits = |10⟩
+    @apply CNOT
+    @expected |11⟩
+    @assert state_equal
+  @end_test
+  
+  @test "pauli_x_gate"
+    # X|0⟩ = |1⟩
+    @input qubit = |0⟩
+    @apply X
+    @expected |1⟩
+    @assert state_equal
+  @end_test
+@end_module
+
+# === Grover搜索算法测试 ===
+@module "grover_search"
+  @test "single_item_search"
+    # 在4个元素中搜索目标
+    @database_size = 4
+    @target_item = 2
+    @iterations = 1
+    @apply grover_algorithm
+    @expected_probability >= 0.9
+    @assert success_rate
+  @end_test
+  
+  @test "multi_item_search"
+    # 在16个元素中搜索多个目标
+    @database_size = 16
+    @target_items = [3, 7, 11]
+    @iterations = 2
+    @apply grover_algorithm
+    @expected_probability >= 0.8
+    @assert success_rate
+  @end_test
+@end_module
+
+# === 量子傅里叶变换测试 ===
+@module "quantum_fourier_transform"
+  @test "qft_2qubits"
+    # 2量子位QFT
+    @input qubits = |01⟩
+    @apply QFT
+    @expected_transform correct_phase
+    @assert phase_accuracy
+  @end_test
+  
+  @test "qft_inverse"
+    # QFT†QFT = I
+    @input qubits = |ψ⟩
+    @apply QFT
+    @apply QFT_inverse
+    @expected |ψ⟩
+    @assert state_equal
+  @end_test
+@end_module
+
+# === 量子机器学习测试 ===
+@module "quantum_ml"
+  @test "quantum_perceptron"
+    # 量子感知机
+    @input_features = [0.5, 0.3, 0.8]
+    @weights = [0.4, 0.6, 0.2]
+    @apply quantum_perceptron
+    @expected_output in_range(0, 1)
+    @assert output_valid
+  @end_test
+  
+  @test "quantum_neural_layer"
+    # 量子神经网络层
+    @input_size = 4
+    @output_size = 2
+    @apply quantum_layer
+    @assert dimension_correct
+  @end_test
+@end_module
+
+# === 量子纠缠测试 ===
+@module "quantum_entanglement"
+  @test "bell_state"
+    # 创建Bell态
+    @input qubits = |00⟩
+    @apply H(0)
+    @apply CNOT(0, 1)
+    @expected bell_state
+    @assert entanglement_verified
+  @end_test
+  
+  @test "ghz_state"
+    # 创建GHZ态
+    @input qubits = |000⟩
+    @apply H(0)
+    @apply CNOT(0, 1)
+    @apply CNOT(0, 2)
+    @expected ghz_state
+    @assert entanglement_verified
+  @end_test
+@end_module
+
+# === 量子密码学测试 ===
+@module "quantum_cryptography"
+  @test "bb84_protocol"
+    # BB84量子密钥分发
+    @alice_bits = random(8)
+    @alice_bases = random(8)
+    @bob_bases = random(8)
+    @apply bb84_protocol
+    @expected_key_length >= 4
+    @assert key_valid
+  @end_test
+@end_module
+
+# === 运行所有测试 ===
+@run_all_tests
+@output_format "json"
+@report_path "/root/QSM/QEntL/System/Testing/results/"

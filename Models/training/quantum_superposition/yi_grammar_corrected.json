@@ -1,0 +1,79 @@
+{
+  "grammar_rules": {
+    "word_order": "SOV",
+    "description": "彝语是SOV语言，动词在句末",
+    "negative_position": "before_verb",
+    "negative_examples": {
+      "我不去": "我 + 󲮤 + 去",
+      "我不吃": "我 + 󲮤 + 吃",
+      "他不看": "他 + 󲮤 + 看"
+    },
+    "adjective_position": "before_noun",
+    "numeral_position": "before_noun",
+    "question_marker": "sentence_end",
+    "important_notes": [
+      "否定词'不'(󲮤)在动词之前，与汉语相同",
+      "否定结构：主语 + 不 + 动词",
+      "SOV语序主要影响宾语和动词的位置",
+      "否定词位置与汉语一致，不受SOV影响"
+    ]
+  },
+  "sentence_patterns": [
+    {
+      "type": "肯定句",
+      "chinese_order": "主语 + 动词 + 宾语",
+      "yi_order": "主语 + 宾语 + 动词",
+      "example": {
+        "chinese": "我吃饭",
+        "yi_words": [
+          "我",
+          "饭",
+          "吃"
+        ],
+        "note": "宾语移到动词前（SOV）"
+      }
+    },
+    {
+      "type": "否定句",
+      "chinese_order": "主语 + 不 + 动词",
+      "yi_order": "主语 + 不 + 动词",
+      "example": {
+        "chinese": "我不去",
+        "yi_words": [
+          "我",
+          "不",
+          "去"
+        ],
+        "yi_chars": [
+          "我",
+          "󲮤",
+          "去"
+        ],
+        "note": "否定词在动词前，与汉语相同"
+      }
+    },
+    {
+      "type": "否定句+宾语",
+      "chinese_order": "主语 + 不 + 动词 + 宾语",
+      "yi_order": "主语 + 不 + 宾语 + 动词",
+      "example": {
+        "chinese": "我不吃饭",
+        "yi_words": [
+          "我",
+          "不",
+          "饭",
+          "吃"
+        ],
+        "note": "不字在动词前，宾语在动词前"
+      }
+    }
+  ],
+  "negative_words": {
+    "不": "󲮤",
+    "没": "󲮥",
+    "别": "󲮦"
+  },
+  "created_at": "2026-03-25T09:44:18.175951",
+  "version": "v2.0 修正版",
+  "correction": "否定词位置已修正为动词之前"
+}

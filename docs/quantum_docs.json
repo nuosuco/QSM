@@ -1,0 +1,52 @@
+{
+  "generated_at": "2026-03-24T15:10:21.553093",
+  "modules": [
+    {
+      "name": "QuantumSimulator",
+      "description": "量子模拟器核心类",
+      "classes": [
+        {
+          "name": "QuantumSimulator",
+          "description": "量子态模拟器",
+          "methods": [
+            "hadamard",
+            "cnot",
+            "measure"
+          ]
+        }
+      ],
+      "functions": []
+    },
+    {
+      "name": "QuantumCryptography",
+      "description": "量子密码学模块",
+      "classes": [
+        {
+          "name": "QuantumCryptography",
+          "description": "量子密钥分发",
+          "methods": [
+            "bb84_key_generation",
+            "e91_entanglement_protocol"
+          ]
+        }
+      ],
+      "functions": []
+    },
+    {
+      "name": "QuantumOptimizer",
+      "description": "量子电路优化器",
+      "classes": [
+        {
+          "name": "QuantumOptimizer",
+          "description": "电路优化",
+          "methods": [
+            "optimize",
+            "estimate_fidelity"
+          ]
+        }
+      ],
+      "functions": []
+    }
+  ],
+  "total_modules": 3
+}

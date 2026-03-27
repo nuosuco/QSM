@@ -1,0 +1,106 @@
+{
+  "quantum_vocab": {
+    "chinese": {},
+    "yi_common": {
+      "（": 21,
+      "）": 29,
+      "；": 40,
+      "，": 75,
+      "：": 2604,
+      "！": 3417,
+      "？": 4860
+    },
+    "yi_liangshan": {},
+    "english": {}
+  },
+  "entanglement_map": {
+    "心": {
+      "yi_common": "󲜷",
+      "yi_liangshan": "ꑌ",
+      "english": "heart"
+    },
+    "天": {
+      "yi_common": "󲜭",
+      "yi_liangshan": "ꃅ",
+      "english": "sky"
+    },
+    "火": {
+      "yi_common": "󲜮",
+      "yi_liangshan": "궈",
+      "english": "fire"
+    },
+    "水": {
+      "yi_common": "󲜚",
+      "yi_liangshan": "ꒈ",
+      "english": "water"
+    },
+    "山": {
+      "yi_common": "󲜏",
+      "yi_liangshan": "ꁦ",
+      "english": "mountain"
+    },
+    "人": {
+      "yi_common": "󲜐",
+      "yi_liangshan": "ꊿ",
+      "english": "person"
+    },
+    "日": {
+      "yi_common": "󲞭",
+      "yi_liangshan": "ꑋ",
+      "english": "sun"
+    },
+    "月": {
+      "yi_common": "󲞮",
+      "english": "moon"
+    },
+    "吃": {
+      "yi_common": "󲜀",
+      "yi_liangshan": "ꈈ",
+      "english": "eat"
+    },
+    "喝": {
+      "yi_common": "󲜁",
+      "yi_liangshan": "ꈉ",
+      "english": "drink"
+    },
+    "看": {
+      "yi_common": "󲜂",
+      "yi_liangshan": "ꈊ",
+      "english": "see"
+    },
+    "走": {
+      "yi_common": "󲜃",
+      "yi_liangshan": "ꈋ",
+      "english": "walk"
+    }
+  },
+  "coefficients": {
+    "alpha": 0.3,
+    "beta": 0.3,
+    "gamma": 0.2,
+    "delta": 0.2
+  },
+  "grammar_rules": {
+    "VO": true,
+    "VN": true,
+    "examples": {
+      "吃饭": [
+        "饭",
+        "吃"
+      ],
+      "喝水": [
+        "水",
+        "喝"
+      ],
+      "看书": [
+        "书",
+        "看"
+      ],
+      "走路": [
+        "路",
+        "走"
+      ]
+    }
+  },
+  "timestamp": "2026-03-25T08:39:31.781655"
+}
