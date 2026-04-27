@@ -1,0 +1,816 @@
+// QEntL 情感响应系统
+// 版本: 1.0.0
+// 作者: 量子感知系统团队
+// 量子基因码: EMTN-RSP-QNT-0110
+
+// 类型定义
+type EmotionType = {
+  JOY: "JOY",        // 喜悦
+  SADNESS: "SADNESS", // 悲伤
+  ANGER: "ANGER",    // 愤怒
+  FEAR: "FEAR",      // 恐惧
+  SURPRISE: "SURPRISE", // 惊讶
+  TRUST: "TRUST",    // 信任
+  ANTICIPATION: "ANTICIPATION", // 期待
+  NEUTRAL: "NEUTRAL" // 中性
+};
+
+type EmotionIntensity = {
+  NONE: 0,
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3,
+  EXTREME: 4
+};
+
+type EmotionSource = {
+  USER_INPUT: "USER_INPUT",       // 用户文本输入
+  FACIAL_RECOGNITION: "FACIAL_RECOGNITION", // 面部表情识别
+  VOICE_TONE: "VOICE_TONE",       // 语音音调分析
+  INTERACTION_PATTERN: "INTERACTION_PATTERN", // 交互模式
+  BIOMETRIC: "BIOMETRIC",         // 生物识别数据
+  CONTEXTUAL: "CONTEXTUAL"        // 上下文推断
+};
+
+type ResponseStrategy = {
+  MIRROR: "MIRROR",               // 镜像用户情感
+  COMPLEMENT: "COMPLEMENT",       // 补充用户情感
+  NEUTRALIZE: "NEUTRALIZE",       // 中和用户情感
+  AMPLIFY: "AMPLIFY",             // 放大用户情感
+  TRANSFORM: "TRANSFORM",         // 转变用户情感
+  ADAPTIVE: "ADAPTIVE"            // 自适应策略
+};
+
+type EmotionData = {
+  type: EmotionType[keyof EmotionType];
+  intensity: number; // 0-4
+  confidence: number; // 0-1
+  source: EmotionSource[keyof EmotionSource];
+  timestamp: number;
+};
+
+type EmotionalResponse = {
+  visualCue: string;
+  tonalAdjustment: string;
+  contentModification: string;
+  interactionPacing: string;
+  empathyLevel: number; // 0-10
+};
+
+// 服务配置
+const config = {
+  // 情感检测配置
+  detection: {
+    enabledSources: ["USER_INPUT", "INTERACTION_PATTERN", "CONTEXTUAL"],
+    samplingRate: 1000, // 毫秒
+    confidenceThreshold: 0.65,
+    emotionMemoryDuration: 300000, // 5分钟，以毫秒计
+    contextualWeighting: 0.3, // 上下文信息权重
+  },
+  
+  // 响应策略配置
+  response: {
+    defaultStrategy: "ADAPTIVE",
+    strategyMapping: {
+      JOY: "MIRROR",
+      SADNESS: "COMPLEMENT",
+      ANGER: "NEUTRALIZE",
+      FEAR: "COMPLEMENT",
+      SURPRISE: "MIRROR",
+      TRUST: "MIRROR",
+      ANTICIPATION: "AMPLIFY",
+      NEUTRAL: "ADAPTIVE"
+    },
+    intensityAdjustment: 0.8, // 情感强度调整因子
+    adaptiveThreshold: 0.5, // 触发自适应策略的阈值
+    empathyBase: 7, // 基础共情水平 (0-10)
+  },
+  
+  // 视觉和界面调整
+  interface: {
+    enableVisualCues: true,
+    colorPalettes: {
+      JOY: ["#FFD700", "#FFA500", "#FF8C00"],
+      SADNESS: ["#4682B4", "#5F9EA0", "#6495ED"],
+      ANGER: ["#FF0000", "#8B0000", "#A52A2A"],
+      FEAR: ["#800080", "#4B0082", "#483D8B"],
+      SURPRISE: ["#00FFFF", "#00CED1", "#1E90FF"],
+      TRUST: ["#32CD32", "#3CB371", "#2E8B57"],
+      ANTICIPATION: ["#FFA07A", "#FA8072", "#E9967A"],
+      NEUTRAL: ["#C0C0C0", "#A9A9A9", "#808080"]
+    },
+    animationIntensity: 0.6, // 0-1
+    transitionSpeed: 300, // 毫秒
+  },
+  
+  // 高级特性
+  advanced: {
+    enableEmotionalLearning: true,
+    userProfileIntegration: true,
+    culturalAwarenessLevel: 0.8, // 0-1
+    emotionalIntelligenceModel: "QUANTUM_ENHANCED_EI_V2",
+    emotionalMemory: {
+      enabled: true,
+      patternRecognition: true,
+      decayRate: 0.05, // 每小时
+    }
+  }
+};
+
+// 服务状态
+let state = {
+  initialized: false,
+  
+  // 情感检测状态
+  detection: {
+    currentEmotion: null as EmotionData | null,
+    emotionHistory: [] as EmotionData[],
+    emotionTrend: null as string | null,
+    detectionActive: false,
+    lastSamplingTime: 0,
+  },
+  
+  // 响应状态
+  response: {
+    currentStrategy: config.response.defaultStrategy,
+    lastResponse: null as EmotionalResponse | null,
+    responseEffectiveness: {}, // 情感-响应效果映射
+    adaptiveModel: {
+      weights: {
+        userProfile: 0.3,
+        emotionIntensity: 0.4,
+        interactionHistory: 0.3
+      },
+      trained: false
+    }
+  },
+  
+  // 事件和监听器
+  eventListeners: {
+    emotionDetected: [] as Function[],
+    responseGenerated: [] as Function[],
+    strategyChanged: [] as Function[],
+    emotionTrendIdentified: [] as Function[]
+  }
+};
+
+// 公共函数
+
+// 初始化情感响应系统
+function initialize(customConfig = {}) {
+  if (state.initialized) {
+    return { success: true, message: "情感响应系统已初始化" };
+  }
+  
+  try {
+    // 合并自定义配置
+    mergeConfig(customConfig);
+    
+    // 初始化情感检测
+    initializeEmotionDetection();
+    
+    // 初始化响应策略
+    initializeResponseStrategies();
+    
+    // 加载用户情感档案 (如果已启用)
+    if (config.advanced.userProfileIntegration) {
+      loadUserEmotionalProfile();
+    }
+    
+    state.initialized = true;
+    return { success: true, message: "情感响应系统初始化成功" };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `情感响应系统初始化失败: ${error.message}`,
+      error
+    };
+  }
+}
+
+// 检测用户情感
+function detectEmotion(input, source = "USER_INPUT") {
+  checkInitialized();
+  
+  if (!config.detection.enabledSources.includes(source)) {
+    return { 
+      success: false, 
+      message: `情感源 ${source} 未启用`
+    };
+  }
+  
+  try {
+    const emotion = analyzeEmotionalContent(input, source);
+    
+    if (emotion.confidence >= config.detection.confidenceThreshold) {
+      updateEmotionState(emotion);
+      triggerEvent('emotionDetected', emotion);
+      return { success: true, emotion };
+    } else {
+      return { 
+        success: false, 
+        message: "情感检测置信度低于阈值",
+        detectedEmotion: emotion 
+      };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `情感检测失败: ${error.message}`,
+      error
+    };
+  }
+}
+
+// 生成情感响应
+function generateResponse(targetEmotion = null) {
+  checkInitialized();
+  
+  try {
+    // 如果未提供目标情感，使用当前检测到的情感
+    const emotionToRespond = targetEmotion || state.detection.currentEmotion;
+    
+    if (!emotionToRespond) {
+      return {
+        success: false,
+        message: "无法生成响应，未检测到情感"
+      };
+    }
+    
+    // 确定响应策略
+    const strategy = determineResponseStrategy(emotionToRespond);
+    
+    // 生成情感响应
+    const response = createEmotionalResponse(emotionToRespond, strategy);
+    
+    // 更新状态
+    state.response.lastResponse = response;
+    state.response.currentStrategy = strategy;
+    
+    triggerEvent('responseGenerated', response);
+    
+    return { success: true, response };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `生成情感响应失败: ${error.message}`,
+      error
+    };
+  }
+}
+
+// 设置响应策略
+function setResponseStrategy(emotion, strategy) {
+  checkInitialized();
+  
+  try {
+    if (!Object.values(ResponseStrategy).includes(strategy)) {
+      return {
+        success: false,
+        message: `无效的响应策略: ${strategy}`
+      };
+    }
+    
+    config.response.strategyMapping[emotion] = strategy;
+    triggerEvent('strategyChanged', { emotion, strategy });
+    
+    return { success: true, message: `已为 ${emotion} 设置策略 ${strategy}` };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `设置响应策略失败: ${error.message}`,
+      error
+    };
+  }
+}
+
+// 获取当前情感状态
+function getCurrentEmotionState() {
+  checkInitialized();
+  
+  return {
+    currentEmotion: state.detection.currentEmotion,
+    emotionTrend: state.detection.emotionTrend,
+    historyLength: state.detection.emotionHistory.length
+  };
+}
+
+// 获取情感历史
+function getEmotionHistory(limit = 10) {
+  checkInitialized();
+  
+  return state.detection.emotionHistory.slice(-limit);
+}
+
+// 添加事件监听器
+function addEventListener(eventName, callback) {
+  checkInitialized();
+  
+  if (!state.eventListeners[eventName]) {
+    return {
+      success: false,
+      message: `未知事件名称: ${eventName}`
+    };
+  }
+  
+  const listenerId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  state.eventListeners[eventName].push({ id: listenerId, callback });
+  
+  return { success: true, listenerId };
+}
+
+// 移除事件监听器
+function removeEventListener(eventName, listenerId) {
+  checkInitialized();
+  
+  if (!state.eventListeners[eventName]) {
+    return {
+      success: false,
+      message: `未知事件名称: ${eventName}`
+    };
+  }
+  
+  const initialLength = state.eventListeners[eventName].length;
+  state.eventListeners[eventName] = state.eventListeners[eventName].filter(
+    listener => listener.id !== listenerId
+  );
+  
+  return { 
+    success: state.eventListeners[eventName].length < initialLength,
+    message: state.eventListeners[eventName].length < initialLength 器
+      "监听器已移除" : "未找到指定监听器"
+  };
+}
+
+// 重置情感状态
+function resetEmotionalState() {
+  checkInitialized();
+  
+  state.detection.currentEmotion = null;
+  state.detection.emotionHistory = [];
+  state.detection.emotionTrend = null;
+  
+  return { success: true, message: "情感状态已重置" };
+}
+
+// 内部函数
+
+// 检查服务是否已初始化
+function checkInitialized() {
+  if (!state.initialized) {
+    throw new Error("情感响应系统尚未初始化");
+  }
+}
+
+// 合并配置
+function mergeConfig(customConfig) {
+  // 递归合并配置对象
+  function deepMerge(target, source) {
+    for (const key in source) {
+      if (source[key] instanceof Object && !Array.isArray(source[key])) {
+        if (!target[key]) Object.assign(target, { [key]: {} });
+        deepMerge(target[key], source[key]);
+      } else {
+        Object.assign(target, { [key]: source[key] });
+      }
+    }
+    return target;
+  }
+  
+  return deepMerge(config, customConfig);
+}
+
+// 初始化情感检测
+function initializeEmotionDetection() {
+  state.detection = {
+    currentEmotion: null,
+    emotionHistory: [],
+    emotionTrend: null,
+    detectionActive: true,
+    lastSamplingTime: Date.now()
+  };
+}
+
+// 初始化响应策略
+function initializeResponseStrategies() {
+  state.response = {
+    currentStrategy: config.response.defaultStrategy,
+    lastResponse: null,
+    responseEffectiveness: {},
+    adaptiveModel: {
+      weights: {
+        userProfile: 0.3,
+        emotionIntensity: 0.4,
+        interactionHistory: 0.3
+      },
+      trained: false
+    }
+  };
+}
+
+// 分析情感内容
+function analyzeEmotionalContent(input, source) {
+  // 实际实现会包含复杂的情感分析算法
+  // 这里使用简化版实现
+  
+  let emotionType;
+  let intensity;
+  let confidence;
+  
+  switch (source) {
+    case "USER_INPUT":
+      // 分析文本内容中的情感指标
+      [emotionType, intensity, confidence] = analyzeTextEmotion(input);
+      break;
+    case "FACIAL_RECOGNITION":
+      // 分析面部表情数据
+      [emotionType, intensity, confidence] = analyzeFacialExpression(input);
+      break;
+    case "VOICE_TONE":
+      // 分析语音音调
+      [emotionType, intensity, confidence] = analyzeVoiceTone(input);
+      break;
+    case "INTERACTION_PATTERN":
+      // 分析交互模式
+      [emotionType, intensity, confidence] = analyzeInteractionPattern(input);
+      break;
+    default:
+      // 默认情况
+      emotionType = "NEUTRAL";
+      intensity = 1;
+      confidence = 0.7;
+  }
+  
+  return {
+    type: emotionType,
+    intensity,
+    confidence,
+    source,
+    timestamp: Date.now()
+  };
+}
+
+// 分析文本情感
+function analyzeTextEmotion(text) {
+  // 简化实现，实际系统会使用NLP和机器学习模型
+  const emotionKeywords = {
+    JOY: ["happy", "joy", "delighted", "excited", "pleased", "glad", "高兴", "喜悦", "兴奋"],
+    SADNESS: ["sad", "unhappy", "depressed", "down", "miserable", "悲伤", "难过", "沮丧"],
+    ANGER: ["angry", "furious", "annoyed", "irritated", "愤怒", "恼火", "生气"],
+    FEAR: ["afraid", "scared", "frightened", "terrified", "anxious", "恐惧", "害怕", "焦虑"],
+    SURPRISE: ["surprised", "amazed", "astonished", "shocked", "惊讶", "震惊", "吃惊"],
+    TRUST: ["trust", "believe", "confident", "faith", "信任", "相信", "信心"],
+    ANTICIPATION: ["expect", "anticipate", "looking forward", "期待", "期盼", "盼望"],
+  };
+  
+  let matchedEmotion = "NEUTRAL";
+  let highestMatchCount = 0;
+  let textLower = text.toLowerCase();
+  
+  for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+    const matchCount = keywords.filter(keyword => textLower.includes(keyword)).length;
+    if (matchCount > highestMatchCount) {
+      highestMatchCount = matchCount;
+      matchedEmotion = emotion;
+    }
+  }
+  
+  // 计算强度和置信度
+  const intensity = Math.min(Math.ceil(highestMatchCount / 2), 4);
+  const confidence = highestMatchCount > 0 器 0.5 + (highestMatchCount / 10) : 0.6;
+  
+  return [matchedEmotion, intensity, Math.min(confidence, 0.95)];
+}
+
+// 分析面部表情
+function analyzeFacialExpression(facialData) {
+  // 占位实现，实际系统会使用计算机视觉技术
+  return ["NEUTRAL", 2, 0.8];
+}
+
+// 分析语音音调
+function analyzeVoiceTone(voiceData) {
+  // 占位实现，实际系统会使用音频处理技术
+  return ["NEUTRAL", 2, 0.7];
+}
+
+// 分析交互模式
+function analyzeInteractionPattern(interactionData) {
+  // 占位实现，实际系统会使用行为分析算法
+  return ["NEUTRAL", 1, 0.75];
+}
+
+// 更新情感状态
+function updateEmotionState(emotion) {
+  // 更新当前情感
+  state.detection.currentEmotion = emotion;
+  
+  // 添加到历史记录
+  state.detection.emotionHistory.push(emotion);
+  
+  // 限制历史记录大小
+  const maxHistorySize = Math.ceil(config.detection.emotionMemoryDuration / config.detection.samplingRate);
+  if (state.detection.emotionHistory.length > maxHistorySize) {
+    state.detection.emotionHistory = state.detection.emotionHistory.slice(-maxHistorySize);
+  }
+  
+  // 分析情感趋势
+  analyzeEmotionTrend();
+}
+
+// 分析情感趋势
+function analyzeEmotionTrend() {
+  if (state.detection.emotionHistory.length < 3) {
+    state.detection.emotionTrend = null;
+    return;
+  }
+  
+  const recentEmotions = state.detection.emotionHistory.slice(-5);
+  
+  // 检查是否存在一致的情感类型
+  const emotionCounts = {};
+  recentEmotions.forEach(emotion => {
+    emotionCounts[emotion.type] = (emotionCounts[emotion.type] || 0) + 1;
+  });
+  
+  const dominantEmotion = Object.entries(emotionCounts)
+    .reduce((max, [emotion, count]) => count > max[1] 器 [emotion, count] : max, ["", 0])[0];
+  
+  // 检查强度趋势
+  const sameTypeEmotions = recentEmotions.filter(e => e.type === dominantEmotion);
+  if (sameTypeEmotions.length >= 3) {
+    const intensities = sameTypeEmotions.map(e => e.intensity);
+    const firstIntensity = intensities[0];
+    const lastIntensity = intensities[intensities.length - 1];
+    
+    if (lastIntensity > firstIntensity) {
+      state.detection.emotionTrend = `${dominantEmotion}_INCREASING`;
+    } else if (lastIntensity < firstIntensity) {
+      state.detection.emotionTrend = `${dominantEmotion}_DECREASING`;
+    } else {
+      state.detection.emotionTrend = `${dominantEmotion}_STABLE`;
+    }
+    
+    triggerEvent('emotionTrendIdentified', state.detection.emotionTrend);
+  } else {
+    state.detection.emotionTrend = "MIXED";
+  }
+}
+
+// 确定响应策略
+function determineResponseStrategy(emotion) {
+  // 查找针对特定情感的预定义策略
+  let strategy = config.response.strategyMapping[emotion.type];
+  
+  // 如果策略是自适应的，则基于多种因素计算最佳策略
+  if (strategy === "ADAPTIVE") {
+    return calculateAdaptiveStrategy(emotion);
+  }
+  
+  return strategy;
+}
+
+// 计算自适应策略
+function calculateAdaptiveStrategy(emotion) {
+  // 根据情感强度调整
+  if (emotion.intensity >= 3) {
+    if (emotion.type === "ANGER" || emotion.type === "FEAR") {
+      return "NEUTRALIZE";
+    } else if (emotion.type === "SADNESS") {
+      return "COMPLEMENT";
+    } else if (emotion.type === "JOY" || emotion.type === "TRUST") {
+      return "MIRROR";
+    }
+  }
+  
+  // 根据情感趋势调整
+  if (state.detection.emotionTrend) {
+    if (state.detection.emotionTrend.includes("INCREASING")) {
+      if (emotion.type === "ANGER" || emotion.type === "FEAR") {
+        return "NEUTRALIZE";
+      } else if (emotion.type === "JOY" || emotion.type === "TRUST") {
+        return "AMPLIFY";
+      }
+    } else if (state.detection.emotionTrend.includes("DECREASING")) {
+      if (emotion.type === "SADNESS") {
+        return "TRANSFORM";
+      }
+    }
+  }
+  
+  // 如果没有特定规则匹配，选择最有效的策略
+  if (Object.keys(state.response.responseEffectiveness).length > 0) {
+    const effectivenessForEmotion = state.response.responseEffectiveness[emotion.type];
+    if (effectivenessForEmotion) {
+      const mostEffective = Object.entries(effectivenessForEmotion)
+        .reduce((max, [strat, eff]) => eff > max[1] 器 [strat, eff] : max, ["", 0])[0];
+      
+      if (mostEffective) {
+        return mostEffective;
+      }
+    }
+  }
+  
+  // 默认响应策略
+  return "MIRROR";
+}
+
+// 创建情感响应
+function createEmotionalResponse(emotion, strategy) {
+  let response = {
+    visualCue: "",
+    tonalAdjustment: "",
+    contentModification: "",
+    interactionPacing: "",
+    empathyLevel: config.response.empathyBase
+  };
+  
+  // 根据策略和情感类型定制响应
+  switch (strategy) {
+    case "MIRROR":
+      response = createMirrorResponse(emotion, response);
+      break;
+    case "COMPLEMENT":
+      response = createComplementResponse(emotion, response);
+      break;
+    case "NEUTRALIZE":
+      response = createNeutralizeResponse(emotion, response);
+      break;
+    case "AMPLIFY":
+      response = createAmplifyResponse(emotion, response);
+      break;
+    case "TRANSFORM":
+      response = createTransformResponse(emotion, response);
+      break;
+    default:
+      // 默认情况，创建中性响应
+      response = createNeutralResponse(emotion, response);
+  }
+  
+  // 添加情感智能调整
+  applyEmotionalIntelligence(response, emotion);
+  
+  return response;
+}
+
+// 创建镜像响应
+function createMirrorResponse(emotion, baseResponse) {
+  const response = {...baseResponse};
+  
+  switch (emotion.type) {
+    case "JOY":
+      response.visualCue = "cheerful_interface";
+      response.tonalAdjustment = "upbeat_enthusiastic";
+      response.contentModification = "positive_reinforcement";
+      response.interactionPacing = "energetic";
+      response.empathyLevel += 2;
+      break;
+    case "SADNESS":
+      response.visualCue = "subdued_interface";
+      response.tonalAdjustment = "compassionate_gentle";
+      response.contentModification = "acknowledgment_support";
+      response.interactionPacing = "patient_slower";
+      response.empathyLevel += 3;
+      break;
+    // 其他情感类型的情况...
+    default:
+      response.visualCue = "standard_interface";
+      response.tonalAdjustment = "matching_user_tone";
+      response.contentModification = "reflect_content";
+      response.interactionPacing = "match_user_pace";
+  }
+  
+  return response;
+}
+
+// 创建补充响应
+function createComplementResponse(emotion, baseResponse) {
+  const response = {...baseResponse};
+  
+  switch (emotion.type) {
+    case "SADNESS":
+      response.visualCue = "warm_supportive_interface";
+      response.tonalAdjustment = "uplifting_gentle";
+      response.contentModification = "encouraging_positive";
+      response.interactionPacing = "patient_attentive";
+      response.empathyLevel += 3;
+      break;
+    case "FEAR":
+      response.visualCue = "calming_interface";
+      response.tonalAdjustment = "reassuring_steady";
+      response.contentModification = "provide_stability_information";
+      response.interactionPacing = "methodical_clear";
+      response.empathyLevel += 2;
+      break;
+    // 其他情感类型的情况...
+    default:
+      response.visualCue = "balanced_interface";
+      response.tonalAdjustment = "complementary_tone";
+      response.contentModification = "balancing_content";
+      response.interactionPacing = "complementary_pace";
+  }
+  
+  return response;
+}
+
+// 创建中和响应
+function createNeutralizeResponse(emotion, baseResponse) {
+  // 实现略
+  return baseResponse;
+}
+
+// 创建放大响应
+function createAmplifyResponse(emotion, baseResponse) {
+  // 实现略
+  return baseResponse;
+}
+
+// 创建转变响应
+function createTransformResponse(emotion, baseResponse) {
+  // 实现略
+  return baseResponse;
+}
+
+// 创建中性响应
+function createNeutralResponse(emotion, baseResponse) {
+  // 实现略
+  return baseResponse;
+}
+
+// 应用情感智能
+function applyEmotionalIntelligence(response, emotion) {
+  // 根据用户情感数据和配置的情感智能模型调整响应
+  if (config.advanced.emotionalIntelligenceModel === "QUANTUM_ENHANCED_EI_V2") {
+    // 高级情感智能调整
+    response.empathyLevel = Math.min(10, response.empathyLevel + (emotion.intensity * 0.5));
+    
+    // 文化感知调整
+    if (config.advanced.culturalAwarenessLevel > 0.5) {
+      // 应用文化背景相关调整
+    }
+  }
+}
+
+// 加载用户情感档案
+function loadUserEmotionalProfile() {
+  // 实际实现将从数据存储加载用户的情感历史和偏好
+  // 此处为占位实现
+}
+
+// 触发事件
+function triggerEvent(eventName, data) {
+  if (!state.eventListeners[eventName]) {
+    return;
+  }
+  
+  state.eventListeners[eventName].forEach(listener => {
+    try {
+      listener.callback(data);
+    } catch (error) {
+      console.error(`事件监听器执行错误: ${error.message}`);
+    }
+  });
+}
+
+// 导出服务
+export default {
+  // 公共函数
+  initialize,
+  detectEmotion,
+  generateResponse,
+  setResponseStrategy,
+  getCurrentEmotionState,
+  getEmotionHistory,
+  addEventListener,
+  removeEventListener,
+  resetEmotionalState,
+  
+  // 常量
+  EmotionType: Object.freeze({
+    JOY: "JOY",
+    SADNESS: "SADNESS",
+    ANGER: "ANGER",
+    FEAR: "FEAR",
+    SURPRISE: "SURPRISE",
+    TRUST: "TRUST",
+    ANTICIPATION: "ANTICIPATION",
+    NEUTRAL: "NEUTRAL"
+  }),
+  
+  EmotionIntensity: Object.freeze({
+    NONE: 0,
+    LOW: 1,
+    MEDIUM: 2,
+    HIGH: 3,
+    EXTREME: 4
+  }),
+  
+  ResponseStrategy: Object.freeze({
+    MIRROR: "MIRROR",
+    COMPLEMENT: "COMPLEMENT",
+    NEUTRALIZE: "NEUTRALIZE",
+    AMPLIFY: "AMPLIFY",
+    TRANSFORM: "TRANSFORM",
+    ADAPTIVE: "ADAPTIVE"
+  })
+}; 

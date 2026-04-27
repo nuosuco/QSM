@@ -1,0 +1,907 @@
+/**
+ * QEntL输入/输出调度器
+ * QuantumGene: QG-KERNEL-IOSCHED-H3P7-1714329860
+ * EntanglementStrength: 0.87
+ */
+
+quantum_program IOScheduler {
+    metadata {
+        name: "QEntL输入/输出调度器",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的I/O调度器，优化设备I/O操作的调度",
+        quantum_gene: "QG-KERNEL-IOSCHED-H3P7-1714329860",
+        entanglement_strength: 0.87
+    }
+
+    // 导入依赖模块
+    import DeviceFramework from "./device_framework.qentl";
+    import DeviceRegistry from "./device_registry.qentl";
+
+    // I/O请求状态常量
+    constexpr io_request_states = {
+        PENDING: 0,          // 等待中
+        PROCESSING: 1,       // 处理中
+        COMPLETED: 2,        // 已完成
+        FAILED: 3,           // 失败
+        CANCELLED: 4         // 已取消
+    };
+
+    // I/O请求类型常量
+    constexpr io_request_types = {
+        READ: 0,             // 读取操作
+        WRITE: 1,            // 写入操作
+        CONTROL: 2,          // 控制操作
+        QUANTUM_READ: 3,     // 量子读取
+        QUANTUM_WRITE: 4,    // 量子写入
+        QUANTUM_ENTANGLE: 5, // 量子纠缠操作
+        QUANTUM_MEASURE: 6   // 量子测量操作
+    };
+
+    // I/O调度策略常量
+    constexpr scheduling_policies = {
+        FIFO: 0,             // 先进先出
+        PRIORITY: 1,         // 优先级调度
+        DEADLINE: 2,         // 截止时间调度
+        QUANTUM_AWARE: 3,    // 量子感知调度
+        FAIR_QUEUE: 4        // 公平队列调度
+    };
+
+    // 模块状态
+    state {
+        // 内核引用
+        kernel_reference: null,
+        
+        // 设备框架引用
+        device_framework: null,
+        
+        // 设备注册表引用
+        device_registry: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 当前调度策略
+        current_policy: null,
+        
+        // 下一个可用的请求ID
+        next_request_id: 1,
+        
+        // 请求队列 - 按设备ID分组
+        request_queues: {},
+        
+        // 当前活动的I/O请求
+        active_requests: {},
+        
+        // 已完成的请求
+        completed_requests: {},
+        
+        // 请求计数器
+        request_count: {
+            total: 0,
+            completed: 0,
+            failed: 0,
+            cancelled: 0
+        },
+        
+        // 设备统计信息
+        device_stats: {},
+        
+        // 调度统计信息
+        scheduling_stats: {
+            policy_changes: 0,
+            last_policy_change: null,
+            scheduling_cycles: 0,
+            last_scheduling_cycle: null,
+            total_wait_time: 0,
+            total_processing_time: 0,
+            quantum_operations: 0
+        },
+        
+        // 请求回调
+        request_callbacks: {},
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化I/O调度器
+    initialize(kernel_ref, device_framework_ref, device_registry_ref, config) {
+        kernel_log("初始化I/O调度器...");
+        
+        // 保存引用
+        this.kernel_reference = kernel_ref;
+        this.device_framework = device_framework_ref || DeviceFramework;
+        this.device_registry = device_registry_ref || DeviceRegistry;
+        
+        // 验证设备框架和注册表已初始化
+        if (!this.device_framework || !this.device_framework.initialized) {
+            this.add_error("无法初始化I/O调度器：设备框架未初始化");
+            return false;
+        }
+        
+        if (!this.device_registry || !this.device_registry.initialized) {
+            this.add_error("无法初始化I/O调度器：设备注册表未初始化");
+            return false;
+        }
+        
+        // 应用配置
+        if (config) {
+            // 设置调度策略
+            if (config.policy !== undefined && config.policy in this.scheduling_policies) {
+                this.current_policy = config.policy;
+            } else {
+                this.current_policy = this.scheduling_policies.FIFO; // 默认使用FIFO
+            }
+        } else {
+            this.current_policy = this.scheduling_policies.FIFO;
+        }
+        
+        this.initialized = true;
+        kernel_log(`I/O调度器初始化完成，当前策略: ${this.get_policy_name()}`);
+        
+        return true;
+    }
+
+    // 重置I/O调度器
+    reset() {
+        kernel_log("重置I/O调度器...");
+        
+        // 保存引用
+        const kernel_ref = this.kernel_reference;
+        const device_framework = this.device_framework;
+        const device_registry = this.device_registry;
+        
+        // 取消所有待处理的请求
+        for (const device_id in this.request_queues) {
+            const queue = this.request_queues[device_id];
+            
+            for (const request_id in queue) {
+                this.cancel_request(request_id);
+            }
+        }
+        
+        // 清空所有请求
+        this.request_queues = {};
+        this.active_requests = {};
+        this.completed_requests = {};
+        this.request_callbacks = {};
+        
+        // 重置请求ID计数器
+        this.next_request_id = 1;
+        
+        // 重置请求计数
+        this.request_count = {
+            total: 0,
+            completed: 0,
+            failed: 0,
+            cancelled: 0
+        };
+        
+        // 重置设备统计信息
+        this.device_stats = {};
+        
+        // 重置调度统计信息
+        this.scheduling_stats = {
+            policy_changes: 0,
+            last_policy_change: null,
+            scheduling_cycles: 0,
+            last_scheduling_cycle: null,
+            total_wait_time: 0,
+            total_processing_time: 0,
+            quantum_operations: 0
+        };
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 恢复引用
+        this.kernel_reference = kernel_ref;
+        this.device_framework = device_framework;
+        this.device_registry = device_registry;
+        
+        kernel_log("I/O调度器已重置");
+    }
+
+    // 获取调度策略名称
+    get_policy_name() {
+        switch (this.current_policy) {
+            case this.scheduling_policies.FIFO:
+                return "先进先出 (FIFO)";
+            case this.scheduling_policies.PRIORITY:
+                return "优先级调度 (Priority)";
+            case this.scheduling_policies.DEADLINE:
+                return "截止时间调度 (Deadline)";
+            case this.scheduling_policies.QUANTUM_AWARE:
+                return "量子感知调度 (Quantum-Aware)";
+            case this.scheduling_policies.FAIR_QUEUE:
+                return "公平队列 (Fair Queue)";
+            default:
+                return "未知策略";
+        }
+    }
+
+    // 更改调度策略
+    change_policy(new_policy) {
+        if (!this.initialized) {
+            this.add_error("无法更改调度策略：I/O调度器未初始化");
+            return false;
+        }
+        
+        if (!(new_policy in this.scheduling_policies)) {
+            this.add_error(`无效的调度策略: ${new_policy}`);
+            return false;
+        }
+        
+        const old_policy = this.current_policy;
+        this.current_policy = new_policy;
+        
+        // 更新统计信息
+        this.scheduling_stats.policy_changes++;
+        this.scheduling_stats.last_policy_change = Date.now();
+        
+        kernel_log(`I/O调度策略已更改: ${this.get_policy_name(old_policy)} -> ${this.get_policy_name()}`);
+        
+        return true;
+    }
+
+    // 创建新的I/O请求
+    create_request(device_id, type, data, options) {
+        if (!this.initialized) {
+            this.add_error("无法创建I/O请求：I/O调度器未初始化");
+            return null;
+        }
+        
+        // 检查设备是否存在
+        if (!this.device_registry.get_device_info(device_id)) {
+            this.add_error(`无法创建I/O请求：设备ID ${device_id} 不存在`);
+            return null;
+        }
+        
+        // 检查请求类型是否有效
+        if (!(type in this.io_request_types)) {
+            this.add_error(`无法创建I/O请求：无效的请求类型 ${type}`);
+            return null;
+        }
+        
+        // 获取新的请求ID
+        const request_id = this.next_request_id++;
+        
+        // 创建请求对象
+        const request = {
+            id: request_id,
+            device_id: device_id,
+            type: type,
+            data: data || null,
+            options: options || {},
+            state: this.io_request_states.PENDING,
+            created_at: Date.now(),
+            started_at: null,
+            completed_at: null,
+            priority: options && options.priority !== undefined 器 options.priority : 0,
+            deadline: options && options.deadline 器 options.deadline : null,
+            result: null,
+            error: null
+        };
+        
+        // 初始化设备队列（如果不存在）
+        if (!this.request_queues[device_id]) {
+            this.request_queues[device_id] = {};
+        }
+        
+        // 添加到设备的请求队列
+        this.request_queues[device_id][request_id] = request;
+        
+        // 更新请求计数
+        this.request_count.total++;
+        
+        // 更新设备统计信息
+        if (!this.device_stats[device_id]) {
+            this.device_stats[device_id] = {
+                total_requests: 0,
+                completed_requests: 0,
+                failed_requests: 0,
+                cancelled_requests: 0,
+                average_wait_time: 0,
+                average_processing_time: 0
+            };
+        }
+        this.device_stats[device_id].total_requests++;
+        
+        // 如果有回调，保存它
+        if (options && typeof options.callback === 'function') {
+            this.request_callbacks[request_id] = options.callback;
+        }
+        
+        kernel_log(`I/O请求已创建: ID ${request_id}, 设备 ${device_id}, 类型 ${this.get_request_type_name(type)}`);
+        
+        // 触发调度周期
+        this.schedule();
+        
+        return request_id;
+    }
+
+    // 获取请求类型名称
+    get_request_type_name(type) {
+        switch (type) {
+            case this.io_request_types.READ:
+                return "读取";
+            case this.io_request_types.WRITE:
+                return "写入";
+            case this.io_request_types.CONTROL:
+                return "控制";
+            case this.io_request_types.QUANTUM_READ:
+                return "量子读取";
+            case this.io_request_types.QUANTUM_WRITE:
+                return "量子写入";
+            case this.io_request_types.QUANTUM_ENTANGLE:
+                return "量子纠缠";
+            case this.io_request_types.QUANTUM_MEASURE:
+                return "量子测量";
+            default:
+                return "未知";
+        }
+    }
+
+    // 获取请求状态名称
+    get_request_state_name(state) {
+        switch (state) {
+            case this.io_request_states.PENDING:
+                return "等待中";
+            case this.io_request_states.PROCESSING:
+                return "处理中";
+            case this.io_request_states.COMPLETED:
+                return "已完成";
+            case this.io_request_states.FAILED:
+                return "失败";
+            case this.io_request_states.CANCELLED:
+                return "已取消";
+            default:
+                return "未知";
+        }
+    }
+
+    // 获取请求信息
+    get_request_info(request_id) {
+        if (!this.initialized) {
+            this.add_error("无法获取请求信息：I/O调度器未初始化");
+            return null;
+        }
+        
+        // 检查活动请求中是否存在
+        if (this.active_requests[request_id]) {
+            return { ...this.active_requests[request_id] };
+        }
+        
+        // 检查已完成请求中是否存在
+        if (this.completed_requests[request_id]) {
+            return { ...this.completed_requests[request_id] };
+        }
+        
+        // 在各设备的请求队列中查找
+        for (const device_id in this.request_queues) {
+            if (this.request_queues[device_id][request_id]) {
+                return { ...this.request_queues[device_id][request_id] };
+            }
+        }
+        
+        this.add_warning(`请求不存在: ${request_id}`);
+        return null;
+    }
+
+    // 取消请求
+    cancel_request(request_id) {
+        if (!this.initialized) {
+            this.add_error("无法取消请求：I/O调度器未初始化");
+            return false;
+        }
+        
+        const request = this.get_request_info(request_id);
+        if (!request) {
+            this.add_error(`无法取消请求：请求ID ${request_id} 不存在`);
+            return false;
+        }
+        
+        // 只能取消未完成的请求
+        if (request.state === this.io_request_states.COMPLETED || 
+            request.state === this.io_request_states.FAILED ||
+            request.state === this.io_request_states.CANCELLED) {
+            this.add_warning(`请求 ${request_id} 已经处于最终状态，无法取消`);
+            return false;
+        }
+        
+        const device_id = request.device_id;
+        
+        // 从活动请求中移除（如果存在）
+        if (this.active_requests[request_id]) {
+            delete this.active_requests[request_id];
+        }
+        
+        // 从请求队列中移除（如果存在）
+        if (this.request_queues[device_id] && this.request_queues[device_id][request_id]) {
+            delete this.request_queues[device_id][request_id];
+        }
+        
+        // 更新请求状态
+        request.state = this.io_request_states.CANCELLED;
+        request.completed_at = Date.now();
+        
+        // 添加到已完成请求
+        this.completed_requests[request_id] = request;
+        
+        // 更新统计信息
+        this.request_count.cancelled++;
+        if (this.device_stats[device_id]) {
+            this.device_stats[device_id].cancelled_requests++;
+        }
+        
+        // 调用回调
+        this.call_request_callback(request_id, null, { cancelled: true });
+        
+        kernel_log(`I/O请求已取消: ID ${request_id}`);
+        
+        return true;
+    }
+
+    // 调度I/O请求
+    schedule() {
+        if (!this.initialized) {
+            this.add_error("无法调度请求：I/O调度器未初始化");
+            return;
+        }
+        
+        // 更新调度统计
+        this.scheduling_stats.scheduling_cycles++;
+        this.scheduling_stats.last_scheduling_cycle = Date.now();
+        
+        // 对每个设备进行调度
+        for (const device_id in this.request_queues) {
+            // 获取设备信息
+            const device_info = this.device_registry.get_device_info(device_id);
+            if (!device_info) {
+                this.add_warning(`调度跳过设备 ${device_id}: 设备不存在`);
+                continue;
+            }
+            
+            // 检查设备是否就绪
+            if (device_info.state !== this.device_framework.device_states.READY) {
+                continue;
+            }
+            
+            // 获取设备的请求队列
+            const queue = this.request_queues[device_id];
+            if (Object.keys(queue).length === 0) {
+                continue; // 队列为空
+            }
+            
+            // 选择下一个请求
+            const next_request_id = this.select_next_request(device_id);
+            if (next_request_id === null) {
+                continue;
+            }
+            
+            // 执行请求
+            this.process_request(next_request_id);
+        }
+    }
+
+    // 选择下一个要处理的请求
+    select_next_request(device_id) {
+        const queue = this.request_queues[device_id];
+        if (!queue || Object.keys(queue).length === 0) {
+            return null;
+        }
+        
+        // 根据当前调度策略选择
+        switch (this.current_policy) {
+            case this.scheduling_policies.FIFO:
+                return this.select_fifo(device_id);
+                
+            case this.scheduling_policies.PRIORITY:
+                return this.select_priority(device_id);
+                
+            case this.scheduling_policies.DEADLINE:
+                return this.select_deadline(device_id);
+                
+            case this.scheduling_policies.QUANTUM_AWARE:
+                return this.select_quantum_aware(device_id);
+                
+            case this.scheduling_policies.FAIR_QUEUE:
+                return this.select_fair_queue(device_id);
+                
+            default:
+                return this.select_fifo(device_id);
+        }
+    }
+
+    // FIFO选择策略
+    select_fifo(device_id) {
+        const queue = this.request_queues[device_id];
+        let oldest_request_id = null;
+        let oldest_time = Number.MAX_SAFE_INTEGER;
+        
+        for (const request_id in queue) {
+            const request = queue[request_id];
+            if (request.created_at < oldest_time) {
+                oldest_time = request.created_at;
+                oldest_request_id = request_id;
+            }
+        }
+        
+        return oldest_request_id;
+    }
+
+    // 优先级选择策略
+    select_priority(device_id) {
+        const queue = this.request_queues[device_id];
+        let highest_priority_id = null;
+        let highest_priority = -Number.MAX_SAFE_INTEGER;
+        
+        for (const request_id in queue) {
+            const request = queue[request_id];
+            if (request.priority > highest_priority) {
+                highest_priority = request.priority;
+                highest_priority_id = request_id;
+            }
+        }
+        
+        return highest_priority_id;
+    }
+
+    // 截止时间选择策略
+    select_deadline(device_id) {
+        const queue = this.request_queues[device_id];
+        let earliest_deadline_id = null;
+        let earliest_deadline = Number.MAX_SAFE_INTEGER;
+        
+        for (const request_id in queue) {
+            const request = queue[request_id];
+            // 如果未设置截止时间，使用创建时间+默认时间
+            const deadline = request.deadline || (request.created_at + 1000);
+            
+            if (deadline < earliest_deadline) {
+                earliest_deadline = deadline;
+                earliest_deadline_id = request_id;
+            }
+        }
+        
+        return earliest_deadline_id;
+    }
+
+    // 量子感知选择策略
+    select_quantum_aware(device_id) {
+        const queue = this.request_queues[device_id];
+        let quantum_request_id = null;
+        let non_quantum_request_id = null;
+        
+        for (const request_id in queue) {
+            const request = queue[request_id];
+            
+            // 优先选择量子操作
+            if (request.type === this.io_request_types.QUANTUM_READ || 
+                request.type === this.io_request_types.QUANTUM_WRITE || 
+                request.type === this.io_request_types.QUANTUM_ENTANGLE || 
+                request.type === this.io_request_types.QUANTUM_MEASURE) {
+                
+                if (quantum_request_id === null || 
+                    queue[quantum_request_id].created_at > request.created_at) {
+                    quantum_request_id = request_id;
+                }
+            } else {
+                if (non_quantum_request_id === null || 
+                    queue[non_quantum_request_id].created_at > request.created_at) {
+                    non_quantum_request_id = request_id;
+                }
+            }
+        }
+        
+        // 优先返回量子请求
+        return quantum_request_id !== null 器 quantum_request_id : non_quantum_request_id;
+    }
+
+    // 公平队列选择策略
+    select_fair_queue(device_id) {
+        // 简化版公平队列 - 根据请求类型进行轮转
+        const queue = this.request_queues[device_id];
+        
+        // 按类型分组
+        const type_groups = {};
+        for (const request_id in queue) {
+            const request = queue[request_id];
+            if (!type_groups[request.type]) {
+                type_groups[request.type] = [];
+            }
+            type_groups[request.type].push(request_id);
+        }
+        
+        // 从每个组中选择最早的请求
+        const candidates = [];
+        for (const type in type_groups) {
+            const group = type_groups[type];
+            if (group.length > 0) {
+                // 找出组中最早的请求
+                let earliest_id = group[0];
+                let earliest_time = queue[group[0]].created_at;
+                
+                for (let i = 1; i < group.length; i++) {
+                    const request_id = group[i];
+                    if (queue[request_id].created_at < earliest_time) {
+                        earliest_time = queue[request_id].created_at;
+                        earliest_id = request_id;
+                    }
+                }
+                
+                candidates.push(earliest_id);
+            }
+        }
+        
+        // 如果没有候选，返回null
+        if (candidates.length === 0) {
+            return null;
+        }
+        
+        // 随机选择一个候选请求，实现公平性
+        const index = Math.floor(Math.random() * candidates.length);
+        return candidates[index];
+    }
+
+    // 处理请求
+    process_request(request_id) {
+        if (!this.initialized) {
+            this.add_error("无法处理请求：I/O调度器未初始化");
+            return false;
+        }
+        
+        // 获取请求信息
+        let request = null;
+        let device_id = null;
+        
+        // 在各设备的请求队列中查找
+        for (const d_id in this.request_queues) {
+            if (this.request_queues[d_id][request_id]) {
+                request = this.request_queues[d_id][request_id];
+                device_id = d_id;
+                break;
+            }
+        }
+        
+        if (!request) {
+            this.add_error(`无法处理请求：请求ID ${request_id} 不存在`);
+            return false;
+        }
+        
+        // 更新请求状态
+        request.state = this.io_request_states.PROCESSING;
+        request.started_at = Date.now();
+        
+        // 从请求队列中移除
+        delete this.request_queues[device_id][request_id];
+        
+        // 添加到活动请求
+        this.active_requests[request_id] = request;
+        
+        kernel_log(`开始处理I/O请求: ID ${request_id}, 设备 ${device_id}, 类型 ${this.get_request_type_name(request.type)}`);
+        
+        // 获取设备和驱动信息
+        const device_info = this.device_registry.get_device_info(device_id);
+        if (!device_info) {
+            this.complete_request(request_id, null, { error: "设备不存在" });
+            return false;
+        }
+        
+        const driver_info = this.device_registry.get_driver_info(device_info.driver_name);
+        if (!driver_info) {
+            this.complete_request(request_id, null, { error: "驱动不存在" });
+            return false;
+        }
+        
+        // 执行I/O操作
+        try {
+            // 模拟I/O操作
+            // 在实际实现中，这里会将请求转发给设备驱动程序
+            
+            const is_quantum = request.type >= this.io_request_types.QUANTUM_READ;
+            const process_time = is_quantum 器 50 : 10; // 模拟处理时间
+            
+            // 更新统计信息
+            if (is_quantum) {
+                this.scheduling_stats.quantum_operations++;
+            }
+            
+            // 延迟处理结果
+            setTimeout(() => {
+                const success = Math.random() > 0.1; // 90%成功率
+                
+                if (success) {
+                    let result = null;
+                    
+                    // 根据请求类型生成模拟结果
+                    switch (request.type) {
+                        case this.io_request_types.READ:
+                        case this.io_request_types.QUANTUM_READ:
+                            result = { data: "模拟读取数据" };
+                            break;
+                            
+                        case this.io_request_types.WRITE:
+                        case this.io_request_types.QUANTUM_WRITE:
+                            result = { bytes_written: request.data 器 String(request.data).length : 0 };
+                            break;
+                            
+                        case this.io_request_types.CONTROL:
+                            result = { status: "command_executed" };
+                            break;
+                            
+                        case this.io_request_types.QUANTUM_ENTANGLE:
+                            result = { entanglement_id: `ent_${Date.now()}` };
+                            break;
+                            
+                        case this.io_request_types.QUANTUM_MEASURE:
+                            result = { measurement: Math.random() < 0.5 器 0 : 1 };
+                            break;
+                    }
+                    
+                    this.complete_request(request_id, result);
+                } else {
+                    this.complete_request(request_id, null, { error: "模拟I/O错误" });
+                }
+            }, process_time);
+            
+            return true;
+            
+        } catch (error) {
+            this.complete_request(request_id, null, { error: error.message || "未知错误" });
+            return false;
+        }
+    }
+
+    // 完成请求处理
+    complete_request(request_id, result, error) {
+        if (!this.initialized) {
+            this.add_error("无法完成请求：I/O调度器未初始化");
+            return false;
+        }
+        
+        // 获取请求信息
+        const request = this.active_requests[request_id];
+        if (!request) {
+            this.add_error(`无法完成请求：请求ID ${request_id} 不在活动请求中`);
+            return false;
+        }
+        
+        // 更新请求状态
+        request.completed_at = Date.now();
+        request.result = result;
+        request.error = error;
+        
+        if (error) {
+            request.state = this.io_request_states.FAILED;
+            this.request_count.failed++;
+            
+            if (this.device_stats[request.device_id]) {
+                this.device_stats[request.device_id].failed_requests++;
+            }
+            
+            kernel_log(`I/O请求失败: ID ${request_id}, 错误: ${error.error || "未知错误"}`);
+        } else {
+            request.state = this.io_request_states.COMPLETED;
+            this.request_count.completed++;
+            
+            if (this.device_stats[request.device_id]) {
+                this.device_stats[request.device_id].completed_requests++;
+            }
+            
+            kernel_log(`I/O请求完成: ID ${request_id}`);
+        }
+        
+        // 更新等待和处理时间统计
+        const wait_time = request.started_at - request.created_at;
+        const processing_time = request.completed_at - request.started_at;
+        
+        this.scheduling_stats.total_wait_time += wait_time;
+        this.scheduling_stats.total_processing_time += processing_time;
+        
+        if (this.device_stats[request.device_id]) {
+            const stats = this.device_stats[request.device_id];
+            const completed_count = stats.completed_requests + stats.failed_requests;
+            
+            // 更新平均等待和处理时间
+            stats.average_wait_time = ((stats.average_wait_time * (completed_count - 1)) + wait_time) / completed_count;
+            stats.average_processing_time = ((stats.average_processing_time * (completed_count - 1)) + processing_time) / completed_count;
+        }
+        
+        // 从活动请求中移除
+        delete this.active_requests[request_id];
+        
+        // 添加到已完成请求
+        this.completed_requests[request_id] = request;
+        
+        // 调用回调
+        this.call_request_callback(request_id, result, error);
+        
+        // 触发下一次调度
+        this.schedule();
+        
+        return true;
+    }
+
+    // 调用请求回调
+    call_request_callback(request_id, result, error) {
+        if (this.request_callbacks[request_id]) {
+            try {
+                this.request_callbacks[request_id](result, error);
+            } catch (e) {
+                this.add_warning(`请求 ${request_id} 的回调执行出错: ${e.message || "未知错误"}`);
+            }
+            
+            // 删除已使用的回调
+            delete this.request_callbacks[request_id];
+        }
+    }
+
+    // 获取统计信息
+    get_statistics() {
+        if (!this.initialized) {
+            this.add_error("无法获取统计信息：I/O调度器未初始化");
+            return null;
+        }
+        
+        // 计算平均时间
+        const total_completed = this.request_count.completed + this.request_count.failed;
+        const average_wait_time = total_completed > 0 器 this.scheduling_stats.total_wait_time / total_completed : 0;
+        const average_processing_time = total_completed > 0 器 this.scheduling_stats.total_processing_time / total_completed : 0;
+        
+        return {
+            current_policy: this.current_policy,
+            policy_name: this.get_policy_name(),
+            request_counts: { ...this.request_count },
+            pending_requests: Object.keys(this.request_queues).reduce((sum, device_id) => sum + Object.keys(this.request_queues[device_id]).length, 0),
+            active_requests: Object.keys(this.active_requests).length,
+            completed_requests: Object.keys(this.completed_requests).length,
+            average_wait_time,
+            average_processing_time,
+            device_stats: { ...this.device_stats },
+            scheduling_cycles: this.scheduling_stats.scheduling_cycles,
+            policy_changes: this.scheduling_stats.policy_changes,
+            quantum_operations: this.scheduling_stats.quantum_operations
+        };
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`I/O调度器错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`I/O调度器警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+}
+
+// 导出I/O调度器模块
+export IOScheduler; 

@@ -1,0 +1,29 @@
+# OpenClaw internal
+.openclaw/
+.clawhub/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Temporary files
+*.log
+*.tmp
+*.pid
+
+# Large model files (use Git LFS or separate storage)
+Models/QSM/bin/*.pth
+Models/QSM/bin/*.safetensors
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node modules
+node_modules/
+
+# Backup files
+*~
+*.bak

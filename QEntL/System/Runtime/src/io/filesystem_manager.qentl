@@ -1,0 +1,828 @@
+# QEntL Filesystem Manager
+# 文件系统管理模块
+# 版本：1.0.0
+# 作者：QEntL Filesystem Team
+
+module FileSystemManager {
+    # 文件类型枚举
+    enum FileType {
+        REGULAR,
+        DIRECTORY,
+        SYMLINK,
+        DEVICE,
+        QUANTUM_STATE
+    }
+    
+    # 文件权限枚举
+    enum FilePermission {
+        READ = 1,
+        WRITE = 2, 
+        EXECUTE = 4,
+        DELETE = 8
+    }
+    
+    # 文件节点（inode）
+    class FileNode {
+        field inode_number: int
+        field name: string
+        field type: FileType
+        field size: int
+        field permissions: int
+        field owner_id: int
+        field group_id: int
+        field creation_time: timestamp
+        field modification_time: timestamp
+        field access_time: timestamp
+        field data_blocks: list<int>
+        field link_count: int
+        field parent_inode: int
+        field children: map<string, int>  # 子目录项映射
+        
+        method init(inode_num: int, file_name: string, file_type: FileType) {
+            self.inode_number = inode_num
+            self.name = file_name
+            self.type = file_type
+            self.size = 0
+            self.permissions = FilePermission.READ | FilePermission.WRITE
+            self.owner_id = ProcessManager.get_current_process().process_id
+            self.group_id = 0
+            self.creation_time = SystemClock.now()
+            self.modification_time = self.creation_time
+            self.access_time = self.creation_time
+            self.data_blocks = []
+            self.link_count = 1
+            self.parent_inode = -1
+            self.children = map<string, int>()
+        }
+        
+        # 检查权限
+        method has_permission(user_id: int, permission: FilePermission) -> bool {
+            if user_id == 0 {  # root用户
+                return true
+            }
+            
+            if user_id == self.owner_id {
+                return (self.permissions & permission) != 0
+            }
+            
+            # 简化的权限检查，实际应该检查组权限和其他权限
+            return (self.permissions & permission) != 0
+        }
+        
+        # 添加子目录项
+        method add_child(name: string, inode: int) {
+            if self.type != FileType.DIRECTORY {
+                throw FileSystemError("Cannot add child to non-directory")
+            }
+            
+            self.children[name] = inode
+            self.modification_time = SystemClock.now()
+        }
+        
+        # 移除子目录项
+        method remove_child(name: string) {
+            if self.type != FileType.DIRECTORY {
+                throw FileSystemError("Cannot remove child from non-directory")
+            }
+            
+            self.children.remove(name)
+            self.modification_time = SystemClock.now()
+        }
+        
+        # 获取文件信息
+        method get_file_info() -> FileInfo {
+            return FileInfo {
+                inode: self.inode_number,
+                name: self.name,
+                type: self.type,
+                size: self.size,
+                permissions: self.permissions,
+                owner: self.owner_id,
+                group: self.group_id,
+                created: self.creation_time,
+                modified: self.modification_time,
+                accessed: self.access_time,
+                links: self.link_count
+            }
+        }
+    }
+    
+    # 文件描述符
+    class FileDescriptor {
+        field fd_number: int
+        field inode: FileNode
+        field position: int
+        field flags: int
+        field process_id: int
+        
+        method init(fd_num: int, file_inode: FileNode, open_flags: int) {
+            self.fd_number = fd_num
+            self.inode = file_inode
+            self.position = 0
+            self.flags = open_flags
+            self.process_id = ProcessManager.get_current_process().process_id
+        }
+        
+        # 读取文件
+        method read(buffer: ptr, count: int) -> int {
+            if !(self.flags & FilePermission.READ) {
+                throw FileSystemError("File not open for reading")
+            }
+            
+            bytes_read = FileSystemManager.read_file_data(self.inode, self.position, buffer, count)
+            self.position += bytes_read
+            self.inode.access_time = SystemClock.now()
+            
+            return bytes_read
+        }
+        
+        # 写入文件
+        method write(buffer: ptr, count: int) -> int {
+            if !(self.flags & FilePermission.WRITE) {
+                throw FileSystemError("File not open for writing")
+            }
+            
+            bytes_written = FileSystemManager.write_file_data(self.inode, self.position, buffer, count)
+            self.position += bytes_written
+            self.inode.modification_time = SystemClock.now()
+            
+            return bytes_written
+        }
+        
+        # 设置文件位置
+        method seek(offset: int, whence: int) -> int {
+            if whence == 0 {  # SEEK_SET
+                self.position = offset
+            } else if whence == 1 {  # SEEK_CUR
+                self.position += offset
+            } else if whence == 2 {  # SEEK_END
+                self.position = self.inode.size + offset
+            }
+            
+            # 确保位置在有效范围内
+            if self.position < 0 {
+                self.position = 0
+            }
+            
+            return self.position
+        }
+        
+        # 关闭文件
+        method close() {
+            FileSystemManager.close_file(self.fd_number)
+        }
+    }
+    
+    # 块设备管理器
+    class BlockDevice {
+        field device_id: int
+        field block_size: int
+        field total_blocks: int
+        field free_blocks: list<int>
+        field block_bitmap: BitMap
+        field data_storage: ptr
+        
+        method init(dev_id: int, blocks: int, block_sz: int) {
+            self.device_id = dev_id
+            self.total_blocks = blocks
+            self.block_size = block_sz
+            self.free_blocks = []
+            self.block_bitmap = BitMap(blocks)
+            
+            # 分配存储空间
+            storage_size = blocks * block_sz
+            self.data_storage = MemoryManager.allocate(storage_size)
+            
+            # 初始化所有块为空闲
+            for i in range(blocks) {
+                self.free_blocks.append(i)
+            }
+            
+            QuantumLogger.log("Block device " + dev_id + " initialized with " + blocks + " blocks")
+        }
+        
+        # 分配块
+        method allocate_block() -> int {
+            if self.free_blocks.is_empty() {
+                return -1  # 没有空闲块
+            }
+            
+            block_num = self.free_blocks.remove(0)
+            self.block_bitmap.set_bit(block_num, true)
+            
+            return block_num
+        }
+        
+        # 释放块
+        method free_block(block_num: int) {
+            if block_num >= 0 && block_num < self.total_blocks {
+                self.block_bitmap.set_bit(block_num, false)
+                self.free_blocks.append(block_num)
+            }
+        }
+        
+        # 读取块
+        method read_block(block_num: int, buffer: ptr) -> bool {
+            if block_num < 0 || block_num >= self.total_blocks {
+                return false
+            }
+            
+            source_addr = self.data_storage + (block_num * self.block_size)
+            MemoryManager.copy_memory(source_addr, buffer, self.block_size)
+            
+            return true
+        }
+        
+        # 写入块
+        method write_block(block_num: int, buffer: ptr) -> bool {
+            if block_num < 0 || block_num >= self.total_blocks {
+                return false
+            }
+            
+            dest_addr = self.data_storage + (block_num * self.block_size)
+            MemoryManager.copy_memory(buffer, dest_addr, self.block_size)
+            
+            return true
+        }
+        
+        # 获取设备统计信息
+        method get_device_stats() -> DeviceStatistics {
+            free_count = self.free_blocks.size()
+            used_count = self.total_blocks - free_count
+            
+            return DeviceStatistics {
+                device_id: self.device_id,
+                total_blocks: self.total_blocks,
+                free_blocks: free_count,
+                used_blocks: used_count,
+                block_size: self.block_size,
+                utilization: (used_count * 100.0) / self.total_blocks
+            }
+        }
+    }
+    
+    # 文件系统管理器主类
+    class FileSystemManagerImpl {
+        field root_inode: FileNode
+        field inode_table: map<int, FileNode>
+        field next_inode_number: int
+        field open_files: map<int, FileDescriptor>
+        field next_fd_number: int
+        field block_device: BlockDevice
+        field current_directory: FileNode
+        field mount_points: map<string, FileSystemManagerImpl>
+        
+        method init() {
+            self.next_inode_number = 1
+            self.next_fd_number = 1
+            self.inode_table = map<int, FileNode>()
+            self.open_files = map<int, FileDescriptor>()
+            self.mount_points = map<string, FileSystemManagerImpl>()
+            
+            # 初始化块设备（1MB，每块4KB）
+            self.block_device = BlockDevice(0, 256, 4096)
+            
+            # 创建根目录
+            create_root_directory()
+            
+            QuantumLogger.log("File system initialized")
+        }
+        
+        # 创建根目录
+        method create_root_directory() {
+            self.root_inode = FileNode(0, "/", FileType.DIRECTORY)
+            self.root_inode.permissions = FilePermission.READ | FilePermission.WRITE | FilePermission.EXECUTE
+            self.inode_table[0] = self.root_inode
+            self.current_directory = self.root_inode
+            
+            # 添加 . 和 .. 目录项
+            self.root_inode.add_child(".", 0)
+            self.root_inode.add_child("..", 0)
+        }
+        
+        # 创建文件
+        method create_file(path: string, file_type: FileType) -> int {
+            path_parts = parse_path(path)
+            parent_dir = find_parent_directory(path_parts)
+            
+            if parent_dir == null {
+                throw FileSystemError("Parent directory not found: " + path)
+            }
+            
+            filename = path_parts[path_parts.size() - 1]
+            
+            # 检查文件是否已存在
+            if parent_dir.children.contains(filename) {
+                throw FileSystemError("File already exists: " + path)
+            }
+            
+            # 检查权限
+            current_user = ProcessManager.get_current_process().process_id
+            if !parent_dir.has_permission(current_user, FilePermission.WRITE) {
+                throw FileSystemError("Permission denied: " + path)
+            }
+            
+            # 创建新的inode
+            inode_num = self.next_inode_number
+            self.next_inode_number += 1
+            
+            new_inode = FileNode(inode_num, filename, file_type)
+            new_inode.parent_inode = parent_dir.inode_number
+            
+            self.inode_table[inode_num] = new_inode
+            parent_dir.add_child(filename, inode_num)
+            
+            QuantumLogger.log("Created file: " + path + " (inode: " + inode_num + ")")
+            
+            return inode_num
+        }
+        
+        # 删除文件
+        method delete_file(path: string) -> bool {
+            inode = find_file(path)
+            if inode == null {
+                return false
+            }
+            
+            # 检查权限
+            current_user = ProcessManager.get_current_process().process_id
+            if !inode.has_permission(current_user, FilePermission.DELETE) {
+                throw FileSystemError("Permission denied: " + path)
+            }
+            
+            # 如果是目录，检查是否为空
+            if inode.type == FileType.DIRECTORY && inode.children.size() > 2 {  # 除了 . 和 ..
+                throw FileSystemError("Directory not empty: " + path)
+            }
+            
+            # 从父目录中移除
+            parent_inode = self.inode_table.get(inode.parent_inode, null)
+            if parent_inode != null {
+                parent_inode.remove_child(inode.name)
+            }
+            
+            # 释放数据块
+            for block_num in inode.data_blocks {
+                self.block_device.free_block(block_num)
+            }
+            
+            # 删除inode
+            self.inode_table.remove(inode.inode_number)
+            
+            QuantumLogger.log("Deleted file: " + path)
+            
+            return true
+        }
+        
+        # 打开文件
+        method open_file(path: string, flags: int) -> int {
+            inode = find_file(path)
+            if inode == null {
+                # 如果文件不存在且有创建标志，则创建文件
+                if (flags & O_CREAT) != 0 {
+                    inode_num = create_file(path, FileType.REGULAR)
+                    inode = self.inode_table[inode_num]
+                } else {
+                    throw FileSystemError("File not found: " + path)
+                }
+            }
+            
+            # 检查权限
+            current_user = ProcessManager.get_current_process().process_id
+            if (flags & FilePermission.READ) && !inode.has_permission(current_user, FilePermission.READ) {
+                throw FileSystemError("Permission denied for read: " + path)
+            }
+            if (flags & FilePermission.WRITE) && !inode.has_permission(current_user, FilePermission.WRITE) {
+                throw FileSystemError("Permission denied for write: " + path)
+            }
+            
+            # 创建文件描述符
+            fd_num = self.next_fd_number
+            self.next_fd_number += 1
+            
+            fd = FileDescriptor(fd_num, inode, flags)
+            self.open_files[fd_num] = fd
+            
+            QuantumLogger.debug("Opened file: " + path + " (fd: " + fd_num + ")")
+            
+            return fd_num
+        }
+        
+        # 关闭文件
+        method close_file(fd_num: int) -> bool {
+            fd = self.open_files.get(fd_num, null)
+            if fd == null {
+                return false
+            }
+            
+            self.open_files.remove(fd_num)
+            
+            QuantumLogger.debug("Closed file descriptor: " + fd_num)
+            
+            return true
+        }
+        
+        # 读取文件数据
+        method read_file_data(inode: FileNode, offset: int, buffer: ptr, count: int) -> int {
+            if offset >= inode.size {
+                return 0  # EOF
+            }
+            
+            bytes_to_read = min(count, inode.size - offset)
+            bytes_read = 0
+            
+            block_size = self.block_device.block_size
+            
+            while bytes_read < bytes_to_read {
+                block_index = (offset + bytes_read) / block_size
+                block_offset = (offset + bytes_read) % block_size
+                
+                if block_index >= inode.data_blocks.size() {
+                    break  # 没有更多数据块
+                }
+                
+                block_num = inode.data_blocks[block_index]
+                block_buffer = MemoryManager.allocate(block_size)
+                
+                if !self.block_device.read_block(block_num, block_buffer) {
+                    MemoryManager.deallocate(block_buffer)
+                    break
+                }
+                
+                # 计算这次读取的字节数
+                bytes_in_block = min(block_size - block_offset, bytes_to_read - bytes_read)
+                
+                # 复制数据到用户缓冲区
+                MemoryManager.copy_memory(
+                    block_buffer + block_offset,
+                    buffer + bytes_read,
+                    bytes_in_block
+                )
+                
+                bytes_read += bytes_in_block
+                MemoryManager.deallocate(block_buffer)
+            }
+            
+            return bytes_read
+        }
+        
+        # 写入文件数据
+        method write_file_data(inode: FileNode, offset: int, buffer: ptr, count: int) -> int {
+            bytes_written = 0
+            block_size = self.block_device.block_size
+            
+            while bytes_written < count {
+                block_index = (offset + bytes_written) / block_size
+                block_offset = (offset + bytes_written) % block_size
+                
+                # 如果需要新的数据块
+                if block_index >= inode.data_blocks.size() {
+                    new_block = self.block_device.allocate_block()
+                    if new_block == -1 {
+                        break  # 磁盘空间不足
+                    }
+                    inode.data_blocks.append(new_block)
+                }
+                
+                block_num = inode.data_blocks[block_index]
+                block_buffer = MemoryManager.allocate(block_size)
+                
+                # 如果不是从块开始写入，先读取现有数据
+                if block_offset > 0 {
+                    self.block_device.read_block(block_num, block_buffer)
+                }
+                
+                # 计算这次写入的字节数
+                bytes_in_block = min(block_size - block_offset, count - bytes_written)
+                
+                # 复制数据到块缓冲区
+                MemoryManager.copy_memory(
+                    buffer + bytes_written,
+                    block_buffer + block_offset,
+                    bytes_in_block
+                )
+                
+                # 写入块
+                if !self.block_device.write_block(block_num, block_buffer) {
+                    MemoryManager.deallocate(block_buffer)
+                    break
+                }
+                
+                bytes_written += bytes_in_block
+                MemoryManager.deallocate(block_buffer)
+            }
+            
+            # 更新文件大小
+            new_size = max(inode.size, offset + bytes_written)
+            inode.size = new_size
+            
+            return bytes_written
+        }
+        
+        # 查找文件
+        method find_file(path: string) -> FileNode {
+            if path == "/" {
+                return self.root_inode
+            }
+            
+            path_parts = parse_path(path)
+            current_inode = self.root_inode
+            
+            for part in path_parts {
+                if part == "" {
+                    continue
+                }
+                
+                if current_inode.type != FileType.DIRECTORY {
+                    return null
+                }
+                
+                child_inode_num = current_inode.children.get(part, -1)
+                if child_inode_num == -1 {
+                    return null
+                }
+                
+                current_inode = self.inode_table.get(child_inode_num, null)
+                if current_inode == null {
+                    return null
+                }
+            }
+            
+            return current_inode
+        }
+        
+        # 解析路径
+        method parse_path(path: string) -> list<string> {
+            if path.starts_with("/") {
+                path = path.substring(1)
+            }
+            
+            if path == "" {
+                return []
+            }
+            
+            return path.split("/")
+        }
+        
+        # 查找父目录
+        method find_parent_directory(path_parts: list<string>) -> FileNode {
+            if path_parts.size() <= 1 {
+                return self.root_inode
+            }
+            
+            parent_parts = path_parts.slice(0, path_parts.size() - 1)
+            parent_path = "/" + parent_parts.join("/")
+            
+            return find_file(parent_path)
+        }
+        
+        # 列出目录内容
+        method list_directory(path: string) -> list<FileInfo> {
+            dir_inode = find_file(path)
+            if dir_inode == null || dir_inode.type != FileType.DIRECTORY {
+                throw FileSystemError("Not a directory: " + path)
+            }
+            
+            # 检查权限
+            current_user = ProcessManager.get_current_process().process_id
+            if !dir_inode.has_permission(current_user, FilePermission.READ) {
+                throw FileSystemError("Permission denied: " + path)
+            }
+            
+            result = []
+            
+            for filename, inode_num in dir_inode.children {
+                child_inode = self.inode_table.get(inode_num, null)
+                if child_inode != null {
+                    result.append(child_inode.get_file_info())
+                }
+            }
+            
+            return result
+        }
+        
+        # 更改当前目录
+        method change_directory(path: string) -> bool {
+            target_inode = find_file(path)
+            if target_inode == null || target_inode.type != FileType.DIRECTORY {
+                return false
+            }
+            
+            # 检查权限
+            current_user = ProcessManager.get_current_process().process_id
+            if !target_inode.has_permission(current_user, FilePermission.EXECUTE) {
+                return false
+            }
+            
+            self.current_directory = target_inode
+            return true
+        }
+        
+        # 获取当前目录路径
+        method get_current_directory() -> string {
+            if self.current_directory == self.root_inode {
+                return "/"
+            }
+            
+            # 通过向上遍历构建路径
+            path_parts = []
+            current = self.current_directory
+            
+            while current != self.root_inode && current.parent_inode != -1 {
+                path_parts.append(current.name)
+                current = self.inode_table.get(current.parent_inode, null)
+                if current == null {
+                    break
+                }
+            }
+            
+            path_parts.reverse()
+            return "/" + path_parts.join("/")
+        }
+        
+        # 获取文件系统统计信息
+        method get_filesystem_stats() -> FileSystemStatistics {
+            device_stats = self.block_device.get_device_stats()
+            
+            return FileSystemStatistics {
+                total_inodes: self.inode_table.size(),
+                total_files: count_files_by_type(FileType.REGULAR),
+                total_directories: count_files_by_type(FileType.DIRECTORY),
+                open_files: self.open_files.size(),
+                device_stats: device_stats
+            }
+        }
+        
+        # 按类型统计文件数量
+        method count_files_by_type(file_type: FileType) -> int {
+            count = 0
+            for inode_num, inode in self.inode_table {
+                if inode.type == file_type {
+                    count += 1
+                }
+            }
+            return count
+        }
+    }
+    
+    # 文件信息结构
+    class FileInfo {
+        field inode: int
+        field name: string
+        field type: FileType
+        field size: int
+        field permissions: int
+        field owner: int
+        field group: int
+        field created: timestamp
+        field modified: timestamp
+        field accessed: timestamp
+        field links: int
+    }
+    
+    # 设备统计信息
+    class DeviceStatistics {
+        field device_id: int
+        field total_blocks: int
+        field free_blocks: int
+        field used_blocks: int
+        field block_size: int
+        field utilization: float
+    }
+    
+    # 文件系统统计信息
+    class FileSystemStatistics {
+        field total_inodes: int
+        field total_files: int
+        field total_directories: int
+        field open_files: int
+        field device_stats: DeviceStatistics
+    }
+    
+    # 位图类
+    class BitMap {
+        field bits: list<int>
+        field size: int
+        
+        method init(bit_count: int) {
+            self.size = bit_count
+            int_count = (bit_count + 31) / 32
+            self.bits = []
+            
+            for i in range(int_count) {
+                self.bits.append(0)
+            }
+        }
+        
+        method set_bit(index: int, value: bool) {
+            if index < 0 || index >= self.size {
+                return
+            }
+            
+            int_index = index / 32
+            bit_index = index % 32
+            
+            if value {
+                self.bits[int_index] |= (1 << bit_index)
+            } else {
+                self.bits[int_index] &= ~(1 << bit_index)
+            }
+        }
+        
+        method get_bit(index: int) -> bool {
+            if index < 0 || index >= self.size {
+                return false
+            }
+            
+            int_index = index / 32
+            bit_index = index % 32
+            
+            return (self.bits[int_index] & (1 << bit_index)) != 0
+        }
+    }
+    
+    # 文件打开标志常量
+    const O_RDONLY = 1
+    const O_WRONLY = 2
+    const O_RDWR = 3
+    const O_CREAT = 4
+    const O_TRUNC = 8
+    const O_APPEND = 16
+    
+    # 全局文件系统管理器实例
+    global filesystem_manager: FileSystemManagerImpl
+    
+    # 初始化文件系统
+    function init_filesystem() {
+        filesystem_manager = FileSystemManagerImpl()
+        QuantumLogger.log("File system manager initialized")
+    }
+    
+    # 创建文件
+    function create_file(path: string, type: FileType = FileType.REGULAR) -> int {
+        return filesystem_manager.create_file(path, type)
+    }
+    
+    # 打开文件
+    function open(path: string, flags: int = O_RDONLY) -> int {
+        return filesystem_manager.open_file(path, flags)
+    }
+    
+    # 关闭文件
+    function close(fd: int) -> bool {
+        return filesystem_manager.close_file(fd)
+    }
+    
+    # 读取文件
+    function read(fd: int, buffer: ptr, count: int) -> int {
+        file_desc = filesystem_manager.open_files.get(fd, null)
+        if file_desc == null {
+            return -1
+        }
+        return file_desc.read(buffer, count)
+    }
+    
+    # 写入文件
+    function write(fd: int, buffer: ptr, count: int) -> int {
+        file_desc = filesystem_manager.open_files.get(fd, null)
+        if file_desc == null {
+            return -1
+        }
+        return file_desc.write(buffer, count)
+    }
+    
+    # 删除文件
+    function unlink(path: string) -> bool {
+        return filesystem_manager.delete_file(path)
+    }
+    
+    # 创建目录
+    function mkdir(path: string) -> int {
+        return filesystem_manager.create_file(path, FileType.DIRECTORY)
+    }
+    
+    # 列出目录
+    function listdir(path: string) -> list<FileInfo> {
+        return filesystem_manager.list_directory(path)
+    }
+    
+    # 更改目录
+    function chdir(path: string) -> bool {
+        return filesystem_manager.change_directory(path)
+    }
+    
+    # 获取当前目录
+    function getcwd() -> string {
+        return filesystem_manager.get_current_directory()
+    }
+    
+    # 获取文件系统统计
+    function get_filesystem_stats() -> FileSystemStatistics {
+        return filesystem_manager.get_filesystem_stats()
+    }
+    
+    # 关闭文件系统
+    function shutdown() {
+        QuantumLogger.log("File system shutdown")
+    }
+}

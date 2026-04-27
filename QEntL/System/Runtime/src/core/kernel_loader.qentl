@@ -1,0 +1,476 @@
+/**
+ * @file kernel_loader.qentl
+ * @brief QEntL内核加载器 - 负责加载和初始化QEntL内核组件
+ * 
+ * 量子基因编码: QGC-RUNTIME-KERNEL-LOADER-2025061901
+ * 量子纠缠信道: QEC-RUNTIME-CORE-01
+ */
+
+import "QEntL/core/console.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/memory.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/debug.qentl";
+
+/**
+ * @enum KernelLoadStatus
+ * @brief 内核加载状态
+ */
+quantum_enum KernelLoadStatus {
+    SUCCESS,           // 加载成功
+    FILE_NOT_FOUND,    // 文件未找到
+    INVALID_FORMAT,    // 格式无效
+    MEMORY_ERROR,      // 内存错误
+    DEPENDENCY_ERROR,  // 依赖错误
+    UNKNOWN_ERROR      // 未知错误
+}
+
+/**
+ * @class KernelComponent
+ * @brief 内核组件信息
+ */
+quantum_class KernelComponent {
+    public {
+        name: String;              // 组件名称
+        path: String;              // 文件路径
+        size: Integer;             // 文件大小
+        checksum: String;          // 校验和
+        dependencies: Array<String>; // 依赖组件
+        loaded: Boolean;           // 是否已加载
+        baseAddress: Integer;      // 内存基地址
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(name: String, path: String) {
+        this.name = name;
+        this.path = path;
+        this.size = 0;
+        this.checksum = "";
+        this.dependencies = Array<String>.new();
+        this.loaded = false;
+        this.baseAddress = 0;
+    }
+    
+    /**
+     * @brief 验证组件完整性
+     */
+    public function validateIntegrity() -> Boolean {
+        if (!File.exists(this.path)) {
+            Console.errorPrintln("组件文件不存在: " + this.path);
+            return false;
+        }
+        
+        let fileSize = File.getSize(this.path);
+        if (fileSize != this.size && this.size > 0) {
+            Console.errorPrintln("组件大小不匹配: " + this.name);
+            return false;
+        }
+        
+        // 验证校验和 (如果提供)
+        if (this.checksum.length > 0) {
+            let actualChecksum = File.calculateChecksum(this.path);
+            if (actualChecksum != this.checksum) {
+                Console.errorPrintln("组件校验和不匹配: " + this.name);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+}
+
+/**
+ * @class KernelLoader
+ * @brief QEntL内核加载器主类
+ */
+quantum_class KernelLoader {
+    private {
+        components: Array<KernelComponent>;  // 内核组件列表
+        loadOrder: Array<String>;           // 加载顺序
+        kernelBase: Integer;                 // 内核基地址
+        memoryManager: MemoryManager;        // 内存管理器
+        debugMode: Boolean;                  // 调试模式
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.components = Array<KernelComponent>.new();
+        this.loadOrder = Array<String>.new();
+        this.kernelBase = 0x10000000;  // 内核基地址
+        this.memoryManager = MemoryManager.new();
+        this.debugMode = false;
+    }
+    
+    /**
+     * @brief 初始化内核加载器
+     */
+    public function initialize(kernelPath: String) -> KernelLoadStatus {
+        Console.println("初始化QEntL内核加载器...");
+        
+        if (this.debugMode) {
+            Console.println("调试模式已启用");
+        }
+        
+        // 扫描内核组件
+        let scanResult = this.scanKernelComponents(kernelPath);
+        if (scanResult != KernelLoadStatus.SUCCESS) {
+            return scanResult;
+        }
+        
+        // 分析依赖关系
+        let depResult = this.analyzeDependencies();
+        if (depResult != KernelLoadStatus.SUCCESS) {
+            return depResult;
+        }
+        
+        // 计算加载顺序
+        let orderResult = this.calculateLoadOrder();
+        if (orderResult != KernelLoadStatus.SUCCESS) {
+            return orderResult;
+        }
+        
+        Console.println("内核加载器初始化完成");
+        return KernelLoadStatus.SUCCESS;
+    }
+    
+    /**
+     * @brief 扫描内核组件
+     */
+    private function scanKernelComponents(kernelPath: String) -> KernelLoadStatus {
+        Console.println("扫描内核组件: " + kernelPath);
+        
+        // 扫描文件系统组件
+        this.scanComponentDirectory(Path.join(kernelPath, "filesystem"), "filesystem");
+        
+        // 扫描GUI组件
+        this.scanComponentDirectory(Path.join(kernelPath, "gui"), "gui");
+        
+        // 扫描核心内核组件
+        this.scanComponentDirectory(Path.join(kernelPath, "kernel"), "kernel");
+        
+        // 扫描服务组件
+        this.scanComponentDirectory(Path.join(kernelPath, "services"), "services");
+        
+        Console.println("发现 " + this.components.length + " 个内核组件");
+        return KernelLoadStatus.SUCCESS;
+    }
+    
+    /**
+     * @brief 扫描组件目录
+     */
+    private function scanComponentDirectory(dirPath: String, category: String) -> Void {
+        if (!File.exists(dirPath)) {
+            Console.println("组件目录不存在: " + dirPath);
+            return;
+        }
+        
+        let files = File.listFiles(dirPath, "*.qbc");
+        for (let file in files) {
+            let componentName = category + "/" + Path.getFileNameWithoutExtension(file);
+            let component = KernelComponent.new(componentName, file);
+            
+            // 设置组件大小
+            component.size = File.getSize(file);
+            
+            this.components.add(component);
+            
+            if (this.debugMode) {
+                Console.println("发现组件: " + componentName + " (" + component.size + " bytes)");
+            }
+        }
+    }
+    
+    /**
+     * @brief 分析依赖关系
+     */
+    private function analyzeDependencies() -> KernelLoadStatus {
+        Console.println("分析组件依赖关系...");
+        
+        for (let component in this.components) {
+            // 分析QBC文件头部的依赖信息
+            let dependencies = this.extractDependencies(component.path);
+            component.dependencies = dependencies;
+            
+            if (this.debugMode && dependencies.length > 0) {
+                Console.println("组件 " + component.name + " 依赖: " + dependencies.join(", "));
+            }
+        }
+        
+        return KernelLoadStatus.SUCCESS;
+    }
+    
+    /**
+     * @brief 提取依赖关系
+     */
+    private function extractDependencies(qbcFile: String) -> Array<String> {
+        let dependencies = Array<String>.new();
+        
+        try {
+            // 读取QBC文件头部
+            let content = File.readBinary(qbcFile);
+            
+            // 查找依赖信息 (简化实现)
+            // 实际应该解析QBC文件格式
+            
+            // 根据组件类型添加基础依赖
+            let fileName = Path.getFileName(qbcFile);
+            
+            // 文件系统组件通常依赖核心内核
+            if (fileName.contains("filesystem")) {
+                dependencies.add("kernel/microkernel_core");
+                dependencies.add("kernel/memory_allocator");
+            }
+            
+            // GUI组件依赖文件系统和核心
+            if (fileName.contains("gui")) {
+                dependencies.add("kernel/microkernel_core");
+                dependencies.add("filesystem/file_operations");
+            }
+            
+            // 服务组件依赖核心和网络
+            if (fileName.contains("services")) {
+                dependencies.add("kernel/microkernel_core");
+                dependencies.add("kernel/process_manager_core");
+            }
+            
+        } catch (Exception e) {
+            Console.errorPrintln("分析依赖失败: " + qbcFile + " - " + e.getMessage());
+        }
+        
+        return dependencies;
+    }
+    
+    /**
+     * @brief 计算加载顺序
+     */
+    private function calculateLoadOrder() -> KernelLoadStatus {
+        Console.println("计算组件加载顺序...");
+        
+        // 拓扑排序计算加载顺序
+        let visited = Map<String, Boolean>.new();
+        let tempMark = Map<String, Boolean>.new();
+        this.loadOrder.clear();
+        
+        for (let component in this.components) {
+            if (!visited.get(component.name, false)) {
+                if (!this.topologicalSort(component.name, visited, tempMark)) {
+                    Console.errorPrintln("检测到循环依赖");
+                    return KernelLoadStatus.DEPENDENCY_ERROR;
+                }
+            }
+        }
+        
+        Console.println("加载顺序计算完成，共 " + this.loadOrder.length + " 个组件");
+        
+        if (this.debugMode) {
+            Console.println("加载顺序: " + this.loadOrder.join(" -> "));
+        }
+        
+        return KernelLoadStatus.SUCCESS;
+    }
+    
+    /**
+     * @brief 拓扑排序 (深度优先)
+     */
+    private function topologicalSort(componentName: String, 
+                                   visited: Map<String, Boolean>, 
+                                   tempMark: Map<String, Boolean>) -> Boolean {
+        if (tempMark.get(componentName, false)) {
+            return false; // 循环依赖
+        }
+        
+        if (visited.get(componentName, false)) {
+            return true; // 已访问
+        }
+        
+        tempMark.set(componentName, true);
+        
+        // 查找组件
+        let component = this.findComponent(componentName);
+        if (component != null) {
+            // 访问所有依赖
+            for (let dep in component.dependencies) {
+                if (!this.topologicalSort(dep, visited, tempMark)) {
+                    return false;
+                }
+            }
+        }
+        
+        tempMark.set(componentName, false);
+        visited.set(componentName, true);
+        this.loadOrder.add(componentName);
+        
+        return true;
+    }
+    
+    /**
+     * @brief 查找组件
+     */
+    private function findComponent(name: String) -> KernelComponent? {
+        for (let component in this.components) {
+            if (component.name == name) {
+                return component;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * @brief 加载内核
+     */
+    public function loadKernel() -> KernelLoadStatus {
+        Console.println("开始加载QEntL内核...");
+        
+        let loadedCount = 0;
+        let totalCount = this.loadOrder.length;
+        
+        for (let componentName in this.loadOrder) {
+            let component = this.findComponent(componentName);
+            if (component == null) {
+                Console.errorPrintln("组件未找到: " + componentName);
+                continue;
+            }
+            
+            Console.println("[" + (loadedCount + 1) + "/" + totalCount + "] 加载组件: " + componentName);
+            
+            let result = this.loadComponent(component);
+            if (result != KernelLoadStatus.SUCCESS) {
+                Console.errorPrintln("组件加载失败: " + componentName);
+                return result;
+            }
+            
+            loadedCount++;
+        }
+        
+        Console.println("内核加载完成，共加载 " + loadedCount + " 个组件");
+        return KernelLoadStatus.SUCCESS;
+    }
+    
+    /**
+     * @brief 加载单个组件
+     */
+    private function loadComponent(component: KernelComponent) -> KernelLoadStatus {
+        // 验证组件完整性
+        if (!component.validateIntegrity()) {
+            return KernelLoadStatus.INVALID_FORMAT;
+        }
+        
+        try {
+            // 分配内存空间
+            let memorySize = component.size + 4096; // 额外缓冲区
+            let baseAddress = this.memoryManager.allocate(memorySize);
+            if (baseAddress == 0) {
+                Console.errorPrintln("内存分配失败: " + component.name);
+                return KernelLoadStatus.MEMORY_ERROR;
+            }
+            
+            component.baseAddress = baseAddress;
+            
+            // 读取组件数据
+            let componentData = File.readBinary(component.path);
+            
+            // 加载到内存
+            this.memoryManager.copyToMemory(baseAddress, componentData);
+            
+            // 标记为已加载
+            component.loaded = true;
+            
+            if (this.debugMode) {
+                Console.println("组件加载成功: " + component.name + 
+                              " @ 0x" + baseAddress.toHexString());
+            }
+            
+        } catch (Exception e) {
+            Console.errorPrintln("加载组件异常: " + component.name + " - " + e.getMessage());
+            return KernelLoadStatus.UNKNOWN_ERROR;
+        }
+        
+        return KernelLoadStatus.SUCCESS;
+    }
+    
+    /**
+     * @brief 设置调试模式
+     */
+    public function setDebugMode(enabled: Boolean) -> Void {
+        this.debugMode = enabled;
+        Console.println("调试模式: " + (enabled ? "启用" : "禁用"));
+    }
+    
+    /**
+     * @brief 获取加载统计
+     */
+    public function getLoadStatistics() -> Map<String, Integer> {
+        let stats = Map<String, Integer>.new();
+        
+        let loadedCount = 0;
+        let totalMemory = 0;
+        
+        for (let component in this.components) {
+            if (component.loaded) {
+                loadedCount++;
+                totalMemory += component.size;
+            }
+        }
+        
+        stats.set("total_components", this.components.length);
+        stats.set("loaded_components", loadedCount);
+        stats.set("total_memory", totalMemory);
+        stats.set("kernel_base", this.kernelBase);
+        
+        return stats;
+    }
+}
+
+/**
+ * @brief 主函数 - 内核加载器入口
+ */
+function main(args: Array<String>) -> Integer {
+    Console.println("QEntL内核加载器启动");
+    Console.println("量子基因编码: QGC-RUNTIME-KERNEL-LOADER-2025061901");
+    
+    let loader = KernelLoader.new();
+    
+    // 检查命令行参数
+    let kernelPath = "System/qbc/kernel";
+    let debugMode = false;
+    
+    for (let arg in args) {
+        if (arg == "--debug" || arg == "-d") {
+            debugMode = true;
+        } else if (arg.startsWith("--kernel-path=")) {
+            kernelPath = arg.substring(14);
+        }
+    }
+    
+    loader.setDebugMode(debugMode);
+    
+    // 初始化加载器
+    let initResult = loader.initialize(kernelPath);
+    if (initResult != KernelLoadStatus.SUCCESS) {
+        Console.errorPrintln("内核加载器初始化失败");
+        return 1;
+    }
+    
+    // 加载内核
+    let loadResult = loader.loadKernel();
+    if (loadResult != KernelLoadStatus.SUCCESS) {
+        Console.errorPrintln("内核加载失败");
+        return 1;
+    }
+    
+    // 显示统计信息
+    let stats = loader.getLoadStatistics();
+    Console.println("加载统计:");
+    Console.println("  总组件数: " + stats.get("total_components", 0));
+    Console.println("  已加载: " + stats.get("loaded_components", 0));
+    Console.println("  内存使用: " + stats.get("total_memory", 0) + " bytes");
+    
+    Console.println("QEntL内核加载完成");
+    return 0;
+}

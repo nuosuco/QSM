@@ -1,0 +1,771 @@
+// QEntL 偏好设置管理器
+// 版本: 1.0.0
+// 作者: QSM团队
+// 量子基因码: QSM-PREF-9012-F789
+// 描述: 实现用户偏好设置的管理、存储和应用功能
+
+// 类型定义
+type PreferenceType {
+    STRING,             // 字符串
+    NUMBER,             // 数字
+    BOOLEAN,            // 布尔值
+    ARRAY,              // 数组
+    OBJECT,             // 对象
+    COLOR,              // 颜色
+    DATE,               // 日期
+    TIME,               // 时间
+    QUANTUM,            // 量子值
+    FILE_PATH,          // 文件路径
+    CUSTOM              // 自定义
+}
+
+type PreferenceScope {
+    USER,               // 用户范围
+    WORKSPACE,          // 工作区范围
+    APPLICATION,        // 应用程序范围
+    DEVICE,             // 设备范围
+    SESSION,            // 会话范围
+    GLOBAL              // 全局范围
+}
+
+type PreferenceCategory {
+    GENERAL,            // 常规
+    APPEARANCE,         // 外观
+    EDITOR,             // 编辑器
+    LANGUAGE,           // 语言
+    SECURITY,           // 安全
+    PERFORMANCE,        // 性能
+    ACCESSIBILITY,      // 辅助功能
+    EXTENSIONS,         // 扩展功能
+    QUANTUM,            // 量子功能
+    CUSTOM              // 自定义
+}
+
+type PreferenceMetadata {
+    description: String,        // 描述
+    defaultValue: Any,          // 默认值
+    type: PreferenceType,       // 类型
+    scope: PreferenceScope,     // 范围
+    category: PreferenceCategory, // 分类
+    tags: List<String>,         // 标签
+    version: String,            // 版本
+    isDeprecated: Bool,         // 是否已弃用
+    replacedBy: String,         // 替代项
+    requiresRestart: Bool,      // 是否需要重启
+    minValue: Number,           // 最小值（针对数字）
+    maxValue: Number,           // 最大值（针对数字）
+    enum: List<Any>,            // 枚举可选值
+    format: String,             // 格式（正则表达式）
+    order: Int,                 // 排序
+    group: String,              // 分组
+    experimental: Bool,         // 是否实验性质
+    visibility: String,         // 可见性(public, protected, private)
+    customProperties: Object    // 自定义属性
+}
+
+type PreferenceDefinition {
+    key: String,                   // 键
+    metadata: PreferenceMetadata,  // 元数据
+    validator: Function,           // 验证器
+    transformer: Function,         // 转换器
+    onChanged: Function            // 变更回调
+}
+
+type PreferenceEvent {
+    key: String,                  // 键
+    scope: PreferenceScope,       // 范围
+    oldValue: Any,                // 旧值
+    newValue: Any,                // 新值
+    source: String,               // 来源
+    timestamp: DateTime,          // 时间戳
+    user: String                  // 用户
+}
+
+// 配置
+config {
+    // 存储设置
+    storageType: "file",                     // 存储类型(file, database, cloud)
+    storageLocation: "preferences/",         // 存储位置
+    autoSaveEnabled: true,                   // 是否自动保存
+    autoSaveDelayMs: 1000,                   // 自动保存延迟(毫秒)
+    backupsEnabled: true,                    // 是否启用备份
+    maxBackups: 5,                           // 最大备份数量
+    encryptionEnabled: false,                // 是否启用加密
+    
+    // 行为设置
+    validateOnSet: true,                     // 设置时是否验证
+    transformOnGet: true,                    // 获取时是否转换
+    notifyOnChange: true,                    // 变更时是否通知
+    fallbackToGlobal: true,                  // 是否回退到全局
+    useDefaultOnInvalid: true,               // 无效时是否使用默认值
+    
+    // 事件设置
+    eventBufferSize: 50,                     // 事件缓冲区大小
+    logChanges: true,                        // 是否记录变更
+    
+    // 同步设置
+    syncEnabled: false,                      // 是否启用同步
+    syncInterval: 30 * 60 * 1000,            // 同步间隔(毫秒)
+    conflictResolution: "latest",            // 冲突解决(latest, local, remote, merge)
+    
+    // 量子设置
+    quantumFeaturesEnabled: true,            // 是否启用量子功能
+    quantumPersistenceEnabled: true          // 是否启用量子持久化
+}
+
+// 服务状态
+state {
+    initialized: Bool = false,                       // 服务是否已初始化
+    definitions: Map<String, PreferenceDefinition> = {}, // 偏好定义 <key, PreferenceDefinition>
+    values: Map<PreferenceScope, Map<String, Any>> = {}, // 偏好值 <scope, <key, value>>
+    defaults: Map<String, Any> = {},                 // 默认值 <key, value>
+    
+    // 运行时状态
+    autoSaveTimer: Object = null,                    // 自动保存计时器
+    pendingChanges: Map<PreferenceScope, Set<String>> = {}, // 待处理的更改 <scope, Set<key>>
+    changeHistory: List<PreferenceEvent> = [],       // 更改历史
+    lastSyncTime: DateTime = null,                   // 最后同步时间
+    
+    // 事件监听器
+    onPreferenceChangedListeners: List<Object> = [], // 偏好变更事件监听器
+    onSyncCompletedListeners: List<Object> = []      // 同步完成事件监听器
+}
+
+// 公共函数
+function initialize(customConfig: Object = null): Bool {
+    if (state.initialized) {
+        return true; // 已经初始化
+    }
+    
+    // 合并自定义配置(如果有)
+    if (customConfig != null) {
+        config = _mergeConfigs(config, customConfig);
+    }
+    
+    // 初始化值存储
+    _initializeValueStorage();
+    
+    // 注册默认偏好
+    _registerDefaultPreferences();
+    
+    // 加载偏好值
+    _loadPreferences();
+    
+    // 设置自动保存
+    if (config.autoSaveEnabled) {
+        _setupAutoSave();
+    }
+    
+    state.initialized = true;
+    return true;
+}
+
+// 注册偏好定义
+function registerPreference(definition: PreferenceDefinition): Bool {
+    _checkInitialized();
+    
+    // 验证定义
+    if (!definition.key) {
+        return false;
+    }
+    
+    // 添加定义
+    state.definitions[definition.key] = definition;
+    
+    // 设置默认值
+    if (definition.metadata.defaultValue !== undefined) {
+        state.defaults[definition.key] = definition.metadata.defaultValue;
+    }
+    
+    return true;
+}
+
+// 设置偏好值
+function setPreference(key: String, value: Any, scope: PreferenceScope = PreferenceScope.USER): Bool {
+    _checkInitialized();
+    
+    // 检查键是否存在
+    if (!state.definitions.hasKey(key)) {
+        // 如果键不存在但值不是undefined，自动注册
+        if (value !== undefined) {
+            registerPreference(PreferenceDefinition {
+                key: key,
+                metadata: PreferenceMetadata {
+                    type: _inferType(value),
+                    scope: scope,
+                    category: PreferenceCategory.CUSTOM,
+                    defaultValue: value
+                }
+            });
+        } else {
+            return false;
+        }
+    }
+    
+    let definition = state.definitions[key];
+    
+    // 验证值
+    if (config.validateOnSet && definition.validator) {
+        try {
+            if (!definition.validator(value)) {
+                // 验证失败
+                if (config.useDefaultOnInvalid) {
+                    value = definition.metadata.defaultValue;
+                } else {
+                    return false;
+                }
+            }
+        } catch (e) {
+            // 验证器错误
+            if (config.useDefaultOnInvalid) {
+                value = definition.metadata.defaultValue;
+            } else {
+                return false;
+            }
+        }
+    }
+    
+    // 确保作用域存储已初始化
+    if (!state.values.hasKey(scope)) {
+        state.values[scope] = {};
+    }
+    
+    // 获取当前值
+    let oldValue = _getValueFromScope(key, scope);
+    
+    // 如果值没有变化，返回成功
+    if (_isEqual(oldValue, value)) {
+        return true;
+    }
+    
+    // 设置新值
+    state.values[scope][key] = value;
+    
+    // 添加到待处理的更改
+    if (!state.pendingChanges.hasKey(scope)) {
+        state.pendingChanges[scope] = new Set();
+    }
+    state.pendingChanges[scope].add(key);
+    
+    // 创建更改事件
+    let event = PreferenceEvent {
+        key: key,
+        scope: scope,
+        oldValue: oldValue,
+        newValue: value,
+        source: "api",
+        timestamp: DateTime.now(),
+        user: _getCurrentUser()
+    };
+    
+    // 添加到历史记录
+    state.changeHistory.push(event);
+    if (state.changeHistory.length > config.eventBufferSize) {
+        state.changeHistory.shift();
+    }
+    
+    // 调用onChanged回调
+    if (definition.onChanged) {
+        try {
+            definition.onChanged(key, value, oldValue, scope);
+        } catch (e) {
+            // 忽略错误
+        }
+    }
+    
+    // 触发更改事件
+    if (config.notifyOnChange) {
+        _triggerEvent("preferenceChanged", event);
+    }
+    
+    // 如果启用自动保存，安排保存
+    if (config.autoSaveEnabled) {
+        _scheduleAutoSave();
+    }
+    
+    return true;
+}
+
+// 获取偏好值
+function getPreference(key: String, scope: PreferenceScope = PreferenceScope.USER, defaultValue: Any = undefined): Any {
+    _checkInitialized();
+    
+    let value = _getValueWithFallback(key, scope);
+    
+    // 如果值未定义，使用提供的默认值或定义的默认值
+    if (value === undefined) {
+        if (defaultValue !== undefined) {
+            return defaultValue;
+        }
+        
+        if (state.defaults.hasKey(key)) {
+            return state.defaults[key];
+        }
+        
+        return undefined;
+    }
+    
+    // 应用转换器
+    if (config.transformOnGet && state.definitions.hasKey(key) && state.definitions[key].transformer) {
+        try {
+            let transformed = state.definitions[key].transformer(value);
+            if (transformed !== undefined) {
+                return transformed;
+            }
+        } catch (e) {
+            // 忽略错误，使用原始值
+        }
+    }
+    
+    return value;
+}
+
+// 重置偏好值为默认值
+function resetPreference(key: String, scope: PreferenceScope = PreferenceScope.USER): Bool {
+    _checkInitialized();
+    
+    // 检查键是否存在
+    if (!state.definitions.hasKey(key)) {
+        return false;
+    }
+    
+    let defaultValue = state.defaults[key];
+    
+    // 如果默认值未定义，删除偏好值
+    if (defaultValue === undefined) {
+        return removePreference(key, scope);
+    }
+    
+    // 设置为默认值
+    return setPreference(key, defaultValue, scope);
+}
+
+// 删除偏好值
+function removePreference(key: String, scope: PreferenceScope = PreferenceScope.USER): Bool {
+    _checkInitialized();
+    
+    // 确保作用域存储已初始化
+    if (!state.values.hasKey(scope)) {
+        return true; // 作用域不存在，视为成功
+    }
+    
+    // 检查键是否在作用域中存在
+    if (!state.values[scope].hasKey(key)) {
+        return true; // 键不存在于作用域中，视为成功
+    }
+    
+    // 保存旧值
+    let oldValue = state.values[scope][key];
+    
+    // 删除键
+    delete state.values[scope][key];
+    
+    // 添加到待处理的更改
+    if (!state.pendingChanges.hasKey(scope)) {
+        state.pendingChanges[scope] = new Set();
+    }
+    state.pendingChanges[scope].add(key);
+    
+    // 创建更改事件
+    let event = PreferenceEvent {
+        key: key,
+        scope: scope,
+        oldValue: oldValue,
+        newValue: undefined,
+        source: "api",
+        timestamp: DateTime.now(),
+        user: _getCurrentUser()
+    };
+    
+    // 添加到历史记录
+    state.changeHistory.push(event);
+    if (state.changeHistory.length > config.eventBufferSize) {
+        state.changeHistory.shift();
+    }
+    
+    // 调用onChanged回调
+    if (state.definitions.hasKey(key) && state.definitions[key].onChanged) {
+        try {
+            state.definitions[key].onChanged(key, undefined, oldValue, scope);
+        } catch (e) {
+            // 忽略错误
+        }
+    }
+    
+    // 触发更改事件
+    if (config.notifyOnChange) {
+        _triggerEvent("preferenceChanged", event);
+    }
+    
+    // 如果启用自动保存，安排保存
+    if (config.autoSaveEnabled) {
+        _scheduleAutoSave();
+    }
+    
+    return true;
+}
+
+// 获取偏好定义
+function getPreferenceDefinition(key: String): PreferenceDefinition {
+    _checkInitialized();
+    
+    if (!state.definitions.hasKey(key)) {
+        return null;
+    }
+    
+    return state.definitions[key];
+}
+
+// 获取特定分类的所有偏好
+function getCategoryPreferences(category: PreferenceCategory): Map<String, Any> {
+    _checkInitialized();
+    
+    let result = {};
+    
+    for (let key in state.definitions) {
+        let definition = state.definitions[key];
+        if (definition.metadata.category == category) {
+            result[key] = getPreference(key);
+        }
+    }
+    
+    return result;
+}
+
+// 保存偏好
+function savePreferences(): Bool {
+    _checkInitialized();
+    
+    // 保存所有有待处理更改的作用域
+    for (let scope in state.pendingChanges) {
+        // 跳过空作用域
+        if (!state.pendingChanges[scope] || state.pendingChanges[scope].size == 0) {
+            continue;
+        }
+        
+        // 保存作用域
+        if (!_saveScope(scope)) {
+            return false;
+        }
+        
+        // 清除待处理的更改
+        state.pendingChanges[scope].clear();
+    }
+    
+    return true;
+}
+
+// 加载偏好
+function loadPreferences(): Bool {
+    _checkInitialized();
+    
+    return _loadPreferences();
+}
+
+// 获取更改历史
+function getChangeHistory(): List<PreferenceEvent> {
+    _checkInitialized();
+    
+    return state.changeHistory;
+}
+
+// 添加事件监听器
+function addEventListener(eventName: String, callback: Function): String {
+    _checkInitialized();
+    
+    let listenerId = _generateId();
+    
+    // 根据事件类型添加监听器
+    switch (eventName) {
+        case "preferenceChanged":
+            state.onPreferenceChangedListeners.push({id: listenerId, callback: callback});
+            break;
+        case "syncCompleted":
+            state.onSyncCompletedListeners.push({id: listenerId, callback: callback});
+            break;
+        default:
+            return "";
+    }
+    
+    return listenerId;
+}
+
+// 移除事件监听器
+function removeEventListener(eventName: String, listenerId: String): Bool {
+    _checkInitialized();
+    
+    // 根据事件类型移除监听器
+    switch (eventName) {
+        case "preferenceChanged":
+            state.onPreferenceChangedListeners = state.onPreferenceChangedListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "syncCompleted":
+            state.onSyncCompletedListeners = state.onSyncCompletedListeners.filter(listener => listener.id != listenerId);
+            break;
+        default:
+            return false;
+    }
+    
+    return true;
+}
+
+// 内部函数
+
+// 检查服务是否已初始化
+function _checkInitialized() {
+    if (!state.initialized) {
+        throw "偏好设置管理器尚未初始化";
+    }
+}
+
+// 合并配置
+function _mergeConfigs(baseConfig: Object, customConfig: Object): Object {
+    // 简单合并对象
+    let result = baseConfig.clone();
+    
+    for (let key in customConfig) {
+        if (result.hasKey(key)) {
+            if (typeof result[key] == "object" && typeof customConfig[key] == "object") {
+                result[key] = _mergeConfigs(result[key], customConfig[key]);
+            } else {
+                result[key] = customConfig[key];
+            }
+        }
+    }
+    
+    return result;
+}
+
+// 初始化值存储
+function _initializeValueStorage() {
+    // 初始化作用域存储
+    for (let scope in PreferenceScope) {
+        state.values[scope] = {};
+        state.pendingChanges[scope] = new Set();
+    }
+}
+
+// 注册默认偏好
+function _registerDefaultPreferences() {
+    // 注册一些默认偏好
+    // 这里只是一个示例
+    
+    // 常规偏好
+    registerPreference(PreferenceDefinition {
+        key: "general.language",
+        metadata: PreferenceMetadata {
+            description: "界面语言",
+            defaultValue: "zh-CN",
+            type: PreferenceType.STRING,
+            scope: PreferenceScope.USER,
+            category: PreferenceCategory.GENERAL,
+            enum: ["zh-CN", "en-US"],
+            requiresRestart: true,
+            order: 0
+        }
+    });
+    
+    registerPreference(PreferenceDefinition {
+        key: "general.theme",
+        metadata: PreferenceMetadata {
+            description: "界面主题",
+            defaultValue: "auto",
+            type: PreferenceType.STRING,
+            scope: PreferenceScope.USER,
+            category: PreferenceCategory.APPEARANCE,
+            enum: ["light", "dark", "auto"],
+            requiresRestart: false,
+            order: 0
+        }
+    });
+}
+
+// 加载偏好
+function _loadPreferences(): Bool {
+    // 在实际实现中，这里会从存储加载偏好
+    // 这里只是一个示例
+    return true;
+}
+
+// 设置自动保存
+function _setupAutoSave() {
+    // 在实际实现中，这里会设置自动保存计时器
+    // 这里只是一个示例
+}
+
+// 安排自动保存
+function _scheduleAutoSave() {
+    // 取消现有计时器
+    if (state.autoSaveTimer) {
+        clearTimeout(state.autoSaveTimer);
+    }
+    
+    // 设置新计时器
+    state.autoSaveTimer = setTimeout(() => {
+        savePreferences();
+    }, config.autoSaveDelayMs);
+}
+
+// 从作用域获取值
+function _getValueFromScope(key: String, scope: PreferenceScope): Any {
+    if (!state.values.hasKey(scope)) {
+        return undefined;
+    }
+    
+    return state.values[scope][key];
+}
+
+// 获取带回退的值
+function _getValueWithFallback(key: String, scope: PreferenceScope): Any {
+    // 尝试从指定的作用域获取
+    let value = _getValueFromScope(key, scope);
+    
+    // 如果找不到值且启用了回退，尝试其他作用域
+    if (value === undefined && config.fallbackToGlobal) {
+        // 作用域回退顺序
+        let fallbackScopes = [
+            PreferenceScope.USER,
+            PreferenceScope.WORKSPACE,
+            PreferenceScope.APPLICATION,
+            PreferenceScope.GLOBAL
+        ];
+        
+        // 从回退作用域获取
+        for (let i = 0; i < fallbackScopes.length; i++) {
+            let fallbackScope = fallbackScopes[i];
+            
+            // 跳过当前作用域
+            if (fallbackScope == scope) {
+                continue;
+            }
+            
+            let fallbackValue = _getValueFromScope(key, fallbackScope);
+            if (fallbackValue !== undefined) {
+                return fallbackValue;
+            }
+        }
+    }
+    
+    return value;
+}
+
+// 保存作用域
+function _saveScope(scope: PreferenceScope): Bool {
+    // 在实际实现中，这里会将作用域数据保存到存储
+    // 这里只是一个示例
+    return true;
+}
+
+// 推断类型
+function _inferType(value: Any): PreferenceType {
+    if (value === null) {
+        return PreferenceType.STRING;
+    }
+    
+    switch (typeof value) {
+        case "string":
+            return PreferenceType.STRING;
+        case "number":
+            return PreferenceType.NUMBER;
+        case "boolean":
+            return PreferenceType.BOOLEAN;
+        case "object":
+            if (Array.isArray(value)) {
+                return PreferenceType.ARRAY;
+            }
+            return PreferenceType.OBJECT;
+        default:
+            return PreferenceType.STRING;
+    }
+}
+
+// 检查值是否相等
+function _isEqual(a: Any, b: Any): Bool {
+    // 简单比较
+    if (a === b) {
+        return true;
+    }
+    
+    // 如果一个是undefined或null，另一个不是，则不相等
+    if (a === undefined || a === null || b === undefined || b === null) {
+        return false;
+    }
+    
+    // 类型不同，不相等
+    if (typeof a !== typeof b) {
+        return false;
+    }
+    
+    // 对于对象，执行深度比较
+    if (typeof a === "object") {
+        // 数组对比
+        if (Array.isArray(a) && Array.isArray(b)) {
+            if (a.length !== b.length) {
+                return false;
+            }
+            
+            for (let i = 0; i < a.length; i++) {
+                if (!_isEqual(a[i], b[i])) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // 对象对比
+        let keysA = Object.keys(a);
+        let keysB = Object.keys(b);
+        
+        if (keysA.length !== keysB.length) {
+            return false;
+        }
+        
+        for (let key of keysA) {
+            if (!b.hasKey(key) || !_isEqual(a[key], b[key])) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // 基本类型不相等
+    return false;
+}
+
+// 获取当前用户
+function _getCurrentUser(): String {
+    // 在实际实现中，这里会获取当前用户ID
+    // 这里只是一个示例
+    return "current_user";
+}
+
+// 触发事件
+function _triggerEvent(eventName: String, eventData: Object) {
+    // 根据事件类型触发相应的事件
+    let listeners = [];
+    
+    switch (eventName) {
+        case "preferenceChanged":
+            listeners = state.onPreferenceChangedListeners;
+            break;
+        case "syncCompleted":
+            listeners = state.onSyncCompletedListeners;
+            break;
+    }
+    
+    // 调用所有监听器
+    for (let i = 0; i < listeners.length; i++) {
+        try {
+            listeners[i].callback(eventData);
+        } catch (e) {
+            // 记录错误但不中断执行
+        }
+    }
+}
+
+// 生成随机ID
+function _generateId(): String {
+    return "id_" + Math.random().toString(36).substring(2, 15);
+} 

@@ -1,0 +1,313 @@
+{
+  "version": "3.0",
+  "qbc_version": "1.0",
+  "constants": [
+    "用户",
+    "ID:字符串",
+    "名称:字符串",
+    "年龄:整数",
+    "",
+    "你好，未知用户！",
+    "你好，",
+    "！",
+    "初始化测试程序...",
+    1,
+    2,
+    3,
+    4,
+    5,
+    "循环迭代: "
+  ],
+  "variables": [
+    "名称",
+    "用户1",
+    "问候语"
+  ],
+  "functions": {
+    "问候": 5,
+    "setup": 22,
+    "run": 32
+  },
+  "instructions": [
+    {
+      "op": "NOP",
+      "code": 0,
+      "operand": null,
+      "line": 4
+    },
+    {
+      "op": "TYPE_DEF",
+      "code": 112,
+      "operand": 0,
+      "line": 9
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 1,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 2,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 3,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "名称",
+      "line": 16
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 4,
+      "line": 16
+    },
+    {
+      "op": "EQ",
+      "code": 48,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "JUMP_IF_FALSE",
+      "code": 65,
+      "operand": "L1",
+      "line": 16
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 5,
+      "line": 17
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 17
+    },
+    {
+      "op": "JUMP",
+      "code": 64,
+      "operand": "L2",
+      "line": 16
+    },
+    {
+      "op": "LABEL",
+      "name": "L1"
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 6,
+      "line": 19
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "名称",
+      "line": 19
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 7,
+      "line": 19
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 19
+    },
+    {
+      "op": "LABEL",
+      "name": "L2"
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_INIT",
+      "code": 80,
+      "operand": null,
+      "line": 24
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 8,
+      "line": 26
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 26
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "用户1",
+      "line": 27
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "用户1",
+      "line": 28
+    },
+    {
+      "op": "LOAD_FIELD",
+      "code": 19,
+      "operand": "名称",
+      "line": 28
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "问候",
+      "line": 28
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "问候语",
+      "line": 28
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "问候语",
+      "line": 29
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 29
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 9,
+      "line": 33
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 10,
+      "line": 33
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 11,
+      "line": 33
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 12,
+      "line": 33
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 13,
+      "line": 33
+    },
+    {
+      "op": "QUANTUM_INIT",
+      "code": 80,
+      "operand": 5,
+      "line": 33
+    },
+    {
+      "op": "LOOP_START",
+      "code": 69,
+      "operand": "i",
+      "line": 33
+    },
+    {
+      "op": "LABEL",
+      "name": "L3"
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 14,
+      "line": 34
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "i",
+      "line": 34
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 34
+    },
+    {
+      "op": "LOOP_END",
+      "code": 70,
+      "operand": "L3",
+      "line": 33
+    },
+    {
+      "op": "LABEL",
+      "name": "L4"
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "HALT",
+      "code": 1,
+      "operand": null,
+      "line": 0
+    }
+  ]
+}

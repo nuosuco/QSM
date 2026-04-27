@@ -1,0 +1,375 @@
+/**
+ * QEntL视图渲染器实现
+ * QuantumGene: QG-VRENDER-D4G9-1714047100
+ * EntanglementStrength: 0.7
+ */
+
+import { ViewEngine } from "./view_engine.qentl";
+
+quantum_module ViewRenderer {
+    // 模块元数据
+    metadata: {
+        name: "视图渲染器",
+        version: "1.0.0",
+        description: "QEntL文件系统的视图渲染器实现",
+        author: "QEntL开发团队",
+        quantum_gene: "QG-VRENDER-D4G9-1714047100",
+        entanglement_strength: 0.7
+    },
+    
+    // 渲染器配置
+    config: {
+        default_layout: "main",          // 默认布局
+        view_path: "/views",             // 视图路径
+        layout_path: "/views/layouts",   // 布局路径
+        partial_path: "/views/partials", // 部分视图路径
+        extension: ".qview",             // 视图扩展名
+        default_data: {},                // 默认数据
+        escape_html: true,               // 是否转义HTML
+        use_layouts: true,               // 是否使用布局
+        parallel_rendering: true,        // 是否并行渲染
+        cache_partials: true,            // 是否缓存部分视图
+        debug_mode: false                // 是否调试模式
+    },
+    
+    // 渲染器状态
+    state: {
+        engine: null,                    // 视图引擎实例
+        layouts: {},                     // 已加载的布局
+        partials: {},                    // 已加载的部分视图
+        initialized: false,              // 是否已初始化
+        stats: {                         // 统计信息
+            renders: 0,                  // 渲染次数
+            last_render_time: 0,         // 最后渲染时间
+            total_render_time: 0,        // 总渲染时间
+            errors: 0                    // 错误次数
+        }
+    },
+    
+    /**
+     * 初始化视图渲染器
+     * @param {Object} options 初始化选项
+     * @returns {Boolean} 是否成功初始化
+     */
+    initialize: function(options) {
+        log("视图渲染器", "初始化视图渲染器");
+        
+        // 合并选项
+        this.config = Object.assign({}, this.config, options || {});
+        
+        // 检查视图引擎
+        if (!ViewEngine) {
+            log("视图渲染器", "未找到视图引擎", "ERROR");
+            return false;
+        }
+        
+        // 初始化视图引擎
+        this.state.engine = ViewEngine;
+        
+        // 如果引擎未初始化，则初始化它
+        if (!this.state.engine.state.initialized) {
+            this.state.engine.initialize({
+                template_path: this.config.view_path,
+                default_extension: this.config.extension
+            });
+        }
+        
+        // 预加载常用部分视图
+        if (this.config.cache_partials) {
+            this._preloadPartials();
+        }
+        
+        this.state.initialized = true;
+        log("视图渲染器", "视图渲染器初始化完成");
+        return true;
+    },
+    
+    /**
+     * 渲染视图
+     * @param {String} view 视图名称
+     * @param {Object} data 视图数据
+     * @param {Object} options 渲染选项
+     * @returns {Promise<String>} 渲染结果
+     */
+    render: async function(view, data, options) {
+        if (!this.state.initialized) {
+            throw new Error("视图渲染器未初始化");
+        }
+        
+        const start_time = Date.now();
+        log("视图渲染器", `渲染视图: ${view}`);
+        
+        try {
+            // 合并选项和数据
+            const merged_options = Object.assign({}, this.config, options || {});
+            const merged_data = Object.assign({}, this.config.default_data, data || {});
+            
+            // 解析视图路径
+            const view_path = this._resolveViewPath(view);
+            
+            // 创建渲染上下文
+            const context = {
+                view: view,
+                data: merged_data,
+                options: merged_options,
+                content: "",
+                layout: merged_options.layout || (merged_options.use_layouts 器 this.config.default_layout : null)
+            };
+            
+            // 渲染视图内容
+            context.content = await this.state.engine.renderTemplate(view_path, merged_data, {
+                skip_minify: true // 暂时跳过压缩，等布局渲染后再压缩
+            });
+            
+            // 如果使用布局，则渲染布局
+            let result = context.content;
+            if (context.layout) {
+                result = await this._renderWithLayout(context);
+            }
+            
+            // 如果需要，则转义HTML
+            if (merged_options.escape_html) {
+                result = this._escapeHtml(result);
+            }
+            
+            // 更新统计信息
+            this.state.stats.renders++;
+            this.state.stats.last_render_time = Date.now() - start_time;
+            this.state.stats.total_render_time += this.state.stats.last_render_time;
+            
+            log("视图渲染器", `视图渲染完成: ${view}, 耗时: ${this.state.stats.last_render_time}ms`);
+            return result;
+        } catch (error) {
+            this.state.stats.errors++;
+            log("视图渲染器", `渲染视图 ${view} 时出错: ${error.message}`, "ERROR");
+            
+            if (this.config.debug_mode) {
+                // 在调试模式下返回错误信息
+                return `
+                <div style="color: red; background-color: #ffeeee; padding: 10px; border: 1px solid #cc0000;">
+                    <h2>渲染错误</h2>
+                    <p><strong>视图:</strong> ${view}</p>
+                    <p><strong>错误:</strong> ${error.message}</p>
+                    ${error.stack 器 `<pre>${error.stack}</pre>` : ''}
+                </div>`;
+            } else {
+                // 在生产模式下抛出错误
+                throw error;
+            }
+        }
+    },
+    
+    /**
+     * 渲染部分视图
+     * @param {String} partial 部分视图名称
+     * @param {Object} data 视图数据
+     * @returns {Promise<String>} 渲染结果
+     */
+    renderPartial: async function(partial, data) {
+        if (!this.state.initialized) {
+            throw new Error("视图渲染器未初始化");
+        }
+        
+        log("视图渲染器", `渲染部分视图: ${partial}`);
+        
+        // 解析部分视图路径
+        const partial_path = this._resolvePartialPath(partial);
+        
+        // 渲染部分视图
+        return await this.state.engine.renderTemplate(partial_path, data || {});
+    },
+    
+    /**
+     * 批量渲染多个视图
+     * @param {Array} views 视图配置数组，每项包含view、data、options
+     * @returns {Promise<Object>} 渲染结果映射
+     */
+    renderBatch: async function(views) {
+        if (!this.state.initialized) {
+            throw new Error("视图渲染器未初始化");
+        }
+        
+        log("视图渲染器", `批量渲染 ${views.length} 个视图`);
+        const start_time = Date.now();
+        
+        const results = {};
+        const renderPromises = [];
+        
+        for (const item of views) {
+            const viewName = item.view;
+            
+            const renderPromise = this.render(viewName, item.data, item.options)
+                .then(result => {
+                    results[viewName] = result;
+                })
+                .catch(error => {
+                    log("视图渲染器", `批量渲染视图 ${viewName} 时出错: ${error.message}`, "ERROR");
+                    results[viewName] = null;
+                    this.state.stats.errors++;
+                });
+            
+            renderPromises.push(renderPromise);
+        }
+        
+        // 并行或串行处理
+        if (this.config.parallel_rendering) {
+            await Promise.all(renderPromises);
+        } else {
+            for (const promise of renderPromises) {
+                await promise;
+            }
+        }
+        
+        const batch_time = Date.now() - start_time;
+        log("视图渲染器", `批量渲染完成，耗时: ${batch_time}ms`);
+        
+        return results;
+    },
+    
+    /**
+     * 获取渲染统计信息
+     * @returns {Object} 统计信息
+     */
+    getStatistics: function() {
+        const engineStats = this.state.engine.getStatistics();
+        
+        return {
+            renderer: {
+                renders: this.state.stats.renders,
+                average_render_time: this.state.stats.renders > 0 
+                    器 this.state.stats.total_render_time / this.state.stats.renders 
+                    : 0,
+                last_render_time: this.state.stats.last_render_time,
+                errors: this.state.stats.errors
+            },
+            engine: engineStats
+        };
+    },
+    
+    /**
+     * 清除视图缓存
+     * @param {String} view 视图名称（可选）
+     * @returns {Boolean} 是否成功清除
+     */
+    clearCache: function(view) {
+        if (!this.state.initialized) {
+            return false;
+        }
+        
+        if (view) {
+            const view_path = this._resolveViewPath(view);
+            return this.state.engine.clearCache(view_path) > 0;
+        } else {
+            // 清除所有缓存
+            this.state.engine.clearCache();
+            this.state.layouts = {};
+            this.state.partials = {};
+            return true;
+        }
+    },
+    
+    // 内部方法
+    
+    /**
+     * 使用布局渲染视图
+     * @private
+     */
+    _renderWithLayout: async function(context) {
+        // 解析布局路径
+        const layout_path = this._resolveLayoutPath(context.layout);
+        
+        // 准备布局数据
+        const layout_data = Object.assign({}, context.data, {
+            content: context.content,
+            view: context.view
+        });
+        
+        // 渲染布局
+        return await this.state.engine.renderTemplate(layout_path, layout_data, context.options);
+    },
+    
+    /**
+     * 解析视图路径
+     * @private
+     */
+    _resolveViewPath: function(view) {
+        // 如果已经是完整路径，则直接返回
+        if (view.startsWith('/') || view.includes(this.config.extension)) {
+            return view;
+        }
+        
+        // 否则构建完整路径
+        return `${this.config.view_path}/${view}${this.config.extension}`;
+    },
+    
+    /**
+     * 解析布局路径
+     * @private
+     */
+    _resolveLayoutPath: function(layout) {
+        // 如果已经是完整路径，则直接返回
+        if (layout.startsWith('/') || layout.includes(this.config.extension)) {
+            return layout;
+        }
+        
+        // 否则构建完整路径
+        return `${this.config.layout_path}/${layout}${this.config.extension}`;
+    },
+    
+    /**
+     * 解析部分视图路径
+     * @private
+     */
+    _resolvePartialPath: function(partial) {
+        // 如果已经是完整路径，则直接返回
+        if (partial.startsWith('/') || partial.includes(this.config.extension)) {
+            return partial;
+        }
+        
+        // 否则构建完整路径
+        return `${this.config.partial_path}/${partial}${this.config.extension}`;
+    },
+    
+    /**
+     * 预加载常用部分视图
+     * @private
+     */
+    _preloadPartials: function() {
+        log("视图渲染器", "预加载常用部分视图");
+        
+        // 常用部分视图列表
+        const common_partials = ["header", "footer", "sidebar", "nav"];
+        
+        // 异步加载部分视图
+        for (const partial of common_partials) {
+            const partial_path = this._resolvePartialPath(partial);
+            
+            this.state.engine.loadTemplate(partial_path)
+                .then(template => {
+                    this.state.partials[partial] = template;
+                    log("视图渲染器", `预加载部分视图成功: ${partial}`);
+                })
+                .catch(error => {
+                    // 忽略加载错误，这只是预加载尝试
+                    log("视图渲染器", `预加载部分视图 ${partial} 失败: ${error.message}`, "WARNING");
+                });
+        }
+    },
+    
+    /**
+     * 转义HTML
+     * @private
+     */
+    _escapeHtml: function(html) {
+        // 简单的HTML转义
+        return html
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+};
+
+// 导出模块
+export ViewRenderer; 
