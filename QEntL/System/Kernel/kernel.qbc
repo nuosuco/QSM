@@ -1,0 +1,1033 @@
+{
+  "version": "3.0",
+  "qbc_version": "1.0",
+  "constants": [
+    "量子寄存器",
+    "量子比特数:整数",
+    "状态向量:浮点数组",
+    "纠缠对:整数数组",
+    "量子门",
+    "名称:字符串",
+    "矩阵:浮点数组",
+    "目标比特:整数",
+    "进程",
+    "标识:整数",
+    "状态:字符串",
+    "优先级:整数",
+    "文件句柄",
+    "路径:字符串",
+    "模式:字符串",
+    "偏移:整数",
+    "⚛ QEntL量子内核 V1.0 启动中...",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    8,
+    "初始化量子寄存器: ",
+    " 量子比特",
+    "挂载量子动态文件系统...",
+    "  /qentl/system/kernel/",
+    "  /qentl/system/compiler/",
+    "  /qentl/models/qsm/",
+    "  /qentl/data/",
+    "  /qentl/quantum/register/",
+    "初始化进程管理器...",
+    "QSM量子叠加态模型: ",
+    "✅ QEntL量子环境就绪",
+    0,
+    "  加载QSM模型权重...",
+    "  初始化三语词汇表: 中/彝/英",
+    "  初始化量子注意力层...",
+    "  启动翻译引擎...",
+    "就绪",
+    "创建量子寄存器: ",
+    " 比特",
+    "应用量子门: ",
+    " → 比特",
+    "量子测量 → |",
+    "⟩",
+    "创建进程: ",
+    " [优先级:",
+    "]",
+    "量子读取: ",
+    "数据",
+    "量子写入: ",
+    " [",
+    " 字节]",
+    42,
+    1,
+    "QEntL量子环境运行中..."
+  ],
+  "variables": [
+    "比特数",
+    "寄存器",
+    "门",
+    "名称",
+    "优先级",
+    "路径",
+    "数据",
+    "文本"
+  ],
+  "functions": {
+    "内核启动": 18,
+    "初始化QSM": 59,
+    "创建量子寄存器": 70,
+    "应用量子门": 82,
+    "量子测量": 95,
+    "创建进程": 107,
+    "量子读取": 123,
+    "量子写入": 130,
+    "随机数": 145,
+    "长度": 148,
+    "setup": 152,
+    "run": 154
+  },
+  "instructions": [
+    {
+      "op": "NOP",
+      "code": 0,
+      "operand": null,
+      "line": 9
+    },
+    {
+      "op": "TYPE_DEF",
+      "code": 112,
+      "operand": 0,
+      "line": 16
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 1,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 2,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 3,
+      "line": 0
+    },
+    {
+      "op": "TYPE_DEF",
+      "code": 112,
+      "operand": 4,
+      "line": 22
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 5,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 6,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 7,
+      "line": 0
+    },
+    {
+      "op": "TYPE_DEF",
+      "code": 112,
+      "operand": 8,
+      "line": 28
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 5,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 9,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 10,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 11,
+      "line": 0
+    },
+    {
+      "op": "TYPE_DEF",
+      "code": 112,
+      "operand": 12,
+      "line": 35
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 13,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 14,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 15,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 16,
+      "line": 43
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 43
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 17,
+      "line": 44
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 44
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "让",
+      "line": 47
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "量子位",
+      "line": 47
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 18,
+      "line": 47
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 19,
+      "line": 48
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "量子位",
+      "line": 48
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 20,
+      "line": 48
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 48
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 21,
+      "line": 51
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 51
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 22,
+      "line": 52
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 52
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 23,
+      "line": 53
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 53
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 24,
+      "line": 54
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 54
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 25,
+      "line": 55
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 55
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 26,
+      "line": 56
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 56
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 27,
+      "line": 59
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 59
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "让",
+      "line": 62
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "模型状态",
+      "line": 62
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "初始化QSM",
+      "line": 62
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 28,
+      "line": 63
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "模型状态",
+      "line": 63
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 63
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 17,
+      "line": 65
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 65
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 29,
+      "line": 66
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 66
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 30,
+      "line": 68
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 68
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 31,
+      "line": 73
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 73
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 32,
+      "line": 74
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 74
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 33,
+      "line": 75
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 75
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 34,
+      "line": 76
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 76
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 35,
+      "line": 77
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 77
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "让",
+      "line": 82
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "寄存器",
+      "line": 82
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "量子寄存器",
+      "line": 82
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 36,
+      "line": 88
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "比特数",
+      "line": 88
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 37,
+      "line": 88
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 88
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "寄存器",
+      "line": 89
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 89
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 38,
+      "line": 94
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "门",
+      "line": 94
+    },
+    {
+      "op": "LOAD_FIELD",
+      "code": 19,
+      "operand": "名称",
+      "line": 94
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 39,
+      "line": 94
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "门",
+      "line": 94
+    },
+    {
+      "op": "LOAD_FIELD",
+      "code": 19,
+      "operand": "目标比特",
+      "line": 94
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 94
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "寄存器",
+      "line": 95
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 95
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "让",
+      "line": 100
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "结果",
+      "line": 100
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 30,
+      "line": 100
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 40,
+      "line": 101
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "结果",
+      "line": 101
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 41,
+      "line": 101
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 101
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "结果",
+      "line": 102
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 102
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "让",
+      "line": 107
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "新进程",
+      "line": 107
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "进程",
+      "line": 107
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 42,
+      "line": 113
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "名称",
+      "line": 113
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 43,
+      "line": 113
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "优先级",
+      "line": 113
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 44,
+      "line": 113
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 113
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "新进程",
+      "line": 114
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 114
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 45,
+      "line": 119
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "路径",
+      "line": 119
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 119
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 46,
+      "line": 120
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 120
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 47,
+      "line": 124
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "路径",
+      "line": 124
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 48,
+      "line": 124
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "数据",
+      "line": 124
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "长度",
+      "line": 124
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 49,
+      "line": 124
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 124
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "数据",
+      "line": 125
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "长度",
+      "line": 125
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 125
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 50,
+      "line": 130
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 130
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 51,
+      "line": 134
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 134
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_INIT",
+      "code": 80,
+      "operand": null,
+      "line": 138
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "内核启动",
+      "line": 140
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 52,
+      "line": 144
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "LOG",
+      "line": 144
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "HALT",
+      "code": 1,
+      "operand": null,
+      "line": 0
+    }
+  ]
+}
