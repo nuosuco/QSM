@@ -220,6 +220,65 @@ class QSM_V4(nn.Module):
         
         return logits
     
+
+    def translate_beam_search(self, src_ids, beam_size=5, max_len=64, length_penalty=0.6):
+        """束搜索翻译 - 比sampling更高质量的解码"""
+        self.eval()
+        device = next(self.parameters()).device
+        
+        if isinstance(src_ids, list):
+            src_ids = torch.tensor([src_ids], device=device)
+        
+        src_pad_mask = self._make_pad_mask(src_ids, self.pad_id)
+        enc_output = self.encode(src_ids, src_pad_mask)
+        
+        BOS = 6920
+        EOS = 6921
+        
+        # Initialize beams: list of (score, token_ids)
+        beams = [(0.0, [BOS])]
+        completed = []
+        
+        for step in range(max_len):
+            new_beams = []
+            for score, ids in beams:
+                if ids[-1] == EOS:
+                    completed.append((score, ids))
+                    continue
+                
+                tgt = torch.tensor([ids], device=device)
+                tgt_len = len(ids)
+                causal_mask = self._make_causal_mask(tgt_len).to(device)
+                
+                with torch.no_grad():
+                    logits = self.decode(tgt, enc_output, causal_mask, src_pad_mask)
+                
+                log_probs = torch.log_softmax(logits[:, -1, :], dim=-1).squeeze(0)
+                topk_probs, topk_ids = log_probs.topk(beam_size)
+                
+                for i in range(beam_size):
+                    new_id = topk_ids[i].item()
+                    new_score = score + topk_probs[i].item()
+                    new_beams.append((new_score, ids + [new_id]))
+            
+            # Keep top beam_size beams
+            new_beams.sort(key=lambda x: x[0] / (len(x[1]) ** length_penalty), reverse=True)
+            beams = new_beams[:beam_size]
+            
+            # Early stop if all beams ended
+            if all(b[1][-1] == EOS for b in beams):
+                completed.extend(beams)
+                break
+        
+        # Add remaining beams to completed
+        completed.extend(beams)
+        
+        # Select best beam with length penalty
+        if completed:
+            completed.sort(key=lambda x: x[0] / (len(x[1]) ** length_penalty), reverse=True)
+            return completed[0][1]
+        return [BOS]
+
     def translate(self, src_ids, max_len=64, temperature=1.0):
         """自回归翻译"""
         self.eval()

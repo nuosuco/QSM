@@ -77,7 +77,8 @@ def translate_text(text, max_len=64, temperature=0.8):
         return "", "输入无有效字符"
     
     try:
-        result_ids = model.translate(src_ids, max_len=max_len, temperature=temperature)
+        # Use beam search for better quality
+        result_ids = model.translate_beam_search(src_ids, beam_size=3, max_len=max_len)
         result_chars = []
         for tid in result_ids[1:]:  # Skip BOS
             if tid == EOS_ID:
