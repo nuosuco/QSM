@@ -99,8 +99,10 @@
 - **V3训练中**: 1242万参数(384d/4层), 8 Epoch训练, Epoch 3/8进行中
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
-  - 公网API: https://som.top/api/qv4/ (翻译+QEntL编译)
-- **V4 V2训练中**: 30000对数据, 20 Epochs, 目标Val Loss < 2.0
+  - 公网API: https://som.top/api/qv4/ (翻译+QEntL编译+Beam Search)
+- **V4 V2训练中**: 30000对数据, 20 Epochs, Epoch 8 Loss 1.57
+  - Val Loss 1.79 (Epoch 5), 已超越V1的2.35
+  - 目标: Val Loss < 1.0
 
 ## 量子自举架构（2026-04-28确立）
 - **核心理念**: 不依赖第三方语言/代码/文件/环境
