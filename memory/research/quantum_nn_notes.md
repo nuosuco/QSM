@@ -241,3 +241,19 @@
 6. ⬜ 编译器用QEntL重写 — 自举关键
 7. ⬜ VM用C重写 — 性能提升
 8. ⬜ QEntL标准库 — 文件I/O/网络/数学
+
+## 26. 二进制QBC格式设计
+- JSON QBC: 16380 bytes (kernel)
+- Binary QBC: 2043 bytes (12% of JSON!) 
+- 格式: [MAGIC "QBC\x01"][n_const][n_func][n_instr][constants][functions][instructions][string_table]
+- 常量类型: int8/int32/float64/string
+- 操作数类型: none/int/string_ref
+- 字符串表在末尾，指令通过索引引用
+- **C启动器可直接读取此格式**
+- 下一步: 在qvm_boot.c中实现二进制QBC加载器
+
+## 27. V4 V2训练进展分析
+- Epoch 1 Val Loss: 3.18 (vs V4 V1的8.6)
+- 巨大改善因为: 3倍数据量(30000对) + 双向训练
+- 预计20 Epochs后Val Loss可达1.5-2.0
+- 训练每Epoch约7分钟(vs V1的2分钟，因为数据多了3倍)
