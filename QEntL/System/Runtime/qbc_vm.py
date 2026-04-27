@@ -66,18 +66,27 @@ class QBCVirtualMachine:
         self.running = True
         steps = 0
         
-        # Auto-detect main entry point: find QUANTUM_INIT or first non-function code
+        # Auto-detect main entry point
         if self.ip == 0:
-            # Find main program start (after all function definitions)
-            max_func_ip = max(self.functions.values()) if self.functions else 0
-            # Find the next instruction after all function code
-            for i in range(max_func_ip, len(self.instructions)):
-                instr = self.instructions[i]
-                if instr.get('op') in ('QUANTUM_INIT', 'NOP') and i > max_func_ip:
-                    self.ip = i
-                    break
+            # Priority 1: If 'setup' function exists, call it
+            if 'setup' in self.functions:
+                # Find QUANTUM_INIT before setup and start there
+                # The setup function will be called via CALL at its entry
+                # Look for the first QUANTUM_INIT
+                for i, instr in enumerate(self.instructions):
+                    if instr.get('op') == 'QUANTUM_INIT':
+                        self.ip = i
+                        break
+                else:
+                    self.ip = self.functions['setup']
             else:
-                self.ip = max_func_ip
+                # No setup - find QUANTUM_INIT or start at beginning
+                for i, instr in enumerate(self.instructions):
+                    if instr.get('op') == 'QUANTUM_INIT':
+                        self.ip = i
+                        break
+                else:
+                    self.ip = 0
         
         while self.running and self.ip < len(self.instructions) and steps < max_steps:
             instr = self.instructions[self.ip]
