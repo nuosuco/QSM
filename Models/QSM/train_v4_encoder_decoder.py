@@ -294,18 +294,18 @@ def train():
     d_ff = 512
     dropout = 0.1
     batch_size = 8
-    epochs = 15
+    epochs = 20
     lr = 3e-4
     accum_steps = 4  # Gradient accumulation
     max_len = 64
     pad_id = 0
-    warmup_steps = 500
+    warmup_steps = 1000
     label_smoothing = 0.1
     
     # Load data
     print("\n📂 加载训练数据...")
-    train_pairs = load_data('Models/QSM/bin/v4_train_pairs.json')
-    val_pairs = load_data('Models/QSM/bin/v4_val_pairs.json')
+    train_pairs = load_data('Models/QSM/bin/v4_train_pairs_v2.json')
+    val_pairs = load_data('Models/QSM/bin/v4_val_pairs_v2.json')
     
     with open('Models/QSM/bin/v4_vocab.json', 'r', encoding='utf-8') as f:
         vocab = json.load(f)
