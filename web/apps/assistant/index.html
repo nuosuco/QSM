@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量子助手 - QSM三语模型</title>
+<style>
+@font-face{font-family:'YiFont';src:url('/fonts/lingyi.ttf') format('truetype');font-display:swap}
+.yi-font{font-family:'YiFont',sans-serif!important}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#0a0a1a,#1a1a2e,#16213e);min-height:100vh;color:#fff}
+.container{max-width:800px;margin:0 auto;padding:15px}
+h1{text-align:center;padding:10px;color:#8a87ff;font-size:24px}
+.models{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;justify-content:center}
+.btn{min-width:90px;padding:10px;border:2px solid #4a90d9;background:transparent;color:#fff;border-radius:10px;cursor:pointer;text-align:center;transition:all 0.3s}
+.btn.active{background:#4a90d9;transform:scale(1.05)}
+.btn small{display:block;font-size:10px;opacity:0.8;margin-top:3px}
+.btn:hover{background:rgba(74,144,217,0.3)}
+.info{background:rgba(255,255,255,0.1);padding:8px;border-radius:8px;text-align:center;margin-bottom:10px;font-size:14px;border:1px solid rgba(138,135,255,0.3)}
+.chat{background:rgba(255,255,255,0.05);border-radius:12px;padding:12px;min-height:180px;max-height:35vh;overflow-y:auto;margin-bottom:10px;border:1px solid rgba(138,135,255,0.2)}
+.msg{padding:8px 14px;border-radius:14px;margin:6px 0;max-width:85%;line-height:1.5;font-size:15px}
+.user{background:linear-gradient(135deg,#4ecdc4,#44a08d);color:#1a1a2e;margin-left:auto}
+.ai{background:rgba(138,135,255,0.15);border:1px solid rgba(138,135,255,0.3)}
+.input{display:flex;gap:8px;margin-bottom:8px}
+input{flex:1;padding:12px;border:2px solid rgba(138,135,255,0.3);border-radius:20px;background:rgba(0,0,0,0.3);color:#fff;font-size:15px}
+input:focus{outline:none;border-color:#8a87ff}
+button{padding:12px 25px;border:none;border-radius:20px;background:linear-gradient(135deg,#8a87ff,#6c63ff);color:#fff;font-size:15px;cursor:pointer;font-weight:bold}
+button:hover{opacity:0.9}
+.status{text-align:center;padding:8px;color:#8a87ff;font-size:13px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔮 量子助手</h1>
+
+<div class="models">
+<button class="btn active" onclick="sel('Q1')" id="b-Q1">Q系列<br><small>纯量子叠加态</small></button>
+<button class="btn" onclick="sel('V4')" id="b-V4">V系列<br><small>传统模型</small></button>
+<button class="btn" onclick="sel('QV4')" id="b-QV4">QV系列<br><small>混合模型</small></button>
+</div>
+
+<div class="info" id="info">当前: Q1 - 纯量子叠加态模型 (训练中)</div>
+
+<div class="chat" id="chat">
+<div class="msg ai">我是QSM三语模型，支持彝文、中文、英文。请输入内容，我来回答。</div>
+</div>
+
+<div class="input">
+<input type="text" id="txt" placeholder="输入彝文/中文/英文..." onkeypress="if(event.key=='Enter')send()">
+<button onclick="send()">发送</button>
+</div>
+
+<div class="status" id="status">✓ Q系列是最终目标，V/QV用于研究对比</div>
+</div>
+
+<script>
+var model='Q1';
+var paths={Q1:'/api/q1/',V4:'/api/v4/',QV4:'/api/qv4/'};
+var names={Q1:'纯量子叠加态模型',V4:'传统模型',QV4:'混合模型'};
+
+function sel(m){
+  model=m;
+  document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('b-'+m).classList.add('active');
+  document.getElementById('info').textContent='当前: '+m+' - '+names[m];
+  document.getElementById('status').textContent='✓ 已切换到 '+m+' 模型';
+}
+
+function send(){
+  var t=document.getElementById('txt').value.trim();
+  if(!t)return;
+  
+  var chat=document.getElementById('chat');
+  chat.innerHTML+='<div class="msg user">'+t+'</div>';
+  document.getElementById('txt').value='';
+  document.getElementById('status').textContent='⏳ '+model+' 处理中...';
+  
+  fetch(paths[model]+'translate',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:t})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    chat.innerHTML+='<div class="msg ai yi-font">'+(d.translated||'?')+'</div>';
+    document.getElementById('status').textContent='✓ '+model+' 完成';
+    chat.scrollTop=chat.scrollHeight;
+  })
+  .catch(e=>{
+    chat.innerHTML+='<div class="msg ai" style="color:#f99">服务连接失败</div>';
+    document.getElementById('status').textContent='✗ 连接失败';
+    chat.scrollTop=chat.scrollHeight;
+  });
+}
+</script>
+</body>
+</html>
