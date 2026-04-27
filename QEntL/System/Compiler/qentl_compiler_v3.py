@@ -82,7 +82,7 @@ class TokenType(Enum):
     IN = '在'
     TO = '到'
     WHILE = '当'
-    LOG = '日志'
+    LOG = 'LOG'  # Use English keyword 'LOG' (was '日志')
     SETUP = 'setup'
     RUN = 'run'
     
