@@ -150,6 +150,25 @@ quantum_program 类型测试 {
     print(f"  输出: {output}")
     print("✅ 测试7 类型定义: 通过")
 
+def test_for_loop():
+    """测试10: FOR循环"""
+    source = """quantum_program 循环测试 {
+        setup: 函数() {
+            让 总和 = 0
+            循环 i 在 0 到 4 {
+                让 总和 = 总和 + i
+            }
+            LOG(总和)
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert len(output) > 0, "无输出"
+    assert output[0] == "6", f"0+1+2+3=6, 得{output[0]}"
+    return output
+
 def test_modulo():
     """测试9: 取模运算"""
     source = """quantum_program 取模测试 {
@@ -206,7 +225,8 @@ def run_all_tests():
         ("循环", test_loop),
         ("量子初始化", test_quantum_init),
         ("类型定义", test_type_definition),
-        ("取模运算", test_modulo),
+        ("FOR循环", test_for_loop),
+    ("取模运算", test_modulo),
     ("内核执行", test_kernel),
     ]
     

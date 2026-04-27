@@ -472,7 +472,14 @@ class Parser:
         self._expect(TokenType.FOR)
         node.value = self._advance().value  # loop variable
         self._expect(TokenType.IN)
-        node.children.append(self._parse_expression())  # range
+        # Parse range: start 到 end
+        start = self._parse_expression()
+        if self._current().type == TokenType.TO:
+            self._advance()  # consume 到
+            end = self._parse_expression()
+            node.children.append(ASTNode('Range', children=[start, end]))
+        else:
+            node.children.append(start)
         node.children.append(self._parse_block())
         return node
     
@@ -692,13 +699,29 @@ class CodeGenerator:
         elif node.type == 'For':
             start_label = self._new_label()
             end_label = self._new_label()
-            self._gen_node(node.children[0])  # range
-            self._emit(OpCode.LOOP_START, node.value, node.line)
+            range_node = node.children[0]
+            if range_node.type == 'Range':
+                self._gen_node(range_node.children[0])
+                self._emit(OpCode.STORE_VAR, node.value, node.line)
+                self._gen_node(range_node.children[1])
+                self._emit(OpCode.STORE_VAR, f'_for_end_{node.value}', node.line)
+            else:
+                self._gen_node(range_node)
+                self._emit(OpCode.STORE_VAR, node.value, node.line)
             self.instructions.append({'op': 'LABEL', 'name': start_label})
-            self._gen_node(node.children[1])  # body
-            self._emit(OpCode.LOOP_END, start_label, node.line)
+            self._emit(OpCode.LOAD_VAR, node.value, node.line)
+            self._emit(OpCode.LOAD_VAR, f'_for_end_{node.value}', node.line)
+            self._emit(OpCode.LT, None, node.line)
+            self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
+            self._gen_node(node.children[1])
+            self._emit(OpCode.LOAD_VAR, node.value, node.line)
+            step_idx = len(self.constants)
+            self.constants.append(1)
+            self._emit(OpCode.LOAD_CONST, step_idx, node.line)
+            self._emit(OpCode.ADD, None, node.line)
+            self._emit(OpCode.STORE_VAR, node.value, node.line)
+            self._emit(OpCode.JUMP, start_label, node.line)
             self.instructions.append({'op': 'LABEL', 'name': end_label})
-        
         elif node.type == 'BinaryOp':
             self._gen_node(node.children[0])
             self._gen_node(node.children[1])
