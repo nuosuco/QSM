@@ -439,8 +439,20 @@ class QBCVirtualMachine:
                 self.stack.append(0)
             self.ip += 1
         elif op == OpCode.QUANTUM_ENTANGLE:
-            self.ip += 1  # placeholder
-        
+            if self.quantum_bits >= 2:
+                if isinstance(operand, str) and operand:
+                    parts = operand.split()
+                    control = int(parts[0]) if parts else 0
+                    target = int(parts[1]) if len(parts) > 1 else 1
+                else:
+                    control = 0
+                    target = 1
+                self._apply_hadamard(control)
+                self._apply_cnot(control, target)
+                msg = f"创建纠缠对: 比特{control} ↔ 比特{target}"
+                self.output.append(msg)
+                print(msg)
+            self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
                 val = self.stack.pop()
