@@ -155,3 +155,29 @@
 - 总计: ~11,407,360 (约1140万参数)
 - 内存估算: 1140万 × 4bytes × 4(梯度+优化器) ≈ 175MB → 不会OOM!
 - d_model=384版: ~2600万参数，仍可控
+
+## 19. CPU训练优化策略
+- **Gradient Accumulation**: 模拟大batch size
+  - 当前batch=4太小，梯度噪声大
+  - 每4步累加梯度再更新 = 等效batch=16
+  - 实现简单：loss /= accum_steps, 反向传播累加
+  - 效果：训练更稳定，收敛更快
+- **Mixed Precision (FP16)**: CPU不支持原生FP16
+  - 但可以用bfloat16在AMD EPYC上
+  - 需要PyTorch 2.x支持
+  - 内存减半，速度提升
+- **Learning Rate Scheduling**:
+  - Warmup: 前10%步骤LR从0线性增长
+  - Cosine Decay: 后90%步骤余弦退火
+  - 比固定LR好得多
+- **Label Smoothing**: 防止过度自信
+  - soft_target = (1-ε)*one_hot + ε/vocab_size
+  - ε=0.1常用
+  - 提高泛化能力
+
+## 20. 编译器'让'关键字修复
+- 问题: LET = 'let' 但QEntL使用中文'让'
+- 修复: LET = '让'
+- 效果: '让 量子位 = 8' 正确编译为 LOAD_CONST(8) → STORE_VAR(量子位)
+- 内核执行输出从"None"变为正确值"8"
+- **教训**: 关键字映射必须匹配实际使用的语言

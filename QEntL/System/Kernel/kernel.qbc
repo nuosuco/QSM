@@ -57,28 +57,32 @@
     "QEntL量子环境运行中..."
   ],
   "variables": [
+    "量子位",
+    "模型状态",
     "比特数",
     "寄存器",
     "门",
+    "结果",
     "名称",
     "优先级",
+    "新进程",
     "路径",
     "数据",
     "文本"
   ],
   "functions": {
     "内核启动": 18,
-    "初始化QSM": 59,
-    "创建量子寄存器": 70,
-    "应用量子门": 82,
-    "量子测量": 95,
-    "创建进程": 107,
-    "量子读取": 123,
-    "量子写入": 130,
-    "随机数": 145,
-    "长度": 148,
-    "setup": 152,
-    "run": 154
+    "初始化QSM": 57,
+    "创建量子寄存器": 68,
+    "应用量子门": 79,
+    "量子测量": 92,
+    "创建进程": 103,
+    "量子读取": 118,
+    "量子写入": 125,
+    "随机数": 140,
+    "长度": 143,
+    "setup": 147,
+    "run": 149
   },
   "instructions": [
     {
@@ -214,21 +218,15 @@
       "line": 44
     },
     {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "让",
-      "line": 47
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "量子位",
-      "line": 47
-    },
-    {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 18,
+      "line": 47
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "量子位",
       "line": 47
     },
     {
@@ -352,21 +350,15 @@
       "line": 59
     },
     {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "让",
-      "line": 62
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "模型状态",
-      "line": 62
-    },
-    {
       "op": "CALL",
       "code": 67,
       "operand": "初始化QSM",
+      "line": 62
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "模型状态",
       "line": 62
     },
     {
@@ -504,19 +496,13 @@
     {
       "op": "LOAD_VAR",
       "code": 17,
-      "operand": "让",
-      "line": 82
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "寄存器",
-      "line": 82
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
       "operand": "量子寄存器",
+      "line": 82
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "寄存器",
       "line": 82
     },
     {
@@ -652,21 +638,15 @@
       "line": 0
     },
     {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "让",
-      "line": 100
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "结果",
-      "line": 100
-    },
-    {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 30,
+      "line": 100
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "结果",
       "line": 100
     },
     {
@@ -726,19 +706,13 @@
     {
       "op": "LOAD_VAR",
       "code": 17,
-      "operand": "让",
-      "line": 107
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "新进程",
-      "line": 107
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
       "operand": "进程",
+      "line": 107
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "新进程",
       "line": 107
     },
     {

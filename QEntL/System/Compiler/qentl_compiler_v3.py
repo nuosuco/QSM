@@ -77,7 +77,7 @@ class TokenType(Enum):
     ELSE = '否则'
     ELIF = '否则如果'
     RETURN = '返回'
-    LET = 'let'
+    LET = '让'
     FOR = '循环'
     IN = '在'
     WHILE = '当'
