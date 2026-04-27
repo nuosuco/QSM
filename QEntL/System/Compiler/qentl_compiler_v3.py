@@ -80,6 +80,7 @@ class TokenType(Enum):
     LET = '让'
     FOR = '循环'
     IN = '在'
+    TO = '到'
     WHILE = '当'
     LOG = '日志'
     SETUP = 'setup'
