@@ -5,8 +5,9 @@
     "创建量子寄存器: ",
     " 比特",
     0,
-    42,
+    "初始化比特: ",
     1,
+    42,
     90,
     "应用量子门: ",
     " → 比特",
@@ -15,15 +16,14 @@
     "CNOT",
     "✅ Bell态创建完成",
     "测量比特: ",
-    "QEntL量子操作系统 V1.1",
+    "QEntL量子操作系统 V1.2",
     "内核: 量子叠加态模型",
     "架构: 编码器-解码器 + 交叉注意力",
     "翻译请求: ",
     " → ",
     "翻译结果",
-    "⚛ QEntL量子内核 V1.1 启动中...",
+    "⚛ QEntL量子内核 V1.2 启动中...",
     8,
-    "初始化量子寄存器: ",
     "✅ 量子环境就绪",
     "⚠ 量子环境异常"
   ],
@@ -42,26 +42,26 @@
   ],
   "functions": {
     "初始化量子态": 0,
-    "健康检查": 11,
-    "应用量子门": 27,
-    "创建Bell态": 36,
-    "量子测量": 47,
-    "系统信息": 56,
-    "翻译接口": 63,
-    "setup": 75
+    "健康检查": 30,
+    "应用量子门": 46,
+    "创建Bell态": 55,
+    "量子测量": 66,
+    "系统信息": 75,
+    "翻译接口": 82,
+    "setup": 94
   },
   "instructions": [
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 0,
-      "line": 5
+      "line": 6
     },
     {
       "op": "LOAD_VAR",
       "code": 17,
       "operand": "比特数",
-      "line": 5
+      "line": 6
     },
     {
       "op": "ADD",
@@ -73,7 +73,7 @@
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 1,
-      "line": 5
+      "line": 6
     },
     {
       "op": "ADD",
@@ -85,107 +85,125 @@
       "op": "LOG",
       "code": 96,
       "operand": null,
-      "line": 5
+      "line": 6
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 2,
-      "line": 6
+      "line": 7
     },
     {
       "op": "STORE_VAR",
       "code": 18,
       "operand": "状态",
-      "line": 6
+      "line": 7
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 2,
+      "line": 8
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "i",
+      "line": 8
     },
     {
       "op": "LOAD_VAR",
       "code": 17,
-      "operand": "状态",
-      "line": 7
+      "operand": "比特数",
+      "line": 8
     },
     {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 7
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "_for_end_i",
+      "line": 8
     },
     {
-      "op": "RETURN",
-      "code": 68,
+      "op": "LABEL",
+      "name": "L1"
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "i",
+      "line": 8
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "_for_end_i",
+      "line": 8
+    },
+    {
+      "op": "LT",
+      "code": 50,
       "operand": null,
-      "line": 0
+      "line": 8
+    },
+    {
+      "op": "JUMP_IF_FALSE",
+      "code": 65,
+      "operand": "L2",
+      "line": 8
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 3,
-      "line": 12
+      "line": 9
     },
     {
-      "op": "STORE_VAR",
-      "code": 18,
-      "operand": "内存",
-      "line": 12
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "i",
+      "line": 9
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 9
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "i",
+      "line": 8
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 4,
-      "line": 13
+      "line": 8
     },
     {
-      "op": "STORE_VAR",
-      "code": 18,
-      "operand": "正常",
-      "line": 13
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "内存",
-      "line": 14
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 5,
-      "line": 14
-    },
-    {
-      "op": "GT",
-      "code": 51,
+      "op": "ADD",
+      "code": 32,
       "operand": null,
-      "line": 0
-    },
-    {
-      "op": "JUMP_IF_FALSE",
-      "code": 65,
-      "operand": "L1",
-      "line": 14
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 2,
-      "line": 15
+      "line": 8
     },
     {
       "op": "STORE_VAR",
       "code": 18,
-      "operand": "正常",
-      "line": 15
+      "operand": "i",
+      "line": 8
     },
     {
       "op": "JUMP",
       "code": 64,
-      "operand": "L2",
-      "line": 14
-    },
-    {
-      "op": "LABEL",
-      "name": "L1"
+      "operand": "L1",
+      "line": 8
     },
     {
       "op": "LABEL",
@@ -194,68 +212,14 @@
     {
       "op": "LOAD_VAR",
       "code": 17,
-      "operand": "正常",
-      "line": 17
+      "operand": "状态",
+      "line": 11
     },
     {
       "op": "RETURN",
       "code": 68,
       "operand": null,
-      "line": 17
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 6,
-      "line": 22
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "门名称",
-      "line": 22
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 7,
-      "line": 22
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "目标比特",
-      "line": 22
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 22
+      "line": 11
     },
     {
       "op": "RETURN",
@@ -266,320 +230,38 @@
     {
       "op": "LOAD_CONST",
       "code": 16,
-      "operand": 8,
-      "line": 27
+      "operand": 5,
+      "line": 16
     },
     {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 27
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 9,
-      "line": 28
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 2,
-      "line": 28
-    },
-    {
-      "op": "CALL",
-      "code": 67,
-      "operand": "应用量子门",
-      "line": 28
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 10,
-      "line": 29
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "内存",
+      "line": 16
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 4,
-      "line": 29
-    },
-    {
-      "op": "CALL",
-      "code": 67,
-      "operand": "应用量子门",
-      "line": 29
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 11,
-      "line": 30
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 30
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 12,
-      "line": 35
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "比特",
-      "line": 35
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 35
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 2,
-      "line": 36
+      "line": 17
     },
     {
       "op": "STORE_VAR",
       "code": 18,
-      "operand": "结果",
-      "line": 36
+      "operand": "正常",
+      "line": 17
     },
     {
       "op": "LOAD_VAR",
       "code": 17,
-      "operand": "结果",
-      "line": 37
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 37
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
+      "operand": "内存",
+      "line": 18
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
-      "operand": 13,
-      "line": 42
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 42
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 14,
-      "line": 43
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 43
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 15,
-      "line": 44
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 44
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 16,
-      "line": 49
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "文本",
-      "line": 49
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 17,
-      "line": 49
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "方向",
-      "line": 49
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 49
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 18,
-      "line": 50
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 50
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "QUANTUM_INIT",
-      "code": 80,
-      "operand": null,
-      "line": 53
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 19,
-      "line": 55
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 55
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 20,
-      "line": 56
-    },
-    {
-      "op": "STORE_VAR",
-      "code": 18,
-      "operand": "比特数",
-      "line": 56
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 21,
-      "line": 57
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "比特数",
-      "line": 57
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 1,
-      "line": 57
-    },
-    {
-      "op": "ADD",
-      "code": 32,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 57
-    },
-    {
-      "op": "CALL",
-      "code": 67,
-      "operand": "健康检查",
-      "line": 58
-    },
-    {
-      "op": "STORE_VAR",
-      "code": 18,
-      "operand": "健康",
-      "line": 58
-    },
-    {
-      "op": "LOAD_VAR",
-      "code": 17,
-      "operand": "健康",
-      "line": 59
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 2,
-      "line": 59
+      "operand": 6,
+      "line": 18
     },
     {
       "op": "GT",
@@ -591,45 +273,449 @@
       "op": "JUMP_IF_FALSE",
       "code": 65,
       "operand": "L3",
-      "line": 59
+      "line": 18
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
-      "operand": 22,
-      "line": 60
+      "operand": 2,
+      "line": 19
     },
     {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 60
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "正常",
+      "line": 19
     },
     {
       "op": "JUMP",
       "code": 64,
       "operand": "L4",
-      "line": 59
+      "line": 18
     },
     {
       "op": "LABEL",
       "name": "L3"
     },
     {
+      "op": "LABEL",
+      "name": "L4"
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "正常",
+      "line": 21
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 21
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
       "op": "LOAD_CONST",
       "code": 16,
-      "operand": 23,
-      "line": 62
+      "operand": 7,
+      "line": 26
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "门名称",
+      "line": 26
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 8,
+      "line": 26
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "目标比特",
+      "line": 26
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
     },
     {
       "op": "LOG",
       "code": 96,
       "operand": null,
+      "line": 26
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 9,
+      "line": 31
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 31
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 10,
+      "line": 32
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 2,
+      "line": 32
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "应用量子门",
+      "line": 32
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 11,
+      "line": 33
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 4,
+      "line": 33
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "应用量子门",
+      "line": 33
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 12,
+      "line": 34
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 34
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 13,
+      "line": 39
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "比特",
+      "line": 39
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 39
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 2,
+      "line": 40
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "结果",
+      "line": 40
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "结果",
+      "line": 41
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 41
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 14,
+      "line": 46
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 46
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 15,
+      "line": 47
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 47
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 16,
+      "line": 48
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 48
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 17,
+      "line": 53
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "文本",
+      "line": 53
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 18,
+      "line": 53
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "方向",
+      "line": 53
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 53
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 19,
+      "line": 54
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 54
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_INIT",
+      "code": 80,
+      "operand": null,
+      "line": 57
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 20,
+      "line": 59
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 59
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 21,
+      "line": 60
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "比特数",
+      "line": 60
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "比特数",
+      "line": 61
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "初始化量子态",
+      "line": 61
+    },
+    {
+      "op": "CALL",
+      "code": 67,
+      "operand": "健康检查",
       "line": 62
     },
     {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "健康",
+      "line": 62
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "健康",
+      "line": 63
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 2,
+      "line": 63
+    },
+    {
+      "op": "GT",
+      "code": 51,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "JUMP_IF_FALSE",
+      "code": 65,
+      "operand": "L5",
+      "line": 63
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 22,
+      "line": 64
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 64
+    },
+    {
+      "op": "JUMP",
+      "code": 64,
+      "operand": "L6",
+      "line": 63
+    },
+    {
       "op": "LABEL",
-      "name": "L4"
+      "name": "L5"
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 23,
+      "line": 66
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 66
+    },
+    {
+      "op": "LABEL",
+      "name": "L6"
     },
     {
       "op": "RETURN",
