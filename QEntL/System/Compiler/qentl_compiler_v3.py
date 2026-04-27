@@ -118,6 +118,7 @@ class TokenType(Enum):
     GT = '>'
     LTE = '<='
     GTE = '>='
+    PERCENT = '%'
     AND = '且'
     OR = '或'
     NOT = '非'
@@ -212,7 +213,8 @@ class Lexer:
                 ':': TokenType.COLON, ';': TokenType.SEMICOLON,
                 '=': TokenType.ASSIGN, '+': TokenType.PLUS,
                 '-': TokenType.MINUS, '*': TokenType.STAR,
-                '/': TokenType.SLASH, '<': TokenType.LT,
+                '/': TokenType.SLASH,
+    '%': TokenType.PERCENT, '<': TokenType.LT,
                 '>': TokenType.GT,
             }
             if ch in symbol_map:
@@ -510,7 +512,7 @@ class Parser:
     
     def _parse_multiplication(self):
         left = self._parse_primary()
-        while self._current().type in (TokenType.STAR, TokenType.SLASH):
+        while self._current().type in (TokenType.STAR, TokenType.SLASH, TokenType.PERCENT):
             op = self._advance().value
             right = self._parse_primary()
             left = ASTNode('BinaryOp', value=op, children=[left, right])
@@ -702,7 +704,7 @@ class CodeGenerator:
             self._gen_node(node.children[1])
             op_map = {
                 '+': OpCode.ADD, '-': OpCode.SUB,
-                '*': OpCode.MUL, '/': OpCode.DIV,
+                '*': OpCode.MUL, '/': OpCode.DIV, '%': OpCode.MOD,
                 '==': OpCode.EQ, '!=': OpCode.NEQ,
                 '<': OpCode.LT, '>': OpCode.GT,
                 '<=': OpCode.LTE, '>=': OpCode.GTE,
