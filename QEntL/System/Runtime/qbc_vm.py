@@ -42,6 +42,109 @@ class QBCVirtualMachine:
         self.quantum_register: List[complex] = []
         self.quantum_bits: int = 0
     
+
+    # === Quantum State Simulation (Real Quantum Mechanics) ===
+    def _init_quantum_state(self, n_bits: int):
+        """Initialize quantum state as |0...0⟩ using complex vectors"""
+        import math
+        self.quantum_bits = n_bits
+        dim = 2 ** n_bits
+        # |0...0⟩ state: first basis vector
+        self.quantum_register = [0.0+0.0j] * dim
+        self.quantum_register[0] = 1.0+0.0j
+    
+    def _apply_hadamard(self, target: int):
+        """Apply Hadamard gate to target qubit"""
+        import math
+        sqrt2 = 1.0 / math.sqrt(2)
+        dim = 2 ** self.quantum_bits
+        new_state = [0.0+0.0j] * dim
+        
+        for i in range(dim):
+            # Get bit value at target position
+            bit = (i >> target) & 1
+            # Partner index (flipped target bit)
+            partner = i ^ (1 << target)
+            
+            if bit == 0:
+                new_state[i] = sqrt2 * (self.quantum_register[i] + self.quantum_register[partner])
+            else:
+                new_state[i] = sqrt2 * (self.quantum_register[i] - self.quantum_register[partner])
+        
+        self.quantum_register = new_state
+    
+    def _apply_cnot(self, control: int, target: int):
+        """Apply CNOT gate: flip target if control is |1⟩"""
+        dim = 2 ** self.quantum_bits
+        new_state = [0.0+0.0j] * dim
+        
+        for i in range(dim):
+            control_bit = (i >> control) & 1
+            if control_bit == 1:
+                # Flip target bit
+                partner = i ^ (1 << target)
+                new_state[partner] = self.quantum_register[i]
+            else:
+                new_state[i] = self.quantum_register[i]
+        
+        self.quantum_register = new_state
+    
+    def _apply_pauli_x(self, target: int):
+        """Apply Pauli-X (NOT) gate"""
+        dim = 2 ** self.quantum_bits
+        new_state = [0.0+0.0j] * dim
+        
+        for i in range(dim):
+            partner = i ^ (1 << target)
+            new_state[partner] = self.quantum_register[i]
+        
+        self.quantum_register = new_state
+    
+    def _measure_qubit(self, target: int) -> int:
+        """Measure a single qubit with probabilistic outcome"""
+        import random
+        dim = 2 ** self.quantum_bits
+        
+        # Calculate probability of measuring |1⟩
+        prob_one = 0.0
+        for i in range(dim):
+            if (i >> target) & 1:
+                prob_one += abs(self.quantum_register[i]) ** 2
+        
+        # Probabilistic measurement
+        result = 1 if random.random() < prob_one else 0
+        
+        # Collapse state
+        new_state = [0.0+0.0j] * dim
+        norm = 0.0
+        for i in range(dim):
+            if ((i >> target) & 1) == result:
+                new_state[i] = self.quantum_register[i]
+                norm += abs(self.quantum_register[i]) ** 2
+        
+        # Normalize
+        if norm > 0:
+            import math
+            factor = 1.0 / math.sqrt(norm)
+            for i in range(dim):
+                new_state[i] *= factor
+        
+        self.quantum_register = new_state
+        return result
+    
+    def _get_state_info(self) -> str:
+        """Get quantum state information string"""
+        dim = 2 ** self.quantum_bits
+        non_zero = [(i, self.quantum_register[i]) for i in range(dim) 
+                     if abs(self.quantum_register[i]) > 1e-10]
+        if len(non_zero) <= 4:
+            parts = []
+            for idx, amp in non_zero:
+                bits = format(idx, f'0{self.quantum_bits}b')
+                parts.append(f"{amp:.3f}|{bits}⟩")
+            return " + ".join(parts)
+        return f"{len(non_zero)} non-zero amplitudes"
+
     def load_qbc(self, qbc: Dict):
         """加载QBC字节码程序"""
         self.constants = qbc.get('constants', [])
@@ -302,32 +405,39 @@ class QBCVirtualMachine:
         
         elif op == OpCode.QUANTUM_INIT:
             n_qubits = operand if operand else 1
-            self.quantum_bits = n_qubits
-            # Initialize |0⟩ state
-            self.quantum_register = [complex(0)] * (2 ** n_qubits)
-            self.quantum_register[0] = complex(1)  # |000...0⟩
+            self._init_quantum_state(n_qubits)
             self.ip += 1
-        
+
         elif op == OpCode.QUANTUM_GATE:
-            self.ip += 1  # placeholder
-        
-        elif op == OpCode.QUANTUM_MEASURE:
-            # Simulate measurement
-            import random
-            if self.quantum_register:
-                probs = [abs(x)**2 for x in self.quantum_register]
-                total = sum(probs)
-                if total > 0:
-                    probs = [p/total for p in probs]
-                    r = random.random()
-                    cumulative = 0
-                    for i, p in enumerate(probs):
-                        cumulative += p
-                        if r <= cumulative:
-                            self.stack.append(i)
-                            break
+            # operand is dict-like or string describing the gate
+            if operand and isinstance(operand, str):
+                gate_info = operand.split()
+                gate_name = gate_info[0]
+                target = int(gate_info[1]) if len(gate_info) > 1 else 0
+                if gate_name == 'H':
+                    self._apply_hadamard(target)
+                elif gate_name == 'X' or gate_name == 'NOT':
+                    self._apply_pauli_x(target)
+                elif gate_name == 'CNOT':
+                    control = target
+                    target2 = int(gate_info[2]) if len(gate_info) > 2 else (target + 1)
+                    self._apply_cnot(control, target2)
+                else:
+                    self._apply_hadamard(target)  # default to H
             self.ip += 1
-        
+
+        elif op == OpCode.QUANTUM_MEASURE:
+            target = operand if isinstance(operand, int) else 0
+            if self.quantum_bits > 0:
+                result = self._measure_qubit(target)
+                self.stack.append(result)
+                state_info = self._get_state_info()
+                msg = f"测量比特{target}: {result} (状态: {state_info})"
+                self.output.append(msg)
+                print(msg)
+            else:
+                self.stack.append(0)
+            self.ip += 1
         elif op == OpCode.QUANTUM_ENTANGLE:
             self.ip += 1  # placeholder
         

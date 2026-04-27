@@ -187,6 +187,30 @@ def test_modulo():
     assert output[0] == "1", f"10%3应=1, 得{output[0]}"
     return output
 
+def test_bell_state():
+    """测试11: Bell态量子纠缠"""
+    qbc = {
+        "constants": ["Bell态测试"],
+        "variables": [],
+        "functions": {"setup": 1},
+        "instructions": [
+            {"op": "QUANTUM_INIT", "code": 80, "operand": 2},
+            {"op": "QUANTUM_GATE", "code": 81, "operand": "H 0"},
+            {"op": "QUANTUM_GATE", "code": 81, "operand": "CNOT 0 1"},
+            {"op": "QUANTUM_MEASURE", "code": 82, "operand": 0},
+            {"op": "QUANTUM_MEASURE", "code": 82, "operand": 1},
+            {"op": "RETURN", "code": 68, "operand": None},
+            {"op": "HALT", "code": 1, "operand": None},
+        ]
+    }
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    # Both measurements should show same bit value (entanglement)
+    measurements = [l for l in output if '测量' in l]
+    assert len(measurements) == 2, f"应有2次测量, 得{len(measurements)}"
+    return output
+
 def test_kernel():
     """测试8: 完整内核执行"""
     code = '''
@@ -227,6 +251,7 @@ def run_all_tests():
         ("类型定义", test_type_definition),
         ("FOR循环", test_for_loop),
     ("取模运算", test_modulo),
+    ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
     
