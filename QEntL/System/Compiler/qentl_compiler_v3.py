@@ -541,6 +541,12 @@ class Parser:
                 self._advance()
                 field = self._advance().value
                 node = ASTNode('FieldAccess', value=field, children=[node], line=t.line)
+            elif self._current().type == TokenType.LBRACKET:
+                # Array index: identifier[expr]
+                self._advance()  # consume [
+                index = self._parse_expression()
+                self._expect(TokenType.RBRACKET)  # consume ]
+                node = ASTNode('IndexAccess', children=[node, index], line=t.line)
             return node
         elif t.type == TokenType.LPAREN:
             self._advance()
