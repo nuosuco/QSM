@@ -230,13 +230,43 @@ class QBCVirtualMachine:
                         self.variables[pname] = None
                 self.ip = self.functions[func_name]
             else:
-                # Built-in function
-                if func_name == '问候' or func_name == 'greet':
+                # Built-in functions
+                if func_name in ('LOG', 'log', '日志', 'print'):
+                    if self.stack:
+                        val = self.stack.pop()
+                        msg = str(val) if val is not None else 'None'
+                        self.output.append(msg)
+                        print(msg)
+                    self.stack.append(None)
+                elif func_name in ('问候', 'greet', '你好'):
                     if self.stack:
                         arg = self.stack.pop()
                         self.stack.append(f"你好，{arg}！")
+                elif func_name in ('加法', 'add'):
+                    if len(self.stack) >= 2:
+                        b = self.stack.pop()
+                        a = self.stack.pop()
+                        try:
+                            self.stack.append(a + b)
+                        except:
+                            self.stack.append(0)
+                elif func_name in ('长度', 'len', 'length'):
+                    if self.stack:
+                        val = self.stack.pop()
+                        self.stack.append(len(str(val)) if val else 0)
+                    else:
+                        self.stack.append(0)
+                elif func_name in ('随机数', 'random', 'rand'):
+                    import random as _r
+                    self.stack.append(_r.randint(0, 100))
+                elif func_name in ('类型', 'type'):
+                    if self.stack:
+                        val = self.stack.pop()
+                        self.stack.append(type(val).__name__)
+                    else:
+                        self.stack.append('None')
                 else:
-                    # Unknown function, just push None
+                    # Unknown built-in, pop args and push None
                     if self.stack:
                         self.stack.pop()
                     self.stack.append(None)
