@@ -27,3 +27,7 @@ node_modules/
 # Backup files
 *~
 *.bak
+# Large model files (>100MB, exceed GitHub limit)
+Models/QSM/bin/archive/Q1_v2_pretrained.pth
+Models/QSM/bin/archive/*.pth
+Models/QSM/bin/*.pth
