@@ -305,6 +305,69 @@ def quantum_gates():
         }
     })
 
+
+
+@app.route('/circuit', methods=['POST'])
+def circuit_visualize():
+    """编译QEntL并返回量子电路可视化"""
+    data = request.get_json(force=True)
+    source = data.get('source', '')
+    gates = data.get('gates', [])
+    
+    try:
+        import sys
+        sys.path.insert(0, '/root/.openclaw/workspace/QEntL/System/Compiler')
+        sys.path.insert(0, '/root/.openclaw/workspace/QEntL/System/Runtime')
+        from qentl_compiler_v3 import compile_qentl
+        from qbc_vm import QBCVirtualMachine
+        
+        if source:
+            qbc = compile_qentl(source)
+            func_name = data.get('function', 'setup')
+            vm = QBCVirtualMachine()
+            vm.load_qbc(qbc)
+            try:
+                output = vm.run_with_function(func_name, 50000)
+            except:
+                output = vm.run(50000)
+        else:
+            # Build from gate list
+            n_qubits = data.get('qubits', 2)
+            qbc = {
+                "constants": [],
+                "variables": [],
+                "functions": {"setup": 1},
+                "instructions": [
+                    {"op": "QUANTUM_INIT", "code": 80, "operand": n_qubits},
+                ]
+            }
+            for gate in gates:
+                name = gate.get('name', 'H')
+                if name == 'CNOT':
+                    qbc["instructions"].append({"op": "QUANTUM_GATE", "code": 81, "operand": f"CNOT {gate.get('control',0)} {gate.get('target',1)}"})
+                else:
+                    qbc["instructions"].append({"op": "QUANTUM_GATE", "code": 81, "operand": f"{name} {gate.get('target',0)}"})
+            qbc["instructions"].extend([
+                {"op": "RETURN", "code": 68, "operand": None},
+                {"op": "HALT", "code": 1, "operand": None},
+            ])
+            vm = QBCVirtualMachine()
+            vm.load_qbc(qbc)
+            output = vm.run(10000)
+        
+        circuit_text = vm.get_quantum_circuit_text() if hasattr(vm, 'get_quantum_circuit_text') else ""
+        state_info = vm._get_state_info() if vm.quantum_bits > 0 else ""
+        
+        return jsonify({
+            "success": True,
+            "output": output,
+            "quantum_state": state_info,
+            "circuit": circuit_text,
+            "gates_applied": len(vm.quantum_gates_applied) if hasattr(vm, 'quantum_gates_applied') else 0
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  QSM V4 量子翻译API")
