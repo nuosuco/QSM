@@ -65,6 +65,9 @@ class OpCode(Enum):
     OBJ_CREATE = 0x80
     OBJ_GET = 0x81
     OBJ_SET = 0x82
+    # 数组操作
+    BUILD_LIST = 0x90
+    INDEX_ACCESS = 0x91
 
 # === 词法分析 ===
 class TokenType(Enum):
@@ -860,6 +863,16 @@ class CodeGenerator:
         elif node.type == 'StringLit':
             idx = self._add_const(node.value)
             self._emit(OpCode.LOAD_CONST, idx, node.line)
+        elif node.type == 'List':
+            # Build list: push all elements then BUILD_LIST with count
+            for child in node.children:
+                self._gen_node(child)
+            self._emit(OpCode.BUILD_LIST, len(node.children), node.line)
+        elif node.type == 'IndexAccess':
+            # Push variable value, then push index
+            self._gen_node(node.children[0])  # the array variable
+            self._gen_node(node.children[1])  # the index
+            self._emit(OpCode.INDEX_ACCESS, None, node.line)
         
         elif node.type == 'Identifier':
             self._emit(OpCode.LOAD_VAR, node.value, node.line)

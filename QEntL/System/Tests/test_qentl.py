@@ -279,6 +279,7 @@ def run_all_tests():
     ("字符串拼接", test_string_concat),
     ("嵌套IF函数", test_nested_if_function),
     ("WHILE循环", test_while_loop),
+    ("数组", test_array),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -477,6 +478,23 @@ def test_while_loop():
     output = vm.run(10000)
     # 5+4+3+2+1=15
     assert any('15' in l for l in output), f"WHILE循环测试失败: {output}"
+
+
+
+def test_array():
+    """测试21: 数组创建和索引访问"""
+    source = """quantum_program 数组测试 {
+        setup: 函数() {
+            让 nums = [100, 200, 300]
+            LOG(nums[0])
+            LOG(nums[2])
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert '100' in output and '300' in output, f"数组测试失败: {output}"
 
 
 if __name__ == '__main__':
