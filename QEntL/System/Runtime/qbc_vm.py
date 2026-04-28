@@ -545,13 +545,26 @@ class QBCVirtualMachine:
             self.quantum_register = [x/norm for x in new_state]
 
     def run_with_function(self, func_name, max_steps=10000):
-        """运行指定函数"""
+        """运行指定函数 - 自动初始化量子比特再跳转到目标"""
         if func_name not in self.functions:
             raise ValueError(f"函数 {func_name} 不存在")
-        entry = self.functions[func_name]
-        self.pc = entry
-        self.call_stack = []
+        
+        # Reset state
         self.stack = []
+        self.call_stack = []
+        self.output = []
+        self.quantum_gates_applied = []
+        
+        # Find and execute QUANTUM_INIT if exists
+        for instr in self.instructions:
+            if instr.get('op') == 'QUANTUM_INIT':
+                n_qubits = instr.get('operand') or 2
+                self._init_quantum_state(n_qubits)
+                break
+        
+        # Jump to target function
+        self.ip = self.functions[func_name]
+        self.running = True
         return self.run(max_steps)
 
     def get_quantum_circuit_text(self):
