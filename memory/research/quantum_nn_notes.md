@@ -1884,3 +1884,66 @@ Phase 3: 用QEntL重写编译器核心(自举!)→qentl_compiler.qbc
 Phase 4: 用QEntL重写VM→qvm.qbc
 Phase 5: C启动器加载qvm.qbc→完全自举!
 → 最终: 只剩qvm_boot.c一个外部依赖!
+
+## 170. QSM量子叠加态模型完整架构文档
+### (基于95个QEntL文件研读成果)
+
+#### 一、QSM是什么
+QSM(量子叠加态模型)是一个像ChatGPT一样的智能系统，不是翻译系统。
+三语(彝/中/英)互译只是最基本功。QSM有6层智能架构。
+
+#### 二、6层智能架构
+```
+Layer 6: 响应层 — 三语输出+情感策略(镜像/补充/中和/放大/转变)
+Layer 5: 意识层 — Ref自省模型(监控+评估+改进)
+Layer 4: 推理层 — 行为学习(500模式/3步预测)+推荐引擎(行为40%+内容30%+语义30%)
+Layer 3: 知识层 — 量子知识网络(1M节点/5M边/768维向量/语义关联/证据链)
+Layer 2: 语言层 — V5量子神经网络(7.5M参数/52K数据)+transformer-qe5(768维/4096上下文/量子加速)
+Layer 1: 感知层 — 全感知上下文(文件/剪贴板/搜索/光标/滚动)+8情感+7意图(含脑机)
+```
+
+#### 三、运行环境: QEntL量子操作系统
+QSM运行在QEntL量子OS上，不是Python/Flask!
+
+QEntL量子OS架构(95个.qentl文件):
+- 内核(17): 微内核+量子处理器(256比特)+量子内存(表面码纠错)+量子中断(10种事件)+量子syscall(5个)+I/O调度(量子感知)
+- 文件系统(26): 语义搜索(量子叠加深度3)+知识网络+行为学习+推荐引擎+量子加速读写+QUANTUM_STATE文件类型
+- GUI(15): 意图驱动(7种识别含脑机)+情感响应(8情感)+量子布局+量子搜索+量子设备管理
+- 服务(24): 四大模型集成+量子网络(6种节点)+QKD+量子令牌+量子一致性+量子随机数+纠缠提供服务+量子RPC
+- Runtime(9): 9阶段引导+内核加载+量子运行时+量子日志(量子签名)
+- VM(1): 彝文字符操作码(爬/凑/升/逃)
+- 编译器(3): V1(彝文变量)+V2(三语+quantum_class/enum/interface)
+
+#### 四、10大量子特性(量子渗透率~80%)
+1. 量子认证(QUANTUM_TOKEN不可伪造)
+2. 量子一致性(QUANTUM默认)
+3. 量子I/O(READ/WRITE/ENTANGLE/MEASURE)
+4. 量子中断(10种量子态事件)
+5. 量子syscall(allocate/free/gate/measure/entangle)
+6. 量子内存(COHERENT+ENTANGLED权限位)
+7. 量子网络(ENTANGLEMENT协议+QUANTUM套接字)
+8. 量子布局(量子态自适应UI)
+9. 量子搜索(QUANTUM_DATA数据源)
+10. 量子日志(QUANTUM_STATE编码+量子签名)
+
+#### 五、7种量子文件格式
+.qentl(源码) → .qbc(字节码) → .qim(镜像)
+.qview(视图) / .qjson(量子JSON) / .qubinary(量子二进制)
+.c(C启动器=唯一外部依赖)
+
+#### 六、9阶段引导流程
+qvm_boot.c → VM → INIT → MEMORY → KERNEL → QUANTUM → SERVICES → FILESYSTEM → NETWORK → USER_READY
+
+#### 七、量子自举5阶段
+Phase 1: Python编译器→QBC→Python VM (当前)
+Phase 2: 编译器+quantum_class/enum支持
+Phase 3: QEntL重写编译器核心(自举!)
+Phase 4: QEntL重写VM
+Phase 5: qvm_boot.c→完全自举! 只剩1个外部依赖
+
+#### 八、.py消灭计划(5个→0个)
+1. qsm_v4_api.py → QEntL Service替代
+2. qsm_yi_translate_api.py → QEntL Service替代
+3. train_v5_encoder_decoder.py → 训练完删
+4. qentl_compiler_v3.py → QEntL自举编译器替代
+5. qbc_vm.py → quantum_vm.qentl替代
