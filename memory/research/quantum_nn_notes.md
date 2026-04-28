@@ -948,3 +948,39 @@
   - 中文: 字级+高频词("量子"不拆)
   - 彝文: 字级(每个彝文字符=1 token)
   - 特殊: 翻译方向标记(<zh2en>, <en2zh>)
+
+## 77. 共享嵌入(Shared Embeddings)在Encoder-Decoder中的应用
+- **问题**: QSM V5的encoder和decoder各有独立的embedding层
+  - 参数浪费: 两个6924×d_model矩阵
+  - 中英文字符有很多重叠(数字/标点/部分汉字)
+- **Shared Embeddings**: encoder和decoder共享同一个embedding矩阵
+  - 参数减少: 1个矩阵代替2个
+  - 好处: 字符表示一致, "你"在encoder和decoder中是同一个向量
+  - 成功案例: 使用共享嵌入的模型，参数节省30-40%
+- **Tying策略**:
+  1. Embed+Softmax共享: embedding矩阵=输出层权重(转置)
+  2. 三角共享: encoder embed = decoder embed = output projection
+  3. 部分共享: 只共享重叠的token
+- **QSM V6应用**:
+  - 采用三角共享: embed→encoder→decoder→output都共享
+  - 节省: 7.5M→约5M参数(↓33%)
+  - 或: 保持7.5M但增大d_model(256→384)提升质量
+- **Press & Wolf 2017**: "Language Modeling with Shared Embeddings"证明共享嵌入提升NMT质量
+
+## 78. 旋转位置编码(RoPE)与量子旋转的深层联系
+- **RoPE**: 用旋转矩阵编码位置信息
+  - 位置n的token: 向量乘以旋转矩阵R(nθ)
+  - 内积: <R(mθ)x, R(nθ)q> = f(m-n) → 天然相对位置
+- **量子旋转门**: RX/RZ也是旋转矩阵!
+  - RX(θ): 绕X轴旋转θ
+  - RZ(θ): 绕Z轴旋转θ
+  - RoPE的旋转在2D子空间, 量子门在Hilbert空间
+- **QSM量子注意力**:
+  - 当前: gate * quantum + (1-gate) * classical
+  - 改进: 用量子旋转门替代RoPE
+  - 量子门RX(θ)做位置编码 → 物理级相对位置
+  - 量子优势: 叠加态→同时编码多个位置
+- **实现路线**:
+  1. V5: 标准正弦位置编码(当前)
+  2. V6: RoPE(旋转位置编码)
+  3. V7: 量子旋转位置编码(终极目标)
