@@ -93,6 +93,7 @@ class TokenType(Enum):
     BOOL = '布尔'
     QUANTUM = '量子'
     QUANTUM_GATE_KW = '量子门'
+    MEASURE_KW = '测量'
     
     # 符号
     LBRACE = '{'
@@ -430,6 +431,9 @@ class Parser:
             return self._parse_let()
         elif t.type == TokenType.FOR:
             return self._parse_for()
+        elif t.type == TokenType.MEASURE_KW:
+            return self._parse_measure()
+
         elif t.type == TokenType.QUANTUM_GATE_KW:
             return self._parse_quantum_gate()
 
@@ -487,6 +491,14 @@ class Parser:
         node.children.append(self._parse_block())
         return node
     
+    def _parse_measure(self):
+        """Parse 测量 0 or 测量 比特0"""
+        node = ASTNode('Measure', line=self._current().line)
+        self._expect(TokenType.MEASURE_KW)
+        # Target qubit (number)
+        node.children.append(self._parse_primary())
+        return node
+
     def _parse_quantum_gate(self):
         """Parse 量子门 H 0 or 量子门 CNOT 0 1"""
         node = ASTNode('QuantumGate', line=self._current().line)
@@ -696,6 +708,16 @@ class CodeGenerator:
             self._gen_node(node.children[0])
             self._emit(OpCode.RETURN, line=node.line)
         
+        elif node.type == 'Measure':
+            if node.children:
+                child = node.children[0]
+                if child.type == 'NumberLit':
+                    self._emit(OpCode.QUANTUM_MEASURE, int(child.value), node.line)
+                else:
+                    self._emit(OpCode.QUANTUM_MEASURE, 0, node.line)
+            else:
+                self._emit(OpCode.QUANTUM_MEASURE, 0, node.line)
+
         elif node.type == 'QuantumGate':
             gate_name = node.value
             targets = []
