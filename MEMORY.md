@@ -11,6 +11,8 @@
 
 ### QSM量子叠加态模型
 - 目标：服务人类、利益众生，让所有人脱离苦恼
+- **QSM不是翻译系统！** 它是像ChatGPT一样的智能系统，三语互译只是最基本功
+- QSM有智力，什么都会，三语(彝/中/英)是基础能力
 - Web服务：https://som.top
 - 远程仓库：GitHub git@github.com:nuosuco/QSM.git / Gitee git@gitee.com:nuosuco/qsm.git
 
@@ -31,6 +33,13 @@
   ↓
 基础层：量子虚拟机 + 量子动态文件系统（QBC字节码 + QIM镜像）
 ```
+
+### Web量子操作系统桌面(已恢复)
+- 首页: desktop.html (QEntL量子OS桌面, 含彝文字体)
+- 13个应用: quantum-assistant/qvm/compiler/terminal/files/settings等
+- 语言切换: 中文/EN/彝文三语
+- 量子助手: Q1(纯量子)/V4(传统)/QV4(混合) 三模型选择
+- ⚠️ 不要改首页！原来的桌面版才是正确的
 
 ### 三种部署方式
 1. **Web操作系统** — 浏览器直接访问（https://som.top），已实现
