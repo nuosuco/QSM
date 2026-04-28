@@ -76,10 +76,10 @@
 - 词法分析器 compiler_verifier.py ✅
 - 语法分析器 qentl_parser.py ✅
 - 代码生成器 qentl_codegen.py ✅
-- QBC虚拟机 qbc_vm.py ✅
+- QBC虚拟机 qbc_vm.py ✅ (9量子门: H/X/Y/Z/S/T/RX/RZ/CNOT + 概率测量 + 状态坍缩)
 - 错误处理 qentl_errors.py ✅
 - 优化器 qentl_optimizer.py ✅
-- 单元测试 test_compiler.py ✅ 8/8通过
+- 单元测试 test_qentl.py ✅ 12/12通过 (量子门语法/纠缠/测量/Bell态)
 
 ### QEntL V3编译器+虚拟机（2026-04-27/28 完成）
 - **qentl_compiler_v3.py**: 完整Python编译器
@@ -100,10 +100,10 @@
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
   - 公网API: https://som.top/api/qv4/ (翻译+QEntL编译+Beam Search)
-- **V4 V2训练中**: 30000对数据, 20 Epochs, Epoch 13 Loss 1.42
-  - Val Loss 1.47 (Epoch 12), 已超越V1的2.35
+- **V4 V2训练中**: 30000对数据, 20 Epochs, Epoch 16 Loss 1.38
+  - Val Loss 1.44 (Epoch 15), 已超越V1的2.35
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
-  - 解决方案: 全小写英文训练数据, 需重新训练
+  - 解决方案: V5全小写英文训练数据(52K对已准备)
   - 目标: Val Loss < 1.0
 
 ## 量子自举架构（2026-04-28确立）
