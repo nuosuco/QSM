@@ -271,6 +271,7 @@ def run_all_tests():
         ("FOR循环", test_for_loop),
     ("取模运算", test_modulo),
     ("量子门语法", test_quantum_gate_syntax),
+    ("SWAP门", test_swap_gate),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -292,6 +293,33 @@ def run_all_tests():
     print("=" * 50)
     
     return failed == 0
+
+
+def test_swap_gate():
+    """测试13: SWAP量子门"""
+    source = """quantum_program SWAP测试 {
+        setup: 函数() {
+            量子门 X 0
+            量子门 SWAP 0 1
+            测量 0
+            测量 1
+        }
+    }"""
+    qbc = compile_qentl(source)
+    # Run multiple trials to verify SWAP behavior
+    results = []
+    for _ in range(5):
+        vm = QBCVirtualMachine()
+        vm.load_qbc(qbc)
+        output = vm.run(10000)
+        measures = [l for l in output if '测量比特' in l]
+        if len(measures) >= 2:
+            q0 = measures[0].split(':')[1].strip()[0]
+            q1 = measures[1].split(':')[1].strip()[0]
+            results.append((q0, q1))
+    # After X(0) + SWAP(0,1): q0 should be 0, q1 should be 1
+    assert all(r == ('0', '1') for r in results), f"SWAP验证失败: {results}"
+
 
 if __name__ == '__main__':
     run_all_tests()
