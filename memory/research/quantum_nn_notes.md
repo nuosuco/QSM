@@ -838,3 +838,19 @@
   - 自动处理步数计数
   - Leslie Smith的super-convergence理论
 - **V5重启建议**: 使用手动LR或OneCycleLR
+
+## 69. Teacher Forcing与Scheduled Sampling
+- **Teacher Forcing**: 训练时用真实目标序列作为decoder输入
+  - 优点: 快速收敛, 训练稳定
+  - 缺点: 推理时用自己预测→exposure bias(训练推理不一致)
+- **Scheduled Sampling**: 逐步从teacher forcing过渡到自回归
+  - 概率p用真实token, 概率1-p用模型预测
+  - p从1.0逐渐降到0.0(随epoch)
+  - Bengio 2015提出
+- **QSM V5当前**: 纯teacher forcing(标准做法)
+- **V6改进**: 加入scheduled sampling
+  - E1-10: p=1.0(纯teacher forcing)
+  - E11-20: p线性降到0.5
+  - E21-30: p线性降到0.0
+- **量子类比**: teacher forcing ≈ 量子Zeno效应(持续观测抑制演化)
+  - scheduled sampling ≈ 逐步释放退相干, 让系统自由演化
