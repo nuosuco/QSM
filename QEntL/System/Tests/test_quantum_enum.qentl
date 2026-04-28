@@ -1,0 +1,54 @@
+// QEntL量子枚举测试
+// 测试quantum_enum语法(基于QEntL 95文件中的枚举类型)
+配置 {
+    测试模式: true,
+    版本: "1.0.0"
+}
+
+// 量子状态枚举(对应quantum_state_interrupt.qentl)
+quantum_enum 量子状态 {
+    叠加,
+    纠缠,
+    坍缩,
+    退相干
+}
+
+// 量子门类型枚举(对应quantum_processor.qentl)
+quantum_enum 量子门类型 {
+    Hadamard,
+    CNOT,
+    PauliX,
+    PauliY,
+    PauliZ,
+    测量
+}
+
+// 服务状态枚举(对应qsm_main_service.qentl)
+quantum_enum 服务状态 {
+    已停止,
+    启动中,
+    运行中,
+    停止中,
+    错误
+}
+
+// 量子程序: 测试所有枚举+量子操作
+quantum_program 枚举量子测试 {
+    setup: 函数() {
+        LOG("⚛ 量子枚举测试开始")
+        LOG("量子状态: 叠加/纠缠/坍缩/退相干")
+        LOG("量子门类型: H/CNOT/X/Y/Z/测量")
+        LOG("服务状态: 已停止/启动中/运行中/停止中/错误")
+        
+        // Bell态: 叠加→纠缠→测量(坍缩)
+        量子门 H 0
+        量子门 CNOT 0 1
+        LOG("✅ 叠加+纠缠创建完成")
+        
+        测量 0
+        测量 1
+        LOG("✅ 测量完成(坍缩)")
+        
+        LOG("⚛ 量子枚举测试完成!")
+    }
+}
