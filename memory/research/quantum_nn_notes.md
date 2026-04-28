@@ -869,3 +869,21 @@
   - 不需要更多内存, 只是更慢
   - 实现: optimizer.zero_grad()只在累积开始时调用
   - QSM V6可以考虑: 累积3步→等效batch_size=48
+
+## 71. QEntL VM函数返回值机制
+- **问题**: QUANTUM_INIT后VM顺序执行, 会进入其他函数体
+- **修复**: QUANTUM_INIT后跳转到setup函数入口
+  - 添加fake return address: call_stack.append((len(instructions), {}))
+  - setup的RETURN会终止程序(到达末尾)
+- **返回值**: 函数返回值通过stack传递
+  - RETURN: ret_val = stack[-1], 恢复saved_vars, push ret_val
+  - 调用方: STORE_VAR从stack取返回值
+- **限制**: 函数参数仍不支持类型标注(`函数(a: 整数)`)
+  - 需要扩展parser支持参数列表
+
+## 72. V5 Loss下降速度分析(E6 B1600=2.37)
+- E5 Val 2.96 → E6 B1600 2.37 (↓20% in 半个epoch)
+- 预测E6 Val: ~2.3-2.5
+- 每epoch约降15-20%
+- 按此速度: E10 Val ~1.2, E12 Val ~0.8
+- **可能E10-12达到<1.0目标!**

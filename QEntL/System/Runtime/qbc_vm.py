@@ -407,7 +407,12 @@ class QBCVirtualMachine:
         elif op == OpCode.QUANTUM_INIT:
             n_qubits = operand if operand else 2
             self._init_quantum_state(n_qubits)
-            self.ip += 1
+            # After init, jump to setup function
+            if 'setup' in self.functions:
+                self.call_stack.append((len(self.instructions), {}))
+                self.ip = self.functions['setup']
+            else:
+                self.ip += 1
 
         elif op == OpCode.QUANTUM_GATE:
             if operand and isinstance(operand, str):
