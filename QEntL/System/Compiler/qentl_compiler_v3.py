@@ -869,6 +869,29 @@ def compile_qentl(source: str) -> Dict:
     codegen = CodeGenerator()
     qbc = codegen.generate(ast)
     
+    # Auto-detect qubit count from instructions
+    max_qubit = 1
+    for instr in qbc.get('instructions', []):
+        op = instr.get('op', '')
+        operand = instr.get('operand')
+        if op == 'QUANTUM_GATE' and isinstance(operand, str):
+            parts = operand.split()
+            for p in parts[1:]:
+                try: max_qubit = max(max_qubit, int(p))
+                except: pass
+        elif op == 'QUANTUM_MEASURE' and isinstance(operand, int):
+            max_qubit = max(max_qubit, operand)
+        elif op == 'QUANTUM_ENTANGLE' and isinstance(operand, str):
+            for p in operand.split():
+                try: max_qubit = max(max_qubit, int(p))
+                except: pass
+    n_qubits = max_qubit + 1
+    # Patch QUANTUM_INIT instruction
+    for instr in qbc.get('instructions', []):
+        if instr.get('op') == 'QUANTUM_INIT':
+            instr['operand'] = n_qubits
+            break
+    qbc['n_qubits'] = n_qubits
     return qbc
 
 def compile_file(input_path: str, output_path: str = None):
@@ -889,7 +912,7 @@ def compile_file(input_path: str, output_path: str = None):
     print(f"   变量: {len(qbc['variables'])}")
     print(f"   函数: {len(qbc['functions'])}")
     print(f"   指令: {len(qbc['instructions'])}")
-    return qbc
+
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
