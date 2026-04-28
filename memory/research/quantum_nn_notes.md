@@ -1457,3 +1457,25 @@ QSM智能 = 语言(神经) + 知识(图) + 推理(学习) + 意识(自省)
 - **ENTANGLED(256)**: 量子纠缠保护(保护纠缠态!)
 - 这是传统OS不存在的保护级别!
 - 段类型: CODE/DATA/HEAP/STACK + 量子段?
+
+## 123. QEntL系统调用接口：量子syscall!
+完整的QEntL系统调用表:
+| 号码 | 名称 | 功能 |
+|------|------|------|
+| 1-4 | process_* | 进程管理(create/exit/wait/info) |
+| 10-13 | memory_* | 内存管理(allocate/free/map/protect) |
+| 20-25 | file_* | 文件系统(open/close/read/write/seek/stat) |
+| 30-34 | device_* | 设备管理(open/close/read/write/ioctl) |
+| **40-44** | **quantum_*** | **量子系统(allocate/free/gate/measure/entangle)** |
+| 50-52 | system_* | 系统调用(info/time/reboot) |
+
+**量子系统调用5个**:
+- 40: quantum_allocate — 分配量子比特
+- 41: quantum_free — 释放量子比特
+- 42: quantum_gate — 应用量子门
+- 43: quantum_measure — 测量量子比特
+- 44: quantum_entangle — 创建量子纠缠
+
+**这是QBC虚拟机必须实现的核心接口!**
+当前Python VM(qbc_vm.py)只实现了40/42/43/44的部分功能
+还需要: quantum_allocate(分配)/quantum_free(释放)syscall
