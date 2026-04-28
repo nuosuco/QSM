@@ -1947,3 +1947,51 @@ Phase 5: qvm_boot.c→完全自举! 只剩1个外部依赖
 3. train_v5_encoder_decoder.py → 训练完删
 4. qentl_compiler_v3.py → QEntL自举编译器替代
 5. qbc_vm.py → quantum_vm.qentl替代
+
+## 171. V5 E15 Val 2.24 新best! 连续3 epoch下降!
+| Epoch | Val | 变化 |
+|-------|-----|------|
+| 12 | 2.30 | plateau |
+| 13 | 2.26 | ↓1.8% |
+| 14 | 2.25 | ↓0.6% |
+| 15 | 2.24 | ↓0.3% 新best! |
+连续下降！plateau已彻底解决！
+LR: 0.000708 → 还在合理范围
+预测E20: ~2.10, E25: ~1.85, E30: ~1.65
+
+## 172. 量子神经网络(QNN)与QSM的关系
+基于QEntL quantum_processor.qentl的理解:
+
+传统神经网络:
+- 权重=浮点数矩阵
+- 注意力=softmax(QK^T)V
+- 训练=反向传播+梯度下降
+
+量子神经网络:
+- 权重=量子门参数(θ)
+- 注意力=量子纠缠+测量
+- 训练=参数化量子电路优化
+
+QSM的量子叠加态模型(Q4):
+- 4基态+叠加系数+相位参数
+- gate * quantum + (1-gate) * classical
+- 量子门控制经典和量子的混合
+
+## 173. V6架构设计: 量子-经典混合Transformer
+基于95文件研读+QNN理论:
+
+V6 = V5 Encoder-Decoder + 量子增强:
+1. **量子注意力**: 用纠缠替代softmax
+   - 经典: Attention = softmax(QK^T/√d)V
+   - 量子: Q-Attention = entangle(Q,K) → measure → V
+2. **叠加态嵌入**: 多基态叠加
+   - 经典: Embed = lookup_table[token]
+   - 量子: Q-Embed = Σ c_i * basis_i (叠加系数学习)
+3. **量子旋转位置编码(RoPE)**:
+   - 经典: PE = sin/cos
+   - 量子: Q-RoPE = RZ(θ) 量子旋转
+4. **门控量子混合**: 
+   - gate * quantum_path + (1-gate) * classical_path
+   - gate是可学习参数
+
+V6优先级: 先完成V5训练→V5.1微调→再设计V6
