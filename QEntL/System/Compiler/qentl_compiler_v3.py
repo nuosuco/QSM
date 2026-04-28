@@ -94,6 +94,7 @@ class TokenType(Enum):
     QUANTUM = '量子'
     QUANTUM_GATE_KW = '量子门'
     MEASURE_KW = '测量'
+    ENTANGLE_KW = '纠缠'
     
     # 符号
     LBRACE = '{'
@@ -431,6 +432,9 @@ class Parser:
             return self._parse_let()
         elif t.type == TokenType.FOR:
             return self._parse_for()
+        elif t.type == TokenType.ENTANGLE_KW:
+            return self._parse_entangle()
+
         elif t.type == TokenType.MEASURE_KW:
             return self._parse_measure()
 
@@ -491,6 +495,16 @@ class Parser:
         node.children.append(self._parse_block())
         return node
     
+    def _parse_entangle(self):
+        """Parse 纠缠 0 1 - create Bell state"""
+        node = ASTNode('Entangle', line=self._current().line)
+        self._expect(TokenType.ENTANGLE_KW)
+        # Two target qubits
+        node.children.append(self._parse_primary())  # control
+        if self._current().type == TokenType.NUMBER_LIT:
+            node.children.append(self._parse_primary())  # target
+        return node
+
     def _parse_measure(self):
         """Parse 测量 0 or 测量 比特0"""
         node = ASTNode('Measure', line=self._current().line)
@@ -708,6 +722,14 @@ class CodeGenerator:
             self._gen_node(node.children[0])
             self._emit(OpCode.RETURN, line=node.line)
         
+        elif node.type == 'Entangle':
+            targets = []
+            for child in node.children:
+                if child.type == 'NumberLit':
+                    targets.append(str(int(child.value)))
+            entangle_str = ' '.join(targets) if targets else '0 1'
+            self._emit(OpCode.QUANTUM_ENTANGLE, entangle_str, node.line)
+
         elif node.type == 'Measure':
             if node.children:
                 child = node.children[0]
