@@ -189,6 +189,84 @@ def index():
         'principle': '量子自举 — 用自己的语言构建自己的世界'
     })
 
+
+
+@app.route('/quantum', methods=['POST'])
+def quantum_execute():
+    """执行量子电路 - 从QEntL源码编译并运行量子部分"""
+    data = request.get_json(force=True)
+    source = data.get('source', '')
+    gates = data.get('gates', [])  # Alternative: direct gate list
+    
+    if gates:
+        # Direct gate execution: {"gates": [{"name":"H","target":0}, {"name":"CNOT","control":0,"target":1}]}
+        try:
+            import sys
+            sys.path.insert(0, '/root/.openclaw/workspace/QEntL/System/Runtime')
+            from qbc_vm import QBCVirtualMachine
+            n_qubits = data.get('qubits', 2)
+            qbc = {
+                "constants": [],
+                "variables": [],
+                "functions": {"setup": 1},
+                "instructions": [
+                    {"op": "QUANTUM_INIT", "code": 80, "operand": n_qubits},
+                ]
+            }
+            for gate in gates:
+                name = gate.get('name', 'H')
+                if name == 'CNOT':
+                    gate_str = f"CNOT {gate.get('control',0)} {gate.get('target',1)}"
+                else:
+                    gate_str = f"{name} {gate.get('target',0)}"
+                qbc["instructions"].append({"op": "QUANTUM_GATE", "code": 81, "operand": gate_str})
+            
+            qbc["instructions"].extend([
+                {"op": "RETURN", "code": 68, "operand": None},
+                {"op": "HALT", "code": 1, "operand": None},
+            ])
+            
+            vm = QBCVirtualMachine()
+            vm.load_qbc(qbc)
+            output = vm.run(10000)
+            state_info = vm._get_state_info()
+            
+            return jsonify({
+                "success": True,
+                "output": output,
+                "quantum_state": state_info,
+                "n_qubits": n_qubits
+            })
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)})
+    
+    elif source:
+        # Compile and execute QEntL source
+        try:
+            import sys
+            sys.path.insert(0, '/root/.openclaw/workspace/QEntL/System/Compiler')
+            sys.path.insert(0, '/root/.openclaw/workspace/QEntL/System/Runtime')
+            from qentl_compiler_v3 import compile_qentl
+            from qbc_vm import QBCVirtualMachine
+            
+            qbc = compile_qentl(source)
+            vm = QBCVirtualMachine()
+            vm.load_qbc(qbc)
+            output = vm.run(50000)
+            state_info = vm._get_state_info() if vm.quantum_bits > 0 else None
+            
+            return jsonify({
+                "success": True,
+                "output": output,
+                "quantum_state": state_info,
+                "functions": qbc.get('functions', {}),
+                "instructions_count": len(qbc.get('instructions', []))
+            })
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)})
+    
+    return jsonify({"error": "Provide 'source' or 'gates' parameter"})
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  QSM V4 量子翻译API")
