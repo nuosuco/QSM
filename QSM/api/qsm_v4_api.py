@@ -408,6 +408,37 @@ def quantum_teleportation():
     except Exception as e:
         return {"error": str(e)}
 
+
+@app.route('/training-status', methods=['GET'])
+def training_status():
+    # V5训练状态实时查看
+    import os, re
+    log_path = '/tmp/qsm_v5_training.log'
+    status = {"training": False, "model": "V5", "progress": None}
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, 'r') as f:
+                lines = f.readlines()
+            last_lines = lines[-10:]
+            status["training"] = True
+            for line in reversed(last_lines):
+                m = re.search(r'E(\d+)/\d+\s+B(\d+)/(\d+)\s+L:([\d.]+)\s+lr:([\d.]+)', line)
+                if m:
+                    status["progress"] = {
+                        "epoch": int(m.group(1)),
+                        "batch": int(m.group(2)),
+                        "total_batches": int(m.group(3)),
+                        "loss": float(m.group(4)),
+                        "learning_rate": float(m.group(5))
+                    }
+                    break
+                best = re.search(r'Best.*Train:([\d.]+).*Val:([\d.]+)', line)
+                if best:
+                    status["best"] = {"train_loss": float(best.group(1)), "val_loss": float(best.group(2))}
+        except:
+            pass
+    return jsonify(status)
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  QSM V4 量子翻译API")
