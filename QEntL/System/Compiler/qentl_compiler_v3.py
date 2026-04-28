@@ -95,6 +95,7 @@ class TokenType(Enum):
     QUANTUM_GATE_KW = '量子门'
     MEASURE_KW = '测量'
     ENTANGLE_KW = '纠缠'
+    STEP_KW = '步长'
     
     # 符号
     LBRACE = '{'
@@ -489,7 +490,12 @@ class Parser:
         if self._current().type == TokenType.TO:
             self._advance()  # consume 到
             end = self._parse_expression()
-            node.children.append(ASTNode('Range', children=[start, end]))
+            # Optional step: 步长 2
+            step = ASTNode('Number', value='1')
+            if self._current().type == TokenType.STEP_KW:
+                self._advance()  # consume 步长
+                step = self._parse_expression()
+            node.children.append(ASTNode('Range', children=[start, end, step]))
         else:
             node.children.append(start)
         node.children.append(self._parse_block())
