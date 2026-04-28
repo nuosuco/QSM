@@ -395,13 +395,23 @@ class Parser:
             self._expect(TokenType.COLON)
             # The body can be a function definition or an inline anonymous function
             if self._current().type == TokenType.FUNC:
-                # Anonymous function: 函数() { ... } - parse function name as empty, skip parens
+                # Function with optional params
                 self._advance()  # skip 函数
                 self._expect(TokenType.LPAREN)
+                param_names = []
+                while self._current().type != TokenType.RPAREN:
+                    pname = self._advance().value
+                    if self._current().type == TokenType.COLON:
+                        self._advance()  # skip :
+                        self._advance()  # skip type
+                    param_names.append(pname)
+                    if self._current().type == TokenType.COMMA:
+                        self._advance()
                 self._expect(TokenType.RPAREN)
                 body = self._parse_block()
                 body.type = 'Function'
-                body.value = section  # use section name as function name
+                body.value = section
+                body.params = param_names
             elif self._current().type == TokenType.LBRACE:
                 body = self._parse_block()
             else:
