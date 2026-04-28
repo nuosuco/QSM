@@ -823,3 +823,18 @@
   - E1 8.94 → E3 6.22(3 epochs仅降30%)
   - 正常LR下应该E3就能降到2-3
 - **建议**: 终止当前V5, 用修复后的脚本重启
+
+## 68. PyTorch LR Scheduler最佳实践(V5修复总结)
+- **LambdaLR Bug**: PyTorch 2.x中LambdaLR的step计数不同步
+  - 内部计数器与lambda函数参数不一致
+  - 导致LR远低于预期
+- **解决方案**:
+  1. ✅ 手动设置LR(最可靠): `pg['lr'] = get_lr(step)`
+  2. CosineAnnealingLR(内置): `scheduler = CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-5)`
+  3. OneCycleLR(推荐): `scheduler = OneCycleLR(optimizer, max_lr=1e-3, total_steps=total_steps, pct_start=0.05)`
+- **OneCycleLR优势**: 
+  - 内置warmup+cosine decay
+  - 不需要自定义lambda
+  - 自动处理步数计数
+  - Leslie Smith的super-convergence理论
+- **V5重启建议**: 使用手动LR或OneCycleLR
