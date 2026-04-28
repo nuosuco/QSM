@@ -104,6 +104,14 @@ if __name__ == '__main__':
     val_dl = DataLoader(val_ds, batch_size=c['batch_size'], shuffle=False)
     model = QSM_V5(c['vocab_size'], c['d_model'], c['n_heads'], c['n_layers'], c['d_ff'], c['dropout'], c['max_len']).to(dev)
     n_params = sum(p.numel() for p in model.parameters())
+# Resume from checkpoint if available
+resume_path = os.path.join(c['save_dir'], 'qsm_v5_quantum_best.pth')
+start_epoch = 0
+if os.path.exists(resume_path):
+    ckpt = torch.load(resume_path, map_location=dev)
+    model.load_state_dict(ckpt['model_state'])
+    start_epoch = ckpt.get('epoch', 0)
+    print(f'✅ Resume from Epoch {start_epoch}, Val Loss {ckpt.get("val_loss", "?"):.4f}')
     print(f"参数: {n_params:,}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=c['lr'], weight_decay=c['weight_decay'])
     criterion = nn.CrossEntropyLoss(ignore_index=0, label_smoothing=c['label_smoothing'])
@@ -118,7 +126,7 @@ if __name__ == '__main__':
             pg['lr'] = lr
     scheduler = None  # Not using LambdaLR due to step counting bug
     best_val = float('inf'); start = time.time(); gs = 0
-    for ep in range(c['epochs']):
+    for ep in range(start_epoch, c['epochs']):
         model.train(); tl = 0; nb = 0
         for bi, (src, ti, to) in enumerate(train_dl):
             src, ti, to = src.to(dev), ti.to(dev), to.to(dev)
