@@ -1501,3 +1501,27 @@ QSM智能 = 语言(神经) + 知识(图) + 推理(学习) + 意识(自省)
 - VM(1/1): quantum_vm
 - 编译器(1/3): quantum_compiler_v2
 还需读约65个文件
+
+## 127. QEntL安全通道: 量子密钥分发(QKD)
+- 4种通道: **QUANTUM_ENCRYPTED**(默认!)/HYBRID_ENCRYPTED/CLASSICAL_TLS/DIRECT
+- 量子密钥分发(quantum_key_distribution): 不可窃听!
+- 2048位量子密钥最小长度
+- 5分钟密钥自动刷新
+- 纠缠强度: 0.95
+
+## 128. QEntL持久化管理器: 量子数据格式
+- 3种存储: QUANTUM/CLASSICAL/**HYBRID**(默认)
+- 4种持久级: VOLATILE→TEMPORARY→PERSISTENT→PERMANENT
+- 6种格式: BINARY/**QUBINARY**(量子二进制!)/JSON/**QJSON**(量子JSON!)/STRUCTURED/RAW
+- **QUBINARY**: 量子二进制格式=.qbc字节码的存储版?
+- **QJSON**: 量子JSON格式=.qim镜像的数据版?
+- 30秒自动刷新
+
+## 129. QEntL量子文件格式体系
+根据代码发现，QEntL有完整文件格式体系:
+- .qentl: 量子源码(人类可读)
+- .qbc: 量子字节码(编译后)
+- .qim: 量子镜像(打包发布)
+- .qview: 量子视图(UI模板)
+- .qjson: 量子JSON(数据存储, 含量子态)
+- .qubinary: 量子二进制(高效存储, 含量子态)
