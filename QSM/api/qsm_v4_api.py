@@ -295,9 +295,10 @@ def quantum_gates():
             {"name": "T", "full_name": "T-gate", "description": "S的平方根"},
             {"name": "RX", "full_name": "Rotation-X", "description": "绕X轴旋转π/4"},
             {"name": "RZ", "full_name": "Rotation-Z", "description": "绕Z轴旋转π/4"},
-            {"name": "CNOT", "full_name": "Controlled-NOT", "description": "受控非门(2比特)", "two_qubit": True}
+            {"name": "CNOT", "full_name": "Controlled-NOT", "description": "受控非门(2比特)", "two_qubit": True},
+            {"name": "SWAP", "full_name": "SWAP", "description": "交换两个量子比特", "two_qubit": True}
         ],
-        "total": 9,
+        "total": 10,
         "keywords": {
             "量子门": "apply gate",
             "纠缠": "create Bell state (H+CNOT shortcut)",
