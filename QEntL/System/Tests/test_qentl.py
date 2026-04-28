@@ -272,6 +272,7 @@ def run_all_tests():
     ("取模运算", test_modulo),
     ("量子门语法", test_quantum_gate_syntax),
     ("SWAP门", test_swap_gate),
+    ("隐形传态", test_quantum_teleportation),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -319,6 +320,33 @@ def test_swap_gate():
             results.append((q0, q1))
     # After X(0) + SWAP(0,1): q0 should be 0, q1 should be 1
     assert all(r == ('0', '1') for r in results), f"SWAP验证失败: {results}"
+
+
+
+def test_quantum_teleportation():
+    """测试14: 量子隐形传态协议(3比特)"""
+    source = """quantum_program 隐形传态 {
+        setup: 函数() {
+            量子门 H 1
+            量子门 CNOT 1 2
+            量子门 CNOT 0 1
+            量子门 H 0
+            测量 0
+            测量 1
+            测量 2
+        }
+    }"""
+    qbc = compile_qentl(source)
+    # Should auto-detect 3 qubits
+    assert qbc.get('n_qubits') == 3, f"Expected 3 qubits, got {qbc.get('n_qubits')}"
+    # Run and verify all measurements succeed
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    measures = [l for l in output if '测量比特' in l]
+    assert len(measures) == 3, f"Expected 3 measurements, got {len(measures)}"
+    # Circuit should have 7 operations (4 gates + 3 measures)
+    assert len(vm.quantum_gates_applied) == 7, f"Expected 7 gate ops, got {len(vm.quantum_gates_applied)}"
 
 
 if __name__ == '__main__':
