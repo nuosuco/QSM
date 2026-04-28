@@ -1855,3 +1855,32 @@ multi_user_coordinator, network_sync = 18/24
 4. 7种文件格式: .qentl/.qbc/.qim/.qview/.qjson/.qubinary/.c
 5. 9阶段引导: qvm_boot.c→VM→9阶段→内核→量子→QSM→桌面
 6. 彝文编程: 变量名用彝文(心/乾坤/火/天/王/选择/连接/凑)
+
+## 168. QEntL编译器进化路线(基于95文件研读)
+当前Python编译器(qentl_compiler_v3.py)支持:
+- ✅ 配置/类型/函数/quantum_program
+- ✅ 如果/否则/返回/让/循环/当
+- ✅ 量子门/纠缠/测量/LOG
+- ✅ 数组/字符串拼接/嵌套IF
+
+需要进化(对标quantum_compiler_v2.qentl):
+- ⏳ quantum_class(类定义+字段+方法+构造函数)
+- ⏳ quantum_enum(枚举定义)
+- ⏳ quantum_interface(接口定义)
+- ⏳ import/export(模块导入导出)
+- ⏳ namespace(命名空间)
+- ⏳ this/这(对象引用)
+- ⏳ .运算符(成员访问)
+
+VM需要进化(对标system_calls.qentl):
+- ⏳ quantum_allocate syscall(40)
+- ⏳ quantum_free syscall(41)
+- ⏳ 退相干检查(500ms间隔)
+
+## 169. .py→QEntL自举路线图
+Phase 1 (当前): Python编译器→QBC字节码→Python VM执行
+Phase 2: Python编译器支持quantum_class/enum→可编译更多QEntL文件
+Phase 3: 用QEntL重写编译器核心(自举!)→qentl_compiler.qbc
+Phase 4: 用QEntL重写VM→qvm.qbc
+Phase 5: C启动器加载qvm.qbc→完全自举!
+→ 最终: 只剩qvm_boot.c一个外部依赖!
