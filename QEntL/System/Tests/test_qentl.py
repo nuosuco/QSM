@@ -273,6 +273,7 @@ def run_all_tests():
     ("量子门语法", test_quantum_gate_syntax),
     ("SWAP门", test_swap_gate),
     ("隐形传态", test_quantum_teleportation),
+    ("FOR步长", test_for_step),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -347,6 +348,26 @@ def test_quantum_teleportation():
     assert len(measures) == 3, f"Expected 3 measurements, got {len(measures)}"
     # Circuit should have 7 operations (4 gates + 3 measures)
     assert len(vm.quantum_gates_applied) == 7, f"Expected 7 gate ops, got {len(vm.quantum_gates_applied)}"
+
+
+
+def test_for_step():
+    """测试15: FOR循环+步长(步长)"""
+    source = """quantum_program 步长测试 {
+        setup: 函数() {
+            让 a = 0
+            循环 i 在 0 到 6 步长 2 {
+                让 a = a + i
+            }
+            LOG(a)
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    # 0+2+4 = 6
+    assert any('6' in l for l in output), f"步长循环结果错误: {output}"
 
 
 if __name__ == '__main__':

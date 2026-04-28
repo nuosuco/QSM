@@ -491,7 +491,7 @@ class Parser:
             self._advance()  # consume 到
             end = self._parse_expression()
             # Optional step: 步长 2
-            step = ASTNode('Number', value='1')
+            step = ASTNode('NumberLit', value='1')
             if self._current().type == TokenType.STEP_KW:
                 self._advance()  # consume 步长
                 step = self._parse_expression()
@@ -803,9 +803,13 @@ class CodeGenerator:
             self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
             self._gen_node(node.children[1])
             self._emit(OpCode.LOAD_VAR, node.value, node.line)
-            step_idx = len(self.constants)
-            self.constants.append(1)
-            self._emit(OpCode.LOAD_CONST, step_idx, node.line)
+            # Use step from Range if available, else default 1
+            if range_node.type == 'Range' and len(range_node.children) > 2:
+                self._gen_node(range_node.children[2])
+            else:
+                step_idx = len(self.constants)
+                self.constants.append(1)
+                self._emit(OpCode.LOAD_CONST, step_idx, node.line)
             self._emit(OpCode.ADD, None, node.line)
             self._emit(OpCode.STORE_VAR, node.value, node.line)
             self._emit(OpCode.JUMP, start_label, node.line)
