@@ -631,3 +631,43 @@
   - 避免早期训练被长序列dominate
   - 逐步提升模型能力
   - 更快的收敛速度
+
+## 54. PennyLane量子机器学习框架
+- **核心**: 量子电路=神经网络层, 自动微分量子电路
+- **关键概念**:
+  - QNode: 量子函数(类似PyTorch的Module)
+  - Device: 量子模拟器/硬件后端
+  - QuantumLayer: 可嵌入经典NN的量子层
+- **混合量子-经典模型**:
+  ```python
+  @qml.qnode(dev)
+  def quantum_layer(inputs, weights):
+      qml.AngleEmbedding(inputs, wires=range(n_qubits))
+      qml.BasicEntanglerLayers(weights, wires=range(n_qubits))
+      return qml.expval(qml.PauliZ(0))
+  ```
+- **与QSM的联系**:
+  - QSM的"门控量子注意力"类似PennyLane的hybrid model
+  - PennyLane的AngleEmbedding ≈ QSM的量子旋转编码
+  - PennyLane的BasicEntanglerLayers ≈ QSM的纠缠层
+- **QEntL可以实现**:
+  - AngleEmbedding → 用量子门 RX/RZ 带"参数"
+  - EntanglerLayers → 用纠缠关键词
+  - 测量 → 用测量关键词
+- **限制**: QEntL目前不支持参数化门(如RX(θ), θ是变量)
+  - 需要添加: 变量量子门语法 `量子门 RX 参数θ 0`
+
+## 55. V5训练启动规划
+- **等待V4 V2完成**: Epoch 19/20, ~15分钟后
+- **V5训练配置**:
+  - 数据: 52,354对(含difficulty标签)
+  - 课程学习: 先短后长
+  - 模型: 保持5.7M (d_model=256, 3层)
+  - Epochs: 30 (数据多需要更多)
+  - LR: 1e-3 → 1e-5 (cosine decay)
+  - Warmup: 500步
+  - Label smoothing: 0.1
+  - 优化: AdamW (weight_decay=0.01)
+- **启动时机**: V4 V2完成后立即启动
+- **内存**: 需要关掉V3训练(8.5%内存)来释放空间
+  - V3 Loss 3.7-4.8, 效果差, 可以停止
