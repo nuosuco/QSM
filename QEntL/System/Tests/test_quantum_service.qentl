@@ -1,0 +1,65 @@
+// QEntL量子服务测试程序
+// 基于95文件研读: 测试量子系统调用(40-44)和服务架构
+配置 {
+    测试模式: true,
+    版本: "1.0.0"
+}
+
+// 量子比特分配测试(模拟syscall 40)
+测试量子分配: 函数() {
+    LOG("📡 Syscall 40: quantum_allocate")
+    量子门 H 0
+    LOG("✅ 分配1个量子比特(q0)")
+}
+
+// 量子门操作测试(模拟syscall 42)
+测试量子门: 函数() {
+    LOG("📡 Syscall 42: quantum_gate")
+    量子门 H 0
+    量子门 X 1
+    量子门 CNOT 0 1
+    LOG("✅ H+X+CNOT门序列完成")
+}
+
+// 量子测量测试(模拟syscall 43)
+测试量子测量: 函数() {
+    LOG("📡 Syscall 43: quantum_measure")
+    测量 0
+    测量 1
+    LOG("✅ 2比特测量完成")
+}
+
+// 量子纠缠测试(模拟syscall 44)
+测试量子纠缠: 函数() {
+    LOG("📡 Syscall 44: quantum_entangle")
+    量子门 H 0
+    量子门 CNOT 0 1
+    LOG("✅ Bell态纠缠创建完成")
+}
+
+// 量子释放测试(模拟syscall 41)
+测试量子释放: 函数() {
+    LOG("📡 Syscall 41: quantum_free")
+    LOG("✅ 量子比特释放完成")
+}
+
+// 量子随机数生成(ENTROPIC设备)
+测试量子随机: 函数() {
+    LOG("🎰 ENTROPIC设备: 量子随机数")
+    量子门 H 0
+    测量 0
+    LOG("✅ 量子随机数生成完成")
+}
+
+quantum_program 量子服务测试 {
+    setup: 函数() {
+        LOG("⚛ QEntL量子服务测试开始")
+        测试量子分配()
+        测试量子门()
+        测试量子纠缠()
+        测试量子测量()
+        测试量子释放()
+        测试量子随机()
+        LOG("⚛ 5个量子syscall + ENTROPIC设备测试完成!")
+    }
+}
