@@ -1081,3 +1081,35 @@
   - 收敛更快(简单数据快速建立基础)
   - 泛化更好(逐步增加难度避免过拟合)
   - 更稳定(避免训练初期Loss爆炸)
+
+## 85. 训练Plateau的诊断与恢复策略
+- **Plateau类型**:
+  1. 真plateau: 模型已到容量极限(Val+Train都不降)
+  2. 假plateau: Train降但Val不变(过拟合早期)
+  3. LR plateaus: 当前LR太小, 跳不出局部最优
+- **V5 E8情况**: Train 2.35↓, Val 2.42→→ 假plateau(类型2)
+- **恢复策略**:
+  1. **继续训练**: Cosine decay的LR还在93%, 后期可能自然突破
+  2. **Warm restart**: 在plateau时重置LR到peak, 重新warmup (cosine annealing with restarts)
+  3. **增加正则化**: Dropout 0.1→0.2, Weight decay增加
+  4. **数据增强**: 回译+同义词替换, 增加数据多样性
+  5. **SWA(随机权重平均)**: 训练后期取权重平均, 更好的泛化
+- **SWA原理**:
+  - 训练后期(Val plateau后), 每N步保存权重
+  - 最终模型 = 所有保存权重的平均
+  - 效果: 平滑loss landscape, 更宽的最优解
+  - 实现: `torch.optim.swa_utils.AveragedModel`
+- **量子类比**: SWA ≈ 量子态的时间平均 → 混态
+  - 纯态(单点权重) → 混态(权重分布)
+  - 更稳定, 更好泛化
+
+## 86. V5 Plateau应对方案
+- **Plan A**: 继续训练到E15, 观察Val是否恢复下降
+  - 如果E10-12 Val仍2.4 → 启用Plan B
+- **Plan B**: 在E15后启用SWA
+  - 保存最后5个epoch的权重平均
+  - 预期Val改善0.05-0.1
+- **Plan C**: V5完成后, 训练V5.1
+  - 增加Dropout到0.2
+  - 使用回译数据增强
+  - 从V5 best checkpoint微调
