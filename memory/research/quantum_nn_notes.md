@@ -765,3 +765,28 @@
 - 500步后LR升高→Loss会加速下降
 - 对比V4 V2: Epoch 1 Val 3.18(30K数据), V5 52K数据Loss更高但数据量大4倍
 - 预期: Epoch 5-10后Loss会快速下降(V4在E5达到1.79)
+
+## 63. 梯度检查点(Gradient Checkpointing) - 用时间换内存
+- **问题**: 反向传播需要存储所有中间激活值 → O(n×layers)内存
+- **解决**: 只存部分层的激活值, 需要时重新计算前向传播
+- **权衡**: 内存↓60-70%, 速度↓30-40%
+- **实现**: torch.utils.checkpoint.checkpoint()
+  ```python
+  from torch.utils.checkpoint import checkpoint
+  # 替代: out = layer(x)
+  out = checkpoint(layer, x)
+  ```
+- **QSM应用**:
+  - 当前7.5M参数+52K数据, MEM 54% → 还有余量
+  - 如果扩展到d_model=384(10M+参数), 可能需要gradient checkpointing
+  - 或者: 减少batch_size(当前16→8)也能省内存
+  - 优先级: 不急, 等V5完成后再考虑扩模型
+
+## 64. 混合精度训练(FP16/BF16) - 速度+内存优化
+- **原理**: 前向用FP16(2字节), 反向用FP32(4字节)更新权重
+- **好处**: 内存↓50%, 速度↑2x(GPU), 精度损失小
+- **PyTorch**: torch.cuda.amp.autocast + GradScaler
+- **QSM限制**: 无GPU, CPU训练不支持AMP加速
+- **未来**: 如果获得GPU, 混合精度是最优先的优化
+  - 52K数据训练从~21小时降到~10小时
+  - 可以增大batch_size(16→64)→更好的梯度估计
