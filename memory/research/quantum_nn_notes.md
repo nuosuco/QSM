@@ -1479,3 +1479,25 @@ QSM智能 = 语言(神经) + 知识(图) + 推理(学习) + 意识(自省)
 **这是QBC虚拟机必须实现的核心接口!**
 当前Python VM(qbc_vm.py)只实现了40/42/43/44的部分功能
 还需要: quantum_allocate(分配)/quantum_free(释放)syscall
+
+## 124. QEntL I/O调度器: 量子I/O操作
+- 7种I/O类型: READ/WRITE/CONTROL/**QUANTUM_READ/QUANTUM_WRITE/QUANTUM_ENTANGLE/QUANTUM_MEASURE**
+- 5种调度: FIFO/PRIORITY/DEADLINE/**QUANTUM_AWARE**(量子感知!)/FAIR_QUEUE
+- 量子操作也是I/O操作(量子读取/写入/纠缠/测量)
+- 量子感知调度=根据量子退相干时间优化调度顺序!
+
+## 125. QEntL IPC管理器: 量子进程通信
+- 4种IPC: 管道/消息队列/共享内存/信号量
+- 全部用QEntL实现(不依赖C/Python)
+- 纠缠强度: 0.85
+
+## 126. QEntL研读进度
+已读约30/95个文件:
+- 内核(8/17): microkernel_core, process_manager_core, quantum_processor, quantum_memory, system_calls, io_scheduler, ipc_manager, memory_protection
+- 文件系统(4/26): semantic_search, knowledge_network, behavior_learner, recommendation_engine, view_engine
+- GUI(3/15): app_launcher, intent_ui_engine, emotional_response
+- 服务(6/24): qsm_main_service, quantum_network, quantum_parallel_execution, quantum_task_scheduler, authentication, error_service, distributed_storage, consistency_engine, quantum_resource_estimator
+- Runtime(3/9): runtime_bootstrap, kernel_loader, quantum_runtime
+- VM(1/1): quantum_vm
+- 编译器(1/3): quantum_compiler_v2
+还需读约65个文件
