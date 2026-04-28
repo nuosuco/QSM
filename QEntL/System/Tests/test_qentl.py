@@ -277,6 +277,7 @@ def run_all_tests():
     ("函数返回值", test_function_return),
     ("函数参数", test_function_params),
     ("字符串拼接", test_string_concat),
+    ("嵌套IF函数", test_nested_if_function),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -430,6 +431,29 @@ def test_string_concat():
     vm.load_qbc(qbc)
     output = vm.run(10000)
     assert any('你好' in l and '世界' in l for l in output), f"字符串拼接测试失败: {output}"
+
+
+
+def test_nested_if_function():
+    """测试19: 嵌套IF+比较+函数返回"""
+    source = """quantum_program 嵌套测试 {
+        最大值: 函数(a: 整数, b: 整数) {
+            如果 a > b {
+                返回 a
+            } 否则 {
+                返回 b
+            }
+        }
+        setup: 函数() {
+            让 m = 最大值(7, 3)
+            LOG(m)
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert any('7' in l for l in output), f"嵌套IF函数测试失败: {output}"
 
 
 if __name__ == '__main__':
