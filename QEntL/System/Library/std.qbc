@@ -11,16 +11,19 @@
     "✅ 全叠加完成",
     "✅ 反向GHZ完成"
   ],
-  "variables": [],
+  "variables": [
+    "c"
+  ],
   "functions": {
     "创建GHZ态": 1,
     "量子隐形传态": 10,
     "量子比特交换": 20,
-    "相位演示": 27,
-    "旋转演示": 34,
-    "量子随机": 41,
-    "全叠加": 46,
-    "反向GHZ": 55
+    "量子加法": 27,
+    "相位演示": 34,
+    "旋转演示": 41,
+    "量子随机": 48,
+    "全叠加": 53,
+    "反向GHZ": 62
   },
   "instructions": [
     {
@@ -186,40 +189,82 @@
       "line": 0
     },
     {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "a",
+      "line": 40
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "b",
+      "line": 40
+    },
+    {
+      "op": "ADD",
+      "code": 32,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "STORE_VAR",
+      "code": 18,
+      "operand": "c",
+      "line": 40
+    },
+    {
+      "op": "LOAD_VAR",
+      "code": 17,
+      "operand": "c",
+      "line": 41
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 41
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "H 0",
-      "line": 40
+      "line": 46
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "S 0",
-      "line": 41
+      "line": 47
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "T 0",
-      "line": 42
+      "line": 48
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 0,
-      "line": 43
+      "line": 49
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 3,
-      "line": 44
+      "line": 50
     },
     {
       "op": "LOG",
       "code": 96,
       "operand": null,
-      "line": 44
+      "line": 50
     },
     {
       "op": "RETURN",
@@ -231,37 +276,37 @@
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "H 0",
-      "line": 49
+      "line": 55
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "RX 0",
-      "line": 50
+      "line": 56
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "RZ 0",
-      "line": 51
+      "line": 57
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 0,
-      "line": 52
+      "line": 58
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 4,
-      "line": 53
+      "line": 59
     },
     {
       "op": "LOG",
       "code": 96,
       "operand": null,
-      "line": 53
+      "line": 59
     },
     {
       "op": "RETURN",
@@ -273,25 +318,25 @@
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "H 0",
-      "line": 58
+      "line": 64
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 0,
-      "line": 59
+      "line": 65
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 5,
-      "line": 60
+      "line": 66
     },
     {
       "op": "LOG",
       "code": 96,
       "operand": null,
-      "line": 60
+      "line": 66
     },
     {
       "op": "RETURN",
@@ -303,49 +348,49 @@
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "H 0",
-      "line": 65
+      "line": 71
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "H 1",
-      "line": 66
+      "line": 72
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "H 2",
-      "line": 67
+      "line": 73
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 0,
-      "line": 68
+      "line": 74
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 1,
-      "line": 69
+      "line": 75
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 2,
-      "line": 70
+      "line": 76
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 6,
-      "line": 71
+      "line": 77
     },
     {
       "op": "LOG",
       "code": 96,
       "operand": null,
-      "line": 71
+      "line": 77
     },
     {
       "op": "RETURN",
@@ -357,55 +402,55 @@
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "X 0",
-      "line": 76
+      "line": 82
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "H 0",
-      "line": 77
+      "line": 83
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "CNOT 0 1",
-      "line": 78
+      "line": 84
     },
     {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "CNOT 0 2",
-      "line": 79
+      "line": 85
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 0,
-      "line": 80
+      "line": 86
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 1,
-      "line": 81
+      "line": 87
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 2,
-      "line": 82
+      "line": 88
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
       "operand": 7,
-      "line": 83
+      "line": 89
     },
     {
       "op": "LOG",
       "code": 96,
       "operand": null,
-      "line": 83
+      "line": 89
     },
     {
       "op": "RETURN",

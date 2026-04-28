@@ -1,7 +1,7 @@
-// QEntL标准库 V1.3 - 完整10量子门+隐形传态
+// QEntL标准库 V1.4 - 10量子门+函数参数+隐形传态
 // 作者: 小趣WeQ | 监督: 中华Zhoho
 
-quantum_program QEntL_Std_V13 {
+quantum_program QEntL_Std_V14 {
 
     // GHZ三比特纠缠
     创建GHZ态: 函数() {
@@ -33,6 +33,12 @@ quantum_program QEntL_Std_V13 {
         测量 0
         测量 1
         LOG("✅ SWAP交换完成")
+    }
+
+    // 量子加法(带参数)
+    量子加法: 函数(a: 整数, b: 整数) {
+        让 c = a + b
+        返回 c
     }
 
     // 相位门序列
