@@ -187,6 +187,25 @@ def test_modulo():
     assert output[0] == "1", f"10%3应=1, 得{output[0]}"
     return output
 
+def test_quantum_gate_syntax():
+    """测试12: 量子门语法"""
+    source = """quantum_program 量子门测试 {
+        setup: 函数() {
+            量子门 H 0
+            量子门 CNOT 0 1
+            LOG("量子门执行成功")
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert "量子门执行成功" in output, f"量子门执行失败: {output}"
+    # Verify Bell state was created
+    state_info = vm._get_state_info()
+    assert "|00⟩" in state_info and "|11⟩" in state_info, f"Bell态验证失败: {state_info}"
+    return output
+
 def test_bell_state():
     """测试11: Bell态量子纠缠"""
     qbc = {
@@ -251,6 +270,7 @@ def run_all_tests():
         ("类型定义", test_type_definition),
         ("FOR循环", test_for_loop),
     ("取模运算", test_modulo),
+    ("量子门语法", test_quantum_gate_syntax),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
