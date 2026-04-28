@@ -854,3 +854,18 @@
   - E21-30: p线性降到0.0
 - **量子类比**: teacher forcing ≈ 量子Zeno效应(持续观测抑制演化)
   - scheduled sampling ≈ 逐步释放退相干, 让系统自由演化
+
+## 70. V5 Loss破3分析 + Cosine Decay效果
+- **V5 LR修复后Loss曲线**:
+  - B0: 5.81 → B2400: 2.97 (↓49% in 1 epoch)
+  - 旧scheduler同样epoch: 8.94→6.22 (↓30% in 4 epochs)
+  - 修复后速度快~5倍
+- **Loss波动**: B1200=3.20, B1600=4.27(↑34%), B2000=3.20(回)
+  - 这是正常的训练波动(batch-level noise)
+  - 原因: batch_size=16较小, 梯度方差大
+  - 缓解: 增大batch_size(需要更多内存)或梯度累积
+- **梯度累积**: 用多个小batch累积梯度再更新
+  - 效果等价于增大batch_size(16→48)
+  - 不需要更多内存, 只是更慢
+  - 实现: optimizer.zero_grad()只在累积开始时调用
+  - QSM V6可以考虑: 累积3步→等效batch_size=48
