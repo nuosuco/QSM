@@ -2,27 +2,27 @@
   "version": "3.0",
   "qbc_version": "1.0",
   "constants": [
-    "⚛ QEntL内核 V1.4 启动",
-    "支持9量子门: H/X/Y/Z/S/T/RX/RZ/CNOT",
-    "支持3关键词: 量子门/纠缠/测量",
-    "✅ Bell态 |Φ+⟩ 创建完成",
-    "✅ Bell态手动创建完成",
-    "✅ GHZ态 |Φ₃⟩ 创建完成",
-    "✅ 相位门序列执行完成",
-    "✅ 旋转门序列执行完成",
-    "✅ 量子随机比特生成完成",
-    "✅ 双量子随机比特生成完成"
+    "⚛ QEntL内核 V1.5",
+    "10量子门: H/X/Y/Z/S/T/RX/RZ/CNOT/SWAP",
+    "3关键词: 量子门/纠缠/测量",
+    "✅ Bell态完成",
+    "✅ GHZ态完成",
+    "✅ SWAP交换完成",
+    "✅ 相位演示完成",
+    "✅ 旋转演示完成",
+    "✅ 量子随机完成",
+    "✅ 全叠加完成"
   ],
   "variables": [],
   "functions": {
     "setup": 1,
     "创建Bell态": 8,
-    "创建Bell态手动": 12,
-    "创建GHZ态": 17,
-    "量子相位演示": 23,
-    "量子旋转演示": 30,
-    "量子随机": 36,
-    "双量子随机": 41
+    "创建GHZ态": 12,
+    "量子比特交换": 21,
+    "相位演示": 28,
+    "旋转演示": 35,
+    "量子随机": 42,
+    "全叠加": 47
   },
   "instructions": [
     {
@@ -110,202 +110,250 @@
       "line": 23
     },
     {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 4,
-      "line": 24
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 24
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "H 0",
-      "line": 29
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "CNOT 0 1",
-      "line": 30
-    },
-    {
       "op": "QUANTUM_GATE",
       "code": 81,
       "operand": "CNOT 0 2",
-      "line": 31
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 5,
-      "line": 32
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 32
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "H 0",
-      "line": 37
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "S 0",
-      "line": 38
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "T 0",
-      "line": 39
+      "line": 24
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 0,
-      "line": 40
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 6,
-      "line": 41
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 41
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "RX 0",
-      "line": 46
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "RZ 0",
-      "line": 47
-    },
-    {
-      "op": "QUANTUM_MEASURE",
-      "code": 82,
-      "operand": 0,
-      "line": 48
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 7,
-      "line": 49
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 49
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "H 0",
-      "line": 54
-    },
-    {
-      "op": "QUANTUM_MEASURE",
-      "code": 82,
-      "operand": 0,
-      "line": 55
-    },
-    {
-      "op": "LOAD_CONST",
-      "code": 16,
-      "operand": 8,
-      "line": 56
-    },
-    {
-      "op": "LOG",
-      "code": 96,
-      "operand": null,
-      "line": 56
-    },
-    {
-      "op": "RETURN",
-      "code": 68,
-      "operand": null,
-      "line": 0
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "H 0",
-      "line": 61
-    },
-    {
-      "op": "QUANTUM_GATE",
-      "code": 81,
-      "operand": "H 1",
-      "line": 62
-    },
-    {
-      "op": "QUANTUM_MEASURE",
-      "code": 82,
-      "operand": 0,
-      "line": 63
+      "line": 25
     },
     {
       "op": "QUANTUM_MEASURE",
       "code": 82,
       "operand": 1,
-      "line": 64
+      "line": 26
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 2,
+      "line": 27
     },
     {
       "op": "LOAD_CONST",
       "code": 16,
-      "operand": 9,
-      "line": 65
+      "operand": 4,
+      "line": 28
     },
     {
       "op": "LOG",
       "code": 96,
       "operand": null,
-      "line": 65
+      "line": 28
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "X 0",
+      "line": 33
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "SWAP 0 1",
+      "line": 34
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 0,
+      "line": 35
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 1,
+      "line": 36
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 5,
+      "line": 37
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 37
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "H 0",
+      "line": 42
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "S 0",
+      "line": 43
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "T 0",
+      "line": 44
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 0,
+      "line": 45
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 6,
+      "line": 46
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 46
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "H 0",
+      "line": 51
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "RX 0",
+      "line": 52
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "RZ 0",
+      "line": 53
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 0,
+      "line": 54
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 7,
+      "line": 55
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 55
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "H 0",
+      "line": 60
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 0,
+      "line": 61
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 8,
+      "line": 62
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 62
+    },
+    {
+      "op": "RETURN",
+      "code": 68,
+      "operand": null,
+      "line": 0
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "H 0",
+      "line": 67
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "H 1",
+      "line": 68
+    },
+    {
+      "op": "QUANTUM_GATE",
+      "code": 81,
+      "operand": "H 2",
+      "line": 69
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 0,
+      "line": 70
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 1,
+      "line": 71
+    },
+    {
+      "op": "QUANTUM_MEASURE",
+      "code": 82,
+      "operand": 2,
+      "line": 72
+    },
+    {
+      "op": "LOAD_CONST",
+      "code": 16,
+      "operand": 9,
+      "line": 73
+    },
+    {
+      "op": "LOG",
+      "code": 96,
+      "operand": null,
+      "line": 73
     },
     {
       "op": "RETURN",
