@@ -275,6 +275,7 @@ def run_all_tests():
     ("隐形传态", test_quantum_teleportation),
     ("FOR步长", test_for_step),
     ("函数返回值", test_function_return),
+    ("函数参数", test_function_params),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -388,6 +389,26 @@ def test_function_return():
     vm.load_qbc(qbc)
     output = vm.run(10000)
     assert any('8' in l for l in output), f"函数返回值测试失败: {output}"
+
+
+
+def test_function_params():
+    """测试17: 函数参数传递"""
+    source = """quantum_program 参数测试 {
+        计算: 函数(x: 整数, y: 整数) {
+            让 r = x + y
+            返回 r
+        }
+        setup: 函数() {
+            让 结果 = 计算(3, 5)
+            LOG(结果)
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert any('8' in l for l in output), f"函数参数测试失败: {output}"
 
 
 if __name__ == '__main__':
