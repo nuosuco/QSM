@@ -1378,3 +1378,28 @@ QSM智能 = 语言(神经) + 知识(图) + 推理(学习) + 意识(自省)
 - UserIntent: ID+名称+描述+类别+参数+置信度+识别方法+会话上下文
 - UIResponse: 响应类型+UI元素+过渡效果+反馈+优先级+自适应选项
 - **脑机接口(BRAIN_COMPUTER)**: 未来人机交互终极形态!
+
+## 113. QEntL认证服务: 量子令牌认证
+- 6种认证: PASSWORD/QUANTUM_TOKEN/BIOMETRIC/TWO_FACTOR/HARDWARE_KEY/SSO
+- **QUANTUM_TOKEN**: 量子令牌=不可伪造的量子态认证
+- 密码策略: 最小长度+大小写+数字+特殊字符+过期天数+历史
+- 多因素认证(MFA)
+- 账户锁定机制
+
+## 114. QEntL错误服务: 量子错误处理
+- 5级: INFO→WARNING→ERROR→CRITICAL→FATAL
+- 11种类型含**QUANTUM**(量子处理错误)
+- 纠缠强度: 1.0(最高)
+- 自动恢复+诊断
+
+## 115. QEntL研读统计(至今)
+已读文件类型:
+- 内核(kernel): microkernel_core, process_manager_core, quantum_processor, quantum_memory, system_calls
+- 文件系统(filesystem): semantic_search, knowledge_network, behavior_learner, recommendation_engine
+- GUI: app_launcher, intent_ui_engine
+- 服务(services): qsm_main_service, quantum_network, quantum_parallel_execution, quantum_task_scheduler, authentication, error_service
+- Runtime: runtime_bootstrap, kernel_loader, quantum_runtime
+- VM: quantum_vm
+- 编译器: quantum_compiler_v2
+
+已读约25/95个文件，还需读约70个
