@@ -404,7 +404,7 @@ class QBCVirtualMachine:
             self.ip += 1  # simplified: just continue
         
         elif op == OpCode.QUANTUM_INIT:
-            n_qubits = operand if operand else 1
+            n_qubits = operand if operand else 2
             self._init_quantum_state(n_qubits)
             self.ip += 1
 

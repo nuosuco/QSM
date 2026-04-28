@@ -92,6 +92,7 @@ class TokenType(Enum):
     FLOAT = '浮点数'
     BOOL = '布尔'
     QUANTUM = '量子'
+    QUANTUM_GATE_KW = '量子门'
     
     # 符号
     LBRACE = '{'
@@ -429,6 +430,9 @@ class Parser:
             return self._parse_let()
         elif t.type == TokenType.FOR:
             return self._parse_for()
+        elif t.type == TokenType.QUANTUM_GATE_KW:
+            return self._parse_quantum_gate()
+
         elif t.type == TokenType.LOG:
             return self._parse_log()
         elif t.type == TokenType.WHILE:
@@ -483,6 +487,20 @@ class Parser:
         node.children.append(self._parse_block())
         return node
     
+    def _parse_quantum_gate(self):
+        """Parse 量子门 H 0 or 量子门 CNOT 0 1"""
+        node = ASTNode('QuantumGate', line=self._current().line)
+        self._expect(TokenType.QUANTUM_GATE_KW)
+        # Gate name (identifier or string)
+        if self._current().type == TokenType.STRING_LIT:
+            node.value = self._advance().value
+        else:
+            node.value = self._advance().value  # gate name as identifier
+        # Target qubits - only consume NUMBER_LIT tokens
+        while self._current().type == TokenType.NUMBER_LIT:
+            node.children.append(self._parse_primary())
+        return node
+
     def _parse_log(self):
         node = ASTNode('Log', line=self._current().line)
         self._expect(TokenType.LOG)
@@ -678,6 +696,16 @@ class CodeGenerator:
             self._gen_node(node.children[0])
             self._emit(OpCode.RETURN, line=node.line)
         
+        elif node.type == 'QuantumGate':
+            gate_name = node.value
+            targets = []
+            for child in node.children:
+                if child.type == 'NumberLit':
+                    targets.append(child.value)
+                elif child.type == 'Identifier':
+                    targets.append(child.value)
+            gate_str = gate_name + ' ' + ' '.join(str(t) for t in targets)
+            self._emit(OpCode.QUANTUM_GATE, gate_str.strip(), node.line)
         elif node.type == 'Log':
             self._gen_node(node.children[0])
             self._emit(OpCode.LOG, line=node.line)
