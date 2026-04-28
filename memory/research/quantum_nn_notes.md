@@ -601,3 +601,33 @@
   - Cosine decay: 1e-3 → 1e-5
   - Label smoothing: 0.1
 - **目标**: Val Loss < 1.0 → 翻译准确率>50%
+
+## 52. 知识蒸馏与QSM小模型优化
+- **核心**: 大模型(teacher)→小模型(student), 保留性能
+  - Soft targets: teacher的logits(包含"暗知识")
+  - Temperature T: softmax(q_i/T) 软化分布
+  - Student loss = α·硬标签损失 + β·KL散度(soft targets)
+- **QSM应用**:
+  - 用DeepSeek/GLM大模型作为teacher
+  - 蒸馏到5.7M参数的QSM V4
+  - 彝文翻译的"暗知识": 字符间的语义关联
+- **实现**: 
+  1. 用大模型生成彝文翻译的soft labels
+  2. 训练QSM同时拟合hard labels和soft labels
+  3. T=3-5, α=0.3, β=0.7
+
+## 53. 课程学习(Curriculum Learning)用于翻译训练
+- **核心**: 从简单→困难, 模仿人类学习
+  - Stage 1: 字符级翻译(心→heart)
+  - Stage 2: 词语级翻译(量子→quantum)
+  - Stage 3: 短语级(量子叠加态→quantum superposition)
+  - Stage 4: 句子级(道法自然→the way follows nature)
+- **QSM V5训练策略**:
+  - Epoch 1-8: 字符+词语数据(短序列)
+  - Epoch 9-16: 短语级数据
+  - Epoch 17-25: 句子+段落级
+  - Epoch 26-30: 全量混合
+- **好处**: 
+  - 避免早期训练被长序列dominate
+  - 逐步提升模型能力
+  - 更快的收敛速度

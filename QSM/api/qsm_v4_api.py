@@ -231,11 +231,17 @@ def quantum_execute():
             output = vm.run(10000)
             state_info = vm._get_state_info()
             
+            # Get circuit visualization
+            circuit_text = ""
+            if hasattr(vm, 'get_quantum_circuit_text'):
+                circuit_text = vm.get_quantum_circuit_text()
+            
             return jsonify({
                 "success": True,
                 "output": output,
                 "quantum_state": state_info,
-                "n_qubits": n_qubits
+                "n_qubits": n_qubits,
+                "circuit": circuit_text
             })
         except Exception as e:
             return jsonify({"success": False, "error": str(e)})
@@ -255,12 +261,18 @@ def quantum_execute():
             output = vm.run(50000)
             state_info = vm._get_state_info() if vm.quantum_bits > 0 else None
             
+            # Get circuit visualization
+            circuit_text = ""
+            if hasattr(vm, 'get_quantum_circuit_text'):
+                circuit_text = vm.get_quantum_circuit_text()
+            
             return jsonify({
                 "success": True,
                 "output": output,
                 "quantum_state": state_info,
                 "functions": qbc.get('functions', {}),
-                "instructions_count": len(qbc.get('instructions', []))
+                "instructions_count": len(qbc.get('instructions', [])),
+                "circuit": circuit_text
             })
         except Exception as e:
             return jsonify({"success": False, "error": str(e)})
