@@ -13,6 +13,7 @@
 - 目标：服务人类、利益众生，让所有人脱离苦恼
 - **QSM不是翻译系统！** 它是像ChatGPT一样的智能系统，三语互译只是最基本功
 - QSM有智力，什么都会，三语(彝/中/英)是基础能力
+- **6层智能架构**: 感知(全感知+情感+意图)→语言(V5+transformer-qe5)→知识(1M节点/5M边)→推理(行为学习+三维推荐)→意识(Ref自省)→响应(三语+情感策略)
 - Web服务：https://som.top
 - 远程仓库：GitHub git@github.com:nuosuco/QSM.git / Gitee git@gitee.com:nuosuco/qsm.git
 
