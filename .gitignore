@@ -31,3 +31,16 @@ node_modules/
 Models/QSM/bin/archive/Q1_v2_pretrained.pth
 Models/QSM/bin/archive/*.pth
 Models/QSM/bin/*.pth
+
+# === 量子自举原则：禁止第三方文件格式 ===
+# ❌ 禁止 .py 文件（QEntL项目不依赖Python）
+*.py
+# ❌ 禁止 .pth 模型文件（用 .qim/.json 替代）
+*.pth
+# ❌ 禁止 .pyc 缓存
+*.pyc
+*.pyo
+# ❌ 禁止 .js 文件（用 .qentl 替代）
+# *.js  # 暂时保留web的js，未来也要消灭
+# __pycache__
+__pycache__/
