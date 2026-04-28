@@ -112,7 +112,11 @@ if __name__ == '__main__':
         if step < c['warmup_steps']: return c['lr'] * step / c['warmup_steps']
         p = (step - c['warmup_steps']) / max(total_steps - c['warmup_steps'], 1)
         return c['lr'] * 0.5 * (1 + math.cos(math.pi * p))
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, get_lr)
+    # Manual LR scheduling (LambdaLR bug in PyTorch 2.x)
+    def set_lr(optimizer, lr):
+        for pg in optimizer.param_groups:
+            pg['lr'] = lr
+    scheduler = None  # Not using LambdaLR due to step counting bug
     best_val = float('inf'); start = time.time(); gs = 0
     for ep in range(c['epochs']):
         model.train(); tl = 0; nb = 0
@@ -123,10 +127,10 @@ if __name__ == '__main__':
             logits = model(src, ti, tgt_mask=tgt_mask, tgt_key_padding_mask=(ti == 0))
             loss = criterion(logits.reshape(-1, c['vocab_size']), to.reshape(-1))
             loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step(); scheduler.step()
+            optimizer.step(); set_lr(optimizer, get_lr(gs+1))
             tl += loss.item(); nb += 1; gs += 1
             if bi % 400 == 0:
-                print(f"E{ep+1}/{c['epochs']} B{bi}/{len(train_dl)} L:{loss.item():.4f} lr:{scheduler.get_last_lr()[0]:.6f} T:{(time.time()-start)/60:.1f}m")
+                print(f"E{ep+1}/{c['epochs']} B{bi}/{len(train_dl)} L:{loss.item():.4f} lr:{get_lr(gs):.6f} T:{(time.time()-start)/60:.1f}m")
         model.eval(); vl = 0; vb = 0
         with torch.no_grad():
             for src, ti, to in val_dl:
