@@ -984,3 +984,34 @@
   1. V5: 标准正弦位置编码(当前)
   2. V6: RoPE(旋转位置编码)
   3. V7: 量子旋转位置编码(终极目标)
+
+## 79. 知识蒸馏(Knowledge Distillation)与量子退火
+- **知识蒸馏**: 大模型(teacher)→小模型(student)
+  - Teacher的soft logits作为soft target
+  - Temperature T↑ → 概率分布更平滑
+  - Loss = α·hard_loss + (1-α)·KL(soft_student||soft_teacher)
+- **量子类比**:
+  - Teacher ≈ 大Hilbert空间(多量子比特)
+  - Student ≈ 小Hilbert空间(少量子比特)
+  - 蒸馏 ≈ 量子态投影到低维子空间
+  - 信息损失 ≈ 退相干
+- **QSM应用**:
+  1. V5(7.5M)作为teacher → V6(3M)作为student
+  2. V5的soft predictions指导V6训练
+  3. V6更小更快, 适合部署到资源受限环境
+  4. 保持V5翻译质量的同时减少计算量
+
+## 80. V6模型架构规划
+- **核心改进**:
+  1. SentencePiece 64K子词分词(替代字级分词)
+  2. Shared Embeddings(三角共享, 节省33%参数)
+  3. RoPE旋转位置编码(替代正弦编码)
+  4. Scheduled Sampling(逐步从TF→自回归)
+  5. 知识蒸馏(V5→V6)
+- **架构**: Encoder-Decoder, d_model=384, 6层, 8头
+- **预计参数**: ~15M(比V5大2倍, 但共享嵌入节省内存)
+- **训练策略**: 
+  - Phase 1: 用V5 soft labels + hard labels混合训练
+  - Phase 2: 纯hard labels微调
+  - Phase 3: Scheduled Sampling
+- **目标**: BLEU>30(可理解翻译)
