@@ -267,6 +267,32 @@ def quantum_execute():
     
     return jsonify({"error": "Provide 'source' or 'gates' parameter"})
 
+
+
+@app.route('/gates', methods=['GET'])
+def quantum_gates():
+    """返回支持的量子门列表"""
+    return jsonify({
+        "success": True,
+        "gates": [
+            {"name": "H", "full_name": "Hadamard", "description": "创建叠加态"},
+            {"name": "X", "full_name": "Pauli-X", "description": "比特翻转"},
+            {"name": "Y", "full_name": "Pauli-Y", "description": "Y轴翻转"},
+            {"name": "Z", "full_name": "Pauli-Z", "description": "相位翻转"},
+            {"name": "S", "full_name": "S-gate", "description": "Z的平方根"},
+            {"name": "T", "full_name": "T-gate", "description": "S的平方根"},
+            {"name": "RX", "full_name": "Rotation-X", "description": "绕X轴旋转π/4"},
+            {"name": "RZ", "full_name": "Rotation-Z", "description": "绕Z轴旋转π/4"},
+            {"name": "CNOT", "full_name": "Controlled-NOT", "description": "受控非门(2比特)", "two_qubit": True}
+        ],
+        "total": 9,
+        "keywords": {
+            "量子门": "apply gate",
+            "纠缠": "create Bell state (H+CNOT shortcut)",
+            "测量": "measure qubit with collapse"
+        }
+    })
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  QSM V4 量子翻译API")
