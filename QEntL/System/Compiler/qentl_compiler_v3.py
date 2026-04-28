@@ -569,6 +569,16 @@ class Parser:
             left = ASTNode('BinaryOp', value=op, children=[left, right])
         return left
     
+    def _parse_factor(self):
+        """Parse factor - handle unary minus"""
+        if self._current().type == TokenType.MINUS:
+            self._advance()
+            node = self._parse_primary()
+            neg_node = ASTNode('UnaryMinus', line=node.line)
+            neg_node.children.append(node)
+            return neg_node
+        return self._parse_primary()
+
     def _parse_primary(self):
         t = self._current()
         if t.type == TokenType.NUMBER_LIT:
@@ -806,6 +816,12 @@ class CodeGenerator:
             }
             self._emit(op_map.get(node.value, OpCode.NOP), line=node.line)
         
+        elif node.type == 'UnaryMinus':
+            # Push 0, then subtract
+            self._emit(OpCode.LOAD_CONST, 0, node.line)
+            self._codegen(node.children[0])
+            self._emit(OpCode.MINUS, None, node.line)
+
         elif node.type == 'NumberLit':
             idx = self._add_const(float(node.value) if '.' in node.value else int(node.value))
             self._emit(OpCode.LOAD_CONST, idx, node.line)
