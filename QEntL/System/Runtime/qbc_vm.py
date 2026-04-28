@@ -41,6 +41,7 @@ class QBCVirtualMachine:
         # Quantum state simulation
         self.quantum_register: List[complex] = []
         self.quantum_bits: int = 0
+        self.quantum_gates_applied: List[Dict] = []
     
 
     # === Quantum State Simulation (Real Quantum Mechanics) ===
@@ -428,6 +429,7 @@ class QBCVirtualMachine:
 
         elif op == OpCode.QUANTUM_MEASURE:
             target = operand if isinstance(operand, int) else 0
+            self.quantum_gates_applied.append({'name': 'MEASURE', 'target': target})
             if self.quantum_bits > 0:
                 result = self._measure_qubit(target)
                 self.stack.append(result)
@@ -449,6 +451,7 @@ class QBCVirtualMachine:
                     target = 1
                 self._apply_hadamard(control)
                 self._apply_cnot(control, target)
+                self.quantum_gates_applied.append({'name': 'ENTANGLE', 'control': control, 'target': target})
                 msg = f"创建纠缠对: 比特{control} ↔ 比特{target}"
                 self.output.append(msg)
                 print(msg)
@@ -491,6 +494,112 @@ class QBCVirtualMachine:
             if instr.get('op') == 'LABEL' and instr.get('name') == label_name:
                 return i + 1  # return instruction after label
         return None
+
+    def _apply_gate_by_name(self, gate_name, target):
+        """Apply a named quantum gate to target qubit"""
+        n = self.quantum_bits
+        if n == 0: return
+        n_states = 1 << n
+        state = self.quantum_register
+        new_state = [complex(0)] * n_states
+        import math
+        for i in range(n_states):
+            bits = i
+            bit_val = (bits >> target) & 1
+            flipped = bits ^ (1 << target)
+            if gate_name == 'Y':
+                if bit_val == 0:
+                    new_state[flipped] += -1j * state[i]
+                else:
+                    new_state[flipped] += 1j * state[i]
+            elif gate_name == 'Z':
+                if bit_val == 1:
+                    new_state[i] = -state[i]
+                else:
+                    new_state[i] = state[i]
+            elif gate_name == 'S':
+                if bit_val == 1:
+                    new_state[i] = 1j * state[i]
+                else:
+                    new_state[i] = state[i]
+            elif gate_name == 'T':
+                if bit_val == 1:
+                    new_state[i] = complex(math.cos(math.pi/4), math.sin(math.pi/4)) * state[i]
+                else:
+                    new_state[i] = state[i]
+            elif gate_name == 'RX':
+                cos_v = math.cos(math.pi / 4)
+                sin_v = math.sin(math.pi / 4)
+                new_state[i] += cos_v * state[i]
+                new_state[flipped] += -1j * sin_v * state[i]
+            elif gate_name == 'RZ':
+                if bit_val == 0:
+                    new_state[i] = complex(math.cos(-math.pi/8), math.sin(-math.pi/8)) * state[i]
+                else:
+                    new_state[i] = complex(math.cos(math.pi/8), math.sin(math.pi/8)) * state[i]
+            else:
+                new_state[i] = state[i]
+        # Normalize
+        norm = math.sqrt(sum(abs(x)**2 for x in new_state))
+        if norm > 0:
+            self.quantum_register = [x/norm for x in new_state]
+
+    def run_with_function(self, func_name, max_steps=10000):
+        """运行指定函数"""
+        if func_name not in self.functions:
+            raise ValueError(f"函数 {func_name} 不存在")
+        entry = self.functions[func_name]
+        self.pc = entry
+        self.call_stack = []
+        self.stack = []
+        return self.run(max_steps)
+
+    def get_quantum_circuit_text(self):
+        """获取量子电路的可视化文本表示"""
+        if not self.quantum_gates_applied:
+            return "无量子门操作"
+        
+        n_qubits = self.quantum_bits
+        lines = []
+        # Header
+        lines.append(f"量子电路 ({n_qubits}比特, {len(self.quantum_gates_applied)}门):")
+        lines.append("")
+        
+        # Draw wire diagram
+        wires = {i: [] for i in range(n_qubits)}
+        for gate_info in self.quantum_gates_applied:
+            name = gate_info.get('name', '?')
+            target = gate_info.get('target', 0)
+            control = gate_info.get('control', None)
+            
+            if name in ('CNOT', 'ENTANGLE') and control is not None:
+                wires[control].append('●')
+                wires[target].append('X')
+            elif name == 'MEASURE':
+                wires[target].append('M')
+            else:
+                wires[target].append(name)
+        
+        # Format wires
+        max_len = max(len(w) for w in wires.values()) if wires else 0
+        for q in range(n_qubits):
+            gate_str = '──'.join(wires[q][i] if i < len(wires[q]) else '─' for i in range(max_len))
+            lines.append(f"  q{q}: ─{gate_str}─")
+        
+        # Gate list
+        lines.append("")
+        lines.append("门序列:")
+        for i, g in enumerate(self.quantum_gates_applied):
+            name = g.get('name', '?')
+            target = g.get('target', 0)
+            control = g.get('control', None)
+            if control is not None:
+                lines.append(f"  {i+1}. {name}({control},{target})")
+            else:
+                lines.append(f"  {i+1}. {name}({target})")
+        
+        return '\n'.join(lines)
+
 
 
 def run_qbc_file(path: str, max_steps: int = 100000) -> List[str]:
