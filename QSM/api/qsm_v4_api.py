@@ -369,6 +369,45 @@ def circuit_visualize():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+
+@app.route('/teleport', methods=['GET'])
+def quantum_teleportation():
+    """运行量子隐形传态协议(3比特)"""
+    sys.path.insert(0, RUNTIME_PATH)
+    from qbc_vm import QBCVirtualMachine
+    try:
+        qbc, err = compile_qentl_source("""quantum_program T {
+            setup: 函数() {
+                量子门 H 1
+                量子门 CNOT 1 2
+                量子门 CNOT 0 1
+                量子门 H 0
+                测量 0
+                测量 1
+                测量 2
+            }
+        }""")
+        vm = QBCVirtualMachine()
+        vm.load_qbc(qbc)
+        output = vm.run(10000)
+        measures = [l for l in output if '测量比特' in l]
+        results = []
+        for m in measures:
+            parts = m.split(':')
+            qubit = parts[0].replace('测量比特', '').strip()
+            val = parts[1].strip()[0]
+            results.append({"qubit": int(qubit), "value": int(val)})
+        return {
+            "protocol": "quantum_teleportation",
+            "qubits": 3,
+            "gates_applied": len(vm.quantum_gates_applied),
+            "circuit": vm.get_quantum_circuit_text(),
+            "measurements": results,
+            "gate_history": [{"name": g["name"], "target": g.get("target", g.get("control","?"))} for g in vm.quantum_gates_applied[:10]]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  QSM V4 量子翻译API")
