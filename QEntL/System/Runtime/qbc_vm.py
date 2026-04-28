@@ -410,23 +410,30 @@ class QBCVirtualMachine:
             self.ip += 1
 
         elif op == OpCode.QUANTUM_GATE:
-            # operand is dict-like or string describing the gate
             if operand and isinstance(operand, str):
                 gate_info = operand.split()
                 gate_name = gate_info[0]
                 target = int(gate_info[1]) if len(gate_info) > 1 else 0
                 if gate_name == 'H':
                     self._apply_hadamard(target)
-                elif gate_name == 'X' or gate_name == 'NOT':
+                    self.quantum_gates_applied.append({'name': 'H', 'target': target})
+                elif gate_name in ('X', 'NOT'):
                     self._apply_pauli_x(target)
+                    self.quantum_gates_applied.append({'name': 'X', 'target': target})
                 elif gate_name == 'CNOT':
                     control = target
                     target2 = int(gate_info[2]) if len(gate_info) > 2 else (target + 1)
                     self._apply_cnot(control, target2)
+                    self.quantum_gates_applied.append({'name': 'CNOT', 'control': control, 'target': target2})
                 else:
-                    self._apply_hadamard(target)  # default to H
+                    if gate_name == 'SWAP':
+                        self._swap_target2 = int(gate_info[2]) if len(gate_info) > 2 else target + 1
+                    self._apply_gate_by_name(gate_name, target)
+                    if gate_name == 'SWAP':
+                        self.quantum_gates_applied.append({'name': 'SWAP', 'control': target, 'target': self._swap_target2})
+                    else:
+                        self.quantum_gates_applied.append({'name': gate_name, 'target': target})
             self.ip += 1
-
         elif op == OpCode.QUANTUM_MEASURE:
             target = operand if isinstance(operand, int) else 0
             self.quantum_gates_applied.append({'name': 'MEASURE', 'target': target})
@@ -537,6 +544,15 @@ class QBCVirtualMachine:
                     new_state[i] = complex(math.cos(-math.pi/8), math.sin(-math.pi/8)) * state[i]
                 else:
                     new_state[i] = complex(math.cos(math.pi/8), math.sin(math.pi/8)) * state[i]
+            elif gate_name == 'SWAP':
+                # SWAP two qubits - target2 stored in special var
+                target2 = getattr(self, '_swap_target2', target + 1)
+                bit1 = (bits >> target) & 1
+                bit2 = (bits >> target2) & 1
+                swapped = bits
+                if bit1 != bit2:
+                    swapped = bits ^ ((1 << target) | (1 << target2))
+                new_state[swapped] = state[i]
             else:
                 new_state[i] = state[i]
         # Normalize
