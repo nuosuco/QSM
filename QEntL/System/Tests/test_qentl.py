@@ -278,6 +278,7 @@ def run_all_tests():
     ("函数参数", test_function_params),
     ("字符串拼接", test_string_concat),
     ("嵌套IF函数", test_nested_if_function),
+    ("WHILE循环", test_while_loop),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -454,6 +455,28 @@ def test_nested_if_function():
     vm.load_qbc(qbc)
     output = vm.run(10000)
     assert any('7' in l for l in output), f"嵌套IF函数测试失败: {output}"
+
+
+
+def test_while_loop():
+    """测试20: WHILE循环(当x>0)"""
+    source = """quantum_program 循环测试 {
+        setup: 函数() {
+            让 x = 5
+            让 总和 = 0
+            当 x > 0 {
+                让 总和 = 总和 + x
+                让 x = x - 1
+            }
+            LOG(总和)
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    # 5+4+3+2+1=15
+    assert any('15' in l for l in output), f"WHILE循环测试失败: {output}"
 
 
 if __name__ == '__main__':
