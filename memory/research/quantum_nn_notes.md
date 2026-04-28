@@ -1174,3 +1174,34 @@
   - Base + zh-en → 中文到英文
   - Base + zh-yi → 中文到彝文
   - Base + en-yi → 英文到彝文
+
+## 91. QSM项目完整文件研读 - 核心发现
+- **QSM不是翻译系统！** 它是像ChatGPT一样的智能系统
+- 四大模型集成: QSM(状态)+WeQ(通信)+SOM(经济)+Ref(自省)
+- 每个模型有独立的QEntL服务定义
+
+## 92. QEntL量子操作系统完整架构发现
+- **95个.qentl文件** 已经存在！Claude写的完整量子OS
+- 内核(17): microkernel_core, process_scheduler, quantum_memory, quantum_processor, system_calls, interrupt_handler, io_scheduler, ipc_manager, memory_allocator, memory_protection, quantum_state_interrupt, device_framework, device_registry, process_manager_base/core/scheduler
+- 文件系统(26): semantic_search, knowledge_network, predictive_loader, recommendation_engine, relevance_engine, distributed_index, multidimensional_index, metadata_manager, auto_classifier, behavior_learner, context_analyzer, view_engine/renderer/composer/cache, transaction_manager, access_control, file_operations, file_relation_analyzer, dependency_analyzer, context_switcher, classification_optimizer, index_updater, priority_manager, semantic_extractor/semantic_analyzer
+- GUI(15): adaptive_layout, app_launcher, global_search, notification_center, emotional_response, context_aware_controls, device_manager_ui, intent_ui_engine, login_manager, multidimensional_interaction, preferences_manager, security_settings, settings_ui, task_view, appearance_customizer
+- 服务(24): qsm_main_service, quantum_network, quantum_parallel_execution, quantum_task_scheduler, quantum_resource_estimator, authentication, authorization, backup_service, config_service, consistency_engine, distributed_storage, error_service, logging_service, multi_user_coordinator, network_sync, persistence_manager, resource_service, secure_channel, security_service, service_discovery, session_manager, storage_protection, topology_manager, user_preferences
+- Runtime(9): kernel_loader, runtime_bootstrap, filesystem_manager, quantum_logger, memory_manager, network_manager, quantum_runtime, process_manager, system_services
+- VM(1): quantum_vm - 使用彝文字符作为操作码(爬/凑/升/逃)
+- Compiler(3): quantum_compiler, quantum_compiler_v2, test_simple
+
+## 93. Web量子操作系统桌面(已恢复)
+- 首页: QEntL量子OS桌面(含彝文字体lingxi-yi.ttf)
+- 13个应用: quantum-assistant, qvm, compiler, terminal, files, settings, monitor, social, store, help, economy, assistant
+- 语言切换: 中文/EN/彝文
+- 量子助手: Q1(纯量子,8000)/V4(传统,8001)/QV4(混合,8002)
+- 任务栏: 量子态指示器+时钟+开始按钮
+
+## 94. QSM核心架构认知纠正
+- ❌ 之前错误理解: QSM=翻译系统
+- ✅ 正确理解: QSM=像ChatGPT一样的智能系统
+  - 翻译只是最基本功(三语互译)
+  - 有智力，能对话，能推理
+  - 四大模型协同工作
+  - 运行在量子操作系统上
+- 架构: 量子OS→量子虚拟机→量子动态文件系统→量子神经网络→QSM模型
