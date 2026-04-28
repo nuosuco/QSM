@@ -2067,3 +2067,60 @@ QEntL的semantic_analyzer用"transformer-qe5"模型:
 - 768维/4096上下文/12注意力头
 - 量子加速=true
 - 这就是QSM V6的目标架构!
+
+## 177. 量子叠加态嵌入(Quantum Superposition Embedding)
+基于QEntL qsm_superposition_api.py(Q4模型)的理解:
+
+### 经典嵌入(Classical Embedding)
+```
+embed(token) = lookup_table[token_id]  # 单一向量
+```
+- 每个token→一个固定向量
+- 无法表示多义性(如"bank"=银行/河岸)
+- 词汇量×维度 的参数矩阵
+
+### 量子叠加态嵌入(Q-Embedding)
+```
+embed(token) = Σ c_i * basis_i  # 多基态叠加
+```
+- 每个token→多个基态的叠加
+- c_i = 叠加系数(可学习)
+- basis_i = 基态向量(可学习)
+- 可以表示多义性!("bank"同时=银行+河岸,测量后坍缩到具体含义)
+
+### Q4模型的实现(来自qsm_Q4_api.py)
+```python
+class Q4SuperpositionModel:
+    coefficients = Parameter([0.25, 0.25, 0.25, 0.25])  # 4基态系数
+    phases = Parameter(randn(4) * 0.1)                  # 4相位
+    embedding = Embedding(vocab, 128)                    # 经典嵌入
+    
+    def forward(x):
+        x = self.embedding(x)
+        for i in range(4):  # 4个基态叠加
+            phase = cos(self.phases[i])
+            x = x + self.coefficients[i] * phase * x
+        x = relu(fc1(x))
+        return fc2(x)
+```
+关键: coefficients和phases是可学习参数!
+4基态×叠加系数+相位 = 量子嵌入
+
+### V6叠加态嵌入设计
+```
+Q-Embed(token) = Σ_{i=1}^{K} c_i(t) * basis_i + Σ_{i=1}^{K} p_i(t) * phase_i
+```
+- K=4基态(与Q4一致)
+- c_i(t)=上下文相关的叠加系数
+- p_i(t)=上下文相关的相位
+- 测量(Measurement)=softmax选择最可能的基态
+- 坍缩=推理时选择最可能含义
+
+### 量子嵌入 vs 经典嵌入
+| 特性 | 经典 | 量子叠加 |
+|------|------|----------|
+| 表示 | 单向量 | 多基态叠加 |
+| 多义性 | ❌无法 | ✅叠加态 |
+| 上下文 | 靠注意力 | 叠加系数自适应 |
+| 参数量 | V×d | V×d + K×2 |
+| 物理含义 | 无 | 量子态 |
