@@ -715,3 +715,33 @@
   - 500步 = 约1.5%总训练步数(3273*30=98190)
   - V4 V2用固定LR(无warmup), 初期不稳定
   - V5应该有更平滑的Loss曲线
+
+## 59. Multi-Query Attention (MQA) vs Multi-Head Attention (MHA)
+- **MHA** (QSM当前): 每个头有独立的Q/K/V投影
+  - 参数: 4 × d_model × d_model (Q/K/V/O)
+  - 内存: O(n² × n_heads) per layer
+- **MQA**: 所有头共享K和V, 只有Q分头
+  - 参数: 更少(只有Q是多头)
+  - 推理: KV cache更小 → 2-4x加速
+  - 质量: 略低于MHA但差距很小
+- **GQA** (Grouped-Query): 介于MHA和MQA之间
+  - n_groups个KV头, n_heads个Q头
+  - Llama 2/3用GQA
+- **QSM应用**: 
+  - 当前7.5M参数小, MHA开销可接受
+  - 如果扩展到大模型(>50M), 考虑GQA
+  - 量子注意力: 可以用量子并行替代多头
+
+## 60. Encoder-Decoder vs Decoder-Only 架构选择
+- **Encoder-Decoder** (QSM V4/V5当前):
+  - 编码器处理源语言, 解码器生成目标语言
+  - 优点: 适合翻译(源和目标明确分离)
+  - 缺点: 推理慢(需要完整编码+自回归解码)
+- **Decoder-Only** (GPT/Llama):
+  - 统一处理, 因果注意力
+  - 优点: 推理快(KV cache复用), 架构简单
+  - 缺点: 翻译不如Encoder-Decoder
+- **QSM的选择**:
+  - V4/V5用Encoder-Decoder: ✅正确选择(翻译任务)
+  - 未来: 如果要做对话+翻译, 考虑Decoder-Only
+  - 混合方案: Prefix-LM(前缀用双向注意力, 生成用因果)
