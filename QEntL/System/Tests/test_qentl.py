@@ -276,6 +276,7 @@ def run_all_tests():
     ("FOR步长", test_for_step),
     ("函数返回值", test_function_return),
     ("函数参数", test_function_params),
+    ("字符串拼接", test_string_concat),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -409,6 +410,26 @@ def test_function_params():
     vm.load_qbc(qbc)
     output = vm.run(10000)
     assert any('8' in l for l in output), f"函数参数测试失败: {output}"
+
+
+
+def test_string_concat():
+    """测试18: 字符串拼接+函数字符串参数"""
+    source = """quantum_program 字符串测试 {
+        问候: 函数(名字: 字符串) {
+            让 msg = "你好，" + 名字 + "！"
+            返回 msg
+        }
+        setup: 函数() {
+            让 r = 问候("世界")
+            LOG(r)
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert any('你好' in l and '世界' in l for l in output), f"字符串拼接测试失败: {output}"
 
 
 if __name__ == '__main__':
