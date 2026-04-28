@@ -1015,3 +1015,37 @@
   - Phase 2: 纯hard labels微调
   - Phase 3: Scheduled Sampling
 - **目标**: BLEU>30(可理解翻译)
+
+## 81. Flash Attention: 内存高效的注意力机制
+- **问题**: 标准注意力O(N²)内存 → 长序列OOM
+  - QSM V5: max_len=128, 已经很小
+  - 但V6如果扩展到512+ → 内存瓶颈
+- **Flash Attention核心思想**:
+  - 分块计算: 将QKV分成小块, 每块独立计算
+  - 在线Softmax: 不需要完整N×N矩阵
+  - IO感知: 减少GPU HBM↔SRAM数据搬运
+- **Flash Attention 2**: 
+  - 优化并行性: 按序列长度而非batch并行
+  - 速度: 比标准注意力快2-4x
+  - 内存: O(N)而非O(N²)
+- **QSM限制**: CPU训练, Flash Attention需要CUDA
+  - 替代方案: xFormers的memory_efficient_attention(CPU支持有限)
+  - 或: 实现简单的分块注意力(纯Python)
+- **量子类比**: Flash Attention的分块 ≈ 量子纠缠的分区域测量
+  - 全局注意力 = 全纠缠
+  - 分块注意力 = 局部纠缠 + 边界通信
+
+## 82. QSM CPU训练优化路线图
+- **当前瓶颈**: CPU训练慢, 52K数据×30 epochs≈21小时
+- **优化方向(按优先级)**:
+  1. ✅ LR修复(已完成, 速度↑100倍)
+  2. 梯度累积(等效batch_size↑, 减少波动)
+  3. 混合精度(FP16, 需要GPU)
+  4. torch.compile()(PyTorch 2.x JIT, CPU可用)
+  5. 数据加载优化(预取+pin_memory)
+  6. 分布式训练(多CPU核心, torch.distributed)
+- **torch.compile()尝试**:
+  - `model = torch.compile(model)`
+  - 自动图优化, CPU上可提速20-50%
+  - PyTorch 2.10支持
+  - 风险: 首次编译慢, 调试困难
