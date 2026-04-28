@@ -274,6 +274,7 @@ def run_all_tests():
     ("SWAP门", test_swap_gate),
     ("隐形传态", test_quantum_teleportation),
     ("FOR步长", test_for_step),
+    ("函数返回值", test_function_return),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -368,6 +369,25 @@ def test_for_step():
     output = vm.run(10000)
     # 0+2+4 = 6
     assert any('6' in l for l in output), f"步长循环结果错误: {output}"
+
+
+
+def test_function_return():
+    """测试16: 函数返回值"""
+    source = """quantum_program 返回测试 {
+        计算: 函数() {
+            返回 8
+        }
+        setup: 函数() {
+            让 r = 计算()
+            LOG(r)
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert any('8' in l for l in output), f"函数返回值测试失败: {output}"
 
 
 if __name__ == '__main__':
