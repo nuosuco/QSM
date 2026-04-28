@@ -2016,3 +2016,54 @@ quantum_enum定义被正确解析, 不干扰量子程序执行!
 ⏳ quantum_class(类定义+字段+方法+构造函数)
 ⏳ import/export(模块导入导出)
 ⏳ namespace(命名空间)
+
+## 176. 量子注意力机制(Q-Attention)深度研究
+基于QEntL semantic_analyzer(transformer-qe5+量子加速=true):
+
+### 经典注意力(Classical Attention)
+```
+Attention(Q,K,V) = softmax(QK^T / √d) V
+```
+- Q=查询, K=键, V=值
+- softmax=概率分布
+- O(n²)复杂度
+- 全连接但权重不均匀
+
+### 量子注意力(Quantum Attention) — QEntL的实现
+```
+Q-Attention(Q,K,V) = entangle(Q,K) → measure → V
+```
+- Q,K通过量子纠缠关联(不是点积!)
+- measure=观测后坍缩到特定关联
+- O(n log n)或O(1)复杂度(纠缠即时!)
+- 纠缠=所有token同时关联(真正的全局注意力!)
+
+### 量子注意力 vs 经典注意力
+| 特性 | 经典 | 量子 |
+|------|------|------|
+| 关联方式 | 点积QK^T | 纠缠entangle(Q,K) |
+| 权重 | softmax概率 | 量子振幅+相位 |
+| 复杂度 | O(n²) | O(n log n)或O(1) |
+| 全局性 | 近似(稀疏) | 真全局(纠缠) |
+| 位置编码 | RoPE/Sin | 量子旋转RZ(θ) |
+| 多头 | 多组QKV | 多组纠缠通道 |
+
+### V6量子注意力实现方案
+Phase 1: 门控混合(经典+量子)
+```
+output = gate * quantum_attention(Q,K,V) + (1-gate) * classical_attention(Q,K,V)
+```
+gate是可学习参数,初始值0.1(主要用经典),训练后逐渐增大
+
+Phase 2: 纯量子注意力
+```
+output = entangle(Q,K) → measure → V
+```
+当量子硬件可用时,完全切换到量子注意力
+
+### transformer-qe5的含义
+QEntL的semantic_analyzer用"transformer-qe5"模型:
+- qe5 = Quantum-Enhanced 5th generation
+- 768维/4096上下文/12注意力头
+- 量子加速=true
+- 这就是QSM V6的目标架构!
