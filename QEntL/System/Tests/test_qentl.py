@@ -280,6 +280,7 @@ def run_all_tests():
     ("嵌套IF函数", test_nested_if_function),
     ("WHILE循环", test_while_loop),
     ("数组", test_array),
+    ("数组赋值", test_array_assign),
     ("Bell态纠缠", test_bell_state),
     ("内核执行", test_kernel),
     ]
@@ -495,6 +496,25 @@ def test_array():
     vm.load_qbc(qbc)
     output = vm.run(10000)
     assert '100' in output and '300' in output, f"数组测试失败: {output}"
+
+
+
+def test_array_assign():
+    """测试22: 数组元素赋值 a[i] = val"""
+    source = """quantum_program 数组赋值测试 {
+        setup: 函数() {
+            让 nums = [10, 20, 30]
+            让 nums[1] = 99
+            LOG(nums[0])
+            LOG(nums[1])
+            LOG(nums[2])
+        }
+    }"""
+    qbc = compile_qentl(source)
+    vm = QBCVirtualMachine()
+    vm.load_qbc(qbc)
+    output = vm.run(10000)
+    assert '10' in output and '99' in output and '30' in output, f"数组赋值测试失败: {output}"
 
 
 if __name__ == '__main__':

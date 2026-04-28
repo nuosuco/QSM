@@ -20,7 +20,7 @@ class OpCode(Enum):
     LOG = 0x60; INPUT = 0x61
     TYPE_DEF = 0x70; TYPE_CAST = 0x71
     OBJ_CREATE = 0x80; OBJ_GET = 0x81; OBJ_SET = 0x82
-    BUILD_LIST = 0x90; INDEX_ACCESS = 0x91
+    BUILD_LIST = 0x90; INDEX_ACCESS = 0x91; INDEX_ASSIGN = 0x92
 
 # Op name to enum mapping
 OP_MAP = {op.name: op for op in OpCode}
@@ -240,6 +240,18 @@ class QBCVirtualMachine:
                     self.stack.append(0)
             else:
                 self.stack.append(0)
+            self.ip += 1
+        elif op == OpCode.INDEX_ASSIGN:
+            val = self.stack.pop() if self.stack else 0
+            idx = self.stack.pop() if self.stack else 0
+            var_name = self.stack.pop() if self.stack else ''
+            arr = self.variables.get(str(var_name), [])
+            if isinstance(arr, list) and isinstance(idx, (int, float)):
+                i = int(idx)
+                while len(arr) <= i:
+                    arr.append(0)
+                arr[i] = val
+                self.variables[str(var_name)] = arr
             self.ip += 1
         elif op == OpCode.HALT:
             self.running = False

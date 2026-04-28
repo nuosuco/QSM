@@ -68,6 +68,7 @@ class OpCode(Enum):
     # 数组操作
     BUILD_LIST = 0x90
     INDEX_ACCESS = 0x91
+    INDEX_ASSIGN = 0x92
 
 # === 词法分析 ===
 class TokenType(Enum):
@@ -489,8 +490,18 @@ class Parser:
         node = ASTNode('Let', line=self._current().line)
         self._expect(TokenType.LET)
         node.value = self._advance().value  # variable name
-        self._expect(TokenType.ASSIGN)
-        node.children.append(self._parse_expression())
+        # Check for indexed assignment
+        if self._current().type == TokenType.LBRACKET:
+            self._advance()  # consume [
+            index = self._parse_expression()
+            self._expect(TokenType.RBRACKET)
+            node.type = 'IndexAssign'
+            self._expect(TokenType.ASSIGN)
+            node.children.append(index)
+            node.children.append(self._parse_expression())
+        else:
+            self._expect(TokenType.ASSIGN)
+            node.children.append(self._parse_expression())
         return node
     
     def _parse_for(self):
@@ -873,6 +884,13 @@ class CodeGenerator:
             self._gen_node(node.children[0])  # the array variable
             self._gen_node(node.children[1])  # the index
             self._emit(OpCode.INDEX_ACCESS, None, node.line)
+        elif node.type == 'IndexAssign':
+            # 让 a[i] = expr → push var name, index, value, INDEX_ASSIGN
+            idx = self._add_const(node.value)  # variable name
+            self._emit(OpCode.LOAD_CONST, idx, node.line)
+            self._gen_node(node.children[0])  # index
+            self._gen_node(node.children[1])  # value
+            self._emit(OpCode.INDEX_ASSIGN, None, node.line)
         
         elif node.type == 'Identifier':
             self._emit(OpCode.LOAD_VAR, node.value, node.line)
