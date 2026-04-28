@@ -100,8 +100,10 @@
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
   - 公网API: https://som.top/api/qv4/ (翻译+QEntL编译+Beam Search)
-- **V4 V2训练中**: 30000对数据, 20 Epochs, Epoch 8 Loss 1.57
-  - Val Loss 1.79 (Epoch 5), 已超越V1的2.35
+- **V4 V2训练中**: 30000对数据, 20 Epochs, Epoch 13 Loss 1.42
+  - Val Loss 1.47 (Epoch 12), 已超越V1的2.35
+  - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
+  - 解决方案: 全小写英文训练数据, 需重新训练
   - 目标: Val Loss < 1.0
 
 ## 量子自举架构（2026-04-28确立）
