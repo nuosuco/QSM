@@ -665,12 +665,48 @@ class Parser:
                 self._advance()
             return expr
 
+        def _parse_if(self):
+            node = ASTNode('If', line=self._current().line)
+            self._expect(TokenType.IF)
+            node.children.append(self._parse_expression())  # condition
+            node.children.append(self._parse_block())  # if-body
+            # Handle elif chain
+            while self._current().type == TokenType.ELIF:
+                self._advance()  # skip '否则如果'
+                elif_node = ASTNode('If', line=self._current().line)
+                elif_node.children.append(self._parse_expression())  # condition
+                elif_node.children.append(self._parse_block())  # elif-body
+                # Check for else after this elif
+                if self._current().type == TokenType.ELSE:
+                    self._advance()  # skip '否则'
+                    elif_node.children.append(self._parse_block())  # else-body
+                node.children.append(elif_node)
+            # Handle final else
+            if self._current().type == TokenType.ELSE:
+                self._advance()  # skip '否则'
+                if self._current().type == TokenType.IF:
+                    node.children.append(self._parse_if())  # else if
+                else:
+                    node.children.append(self._parse_block())  # else-body
+            return node
+
     def _parse_if(self):
         node = ASTNode('If', line=self._current().line)
         self._expect(TokenType.IF)
-        node.children.append(self._parse_expression())
-        node.children.append(self._parse_block())
-        if self._current().type in (TokenType.ELSE, TokenType.ELIF):
+        node.children.append(self._parse_expression())  # condition
+        node.children.append(self._parse_block())  # if-body
+        # Handle elif chain
+        while self._current().type == TokenType.ELIF:
+            self._advance()  # skip '否则如果'
+            elif_node = ASTNode('If', line=self._current().line)
+            elif_node.children.append(self._parse_expression())
+            elif_node.children.append(self._parse_block())
+            if self._current().type == TokenType.ELSE:
+                self._advance()
+                elif_node.children.append(self._parse_block())
+            node.children.append(elif_node)
+        # Handle final else
+        if self._current().type == TokenType.ELSE:
             self._advance()
             if self._current().type == TokenType.IF:
                 node.children.append(self._parse_if())
