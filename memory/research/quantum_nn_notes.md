@@ -2717,3 +2717,32 @@ class LinearAttention(nn.Module):
 - V6-Balanced (28K对, 50%彝文): Val < 1.5 有望
 - 关键指标: 模型能否输出彝文字符
 - 即使翻译不准, 只要能输出彝文就是重大突破
+
+## 194. 量子注意力机制与低资源翻译 (2026-04-30)
+
+### V6 E2过拟合分析
+- E1: Train 5.17, Val 5.65
+- E2: Train 4.99, Val 5.97 ← Val上升!
+- 早期过拟合原因:
+  1. batch_size=8太小→梯度噪声大
+  2. Q-Embedding参数少但表达力强→快速记忆
+  3. 50%彝文数据多样性可能不足
+
+### 解决方案(下一版本)
+1. **增大batch_size到16** — 减少梯度噪声
+2. **Label smoothing=0.1** — 防止过拟合
+3. **Dropout增加到0.2** — 更强正则化
+4. **梯度累积** — 模拟更大batch
+5. **课程学习** — 先学字符,再学词,最后句子
+
+### 量子注意力改进方向(V7+)
+- **Rotary Position Embedding (RoPE)**: 绝对位置→相对位置
+- **Flash Attention**: O(n²)→O(n)内存, 不改计算
+- **Mixture of Experts (MoE)**: 2.8M→1M活跃参数
+- **量子哈密顿量注意力**: H|ψ⟩=E|ψ⟩, 时间演化自然注意力
+- 参考: Quantum Attention (Li et al., 2023)
+
+### Q-Embedding与RoPE结合
+- Q-Embedding的4基态共享→自然RoPE旋转
+- 每个基态有独立的旋转频率
+- cos(θ_i + mω_i) + sin(θ_i + mω_i) → 量子叠加自然支持
