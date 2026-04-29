@@ -1011,6 +1011,7 @@ class CodeGenerator:
             self._emit(OpCode.LOAD_VAR, f'_for_end_{node.value}', node.line)
             self._emit(OpCode.LT, None, node.line)
             self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
+            self.loop_label_stack.append((start_label, end_label))
             self._gen_node(node.children[1])
             self._emit(OpCode.LOAD_VAR, node.value, node.line)
             # Use step from Range if available, else default 1
@@ -1024,6 +1025,7 @@ class CodeGenerator:
             self._emit(OpCode.STORE_VAR, node.value, node.line)
             self._emit(OpCode.JUMP, start_label, node.line)
             self.instructions.append({'op': 'LABEL', 'name': end_label})
+            self.loop_label_stack.pop()
         elif node.type == 'While':
             start_label = self._new_label()
             end_label = self._new_label()

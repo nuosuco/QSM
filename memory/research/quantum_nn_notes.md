@@ -2562,3 +2562,40 @@ class QuantumEmbedding(nn.Module):
 2. 训练观察叠加系数分布 → 确认是否形成有意义的聚类
 3. 如效果不佳, 尝试Bloch球编码 + Q-Embedding混合
 4. 最终: 训练Q-Embedding系数 → 形成自适应量子编码
+
+## 190. 课程学习(Curriculum Learning) - V6训练策略 (2026-04-29)
+
+**问题**: V5训练中彝文比例仅3.3%, 模型难以学会彝文输出.
+V6虽提高到9.5%, 但直接混合训练仍可能导致多数类(中文)主导梯度.
+
+**课程学习方案**: 从易到难, 逐步增加彝文比例
+
+```
+Phase 1 (E1-5): 100% 字符级数据 (彝文单字→含义)
+Phase 2 (E6-10): 70% 字符级 + 30% 词级 (彝文2-3字组合)
+Phase 3 (E11-20): 40% 词级 + 40% 句级 + 20% 对话
+Phase 4 (E21-30): 20% 句级 + 50% 对话 + 30% 推理
+```
+
+**为什么课程学习有效**:
+1. 彝文单字→含义 最简单, 先建立基本映射
+2. 词级需要学会连续输出彝文字符
+3. 句级需要SOV语序转换
+4. 对话/推理需要真正的语言理解
+
+**V6训练数据分布设计**:
+- 1500条字符学习 (Phase 1)
+- 10740条密集训练 (Phase 2-3)
+- 2000条谚语/对话 (Phase 3-4)
+- 255条SOV语法 (Phase 3)
+- 其余混合数据 (Phase 4)
+
+**实现**: 在训练脚本中, 按epoch动态调整数据采样权重
+```python
+def get_sample_weights(epoch, data_difficulty):
+    if epoch < 5:  # Phase 1
+        return [10.0 if d['difficulty']=='char' else 0.5 for d in data_difficulty]
+    elif epoch < 10:  # Phase 2
+        return [5.0 if d['difficulty'] in ['char','word'] else 1.0 for d in data_difficulty]
+    ...
+```
