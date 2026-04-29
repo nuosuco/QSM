@@ -72,6 +72,7 @@ class OpCode(Enum):
     BUILTIN_CALL = 0x95  # 内置函数调用
     # 数组操作
     BUILD_LIST = 0x90
+    BUILD_DICT = 0x93
     INDEX_ACCESS = 0x91
     INDEX_ASSIGN = 0x92
     # 扩展操作
@@ -263,6 +264,7 @@ class Lexer:
                 '(': TokenType.LPAREN, ')': TokenType.RPAREN,
                 '[': TokenType.LBRACKET, ']': TokenType.RBRACKET,
                 '.': TokenType.DOT, ',': TokenType.COMMA,
+    ':': TokenType.COLON,
                 ':': TokenType.COLON, ';': TokenType.SEMICOLON,
                 '=': TokenType.ASSIGN,
         '+=': TokenType.PLUS_ASSIGN,
@@ -908,7 +910,7 @@ class Parser:
             # 类型 as built-in function call
             return self._parse_builtin_call(t.value)
         elif t.type == TokenType.IDENTIFIER:
-            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值'}
+            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典'}
             if t.value in builtin_funcs and self._peek() and self._peek().type == TokenType.LPAREN:
                 return self._parse_builtin_call(t.value)
             self._advance()
@@ -952,6 +954,7 @@ class Parser:
             return expr
         elif t.type == TokenType.LBRACKET:
             return self._parse_list()
+
         elif t.type == TokenType.LBRACE:
             return self._parse_object_literal()
         else:
@@ -982,7 +985,7 @@ class Parser:
         self._expect(TokenType.RBRACKET)
         return node
 
-# === 代码生成器 (.qentl -> .qbc) ===
+
 class CodeGenerator:
     def __init__(self):
         self.instructions = []

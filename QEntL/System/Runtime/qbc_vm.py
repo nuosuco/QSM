@@ -21,7 +21,13 @@ class OpCode(Enum):
     TYPE_DEF = 0x70; TYPE_CAST = 0x71; CLASS_DEF = 0xF3; INTERFACE_DEF = 0xF4; IMPORT = 0xF1; EXPORT = 0xF2
     OBJ_CREATE = 0x80; OBJ_GET = 0x81; OBJ_SET = 0x82
     BUILTIN_CALL = 0x95
-    BUILD_LIST = 0x90; INDEX_ACCESS = 0x91; INDEX_ASSIGN = 0x92; UNARY_NOT = 0xF7; DOT_ACCESS = 0xF5; BOOL_LOAD = 0xF8
+    BUILD_LIST = 0x90
+    BUILD_DICT = 0x93
+    INDEX_ACCESS = 0x91
+    INDEX_ASSIGN = 0x92
+    UNARY_NOT = 0xF7
+    DOT_ACCESS = 0xF5
+    BOOL_LOAD = 0xF8
 
 # Op name to enum mapping
 OP_MAP = {op.name: op for op in OpCode}
@@ -216,7 +222,9 @@ class QBCVirtualMachine:
         elif op == OpCode.INDEX_ACCESS:
             idx = self.stack.pop() if self.stack else 0
             arr = self.stack.pop() if self.stack else []
-            if isinstance(arr, (list, str)) and isinstance(idx, (int, float)):
+            if isinstance(arr, dict):
+                self.stack.append(arr.get(idx, 0))
+            elif isinstance(arr, (list, str)) and isinstance(idx, (int, float)):
                 i = int(idx)
                 if 0 <= i < len(arr):
                     self.stack.append(arr[i])
@@ -561,6 +569,21 @@ class QBCVirtualMachine:
                     b = self.stack.pop()
                     a = self.stack.pop()
                     self.stack.append(min(a, b))
+            elif func_name == '字典':
+                # 字典() → empty dict
+                # 字典([k1,v1,k2,v2,...]) → dict from flat array
+                if self.stack:
+                    arg = self.stack.pop()
+                    if isinstance(arg, list) and len(arg) >= 2:
+                        d = {}
+                        for i in range(0, len(arg), 2):
+                            if i+1 < len(arg):
+                                d[arg[i]] = arg[i+1]
+                        self.stack.append(d)
+                    else:
+                        self.stack.append({})
+                else:
+                    self.stack.append({})
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
