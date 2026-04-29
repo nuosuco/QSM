@@ -2888,3 +2888,27 @@ class QuantumRotationAttention(nn.Module):
 - 注意力 = 量子态的时间演化
 - 计算复杂度: O(n·K) 其中K是截断的键维度
 - 参考: Quantum Hamiltonian Embedding (Lloyd et al., 2023)
+
+## 199. 知识蒸馏与模型压缩 (2026-04-30)
+
+### 为什么V6小模型比V5大模型更好?
+- V5: 7.5M参数(256d/3层/4头) + 3.3%彝文 → Val 2.19但输出乱码
+- V6: 2.86M参数(192d/2层/3头) + 50%彝文 → Val 3.06但输出有意义中文
+- 核心教训: **数据质量 > 模型大小**
+
+### 知识蒸馏(Knowledge Distillation)方案
+Teacher: V5(7.5M参数) → Student: V6(2.86M参数)
+1. 用Teacher生成soft labels(概率分布而非one-hot)
+2. Student同时学习hard labels和soft labels
+3. 温度T控制soft label的平滑度
+4. Loss = α*hard_loss + (1-α)*soft_loss
+
+### 量子蒸馏(Quantum Distillation)
+- Teacher: 经典Transformer注意力矩阵 → Student: 量子门控注意力
+- 将经典注意力分布作为量子测量的目标
+- 量子门控gate值可以从Teacher注意力权重初始化
+
+### 对QSM的启示
+- V6已经证明小模型+好数据>大模型+差数据
+- 下一步: 用V6(Teacher)训练更小的V7(Student)用于部署
+- 目标: 1M参数的V7可以跑在手机上
