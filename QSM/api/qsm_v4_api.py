@@ -646,4 +646,52 @@ if __name__ == '__main__':
     else:
         print("⚠️ V4模型未找到，启动为编译服务模式")
     
+
+@app.route('/v6/status', methods=['GET'])
+def v6_status():
+    import os, re, subprocess
+    log_path = '/tmp/qsm_v6_training.log'
+    status = {"training": False, "model": "V6 Q-Embedding", "progress": None}
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, 'r') as f:
+                lines = f.readlines()
+            last_lines = lines[-10:]
+            status["training"] = True
+            for line in reversed(last_lines):
+                m = re.search(r'E(\d+)/\d+\s+B(\d+)/(\d+)\s+L:([\d.]+)\s+lr:([\d.]+)', line)
+                if m:
+                    status["progress"] = {
+                        "epoch": int(m.group(1)),
+                        "batch": int(m.group(2)),
+                        "total_batches": int(m.group(3)),
+                        "loss": float(m.group(4)),
+                        "learning_rate": float(m.group(5))
+                    }
+                    break
+            for line in reversed(last_lines):
+                m = re.search(r'Epoch (\d+).*Train:([\d.]+).*Val:([\d.]+).*Best:([\d.]+)', line)
+                if m:
+                    status["last_epoch"] = {
+                        "epoch": int(m.group(1)),
+                        "train_loss": float(m.group(2)),
+                        "val_loss": float(m.group(3)),
+                        "best_val": float(m.group(4))
+                    }
+                    break
+            for line in reversed(last_lines):
+                if 'Best!' in line:
+                    status["new_best"] = True
+                    break
+        except:
+            pass
+    try:
+        result = subprocess.run(['pgrep', '-f', 'train_v6'], capture_output=True, text=True)
+        status["process_running"] = bool(result.stdout.strip())
+    except:
+        status["process_running"] = None
+    return jsonify(status)
+
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8002, debug=False)
