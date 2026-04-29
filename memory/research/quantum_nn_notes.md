@@ -2164,3 +2164,56 @@ q_rot = apply_rz_gate(q, theta=pos * base_freq)
 - 量子旋转=自然的相对位置编码
 - RZ门相位差=位置间距离
 - 纠缠=位置关联(全局位置感知!)
+
+## 179. 门控混合机制(Gate-Controlled Mixture)深度设计
+基于QSM V6架构: gate * quantum + (1-gate) * classical
+
+### 核心公式
+```
+output = σ(gate) × Q-Attention(Q,K,V) + (1 - σ(gate)) × C-Attention(Q,K,V)
+```
+- gate = 可学习参数 (初始0.1, 让经典注意力主导)
+- σ = sigmoid, 确保gate在[0,1]范围
+- 训练过程中gate自动调整经典vs量子的比例
+
+### 渐进式量子渗透策略
+```
+Epoch 1-5:   gate ≈ 0.1  (90%经典, 10%量子) ← 安全启动
+Epoch 6-10:  gate ≈ 0.3  (70%经典, 30%量子) ← 量子参与
+Epoch 11-15: gate ≈ 0.5  (50%经典, 50%量子) ← 均衡混合
+Epoch 16-20: gate ≈ 0.7  (30%经典, 70%量子) ← 量子主导
+Epoch 21+:   gate ≈ 0.9  (10%经典, 90%量子) ← 接近纯量子
+```
+
+### V5当前架构(对照)
+```python
+class QSM_V5(nn.Module):
+    def __init__(self, vocab, d_model=384, n_heads=6, n_layers=4):
+        # 经典Transformer encoder-decoder
+        # 量子门控: gate * x + (1-gate) * relu(x)
+        # 这是V5已有的门控! 但只是激活函数级别
+```
+
+### V6升级路线
+Level 1: 激活函数门控(已有) → Level 2: 注意力门控(目标) → Level 3: 纯量子
+
+### 门控梯度的关键洞察
+- gate的梯度: ∂L/∂gate = (Q_out - C_out) × ∂L/∂output
+- 当量子注意力优于经典时, gate梯度为正, gate增大
+- 当经典注意力优于量子时, gate梯度为负, gate减小
+- 这就是"自适应量子渗透"——模型自己学习何时用量子!
+
+### 实现伪代码(QEntL风格)
+```
+让 gate = 0.1  // 初始值
+让 quantum_out = quantum_attention(query, key, value)
+让 classical_out = classical_attention(query, key, value)
+让 output = sigmoid(gate) * quantum_out + (1 - sigmoid(gate)) * classical_out
+// gate自动学习: 好的量子输出→gate增大
+```
+
+### 与QEntL quantum_processor的对应
+QEntL中quantum_processor.qentl使用门控量子电路:
+- QUANTUM_GATE → 应用量子门
+- GATE_CONTROLLED → 门控混合
+- 这就是QEntL级别的门控机制实现!
