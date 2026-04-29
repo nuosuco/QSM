@@ -305,6 +305,17 @@ class QBCVirtualMachine:
                 val = self.stack.pop()
                 if isinstance(val, bool):
                     self.stack.append(not val)
+                elif op == OpCode.DOT_ACCESS:
+                    # Get field/method from object on stack
+                    if len(self.stack) >= 1:
+                        obj = self.stack.pop()
+                        field_name = operand
+                        if isinstance(obj, dict) and field_name in obj:
+                            self.stack.append(obj[field_name])
+                        else:
+                            self.stack.append(None)
+                    self.ip += 1
+
                 elif isinstance(val, (int, float)):
                     self.stack.append(1 if val == 0 else 0)
                 else:
