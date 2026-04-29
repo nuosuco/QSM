@@ -1159,34 +1159,71 @@ class CodeGenerator:
             start_label = self._new_label()
             end_label = self._new_label()
             range_node = node.children[0]
-            if range_node.type == 'Range':
+            if range_node.type == 'Range' or (range_node.type == 'Call' and range_node.value == '范围'):
                 self._gen_node(range_node.children[0])
                 self._emit(OpCode.STORE_VAR, node.value, node.line)
                 self._gen_node(range_node.children[1])
                 self._emit(OpCode.STORE_VAR, f'_for_end_{node.value}', node.line)
-            else:
-                self._gen_node(range_node)
+                self.instructions.append({'op': 'LABEL', 'name': start_label})
+                self._emit(OpCode.LOAD_VAR, node.value, node.line)
+                self._emit(OpCode.LOAD_VAR, f'_for_end_{node.value}', node.line)
+                self._emit(OpCode.LT, None, node.line)
+                self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
+                self.loop_label_stack.append((start_label, end_label))
+                self._gen_node(node.children[1])
+                self._emit(OpCode.LOAD_VAR, node.value, node.line)
+                # Use step from Range if available, else default 1
+                if (range_node.type == 'Range' or range_node.type == 'Call') and len(range_node.children) > 2:
+                    self._gen_node(range_node.children[2])
+                else:
+                    step_idx = self._add_const(1)
+                    self._emit(OpCode.LOAD_CONST, step_idx, node.line)
+                self._emit(OpCode.ADD, None, node.line)
                 self._emit(OpCode.STORE_VAR, node.value, node.line)
-            self.instructions.append({'op': 'LABEL', 'name': start_label})
-            self._emit(OpCode.LOAD_VAR, node.value, node.line)
-            self._emit(OpCode.LOAD_VAR, f'_for_end_{node.value}', node.line)
-            self._emit(OpCode.LT, None, node.line)
-            self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
-            self.loop_label_stack.append((start_label, end_label))
-            self._gen_node(node.children[1])
-            self._emit(OpCode.LOAD_VAR, node.value, node.line)
-            # Use step from Range if available, else default 1
-            if range_node.type == 'Range' and len(range_node.children) > 2:
-                self._gen_node(range_node.children[2])
+                self._emit(OpCode.JUMP, start_label, node.line)
+                self.instructions.append({'op': 'LABEL', 'name': end_label})
+                self.loop_label_stack.pop()
             else:
-                step_idx = len(self.constants)
-                self.constants.append(1)
-                self._emit(OpCode.LOAD_CONST, step_idx, node.line)
-            self._emit(OpCode.ADD, None, node.line)
-            self._emit(OpCode.STORE_VAR, node.value, node.line)
-            self._emit(OpCode.JUMP, start_label, node.line)
-            self.instructions.append({'op': 'LABEL', 'name': end_label})
-            self.loop_label_stack.pop()
+                # Array iteration: 循环 x 在 arr { ... }
+                iter_arr = f'_for_arr_{node.value}'
+                iter_idx = f'_for_idx_{node.value}'
+                self._gen_node(range_node)  # push arr
+                self._emit(OpCode.STORE_VAR, iter_arr, node.line)
+                zero_idx = self._add_const(0)
+                self._emit(OpCode.LOAD_CONST, zero_idx, node.line)
+                self._emit(OpCode.STORE_VAR, iter_idx, node.line)
+                # Store arr length as end
+                self._emit(OpCode.LOAD_VAR, iter_arr, node.line)
+                self._emit(OpCode.BUILTIN_CALL, '长度', node.line)
+                self._emit(OpCode.STORE_VAR, f'_for_end_{node.value}', node.line)
+                # Init loop var to arr[0]
+                self._emit(OpCode.LOAD_VAR, iter_arr, node.line)
+                self._emit(OpCode.LOAD_VAR, iter_idx, node.line)
+                self._emit(OpCode.INDEX_ACCESS, None, node.line)
+                self._emit(OpCode.STORE_VAR, node.value, node.line)
+                self.instructions.append({'op': 'LABEL', 'name': start_label})
+                # Check idx < length
+                self._emit(OpCode.LOAD_VAR, iter_idx, node.line)
+                self._emit(OpCode.LOAD_VAR, f'_for_end_{node.value}', node.line)
+                self._emit(OpCode.LT, None, node.line)
+                self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
+                self.loop_label_stack.append((start_label, end_label))
+                # Body
+                self._gen_node(node.children[1])
+                # Increment idx and update loop var
+                self._emit(OpCode.LOAD_VAR, iter_idx, node.line)
+                one_idx = self._add_const(1)
+                self._emit(OpCode.LOAD_CONST, one_idx, node.line)
+                self._emit(OpCode.ADD, None, node.line)
+                self._emit(OpCode.STORE_VAR, iter_idx, node.line)
+                # Update x = arr[idx]
+                self._emit(OpCode.LOAD_VAR, iter_arr, node.line)
+                self._emit(OpCode.LOAD_VAR, iter_idx, node.line)
+                self._emit(OpCode.INDEX_ACCESS, None, node.line)
+                self._emit(OpCode.STORE_VAR, node.value, node.line)
+                self._emit(OpCode.JUMP, start_label, node.line)
+                self.instructions.append({'op': 'LABEL', 'name': end_label})
+                self.loop_label_stack.pop()
         elif node.type == 'While':
             start_label = self._new_label()
             end_label = self._new_label()

@@ -1,0 +1,21 @@
+# QEntL FOR-in-array 遍历测试
+测试遍历: 函数() {
+    # 数组遍历
+    让 arr = [10, 20, 30]
+    循环 x 在 arr {
+        LOG(x)
+    }
+    
+    # 字符串数组遍历
+    让 names = ["彝", "中", "英"]
+    循环 n 在 names {
+        LOG(n)
+    }
+    
+    # 范围遍历
+    让 sum = 0
+    循环 i 在 范围(1, 5) {
+        让 sum = sum + i
+    }
+    LOG(sum)
+}
