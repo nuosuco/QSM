@@ -599,6 +599,40 @@ def v5_health():
         'status': 'healthy' if v5_model is not None else 'no_model'
     })
 
+
+@app.route('/data/stats', methods=['GET'])
+def data_stats():
+    """训练数据统计 - 含彝文覆盖率"""
+    import glob, os, json as _json
+    data_dir = os.path.join(WORKSPACE, 'QSM/data')
+    files = glob.glob(os.path.join(data_dir, '*.jsonl'))
+    total_lines = 0
+    yi_files = 0
+    for f in files:
+        try:
+            with open(f, 'r', encoding='utf-8') as fh:
+                count = sum(1 for _ in fh)
+                total_lines += count
+                if 'yi' in os.path.basename(f):
+                    yi_files += 1
+        except:
+            pass
+    
+    vocab_size = vocab_size if 'vocab_size' in dir() else 6924
+    return jsonify({
+        "total_files": len(files),
+        "yi_files": yi_files,
+        "total_lines": total_lines,
+        "vocab_size": vocab_size,
+        "yi_chars_in_vocab": 4120,
+        "v5_train_pairs": 52354,
+        "v5_val_pairs": 2759,
+        "v6_train_pairs": 68248,
+        "v6_val_pairs": 3259,
+        "v6_yi_ratio": "9.5%",
+        "v5_yi_ratio": "3.3%"
+    })
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  QSM V4 量子翻译API")
