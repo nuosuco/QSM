@@ -216,12 +216,12 @@ class QBCVirtualMachine:
         elif op == OpCode.INDEX_ACCESS:
             idx = self.stack.pop() if self.stack else 0
             arr = self.stack.pop() if self.stack else []
-            if isinstance(arr, list) and isinstance(idx, (int, float)):
+            if isinstance(arr, (list, str)) and isinstance(idx, (int, float)):
                 i = int(idx)
                 if 0 <= i < len(arr):
                     self.stack.append(arr[i])
                 else:
-                    self.stack.append(0)
+                    self.stack.append(0 if isinstance(arr, list) else '')
             else:
                 self.stack.append(0)
             self.ip += 1
