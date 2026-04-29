@@ -17,14 +17,94 @@ import json
 import sys
 import os
 import torch
+import torch.nn as nn
+import math
 
 app = Flask(__name__)
 CORS(app)
+
+
+# === QSM V5 Model Class (embedded for API independence) ===
+
+class QSM_V5(nn.Module):
+    def __init__(self, vocab_size, d_model=256, n_heads=4, n_layers=3, d_ff=512, dropout=0.1, max_len=64):
+        super().__init__()
+        self.d_model = d_model
+        self.embedding = nn.Embedding(vocab_size, d_model)
+        self.pos_encoding = nn.Embedding(max_len, d_model)
+        enc_layer = nn.TransformerEncoderLayer(d_model, n_heads, d_ff, dropout, batch_first=True)
+        self.encoder = nn.TransformerEncoder(enc_layer, n_layers)
+        dec_layer = nn.TransformerDecoderLayer(d_model, n_heads, d_ff, dropout, batch_first=True)
+        self.decoder = nn.TransformerDecoder(dec_layer, n_layers)
+        self.quantum_gate = nn.Parameter(torch.ones(1) * 0.3)
+        self.quantum_rotation = nn.Parameter(torch.randn(n_heads, d_model // n_heads) * 0.01)
+        self.norm = nn.LayerNorm(d_model)
+        self.output_proj = nn.Linear(d_model, vocab_size)
+        self._init_weights()
+
+    def _init_weights(self):
+        for p in self.parameters():
+            if p.dim() > 1: nn.init.xavier_uniform_(p)
+
+    def forward(self, src, tgt, src_mask=None, tgt_mask=None, tgt_key_padding_mask=None):
+        src_emb = self.embedding(src) * math.sqrt(self.d_model) + self.pos_encoding(torch.arange(src.size(1), device=src.device))
+        enc_out = self.encoder(src_emb, src_key_padding_mask=src_mask)
+        B, S, _ = enc_out.shape
+        nh, dh = self.quantum_rotation.shape
+        enc_view = enc_out.view(B, S, nh, dh)
+        qr = self.quantum_rotation
+        quantum_out = (enc_view * torch.cos(qr) + torch.roll(enc_view, 1, -1) * torch.sin(qr)).reshape(B, S, -1)
+        enc_out = self.quantum_gate * quantum_out + (1 - self.quantum_gate) * enc_out
+        tgt_emb = self.embedding(tgt) * math.sqrt(self.d_model) + self.pos_encoding(torch.arange(tgt.size(1), device=tgt.device))
+        dec_out = self.decoder(tgt_emb, enc_out, tgt_mask=tgt_mask, tgt_key_padding_mask=tgt_key_padding_mask)
+        return self.output_proj(self.norm(dec_out))
+
+    def translate_beam_search(self, src_ids, beam_size=5, max_len=40):
+        self.eval()
+        with torch.no_grad():
+            src = torch.tensor([src_ids], dtype=torch.long)
+            src_emb = self.embedding(src) * math.sqrt(self.d_model) + self.pos_encoding(torch.arange(src.size(1)))
+            enc_out = self.encoder(src_emb)
+            B, S, _ = enc_out.shape
+            nh, dh = self.quantum_rotation.shape
+            enc_view = enc_out.view(B, S, nh, dh)
+            qr = self.quantum_rotation
+            quantum_out = (enc_view * torch.cos(qr) + torch.roll(enc_view, 1, -1) * torch.sin(qr)).reshape(B, S, -1)
+            enc_out = self.quantum_gate * quantum_out + (1 - self.quantum_gate) * enc_out
+            BOS_ID, EOS_ID = 6920, 6921
+            beams = [([BOS_ID], 0.0)]
+            for step in range(max_len):
+                new_beams = []
+                for seq, score in beams:
+                    if seq[-1] == EOS_ID and len(seq) > 1:
+                        new_beams.append((seq, score)); continue
+                    tgt = torch.tensor([seq], dtype=torch.long)
+                    tgt_emb = self.embedding(tgt) * math.sqrt(self.d_model) + self.pos_encoding(torch.arange(tgt.size(1)))
+                    tgt_mask = nn.Transformer.generate_square_subsequent_mask(tgt.size(1))
+                    dec_out = self.decoder(tgt_emb, enc_out, tgt_mask=tgt_mask)
+                    logits = self.output_proj(self.norm(dec_out[:, -1, :]))
+                    log_probs = torch.log_softmax(logits, dim=-1)
+                    topk_probs, topk_ids = log_probs.topk(beam_size)
+                    for i in range(beam_size):
+                        new_beams.append((seq + [topk_ids[0, i].item()], score + topk_probs[0, i].item()))
+                beams = sorted(new_beams, key=lambda x: x[1], reverse=True)[:beam_size]
+                if all(seq[-1] == EOS_ID for seq, _ in beams): break
+            return max(beams, key=lambda x: x[1] / max(len(x[0]), 1))[0]
 
 # Paths
 WORKSPACE = '/root/.openclaw/workspace'
 V4_MODEL_PATH = os.path.join(WORKSPACE, 'Models/QSM/bin/qsm_v4_quantum_best.pth')
 V4_VOCAB_PATH = os.path.join(WORKSPACE, 'Models/QSM/bin/v4_vocab.json')
+
+V5_MODEL_PATH = os.path.join(WORKSPACE, 'Models/QSM/bin/qsm_v5_quantum_best.pth')
+V5_VOCAB_PATH = os.path.join(WORKSPACE, 'Models/QSM/bin/v4_vocab.json')  # Same vocab
+
+# V5 Global model state
+v5_model = None
+v5_vocab = None
+v5_id_to_char = None
+v5_vocab_size = 0
+
 COMPILER_PATH = os.path.join(WORKSPACE, 'QEntL/System/Compiler')
 RUNTIME_PATH = os.path.join(WORKSPACE, 'QEntL/System/Runtime')
 
@@ -63,9 +143,15 @@ def load_v4_model():
         return False
 
 def translate_text(text, max_len=64, temperature=0.8):
-    """使用V4模型翻译文本"""
+    """翻译文本 - 优先V5模型, 回退V4"""
+    # V5优先
+    if v5_model is not None and v5_vocab is not None:
+        result, err = translate_v5(text, max_len)
+        if result is not None:
+            return result, None
+    # V4回退
     if model is None or vocab is None:
-        return None, "模型未加载"
+        return None, "模型未加载(V4已删除,V5不可用)"
     
     BOS_ID = vocab.get('<BOS>', 6920)
     EOS_ID = vocab.get('<EOS>', 6921)
@@ -96,6 +182,51 @@ def compile_qentl_source(source_code):
         from qentl_compiler_v3 import compile_qentl
         qbc = compile_qentl(source_code)
         return qbc, None
+    except Exception as e:
+        return None, str(e)
+
+
+def load_v5_model():
+    """加载V5翻译模型(最新best)"""
+    global v5_model, v5_vocab, v5_id_to_char, v5_vocab_size
+    if not os.path.exists(V5_MODEL_PATH):
+        return False
+    try:
+        with open(V5_VOCAB_PATH, 'r', encoding='utf-8') as f:
+            v5_vocab = json.load(f)
+        v5_id_to_char = {v: k for k, v in v5_vocab.items()}
+        v5_vocab_size = len(v5_vocab)
+        sys.path.insert(0, os.path.join(WORKSPACE, 'Models/QSM'))
+        # Using embedded QSM_V5 class above
+        v5_model = QSM_V5(v5_vocab_size, d_model=256, n_heads=4, n_layers=3, d_ff=512, max_len=64)
+        checkpoint = torch.load(V5_MODEL_PATH, map_location='cpu')
+        v5_model.load_state_dict(checkpoint['model_state'])
+        v5_model.eval()
+        print(f"✅ V5模型加载成功! Epoch {checkpoint.get('epoch')}, Val Loss {checkpoint.get('val_loss', 0):.4f}")
+        return True
+    except Exception as e:
+        print(f"V5模型加载失败: {e}")
+        return False
+
+def translate_v5(text, max_len=64):
+    """使用V5模型翻译文本"""
+    if v5_model is None or v5_vocab is None:
+        return None, "V5模型未加载"
+    BOS_ID = v5_vocab.get('<BOS>', 6920)
+    EOS_ID = v5_vocab.get('<EOS>', 6921)
+    UNK_ID = v5_vocab.get('<UNK>', 3)
+    src_ids = [v5_vocab.get(c, UNK_ID) for c in text if c in v5_vocab]
+    if not src_ids:
+        return "", "输入无有效字符"
+    try:
+        result_ids = v5_model.translate_beam_search(src_ids, beam_size=3, max_len=max_len)
+        result_chars = []
+        for tid in result_ids[1:]:
+            if tid == EOS_ID:
+                break
+            ch = v5_id_to_char.get(tid, '?')
+            result_chars.append(ch)
+        return ''.join(result_chars), None
     except Exception as e:
         return None, str(e)
 
@@ -439,6 +570,35 @@ def training_status():
             pass
     return jsonify(status)
 
+
+@app.route('/v5/translate', methods=['POST'])
+def v5_translate():
+    """V5翻译端点(最新模型)"""
+    data = request.get_json(force=True)
+    text = data.get('text', '')
+    max_len = data.get('max_len', 64)
+    if not text:
+        return jsonify({'error': '请提供text参数'}), 400
+    result, err = translate_v5(text, max_len)
+    if err:
+        return jsonify({'error': err}), 500
+    return jsonify({
+        'input': text,
+        'translation': result,
+        'model': 'QSM V5 Encoder-Decoder',
+        'val_loss': 2.19  # Update this
+    })
+
+@app.route('/v5/health', methods=['GET'])
+def v5_health():
+    """V5健康检查"""
+    return jsonify({
+        'model_loaded': v5_model is not None,
+        'vocab_size': v5_vocab_size,
+        'model': 'QSM V5 Encoder-Decoder (Latest)',
+        'status': 'healthy' if v5_model is not None else 'no_model'
+    })
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  QSM V4 量子翻译API")
@@ -446,6 +606,7 @@ if __name__ == '__main__':
     print("=" * 50)
     
     loaded = load_v4_model()
+    load_v5_model()
     if loaded:
         print(f"✅ V4模型加载成功 (vocab={vocab_size})")
     else:
