@@ -321,6 +321,13 @@ class Parser:
         self.pos += 1
         return t
 
+    def _peek(self, offset=1) -> Token:
+        """Look ahead without consuming"""
+        idx = self.pos + offset
+        if idx < len(self.tokens):
+            return self.tokens[idx]
+        return self.tokens[-1]  # EOF
+
     def _at_end(self) -> bool:
         return self._current().type == TokenType.EOF
 
@@ -424,6 +431,15 @@ class Parser:
             return self._parse_config()
         elif t.type == TokenType.TYPE:
             return self._parse_type_def()
+        elif t.type == TokenType.IDENTIFIER and self._peek().type == TokenType.COLON:
+            # Labeled declaration: 函数名: 函数(args) { body }
+            label = self._advance().value
+            self._advance()  # skip :
+            if self._current().type == TokenType.FUNC:
+                node = self._parse_function(name_override=label)
+                return node
+            else:
+                return None
         elif t.type == TokenType.FUNC:
             return self._parse_function()
         elif t.type == TokenType.QUANTUM_PROGRAM:
@@ -468,10 +484,14 @@ class Parser:
         self._expect(TokenType.RBRACE)
         return node
 
-    def _parse_function(self):
+    def _parse_function(self, name_override=None):
         node = ASTNode('Function', line=self._current().line)
         self._expect(TokenType.FUNC)
-        node.value = self._advance().value  # function name
+        if name_override:
+            node.value = name_override
+            # Skip default name parsing - next token should be LPAREN
+        else:
+            node.value = self._advance().value  # function name
         self._expect(TokenType.LPAREN)
         # Parameters
         while self._current().type != TokenType.RPAREN:
