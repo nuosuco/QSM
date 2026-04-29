@@ -110,8 +110,8 @@
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
   - 公网API: https://som.top/api/v5/translate (V5翻译) + /api/q1/ (V5) + /api/qv4/ (V5 fallback+QEntL编译+量子电路)
-- **V5训练中**: 52K数据, 30 Epochs, **E27进行中**, Best E25 Val 2.1857🔥🔥🔥
-  - Val Loss 1.44 (Epoch 15), 已超越V1的2.35
+- **V5训练完成**: 52K数据, 30 Epochs, **Best E25 Val 2.1857** (7.9h, 翻译仍乱码→需V6)
+  - Val Loss 2.1857 (Epoch 25, Best), E30完成 Val 2.1993
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
   - 解决方案: V5全小写英文训练数据(52K对已准备)
   - **V5模型**: 7.5M参数(256d/3层/4头), Best E19 Val 2.1879
