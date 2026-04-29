@@ -2480,3 +2480,52 @@ Layer 3: 门控混合注意力
 - 温度采样: 推理时调高彝文字符的采样温度
 
 **目标**: V7彝文比例>20%, V8>30%, 最终50%(三语平衡)
+
+## 188. 量子叠加态嵌入(Q-Embedding) - V6核心改进 (2026-04-29)
+
+**问题**: 当前V5使用标准nn.Embedding, 每个token只有一个固定的嵌入向量.
+彝文字符(4120个)和中文字符(2720个)的嵌入空间是分离的,
+模型难以学到彝/中/英之间的语义映射.
+
+**Q-Embedding设计**: 用量子叠加态原理改造嵌入层
+
+```
+标准嵌入: token_id → lookup_table[id] → 固定向量
+量子嵌入: token_id → 4个基态的叠加 → α|0⟩+β|1⟩+γ|2⟩+δ|3⟩ → 可学习叠加系数
+```
+
+**4个基态定义**:
+- |0⟩ = BOS/起始态 (序列开始)
+- |1⟩ = EOS/终止态 (序列结束)  
+- |2⟩ = UNK/未知态 (未知字符)
+- |3⟩ = PAD/填充态 (填充)
+
+**实现方案**:
+```python
+class QuantumEmbedding(nn.Module):
+    def __init__(self, vocab_size, d_model):
+        self.base_embed = nn.Embedding(4, d_model)  # 4个基态
+        self.coeff = nn.Embedding(vocab_size, 4)     # 每个token的4个叠加系数
+        # 系数通过softmax归一化 → 概率幅
+    
+    def forward(self, x):
+        coeff = F.softmax(self.coeff(x), dim=-1)  # [B, S, 4]
+        bases = self.base_embed.weight             # [4, d_model]
+        return torch.matmul(coeff, bases)          # [B, S, d_model] = 叠加态
+```
+
+**优势**:
+1. 所有token共享4个基态 → 参数共享, 泛化更好
+2. 叠加系数可学习 → 相似token自动聚类
+3. 彝文/中文/英文在同一个4基态空间 → 跨语言语义对齐
+4. 参数量: vocab_size×4 + 4×d_model (vs 原始 vocab_size×d_model)
+5. 对V5(6924 vocab, 256 d): 27696+1024=28720 vs 1779744 (98.4%减少!)
+
+**V6迁移路线**:
+- Phase 1: 用Q-Embedding替换nn.Embedding
+- Phase 2: 训练叠加系数, 观察token聚类
+- Phase 3: 添加Q-RoPE(RZ门位置编码)
+- Phase 4: 门控混合注意力(V5已有quantum_gate)
+
+**风险**: 参数大幅减少可能降低表达能力
+**缓解**: 4→8基态, 或混合(hybrid): Q-Embed + 短残差连接到标准Embed
