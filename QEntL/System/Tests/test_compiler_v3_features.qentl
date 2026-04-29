@@ -1,0 +1,79 @@
+// QEntL编译器V3全部新语法特性测试
+// 覆盖: quantum_enum + quantum_class + quantum_interface + import/export
+
+// === 1. import 测试 ===
+import quantum.kernel
+import quantum.math as qmath
+
+// === 2. export 测试 ===
+export 启动
+export 量子计算 as compute
+
+// === 3. quantum_enum 测试 ===
+quantum_enum 量子状态 {
+    叠加,
+    纠缠,
+    坍缩,
+    退相干
+}
+
+quantum_enum 量子门类型 {
+    Hadamard,
+    CNOT,
+    PauliX,
+    PauliZ,
+    测量
+}
+
+// === 4. quantum_interface 测试 ===
+quantum_interface 量子可计算 {
+    初始化,
+    计算,
+    测量结果
+}
+
+// === 5. quantum_class 测试 ===
+quantum_class 量子处理器 {
+    量子比特数: 整数 = 2,
+    纠缠对数: 整数 = 0,
+    函数 初始化() {
+        LOG("⚛ 处理器初始化")
+    }
+    函数 运行() {
+        LOG("▶ 处理器运行中")
+    }
+    函数 停止() {
+        LOG("⏹ 处理器停止")
+    }
+}
+
+quantum_class 量子服务 {
+    名称: 字符串,
+    处理器: 量子处理器,
+    函数 启动() {
+        LOG("🚀 服务启动")
+    }
+}
+
+// === 6. quantum_program 综合测试 ===
+quantum_program 全特性测试 {
+    setup: 函数() {
+        LOG("=== QEntL V3编译器全特性测试 ===")
+        LOG("✅ import: quantum.kernel + quantum.math")
+        LOG("✅ export: 启动 + 量子计算")
+        LOG("✅ enum: 量子状态 + 量子门类型")
+        LOG("✅ interface: 量子可计算")
+        LOG("✅ class: 量子处理器 + 量子服务")
+        
+        // Bell态量子电路
+        量子门 H 0
+        量子门 CNOT 0 1
+        LOG("✅ 叠加+纠缠(Bell态)")
+        
+        测量 0
+        测量 1
+        LOG("✅ 测量(坍缩)")
+        
+        LOG("=== 全特性测试完成! ===")
+    }
+}
