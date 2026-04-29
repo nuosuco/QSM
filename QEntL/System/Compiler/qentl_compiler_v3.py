@@ -73,6 +73,10 @@ class OpCode(Enum):
     BUILD_LIST = 0x90
     INDEX_ACCESS = 0x91
     INDEX_ASSIGN = 0x92
+    # 扩展操作
+    DOT_ACCESS = 0xF5
+    UNARY_NOT = 0xF7
+    BOOL_LOAD = 0xF8
 
 # === 词法分析 ===
 class TokenType(Enum):
@@ -212,6 +216,10 @@ class Lexer:
                     self._add_token(TokenType.NEQ, '!=')
                     self._advance(); self._advance()
                     continue
+            if ch == "!" and (self.pos >= len(self.source) or self.source[self.pos] != "="):
+                self._add_token(TokenType.NOT, "!")
+                self._advance()
+                continue
                 if two == '<=':
                     self._add_token(TokenType.LTE, '<=')
                     self._advance(); self._advance()
@@ -736,7 +744,7 @@ class Parser:
         return left
 
     def _parse_multiplication(self):
-        left = self._parse_primary()
+        left = self._parse_factor()
         while self._current().type in (TokenType.STAR, TokenType.SLASH, TokenType.PERCENT):
             op = self._advance().value
             right = self._parse_primary()
@@ -744,13 +752,19 @@ class Parser:
         return left
 
     def _parse_factor(self):
-        """Parse factor - handle unary minus"""
+        """Parse factor - handle unary minus and NOT"""
         if self._current().type == TokenType.MINUS:
             self._advance()
             node = self._parse_primary()
             neg_node = ASTNode('UnaryMinus', line=node.line)
             neg_node.children.append(node)
             return neg_node
+        if self._current().type == TokenType.NOT:
+            self._advance()
+            node = self._parse_primary()
+            not_node = ASTNode('UnaryNot', line=node.line)
+            not_node.children.append(node)
+            return not_node
         return self._parse_primary()
 
     def _parse_primary(self):
@@ -1008,8 +1022,13 @@ class CodeGenerator:
         elif node.type == 'UnaryMinus':
             # Push 0, then subtract
             self._emit(OpCode.LOAD_CONST, 0, node.line)
-            self._codegen(node.children[0])
+            self._gen_node(node.children[0])
             self._emit(OpCode.MINUS, None, node.line)
+
+        elif node.type == 'UnaryNot':
+            # Evaluate expression, then NOT
+            self._gen_node(node.children[0])
+            self._emit(OpCode.UNARY_NOT, None, node.line)
 
         elif node.type == 'NumberLit':
             idx = self._add_const(float(node.value) if '.' in node.value else int(node.value))

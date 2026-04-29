@@ -20,7 +20,7 @@ class OpCode(Enum):
     LOG = 0x60; INPUT = 0x61
     TYPE_DEF = 0x70; TYPE_CAST = 0x71; CLASS_DEF = 0xF3; INTERFACE_DEF = 0xF4; IMPORT = 0xF1; EXPORT = 0xF2
     OBJ_CREATE = 0x80; OBJ_GET = 0x81; OBJ_SET = 0x82
-    BUILD_LIST = 0x90; INDEX_ACCESS = 0x91; INDEX_ASSIGN = 0x92
+    BUILD_LIST = 0x90; INDEX_ACCESS = 0x91; INDEX_ASSIGN = 0x92; UNARY_NOT = 0xF7; DOT_ACCESS = 0xF5; BOOL_LOAD = 0xF8
 
 # Op name to enum mapping
 OP_MAP = {op.name: op for op in OpCode}
@@ -300,6 +300,17 @@ class QBCVirtualMachine:
                     self.stack.append(False)
             self.ip += 1
         
+        elif op == OpCode.UNARY_NOT:
+            if len(self.stack) >= 1:
+                val = self.stack.pop()
+                if isinstance(val, bool):
+                    self.stack.append(not val)
+                elif isinstance(val, (int, float)):
+                    self.stack.append(1 if val == 0 else 0)
+                else:
+                    self.stack.append(True)
+            self.ip += 1
+
         elif op == OpCode.JUMP:
             # Find label
             label = operand
