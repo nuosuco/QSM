@@ -173,26 +173,8 @@ class QBCVirtualMachine:
         steps = 0
         
         # Auto-detect main entry point
-        if self.ip == 0:
-            # Priority 1: If 'setup' function exists, call it
-            if 'setup' in self.functions:
-                # Find QUANTUM_INIT before setup and start there
-                # The setup function will be called via CALL at its entry
-                # Look for the first QUANTUM_INIT
-                for i, instr in enumerate(self.instructions):
-                    if instr.get('op') == 'QUANTUM_INIT':
-                        self.ip = i
-                        break
-                else:
-                    self.ip = self.functions['setup']
-            else:
-                # No setup - find QUANTUM_INIT or start at beginning
-                for i, instr in enumerate(self.instructions):
-                    if instr.get('op') == 'QUANTUM_INIT':
-                        self.ip = i
-                        break
-                else:
-                    self.ip = 0
+        # Always start from ip=0 to process top-level declarations first
+        # (import/enum/class/interface), then quantum program continues
         
         while self.running and self.ip < len(self.instructions) and steps < max_steps:
             instr = self.instructions[self.ip]
@@ -428,7 +410,9 @@ class QBCVirtualMachine:
                     self.stack.append(ret_val)
                 self.ip = ret_ip
             else:
-                self.running = False
+                # At top level, RETURN just means end of declaration block
+                # Skip it and continue to next instruction
+                self.ip += 1
         
         elif op == OpCode.LOOP_START:
             # operand is loop variable name
@@ -516,22 +500,22 @@ class QBCVirtualMachine:
             self.ip += 1
         
         elif op == OpCode.TYPE_DEF:
-            type_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"type_{inst.get('operand', '?')}"
+            type_name = self.constants[operand] if operand is not None and operand < len(self.constants) else f"type_{operand}"
             self.types[type_name] = {"kind": "type", "fields": []}
             self.variables[type_name] = type_name
             self.ip += 1
         elif op == OpCode.CLASS_DEF:
-            class_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"class_{inst.get('operand', '?')}"
+            class_name = self.constants[operand] if operand is not None and operand < len(self.constants) else f"class_{operand}"
             self.types[class_name] = {"kind": "class", "fields": [], "methods": []}
             self.variables[class_name] = class_name
             self.ip += 1
         elif op == OpCode.INTERFACE_DEF:
-            iface_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"iface_{inst.get('operand', '?')}"
+            iface_name = self.constants[operand] if operand is not None and operand < len(self.constants) else f"iface_{operand}"
             self.types[iface_name] = {"kind": "interface", "methods": []}
             self.variables[iface_name] = iface_name
             self.ip += 1
         elif op == OpCode.IMPORT:
-            mod_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"mod_{inst.get('operand', '?')}"
+            mod_name = self.constants[operand] if operand is not None and operand < len(self.constants) else f"mod_{operand}"
             self.variables[mod_name] = {"kind": "module", "name": mod_name}
             self.ip += 1
         elif op == OpCode.EXPORT:
