@@ -62,6 +62,7 @@ class OpCode(Enum):
     IMPORT = 0xF1
     EXPORT = 0xF2
     CLASS_DEF = 0xF3
+    INTERFACE_DEF = 0xF4
     TYPE_CAST = 0x71
 
     # 对象操作
@@ -82,6 +83,7 @@ class TokenType(Enum):
     QUANTUM_PROGRAM = 'quantum_program'
     QUANTUM_ENUM = 'quantum_enum'
     QUANTUM_CLASS = 'quantum_class'
+    QUANTUM_INTERFACE = 'quantum_interface'
     IMPORT = 'import'
     EXPORT = 'export'
     IF = '如果'
@@ -388,6 +390,31 @@ class Parser:
                 # Skip comma
                 if self._current().type == TokenType.COMMA:
                     self._advance()
+        self._expect(TokenType.RBRACE)
+        return node
+
+
+    def _parse_quantum_interface(self):
+        """解析 quantum_interface: quantum_interface 名称 { 方法签名 }"""
+        node = ASTNode('QuantumInterface', line=self._peek().line)
+        self._expect(TokenType.QUANTUM_INTERFACE)
+        node.value = self._advance().value
+        self._expect(TokenType.LBRACE)
+        while self._current().type != TokenType.RBRACE and not self._at_end():
+            if self._current().type == TokenType.FUNC:
+                method = self._parse_function()
+                node.children.append(method)
+            else:
+                method_name = self._advance().value
+                method_node = ASTNode('MethodSig', value=method_name, line=node.line)
+                if self._current().type == TokenType.LPAREN:
+                    self._advance()
+                    while self._current().type != TokenType.RPAREN:
+                        self._advance()
+                    self._expect(TokenType.RPAREN)
+                node.children.append(method_node)
+            if self._current().type == TokenType.COMMA:
+                self._advance()
         self._expect(TokenType.RBRACE)
         return node
 
@@ -1015,6 +1042,11 @@ class CodeGenerator:
                     # The section's child is the function/block
                     for section_child in child.children:
                         self._gen_node(section_child)
+        elif node.type == 'QuantumInterface':
+            name_idx = self._add_const(node.value)
+            self._emit(OpCode.INTERFACE_DEF, name_idx, node.line)
+            for child in node.children:
+                self._gen_node(child)
         elif node.type == 'QuantumClass':
             name_idx = self._add_const(node.value)
             self._emit(OpCode.CLASS_DEF, name_idx, node.line)
