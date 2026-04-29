@@ -2302,3 +2302,43 @@ Phase 1: V5完成训练(当前E17/30, Val→2.24)
 Phase 2: V6-1 = V5 + Q-Embedding(最小改动验证)
 Phase 3: V6-2 = V6-1 + 门控注意力混合
 Phase 4: V6-3 = V6-2 + Q-RoPE + Ref自省
+
+## 182. 量子纠错在量子神经网络中的应用
+对应QEntL quantum_error_corrector.qentl(9级纠错+7种码)
+
+### 经典神经网络正则化 vs 量子纠错
+| 经典 | 量子 |
+|------|------|
+| Dropout | 退相干保护 |
+| Weight decay | 量子纠错码 |
+| Batch norm | 幅值阻尼修正 |
+| Gradient clip | 相位翻转修正 |
+
+### 5种量子纠错码(来自QEntL)
+1. **比特翻转码(3-qubit)**: |ψ⟩ → |ψ⟩|ψ⟩|ψ⟩, 多数表决纠错
+2. **相位翻转码(3-qubit)**: 用H门转换相位错→比特错
+3. **Shor码(9-qubit)**: 同时纠比特+相位错, 最小完备码
+4. **Steane码(7-qubit)**: CSS码, 比Shor码更高效
+5. **表面码**: 拓扑保护, 2D网格, 容错率~1%
+
+### V6量子纠错策略
+训练时不需要完美纠错(噪声=正则化!):
+```
+训练阶段: 轻微量子噪声 ≈ Dropout (防止过拟合!)
+推理阶段: 量子纠错保护 (确保输出正确!)
+```
+
+这和经典ML的洞见一致: 训练时加噪声(Dropout/Gaussian noise)→泛化更好
+推理时去掉噪声→精确输出
+
+### 量子噪声即正则化(Quantum Noise as Regularization)
+- 幅值阻尼(Amplitude Damping) ≈ Dropout(随机丢弃)
+- 相位阻尼(Phase Damping) ≈ 信息损失(迫使模型不依赖相位细节)
+- 退极化(Depolarizing) ≈ Label Smoothing(平滑输出)
+
+V5已用label_smoothing=0.1! 量子噪声是天然的label smoothing!
+
+### QEntL quantum_error_corrector的关键参数
+- 纠错级别: 9级(从3-qubit到表面码)
+- 纠错周期: 每N步自动纠错
+- 容错阈值: 1% (表面码), 11% (Shor码)
