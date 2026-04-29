@@ -2363,3 +2363,31 @@ V5已用label_smoothing=0.1! 量子噪声是天然的label smoothing!
 - CALL_METHOD: 绑定self到方法,然后执行函数
 
 **优先级:** 中等 - 不阻塞当前开发,但V6自举需要
+
+## 184. QSM四大模型集成架构研读 (2026-04-29)
+
+研读文件: `QEntL/System/Kernel/services/qsm_main_service.qentl`
+
+**核心架构发现:**
+
+1. **启动顺序**: Ref→QSM→WeQ→SOM (Ref先启动用于监控其他服务)
+2. **关闭顺序**: SOM→WeQ→QSM→Ref (反向, Ref最后关持续监控)
+3. **跨模型同步循环**: QSM→WeQ→SOM→Ref→QSM (10秒间隔)
+   - QSM→WeQ: 量子状态变化通知通信网络
+   - WeQ→SOM: 通信活跃度奖励松麦币
+   - SOM→Ref: 经济指标传递监控系统
+   - Ref→QSM: 健康告警触发保护模式
+4. **EventBus事件总线**: 发布-订阅模式解耦四大模型
+5. **ModelService包装器**: 统一状态管理(STOPPED/STARTING/RUNNING/STOPPING/ERROR)
+6. **命令分发**: executeCommand支持status/health/sync/qsm/weq/som/ref
+
+**设计精髓:**
+- 圆形同步而非线性 → 形成闭环反馈
+- 监控先行(Ref先启动) → 确保系统可观测性
+- 事件驱动 → 松耦合易扩展
+- 自愈能力 → Ref.triggerSelfHealing()
+
+**对V6的启发:**
+- V6应实现真实的跨模型注意力机制
+- Ref模型可做在线学习率调整(类似LBFGS观察器)
+- EventBus模式可用于训练过程中的回调系统
