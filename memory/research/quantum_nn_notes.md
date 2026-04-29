@@ -2391,3 +2391,45 @@ V5已用label_smoothing=0.1! 量子噪声是天然的label smoothing!
 - V6应实现真实的跨模型注意力机制
 - Ref模型可做在线学习率调整(类似LBFGS观察器)
 - EventBus模式可用于训练过程中的回调系统
+
+## 185. 量子注意力机制V6设计 - Grover搜索加速 (2026-04-29)
+
+**核心论文思想: Quantum Attention via Grover Search**
+
+传统注意力: O(n²) 复杂度, 需要计算所有query-key对
+量子注意力: O(√n) 搜索, 用Grover算法找到最相关的key
+
+**V6架构草案 - 三层量子注意力:**
+
+```
+Layer 1: Q-Embedding (4基态嵌入)
+├── |0⟩ = BOS, |1⟩ = EOS, |2⟩ = UNK, |3⟩ = PAD
+├── 叠加态: α|0⟩ + β|1⟩ + γ|2⟩ + δ|3⟩
+└── 测量→坍缩到具体token
+
+Layer 2: Q-RoPE (量子旋转位置编码)
+├── 传统RoPE: cos/sin旋转
+├── 量子版: RZ门旋转, 角度=n*θ
+└── 优势: 量子门自然保持相位信息
+
+Layer 3: 门控混合注意力
+├── gate = σ(W_g · [quantum_attn, classical_attn])
+├── output = gate ⊙ quantum_attn + (1-gate) ⊙ classical_attn
+└── V5已实现! quantum_gate参数≈0.3
+```
+
+**V5→V6升级路线:**
+1. Phase 1 (当前): V5验证门控混合 → ✅ quantum_gate=0.3有效
+2. Phase 2: 添加Q-Embedding 4基态, 训练嵌入系数αβγδ
+3. Phase 3: Q-RoPE替代传统位置编码
+4. Phase 4: 完整Grover搜索注意力(需量子硬件模拟)
+
+**模拟策略(CPU可行):**
+- 不用真实量子电路, 用矩阵运算模拟量子态演化
+- 叠加态 = softmax概率分布
+- 测量 = argmax采样
+- 纠缠 = 协方差矩阵建模
+
+**关键指标:**
+- V5 Val Loss 2.19 → V6目标 < 1.0
+- 翻译质量: chrF > 40
