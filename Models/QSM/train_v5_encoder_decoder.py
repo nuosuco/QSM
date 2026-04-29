@@ -126,6 +126,8 @@ if os.path.exists(resume_path):
             pg['lr'] = lr
     scheduler = None  # Not using LambdaLR due to step counting bug
     best_val = float('inf'); start = time.time(); gs = 0
+if os.path.exists(resume_path) and 'val_loss' in ckpt:
+    best_val = ckpt['val_loss']  # Resume best_val to prevent non-best overwrites
     for ep in range(start_epoch, c['epochs']):
         model.train(); tl = 0; nb = 0
         for bi, (src, ti, to) in enumerate(train_dl):
