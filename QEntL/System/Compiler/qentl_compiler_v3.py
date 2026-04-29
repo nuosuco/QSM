@@ -791,7 +791,18 @@ class Parser:
             elif self._current().type == TokenType.DOT:
                 self._advance()
                 field = self._advance().value
-                node = ASTNode('FieldAccess', value=field, children=[node], line=t.line)
+                # Check if this is a method call: obj.method(args)
+                if self._current().type == TokenType.LPAREN:
+                    self._advance()  # consume (
+                    args = []
+                    while self._current().type != TokenType.RPAREN:
+                        args.append(self._parse_expression())
+                        if self._current().type == TokenType.COMMA:
+                            self._advance()
+                    self._expect(TokenType.RPAREN)
+                    node = ASTNode('MethodCall', value=field, children=[node] + args, line=t.line)
+                else:
+                    node = ASTNode('FieldAccess', value=field, children=[node], line=t.line)
             elif self._current().type == TokenType.LBRACKET:
                 # Array index: identifier[expr]
                 self._advance()  # consume [
@@ -1066,6 +1077,14 @@ class CodeGenerator:
         elif node.type == 'FieldAccess':
             self._gen_node(node.children[0])
             self._emit(OpCode.LOAD_FIELD, node.value, node.line)
+
+        elif node.type == 'MethodCall':
+            # obj.method(args) → DOT_ACCESS + CALL
+            self._gen_node(node.children[0])  # obj
+            self._emit(OpCode.DOT_ACCESS, node.value, node.line)  # method name
+            for arg in node.children[1:]:
+                self._gen_node(arg)  # push args
+            self._emit(OpCode.CALL, len(node.children) - 1, node.line)
 
         elif node.type == 'List':
             for child in node.children:
