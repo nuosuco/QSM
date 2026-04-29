@@ -2124,3 +2124,43 @@ Q-Embed(token) = Σ_{i=1}^{K} c_i(t) * basis_i + Σ_{i=1}^{K} p_i(t) * phase_i
 | 上下文 | 靠注意力 | 叠加系数自适应 |
 | 参数量 | V×d | V×d + K×2 |
 | 物理含义 | 无 | 量子态 |
+
+## 178. 量子旋转位置编码(Q-RoPE)
+基于QEntL quantum_processor.qentl(RX/RZ旋转门):
+
+### 经典位置编码
+1. Sinusoidal: PE(pos,2i) = sin(pos/10000^(2i/d))
+2. RoPE: 旋转矩阵乘以Q/K → 位置信息融入注意力
+
+### 量子旋转位置编码(Q-RoPE)
+- 经典RoPE用2D旋转矩阵: R(θ) = [[cos θ, -sin θ], [sin θ, cos θ]]
+- 量子RoPE用量子旋转门: RZ(θ) = [[e^(-iθ/2), 0], [0, e^(iθ/2)]]
+- 量子旋转门天然处理相位信息!
+
+### Q-RoPE实现
+```
+经典: q_rot = q * R(θ_pos)
+量子: q_rot = RZ(θ_pos) |q⟩
+```
+- θ_pos = position * base_freq
+- 量子版天然保持相位相干性
+- 纠缠位置编码: entangle(q_pos, q_context) → 位置感知
+
+### V6位置编码方案
+Phase 1: 经典RoPE(已知有效) + 量子旋转增强
+```python
+# 经典RoPE + 量子相位
+q_rot = apply_rope(q, pos)  # 经典旋转
+q_quantum = q_rot + quantum_phase(pos)  # 量子相位增强
+```
+
+Phase 2: 纯量子位置编码
+```python
+# 量子旋转门直接应用
+q_rot = apply_rz_gate(q, theta=pos * base_freq)
+```
+
+### 关键优势
+- 量子旋转=自然的相对位置编码
+- RZ门相位差=位置间距离
+- 纠缠=位置关联(全局位置感知!)
