@@ -145,6 +145,8 @@ class TokenType(Enum):
     NOT = '非'
     BOOL_TRUE = 'true'
     BOOL_FALSE = 'false'
+    BREAK = 'break'
+    CONTINUE = 'continue'
 
     # 字面量
     IDENTIFIER = 'IDENTIFIER'
@@ -614,6 +616,12 @@ class Parser:
             return self._parse_log()
         elif t.type == TokenType.WHILE:
             return self._parse_while()
+        elif t.type == TokenType.BREAK:
+            self._advance()
+            return ASTNode('Break', line=t.line)
+        elif t.type == TokenType.CONTINUE:
+            self._advance()
+            return ASTNode('Continue', line=t.line)
         else:
             # Expression statement
             expr = self._parse_expression()
@@ -863,6 +871,7 @@ class CodeGenerator:
         self.variables = {}
         self.functions = {}
         self.label_counter = 0
+        self.loop_label_stack = []
         self.current_line = 0
 
     def generate(self, ast: ASTNode) -> Dict:
@@ -1018,6 +1027,7 @@ class CodeGenerator:
         elif node.type == 'While':
             start_label = self._new_label()
             end_label = self._new_label()
+            self.loop_label_stack.append((start_label, end_label))
             self.instructions.append({'op': 'LABEL', 'name': start_label})
             # Evaluate condition
             self._gen_node(node.children[0])
@@ -1026,6 +1036,15 @@ class CodeGenerator:
             self._gen_node(node.children[1])
             self._emit(OpCode.JUMP, start_label, node.line)
             self.instructions.append({'op': 'LABEL', 'name': end_label})
+            self.loop_label_stack.pop()
+        elif node.type == 'Break':
+            if self.loop_label_stack:
+                _, end_label = self.loop_label_stack[-1]
+                self._emit(OpCode.JUMP, end_label, node.line)
+        elif node.type == 'Continue':
+            if self.loop_label_stack:
+                start_label, _ = self.loop_label_stack[-1]
+                self._emit(OpCode.JUMP, start_label, node.line)
         elif node.type == 'BinaryOp':
             self._gen_node(node.children[0])
             self._gen_node(node.children[1])

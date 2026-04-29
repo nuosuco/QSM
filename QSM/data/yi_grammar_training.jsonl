@@ -1,13 +1,3 @@
-{"messages": [{"role": "user", "content": "彝语语法：主语+谓语"}, {"role": "assistant", "content": "彝语基本句型：主语在前，谓语在后。例如：我走 = ꆈ+ꁦ。语序为SOV（主语-宾语-谓语）"}], "grammar_rule": "basic_sov", "metadata": {"rule_id": "yi_grammar_001"}}
-{"messages": [{"role": "user", "content": "彝语语法：形容词位置"}, {"role": "assistant", "content": "形容词放在名词之后。例如：红花 = 花+红 = ꃀ+ꑌ。形容词作定语时后置"}], "grammar_rule": "adjective_position", "metadata": {"rule_id": "yi_grammar_002"}}
-{"messages": [{"role": "user", "content": "彝语语法：否定句"}, {"role": "assistant", "content": "否定词放在动词之前。例如：不去 = 不+去 = ꀋ+ꁦ。否定副词ꀋ表示不、没有"}], "grammar_rule": "negation", "metadata": {"rule_id": "yi_grammar_003"}}
-{"messages": [{"role": "user", "content": "彝语语法：疑问句"}, {"role": "assistant", "content": "疑问词放在句末。例如：你去吗？ = 你+去+吗 = ꆏ+ꁦ+ꑴ。疑问语气词ꑴ表示吗"}], "grammar_rule": "question", "metadata": {"rule_id": "yi_grammar_004"}}
-{"messages": [{"role": "user", "content": "彝语语法：数量词位置"}, {"role": "assistant", "content": "数词+量词+名词顺序。例如：三个人 = 三+个+人 = ꌕ+ꂷ+ꆹ"}], "grammar_rule": "numeral_position", "metadata": {"rule_id": "yi_grammar_005"}}
-{"messages": [{"role": "user", "content": "彝语语法：时态表达"}, {"role": "assistant", "content": "时态用助词表示。完成体用ꇈ，进行体用ꐥ。例如：吃过了 = 吃+完成 = ꋚ+ꇈ"}], "grammar_rule": "tense_marker", "metadata": {"rule_id": "yi_grammar_006"}}
-{"messages": [{"role": "user", "content": "彝语语法：人称代词"}, {"role": "assistant", "content": "我=ꀋ，你=ꆏ，他=ꋍ。复数加ꑋ。例如：我们=ꀋ+ꑋ=ꀊꑋ"}], "grammar_rule": "pronouns", "metadata": {"rule_id": "yi_grammar_007"}}
-{"messages": [{"role": "user", "content": "彝语语法：方位词"}, {"role": "assistant", "content": "上=ꀑ，下=ꀂ，前=ꂫ，后=ꇬ。方位词放在名词后。例如：桌上=桌+上"}], "grammar_rule": "direction_words", "metadata": {"rule_id": "yi_grammar_008"}}
-{"messages": [{"role": "user", "content": "彝语语法：关联词"}, {"role": "assistant", "content": "和=ꌋ，或者=ꀐ。例如：我和你=我+和+你=ꀋ+ꌋ+ꆏ"}], "grammar_rule": "conjunctions", "metadata": {"rule_id": "yi_grammar_009"}}
-{"messages": [{"role": "user", "content": "彝语语法：动词时态"}, {"role": "assistant", "content": "动词+ꇈ表示完成，动词+ꐥ表示进行。例如：正在吃=吃+进行=ꋚ+ꐥ"}], "grammar_rule": "verb_tense", "metadata": {"rule_id": "yi_grammar_010"}}
 {"input": "我吃饭", "output": "󲈮󲊂󲊂", "note": "SOV语序：主语-宾语-谓语"}
 {"input": "你喝水", "output": "󲉖󲊴󲊂", "note": "SOV语序"}
 {"input": "他打山", "output": "󲊂󲊭󲊂", "note": "SOV语序"}
