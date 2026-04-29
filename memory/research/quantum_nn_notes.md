@@ -2746,3 +2746,37 @@ class LinearAttention(nn.Module):
 - Q-Embedding的4基态共享→自然RoPE旋转
 - 每个基态有独立的旋转频率
 - cos(θ_i + mω_i) + sin(θ_i + mω_i) → 量子叠加自然支持
+
+## 195. 参数高效微调(PEFT)与低资源语言 (2026-04-30)
+
+### LoRA vs Q-Embedding对比
+| 方法 | 可训练参数 | 优势 | 劣势 |
+|------|-----------|------|------|
+| LoRA | rank*r*2 per layer | 不改原权重 | 需要预训练基座 |
+| Q-Embedding | 4*n_bases*d | 跨语言对齐 | 表达力可能受限 |
+| Adapter | d*r*2 | 模块化 | 推理延迟 |
+| Prefix-tuning | prefix_len*d | 轻量 | 占用序列长度 |
+
+### Q-Embedding作为LoRA的量子版本
+- LoRA: W' = W + BA (低秩分解)
+- Q-Embed: W' = Σ αᵢ|ψᵢ⟩ (量子叠加)
+- 关键差异: Q-Embed用4个基态共享, LoRA用rank分解
+- Q-Embed天然支持跨语言: 不同语言的词共享基态但有不同的叠加系数
+- 这意味着"heart"和"心"和彝文心可以有相似的叠加分布!
+
+### 低资源语言翻译突破案例
+1. **OPUS-MT** (Helsinki-NLP): 利用平行语料+回译
+2. **mBART/Zcode++**: 多语言预训练+跨语言迁移
+3. **NLLB-200**: Meta的200语言模型, 用SentencePiece+BPE
+4. **关键insight**: 预训练多语言模型>从头训练单语言
+
+### 对V6的启示
+- V6是从头训练, 没有预训练基座 → 学习效率低
+- **V7方向**: 先用大规模中文/英文预训练, 再微调彝文
+- 或者: 用mBERT/mBART的embedding初始化Q-Embedding的基态
+- 这样4个基态就不是随机的, 而是携带了跨语言知识
+
+### 回译(Back-Translation)数据增强
+- 用当前V5/V6模型生成彝文→中文的伪平行数据
+- 虽然质量差, 但可以增加训练量
+- 循环: 训练→翻译→加数据→再训练→更好翻译→更多数据
