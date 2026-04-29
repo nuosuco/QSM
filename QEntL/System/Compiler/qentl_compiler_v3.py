@@ -143,6 +143,8 @@ class TokenType(Enum):
     AND = '且'
     OR = '或'
     NOT = '非'
+    BOOL_TRUE = 'true'
+    BOOL_FALSE = 'false'
 
     # 字面量
     IDENTIFIER = 'IDENTIFIER'
@@ -775,6 +777,12 @@ class Parser:
         elif t.type == TokenType.STRING_LIT:
             self._advance()
             return ASTNode('StringLit', value=t.value, line=t.line)
+        elif t.type == TokenType.BOOL_TRUE:
+            self._advance()
+            return ASTNode('BoolLit', value='true', line=t.line)
+        elif t.type == TokenType.BOOL_FALSE:
+            self._advance()
+            return ASTNode('BoolLit', value='false', line=t.line)
         elif t.type == TokenType.IDENTIFIER:
             self._advance()
             node = ASTNode('Identifier', value=t.value, line=t.line)
@@ -1045,6 +1053,9 @@ class CodeGenerator:
             idx = self._add_const(float(node.value) if '.' in node.value else int(node.value))
             self._emit(OpCode.LOAD_CONST, idx, node.line)
 
+        elif node.type == 'BoolLit':
+            idx = self._add_const(1 if node.value == 'true' else 0)
+            self._emit(OpCode.LOAD_CONST, idx, node.line)
         elif node.type == 'StringLit':
             idx = self._add_const(node.value)
             self._emit(OpCode.LOAD_CONST, idx, node.line)
