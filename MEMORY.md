@@ -14,7 +14,7 @@
 - **QSM不是翻译系统！** 它是像ChatGPT一样的智能系统，三语互译只是最基本功
 - QSM有智力，什么都会，三语(彝/中/英)是基础能力
 - **6层智能架构**: 感知(全感知+情感+意图)→语言(V5+transformer-qe5)→知识(1M节点/5M边)→推理(行为学习+三维推荐)→意识(Ref自省)→响应(三语+情感策略)
-- Web服务：https://som.top
+- Web服务：https://som.top (V5模型已上线三端点)
 - 远程仓库：GitHub git@github.com:nuosuco/QSM.git / Gitee git@gitee.com:nuosuco/qsm.git
 
 ### 五大模型架构
@@ -109,12 +109,13 @@
 - **V3训练中**: 1242万参数(384d/4层), 8 Epoch训练, Epoch 3/8进行中
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
-  - 公网API: https://som.top/api/qv4/ (翻译+QEntL编译+Beam Search)
-- **V4 V2训练中**: 30000对数据, 20 Epochs, Epoch 18 Loss 1.37
+  - 公网API: https://som.top/api/v5/translate (V5翻译) + /api/q1/ (V5) + /api/qv4/ (V5 fallback+QEntL编译+量子电路)
+- **V5训练中**: 52K数据, 30 Epochs, **E22进行中**, Best E19 Val 2.1879
   - Val Loss 1.44 (Epoch 15), 已超越V1的2.35
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
   - 解决方案: V5全小写英文训练数据(52K对已准备)
-  - 目标: Val Loss < 1.0
+  - **V5模型**: 7.5M参数(256d/3层/4头), Best E19 Val 2.1879
+- 目标: Val Loss < 1.0
 
 ## 量子自举架构（2026-04-28确立）
 - **核心理念**: 不依赖第三方语言/代码/文件/环境
