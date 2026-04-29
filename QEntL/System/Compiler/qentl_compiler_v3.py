@@ -224,6 +224,22 @@ class Lexer:
                     self._add_token(TokenType.NEQ, '!=')
                     self._advance(); self._advance()
                     continue
+                if two == '+=':
+                    self._add_token(TokenType.PLUS_ASSIGN, '+=')
+                    self._advance(); self._advance()
+                    continue
+                if two == '-=':
+                    self._add_token(TokenType.MINUS_ASSIGN, '-=')
+                    self._advance(); self._advance()
+                    continue
+                if two == '*=':
+                    self._add_token(TokenType.MUL_ASSIGN, '*=')
+                    self._advance(); self._advance()
+                    continue
+                if two == '/=':
+                    self._add_token(TokenType.DIV_ASSIGN, '/=')
+                    self._advance(); self._advance()
+                    continue
             if ch == "!" and (self.pos >= len(self.source) or self.source[self.pos] != "="):
                 self._add_token(TokenType.NOT, "!")
                 self._advance()
@@ -631,6 +647,18 @@ class Parser:
             self._advance()
             return ASTNode('Continue', line=t.line)
         else:
+            # Check for compound assignment: x += expr
+            if t.type == TokenType.IDENTIFIER and self._peek() and self._peek().type in (TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN, TokenType.MUL_ASSIGN, TokenType.DIV_ASSIGN):
+                var_name = t.value
+                self._advance()  # skip identifier
+                op_token = self._advance()  # skip += etc
+                expr = self._parse_expression()
+                op_map = {TokenType.PLUS_ASSIGN: '升', TokenType.MINUS_ASSIGN: '降', TokenType.MUL_ASSIGN: '乘', TokenType.DIV_ASSIGN: '除'}
+                node = ASTNode('CompoundAssign', value=var_name, line=t.line)
+                node.assign_op = op_map.get(op_token.type, '升')
+                node.children.append(expr)
+                return node
+            
             # Expression statement
             expr = self._parse_expression()
             if self._current().type == TokenType.SEMICOLON:
@@ -952,6 +980,12 @@ class CodeGenerator:
             self._gen_node(node.children[0])
             self._emit(OpCode.STORE_VAR, node.value, node.line)
 
+        elif node.type == 'CompoundAssign':
+            self._emit(OpCode.LOAD_VAR, node.value, node.line)
+            self._gen_node(node.children[0])
+            op_map = {'升': OpCode.ADD, '降': OpCode.SUB, '乘': OpCode.MUL, '除': OpCode.DIV}
+            self._emit(op_map.get(node.assign_op, OpCode.ADD), None, node.line)
+            self._emit(OpCode.STORE_VAR, node.value, node.line)
         elif node.type == 'Return':
             self._gen_node(node.children[0])
             self._emit(OpCode.RETURN, line=node.line)

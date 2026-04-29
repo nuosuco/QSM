@@ -2635,3 +2635,45 @@ class QRoPE(nn.Module):
 3. 与Q-Embedding协同: 位置影响叠加系数的概率幅
 
 **V6迁移**: Phase 3 (Q-Embedding + Q-RoPE + Gate Attention)
+
+## 192. 量子Transformer效率优化 (2026-04-29)
+
+**问题**: 标准Transformer注意力复杂度O(n²), 对于CPU训练的QSM来说太慢.
+V5每个epoch需要~20分钟(3273 batches).
+
+**量子优化方案**: 3个层次
+
+### Level 1: 稀疏注意力 (近期实现)
+```python
+# 只关注最近K个token + 全局[CLS]token
+# 复杂度: O(n*K) 而非 O(n²)
+class SparseAttention(nn.Module):
+    def __init__(self, d_model, n_heads, window_size=8):
+        self.window_size = window_size
+        # 每个head只看window_size个邻居
+```
+
+### Level 2: 量子哈密顿量注意力 (V7+)
+- 用量子哈密顿量H替代QK^T注意力矩阵
+- H = Σ(J_ij * σ_i * σ_j) (Ising模型)
+- 时间演化 e^(-iHt) 代替 softmax(QK^T/√d)
+- 量子态 |ψ(t)⟩ = e^(-iHt)|ψ(0)⟩ 包含全局信息
+- 优势: O(n) 参数, 天然长程依赖
+
+### Level 3: 线性注意力 (实用方案)
+```python
+# 用kernel替代softmax: φ(Q)·φ(K)^T·V
+# 复杂度: O(n*d²) 当 d < n 时更优
+class LinearAttention(nn.Module):
+    def __init__(self, d_model, n_heads):
+        self.elu = lambda x: F.elu(x) + 1  # ELU+1 kernel
+    
+    def forward(self, Q, K, V):
+        Q = self.elu(Q)
+        K = self.elu(K)
+        # 先算K^T·V (d×d), 再乘Q (n×d) → O(n*d²)
+        KV = K.transpose(-2,-1) @ V  # [B, d, d]
+        return Q @ KV / (Q.sum(-1, keepdim=True) + 1e-6)
+```
+
+**V6实施方案**: 先用标准注意力(已验证), V7引入线性注意力
