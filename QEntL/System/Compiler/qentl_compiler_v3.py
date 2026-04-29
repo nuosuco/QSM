@@ -61,6 +61,7 @@ class OpCode(Enum):
     TYPE_DEF = 0x70
     IMPORT = 0xF1
     EXPORT = 0xF2
+    CLASS_DEF = 0xF3
     TYPE_CAST = 0x71
 
     # 对象操作
@@ -80,6 +81,7 @@ class TokenType(Enum):
     FUNC = '函数'
     QUANTUM_PROGRAM = 'quantum_program'
     QUANTUM_ENUM = 'quantum_enum'
+    QUANTUM_CLASS = 'quantum_class'
     IMPORT = 'import'
     EXPORT = 'export'
     IF = '如果'
@@ -352,6 +354,41 @@ class Parser:
         if self._peek() and self._peek().value == 'as':
             self._advance()  # consume 'as'
             node.children.append(ASTNode('Alias', value=self._advance().value, line=node.line))
+        return node
+
+
+    def _parse_quantum_class(self):
+        """解析 quantum_class: quantum_class 名称 { 字段+方法 }"""
+        node = ASTNode('QuantumClass', line=self._peek().line)
+        self._expect(TokenType.QUANTUM_CLASS)
+        node.value = self._advance().value  # class name
+        self._expect(TokenType.LBRACE)
+        while self._current().type != TokenType.RBRACE and not self._at_end():
+            # Parse field: 名称: 类型 or 名称: 类型 = 值
+            # Parse method: 函数 名称(...) { ... }
+            if self._current().type == TokenType.FUNC:
+                method = self._parse_function()
+                node.children.append(method)
+            else:
+                # Field definition
+                field_name = self._advance().value
+                if self._current().type == TokenType.COLON:
+                    self._advance()  # skip :
+                    field_type = self._advance().value
+                    field_node = ASTNode('Field', value=field_name, line=node.line)
+                    field_node.field_type = field_type
+                    # Optional default value
+                    if self._current().value == '=' or self._current().type == TokenType.ASSIGN:
+                        self._advance()
+                        field_node.children.append(ASTNode('Default', value=self._advance().value, line=node.line))
+                    node.children.append(field_node)
+                else:
+                    # Simple field without type
+                    node.children.append(ASTNode('Field', value=field_name, line=node.line))
+                # Skip comma
+                if self._current().type == TokenType.COMMA:
+                    self._advance()
+        self._expect(TokenType.RBRACE)
         return node
 
     def _parse_top_level(self):
@@ -978,6 +1015,11 @@ class CodeGenerator:
                     # The section's child is the function/block
                     for section_child in child.children:
                         self._gen_node(section_child)
+        elif node.type == 'QuantumClass':
+            name_idx = self._add_const(node.value)
+            self._emit(OpCode.CLASS_DEF, name_idx, node.line)
+            for child in node.children:
+                self._gen_node(child)
         elif node.type == 'Import':
             mod_idx = self._add_const(node.value)
             self._emit(OpCode.IMPORT, mod_idx, node.line)
