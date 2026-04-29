@@ -69,6 +69,7 @@ class OpCode(Enum):
     OBJ_CREATE = 0x80
     OBJ_GET = 0x81
     OBJ_SET = 0x82
+    BUILTIN_CALL = 0x95  # 内置函数调用
     # 数组操作
     BUILD_LIST = 0x90
     INDEX_ACCESS = 0x91
@@ -719,6 +720,20 @@ class Parser:
                 node.children.append(self._parse_block())
         return node
 
+    def _parse_builtin_call(self, func_name):
+        node = ASTNode('BuiltinCall', line=self._current().line)
+        node.value = func_name
+        self._advance()  # skip function name
+        self._expect(TokenType.LPAREN)
+        # Parse arguments
+        if self._current().type != TokenType.RPAREN:
+            node.children.append(self._parse_expression())
+            while self._current().type == TokenType.COMMA:
+                self._advance()
+                node.children.append(self._parse_expression())
+        self._expect(TokenType.RPAREN)
+        return node
+
     def _parse_switch(self):
         node = ASTNode('Switch', line=self._current().line)
         self._expect(TokenType.MATCH)
@@ -890,6 +905,9 @@ class Parser:
             self._advance()
             return ASTNode('BoolLit', value='false', line=t.line)
         elif t.type == TokenType.IDENTIFIER:
+            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值'}
+            if t.value in builtin_funcs and self._peek() and self._peek().type == TokenType.LPAREN:
+                return self._parse_builtin_call(t.value)
             self._advance()
             node = ASTNode('Identifier', value=t.value, line=t.line)
             # Check for function call or field access
@@ -1084,6 +1102,10 @@ class CodeGenerator:
             self._gen_node(node.children[0])
             self._emit(OpCode.LOG, line=node.line)
 
+        elif node.type == 'BuiltinCall':
+            for child in node.children:
+                self._gen_node(child)
+            self._emit(OpCode.BUILTIN_CALL, node.value, node.line)
         elif node.type == 'Switch':
             # Evaluate match expression
             self._gen_node(node.children[0])
@@ -1196,16 +1218,13 @@ class CodeGenerator:
             self._emit(op_map.get(node.value, OpCode.NOP), line=node.line)
 
         elif node.type == 'UnaryMinus':
-            # Push 0, then subtract
-            self._emit(OpCode.LOAD_CONST, 0, node.line)
+            zero_idx = self._add_const(0)
+            self._emit(OpCode.LOAD_CONST, zero_idx, node.line)
             self._gen_node(node.children[0])
-            self._emit(OpCode.MINUS, None, node.line)
-
+            self._emit(OpCode.SUB, None, node.line)
         elif node.type == 'UnaryNot':
-            # Evaluate expression, then NOT
             self._gen_node(node.children[0])
             self._emit(OpCode.UNARY_NOT, None, node.line)
-
         elif node.type == 'NumberLit':
             idx = self._add_const(float(node.value) if '.' in node.value else int(node.value))
             self._emit(OpCode.LOAD_CONST, idx, node.line)

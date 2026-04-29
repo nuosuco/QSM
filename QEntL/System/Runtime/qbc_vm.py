@@ -20,6 +20,7 @@ class OpCode(Enum):
     LOG = 0x60; INPUT = 0x61
     TYPE_DEF = 0x70; TYPE_CAST = 0x71; CLASS_DEF = 0xF3; INTERFACE_DEF = 0xF4; IMPORT = 0xF1; EXPORT = 0xF2
     OBJ_CREATE = 0x80; OBJ_GET = 0x81; OBJ_SET = 0x82
+    BUILTIN_CALL = 0x95
     BUILD_LIST = 0x90; INDEX_ACCESS = 0x91; INDEX_ASSIGN = 0x92; UNARY_NOT = 0xF7; DOT_ACCESS = 0xF5; BOOL_LOAD = 0xF8
 
 # Op name to enum mapping
@@ -507,6 +508,59 @@ class QBCVirtualMachine:
                 msg = f"创建纠缠对: 比特{control} ↔ 比特{target}"
                 self.output.append(msg)
                 print(msg)
+            self.ip += 1
+        elif op == OpCode.BUILTIN_CALL:
+            func_name = operand
+            if func_name == '长度':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, (list, str)):
+                        self.stack.append(len(val))
+                    else:
+                        self.stack.append(0)
+            elif func_name == '推入':
+                if len(self.stack) >= 2:
+                    item = self.stack.pop()
+                    arr = self.stack.pop()
+                    if isinstance(arr, list):
+                        arr.append(item)
+                        self.stack.append(arr)
+                    else:
+                        self.stack.append(arr)
+            elif func_name == '弹出':
+                if self.stack:
+                    arr = self.stack.pop()
+                    if isinstance(arr, list) and len(arr) > 0:
+                        self.stack.append(arr.pop())
+                    else:
+                        self.stack.append(None)
+            elif func_name == '类型':
+                if self.stack:
+                    val = self.stack.pop()
+                    type_name = type(val).__name__
+                    if isinstance(val, list):
+                        type_name = '数组'
+                    elif isinstance(val, str):
+                        type_name = '字符串'
+                    elif isinstance(val, int) or isinstance(val, float):
+                        type_name = '数字'
+                    elif isinstance(val, bool):
+                        type_name = '布尔'
+                    self.stack.append(type_name)
+            elif func_name == '绝对值':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(abs(val))
+            elif func_name == '最大值':
+                if len(self.stack) >= 2:
+                    b = self.stack.pop()
+                    a = self.stack.pop()
+                    self.stack.append(max(a, b))
+            elif func_name == '最小值':
+                if len(self.stack) >= 2:
+                    b = self.stack.pop()
+                    a = self.stack.pop()
+                    self.stack.append(min(a, b))
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
