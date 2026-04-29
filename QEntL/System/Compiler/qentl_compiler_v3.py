@@ -904,6 +904,9 @@ class Parser:
         elif t.type == TokenType.BOOL_FALSE:
             self._advance()
             return ASTNode('BoolLit', value='false', line=t.line)
+        elif t.type == TokenType.TYPE and self._peek() and self._peek().type == TokenType.LPAREN:
+            # 类型 as built-in function call
+            return self._parse_builtin_call(t.value)
         elif t.type == TokenType.IDENTIFIER:
             builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值'}
             if t.value in builtin_funcs and self._peek() and self._peek().type == TokenType.LPAREN:
