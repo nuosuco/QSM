@@ -2237,3 +2237,68 @@ QEntL中quantum_processor.qentl使用门控量子电路:
 
 ### V5训练: E16 Val 2.31 (E15 best 2.24)
 best.pth保护生效! 非best不覆盖 ✅
+
+## 181. V6量子-经典混合Transformer完整架构设计
+
+### 架构总览
+```
+输入 → Q-Embedding(叠加态嵌入) → [N×量子注意力层] → 输出
+                    ↓                    ↓
+              经典嵌入(residual)    经典注意力(residual)
+```
+
+### 5大核心创新(对应5个QEntL模块)
+
+#### 1. Q-Embedding (量子叠加态嵌入) - 对应qsm_Q4_api.py
+```
+embed(token) = Σ c_i(t) * basis_i + Σ p_i(t) * phase_i
+```
+- 4基态叠加, c_i和p_i上下文相关可学习参数
+- 解决多义性: "bank"同时=银行+河岸, 测量后坍缩到具体含义
+
+#### 2. Q-Attention (量子注意力) - 对应quantum_processor.qentl
+```
+Q-Attention = entangle(Q,K) → measure → V
+```
+- 纠缠替代点积: O(1)全局注意力
+- 测量=注意力权重坍缩
+- 多头=多组纠缠通道
+
+#### 3. Q-RoPE (量子旋转位置编码) - 对应quantum_processor.qentl
+```
+q_rot = RZ(θ_pos) |q⟩, θ_pos = pos * base_freq
+```
+- RZ门=自然相对位置编码
+- 相位差=位置距离
+- 纠缠=全局位置感知
+
+#### 4. 门控混合(Gate-Controlled Mixture) - 对应V5已有
+```
+output = σ(gate) × Q-output + (1-σ(gate)) × C-output
+```
+- gate可学习, 自动调整经典vs量子比例
+- 渐进策略: 10%→30%→50%→70%→90%量子
+
+#### 5. Ref自省(量子自反省模型) - 对应Ref模型(选择)
+```
+Ref: self_reflect(output) → correction → refined_output
+```
+- 输出→自省→修正→精炼输出
+- 类似人类"再想想"的过程
+- 选择=调度决策
+
+### V6 vs V5 参数对比
+| | V5 | V6 |
+|---|---|---|
+| 嵌入 | 经典查找表 | Q-Embedding(4基态叠加) |
+| 注意力 | 标准multi-head | 门控混合(Q+C) |
+| 位置 | 正弦 | Q-RoPE(RZ门) |
+| 自省 | 无 | Ref自省循环 |
+| 参数 | 7.5M | ~10M(+Q-Embed+gate+Ref) |
+| Loss | 2.24(best) | 目标<1.0 |
+
+### 实施路线
+Phase 1: V5完成训练(当前E17/30, Val→2.24)
+Phase 2: V6-1 = V5 + Q-Embedding(最小改动验证)
+Phase 3: V6-2 = V6-1 + 门控注意力混合
+Phase 4: V6-3 = V6-2 + Q-RoPE + Ref自省
