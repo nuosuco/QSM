@@ -2433,3 +2433,28 @@ Layer 3: 门控混合注意力
 **关键指标:**
 - V5 Val Loss 2.19 → V6目标 < 1.0
 - 翻译质量: chrF > 40
+
+## 186. QEntL编译器缺失特性清单 (2026-04-29)
+
+通过编译95个QEntL文件发现以下缺失特性(按优先级排序):
+
+### P0 - 阻塞大量文件编译
+1. **方法调用(DOT访问)**: `对象.方法(args)` → 需DOT_ACCESS OpCode
+2. **一元NOT**: `!expr` → 需UNARY_NOT OpCode  
+3. **boolean类型**: `true/false` → 需BOOL字面量
+4. **函数调用参数**: `函数名(参数)` 不只是label:func语法
+
+### P1 - 重要但不阻塞
+5. **this/self引用**: 类方法内 `this.字段` 
+6. **try/catch异常处理**: try { } catch(e) { }
+7. **字符串拼接(+)**: 已部分支持
+8. **new实例化**: `new 类名(args)` 或 `类名(args)`
+9. **for...of遍历**: `for (item in list)`
+
+### P2 - 高级特性
+10. **泛型**: `List<String>`
+11. **async/await**: 异步操作
+12. **装饰器**: `@量子注解`
+
+**当前支持**: 配置/类型/函数/量子程序/枚举/类/接口/导入/导出/IF/WHILE/FOR/量子门/字符串/数组
+**需要新增OpCode**: DOT_ACCESS(0xF5), CALL_METHOD(0xF6), UNARY_NOT(0xF7), BOOL_LOAD(0xF8)
