@@ -93,6 +93,9 @@ class TokenType(Enum):
     IF = '如果'
     ELSE = '否则'
     ELIF = '否则如果'
+    MATCH = '匹配'
+    CASE = '情况'
+    DEFAULT = '默认'
     RETURN = '返回'
     LET = '让'
     FOR = '循环'
@@ -621,6 +624,8 @@ class Parser:
         t = self._current()
         if t.type == TokenType.IF:
             return self._parse_if()
+        elif t.type == TokenType.MATCH:
+            return self._parse_switch()
         elif t.type == TokenType.RETURN:
             return self._parse_return()
         elif t.type == TokenType.LET:
@@ -712,6 +717,27 @@ class Parser:
                 node.children.append(self._parse_if())
             else:
                 node.children.append(self._parse_block())
+        return node
+
+    def _parse_switch(self):
+        node = ASTNode('Switch', line=self._current().line)
+        self._expect(TokenType.MATCH)
+        node.children.append(self._parse_expression())  # match expr
+        self._expect(TokenType.LBRACE)
+        # Parse cases
+        while self._current().type == TokenType.CASE:
+            self._advance()  # skip '情况'
+            case_node = ASTNode('Case', line=self._current().line)
+            case_node.children.append(self._parse_expression())  # case value
+            case_node.children.append(self._parse_block())  # case body
+            node.children.append(case_node)
+        # Parse default
+        if self._current().type == TokenType.DEFAULT:
+            self._advance()  # skip '默认'
+            default_node = ASTNode('Default', line=self._current().line)
+            default_node.children.append(self._parse_block())
+            node.children.append(default_node)
+        self._expect(TokenType.RBRACE)
         return node
 
     def _parse_return(self):
@@ -1058,6 +1084,38 @@ class CodeGenerator:
             self._gen_node(node.children[0])
             self._emit(OpCode.LOG, line=node.line)
 
+        elif node.type == 'Switch':
+            # Evaluate match expression
+            self._gen_node(node.children[0])
+            match_var = f'_match_{node.line}'
+            self._emit(OpCode.STORE_VAR, match_var, node.line)
+            end_label = f'_switch_end_{node.line}'
+            default_label = f'_default_{node.line}'
+            for i, child in enumerate(node.children[1:]):
+                if child.type == 'Case':
+                    case_label = f'_case_{node.line}_{i}'
+                    self.instructions.append({'op': 'LABEL', 'name': case_label})
+                    self._emit(OpCode.LOAD_VAR, match_var, child.line)
+                    self._gen_node(child.children[0])  # case value
+                    self._emit(OpCode.EQ, None, child.line)
+                    next_i = i + 1
+                    # Find next case index (skip Default nodes)
+                    remaining = node.children[1:][next_i:]
+                    found_case = False
+                    for j, nxt in enumerate(remaining):
+                        if nxt.type == 'Case':
+                            next_label = f'_case_{node.line}_{next_i + j}'
+                            found_case = True
+                            break
+                    if not found_case:
+                        next_label = default_label
+                    self._emit(OpCode.JUMP_IF_FALSE, next_label, child.line)
+                    self._gen_node(child.children[1])  # case body
+                    self._emit(OpCode.JUMP, end_label, child.line)
+                elif child.type == 'Default':
+                    self.instructions.append({'op': 'LABEL', 'name': default_label})
+                    self._gen_node(child.children[0])
+            self.instructions.append({'op': 'LABEL', 'name': end_label})
         elif node.type == 'If':
             else_label = self._new_label()
             end_label = self._new_label()
