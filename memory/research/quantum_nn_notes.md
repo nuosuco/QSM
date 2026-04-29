@@ -2835,3 +2835,56 @@ class LinearAttention(nn.Module):
 实现: 按epoch调整DataLoader的采样权重
 - 字符数据: w = max(0, 1 - (epoch-5)/5)
 - 对话数据: w = min(1, (epoch-15)/5)
+
+## 198. 量子注意力机制深入分析 (2026-04-30)
+
+### V6门控量子注意力当前实现
+```python
+# 量子旋转
+enc_view = enc_out.view(B, S, nh, dh)
+qr = self.quantum_rotation  # [n_heads, d_head]
+quantum_out = (enc_view * cos(qr) + roll(enc_view,1,-1) * sin(qr)).reshape(B,S,-1)
+# 门控混合
+enc_out = gate * quantum_out + (1-gate) * enc_out
+```
+
+### 问题分析
+1. **roll操作无物理意义**: roll(enc_view,1,-1)只是相邻元素移位, 不是真正的量子旋转
+2. **量子旋转应作用于特征子空间**: 每个head应该有独立的酉变换
+3. **门控值是全局标量**: gate对所有token相同, 应该是动态的
+
+### 改进方案: 真正的量子旋转注意力 (V7)
+```python
+class QuantumRotationAttention(nn.Module):
+    def __init__(self, d_model, n_heads):
+        # 可学习旋转频率 (类似RoPE)
+        self.freq = nn.Parameter(torch.randn(n_heads, d_model//n_heads//2))
+        # 动态门控: 基于输入决定gate值
+        self.gate_net = nn.Linear(d_model, 1)
+    
+    def forward(self, x):
+        B, S, _ = x.shape
+        gate = torch.sigmoid(self.gate_net(x))  # [B,S,1]
+        
+        # RZ门旋转 (真正的量子旋转)
+        x_view = x.view(B, S, nh, dh)
+        theta = self.freq * torch.arange(S).unsqueeze(-1)
+        cos_t = torch.cos(theta)
+        sin_t = torch.sin(theta)
+        
+        # 应用RZ旋转: |0⟩→cos|0⟩+sin|1⟩
+        x_rot = x_view * cos_t + torch.flip(x_view, [-1]) * sin_t
+        return gate * x_rot + (1-gate) * x
+```
+
+### 与RoPE的联系
+- RoPE: 位置编码通过旋转矩阵注入
+- Q-RoPE: 用RZ量子门实现, 频率可学习
+- 优势: 量子旋转天然支持相对位置, 不需要额外位置编码
+
+### 量子哈密顿量注意力 (V8+)
+- H|ψ⟩ = E|ψ⟩ → 时间演化 U(t) = exp(-iHt)
+- H = J∑σᵢ·σⱼ (Heisenberg模型)
+- 注意力 = 量子态的时间演化
+- 计算复杂度: O(n·K) 其中K是截断的键维度
+- 参考: Quantum Hamiltonian Embedding (Lloyd et al., 2023)
