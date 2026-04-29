@@ -59,6 +59,8 @@ class OpCode(Enum):
 
     # 类型操作
     TYPE_DEF = 0x70
+    IMPORT = 0xF1
+    EXPORT = 0xF2
     TYPE_CAST = 0x71
 
     # 对象操作
@@ -78,6 +80,8 @@ class TokenType(Enum):
     FUNC = '函数'
     QUANTUM_PROGRAM = 'quantum_program'
     QUANTUM_ENUM = 'quantum_enum'
+    IMPORT = 'import'
+    EXPORT = 'export'
     IF = '如果'
     ELSE = '否则'
     ELIF = '否则如果'
@@ -321,6 +325,35 @@ class Parser:
             return self._advance()
         raise SyntaxError(f"Expected {ttype}, got {self._current().type} ({self._current().value}) at line {self._current().line}")
 
+
+    def _parse_import(self):
+        """解析 import 语句: import 模块名 [as 别名]"""
+        node = ASTNode('Import', line=self._peek().line)
+        self._expect(TokenType.IMPORT)
+        # Get module path (can be dotted: import A.B.C)
+        module_parts = []
+        module_parts.append(self._advance().value)
+        while self._peek() and self._peek().type == TokenType.DOT:
+            self._advance()  # consume dot
+            module_parts.append(self._advance().value)
+        node.value = '.'.join(module_parts)
+        # Optional: as alias
+        if self._peek() and self._peek().value == 'as':
+            self._advance()  # consume 'as'
+            node.children.append(ASTNode('Alias', value=self._advance().value, line=node.line))
+        return node
+
+    def _parse_export(self):
+        """解析 export 语句: export 名称 [as 别名]"""
+        node = ASTNode('Export', line=self._peek().line)
+        self._expect(TokenType.EXPORT)
+        node.value = self._advance().value
+        # Optional: as alias
+        if self._peek() and self._peek().value == 'as':
+            self._advance()  # consume 'as'
+            node.children.append(ASTNode('Alias', value=self._advance().value, line=node.line))
+        return node
+
     def _parse_top_level(self):
         t = self._current()
         if t.type == TokenType.CONFIG:
@@ -333,6 +366,10 @@ class Parser:
             return self._parse_quantum_program()
         elif t.type == TokenType.QUANTUM_ENUM:
             return self._parse_quantum_enum()
+        elif t.type == TokenType.IMPORT:
+            return self._parse_import()
+        elif t.type == TokenType.EXPORT:
+            return self._parse_export()
         else:
             # Skip unknown token
             self._advance()
@@ -941,6 +978,16 @@ class CodeGenerator:
                     # The section's child is the function/block
                     for section_child in child.children:
                         self._gen_node(section_child)
+        elif node.type == 'Import':
+            mod_idx = self._add_const(node.value)
+            self._emit(OpCode.IMPORT, mod_idx, node.line)
+            for child in node.children:
+                self._gen_node(child)
+        elif node.type == 'Export':
+            name_idx = self._add_const(node.value)
+            self._emit(OpCode.EXPORT, name_idx, node.line)
+            for child in node.children:
+                self._gen_node(child)
         elif node.type == 'QuantumEnum':
             # quantum_enum → store enum name and values as constants
             enum_name_idx = self._add_const(node.value)
