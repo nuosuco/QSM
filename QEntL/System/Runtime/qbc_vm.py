@@ -18,7 +18,7 @@ class OpCode(Enum):
     LOOP_START = 0x45; LOOP_END = 0x46
     QUANTUM_INIT = 0x50; QUANTUM_GATE = 0x51; QUANTUM_MEASURE = 0x52; QUANTUM_ENTANGLE = 0x53
     LOG = 0x60; INPUT = 0x61
-    TYPE_DEF = 0x70; TYPE_CAST = 0x71
+    TYPE_DEF = 0x70; TYPE_CAST = 0x71; CLASS_DEF = 0xF3; INTERFACE_DEF = 0xF4; IMPORT = 0xF1; EXPORT = 0xF2
     OBJ_CREATE = 0x80; OBJ_GET = 0x81; OBJ_SET = 0x82
     BUILD_LIST = 0x90; INDEX_ACCESS = 0x91; INDEX_ASSIGN = 0x92
 
@@ -34,6 +34,7 @@ class QBCVirtualMachine:
         self.stack: List[Any] = []
         self.call_stack: List[tuple] = []  # (ip, variables_snapshot)
         self.functions: Dict[str, int] = {}
+        self.types: Dict[str, Any] = {}
         self.instructions: List[Dict] = []
         self.ip: int = 0  # instruction pointer
         self.running: bool = False
@@ -515,6 +516,26 @@ class QBCVirtualMachine:
             self.ip += 1
         
         elif op == OpCode.TYPE_DEF:
+            type_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"type_{inst.get('operand', '?')}"
+            self.types[type_name] = {"kind": "type", "fields": []}
+            self.variables[type_name] = type_name
+            self.ip += 1
+        elif op == OpCode.CLASS_DEF:
+            class_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"class_{inst.get('operand', '?')}"
+            self.types[class_name] = {"kind": "class", "fields": [], "methods": []}
+            self.variables[class_name] = class_name
+            self.ip += 1
+        elif op == OpCode.INTERFACE_DEF:
+            iface_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"iface_{inst.get('operand', '?')}"
+            self.types[iface_name] = {"kind": "interface", "methods": []}
+            self.variables[iface_name] = iface_name
+            self.ip += 1
+        elif op == OpCode.IMPORT:
+            mod_name = self.constants[inst['operand']] if inst['operand'] is not None and inst['operand'] < len(self.constants) else f"mod_{inst.get('operand', '?')}"
+            self.variables[mod_name] = {"kind": "module", "name": mod_name}
+            self.ip += 1
+        elif op == OpCode.EXPORT:
+            # Export marks a symbol for external use, just skip in VM
             self.ip += 1
         
         elif op == OpCode.TYPE_CAST:
