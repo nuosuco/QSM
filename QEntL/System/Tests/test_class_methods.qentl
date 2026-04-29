@@ -1,0 +1,26 @@
+// 测试: quantum_class基本字段+量子程序组合
+// 作者: 小趣WeQ | 监督: 中华Zhoho
+
+quantum_enum 运算类型 {
+    加法
+    减法
+    乘法
+}
+
+quantum_class 数值 {
+    值: 整数 = 0
+    名: 字符串 = "数值"
+}
+
+quantum_program 测试类枚举组合 {
+    入口: 函数() {
+        LOG("⚛ 测试class+enum+program组合")
+        让 类型 = 运算类型.加法
+        LOG("运算类型已定义")
+        让 数 = 数值()
+        LOG("数值类已实例化")
+        量子门 H 0
+        量子门 CNOT 0 1
+        LOG("Bell态创建完成")
+    }
+}

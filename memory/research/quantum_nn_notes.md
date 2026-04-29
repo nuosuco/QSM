@@ -2342,3 +2342,24 @@ V5已用label_smoothing=0.1! 量子噪声是天然的label smoothing!
 - 纠错级别: 9级(从3-qubit到表面码)
 - 纠错周期: 每N步自动纠错
 - 容错阈值: 1% (表面码), 11% (Shor码)
+
+## 183. quantum_class方法调用设计 (2026-04-29)
+
+当前状态: quantum_class支持字段声明和实例化,但方法定义+调用尚未实现。
+
+**编译器需要的改动:**
+1. _parse_top_level中quantum_class块内识别 `方法名: 函数(参数: 类型)` 语法
+2. 生成CLASS_DEF时将方法作为内部函数编译,绑定到类
+3. 方法调用 `obj.method(args)` → 需要DOT访问操作符 + CALL_METHOD OpCode
+
+**新OpCode设计:**
+- DOT_ACCESS (0xF5): 栈顶对象+属性名 → 获取属性/方法
+- CALL_METHOD (0xF6): 调用对象方法,隐式传入self
+
+**VM执行:**
+- CLASS_DEF存储字段+方法到types dict
+- 实例化时创建对象(dict),包含字段值和方法引用
+- DOT_ACCESS: 从对象中查找属性
+- CALL_METHOD: 绑定self到方法,然后执行函数
+
+**优先级:** 中等 - 不阻塞当前开发,但V6自举需要
