@@ -127,6 +127,10 @@ class TokenType(Enum):
     COLON = ':'
     SEMICOLON = ';'
     ASSIGN = '='
+    PLUS_ASSIGN = '+='
+    MINUS_ASSIGN = '-='
+    MUL_ASSIGN = '*='
+    DIV_ASSIGN = '/='
 
     # 运算符
     PLUS = '+'
@@ -240,7 +244,11 @@ class Lexer:
                 '[': TokenType.LBRACKET, ']': TokenType.RBRACKET,
                 '.': TokenType.DOT, ',': TokenType.COMMA,
                 ':': TokenType.COLON, ';': TokenType.SEMICOLON,
-                '=': TokenType.ASSIGN, '+': TokenType.PLUS,
+                '=': TokenType.ASSIGN,
+        '+=': TokenType.PLUS_ASSIGN,
+        '-=': TokenType.MINUS_ASSIGN,
+        '*=': TokenType.MUL_ASSIGN,
+        '/=': TokenType.DIV_ASSIGN, '+': TokenType.PLUS,
                 '-': TokenType.MINUS, '*': TokenType.STAR,
                 '/': TokenType.SLASH,
     '%': TokenType.PERCENT, '<': TokenType.LT,

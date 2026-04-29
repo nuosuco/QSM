@@ -2599,3 +2599,39 @@ def get_sample_weights(epoch, data_difficulty):
         return [5.0 if d['difficulty'] in ['char','word'] else 1.0 for d in data_difficulty]
     ...
 ```
+
+## 191. Q-RoPE: 量子旋转位置编码 (2026-04-29)
+
+**问题**: 标准位置编码(nn.Embedding)是绝对位置, 不支持长度泛化.
+RoPE(旋转位置编码)已被证明在长序列上更有效(Llama/Mistral等使用).
+
+**Q-RoPE设计**: 用量子RZ门模拟RoPE
+
+```
+标准RoPE: pos_k → θ = pos * freq → [cos(θ), -sin(θ), sin(θ), cos(θ)]
+Q-RoPE:   pos_k → RZ(θ) → |0⟩保持 + |1⟩相位旋转
+         = cos(θ/2)|0⟩ + e^(iφ)sin(θ/2)|1⟩
+```
+
+**实现方案**:
+```python
+class QRoPE(nn.Module):
+    def __init__(self, d_model, max_len=64):
+        self.freq = nn.Parameter(torch.ones(d_model // 2) * 0.01)
+    
+    def forward(self, x, positions):
+        # x: [B, S, d_model]
+        theta = positions * self.freq  # [S, d//2]
+        cos_t = torch.cos(theta)
+        sin_t = torch.sin(theta)
+        x1, x2 = x[..., :d//2], x[..., d//2:]
+        # RZ门旋转: cos(θ)*x1 - sin(θ)*x2, sin(θ)*x1 + cos(θ)*x2
+        return torch.cat([x1*cos_t - x2*sin_t, x1*sin_t + x2*cos_t], -1)
+```
+
+**与RoPE的区别**:
+1. 频率可学习 (self.freq) → 不是固定的1/10000^(2i/d)
+2. 语义: RZ门旋转 = 在Bloch球上绕Z轴旋转
+3. 与Q-Embedding协同: 位置影响叠加系数的概率幅
+
+**V6迁移**: Phase 3 (Q-Embedding + Q-RoPE + Gate Attention)
