@@ -25,6 +25,7 @@ class OpCode(Enum):
     BUILD_DICT = 0x93
     INDEX_ACCESS = 0x91
     INDEX_ASSIGN = 0x92
+    SLICE_ACCESS = 0x94
     UNARY_NOT = 0xF7
     DOT_ACCESS = 0xF5
     BOOL_LOAD = 0xF8
@@ -244,6 +245,16 @@ class QBCVirtualMachine:
                 while len(arr) <= i:
                     arr.append(0)
                 arr[i] = val
+            self.ip += 1
+        elif op == OpCode.SLICE_ACCESS:
+            end = self.stack.pop() if self.stack else 0
+            start = self.stack.pop() if self.stack else 0
+            arr = self.stack.pop() if self.stack else []
+            s, e = int(start), int(end)
+            if isinstance(arr, (list, str)):
+                self.stack.append(arr[s:e])
+            else:
+                self.stack.append([])
             self.ip += 1
         elif op == OpCode.HALT:
             self.running = False

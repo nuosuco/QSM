@@ -75,6 +75,7 @@ class OpCode(Enum):
     BUILD_DICT = 0x93
     INDEX_ACCESS = 0x91
     INDEX_ASSIGN = 0x92
+    SLICE_ACCESS = 0x94
     # 扩展操作
     DOT_ACCESS = 0xF5
     UNARY_NOT = 0xF7
@@ -941,12 +942,19 @@ class Parser:
                 else:
                     node = ASTNode('FieldAccess', value=field, children=[node], line=t.line)
             elif self._current().type == TokenType.LBRACKET:
-                # Array index: identifier[expr]
+                # Array index or slice: identifier[expr] or identifier[start:end]
                 self._advance()  # consume [
-                index = self._parse_expression()
-                self._expect(TokenType.RBRACKET)  # consume ]
-                node = ASTNode('IndexAccess', children=[node, index], line=t.line)
-            return node
+                first = self._parse_expression()
+                if self._current().type == TokenType.COLON:
+                    # Slice: identifier[start:end]
+                    self._advance()  # consume :
+                    second = self._parse_expression()
+                    self._expect(TokenType.RBRACKET)
+                    node = ASTNode('SliceAccess', children=[node, first, second], line=t.line)
+                    return node
+                self._expect(TokenType.RBRACKET)
+                node = ASTNode('IndexAccess', children=[node, first], line=t.line)
+                return node
         elif t.type == TokenType.LPAREN:
             self._advance()
             expr = self._parse_expression()
@@ -1161,8 +1169,8 @@ class CodeGenerator:
         elif node.type == 'For':
             start_label = self._new_label()
             end_label = self._new_label()
-            range_node = node.children[0]
-            if range_node.type == 'Range' or (range_node.type == 'Call' and range_node.value == '范围'):
+            range_node = node.children[0] if node.children else None
+            if range_node and (range_node.type == 'Range' or (range_node.type == 'Call' and range_node.value == '范围')):
                 self._gen_node(range_node.children[0])
                 self._emit(OpCode.STORE_VAR, node.value, node.line)
                 self._gen_node(range_node.children[1])
@@ -1288,6 +1296,12 @@ class CodeGenerator:
             self._gen_node(node.children[0])  # the array variable
             self._gen_node(node.children[1])  # the index
             self._emit(OpCode.INDEX_ACCESS, None, node.line)
+        elif node.type == 'SliceAccess':
+            # Push array, start, end then SLICE_ACCESS
+            self._gen_node(node.children[0])  # the array/string
+            self._gen_node(node.children[1])  # start
+            self._gen_node(node.children[2])  # end
+            self._emit(OpCode.SLICE_ACCESS, None, node.line)
         elif node.type == 'IndexAssign':
             # 让 a[i] = expr → push var, index, value, INDEX_ASSIGN
             self._emit(OpCode.LOAD_VAR, node.value, node.line)  # load the actual array/dict
