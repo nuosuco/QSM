@@ -1079,8 +1079,6 @@ class Parser:
         elif t.type == TokenType.LBRACKET:
             return self._parse_list()
 
-        elif t.type == TokenType.LBRACE:
-            return self._parse_object_literal()
         else:
             self._advance()
             return ASTNode('Unknown', value=t.value, line=t.line)
