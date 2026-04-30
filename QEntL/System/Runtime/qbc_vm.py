@@ -696,6 +696,36 @@ class QBCVirtualMachine:
                     exp = self.stack.pop()
                     base = self.stack.pop()
                     self.stack.append(base ** exp)
+            elif func_name == '是数字':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, (int, float)):
+                        self.stack.append(1)
+                    elif isinstance(val, str) and val.lstrip('-').replace('.','').isdigit():
+                        self.stack.append(1)
+                    else:
+                        self.stack.append(0)
+            elif func_name == '是字母':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, str) and val.isalpha():
+                        self.stack.append(1)
+                    else:
+                        self.stack.append(0)
+            elif func_name == '是空':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(1 if val == 0 or val == '' or val is None or val == [] or val == {} else 0)
+            elif func_name == '格式':
+                if len(self.stack) >= 2:
+                    val = self.stack.pop()
+                    fmt_str = self.stack.pop()
+                    if isinstance(fmt_str, str):
+                        self.stack.append(fmt_str.replace('{}', str(val), 1))
+                    else:
+                        self.stack.append(str(fmt_str))
+                elif self.stack:
+                    self.stack.append(str(self.stack.pop()))
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
