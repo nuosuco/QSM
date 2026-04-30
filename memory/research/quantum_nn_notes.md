@@ -3013,3 +3013,102 @@ Teacher: V5(7.5M参数) → Student: V6(2.86M参数)
 3. 语法量子门 → 纠缠相关词对
 4. 测量 → 生成输出
 5. 全部在QEntL量子虚拟机中执行!
+
+## #203 V6 Post-Training Analysis & V7 Architecture Design
+
+### V6 Translation Test Results (E50, Val 2.693)
+- **Semantic associations learned**: "hello"→quantum computer, "彝族人民"→彝文字
+- **Problem: premature EOS** - most inputs generate empty output
+- **Problem: repetition** - "古古古" patterns
+- **Problem: mixed language** - Chinese+English in same output
+
+### Root Cause Analysis
+1. **Val Loss 2.693 is still too high** for coherent generation
+   - GPT-2 at Val ~3.5 generates coherent text
+   - But GPT-2 is decoder-only on monolingual data
+   - Encoder-decoder for translation needs Val < 1.5 typically
+2. **Model too small** (2.86M params) for 28K diverse pairs
+3. **No length normalization** in decoding → EOS bias
+4. **No repetition penalty** in decoding
+
+### V7 Architecture Design
+**Phase 1: Data Scaling**
+- Target: 50K+ pairs with 50% yi content
+- Add sentence pairs from literature, science, daily life
+- Curriculum: char-level (5K) → word-level (15K) → sentence-level (30K+)
+
+**Phase 2: Model Improvements**
+- Increase to 256d/4层/4头 (gradient accumulation, batch=4, accum=4)
+- Label smoothing: 0.15 (up from 0.1)
+- Gradient clipping: 1.0
+- Warmup: 500 steps (longer)
+
+**Phase 3: Decoding Improvements**
+- Beam search (width=5)
+- Length penalty: lp = ((5+|y|)/(5+1))^0.6
+- Repetition penalty: 1.2 for repeated tokens
+- Temperature: 0.7 for sampling
+
+**Phase 4: QMoE Integration**
+- 4 experts routed by Q-Embedding basis states
+- Active 2/4 experts per token → 50% compute reduction
+- Expert specialization: yi/zh/en/special tokens
+
+### Key Insight from V6
+**Data quality > model size > Val Loss number**
+V6 (Val 2.69) produces meaningful output while V5 (Val 2.19) produces garbage.
+The 50% yi data ratio is the critical factor.
+
+## #204 Repetition Penalty & EOS Bias Solutions
+
+### Repetition Penalty (from Keskar et al. 2019)
+```python
+def repetition_penalty(logits, prev_ids, penalty=1.2):
+    for id in prev_ids:
+        if logits[id] > 0:
+            logits[id] /= penalty
+        else:
+            logits[id] *= penalty
+    return logits
+```
+
+### EOS Bias Reduction
+- During training: add random length targets (don't always end at EOS)
+- During decoding: length reward = bonus for generating more tokens
+- Or: train without explicit EOS, use max_length truncation
+
+### Coverage Mechanism (from Tu et al. 2016)
+- Track attention sum over previous steps
+- Coverage loss = sum(min(attn_i, attn_cumulative_i))
+- Prevents attending to same source position repeatedly
+- Good for translation tasks
+
+## #205 Curriculum Learning Implementation Plan
+
+### Stage 1: Character Recognition (5K pairs, 5 epochs)
+- Single character translations: 󲶦→紫黑色→dark purple
+- Character-to-definition pairs
+- Learn basic character meanings
+
+### Stage 2: Word-Level (15K pairs, 10 epochs)
+- Two-to-four character words
+- Simple phrase translations
+- Build word-level associations
+
+### Stage 3: Sentence-Level (30K+ pairs, 20 epochs)
+- Full sentences and paragraphs
+- Conversational data
+- Develop fluency and grammar
+
+### Implementation
+```python
+# Curriculum data loader
+curriculum = [
+    {"data": "stage1_chars.json", "epochs": 5, "lr": 1e-3},
+    {"data": "stage2_words.json", "epochs": 10, "lr": 5e-4},
+    {"data": "stage3_sentences.json", "epochs": 20, "lr": 1e-4},
+]
+```
+
+Each stage: train → validate → if improved, proceed to next stage
+Q-Embedding bases gradually unfreeze: Stage1=2 bases, Stage2=3, Stage3=4
