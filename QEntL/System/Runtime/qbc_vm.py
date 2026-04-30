@@ -26,6 +26,10 @@ class OpCode(Enum):
     INDEX_ACCESS = 0x91
     INDEX_ASSIGN = 0x92
     SLICE_ACCESS = 0x94
+    PUSH_TRY = 0xF9
+    POP_TRY = 0xFA
+    THROW = 0xFB
+    LABEL = 0xFC
     UNARY_NOT = 0xF7
     DOT_ACCESS = 0xF5
     BOOL_LOAD = 0xF8
@@ -168,6 +172,7 @@ class QBCVirtualMachine:
         self.running = False
         self.stack = []
         self.output = []
+        self.try_stack = []  # stack of catch addresses for try/catch
     
     def load_file(self, path: str):
         """从文件加载QBC程序"""
@@ -256,6 +261,22 @@ class QBCVirtualMachine:
             else:
                 self.stack.append([])
             self.ip += 1
+        elif op == OpCode.PUSH_TRY:
+            if operand is not None:
+                target = self._find_label(operand)
+                self.try_stack.append(target if target is not None else self.ip + 1)
+            self.ip += 1
+        elif op == OpCode.POP_TRY:
+            if self.try_stack:
+                self.try_stack.pop()
+            self.ip += 1
+        elif op == OpCode.THROW:
+            if self.try_stack:
+                catch_addr = self.try_stack.pop()
+                self.ip = catch_addr
+            else:
+                self.output.append('Error: unhandled exception')
+                self.running = False
         elif op == OpCode.HALT:
             self.running = False
         
@@ -721,7 +742,7 @@ class QBCVirtualMachine:
     def _find_label(self, label_name: str) -> Optional[int]:
         """Find instruction index for a label"""
         for i, instr in enumerate(self.instructions):
-            if instr.get('op') == 'LABEL' and instr.get('name') == label_name:
+            if instr.get('op') == 'LABEL' and (instr.get('name') == label_name or instr.get('operand') == label_name):
                 return i + 1  # return instruction after label
         return None
 
@@ -792,6 +813,7 @@ class QBCVirtualMachine:
         self.stack = []
         self.call_stack = []
         self.output = []
+        self.try_stack = []  # stack of catch addresses for try/catch
         self.quantum_gates_applied = []
         
         # Find and execute QUANTUM_INIT if exists

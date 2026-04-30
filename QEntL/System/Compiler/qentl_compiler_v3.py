@@ -80,6 +80,10 @@ class OpCode(Enum):
     DOT_ACCESS = 0xF5
     UNARY_NOT = 0xF7
     BOOL_LOAD = 0xF8
+    PUSH_TRY = 0xF9
+    POP_TRY = 0xFA
+    THROW = 0xFB
+    LABEL = 0xFC
 
 # === 词法分析 ===
 class TokenType(Enum):
@@ -157,6 +161,8 @@ class TokenType(Enum):
     BOOL_FALSE = 'false'
     BREAK = 'break'
     CONTINUE = 'continue'
+    TRY = '尝试'
+    CATCH = '捕获'
 
     # 字面量
     IDENTIFIER = 'IDENTIFIER'
@@ -655,6 +661,8 @@ class Parser:
         elif t.type == TokenType.CONTINUE:
             self._advance()
             return ASTNode('Continue', line=t.line)
+        elif t.type == TokenType.TRY:
+            return self._parse_try()
         else:
             # Check for compound assignment: x += expr
             if t.type == TokenType.IDENTIFIER and self._peek() and self._peek().type in (TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN, TokenType.MUL_ASSIGN, TokenType.DIV_ASSIGN):
@@ -693,7 +701,25 @@ class Parser:
             self._advance()
         return expr
 
-        def _parse_if(self):
+    def _parse_try(self):
+        """Parse try/catch: 尝试 { ... } 捕获 (e) { ... }"""
+        node = ASTNode('Try', line=self._current().line)
+        self._expect(TokenType.TRY)
+        node.children.append(self._parse_block())  # try body
+        if self._current().type == TokenType.CATCH:
+            self._advance()
+            # Optional error variable: 捕获(e) or 捕获
+            error_var = None
+            if self._current().type == TokenType.LPAREN:
+                self._advance()
+                error_var = self._advance().value
+                self._expect(TokenType.RPAREN)
+            node.children.append(self._parse_block())  # catch body
+            if error_var:
+                node.value = error_var
+        return node
+
+    def _parse_if(self):
             node = ASTNode('If', line=self._current().line)
             self._expect(TokenType.IF)
             node.children.append(self._parse_expression())  # condition
@@ -717,6 +743,24 @@ class Parser:
                 else:
                     node.children.append(self._parse_block())  # else-body
             return node
+
+    def _parse_try(self):
+        """Parse try/catch: 尝试 { ... } 捕获 (e) { ... }"""
+        node = ASTNode('Try', line=self._current().line)
+        self._expect(TokenType.TRY)
+        node.children.append(self._parse_block())  # try body
+        if self._current().type == TokenType.CATCH:
+            self._advance()
+            # Optional error variable: 捕获(e) or 捕获
+            error_var = None
+            if self._current().type == TokenType.LPAREN:
+                self._advance()
+                error_var = self._advance().value
+                self._expect(TokenType.RPAREN)
+            node.children.append(self._parse_block())  # catch body
+            if error_var:
+                node.value = error_var
+        return node
 
     def _parse_if(self):
         node = ASTNode('If', line=self._current().line)
@@ -1045,6 +1089,11 @@ class CodeGenerator:
     def _new_label(self) -> str:
         self.label_counter += 1
         return f"L{self.label_counter}"
+
+    def _emit_label(self, label_name):
+        """Emit a label marker for jump targets"""
+        self.instructions.append({'op': 'LABEL', 'name': label_name, 'code': OpCode.LABEL.value, 'operand': label_name, 'line': 0})
+
 
     def _add_const(self, value) -> int:
         if value not in self.constants:
@@ -1384,6 +1433,19 @@ class CodeGenerator:
             self._emit(OpCode.CLASS_DEF, name_idx, node.line)
             for child in node.children:
                 self._gen_node(child)
+        elif node.type == 'Try':
+            catch_label = self._new_label()
+            end_label = self._new_label()
+            self._emit(OpCode.PUSH_TRY, catch_label, node.line)
+            self._gen_node(node.children[0])  # try body
+            self._emit(OpCode.POP_TRY, None, node.line)
+            self._emit(OpCode.JUMP, end_label, node.line)
+            # catch_label:
+            self._emit_label(catch_label)
+            if len(node.children) > 1:
+                self._gen_node(node.children[1])  # catch body
+            # end_label:
+            self._emit_label(end_label)
         elif node.type == 'Import':
             mod_idx = self._add_const(node.value)
             self._emit(OpCode.IMPORT, mod_idx, node.line)
