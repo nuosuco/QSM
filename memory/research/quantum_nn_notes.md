@@ -3112,3 +3112,84 @@ curriculum = [
 
 Each stage: train → validate → if improved, proceed to next stage
 Q-Embedding bases gradually unfreeze: Stage1=2 bases, Stage2=3, Stage3=4
+
+## #206 Quantum NLP for Low-Resource Languages (QSM Application)
+
+### Problem: V6 Model Output Issues
+1. **Premature EOS**: Model generates EOS token too early
+   - Solution: Length normalization during decoding
+   - Solution: Train with random length targets
+   - Solution: Add minimum length constraint during inference
+
+2. **Repetition**: "古古古" patterns
+   - Solution: Repetition penalty (Keskar et al. 2019)
+   - Solution: n-gram blocking (Paulus et al. 2017)
+   - Solution: Coverage mechanism (Tu et al. 2016)
+
+3. **Mixed Language**: Chinese+English in same output
+   - Root cause: V6 has no language mode signal
+   - Solution: Add language token prefix (zh>, yi>, en>)
+   - Solution: Train with language-specific BOS tokens
+
+### V7 Architecture: Language-Controlled Generation
+```python
+class QSM_V7(nn.Module):
+    def __init__(self, vocab_size, d_model=256, n_heads=4, n_layers=4):
+        # Language-specific BOS tokens
+        self.lang_bos = {
+            'zh': stoi['<bos_zh>'],  # Chinese mode
+            'yi': stoi['<bos_yi>'],  # Yi mode  
+            'en': stoi['<bos_en>'],  # English mode
+        }
+        # QMoE: 4 experts, 2 active
+        self.experts = nn.ModuleList([
+            TransformerLayer(d_model, n_heads) for _ in range(4)
+        ])
+        self.router = QEmbeddingRouter(n_bases=4, n_experts=4)
+```
+
+### Decoding Strategy for V7
+```python
+def beam_search_decode(model, src, beam_width=5, max_len=50, 
+                        length_penalty=0.6, rep_penalty=1.2):
+    # Initialize beams
+    beams = [(0.0, [bos_id])]
+    
+    for step in range(max_len):
+        candidates = []
+        for score, seq in beams:
+            logits = model(src, torch.tensor([seq]))
+            logits = logits[0, -1]
+            
+            # Repetition penalty
+            for prev_id in set(seq):
+                if logits[prev_id] > 0:
+                    logits[prev_id] /= rep_penalty
+                else:
+                    logits[prev_id] *= rep_penalty
+            
+            # Top-k sampling
+            top_k = torch.topk(logits, beam_width)
+            for i in range(beam_width):
+                new_score = score + top_k.values[i].item()
+                candidates.append((new_score, seq + [top_k.indices[i].item()]))
+        
+        # Length normalization
+        beams = sorted(candidates, 
+                      key=lambda x: x[0] / ((5 + len(x[1])) / 6) ** length_penalty,
+                      reverse=True)[:beam_width]
+        
+        # Check if all beams ended
+        if all(seq[-1] == eos_id for _, seq in beams):
+            break
+    
+    return beams[0][1]
+```
+
+### Key V7 Improvements Summary
+1. Language-controlled BOS tokens → solves mixed language
+2. Beam search + length penalty → solves premature EOS
+3. Repetition penalty → solves "古古古" patterns
+4. 256d/4层 → better capacity for 57K data
+5. Curriculum learning → char→word→sentence stages
+6. QMoE → efficient expert routing
