@@ -160,6 +160,7 @@ class TokenType(Enum):
     NOT = '非'
     BOOL_TRUE = 'true'
     BOOL_FALSE = 'false'
+    NULL = '空'
     BREAK = 'break'
     CONTINUE = 'continue'
     ASSERT = '断言'
@@ -207,8 +208,12 @@ class Lexer:
                 self.pos += 1
                 continue
 
-            # Comments
+            # Comments (// or #)
             if ch == '/' and self.pos + 1 < len(self.source) and self.source[self.pos+1] == '/':
+                while self.pos < len(self.source) and self.source[self.pos] != '\n':
+                    self._advance()
+                continue
+            if ch == '#':
                 while self.pos < len(self.source) and self.source[self.pos] != '\n':
                     self._advance()
                 continue
@@ -1011,6 +1016,9 @@ class Parser:
         elif t.type == TokenType.BOOL_FALSE:
             self._advance()
             return ASTNode('BoolLit', value='false', line=t.line)
+        elif t.type == TokenType.NULL:
+            self._advance()
+            return ASTNode('NullLit', line=t.line)
         elif t.type == TokenType.TYPE and self._peek() and self._peek().type == TokenType.LPAREN:
             # 类型 as built-in function call
             return self._parse_builtin_call(t.value)
@@ -1393,6 +1401,9 @@ class CodeGenerator:
             idx = self._add_const(float(node.value) if '.' in node.value else int(node.value))
             self._emit(OpCode.LOAD_CONST, idx, node.line)
 
+        elif node.type == 'NullLit':
+            none_idx = self._add_const(None)
+            self._emit(OpCode.LOAD_CONST, none_idx, node.line)
         elif node.type == 'BoolLit':
             idx = self._add_const(1 if node.value == 'true' else 0)
             self._emit(OpCode.LOAD_CONST, idx, node.line)
