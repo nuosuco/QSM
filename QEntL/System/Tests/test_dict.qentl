@@ -1,0 +1,24 @@
+# QEntL 字典+数组修改综合测试
+测试字典: 函数() {
+    # 创建字典
+    让 d = 字典(["name", "QSM", "version", 6])
+    LOG(d["name"])
+    
+    # 修改字典值
+    让 d["version"] = 7
+    LOG(d["version"])
+    
+    # 添加新键
+    让 d["type"] = "quantum"
+    LOG(d["type"])
+    
+    # 字典长度和类型
+    LOG(长度(d))
+    LOG(类型(d))
+    
+    # 数组修改
+    让 arr = [10, 20, 30]
+    让 arr[0] = 99
+    LOG(arr[0])
+    LOG(arr[1])
+}

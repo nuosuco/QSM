@@ -522,7 +522,7 @@ class QBCVirtualMachine:
             if func_name == '长度':
                 if self.stack:
                     val = self.stack.pop()
-                    if isinstance(val, (list, str)):
+                    if isinstance(val, (list, str, dict)):
                         self.stack.append(len(val))
                     else:
                         self.stack.append(0)
