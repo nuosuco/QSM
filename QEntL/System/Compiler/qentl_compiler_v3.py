@@ -668,11 +668,30 @@ class Parser:
                 node.children.append(expr)
                 return node
             
-            # Expression statement
-            expr = self._parse_expression()
-            if self._current().type == TokenType.SEMICOLON:
-                self._advance()
-            return expr
+        # Expression statement (may be assignment)
+        expr = self._parse_expression()
+        if self._current() and self._current().type == TokenType.ASSIGN:
+            # Assignment without 让: x = val, d["key"] = val, arr[i] = val
+            self._advance()  # skip =
+            value = self._parse_expression()
+            if expr.type == 'IndexAccess':
+                # d["key"] = val → IndexAssign
+                assign_node = ASTNode('IndexAssign', line=expr.line)
+                # d["key"] = val → IndexAssign (value=var_name, children=[key, val])
+                assign_node = ASTNode('IndexAssign', value=expr.children[0].value if expr.children[0].type == 'Identifier' else None, line=expr.line)
+                assign_node.children.append(expr.children[1])  # key
+                assign_node.children.append(value)  # value
+                return assign_node
+            elif expr.type == 'Identifier':
+                # x = val → Assign
+                assign_node = ASTNode('Assign', value=expr.value, line=expr.line)
+                assign_node.children.append(value)
+                return assign_node
+            else:
+                return value
+        if self._current().type == TokenType.SEMICOLON:
+            self._advance()
+        return expr
 
         def _parse_if(self):
             node = ASTNode('If', line=self._current().line)
@@ -915,7 +934,7 @@ class Parser:
             # 类型 as built-in function call
             return self._parse_builtin_call(t.value)
         elif t.type == TokenType.IDENTIFIER:
-            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典', '翻转', '包含', '连接'}
+            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典', '翻转', '包含', '连接', '分割', '替换', '子串'}
             if t.value in builtin_funcs and self._peek() and self._peek().type == TokenType.LPAREN:
                 return self._parse_builtin_call(t.value)
             self._advance()
@@ -1317,6 +1336,10 @@ class CodeGenerator:
             self._gen_node(node.children[1])  # value
             self._emit(OpCode.INDEX_ASSIGN, None, node.line)
 
+        elif node.type == 'Assign':
+            # x = expr → generate value, then STORE_VAR
+            self._gen_node(node.children[0])
+            self._emit(OpCode.STORE_VAR, node.value, node.line)
         elif node.type == 'Identifier':
             self._emit(OpCode.LOAD_VAR, node.value, node.line)
 

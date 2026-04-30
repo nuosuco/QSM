@@ -1,0 +1,38 @@
+# 测试扩展内建函数
+
+测试扩展: 函数() {
+    # 分割 - string split
+    让 parts = 分割("a,b,c", ",")
+    LOG(parts)
+    LOG(长度(parts))
+    
+    # 替换 - string replace
+    让 s1 = 替换("hello world", "world", "qsm")
+    LOG(s1)
+    
+    # 子串 - substring
+    让 s2 = 子串("hello world", 0, 5)
+    LOG(s2)
+    
+    # 翻转 - reverse
+    让 arr = [1, 2, 3]
+    LOG(翻转(arr))
+    让 rev_str = 翻转("abc")
+    LOG(rev_str)
+    
+    # 包含 - contains
+    LOG(包含([10, 20, 30], 20))
+    LOG(包含([10, 20, 30], 99))
+    LOG(包含("hello", "ell"))
+    
+    # 连接 - join
+    让 joined = 连接(["x", "y", "z"], "-")
+    LOG(joined)
+    
+    # 字典操作
+    让 d = 字典()
+    d["name"] = "qsm"
+    d["version"] = "v6"
+    LOG(d["name"])
+    LOG(长度(d))
+}

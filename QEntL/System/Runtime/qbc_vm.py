@@ -622,6 +622,32 @@ class QBCVirtualMachine:
                         self.stack.append(sep.join(str(x) for x in arr))
                     else:
                         self.stack.append(str(arr))
+            elif func_name == '分割':
+                if len(self.stack) >= 2:
+                    sep = self.stack.pop()
+                    s = self.stack.pop()
+                    if isinstance(s, str) and isinstance(sep, str):
+                        self.stack.append(s.split(sep))
+                    else:
+                        self.stack.append([s])
+            elif func_name == '替换':
+                if len(self.stack) >= 3:
+                    new_s = self.stack.pop()
+                    old_s = self.stack.pop()
+                    s = self.stack.pop()
+                    if isinstance(s, str) and isinstance(old_s, str) and isinstance(new_s, str):
+                        self.stack.append(s.replace(old_s, new_s))
+                    else:
+                        self.stack.append(s)
+            elif func_name == '子串':
+                if len(self.stack) >= 2:
+                    end = self.stack.pop()
+                    start = self.stack.pop()
+                    s = self.stack.pop()
+                    if isinstance(s, str) and isinstance(start, int) and isinstance(end, int):
+                        self.stack.append(s[start:end])
+                    else:
+                        self.stack.append(s)
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
