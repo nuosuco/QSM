@@ -3193,3 +3193,34 @@ def beam_search_decode(model, src, beam_width=5, max_len=50,
 4. 256d/4层 → better capacity for 57K data
 5. Curriculum learning → char→word→sentence stages
 6. QMoE → efficient expert routing
+
+## #207 Parameter Efficiency Analysis: V6 vs V7
+
+### V6 (2.86M params, 28K data)
+- Val Loss: 2.693 after 50 epochs
+- Params/Data ratio: 101 (borderline overfitting)
+- Output: Partial semantic associations, premature EOS
+
+### V7 (9.2M params, 57K data)  
+- Val Loss: 6.43 after 1 epoch (just started)
+- Params/Data ratio: 161 (higher risk of overfitting)
+- Architecture: 256d/4层/4头/1024ff
+- Strategy: More data + gradient accumulation + label smoothing
+
+### Risk Assessment
+- V7 has 3.2x more parameters but only 2x more data
+- If V7 overfits: reduce to 3层 or 192d
+- Alternative: Use LoRA adapters on V6 best model
+- Optimal ratio for char-level seq2seq: ~50-80 params/data point
+
+### Q-Embedding Efficiency
+- Q-Embedding reduces embedding params by 98.4%
+- 4 bases × 256d = 1,024 params vs 6,924 × 256 = 1,772,544
+- This is the key advantage of quantum-inspired architecture
+- Saves 1.77M params → can afford deeper network layers
+
+### Recommendations
+1. Monitor V7 Val Loss closely - if Train << Val, reduce capacity
+2. If V7 overfits by E10: try d_model=192, n_layers=4
+3. Consider LoRA: freeze V6, add 0.5M adapter params
+4. QMoE could reduce active params by 50% during inference

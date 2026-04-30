@@ -1,0 +1,31 @@
+# QEntL 集成测试
+
+测试集成: 函数() {
+    让 a = 10
+    让 b = 3
+    LOG(a + b)
+    LOG(a * b)
+    LOG(长度("hello"))
+    LOG(子串("hello world", 0, 5))
+    LOG(翻转("abc"))
+    LOG(包含("hello", "ell"))
+    让 arr = [10, 20, 30]
+    LOG(arr[0])
+    LOG(arr[-1])
+    让 d = 字典()
+    d["k"] = "v"
+    LOG(d["k"])
+    LOG(取整(3.7))
+    LOG(幂(2, 8))
+    LOG(绝对值(-5))
+    如果 a > 5 {
+        LOG("big")
+    }
+    让 s = 0
+    循环 i 在 范围(1, 5) {
+        s = s + i
+    }
+    LOG(s)
+    LOG(格式("x={}", 10))
+    断言(a > 0)
+}
