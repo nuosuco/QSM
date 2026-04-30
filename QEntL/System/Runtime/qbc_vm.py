@@ -726,6 +726,50 @@ class QBCVirtualMachine:
                         self.stack.append(str(fmt_str))
                 elif self.stack:
                     self.stack.append(str(self.stack.pop()))
+            elif func_name == '查找':
+                if len(self.stack) >= 2:
+                    item = self.stack.pop()
+                    container = self.stack.pop()
+                    if isinstance(container, list):
+                        try:
+                            self.stack.append(container.index(item))
+                        except ValueError:
+                            self.stack.append(-1)
+                    elif isinstance(container, str) and isinstance(item, str):
+                        self.stack.append(container.find(item))
+                    else:
+                        self.stack.append(-1)
+            elif func_name == '删除':
+                if len(self.stack) >= 2:
+                    idx = self.stack.pop()
+                    arr = self.stack.pop()
+                    if isinstance(arr, list) and isinstance(idx, int):
+                        if 0 <= idx < len(arr):
+                            self.stack.append(arr.pop(idx))
+                        else:
+                            self.stack.append(None)
+                    else:
+                        self.stack.append(None)
+            elif func_name == '插入':
+                if len(self.stack) >= 3:
+                    val = self.stack.pop()
+                    idx = self.stack.pop()
+                    arr = self.stack.pop()
+                    if isinstance(arr, list) and isinstance(idx, int):
+                        arr.insert(idx, val)
+                        self.stack.append(arr)
+                    else:
+                        self.stack.append(arr)
+            elif func_name == '重复':
+                if len(self.stack) >= 2:
+                    n = self.stack.pop()
+                    s = self.stack.pop()
+                    if isinstance(s, str) and isinstance(n, int):
+                        self.stack.append(s * n)
+                    elif isinstance(s, list) and isinstance(n, int):
+                        self.stack.append(s * n)
+                    else:
+                        self.stack.append(s)
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:

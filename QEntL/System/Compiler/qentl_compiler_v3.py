@@ -1023,7 +1023,7 @@ class Parser:
             # 类型 as built-in function call
             return self._parse_builtin_call(t.value)
         elif t.type == TokenType.IDENTIFIER:
-            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典', '翻转', '包含', '连接', '分割', '替换', '子串', '增1', '减1', '取整', '幂', '是数字', '是字母', '是空', '格式'}
+            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典', '翻转', '包含', '连接', '分割', '替换', '子串', '增1', '减1', '取整', '幂', '是数字', '是字母', '是空', '格式', '查找', '删除', '插入', '重复'}
             if t.value in builtin_funcs and self._peek() and self._peek().type == TokenType.LPAREN:
                 return self._parse_builtin_call(t.value)
             self._advance()
