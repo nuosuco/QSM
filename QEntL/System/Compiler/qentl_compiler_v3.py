@@ -882,12 +882,16 @@ class Parser:
         if self._current().type == TokenType.MINUS:
             self._advance()
             node = self._parse_primary()
+            if node is None:
+                return ASTNode('NumberLit', value='0', line=1)
             neg_node = ASTNode('UnaryMinus', line=node.line)
             neg_node.children.append(node)
             return neg_node
         if self._current().type == TokenType.NOT:
             self._advance()
             node = self._parse_primary()
+            if node is None:
+                return ASTNode('BoolLit', value='false', line=1)
             not_node = ASTNode('UnaryNot', line=node.line)
             not_node.children.append(node)
             return not_node
