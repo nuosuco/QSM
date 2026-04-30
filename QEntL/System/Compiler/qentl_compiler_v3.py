@@ -915,7 +915,7 @@ class Parser:
             # 类型 as built-in function call
             return self._parse_builtin_call(t.value)
         elif t.type == TokenType.IDENTIFIER:
-            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典'}
+            builtin_funcs = {'长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典', '翻转', '包含', '连接'}
             if t.value in builtin_funcs and self._peek() and self._peek().type == TokenType.LPAREN:
                 return self._parse_builtin_call(t.value)
             self._advance()
@@ -930,6 +930,7 @@ class Parser:
                         self._advance()
                 self._expect(TokenType.RPAREN)
                 node = ASTNode('Call', value=t.value, children=args, line=t.line)
+                return node
             elif self._current().type == TokenType.DOT:
                 self._advance()
                 field = self._advance().value
@@ -943,8 +944,10 @@ class Parser:
                             self._advance()
                     self._expect(TokenType.RPAREN)
                     node = ASTNode('MethodCall', value=field, children=[node] + args, line=t.line)
+                    return node
                 else:
                     node = ASTNode('FieldAccess', value=field, children=[node], line=t.line)
+                return node
             elif self._current().type == TokenType.LBRACKET:
                 # Array index or slice: identifier[expr] or identifier[start:end]
                 self._advance()  # consume [
@@ -959,6 +962,7 @@ class Parser:
                 self._expect(TokenType.RBRACKET)
                 node = ASTNode('IndexAccess', children=[node, first], line=t.line)
                 return node
+            return node  # plain identifier or modified node
         elif t.type == TokenType.LPAREN:
             self._advance()
             expr = self._parse_expression()

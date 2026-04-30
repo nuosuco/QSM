@@ -595,6 +595,33 @@ class QBCVirtualMachine:
                         self.stack.append({})
                 else:
                     self.stack.append({})
+            elif func_name == '翻转':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, list):
+                        self.stack.append(list(reversed(val)))
+                    elif isinstance(val, str):
+                        self.stack.append(val[::-1])
+                    else:
+                        self.stack.append(val)
+            elif func_name == '包含':
+                if len(self.stack) >= 2:
+                    item = self.stack.pop()
+                    container = self.stack.pop()
+                    if isinstance(container, (list, str)):
+                        self.stack.append(1 if item in container else 0)
+                    elif isinstance(container, dict):
+                        self.stack.append(1 if item in container else 0)
+                    else:
+                        self.stack.append(0)
+            elif func_name == '连接':
+                if len(self.stack) >= 2:
+                    sep = self.stack.pop()
+                    arr = self.stack.pop()
+                    if isinstance(arr, list) and isinstance(sep, str):
+                        self.stack.append(sep.join(str(x) for x in arr))
+                    else:
+                        self.stack.append(str(arr))
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
