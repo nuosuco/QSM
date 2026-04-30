@@ -157,6 +157,39 @@ def translate():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """Q1 智能对话端点 - 彝/中/英三语"""
+    try:
+        data = request.get_json(force=True)
+        message = data.get('message', '') if data else ''
+        if not message:
+            return jsonify({'response': '请输入内容', 'model': 'QSM Q1'})
+        if model is None:
+            return jsonify({'response': '模型未加载', 'model': 'QSM Q1'})
+        
+        UNK_ID = vocab.get('<UNK>', 3)
+        src_ids = [vocab.get(c, UNK_ID) for c in message if c in vocab]
+        if not src_ids:
+            return jsonify({'response': '输入无有效字符', 'model': 'QSM Q1'})
+        
+        result_ids = model.translate_beam_search(src_ids, beam_size=3, max_len=64)
+        result_chars = []
+        for tid in result_ids[1:]:
+            if tid == model.vocab_eos:
+                break
+            ch = id_to_char.get(tid, '?')
+            result_chars.append(ch)
+        result = ''.join(result_chars)
+        
+        return jsonify({
+            'response': result,
+            'model': 'QSM Q1'
+        })
+    except Exception as e:
+        return jsonify({'response': f'处理出错: {str(e)[:80]}', 'model': 'QSM Q1'})
+
 if __name__ == '__main__':
     print("🚀 启动V5翻译API (端口8000)...")
     app.run(host='0.0.0.0', port=8000, debug=False)
