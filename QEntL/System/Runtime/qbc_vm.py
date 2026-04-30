@@ -770,6 +770,40 @@ class QBCVirtualMachine:
                         self.stack.append(s * n)
                     else:
                         self.stack.append(s)
+            elif func_name == '排序':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, list):
+                        self.stack.append(sorted(val))
+                    else:
+                        self.stack.append(val)
+            elif func_name == '去重':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, list):
+                        self.stack.append(list(dict.fromkeys(val)))
+                    else:
+                        self.stack.append(val)
+            elif func_name == '范围数':
+                # 范围数(start, end) → list of integers
+                if len(self.stack) >= 2:
+                    end = int(self.stack.pop())
+                    start = int(self.stack.pop())
+                    self.stack.append(list(range(start, end)))
+                elif self.stack:
+                    end = int(self.stack.pop())
+                    self.stack.append(list(range(end)))
+            elif func_name == '随机数':
+                import random
+                if len(self.stack) >= 2:
+                    b = int(self.stack.pop())
+                    a = int(self.stack.pop())
+                    self.stack.append(random.randint(a, b))
+                elif self.stack:
+                    b = int(self.stack.pop())
+                    self.stack.append(random.randint(0, b))
+                else:
+                    self.stack.append(random.randint(0, 100))
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
