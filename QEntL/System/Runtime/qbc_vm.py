@@ -30,6 +30,7 @@ class OpCode(Enum):
     POP_TRY = 0xFA
     THROW = 0xFB
     LABEL = 0xFC
+    ASSERT = 0xCD
     UNARY_NOT = 0xF7
     DOT_ACCESS = 0xF5
     BOOL_LOAD = 0xF8
@@ -277,6 +278,15 @@ class QBCVirtualMachine:
             else:
                 self.output.append('Error: unhandled exception')
                 self.running = False
+        elif op == OpCode.ASSERT:
+            n_args = operand if operand else 1
+            if n_args >= 1 and self.stack:
+                cond = self.stack.pop()
+                if not cond:
+                    msg = self.stack.pop() if self.stack and n_args >= 2 else 'assertion failed'
+                    self.output.append(f'AssertionError: {msg}')
+                    self.running = False
+            self.ip += 1
         elif op == OpCode.HALT:
             self.running = False
         

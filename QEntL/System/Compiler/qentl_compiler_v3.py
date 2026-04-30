@@ -84,6 +84,7 @@ class OpCode(Enum):
     POP_TRY = 0xFA
     THROW = 0xFB
     LABEL = 0xFC
+    ASSERT = 0xCD
 
 # === 词法分析 ===
 class TokenType(Enum):
@@ -161,6 +162,7 @@ class TokenType(Enum):
     BOOL_FALSE = 'false'
     BREAK = 'break'
     CONTINUE = 'continue'
+    ASSERT = '断言'
     TRY = '尝试'
     CATCH = '捕获'
 
@@ -308,12 +310,21 @@ class Lexer:
 
     def _read_string(self):
         self._advance()  # skip opening "
-        start = self.pos
+        chars = []
         while self.pos < len(self.source) and self.source[self.pos] != '"':
+            if self.source[self.pos] == '\\':
+                self._advance()  # skip backslash
+                if self.pos < len(self.source):
+                    esc = self.source[self.pos]
+                    esc_map = {'n': '\n', 't': '\t', 'r': '\r', '\\': '\\', '"': '"', '0': '\0'}
+                    chars.append(esc_map.get(esc, '\\' + esc))
+                    self._advance()
+                continue
             if self.source[self.pos] == '\n':
                 self.line += 1
+            chars.append(self.source[self.pos])
             self._advance()
-        value = self.source[start:self.pos]
+        value = ''.join(chars)
         self._add_token(TokenType.STRING_LIT, value)
         self._advance()  # skip closing "
 
@@ -663,6 +674,8 @@ class Parser:
             return ASTNode('Continue', line=t.line)
         elif t.type == TokenType.TRY:
             return self._parse_try()
+        elif t.type == TokenType.ASSERT:
+            return self._parse_assert()
         else:
             # Check for compound assignment: x += expr
             if t.type == TokenType.IDENTIFIER and self._peek() and self._peek().type in (TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN, TokenType.MUL_ASSIGN, TokenType.DIV_ASSIGN):
@@ -700,6 +713,18 @@ class Parser:
         if self._current().type == TokenType.SEMICOLON:
             self._advance()
         return expr
+
+    def _parse_assert(self):
+        """Parse assert: 断言(expr) or 断言(expr, "message")"""
+        node = ASTNode('Assert', line=self._current().line)
+        self._expect(TokenType.ASSERT)
+        self._expect(TokenType.LPAREN)
+        node.children.append(self._parse_expression())  # condition
+        if self._current().type == TokenType.COMMA:
+            self._advance()
+            node.children.append(self._parse_expression())  # message
+        self._expect(TokenType.RPAREN)
+        return node
 
     def _parse_try(self):
         """Parse try/catch: 尝试 { ... } 捕获 (e) { ... }"""
@@ -743,6 +768,18 @@ class Parser:
                 else:
                     node.children.append(self._parse_block())  # else-body
             return node
+
+    def _parse_assert(self):
+        """Parse assert: 断言(expr) or 断言(expr, "message")"""
+        node = ASTNode('Assert', line=self._current().line)
+        self._expect(TokenType.ASSERT)
+        self._expect(TokenType.LPAREN)
+        node.children.append(self._parse_expression())  # condition
+        if self._current().type == TokenType.COMMA:
+            self._advance()
+            node.children.append(self._parse_expression())  # message
+        self._expect(TokenType.RPAREN)
+        return node
 
     def _parse_try(self):
         """Parse try/catch: 尝试 { ... } 捕获 (e) { ... }"""
@@ -1446,6 +1483,9 @@ class CodeGenerator:
                 self._gen_node(node.children[1])  # catch body
             # end_label:
             self._emit_label(end_label)
+        elif node.type == 'Assert':
+            self._gen_node(node.children[0])
+            self._emit(OpCode.ASSERT, len(node.children), node.line)
         elif node.type == 'Import':
             mod_idx = self._add_const(node.value)
             self._emit(OpCode.IMPORT, mod_idx, node.line)
