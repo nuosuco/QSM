@@ -236,14 +236,14 @@ class QBCVirtualMachine:
         elif op == OpCode.INDEX_ASSIGN:
             val = self.stack.pop() if self.stack else 0
             idx = self.stack.pop() if self.stack else 0
-            var_name = self.stack.pop() if self.stack else ''
-            arr = self.variables.get(str(var_name), [])
-            if isinstance(arr, list) and isinstance(idx, (int, float)):
+            arr = self.stack.pop() if self.stack else []
+            if isinstance(arr, dict):
+                arr[idx] = val
+            elif isinstance(arr, list) and isinstance(idx, (int, float)):
                 i = int(idx)
                 while len(arr) <= i:
                     arr.append(0)
                 arr[i] = val
-                self.variables[str(var_name)] = arr
             self.ip += 1
         elif op == OpCode.HALT:
             self.running = False

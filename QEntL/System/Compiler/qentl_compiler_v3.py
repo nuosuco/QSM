@@ -1289,9 +1289,8 @@ class CodeGenerator:
             self._gen_node(node.children[1])  # the index
             self._emit(OpCode.INDEX_ACCESS, None, node.line)
         elif node.type == 'IndexAssign':
-            # 让 a[i] = expr → push var name, index, value, INDEX_ASSIGN
-            idx = self._add_const(node.value)  # variable name
-            self._emit(OpCode.LOAD_CONST, idx, node.line)
+            # 让 a[i] = expr → push var, index, value, INDEX_ASSIGN
+            self._emit(OpCode.LOAD_VAR, node.value, node.line)  # load the actual array/dict
             self._gen_node(node.children[0])  # index
             self._gen_node(node.children[1])  # value
             self._emit(OpCode.INDEX_ASSIGN, None, node.line)
