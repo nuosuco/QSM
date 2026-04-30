@@ -123,6 +123,7 @@ class TokenType(Enum):
     QUANTUM_GATE_KW = '量子门'
     MEASURE_KW = '测量'
     ENTANGLE_KW = '纠缠'
+    QUANTUM_INIT_KW = '量子初始化'
     STEP_KW = '步长'
 
     # 符号
@@ -185,6 +186,12 @@ class Token:
 
 class Lexer:
     KEYWORDS = {t.value: t for t in TokenType if t.value and t.value not in ['IDENTIFIER', 'STRING_LIT', 'NUMBER_LIT', 'EOF', 'COMMENT']}
+    # Chinese aliases
+    KEYWORDS['量子程序'] = TokenType.QUANTUM_PROGRAM
+    KEYWORDS['量子初始化'] = TokenType.QUANTUM_INIT_KW
+    KEYWORDS['量子类'] = TokenType.QUANTUM_CLASS
+    KEYWORDS['量子枚举'] = TokenType.QUANTUM_ENUM
+    KEYWORDS['量子接口'] = TokenType.QUANTUM_INTERFACE
 
     def __init__(self, source: str):
         self.source = source
@@ -580,6 +587,36 @@ class Parser:
     def _parse_quantum_program(self):
         node = ASTNode('QuantumProgram', line=self._current().line)
         self._expect(TokenType.QUANTUM_PROGRAM)
+        # Check if next token is LBRACE (simple format) or name (full format)
+        if self._current().type == TokenType.LBRACE:
+            # Simple format: 量子程序 { 量子初始化 N; 量子门 H 0; ... }
+            node.value = 'inline_quantum'
+            self._advance()  # skip LBRACE
+            # Parse quantum instructions directly
+            while self._current().type != TokenType.RBRACE:
+                if self._current().value in ('量子初始化', 'quantum_init'):
+                    self._advance()
+                    n_qubits = int(self._advance().value)
+                    init_node = ASTNode('QuantumInit', value=n_qubits, line=self._current().line)
+                    node.children.append(init_node)
+                elif self._current().value in ('量子门', 'quantum_gate'):
+                    self._advance()
+                    gate_name = self._advance().value
+                    target = self._advance().value
+                    gate_node = ASTNode('QuantumGate', value=f'{gate_name} {target}', line=self._current().line)
+                    node.children.append(gate_node)
+                elif self._current().value in ('纠缠', 'entangle', 'CNOT'):
+                    self._advance()
+                    ctrl = self._advance().value
+                    tgt = self._advance().value
+                    ent_node = ASTNode('QuantumEntangle', value=f'{ctrl} {tgt}', line=self._current().line)
+                    node.children.append(ent_node)
+                elif self._current().type == TokenType.NEWLINE:
+                    self._advance()
+                else:
+                    self._advance()  # skip unknown
+            self._expect(TokenType.RBRACE)
+            return node
         node.value = self._advance().value  # program name
         self._expect(TokenType.LBRACE)
         # Parse setup/run sections - they use inline function-like syntax
@@ -681,6 +718,8 @@ class Parser:
             return self._parse_try()
         elif t.type == TokenType.ASSERT:
             return self._parse_assert()
+        elif t.type == TokenType.QUANTUM_PROGRAM:
+            return self._parse_quantum_program()
         else:
             # Check for compound assignment: x += expr
             if t.type == TokenType.IDENTIFIER and self._peek() and self._peek().type in (TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN, TokenType.MUL_ASSIGN, TokenType.DIV_ASSIGN):
@@ -1461,14 +1500,23 @@ class CodeGenerator:
             self._emit(OpCode.QUANTUM_INIT, len(node.children), node.line)
 
         elif node.type == 'QuantumProgram':
-            self._emit(OpCode.QUANTUM_INIT, line=node.line)
-            for child in node.children:
-                self._gen_node(child)
-                # For sections (setup/run), emit the block code directly
-                if child.type == 'Section':
-                    # The section's child is the function/block
-                    for section_child in child.children:
-                        self._gen_node(section_child)
+            # Simple format: inline quantum instructions
+            if node.value == 'inline_quantum':
+                for child in node.children:
+                    if child.type == 'QuantumInit':
+                        self._emit(OpCode.QUANTUM_INIT, child.value, child.line)
+                    elif child.type == 'QuantumGate':
+                        self._emit(OpCode.QUANTUM_GATE, child.value, child.line)
+                    elif child.type == 'QuantumEntangle':
+                        self._emit(OpCode.QUANTUM_ENTANGLE, child.value, child.line)
+            else:
+                # Full format: setup/run sections
+                self._emit(OpCode.QUANTUM_INIT, line=node.line)
+                for child in node.children:
+                    self._gen_node(child)
+                    if child.type == 'Section':
+                        for section_child in child.children:
+                            self._gen_node(section_child)
         elif node.type == 'QuantumInterface':
             name_idx = self._add_const(node.value)
             self._emit(OpCode.INTERFACE_DEF, name_idx, node.line)

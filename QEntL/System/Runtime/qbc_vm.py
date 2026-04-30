@@ -85,7 +85,7 @@ class QBCVirtualMachine:
             if bit == 0:
                 new_state[i] = sqrt2 * (self.quantum_register[i] + self.quantum_register[partner])
             else:
-                new_state[i] = sqrt2 * (self.quantum_register[i] - self.quantum_register[partner])
+                new_state[i] = sqrt2 * (self.quantum_register[partner] - self.quantum_register[i])
         
         self.quantum_register = new_state
     
@@ -552,7 +552,7 @@ class QBCVirtualMachine:
                 else:
                     control = 0
                     target = 1
-                self._apply_hadamard(control)
+                # No extra H - user code handles it
                 self._apply_cnot(control, target)
                 self.quantum_gates_applied.append({'name': 'ENTANGLE', 'control': control, 'target': target})
                 msg = f"创建纠缠对: 比特{control} ↔ 比特{target}"
