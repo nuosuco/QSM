@@ -3286,3 +3286,56 @@ class QRoPE(nn.Module):
 - Q-Embedding (4 bases, saves 95% embedding params)
 - Q-RoPE position encoding
 - Greedy decoding only (fast)
+
+## #210 Curriculum Learning for Low-Resource Languages
+
+### The Problem
+- V7 Val went UP at E2 (6.43→6.68), suggesting overfitting
+- 9.2M params / 57K data = 161 ratio is too high
+- Random shuffle causes model to see complex sentences before mastering characters
+
+### Curriculum Learning Strategy (Bengio et al. 2009)
+Train on progressively harder data:
+1. **Stage 1**: Character-level (20K pairs, avg len 8) - Learn character meanings
+2. **Stage 2**: Word/phrase-level (31K pairs, avg len 20) - Learn word associations  
+3. **Stage 3**: Sentence-level (5.5K pairs, avg len 50+) - Learn fluency
+
+### Implementation Plan
+```python
+# V7-Curriculum: Start with Stage 1, gradually add harder data
+curriculum_schedule = [
+    {"epochs": 5, "data": "stage1_chars.json", "lr": 1e-3},
+    {"epochs": 10, "data": "stage1+stage2.json", "lr": 5e-4},
+    {"epochs": 15, "data": "all_stages.json", "lr": 2e-4},
+]
+```
+
+### Self-Paced Learning (Kumar et al. 2010)
+- Let model decide difficulty: compute loss per sample
+- Easy samples (low loss) get less weight
+- Hard samples (high loss) get more weight
+- This prevents wasting capacity on already-learned patterns
+
+### Q-Embedding Curriculum
+- Freeze Q-Embedding bases during Stage 1 (only train coefficients)
+- Unfreeze 1 more basis each stage
+- Stage 1: 2 bases (BOS+EOS), Stage 2: 3 bases, Stage 3: 4 bases
+- Gradual unfreezing prevents catastrophic forgetting
+
+### Expected Outcomes
+- Stage 1 should reach Val < 2.0 quickly (character learning is easy)
+- Stage 2 should build on character knowledge
+- Stage 3 should achieve fluency with fewer epochs than random training
+
+### V7 Overfitting Response Plan
+If V7 continues to overfit:
+1. **Immediate**: Increase dropout to 0.3, add gradient clip 0.5
+2. **If still overfitting by E5**: Stop and restart with smaller model (192d/3层=4M)
+3. **If Val stabilizes**: Continue to E30 with LR decay
+4. **Best case**: V7 achieves Val < 3.0 and produces meaningful output
+
+### Small Model Alternative (V7-Small)
+- 192d / 3层 / 3头 / 768ff
+- Estimated ~4M params, ratio = 4M/57K = 70 (healthy)
+- Should train in ~15min/epoch (2.5x faster)
+- May actually outperform V7-large due to better generalization
