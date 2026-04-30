@@ -227,7 +227,7 @@ class QBCVirtualMachine:
                 self.stack.append(arr.get(idx, 0))
             elif isinstance(arr, (list, str)) and isinstance(idx, (int, float)):
                 i = int(idx)
-                if 0 <= i < len(arr):
+                if -len(arr) <= i < len(arr):
                     self.stack.append(arr[i])
                 else:
                     self.stack.append(0 if isinstance(arr, list) else '')
@@ -648,6 +648,23 @@ class QBCVirtualMachine:
                         self.stack.append(s[start:end])
                     else:
                         self.stack.append(s)
+            elif func_name == '增1':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(val + 1)
+            elif func_name == '减1':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(val - 1)
+            elif func_name == '取整':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(int(val))
+            elif func_name == '幂':
+                if len(self.stack) >= 2:
+                    exp = self.stack.pop()
+                    base = self.stack.pop()
+                    self.stack.append(base ** exp)
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
