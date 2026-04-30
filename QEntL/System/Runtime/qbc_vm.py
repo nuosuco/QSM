@@ -804,6 +804,39 @@ class QBCVirtualMachine:
                     self.stack.append(random.randint(0, b))
                 else:
                     self.stack.append(random.randint(0, 100))
+            elif func_name == '大写':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(str(val).upper() if isinstance(val, str) else val)
+            elif func_name == '小写':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(str(val).lower() if isinstance(val, str) else val)
+            elif func_name == '首大写':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, str) and val:
+                        self.stack.append(val[0].upper() + val[1:])
+                    else:
+                        self.stack.append(val)
+            elif func_name == '计数':
+                if len(self.stack) >= 2:
+                    item = self.stack.pop()
+                    container = self.stack.pop()
+                    if isinstance(container, (list, str)):
+                        self.stack.append(container.count(item))
+                    else:
+                        self.stack.append(0)
+            elif func_name == '开始以':
+                if len(self.stack) >= 2:
+                    prefix = self.stack.pop()
+                    s = self.stack.pop()
+                    self.stack.append(1 if isinstance(s, str) and s.startswith(str(prefix)) else 0)
+            elif func_name == '结束以':
+                if len(self.stack) >= 2:
+                    suffix = self.stack.pop()
+                    s = self.stack.pop()
+                    self.stack.append(1 if isinstance(s, str) and s.endswith(str(suffix)) else 0)
             self.ip += 1
         elif op == OpCode.LOG:
             if self.stack:
