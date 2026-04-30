@@ -3224,3 +3224,65 @@ def beam_search_decode(model, src, beam_width=5, max_len=50,
 2. If V7 overfits by E10: try d_model=192, n_layers=4
 3. Consider LoRA: freeze V6, add 0.5M adapter params
 4. QMoE could reduce active params by 50% during inference
+
+## #208 Q-RoPE: Quantum Rotary Position Embedding
+
+### Standard RoPE (Su et al. 2021)
+- Rotates query/key vectors by position-dependent angles
+- θ_i = 10000^(-2i/d) for dimension i
+- Enables relative position encoding through rotation
+- Extrapolates to longer sequences with scaling
+
+### Q-RoPE: Quantum-Enhanced Rotary Embedding
+- Replace fixed base 10000 with quantum-dependent base
+- Each Q-Embedding basis state → different rotation frequency
+- |0⟩=BOS basis: slow rotation (global context)
+- |1⟩=EOS basis: medium rotation (sentence boundary)
+- |2⟩=UNK basis: fast rotation (local detail)
+- |3⟩=PAD basis: no rotation (padding invariant)
+
+### Implementation for V8
+```python
+class QRoPE(nn.Module):
+    def __init__(self, d_model, n_bases=4):
+        self.base_per_basis = nn.Parameter(
+            torch.tensor([10000, 5000, 20000, 1.0]))  # learned bases
+    
+    def forward(self, x, positions, basis_ids):
+        # Each token gets rotation based on its dominant basis
+        base = self.base_per_basis[basis_ids]  # [B, S]
+        theta = base ** (-2 * torch.arange(self.d_model//2) / self.d_model)
+        # Apply rotation...
+```
+
+### Advantages
+- Language-aware position encoding (Yi/Chinese/English have different optimal bases)
+- Can extrapolate to unseen lengths
+- Naturally handles code-switching between languages
+- Only 4 extra parameters (one per basis)
+
+## #209 Sequence-Level Knowledge Distillation (V8 Plan)
+
+### Teacher-Student Framework
+- Teacher: V7 (9.2M params, beam search decoding)
+- Student: V8 (1-2M params, greedy decoding)
+- Distill at sequence level (not just token level)
+
+### Process
+1. Train V7 to convergence (target Val < 2.0)
+2. Generate beam search outputs for all training data
+3. Replace ground truth with V7's best beam outputs
+4. Train V8 on V7's outputs (soft + hard labels)
+5. V8 can run on mobile/edge devices
+
+### Expected Gains
+- 5-10x inference speedup (smaller model, greedy decode)
+- 80-90% of teacher quality retained
+- Mobile deployment possible
+- Q-Embedding makes student embedding very compact
+
+### V8 Architecture
+- 128d/2层/2头 (1.5M params)
+- Q-Embedding (4 bases, saves 95% embedding params)
+- Q-RoPE position encoding
+- Greedy decoding only (fast)
