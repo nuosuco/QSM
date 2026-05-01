@@ -160,10 +160,10 @@ def translate():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Q1 智能对话端点 - 彝/中/英三语"""
+    """Q1 智能对话 - V5模型"""
     try:
         data = request.get_json(force=True)
-        message = data.get('message', '') if data else ''
+        message = data.get('message', '')
         if not message:
             return jsonify({'response': '请输入内容', 'model': 'QSM Q1'})
         if model is None:
@@ -185,7 +185,7 @@ def chat():
         
         return jsonify({
             'response': result,
-            'model': 'QSM Q1'
+            'model': 'QSM Q1 (V7-Small训练中)'
         })
     except Exception as e:
         return jsonify({'response': f'处理出错: {str(e)[:80]}', 'model': 'QSM Q1'})
