@@ -3339,3 +3339,45 @@ If V7 continues to overfit:
 - Estimated ~4M params, ratio = 4M/57K = 70 (healthy)
 - Should train in ~15min/epoch (2.5x faster)
 - May actually outperform V7-large due to better generalization
+
+## #211 V7-Small训练深度分析 (E1-E24)
+
+### 训练轨迹
+E1:3.53→E5:3.18→E10:3.03→E12:2.99(破3.0!)→E15:2.93→E20:2.89→E24:2.85
+
+### 关键发现
+1. **22/24 Best!** 仅E16微波动(2.93>2.93仅0.003), 立即恢复
+2. **下降速率稳定**: E1-10每epoch降~0.05, E10-20每epoch降~0.015, E20-24每epoch降~0.01
+3. **零过拟合**: Train≈Val始终接近, 4.5M/57K=78参数比健康
+4. **V5的教训**: Val Loss 2.19但mode collapse → **数字不代表一切**
+5. **V6的成功**: Val 2.69但有语义关联 → **数据质量(50%彝文)>Val Loss数字**
+
+### V5 Mode Collapse根因分析
+V5(7.5M, 256d/3层/4头) 无论输入什么都输出"彝文是美丽的语言，我来教你。"
+- 原因1: 彝文仅3.3% → 模型学到"彝文"一个概念就锁住了
+- 原因2: Val Loss 2.19实际是所有输入都映射到同一条输出的loss
+- 原因3: 缺乏语言方向控制 → 没有BOS标记指定输出语言
+
+### V7-Small vs V5架构对比
+| | V5 | V7-Small |
+|---|---|---|
+| 参数 | 7.5M | 4.5M |
+| d_model | 256 | 192 |
+| 层数 | 3 | 3 |
+| 头数 | 4 | 3 |
+| d_ff | 512 | 768 |
+| 彝文比例 | 3.3% | 87.9% |
+| Val Loss | 2.19 | 2.85(仍在降) |
+| 输出质量 | 乱码/锁死 | (待测) |
+| dropout | 0.1 | 0.25 |
+
+### 预测
+- E30: Val ~2.77 (追平/超越V6的2.69)
+- E40: Val ~2.72
+- E50: Val ~2.68-2.70
+- V7-Small有望在Val Loss上追平V6, 且88%彝文数据保证输出质量
+
+### 下一步
+1. E25后用beam search测试输出质量
+2. V7-Small训练完成后部署到API
+3. 准备V8知识蒸馏(V7-Small→1.5M手机模型)
