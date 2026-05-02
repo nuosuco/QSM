@@ -1095,6 +1095,21 @@ class Parser:
         elif t.type == TokenType.TYPE and self._peek() and self._peek().type == TokenType.LPAREN:
             # 类型 as built-in function call
             return self._parse_builtin_call(t.value)
+        elif t.type == TokenType.CONFIG and self._peek() and self._peek().type == TokenType.LPAREN:
+            # 配置 as class instantiation (not config declaration)
+            # Treat as identifier for expression context
+            self._advance()
+            node = ASTNode('Identifier', value=t.value, line=t.line)
+            if self._current().type == TokenType.LPAREN:
+                self._advance()
+                args = []
+                while self._current().type != TokenType.RPAREN:
+                    args.append(self._parse_expression())
+                    if self._current().type == TokenType.COMMA:
+                        self._advance()
+                self._expect(TokenType.RPAREN)
+                node = ASTNode('Call', value=t.value, children=args, line=t.line)
+            # Don't return - fall through to chained dot access below
         elif t.type == TokenType.IDENTIFIER:
             builtin_funcs = {'打印', '长度', '推入', '弹出', '类型', '绝对值', '最大值', '最小值', '字典', '翻转', '包含', '连接', '分割', '替换', '子串', '增1', '减1', '取整', '幂', '是数字', '是字母', '是空', '格式', '查找', '删除', '插入', '重复', '排序', '去重', '范围数', '随机数', '大写', '小写', '首大写', '计数', '开始以', '结束以'}
             if t.value in builtin_funcs and self._peek() and self._peek().type == TokenType.LPAREN:
