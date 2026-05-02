@@ -1,0 +1,33 @@
+// QEntL高级测试 - 全部放在函数中
+主函数: 函数() {
+    // 斐波那契
+    让 a = 0
+    让 b = 1
+    循环 i 在 范围(0, 10) {
+        让 temp = a + b
+        让 a = b
+        让 b = temp
+    }
+    LOG(b)
+    
+    // 数组求和
+    让 nums = [10, 20, 30, 40, 50]
+    让 total = 0
+    循环 x 在 nums {
+        让 total = total + x
+    }
+    LOG(total)
+    
+    // 最大值
+    让 m = nums[0]
+    循环 i 在 范围(1, 长度(nums)) {
+        如果 nums[i] > m {
+            让 m = nums[i]
+        }
+    }
+    LOG(m)
+    
+    // 字符串
+    让 text = "hello quantum"
+    LOG(长度(text))
+}

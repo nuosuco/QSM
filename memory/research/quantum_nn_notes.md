@@ -3483,3 +3483,24 @@ V7-Small(Teacher 4.5M) → V8(Student 1.5M)
 - "Curriculum Learning" (Bengio et al., 2009)
 - "Self-Paced Learning" (Kumar et al., 2010)
 - 适用于低资源语言的关键: 由简到难, 避免早期困难样本干扰
+
+## #215 V7-Small输出质量分析+改进方向
+
+### 当前输出问题(Val 2.65)
+1. **英文碎片**: 36.1%训练数据输出含英文 → 模型学到了英文混杂
+2. **重复模式**: "the the the", "lig lig" → beam search重复惩罚不够
+3. **混合语言**: 同一输出混杂中/英/彝 → 需要语言控制信号
+4. **EOS过早**: 部分输入输出很短 → BOS语言标记可能无效
+5. **语义关联好**: 水→snow, 量子→彝文, hello→英文 → 基础理解正确!
+
+### 改进方向
+1. **纯彝文训练数据**: 新增中文→纯彝文对(去掉英文混杂)
+2. **更强重复惩罚**: rep_penalty从1.2→1.5, 或n-gram blocking
+3. **语言控制BOS**: 不同BOS标记→不同输出语言
+4. **更长训练**: E50可能不够, 继续训练到E80
+5. **n-gram blocking**: 禁止连续重复3个相同token
+
+### V8规划(知识蒸馏)
+- Teacher: V7-Small (4.5M)
+- Student: V8 (1.5M, 128d/2层/2头)
+- 可部署到手机端
