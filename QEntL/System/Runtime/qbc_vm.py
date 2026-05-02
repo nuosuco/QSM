@@ -11,7 +11,7 @@ from typing import Dict, List, Any, Optional
 
 class OpCode(Enum):
     NOP = 0x00; HALT = 0x01
-    LOAD_CONST = 0x10; LOAD_VAR = 0x11; STORE_VAR = 0x12; LOAD_FIELD = 0x13; STORE_FIELD = 0x14
+    LOAD_CONST = 0x10; LOAD_VAR = 0x11; STORE_VAR = 0x12; LOAD_FIELD = 0x13; GLOBAL_DECL = 0x25; STORE_FIELD = 0x14
     ADD = 0x20; SUB = 0x21; MUL = 0x22; DIV = 0x23; MOD = 0x24
     EQ = 0x30; NEQ = 0x31; LT = 0x32; GT = 0x33; LTE = 0x34; GTE = 0x35
     JUMP = 0x40; JUMP_IF_FALSE = 0x41; JUMP_IF_TRUE = 0x42; CALL = 0x43; RETURN = 0x44
@@ -37,6 +37,7 @@ class OpCode(Enum):
 
 # Op name to enum mapping
 OP_MAP = {op.name: op for op in OpCode}
+OP_MAP['GLOBAL_DECL'] = OpCode.GLOBAL_DECL
 
 class QBCVirtualMachine:
     """量子字节码虚拟机"""
@@ -169,11 +170,29 @@ class QBCVirtualMachine:
         self.function_params = qbc.get('function_params', {})
         self.instructions = qbc.get('instructions', [])
         # Initialize variables
+        self._pre_init_vars = set()
         for var_name in qbc.get('variables', []):
             self.variables[var_name] = None
+        # Pre-initialize top-level variable assignments
+        instructions = qbc.get('instructions', [])
+        func_starts = set(qbc.get('functions', {}).values())
+        min_func_ip = min(func_starts) if func_starts else len(instructions)
+        i = 0
+        while i < min_func_ip and i < len(instructions) - 1:
+            inst = instructions[i]
+            next_inst = instructions[i + 1] if i + 1 < len(instructions) else {}
+            if inst.get('op') == 'LOAD_CONST' and next_inst.get('op') == 'STORE_VAR':
+                var_name = next_inst.get('operand')
+                const_idx = inst.get('operand', 0)
+                consts = qbc.get('constants', [])
+                if const_idx < len(consts):
+                    self.variables[var_name] = consts[const_idx]
+                    self._pre_init_vars.add(var_name)
+            i += 1
         self.ip = 0
         self.running = False
         self.stack = []
+        self.global_vars = set()
         self.output = []
         self.try_stack = []  # stack of catch addresses for try/catch
 
@@ -411,7 +430,7 @@ class QBCVirtualMachine:
             func_name = operand
             if func_name in self.functions:
                 # Save return point and current variables
-                self.call_stack.append((self.ip + 1, dict(self.variables)))
+                self.call_stack.append(self.ip + 1)
                 # Get parameter names from QBC metadata (function_params)
                 param_names = self.function_params.get(func_name, [])
                 # Bind arguments in reverse order (stack is LIFO)
@@ -466,12 +485,12 @@ class QBCVirtualMachine:
 
         elif op == OpCode.RETURN:
             if self.call_stack:
-                ret_ip, saved_vars = self.call_stack.pop()
+                ret_addr = self.call_stack.pop()
                 ret_val = self.stack.pop() if self.stack else None
-                self.variables = saved_vars
+                # Flat namespace: don't restore variables
                 if ret_val is not None:
                     self.stack.append(ret_val)
-                self.ip = ret_ip
+                self.ip = ret_addr
             else:
                 # At top level, RETURN just means end of declaration block
                 # Skip it and continue to next instruction
@@ -983,6 +1002,13 @@ class QBCVirtualMachine:
             op_name = instr.get('op', 'NOP')
             operand = instr.get('operand')
             if op_name == 'LABEL':
+                self.ip += 1
+                steps += 1
+                continue
+            # Skip STORE_VAR for pre-initialized variables (avoid resetting globals)
+            if op_name == 'STORE_VAR' and operand in self._pre_init_vars:
+                if self.stack:
+                    self.stack.pop()
                 self.ip += 1
                 steps += 1
                 continue

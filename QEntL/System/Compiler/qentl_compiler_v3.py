@@ -20,7 +20,7 @@ class OpCode(Enum):
     LOAD_CONST = 0x10      # 加载常量
     LOAD_VAR = 0x11        # 加载变量
     STORE_VAR = 0x12       # 存储变量
-    LOAD_FIELD = 0x13      # 加载字段
+    LOAD_FIELD = 0x13; GLOBAL_DECL = 0x25      # 加载字段
     STORE_FIELD = 0x14     # 存储字段
 
     # 算术运算 (QBC: 升)
@@ -110,6 +110,7 @@ class TokenType(Enum):
     IN = '在'
     TO = '到'
     WHILE = '当'
+    GLOBAL = '全局'
     LOG = 'LOG'  # Use English keyword 'LOG' (was '日志')
     SETUP = 'setup'
     RUN = 'run'
@@ -194,6 +195,7 @@ class Lexer:
     KEYWORDS['量子接口'] = TokenType.QUANTUM_INTERFACE
     KEYWORDS['循环当'] = TokenType.WHILE
     KEYWORDS['每个'] = TokenType.FOR
+    KEYWORDS['全局'] = TokenType.GLOBAL
     KEYWORDS['否则如果'] = TokenType.ELIF
 
     def __init__(self, source: str):
@@ -524,6 +526,12 @@ class Parser:
             return self._parse_import()
         elif t.type == TokenType.EXPORT:
             return self._parse_export()
+        elif t.type == TokenType.LET:
+            return self._parse_let()
+        elif t.type == TokenType.QUANTUM_CLASS:
+            return self._parse_quantum_class()
+        elif t.type == TokenType.QUANTUM_INTERFACE:
+            return self._parse_quantum_interface()
         else:
             # Skip unknown token
             self._advance()
@@ -713,6 +721,10 @@ class Parser:
             return self._parse_log()
         elif t.type == TokenType.WHILE:
             return self._parse_while()
+        elif t.type == TokenType.GLOBAL:
+            self._advance()
+            var_name = self._advance().value
+            return ASTNode('GlobalDecl', value=var_name, line=t.line)
         elif t.type == TokenType.BREAK:
             self._advance()
             return ASTNode('Break', line=t.line)
@@ -1421,6 +1433,8 @@ class CodeGenerator:
             if self.loop_label_stack:
                 _, end_label = self.loop_label_stack[-1]
                 self._emit(OpCode.JUMP, end_label, node.line)
+        elif node.type == 'GlobalDecl':
+            self._emit(OpCode.GLOBAL_DECL, node.value, node.line)
         elif node.type == 'Continue':
             if self.loop_label_stack:
                 start_label, _ = self.loop_label_stack[-1]
