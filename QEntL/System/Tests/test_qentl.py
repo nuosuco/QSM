@@ -295,6 +295,31 @@ def test_try_catch():
     assert out == ['测试错误']
     print("✅ 尝试/捕获(try/catch)")
 
+
+def test_method_call():
+    code = """
+quantum_class 计算器 { 值: 整数 }
+增加: 函数(self, n) {
+    返回 self.值 + n
+}
+翻倍: 函数(self) {
+    self.值 = self.值 * 2
+    返回 self.值
+}
+主函数: 函数() {
+    让 c = 计算器()
+    c.值 = 10
+    让 a = c.增加(5)
+    让 b = c.翻倍()
+    打印(a)
+    打印(b)
+}
+"""
+    out = run_qentl(code)
+    assert '15' in out, f"Expected 15, got {out}"
+    assert '20' in out, f"Expected 20, got {out}"
+    print("✅ 方法调用(method call)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -305,6 +330,7 @@ tests = [
     test_break, test_continue,
     test_field_assignment,
     test_try_catch,
+    test_method_call,
 ]
 
 if __name__ == '__main__':

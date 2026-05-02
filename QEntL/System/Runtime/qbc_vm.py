@@ -33,6 +33,7 @@ class OpCode(Enum):
     ASSERT = 0xCD
     UNARY_NOT = 0xF7
     DOT_ACCESS = 0xF5
+    METHOD_CALL = 0xF6
     BOOL_LOAD = 0xF8
 
 # Op name to enum mapping
@@ -398,12 +399,48 @@ class QBCVirtualMachine:
                             self.stack.append(None)
                     self.ip += 1
 
-                elif isinstance(val, (int, float)):
-                    self.stack.append(1 if val == 0 else 0)
-                else:
-                    self.stack.append(True)
-            self.ip += 1
-
+        elif op == OpCode.METHOD_CALL:
+            # METHOD_CALL: obj.method(args) - calls function with self binding
+            # operand = (method_name, n_explicit_args) or method_name
+            if isinstance(operand, (list, tuple)):
+                method_name, n_explicit = operand
+            else:
+                method_name = str(operand)
+                n_explicit = 0
+            # Pop n_explicit args from stack
+            args = []
+            for _ in range(n_explicit):
+                if self.stack:
+                    args.insert(0, self.stack.pop())
+            # Pop self object from stack
+            self_obj = self.stack.pop() if self.stack else None
+            # Look up the function by name
+            if method_name in self.functions:
+                func_addr = self.functions[method_name]
+                func_params = self.function_params.get(method_name, []) if isinstance(self.function_params, dict) else []
+                # Build call_args: if first param is 'self', prepend self_obj
+                call_args = list(args)
+                if func_params and func_params[0] == 'self':
+                    call_args.insert(0, self_obj)
+                # Save return address (same format as CALL)
+                self.call_stack.append(self.ip + 1)
+                # Save params for recursive calls (same format as CALL)
+                saved_params = {}
+                for pname in func_params:
+                    saved_params[pname] = self.variables.get(pname)
+                self.call_stack_params.append(saved_params)
+                # Bind function parameters (call_args is in correct order)
+                for i, pname in enumerate(func_params):
+                    if i < len(call_args):
+                        self.variables[pname] = call_args[i]
+                    else:
+                        self.variables[pname] = None
+                # Jump to function entry
+                self.ip = func_addr
+            else:
+                self.output.append(f'Error: method {method_name} not found')
+                self.stack.append(None)
+                self.ip += 1
         elif op == OpCode.JUMP:
             # Find label
             label = operand

@@ -4053,3 +4053,62 @@ QuantumEmbeddingV2:
 
 ### 下一步: 模板扩展生成
 用已知句子模板,批量替换词汇生成10000+新数据
+
+## 研究#231: 量子-经典混合注意力机制设计 (2026-05-03)
+
+### 核心思路
+将量子旋转编码(研究#228)与经典Transformer注意力结合,
+创建量子增强的注意力层,用于QSM模型的改进。
+
+### 量子注意力层设计 (QuantumAttentionV2)
+```
+经典路径: Q·K^T / √d → softmax → Attention(Q,K,V)
+量子路径: 
+1. Q,K → RY旋转门编码 → 量子态 |ψ_Q⟩, |ψ_K⟩
+2. 内积 ⟨ψ_Q|ψ_K⟩ = 量子关联度
+3. CNOT纠缠层 → 多头量子注意力
+4. 概率测量 → 经典注意力权重
+```
+
+### 关键改进点
+1. **旋转编码**: 每个token → RY(θ_i)|0⟩, θ_i = embedding_i * π
+2. **量子关联**: ⟨ψ_Q|ψ_K⟩ = cos(θ_Q - θ_K) — 天然归一化!
+   - 不需要softmax归一化(量子内积自动归一化)
+   - 计算复杂度: O(1) vs softmax O(n)
+3. **纠缠增强**: CNOT门创建qubit对间关联
+   - 相邻token自动获得纠缠关联
+   - 长距离依赖通过量子隧穿效应
+4. **概率测量**: 测量后坍缩为经典注意力权重
+
+### 与经典方法对比
+| 特性 | softmax注意力 | 量子注意力V2 |
+|------|-------------|-------------|
+| 归一化 | 需要softmax | 天然归一化 |
+| 长距离 | O(n²) | O(1)量子关联 |
+| 参数量 | d² per head | d per qubit |
+| 可训练 | ✅ | ✅ (旋转角度θ) |
+| 实现 | GPU | 模拟器(当前) |
+
+### 实现路线
+1. V1: 纯模拟(当前) — 用numpy模拟量子门
+2. V2: 混合 — 经典注意力 + 量子修正项
+3. V3: 真实量子 — PennyLane/Qiskit硬件
+
+### PennyLane实现思路
+```python
+import pennylane as qml
+dev = qml.device('default.qubit', wires=n_qubits)
+
+@qml.qnode(dev)
+def quantum_attention(query, key):
+    # RY旋转编码
+    for i, q in enumerate(query):
+        qml.RY(q * np.pi, wires=i)
+    for i, k in enumerate(key):
+        qml.RY(k * np.pi, wires=i + n_qubits//2)
+    # CNOT纠缠
+    for i in range(n_qubits//2):
+        qml.CNOT(wires=[i, i + n_qubits//2])
+    # 测量
+    return qml.probs(wires=range(n_qubits))
+```

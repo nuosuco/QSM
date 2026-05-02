@@ -78,6 +78,7 @@ class OpCode(Enum):
     SLICE_ACCESS = 0x94
     # 扩展操作
     DOT_ACCESS = 0xF5
+    METHOD_CALL = 0xF6
     UNARY_NOT = 0xF7
     BOOL_LOAD = 0xF8
     PUSH_TRY = 0xF9
@@ -1572,12 +1573,12 @@ class CodeGenerator:
             self._emit(OpCode.LOAD_FIELD, node.value, node.line)
 
         elif node.type == 'MethodCall':
-            # obj.method(args) → DOT_ACCESS + CALL
-            self._gen_node(node.children[0])  # obj
-            self._emit(OpCode.DOT_ACCESS, node.value, node.line)  # method name
+            # obj.method(args) → LOAD obj + LOAD args + METHOD_CALL
+            self._gen_node(node.children[0])  # push obj (will become self)
             for arg in node.children[1:]:
                 self._gen_node(arg)  # push args
-            self._emit(OpCode.CALL, len(node.children) - 1, node.line)
+            n_args = len(node.children) - 1  # number of explicit args (not counting self)
+            self._emit(OpCode.METHOD_CALL, (node.value, n_args), node.line)
 
         elif node.type == 'List':
             for child in node.children:
