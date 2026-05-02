@@ -3855,3 +3855,34 @@ V7-Small使用标准Multi-Head Attention:
 - "Language-Aware Attention for Multilingual NMT" (2024)
 - "Cross-lingual Attention for Low-resource Translation" (2023)
 - "Quantum Attention Networks" (2023) - 量子注意力机制
+
+## #226 量子注意力网络(Quantum Attention)研究
+
+### 核心概念
+量子注意力将经典softmax注意力与量子力学概念结合:
+- **叠加态注意力**: 查询-键匹配不是确定性的,而是概率幅叠加
+- **纠缠注意力**: 不同注意力头之间共享量子纠缠关系
+- **测量坍缩**: 注意力权重通过"测量"从叠加态坍缩为确定值
+
+### 数学框架
+经典注意力: Attention(Q,K,V) = softmax(QK^T/√d)V
+量子注意力: 
+1. 编码: |q⟩ = U_q|ψ_q⟩, |k⟩ = U_k|ψ_k⟩
+2. 叠加: α_ij = ⟨q_i|k_j⟩ (量子内积=复数振幅)
+3. 测量: p_ij = |α_ij|² (概率=振幅模平方)
+4. 输出: O_i = Σ_j p_ij · V_j
+
+### 对QSM的改进路线
+1. **短期(可实现)**: 量子旋转嵌入(已有) + 量子位置编码
+2. **中期**: 叠加态注意力 - 用复数振幅替代softmax
+3. **长期**: 量子纠缠注意力 - 头间纠缠关系
+
+### 量子旋转嵌入V2(当前)
+- 4个基态嵌入 + 语言偏置
+- coeff = softmax(W_lang * lang_id)  
+- embedding = Σ coeff_i * basis_i * √d_model
+
+### 量子旋转嵌入V3(计划)
+- 添加相位参数: |ψ⟩ = r·e^(iθ)|basis⟩
+- 不同语言的相位不同
+- 旋转门Rz(θ)控制语言分离度

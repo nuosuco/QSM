@@ -99,7 +99,12 @@
 - 循环当(while)+否则如果(elif)关键字别名
 - run_with_function: 先执行顶层声明
 - 参数类型注解可选(self不需要:any)
-- **12/12测试全通过!**
+- **15/15测试全通过!** (含全局变量修改+for-each+范围循环)
+- 循环当(while)+否则如果(elif)关键字别名
+- 每个(for-each)+范围循环
+- 全局关键字+flat namespace变量空间
+- 顶层变量初始化(load预设+run跳过)
+- 冒泡排序程序验证全部特性 ✅
 
 ### QEntL V3编译器+虚拟机（2026-04-27/28 完成）
 - **qentl_compiler_v3.py**: 完整Python编译器
