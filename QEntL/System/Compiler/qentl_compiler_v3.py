@@ -567,9 +567,12 @@ class Parser:
         # Parameters
         while self._current().type != TokenType.RPAREN:
             pname = self._advance().value
-            self._expect(TokenType.COLON)
-            ptype = self._advance().value
-            node.children.append(ASTNode('Param', value=f"{pname}:{ptype}"))
+            if self._current().type == TokenType.COLON:
+                self._advance()
+                ptype = self._advance().value
+                node.children.append(ASTNode('Param', value=f"{pname}:{ptype}"))
+            else:
+                node.children.append(ASTNode('Param', value=f"{pname}:any"))
             if self._current().type == TokenType.COMMA:
                 self._advance()
         self._expect(TokenType.RPAREN)
