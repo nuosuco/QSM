@@ -1153,6 +1153,7 @@ class CodeGenerator:
         self.constants = []
         self.variables = {}
         self.functions = {}
+        self.function_params = {}
         self.label_counter = 0
         self.loop_label_stack = []
         self.current_line = 0
@@ -1165,6 +1166,7 @@ class CodeGenerator:
             'constants': self.constants,
             'variables': list(self.variables.keys()),
             'functions': self.functions,
+            'function_params': self.function_params,
             'instructions': self.instructions
         }
 
@@ -1214,13 +1216,17 @@ class CodeGenerator:
 
         elif node.type == 'Function':
             self.functions[node.value] = len(self.instructions)
+            param_names = []
             for child in node.children:
                 if child.type == 'Param':
-                    self.variables[child.value.split(':')[0]] = len(self.variables)
+                    pname = child.value.split(':')[0]
+                    param_names.append(pname)
+                    self.variables[pname] = len(self.variables)
                 elif child.type == 'Block':
                     self._gen_node(child)
                 elif child.type != 'ReturnType':
                     self._gen_node(child)
+            self.function_params[node.value] = param_names
             self._emit(OpCode.RETURN)
 
         elif node.type == 'Block':

@@ -47,6 +47,7 @@ class QBCVirtualMachine:
         self.stack: List[Any] = []
         self.call_stack: List[tuple] = []  # (ip, variables_snapshot)
         self.functions: Dict[str, int] = {}
+        self.function_params: Dict[str, list] = {}
         self.types: Dict[str, Any] = {}
         self.instructions: List[Dict] = []
         self.ip: int = 0  # instruction pointer
@@ -165,6 +166,7 @@ class QBCVirtualMachine:
         """加载QBC字节码程序"""
         self.constants = qbc.get('constants', [])
         self.functions = qbc.get('functions', {})
+        self.function_params = qbc.get('function_params', {})
         self.instructions = qbc.get('instructions', [])
         # Initialize variables
         for var_name in qbc.get('variables', []):
@@ -410,20 +412,8 @@ class QBCVirtualMachine:
             if func_name in self.functions:
                 # Save return point and current variables
                 self.call_stack.append((self.ip + 1, dict(self.variables)))
-                # Pop arguments from stack and bind to function parameter variables
-                # The function's variables list defines parameter names
-                # We need to find how many params the function has
-                func_entry = self.functions[func_name]
-                # Count LOAD_VAR instructions before first non-param instruction
-                param_names = []
-                for i in range(func_entry, min(func_entry + 10, len(self.instructions))):
-                    instr = self.instructions[i]
-                    if instr.get('op') == 'LOAD_VAR':
-                        pname = instr.get('operand', '')
-                        if pname and pname not in param_names:
-                            param_names.append(pname)
-                    elif instr.get('op') in ('ADD', 'SUB', 'MUL', 'DIV', 'RETURN', 'EQ'):
-                        break
+                # Get parameter names from QBC metadata (function_params)
+                param_names = self.function_params.get(func_name, [])
                 # Bind arguments in reverse order (stack is LIFO)
                 for pname in reversed(param_names):
                     if self.stack:
@@ -477,7 +467,7 @@ class QBCVirtualMachine:
         elif op == OpCode.RETURN:
             if self.call_stack:
                 ret_ip, saved_vars = self.call_stack.pop()
-                ret_val = self.stack[-1] if self.stack else None
+                ret_val = self.stack.pop() if self.stack else None
                 self.variables = saved_vars
                 if ret_val is not None:
                     self.stack.append(ret_val)
