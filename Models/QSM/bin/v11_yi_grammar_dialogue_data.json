@@ -1,0 +1,922 @@
+[
+  {
+    "input": "彝文字符󲜷在句子中怎么用",
+    "output": "󲜷字表示心，可以组成如'心灵'、'心气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲜷 means",
+    "output": "󲜷 means 心 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲞭在句子中怎么用",
+    "output": "󲞭字表示天，可以组成如'天灵'、'天气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲞭 means",
+    "output": "󲞭 means 天 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲞮在句子中怎么用",
+    "output": "󲞮字表示火，可以组成如'火灵'、'火气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲞮 means",
+    "output": "󲞮 means 火 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲞰在句子中怎么用",
+    "output": "󲞰字表示王，可以组成如'王灵'、'王气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲞰 means",
+    "output": "󲞰 means 王 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲜵在句子中怎么用",
+    "output": "󲜵字表示乾坤，可以组成如'乾坤灵'、'乾坤气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲜵 means",
+    "output": "󲜵 means 乾坤 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲥡在句子中怎么用",
+    "output": "󲥡字表示文，可以组成如'文灵'、'文气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲥡 means",
+    "output": "󲥡 means 文 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲥰在句子中怎么用",
+    "output": "󲥰字表示彝，可以组成如'彝灵'、'彝气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲥰 means",
+    "output": "󲥰 means 彝 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲜸在句子中怎么用",
+    "output": "󲜸字表示性，可以组成如'性灵'、'性气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲜸 means",
+    "output": "󲜸 means 性 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文字符󲜹在句子中怎么用",
+    "output": "󲜹字表示觉，可以组成如'觉灵'、'觉气'等词语",
+    "type": "yi-zh"
+  },
+  {
+    "input": "the yi character 󲜹 means",
+    "output": "󲜹 means 觉 in chinese",
+    "type": "yi-en"
+  },
+  {
+    "input": "彝文SOV: 我+饭+吃",
+    "output": "中文SVO: 我吃饭 (i eat rice)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "我吃饭",
+    "output": "i eat rice",
+    "type": "zh-en"
+  },
+  {
+    "input": "i eat rice",
+    "output": "我吃饭",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 我饭吃 翻译成中文",
+    "output": "我吃饭 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 他+书+读",
+    "output": "中文SVO: 他读书 (he reads a book)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "他读书",
+    "output": "he reads a book",
+    "type": "zh-en"
+  },
+  {
+    "input": "he reads a book",
+    "output": "他读书",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 他书读 翻译成中文",
+    "output": "他读书 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 她+歌+唱",
+    "output": "中文SVO: 她唱歌 (she sings a song)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "她唱歌",
+    "output": "she sings a song",
+    "type": "zh-en"
+  },
+  {
+    "input": "she sings a song",
+    "output": "她唱歌",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 她歌唱 翻译成中文",
+    "output": "她唱歌 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 我们+路+走",
+    "output": "中文SVO: 我们走路 (we walk the road)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "我们走路",
+    "output": "we walk the road",
+    "type": "zh-en"
+  },
+  {
+    "input": "we walk the road",
+    "output": "我们走路",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 我们路走 翻译成中文",
+    "output": "我们走路 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 他们+水+喝",
+    "output": "中文SVO: 他们喝水 (they drink water)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "他们喝水",
+    "output": "they drink water",
+    "type": "zh-en"
+  },
+  {
+    "input": "they drink water",
+    "output": "他们喝水",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 他们水喝 翻译成中文",
+    "output": "他们喝水 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 猫+老鼠+抓",
+    "output": "中文SVO: 猫抓老鼠 (the cat catches the mouse)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "猫抓老鼠",
+    "output": "the cat catches the mouse",
+    "type": "zh-en"
+  },
+  {
+    "input": "the cat catches the mouse",
+    "output": "猫抓老鼠",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 猫老鼠抓 翻译成中文",
+    "output": "猫抓老鼠 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 鸟+天+飞",
+    "output": "中文SVO: 鸟飞天 (the bird flies in the sky)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "鸟在天上飞",
+    "output": "the bird flies in the sky",
+    "type": "zh-en"
+  },
+  {
+    "input": "the bird flies in the sky",
+    "output": "鸟在天上飞",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 鸟天飞 翻译成中文",
+    "output": "鸟在天上飞 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 鱼+水+游",
+    "output": "中文SVO: 鱼游水 (the fish swims in the water)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "鱼在水里游",
+    "output": "the fish swims in the water",
+    "type": "zh-en"
+  },
+  {
+    "input": "the fish swims in the water",
+    "output": "鱼在水里游",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 鱼水游 翻译成中文",
+    "output": "鱼在水里游 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 农民+地+种",
+    "output": "中文SVO: 农民种地 (the farmer farms the land)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "农民种地",
+    "output": "the farmer farms the land",
+    "type": "zh-en"
+  },
+  {
+    "input": "the farmer farms the land",
+    "output": "农民种地",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 农民地种 翻译成中文",
+    "output": "农民种地 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 老师+课+讲",
+    "output": "中文SVO: 老师讲课 (the teacher teaches the class)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "老师讲课",
+    "output": "the teacher teaches the class",
+    "type": "zh-en"
+  },
+  {
+    "input": "the teacher teaches the class",
+    "output": "老师讲课",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 老师课讲 翻译成中文",
+    "output": "老师讲课 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 孩子+游戏+玩",
+    "output": "中文SVO: 孩子玩游戏 (the child plays games)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "孩子玩游戏",
+    "output": "the child plays games",
+    "type": "zh-en"
+  },
+  {
+    "input": "the child plays games",
+    "output": "孩子玩游戏",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 孩子游戏玩 翻译成中文",
+    "output": "孩子玩游戏 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 妈妈+衣服+洗",
+    "output": "中文SVO: 妈妈洗衣服 (mother washes clothes)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "妈妈洗衣服",
+    "output": "mother washes clothes",
+    "type": "zh-en"
+  },
+  {
+    "input": "mother washes clothes",
+    "output": "妈妈洗衣服",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 妈妈衣服洗 翻译成中文",
+    "output": "妈妈洗衣服 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 爸爸+钱+赚",
+    "output": "中文SVO: 爸爸赚钱 (father earns money)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "爸爸赚钱",
+    "output": "father earns money",
+    "type": "zh-en"
+  },
+  {
+    "input": "father earns money",
+    "output": "爸爸赚钱",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 爸爸钱赚 翻译成中文",
+    "output": "爸爸赚钱 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 学生+字+写",
+    "output": "中文SVO: 学生写字 (the student writes characters)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "学生写字",
+    "output": "the student writes characters",
+    "type": "zh-en"
+  },
+  {
+    "input": "the student writes characters",
+    "output": "学生写字",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 学生字写 翻译成中文",
+    "output": "学生写字 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 医生+病+治",
+    "output": "中文SVO: 医生治病 (the doctor cures diseases)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "医生治病",
+    "output": "the doctor cures diseases",
+    "type": "zh-en"
+  },
+  {
+    "input": "the doctor cures diseases",
+    "output": "医生治病",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 医生病治 翻译成中文",
+    "output": "医生治病 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 狗+门+守",
+    "output": "中文SVO: 狗守门 (the dog guards the door)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "狗守门",
+    "output": "the dog guards the door",
+    "type": "zh-en"
+  },
+  {
+    "input": "the dog guards the door",
+    "output": "狗守门",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 狗门守 翻译成中文",
+    "output": "狗守门 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 牛+草+吃",
+    "output": "中文SVO: 牛吃草 (the cow eats grass)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "牛吃草",
+    "output": "the cow eats grass",
+    "type": "zh-en"
+  },
+  {
+    "input": "the cow eats grass",
+    "output": "牛吃草",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 牛草吃 翻译成中文",
+    "output": "牛吃草 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 马+路+跑",
+    "output": "中文SVO: 马跑路 (the horse runs on the road)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "马在路上跑",
+    "output": "the horse runs on the road",
+    "type": "zh-en"
+  },
+  {
+    "input": "the horse runs on the road",
+    "output": "马在路上跑",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 马路跑 翻译成中文",
+    "output": "马在路上跑 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 我+话+说",
+    "output": "中文SVO: 我说话 (i speak words)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "我说话",
+    "output": "i speak words",
+    "type": "zh-en"
+  },
+  {
+    "input": "i speak words",
+    "output": "我说话",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 我话说 翻译成中文",
+    "output": "我说话 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文SOV: 她+舞+跳",
+    "output": "中文SVO: 她跳舞 (she dances)",
+    "type": "yi-zh"
+  },
+  {
+    "input": "她跳舞",
+    "output": "she dances",
+    "type": "zh-en"
+  },
+  {
+    "input": "she dances",
+    "output": "她跳舞",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文语序: 她舞跳 翻译成中文",
+    "output": "她跳舞 (彝文是主宾动SOV，中文是主动宾SVO)",
+    "type": "yi-zh-grammar"
+  },
+  {
+    "input": "彝文语序是主宾动SOV",
+    "output": "yi word order is subject-object-verb SOV",
+    "type": "zh-en"
+  },
+  {
+    "input": "yi word order is subject-object-verb SOV",
+    "output": "彝文语序是主宾动SOV",
+    "type": "en-zh"
+  },
+  {
+    "input": "中文语序是主宾动SVO",
+    "output": "chinese word order is subject-verb-object SVO",
+    "type": "zh-en"
+  },
+  {
+    "input": "chinese word order is subject-verb-object SVO",
+    "output": "中文语序是主宾动SVO",
+    "type": "en-zh"
+  },
+  {
+    "input": "英文语序是主宾动SVO",
+    "output": "english word order is subject-verb-object SVO",
+    "type": "zh-en"
+  },
+  {
+    "input": "english word order is subject-verb-object SVO",
+    "output": "英文语序是主宾动SVO",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文的形容词在名词后面",
+    "output": "in yi adjectives come after nouns",
+    "type": "zh-en"
+  },
+  {
+    "input": "in yi adjectives come after nouns",
+    "output": "彝文的形容词在名词后面",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文的助词放在句末",
+    "output": "in yi particles are placed at the end of sentences",
+    "type": "zh-en"
+  },
+  {
+    "input": "in yi particles are placed at the end of sentences",
+    "output": "彝文的助词放在句末",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文有四种声调",
+    "output": "yi has four tones",
+    "type": "zh-en"
+  },
+  {
+    "input": "yi has four tones",
+    "output": "彝文有四种声调",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文从左到右书写",
+    "output": "yi is written from left to right",
+    "type": "zh-en"
+  },
+  {
+    "input": "yi is written from left to right",
+    "output": "彝文从左到右书写",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文是音节文字",
+    "output": "yi is a syllabic script",
+    "type": "zh-en"
+  },
+  {
+    "input": "yi is a syllabic script",
+    "output": "彝文是音节文字",
+    "type": "en-zh"
+  },
+  {
+    "input": "凉山彝文有819个规范字符",
+    "output": "the liangshan yi script has 819 standardized characters",
+    "type": "zh-en"
+  },
+  {
+    "input": "the liangshan yi script has 819 standardized characters",
+    "output": "凉山彝文有819个规范字符",
+    "type": "en-zh"
+  },
+  {
+    "input": "通用彝文有87046个字符",
+    "output": "standard yi script has 87046 characters",
+    "type": "zh-en"
+  },
+  {
+    "input": "standard yi script has 87046 characters",
+    "output": "通用彝文有87046个字符",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文可以竖写也可以横写",
+    "output": "yi can be written vertically or horizontally",
+    "type": "zh-en"
+  },
+  {
+    "input": "yi can be written vertically or horizontally",
+    "output": "彝文可以竖写也可以横写",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文是世界上最古老的文字之一",
+    "output": "yi is one of the oldest writing systems in the world",
+    "type": "zh-en"
+  },
+  {
+    "input": "yi is one of the oldest writing systems in the world",
+    "output": "彝文是世界上最古老的文字之一",
+    "type": "en-zh"
+  },
+  {
+    "input": "你好",
+    "output": "hello",
+    "type": "zh-en"
+  },
+  {
+    "input": "hello",
+    "output": "你好",
+    "type": "en-zh"
+  },
+  {
+    "input": "你好！你好吗",
+    "output": "hello! how are you",
+    "type": "zh-en"
+  },
+  {
+    "input": "hello! how are you",
+    "output": "你好！你好吗",
+    "type": "en-zh"
+  },
+  {
+    "input": "我很好，谢谢",
+    "output": "i am fine thank you",
+    "type": "zh-en"
+  },
+  {
+    "input": "i am fine thank you",
+    "output": "我很好，谢谢",
+    "type": "en-zh"
+  },
+  {
+    "input": "请问火车站在哪里",
+    "output": "excuse me where is the train station",
+    "type": "zh-en"
+  },
+  {
+    "input": "excuse me where is the train station",
+    "output": "请问火车站在哪里",
+    "type": "en-zh"
+  },
+  {
+    "input": "火车站就在前面",
+    "output": "the train station is just ahead",
+    "type": "zh-en"
+  },
+  {
+    "input": "the train station is just ahead",
+    "output": "火车站就在前面",
+    "type": "en-zh"
+  },
+  {
+    "input": "谢谢",
+    "output": "thank you",
+    "type": "zh-en"
+  },
+  {
+    "input": "thank you",
+    "output": "谢谢",
+    "type": "en-zh"
+  },
+  {
+    "input": "这个多少钱",
+    "output": "how much is this",
+    "type": "zh-en"
+  },
+  {
+    "input": "how much is this",
+    "output": "这个多少钱",
+    "type": "en-zh"
+  },
+  {
+    "input": "这个五十元",
+    "output": "this is fifty yuan",
+    "type": "zh-en"
+  },
+  {
+    "input": "this is fifty yuan",
+    "output": "这个五十元",
+    "type": "en-zh"
+  },
+  {
+    "input": "太贵了，便宜一点",
+    "output": "it is too expensive cheaper please",
+    "type": "zh-en"
+  },
+  {
+    "input": "it is too expensive cheaper please",
+    "output": "太贵了，便宜一点",
+    "type": "en-zh"
+  },
+  {
+    "input": "请给我菜单",
+    "output": "please give me the menu",
+    "type": "zh-en"
+  },
+  {
+    "input": "please give me the menu",
+    "output": "请给我菜单",
+    "type": "en-zh"
+  },
+  {
+    "input": "你想吃什么",
+    "output": "what would you like to eat",
+    "type": "zh-en"
+  },
+  {
+    "input": "what would you like to eat",
+    "output": "你想吃什么",
+    "type": "en-zh"
+  },
+  {
+    "input": "我要一碗米饭和一份菜",
+    "output": "i want a bowl of rice and a dish",
+    "type": "zh-en"
+  },
+  {
+    "input": "i want a bowl of rice and a dish",
+    "output": "我要一碗米饭和一份菜",
+    "type": "en-zh"
+  },
+  {
+    "input": "今天天气怎么样",
+    "output": "how is the weather today",
+    "type": "zh-en"
+  },
+  {
+    "input": "how is the weather today",
+    "output": "今天天气怎么样",
+    "type": "en-zh"
+  },
+  {
+    "input": "今天晴天，温度二十度",
+    "output": "today is sunny twenty degrees",
+    "type": "zh-en"
+  },
+  {
+    "input": "today is sunny twenty degrees",
+    "output": "今天晴天，温度二十度",
+    "type": "en-zh"
+  },
+  {
+    "input": "明天会下雨吗",
+    "output": "will it rain tomorrow",
+    "type": "zh-en"
+  },
+  {
+    "input": "will it rain tomorrow",
+    "output": "明天会下雨吗",
+    "type": "en-zh"
+  },
+  {
+    "input": "现在几点了",
+    "output": "what time is it now",
+    "type": "zh-en"
+  },
+  {
+    "input": "what time is it now",
+    "output": "现在几点了",
+    "type": "en-zh"
+  },
+  {
+    "input": "现在下午三点",
+    "output": "it is three pm now",
+    "type": "zh-en"
+  },
+  {
+    "input": "it is three pm now",
+    "output": "现在下午三点",
+    "type": "en-zh"
+  },
+  {
+    "input": "我们什么时候出发",
+    "output": "when shall we leave",
+    "type": "zh-en"
+  },
+  {
+    "input": "when shall we leave",
+    "output": "我们什么时候出发",
+    "type": "en-zh"
+  },
+  {
+    "input": "彝文一怎么说",
+    "output": "彝文中一的发音是cyp",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 一 in yi",
+    "output": "一 is pronounced cyp in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文二怎么说",
+    "output": "彝文中二的发音是nip",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 二 in yi",
+    "output": "二 is pronounced nip in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文三怎么说",
+    "output": "彝文中三的发音是suo",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 三 in yi",
+    "output": "三 is pronounced suo in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文四怎么说",
+    "output": "彝文中四的发音是ly",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 四 in yi",
+    "output": "四 is pronounced ly in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文五怎么说",
+    "output": "彝文中五的发音是ngep",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 五 in yi",
+    "output": "五 is pronounced ngep in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文六怎么说",
+    "output": "彝文中六的发音是fut",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 六 in yi",
+    "output": "六 is pronounced fut in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文七怎么说",
+    "output": "彝文中七的发音是shyp",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 七 in yi",
+    "output": "七 is pronounced shyp in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文八怎么说",
+    "output": "彝文中八的发音是hxit",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 八 in yi",
+    "output": "八 is pronounced hxit in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文九怎么说",
+    "output": "彝文中九的发音是gget",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 九 in yi",
+    "output": "九 is pronounced gget in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文十怎么说",
+    "output": "彝文中十的发音是cip",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 十 in yi",
+    "output": "十 is pronounced cip in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文百怎么说",
+    "output": "彝文中百的发音是hap",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 百 in yi",
+    "output": "百 is pronounced hap in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文千怎么说",
+    "output": "彝文中千的发音是tu",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 千 in yi",
+    "output": "千 is pronounced tu in yi",
+    "type": "en-yi"
+  },
+  {
+    "input": "彝文万怎么说",
+    "output": "彝文中万的发音是vat",
+    "type": "zh-yi"
+  },
+  {
+    "input": "how to say 万 in yi",
+    "output": "万 is pronounced vat in yi",
+    "type": "en-yi"
+  }
+]
