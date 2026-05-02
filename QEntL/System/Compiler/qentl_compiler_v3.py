@@ -197,6 +197,8 @@ class Lexer:
     KEYWORDS['每个'] = TokenType.FOR
     KEYWORDS['全局'] = TokenType.GLOBAL
     KEYWORDS['否则如果'] = TokenType.ELIF
+    KEYWORDS['跳出'] = TokenType.BREAK
+    KEYWORDS['继续'] = TokenType.CONTINUE
 
     def __init__(self, source: str):
         self.source = source
@@ -1377,8 +1379,10 @@ class CodeGenerator:
                 self._emit(OpCode.LOAD_VAR, f'_for_end_{node.value}', node.line)
                 self._emit(OpCode.LT, None, node.line)
                 self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
-                self.loop_label_stack.append((start_label, end_label))
+                continue_label = self._new_label()
+                self.loop_label_stack.append((continue_label, end_label))
                 self._gen_node(node.children[1])
+                self.instructions.append({'op': 'LABEL', 'name': continue_label})
                 self._emit(OpCode.LOAD_VAR, node.value, node.line)
                 # Use step from Range if available, else default 1
                 if (range_node.type == 'Range' or range_node.type == 'Call') and len(range_node.children) > 2:
@@ -1415,9 +1419,11 @@ class CodeGenerator:
                 self._emit(OpCode.LOAD_VAR, f'_for_end_{node.value}', node.line)
                 self._emit(OpCode.LT, None, node.line)
                 self._emit(OpCode.JUMP_IF_FALSE, end_label, node.line)
-                self.loop_label_stack.append((start_label, end_label))
+                continue_label_fe = self._new_label()
+                self.loop_label_stack.append((continue_label_fe, end_label))
                 # Body
                 self._gen_node(node.children[1])
+                self.instructions.append({'op': 'LABEL', 'name': continue_label_fe})
                 # Increment idx and update loop var
                 self._emit(OpCode.LOAD_VAR, iter_idx, node.line)
                 one_idx = self._add_const(1)
