@@ -266,19 +266,18 @@ class Lexer:
                     self._add_token(TokenType.DIV_ASSIGN, '/=')
                     self._advance(); self._advance()
                     continue
+            if two == '<=':
+                self._add_token(TokenType.LTE, '<=')
+                self._advance(); self._advance()
+                continue
+            if two == '>=':
+                self._add_token(TokenType.GTE, '>=')
+                self._advance(); self._advance()
+                continue
             if ch == "!" and (self.pos >= len(self.source) or self.source[self.pos] != "="):
                 self._add_token(TokenType.NOT, "!")
                 self._advance()
                 continue
-                if two == '<=':
-                    self._add_token(TokenType.LTE, '<=')
-                    self._advance(); self._advance()
-                    continue
-                if two == '>=':
-                    self._add_token(TokenType.GTE, '>=')
-                    self._advance(); self._advance()
-                    continue
-
             # Single character operators/symbols
             symbol_map = {
                 '{': TokenType.LBRACE, '}': TokenType.RBRACE,
