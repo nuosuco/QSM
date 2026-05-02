@@ -94,8 +94,12 @@
 ### QEntL VM函数作用域+递归修复（2026-05-02）
 - function_params元数据: 编译器→QBC→VM正确绑定参数
 - RETURN handler修复: stack.pop()替代stack[-1]
-- 6/6测试通过: 斐波那契(10)=89, 阶乘(5)=120(递归!)
-- 打印()内建函数已添加
+- <=/>=运算符Lexer缩进bug修复
+- 打印()内建函数, quantum_enum完整支持
+- 循环当(while)+否则如果(elif)关键字别名
+- run_with_function: 先执行顶层声明
+- 参数类型注解可选(self不需要:any)
+- **12/12测试全通过!**
 
 ### QEntL V3编译器+虚拟机（2026-04-27/28 完成）
 - **qentl_compiler_v3.py**: 完整Python编译器
@@ -118,6 +122,7 @@
   - 公网API: https://som.top API (V7-Small, val_loss=2.6531)
 - /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
 - Beam search改进: n-gram blocking + rep_penalty=1.5 + min_len=3
+- /health, /version, /translate, /chat 四个端点
 - **V5训练完成**: 52K数据, 30 Epochs, **Best E25 Val 2.1857** (7.9h, 翻译仍乱码→需V6)
   - Val Loss 2.1857 (Epoch 25, Best), E30完成 Val 2.1993
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
