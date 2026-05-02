@@ -433,7 +433,7 @@ class QBCVirtualMachine:
                 self.ip = self.functions[func_name]
             else:
                 # Built-in functions
-                if func_name in ('LOG', 'log', '日志', 'print'):
+                if func_name in ('LOG', 'log', '日志', 'print', '打印'):
                     if self.stack:
                         val = self.stack.pop()
                         msg = str(val) if val is not None else 'None'
@@ -837,15 +837,23 @@ class QBCVirtualMachine:
                     suffix = self.stack.pop()
                     s = self.stack.pop()
                     self.stack.append(1 if isinstance(s, str) and s.endswith(str(suffix)) else 0)
+            elif func_name == '打印':
+                if self.stack:
+                    val = self.stack.pop()
+                    msg = str(val) if val is not None else 'None'
+                    self.output.append(msg)
+                    print(msg)
+                    self.stack.append(None)
             self.ip += 1
+        
         elif op == OpCode.LOG:
             if self.stack:
                 val = self.stack.pop()
-                msg = str(val)
+                msg = str(val) if val is not None else 'None'
                 self.output.append(msg)
                 print(msg)
+                self.stack.append(None)
             self.ip += 1
-        
         elif op == OpCode.INPUT:
             # For VM, just push empty string
             self.stack.append("")

@@ -1,33 +1,42 @@
-// QEntL高级测试 - 全部放在函数中
-主函数: 函数() {
-    // 斐波那契
+// QEntL高级功能测试 - labeled函数+循环+打印+内建
+
+// 斐波那契
+斐波那契: 函数(n: 整数) {
     让 a = 0
     让 b = 1
-    循环 i 在 范围(0, 10) {
+    循环 i 在 范围(0, n) {
         让 temp = a + b
         让 a = b
         让 b = temp
     }
-    LOG(b)
-    
-    // 数组求和
-    让 nums = [10, 20, 30, 40, 50]
+    返回 b
+}
+
+// 数组求和
+数组求和: 函数(arr: 数组) {
     让 total = 0
-    循环 x 在 nums {
+    循环 x 在 arr {
         让 total = total + x
     }
-    LOG(total)
-    
-    // 最大值
-    让 m = nums[0]
-    循环 i 在 范围(1, 长度(nums)) {
-        如果 nums[i] > m {
-            让 m = nums[i]
+    返回 total
+}
+
+// 最大值
+找最大: 函数(arr: 数组) {
+    让 m = arr[0]
+    循环 i 在 范围(1, 长度(arr)) {
+        如果 arr[i] > m {
+            让 m = arr[i]
         }
     }
-    LOG(m)
-    
-    // 字符串
-    让 text = "hello quantum"
-    LOG(长度(text))
+    返回 m
+}
+
+// 主函数
+主函数: 函数() {
+    打印(斐波那契(10))
+    让 nums = [10, 20, 30, 40, 50]
+    打印(数组求和(nums))
+    打印(找最大(nums))
+    打印(长度("hello qentl"))
 }
