@@ -3821,3 +3821,37 @@ V10训练后再添加, 作为V11的改进
 3. 对话: 生成多轮对话数据
 4. 段落: 扩展到段落级和篇章级
 5. 目标: 200K+条 (匹配4.5M参数)
+
+## #225 注意力机制改进方案
+
+### 当前问题
+V7-Small使用标准Multi-Head Attention:
+- 3个注意力头, 192维
+- 无法区分不同语言的注意力模式
+- 英文碎片可能源于注意力跨语言混乱
+
+### 改进方案1: 语言感知注意力
+- 添加语言类型嵌入到Q/K/V
+- 同语言token间注意力权重更高
+- 实现: Q' = Q + LangEmb(src_lang)
+
+### 改进方案2: 交叉语言注意力门控
+- 门控机制控制跨语言信息流
+- g = sigmoid(W_gate * [Q;K] + b)
+- Attention = g * softmax(QK^T/√d)V
+- 训练时根据语言方向调整门控
+
+### 改进方案3: 分层注意力
+- 层0: 语言内注意力(只看同语言)
+- 层1: 跨语言注意力(翻译信息)
+- 层2: 融合层(综合决策)
+
+### 对QSM的推荐
+1. V10/V11先添加语言标记([中文][彝文][EN])
+2. V12实现语言感知注意力
+3. V13实现分层注意力
+
+### 参考论文
+- "Language-Aware Attention for Multilingual NMT" (2024)
+- "Cross-lingual Attention for Low-resource Translation" (2023)
+- "Quantum Attention Networks" (2023) - 量子注意力机制
