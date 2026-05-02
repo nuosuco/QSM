@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 QBC虚拟机 V1 - 执行QBC字节码
-支持：算术/比较/控制流/量子操作/对象/I/O
+支持:算术/比较/控制流/量子操作/对象/I/O
 """
 
 import json
@@ -40,7 +40,7 @@ OP_MAP = {op.name: op for op in OpCode}
 
 class QBCVirtualMachine:
     """量子字节码虚拟机"""
-    
+
     def __init__(self):
         self.constants: List[Any] = []
         self.variables: Dict[str, Any] = {}
@@ -53,12 +53,12 @@ class QBCVirtualMachine:
         self.ip: int = 0  # instruction pointer
         self.running: bool = False
         self.output: List[str] = []  # captured log output
-        
+
         # Quantum state simulation
         self.quantum_register: List[complex] = []
         self.quantum_bits: int = 0
         self.quantum_gates_applied: List[Dict] = []
-    
+
 
     # === Quantum State Simulation (Real Quantum Mechanics) ===
     def _init_quantum_state(self, n_bits: int):
@@ -69,32 +69,32 @@ class QBCVirtualMachine:
         # |0...0⟩ state: first basis vector
         self.quantum_register = [0.0+0.0j] * dim
         self.quantum_register[0] = 1.0+0.0j
-    
+
     def _apply_hadamard(self, target: int):
         """Apply Hadamard gate to target qubit"""
         import math
         sqrt2 = 1.0 / math.sqrt(2)
         dim = 2 ** self.quantum_bits
         new_state = [0.0+0.0j] * dim
-        
+
         for i in range(dim):
             # Get bit value at target position
             bit = (i >> target) & 1
             # Partner index (flipped target bit)
             partner = i ^ (1 << target)
-            
+
             if bit == 0:
                 new_state[i] = sqrt2 * (self.quantum_register[i] + self.quantum_register[partner])
             else:
                 new_state[i] = sqrt2 * (self.quantum_register[partner] - self.quantum_register[i])
-        
+
         self.quantum_register = new_state
-    
+
     def _apply_cnot(self, control: int, target: int):
         """Apply CNOT gate: flip target if control is |1⟩"""
         dim = 2 ** self.quantum_bits
         new_state = [0.0+0.0j] * dim
-        
+
         for i in range(dim):
             control_bit = (i >> control) & 1
             if control_bit == 1:
@@ -103,34 +103,34 @@ class QBCVirtualMachine:
                 new_state[partner] = self.quantum_register[i]
             else:
                 new_state[i] = self.quantum_register[i]
-        
+
         self.quantum_register = new_state
-    
+
     def _apply_pauli_x(self, target: int):
         """Apply Pauli-X (NOT) gate"""
         dim = 2 ** self.quantum_bits
         new_state = [0.0+0.0j] * dim
-        
+
         for i in range(dim):
             partner = i ^ (1 << target)
             new_state[partner] = self.quantum_register[i]
-        
+
         self.quantum_register = new_state
-    
+
     def _measure_qubit(self, target: int) -> int:
         """Measure a single qubit with probabilistic outcome"""
         import random
         dim = 2 ** self.quantum_bits
-        
+
         # Calculate probability of measuring |1⟩
         prob_one = 0.0
         for i in range(dim):
             if (i >> target) & 1:
                 prob_one += abs(self.quantum_register[i]) ** 2
-        
+
         # Probabilistic measurement
         result = 1 if random.random() < prob_one else 0
-        
+
         # Collapse state
         new_state = [0.0+0.0j] * dim
         norm = 0.0
@@ -138,21 +138,21 @@ class QBCVirtualMachine:
             if ((i >> target) & 1) == result:
                 new_state[i] = self.quantum_register[i]
                 norm += abs(self.quantum_register[i]) ** 2
-        
+
         # Normalize
         if norm > 0:
             import math
             factor = 1.0 / math.sqrt(norm)
             for i in range(dim):
                 new_state[i] *= factor
-        
+
         self.quantum_register = new_state
         return result
-    
+
     def _get_state_info(self) -> str:
         """Get quantum state information string"""
         dim = 2 ** self.quantum_bits
-        non_zero = [(i, self.quantum_register[i]) for i in range(dim) 
+        non_zero = [(i, self.quantum_register[i]) for i in range(dim)
                      if abs(self.quantum_register[i]) > 1e-10]
         if len(non_zero) <= 4:
             parts = []
@@ -176,50 +176,50 @@ class QBCVirtualMachine:
         self.stack = []
         self.output = []
         self.try_stack = []  # stack of catch addresses for try/catch
-    
+
     def load_file(self, path: str):
         """从文件加载QBC程序"""
         with open(path, 'r', encoding='utf-8') as f:
             qbc = json.load(f)
         self.load_qbc(qbc)
-    
+
     def run(self, max_steps: int = 100000) -> List[str]:
         """执行QBC程序"""
         self.running = True
         steps = 0
-        
+
         # Auto-detect main entry point
         # Always start from ip=0 to process top-level declarations first
         # (import/enum/class/interface), then quantum program continues
-        
+
         while self.running and self.ip < len(self.instructions) and steps < max_steps:
             instr = self.instructions[self.ip]
             op_name = instr.get('op', 'NOP')
             operand = instr.get('operand')
-            
+
             # Handle labels (skip)
             if op_name == 'LABEL':
                 self.ip += 1
                 steps += 1
                 continue
-            
+
             op = OP_MAP.get(op_name)
             if op is None:
                 self.ip += 1
                 steps += 1
                 continue
-            
+
             self._execute(op, operand)
             steps += 1
-        
+
         return self.output
-    
+
     def _execute(self, op: OpCode, operand):
         """执行单条指令"""
-        
+
         if op == OpCode.NOP:
             self.ip += 1
-        
+
         elif op == OpCode.BUILD_LIST:
             count = operand if operand else 0
             items = []
@@ -291,22 +291,22 @@ class QBCVirtualMachine:
             self.ip += 1
         elif op == OpCode.HALT:
             self.running = False
-        
+
         elif op == OpCode.LOAD_CONST:
             val = self.constants[operand] if operand < len(self.constants) else None
             self.stack.append(val)
             self.ip += 1
-        
+
         elif op == OpCode.LOAD_VAR:
             val = self.variables.get(operand)
             self.stack.append(val)
             self.ip += 1
-        
+
         elif op == OpCode.STORE_VAR:
             if self.stack:
                 self.variables[operand] = self.stack.pop()
             self.ip += 1
-        
+
         elif op == OpCode.LOAD_FIELD:
             if len(self.stack) >= 1:
                 obj = self.stack.pop()
@@ -315,7 +315,7 @@ class QBCVirtualMachine:
                 else:
                     self.stack.append(None)
             self.ip += 1
-        
+
         elif op in (OpCode.ADD, OpCode.SUB, OpCode.MUL, OpCode.DIV, OpCode.MOD):
             if len(self.stack) >= 2:
                 b = self.stack.pop()
@@ -335,7 +335,7 @@ class QBCVirtualMachine:
                     else:
                         self.stack.append(0)
             self.ip += 1
-        
+
         elif op in (OpCode.EQ, OpCode.NEQ, OpCode.LT, OpCode.GT, OpCode.LTE, OpCode.GTE):
             if len(self.stack) >= 2:
                 b = self.stack.pop()
@@ -352,7 +352,7 @@ class QBCVirtualMachine:
                 except (TypeError, ValueError):
                     self.stack.append(False)
             self.ip += 1
-        
+
         elif op == OpCode.UNARY_NOT:
             if len(self.stack) >= 1:
                 val = self.stack.pop()
@@ -383,7 +383,7 @@ class QBCVirtualMachine:
                 self.ip = target
             else:
                 self.ip += 1
-        
+
         elif op == OpCode.JUMP_IF_FALSE:
             if self.stack:
                 cond = self.stack.pop()
@@ -394,7 +394,7 @@ class QBCVirtualMachine:
                         self.ip = target
                         return
             self.ip += 1
-        
+
         elif op == OpCode.JUMP_IF_TRUE:
             if self.stack:
                 cond = self.stack.pop()
@@ -405,7 +405,7 @@ class QBCVirtualMachine:
                         self.ip = target
                         return
             self.ip += 1
-        
+
         elif op == OpCode.CALL:
             # Call function
             func_name = operand
@@ -433,7 +433,7 @@ class QBCVirtualMachine:
                 elif func_name in ('问候', 'greet', '你好'):
                     if self.stack:
                         arg = self.stack.pop()
-                        self.stack.append(f"你好，{arg}！")
+                        self.stack.append(f"你好,{arg}!")
                 elif func_name in ('加法', 'add'):
                     if len(self.stack) >= 2:
                         b = self.stack.pop()
@@ -463,7 +463,7 @@ class QBCVirtualMachine:
                         self.stack.pop()
                     self.stack.append(None)
                 self.ip += 1
-        
+
         elif op == OpCode.RETURN:
             if self.call_stack:
                 ret_ip, saved_vars = self.call_stack.pop()
@@ -476,15 +476,15 @@ class QBCVirtualMachine:
                 # At top level, RETURN just means end of declaration block
                 # Skip it and continue to next instruction
                 self.ip += 1
-        
+
         elif op == OpCode.LOOP_START:
             # operand is loop variable name
             self.ip += 1
-        
+
         elif op == OpCode.LOOP_END:
             # operand is label to jump back
             self.ip += 1  # simplified: just continue
-        
+
         elif op == OpCode.QUANTUM_INIT:
             n_qubits = operand if operand else 2
             self._init_quantum_state(n_qubits)
@@ -835,7 +835,7 @@ class QBCVirtualMachine:
                     print(msg)
                     self.stack.append(None)
             self.ip += 1
-        
+
         elif op == OpCode.LOG:
             if self.stack:
                 val = self.stack.pop()
@@ -848,7 +848,7 @@ class QBCVirtualMachine:
             # For VM, just push empty string
             self.stack.append("")
             self.ip += 1
-        
+
         elif op == OpCode.TYPE_DEF:
             type_name = self.constants[operand] if operand is not None and operand < len(self.constants) else f"type_{operand}"
             self.types[type_name] = {"kind": "type", "fields": []}
@@ -871,23 +871,23 @@ class QBCVirtualMachine:
         elif op == OpCode.EXPORT:
             # Export marks a symbol for external use, just skip in VM
             self.ip += 1
-        
+
         elif op == OpCode.TYPE_CAST:
             self.ip += 1
-        
+
         elif op == OpCode.OBJ_CREATE:
             self.stack.append({})
             self.ip += 1
-        
+
         elif op == OpCode.OBJ_GET:
             self.ip += 1
-        
+
         elif op == OpCode.OBJ_SET:
             self.ip += 1
-        
+
         else:
             self.ip += 1
-    
+
     def _find_label(self, label_name: str) -> Optional[int]:
         """Find instruction index for a label"""
         for i, instr in enumerate(self.instructions):
@@ -954,47 +954,69 @@ class QBCVirtualMachine:
             self.quantum_register = [x/norm for x in new_state]
 
     def run_with_function(self, func_name, max_steps=10000):
-        """运行指定函数 - 自动初始化量子比特再跳转到目标"""
+        """运行指定函数 - 先执行顶层声明再跳转到目标"""
         if func_name not in self.functions:
             raise ValueError(f"函数 {func_name} 不存在")
-        
+
         # Reset state
         self.stack = []
         self.call_stack = []
         self.output = []
         self.try_stack = []  # stack of catch addresses for try/catch
         self.quantum_gates_applied = []
-        
+
         # Find and execute QUANTUM_INIT if exists
         for instr in self.instructions:
             if instr.get('op') == 'QUANTUM_INIT':
                 n_qubits = instr.get('operand') or 2
                 self._init_quantum_state(n_qubits)
                 break
-        
-        # Jump to target function
-        self.ip = self.functions[func_name]
+
+        # Execute top-level declarations before the function
+        # (enum/class/interface/import/variable definitions)
+        func_ip = self.functions[func_name]
+        self.ip = 0
         self.running = True
+        steps = 0
+        while self.ip < func_ip and self.running and steps < 1000:
+            instr = self.instructions[self.ip]
+            op_name = instr.get('op', 'NOP')
+            operand = instr.get('operand')
+            if op_name == 'LABEL':
+                self.ip += 1
+                steps += 1
+                continue
+            op = OP_MAP.get(op_name)
+            if op is None:
+                self.ip += 1
+                steps += 1
+                continue
+            self._execute(op, operand)
+            steps += 1
+
+        # Now jump to target function
+        self.ip = self.functions[func_name]
+        self.stack = []  # Clear stack from top-level execution
         return self.run(max_steps)
 
     def get_quantum_circuit_text(self):
         """获取量子电路的可视化文本表示"""
         if not self.quantum_gates_applied:
             return "无量子门操作"
-        
+
         n_qubits = self.quantum_bits
         lines = []
         # Header
         lines.append(f"量子电路 ({n_qubits}比特, {len(self.quantum_gates_applied)}门):")
         lines.append("")
-        
+
         # Draw wire diagram
         wires = {i: [] for i in range(n_qubits)}
         for gate_info in self.quantum_gates_applied:
             name = gate_info.get('name', '?')
             target = gate_info.get('target', 0)
             control = gate_info.get('control', None)
-            
+
             if name in ('CNOT', 'ENTANGLE') and control is not None:
                 wires[control].append('●')
                 wires[target].append('X')
@@ -1002,13 +1024,13 @@ class QBCVirtualMachine:
                 wires[target].append('M')
             else:
                 wires[target].append(name)
-        
+
         # Format wires
         max_len = max(len(w) for w in wires.values()) if wires else 0
         for q in range(n_qubits):
             gate_str = '──'.join(wires[q][i] if i < len(wires[q]) else '─' for i in range(max_len))
             lines.append(f"  q{q}: ─{gate_str}─")
-        
+
         # Gate list
         lines.append("")
         lines.append("门序列:")
@@ -1020,7 +1042,7 @@ class QBCVirtualMachine:
                 lines.append(f"  {i+1}. {name}({control},{target})")
             else:
                 lines.append(f"  {i+1}. {name}({target})")
-        
+
         return '\n'.join(lines)
 
 
@@ -1036,10 +1058,10 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("用法: python3 qbc_vm.py <input.qbc> [max_steps]")
         sys.exit(1)
-    
+
     qbc_file = sys.argv[1]
     max_steps = int(sys.argv[2]) if len(sys.argv) > 2 else 100000
-    
+
     output = run_qbc_file(qbc_file, max_steps)
     if output:
         print("\n=== 输出 ===")

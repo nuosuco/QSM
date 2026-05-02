@@ -1559,12 +1559,16 @@ class CodeGenerator:
             for child in node.children:
                 self._gen_node(child)
         elif node.type == 'QuantumEnum':
-            # quantum_enum → store enum name and values as constants
-            enum_name_idx = self._add_const(node.value)
-            self._emit(OpCode.TYPE_DEF, enum_name_idx, node.line)
-            for child in node.children:
-                val_idx = self._add_const(child.value)
-                self._emit(OpCode.LOAD_CONST, val_idx, child.line)
+            # quantum_enum → create dict with values mapped to indices
+            enum_name = node.value
+            self.variables[enum_name] = len(self.variables)
+            # Build enum dict: {value_name: index, ...}
+            enum_dict = {}
+            for idx, child in enumerate(node.children):
+                enum_dict[child.value] = idx
+            dict_idx = self._add_const(enum_dict)
+            self._emit(OpCode.LOAD_CONST, dict_idx, node.line)
+            self._emit(OpCode.STORE_VAR, enum_name, node.line)
 
 # === 编译主流程 ===
 def compile_qentl(source: str) -> Dict:
