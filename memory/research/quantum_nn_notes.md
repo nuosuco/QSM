@@ -3580,3 +3580,45 @@ for tid, count in token_counts.items():
 1. V8训练完成后对比测试
 2. 考虑扩展词汇表(加英文小写+高频UNK)
 3. 增加更多句子级训练数据(减少模板化)
+
+## #218 课程学习(Curriculum Learning)实现方案
+
+### 核心思想
+按难度递增顺序训练: 字符→词汇→句子→段落→对话
+
+### 三阶段设计
+**阶段1: 字符级 (Epoch 1-15)**
+- 数据: 单字符含义映射 (4120彝文字→含义)
+- 目标: 学会基本字符-含义对应
+- V8已有大量此类数据(meaning_query: 14303条)
+
+**阶段2: 词汇级 (Epoch 16-30)**
+- 数据: 词汇翻译(中文词→彝文/英文)
+- 目标: 学会词汇级翻译
+- V8有word+phrase数据(34791条)
+
+**阶段3: 句子级 (Epoch 31-50)**
+- 数据: 句子/对话/描述
+- 目标: 学会句子生成+对话
+- V8有sentence+translation(16719条)
+
+### 实现方式
+```python
+# 按数据长度排序 → 短的先训练
+dataset.sort(key=lambda x: len(x['input']) + len(x['output']))
+
+# 或者按类别分batch
+easy_data = [d for d in dataset if len(d['output']) < 10]  # 字符级
+medium_data = [d for d in dataset if 10 <= len(d['output']) < 30]  # 词汇级
+hard_data = [d for d in dataset if len(d['output']) >= 30]  # 句子级
+```
+
+### 预期效果
+- 避免mode collapse(从简单开始, 逐步增加复杂度)
+- 更好的收敛(基础概念先学会, 再学高级)
+- 减少英文碎片(纯中文数据先训练)
+
+### 与V8结合
+- V8英文比例6.2%(input), 但output仍有31%含英文
+- 课程学习: 先训练纯中文output数据, 再混入英文数据
+- 阶段1只用纯output数据, 阶段2开始混入含英文数据
