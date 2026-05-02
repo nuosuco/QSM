@@ -3622,3 +3622,48 @@ hard_data = [d for d in dataset if len(d['output']) >= 30]  # 句子级
 - V8英文比例6.2%(input), 但output仍有31%含英文
 - 课程学习: 先训练纯中文output数据, 再混入英文数据
 - 阶段1只用纯output数据, 阶段2开始混入含英文数据
+
+## #219 量子旋转嵌入(Quantum Rotational Embedding)改进
+
+### 当前V7-Small实现
+```python
+# QuantumEmbeddingV2
+quantum_rotation = nn.Parameter(torch.randn(n_heads, d_head))
+quantum_gate = nn.Parameter(torch.tensor(0.1))
+
+# Forward
+enc_view = enc_out.view(B, S, nh, dh)
+qr = self.quantum_rotation
+quantum_out = (enc_view * cos(qr) + roll(enc_view,1,-1) * sin(qr)).reshape(B,S,-1)
+enc_out = quantum_gate * quantum_out + (1-quantum_gate) * enc_out
+```
+
+### 改进方向1: 多层量子旋转
+```python
+# 当前: 单次旋转
+# 改进: 多次旋转(类似量子电路的深度)
+for layer in range(n_quantum_layers):
+    qr = self.quantum_rotations[layer]
+    enc_view = enc_view * cos(qr) + roll(enc_view, 1, -1) * sin(qr)
+```
+
+### 改进方向2: 量子纠缠注意力
+```python
+# 在注意力计算中加入量子纠缠项
+# 两个token的关联不仅通过点积, 还通过量子态的内积
+q_entangled = q * cos(self.entangle_phase) + k * sin(self.entangle_phase)
+attn = q @ k.T + alpha * (q_entangled @ k.T)
+```
+
+### 改进方向3: 自适应量子门
+```python
+# quantum_gate从标量变为token-level
+gate = sigmoid(self.gate_proj(enc_out))  # [B, S, 1]
+enc_out = gate * quantum_out + (1-gate) * enc_out
+```
+
+### V8后续计划
+1. 测试V8输出质量(英文碎片是否减少)
+2. 如果V8仍不够好, 实现多层量子旋转
+3. 考虑增大模型到256d/4层(需谨慎OOM)
+4. 词汇表扩展: 添加英文小写高频词
