@@ -91,6 +91,12 @@
 - 优化器 qentl_optimizer.py ✅
 - 单元测试 test_qentl.py ✅ 12/12通过 (量子门语法/纠缠/测量/Bell态)
 
+### QEntL VM函数作用域+递归修复（2026-05-02）
+- function_params元数据: 编译器→QBC→VM正确绑定参数
+- RETURN handler修复: stack.pop()替代stack[-1]
+- 6/6测试通过: 斐波那契(10)=89, 阶乘(5)=120(递归!)
+- 打印()内建函数已添加
+
 ### QEntL V3编译器+虚拟机（2026-04-27/28 完成）
 - **qentl_compiler_v3.py**: 完整Python编译器
   - 词法分析：中英文关键字、字符串、数字、符号
@@ -109,7 +115,9 @@
 - **V3训练中**: 1242万参数(384d/4层), 8 Epoch训练, Epoch 3/8进行中
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
-  - 公网API: https://som.top/api/v5/translate (V5翻译) + /api/q1/ (V5) + /api/qv4/ (V5 fallback+QEntL编译+量子电路)
+  - 公网API: https://som.top API (V7-Small, val_loss=2.6531)
+- /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
+- Beam search改进: n-gram blocking + rep_penalty=1.5 + min_len=3
 - **V5训练完成**: 52K数据, 30 Epochs, **Best E25 Val 2.1857** (7.9h, 翻译仍乱码→需V6)
   - Val Loss 2.1857 (Epoch 25, Best), E30完成 Val 2.1993
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
