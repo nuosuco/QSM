@@ -192,6 +192,8 @@ class Lexer:
     KEYWORDS['量子类'] = TokenType.QUANTUM_CLASS
     KEYWORDS['量子枚举'] = TokenType.QUANTUM_ENUM
     KEYWORDS['量子接口'] = TokenType.QUANTUM_INTERFACE
+    KEYWORDS['循环当'] = TokenType.WHILE
+    KEYWORDS['否则如果'] = TokenType.ELIF
 
     def __init__(self, source: str):
         self.source = source
