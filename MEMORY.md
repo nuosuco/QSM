@@ -14,7 +14,7 @@
 - **QSM不是翻译系统！** 它是像ChatGPT一样的智能系统，三语互译只是最基本功
 - QSM有智力，什么都会，三语(彝/中/英)是基础能力
 - **6层智能架构**: 感知(全感知+情感+意图)→语言(V5+transformer-qe5)→知识(1M节点/5M边)→推理(行为学习+三维推荐)→意识(Ref自省)→响应(三语+情感策略)
-- Web服务：https://som.top (V5模型已上线三端点)
+- Web服务：https://som.top (🔥V7-Small模型已部署API!)
 - 远程仓库：GitHub git@github.com:nuosuco/QSM.git / Gitee git@gitee.com:nuosuco/qsm.git
 
 ### 五大模型架构
@@ -115,6 +115,11 @@
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
   - 解决方案: V5全小写英文训练数据(52K对已准备)
   - **V5模型**: 7.5M参数(256d/3层/4头), Best E19 Val 2.1879, 输出乱码❌
+- **🔥V7-Small(2026-05-02)**: 4.5M参数(192d/3层/3头/768ff), Val **2.6531** — ✅ALL-TIME BEST!
+  - 42/50 ALL BEST, 零过拟合(Train 2.50 < Val 2.65)
+  - QuantumEmbeddingV2(语言感知量子嵌入)+beam search+重复惩罚
+  - 已部署API(端口8000) 替换V5 mode collapse模型
+  - best.pth已备份: qsm_v7_small_best_backup.pth
 - 目标: Val Loss < 1.0
 - **⚠️关键发现**: V5训练集彝文比例仅3.3%! 模型学不会彝语
 - **V6训练集**: 68K对, 彝文比例9.5%(3倍提升)
