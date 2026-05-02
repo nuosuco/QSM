@@ -165,6 +165,7 @@ class TokenType(Enum):
     NULL = '空'
     BREAK = 'break'
     CONTINUE = 'continue'
+    THROW = '抛出'
     ASSERT = '断言'
     TRY = '尝试'
     CATCH = '捕获'
@@ -199,6 +200,8 @@ class Lexer:
     KEYWORDS['否则如果'] = TokenType.ELIF
     KEYWORDS['跳出'] = TokenType.BREAK
     KEYWORDS['继续'] = TokenType.CONTINUE
+    KEYWORDS['抛出'] = TokenType.THROW
+    KEYWORDS['throw'] = TokenType.THROW
 
     def __init__(self, source: str):
         self.source = source
@@ -733,6 +736,12 @@ class Parser:
         elif t.type == TokenType.CONTINUE:
             self._advance()
             return ASTNode('Continue', line=t.line)
+        elif t.type == TokenType.THROW:
+            self._advance()
+            expr = self._parse_expression()
+            node = ASTNode('Throw', line=t.line)
+            node.children.append(expr)
+            return node
         elif t.type == TokenType.TRY:
             return self._parse_try()
         elif t.type == TokenType.ASSERT:
@@ -1467,6 +1476,9 @@ class CodeGenerator:
             if self.loop_label_stack:
                 start_label, _ = self.loop_label_stack[-1]
                 self._emit(OpCode.JUMP, start_label, node.line)
+        elif node.type == 'Throw':
+            self._gen_node(node.children[0])  # exception value
+            self._emit(OpCode.THROW, None, node.line)
         elif node.type == 'BinaryOp':
             self._gen_node(node.children[0])
             self._gen_node(node.children[1])
@@ -1594,6 +1606,11 @@ class CodeGenerator:
             self._emit(OpCode.JUMP, end_label, node.line)
             # catch_label:
             self._emit_label(catch_label)
+            # Bind exception value to catch variable
+            if node.value:  # catch variable name (e.g., 'e')
+                self._emit(OpCode.STORE_VAR, node.value, node.line)
+            elif self.stack:  # no variable, just pop
+                pass  # value stays on stack
             if len(node.children) > 1:
                 self._gen_node(node.children[1])  # catch body
             # end_label:

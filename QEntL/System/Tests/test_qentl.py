@@ -280,6 +280,21 @@ def test_field_assignment():
     assert float(out[0]) == 7
     print("✅ 字段赋值(field assignment)")
 
+
+def test_try_catch():
+    code = """
+主函数: 函数() {
+    尝试 {
+        抛出 "测试错误"
+    } 捕获 (e) {
+        打印(e)
+    }
+}
+"""
+    out = run_qentl(code)
+    assert out == ['测试错误']
+    print("✅ 尝试/捕获(try/catch)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -289,6 +304,7 @@ tests = [
     test_multi_elif, test_fibonacci_recursive, test_gcd, test_string_builtins, test_math_builtins,
     test_break, test_continue,
     test_field_assignment,
+    test_try_catch,
 ]
 
 if __name__ == '__main__':
