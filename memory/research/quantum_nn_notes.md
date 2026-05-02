@@ -3504,3 +3504,40 @@ V7-Small(Teacher 4.5M) → V8(Student 1.5M)
 - Teacher: V7-Small (4.5M)
 - Student: V8 (1.5M, 128d/2层/2头)
 - 可部署到手机端
+
+## #216 重复惩罚与N-gram阻断改进解码
+
+### 当前问题(V7-Small beam search)
+- 输出含重复模式: "the the the", "lig lig lig"
+- beam search rep_penalty=1.2 不够强
+- 某些token被过度重复(如"the")
+
+### 改进方案1: N-gram Blocking
+```python
+# 禁止连续3个相同token
+for beam in beams:
+    if len(beam) >= 2 and beam[-1] == beam[-2]:
+        logits[beam[-1]] = -inf  # 阻断
+```
+- 简单有效, 防止AA模式
+- 扩展: 禁止ABCABC模式(6-gram)
+
+### 改进方案2: 递增惩罚
+```python
+# 重复次数越多, 惩罚越重
+token_counts = Counter(seq)
+for tid, count in token_counts.items():
+    if count > 2:
+        logits[tid] /= (rep_penalty ** (count - 1))
+```
+
+### 改进方案3: 温度+top-p采样
+- 不用beam search, 用nucleus sampling
+- temperature=0.7, top_p=0.9
+- 更自然的输出, 减少重复
+
+### 下一步
+1. 实现n-gram blocking
+2. 测试不同rep_penalty(1.2→1.5→2.0)
+3. 对比beam search vs nucleus sampling
+4. 考虑语言控制BOS标记
