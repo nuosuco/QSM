@@ -335,6 +335,16 @@ class QBCVirtualMachine:
                     self.stack.append(None)
             self.ip += 1
 
+        elif op == OpCode.STORE_FIELD:
+            if len(self.stack) >= 2:
+                value = self.stack.pop()
+                obj = self.stack.pop()
+                if isinstance(obj, dict):
+                    obj[operand] = value
+                self.stack.append(obj)
+            elif len(self.stack) >= 1:
+                self.stack.pop()
+            self.ip += 1
         elif op in (OpCode.ADD, OpCode.SUB, OpCode.MUL, OpCode.DIV, OpCode.MOD):
             if len(self.stack) >= 2:
                 b = self.stack.pop()
@@ -445,6 +455,14 @@ class QBCVirtualMachine:
                     else:
                         self.variables[pname] = None
                 self.ip = self.functions[func_name]
+            elif func_name in self.types and self.types[func_name].get('kind') == 'class':
+                # Class instantiation: create object dict
+                class_info = self.types[func_name]
+                obj = {'_class': func_name}
+                for field in class_info.get('fields', []):
+                    obj[field] = None
+                self.stack.append(obj)
+                self.ip += 1
             else:
                 # Built-in functions
                 if func_name in ('LOG', 'log', '日志', 'print', '打印'):
