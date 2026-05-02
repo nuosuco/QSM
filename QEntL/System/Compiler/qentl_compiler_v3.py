@@ -766,6 +766,12 @@ class Parser:
                 assign_node.children.append(expr.children[1])  # key
                 assign_node.children.append(value)  # value
                 return assign_node
+            elif expr.type == 'FieldAccess':
+                # q.field = val → FieldAssign
+                assign_node = ASTNode('FieldAssign', value=expr.value, line=expr.line)
+                assign_node.children.append(expr.children[0])  # object
+                assign_node.children.append(value)  # value
+                return assign_node
             elif expr.type == 'Identifier':
                 # x = val → Assign
                 assign_node = ASTNode('Assign', value=expr.value, line=expr.line)
@@ -1521,6 +1527,11 @@ class CodeGenerator:
             # x = expr → generate value, then STORE_VAR
             self._gen_node(node.children[0])
             self._emit(OpCode.STORE_VAR, node.value, node.line)
+        elif node.type == 'FieldAssign':
+            # q.field = val → load obj, load value, STORE_FIELD
+            self._gen_node(node.children[0])  # object (push dict)
+            self._gen_node(node.children[1])  # value (push value)
+            self._emit(OpCode.STORE_FIELD, node.value, node.line)  # field name
         elif node.type == 'Identifier':
             self._emit(OpCode.LOAD_VAR, node.value, node.line)
 
