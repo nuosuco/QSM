@@ -197,6 +197,21 @@ def health():
     })
 
 
+
+@app.route('/version', methods=['GET'])
+def version():
+    return jsonify({
+        "model": "QSM V7-Small (192d/3L/3H)",
+        "version": "7.0",
+        "val_loss": 2.6531,
+        "params": 4493437,
+        "vocab_size": 6924,
+        "architecture": "QuantumRotationalEmbedding + Transformer",
+        "features": ["beam_search", "ngram_blocking", "rep_penalty_1.5"],
+        "next": "V10 (50523 pure pairs, 0% zh-en)",
+        "server": "som.top"
+    })
+
 @app.route('/translate', methods=['POST'])
 def translate():
     data = request.get_json(force=True)
