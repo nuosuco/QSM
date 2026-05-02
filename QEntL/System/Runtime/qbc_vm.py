@@ -433,6 +433,11 @@ class QBCVirtualMachine:
                 self.call_stack.append(self.ip + 1)
                 # Get parameter names from QBC metadata (function_params)
                 param_names = self.function_params.get(func_name, [])
+                # Save current values of params (for recursive calls)
+                saved_params = {}
+                for pname in param_names:
+                    saved_params[pname] = self.variables.get(pname)
+                self.call_stack_params.append(saved_params)
                 # Bind arguments in reverse order (stack is LIFO)
                 for pname in reversed(param_names):
                     if self.stack:
@@ -484,18 +489,24 @@ class QBCVirtualMachine:
                 self.ip += 1
 
         elif op == OpCode.RETURN:
+            # Restore saved params (for recursive calls)
+            if self.call_stack_params:
+                saved = self.call_stack_params.pop()
+                for pname, old_val in saved.items():
+                    if old_val is None:
+                        if pname in self.variables:
+                            del self.variables[pname]
+                    else:
+                        self.variables[pname] = old_val
             if self.call_stack:
                 ret_addr = self.call_stack.pop()
                 ret_val = self.stack.pop() if self.stack else None
-                # Flat namespace: don't restore variables
                 if ret_val is not None:
                     self.stack.append(ret_val)
                 self.ip = ret_addr
             else:
-                # At top level, RETURN just means end of declaration block
-                # Skip it and continue to next instruction
-                self.ip += 1
-
+                # At top level, RETURN means end of declaration
+                self.running = False
         elif op == OpCode.LOOP_START:
             # operand is loop variable name
             self.ip += 1
@@ -980,6 +991,7 @@ class QBCVirtualMachine:
         # Reset state
         self.stack = []
         self.call_stack = []
+        self.call_stack_params = []
         self.output = []
         self.try_stack = []  # stack of catch addresses for try/catch
         self.quantum_gates_applied = []

@@ -1342,10 +1342,26 @@ class CodeGenerator:
             self._emit(OpCode.JUMP, end_label, node.line)
             # Else label
             self.instructions.append({'op': 'LABEL', 'name': else_label})
-            if len(node.children) > 2:  # else body
-                self._gen_node(node.children[2])
+            if len(node.children) > 2:
+                # Handle elif chain
+                # children[2..n] are elif If nodes or a final else Block
+                # If only children[2] exists, it's a single else/elif
+                if len(node.children) == 3:
+                    # Single else or nested elif-with-else
+                    self._gen_node(node.children[2])
+                else:
+                    # Multiple elif nodes without else at the end
+                    # Generate each elif inline
+                    for i in range(2, len(node.children)):
+                        child = node.children[i]
+                        child_else = self._new_label()
+                        self._gen_node(child.children[0])  # elif condition
+                        self._emit(OpCode.JUMP_IF_FALSE, child_else, child.line)
+                        self._gen_node(child.children[1])  # elif body
+                        self._emit(OpCode.JUMP, end_label, child.line)
+                        self.instructions.append({'op': 'LABEL', 'name': child_else})
             # End label
-            self.instructions.append({'op': 'LABEL', 'name': end_label})
+            self.instructions.append({"op": "LABEL", "name": end_label})
 
         elif node.type == 'For':
             start_label = self._new_label()
