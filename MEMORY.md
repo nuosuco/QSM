@@ -35,6 +35,13 @@
 基础层：量子虚拟机 + 量子动态文件系统（QBC字节码 + QIM镜像）
 ```
 
+### QEntL量子操作系统API(已上线🔥)
+- **公网**: https://som.top/api/qentl/
+- **端点**: /health, /run, /compile, /examples
+- **端口**: 8003, Nginx代理 /api/qentl/ → 8003
+- **systemd**: qentl-api.service (开机自启)
+- 实时编译QEntL源码→QBC→VM执行, 返回输出+函数+变量
+
 ### Web量子操作系统桌面(已恢复)
 - 首页: desktop.html (QEntL量子OS桌面, 含彝文字体)
 - 13个应用: quantum-assistant/qvm/compiler/terminal/files/settings等
@@ -128,6 +135,7 @@
 - /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
 - Beam search改进: n-gram blocking + rep_penalty=1.5 + min_len=3
 - /health, /version, /translate, /chat 四个端点
+- QEntL API: /api/qentl/ (run/compile/examples)
 - **V5训练完成**: 52K数据, 30 Epochs, **Best E25 Val 2.1857** (7.9h, 翻译仍乱码→需V6)
   - Val Loss 2.1857 (Epoch 25, Best), E30完成 Val 2.1993
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
