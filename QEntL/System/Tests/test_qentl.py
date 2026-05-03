@@ -440,6 +440,31 @@ set: 函数(self, key, val) {
     print("✅ 字典变异跨方法(dict mutation)")
 
 # === Test Runner ===
+
+def test_global_cross_func():
+    """测试全局变量跨函数访问和修改"""
+    code = """
+全局 counter
+让 counter = 0
+递增: 函数() {
+    counter = counter + 1
+    返回 counter
+}
+主函数: 函数() {
+    让 a = 递增()
+    让 b = 递增()
+    让 c = 递增()
+    打印(a)
+    打印(b)
+    打印(c)
+}
+"""
+    result = run_qentl(code)
+    assert '1' in result, f"Expected 1 in {result}"
+    assert '2' in result, f"Expected 2 in {result}"
+    assert '3' in result, f"Expected 3 in {result}"
+    print("✅ 全局变量跨函数(global cross-func) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -456,6 +481,7 @@ tests = [
     test_logical_operators,
     test_ternary,
     test_dict_mutation_across_method,
+    test_global_cross_func,
 ]
 
 if __name__ == '__main__':

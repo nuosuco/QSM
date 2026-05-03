@@ -192,10 +192,19 @@ class QBCVirtualMachine:
                     self.variables[var_name] = consts[const_idx]
                     self._pre_init_vars.add(var_name)
             i += 1
+        # Scan for GLOBAL_DECL in top-level code to pre-populate global_vars
+        self.global_vars = set()
+        for inst in instructions[:min_func_ip]:
+            if inst.get('op') == 'GLOBAL_DECL':
+                gvar = inst.get('operand')
+                if gvar:
+                    self.global_vars.add(str(gvar))
+                    if gvar not in self.variables:
+                        self.variables[gvar] = None
+
         self.ip = 0
         self.running = False
         self.stack = []
-        self.global_vars = set()
         self.output = []
         self.try_stack = []  # stack of catch addresses for try/catch
 

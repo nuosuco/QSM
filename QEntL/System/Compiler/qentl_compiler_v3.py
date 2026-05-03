@@ -539,6 +539,10 @@ class Parser:
             return self._parse_let()
         elif t.type == TokenType.QUANTUM_CLASS:
             return self._parse_quantum_class()
+        elif t.type == TokenType.GLOBAL:
+            self._advance()
+            var_name = self._advance().value
+            return ASTNode('GlobalDecl', value=var_name, line=t.line)
         elif t.type == TokenType.QUANTUM_INTERFACE:
             return self._parse_quantum_interface()
         else:
