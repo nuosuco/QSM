@@ -811,7 +811,10 @@ class QBCVirtualMachine:
                     s = self.stack.pop()
                     if isinstance(s, str) and isinstance(start, int) and isinstance(end, int):
                         self.stack.append(s[start:end])
+                    elif isinstance(s, list) and isinstance(start, int) and isinstance(end, int):
+                        self.stack.append(s[start:end])
                     else:
+                        self.stack.append(s)
                         self.stack.append(s)
             elif func_name == '增1':
                 if self.stack:

@@ -479,6 +479,21 @@ def test_string_format():
     assert 'hello world' in result, f"Expected 'hello world' in {result}"
     print("✅ 字符串格式化(string format) 通过:", result)
 
+
+def test_array_slicing():
+    """测试数组和字符串切片"""
+    code = """
+主函数: 函数() {
+    让 a = [10, 20, 30, 40, 50]
+    打印(子串(a, 1, 4))
+    打印(子串("hello world", 0, 5))
+}
+"""
+    result = run_qentl(code)
+    assert '[20, 30, 40]' in result, f"Expected [20, 30, 40] in {result}"
+    assert 'hello' in result, f"Expected hello in {result}"
+    print("✅ 数组切片(array slicing) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -497,6 +512,7 @@ tests = [
     test_dict_mutation_across_method,
     test_global_cross_func,
     test_string_format,
+    test_array_slicing,
 ]
 
 if __name__ == '__main__':
