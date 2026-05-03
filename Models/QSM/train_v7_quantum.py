@@ -271,6 +271,8 @@ def train():
     parser.add_argument('--weight_decay', type=float, default=0.05)
     parser.add_argument('--use_qmoe', action='store_true')
     parser.add_argument('--val_interval', type=int, default=1, help='validate every N epochs')
+    parser.add_argument('--scheduler', type=str, default='step', choices=['step', 'cosine'], help='LR scheduler')
+    parser.add_argument('--grad_clip', type=float, default=0, help='gradient clipping max norm (0=disabled)')
     parser.add_argument('--lora', type=int, default=0, help='LoRA rank (0=disabled, 8/16=enabled)')
     parser.add_argument('--lora_alpha', type=int, default=16, help='LoRA alpha scaling')
     parser.add_argument('--curriculum', action='store_true', help='enable curriculum learning (difficulty-based)')
@@ -343,6 +345,7 @@ def train():
     log_file = '/tmp/qsm_v7_training.log'
     
     for epoch in range(start_epoch, args.epochs):
+        epoch_train = train_data
         epoch_train = train_data
         model.train()
         total_loss = 0
