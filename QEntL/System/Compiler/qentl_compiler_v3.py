@@ -162,6 +162,7 @@ class TokenType(Enum):
     PERCENT = '%'
     AND = '且'
     OR = '或'
+    QUESTION = '?'
     NOT = '非'
     BOOL_TRUE = 'true'
     BOOL_FALSE = 'false'
@@ -297,8 +298,8 @@ class Lexer:
                 '(': TokenType.LPAREN, ')': TokenType.RPAREN,
                 '[': TokenType.LBRACKET, ']': TokenType.RBRACKET,
                 '.': TokenType.DOT, ',': TokenType.COMMA,
-    ':': TokenType.COLON,
-                ':': TokenType.COLON, ';': TokenType.SEMICOLON,
+    '?': TokenType.QUESTION,
+    ':': TokenType.COLON, ';': TokenType.SEMICOLON,
                 '=': TokenType.ASSIGN,
         '+=': TokenType.PLUS_ASSIGN,
         '-=': TokenType.MINUS_ASSIGN,
@@ -1032,7 +1033,18 @@ class Parser:
         return node
 
     def _parse_expression(self):
-        return self._parse_logical_or()
+        return self._parse_ternary()
+
+    def _parse_ternary(self):
+        """Parse ternary: condition ? true_expr : false_expr"""
+        node = self._parse_logical_or()
+        if self._current().type == TokenType.QUESTION:
+            self._advance()  # consume ?
+            true_expr = self._parse_expression()
+            self._expect(TokenType.COLON)
+            false_expr = self._parse_expression()
+            node = ASTNode('Ternary', children=[node, true_expr, false_expr], line=node.line)
+        return node
 
     def _parse_logical_or(self):
         left = self._parse_logical_and()
@@ -1571,6 +1583,17 @@ class CodeGenerator:
             self._emit(OpCode.LOAD_CONST, zero_idx, node.line)
             self._gen_node(node.children[0])
             self._emit(OpCode.SUB, None, node.line)
+        elif node.type == 'Ternary':
+            # condition ? true_expr : false_expr
+            false_label = self._new_label()
+            end_label = self._new_label()
+            self._gen_node(node.children[0])  # condition
+            self._emit(OpCode.JUMP_IF_FALSE, false_label, node.line)
+            self._gen_node(node.children[1])  # true_expr
+            self._emit(OpCode.JUMP, end_label, node.line)
+            self._emit(OpCode.LABEL, false_label, node.line)
+            self._gen_node(node.children[2])  # false_expr
+            self._emit(OpCode.LABEL, end_label, node.line)
         elif node.type == 'UnaryNot':
             self._gen_node(node.children[0])
             self._emit(OpCode.UNARY_NOT, None, node.line)

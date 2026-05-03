@@ -403,6 +403,22 @@ def test_logical_operators():
     assert '正常分数' in out_str, f"Expected 正常分数, got {out}"
     print("✅ 逻辑运算符(且/或)")
 
+
+def test_ternary():
+    code = """
+主函数: 函数() {
+    让 age = 20
+    让 label = age >= 18 ? "成年" : "未成年"
+    打印(label)
+    打印(age < 18 ? "kid" : "adult")
+}
+"""
+    out = run_qentl(code)
+    out_str = ' '.join(out) if isinstance(out, list) else str(out)
+    assert '成年' in out_str, f"Expected 成年, got {out}"
+    assert 'adult' in out_str, f"Expected adult, got {out}"
+    print("✅ 三元运算符(ternary ?:)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -418,6 +434,7 @@ tests = [
     test_dict_literal,
     test_foreach_loop,
     test_logical_operators,
+    test_ternary,
 ]
 
 if __name__ == '__main__':
