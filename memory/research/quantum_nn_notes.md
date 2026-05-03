@@ -4607,3 +4607,40 @@ QSM当前4.5M参数, 能力有限
 2. 加载Qwen3-0.6B (CPU即可, 只需推理)
 3. 批量生成zh→yi, en→yi翻译数据
 4. 混合蒸馏数据+原始数据训练QSM
+
+## 研究#247: Beam Search改进 — 对比搜索与核采样 (2026-05-03)
+
+### 当前方案
+- Beam Search (beam_size=5)
+- n-gram blocking (禁止3-gram重复)
+- rep_penalty=1.5
+- length_penalty=0.6
+
+### 问题
+- Beam Search倾向生成短文本(长度惩罚不够)
+- 重复模式虽有缓解但仍存在
+- 缺乏多样性(beam内路径趋同)
+
+### 对比搜索 (Contrastive Search, Su et al., 2022)
+- 核心思想: 同时考虑概率和退化惩罚
+- 公式: s(x_t) = p(x_t) - α × max_sim(x_t, context)
+- α=0.6时效果最佳
+- 优势: 高质量+高多样性
+
+### 核采样 (Nucleus Sampling, Holtzman et al., 2020)
+- 核心思想: 从概率质量前p的token中采样
+- p=0.9 (top-p sampling)
+- 优势: 自然多样性, 避免beam趋同
+- 适合对话/创意生成
+
+### 实施计划
+1. 在API中添加decoding_strategy参数
+2. "beam": 当前beam search
+3. "contrastive": 对比搜索(α=0.6)
+4. "nucleus": 核采样(top-p=0.9, temperature=0.7)
+5. "greedy": 贪心解码(最快)
+
+### 预期
+- 翻译任务: beam search最好(确定性强)
+- 对话任务: nucleus sampling更好(多样性)
+- 对比搜索: 两者之间的平衡
