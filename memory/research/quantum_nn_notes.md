@@ -4675,3 +4675,67 @@ QSM当前4.5M参数, 能力有限
 - Tatoeba数据: 默认difficulty=2 (句子级)
 - 模板数据: 根据模板类型标注 (SVO=2, 比较=3, 因果=4)
 - 对话数据: difficulty=3
+
+## 研究#249: LoRA微调实践方案 (2026-05-04)
+
+### LoRA原理 (Hu et al., 2021)
+- W = W₀ + ΔW = W₀ + BA
+- B ∈ R^{d×r}, A ∈ R^{r×d}
+- r << d → 仅训练2rd参数 (vs d²全量)
+- α/r缩放: ΔW = (α/r) × BA
+
+### QSM V7-Small参数分析
+- d_model=192, n_heads=3, n_layers=3, d_ff=768
+- 总参数: 4.5M
+- Attention: Q/K/V/O projections = 4 × (192×192) × 3层 = 442K
+- FFN: 2 × (192×768 + 768×192) × 3层 = 1.77M
+- LoRA r=16: 每层4×2×16×192 = 24K, 3层=73K
+- 训练比例: 73K/4.5M = 1.6% (vs 全量100%)
+
+### 实施方案
+1. V12完成后, 用V13 77K数据 + LoRA r=16 续训
+2. --lora 16 --lora_alpha 16
+3. 预期: 23min→5min/epoch (4.6x加速)
+4. 可配合课程学习: --curriculum
+5. LoRA可叠加: 多个LoRA适配不同任务
+
+### 注意事项
+- loralib已安装(0.1.2)
+- mark_only_lora_as_trainable()是关键API
+- LoRA只对大维度Linear层有效(≥d_model)
+- Resume时需加载完整模型+LoRA权重
+
+## 研究#250: Qwen3-0.6B知识蒸馏实践 (2026-05-04)
+
+### 测试结果
+- Qwen3-0.6B已成功加载(CPU, 1.5秒)
+- 内存占用: ~3.5GB (V12训练2.3GB + Qwen3 3.5GB = 5.8GB < 7.4GB)
+- 问题: 简单prompt("Translate to English: X")产生中文续写而非翻译
+- 需要使用chat template才能获得正确翻译
+
+### 正确的Prompt格式 (Qwen3)
+```
+<|im_start|>system
+You are a professional translator. Translate Chinese to English.<|im_end|>
+<|im_start|>user
+今天天气很好<|im_end|>
+<|im_start|>assistant
+```
+
+### 蒸馏数据生成计划
+1. 用Qwen3生成5万条zh→en翻译对
+2. 输入: 从V13数据集中提取中文句子
+3. 温度: 0.3 (低随机性, 高质量)
+4. max_new_tokens: 64 (匹配QSM训练长度)
+5. 后处理: 过滤<2词或>50词的输出
+
+### 彝文蒸馏
+- Qwen3不认识彝文→不能直接用于yi翻译
+- 方案: 先训zh↔en到Val<2, 再用模型自身做回译
+- 或者: 用Qwen3生成zh句子, 再人工/模板翻译为彝文
+
+### 实施优先级
+1. V12完成后: Qwen3生成en↔zh数据 (5万条)
+2. 合并到V13数据集 (77K→120K+)
+3. 用课程学习+LoRA训练V13
+4. V13达到Val<2后: 回译生成yi数据
