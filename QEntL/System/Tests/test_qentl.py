@@ -568,6 +568,36 @@ def test_nested_builtins():
     assert '量子' in result, f"Expected 量子 in {result}"
     print("✅ 嵌套内置函数(nested builtins) 通过:", result)
 
+
+def test_fibonacci_memo():
+    """测试斐波那契记忆化(递归+全局字典缓存)"""
+    code = """
+fib_cache: {}
+
+斐波那契: 函数(n) {
+    如果 n <= 1 {
+        返回 n
+    }
+    如果 包含(fib_cache, n) {
+        返回 fib_cache[n]
+    }
+    让 result = 斐波那契(n-1) + 斐波那契(n-2)
+    fib_cache[n] = result
+    返回 result
+}
+
+主函数: 函数() {
+    循环 i 在 0 到 8 {
+        打印(斐波那契(i))
+    }
+}
+"""
+    result = run_qentl(code)
+    expected = ['0', '1', '1', '2', '3', '5', '8', '13']
+    for e in expected:
+        assert e in result, f"Expected {e} in {result}"
+    print("✅ 斐波那契记忆化(fibonacci memoization) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -590,6 +620,7 @@ tests = [
     test_oop_format_integration,
     test_break_continue,
     test_nested_builtins,
+    test_fibonacci_memo,
 ]
 
 if __name__ == '__main__':
