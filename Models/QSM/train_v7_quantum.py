@@ -343,6 +343,7 @@ def train():
     log_file = '/tmp/qsm_v7_training.log'
     
     for epoch in range(start_epoch, args.epochs):
+        epoch_train = train_data
         model.train()
         total_loss = 0
         n_batches = 0
