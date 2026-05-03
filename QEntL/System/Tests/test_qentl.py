@@ -346,6 +346,23 @@ quantum_enum 季节 { 春, 夏, 秋, 冬 }
     assert '其他' in out, f"Expected 其他 for default, got {out}"
     print("✅ 匹配/情况(match/case)")
 
+
+def test_dict_literal():
+    code = """
+主函数: 函数() {
+    让 d = {"name": "量子", "level": 5}
+    打印(d["name"])
+    打印(d["level"])
+    d["level"] = 10
+    打印(d["level"])
+}
+"""
+    out = run_qentl(code)
+    assert '量子' in out, f"Expected 量子, got {out}"
+    assert '5' in out, f"Expected 5, got {out}"
+    assert '10' in out, f"Expected 10 after update, got {out}"
+    print("✅ 字典字面量(dict literal)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -358,6 +375,7 @@ tests = [
     test_try_catch,
     test_method_call,
     test_match_case,
+    test_dict_literal,
 ]
 
 if __name__ == '__main__':

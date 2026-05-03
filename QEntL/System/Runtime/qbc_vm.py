@@ -248,6 +248,15 @@ class QBCVirtualMachine:
                     items.insert(0, self.stack.pop())
             self.stack.append(items)
             self.ip += 1
+        elif op == OpCode.BUILD_DICT:
+            count = operand if operand else 0
+            d = {}
+            for _ in range(count):
+                val = self.stack.pop() if self.stack else None
+                key = self.stack.pop() if self.stack else ''
+                d[key] = val
+            self.stack.append(d)
+            self.ip += 1
         elif op == OpCode.INDEX_ACCESS:
             idx = self.stack.pop() if self.stack else 0
             arr = self.stack.pop() if self.stack else []

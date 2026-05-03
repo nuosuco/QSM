@@ -1160,6 +1160,8 @@ class Parser:
             expr = self._parse_expression()
             self._expect(TokenType.RPAREN)
             return expr
+        elif t.type == TokenType.LBRACE:
+            return self._parse_dict_literal()
         elif t.type == TokenType.LBRACKET:
             return self._parse_list()
         else:
@@ -1197,6 +1199,25 @@ class Parser:
                 self._advance()
         self._expect(TokenType.RBRACE)
         return node
+
+    def _parse_dict_literal(self):
+        """Parse dict literal: { "key": expr, ... } or { key: expr, ... }"""
+        line = self._current().line
+        self._advance()  # consume {
+        pairs = []
+        if self._current().type != TokenType.RBRACE:
+            key = self._parse_expression()
+            self._expect(TokenType.COLON)
+            value = self._parse_expression()
+            pairs.append((key, value))
+            while self._current().type == TokenType.COMMA:
+                self._advance()
+                key = self._parse_expression()
+                self._expect(TokenType.COLON)
+                value = self._parse_expression()
+                pairs.append((key, value))
+        self._expect(TokenType.RBRACE)
+        return ASTNode('DictLiteral', children=pairs, line=line)
 
     def _parse_list(self):
         node = ASTNode('List', line=self._current().line)
@@ -1545,6 +1566,12 @@ class CodeGenerator:
             for child in node.children:
                 self._gen_node(child)
             self._emit(OpCode.BUILD_LIST, len(node.children), node.line)
+        elif node.type == 'DictLiteral':
+            # Build dict: push key-value pairs then BUILD_DICT with pair count
+            for key_node, val_node in node.children:
+                self._gen_node(key_node)
+                self._gen_node(val_node)
+            self._emit(OpCode.BUILD_DICT, len(node.children), node.line)
         elif node.type == 'IndexAccess':
             # Push variable value, then push index
             self._gen_node(node.children[0])  # the array variable
