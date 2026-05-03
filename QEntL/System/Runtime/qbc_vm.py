@@ -946,6 +946,25 @@ class QBCVirtualMachine:
                     suffix = self.stack.pop()
                     s = self.stack.pop()
                     self.stack.append(1 if isinstance(s, str) and s.endswith(str(suffix)) else 0)
+            elif func_name == '键':
+                if self.stack:
+                    obj = self.stack.pop()
+                    self.stack.append(list(obj.keys()) if isinstance(obj, dict) else [])
+            elif func_name == '值':
+                if self.stack:
+                    obj = self.stack.pop()
+                    self.stack.append(list(obj.values()) if isinstance(obj, dict) else [])
+            elif func_name == '合并':
+                if len(self.stack) >= 2:
+                    d2 = self.stack.pop()
+                    d1 = self.stack.pop()
+                    if isinstance(d1, dict) and isinstance(d2, dict):
+                        self.stack.append({**d1, **d2})
+                    else:
+                        self.stack.append(d1 if isinstance(d1, dict) else {})
+                elif self.stack:
+                    obj = self.stack.pop()
+                    self.stack.append(obj if isinstance(obj, dict) else {})
             elif func_name == '打印':
                 if self.stack:
                     val = self.stack.pop()
