@@ -989,6 +989,25 @@ class QBCVirtualMachine:
                     import time
                     time.sleep(seconds)
                     self.stack.append(1)
+            elif func_name == '运行QBC':
+                if self.stack:
+                    path = str(self.stack.pop())
+                    try:
+                        sub_vm = QBCVirtualMachine()
+                        sub_vm.load_file(path)
+                        # Find main function
+                        main_func = None
+                        for fname in sub_vm.function_params:
+                            if fname in ('主函数', 'main'):
+                                main_func = fname
+                                break
+                        if main_func:
+                            result = sub_vm.run_with_function(main_func, max_steps=50000)
+                        else:
+                            result = sub_vm.run(max_steps=50000)
+                        self.stack.append(result if result else [])
+                    except Exception as e:
+                        self.stack.append(['Error: ' + str(e)])
             elif func_name == '是数字':
                 if self.stack:
                     val = self.stack.pop()
