@@ -4457,3 +4457,83 @@ Phase 4 (E81-100): 全部数据 + lr降低 → 精调
 - Phase2学会词组翻译
 - Phase3学会句子翻译
 - Phase4精调整体质量
+
+## 研究#243: Flash Attention训练加速 (2026-05-03)
+
+### 问题
+当前训练 ~27min/epoch (36K数据, batch=16)
+100 epochs = ~45小时
+
+### Flash Attention (Dao et al., 2022)
+- 核心思想: 分块计算注意力, 减少HBM读写
+- 内存: O(N) 而非 O(N²)
+- 速度: 2-4x 加速
+- PyTorch 2.0+: `torch.nn.functional.scaled_dot_product_attention`
+
+### 实施方案
+```python
+# 替换标准注意力
+# PyTorch 2.0+ 自动使用Flash Attention
+import torch.nn.functional as F
+
+# 在 TransformerEncoderLayer 中
+# PyTorch 2.0+ 默认启用 Flash Attention
+# 只需: torch.backends.cuda.enable_flash_sdp(True)
+```
+
+### 问题: 服务器无GPU!
+- Flash Attention需要CUDA GPU
+- 当前仅CPU训练 → 无法使用Flash Attention
+- 替代方案: 减少层数/使用梯度累积/混合精度
+
+### CPU训练优化方案
+1. torch.compile() - PyTorch 2.0+ JIT编译
+2. 梯度累积: batch=4x4=16 → 有效batch=16
+3. 混合精度: float16前向+float32反向 (CPU不支持)
+4. 减少验证频率: 每epoch验证 → 每5epoch验证
+5. 减少数据量: 37K→20K (但可能影响质量)
+
+### 结论
+当前CPU训练无法用Flash Attention
+最有效加速: 减少验证频率(省~3min/epoch)
+
+## 研究#244: 低资源语言数据增强策略 (2026-05-03)
+
+### 问题
+彝文是低资源语言, 平行语料极其有限
+当前V13仅37K条, 目标100K+
+
+### 策略对比
+
+| 策略 | 效果 | 难度 | 优先级 |
+|------|------|------|--------|
+| 模板扩展 | 高(可控) | 低 | ⭐⭐⭐⭐⭐ |
+| 回译 | 高(需可用模型) | 高 | ⭐⭐ |
+| 外部语料库 | 高(质量好) | 中 | ⭐⭐⭐⭐ |
+| 同义词替换 | 中 | 低 | ⭐⭐⭐ |
+| 句子重组 | 低 | 低 | ⭐⭐ |
+| GPT生成 | 高(成本高) | 中 | ⭐⭐⭐ |
+
+### 模板扩展方案(最有效)
+1. 固定模板: "我[verb]了[object]" → 20×18 = 360条
+2. 变量替换: "[person]在[place]" → 8×10 = 80条
+3. 条件句: "如果[A]就[B]" → 15×15 = 225条
+4. 问题模板: "[wh]是[what]" → 无限
+
+### 外部语料库
+- Tatoeba: https://tatoeba.org (有彝文句子!)
+- OPUS: https://opus.nlpl.eu (平行语料)
+-彝文维基: 可爬取但量很少
+
+### 回译(需V12模型可用后)
+1. 用V12模型翻译zh→yi
+2. 人工校对关键句子
+3. 用校对后的数据再训练
+4. 循环改进
+
+### 词汇表扩展
+当前词汇6924→需扩展:
+- 英文: 26→至少1000
+- 中文: 2720→至少5000  
+- 彝文: 4120→至少8000
+- SentencePiece: 16000子词(已训练)
