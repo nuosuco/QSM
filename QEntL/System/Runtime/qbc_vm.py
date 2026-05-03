@@ -1008,6 +1008,29 @@ class QBCVirtualMachine:
                         self.stack.append(result if result else [])
                     except Exception as e:
                         self.stack.append(['Error: ' + str(e)])
+            elif func_name == '字符位置':
+                if len(self.stack) >= 2:
+                    substr = str(self.stack.pop())
+                    s = str(self.stack.pop())
+                    self.stack.append(s.find(substr))
+            elif func_name == '删除空白':
+                if self.stack:
+                    s = str(self.stack.pop())
+                    self.stack.append(s.strip())
+            elif func_name == '左边空白':
+                if self.stack:
+                    n = int(self.stack.pop()) if self.stack else 2
+                    s = str(self.stack.pop()) if self.stack else ''
+                    self.stack.append(s.ljust(n))
+            elif func_name == '重复到':
+                if len(self.stack) >= 2:
+                    length = int(self.stack.pop())
+                    s = str(self.stack.pop())
+                    if len(s) == 0:
+                        self.stack.append('')
+                    else:
+                        result = (s * ((length // len(s)) + 1))[:length]
+                        self.stack.append(result)
             elif func_name == '是数字':
                 if self.stack:
                     val = self.stack.pop()
