@@ -272,7 +272,7 @@ def train():
     parser.add_argument('--use_qmoe', action='store_true')
     parser.add_argument('--val_interval', type=int, default=1, help='validate every N epochs')
     parser.add_argument('--scheduler', type=str, default='step', choices=['step', 'cosine'], help='LR scheduler')
-    parser.add_argument('--grad_clip', type=float, default=0, help='gradient clipping max norm (0=disabled)')
+    parser.add_argument('--grad_clip', type=float, default=1.0, help='gradient clipping max norm')
     parser.add_argument('--lora', type=int, default=0, help='LoRA rank (0=disabled, 8/16=enabled)')
     parser.add_argument('--lora_alpha', type=int, default=16, help='LoRA alpha scaling')
     parser.add_argument('--curriculum', action='store_true', help='enable curriculum learning (difficulty-based)')
@@ -398,7 +398,7 @@ else:
             
             # Gradient accumulation
             if (batch_i // args.batch_size + 1) % args.accum_steps == 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
                 
                 # Manual LR with warmup + decay
                 if global_step < args.warmup:
