@@ -749,6 +749,23 @@ def test_system_builtins():
     assert any('qentl' in r for r in result), f"执行命令: {result}"
     print("✅ 系统内置函数(system builtins) 通过:", result)
 
+def test_string_utilities():
+    """字符串工具函数"""
+    code = """
+主函数: 函数() {
+    让 s = "hello world"
+    让 pos = 字符位置(s, "world")
+    让 notfound = 字符位置(s, "xyz")
+    让 cleaned = 删除空白("  hi  ")
+    让 repeated = 重复到("ab", 7)
+    打印(格式("pos={} not={} clean=[{}] rep={}", pos, notfound, cleaned, repeated))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['pos=6 not=-1 clean=[hi] rep=abababa'], f"字符串工具: {result}"
+    print("✅ 字符串工具函数(string utilities) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -778,7 +795,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins,
+    test_system_builtins, test_string_utilities,
 ]
 
 if __name__ == '__main__':
