@@ -4313,3 +4313,29 @@ spm.SentencePieceTrainer.train(
 - SentencePiece是Python库(违反量子自举?)
 - 可以用QEntL重写BPE算法(长期)
 - 短期: SPM训练→导出词表→QSM训练
+
+## 研究#238: 语言控制Token方案 (2026-05-03)
+
+### 问题
+模型无法区分输出语言——输入彝文可能输出英文/中文混杂
+
+### 方案: 添加语言控制前缀Token
+训练数据格式改为: `[目标语言] 输入内容 → 输出`
+- `[彝文] 你好世界 → 彝文翻译`
+- `[中文] hello → 你好`  
+- `[EN] 你好 → hello`
+
+### 实施
+1. 修改tokenizer: 添加3个特殊token [YI], [ZH], [EN]
+2. 修改训练数据: 每条input前加语言标签
+3. 推理时: 用户指定目标语言, 自动加前缀
+
+### 预期效果
+- 模型明确知道该输出什么语言
+- 减少语言混杂问题
+- 支持同一输入翻译到不同语言
+
+### 代码变更
+- train_v7_quantum.py: 添加lang_bos参数支持
+- 数据预处理: input = f"[{lang}] {original_input}"
+- vocab.json: 添加[YI]/[ZH]/[EN]三个token
