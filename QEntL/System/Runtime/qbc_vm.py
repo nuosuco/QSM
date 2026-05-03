@@ -827,12 +827,89 @@ class QBCVirtualMachine:
             elif func_name == '取整':
                 if self.stack:
                     val = self.stack.pop()
-                    self.stack.append(int(val))
+                    try:
+                        self.stack.append(int(val))
+                    except (ValueError, TypeError):
+                        try:
+                            self.stack.append(int(float(val)))
+                        except (ValueError, TypeError):
+                            self.stack.append(0)
             elif func_name == '幂':
                 if len(self.stack) >= 2:
                     exp = self.stack.pop()
                     base = self.stack.pop()
                     self.stack.append(base ** exp)
+            elif func_name == '大写':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(str(val).upper())
+            elif func_name == '小写':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(str(val).lower())
+            elif func_name == '替换':
+                if len(self.stack) >= 3:
+                    replacement = self.stack.pop()
+                    old = self.stack.pop()
+                    s = self.stack.pop()
+                    self.stack.append(str(s).replace(str(old), str(replacement)))
+            elif func_name == '绝对值':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(abs(val))
+            elif func_name == '最大值':
+                if len(self.stack) >= 2:
+                    b = self.stack.pop()
+                    a = self.stack.pop()
+                    self.stack.append(max(a, b))
+            elif func_name == '最小值':
+                if len(self.stack) >= 2:
+                    b = self.stack.pop()
+                    a = self.stack.pop()
+                    self.stack.append(min(a, b))
+            elif func_name == '四舍五入':
+                if self.stack:
+                    val = self.stack.pop()
+                    try:
+                        self.stack.append(round(float(val)))
+                    except (ValueError, TypeError):
+                        self.stack.append(0)
+            elif func_name == '浮点':
+                if self.stack:
+                    val = self.stack.pop()
+                    try:
+                        self.stack.append(float(val))
+                    except (ValueError, TypeError):
+                        self.stack.append(0.0)
+            elif func_name == '平方':
+                if self.stack:
+                    val = self.stack.pop()
+                    self.stack.append(val * val)
+            elif func_name == '平方根':
+                if self.stack:
+                    val = self.stack.pop()
+                    try:
+                        import math
+                        self.stack.append(math.sqrt(float(val)))
+                    except (ValueError, TypeError):
+                        self.stack.append(0.0)
+            elif func_name == '求和':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, list):
+                        self.stack.append(sum(val))
+                    else:
+                        self.stack.append(val)
+            elif func_name == '求积':
+                if self.stack:
+                    val = self.stack.pop()
+                    if isinstance(val, list):
+                        result = 1
+                        for v in val:
+                            result *= v
+                        self.stack.append(result)
+                    else:
+                        self.stack.append(val)
             elif func_name == '是数字':
                 if self.stack:
                     val = self.stack.pop()

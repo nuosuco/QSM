@@ -669,6 +669,29 @@ def test_elif_5branch():
     assert any('不及格' in r for r in result), f"Expected 不及格 in {result}"
     print("✅ 5分支elif链(multi-elif) 通过:", result)
 
+
+def test_math_builtins():
+    """测试数学内置函数"""
+    code = """
+主函数: 函数() {
+    打印(四舍五入(3.7))
+    打印(平方(5))
+    打印(平方根(16))
+    打印(求和([1,2,3,4,5]))
+    打印(求积([2,3,4]))
+    打印(绝对值(-7))
+    打印(最大值(3, 9))
+    打印(替换("hello world", "world", "qsm"))
+}
+"""
+    result = run_qentl(code)
+    assert any('4' in r for r in result[:1]), f"四舍五入: {result}"
+    assert any('25' in r for r in result), f"平方: {result}"
+    assert any('15' in r for r in result), f"求和: {result}"
+    assert any('24' in r for r in result), f"求积: {result}"
+    assert any('hello qsm' in r for r in result), f"替换: {result}"
+    print("✅ 数学内置函数(math builtins) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -695,6 +718,7 @@ tests = [
     test_multi_return_and_string_ops,
     test_format_specs,
     test_elif_5branch,
+    test_math_builtins,
 ]
 
 if __name__ == '__main__':
