@@ -363,6 +363,25 @@ def test_dict_literal():
     assert '10' in out, f"Expected 10 after update, got {out}"
     print("✅ 字典字面量(dict literal)")
 
+
+def test_foreach_loop():
+    code = """
+主函数: 函数() {
+    让 fruits = ["苹果", "香蕉", "橘子"]
+    让 result = ""
+    循环 fruit 在 fruits {
+        让 result = result + fruit + " "
+    }
+    打印(result)
+}
+"""
+    out = run_qentl(code)
+    out_str = ' '.join(out) if isinstance(out, list) else str(out)
+    assert '苹果' in out_str, f"Expected 苹果, got {out}"
+    assert '香蕉' in out_str, f"Expected 香蕉, got {out}"
+    assert '橘子' in out_str, f"Expected 橘子, got {out}"
+    print("✅ 遍历循环(foreach)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -376,6 +395,7 @@ tests = [
     test_method_call,
     test_match_case,
     test_dict_literal,
+    test_foreach_loop,
 ]
 
 if __name__ == '__main__':
