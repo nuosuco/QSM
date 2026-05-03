@@ -545,6 +545,29 @@ def test_break_continue():
     assert '5' not in result, f"5 should not appear (break at 4)"
     print("✅ 跳出/继续(break/continue) 通过:", result)
 
+
+def test_nested_builtins():
+    """测试嵌套内置函数调用"""
+    code = """
+主函数: 函数() {
+    打印(长度(范围数(10)))
+    打印(最大值(3, 7))
+    打印(绝对值(-42))
+    打印(幂(2, 8))
+    打印(类型(42))
+    打印(类型("hello"))
+    打印(包含("hello world", "world"))
+    打印(子串("量子计算", 0, 2))
+}
+"""
+    result = run_qentl(code)
+    assert '10' in result, f"Expected 10 in {result}"
+    assert '256' in result, f"Expected 256 in {result}"
+    assert '数字' in result, f"Expected 数字 in {result}"
+    assert '字符串' in result, f"Expected 字符串 in {result}"
+    assert '量子' in result, f"Expected 量子 in {result}"
+    print("✅ 嵌套内置函数(nested builtins) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -566,6 +589,7 @@ tests = [
     test_array_slicing,
     test_oop_format_integration,
     test_break_continue,
+    test_nested_builtins,
 ]
 
 if __name__ == '__main__':
