@@ -419,6 +419,26 @@ def test_ternary():
     assert 'adult' in out_str, f"Expected adult, got {out}"
     print("✅ 三元运算符(ternary ?:)")
 
+
+def test_dict_mutation_across_method():
+    code = """
+quantum_class DB { data: 整数 }
+set: 函数(self, key, val) {
+    self.data[key] = val
+}
+主函数: 函数() {
+    让 db = DB()
+    db.data = {"a": 1}
+    db.set("b", 2)
+    打印(db.data["a"])
+    打印(db.data["b"])
+}
+"""
+    out = run_qentl(code)
+    assert '1' in out, f"Expected 1, got {out}"
+    assert '2' in out, f"Expected 2, got {out}"
+    print("✅ 字典变异跨方法(dict mutation)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -435,6 +455,7 @@ tests = [
     test_foreach_loop,
     test_logical_operators,
     test_ternary,
+    test_dict_mutation_across_method,
 ]
 
 if __name__ == '__main__':
