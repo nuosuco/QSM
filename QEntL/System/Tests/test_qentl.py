@@ -524,6 +524,27 @@ quantum_class 学生 {
     assert '及格' in result, f"Expected pass in {result}"
     print("✅ OOP+格式化+三元综合(integration) 通过:", result)
 
+
+def test_break_continue():
+    """测试跳出(break)和继续(continue)"""
+    code = """
+主函数: 函数() {
+    循环 i 在 0 到 6 {
+        如果 i == 4 {
+            跳出
+        }
+        如果 i % 2 == 0 {
+            继续
+        }
+        打印(i)
+    }
+}
+"""
+    result = run_qentl(code)
+    assert '1' in result and '3' in result, f"Expected 1,3 in {result}"
+    assert '5' not in result, f"5 should not appear (break at 4)"
+    print("✅ 跳出/继续(break/continue) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -544,6 +565,7 @@ tests = [
     test_string_format,
     test_array_slicing,
     test_oop_format_integration,
+    test_break_continue,
 ]
 
 if __name__ == '__main__':
