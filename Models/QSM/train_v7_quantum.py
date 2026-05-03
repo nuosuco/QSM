@@ -271,7 +271,9 @@ def train():
     parser.add_argument('--weight_decay', type=float, default=0.05)
     parser.add_argument('--use_qmoe', action='store_true')
     parser.add_argument('--val_interval', type=int, default=1, help='validate every N epochs')
-    parser.add_argument('--scheduler', type=str, default='step', choices=['step', 'cosine'], help='LR scheduler')
+    parser.add_argument('--scheduler', type=str, default='step', choices=['step', 'cosine', 'sgdr'], help='LR scheduler')
+    parser.add_argument('--sgdr_t0', type=int, default=10, help='SGDR T_0 (first cycle)')
+    parser.add_argument('--sgdr_tmult', type=int, default=2, help='SGDR T_mult (cycle multiplier)')
     parser.add_argument('--grad_clip', type=float, default=1.0, help='gradient clipping max norm')
     parser.add_argument('--lora', type=int, default=0, help='LoRA rank (0=disabled, 8/16=enabled)')
     parser.add_argument('--lora_alpha', type=int, default=16, help='LoRA alpha scaling')
@@ -331,6 +333,11 @@ if args.scheduler == 'cosine':
         optimizer, T_max=args.epochs, eta_min=1e-5
     )
     print(f"LR Scheduler: Cosine Annealing (T_max={args.epochs}, eta_min=1e-5)")
+elif args.scheduler == 'sgdr':
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=args.sgdr_t0, T_mult=args.sgdr_tmult, eta_min=1e-6
+    )
+    print(f"LR Scheduler: SGDR (T_0={args.sgdr_t0}, T_mult={args.sgdr_tmult}, eta_min=1e-6)")
 else:
     print(f"LR Scheduler: Step decay (0.85^(step/batches_per_epoch))")
     
