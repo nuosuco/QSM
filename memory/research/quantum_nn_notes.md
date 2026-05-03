@@ -4426,3 +4426,34 @@ class RotaryEmbedding(nn.Module):
 - 模型知道当前处理的语言对
 - 不同语言对有不同的嵌入偏置
 - 减少语言混杂输出
+
+## 研究#242: 课程学习实施 — V12训练策略 (2026-05-03)
+
+### 核心理念
+人类学习语言: 字母→词→句→文
+模型也应: 短词→短语→句子→段落
+
+### V13数据difficulty分布
+- difficulty=1 (字符级): ~3,000条
+- difficulty=2 (词组级): ~15,000条  
+- difficulty=3 (句子级): ~18,000条
+- difficulty=4 (段落级): ~1,000条
+
+### 训练计划(100 epochs)
+```
+Phase 1 (E1-20): difficulty 1-2 → 字符+词组
+Phase 2 (E21-50): difficulty 1-3 → 加入句子
+Phase 3 (E51-80): difficulty 1-4 → 全部数据
+Phase 4 (E81-100): 全部数据 + lr降低 → 精调
+```
+
+### 实施
+1. 预处理: 按difficulty分组保存
+2. 训练脚本: 每N个epoch切换数据子集
+3. 学习率: Phase1=1e-3, Phase2=5e-4, Phase3=1e-4, Phase4=5e-5
+
+### 预期
+- Phase1学会字符含义(彝文→中文映射)
+- Phase2学会词组翻译
+- Phase3学会句子翻译
+- Phase4精调整体质量
