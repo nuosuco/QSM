@@ -730,6 +730,25 @@ def test_substring_2arg():
     assert any('30, 40' in r for r in result), f"数组子串: {result}"
     print("✅ 子串2参数(substring 2-arg) 通过:", result)
 
+
+def test_system_builtins():
+    """测试系统内置函数"""
+    code = """
+主函数: 函数() {
+    让 t = 当前时间()
+    打印(格式("时间长度={}", 长度(t)))
+    让 home = 获取环境("HOME")
+    打印(格式("HOME有值={}", 长度(home) > 0))
+    让 os = 执行命令("echo qentl")
+    打印(格式("echo={}", os))
+}
+"""
+    result = run_qentl(code)
+    assert any('时间长度=19' in r for r in result), f"当前时间: {result}"
+    assert any('HOME有值=True' in r or 'HOME有值=1' in r for r in result), f"获取环境: {result}"
+    assert any('qentl' in r for r in result), f"执行命令: {result}"
+    print("✅ 系统内置函数(system builtins) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -759,6 +778,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
+    test_system_builtins,
 ]
 
 if __name__ == '__main__':

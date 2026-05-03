@@ -966,6 +966,29 @@ class QBCVirtualMachine:
                         self.stack.append(1)
                     except Exception:
                         self.stack.append(0)
+            elif func_name == '当前时间':
+                import datetime
+                self.stack.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            elif func_name == '获取环境':
+                if self.stack:
+                    key = str(self.stack.pop())
+                    import os
+                    self.stack.append(os.environ.get(key, ''))
+            elif func_name == '执行命令':
+                if self.stack:
+                    cmd = str(self.stack.pop())
+                    import subprocess
+                    try:
+                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+                        self.stack.append(result.stdout.strip())
+                    except Exception as e:
+                        self.stack.append(str(e))
+            elif func_name == '等待':
+                if self.stack:
+                    seconds = float(self.stack.pop())
+                    import time
+                    time.sleep(seconds)
+                    self.stack.append(1)
             elif func_name == '是数字':
                 if self.stack:
                     val = self.stack.pop()
