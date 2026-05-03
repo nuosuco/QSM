@@ -692,6 +692,28 @@ def test_math_builtins():
     assert any('hello qsm' in r for r in result), f"替换: {result}"
     print("✅ 数学内置函数(math builtins) 通过:", result)
 
+
+def test_file_io():
+    """测试文件读写"""
+    import os
+    code = """
+主函数: 函数() {
+    让 ok = 写入文件("/tmp/qentl_io_test.txt", "qentl os")
+    打印(格式("写入={}", ok))
+    让 content = 读取文件("/tmp/qentl_io_test.txt")
+    打印(格式("内容={}", content))
+    打印(格式("存在={}", 文件存在("/tmp/qentl_io_test.txt")))
+}
+"""
+    result = run_qentl(code)
+    assert any('写入=1' in r for r in result), f"写入失败: {result}"
+    assert any('qentl os' in r for r in result), f"读取失败: {result}"
+    assert any('存在=1' in r for r in result), f"存在检测失败: {result}"
+    # Cleanup
+    if os.path.exists("/tmp/qentl_io_test.txt"):
+        os.remove("/tmp/qentl_io_test.txt")
+    print("✅ 文件IO(file read/write) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -719,6 +741,7 @@ tests = [
     test_format_specs,
     test_elif_5branch,
     test_math_builtins,
+    test_file_io,
 ]
 
 if __name__ == '__main__':

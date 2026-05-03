@@ -910,6 +910,55 @@ class QBCVirtualMachine:
                         self.stack.append(result)
                     else:
                         self.stack.append(val)
+            elif func_name == '读取文件':
+                if self.stack:
+                    path = str(self.stack.pop())
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            self.stack.append(f.read())
+                    except Exception as e:
+                        self.stack.append('')
+            elif func_name == '写入文件':
+                if len(self.stack) >= 2:
+                    content = str(self.stack.pop())
+                    path = str(self.stack.pop())
+                    try:
+                        with open(path, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        self.stack.append(1)
+                    except Exception:
+                        self.stack.append(0)
+            elif func_name == '文件存在':
+                if self.stack:
+                    path = str(self.stack.pop())
+                    import os
+                    self.stack.append(1 if os.path.exists(path) else 0)
+            elif func_name == '列出目录':
+                if self.stack:
+                    path = str(self.stack.pop())
+                    import os
+                    try:
+                        self.stack.append(os.listdir(path))
+                    except Exception:
+                        self.stack.append([])
+            elif func_name == '创建目录':
+                if self.stack:
+                    path = str(self.stack.pop())
+                    import os
+                    try:
+                        os.makedirs(path, exist_ok=True)
+                        self.stack.append(1)
+                    except Exception:
+                        self.stack.append(0)
+            elif func_name == '删除文件':
+                if self.stack:
+                    path = str(self.stack.pop())
+                    import os
+                    try:
+                        os.remove(path)
+                        self.stack.append(1)
+                    except Exception:
+                        self.stack.append(0)
             elif func_name == '是数字':
                 if self.stack:
                     val = self.stack.pop()
