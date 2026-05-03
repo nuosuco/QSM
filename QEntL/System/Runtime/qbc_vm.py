@@ -805,17 +805,24 @@ class QBCVirtualMachine:
                     else:
                         self.stack.append(s)
             elif func_name == '子串':
-                if len(self.stack) >= 2:
+                if expected_args is not None and expected_args >= 3:
+
                     end = self.stack.pop()
                     start = self.stack.pop()
                     s = self.stack.pop()
-                    if isinstance(s, str) and isinstance(start, int) and isinstance(end, int):
-                        self.stack.append(s[start:end])
-                    elif isinstance(s, list) and isinstance(start, int) and isinstance(end, int):
+                    if isinstance(s, (str, list)) and isinstance(start, int) and isinstance(end, int):
                         self.stack.append(s[start:end])
                     else:
                         self.stack.append(s)
+                elif len(self.stack) >= 2:
+                    start = self.stack.pop()
+                    s = self.stack.pop()
+                    if isinstance(s, (str, list)) and isinstance(start, int):
+                        self.stack.append(s[start:])
+                    else:
                         self.stack.append(s)
+                elif self.stack:
+                    self.stack.append(self.stack.pop())
             elif func_name == '增1':
                 if self.stack:
                     val = self.stack.pop()

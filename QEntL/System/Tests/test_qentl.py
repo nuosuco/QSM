@@ -714,6 +714,22 @@ def test_file_io():
         os.remove("/tmp/qentl_io_test.txt")
     print("✅ 文件IO(file read/write) 通过:", result)
 
+
+def test_substring_2arg():
+    """测试子串2参数(从start到末尾)"""
+    code = """
+主函数: 函数() {
+    打印(子串("hello world", 6))
+    打印(子串("hello", 0, 3))
+    打印(格式("arr={}", 子串([10,20,30,40], 2)))
+}
+"""
+    result = run_qentl(code)
+    assert any('world' in r for r in result), f"子串2arg: {result}"
+    assert any('hel' in r for r in result), f"子串3arg: {result}"
+    assert any('30, 40' in r for r in result), f"数组子串: {result}"
+    print("✅ 子串2参数(substring 2-arg) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -742,6 +758,7 @@ tests = [
     test_elif_5branch,
     test_math_builtins,
     test_file_io,
+    test_substring_2arg,
 ]
 
 if __name__ == '__main__':
