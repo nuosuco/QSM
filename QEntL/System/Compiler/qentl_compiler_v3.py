@@ -772,19 +772,25 @@ class Parser:
             self._advance()  # skip =
             value = self._parse_expression()
             if expr.type == 'IndexAccess':
-                # d["key"] = val → IndexAssign
-                assign_node = ASTNode('IndexAssign', line=expr.line)
-                # d["key"] = val → IndexAssign (value=var_name, children=[key, val])
-                assign_node = ASTNode('IndexAssign', value=expr.children[0].value if expr.children[0].type == 'Identifier' else None, line=expr.line)
-                assign_node.children.append(expr.children[1])  # key
-                assign_node.children.append(value)  # value
+                # d["key"] = val or self.data[key] = val
+                if expr.children[0].type == 'Identifier':
+                    # Simple: d[key] = val
+                    assign_node = ASTNode('IndexAssign', value=expr.children[0].value, line=expr.line)
+                    assign_node.children.append(expr.children[1])  # key
+                    assign_node.children.append(value)  # value
+                else:
+                    # Complex: self.data[key] = val
+                    assign_node = ASTNode('IndexAssign', value=None, line=expr.line)
+                    assign_node.children.append(expr.children[0])  # target expr
+                    assign_node.children.append(expr.children[1])  # key
+                    assign_node.children.append(value)  # value
                 return assign_node
             elif expr.type == 'FieldAccess':
                 # q.field = val → FieldAssign
-                assign_node = ASTNode('FieldAssign', value=expr.value, line=expr.line)
-                assign_node.children.append(expr.children[0])  # object
-                assign_node.children.append(value)  # value
-                return assign_node
+                    assign_node = ASTNode('FieldAssign', value=expr.value, line=expr.line)
+                    assign_node.children.append(expr.children[0])  # object
+                    assign_node.children.append(value)  # value
+                    return assign_node
             elif expr.type == 'Identifier':
                 # x = val → Assign
                 assign_node = ASTNode('Assign', value=expr.value, line=expr.line)
@@ -1633,12 +1639,18 @@ class CodeGenerator:
             self._gen_node(node.children[2])  # end
             self._emit(OpCode.SLICE_ACCESS, None, node.line)
         elif node.type == 'IndexAssign':
-            # 让 a[i] = expr → push var, index, value, INDEX_ASSIGN
-            self._emit(OpCode.LOAD_VAR, node.value, node.line)  # load the actual array/dict
-            self._gen_node(node.children[0])  # index
-            self._gen_node(node.children[1])  # value
+            # a[i] = expr → push array/dict, index, value, INDEX_ASSIGN
+            if node.value is not None:
+                # Simple: d[key] = val
+                self._emit(OpCode.LOAD_VAR, node.value, node.line)
+                self._gen_node(node.children[0])  # index
+                self._gen_node(node.children[1])  # value
+            else:
+                # Complex: self.data[key] = val
+                self._gen_node(node.children[0])  # target expr (pushes dict)
+                self._gen_node(node.children[1])  # index
+                self._gen_node(node.children[2])  # value
             self._emit(OpCode.INDEX_ASSIGN, None, node.line)
-
         elif node.type == 'Assign':
             # x = expr → generate value, then STORE_VAR
             self._gen_node(node.children[0])
