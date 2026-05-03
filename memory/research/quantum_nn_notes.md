@@ -4811,3 +4811,68 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
 2. INT8量化 (简单, 推理2x加速)
 3. 知识蒸馏 (中等, 质量提升)
 4. 剪枝 (最后, 需要重新训练)
+
+## 研究#253: RoPE旋转位置编码实施详解 (2026-05-04)
+
+### 原理 (Su et al., 2021 "RoFormer")
+- 位置信息通过旋转矩阵编码到Q和K中
+- q_m = R(m) · W_q · x_m, k_n = R(n) · W_k · x_n
+- 注意力: q_m · k_n = (R(m)W_qx_m)^T · (R(n)W_kx_n)
+- 利用旋转性质: R(m)^T · R(n) = R(n-m)
+- 所以 q_m · k_n = f(相对位置 n-m) ← 自然编码相对位置!
+
+### 旋转矩阵
+```
+R(θ, m) = [cos(mθ)  -sin(mθ)]
+           [sin(mθ)   cos(mθ)]
+```
+- 对d维向量，每2维一组，共d/2组
+- 每组有不同的θ_i = 10000^(-2i/d)
+- 实现: 逐元素乘法 (比矩阵乘法快)
+
+### PyTorch实现
+```python
+class RotaryEmbedding(nn.Module):
+    def __init__(self, dim, max_seq_len=512):
+        super().__init__()
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer('inv_freq', inv_freq)
+        t = torch.arange(max_seq_len).float()
+        freqs = torch.einsum('i,j->ij', t, inv_freq)
+        self.register_buffer('cos_cache', freqs.cos())
+        self.register_buffer('sin_cache', freqs.sin())
+    
+    def forward(self, x, seq_len):
+        return self.cos_cache[:seq_len], self.sin_cache[:seq_len]
+
+def rotate_half(x):
+    x1, x2 = x.chunk(2, dim=-1)
+    return torch.cat((-x2, x1), dim=-1)
+
+def apply_rotary(x, cos, sin):
+    return x * cos + rotate_half(x) * sin
+```
+
+### QSM集成方案
+1. 创建自定义MultiHeadAttention替代nn.MultiheadAttention
+2. 在Q和K投影后应用RoPE (V不需要位置编码)
+3. 移除pos_encoding = nn.Embedding(max_len, d_model)
+4. 保留QuantumEmbeddingV2(语言感知)
+5. max_len可从64→512 (长度外推)
+
+### 预期收益
+- 支持更长序列 (64→512)
+- 更好的长度泛化能力
+- 相对位置编码(更自然)
+- 移除绝对位置嵌入(减少参数)
+
+### 实施时间线
+- V13训练完成后实施(V13用现有架构)
+- 创建QSM_V8架构(含RoPE)
+- V14训练用V8架构 + V13数据
+
+### 与量子概念的联系
+- 旋转矩阵 = 量子门(R_z旋转)
+- θ_i = 不同量子态的旋转角
+- 位置m = 时间步(量子演化)
+- 自然映射: 位置编码 → 量子旋转门序列
