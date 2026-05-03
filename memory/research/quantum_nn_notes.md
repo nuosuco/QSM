@@ -4876,3 +4876,36 @@ def apply_rotary(x, cos, sin):
 - θ_i = 不同量子态的旋转角
 - 位置m = 时间步(量子演化)
 - 自然映射: 位置编码 → 量子旋转门序列
+
+## 研究#254: Qwen3-0.6B知识蒸馏实施细节 (2026-05-04)
+
+### 测试结果
+- Qwen3-0.6B可以正确翻译zh→en: "今天天气很好"→"Today's weather is good."
+- 但使用了thinking模式(थिं块占200+ tokens)
+- CPU速度: ~30秒/句 (含thinking)
+- 50K句子需要~17天 (不可行)
+
+### 优化方案
+1. **禁用thinking**: Qwen3支持`enable_thinking=False`
+   - 或在generate时设置`extra_body={"enable_thinking": false}`
+   - 预期速度: 5-10秒/句 (无thinking)
+2. **批量生成**: 使用batch_size>1 (需要更多内存)
+3. **GPU服务器**: 用Colab免费GPU (T4) 生成
+   - 速度: ~0.1秒/句, 50K→1.4小时
+4. **预计算thinking**: 让模型先think, 然后用thinking+answer微调QSM
+
+### 实际可行的蒸馏方案
+**Phase 1**: 用模板+Tatoeba数据训练到Val<2.0 (纯CPU)
+**Phase 2**: 达到Val<2.0后, 用QSM自身做回译(无需Qwen3)
+**Phase 3**: GPU服务器上用Qwen3生成50K高质量对
+**Phase 4**: 合并所有数据, 最终训练
+
+### 回译方案 (无需GPU, Phase 2可用)
+- 用QSM(Val<2)翻译 en→zh, 对比原文生成新训练对
+- 用QSM翻译 zh→en, 对比Qwen3翻译质量过滤
+- 自我迭代: 每轮训练→回译→过滤→再训练
+
+### 关键洞察
+- 模板数据(结构化、可控) > 蒸馏数据(质量不稳定)
+- V13 77K条模板+Tatoeba已足够训练到Val<2
+- 知识蒸馏是锦上添花, 不是必需品
