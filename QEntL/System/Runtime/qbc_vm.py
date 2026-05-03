@@ -854,30 +854,28 @@ class QBCVirtualMachine:
                     val = self.stack.pop()
                     self.stack.append(1 if val == 0 or val == '' or val is None or val == [] or val == {} else 0)
             elif func_name == '格式':
-                # String formatting: 格式("{}+{}={}", a, b, c)
-                # Stack: [fmt_str, a, b, c] (bottom to top)
+                # String formatting: 格式("{}+{}={}", a, b, c) or 格式("{:.1f}", x)
                 if expected_args is not None and expected_args >= 1:
-                    # Pop all args in reverse order
                     all_args = []
                     for _ in range(expected_args):
                         all_args.insert(0, self.stack.pop() if self.stack else '')
                     fmt_str = str(all_args[0]) if all_args else ''
-                    if '{}' in fmt_str:
-                        count = fmt_str.count('{}')
-                        values = [str(a) for a in all_args[1:count+1]]
+                    values = all_args[1:]
+                    try:
+                        result = fmt_str.format(*values)
+                    except (IndexError, KeyError, ValueError):
+                        # Fallback: simple {} replacement
                         result = fmt_str
                         for v in values:
-                            result = result.replace('{}', v, 1)
-                        self.stack.append(result)
-                    else:
-                        self.stack.append(fmt_str)
+                            result = result.replace('{}', str(v), 1)
+                    self.stack.append(result)
                 elif len(self.stack) >= 2:
                     val = self.stack.pop()
                     fmt_str = self.stack.pop()
-                    if isinstance(fmt_str, str):
-                        self.stack.append(fmt_str.replace('{}', str(val), 1))
-                    else:
-                        self.stack.append(str(fmt_str))
+                    try:
+                        self.stack.append(str(fmt_str).format(val))
+                    except (IndexError, KeyError, ValueError):
+                        self.stack.append(str(fmt_str).replace('{}', str(val), 1))
                 elif self.stack:
                     self.stack.append(str(self.stack.pop()))
             elif func_name == '查找':

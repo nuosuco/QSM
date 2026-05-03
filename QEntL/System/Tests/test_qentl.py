@@ -626,6 +626,22 @@ def test_multi_return_and_string_ops():
     assert '***' in result, f"Expected *** in {result}"
     print("✅ 多返回值+字符串操作(multi-return+string ops) 通过:", result)
 
+
+def test_format_specs():
+    """测试Python格式规范支持"""
+    code = """
+主函数: 函数() {
+    打印(格式("pi={:.2f}", 3.14159))
+    打印(格式("{:05d}", 42))
+    打印(格式("{}+{}={}", 1, 2, 3))
+}
+"""
+    result = run_qentl(code)
+    assert any('3.14' in r for r in result), f"Expected 3.14 in {result}"
+    assert any('00042' in r for r in result), f"Expected 00042 in {result}"
+    assert any('1+2=3' in r for r in result), f"Expected 1+2=3 in {result}"
+    print("✅ 格式规范(format specs) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -650,6 +666,7 @@ tests = [
     test_nested_builtins,
     test_fibonacci_memo,
     test_multi_return_and_string_ops,
+    test_format_specs,
 ]
 
 if __name__ == '__main__':
