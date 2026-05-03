@@ -98,11 +98,12 @@
 - 优化器 qentl_optimizer.py ✅
 - 单元测试 test_qentl.py ✅ 12/12通过 (量子门语法/纠缠/测量/Bell态)
 
-### QEntL 5分支elif修复 + 格式规范（2026-05-03）
-- 编译器: flat+nested elif AST统一处理, 4+分支else不再dead code
-- 格式()升级: 支持{:.2f}/{:05d}等Python格式规范
-- **41/41 ALL PASS!** (从30→41, +11个新测试)
-- 字典遍历/数组切片/跳出继续/全局变量/斐波那契/多返回值
+### QEntL 44/44 + 文件IO（2026-05-03）
+- 编译器: flat+nested elif统一, 5+分支else修复
+- 格式()升级: {:.2f}/{:05d} Python格式规范
+- **44/44 ALL PASS!** (从30→44, +14个新测试)
+- 18个新内置: 文件IO(6)+数学(9)+字符串(3)
+- 子串2/3参数, BUILTIN_CALL arg隔离
 
 ### QEntL VM函数作用域+递归修复（2026-05-02）
 - function_params元数据: 编译器→QBC→VM正确绑定参数
@@ -138,7 +139,7 @@
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
   - 公网API: https://som.top API (V7-Small, val_loss=2.6531)
-- **V12训练中**: E13/100, Val 3.1401 (持续NEW BEST, 57K数据)
+- **V12训练中**: E19/100, Val 3.0662 (持续下降, 68K数据, best备份E18)
 - **⚠️ V8 API输出仍为垃圾** — 根因是V12数据48%噪声, V12训练中用V13清洗数据
 - /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
 - Beam search改进: n-gram blocking + rep_penalty=1.5 + min_len=3

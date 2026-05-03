@@ -4776,3 +4776,38 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
 - 课程学习: 4阶段difficulty递增
 - Cosine Annealing LR
 - 梯度裁剪: max_norm=1.0
+
+## 研究#252: 低资源神经机器翻译高效推理 (2026-05-04)
+
+### 问题
+- QSM V7-Small: 4.5M参数, 推理慢(CPU)
+- 彝文是极低资源语言, 训练数据有限
+- 需要优化推理速度同时保持质量
+
+### 推理优化技术
+1. **知识蒸馏(KD)**: 大模型→小模型
+   - Teacher: Qwen3-0.6B (600M)
+   - Student: QSM V7-Small (4.5M)
+   - 蒸馏损失: L = α*L_hard + (1-α)*L_soft
+   - soft target: softmax(zi/T) T=4
+
+2. **量化(Quantization)**:
+   - FP32→INT8: 模型大小减半, 推理2x加速
+   - torch.quantization.quantize_dynamic()
+   - 适用于CPU推理, 无需GPU
+
+3. **剪枝(Pruning)**:
+   - 移除不重要的注意力头/FFN神经元
+   - 结构化剪枝: 删除整个head
+   - QSM 3头→2头: 参数减少33%
+
+4. **缓存优化(KV Cache)**:
+   - 自回归推理时缓存key/value
+   - 避免重复计算已生成的token
+   - 当前API每次重新计算→需添加
+
+### 实施优先级
+1. KV Cache (最容易, 推理2-3x加速)
+2. INT8量化 (简单, 推理2x加速)
+3. 知识蒸馏 (中等, 质量提升)
+4. 剪枝 (最后, 需要重新训练)
