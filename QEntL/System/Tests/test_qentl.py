@@ -320,6 +320,32 @@ quantum_class 计算器 { 值: 整数 }
     assert '20' in out, f"Expected 20, got {out}"
     print("✅ 方法调用(method call)")
 
+
+def test_match_case():
+    code = """
+quantum_enum 季节 { 春, 夏, 秋, 冬 }
+季节名: 函数(s) {
+    匹配 s {
+        情况 季节.春 { 返回 "春天" }
+        情况 季节.夏 { 返回 "夏天" }
+        情况 季节.秋 { 返回 "秋天" }
+        默认 { 返回 "其他" }
+    }
+}
+主函数: 函数() {
+    打印(季节名(0))
+    打印(季节名(1))
+    打印(季节名(2))
+    打印(季节名(99))
+}
+"""
+    out = run_qentl(code)
+    assert '春天' in out, f"Expected 春天, got {out}"
+    assert '夏天' in out, f"Expected 夏天, got {out}"
+    assert '秋天' in out, f"Expected 秋天, got {out}"
+    assert '其他' in out, f"Expected 其他 for default, got {out}"
+    print("✅ 匹配/情况(match/case)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -331,6 +357,7 @@ tests = [
     test_field_assignment,
     test_try_catch,
     test_method_call,
+    test_match_case,
 ]
 
 if __name__ == '__main__':
