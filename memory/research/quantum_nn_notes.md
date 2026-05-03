@@ -4404,3 +4404,25 @@ class RotaryEmbedding(nn.Module):
 1. 替换固定位置编码→RoPE
 2. max_seq_len从128→512
 3. 预期: 长文本翻译质量提升
+
+## 研究#241: 语言控制Token实现方案 (2026-05-03)
+
+### 现有基础设施
+- QuantumEmbeddingV2 已有 lang_bias (4维, 对应4种语言)
+- QSMTransformer.forward() 已接受 lang_id 参数
+- 但训练循环从未传入 lang_id!
+
+### 实施步骤
+1. 训练数据预处理: 检测每对数据的源/目标语言
+2. 语言检测规则:
+   - 含彝文字符(U+F2000+) → yi (lang_id=2)
+   - 含中文(\u4e00-\u9fff) + 英文(a-z) → mixed (lang_id=3)
+   - 纯中文 → zh (lang_id=0)
+   - 纯英文 → en (lang_id=1)
+3. 修改训练循环: output = model(src, tgt, lang_id=lang_id)
+4. 推理时: 根据输入语言自动设置lang_id
+
+### 预期效果
+- 模型知道当前处理的语言对
+- 不同语言对有不同的嵌入偏置
+- 减少语言混杂输出
