@@ -465,6 +465,20 @@ def test_global_cross_func():
     assert '3' in result, f"Expected 3 in {result}"
     print("✅ 全局变量跨函数(global cross-func) 通过:", result)
 
+
+def test_string_format():
+    """测试字符串格式化"""
+    code = """
+主函数: 函数() {
+    打印(格式("{}+{}={}", 1, 2, 3))
+    打印(格式("hello {}", "world"))
+}
+"""
+    result = run_qentl(code)
+    assert '1+2=3' in result, f"Expected '1+2=3' in {result}"
+    assert 'hello world' in result, f"Expected 'hello world' in {result}"
+    print("✅ 字符串格式化(string format) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -482,6 +496,7 @@ tests = [
     test_ternary,
     test_dict_mutation_across_method,
     test_global_cross_func,
+    test_string_format,
 ]
 
 if __name__ == '__main__':

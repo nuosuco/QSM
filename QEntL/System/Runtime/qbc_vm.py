@@ -851,7 +851,24 @@ class QBCVirtualMachine:
                     val = self.stack.pop()
                     self.stack.append(1 if val == 0 or val == '' or val is None or val == [] or val == {} else 0)
             elif func_name == '格式':
-                if len(self.stack) >= 2:
+                # String formatting: 格式("{}+{}={}", a, b, c)
+                # Stack: [fmt_str, a, b, c] (bottom to top)
+                if expected_args is not None and expected_args >= 1:
+                    # Pop all args in reverse order
+                    all_args = []
+                    for _ in range(expected_args):
+                        all_args.insert(0, self.stack.pop() if self.stack else '')
+                    fmt_str = str(all_args[0]) if all_args else ''
+                    if '{}' in fmt_str:
+                        count = fmt_str.count('{}')
+                        values = [str(a) for a in all_args[1:count+1]]
+                        result = fmt_str
+                        for v in values:
+                            result = result.replace('{}', v, 1)
+                        self.stack.append(result)
+                    else:
+                        self.stack.append(fmt_str)
+                elif len(self.stack) >= 2:
                     val = self.stack.pop()
                     fmt_str = self.stack.pop()
                     if isinstance(fmt_str, str):
