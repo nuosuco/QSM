@@ -494,6 +494,36 @@ def test_array_slicing():
     assert 'hello' in result, f"Expected hello in {result}"
     print("✅ 数组切片(array slicing) 通过:", result)
 
+
+def test_oop_format_integration():
+    """测试OOP+格式化+三元综合"""
+    code = """
+quantum_class 学生 {
+    名字: 字符串
+    分数: 整数
+}
+
+信息: 函数(self) {
+    返回 格式("{}的分数是{}", self.名字, self.分数)
+}
+
+及格: 函数(self) {
+    返回 self.分数 >= 60 ? "及格" : "不及格"
+}
+
+主函数: 函数() {
+    让 s1 = 学生()
+    s1.名字 = "小明"
+    s1.分数 = 85
+    打印(s1.信息())
+    打印(s1.及格())
+}
+"""
+    result = run_qentl(code)
+    assert '小明的分数是85' in result, f"Expected score in {result}"
+    assert '及格' in result, f"Expected pass in {result}"
+    print("✅ OOP+格式化+三元综合(integration) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -513,6 +543,7 @@ tests = [
     test_global_cross_func,
     test_string_format,
     test_array_slicing,
+    test_oop_format_integration,
 ]
 
 if __name__ == '__main__':
