@@ -4942,3 +4942,41 @@ def apply_rotary(x, cos, sin):
 2. **Layer Normalization**: 已有(self.norm)
 3. **Warmup**: 已有(500 steps)
 4. **梯度累积**: 已有(4步)
+
+## 研究#256: Cosine Annealing with Warm Restarts (SGDR) (2026-05-04)
+
+### 原理 (Loshchilov & Hutter, 2017)
+- 标准Cosine: η_t = η_min + 0.5(η_max - η_min)(1 + cos(πt/T_max))
+- SGDR: 周期性重启, 每个周期T_i后LR跳回η_max
+- 重启让模型逃离局部最优
+
+### V12当前问题
+- Step decay: lr=0.0003*0.85^(step/4049)
+- E25时lr=0.000133, 还在下降但很慢
+- E50时lr≈0.00003, 几乎为零→训练停滞
+
+### V13 SGDR方案
+- T_0=10 (第一个周期10 epochs)
+- T_mult=2 (每次周期翻倍: 10→20→40→80)
+- η_min=1e-6, η_max=0.0003
+- 总周期: E1-10, E11-30, E31-70, E71-150
+- 每次重启从当前best模型开始
+
+### PyTorch实现
+```python
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+    optimizer, T_0=10, T_mult=2, eta_min=1e-6
+)
+scheduler.step()  # 每epoch调用
+```
+
+### 与课程学习配合
+- Phase 1 (E1-10): difficulty 1-2 + SGDR周期1
+- Phase 2 (E11-30): difficulty 2-3 + SGDR周期2
+- Phase 3 (E31-70): difficulty 3-4 + SGDR周期3
+- Phase 4 (E71+): difficulty 1-4 + SGDR周期4
+
+### 预期收益
+- 避免LR过低导致的训练停滞
+- 重启帮助探索更好的参数空间
+- 与课程学习自然配合(难度递增+LR重启)
