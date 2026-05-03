@@ -383,22 +383,31 @@ class QBCVirtualMachine:
                     self.stack.append(False)
             self.ip += 1
 
+
         elif op == OpCode.UNARY_NOT:
             if len(self.stack) >= 1:
                 val = self.stack.pop()
                 if isinstance(val, bool):
                     self.stack.append(not val)
-                elif op == OpCode.DOT_ACCESS:
-                    # Get field/method from object on stack
-                    if len(self.stack) >= 1:
-                        obj = self.stack.pop()
-                        field_name = operand
-                        if isinstance(obj, dict) and field_name in obj:
-                            self.stack.append(obj[field_name])
-                        else:
-                            self.stack.append(None)
-                    self.ip += 1
-
+                elif isinstance(val, (int, float)):
+                    self.stack.append(1 if val == 0 else 0)
+                else:
+                    self.stack.append(True)
+            self.ip += 1
+            # Get field/method from object on stack
+            if len(self.stack) >= 1:
+                obj = self.stack.pop()
+                field_name = operand
+                if isinstance(obj, dict) and field_name in obj:
+                    self.stack.append(obj[field_name])
+                else:
+                    self.stack.append(None)
+            self.ip += 1
+        elif op == OpCode.GLOBAL_DECL:
+            # Mark variable as global - prevent param save/restore from resetting it
+            if operand:
+                self.global_vars.add(str(operand))
+            self.ip += 1
         elif op == OpCode.METHOD_CALL:
             # METHOD_CALL: obj.method(args) - calls function with self binding
             # operand = (method_name, n_explicit_args) or method_name
@@ -545,9 +554,12 @@ class QBCVirtualMachine:
 
         elif op == OpCode.RETURN:
             # Restore saved params (for recursive calls)
+            # But don't restore global variables - they persist across calls
             if self.call_stack_params:
                 saved = self.call_stack_params.pop()
                 for pname, old_val in saved.items():
+                    if pname in self.global_vars:
+                        continue  # Skip global variables
                     if old_val is None:
                         if pname in self.variables:
                             del self.variables[pname]

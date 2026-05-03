@@ -1,0 +1,89 @@
+// QEntL 量子文件系统 V3 — 全局变量+方法调用+异常处理
+
+quantum_class 量子节点 {
+    name: 字符串
+    kind: 整数
+    size: 整数
+    data: 字符串
+}
+
+// 全局状态
+全局 根目录
+全局 节点计数
+
+// 创建节点
+创建: 函数(n, k, s) {
+    让 node = 量子节点()
+    node.name = n
+    node.kind = k
+    node.size = s
+    node.data = ""
+    让 节点计数 = 节点计数 + 1
+    返回 node
+}
+
+// 方法: 获取类型名
+获取类型: 函数(self) {
+    如果 self.kind == 0 { 返回 "文件" }
+    否则如果 self.kind == 1 { 返回 "目录" }
+    否则 { 返回 "链接" }
+}
+
+// 方法: 显示信息
+信息: 函数(self) {
+    让 t = self.获取类型()
+    返回 "[" + t + "] " + self.name + " (" + self.size + "B)"
+}
+
+// 初始化文件系统
+初始化: 函数() {
+    让 home = 创建("home", 1, 0)
+    让 quantum = 创建("quantum.qentl", 0, 2048)
+    quantum.data = "量子叠加态程序"
+    让 kernel = 创建("kernel.qbc", 0, 4096)
+    kernel.data = "QBC字节码"
+    让 根目录 = [home, quantum, kernel]
+    打印("初始化完成, 节点: " + 节点计数)
+}
+
+// 列目录
+列目录: 函数() {
+    打印("=== 量子文件系统 ===")
+    每个 node 在 根目录 {
+        打印(node.信息())
+    }
+}
+
+// 查找
+查找: 函数(name) {
+    每个 node 在 根目录 {
+        如果 node.name == name { 返回 node }
+    }
+    返回 0
+}
+
+// 主函数
+主函数: 函数() {
+    打印("QEntL量子文件系统V3")
+    让 节点计数 = 0
+    
+    初始化()
+    列目录()
+    
+    // 查找并读取
+    让 q = 查找("quantum.qentl")
+    如果 q != 0 {
+        打印("内容: " + q.data)
+    }
+    
+    // 异常处理
+    尝试 {
+        让 total = 0
+        每个 node 在 根目录 { 让 total = total + node.size }
+        如果 total > 5000 { 抛出 "空间不足" }
+    } 捕获(e) {
+        打印("警告: " + e)
+    }
+    
+    打印("文件系统就绪, 总节点: " + 节点计数)
+}
