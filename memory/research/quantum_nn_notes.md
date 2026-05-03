@@ -4537,3 +4537,73 @@ import torch.nn.functional as F
 - 中文: 2720→至少5000  
 - 彝文: 4120→至少8000
 - SentencePiece: 16000子词(已训练)
+
+## 研究#245: LoRA微调实施 — 大幅提升训练效率 (2026-05-03)
+
+### LoRA原理 (Hu et al., 2021)
+- Low-Rank Adaptation: W = W₀ + ΔW = W₀ + BA
+- B: d×r, A: r×d, r << d (rank)
+- 仅训练B和A, 冻结W₀
+- 参数量: 2×d×r vs d² (节省>95%)
+
+### QSM V7-Small LoRA方案
+- d_model=192, n_heads=3, n_layers=3
+- 总参数: 4.5M
+- LoRA target: Q/V投影矩阵 (每个注意力层)
+- r=16: LoRA参数 ≈ 3layers × 2heads × 192 × 16 × 2 = 37K
+- 训练参数占比: 37K/4.5M = 0.8%!
+
+### 实施步骤
+1. pip install loralib (或手动实现)
+2. 冻结原始权重: `for p in model.parameters(): p.requires_grad = False`
+3. 添加LoRA层:
+```python
+import loralib as lora
+# 替换线性层
+model.encoder.layers[i].self_attn.in_proj_weight = lora.Linear(192, 576, r=16)
+```
+4. 训练: 仅LoRA参数有梯度
+5. 合并: W₀ = W₀ + BA (推理时无额外开销)
+
+### 预期效果
+- 训练速度: 27min → ~5min/epoch (5x加速)
+- 内存: 4.0Gi → ~2.5Gi (可同时训练更大模型)
+- 质量: LoRA微调效果接近全参数微调
+- 100 epochs: 45h → 8h!
+
+### 下一步
+1. 安装loralib
+2. 修改train_v7_quantum.py添加--lora参数
+3. 用V13数据+LoRA快速训练V13模型
+
+## 研究#246: 知识蒸馏 — 从大模型到小模型 (2026-05-03)
+
+### 问题
+QSM当前4.5M参数, 能力有限
+但训练更大模型(50M+)需要GPU
+
+### 知识蒸馏 (Hinton et al., 2015)
+- Teacher: 大模型(如Qwen3-0.6B, 600M参数)
+- Student: QSM V7-Small (4.5M参数)
+- 核心思想: 用Teacher的soft targets训练Student
+
+### 实施方案
+1. 用Qwen3-0.6B翻译更多数据(教师信号)
+2. Student学习Teacher的输出分布(温度缩放)
+3. 损失函数: α·L_hard + (1-α)·L_soft
+
+### QSM特有方案
+1. 用Qwen3生成彝文翻译(教师模型)
+2. QSM学习Qwen3的翻译风格
+3. QSM最终独立运行(不需要Qwen3)
+
+### 优势
+- 数据增强: Qwen3可生成无限训练数据
+- 质量提升: 教师信号比模板更自然
+- 无需GPU: 蒸馏过程用CPU即可
+
+### 实施步骤
+1. 安装transformers库
+2. 加载Qwen3-0.6B (CPU即可, 只需推理)
+3. 批量生成zh→yi, en→yi翻译数据
+4. 混合蒸馏数据+原始数据训练QSM

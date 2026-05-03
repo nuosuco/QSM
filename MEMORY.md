@@ -132,6 +132,7 @@
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
   - 公网API: https://som.top API (V7-Small, val_loss=2.6531)
+- **⚠️ V8 API输出仍为垃圾** — 根因是V12数据48%噪声, V12训练中用V13清洗数据
 - /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
 - Beam search改进: n-gram blocking + rep_penalty=1.5 + min_len=3
 - /health, /version, /translate, /chat 四个端点
@@ -141,7 +142,10 @@
   - 发现英文碎片根因: 大写字母(G/M/H/W/F)不在词汇表
   - 解决方案: V5全小写英文训练数据(52K对已准备)
   - **V5模型**: 7.5M参数(256d/3层/4头), Best E19 Val 2.1879, 输出乱码❌
-- **🔥V7-Small(2026-05-02)**: 4.5M参数(192d/3层/3头/768ff), Val **2.6531** — ✅ALL-TIME BEST!
+- **🔥V7-Small(2026-05-02)**: 4.5M参数(192d/3层/3头/768ff), Val **2.6531**
+- **🔥V12训练中(2026-05-03)**: V13清洗数据(57K→77K), 随机初始化
+  - E1: Val 4.09 → E5: Val **3.41** (NEW BEST, 快速下降中)
+  - 清洗数据效果极显著! 比V11/V8下降更快
   - 42/50 ALL BEST, 零过拟合(Train 2.50 < Val 2.65)
   - QuantumEmbeddingV2(语言感知量子嵌入)+beam search+重复惩罚
   - 已部署API(端口8000) 替换V5 mode collapse模型
