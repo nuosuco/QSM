@@ -323,6 +323,16 @@ def train():
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss(ignore_index=0, label_smoothing=args.label_smoothing)
+
+# Create LR scheduler if cosine annealing is selected
+scheduler = None
+if args.scheduler == 'cosine':
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.epochs, eta_min=1e-5
+    )
+    print(f"LR Scheduler: Cosine Annealing (T_max={args.epochs}, eta_min=1e-5)")
+else:
+    print(f"LR Scheduler: Step decay (0.85^(step/batches_per_epoch))")
     
     # Resume
     start_epoch = 0
