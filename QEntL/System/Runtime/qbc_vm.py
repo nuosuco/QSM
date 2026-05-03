@@ -32,6 +32,8 @@ class OpCode(Enum):
     LABEL = 0xFC
     ASSERT = 0xCD
     UNARY_NOT = 0xF7
+    LOGICAL_AND = 0xCE
+    LOGICAL_OR = 0xCF
     DOT_ACCESS = 0xF5
     METHOD_CALL = 0xF6
     BOOL_LOAD = 0xF8
@@ -403,14 +405,25 @@ class QBCVirtualMachine:
                 else:
                     self.stack.append(True)
             self.ip += 1
-            # Get field/method from object on stack
-            if len(self.stack) >= 1:
-                obj = self.stack.pop()
-                field_name = operand
-                if isinstance(obj, dict) and field_name in obj:
-                    self.stack.append(obj[field_name])
-                else:
-                    self.stack.append(None)
+        elif op == OpCode.LOGICAL_AND:
+            if len(self.stack) >= 2:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                lval = bool(left) if not isinstance(left, bool) else left
+                rval = bool(right) if not isinstance(right, bool) else right
+                self.stack.append(1 if (lval and rval) else 0)
+            else:
+                self.stack.append(0)
+            self.ip += 1
+        elif op == OpCode.LOGICAL_OR:
+            if len(self.stack) >= 2:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                lval = bool(left) if not isinstance(left, bool) else left
+                rval = bool(right) if not isinstance(right, bool) else right
+                self.stack.append(1 if (lval or rval) else 0)
+            else:
+                self.stack.append(0)
             self.ip += 1
         elif op == OpCode.GLOBAL_DECL:
             # Mark variable as global - prevent param save/restore from resetting it

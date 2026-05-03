@@ -80,6 +80,8 @@ class OpCode(Enum):
     DOT_ACCESS = 0xF5
     METHOD_CALL = 0xF6
     UNARY_NOT = 0xF7
+    LOGICAL_AND = 0xCE
+    LOGICAL_OR = 0xCF
     BOOL_LOAD = 0xF8
     PUSH_TRY = 0xF9
     POP_TRY = 0xFA
@@ -1030,7 +1032,23 @@ class Parser:
         return node
 
     def _parse_expression(self):
-        return self._parse_comparison()
+        return self._parse_logical_or()
+
+    def _parse_logical_or(self):
+        left = self._parse_logical_and()
+        while self._current().type == TokenType.OR:
+            self._advance()  # consume 或
+            right = self._parse_logical_and()
+            left = ASTNode('BinaryOp', value='或', children=[left, right])
+        return left
+
+    def _parse_logical_and(self):
+        left = self._parse_comparison()
+        while self._current().type == TokenType.AND:
+            self._advance()  # consume 且
+            right = self._parse_comparison()
+            left = ASTNode('BinaryOp', value='且', children=[left, right])
+        return left
 
     def _parse_comparison(self):
         left = self._parse_addition()
@@ -1544,6 +1562,7 @@ class CodeGenerator:
                 '==': OpCode.EQ, '!=': OpCode.NEQ,
                 '<': OpCode.LT, '>': OpCode.GT,
                 '<=': OpCode.LTE, '>=': OpCode.GTE,
+                '且': OpCode.LOGICAL_AND, '或': OpCode.LOGICAL_OR,
             }
             self._emit(op_map.get(node.value, OpCode.NOP), line=node.line)
 

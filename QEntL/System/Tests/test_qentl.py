@@ -382,6 +382,27 @@ def test_foreach_loop():
     assert '橘子' in out_str, f"Expected 橘子, got {out}"
     print("✅ 遍历循环(foreach)")
 
+
+def test_logical_operators():
+    code = """
+主函数: 函数() {
+    让 score = 85
+    如果 score >= 80 且 score <= 100 {
+        打印("优秀范围")
+    }
+    如果 score < 60 或 score > 90 {
+        打印("极端分数")
+    } 否则 {
+        打印("正常分数")
+    }
+}
+"""
+    out = run_qentl(code)
+    out_str = ' '.join(out) if isinstance(out, list) else str(out)
+    assert '优秀范围' in out_str, f"Expected 优秀范围, got {out}"
+    assert '正常分数' in out_str, f"Expected 正常分数, got {out}"
+    print("✅ 逻辑运算符(且/或)")
+
 # === Test Runner ===
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
@@ -396,6 +417,7 @@ tests = [
     test_match_case,
     test_dict_literal,
     test_foreach_loop,
+    test_logical_operators,
 ]
 
 if __name__ == '__main__':
