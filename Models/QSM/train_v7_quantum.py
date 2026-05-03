@@ -271,6 +271,12 @@ def train():
     parser.add_argument('--weight_decay', type=float, default=0.05)
     parser.add_argument('--use_qmoe', action='store_true')
     parser.add_argument('--val_interval', type=int, default=1, help='validate every N epochs')
+    parser.add_argument('--lora', type=int, default=0, help='LoRA rank (0=disabled, 8/16=enabled)')
+    parser.add_argument('--lora_alpha', type=int, default=16, help='LoRA alpha scaling')
+    parser.add_argument('--curriculum', action='store_true', help='enable curriculum learning (difficulty-based)')
+    parser.add_argument('--max_difficulty', type=int, default=4, help='max difficulty level (1-4)')
+    parser.add_argument('--difficulty_schedule', type=str, default='10,30,70,100',
+                        help='epochs to increase difficulty (comma-separated)')
     args = parser.parse_args()
     
     device = torch.device('cpu')
@@ -343,10 +349,10 @@ def train():
         epoch_start = time.time()
         
         # Shuffle
-        random.shuffle(train_data)
+        random.shuffle(epoch_train)
         
-        for batch_i in range(0, len(train_data), args.batch_size):
-            batch = train_data[batch_i:batch_i+args.batch_size]
+        for batch_i in range(0, len(epoch_train), args.batch_size):
+            batch = epoch_train[batch_i:batch_i+args.batch_size]
             if len(batch) < 2:
                 continue
             
@@ -384,7 +390,7 @@ def train():
                 if global_step < args.warmup:
                     lr = args.lr * (global_step + 1) / args.warmup
                 else:
-                    lr = args.lr * (0.85 ** (global_step // (len(train_data) // args.batch_size)))
+                    lr = args.lr * (0.85 ** (global_step // (len(epoch_train) // args.batch_size)))
                 
                 for pg in optimizer.param_groups:
                     pg['lr'] = lr
