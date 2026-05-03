@@ -1117,7 +1117,7 @@ class Parser:
                 return self._parse_builtin_call(t.value)
             self._advance()
             node = ASTNode('Identifier', value=t.value, line=t.line)
-            # Check for function call or field access
+            # Check for function call: identifier(args)
             if self._current().type == TokenType.LPAREN:
                 self._advance()  # (
                 args = []
@@ -1127,39 +1127,34 @@ class Parser:
                         self._advance()
                 self._expect(TokenType.RPAREN)
                 node = ASTNode('Call', value=t.value, children=args, line=t.line)
-                return node
-            elif self._current().type == TokenType.DOT:
-                self._advance()
-                field = self._advance().value
-                # Check if this is a method call: obj.method(args)
-                if self._current().type == TokenType.LPAREN:
-                    self._advance()  # consume (
-                    args = []
-                    while self._current().type != TokenType.RPAREN:
-                        args.append(self._parse_expression())
-                        if self._current().type == TokenType.COMMA:
-                            self._advance()
-                    self._expect(TokenType.RPAREN)
-                    node = ASTNode('MethodCall', value=field, children=[node] + args, line=t.line)
-                    return node
-                else:
-                    node = ASTNode('FieldAccess', value=field, children=[node], line=t.line)
-                return node
+            # Check for index/slice: identifier[expr]
             elif self._current().type == TokenType.LBRACKET:
-                # Array index or slice: identifier[expr] or identifier[start:end]
                 self._advance()  # consume [
                 first = self._parse_expression()
                 if self._current().type == TokenType.COLON:
-                    # Slice: identifier[start:end]
                     self._advance()  # consume :
                     second = self._parse_expression()
                     self._expect(TokenType.RBRACKET)
                     node = ASTNode('SliceAccess', children=[node, first, second], line=t.line)
-                    return node
-                self._expect(TokenType.RBRACKET)
-                node = ASTNode('IndexAccess', children=[node, first], line=t.line)
-                return node
-            return node  # plain identifier or modified node
+                else:
+                    self._expect(TokenType.RBRACKET)
+                    node = ASTNode('IndexAccess', children=[node, first], line=t.line)
+            # Apply chained dot access (obj.field, obj.method())
+            return self._apply_chained_dot(node)
+        elif t.type == TokenType.CONFIG and self._peek() and self._peek().type == TokenType.LPAREN:
+            # 配置 as class instantiation (not config declaration)
+            self._advance()
+            node = ASTNode('Identifier', value=t.value, line=t.line)
+            if self._current().type == TokenType.LPAREN:
+                self._advance()
+                args = []
+                while self._current().type != TokenType.RPAREN:
+                    args.append(self._parse_expression())
+                    if self._current().type == TokenType.COMMA:
+                        self._advance()
+                self._expect(TokenType.RPAREN)
+                node = ASTNode('Call', value=t.value, children=args, line=t.line)
+            return self._apply_chained_dot(node)
         elif t.type == TokenType.LPAREN:
             self._advance()
             expr = self._parse_expression()
@@ -1167,11 +1162,28 @@ class Parser:
             return expr
         elif t.type == TokenType.LBRACKET:
             return self._parse_list()
-
         else:
             self._advance()
             return ASTNode('Unknown', value=t.value, line=t.line)
-
+    def _apply_chained_dot(self, node):
+        """Apply chained dot access (obj.field.method()) to any node."""
+        while self._current() and self._current().type == TokenType.DOT:
+            self._advance()
+            field = self._advance().value
+            if self._current().type == TokenType.LPAREN:
+                # Method call: obj.method(args)
+                self._advance()  # consume (
+                args = []
+                while self._current().type != TokenType.RPAREN:
+                    args.append(self._parse_expression())
+                    if self._current().type == TokenType.COMMA:
+                        self._advance()
+                self._expect(TokenType.RPAREN)
+                node = ASTNode('MethodCall', value=field, children=[node] + args, line=node.line)
+            else:
+                # Field access: obj.field
+                node = ASTNode('FieldAccess', value=field, children=[node], line=node.line)
+        return node
     def _parse_object_literal(self):
         """Parse object literal { key: value, ... }"""
         node = ASTNode('ObjectLiteral', line=self._current().line)
