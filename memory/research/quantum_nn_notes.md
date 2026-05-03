@@ -4739,3 +4739,40 @@ You are a professional translator. Translate Chinese to English.<|im_end|>
 2. 合并到V13数据集 (77K→120K+)
 3. 用课程学习+LoRA训练V13
 4. V13达到Val<2后: 回译生成yi数据
+
+## 研究#251: CPU训练优化策略 (2026-05-04)
+
+### 当前瓶颈
+- V12训练: 23min/epoch, 68K数据, 4.5M参数
+- CPU-only, 无GPU, 内存2.7GB/7.4GB
+- 主要耗时: 前向+反向传播(纯CPU矩阵运算)
+
+### 优化方案
+1. **梯度累积**(已实现): batch_size=4 × accum_steps=4 = effective 16
+   - 减少内存峰值, 等效大批量
+2. **学习率调度**: 当前用step decay(0.85^step)
+   - 改进: Cosine Annealing(更平滑收敛)
+   - 公式: lr = lr_min + 0.5*(lr_max-lr_min)*(1+cos(πt/T))
+3. **梯度裁剪**: 防止梯度爆炸
+   - `torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)`
+4. **torch.compile()**: PyTorch 2.x JIT编译(需torch>=2.0)
+   - 可加速10-30% (CPU也有优化)
+5. **减少验证频率**: --val_interval 5 (每5 epoch验证一次)
+   - 省4min/epoch × 5 = 20min/5epochs
+
+### Cosine Annealing实施
+```python
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    optimizer, T_max=args.epochs, eta_min=1e-5
+)
+```
+- 自动平滑衰减, 无需手动step
+- 在训练后期更精细调整
+
+### 下次训练(V13)参数
+- 数据: v13_clean (77K)
+- 模型: 4.5M (V7-Small架构)
+- LoRA: r=16 (1.6%可训练)
+- 课程学习: 4阶段difficulty递增
+- Cosine Annealing LR
+- 梯度裁剪: max_norm=1.0
