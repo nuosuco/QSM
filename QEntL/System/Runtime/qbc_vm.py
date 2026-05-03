@@ -669,7 +669,23 @@ class QBCVirtualMachine:
                 print(msg)
             self.ip += 1
         elif op == OpCode.BUILTIN_CALL:
-            func_name = operand
+            # operand is (func_name, arg_count) or just func_name (legacy)
+            if isinstance(operand, (list, tuple)):
+                func_name = operand[0]
+                expected_args = operand[1] if len(operand) > 1 else None
+            else:
+                func_name = operand
+                expected_args = None
+            
+            # Pop only the expected number of arguments from stack
+            # This prevents consuming extra items in complex expressions
+            builtin_args = []
+            if expected_args is not None:
+                for _ in range(expected_args):
+                    builtin_args.insert(0, self.stack.pop() if self.stack else None)
+            # Push args back so individual handlers can pop them
+            for arg in builtin_args:
+                self.stack.append(arg)
             if func_name == '长度':
                 if self.stack:
                     val = self.stack.pop()

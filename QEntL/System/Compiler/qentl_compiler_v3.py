@@ -1409,7 +1409,7 @@ class CodeGenerator:
         elif node.type == 'BuiltinCall':
             for child in node.children:
                 self._gen_node(child)
-            self._emit(OpCode.BUILTIN_CALL, node.value, node.line)
+            self._emit(OpCode.BUILTIN_CALL, (node.value, len(node.children)), node.line)
         elif node.type == 'Switch':
             # Evaluate match expression
             self._gen_node(node.children[0])
@@ -1513,7 +1513,7 @@ class CodeGenerator:
                 self._emit(OpCode.STORE_VAR, iter_idx, node.line)
                 # Store arr length as end
                 self._emit(OpCode.LOAD_VAR, iter_arr, node.line)
-                self._emit(OpCode.BUILTIN_CALL, '长度', node.line)
+                self._emit(OpCode.BUILTIN_CALL, ('长度', 1), node.line)
                 self._emit(OpCode.STORE_VAR, f'_for_end_{node.value}', node.line)
                 # Init loop var to arr[0]
                 self._emit(OpCode.LOAD_VAR, iter_arr, node.line)
