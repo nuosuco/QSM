@@ -4275,3 +4275,41 @@ W = W₀ + BA  (B∈R^(d×r), A∈R^(r×d), r≪d)
 - 避免早期被复杂数据干扰
 - 字符/词组先学会→句子才能理解
 - 类似人类学习: 先学字母→词→句子→文章
+
+## 研究#237: 子词分词方案实施细节 (2026-05-03)
+
+### 当前问题
+- 词汇表6924个token, 大量<unk>
+- 彝文4120字各占1个token, 无法表示未登录字
+- 英文全小写但仍有很多未登录词
+
+### SentencePiece方案
+1. 用V12数据(68K对)训练SentencePiece模型
+2. 目标词汇量: 16000 (当前6924→16000)
+3. 彝文字符保留完整(不拆分), 英文用BPE
+4. 中文也用BPE(常见字/词组合并)
+
+### 实施步骤
+```python
+import sentencepiece as spm
+# 训练SPM
+spm.SentencePieceTrainer.train(
+    input='v12_corpus.txt',
+    model_prefix='qsm_v12',
+    vocab_size=16000,
+    character_coverage=0.9995,
+    model_type='bpe',
+    treat_whitespace_as_suffix=True
+)
+```
+
+### 预期效果
+- <unk>率从~15%降至<2%
+- 英文词如"quantum"/"computer"不再全是单字符
+- 彝文保留字符级(已4120字)
+- 模型参数量: 4.5M→8M (因词汇扩大)
+
+### 风险
+- SentencePiece是Python库(违反量子自举?)
+- 可以用QEntL重写BPE算法(长期)
+- 短期: SPM训练→导出词表→QSM训练
