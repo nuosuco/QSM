@@ -1447,35 +1447,66 @@ class CodeGenerator:
                     self._gen_node(child.children[0])
             self.instructions.append({'op': 'LABEL', 'name': end_label})
         elif node.type == 'If':
-            else_label = self._new_label()
-            end_label = self._new_label()
-            self._gen_node(node.children[0])  # condition
-            self._emit(OpCode.JUMP_IF_FALSE, else_label, node.line)
-            self._gen_node(node.children[1])  # if body
-            self._emit(OpCode.JUMP, end_label, node.line)
-            # Else label
-            self.instructions.append({'op': 'LABEL', 'name': else_label})
-            if len(node.children) > 2:
-                # Handle elif chain
-                # children[2..n] are elif If nodes or a final else Block
-                # If only children[2] exists, it's a single else/elif
-                if len(node.children) == 3:
-                    # Single else or nested elif-with-else
-                    self._gen_node(node.children[2])
+            # Handle elif chain - parser creates either flat or nested AST
+            # Flat (4+ch): If(c1,b1, If(c2,b2), If(c3,b3), If(c4,b4,else))
+            # Nested (3ch): If(c1,b1, If(c2,b2, elseBlock))
+            branches = []
+            else_body = None
+            
+            # First branch is always children[0] and children[1]
+            branches.append((node.children[0], node.children[1]))
+            
+            if len(node.children) == 3:
+                # Nested: children[2] is If (with possible nested elif) or Block
+                child2 = node.children[2]
+                if child2.type == 'If':
+                    # Walk nested If chain
+                    current = child2
+                    while True:
+                        branches.append((current.children[0], current.children[1]))
+                        if len(current.children) > 2:
+                            nxt = current.children[2]
+                            if nxt.type == 'If':
+                                current = nxt
+                                continue
+                            else:
+                                else_body = nxt
+                        break
                 else:
-                    # Multiple elif nodes without else at the end
-                    # Generate each elif inline
-                    for i in range(2, len(node.children)):
-                        child = node.children[i]
-                        child_else = self._new_label()
-                        self._gen_node(child.children[0])  # elif condition
-                        self._emit(OpCode.JUMP_IF_FALSE, child_else, child.line)
-                        self._gen_node(child.children[1])  # elif body
-                        self._emit(OpCode.JUMP, end_label, child.line)
-                        self.instructions.append({'op': 'LABEL', 'name': child_else})
+                    else_body = child2
+            elif len(node.children) > 3:
+                # Flat: children[2..n-1] are If nodes, last may have else
+                for ci in range(2, len(node.children)):
+                    child = node.children[ci]
+                    if child.type == 'If':
+                        branches.append((child.children[0], child.children[1]))
+                        if len(child.children) > 2:
+                            else_body = child.children[2]  # Final else
+                    else:
+                        else_body = child
+            
+            end_label = self._new_label()
+            # Generate first branch (if)
+            next_label = self._new_label() if len(branches) > 1 or else_body else end_label
+            self._gen_node(branches[0][0])
+            self._emit(OpCode.JUMP_IF_FALSE, next_label, node.line)
+            self._gen_node(branches[0][1])
+            self._emit(OpCode.JUMP, end_label, node.line)
+            # Generate elif branches
+            for i in range(1, len(branches)):
+                self.instructions.append({'op': 'LABEL', 'name': next_label})
+                is_last = (i == len(branches) - 1)
+                next_label = self._new_label() if (not is_last or else_body) else end_label
+                self._gen_node(branches[i][0])
+                self._emit(OpCode.JUMP_IF_FALSE, next_label, branches[i][0].line)
+                self._gen_node(branches[i][1])
+                self._emit(OpCode.JUMP, end_label, node.line)
+            # Generate else body
+            if else_body:
+                self.instructions.append({'op': 'LABEL', 'name': next_label})
+                self._gen_node(else_body)
             # End label
-            self.instructions.append({"op": "LABEL", "name": end_label})
-
+            self.instructions.append({'op': 'LABEL', 'name': end_label})
         elif node.type == 'For':
             start_label = self._new_label()
             end_label = self._new_label()

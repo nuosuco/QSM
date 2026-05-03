@@ -642,6 +642,33 @@ def test_format_specs():
     assert any('1+2=3' in r for r in result), f"Expected 1+2=3 in {result}"
     print("✅ 格式规范(format specs) 通过:", result)
 
+
+def test_elif_5branch():
+    """测试5分支elif/else链"""
+    code = """
+分类: 函数(score) {
+    如果 score >= 90 { 返回 "优秀" }
+    否则如果 score >= 80 { 返回 "良好" }
+    否则如果 score >= 70 { 返回 "中等" }
+    否则如果 score >= 60 { 返回 "及格" }
+    否则 { 返回 "不及格" }
+}
+主函数: 函数() {
+    打印(分类(95))
+    打印(分类(85))
+    打印(分类(75))
+    打印(分类(65))
+    打印(分类(45))
+}
+"""
+    result = run_qentl(code)
+    assert any('优秀' in r for r in result), f"Expected 优秀 in {result}"
+    assert any('良好' in r for r in result), f"Expected 良好 in {result}"
+    assert any('中等' in r for r in result), f"Expected 中等 in {result}"
+    assert any('及格' in r for r in result), f"Expected 及格 in {result}"
+    assert any('不及格' in r for r in result), f"Expected 不及格 in {result}"
+    print("✅ 5分支elif链(multi-elif) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -667,6 +694,7 @@ tests = [
     test_fibonacci_memo,
     test_multi_return_and_string_ops,
     test_format_specs,
+    test_elif_5branch,
 ]
 
 if __name__ == '__main__':
