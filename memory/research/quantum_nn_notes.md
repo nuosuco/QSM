@@ -4366,3 +4366,41 @@ spm.SentencePieceTrainer.train(
 - V13训练 → 对比V8质量
 - 如果仍不够: 需要更多高质量句子数据(>10K句)
 - 考虑用外部平行语料库(Tatoeba/OPUS)
+
+## 研究#240: Transformer改进方案 — 旋转位置编码(RoPE) (2026-05-03)
+
+### 当前问题
+- QSM使用固定正弦位置编码
+- 长序列外推能力差(训练128tokens,推理>128时崩溃)
+- 位置信息与内容信息解耦不够
+
+### RoPE (Rotary Position Embedding)
+- 论文: "RoFormer" (Su et al., 2021)
+- 核心思想: 用旋转矩阵编码位置信息
+- 将位置信息融入注意力计算(q·k时自动包含相对位置)
+
+### 优势
+1. 相对位置编码(天然支持)
+2. 长度外推性好(训练128,推理512)
+3. 计算效率高(仅2D旋转)
+4. 不需要额外位置参数
+
+### 实施方案
+```python
+class RotaryEmbedding(nn.Module):
+    def __init__(self, dim, max_seq_len=512):
+        super().__init__()
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
+        self.register_buffer('inv_freq', inv_freq)
+        
+    def forward(self, x, seq_len):
+        t = torch.arange(seq_len, device=x.device)
+        freqs = torch.outer(t, self.inv_freq)
+        emb = torch.cat([freqs, freqs], dim=-1)
+        return emb.cos(), emb.sin()
+```
+
+### QSM改进计划
+1. 替换固定位置编码→RoPE
+2. max_seq_len从128→512
+3. 预期: 长文本翻译质量提升
