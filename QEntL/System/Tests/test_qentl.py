@@ -598,6 +598,34 @@ fib_cache: {}
         assert e in result, f"Expected {e} in {result}"
     print("✅ 斐波那契记忆化(fibonacci memoization) 通过:", result)
 
+
+def test_multi_return_and_string_ops():
+    """测试多返回值(列表)和字符串连接/重复"""
+    code = """
+最大最小: 函数(arr) {
+    让 mx = arr[0]
+    让 mn = arr[0]
+    循环 x 在 arr {
+        如果 x > mx { mx = x }
+        如果 x < mn { mn = x }
+    }
+    返回 [mx, mn]
+}
+
+主函数: 函数() {
+    让 r = 最大最小([5, 3, 9, 1, 7])
+    打印(格式("max={},min={}", r[0], r[1]))
+    让 words = ["a", "b", "c"]
+    打印(连接(words, "-"))
+    打印(重复("*", 3))
+}
+"""
+    result = run_qentl(code)
+    assert 'max=9,min=1' in result, f"Expected max=9,min=1 in {result}"
+    assert 'a-b-c' in result, f"Expected a-b-c in {result}"
+    assert '***' in result, f"Expected *** in {result}"
+    print("✅ 多返回值+字符串操作(multi-return+string ops) 通过:", result)
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -621,6 +649,7 @@ tests = [
     test_break_continue,
     test_nested_builtins,
     test_fibonacci_memo,
+    test_multi_return_and_string_ops,
 ]
 
 if __name__ == '__main__':
