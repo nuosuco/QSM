@@ -1274,6 +1274,53 @@ def test_fast_exponentiation():
     print("✅ 快速幂(fast exponentiation) 通过:", result)
 
 
+def test_prefix_sum():
+    """前缀和(累积和)"""
+    code = """
+前缀和: 函数(arr) {
+    让 result = []
+    让 s = 0
+    循环 x 在 arr {
+        s = s + x
+        推入(result, s)
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    让 data = [1, 2, 3, 4, 5]
+    让 ps = 前缀和(data)
+    打印(连接(ps, ","))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1,3,6,10,15'], f"前缀和: {result}"
+    print("✅ 前缀和(prefix sum) 通过:", result)
+
+
+def test_decimal_to_binary():
+    """十进制转二进制"""
+    code = """
+十转二: 函数(n) {
+    如果 n == 0 { 返回 "0" }
+    让 result = ""
+    循环当 n > 0 {
+        result = 格式("{}{}", n % 2, result)
+        n = 取整(n / 2)
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(十转二(10))
+    打印(十转二(255))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1010', '11111111'], f"进制转换: {result}"
+    print("✅ 十进制转二进制(decimal to binary) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1303,7 +1350,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary,
 ]
 
 if __name__ == '__main__':
