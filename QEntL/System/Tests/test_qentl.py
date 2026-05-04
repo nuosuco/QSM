@@ -766,6 +766,33 @@ def test_string_utilities():
     print("✅ 字符串工具函数(string utilities) 通过:", result)
 
 
+def test_class_external_methods():
+    """quantum_class + 外部方法模式 (Go-style)"""
+    code = """
+quantum_class 学生 { 姓名: 字符串; 分数: 整数 }
+
+评价: 函数(self) {
+    如果 self.分数 >= 90 { 返回 "A" }
+    否则如果 self.分数 >= 60 { 返回 "D" }
+    否则 { 返回 "F" }
+}
+
+报告: 函数(self) {
+    返回 格式("{}: {}={}", self.姓名, self.分数, 评价(self))
+}
+
+主函数: 函数() {
+    让 s1 = 学生(); s1.姓名 = "张三"; s1.分数 = 95
+    让 s2 = 学生(); s2.姓名 = "王五"; s2.分数 = 55
+    打印(报告(s1))
+    打印(报告(s2))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['张三: 95=A', '王五: 55=F'], f"类外部方法: {result}"
+    print("✅ 类外部方法(class+external methods) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -795,7 +822,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities,
+    test_system_builtins, test_string_utilities, test_class_external_methods,
 ]
 
 if __name__ == '__main__':
