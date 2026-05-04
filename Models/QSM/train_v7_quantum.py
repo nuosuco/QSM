@@ -485,6 +485,9 @@ else:
         print(log_line, flush=True)
         with open(log_file, 'a') as f:
             f.write(log_line + '\n')
+            # Step the LR scheduler
+            if scheduler is not None:
+                scheduler.step()
         
         # Save
         if is_best:
