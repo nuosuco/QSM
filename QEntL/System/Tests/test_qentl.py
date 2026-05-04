@@ -1175,6 +1175,30 @@ def test_nested_list_iteration():
     print("✅ 嵌套列表迭代(nested list/matrix sum) 通过:", result)
 
 
+def test_is_prime():
+    """素数判断"""
+    code = """
+是素数: 函数(n) {
+    如果 n < 2 { 返回 0 }
+    让 i = 2
+    循环当 i * i <= n {
+        如果 n % i == 0 { 返回 0 }
+        i = i + 1
+    }
+    返回 1
+}
+
+主函数: 函数() {
+    打印(格式("7={}", 是素数(7)))
+    打印(格式("10={}", 是素数(10)))
+    打印(格式("13={}", 是素数(13)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['7=1', '10=0', '13=1'], f"素数: {result}"
+    print("✅ 素数判断(is prime) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1204,7 +1228,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime,
 ]
 
 if __name__ == '__main__':
