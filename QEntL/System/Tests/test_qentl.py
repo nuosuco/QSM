@@ -930,6 +930,26 @@ def test_recursive_factorial():
     print("✅ 递归阶乘(recursive factorial) 通过:", result)
 
 
+def test_recursive_fibonacci():
+    """递归斐波那契"""
+    code = """
+斐波那契: 函数(n) {
+    如果 n <= 1 { 返回 n }
+    返回 斐波那契(n - 1) + 斐波那契(n - 2)
+}
+
+主函数: 函数() {
+    循环 i 在 范围数(0, 10) {
+        打印(格式("F({})={}", i, 斐波那契(i)))
+    }
+}
+"""
+    result = run_qentl(code)
+    assert result == ['F(0)=0','F(1)=1','F(2)=1','F(3)=2','F(4)=3',
+                       'F(5)=5','F(6)=8','F(7)=13','F(8)=21','F(9)=34'], f"斐波那契: {result}"
+    print("✅ 递归斐波那契(recursive fibonacci) 通过:", result[:3], "...")
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -959,7 +979,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci,
 ]
 
 if __name__ == '__main__':
