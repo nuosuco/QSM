@@ -971,6 +971,28 @@ def test_array_sum_average():
     print("✅ 数组求和平均(array sum/average) 通过:", result)
 
 
+def test_list_filter():
+    """列表过滤(偶数筛选)"""
+    code = """
+过滤偶数: 函数(arr) {
+    让 result = []
+    循环 x 在 arr {
+        如果 x % 2 == 0 { 推入(result, x) }
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    让 nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    让 evens = 过滤偶数(nums)
+    打印(格式("偶数个数={}", 长度(evens)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['偶数个数=5'], f"列表过滤: {result}"
+    print("✅ 列表过滤(list filter) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1000,7 +1022,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter,
 ]
 
 if __name__ == '__main__':
