@@ -1128,6 +1128,32 @@ def test_euclidean_gcd():
     print("✅ 辗转相除法(Euclidean GCD) 通过:", result)
 
 
+def test_binary_search():
+    """二分查找算法"""
+    code = """
+二分查找: 函数(arr, target) {
+    让 low = 0
+    让 high = 长度(arr) - 1
+    循环当 low <= high {
+        让 mid = 取整((low + high) / 2)
+        如果 arr[mid] == target { 返回 mid }
+        否则如果 arr[mid] < target { low = mid + 1 }
+        否则 { high = mid - 1 }
+    }
+    返回 -1
+}
+
+主函数: 函数() {
+    让 data = [1, 3, 5, 7, 9, 11, 13, 15]
+    打印(格式("7={}", 二分查找(data, 7)))
+    打印(格式("8={}", 二分查找(data, 8)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['7=3', '8=-1'], f"二分查找: {result}"
+    print("✅ 二分查找(binary search) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1157,7 +1183,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search,
 ]
 
 if __name__ == '__main__':
