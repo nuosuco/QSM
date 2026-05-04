@@ -1199,6 +1199,30 @@ def test_is_prime():
     print("✅ 素数判断(is prime) 通过:", result)
 
 
+def test_palindrome_check():
+    """回文字符串判断"""
+    code = """
+是回文: 函数(s) {
+    让 i = 0
+    让 j = 长度(s) - 1
+    循环当 i < j {
+        如果 子串(s, i, 1) != 子串(s, j, 1) { 返回 0 }
+        i = i + 1
+        j = j - 1
+    }
+    返回 1
+}
+
+主函数: 函数() {
+    打印(格式("aba={}", 是回文("aba")))
+    打印(格式("abc={}", 是回文("abc")))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['aba=1', 'abc=0'], f"回文: {result}"
+    print("✅ 回文判断(palindrome check) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1228,7 +1252,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check,
 ]
 
 if __name__ == '__main__':
