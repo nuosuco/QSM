@@ -875,6 +875,27 @@ quantum_class 商品 { 名称: 字符串; 价格: 整数 }
     print("✅ 综合集成(comprehensive integration) 通过:", result)
 
 
+def test_string_pipeline():
+    """字符串处理管道"""
+    code = """
+主函数: 函数() {
+    让 s = "hello world from qentl"
+    让 parts = 分割(s, " ")
+    让 upper = []
+    循环 p 在 parts {
+        推入(upper, 首大写(p))
+    }
+    打印(格式("词数={}", 长度(parts)))
+    打印(格式("首词={}", parts[0]))
+    打印(格式("包含qentl={}", 包含(s, "qentl")))
+    打印(格式("位置={}", 字符位置(s, "world")))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['词数=4', '首词=hello', '包含qentl=1', '位置=6'], f"字符串管道: {result}"
+    print("✅ 字符串处理管道(string pipeline) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -904,7 +925,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline,
 ]
 
 if __name__ == '__main__':
