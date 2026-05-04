@@ -1502,6 +1502,29 @@ def test_selection_sort():
     print("✅ 选择排序(selection sort) 通过:", result)
 
 
+def test_collatz_steps():
+    """考拉兹猜想(3n+1问题)步数"""
+    code = """
+考拉兹步数: 函数(n) {
+    让 steps = 0
+    循环当 n != 1 {
+        如果 n % 2 == 0 { n = 取整(n / 2) }
+        否则 { n = n * 3 + 1 }
+        steps = steps + 1
+    }
+    返回 steps
+}
+
+主函数: 函数() {
+    打印(格式("1={}", 考拉兹步数(1)))
+    打印(格式("7={}", 考拉兹步数(7)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1=0', '7=16'], f"考拉兹: {result}"
+    print("✅ 考拉兹猜想(Collatz 3n+1) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1531,7 +1554,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps,
 ]
 
 if __name__ == '__main__':
