@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import argparse
+import loralib as lora
 from collections import Counter
 
 # === 量子嵌入 (4基态叠加) ===
