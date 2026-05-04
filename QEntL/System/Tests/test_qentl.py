@@ -1349,6 +1349,24 @@ def test_run_length_encoding():
     print("✅ 行程编码(RLE/compression) 通过:", result)
 
 
+def test_fizzbuzz():
+    """FizzBuzz经典编程题"""
+    code = """
+主函数: 函数() {
+    循环 i 在 范围数(1, 16) {
+        如果 i % 15 == 0 { 打印("FizzBuzz") }
+        否则如果 i % 3 == 0 { 打印("Fizz") }
+        否则如果 i % 5 == 0 { 打印("Buzz") }
+        否则 { 打印(格式("{}", i)) }
+    }
+}
+"""
+    result = run_qentl(code)
+    expected = ['1', '2', 'Fizz', '4', 'Buzz', 'Fizz', '7', '8', 'Fizz', 'Buzz', '11', 'Fizz', '13', '14', 'FizzBuzz']
+    assert result == expected, f"FizzBuzz: {result}"
+    print("✅ FizzBuzz 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1378,7 +1396,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz,
 ]
 
 if __name__ == '__main__':

@@ -5599,3 +5599,32 @@ cumsum = torch.cumsum(sorted_probs, dim=-1)
 - 续训命令已验证可工作(--resume正确恢复)
 - best.pth每epoch备份
 - 新日志: /tmp/qsm_v13_train2.log
+
+## 研究#272: QEntL 推入函数内返回空列表bug (2026-05-04)
+
+### 现象
+- 函数内: 推入(result, 99) → 长度(result)=1 ✅
+- 函数外: 让 m = 合并(a,b) → 长度(m)=0 ❌
+- RETURN返回的列表是空的, 但函数内部推入是成功的
+
+### 根因分析
+推入(list, item)修改list in-place, 但flat namespace下:
+- `result`在函数作用域内指向新列表对象
+- 推入修改了该对象(内部确认len=1)
+- RETURN时: `self.stack.append(self.variables.get(name))` 
+- 问题: RETURN可能返回了变量的早期值或浅拷贝
+
+### 影响
+- 影响所有在函数内使用推入+返回列表的代码
+- 已有测试(推入在主函数内)不受影响
+- 冒泡排序/插入排序可以工作是因为它们直接修改传入的list参数
+
+### 临时方案
+- 避免在函数内创建新空列表+推入+返回的模式
+- 使用字符串拼接代替(已验证可行)
+- 或在主函数内创建list, 传入函数修改
+
+### 修复方向
+1. 检查RETURN handler是否正确读取variables中的列表引用
+2. 确保推入修改的是同一个对象(引用传递)
+3. 可能需要: RETURN时用`self.variables[self.return_vars[-1]]`而非拷贝
