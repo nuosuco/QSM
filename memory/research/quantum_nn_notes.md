@@ -5802,3 +5802,43 @@ cumsum = torch.cumsum(sorted_probs, dim=-1)
 | < 2.0 | 有望产生有意义输出 | 替换主API |
 | < 1.5 | 较好质量 | Beam search优化 |
 | < 1.0 | 高质量翻译 | 正式发布! |
+
+## 研究#278: V13训练LR Schedule BUG发现 (2026-05-04)
+
+### BUG描述
+train_v7_quantum.py 第426-432行有**手动LR覆盖代码**:
+```python
+if global_step < args.warmup:
+    lr = args.lr * (global_step + 1) / args.warmup
+else:
+    lr = args.lr * (0.85 ** (global_step // (len(epoch_train) // args.batch_size)))
+for pg in optimizer.param_groups:
+    pg['lr'] = lr
+```
+这段代码在每个accum_step中覆盖optimizer的lr, **完全无视SGDR scheduler**!
+
+### 影响
+- `--scheduler sgdr` 参数虽然设置了CosineAnnealingWarmRestarts
+- scheduler.step()在epoch结束后被调用, 设置lr
+- 但下一个batch, 手动代码立即覆盖scheduler设置的lr
+- **实际使用的是step decay (0.85^n), 不是SGDR!**
+
+### 为什么V13仍然成功?
+- Step decay(0.85^n)本身是合理的衰减策略
+- V13连续10次BEST, 说明step decay在这个数据集上有效
+- 0.85^10 ≈ 0.197, E10时lr ≈ 0.0003 * 0.197 = 0.000059
+
+### 修复方案(V14)
+```python
+if args.scheduler == 'sgdr':
+    # SGDR manages lr automatically
+    pass  # 不要手动覆盖!
+elif global_step < args.warmup:
+    lr = args.lr * (global_step + 1) / args.warmup
+    for pg in optimizer.param_groups:
+        pg['lr'] = lr
+```
+
+### 决策
+- **V13训练中不修复!** 当前策略仍在产生BEST
+- V14使用真正的SGDR + warmup, 比较效果

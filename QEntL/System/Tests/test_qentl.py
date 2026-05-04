@@ -1639,6 +1639,30 @@ def test_string_dedup():
     print("✅ 字符串去重(string dedup) 通过:", result)
 
 
+def test_frequency_count():
+    """字符串频率统计(dict+条件赋值)"""
+    code = """
+频率统计: 函数(text) {
+    让 freq = {}
+    循环 i 在 范围数(0, 长度(text)) {
+        让 c = 子串(text, i, 1)
+        如果 包含(freq, c) { freq[c] = freq[c] + 1 }
+        否则 { freq[c] = 1 }
+    }
+    返回 freq
+}
+
+主函数: 函数() {
+    让 f = 频率统计("aabb")
+    打印(格式("a={}", f["a"]))
+    打印(格式("b={}", f["b"]))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['a=2', 'b=2'], f"频率: {result}"
+    print("✅ 频率统计(frequency count) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1668,7 +1692,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count,
 ]
 
 if __name__ == '__main__':
