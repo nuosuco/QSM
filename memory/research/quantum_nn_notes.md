@@ -6474,3 +6474,58 @@ sudo systemctl start qsm-v13-train
 3. **并发基础**: 协程/通道
 4. **量子扩展**: 纠缠交换/量子隐形传态算法
 5. **Web集成**: HTTP请求/JSON处理
+
+## 研究#294: SPM子词编码对低资源MT的影响 (2026-05-04)
+
+### 当前问题: 字符级编码效率低
+- V13使用7403字符词汇表, 每个token=1字符
+- "hello world" = 11 tokens (h,e,l,l,o, ,w,o,r,l,d)
+- "你好世界" = 4 tokens (你,好,世,界)
+- **英文序列过长!** 64字符max_len=64字符(约10-12英文单词)
+
+### SPM 32K词汇的改进
+- "hello world" ≈ 2-3 tokens (子词级)
+- "你好世界" ≈ 2-3 tokens
+- **序列长度减少3-5x!** 64 tokens ≈ 30-50英文单词
+
+### 对训练的影响
+| 指标 | 字符级(7403) | SPM 32K |
+|------|-------------|---------|
+| 平均输入长度 | 20-40 tokens | 5-15 tokens |
+| 平均输出长度 | 20-40 tokens | 5-15 tokens |
+| 信息密度 | 低 | 高 |
+| 训练速度 | 慢(长序列) | 快(短序列) |
+| max_len=64覆盖 | ~10英文字 | ~50英文字 |
+| OOV风险 | 低(字符覆盖) | 中(未登录词) |
+
+### 彝文特殊考虑
+- 4120彝文字符→SPM可能拆分为子词
+- **推荐**: 彝文保持字符级, 中文/英文用SPM
+- 混合编码: 彝文1char=1token, 中英文=子词
+
+### 实施方案
+```python
+import sentencepiece as spm
+
+# 训练SPM模型(中英文+彝文)
+spm.SentencePieceTrainer.train(
+    input='v13_corpus.txt',
+    model_prefix='qsm_spm_v14',
+    vocab_size=32000,
+    character_coverage=0.9995,  # 中文需要高覆盖
+    model_type='bpe',
+    unk_id=0, bos_id=1, eos_id=2, pad_id=3
+)
+```
+
+### V14 SPM训练数据准备
+1. 提取v13_clean_dataset.json所有input/output文本
+2. 合并为corpus.txt(一行一句)
+3. 训练SPM 32K模型
+4. 重新编码训练数据→新dataset.json
+5. 修改train_v7_quantum.py的tokenization
+
+### 预期效果
+- **Val -0.10~0.20**: 信息密度提升, 序列更短
+- **推理加速3-5x**: 输出token数减少
+- **长句能力**: max_len=64可处理50+单词句子
