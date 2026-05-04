@@ -5252,3 +5252,46 @@ class MultiLangControl:
 - **当前瓶颈不是语言控制, 是Val Loss太高(2.93)**
 - Val < 2.0后语言控制才变得重要
 - 先把Val降下来, 再优化语言控制
+
+## 研究#262: 词汇表扩展策略 (2026-05-04)
+
+### 当前词汇表问题
+- v4_vocab.json: 6924个token (4120彝文/2720中文/26英文/6特殊/52其他)
+- 英文仅26个token! → 大写字母G/M/H/W/F不在词汇表中
+- UNK token过多 → 模型输出含<unk>和英文碎片
+
+### 词汇表扩展方案
+
+#### 方案1: BPE/SPM扩展 (推荐)
+- 当前SPM: qsm_spm_v12.model (16000词汇)
+- 扩展到32000: 更多英文subword覆盖
+- 优点: 自动处理OOV, 无需手动添加
+- 缺点: 需要重新训练(新tokenizer→新数据)
+
+#### 方案2: 手动扩展英文词汇
+- 添加500常用英文词到vocab.json
+- 覆盖: 200高频动词/150名词/100形容词/50副词
+- 优点: 兼容现有模型
+- 缺点: 不能完全解决OOV问题
+
+#### 方案3: 双tokenizer (最佳)
+- 中文/彝文: 用SPM tokenizer
+- 英文: 用现有英文tokenizer
+- 合并: 训练时根据语言选择tokenizer
+- 优点: 各语言最优tokenization
+- 缺点: 实现复杂
+
+### 实施路线
+1. **V13**: 手动扩展英文词汇(+500) → 立即可做
+2. **V14**: SPM 32000词汇 → 重新训练
+3. **V15**: 双tokenizer → 架构升级
+
+### 英文高频词列表(top 100)
+the, be, to, of, and, a, in, that, have, i, it, for, not, on, with,
+he, as, you, do, at, this, but, his, by, from, they, we, say, her,
+she, or, an, will, my, one, all, would, there, their, what, so, up,
+out, if, about, who, get, which, go, me, when, make, can, like, time,
+no, just, him, know, take, people, into, year, your, good, some, could,
+them, see, other, than, then, now, look, only, come, its, over, think,
+also, back, after, use, two, how, our, work, first, well, way, even,
+new, want, because, any, these, give, day, most, us
