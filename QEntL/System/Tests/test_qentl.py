@@ -950,6 +950,27 @@ def test_recursive_fibonacci():
     print("✅ 递归斐波那契(recursive fibonacci) 通过:", result[:3], "...")
 
 
+def test_array_sum_average():
+    """数组求和与平均值"""
+    code = """
+求和: 函数(arr) {
+    让 s = 0
+    循环 x 在 arr { s = s + x }
+    返回 s
+}
+
+主函数: 函数() {
+    让 data = [3, 7, 1, 9, 4, 6, 2, 8, 5]
+    打印(格式("和={}", 求和(data)))
+    打印(格式("长度={}", 长度(data)))
+    打印(格式("平均={}", 求和(data) / 长度(data)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['和=45', '长度=9', '平均=5.0'], f"数组操作: {result}"
+    print("✅ 数组求和平均(array sum/average) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -979,7 +1000,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average,
 ]
 
 if __name__ == '__main__':
