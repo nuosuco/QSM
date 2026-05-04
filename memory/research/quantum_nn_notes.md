@@ -5628,3 +5628,28 @@ cumsum = torch.cumsum(sorted_probs, dim=-1)
 1. 检查RETURN handler是否正确读取variables中的列表引用
 2. 确保推入修改的是同一个对象(引用传递)
 3. 可能需要: RETURN时用`self.variables[self.return_vars[-1]]`而非拷贝
+
+## 研究#273: QEntL builtin名冲突审计与修复 (2026-05-04)
+
+### 问题
+用户函数名与builtin名冲突时,编译器错误地将用户函数编译为BUILTIN_CALL.
+示例: 用户定义`合并:函数()`, 但`合并`是builtin dict merge → 被编译为BUILTIN_CALL → 返回dict而非list
+
+### 根因
+编译器在解析函数调用时, 先检查builtin_funcs集合, 匹配则生成BUILTIN_CALL.
+用户函数定义在function_params中, 但调用时未优先检查.
+
+### 修复方案
+1. ✅ 临时: 从builtin_funcs移除易冲突名(已完成: 移除合并)
+2. 🔄 正确: 编译器优先检查用户定义函数, 匹配则生成CALL, 不匹配才BUILTIN_CALL
+3. 📋 长期: 命名空间隔离 - 内建函数用特殊前缀(如`内建.排序`)
+
+### 高风险冲突名
+- 排序, 翻转, 计数, 替换, 删除, 插入, 重复 - 极常见用户函数名
+- 推入, 弹出 - 较特殊,不太会冲突
+- 范围数, 随机数 - 不太会冲突
+
+### 实施优先级
+1. 编译器修改: function_params优先级 > builtin_funcs (V3.1)
+2. 添加编译期警告: 用户函数覆盖builtin时打印warning
+3. 更新测试: 添加"覆盖builtin名"测试用例

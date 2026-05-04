@@ -1400,6 +1400,34 @@ def test_merge_sorted_arrays():
     print("✅ 合并有序数组(merge sorted arrays) 通过:", result)
 
 
+def test_user_func_overrides_builtin():
+    """用户函数覆盖同名内置函数"""
+    code = """
+排序: 函数(arr) {
+    让 n = 长度(arr)
+    循环 i 在 范围数(0, n - 1) {
+        循环 j 在 范围数(0, n - i - 1) {
+            如果 arr[j] > arr[j + 1] {
+                让 temp = arr[j]
+                arr[j] = arr[j + 1]
+                arr[j + 1] = temp
+            }
+        }
+    }
+    返回 arr
+}
+
+主函数: 函数() {
+    让 data = [3, 1, 2]
+    让 s = 排序(data)
+    打印(连接(s, ","))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1,2,3'], f"覆盖builtin: {result}"
+    print("✅ 用户函数覆盖内置(user overrides builtin) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1429,7 +1457,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin,
 ]
 
 if __name__ == '__main__':
