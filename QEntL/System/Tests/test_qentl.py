@@ -2013,6 +2013,31 @@ def test_second_largest():
     print("✅ 第二大数(second largest) 通过:", result)
 
 
+def test_caesar_cipher():
+    """凯撒密码(字符代码+字符+取模)"""
+    code = """
+凯撒: 函数(text, shift) {
+    让 result = ""
+    循环 i 在 范围数(0, 长度(text)) {
+        让 code = 字符代码(子串(text, i, 1))
+        如果 code >= 97 且 code <= 122 {
+            code = ((code - 97 + shift) % 26) + 97
+        }
+        result = result + 字符(code)
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(凯撒("abc", 3))
+    打印(凯撒("xyz", 3))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['def', 'abc'], f"凯撒: {result}"
+    print("✅ 凯撒密码(caesar cipher) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -2042,7 +2067,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest, test_caesar_cipher,
 ]
 
 if __name__ == '__main__':
