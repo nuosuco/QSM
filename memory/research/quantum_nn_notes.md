@@ -6056,3 +6056,61 @@ Val(E) = a - b * ln(E)
 - ✅ 不干预, 继续训练
 - E18: 评估lr衰减, 如果<0.0001准备重置
 - E20: 执行lr重置(0.0003→0.0001)
+
+## 研究#284: 训练进程不稳定性根因分析 (2026-05-04)
+
+### 3次进程消失记录
+1. **V12 E33**: 进程中间消失(非OOM)
+2. **V13 E6 B1000**: 进程消失, 从E5 best恢复
+3. **V13 E14 B200**: 进程消失, 从E13 best恢复
+
+### 共同特征
+- 均非OOM kill (dmesg无记录, MEM使用正常)
+- 均非Python异常 (无traceback)
+- 进程完全消失 (ps找不到)
+- 发生在训练中间batch (非epoch边界)
+
+### 可能根因
+1. **系统OOM killer**: 虽然dmesg无记录, 可能被内核直接杀掉
+   - 服务器7.4GB RAM, 训练占~3-4GB
+   - QSM API(8000)+QEntL API(8003)额外占~500MB
+   - 系统进程+cache可能触发OOM
+   - **echo -17已设置, 但只降低概率不消除**
+
+2. **Python GIL + 信号**: 训练进程可能收到外部信号
+   - nohup应忽略SIGHUP
+   - 但SIGKILL无法捕获
+
+3. **内存碎片化**: 长时间训练后内存碎片→malloc失败→进程崩溃
+
+4. **numpy/PyTorch C层崩溃**: 底层C代码段错误→进程直接终止
+
+### 解决方案
+| 方案 | 效果 | 难度 |
+|------|------|------|
+| 增加swap(4GB) | 减少OOM风险 | 低 |
+| 用systemd管理训练 | 自动重启 | 中 |
+| 减小batch_size | 降低MEM | 低 |
+| 训练前停API | 释放500MB | 低 |
+| 监控脚本(cron) | 快速恢复 | 低 |
+
+### 推荐: 训练进程systemd化
+```ini
+[Unit]
+Description=QSM V13 Training
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/.openclaw/workspace
+ExecStart=python3 Models/QSM/train_v7_quantum.py ...
+Restart=on-failure
+RestartSec=30
+OOMScoreAdjust=-1000
+
+[Install]
+WantedBy=multi-user.target
+```
+- Restart=on-failure: 进程崩溃自动重启
+- OOMScoreAdjust=-1000: 最低OOM优先级
+- 但需处理resume逻辑(从best.pth恢复)
