@@ -912,6 +912,24 @@ def test_nested_function_calls():
     print("✅ 嵌套函数调用(nested function composition) 通过:", result)
 
 
+def test_recursive_factorial():
+    """递归阶乘"""
+    code = """
+阶乘: 函数(n) {
+    如果 n <= 1 { 返回 1 }
+    返回 n * 阶乘(n - 1)
+}
+
+主函数: 函数() {
+    打印(格式("5!={}", 阶乘(5)))
+    打印(格式("10!={}", 阶乘(10)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['5!=120', '10!=3628800'], f"递归阶乘: {result}"
+    print("✅ 递归阶乘(recursive factorial) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -941,7 +959,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial,
 ]
 
 if __name__ == '__main__':
