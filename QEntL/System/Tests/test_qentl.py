@@ -823,6 +823,25 @@ def test_bubble_sort():
     print("✅ 冒泡排序(bubble sort) 通过:", result)
 
 
+def test_quantum_enum_advanced():
+    """量子枚举+循环+条件"""
+    code = """
+quantum_enum 量子态 { 基态, 激发态, 叠加态, 纠缠态 }
+
+主函数: 函数() {
+    让 states = [量子态.基态, 量子态.激发态, 量子态.叠加态, 量子态.纠缠态]
+    循环 i 在 范围数(0, 4) {
+        如果 states[i] == 量子态.纠缠态 {
+            打印(格式("纠缠态:位置={}", i))
+        }
+    }
+}
+"""
+    result = run_qentl(code)
+    assert result == ['纠缠态:位置=3'], f"量子枚举增强: {result}"
+    print("✅ 量子枚举增强(quantum enum advanced) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -852,7 +871,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced,
 ]
 
 if __name__ == '__main__':
