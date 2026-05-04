@@ -1428,6 +1428,29 @@ def test_user_func_overrides_builtin():
     print("✅ 用户函数覆盖内置(user overrides builtin) 通过:", result)
 
 
+def test_matrix_max():
+    """矩阵最大值查找"""
+    code = """
+矩阵最大值: 函数(m) {
+    让 max_val = m[0][0]
+    循环 i 在 范围数(0, 长度(m)) {
+        循环 j 在 范围数(0, 长度(m[i])) {
+            如果 m[i][j] > max_val { max_val = m[i][j] }
+        }
+    }
+    返回 max_val
+}
+
+主函数: 函数() {
+    让 matrix = [[3, 1, 4], [1, 5, 9], [2, 6, 5]]
+    打印(格式("max={}", 矩阵最大值(matrix)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['max=9'], f"矩阵最大值: {result}"
+    print("✅ 矩阵最大值(matrix max) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1457,7 +1480,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max,
 ]
 
 if __name__ == '__main__':
