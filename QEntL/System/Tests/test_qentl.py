@@ -1223,6 +1223,33 @@ def test_palindrome_check():
     print("✅ 回文判断(palindrome check) 通过:", result)
 
 
+def test_caesar_cipher():
+    """凯撒密码(字符代码+字符)"""
+    code = """
+凯撒加密: 函数(text, shift) {
+    让 result = ""
+    循环 i 在 范围数(0, 长度(text)) {
+        让 c = 子串(text, i, 1)
+        让 code = 字符代码(c)
+        如果 code >= 97 且 code <= 122 {
+            code = code + shift
+            如果 code > 122 { code = code - 26 }
+            如果 code < 97 { code = code + 26 }
+        }
+        result = result + 字符(code)
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(凯撒加密("hello", 3))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['khoor'], f"凯撒密码: {result}"
+    print("✅ 凯撒密码(Caesar cipher) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1252,7 +1279,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher,
 ]
 
 if __name__ == '__main__':

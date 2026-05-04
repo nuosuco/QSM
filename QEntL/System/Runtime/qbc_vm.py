@@ -1008,6 +1008,18 @@ class QBCVirtualMachine:
                         self.stack.append(result if result else [])
                     except Exception as e:
                         self.stack.append(['Error: ' + str(e)])
+            elif func_name == '字符代码':
+                s = self.stack.pop()
+                if isinstance(s, str) and len(s) > 0:
+                    self.stack.append(ord(s[0]))
+                else:
+                    self.stack.append(0)
+            elif func_name == '字符':
+                n = self.stack.pop()
+                if isinstance(n, (int, float)):
+                    self.stack.append(chr(int(n)))
+                else:
+                    self.stack.append('')
             elif func_name == '字符位置':
                 if len(self.stack) >= 2:
                     substr = str(self.stack.pop())
