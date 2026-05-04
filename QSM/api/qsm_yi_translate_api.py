@@ -176,6 +176,11 @@ try:
     checkpoint = torch.load(model_path, map_location='cpu')
     model.load_state_dict(checkpoint['model_state'])
     model.eval()
+    # INT8 dynamic quantization for CPU inference speedup
+    model = torch.quantization.quantize_dynamic(
+        model, {nn.Linear}, dtype=torch.qint8
+    )
+    print("✅ Model INT8 quantized for faster CPU inference")
     model.vocab_bos = vocab.get('<BOS>', 6920)
     model.vocab_eos = vocab.get('<EOS>', 6921)
 

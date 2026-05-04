@@ -5068,3 +5068,68 @@ python3 train_v7_quantum.py \
 - 内存占用: 减少80% (可更大batch)
 - 泛化: 更好(参数少→不易过拟合)
 - 收敛: 可能稍慢(r=16限制表达能力)
+
+## 研究#259: Speculative Decoding + CPU推理优化 (2026-05-04)
+
+### 当前QSM API问题
+- CPU推理: 每次请求3-5秒 (太慢)
+- 无KV Cache: 每次重新计算全部attention
+- 单线程: 128核CPU只用了1核
+
+### Speculative Decoding原理 (Leviathan et al., 2023)
+1. 小模型(draft)快速生成K个token
+2. 大模型(target)并行验证K个token
+3. 接受正确的token, 拒绝错误的
+4. 加速比: 2-3x (质量无损!)
+
+### QSM的特殊优势
+- 我们已有V7-Small(4.5M)和V8(4.5M)
+- 可以用更小的draft模型(1M参数)
+- CPU上draft模型推理极快
+- 128核可并行验证多个draft token
+
+### 实施方案
+```python
+class SpeculativeDecoder:
+    def __init__(self, draft_model, target_model):
+        self.draft = draft_model  # 小模型
+        self.target = target_model  # 大模型
+    
+    def generate(self, prompt, max_tokens, K=5):
+        tokens = prompt
+        while len(tokens) < max_tokens:
+            # Draft: 生成K个token
+            draft_tokens = self.draft.generate(tokens, max_new=K)
+            # Target: 并行验证
+            target_probs = self.target.forward(tokens + draft_tokens)
+            # 接受/拒绝
+            accepted = 0
+            for i in range(K):
+                if random() < target_probs[i] / draft_probs[i]:
+                    accepted += 1
+                else:
+                    break
+            tokens += draft_tokens[:accepted]
+            if accepted < K:
+                # 从target分布采样一个token
+                tokens += [sample(target_probs[accepted])]
+        return tokens
+```
+
+### KV Cache实施 (更简单, 先做)
+```python
+class CachedQSM:
+    def __init__(self, model):
+        self.model = model
+        self.cache = {}  # key: (layer, pos) -> (k, v)
+    
+    def forward(self, new_token, cache=None):
+        # 只计算新token的KV, 复用之前的
+        ...
+```
+
+### 优先级排序
+1. **KV Cache** (最简单, 2-3x加速) → 本周实施
+2. **INT8量化** (torch.quantization, 2x加速) → 下周
+3. **Speculative Decoding** (需要draft模型) → V13后
+4. **多线程推理** (torch.compile + 多核) → 长期
