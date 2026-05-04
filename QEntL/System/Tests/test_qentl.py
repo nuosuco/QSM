@@ -842,6 +842,39 @@ quantum_enum 量子态 { 基态, 激发态, 叠加态, 纠缠态 }
     print("✅ 量子枚举增强(quantum enum advanced) 通过:", result)
 
 
+def test_comprehensive_integration():
+    """综合集成测试: 类+函数+循环+条件+格式"""
+    code = """
+quantum_class 商品 { 名称: 字符串; 价格: 整数 }
+
+折扣价: 函数(item, rate) {
+    返回 取整(item.价格 * rate)
+}
+
+主函数: 函数() {
+    让 items = []
+    让 a = 商品(); a.名称 = "书"; a.价格 = 50
+    让 b = 商品(); b.名称 = "笔"; b.价格 = 10
+    让 c = 商品(); c.名称 = "包"; c.价格 = 200
+    推入(items, a); 推入(items, b); 推入(items, c)
+    
+    让 total = 0
+    循环 item 在 items {
+        让 discounted = 折扣价(item, 0.8)
+        打印(格式("{}: {}→{}", item.名称, item.价格, discounted))
+        total = total + discounted
+    }
+    打印(格式("合计={}", total))
+}
+"""
+    result = run_qentl(code)
+    # Should have 3 discount lines + total
+    assert len(result) == 4, f"综合集成: {result}"
+    assert any('书' in r and '50' in r and '40' in r for r in result), f"书折扣: {result}"
+    assert any('合计' in r for r in result), f"合计: {result}"
+    print("✅ 综合集成(comprehensive integration) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -871,7 +904,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration,
 ]
 
 if __name__ == '__main__':

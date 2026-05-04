@@ -364,7 +364,23 @@ else:
     
     for epoch in range(start_epoch, args.epochs):
         epoch_train = train_data
-        epoch_train = train_data
+        # Curriculum learning: filter by difficulty
+        if args.curriculum and train_data and 'difficulty' in train_data[0]:
+            schedule = [int(x) for x in args.difficulty_schedule.split(',')]
+            if epoch < schedule[0]:
+                max_diff = 2
+            elif epoch < schedule[1]:
+                max_diff = 3
+            elif epoch < schedule[2]:
+                max_diff = 4
+            else:
+                max_diff = args.max_difficulty
+            epoch_train = [d for d in train_data if d.get('difficulty', 3) <= max_diff]
+            if len(epoch_train) < 100:
+                epoch_train = train_data
+            print(f"  Curriculum: diff<={max_diff}, {len(epoch_train)} samples")
+        else:
+            epoch_train = train_data
         model.train()
         total_loss = 0
         n_batches = 0
