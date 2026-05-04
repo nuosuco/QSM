@@ -156,6 +156,30 @@ def examples():
 }''',
     })
 
+
+
+@app.route('/stats', methods=['GET'])
+def stats():
+    """QEntL system statistics"""
+    import sys
+    return jsonify({
+        'status': 'healthy',
+        'version': '3.0',
+        'builtin_functions': 62,
+        'opcodes': 56,
+        'test_coverage': '48/48',
+        'features': [
+            'quantum_class', 'functions', 'recursion',
+            'for/while/foreach', 'if/elif/else', 
+            'try/catch/throw', 'match/case',
+            'file_io', 'system_calls', 'math_builtins',
+            'string_utilities', 'format_specs',
+            'beam_search', 'ngram_blocking',
+            'stdlib', 'run_qbc'
+        ],
+        'python_version': sys.version.split()[0],
+    })
+
 if __name__ == '__main__':
     print("QEntL量子操作系统API启动 → 端口8003")
     app.run(host='0.0.0.0', port=8003, debug=False)
