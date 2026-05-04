@@ -1451,6 +1451,27 @@ def test_matrix_max():
     print("✅ 矩阵最大值(matrix max) 通过:", result)
 
 
+def test_armstrong_number():
+    """阿姆斯特朗数(水仙花数)判断"""
+    code = """
+是阿姆斯特朗数: 函数(n) {
+    让 a = 取整(n / 100)
+    让 b = 取整((n % 100) / 10)
+    让 c = n % 10
+    如果 a * a * a + b * b * b + c * c * c == n { 返回 1 }
+    返回 0
+}
+
+主函数: 函数() {
+    打印(格式("153={}", 是阿姆斯特朗数(153)))
+    打印(格式("100={}", 是阿姆斯特朗数(100)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['153=1', '100=0'], f"阿姆斯特朗数: {result}"
+    print("✅ 阿姆斯特朗数(Armstrong number) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1480,7 +1501,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number,
 ]
 
 if __name__ == '__main__':
