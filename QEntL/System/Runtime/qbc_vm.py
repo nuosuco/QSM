@@ -811,7 +811,7 @@ class QBCVirtualMachine:
                     start = self.stack.pop()
                     s = self.stack.pop()
                     if isinstance(s, (str, list)) and isinstance(start, int) and isinstance(end, int):
-                        self.stack.append(s[start:end])
+                        self.stack.append(s[start:start+end])
                     else:
                         self.stack.append(s)
                 elif len(self.stack) >= 2:

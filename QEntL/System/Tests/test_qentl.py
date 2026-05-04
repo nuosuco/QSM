@@ -485,7 +485,7 @@ def test_array_slicing():
     code = """
 主函数: 函数() {
     让 a = [10, 20, 30, 40, 50]
-    打印(子串(a, 1, 4))
+    打印(子串(a, 1, 3))
     打印(子串("hello world", 0, 5))
 }
 """
@@ -1034,6 +1034,28 @@ def test_linear_search():
     print("✅ 线性查找(linear search) 通过:", result)
 
 
+def test_string_reverse():
+    """字符串反转(子串+循环)"""
+    code = """
+反转字符串: 函数(s) {
+    让 result = ""
+    让 i = 长度(s) - 1
+    循环当 i >= 0 {
+        result = result + 子串(s, i, 1)
+        i = i - 1
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(反转字符串("hello"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['olleh'], f"字符串反转: {result}"
+    print("✅ 字符串反转(string reverse) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1063,7 +1085,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse,
 ]
 
 if __name__ == '__main__':
