@@ -896,6 +896,22 @@ def test_string_pipeline():
     print("✅ 字符串处理管道(string pipeline) 通过:", result)
 
 
+def test_nested_function_calls():
+    """嵌套函数调用(函数组合)"""
+    code = """
+平方: 函数(x) { 返回 x * x }
+立方: 函数(x) { 返回 平方(x) * x }
+
+主函数: 函数() {
+    打印(格式("3²={}", 平方(3)))
+    打印(格式("3³={}", 立方(3)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['3²=9', '3³=27'], f"嵌套函数: {result}"
+    print("✅ 嵌套函数调用(nested function composition) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -925,7 +941,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls,
 ]
 
 if __name__ == '__main__':

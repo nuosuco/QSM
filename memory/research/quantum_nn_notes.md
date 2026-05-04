@@ -5295,3 +5295,36 @@ no, just, him, know, take, people, into, year, your, good, some, could,
 them, see, other, than, then, now, look, only, come, its, over, think,
 also, back, after, use, two, how, our, work, first, well, way, even,
 new, want, because, any, these, give, day, most, us
+
+## 研究#263: V13训练策略分析 (2026-05-04)
+
+### V13配置
+- 数据: 78,495 pairs (V13清洗, 0重复/0空值)
+- 架构: 192d/3L/3H/768ff (4.5M params)
+- LoRA: r=16, alpha=16 → 仅训练1.6%参数
+- SGDR: T0=10, Tmult=2 → E10重启, E30重启, E70重启
+- 课程学习: E1-10 diff≤2, E11-30 diff≤3, E31-70 diff≤4, E71+全部
+- Label smoothing: 0.1
+- Grad clip: 1.0
+- Batch: 32x4=128 effective
+
+### SGDR + 课程学习对齐
+| Phase | Epochs | Difficulty | SGDR周期 |
+|-------|--------|------------|----------|
+| 1     | 1-10   | ≤2 (简单)  | 第1周期  |
+| 2     | 11-30  | ≤3 (中等)  | 第2周期  |
+| 3     | 31-70  | ≤4 (较难)  | 第3周期  |
+| 4     | 71-100 | 全部       | 持续     |
+
+### LoRA与全量训练对比
+- LoRA r=16: ~73K可训练参数 (1.6%)
+- 全量: 4.5M参数
+- 优势: 防止过拟合, 4.6x加速
+- 劣势: 可能限制模型容量
+
+### 预测
+- E1-10: 快速下降 (8.25→~5.0, 简单数据+高LR)
+- E11-30: 中等下降 (5.0→~3.5, SGDR重启+中等数据)
+- E31-70: 缓慢下降 (3.5→~2.5, 全数据)
+- E71-100: 微调 (2.5→~2.0, 如果LoRA容量足够)
+- 目标: Val < 2.0 (可用翻译)
