@@ -282,6 +282,43 @@ def chat():
         return jsonify({'response': f'处理出错: {str(e)[:80]}', 'model': 'QSM Q1'})
 
 
+
+
+@app.route('/model_info', methods=['GET'])
+def model_info():
+    """QSM model information"""
+    import os
+    best_path = '/root/.openclaw/workspace/Models/QSM/bin/qsm_v7_quantum_best.pth'
+    model_size = 0
+    if os.path.exists(best_path):
+        model_size = os.path.getsize(best_path)
+    
+    return jsonify({
+        'model': 'QSM V7-Small Encoder-Decoder',
+        'architecture': {
+            'd_model': 192,
+            'n_heads': 3,
+            'n_layers': 3,
+            'd_ff': 768,
+            'params': '~4.5M',
+        },
+        'training': {
+            'current_best': 'V12 E32 Val 2.9259',
+            'dataset': 'V13 78,724 pairs',
+            'vocab_size': 7403,
+            'max_len': 64,
+        },
+        'features': [
+            'QuantumEmbeddingV2',
+            'beam_search',
+            'ngram_blocking',
+            'rep_penalty',
+            'int8_quantization',
+        ],
+        'model_size_mb': round(model_size / 1024 / 1024, 1),
+        'endpoints': ['/health', '/version', '/translate', '/chat', '/model_info'],
+    })
+
 if __name__ == '__main__':
     print("🚀 启动V7-Small翻译API (端口8000)...")
     app.run(host='0.0.0.0', port=8000, debug=False)
