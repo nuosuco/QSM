@@ -1056,6 +1056,28 @@ def test_string_reverse():
     print("✅ 字符串反转(string reverse) 通过:", result)
 
 
+def test_count_occurrences():
+    """计数函数(统计元素出现次数)"""
+    code = """
+计数: 函数(arr, target) {
+    让 count = 0
+    循环 x 在 arr {
+        如果 x == target { count = count + 1 }
+    }
+    返回 count
+}
+
+主函数: 函数() {
+    让 data = [1, 2, 3, 2, 4, 2, 5, 2]
+    打印(格式("2出现了{}次", 计数(data, 2)))
+    打印(格式("7出现了{}次", 计数(data, 7)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['2出现了4次', '7出现了0次'], f"计数: {result}"
+    print("✅ 计数函数(count occurrences) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1085,7 +1107,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences,
 ]
 
 if __name__ == '__main__':
