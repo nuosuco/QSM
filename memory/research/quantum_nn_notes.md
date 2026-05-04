@@ -6599,3 +6599,53 @@ Val = 5.12 - 0.88 × ln(E)
 2. **E30-35需lr重置**: cp best→lr=0.0001续训
 3. **V14才能真正突破2.5**: SGDR修复+ALiBi+SPM
 4. **当前优先级**: V13继续→E30→lr重置→E50→评估
+
+## 研究#297: 梯度累积 - 小内存大batch效果 (2026-05-04)
+
+### 问题
+- 当前batch_size=32, 占MEM~3-4GB
+- 更大batch→更稳定梯度, 但MEM不够
+- batch_size=64可能OOM(7.4GB限制)
+
+### 梯度累积原理
+```python
+# 有效batch=32×4=128, 实际每次只用32的内存
+accumulation_steps = 4
+optimizer.zero_grad()
+for i, (src, tgt) in enumerate(dataloader):
+    loss = model(src, tgt) / accumulation_steps  # 缩放loss
+    loss.backward()  # 梯度累积
+    if (i + 1) % accumulation_steps == 0:
+        optimizer.step()
+        optimizer.zero_grad()
+```
+
+### 对V13/V14的影响
+| 配置 | 有效batch | 实际MEM | 训练速度 |
+|------|----------|---------|---------|
+| 当前(V13) | 32 | 3-4GB | 41min/ep |
+| 累积×2 | 64 | 3-4GB | 82min/ep |
+| 累积×4 | 128 | 3-4GB | 164min/ep |
+
+### 权衡
+- ✅ 更稳定梯度(等价大batch)
+- ✅ 不增加内存
+- ❌ 训练时间线性增长(2x/4x慢)
+
+### 推荐V14配置
+- **accumulation_steps=2**: 有效batch=64
+- 训练82min/ep(vs 41min), 可接受
+- 更稳定的梯度→Val可能额外-0.02~0.05
+
+### 实施修改(train_v7_quantum.py)
+```python
+# 1. 添加参数
+parser.add_argument('--accum_steps', type=int, default=1)
+
+# 2. 修改训练循环
+loss = model(src, tgt) / args.accum_steps
+loss.backward()
+if (batch_idx + 1) % args.accum_steps == 0:
+    optimizer.step()
+    optimizer.zero_grad()
+```
