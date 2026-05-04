@@ -1013,6 +1013,27 @@ def test_list_map_square():
     print("✅ 列表映射(list map/square) 通过:", result)
 
 
+def test_linear_search():
+    """线性查找"""
+    code = """
+查找元素: 函数(arr, target) {
+    循环 i 在 范围数(0, 长度(arr)) {
+        如果 arr[i] == target { 返回 i }
+    }
+    返回 -1
+}
+
+主函数: 函数() {
+    让 data = [10, 20, 30, 40, 50]
+    打印(格式("30的位置={}", 查找元素(data, 30)))
+    打印(格式("99的位置={}", 查找元素(data, 99)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['30的位置=2', '99的位置=-1'], f"线性查找: {result}"
+    print("✅ 线性查找(linear search) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1042,7 +1063,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search,
 ]
 
 if __name__ == '__main__':
