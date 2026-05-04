@@ -1618,6 +1618,27 @@ ROT13: 函数(text) {
     print("✅ ROT13密码(自解密) 通过:", result)
 
 
+def test_string_dedup():
+    """字符串去重(保留首次出现)"""
+    code = """
+去重复字符: 函数(s) {
+    让 result = ""
+    循环 i 在 范围数(0, 长度(s)) {
+        让 c = 子串(s, i, 1)
+        如果 包含(result, c) == 0 { result = result + c }
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(去重复字符("hello"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['helo'], f"去重: {result}"
+    print("✅ 字符串去重(string dedup) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1647,7 +1668,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup,
 ]
 
 if __name__ == '__main__':
