@@ -5189,3 +5189,66 @@ def get_curriculum_data(data, epoch, max_difficulty):
 - Phase 2: 学会语法结构(Val < 2.5)
 - Phase 3: 学会语义理解(Val < 2.0)
 - Phase 4: 精调到Val < 1.5
+
+## 研究#261: 多语言NMT架构 - QSM三语系统设计 (2026-05-04)
+
+### 当前QSM语言控制
+- 语言控制BOS token: 在decoder输入开头加语言标记
+- QuantumEmbeddingV2: 语言偏置(lang_bias) 4×d_model
+- 问题: 语言控制信号太弱, 模型经常"忘记"目标语言
+
+### 多语言NMT最佳实践
+
+#### 1. Language Adapter (Pires et al., 2019)
+- 每种语言一个adapter层(bottleneck结构)
+- 共享底层, 顶层adapter区分语言
+- 优点: 模块化, 新语言只需训练adapter
+- 缺点: 需要更多参数
+
+#### 2. Language Embedding (Artetxe & Schwenk, 2019)
+- 每种语言一个embedding向量
+- 加到输入token embedding上
+- QSM已有类似机制(lang_bias)但太简单
+
+#### 3. Controlled Generation (Sennrich et al., 2016)
+- 在encoder输入加语言标记
+- 训练时随机替换目标语言标记→零样本翻译
+- 关键: 语言标记必须足够强
+
+### QSM改进方案: 多级语言控制
+
+```python
+class MultiLangControl:
+    """多级语言控制"""
+    def __init__(self, d_model, n_languages=3):
+        # Level 1: BOS token (已有)
+        self.lang_bos = nn.Embedding(n_languages, d_model)
+        
+        # Level 2: 输入语言嵌入 (新)
+        self.src_lang_embed = nn.Embedding(n_languages, d_model)
+        self.tgt_lang_embed = nn.Embedding(n_languages, d_model)
+        
+        # Level 3: 适配器层 (新)
+        self.lang_adapter = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(d_model, d_model // 4),
+                nn.ReLU(),
+                nn.Linear(d_model // 4, d_model)
+            ) for _ in range(n_languages)
+        ])
+    
+    def forward(self, x, src_lang, tgt_lang):
+        # 添加源语言和目标语言嵌入
+        x = x + self.src_lang_embed(src_lang) + self.tgt_lang_embed(tgt_lang)
+        return x
+```
+
+### 实施优先级
+- V13: 保持当前BOS控制(简单)
+- V14: +语言嵌入(中等复杂度)
+- V15: +适配器层(完整多语言控制)
+
+### 关键洞察
+- **当前瓶颈不是语言控制, 是Val Loss太高(2.93)**
+- Val < 2.0后语言控制才变得重要
+- 先把Val降下来, 再优化语言控制
