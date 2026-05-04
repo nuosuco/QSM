@@ -993,6 +993,26 @@ def test_list_filter():
     print("✅ 列表过滤(list filter) 通过:", result)
 
 
+def test_list_map_square():
+    """列表映射(每个元素平方)"""
+    code = """
+平方列表: 函数(arr) {
+    让 result = []
+    循环 x 在 arr { 推入(result, x * x) }
+    返回 result
+}
+
+主函数: 函数() {
+    让 nums = [1, 2, 3, 4, 5]
+    让 squared = 平方列表(nums)
+    打印(格式("平方={}", 连接(squared, " ")))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['平方=1 4 9 16 25'], f"列表映射: {result}"
+    print("✅ 列表映射(list map/square) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1022,7 +1042,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square,
 ]
 
 if __name__ == '__main__':
