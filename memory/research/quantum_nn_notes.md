@@ -5328,3 +5328,33 @@ new, want, because, any, these, give, day, most, us
 - E31-70: 缓慢下降 (3.5→~2.5, 全数据)
 - E71-100: 微调 (2.5→~2.0, 如果LoRA容量足够)
 - 目标: Val < 2.0 (可用翻译)
+
+## 研究#264: Encoder-Decoder vs Decoder-Only架构选择 (2026-05-04)
+
+### 当前QSM架构
+- Encoder-Decoder (Transformer)
+- Encoder: 3层, 192d
+- Decoder: 3层, 192d
+- 参数: 4.5M
+
+### 两种架构对比
+
+| 特性 | Encoder-Decoder | Decoder-Only |
+|------|----------------|--------------|
+| 翻译质量 | ✅ 更好(有源端编码) | 一般(cross-attn替代) |
+| 生成能力 | ✅ 条件生成 | ✅ 自回归 |
+| 参数效率 | ✅ 编解码分离 | ❌ 需要更大模型 |
+| 训练稳定性 | ✅ Teacher forcing | 需要careful LR |
+| 代表模型 | T5, BART, mBART | GPT, LLaMA |
+| 多语言 | ✅ mBART/M2M100 | 需要更多数据 |
+
+### QSM选择: Encoder-Decoder ✅
+- 原因1: 翻译是条件生成任务, Encoder-Decoder天然适合
+- 原因2: 低资源(78K pairs)下Encoder-Decoder更高效
+- 原因3: mBART/M2M100证明了此架构在多语言NMT上的优势
+- 原因4: 4.5M参数下Encoder-Decoder > Decoder-Only
+
+### 未来考虑
+- V15+: 如果QSM需要自由对话能力, 考虑混合架构
+- Encoder用于理解, Decoder用于生成
+- 类似T5的text-to-text框架
