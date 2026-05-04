@@ -5467,3 +5467,47 @@ new, want, because, any, these, give, day, most, us
 - E1: Val 4.34, E2: Val 3.62 (-0.72)
 - 每epoch下降0.72 → 远超0.02阈值
 - LoRA容量完全充足, 继续当前配置
+
+## 研究#268: QSM API解码策略优化 (2026-05-04)
+
+### 当前API解码方式
+- Greedy decoding: 每步选概率最高的token
+- 问题: 重复模式, 低多样性, 翻译质量差
+
+### Beam Search改进(V7-Small已实现)
+- beam_width=5
+- n-gram blocking (3-gram重复惩罚)
+- repetition_penalty=1.5
+- 问题: V7-Small模型Val太高(2.65), 输出仍垃圾
+
+### V13模型部署后的解码策略
+当Val < 2.0时, 可用的改进:
+
+#### 1. Temperature Sampling
+```python
+logits = logits / temperature  # T=0.7 for creative, T=1.0 for balanced
+probs = F.softmax(logits, dim=-1)
+next_token = torch.multinomial(probs, 1)
+```
+- T<1: 更确定(适合翻译)
+- T>1: 更随机(适合对话)
+
+#### 2. Top-k + Top-p (Nucleus Sampling)
+```python
+# Top-k: 只从概率最高的k个token中采样
+top_k_logits = torch.topk(logits, k=50)
+# Top-p: 从累积概率超过p的最小集合中采样
+sorted_probs = torch.sort(F.softmax(logits, dim=-1), descending=True)
+cumsum = torch.cumsum(sorted_probs, dim=-1)
+```
+- k=50, p=0.9: 平衡多样性与质量
+
+#### 3. 对比搜索 (Contrastive Search)
+- 选概率最高且与上下文不同的token
+- α=0.7: 对比强度
+- 适合: 长文本生成, 减少退化
+
+### 实施优先级
+1. **V13 Val<2.0**: Temperature=0.7 (最简单)
+2. **V13 Val<1.5**: Top-k(50) + Top-p(0.9)
+3. **V13 Val<1.0**: 对比搜索 α=0.7
