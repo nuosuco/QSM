@@ -1321,6 +1321,34 @@ def test_decimal_to_binary():
     print("✅ 十进制转二进制(decimal to binary) 通过:", result)
 
 
+def test_run_length_encoding():
+    """行程编码(字符串压缩)"""
+    code = """
+行程编码: 函数(s) {
+    让 result = ""
+    让 i = 0
+    让 n = 长度(s)
+    循环当 i < n {
+        让 ch = 子串(s, i, 1)
+        让 count = 1
+        循环当 i + count < n 且 子串(s, i + count, 1) == ch {
+            count = count + 1
+        }
+        result = result + ch + 格式("{}", count)
+        i = i + count
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(行程编码("aaabbc"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['a3b2c1'], f"行程编码: {result}"
+    print("✅ 行程编码(RLE/compression) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1350,7 +1378,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding,
 ]
 
 if __name__ == '__main__':
