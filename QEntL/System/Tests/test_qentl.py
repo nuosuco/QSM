@@ -1566,6 +1566,34 @@ def test_perfect_number():
     print("✅ 完全数(perfect number) 通过:", result)
 
 
+
+def test_tower_of_hanoi_moves():
+    """汉诺塔最少步数(2^n-1)"""
+    code = """
+快速幂: 函数(b, e) {
+    如果 e == 0 { 返回 1 }
+    如果 e == 1 { 返回 b }
+    让 half = 快速幂(b, 取整(e / 2))
+    如果 e % 2 == 0 { 返回 half * half }
+    否则 { 返回 half * half * b }
+}
+
+汉诺塔步数: 函数(n) {
+    返回 快速幂(2, n) - 1
+}
+
+主函数: 函数() {
+    打印(格式("3={}", 汉诺塔步数(3)))
+    打印(格式("5={}", 汉诺塔步数(5)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['3=7', '5=31'], f"汉诺塔: {result}"
+    print("✅ 汉诺塔步数(Tower of Hanoi 2^n-1) 通过:", result)
+
+
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1595,7 +1623,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves,
 ]
 
 if __name__ == '__main__':
