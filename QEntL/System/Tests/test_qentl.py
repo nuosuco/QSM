@@ -1525,6 +1525,47 @@ def test_collatz_steps():
     print("✅ 考拉兹猜想(Collatz 3n+1) 通过:", result)
 
 
+def test_word_count():
+    """单词计数(分割+长度)"""
+    code = """
+单词计数: 函数(text) {
+    让 words = 分割(text, " ")
+    返回 长度(words)
+}
+
+主函数: 函数() {
+    打印(格式("a b c={}", 单词计数("a b c")))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['a b c=3'], f"单词计数: {result}"
+    print("✅ 单词计数(word count) 通过:", result)
+
+
+def test_perfect_number():
+    """完全数判断(6=1+2+3, 28=1+2+4+7+14)"""
+    code = """
+是完全数: 函数(n) {
+    让 sum = 0
+    让 i = 1
+    循环当 i < n {
+        如果 n % i == 0 { sum = sum + i }
+        i = i + 1
+    }
+    如果 sum == n { 返回 1 }
+    返回 0
+}
+
+主函数: 函数() {
+    打印(格式("6={}", 是完全数(6)))
+    打印(格式("12={}", 是完全数(12)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['6=1', '12=0'], f"完全数: {result}"
+    print("✅ 完全数(perfect number) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1554,7 +1595,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number,
 ]
 
 if __name__ == '__main__':
