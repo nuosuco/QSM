@@ -5576,3 +5576,26 @@ cumsum = torch.cumsum(sorted_probs, dim=-1)
 1. **LoRA饱和**: 如果drop持续缩小→需要Phase2 r=32
 2. **课程学习Phase转换震荡**: E11+新数据可能短期升Val
 3. **SGDR重启效果**: 关键看E10 Val变化
+
+## 研究#271: V13训练进程不稳定性分析 (2026-05-04)
+
+### 现象
+- V12: E33 B12400 进程消失(非OOM)
+- V13: E6 B1000 进程消失(非OOM, MEM仅1.9G/7.4G)
+
+### 可能原因
+1. **Python GIL + 信号**: 某些信号(SIGHUP/SIGTERM)可能终止进程
+2. **nohup不够**: 需要更可靠的进程管理
+3. **OOM Killer**: 虽然MEM低, 但系统可能在其他时刻有内存峰值
+4. **subprocess/异常**: 训练脚本中某个未捕获异常
+
+### 解决方案
+1. **systemd管理**: 创建qsm-train.service, 自动重启
+2. **更频繁的checkpoint保存**: 每epoch保存(当前已实现)
+3. **OOM保护**: echo -17 > /proc/$PID/oom_score_adj
+4. **日志flush**: sys.stdout.flush() 确保最后输出可见
+
+### 当前措施
+- 续训命令已验证可工作(--resume正确恢复)
+- best.pth每epoch备份
+- 新日志: /tmp/qsm_v13_train2.log

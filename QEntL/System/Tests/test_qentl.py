@@ -1250,6 +1250,30 @@ def test_caesar_cipher():
     print("✅ 凯撒密码(Caesar cipher) 通过:", result)
 
 
+def test_fast_exponentiation():
+    """快速幂算法(递归分治)"""
+    code = """
+快速幂: 函数(b, e) {
+    如果 e == 0 { 返回 1 }
+    如果 e == 1 { 返回 b }
+    让 half = 快速幂(b, 取整(e / 2))
+    如果 e % 2 == 0 {
+        返回 half * half
+    } 否则 {
+        返回 half * half * b
+    }
+}
+
+主函数: 函数() {
+    打印(格式("2^10={}", 快速幂(2, 10)))
+    打印(格式("3^5={}", 快速幂(3, 5)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['2^10=1024', '3^5=243'], f"快速幂: {result}"
+    print("✅ 快速幂(fast exponentiation) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1279,7 +1303,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation,
 ]
 
 if __name__ == '__main__':
