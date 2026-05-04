@@ -139,7 +139,7 @@
 - **V4第一轮完成**: 5.7M参数, Val Loss 2.35, Train Loss 1.90
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
   - 公网API: https://som.top API (V7-Small, val_loss=2.6531)
-- **V12训练中**: E27/100, Best **2.9834** (E27, 🔥🔥连破3.0!), 仍在加速收敛
+- **V12训练中**: E28/100, Best **2.9783** (E28, 🔥🔥🔥连续6次BEST!), 加速收敛0.027/epoch
 - **⚠️ V8 API输出仍为垃圾** — 根因是V12数据48%噪声, V12训练中用V13清洗数据
 - /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
 - Beam search改进: n-gram blocking + rep_penalty=1.5 + min_len=3

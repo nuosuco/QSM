@@ -5016,3 +5016,55 @@ scheduler.step()  # 每epoch调用
 - LoRA = 更高效训练
 - 课程学习 = 更快收敛
 - **V13预期: E50 Val < 2.0**
+
+## 研究#258: LoRA微调在QSM中的实施 (2026-05-04)
+
+### LoRA原理 (Hu et al., 2022)
+- 冻结预训练权重W₀, 添加低秩分解: W = W₀ + BA
+- B∈R^(d×r), A∈R^(r×k), r≪min(d,k)
+- 仅训练B和A, 参数量从d×k降到r×(d+k)
+
+### QSM V7-Small (4.5M参数) LoRA分析
+| 组件 | 参数 | LoRA r=16 | 可训练% |
+|------|------|-----------|---------|
+| Embedding | 1.3M | ❌ 不加 | 0% |
+| QKV投影 | 3×192×64 | 3×2×16×(192+64) | 0.4% |
+| Out投影 | 192×192 | 2×16×(192+192) | 0.3% |
+| FFN W1 | 192×768 | 2×16×(192+768) | 0.3% |
+| FFN W2 | 768×192 | 2×16×(768+192) | 0.3% |
+| **总计** | 4.5M | ~73K | **1.6%** |
+
+### 关键决策
+1. **只对Attention+FFN加LoRA** (跳过Embedding/LayerNorm)
+2. **r=16, alpha=16** (scaling = alpha/r = 1.0)
+3. **loralib API**: `mark_only_lora_as_trainable(model)`
+4. **4.6x训练加速** (73K vs 4.5M参数)
+
+### PyTorch实现
+```python
+import loralib as lora
+
+# 替换Linear层
+model.encoder.layers[i].self_attn.in_proj_weight = lora.Linear(
+    192, 3*64, r=16, merge=False
+)
+# 标记只训练LoRA
+lora.mark_only_lora_as_trainable(model)
+```
+
+### V13训练命令
+```bash
+python3 train_v7_quantum.py \
+  --data v13_clean_dataset.json \
+  --d_model 192 --n_heads 3 --n_layers 3 --d_ff 768 \
+  --scheduler sgdr --sgdr_t0 10 --sgdr_tmult 2 \
+  --lora 16 --curriculum \
+  --grad_clip 1.0 --label_smoothing 0.1 \
+  --epochs 100 --batch_size 32
+```
+
+### 预期收益
+- 训练速度: 4.6x (21min→5min/epoch)
+- 内存占用: 减少80% (可更大batch)
+- 泛化: 更好(参数少→不易过拟合)
+- 收敛: 可能稍慢(r=16限制表达能力)
