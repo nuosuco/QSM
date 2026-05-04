@@ -165,15 +165,15 @@ try:
     id_to_char = {v: k for k, v in vocab.items()}
     vocab_size = len(vocab)
 
-    model = QSM_V7_Small(vocab_size, d_model=192, n_heads=3, n_layers=3, d_ff=768, dropout=0.25, max_len=64)
-
-    # Try loading best model, fallback to backup
+    # Load checkpoint first to get correct vocab_size
     model_path = V7_MODEL_PATH
     if not os.path.exists(model_path):
         print(f"⚠️ {model_path} not found, trying backup...")
         model_path = V7_BACKUP_PATH
-
     checkpoint = torch.load(model_path, map_location='cpu')
+    ckpt_vocab_size = checkpoint['model_state']['output_proj.weight'].shape[0]
+    print(f"Checkpoint vocab: {ckpt_vocab_size}, Current vocab: {vocab_size}")
+    model = QSM_V7_Small(ckpt_vocab_size, d_model=192, n_heads=3, n_layers=3, d_ff=768, dropout=0.25, max_len=64)
     model.load_state_dict(checkpoint['model_state'])
     model.eval()
     # INT8 dynamic quantization for CPU inference speedup
