@@ -5686,3 +5686,41 @@ cumsum = torch.cumsum(sorted_probs, dim=-1)
 - E10: SGDR重启, lr回升 → 可能跳跃下降到2.8-3.0
 - E11: 课程学习Phase2(diff≤3), 新数据涌入
 - 关键观察: E10-12是否出现Val短暂上升(新数据适应期)
+
+## 研究#275: SGDR重启策略与课程学习对齐 (2026-05-04)
+
+### SGDR配置
+- T_0=10, T_mult=2
+- 周期1: E1-E10 (lr从0.0003→0)
+- 周期2: E11-E30 (lr从0.0003→0, 2倍长)
+- 周期3: E31-E70 (lr从0.0003→0, 4倍长)
+
+### 课程学习Phase
+- Phase1: E1-10, max_difficulty=2
+- Phase2: E11-30, max_difficulty=3
+- Phase3: E31-70, max_difficulty=4
+- Phase4: E71+, max_difficulty=5(全部数据)
+
+### 关键对齐点
+1. **E10→E11**: SGDR重启 + 课程Phase2同时发生!
+   - lr从近0跳回0.0003 → 学习率恢复
+   - 新数据(difficulty≤3)涌入 → 可能短期Val上升
+   - 预期: 1-2个epoch适应期, 然后快速下降
+
+2. **E30→E31**: SGDR第二次重启 + 课程Phase3
+   - 再次lr跳回 + diff≤4数据
+   - 预期效果: 更强的下降动力
+
+3. **E70→E71**: SGDR第三次重启 + Phase4
+   - 全量数据(79K条) + lr恢复
+   - 最终冲刺阶段
+
+### V13当前状态(E8)
+- Val 3.09, 稳定下降0.03/epoch
+- 预计E9: ~3.06, E10: ~3.04(SGDR末期lr极低)
+- E11关键: SGDR重启+新数据→可能跳到2.8或短暂升到3.2
+
+### 决策
+- 如果E11 Val < 3.0: 继续当前策略
+- 如果E11 Val > 3.2: 考虑减小max_difficulty增量
+- 如果E11-13连续升: 可能需要渐进式课程(每epoch+0.1 difficulty)
