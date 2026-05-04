@@ -1154,6 +1154,27 @@ def test_binary_search():
     print("✅ 二分查找(binary search) 通过:", result)
 
 
+def test_nested_list_iteration():
+    """嵌套列表迭代(矩阵求和)"""
+    code = """
+矩阵求和: 函数(m) {
+    让 total = 0
+    循环 row 在 m {
+        循环 x 在 row { total = total + x }
+    }
+    返回 total
+}
+
+主函数: 函数() {
+    让 matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    打印(格式("和={}", 矩阵求和(matrix)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['和=45'], f"嵌套列表: {result}"
+    print("✅ 嵌套列表迭代(nested list/matrix sum) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -1183,7 +1204,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration,
 ]
 
 if __name__ == '__main__':
