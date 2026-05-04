@@ -6388,3 +6388,55 @@ Phase4(E81-100): 全量微调 + SGDR重启
 - V13: 继续训练到E50-100(当前E20)
 - V14开发: V13训练完成后(约5天后)
 - V14训练: 新架构+新数据集
+
+## 研究#292: 训练进程systemd自动恢复方案 (2026-05-04)
+
+### 问题(5次进程消失!)
+1. V12 E33
+2. V13 E6 B1000
+3. V13 E14 B200
+4. V13 E20 B1000
+5. (可能继续...)
+
+### 解决方案: systemd service
+```ini
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=30
+OOMScoreAdjust=-1000
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=python3 train_v7_quantum.py --resume best.pth ...
+```
+
+### 关键特性
+- **Restart=on-failure**: 进程崩溃→30秒后自动重启
+- **OOMScoreAdjust=-1000**: 最低OOM优先级(比echo -17更强)
+- **--resume best.pth**: 每次重启从best续训(不丢失进度)
+- **日志**: /tmp/qsm_v13_train_systemd.log
+
+### 部署步骤(下次进程消失时)
+```bash
+sudo cp /tmp/qsm-v13-train.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start qsm-v13-train
+# 监控: sudo systemctl status qsm-v13-train
+# 日志: tail -f /tmp/qsm_v13_train_systemd.log
+```
+
+### 潜在问题
+1. **重复epoch**: 进程在B1000崩溃→重启从epoch开头重训→浪费41分钟
+   - 可接受! best.pth不受影响, 最多浪费1 epoch
+2. **日志混淆**: 多次重启日志追加到同一文件
+   - 用`append:`模式, 每次重启有"Resumed from epoch"标记
+3. **与其他训练冲突**: 确保同时只有一个训练进程
+   - systemd保证: 失败后重启同一进程
+
+### 对比
+| 方案 | 崩溃恢复 | 数据安全 | 复杂度 |
+|------|---------|---------|--------|
+| nohup(当前) | ❌手动 | ✅best不变 | 低 |
+| systemd | ✅自动30s | ✅best不变 | 中 |
+| checkpoint per batch | ✅精确 | ⚠️复杂 | 高 |
+
+**推荐: systemd方案, 简单有效!**
