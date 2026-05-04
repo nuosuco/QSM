@@ -5133,3 +5133,59 @@ class CachedQSM:
 2. **INT8量化** (torch.quantization, 2x加速) → 下周
 3. **Speculative Decoding** (需要draft模型) → V13后
 4. **多线程推理** (torch.compile + 多核) → 长期
+
+## 研究#260: 课程学习(Curriculum Learning)实施细节 (2026-05-04)
+
+### 原理 (Bengio et al., 2009)
+- 从简单样本开始训练, 逐步增加难度
+- 模拟人类学习过程: 先基础后高级
+- 避免早期被困难样本误导
+
+### V13课程学习4阶段
+| Phase | Epoch | Difficulty | 数据比例 | 目标 |
+|-------|-------|-----------|---------|------|
+| 1 | 1-10 | 1-2 | 简单词/短语 | 基础对齐 |
+| 2 | 11-30 | 1-3 | +句子/对话 | 语法学习 |
+| 3 | 31-70 | 1-4 | +复杂句/段落 | 语义理解 |
+| 4 | 71-100 | 1-4(全) | 所有数据 | 精调 |
+
+### difficulty字段含义
+- 1: 单词/数字/时间 (你好→hello)
+- 2: 短语/简单句 (我想去北京→i want to go to beijing)
+- 3: 复合句/对话 (虽然很冷但是还是去了→although cold still went)
+- 4: 段落/成语/谚语 (千里之行始于足下→a journey of a thousand miles...)
+- 5: 长段落/文章
+
+### 实施要点
+1. 每个epoch根据当前phase过滤数据
+2. Phase转换时LR通过SGDR重启配合
+3. 不要过早引入difficulty 4/5 (模型还没准备好)
+4. Phase 4使用全部数据(防止灾难性遗忘)
+
+### 与SGDR配合
+- Phase 1→2: E10, SGDR周期结束, LR重启
+- Phase 2→3: E30, SGDR周期2结束, LR重启
+- Phase 3→4: E70, SGDR周期3结束, LR重启
+- 完美对齐: 难度增加时LR重启, 模型重新探索
+
+### PyTorch实现
+```python
+def get_curriculum_data(data, epoch, max_difficulty):
+    if epoch < 10:
+        allowed = [1, 2]
+    elif epoch < 30:
+        allowed = [1, 2, 3]
+    elif epoch < 70:
+        allowed = [1, 2, 3, 4]
+    else:
+        allowed = [1, 2, 3, 4, 5]
+    
+    filtered = [d for d in data if d.get('difficulty', 3) in allowed]
+    return filtered
+```
+
+### 预期收益
+- Phase 1: 快速学会基础翻译(Val < 3.0)
+- Phase 2: 学会语法结构(Val < 2.5)
+- Phase 3: 学会语义理解(Val < 2.0)
+- Phase 4: 精调到Val < 1.5
