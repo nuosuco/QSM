@@ -6267,3 +6267,46 @@ V13已经超越V12的2.9259! 而且还在持续下降!
 1. **自适应课程**: 根据Val下降率自动调整phase转换
 2. **更细粒度**: 5-7个difficulty级别而非4个
 3. **数据增强随phase**: Phase3+回译增强(需Val<1.5)
+
+## 研究#289: RoPE vs 学习位置编码 - 低资源机器翻译适用性 (2026-05-04)
+
+### 背景(研究#253延伸)
+当前QSM使用学习式位置编码(learned positional embedding), max_len=64
+RoPE(Rotary Position Embedding)是更先进的方案
+
+### RoPE优势
+1. **长度外推**: 可训练64→推理512+ (关键! 当前64太短)
+2. **相对位置**: 天然编码相对距离, 更适合翻译
+3. **无需额外参数**: 不增加模型大小
+4. **外推性**: 训练短序列→推生长序列
+
+### RoPE劣势(低资源场景)
+1. **实现复杂**: 需修改attention计算
+2. **小模型可能不稳定**: 4.5M参数下RoPE效果未验证
+3. **CPU推理开销**: sin/cos计算增加延迟
+4. **与LoRA兼容性**: 需确认LoRA+RoPE无冲突
+
+### 对QSM的具体影响
+| 方案 | max_len | 参数增量 | 外推能力 |
+|------|---------|---------|---------|
+| 当前(learned) | 64 | 64×192=12K | ❌不可外推 |
+| RoPE | 64训练→512推理 | 0 | ✅8x外推 |
+| ALiBi | 64训练→512推理 | 0 | ✅8x外推 |
+
+### ALiBi vs RoPE
+- **ALiBi**: 更简单实现(仅加线性bias), 低资源下更稳定
+- **RoPE**: 更好的长度外推, 但实现更复杂
+- **推荐V14**: ALiBi(简单+稳定+低资源友好)
+- **推荐V15**: RoPE(如果V14 ALiBi验证成功)
+
+### V14 ALiBi实施计划
+```python
+# attention score加线性bias
+def alibi_bias(n_heads, seq_len):
+    slopes = 2 ** (-8 * torch.arange(1, n_heads+1) / n_heads)
+    bias = torch.arange(seq_len).unsqueeze(0) - torch.arange(seq_len).unsqueeze(1)
+    return slopes.unsqueeze(1).unsqueeze(1) * bias.unsqueeze(0)
+# 添加到attention_scores: scores + alibi_bias
+```
+- 无额外参数, 训练max_len=64→推理max_len=512
+- 低资源下更稳定(无sin/cos计算)
