@@ -793,6 +793,36 @@ quantum_class 学生 { 姓名: 字符串; 分数: 整数 }
     print("✅ 类外部方法(class+external methods) 通过:", result)
 
 
+def test_bubble_sort():
+    """冒泡排序算法"""
+    code = """
+冒泡排序: 函数(arr) {
+    让 n = 长度(arr)
+    循环 i 在 范围数(0, n) {
+        循环 j 在 范围数(0, n - i - 1) {
+            如果 arr[j] > arr[j + 1] {
+                让 temp = arr[j]
+                arr[j] = arr[j + 1]
+                arr[j + 1] = temp
+            }
+        }
+    }
+    返回 arr
+}
+
+主函数: 函数() {
+    让 data = [5, 3, 8, 1, 9, 2, 7]
+    让 sorted = 冒泡排序(data)
+    让 result = 格式("{} {} {} {} {} {} {}", sorted[0], sorted[1], sorted[2], sorted[3], sorted[4], sorted[5], sorted[6])
+    打印(result)
+}
+"""
+    result = run_qentl(code)
+    # Check it contains sorted output
+    assert any('1' in r and '2' in r and '9' in r for r in result), f"冒泡排序: {result}"
+    print("✅ 冒泡排序(bubble sort) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -822,7 +852,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort,
 ]
 
 if __name__ == '__main__':
