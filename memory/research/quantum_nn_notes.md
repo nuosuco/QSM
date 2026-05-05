@@ -7857,3 +7857,63 @@ def encode_data(dataset):
 7. [ ] 删除手动LR覆盖(行426-432)
 8. [ ] LoRA rank递增支持
 9. [ ] 课程学习5-Phase
+
+## 研究#324: V14训练内存估算与优化策略 (2026-05-05)
+
+### V14模型参数
+| 组件 | 参数量 | 大小(float32) |
+|------|--------|---------------|
+| Embedding(16K×256) | 4.1M | 16.4MB |
+| Encoder(4层) | 3.1M | 12.4MB |
+| Decoder(4层) | 3.1M | 12.4MB |
+| Quantum gate | 0.003M | 0.01MB |
+| Output proj | 4.1M | 16.4MB |
+| **Total** | **15.6M** | **57.6MB** |
+
+### 训练内存估算(CPU, batch=32, max_len=128)
+| 组件 | 内存 |
+|------|------|
+| 模型参数 | 58MB |
+| 梯度 | 58MB |
+| Adam状态(2×params) | 116MB |
+| 前向激活(batch=32, 4层) | ~3GB |
+| **总计** | **~3.2GB** |
+
+### ⚠️可能OOM! 7.4GB总内存, 系统占~2GB
+- 可用: ~5.4GB
+- V14训练: ~3.2GB
+- V13训练(同时): ~2.0GB
+- **同时训练=5.2GB→接近极限!**
+
+### 优化方案
+1. **梯度累积accum=4**: batch=8×4=32有效, 减少激活内存~4x
+   - 激活: ~0.75GB, 总计: ~1GB → 安全!
+2. **max_len=64**: 减半序列长度→激活~2x减少
+3. **LoRA r=16**: 仅训练1.6%参数→Adam状态减少
+4. **V13训练暂停**: 释放2GB给V14
+
+### 推荐方案
+1. **先暂停V13训练**(E42+已停滞, lr≈0)
+2. **V14用accum=4, batch=8, max_len=128**
+3. **估算总MEM**: 1GB(模型+优化器) + 0.75GB(激活) ≈ 1.75GB
+4. **V14训练后**: 如果V14更好, 停V13; 否则恢复V13
+
+### V14启动计划
+```bash
+# 停V13
+sudo systemctl stop qsm-v13-train.service
+
+# 启V14
+cd /root/.openclaw/workspace
+python3 Models/QSM/train_v14_alibi.py \
+  --data Models/QSM/bin/v13_clean_dataset.json \
+  --spm_model Models/QSM/bin/qsm_spm_v14_yi.model \
+  --epochs 100 --batch_size 8 --accum_steps 4 \
+  --lr 0.0003 --d_model 256 --n_heads 4 --n_layers 4 \
+  --d_ff 1024 --max_len 128 --dropout 0.1 \
+  --scheduler sgdr --sgdr_t0 10 --sgdr_tmult 2 \
+  --lora_r 16 --max_difficulty 2 \
+  --label_smoothing 0.1 \
+  --output_dir Models/QSM/bin \
+  > /tmp/qsm_v14_train.log 2>&1 &
+```
