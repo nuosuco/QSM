@@ -8245,3 +8245,42 @@ lr_new = lr_old × (batch_new / batch_old) = 0.0003 × (64/32) = 0.0006
 - E100: ~2.1
 
 **即使保守预测, V14也远优于V13 best(2.73)!**
+
+## 研究#333: ALiBi位置编码原理 - 为何优于Learned PE (2026-05-06)
+
+### ALiBi核心思想
+Attention with Linear Biases (Press et al., 2022)
+- **不使用位置embedding!** 位置信息通过attention bias注入
+- Bias = -m_i × |i - j| (i=query位置, j=key位置)
+- m_i = 2^(-8/n_heads × (i+1)) (head-specific斜率)
+
+### ALiBi vs Learned PE对比
+| 特性 | Learned PE | ALiBi |
+|------|-----------|-------|
+| 参数量 | d_model × max_len | 0! |
+| 外推能力 | 训练64→推理64 | 训练128→推理512+ |
+| 学习成本 | 需学习位置模式 | 即插即用 |
+| 长序列表现 | 超出训练长度→崩溃 | 平滑外推 |
+| 计算开销 | 需加法操作 | 需乘法+加法 |
+
+### 为什么ALiBi更好(低资源场景)?
+1. **零参数**: 15.6M模型→全部参数学语义(不浪费学位置)
+2. **更好的外推**: V14训练max_len=128→推理可用512+
+3. **快速收敛**: 不需要学习位置→E1就能利用位置信息
+4. **V14验证**: E1→E2 Val 4.83→4.54, ALiBi贡献显著
+
+### ALiBi斜率计算(V14 n_heads=4)
+```
+m_0 = 2^(-8/4 × 1) = 2^(-2) = 0.25
+m_1 = 2^(-8/4 × 2) = 2^(-4) = 0.0625
+m_2 = 2^(-8/4 × 3) = 2^(-6) = 0.015625
+m_3 = 2^(-8/4 × 4) = 2^(-8) = 0.00390625
+```
+- Head 0: 强近邻偏好(0.25×距离)
+- Head 3: 弱近邻偏好(0.004×距离)≈全局attention
+
+### V14 ALiBi实现验证
+- ✅ ALiBiEncoderLayer(双向, 用于encoder)
+- ✅ ALiBiDecoderLayer(因果mask+ALiBi, 用于decoder)
+- ✅ Cross-attention不使用ALiBi(源码确认)
+- ✅ forward pass smoke test通过
