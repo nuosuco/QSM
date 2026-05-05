@@ -7432,3 +7432,62 @@ test_pairs = [
 2. **新lr**: 0.00005 (比0.0001更保守)
 3. **或者**: 直接切换到V14(ALiBi+SPM+真正SGDR)
 4. **V13的step decay bug是根本原因!** 只有V14能修复
+
+## 研究#317: V14 SGDR修复 - 精确代码变更 (2026-05-05)
+
+### 问题定位(研究#278)
+train_v7_quantum.py中手动LR覆盖了PyTorch的SGDR scheduler
+
+### 需要修复的代码位置
+```python
+# 行426-432(大约):
+# 错误代码:
+for param_group in optimizer.param_groups:
+    param_group['lr'] = args.lr * (0.85 ** epoch)
+
+# 修复: 删除这段手动LR覆盖!
+# 让PyTorch的CosineAnnealingWarmRestarts scheduler自动管理lr
+```
+
+### 正确的SGDR行为
+```python
+scheduler = CosineAnnealingWarmRestarts(
+    optimizer, 
+    T_0=10,      # 第一个周期10 epoch
+    T_mult=2,    # 每次周期翻倍: 10→20→40
+    eta_min=1e-6  # 最低lr
+)
+# 每个epoch调用:
+scheduler.step()  # 自动管理lr, 无需手动设置
+```
+
+### SGDR重启时间表(V14)
+| Epoch | 周期 | lr行为 |
+|-------|------|--------|
+| E1-10 | 第1周期 | 0.0003→cosine→1e-6 |
+| E10 | 重启! | lr跳回0.0003 |
+| E11-30 | 第2周期(20ep) | 0.0003→cosine→1e-6 |
+| E30 | 重启! | lr跳回0.0003 |
+| E31-70 | 第3周期(40ep) | 0.0003→cosine→1e-6 |
+| E70 | 重启! | lr跳回0.0003 |
+| E71-100 | 第4周期 | 0.0003→cosine→1e-6 |
+
+### 关键差异
+| 特性 | V13(step decay) | V14(true SGDR) |
+|------|-----------------|-----------------|
+| lr在E10 | 0.0003*0.85^10=0.000059 | **跳回0.0003!** |
+| lr在E30 | 0.0003*0.85^30≈0 | **跳回0.0003!** |
+| 周期性 | 单调递减↘ | 周期重启↗↘↗↘ |
+| 探索性 | 低→停滞 | 周期性探索新区域 |
+
+### 为什么SGDR更好
+1. **避免lr→0停滞**: 每次重启都给模型新的探索机会
+2. **与课程学习对齐**: Phase转换=SGDR重启点
+3. **找到更优局部最小值**: 多次cosine退火=多轮探索
+4. **V13的两次跳跃证实了重启效应**: 进程重启→warmup=模拟重启→跳跃!
+
+### V14实施清单
+- [ ] 删除手动LR覆盖代码(行426-432)
+- [ ] 确认scheduler.step()在每个epoch调用
+- [ ] 添加eta_min=1e-6参数
+- [ ] 测试: 验证lr在E10/E30/E70自动跳回0.0003
