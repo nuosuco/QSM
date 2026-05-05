@@ -7727,3 +7727,133 @@ def upgrade_lora(model, old_rank, new_rank):
 1. 备份V13 E31 best.pth
 2. 开始V14 SPM训练
 3. 修复SGDR bug
+
+## 研究#323: V14 ALiBi+SPM集成到QSM_V7的具体修改 (2026-05-05)
+
+### 当前QSM_V7结构分析
+```python
+class QSM_V7(nn.Module):
+    def __init__(self, vocab_size, d_model=256, n_heads=4, ...):
+        self.embedding = QuantumEmbeddingV2(vocab_size, d_model)
+        self.pos_encoding = nn.Embedding(max_len, d_model)  # ← 要删!
+        self.encoder = nn.TransformerEncoder(enc_layer, n_layers)
+        self.decoder = nn.TransformerDecoder(dec_layer, n_layers)
+```
+
+### V14需要的修改
+
+#### 1. 删除pos_encoding, 替换为ALiBi
+```python
+# 删除: self.pos_encoding = nn.Embedding(max_len, d_model)
+# 添加:
+self.alibi = ALiBiBias(n_heads, max_len=512)  # 0参数!
+
+# forward中:
+# 删除: + self.pos_encoding(torch.arange(...))
+# 不需要显式添加, ALiBi在attention内部处理
+```
+
+#### 2. ALiBi需要修改PyTorch标准EncoderLayer/DecoderLayer
+**问题**: PyTorch标准TransformerEncoderLayer不接受外部attn_bias!
+**解决方案**: 自定义Attention层, 替换标准层
+
+```python
+class ALiBiMultiheadAttention(nn.Module):
+    def __init__(self, d_model, n_heads, dropout=0.1):
+        super().__init__()
+        self.n_heads = n_heads
+        self.d_k = d_model // n_heads
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, d_model)
+        self.W_v = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_model)
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, query, key, value, alibi_bias=None, 
+                key_padding_mask=None, causal=False):
+        B = query.size(0)
+        # Q, K, V projections
+        Q = self.W_q(query).view(B, -1, self.n_heads, self.d_k).transpose(1,2)
+        K = self.W_k(key).view(B, -1, self.n_heads, self.d_k).transpose(1,2)
+        V = self.W_v(value).view(B, -1, self.n_heads, self.d_k).transpose(1,2)
+        # Attention with ALiBi
+        scores = torch.matmul(Q, K.transpose(-2,-1)) / math.sqrt(self.d_k)
+        if alibi_bias is not None:
+            scores = scores + alibi_bias
+        if causal:
+            mask = torch.triu(torch.ones(scores.size(-2), scores.size(-1)), diagonal=1).bool()
+            scores = scores.masked_fill(mask, float('-inf'))
+        if key_padding_mask is not None:
+            scores = scores.masked_fill(key_padding_mask.unsqueeze(1).unsqueeze(2), float('-inf'))
+        attn = F.softmax(scores, dim=-1)
+        attn = self.dropout(attn)
+        out = torch.matmul(attn, V)
+        out = out.transpose(1,2).contiguous().view(B, -1, self.n_heads * self.d_k)
+        return self.W_o(out)
+```
+
+#### 3. 自定义Encoder/Decoder Layer
+```python
+class ALiBiEncoderLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_ff, dropout=0.1):
+        super().__init__()
+        self.self_attn = ALiBiMultiheadAttention(d_model, n_heads, dropout)
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, d_ff), nn.GELU(), nn.Dropout(dropout),
+            nn.Linear(d_ff, d_model), nn.Dropout(dropout)
+        )
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+    
+    def forward(self, x, alibi_bias=None, src_key_padding_mask=None):
+        x = x + self.self_attn(x, x, x, alibi_bias, src_key_padding_mask, causal=False)
+        x = self.norm1(x)
+        x = x + self.ffn(x)
+        x = self.norm2(x)
+        return x
+
+class ALiBiDecoderLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_ff, dropout=0.1):
+        super().__init__()
+        self.self_attn = ALiBiMultiheadAttention(d_model, n_heads, dropout)
+        self.cross_attn = ALiBiMultiheadAttention(d_model, n_heads, dropout)
+        self.ffn = nn.Sequential(...)
+        ...
+    
+    def forward(self, x, enc_out, self_alibi=None, cross_mask=None, ...):
+        # Self-attention with causal ALiBi
+        x = x + self.self_attn(x, x, x, self_alibi, tgt_key_padding_mask, causal=True)
+        # Cross-attention: NO ALiBi
+        x = x + self.cross_attn(x, enc_out, enc_out, None, src_key_padding_mask, causal=False)
+        ...
+```
+
+#### 4. SPM编码数据
+```python
+import sentencepiece as spm
+sp = spm.SentencePieceProcessor()
+sp.load('qsm_spm_v14_yi.model')
+
+# 编码数据: text → token IDs
+def encode_data(dataset):
+    encoded = []
+    for item in dataset:
+        src_ids = sp.encode(item['input'], out_type=int)
+        tgt_ids = sp.encode(item['output'], out_type=int)
+        encoded.append({
+            'src': [bos] + src_ids + [eos],
+            'tgt': [bos] + tgt_ids + [eos]
+        })
+    return encoded
+```
+
+### V14训练脚本修改清单
+1. ✅ SPM 16K已训练 (qsm_spm_v14_yi.model)
+2. [ ] ALiBiBias类
+3. [ ] ALiBiMultiheadAttention类
+4. [ ] ALiBiEncoderLayer/DecoderLayer类
+5. [ ] QSM_V14类 (替换QSM_V7)
+6. [ ] SPM数据加载器
+7. [ ] 删除手动LR覆盖(行426-432)
+8. [ ] LoRA rank递增支持
+9. [ ] 课程学习5-Phase
