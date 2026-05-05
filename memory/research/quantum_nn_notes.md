@@ -8665,3 +8665,36 @@ E11: lr跳回0.0003→同时增加数据→最大改进!
 - [x] systemd自动重启
 - [ ] E11后验证数据量确实增加到71K
 - [ ] E11-E15密切监控Val变化
+
+## 研究#343: Encoder-Decoder vs Decoder-Only - 低资源NMT架构选择 (2026-05-06)
+
+### V14架构: Encoder-Decoder (Seq2Seq)
+- Encoder: ALiBi双向attention(4层)
+- Decoder: ALiBi因果attention(4层) + Cross-attention
+- 参数: 15.97M (12.8M LoRA可训练)
+
+### Decoder-Only (如GPT) 对比
+| 特性 | Encoder-Decoder | Decoder-Only |
+|------|----------------|-------------|
+| 参数效率 | ✅更高(分离编码/解码) | ❌更低(统一) |
+| 翻译质量 | ✅更好(cross-attn) | ❌较差(无显式对齐) |
+| 生成控制 | ✅编码先处理输入 | ❌prefix拼接 |
+| 低资源优势 | ✅✅显著! | ❌ |
+| 长序列 | ❌编码需完整输入 | ✅自回归 |
+
+### 为什么低资源选Encoder-Decoder?
+1. **Cross-attention**: 显式学习源→目标对齐(关键!)
+2. **编码效率**: Encoder双向→更好理解源句
+3. **参数共享**: Encoder+Decoder共享词嵌入→更高效
+4. **数据效率**: 同等参数→翻译质量更高
+
+### 实证支持
+- Vaswani et al.(2017): Transformer原始就是Encoder-Decoder
+- 低资源翻译benchmark: Enc-Dec consistently outperforms Dec-Only
+- V4(V5 Enc-Dec) vs V3(Dec-Only-like): 翻译质量显著提升
+
+### V14的cross-attention细节
+- Query: 来自Decoder
+- Key/Value: 来自Encoder
+- **不使用ALiBi**(源句位置由Encoder已编码)
+- 这是标准实现✅
