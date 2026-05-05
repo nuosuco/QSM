@@ -8011,3 +8011,34 @@ python3 Models/QSM/train_v14_alibi.py \
 - ~2800步/epoch → E1结束Loss≈3.3-3.5
 - E5预计Loss≈2.5
 - E10(SGDR重启)预计Loss≈2.0
+
+## 研究#327: V14进程崩溃 - 与V13相同的模式 (2026-05-05)
+
+### 崩溃时间线
+- V14启动: 22:05
+- 崩溃: ~23:35 (运行约90分钟)
+- 位置: E1 B2000, L:3.67
+- MEM: 2.2G(非OOM!)
+- dmesg: 无OOM记录
+
+### 与V13对比
+| 版本 | 崩溃频率 | 崩溃位置 | MEM |
+|------|---------|---------|-----|
+| V13 | 每5-7 epoch | epoch边界 | 3-4G |
+| V14 | 首次90min | E1中间 | 2.2G |
+
+### 可能原因
+1. **Python GC spike**: 垃圾回收时内存突增→OOM
+2. **DataLoader worker**: num_workers>0时fork问题
+3. **PyTorch内存碎片**: 长时间训练→碎片累积
+4. **OpenClaw gateway**: 25% MEM(1.9G)→总内存紧张
+
+### 解决方案
+1. ✅ systemd自动重启(Restart=on-failure)
+2. 添加torch.cuda.empty_cache()(CPU无用)
+3. 减少gc压力: 避免在循环中创建大对象
+4. 定期手动gc.collect()
+
+### V14首次重启后
+- E1 B200 L:6.88 (从头开始, 没有checkpoint!)
+- **需要添加checkpoint resume支持!**
