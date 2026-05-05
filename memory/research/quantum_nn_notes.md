@@ -7021,3 +7021,69 @@ class CachedDecoder:
 - **E35**: 评估是否需要再次重置
 - **E50**: 如果Val<2.7, 继续训练
 - **E50**: 如果Val≥2.75, 切换到V14
+
+## 研究#308: ALiBi位置编码实现细节 - V14 Encoder-Decoder (2026-05-05)
+
+### ALiBi原理 (Press et al., 2022)
+- 不使用位置embedding
+- 在attention score上加线性bias: attention = QK^T + m*t
+- m是head-specific斜率: m_i = 2^(-8/n_heads * (i+1))
+- t是token间距离: t[i,j] = j - i (或i - j)
+
+### V14 ALiBi参数
+- n_heads=3 (当前), 斜率:
+  - m_0 = 2^(-8/3 * 1) = 2^(-2.67) = 0.157
+  - m_1 = 2^(-8/3 * 2) = 2^(-5.33) = 0.025
+  - m_2 = 2^(-8/3 * 3) = 2^(-8) = 0.004
+
+### Encoder端(双向)
+```
+bias[i][j] = m * (j - i)  # 可正可负, 双向信息
+```
+- 不需要因果mask
+- 所有token可以看到所有其他token
+
+### Decoder端(因果)
+```
+bias[i][j] = m * (j - i)  # j < i时为负, 自然因果
+causal_mask: j > i → -inf  # 防止看未来
+```
+- ALiBi bias + causal mask同时使用
+- ALiBi bias让近距离token注意力更强
+
+### Cross-Attention
+```
+Q: decoder位置i
+K,V: encoder位置j
+bias[i][j] = m * (j - i)  # 基于decoder-encoder距离
+```
+- 或简单版本: cross-attn不用ALiBi(Encoder已包含位置信息)
+
+### 实现伪代码
+```python
+def get_alibi_slopes(n_heads):
+    return [2 ** (-8 / n_heads * (i + 1)) for i in range(n_heads)]
+
+def alibi_bias(seq_len, slopes, causal=False):
+    # seq_len x seq_len 距离矩阵
+    dist = torch.arange(seq_len).unsqueeze(0) - torch.arange(seq_len).unsqueeze(1)
+    # n_heads x seq_len x seq_len
+    bias = slopes.unsqueeze(1).unsqueeze(2) * dist.unsqueeze(0).float()
+    if causal:
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+        bias = bias.masked_fill(mask, float('-inf'))
+    return bias
+```
+
+### 关键优势
+1. **训练64→推理512**: 无需重训练
+2. **0额外参数**: 替换learned PE(768参数→0)
+3. **更好外推**: 长序列推理不崩溃
+4. **简单实现**: 只需修改attention forward
+
+### V14实施步骤
+1. 训练时: 替换pos_embedding→ALiBi bias
+2. Encoder: 双向ALiBi
+3. Decoder: 因果ALiBi
+4. Cross-attn: 不用ALiBi(或简单版本)
+5. 推理时: 直接支持更长序列
