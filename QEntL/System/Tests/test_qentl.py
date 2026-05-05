@@ -2183,6 +2183,38 @@ def test_vowel_consonant_count():
     print("✅ 元音辅音计数(vowel/consonant) 通过:", result)
 
 
+def test_anagram_check():
+    """异位词检查(dict计数)"""
+    code = """
+异位词: 函数(s1, s2) {
+    如果 长度(s1) != 长度(s2) { 返回 0 }
+    让 count = {}
+    循环 i 在 范围数(0, 长度(s1)) {
+        让 c = 子串(s1, i, 1)
+        如果 包含(count, c) { count[c] = count[c] + 1 } 否则 { count[c] = 1 }
+    }
+    循环 i 在 范围数(0, 长度(s2)) {
+        让 c = 子串(s2, i, 1)
+        如果 包含(count, c) == 0 { 返回 0 }
+        count[c] = count[c] - 1
+    }
+    循环 i 在 范围数(0, 长度(s1)) {
+        让 c = 子串(s1, i, 1)
+        如果 count[c] != 0 { 返回 0 }
+    }
+    返回 1
+}
+
+主函数: 函数() {
+    打印(格式("{}", 异位词("listen", "silent")))
+    打印(格式("{}", 异位词("abc", "def")))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1', '0'], f"异位词: {result}"
+    print("✅ 异位词检查(anagram) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
@@ -2212,7 +2244,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest, test_caesar_cipher, test_int_to_binary, test_power_of_two, test_isomorphic_strings, test_missing_number, test_vowel_consonant_count, test_run_length_encoding,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest, test_caesar_cipher, test_int_to_binary, test_power_of_two, test_isomorphic_strings, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_run_length_encoding,
 ]
 
 if __name__ == '__main__':
