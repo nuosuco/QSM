@@ -8489,3 +8489,54 @@ Label Smoothing: y' = [ε/K, ε/K, 1-ε+ε/K, ε/K, ...]
 - 80K数据+15.6M参数→需要强正则化
 - E5 gap=0.45→没有过拟合→ε=0.1足够
 - 如果E20+出现过拟合(gap>1.5)→考虑ε=0.15
+
+## 研究#339: V14课程学习策略 - max_difficulty调度 (2026-05-06)
+
+### 当前状态
+V14: max_difficulty=2 (Phase1)
+SPM Dataset: 22,444 samples (diff≤2)
+
+### 数据difficulty分布
+| diff | 数量 | 占比 |
+|------|------|------|
+| 1 | 6,483 | 29% |
+| 2 | 15,865 | 71% |
+| 3 | 48,219 | - |
+| 4 | 9,516 | - |
+| 5 | 234 | - |
+
+### 何时增加max_difficulty?
+当前V14只训练diff≤2的数据(22K条)
+E10 SGDR重启后→增加max_difficulty=3(→71K条)
+
+### max_difficulty调度方案
+| 阶段 | Epoch范围 | max_diff | 数据量 | 理由 |
+|------|----------|----------|--------|------|
+| Phase1 | E1-10 | 2 | 22K | 基础模式 |
+| Phase2 | E11-30 | 3 | 71K | 扩大训练集 |
+| Phase3 | E31-70 | 4 | 80K | 接近全量 |
+| Phase4 | E71-100 | 5 | 80K+ | 全量finetune |
+
+### 与SGDR对齐
+- E10: SGDR重启 → max_diff=2(不变, 稳定)
+- E11-20: 新lr周期 → max_diff=3(数据3x增长!)
+- E30: SGDR重启 → max_diff=3(不变)
+- E31: 第二周期 → max_diff=4(数据接近全量)
+
+### 🔥关键: E11双重效应
+1. SGDR: lr跳回0.0003
+2. max_diff: 2→3, 数据22K→71K(3.2x!)
+3. 更多数据+更高lr = 最大改进!
+
+### 实施方案
+修改train_v14_alibi.py:
+```python
+# 在epoch循环开始时动态调整
+if epoch >= 10:
+    args.max_difficulty = 3
+if epoch >= 30:
+    args.max_difficulty = 4
+if epoch >= 70:
+    args.max_difficulty = 5
+# 重新创建dataset
+```
