@@ -8577,3 +8577,53 @@ B200: L=3.61, B400: L=2.94, B600: L=2.95
 
 V14 Val仍高于V13同期→vocab 16K + 数据量22K(远少于V13的80K)
 **V14的真正优势将在E11+释放!**(数据71K+lr重启)
+
+## 研究#341: V14动态max_difficulty实现方案 (2026-05-06)
+
+### 问题
+V14当前max_difficulty=2(22K数据), 但80K+数据已准备就绪
+E7 Train=3.0 vs Val=4.35, gap=1.35→过拟合
+需要E11增加数据量来降低过拟合
+
+### 实现方案
+在train_v14_alibi.py中添加动态difficulty调整:
+
+```python
+# 在epoch循环开始时
+def get_max_difficulty(epoch):
+    if epoch < 10:
+        return 2  # Phase1: 22K
+    elif epoch < 30:
+        return 3  # Phase2: 71K
+    elif epoch < 70:
+        return 4  # Phase3: 80K
+    else:
+        return 5  # Phase4: 80K+
+
+# 当difficulty变化时重建dataset
+if get_max_difficulty(epoch) != current_max_diff:
+    current_max_diff = get_max_difficulty(epoch)
+    train_dataset = SPMDataset(..., max_difficulty=current_max_diff)
+    train_loader = DataLoader(train_dataset, ...)
+```
+
+### SGDR与课程学习完美对齐
+| Epoch | SGDR事件 | max_diff | 数据量 |
+|-------|---------|----------|--------|
+| E1-10 | cosine→0 | 2 | 22K |
+| E11 | 🔥lr重启=0.0003 | 2→3 | 22K→71K |
+| E11-30 | cosine→0 | 3 | 71K |
+| E31 | 🔥lr重启=0.0003 | 3→4 | 71K→80K |
+| E31-70 | cosine→0 | 4 | 80K |
+| E71 | 🔥lr重启=0.0003 | 4→5 | 80K+ |
+
+### 关键: 不在E10改difficulty
+E10是cosine底部(lr≈0), 改数据集无意义
+E11: lr跳回0.0003→同时增加数据→最大改进!
+
+### 实施步骤
+1. 修改train_v14_alibi.py: 添加get_max_difficulty()函数
+2. 在epoch循环中检测difficulty变化并重建dataset
+3. 更新systemd服务参数
+4. 🔥优先级P0: 必须在E10结束前完成!
+   (E10约在当前时间+3epoch×1h=+3h后)
