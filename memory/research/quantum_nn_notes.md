@@ -8146,3 +8146,49 @@ ExecStart=/usr/bin/python3 train_v14_alibi.py \
 - E1 Val: 4.83
 - E2预测Val: ~4.2-4.5(如果趋势持续)
 - 关键看Val而非Train Loss(Val更稳定)
+
+## 研究#331: 梯度累积理论 - 解决V14 batch=8波动问题 (2026-05-05)
+
+### 核心公式
+有效batch_size = batch_size × accum_steps
+
+| accum | 有效batch | 显存增量 | 梯度方差 |
+|-------|----------|---------|---------|
+| 4 | 32 | 基线(1x) | 高 |
+| 8 | 64 | +0.3G | 中 |
+| 16 | 128 | +0.6G | 低 |
+
+### 为什么有效?
+梯度方差 ∝ 1/batch_size
+- batch=8: var ∝ 1/8 = 0.125
+- batch=32(accum=4): var ∝ 1/32 = 0.031
+- batch=64(accum=8): var ∝ 1/64 = 0.016
+- batch=128(accum=16): var ∝ 1/128 = 0.008
+
+**accum 4→8: 方差减半! 训练稳定性显著提升!**
+
+### V14内存预算
+- 模型: ~60MB (15.6M × 4bytes)
+- 前向: ~336MB
+- 梯度(accum=4): ~400MB
+- 梯度(accum=8): ~500MB (+100MB)
+- 优化器: ~240MB (Adam)
+- 总计(accum=8): ~1.14GB ✅ 远低于7.4G
+
+### 实施方案
+在train_v14_alibi.py中修改:
+```python
+# 当前: args.accum_steps = 4
+# 修改: args.accum_steps = 8 (下次重启时)
+# 同时降低lr: 0.0003 × sqrt(2) ≈ 0.0004 (线性缩放)
+# 或保持0.0003 (保守方案)
+```
+
+### 线性缩放规则
+lr_new = lr_old × (batch_new / batch_old) = 0.0003 × (64/32) = 0.0006
+但保守起见: lr = 0.0003 (不缩放, 让SGDR自动调整)
+
+### 何时实施?
+- V14 E2完成后重启时
+- 或下次进程崩溃自动重启时(systemd已配置)
+- 修改systemd ExecStart: --accum_steps 8
