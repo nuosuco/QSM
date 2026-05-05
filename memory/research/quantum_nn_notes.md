@@ -7245,3 +7245,48 @@ spm_train --input=spm_train.txt --model_prefix=qsm_spm_v14 \
 - Val<2.65: 继续训练到E100
 - Val 2.65-2.70: 再LR重置一次(lr=0.00005)
 - Val>2.70: 切换V14
+
+## 研究#313: V13 API部署计划 - 何时更新生产模型 (2026-05-05)
+
+### 当前API状态
+- 端口8000: QSM V7-Small (Val 2.6531, INT8量化)
+- 端口8000: 已有/health, /translate, /chat, /version端点
+- beam search + n-gram blocking + rep_penalty
+
+### V13 vs V7-Small对比
+| 指标 | V7-Small(API) | V13(E31) |
+|------|---------------|----------|
+| Val Loss | 2.6531 | 2.7256 |
+| 参数量 | 4.5M | 4.6M |
+| 数据量 | 52K | 80K |
+| 训练Epoch | 42 | 31 |
+| 量化 | INT8✅ | 无 |
+
+### 部署条件
+1. **Val < 2.65**: 超越V7-Small→立即部署
+2. **Val < 2.60**: 显著超越→部署+INT8量化
+3. **Val < 2.50**: 突破性→部署+KV Cache
+
+### 当前: Val 2.73 > V7-Small 2.65
+- **V13还不足以替换V7-Small!**
+- Val Loss不完全等价翻译质量(不同数据集)
+- 但V7-Small的输出仍含<unk>/碎片
+
+### 计划
+1. **E35**: 如果Val<2.70, 做5句翻译质量对比
+2. **E40**: 如果Val<2.65, 部署V13替换V7-Small
+3. **E50**: 如果Val<2.60, 部署+INT8量化+KV Cache
+4. **质量测试优先于Val数字!**
+
+### 翻译质量测试方法
+```python
+# 5句测试集
+test_pairs = [
+    ("你好", "hello"),
+    ("今天天气很好", "the weather is very good today"),
+    ("人工智能正在改变世界", "artificial intelligence is changing the world"),
+    ("春眠不觉晓", "in spring one sleeps unaware of the dawn"),
+    ("道可道非常道", "the way that can be spoken is not the eternal way"),
+]
+# 对比V7-Small vs V13输出
+```
