@@ -2382,12 +2382,36 @@ def test_binary_search():
     print("✅ 二分查找(binary search) 通过:", result)
 
 
+def test_selection_sort():
+    """选择排序(嵌套循环+交换)"""
+    code = """
+选择排序: 函数(arr) {
+    让 n = 长度(arr)
+    循环 i 在 范围数(0, n - 1) {
+        让 min_idx = i
+        循环 j 在 范围数(i + 1, n) { 如果 arr[j] < arr[min_idx] { min_idx = j } }
+        如果 min_idx != i { 让 temp = arr[i]; arr[i] = arr[min_idx]; arr[min_idx] = temp }
+    }
+    返回 arr
+}
+
+主函数: 函数() {
+    让 a = [64, 25, 12, 22, 11]
+    让 r = 选择排序(a)
+    打印(格式("{} {} {} {} {}", r[0], r[1], r[2], r[3], r[4]))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['11 12 22 25 64'], f"选择排序: {result}"
+    print("✅ 选择排序(selection sort) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
     test_loop_sum, test_builtin_print, test_quantum_program, test_quantum_enum,
     test_while_loop, test_elif_chain, test_for_each, test_range_loop, test_global_var,
-    test_multi_elif, test_fibonacci_recursive, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_string_builtins, test_math_builtins,
+    test_multi_elif, test_fibonacci_recursive, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_selection_sort, test_string_builtins, test_math_builtins,
     test_break, test_continue,
     test_field_assignment,
     test_try_catch,
@@ -2411,7 +2435,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_binary_search, test_euclidean_gcd, test_binary_search, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest, test_caesar_cipher, test_int_to_binary, test_power_of_two, test_isomorphic_strings, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_fibonacci_iterative, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_run_length_encoding,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_binary_search, test_selection_sort, test_euclidean_gcd, test_binary_search, test_selection_sort, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest, test_caesar_cipher, test_int_to_binary, test_power_of_two, test_isomorphic_strings, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_fibonacci_iterative, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_selection_sort, test_run_length_encoding,
 ]
 
 if __name__ == '__main__':
