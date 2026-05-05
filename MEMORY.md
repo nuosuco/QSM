@@ -140,7 +140,7 @@
   - 学会了: 字典查询模式, 英文释义(heart/mind), 哲学句式(道法自然)
   - 公网API: https://som.top API (V7-Small, val_loss=2.6531)
 - **V13 已暂停(E42)**: Best Val **2.7256**(E31, 31st BEST!)
-- **🔥V14训练中(E3)**: E1 Val 4.83→E2 Val 4.54(2nd BEST! Δ=-0.29/epoch)
+- **🔥V14训练中(E7)**: E1 4.83→E6 4.35(5th BEST! 5/6=83%BEST率)
 - **V12 Best**: E32 Val 2.9259 (连续10次BEST!)
 - **⚠️ V8 API输出仍为垃圾** — 根因是V12数据48%噪声, V12训练中用V13清洗数据
 - /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
