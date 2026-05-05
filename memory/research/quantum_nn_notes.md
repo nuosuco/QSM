@@ -6923,3 +6923,58 @@ E23: Val 2.8486 → E24: Val 2.7790 (Δ=-0.070)
 - 当前80K条, 但60%是difficulty=3
 - 如果把difficulty=3的20K条替换为difficulty=4-5
 - **同等数据量, 更高难度→Val更低**
+
+## 研究#306: KV Cache实现方案 - V13 API推理加速 (2026-05-05)
+
+### 当前API性能
+- QSM V7-Small API(8000): ~3-5s/翻译(无KV Cache)
+- Beam search + INT8量化已部署
+- 序列长度64, 3层 → 推理应更快
+
+### KV Cache原理
+```
+无Cache: 每步重新计算所有之前的K,V
+有Cache: 只计算新token的K,V, 之前的从缓存读取
+```
+
+### Encoder-Decoder的KV Cache
+- **Encoder端**: 一次性计算所有token的K,V, 缓存(源端不变)
+- **Decoder端**: 
+  - Self-attention: 缓存已生成token的K,V
+  - Cross-attention: 使用Encoder缓存(不变)
+  - 每步只需计算1个新token的Q,K,V
+
+### 加速预估
+| 配置 | 推理时间/step | 总时间(64 tokens) |
+|------|-------------|-------------------|
+| 无Cache | O(n²×d) | ~5s |
+| 有Cache | O(n×d) | ~1.5s |
+| **加速比** | **~3x** | **~3x** |
+
+### cached_decoder.py实现要点
+```python
+class CachedDecoder:
+    def __init__(self, model, src_enc, src_mask):
+        self.model = model
+        self.enc_cache = src_enc  # Encoder输出, 只算1次
+        self.dec_cache = []       # Decoder KV缓存, 逐步增长
+        
+    def step(self, prev_token):
+        # 1. Embed prev_token
+        # 2. Self-attn: Q=新token, K/V=cache+新token
+        # 3. Cross-attn: Q=新token, K/V=enc_cache
+        # 4. FFN
+        # 5. 更新dec_cache
+        # 6. 返回logits
+```
+
+### 实施步骤
+1. 修改QSM_V7的decoder_forward支持增量推理
+2. 实现CachedDecoder包装类
+3. 集成到API(qsm_yi_translate_api.py)
+4. A/B测试: Cache vs 无Cache速度对比
+
+### 优先级
+- **P1**: E30后V13 Val稳定时实施
+- 当前API用V7-Small, 效果有限
+- **V13 best部署后(KV Cache)→推理3x加速**
