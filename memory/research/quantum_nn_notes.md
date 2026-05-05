@@ -6755,3 +6755,31 @@ if (batch_idx + 1) % args.accum_steps == 0:
 4. **Beam search优化**: 多样性+惩罚调参
 5. **量化部署**: INT8已部署, INT4探索
 6. **知识蒸馏**: Qwen3→QSM(需GPU)
+
+## 研究#301: QEntL 范围数(range)可变参数bug (2026-05-05)
+
+### Bug描述
+`范围数(2, n + 1)` 当n是函数参数时, VM的BUILTIN_CALL处理中:
+- 范围数弹出2个栈元素作为start/end
+- 但如果end是表达式(n+1), 计算结果可能被其他操作污染
+- 导致: `int(self.stack.pop())` → ValueError: 'None1'
+
+### 受影响的代码模式
+```
+循环 i 在 范围数(2, n + 1)  # ❌ 崩溃
+循环 i 在 范围数(0, 长度(s))  # ✅ 正常(长度也是builtin)
+```
+
+### 根因分析
+- 范围数(2, n+1): 编译器先push 2, 再计算n+1(push n, push 1, ADD)
+- 但BUILTIN_CALL的arg_count机制: operand=(func_name, 2)
+- 范围数handler: pop()两次→第二次pop可能得到的是中间结果
+
+### Workaround
+- 用`当(count <= n)`循环替代`循环 i 在 范围数(2, n+1)`
+- 用字面量范围`范围数(0, 10)`替代变量范围
+
+### 修复方向(V14编译器)
+- 范围数应支持3参数: 范围数(start, end, step)
+- BUILTIN_CALL参数应先评估完整表达式再调用
+- 或改为: 编译时展开范围数为循环变量
