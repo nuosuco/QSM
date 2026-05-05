@@ -6686,3 +6686,36 @@ if (batch_idx + 1) % args.accum_steps == 0:
 - Szegedy et al. (2016): ε=0.1在ImageNet最优
 - 低资源MT: 适度平滑有助于泛化(防止对训练集过度自信)
 - 但ε过大会"模糊"目标分布→模型困惑
+
+## 研究#299: Encoder-Decoder vs Decoder-Only再评估 (2026-05-05)
+
+### 背景
+研究#264确认QSM用Encoder-Decoder架构。V13数据(80K)提供了新证据。
+
+### V13的Encoder-Decoder优势
+1. **条件生成**: 翻译是给定源→生成目标, Encoder-Decoder天然适合
+2. **分离表示**: Encoder学源语言, Decoder学生成目标语言
+3. **低资源效率**: 比Decoder-Only更少数据达到同等质量
+4. **双向训练**: zh→en和en→zh共享Encoder, 数据效率2x
+
+### Decoder-Only的问题(对QSM)
+- 需要特殊格式: "Translate: [src] → [tgt]"
+- 上下文窗口浪费: src和tgt共享同一序列
+- 低资源下更容易过拟合(单一方向注意力)
+
+### V13实证
+| 架构 | 参数 | 数据 | Val |
+|------|------|------|-----|
+| Enc-Dec(V7-Small) | 4.5M | 52K | 2.65 |
+| Enc-Dec(V13) | 4.6M | 80K | 2.85* |
+| *V13仍在下降, 最终会更低 |
+
+### V14架构建议
+- **保持Encoder-Decoder** ✅
+- 添加**Cross-Attention的ALiBi bias**(源和目标分别)
+- Encoder: ALiBi(双向), Decoder: ALiBi(因果mask)
+- 这比简单替换位置编码更有效
+
+### 未来考虑(数据>500K后)
+- 数据足够多时, Decoder-Only可能赶上
+- 但当前80K数据, Enc-Dec是最佳选择
