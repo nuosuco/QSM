@@ -2550,12 +2550,34 @@ def test_armstrong_number():
     print("✅ 阿姆斯特朗数(Armstrong number) 通过:", result)
 
 
+def test_string_rotate():
+    """字符串旋转(取模+双循环拼接)"""
+    code = """
+字符串旋转: 函数(s, k) {
+    让 n = 长度(s)
+    让 kmod = k % n
+    让 result = ""
+    循环 i 在 范围数(kmod, n) { result = result + 子串(s, i, 1) }
+    循环 i 在 范围数(0, kmod) { result = result + 子串(s, i, 1) }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(字符串旋转("abcdef", 2))
+    打印(字符串旋转("hello", 3))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['cdefab', 'lohel'], f"字符串旋转: {result}"
+    print("✅ 字符串旋转(string rotate) 通过:", result)
+
+
 tests = [
     test_basic_arithmetic, test_string_operations, test_fibonacci,
     test_factorial_recursive, test_comparison_operators, test_array_operations,
     test_loop_sum, test_builtin_print, test_quantum_program, test_quantum_enum,
     test_while_loop, test_elif_chain, test_for_each, test_range_loop, test_global_var,
-    test_multi_elif, test_fibonacci_recursive, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_string_builtins, test_math_builtins,
+    test_multi_elif, test_fibonacci_recursive, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_string_rotate, test_string_builtins, test_math_builtins,
     test_break, test_continue,
     test_field_assignment,
     test_try_catch,
@@ -2579,7 +2601,7 @@ tests = [
     test_math_builtins,
     test_file_io,
     test_substring_2arg,
-    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_euclidean_gcd, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest, test_caesar_cipher, test_int_to_binary, test_power_of_two, test_isomorphic_strings, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_fibonacci_iterative, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_run_length_encoding,
+    test_system_builtins, test_string_utilities, test_class_external_methods, test_bubble_sort, test_quantum_enum_advanced, test_comprehensive_integration, test_string_pipeline, test_nested_function_calls, test_recursive_factorial, test_recursive_fibonacci, test_array_sum_average, test_list_filter, test_list_map_square, test_linear_search, test_string_reverse, test_count_occurrences, test_insertion_sort, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_string_rotate, test_euclidean_gcd, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_string_rotate, test_nested_list_iteration, test_is_prime, test_palindrome_check, test_caesar_cipher, test_fast_exponentiation, test_prefix_sum, test_decimal_to_binary, test_run_length_encoding, test_fizzbuzz, test_merge_sorted_arrays, test_user_func_overrides_builtin, test_matrix_max, test_armstrong_number, test_string_rotate, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_string_rotate, test_collatz_steps, test_word_count, test_perfect_number, test_tower_of_hanoi_moves, test_rot13_cipher, test_string_dedup, test_frequency_count, test_fibonacci_memo, test_gcd_lcm, test_vowel_count, test_binary_to_decimal, test_decimal_to_roman, test_extract_digits, test_leap_year, test_matrix_transpose, test_recursive_digit_sum, test_tic_tac_toe_win, test_distinct_char_count, test_longest_word, test_merge_sorted_arrays, test_sorted_array_dedup, test_second_largest, test_caesar_cipher, test_int_to_binary, test_power_of_two, test_isomorphic_strings, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_fibonacci_iterative, test_gcd, test_lcm, test_reverse_number, test_array_sum_max, test_insertion_sort, test_binary_search, test_selection_sort, test_palindrome, test_char_frequency, test_matrix_multiply, test_determinant_2x2, test_prime_factor_count, test_armstrong_number, test_string_rotate, test_run_length_encoding,
 ]
 
 if __name__ == '__main__':
