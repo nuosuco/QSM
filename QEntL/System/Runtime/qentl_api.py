@@ -167,7 +167,7 @@ def stats():
         'version': '3.0',
         'builtin_functions': 62,
         'opcodes': 56,
-        'test_coverage': '103/103',
+        'test_coverage': '120/120',
         'features': [
             'quantum_class', 'functions', 'recursion',
             'for/while/foreach', 'if/elif/else', 
