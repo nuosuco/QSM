@@ -7628,3 +7628,59 @@ class ALiBiBias(nn.Module):
 - 训练max_len=64, 推理可扩展到512
 - 消除position embedding → 节省参数
 - 更好的长度泛化→适合变长输入
+
+## 研究#321: V14 LoRA Rank递增实现方案 (2026-05-05)
+
+### 核心思想: 渐进解冻
+- 小rank: 只训练少量参数→快速收敛到好区域
+- 大rank: 解冻更多参数→精细调整
+- 全量: 最终完全微调→最优性能
+
+### 实现方案
+```python
+def get_lora_rank(epoch):
+    if epoch <= 20: return 16    # Phase1: 1.6%参数
+    elif epoch <= 40: return 32  # Phase2: 3.2%参数
+    elif epoch <= 60: return 64  # Phase3: 6.4%参数
+    else: return 0               # Phase4: 全量微调
+
+def upgrade_lora(model, old_rank, new_rank):
+    """LoRA rank升级: 保留已训练权重, 扩展A/B矩阵"""
+    for name, param in model.named_parameters():
+        if 'lora_A' in name:
+            # A: (r, d_in) → (new_r, d_in)
+            old_A = param.data
+            new_A = torch.zeros(new_rank, old_A.shape[1])
+            new_A[:old_rank] = old_A
+            param.data = new_A
+        elif 'lora_B' in name:
+            # B: (d_out, r) → (d_out, new_r)
+            old_B = param.data
+            new_B = torch.zeros(old_B.shape[0], new_rank)
+            new_B[:, :old_rank] = old_B
+            param.data = new_B
+```
+
+### 关键细节
+1. **新rank行初始化**: 新增的A行用Kaiming初始化, B行用0
+2. **rank=0=全量**: merge_weights=True, 然后设requires_grad=True
+3. **optimizer需要重建**: rank变化→参数形状变化→新optimizer
+4. **SGDR重启时机=rank升级时机**: 双重效果!
+
+### V14 5-Phase训练计划
+| Phase | Epoch | LoRA r | 参数% | SGDR周期 | 课程max_diff |
+|-------|-------|--------|-------|---------|-------------|
+| Phase1 | E1-20 | 16 | 1.6% | 周期1(10ep) | 2 |
+| Phase2 | E21-40 | 32 | 3.2% | 周期2(20ep) | 3 |
+| Phase3 | E41-60 | 64 | 6.4% | 周期3(40ep) | 4 |
+| Phase4 | E61-80 | full | 100% | 周期4 | 5 |
+| Phase5 | E81-100 | full | 100% | fine-tune | 5 |
+
+### 与V13对比
+| 特性 | V13 | V14 |
+|------|-----|-----|
+| LoRA | r=16固定 | 16→32→64→full |
+| SGDR | step decay(bug!) | 真正SGDR |
+| 课程 | 4-Phase | 5-Phase |
+| 位置 | learned PE | ALiBi |
+| 词表 | 7403字符 | 16K SPM |
