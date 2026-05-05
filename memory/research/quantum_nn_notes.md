@@ -7118,3 +7118,53 @@ def alibi_bias(seq_len, slopes, causal=False):
 ### 如果方案A失败(E40后仍停滞)
 - 切换到方案B(lr=0.0003, warmup=500)
 - 或直接切换到V14(ALiBi+SPM+真正SGDR)
+
+## 研究#310: SentencePiece训练方案 - V14子词编码 (2026-05-05)
+
+### 当前V13编码问题
+- 字符级编码: 每个汉字=1token, 英文=1token/字符
+- 序列长度浪费: "artificial intelligence" = 23字符→23tokens
+- vocab=7403: 彝文4120+中文2720+英文505
+- max_len=64: 长句子被截断
+
+### SPM 32K方案(研究#294延伸)
+- 词汇量: 32,000 (4.3x增长)
+- 彝文: 保持字符级(4120个字)
+- 中文: SPM子词(~8000词, 覆盖常用词)
+- 英文: SPM子词(~10000词, 覆盖常用词+词根)
+- 特殊: 6 + 预留~8800
+
+### SPM训练数据
+```bash
+# 准备训练文本
+cat v13_clean_dataset.json | jq -r '.[].input + "\n" + .[].output' > spm_train.txt
+# 训练SPM模型
+spm_train --input=spm_train.txt --model_prefix=qsm_spm_v14 \
+  --vocab_size=32000 --character_coverage=0.9995 \
+  --model_type=bpe --user_defined_symbols=彝文字符列表
+```
+
+### 序列长度对比
+| 句子 | 字符级tokens | SPM 32K tokens | 压缩比 |
+|------|-------------|----------------|--------|
+| "人工智能正在改变世界" | 10 | 3-4 | 2.5-3x |
+| "artificial intelligence is changing the world" | 45 | 6-7 | 6-7x |
+| "climate change is a challenge" | 30 | 5-6 | 5-6x |
+
+### 对训练的影响
+1. **序列缩短3-5x**: 同样的max_len=64能编码更多内容
+2. **信息密度↑**: 每个token携带更多语义
+3. **英文大幅改善**: 不再逐字符编码
+4. **彝文保持字符级**: 4120个字不变(每个字=1token)
+
+### 实施步骤(V14)
+1. 从V13数据提取所有文本
+2. 训练SPM模型(qsm_spm_v14.model)
+3. 重新编码V13数据→V14数据
+4. 修改模型: embedding层32000→适配SPM
+5. 训练V14(ALiBi+SPM+SGDR+LoRA)
+
+### 风险
+- 彝文字符在SPM中可能被拆分→需user_defined_symbols保护
+- 词汇量4x增长→模型参数增加(~3M→~5M embedding)
+- 需要重新训练, 不能从V13续训
