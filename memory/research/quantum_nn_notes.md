@@ -8042,3 +8042,39 @@ python3 Models/QSM/train_v14_alibi.py \
 ### V14首次重启后
 - E1 B200 L:6.88 (从头开始, 没有checkpoint!)
 - **需要添加checkpoint resume支持!**
+
+## 研究#328: V14 Checkpoint Resume - 进程崩溃恢复方案 (2026-05-05)
+
+### 问题
+V14训练进程崩溃后重启, 从E1开始训练(无checkpoint resume)
+所有已训练进度丢失!
+
+### 解决方案: 添加--resume参数
+```python
+# 在train()开头添加:
+if args.resume and os.path.exists(args.resume):
+    ckpt = torch.load(args.resume)
+    model.load_state_dict(ckpt['model_state'])
+    optimizer.load_state_dict(ckpt['optimizer_state'])
+    start_epoch = ckpt['epoch']
+    best_val = ckpt.get('best_val', float('inf'))
+    print(f"Resumed from {args.resume}: E{start_epoch}, best_val={best_val}")
+```
+
+### systemd ExecStart添加--resume
+```ini
+ExecStart=/usr/bin/python3 train_v14_alibi.py \
+  --resume Models/QSM/bin/qsm_v14_best.pth \
+  ...其他参数...
+```
+
+### 需要修改的地方
+1. train_v14_alibi.py: 添加--resume参数+加载逻辑
+2. systemd服务: ExecStart添加--resume
+3. 每个epoch结束保存checkpoint(已实现)
+4. **关键: 区分best.pth(最佳)和last.pth(最新)**
+   - best.pth: val_loss最低
+   - last.pth: 每个epoch结束保存
+   - resume从last.pth恢复!
+
+### 实施优先级: 🔥P0(下次崩溃会丢失所有进度!)
