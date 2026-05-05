@@ -7576,3 +7576,55 @@ spm_train \
 - Output: 16K×256 = 4.1M
 - **总计: ~14.4M**
 - MEM估算: ~5.5GB(训练) → 需梯度累积accum=2
+
+## 研究#320: V14 ALiBi位置编码实现伪代码 (2026-05-05)
+
+### ALiBi核心原理
+- 无位置embedding参数
+- 在attention score上加线性bias: score(i,j) += m_i * (j-i-1)
+- j-i-1: 当前位置i对位置j的相对距离(负数)
+- m_i: 每个head的斜率, 几何级数
+
+### QSM V4 ALiBi实现(PyTorch)
+```python
+class ALiBiBias(nn.Module):
+    def __init__(self, n_heads, max_seq_len=512):
+        super().__init__()
+        # 计算斜率: m_i = 2^(-8/n_heads*(i+1))
+        # n_heads=4: [0.5, 0.079, 0.0125, 0.002]
+        slopes = 2 ** (-8.0 / n_heads * torch.arange(1, n_heads+1))
+        self.register_buffer('slopes', slopes)
+        
+        # 预计算距离矩阵 (max_seq_len x max_seq_len)
+        # alibi_bias[i,j] = slope * (j - i - 1)  # j<i时为正, j>i时为负
+        # causal: 只允许j<=i
+        rows = torch.arange(max_seq_len).unsqueeze(1)
+        cols = torch.arange(max_seq_len).unsqueeze(0)
+        dist = cols - rows  # 负数=未来, 正数=过去
+        alibi = slopes.unsqueeze(1).unsqueeze(2) * dist.unsqueeze(0)
+        # alibi: (n_heads, max_seq_len, max_seq_len)
+        self.register_buffer('alibi', alibi)
+    
+    def forward(self, seq_len):
+        # 返回 (n_heads, seq_len, seq_len) 的bias
+        return self.alibi[:, :seq_len, :seq_len]
+```
+
+### Encoder vs Decoder的ALiBi
+| 组件 | ALiBi类型 | 说明 |
+|------|-----------|------|
+| Encoder self-attn | 双向 | 不加causal mask, 但加ALiBi bias |
+| Decoder self-attn | 因果 | causal mask + ALiBi bias |
+| Cross-attn | 不用ALiBi | Encoder已有位置信息 |
+
+### 关键细节
+1. **ALiBi bias加在softmax之前**: scores = QK^T/sqrt(d) + alibi_bias
+2. **Decoder causal mask**: 注意力掩码与ALiBi bias相加
+3. **Encoder双向**: 不需要causal mask, 但ALiBi仍提供位置信号
+4. **推理时外推**: 训练64→推理512, ALiBi天然支持!
+5. **0参数开销**: 不需要learned PE, 节省n_heads*max_seq_len参数
+
+### 对V14训练的影响
+- 训练max_len=64, 推理可扩展到512
+- 消除position embedding → 节省参数
+- 更好的长度泛化→适合变长输入
