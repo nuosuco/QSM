@@ -7290,3 +7290,67 @@ test_pairs = [
 ]
 # 对比V7-Small vs V13输出
 ```
+
+## 研究#314: V14完整架构规格书 (2026-05-05)
+
+### V14核心改进(P0必须 + P1推荐)
+
+#### P0: SGDR Bug修复
+- 问题: 手动LR覆盖scheduler(研究#278)
+- 修复: 删除训练脚本中手动lr赋值, 让SGDR scheduler控制
+- 效果: 真正的cosine restart, E10/E30/E70自动重启lr
+
+#### P1: ALiBi位置编码(研究#308)
+- 替换learned positional embedding
+- Encoder: 双向ALiBi bias
+- Decoder: 因果ALiBi + causal mask
+- Cross-attention: 不用ALiBi(Encoder已有位置信息)
+- 斜率: m_i = 2^(-8/n_heads*(i+1))
+- 优势: 训练64→推理512, 0额外参数
+
+#### P1: SPM 32K子词编码(研究#294, #310)
+- 彝文: 字符级保持(4120字→user_defined_symbols)
+- 中文: SPM ~8000子词
+- 英文: SPM ~10000子词
+- 总词汇: 32K (含特殊+预留)
+- 序列缩短3-5x
+
+#### P1: LoRA Rank递增(研究#280)
+- Phase1: r=16 (E1-20)
+- Phase2: r=32 (E21-40)
+- Phase3: r=64 (E41-60)
+- Full: 全量微调 (E61+)
+- 渐进解冻, 防止灾难性遗忘
+
+#### P2: 梯度累积(研究#297)
+- accum_steps=2→有效batch=64
+- 训练时间2x, 但更稳定梯度
+
+#### P2: 动态Label Smoothing(研究#298)
+- ε=0.1 * 0.5^(epoch/50)
+- E1: 0.10, E25: 0.07, E50: 0.05
+
+### V14模型参数
+| 组件 | V13 | V14 |
+|------|-----|-----|
+| d_model | 192 | 256 |
+| n_heads | 3 | 4 |
+| n_layers | 3 | 4 |
+| d_ff | 768 | 1024 |
+| max_len | 64 | 128(ALiBi) |
+| vocab | 7403 | 32000(SPM) |
+| 位置编码 | learned | ALiBi |
+| 总参数 | 4.6M | ~15M |
+
+### V14训练计划
+1. 准备SPM模型(qsm_spm_v14.model)
+2. 重编码V13数据→V14格式
+3. 从头训练(ALiBi+SPM, 不可续训V13)
+4. SGDR: T_0=10, T_mult=2 (真正SGDR!)
+5. 课程学习+LoRA递增
+6. 目标: Val < 2.00 (E50)
+
+### 风险评估
+- **内存**: 15M模型+SPM 32K → embedding层~5M参数→~19MB
+- 总MEM估计: ~6GB训练→需要梯度累积(accum=2)
+- **数据量**: 80K对SPM 32K可能不足→需要更多数据或小SPM(16K)
