@@ -9446,3 +9446,40 @@ Val(E) = 4.99 * exp(-k * (E-11))
 - 线性衰减: Δ=0.15/epoch→E20 Val=3.63(略>3.5)
 - 真实值可能在3.4-3.7之间
 - **最保守估计: E22-25达Val<3.5**
+
+## 研究#366: QuantumEmbeddingV2理论基础 - 语言感知量子嵌入 (2026-05-06)
+
+### QuantumEmbeddingV1(V7-Small)
+- 简单: word_embed + positional_embed
+- 无语言感知: zh/en/yi混在一起
+
+### QuantumEmbeddingV2(V13/V14)
+- 语言感知量子嵌入
+- 每个token有3个分量:
+  1. **语言标记**: zh/en/yi → 不同的旋转角度
+  2. **语义嵌入**: SPM子词 → 嵌入空间
+  3. **量子相位**: 基于词频的相位编码
+
+### 理论基础: 量子旋转门
+```
+|ψ⟩ = Rz(θ_lang) * Ry(θ_freq) * |semantic⟩
+
+θ_lang: zh=0, en=2π/3, yi=4π/3
+θ_freq: log(freq) / max_freq * π
+```
+
+### V14实现
+- ALiBi替代了learned positional embedding
+- SPM提供更好的子词语义嵌入
+- 但**缺少显式语言标记**!
+
+### V15改进方向
+1. **语言token**: 在SPM编码前添加<zh>/<en><yi>标记
+2. **方向标记**: <zh2en>/<en2zh>标记翻译方向
+3. **量子相位**: 基于词频的相位调制
+4. **ALiBi + 语言偏置**: 不同语言不同的ALiBi斜率
+
+### 预期效果
+- 显式语言标记→减少语言混淆
+- 方向标记→改善双向翻译质量
+- 量子相位→稀有词更好表示
