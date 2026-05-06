@@ -3508,6 +3508,39 @@ def test_max_paren_depth():
     print("✅ 最大括号深度(max paren depth) 通过: 3,1,3")
 
 
+def test_rle_decode():
+    """RLE解码(字符+数字→展开字符串)"""
+    code = """
+RLE解码: 函数(s) {
+    让 result = ""
+    让 i = 0
+    当(i < 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        i = i + 1
+        让 num_str = ""
+        当(i < 长度(s)) {
+            让 c = 子串(s, i, 1)
+            让 code = 字符代码(c)
+            如果 code >= 48 且 code <= 57 { num_str = num_str + c; i = i + 1 }
+            否则 { 跳出 }
+        }
+        让 n = 0
+        循环 d 在 num_str { 让 code = 字符代码(d); n = n * 10 + (code - 48) }
+        循环 j 在 范围数(0, n) { result = result + ch }
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(RLE解码("a3b2c1"))
+    打印(RLE解码("x2y3"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['aaabbc', 'xxyyy'], f"RLE解码: {result}"
+    print("✅ RLE解码(run-length decode) 通过: a3b2c1→aaabbc, x2y3→xxyyy")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3587,7 +3620,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3603,7 +3636,7 @@ test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode,
 test_longest_word,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
@@ -3660,7 +3693,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode,
 ]
 
 if __name__ == '__main__':
