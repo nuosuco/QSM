@@ -3598,6 +3598,32 @@ def test_isomorphic_strings():
     print("✅ 同构字符串(isomorphic strings) 通过: 1,0,1")
 
 
+def test_rot13_cipher():
+    """ROT13密码(字母旋转13位, 大小写保留)"""
+    code = """
+ROT13: 函数(s) {
+    让 result = ""
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        让 code = 字符代码(ch)
+        让 new_code = code
+        如果 code >= 65 且 code <= 90 { new_code = (code - 65 + 13) % 26 + 65 }
+        否则 如果 code >= 97 且 code <= 122 { new_code = (code - 97 + 13) % 26 + 97 }
+        result = result + 字符(new_code)
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(ROT13("hello"))
+    打印(ROT13("world"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['uryyb', 'jbeyq'], f"ROT13: {result}"
+    print("✅ ROT13密码 通过: hello→uryyb, world→jbeyq")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3677,7 +3703,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3693,15 +3719,15 @@ test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings,
-test_longest_word, test_isomorphic_strings,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher,
+test_longest_word, test_isomorphic_strings, test_rot13_cipher,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
 test_second_largest,
 test_caesar_cipher,
 test_int_to_binary,
 test_power_of_two,
-test_isomorphic_strings,
+test_isomorphic_strings, test_rot13_cipher,
 test_run_length_encoding,
 test_missing_number,
 test_vowel_consonant_count,
@@ -3750,7 +3776,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher,
 ]
 
 if __name__ == '__main__':
