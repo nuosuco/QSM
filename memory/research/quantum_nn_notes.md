@@ -9790,3 +9790,47 @@ TypeError: int() argument must be ... not 'NoneType'
 - **E30**: 预计Val≈2.96→Val<3.0!
 - 线性衰减比指数更符合当前趋势
 - 后期可能加速(curriculum升级diff=4→更多数据)
+
+## 研究#376: V14 accum=8实施计划 - 降低Loss波动 (2026-05-06)
+
+### 问题(研究#350)
+V14 E11 B1000-7000 Loss波动±1.0
+- B5000 L:3.03, B6000 L:5.27→同一epoch内波动2.24!
+- 原因: batch=8太小, 71K数据→梯度方差大
+
+### accum=8方案
+当前: batch=8, 每步更新梯度
+目标: batch=8, 累积8步→有效batch=64
+
+### 实施改动(train_v14_alibi.py)
+```python
+# 1. 添加参数
+parser.add_argument('--grad_accum_steps', type=int, default=1)
+
+# 2. 修改训练循环
+optimizer.zero_grad()
+for micro_step in range(grad_accum_steps):
+    loss = model(...)
+    loss = loss / grad_accum_steps  # 缩放
+    loss.backward()
+optimizer.step()
+```
+
+### 效果预测
+| 指标 | 当前batch=8 | accum=8(有效64) |
+|------|-----------|----------------|
+| Loss波动 | ±1.0 | ±0.25(4x降低) |
+| 训练速度 | 11 tok/s | ~10 tok/s(略慢) |
+| 收敛速度 | 基线 | 可能更快(方向更准) |
+| 内存 | 基线 | 不变(累积不额外占用) |
+
+### 实施时机
+- **最佳**: E15或E16(当前epoch完成后重启)
+- **需要**: 修改脚本→重启systemd服务
+- **风险**: 低(accum不改变模型结构)
+
+### 实施步骤
+1. 修改train_v14_alibi.py添加accum支持
+2. 修改systemd service添加--grad_accum_steps 8
+3. systemctl daemon-reload && restart
+4. --resume自动从last.pth继续
