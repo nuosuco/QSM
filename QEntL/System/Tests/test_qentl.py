@@ -2134,10 +2134,35 @@ def test_selection_sort():
     print("✅ 选择排序(selection sort) 通过: [64,25,12,22,11]→[11,12,22,25,64]")
 
 
+def test_merge_sorted_arrays():
+    """合并两个有序数组"""
+    code = """
+合并有序数组: 函数(a, b) {
+    让 result = []
+    让 i = 0
+    让 j = 0
+    当(i < 长度(a) 且 j < 长度(b)) {
+        如果 a[i] <= b[j] { result = result + [a[i]]; i = i + 1 }
+        否则 { result = result + [b[j]]; j = j + 1 }
+    }
+    当(i < 长度(a)) { result = result + [a[i]]; i = i + 1 }
+    当(j < 长度(b)) { result = result + [b[j]]; j = j + 1 }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(格式("{}", 合并有序数组([1, 3, 5], [2, 4, 6])))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['[1, 2, 3, 4, 5, 6]'], f"合并: {result}"
+    print("✅ 合并有序数组(merge sorted) 通过: [1,3,5]+[2,4,6]→[1,2,3,4,5,6]")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2194,23 +2219,23 @@ test_list_map_square,
 test_linear_search,
 test_string_reverse,
 test_count_occurrences,
-test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
+test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
+test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
-test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
+test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
 test_armstrong_number,
-test_selection_sort,
+test_selection_sort, test_merge_sorted_arrays,
 test_collatz_steps,
 test_word_count,
 test_perfect_number,
@@ -2225,7 +2250,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
 ]
 
 if __name__ == '__main__':
