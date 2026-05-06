@@ -2016,10 +2016,35 @@ def test_gcd_euclidean():
     print("✅ 最大公约数(GCD Euclidean) 通过: gcd(48,18)=6, gcd(100,75)=25")
 
 
+def test_binary_search():
+    """二分查找(有序数组)"""
+    code = """
+二分查找: 函数(arr, target) {
+    让 lo = 0
+    让 hi = 长度(arr) - 1
+    当(lo <= hi) {
+        让 mid = 取整(lo + (hi - lo) / 2)
+        如果 arr[mid] == target { 返回 mid }
+        否则 如果 arr[mid] < target { lo = mid + 1 }
+        否则 { hi = mid - 1 }
+    }
+    返回 -1
+}
+
+主函数: 函数() {
+    打印(二分查找([1, 3, 5, 7, 9, 11], 7))
+    打印(二分查找([1, 3, 5, 7, 9, 11], 4))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['3', '-1'], f"二分查找: {result}"
+    print("✅ 二分查找(binary search) 通过: find(7)=3, find(4)=-1")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean,
+test_fibonacci, test_gcd_euclidean, test_binary_search,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2081,13 +2106,13 @@ test_euclidean_gcd,
 test_binary_search,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search,
 test_caesar_cipher,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2107,7 +2132,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search,
 ]
 
 if __name__ == '__main__':
