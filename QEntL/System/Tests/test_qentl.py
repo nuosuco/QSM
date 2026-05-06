@@ -2090,10 +2090,32 @@ def test_insertion_sort():
     print("✅ 插入排序(insertion sort) 通过: [5,2,8,1,9,3]→[1,2,3,5,8,9]")
 
 
+def test_lcm_via_gcd():
+    """最小公倍数(利用GCD: lcm=ab/gcd)"""
+    code = """
+最大公约数: 函数(a, b) {
+    当(b != 0) { 让 temp = b; b = a % b; a = temp }
+    返回 a
+}
+
+最小公倍数: 函数(a, b) {
+    返回 取整(a * b / 最大公约数(a, b))
+}
+
+主函数: 函数() {
+    打印(最小公倍数(12, 18))
+    打印(最小公倍数(4, 7))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['36', '28'], f"LCM: {result}"
+    print("✅ 最小公倍数(LCM) 通过: lcm(12,18)=36, lcm(4,7)=28")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2150,18 +2172,18 @@ test_list_map_square,
 test_linear_search,
 test_string_reverse,
 test_count_occurrences,
-test_insertion_sort,
+test_insertion_sort, test_lcm_via_gcd,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher, test_insertion_sort,
+test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
-test_caesar_cipher, test_insertion_sort,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
+test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2181,7 +2203,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
 ]
 
 if __name__ == '__main__':
