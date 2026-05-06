@@ -3566,6 +3566,38 @@ def test_longest_word():
     print("✅ 最长单词(longest word) 通过: quick, programming")
 
 
+def test_isomorphic_strings():
+    """判断两字符串是否同构(双射映射)"""
+    code = """
+同构: 函数(a, b) {
+    如果 长度(a) != 长度(b) { 返回 0 }
+    让 map1 = ""
+    让 map2 = ""
+    循环 i 在 范围数(0, 长度(a)) {
+        让 ca = 子串(a, i, 1)
+        让 cb = 子串(b, i, 1)
+        让 found = 0
+        循环 j 在 范围数(0, 长度(map1)) {
+            如果 子串(map1, j, 1) == ca 且 子串(map2, j, 1) != cb { 返回 0 }
+            如果 子串(map2, j, 1) == cb 且 子串(map1, j, 1) != ca { 返回 0 }
+            如果 子串(map1, j, 1) == ca { found = 1 }
+        }
+        如果 found == 0 { map1 = map1 + ca; map2 = map2 + cb }
+    }
+    返回 1
+}
+
+主函数: 函数() {
+    打印(同构("egg", "add"))
+    打印(同构("foo", "bar"))
+    打印(同构("paper", "title"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1', '0', '1'], f"同构: {result}"
+    print("✅ 同构字符串(isomorphic strings) 通过: 1,0,1")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3645,7 +3677,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3661,8 +3693,8 @@ test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word,
-test_longest_word,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings,
+test_longest_word, test_isomorphic_strings,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
 test_second_largest,
@@ -3718,7 +3750,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings,
 ]
 
 if __name__ == '__main__':
