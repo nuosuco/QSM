@@ -9201,3 +9201,38 @@ Decoder:
 1. P0: 基本beam search + SPM decode (Val<3.5时)
 2. P1: Length normalization + coverage penalty
 3. P2: 双向方向标记
+
+## 研究#359: V14训练效率分析 - tokens/second (2026-05-06)
+
+### 训练速度指标
+| 指标 | E1-10(22K) | E11+(71K) |
+|------|-----------|-----------|
+| 每epoch步数 | ~2,250 | ~7,100 |
+| 每步时间 | ~1.5s | ~1.5s |
+| 每epoch时间 | 56min | 177min(3h) |
+| tokens/epoch | ~36K | ~114K |
+| tokens/second | ~11 | ~11 |
+
+### 关键发现
+- tokens/second恒定(~11 tok/s)
+- 训练时间与数据量线性关系✅
+- 没有因数据增多而变慢
+
+### V14 vs V13效率对比
+| 指标 | V13 | V14 |
+|------|-----|-----|
+| 模型参数 | 4.5M | 16M |
+| vocab | 7.4K char | 16K SPM |
+| 每步时间 | ~1.2s | ~1.5s |
+| tokens/step | ~8 | ~8 |
+| 有效信息量 | 低(char级) | 高(子词级) |
+
+### V14效率优势
+- SPM编码: 12 tok/pair vs V13的~25 tok/pair
+- 同样tokens→更多信息量!
+- 16M参数训练速度仅比4.5M慢25%→值得!
+
+### 优化方向
+1. accum=8→减少方差但不影响速度
+2. 混合精度(fp16)→2x速度, 但CPU不支持
+3. 多线程DataLoader→可能提升10-20%
