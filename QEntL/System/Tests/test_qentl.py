@@ -1994,10 +1994,32 @@ def test_fibonacci():
     print("✅ 斐波那契(Fibonacci) 通过: F(10)=55")
 
 
+def test_gcd_euclidean():
+    """最大公约数(辗转相除法)"""
+    code = """
+最大公约数: 函数(a, b) {
+    当(b != 0) {
+        让 temp = b
+        b = a % b
+        a = temp
+    }
+    返回 a
+}
+
+主函数: 函数() {
+    打印(最大公约数(48, 18))
+    打印(最大公约数(100, 75))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['6', '25'], f"GCD: {result}"
+    print("✅ 最大公约数(GCD Euclidean) 通过: gcd(48,18)=6, gcd(100,75)=25")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci,
+test_fibonacci, test_gcd_euclidean,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2059,13 +2081,13 @@ test_euclidean_gcd,
 test_binary_search,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean,
 test_caesar_cipher,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2085,7 +2107,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean,
 ]
 
 if __name__ == '__main__':
