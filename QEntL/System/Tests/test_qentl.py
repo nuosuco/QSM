@@ -3757,6 +3757,34 @@ def test_string_dedup_consecutive():
     print("✅ 去连续重复(string dedup consecutive) 通过: abca, helo, abc")
 
 
+def test_frequency_count():
+    """字符频率统计(并行数组chars+counts)"""
+    code = """
+频率统计: 函数(s) {
+    让 chars = ""
+    让 counts = []
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        让 idx = -1
+        循环 j 在 范围数(0, 长度(chars)) {
+            如果 子串(chars, j, 1) == ch { idx = j }
+        }
+        如果 idx == -1 { chars = chars + ch; counts = counts + [1] }
+        否则 { counts[idx] = counts[idx] + 1 }
+    }
+    返回 [chars, counts]
+}
+
+主函数: 函数() {
+    让 r = 频率统计("aabccc")
+    打印(格式("{}", r))
+}
+"""
+    result = run_qentl(code)
+    assert result == ["['abc', [2, 1, 3]]"], f"频率统计: {result}"
+    print("✅ 频率统计(frequency count) 通过: aabccc→['abc',[2,1,3]]")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3836,10 +3864,10 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
 test_perfect_number,
 test_tower_of_hanoi_moves,
-test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
+test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
 test_string_dedup,
 test_frequency_count,
 test_fibonacci_memo,
@@ -3847,24 +3875,24 @@ test_gcd_lcm,
 test_vowel_count,
 test_binary_to_decimal,
 test_decimal_to_roman,
-test_extract_digits, test_string_dedup_consecutive,
+test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
 test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
-test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
+test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
 test_second_largest,
 test_caesar_cipher,
 test_int_to_binary,
 test_power_of_two,
-test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
+test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
 test_run_length_encoding,
-test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
-test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
-test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
+test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
+test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
+test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
 test_fibonacci_iterative,
 test_gcd,
 test_lcm,
@@ -3909,7 +3937,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count,
 ]
 
 if __name__ == '__main__':
