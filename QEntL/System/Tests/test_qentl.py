@@ -3541,6 +3541,31 @@ RLE解码: 函数(s) {
     print("✅ RLE解码(run-length decode) 通过: a3b2c1→aaabbc, x2y3→xxyyy")
 
 
+def test_longest_word():
+    """找出字符串中最长的单词(空格分隔)"""
+    code = """
+最长单词: 函数(s) {
+    让 longest = ""
+    让 current = ""
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        如果 ch != " " { current = current + ch }
+        否则 { 如果 长度(current) > 长度(longest) { longest = current }; current = "" }
+    }
+    如果 长度(current) > 长度(longest) { longest = current }
+    返回 longest
+}
+
+主函数: 函数() {
+    打印(最长单词("the quick brown fox"))
+    打印(最长单词("hello world programming"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['quick', 'programming'], f"最长单词: {result}"
+    print("✅ 最长单词(longest word) 通过: quick, programming")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3620,7 +3645,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3636,7 +3661,7 @@ test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth, test_rle_decode,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word,
 test_longest_word,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
@@ -3693,7 +3718,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word,
 ]
 
 if __name__ == '__main__':
