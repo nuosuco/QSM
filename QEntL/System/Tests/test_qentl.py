@@ -3904,6 +3904,26 @@ def test_matrix_transpose():
     print("✅ 矩阵转置(matrix transpose) 通过: 2x3→3x2")
 
 
+def test_prefix_sum():
+    """前缀和(累计求和)"""
+    code = """
+前缀和: 函数(arr) {
+    让 result = []
+    让 sum = 0
+    循环 x 在 arr { sum = sum + x; result = result + [sum] }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(格式("{}", 前缀和([1, 2, 3, 4, 5])))
+    打印(格式("{}", 前缀和([10, 20, 30])))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['[1, 3, 6, 10, 15]', '[10, 30, 60]'], f"前缀和: {result}"
+    print("✅ 前缀和(prefix sum) 通过: [1,3,6,10,15], [10,30,60]")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3983,39 +4003,39 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_perfect_number,
 test_tower_of_hanoi_moves,
-test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_string_dedup,
-test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_fibonacci_memo,
 test_gcd_lcm,
 test_vowel_count,
 test_binary_to_decimal,
 test_decimal_to_roman,
-test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_leap_year,
-test_matrix_transpose,
+test_matrix_transpose, test_prefix_sum,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
-test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
+test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
 test_second_largest,
 test_caesar_cipher,
 test_int_to_binary,
 test_power_of_two,
-test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_run_length_encoding,
-test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
-test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
-test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
+test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
+test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_fibonacci_iterative,
 test_gcd,
 test_lcm,
-test_reverse_number, test_matrix_transpose,
+test_reverse_number, test_matrix_transpose, test_prefix_sum,
 test_array_sum_max,
 test_insertion_sort,
 test_binary_search,
@@ -4056,7 +4076,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_reverse_number, test_matrix_transpose,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits, test_string_dedup_consecutive, test_frequency_count, test_decimal_to_roman_v2, test_count_vowels, test_reverse_number, test_matrix_transpose, test_prefix_sum, test_reverse_number, test_matrix_transpose, test_prefix_sum,
 ]
 
 if __name__ == '__main__':
