@@ -3385,6 +3385,34 @@ def test_word_count():
     print("✅ 词数统计(word count) 通过: 2,5,1")
 
 
+def test_sieve_of_eratosthenes():
+    """埃氏筛法(试除法找n以内所有质数)"""
+    code = """
+埃氏筛: 函数(n) {
+    让 primes = []
+    让 i = 2
+    当(i <= n) {
+        让 is_prime = 1
+        让 j = 2
+        当(j * j <= i) {
+            如果 i % j == 0 { is_prime = 0 }
+            j = j + 1
+        }
+        如果 is_prime == 1 { primes = primes + [i] }
+        i = i + 1
+    }
+    返回 primes
+}
+
+主函数: 函数() {
+    打印(格式("{}", 埃氏筛(20)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['[2, 3, 5, 7, 11, 13, 17, 19]'], f"埃氏筛: {result}"
+    print("✅ 埃氏筛法(Sieve of Eratosthenes) 通过:", result)
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3464,7 +3492,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count,
+test_word_count, test_sieve_of_eratosthenes,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3537,7 +3565,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes,
 ]
 
 if __name__ == '__main__':
