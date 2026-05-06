@@ -8960,3 +8960,37 @@ E31(E30完成后)是最佳升级时机:
 2. diff=4→80K数据
 3. Val预计<3.5→rank升级有意义
 4. 平滑过渡(B=0初始化)
+
+## 研究#352: Curriculum Transition Warmup - 减少数据切换冲击 (2026-05-06)
+
+### 问题
+E11从22K→71K数据时, Loss从4.34飙升到6.20(+1.86!)
+虽然已快速回落, 但波动大(±1.0)
+
+### 原因分析
+1. 新数据(diff=3)比旧数据(diff=2)更复杂
+2. 模型在22K数据上过度适应→遇到新模式时困惑
+3. 相当于分布偏移(distribution shift)
+
+### 改进方案: 渐进混合
+```python
+# 旧方案(硬切换):
+diff = get_max_difficulty(epoch)  # 2→3 直接切换
+
+# 新方案(渐进混合):
+if transition_epoch:
+    # 70%旧数据 + 30%新数据 → 50/50 → 30/70 → 100%新数据
+    old_ratio = max(0, 1 - (epoch - transition_epoch) / 3)
+    mixed_data = sample(old_data, old_ratio) + sample(new_data, 1-old_ratio)
+```
+
+### 实施时机
+- V14的diff=3→4切换(E31)可以实施渐进混合
+- 需要3个epoch的过渡期(E31-33)
+- SGDR重启+E31本身就提供warmup→可能不需要额外混合
+- 观察E31切换效果后再决定
+
+### 理论支持
+- Curriculum Learning原论文(Bengio 2009)建议渐进难度
+- 但SGDR重启本身就有warmup效应(lr从0→max)
+- 两者可能已足够, 无需额外混合层
