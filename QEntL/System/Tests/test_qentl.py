@@ -3413,6 +3413,25 @@ def test_sieve_of_eratosthenes():
     print("✅ 埃氏筛法(Sieve of Eratosthenes) 通过:", result)
 
 
+def test_sum_of_evens():
+    """数组中偶数之和(for-each+取模)"""
+    code = """
+偶数之和: 函数(arr) {
+    让 sum = 0
+    循环 x 在 arr { 如果 x % 2 == 0 { sum = sum + x } }
+    返回 sum
+}
+
+主函数: 函数() {
+    打印(偶数之和([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
+    打印(偶数之和([11, 22, 33, 44]))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['30', '66'], f"偶数之和: {result}"
+    print("✅ 偶数之和(sum of evens) 通过: 30, 66")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3492,7 +3511,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3565,7 +3584,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens,
 ]
 
 if __name__ == '__main__':
