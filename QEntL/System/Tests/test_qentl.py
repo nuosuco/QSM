@@ -3459,6 +3459,30 @@ def test_power_of_two_check():
     print("✅ 2的幂判断(power of two) 通过: 1,8,16=是; 6=否")
 
 
+def test_distinct_char_count():
+    """统计字符串中不重复字符数(包含判断)"""
+    code = """
+不重复字符数: 函数(s) {
+    让 seen = ""
+    让 count = 0
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        如果 包含(seen, ch) == 0 { seen = seen + ch; count = count + 1 }
+    }
+    返回 count
+}
+
+主函数: 函数() {
+    打印(不重复字符数("hello"))
+    打印(不重复字符数("abcabc"))
+    打印(不重复字符数("abcdef"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['4', '3', '6'], f"不重复字符数: {result}"
+    print("✅ 不重复字符数(distinct char count) 通过: 4,3,6")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3538,7 +3562,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3611,7 +3635,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count,
 ]
 
 if __name__ == '__main__':
