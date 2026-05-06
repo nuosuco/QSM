@@ -8786,3 +8786,47 @@ KV Cache: 缓存已计算的K,V → 每步只计算新token → O(n)增量
 - 可能出现短暂val上升(E11-12: 新数据还没适应)
 - E13-E15: 稳定下降, 超越E7 best(4.34)
 - 预测E15 Val ≈ 3.8-4.0
+
+## 研究#347: 梯度累积深入分析 + V14 accum=8实施计划 (2026-05-06)
+
+### 为什么batch=8太小?
+- 标准transformer训练: batch=32-4096
+- V14当前: batch=8(因内存限制)
+- 小batch问题:
+  1. 梯度方差大→Loss波动±1.15(研究#330)
+  2. 每步更新噪声大→收敛慢
+  3. BatchNorm/LayerNorm统计不稳定
+
+### 梯度累积原理
+```
+for i in range(accum):
+    loss = model(batch_i) / accum
+    loss.backward()  # 梯度累加到.grad
+optimizer.step()     # 一次性更新(等效batch=8×accum)
+optimizer.zero_grad()
+```
+
+### V14 accum=4→8的效果预测
+| 指标 | accum=4 | accum=8 |
+|------|---------|---------|
+| 有效batch | 32 | 64 |
+| 梯度方差 | σ² | σ²/2 |
+| 显存增量 | 0 | +0.1GB |
+| 训练速度 | 1x | 0.95x |
+| Loss波动 | ±1.15 | ±0.8(估计) |
+
+### 实施条件
+- ⚠️ 必须等E11 SGDR重启后观察效果
+- 如果E11-E15仍波动大→在下次重启时实施
+- 修改train_v14_alibi.py中accum=4→accum=8
+- 代码改动: 仅1行! `accum_steps = 8`
+
+### 理论最优accum
+- 数据80K, 有效batch=64 → 每epoch ~1250步
+- 数据71K(diff=3) → 每epoch ~1110步
+- 这是合理的! 标准NMT: 1000-10000步/epoch
+
+### 注意事项
+- accum增大→lr可能需要微调(linear scaling rule)
+- 但SGDR已经有warmup, 不需要额外调整
+- accum=8比accum=4更稳定, 但不会改变最终收敛值
