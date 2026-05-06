@@ -1930,6 +1930,27 @@ RLE编码: 函数(s) {
     print("✅ RLE编码(run-length encoding) 通过: aaabbc→a3b2c1")
 
 
+def test_palindrome_check():
+    """回文判断(racecar=1, hello=0)"""
+    code = """
+是否回文: 函数(s) {
+    让 n = 长度(s)
+    循环 i 在 范围数(0, n / 2) {
+        如果 子串(s, i, 1) != 子串(s, n - 1 - i, 1) { 返回 0 }
+    }
+    返回 1
+}
+
+主函数: 函数() {
+    打印(是否回文("racecar"))
+    打印(是否回文("hello"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1', '0'], f"回文: {result}"
+    print("✅ 回文判断(palindrome) 通过: racecar=1, hello=0")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -2001,7 +2022,7 @@ test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode,
+test_fizzbuzz, test_rle_encode, test_palindrome_check,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2021,7 +2042,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check,
 ]
 
 if __name__ == '__main__':
