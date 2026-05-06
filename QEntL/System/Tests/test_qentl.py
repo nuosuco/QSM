@@ -1880,6 +1880,31 @@ def test_recursive_digit_sum():
 
 
 
+def test_fizzbuzz():
+    """FizzBuzz(1-15, 3的倍数Fizz,5的倍数Buzz,15的倍数FizzBuzz)"""
+    code = """
+FizzBuzz: 函数(n) {
+    让 i = 1
+    让 result = ""
+    当(i <= n) {
+        如果 i % 15 == 0 { result = result + "FizzBuzz " }
+        否则 如果 i % 3 == 0 { result = result + "Fizz " }
+        否则 如果 i % 5 == 0 { result = result + "Buzz " }
+        否则 { result = result + 格式("{} ", i) }
+        i = i + 1
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(FizzBuzz(5))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1 2 Fizz 4 Buzz '], f"FizzBuzz: {result}"
+    print("✅ FizzBuzz 通过: 1 2 Fizz 4 Buzz")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -1971,7 +1996,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum,
+test_recursive_digit_sum, test_fizzbuzz,
 ]
 
 if __name__ == '__main__':
