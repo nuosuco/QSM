@@ -1905,6 +1905,31 @@ FizzBuzz: 函数(n) {
     print("✅ FizzBuzz 通过: 1 2 Fizz 4 Buzz")
 
 
+def test_rle_encode():
+    """RLE游程编码(aaabbc→a3b2c1)"""
+    code = """
+RLE编码: 函数(s) {
+    让 result = ""
+    让 i = 0
+    让 n = 长度(s)
+    当(i < n) {
+        让 ch = 子串(s, i, 1)
+        让 count = 0
+        当(i < n 且 子串(s, i, 1) == ch) { count = count + 1; i = i + 1 }
+        result = result + ch + 格式("{}", count)
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(RLE编码("aaabbc"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['a3b2c1'], f"RLE编码: {result}"
+    print("✅ RLE编码(run-length encoding) 通过: aaabbc→a3b2c1")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -1976,7 +2001,7 @@ test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz,
+test_fizzbuzz, test_rle_encode,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -1996,7 +2021,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode,
 ]
 
 if __name__ == '__main__':
