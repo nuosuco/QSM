@@ -3360,6 +3360,31 @@ def test_digital_root():
     print("✅ 数根(digital root) 通过: 38→2")
 
 
+def test_word_count():
+    """统计字符串中单词数(空格分隔+状态机)"""
+    code = """
+词数: 函数(s) {
+    让 count = 0
+    让 in_word = 0
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        如果 ch != " " 且 in_word == 0 { count = count + 1; in_word = 1 }
+        否则 如果 ch == " " { in_word = 0 }
+    }
+    返回 count
+}
+
+主函数: 函数() {
+    打印(词数("hello world"))
+    打印(词数("the quick brown fox jumps"))
+    打印(词数("hi"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['2', '5', '1'], f"词数: {result}"
+    print("✅ 词数统计(word count) 通过: 2,5,1")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3512,7 +3537,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root,
+test_digital_root, test_word_count,
 ]
 
 if __name__ == '__main__':
