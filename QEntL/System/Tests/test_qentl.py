@@ -2159,10 +2159,36 @@ def test_merge_sorted_arrays():
     print("✅ 合并有序数组(merge sorted) 通过: [1,3,5]+[2,4,6]→[1,2,3,4,5,6]")
 
 
+def test_title_case():
+    """首字母大写(title case)"""
+    code = """
+首字母大写: 函数(s) {
+    让 result = ""
+    让 upper = 1
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        让 code = 字符代码(ch)
+        如果 upper == 1 且 code >= 97 且 code <= 122 {
+            result = result + 字符(code - 32); upper = 0
+        } 否则 如果 ch == " " { result = result + ch; upper = 1 }
+        否则 { result = result + ch; upper = 0 }
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(首字母大写("hello world from qentl"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['Hello World From Qentl'], f"Title: {result}"
+    print("✅ 首字母大写(title case) 通过: hello world→Hello World From Qentl")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2219,23 +2245,23 @@ test_list_map_square,
 test_linear_search,
 test_string_reverse,
 test_count_occurrences,
-test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
+test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
+test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
-test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
-test_merge_sorted_arrays,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_merge_sorted_arrays, test_title_case,
 test_user_func_overrides_builtin,
 test_matrix_max,
 test_armstrong_number,
-test_selection_sort, test_merge_sorted_arrays,
+test_selection_sort, test_merge_sorted_arrays, test_title_case,
 test_collatz_steps,
 test_word_count,
 test_perfect_number,
@@ -2250,7 +2276,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
 ]
 
 if __name__ == '__main__':
