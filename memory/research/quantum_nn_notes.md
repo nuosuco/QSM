@@ -9871,3 +9871,54 @@ optimizer.step()
 2. 基于V14 best创建V15(添加语言标记)
 3. 用81K数据微调V15
 4. 评估→迭代
+
+## 研究#378: V14 accum=8代码实施 - 具体改动 (2026-05-06)
+
+### train_v14_alibi.py改动
+
+#### 1. 新增参数
+```python
+parser.add_argument('--grad_accum_steps', type=int, default=1,
+                    help='gradient accumulation steps (effective batch=batch*accum)')
+```
+
+#### 2. 修改训练循环(核心改动)
+```python
+# 当前代码:
+optimizer.zero_grad()
+loss = model(batch)
+loss.backward()
+optimizer.step()
+
+# 改为:
+optimizer.zero_grad()
+for _ in range(args.grad_accum_steps):
+    batch = next(train_iter)
+    loss = model(batch)
+    loss = loss / args.grad_accum_steps  # 关键: 缩放
+    loss.backward()  # 梯度自动累积
+optimizer.step()
+```
+
+#### 3. 日志修改
+```python
+# 每 accum 步记录一次, 不是每batch
+if step % args.grad_accum_steps == 0:
+    log_loss(...)
+```
+
+#### 4. systemd修改
+```ini
+ExecStart=... train_v14_alibi.py --resume --grad_accum_steps 8
+```
+
+### 注意事项
+- `loss / accum` 必须在backward前
+- LR scheduler步进不变(optimizer.step后才step)
+- 验证不受影响(全量eval)
+- checkpoint保存不变
+
+### 实施时机
+- E15完成后重启(等待Val结果)
+- 或下次进程崩溃时自然重启
+- --resume会自动从last.pth继续
