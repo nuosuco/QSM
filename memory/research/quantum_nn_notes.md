@@ -9306,3 +9306,46 @@ Decoder:
 - 今日新增1,658条数据(地理/时间/礼仪/复合句/被动/数量/科技/情感/商务/医疗/哲学/教育/自然/体育/社交/烹饪/旅行/成语)
 - difficulty分布逐渐平衡
 - 成语谚语(difficulty=4)今日首次添加!
+
+## 研究#362: Cross-Attention对齐模式 - 翻译质量关键 (2026-05-06)
+
+### Cross-Attention在翻译中的作用
+Encoder-Decoder的核心: Cross-Attention层
+- Query: 来自Decoder(目标语言)
+- Key/Value: 来自Encoder(源语言)
+- **每个decoder token选择关注哪些encoder token**
+
+### 理想的对齐模式
+```
+源: 我 | 喜欢 | 苹果
+目: I  | like | apples
+
+理想attention:
+  I     → 我(高权重)
+  like  → 喜欢(高权重)
+  apples→ 苹果(高权重)
+```
+
+### 低资源下的挑战
+1. **词汇不对齐**: 中英词序不同(SVO vs SVO, 但修饰语位置不同)
+2. **一对多**: 中文"喜欢"→英文"like"(1:1), 但"不"→"not"(需跨位置)
+3. **彝文SOV**: 彝文主-宾-谓语序→attention模式更复杂
+
+### V14的ALiBi对Cross-Attention的影响
+- ALiBi只应用于Self-Attention(编码器和解码器各自)
+- Cross-Attention**不使用ALiBi**(标准实现)
+- 这是正确的! Cross-attention需要自由对齐, 不受位置偏置约束
+
+### 监控方案
+当Val<3.0时, 可视化attention矩阵:
+```python
+# 提取cross-attention权重
+attn_weights = model.decoder.layers[i].cross_attn_weights
+# 画出热力图观察对齐模式
+```
+
+### 关键洞察
+- Cross-attention质量=翻译质量
+- 低Val Loss→更好的attention对齐
+- 当前Val 4.78→attention可能还很模糊
+- 预计Val<3.0时attention开始清晰
