@@ -3432,6 +3432,33 @@ def test_sum_of_evens():
     print("✅ 偶数之和(sum of evens) 通过: 30, 66")
 
 
+def test_power_of_two_check():
+    """判断n是否为2的幂(反复除2)"""
+    code = """
+是二的幂: 函数(n) {
+    如果 n <= 0 { 返回 0 }
+    当(n > 1) {
+        如果 n % 2 != 0 { 返回 0 }
+        让 q = 0
+        让 r = n
+        当(r >= 2) { r = r - 2; q = q + 1 }
+        n = q
+    }
+    返回 1
+}
+
+主函数: 函数() {
+    打印(是二的幂(1))
+    打印(是二的幂(8))
+    打印(是二的幂(16))
+    打印(是二的幂(6))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['1', '1', '1', '0'], f"是二的幂: {result}"
+    print("✅ 2的幂判断(power of two) 通过: 1,8,16=是; 6=否")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3511,7 +3538,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3584,7 +3611,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check,
 ]
 
 if __name__ == '__main__':

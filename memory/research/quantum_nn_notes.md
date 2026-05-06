@@ -8830,3 +8830,30 @@ optimizer.zero_grad()
 - accum增大→lr可能需要微调(linear scaling rule)
 - 但SGDR已经有warmup, 不需要额外调整
 - accum=8比accum=4更稳定, 但不会改变最终收敛值
+
+## 研究#348: V14 E11 71K数据冲击分析 (2026-05-06)
+
+### E1-10 vs E11数据对比
+| 指标 | E1-10 | E11+ |
+|------|-------|------|
+| 数据量 | 22,493 | 71,086 |
+| difficulty | ≤2 | ≤3 |
+| 每epoch步数 | ~2,250 | ~7,100 |
+| 预计训练时间/epoch | 62min | ~195min(3.2x) |
+
+### 关键问题
+- E11初始Loss=6.2(高于E1的6.05!)
+- 原因: diff=3数据更复杂+模型已适应简单数据
+- 预计E11-12 Loss波动大
+- E13-15开始稳定下降
+
+### E11完成的里程碑意义
+- 71K数据意味着模型看到更多样化的翻译模式
+- difficulty=3数据包含: 科技/物理/地理/烹饪/文化/复合句/被动语态
+- 这些是之前模型完全没见过的模式!
+
+### Curriculum修复总结
+发现并修复3个Bug:
+1. systemd --max_difficulty 2 硬编码→动态过滤
+2. optimizer.load_state_dict被新AdamW覆盖→创建顺序修复
+3. random_split Subset无法调set_max_difficulty→full_ds引用
