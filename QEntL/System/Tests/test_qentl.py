@@ -3624,6 +3624,28 @@ ROT13: 函数(s) {
     print("✅ ROT13密码 通过: hello→uryyb, world→jbeyq")
 
 
+def test_missing_number():
+    """找出1到n中缺失的数字(求和差)"""
+    code = """
+找缺失: 函数(arr, n) {
+    让 sum = 0
+    循环 x 在 arr { sum = sum + x }
+    让 expected = 0
+    让 i = 1
+    当(i <= n) { expected = expected + i; i = i + 1 }
+    返回 expected - sum
+}
+
+主函数: 函数() {
+    打印(找缺失([1, 2, 4, 5], 5))
+    打印(找缺失([1, 3, 4, 5, 6, 7, 8], 8))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['3', '2'], f"找缺失: {result}"
+    print("✅ 找缺失数字(missing number) 通过: 3, 2")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3703,10 +3725,10 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number,
 test_perfect_number,
 test_tower_of_hanoi_moves,
-test_rot13_cipher,
+test_rot13_cipher, test_missing_number,
 test_string_dedup,
 test_frequency_count,
 test_fibonacci_memo,
@@ -3719,15 +3741,15 @@ test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher,
-test_longest_word, test_isomorphic_strings, test_rot13_cipher,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number,
+test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
 test_second_largest,
 test_caesar_cipher,
 test_int_to_binary,
 test_power_of_two,
-test_isomorphic_strings, test_rot13_cipher,
+test_isomorphic_strings, test_rot13_cipher, test_missing_number,
 test_run_length_encoding,
 test_missing_number,
 test_vowel_consonant_count,
@@ -3776,7 +3798,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number,
 ]
 
 if __name__ == '__main__':
