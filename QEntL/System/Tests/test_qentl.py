@@ -2112,10 +2112,32 @@ def test_lcm_via_gcd():
     print("✅ 最小公倍数(LCM) 通过: lcm(12,18)=36, lcm(4,7)=28")
 
 
+def test_selection_sort():
+    """选择排序"""
+    code = """
+选择排序: 函数(arr) {
+    让 n = 长度(arr)
+    循环 i 在 范围数(0, n - 1) {
+        让 min_idx = i
+        循环 j 在 范围数(i + 1, n) { 如果 arr[j] < arr[min_idx] { min_idx = j } }
+        如果 min_idx != i { 让 temp = arr[i]; arr[i] = arr[min_idx]; arr[min_idx] = temp }
+    }
+    返回 arr
+}
+
+主函数: 函数() {
+    打印(格式("{}", 选择排序([64, 25, 12, 22, 11])))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['[11, 12, 22, 25, 64]'], f"选择排序: {result}"
+    print("✅ 选择排序(selection sort) 通过: [64,25,12,22,11]→[11,12,22,25,64]")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2172,18 +2194,18 @@ test_list_map_square,
 test_linear_search,
 test_string_reverse,
 test_count_occurrences,
-test_insertion_sort, test_lcm_via_gcd,
+test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
+test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
-test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
+test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2203,7 +2225,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort,
 ]
 
 if __name__ == '__main__':
