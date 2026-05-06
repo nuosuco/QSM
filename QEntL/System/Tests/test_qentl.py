@@ -2067,10 +2067,33 @@ def test_caesar_cipher():
     print("✅ 凯撒加密(Caesar cipher) 通过: hello+3→khoor")
 
 
+def test_insertion_sort():
+    """插入排序"""
+    code = """
+插入排序: 函数(arr) {
+    让 n = 长度(arr)
+    循环 i 在 范围数(1, n) {
+        让 key = arr[i]
+        让 j = i - 1
+        当(j >= 0 且 arr[j] > key) { arr[j + 1] = arr[j]; j = j - 1 }
+        arr[j + 1] = key
+    }
+    返回 arr
+}
+
+主函数: 函数() {
+    打印(格式("{}", 插入排序([5, 2, 8, 1, 9, 3])))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['[1, 2, 3, 5, 8, 9]'], f"插入排序: {result}"
+    print("✅ 插入排序(insertion sort) 通过: [5,2,8,1,9,3]→[1,2,3,5,8,9]")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2129,16 +2152,16 @@ test_string_reverse,
 test_count_occurrences,
 test_insertion_sort,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher,
+test_binary_search, test_caesar_cipher, test_insertion_sort,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher,
-test_caesar_cipher,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
+test_caesar_cipher, test_insertion_sort,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2158,7 +2181,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort,
 ]
 
 if __name__ == '__main__':
