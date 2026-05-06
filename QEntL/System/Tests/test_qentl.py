@@ -1973,6 +1973,27 @@ def test_second_largest():
     print("✅ 第二大(second largest) 通过: [5,1,9,3,7]→7")
 
 
+def test_fibonacci():
+    """斐波那契数列第10项=55(迭代法)"""
+    code = """
+主函数: 函数() {
+    让 a = 0
+    让 b = 1
+    让 count = 0
+    当(count < 10) {
+        让 temp = a + b
+        a = b
+        b = temp
+        count = count + 1
+    }
+    打印(a)
+}
+"""
+    result = run_qentl(code)
+    assert result == ['55'], f"斐波那契: {result}"
+    print("✅ 斐波那契(Fibonacci) 通过: F(10)=55")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -2038,13 +2059,13 @@ test_euclidean_gcd,
 test_binary_search,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest,
+test_palindrome_check, test_second_largest, test_fibonacci,
 test_caesar_cipher,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2064,7 +2085,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci,
 ]
 
 if __name__ == '__main__':
