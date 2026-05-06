@@ -2212,10 +2212,36 @@ def test_char_type_count():
     print("✅ 字符类型统计(char type count) 通过: hello 123 world!→10,3,2,1")
 
 
+def test_matrix_multiply():
+    """2x2矩阵乘法"""
+    code = """
+矩阵乘法: 函数(a, b) {
+    让 result = [[0, 0], [0, 0]]
+    循环 i 在 范围数(0, 2) {
+        循环 j 在 范围数(0, 2) {
+            让 sum = 0
+            循环 k 在 范围数(0, 2) { sum = sum + a[i][k] * b[k][j] }
+            result[i][j] = sum
+        }
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    让 a = [[1, 2], [3, 4]]
+    让 b = [[5, 6], [7, 8]]
+    打印(格式("{}", 矩阵乘法(a, b)))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['[[19, 22], [43, 50]]'], f"矩阵乘法: {result}"
+    print("✅ 矩阵乘法(matrix multiply) 通过: [[1,2],[3,4]]*[[5,6],[7,8]]=[[19,22],[43,50]]")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2272,23 +2298,23 @@ test_list_map_square,
 test_linear_search,
 test_string_reverse,
 test_count_occurrences,
-test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
-test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
+test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
-test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
+test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
 test_user_func_overrides_builtin,
 test_matrix_max,
 test_armstrong_number,
-test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
 test_collatz_steps,
 test_word_count,
 test_perfect_number,
@@ -2303,7 +2329,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply,
 ]
 
 if __name__ == '__main__':
