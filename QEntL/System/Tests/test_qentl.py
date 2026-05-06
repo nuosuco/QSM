@@ -1951,6 +1951,28 @@ def test_palindrome_check():
     print("✅ 回文判断(palindrome) 通过: racecar=1, hello=0")
 
 
+def test_second_largest():
+    """找数组中第二大元素"""
+    code = """
+第二大: 函数(arr) {
+    让 max1 = -999999
+    让 max2 = -999999
+    循环 x 在 arr {
+        如果 x > max1 { max2 = max1; max1 = x }
+        否则 如果 x > max2 { max2 = x }
+    }
+    返回 max2
+}
+
+主函数: 函数() {
+    打印(第二大([5, 1, 9, 3, 7]))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['7'], f"第二大: {result}"
+    print("✅ 第二大(second largest) 通过: [5,1,9,3,7]→7")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -2016,13 +2038,13 @@ test_euclidean_gcd,
 test_binary_search,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check,
+test_palindrome_check, test_second_largest,
 test_caesar_cipher,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest,
 test_merge_sorted_arrays,
 test_user_func_overrides_builtin,
 test_matrix_max,
@@ -2042,7 +2064,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest,
 ]
 
 if __name__ == '__main__':
