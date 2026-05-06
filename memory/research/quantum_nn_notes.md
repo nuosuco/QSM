@@ -10133,3 +10133,44 @@ E31数据增量比E11小得多(1.13x vs 3.2x)
 | 4+5 | ~11000 | 13.7% |
 
 diff=4+5仅11K条→80K总量中13.7%新增
+
+## 研究#385: V14翻译质量测试计划 (2026-05-06)
+
+### Val Loss vs 翻译质量映射(基于历史)
+| Val Loss | V7-Small质量 | V14预期 |
+|----------|-------------|---------|
+| >4.0 | N/A(未到达) | 单词级翻译 |
+| 3.0-4.0 | N/A | 短语翻译(有语法错误) |
+| 2.5-3.0 | <unk>+碎片 | 基本句子(有错误) |
+| 2.0-2.5 | N/A | 较好句子(少量错误) |
+| <2.0 | N/A | 流畅翻译(目标) |
+
+### V14当前Val=4.49→测试意义
+- 当前可能输出: 单词级或乱序翻译
+- 不值得部署API测试
+- **测试门槛: Val<3.5**
+
+### 测试方案(Val<3.5时)
+```bash
+# 1. 加载V14 best模型
+python3 -c "
+from cached_decoder import CachedDecoder
+dec = CachedDecoder('qsm_v14_best.pth', 'qsm_spm_v14_yi.model')
+# zh→en
+print(dec.translate('我喜欢编程'))
+# en→zh
+print(dec.translate('i like programming'))
+"
+```
+
+### 关键测试用例
+1. 简单词: 水→water, 火→fire
+2. 短句: 我喜欢编程→i like programming
+3. 长句: 量子叠加态是量子力学的基本原理
+4. 彝文: ⚠️需要SPM编解码测试
+5. 双向: zh→en和en→zh都测
+
+### 何时测试?
+- **E25**: 预计Val≈3.46→首次<3.5!
+- 测试5-10句, 记录质量
+- 如果可用→开始INT8量化部署
