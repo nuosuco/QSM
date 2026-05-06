@@ -8725,3 +8725,38 @@ E11: lr跳回0.0003→同时增加数据→最大改进!
 - 当前best: E7 Val 4.3413
 - E11后如果Val<4.0→考虑部署API
 - API部署条件: Val<3.5或人工翻译质量测试通过
+
+## 研究#345: KV Cache推理优化 - V14 API部署准备 (2026-05-06)
+
+### KV Cache原理
+标准自回归解码: 每步重新计算所有K,V → O(n²)重复计算
+KV Cache: 缓存已计算的K,V → 每步只计算新token → O(n)增量
+
+### Encoder-Decoder KV Cache
+1. **Encoder**: 一次性编码完整输入→缓存所有encoder输出(不变!)
+2. **Decoder**: 
+   - Cross-attention: K,V来自encoder缓存(不变!)
+   - Self-attention: 只缓存历史decoder的K,V(增量)
+
+### V14推理加速预估
+| 优化 | 加速比 | 实现难度 |
+|------|--------|---------|
+| KV Cache | 3-5x | 中 |
+| INT8量化 | 2x | 低(已部署V7-Small) |
+| Beam Search优化 | 1.5x | 低 |
+| Speculative Decoding | 2-3x | 高 |
+
+### 已有实现
+- `QSM/api/cached_decoder.py`: V7-Small的KV Cache解码器
+- 需要适配V14(ALiBi+SPM)的接口
+
+### V14 API部署条件
+1. Val Loss < 3.5 (当前4.34)
+2. 人工翻译质量测试通过
+3. KV Cache解码器适配V14
+4. INT8量化
+
+### 预计时间线
+- E11-E15: Val可能降到3.5-4.0
+- E20-E30: Val可能降到3.0以下
+- API替换时机: Val<3.5 + 质量测试通过
