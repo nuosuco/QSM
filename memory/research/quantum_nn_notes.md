@@ -9834,3 +9834,40 @@ optimizer.step()
 2. 修改systemd service添加--grad_accum_steps 8
 3. systemctl daemon-reload && restart
 4. --resume自动从last.pth继续
+
+## 研究#377: V15架构改进规划 - 超越V14 (2026-05-06)
+
+### V14局限性
+1. 无语言标记(zh/en/yi混在一起)
+2. 无翻译方向标记(不知道是zh→en还是en→zh)
+3. SPM 16K词汇表偏小(英文子词覆盖不足)
+4. 无梯度累积(batch=8太小→Loss波动)
+5. LoRA未升级(r=16固定)
+
+### V15改进清单(优先级排序)
+
+#### P0: 必须实施
+1. **语言前缀token**: 输入前加<zh>/<en><yi>
+2. **方向前缀token**: 加<zh2en>/<en2zh>/<yi2zh>等
+3. **梯度累积accum=8**: 有效batch=64
+
+#### P1: 高优先
+4. **SPM 32K词汇**: 更好英文覆盖+更多彝文子词
+5. **LoRA r=16→32**: E31后升级
+6. **Beam Search部署**: length_norm+coverage_penalty
+
+#### P2: 中优先
+7. **QuantumEmbeddingV2**: 语言感知量子嵌入
+8. **ALiBi+语言偏置**: 不同语言不同斜率
+9. **Shared Encoder**: 中英彝共享编码器(减少参数)
+
+#### P3: 低优先
+10. **MoE(Mixture of Experts)**: 3个语言专家+1个共享
+11. **Speculative Decoding**: 推理加速(需小模型辅助)
+12. **知识蒸馏**: Qwen3→V15(需GPU)
+
+### V15实施路线
+1. V14训练到E30(Val<3.0)
+2. 基于V14 best创建V15(添加语言标记)
+3. 用81K数据微调V15
+4. 评估→迭代
