@@ -9121,3 +9121,41 @@ V14 SPM 16K是当前最优选择:
 - E20 Val预测: ~3.5-3.8
 - E21-30: SGDR第二半周期, lr再从0→0.0003
 - E30 Val预测: ~3.0-3.2
+
+## 研究#357: INT8量化部署方案 - V14 API准备 (2026-05-06)
+
+### V7-Small INT8量化经验
+- 已部署在8000端口
+- 模型大小: ~4.5M参数→量化后~1.1MB
+- 推理速度: ~2x加速
+- 精度损失: 可接受(Val Loss仅增加0.05)
+
+### V14 INT8量化预估
+| 指标 | FP32 | INT8 |
+|------|------|------|
+| 模型大小 | 171MB | ~43MB |
+| 推理内存 | ~336MB | ~85MB |
+| 推理速度 | 1x | ~2x |
+| 精度损失 | - | ~0.05 Val |
+
+### 量化方法
+```python
+import torch
+quantized = torch.quantization.quantize_dynamic(
+    model, {torch.nn.Linear}, dtype=torch.qint8
+)
+```
+
+### V14 API部署检查清单
+1. [ ] Val Loss < 3.5 (当前4.99)
+2. [ ] 人工翻译质量测试通过
+3. [ ] INT8量化脚本编写
+4. [ ] KV Cache适配ALiBi+SPM
+5. [ ] Beam Search解码器
+6. [ ] systemd服务配置
+7. [ ] Nginx路由配置
+
+### 预计时间线
+- E15-E20: Val可能降到3.5-4.0
+- 开始量化+部署测试
+- E25-E30: 正式替换V7-Small API
