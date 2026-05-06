@@ -3707,6 +3707,31 @@ def test_anagram_check():
     print("✅ 变位词(anagram check) 通过: listen↔silent=1, hello↔world=0, abc↔cab=1")
 
 
+def test_extract_digits():
+    """从字符串中提取所有数字字符(字符代码范围)"""
+    code = """
+提取数字: 函数(s) {
+    让 result = ""
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        让 code = 字符代码(ch)
+        如果 code >= 48 且 code <= 57 { result = result + ch }
+    }
+    如果 长度(result) == 0 { 返回 "0" }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(提取数字("abc123def45"))
+    打印(提取数字("no digits"))
+    打印(提取数字("7 apples"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['12345', '0', '7'], f"提取数字: {result}"
+    print("✅ 提取数字(extract digits) 通过: 12345, 0, 7")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3786,10 +3811,10 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits,
 test_perfect_number,
 test_tower_of_hanoi_moves,
-test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check,
+test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits,
 test_string_dedup,
 test_frequency_count,
 test_fibonacci_memo,
@@ -3802,19 +3827,19 @@ test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check,
-test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check,
+test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits,
+test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
 test_second_largest,
 test_caesar_cipher,
 test_int_to_binary,
 test_power_of_two,
-test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check,
+test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits,
 test_run_length_encoding,
-test_missing_number, test_vowel_consonant_count, test_anagram_check,
-test_vowel_consonant_count, test_anagram_check,
-test_anagram_check,
+test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits,
+test_vowel_consonant_count, test_anagram_check, test_extract_digits,
+test_anagram_check, test_extract_digits,
 test_fibonacci_iterative,
 test_gcd,
 test_lcm,
@@ -3859,7 +3884,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth, test_rle_decode, test_longest_word, test_isomorphic_strings, test_rot13_cipher, test_missing_number, test_vowel_consonant_count, test_anagram_check, test_extract_digits,
 ]
 
 if __name__ == '__main__':
