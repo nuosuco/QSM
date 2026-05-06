@@ -9381,3 +9381,34 @@ E13 lr更低(0.000271 vs 0.000293)但Loss相同!
 - 如果Δ=-0.13(保守): Val≈4.65
 - 如果Δ=-0.21(乐观): Val≈4.57
 - 最可能: Val≈4.60-4.65
+
+## 研究#364: V14 Checkpoint策略 - 100 Epoch训练保障 (2026-05-06)
+
+### 当前Checkpoint机制
+1. **best.pth**: 每次Val创新低保存
+2. **last.pth**: 每epoch结束保存(用于--resume)
+3. **eN.pth**: 每epoch结束保存(如qsm_v14_e10.pth)
+
+### 问题
+1. **best_val重置**: curriculum数据切换后best_val=inf→错误标记BEST
+2. **磁盘空间**: 每个checkpoint 171MB, 100 epochs=17GB→磁盘不够!
+3. **eN.pth堆积**: 旧epoch checkpoint未清理
+
+### 改进方案
+1. **保留最近3个eN.pth**: 自动删除更早的
+2. **best.pth分离**: 保留diff≤2的best和diff≤3的best
+3. **best_val跨dataset**: 不重置, 记录当前dataset的独立best
+
+### 磁盘预算
+| 文件 | 大小 | 数量 | 总计 |
+|------|------|------|------|
+| best.pth | 171MB | 1 | 171MB |
+| last.pth | 171MB | 1 | 171MB |
+| eN.pth | 171MB | 3(滚动) | 513MB |
+| **总计** | | | **855MB** |
+
+当前磁盘可用40GB→足够✅
+
+### 下次进程崩溃时实施
+- 修改train_v14_alibi.py: 滚动保留3个eN.pth
+- 修复best_val跨dataset比较bug
