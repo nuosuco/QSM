@@ -9159,3 +9159,45 @@ quantized = torch.quantization.quantize_dynamic(
 - E15-E20: Val可能降到3.5-4.0
 - 开始量化+部署测试
 - E25-E30: 正式替换V7-Small API
+
+## 研究#358: Beam Search改进方案 - V14解码优化 (2026-05-06)
+
+### 当前Beam Search(V7-Small)
+- beam_width=5
+- n-gram blocking (已有)
+- rep_penalty=1.5 (已有)
+- min_len=3 (已有)
+
+### V14需要的改进
+1. **Length normalization**: 长序列被对数惩罚→避免偏爱短输出
+   ```
+   score = log_prob / (length ** alpha)  # alpha=0.6-0.8
+   ```
+
+2. **Coverage penalty**: 避免重复关注相同encoder位置
+   ```
+   cp = beta * sum(min(attn, 1.0))  # beta=0.3
+   ```
+
+3. **SPM解码**: beam输出token序列→SPM.Decode→最终字符串
+   - 注意: SPM可能产生▁前缀→需要清理
+
+4. **双向翻译控制**: 
+   - zh→en: 输入中文, 期望英文输出
+   - en→zh: 输入英文, 期望中文输出
+   - 通过特殊token标记方向(BOS_zh2en / BOS_en2zh)
+
+### V14解码器架构
+```
+Encoder(src) → context
+Decoder:
+  step 0: BOS token (标记方向)
+  step 1-N: 自回归生成
+  每步: cross-attn(context) + self-attn(历史) → 下一个token
+  EOS → 停止
+```
+
+### 实施优先级
+1. P0: 基本beam search + SPM decode (Val<3.5时)
+2. P1: Length normalization + coverage penalty
+3. P2: 双向方向标记
