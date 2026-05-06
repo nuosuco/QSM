@@ -9657,3 +9657,38 @@ lr峰值: E11=0.0003 → E12-30逐步下降(cycle)
 ### 结论
 V14训练健康, SGDR+curriculum正确工作!
 预计E20-25可达Val<3.5部署门槛
+
+## 研究#372: QEntL 范围数(variable n) bug根因分析 (2026-05-06)
+
+### 现象
+`循环 i 在 范围数(0, n)` 在函数内使用变量n时崩溃:
+```
+ValueError: invalid literal for int() with base 10: 'None1'
+TypeError: int() argument must be ... not 'NoneType'
+```
+
+### 已知信息
+1. 固定数字`范围数(0, 10)`正常工作✅
+2. 变量`范围数(0, n)`在函数内崩溃❌
+3. 研究#301已记录此bug
+
+### 根因推测
+编译器处理RANGE op时:
+1. 编译阶段: `范围数(0, n)` → RANGE(0, n_var)
+2. VM执行: stack.push(0), stack.push(n_value)
+3. 问题: VM期望stack上有两个int, 但n可能是None或字符串
+
+### 可能原因
+- **编译器**: BUILTIN_CALL for 范围数 未正确处理变量参数
+- **VM**: RANGE opcode 从stack取值时类型不对
+- **变量查找**: 函数参数n在RANGE执行时不在作用域
+
+### 修复方向
+1. VM中RANGE handler增加类型检查: `int(self.stack.pop())`
+2. 确保变量查找先检查function_params
+3. 编译器对RANGE使用LOAD_VAR而非直接push
+
+### 影响范围
+- Fibonacci函数版本(循环+范围数+变量n)无法工作
+- 所有使用变量范围的循环都受影响
+- Workaround: 用当循环+计数器替代
