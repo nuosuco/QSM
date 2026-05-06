@@ -2185,10 +2185,37 @@ def test_title_case():
     print("✅ 首字母大写(title case) 通过: hello world→Hello World From Qentl")
 
 
+def test_char_type_count():
+    """字符类型统计(字母/数字/空格/其他)"""
+    code = """
+字符统计: 函数(s) {
+    让 letters = 0
+    让 digits = 0
+    让 spaces = 0
+    让 others = 0
+    循环 i 在 范围数(0, 长度(s)) {
+        让 code = 字符代码(子串(s, i, 1))
+        如果 (code >= 65 且 code <= 90) 或 (code >= 97 且 code <= 122) { letters = letters + 1 }
+        否则 如果 code >= 48 且 code <= 57 { digits = digits + 1 }
+        否则 如果 code == 32 { spaces = spaces + 1 }
+        否则 { others = others + 1 }
+    }
+    返回 格式("{},{},{},{}", letters, digits, spaces, others)
+}
+
+主函数: 函数() {
+    打印(字符统计("hello 123 world!"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['10,3,2,1'], f"字符统计: {result}"
+    print("✅ 字符类型统计(char type count) 通过: hello 123 world!→10,3,2,1")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2245,23 +2272,23 @@ test_list_map_square,
 test_linear_search,
 test_string_reverse,
 test_count_occurrences,
-test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
 test_nested_list_iteration,
 test_is_prime,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
-test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
-test_merge_sorted_arrays, test_title_case,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
+test_merge_sorted_arrays, test_title_case, test_char_type_count,
 test_user_func_overrides_builtin,
 test_matrix_max,
 test_armstrong_number,
-test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
 test_collatz_steps,
 test_word_count,
 test_perfect_number,
@@ -2276,7 +2303,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count,
 ]
 
 if __name__ == '__main__':
