@@ -3483,6 +3483,31 @@ def test_distinct_char_count():
     print("✅ 不重复字符数(distinct char count) 通过: 4,3,6")
 
 
+def test_max_paren_depth():
+    """最大括号嵌套深度(栈模拟)"""
+    code = """
+最大括号深度: 函数(s) {
+    让 max_d = 0
+    让 cur_d = 0
+    循环 i 在 范围数(0, 长度(s)) {
+        让 ch = 子串(s, i, 1)
+        如果 ch == "(" { cur_d = cur_d + 1; 如果 cur_d > max_d { max_d = cur_d } }
+        否则 如果 ch == ")" { cur_d = cur_d - 1 }
+    }
+    返回 max_d
+}
+
+主函数: 函数() {
+    打印(最大括号深度("(a(b(c)d)e)"))
+    打印(最大括号深度("()()()"))
+    打印(最大括号深度("((()))"))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['3', '1', '3'], f"最大括号深度: {result}"
+    print("✅ 最大括号深度(max paren depth) 通过: 3,1,3")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
@@ -3562,7 +3587,7 @@ test_matrix_max,
 test_armstrong_number,
 test_selection_sort,
 test_collatz_steps,
-test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count,
+test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth,
 test_perfect_number,
 test_tower_of_hanoi_moves,
 test_rot13_cipher,
@@ -3578,7 +3603,7 @@ test_leap_year,
 test_matrix_transpose,
 test_recursive_digit_sum,
 test_tic_tac_toe_win,
-test_distinct_char_count,
+test_distinct_char_count, test_max_paren_depth,
 test_longest_word,
 test_merge_sorted_arrays,
 test_sorted_array_dedup,
@@ -3635,7 +3660,7 @@ test_prime_check,
 test_prime_counting,
 test_decimal_to_binary,
 test_binary_to_decimal,
-test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count,
+test_digital_root, test_word_count, test_sieve_of_eratosthenes, test_sum_of_evens, test_power_of_two_check, test_distinct_char_count, test_max_paren_depth,
 ]
 
 if __name__ == '__main__':
