@@ -10306,3 +10306,46 @@ Gap趋势: 0.30→0.06→0.07→0.19→0.30→0.41
 
 ### E31后预测(不变)
 SGDR重启+diff=4→E35预计4.20, E50预计3.0
+
+## 研究#389: Cross-Attention在低资源NMT中的关键作用 (2026-05-07)
+
+### 核心机制
+Encoder-Decoder架构中, Cross-Attention是唯一的信息桥梁:
+```
+Encoder Self-Attn → Encoder输出K,V
+                     ↓
+Decoder Self-Attn → Decoder Q → Cross-Attn(Q_d, K_e, V_e)
+                     ↓
+                  FFN → 输出
+```
+
+### 为什么Cross-Attention对QSM特别重要?
+1. **彝文→英文**: 完全不同的书写系统
+   - Self-Attention只能学语言内部模式
+   - Cross-Attention建立跨语言对齐!
+2. **低资源**: 81K条数据, 每条只看1次
+   - Cross-Attention是最有效的对齐方式
+   - 比增加Self-Attention层更高效
+
+### ALiBi在Cross-Attention中的特殊效果
+- V14用ALiBi只加在Self-Attention
+- Cross-Attention不加位置偏置→自由对齐
+- 这意味着:
+  - Encoder位置i → Decoder位置j 的注意力不受距离惩罚
+  - 语序差异(彝语SOV vs 英语SVO)可自由学习!
+
+### V14 Cross-Attention现状
+- n_layers=4, 每层1个Cross-Attention
+- 共4层Cross-Attention = 4次对齐机会
+- 对于短句翻译(10-20 tokens)足够
+
+### V15改进方向
+1. **Cross-Attention头数增加**: 4→8(更细粒度对齐)
+2. **语言感知位置编码**: 在Cross-Attn加源语言偏置
+3. **Cross-Attention dropout**: p=0.1(防止过拟合特定对齐)
+
+### 与QSM的关系
+- V14 Val 4.44 → Cross-Attention正在学习对齐
+- 每降0.1 = 对齐质量提升
+- Val<3.0时 = 基本对齐建立
+- Val<2.0时 = 强对齐(流畅翻译)
