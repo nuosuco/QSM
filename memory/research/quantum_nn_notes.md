@@ -10801,3 +10801,69 @@ beam = BeamSearch(beam_size=5, ...)
 - **Val<3.5时**: INT8量化+基础API
 - **Val<2.5时**: +KV Cache+Beam Search优化
 - **Val<2.0时**: +语言前缀token+方向标记
+
+## 研究#399: QSM量子自举编译器路线图 (2026-05-07)
+
+### 当前状态
+- Python编译器: qentl_compiler_v3.py ✅(64内置+48 OpCode)
+- Python VM: qbc_vm.py ✅(64+内置+9量子门)
+- C启动器: qvm_boot.c ✅(框架)
+- QEntL测试: 357/357 ✅
+
+### 自举三阶段
+
+#### Phase 1: QEntL重写QEntL编译器(~2周)
+```
+目标: 用QEntL语言编写QEntL编译器
+步骤:
+1. QEntL实现词法分析器(字符代码+子串)
+2. QEntL实现语法分析器(递归下降)
+3. QEntL实现代码生成器(AST→QBC)
+4. 用Python编译器编译QEntL编译器源码
+5. 得到compiler.qbc→用VM运行→编译自身!
+```
+
+**关键挑战**: QEntL缺少
+- 文件IO(已有6个内置!)✅
+- 递归(已有!)✅
+- 字符串操作(字符代码/字符/子串)✅
+- 数组/对象(已有!)✅
+- **缺少**: 字典/哈希表→用数组+线性搜索模拟
+
+#### Phase 2: QBC直接执行(~1周)
+```
+目标: QVM直接运行QBC, 不依赖Python
+步骤:
+1. C启动器加载compiler.qbc
+2. C实现最小VM(仅QBC解释器)
+3. 读入.qentl源码→运行compiler.qbc→输出.qbc
+4. VM执行输出的.qbc
+```
+
+#### Phase 3: 服务自举(~1周)
+```
+目标: QEntL API用QEntL重写
+步骤:
+1. QEntL实现HTTP服务器(需socket内置)
+2. 替换Flask QEntL API
+3. 完全自举: C启动→QVM→QEntL服务
+```
+
+### 自举验证测试
+```qentl
+# 用QEntL编译器编译自身
+量子程序 自举测试() {
+    让 src = 文件读取("compiler.qentl")
+    让 qbc = 编译(src)
+    文件写入("compiler_v2.qbc", qbc)
+    让 test_src = "主函数: 函数() { 打印(42) }"
+    让 test_qbc = 运行QBC(qbc, test_src)
+    打印(执行(test_qbc))
+}
+```
+
+### 时间线
+- **2026-05**: Phase 1开始(QEntL重写词法分析器)
+- **2026-06**: Phase 1完成(编译器自举!)
+- **2026-07**: Phase 2(C VM)
+- **2026-08**: Phase 3(服务自举)
