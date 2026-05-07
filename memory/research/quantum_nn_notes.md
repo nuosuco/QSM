@@ -12518,3 +12518,43 @@ ExecStart=... train_v14_alibi.py \
 - E22-E23 Δ=-0.04/epoch
 - 如果E24 Δ=-0.04→Val=4.27→3连Best!
 - lr=0.000270仍较大→很可能继续降
+
+## 研究#432: 位置编码方案终极对比 (2026-05-07)
+
+### 三大方案对比
+| 特性 | Learned PE | ALiBi | RoPE |
+|------|-----------|-------|------|
+| 训练长度外推 | ❌差 | ✅好 | ✅好 |
+| 实现复杂度 | 简单 | 简单 | 中等 |
+| CPU训练速度 | 快 | 快 | 稍慢 |
+| 长序列性能 | 差 | 好 | 最好 |
+| 参数量 | +seq_len | 0 | 0 |
+| V14使用 | V1-V13 | ✅V14 | - |
+
+### ALiBi(V14当前)
+- 原理: attention score加线性偏置 -m*i/(2^head)
+- 优势: 零参数, CPU友好, 128→512外推
+- 劣势: 长距离关系弱于RoPE
+- 论文: "Train Short, Test Long" (Ofir Press, 2022)
+
+### RoPE(V15可选)
+- 原理: q·k用旋转矩阵编码相对位置
+- 优势: 长序列最好性能, 相对位置天然编码
+- 劣势: CPU计算稍慢(复数乘法), 实现更复杂
+- 论文: "RoFormer" (Jianlin Su, 2021)
+- 实现: torch.view_as_complex → 旋转乘法
+
+### Learned PE(V1-V13)
+- 原理: nn.Embedding(max_len, d_model)
+- 优势: 最简单
+- 劣势: 无法外推, 训练128→推理128上限
+
+### V15决策
+- **保持ALiBi作为V15默认**: CPU训练+简单实现
+- **V15实验**: RoPE作为ablation(仅GPU训练时)
+- **不要混合**: ALiBi+RoPE无意义, 选一个
+- **外推能力**: ALiBi 128→512✅ 对QSM足够
+
+### 关键结论
+ALiBi是CPU训练最佳选择✅
+RoPE留给未来GPU训练实验
