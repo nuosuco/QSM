@@ -11472,3 +11472,76 @@ tail -f /tmp/qsm_v14_train_systemd.log
 - V14训练到E70+: 继续用16K
 - V15开始: 训练新SPM 20K+语言前缀
 - V15同时: accum=8+d_model=256保持
+
+## 研究#412: V14 LoRA r=16→32升级实现细节 (2026-05-07)
+
+### LoRA回顾
+- W = W₀ + BA, B∈R^{d×r}, A∈R^{r×d}
+- r=16: 每层2×d×16参数
+- r=32: 每层2×d×32参数(2x!)
+
+### V14当前LoRA配置
+```python
+lora_r = 16
+lora_alpha = 32  # scale = alpha/r = 2.0
+target_modules = ["q_proj", "v_proj", "k_proj", "out_proj",
+                   "encoder_attn_q", "encoder_attn_v"]
+```
+
+### E31升级方案
+```python
+# 方案A: 直接升级(推荐)
+lora_r = 32
+lora_alpha = 64  # 保持scale=2.0不变!
+
+# 1. 加载checkpoint
+state = torch.load("qsm_v14_last.pth")
+model.load_state_dict(state)
+
+# 2. 扩展LoRA参数
+for name, param in model.named_parameters():
+    if 'lora_B' in name:
+        # B: d×16 → d×32, 新列随机初始化
+        old = param.data  # [d, 16]
+        new = torch.randn(old.shape[0], 32) * 0.01
+        new[:, :16] = old
+        param.data = new
+    if 'lora_A' in name:
+        # A: 16×d → 32×d, 新行随机初始化
+        old = param.data  # [16, d]
+        new = torch.randn(32, old.shape[1]) * 0.01
+        new[:16, :] = old
+        param.data = new
+
+# 3. 重建optimizer(参数shape变了!)
+optimizer = torch.optim.AdamW(
+    [p for p in model.parameters() if p.requires_grad],
+    lr=0.0003  # SGDR重启
+)
+```
+
+### 参数量变化
+| 模块 | r=16参数 | r=32参数 | 增量 |
+|------|---------|---------|------|
+| q_proj(256×256) | 2×256×16=8K | 16K | +8K |
+| k_proj | 8K | 16K | +8K |
+| v_proj | 8K | 16K | +8K |
+| out_proj | 8K | 16K | +8K |
+| enc_q | 8K | 16K | +8K |
+| enc_v | 8K | 16K | +8K |
+| **6模块×4层** | 192K | 384K | +192K |
+
+### 内存影响
+- LoRA参数增量: ~192K × 4bytes = 0.75MB(极小!)
+- 梯度增量: 同上0.75MB
+- **总增量: ~1.5MB** ✅ 完全可忽略
+
+### 为什么scale=alpha/r=2.0不变?
+- 保持LoRA输出尺度不变
+- 新增的r=17-32维度从随机初始化开始
+- SGDR重启lr=0.0003→新维度快速学习
+- 已有r=1-16维度保持已学到的知识
+
+### 关键: 重建optimizer!
+- 参数shape变了→旧optimizer的momentum/variance不匹配
+- 必须新建optimizer→SGDR重启正好配合!
