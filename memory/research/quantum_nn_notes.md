@@ -12079,3 +12079,45 @@ lr_new = lr_base × sqrt(batch_new / batch_base)
 --lora_upgrade_rank 32
 --resume qsm_v14_last.pth
 ```
+
+## 研究#423: QEntL VM取模修复实施 (2026-05-07)
+
+### 当前VM MODULO handler
+需要检查qbc_vm.py中MODULO的具体实现
+
+### 修复目标
+1. int % int → int (不是float)
+2. 确保取模运算符优先级正确
+3. 处理负数取模(Python语义: -1 % 26 = 25)
+
+### Python取模语义(重要!)
+```python
+# Python中:
+12 % 8    # = 4 (int✅)
+-1 % 26   # = 25 (Python总是返回非负数!)
+12.0 % 8  # = 4.0 (float)
+```
+
+### 修复代码(qbc_vm.py)
+```python
+# 在_execute方法中找到MODULO处理
+elif op == 0x3F:  # MODULO
+    b = self.stack.pop()
+    a = self.stack.pop()
+    if isinstance(a, int) and isinstance(b, int):
+        self.stack.append(int(a % b))
+    else:
+        self.stack.append(a % b)
+```
+
+### 同时: 添加整除运算符
+- 关键字: `整除`
+- Python: a // b
+- 返回int
+- 用途: 数组索引、循环计数
+
+### 优先级
+- **P2**: 修复MODULO int返回类型
+- **P3**: 添加整除关键字
+- 当前workaround(自定义函数)已够用
+- 集中修复可以在V14 E31等待期间做
