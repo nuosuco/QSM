@@ -10535,3 +10535,62 @@ temperature = 0.7  # 采样温度
 - Val<3.5时: 基础beam search
 - Val<2.5时: 添加length+coverage penalty
 - Val<2.0时: 多样化策略
+
+## 研究#394: V14 KV Cache推理加速实现 (2026-05-07)
+
+### Encoder-Decoder KV Cache策略
+
+#### Encoder端: 一次性缓存
+- Encoder只运行一次→缓存所有K,V
+- 后续生成步: 直接使用缓存的K,V
+- 加速比: 对于20token输入, 节省20x Encoder计算
+
+#### Decoder端: 增量推理
+```python
+# 无KV Cache(每步重算)
+for step in range(max_len):
+    # 全序列self-attn + cross-attn
+    output = decoder(input[:step+1], encoder_out)
+
+# 有KV Cache(增量)
+cached_k, cached_v = [], []
+for step in range(max_len):
+    # 只算最新token的Q, 复用K,V
+    new_q = decoder.embed(input[step])
+    # Self-attn: 只对最新token
+    attn_out = attention(new_q, cached_k, cached_v)
+    # Cross-attn: 用Encoder缓存(不变!)
+    cross_out = cross_attention(new_q, enc_k_cache, enc_v_cache)
+    # 更新cache
+    cached_k.append(new_k)
+    cached_v.append(new_v)
+```
+
+### V14具体实现
+```python
+class QSMDecoderWithCache(nn.Module):
+    def forward(self, x, enc_out, cache=None):
+        new_cache = []
+        for layer in self.layers:
+            x, layer_cache = layer(x, enc_out, cache)
+            new_cache.append(layer_cache)
+        return x, new_cache
+```
+
+### 加速比估算(研究#306/#345)
+| 序列长度 | 无Cache | 有Cache | 加速比 |
+|----------|---------|---------|--------|
+| 10 | 1x | 1x | 1x |
+| 20 | 1x | 2x | 2x |
+| 50 | 1x | 3x | 3x |
+| 128 | 1x | 5x | 5x |
+
+### 内存开销
+- 每层: 2 * d_model * seq_len * batch_size
+- 4层: 8 * 256 * 128 * 1 = 256KB (可忽略!)
+
+### 部署计划
+- **Val<3.5时**: 实现KV Cache
+- 与INT8量化兼容✅
+- 与Beam Search兼容✅
+- API延迟: 预计从2-3s→0.5-1s
