@@ -2666,10 +2666,29 @@ def test_map_square():
     print("✅ 映射平方(map square) 通过: [1,2,3,4,5]→[1,4,9,16,25]")
 
 
+def test_product_array():
+    """数组求积(reduce multiply)"""
+    code = """
+求积: 函数(arr) {
+    让 result = 1
+    循环 x 在 arr { result = result * x }
+    返回 result
+}
+
+主函数: 函数() {
+    打印(求积([1, 2, 3, 4, 5]))
+    打印(求积([2, 3, 7]))
+}
+"""
+    result = run_qentl(code)
+    assert result == ['120', '42'], f"求积: {result}"
+    print("✅ 数组求积(product) 通过: [1,2,3,4,5]=120, [2,3,7]=42")
+
+
 tests = [
 test_basic_arithmetic,
 test_string_operations,
-test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 test_factorial_recursive,
 test_comparison_operators,
 test_array_operations,
@@ -2723,26 +2742,26 @@ test_recursive_fibonacci,
 test_array_sum_average,
 test_list_filter,
 test_list_map_square,
-test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 test_string_reverse,
-test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
-test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
+test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 test_euclidean_gcd,
-test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 test_nested_list_iteration,
-test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
-test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
-test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
+test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
+test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 test_fast_exponentiation,
 test_prefix_sum,
 test_decimal_to_binary,
 test_run_length_encoding,
-test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
-test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
+test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 test_user_func_overrides_builtin,
 test_matrix_max,
 test_armstrong_number,
-test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 test_collatz_steps,
 test_word_count,
 test_perfect_number,
@@ -2757,7 +2776,7 @@ test_decimal_to_roman,
 test_extract_digits,
 test_leap_year,
 test_matrix_transpose,
-test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square,
+test_recursive_digit_sum, test_fizzbuzz, test_rle_encode, test_palindrome_check, test_second_largest, test_fibonacci, test_gcd_euclidean, test_binary_search, test_caesar_cipher, test_insertion_sort, test_lcm_via_gcd, test_selection_sort, test_merge_sorted_arrays, test_title_case, test_char_type_count, test_matrix_multiply, test_average_score, test_linear_search, test_reverse_array, test_to_uppercase, test_remove_duplicates_sorted, test_clamp, test_count_occurrences, test_is_prime, test_fast_power, test_swap_case, test_min_max, test_rotate_array, test_sum_array, test_find_substring, test_count_words, test_int_to_string, test_is_numeric, test_to_lowercase, test_filter_even, test_map_square, test_product_array,
 ]
 
 if __name__ == '__main__':
