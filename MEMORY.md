@@ -142,6 +142,7 @@
 - **V13 已暂停(E42)**: Best Val **2.7256**(E31, 31st BEST!)
 - **🔥🔥V14 E14 ✅4连Best!🔥**: E11 4.99→E12 4.78→E13 4.65→E14 4.56, SGDR+71K数据, ~3h20m/epoch
 - **V12 Best**: E32 Val 2.9259 (连续10次BEST!)
+- **V14 E18**: Val 4.3964 ✅8连Best!
 - **⚠️ V8 API输出仍为垃圾** — 根因是V12数据48%噪声, V12训练中用V13清洗数据
 - /api/q1/→V7-Small(8000), /api/qv4/→8002, /api/v5/→8002/v5/
 - Beam search改进: n-gram blocking + rep_penalty=1.5 + min_len=3
