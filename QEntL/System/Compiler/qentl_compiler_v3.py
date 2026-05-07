@@ -1090,7 +1090,8 @@ class Parser:
 
     def _parse_multiplication(self):
         left = self._parse_factor()
-        while self._current().type in (TokenType.STAR, TokenType.SLASH, TokenType.PERCENT):
+        while self._current().type in (TokenType.STAR, TokenType.SLASH, TokenType.PERCENT) or \
+              (self._current().type == TokenType.IDENTIFIER and self._current().value == '取模'):
             op = self._advance().value
             right = self._parse_primary()
             left = ASTNode('BinaryOp', value=op, children=[left, right])
@@ -1618,7 +1619,7 @@ class CodeGenerator:
             self._gen_node(node.children[1])
             op_map = {
                 '+': OpCode.ADD, '-': OpCode.SUB,
-                '*': OpCode.MUL, '/': OpCode.DIV, '%': OpCode.MOD,
+                '*': OpCode.MUL, '/': OpCode.DIV, '%': OpCode.MOD, '取模': OpCode.MOD,
                 '==': OpCode.EQ, '!=': OpCode.NEQ,
                 '<': OpCode.LT, '>': OpCode.GT,
                 '<=': OpCode.LTE, '>=': OpCode.GTE,
