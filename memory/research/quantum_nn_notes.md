@@ -11376,3 +11376,51 @@ SGDR余弦退火在周期末尾急剧衰减
 - E25: 5/8 05:00(UTC)
 - E30: 5/8 18:00(UTC)  
 - E31: 5/9 ~01:00(UTC)→🔥SGDR重启!
+
+## 研究#410: V14 E31重启准备清单 (2026-05-07)
+
+### E31将发生的3件大事
+1. **SGDR重启**: lr 0→0.0003(最大!)
+2. **Curriculum升级**: diff 3→4(+9K数据, 71K→80K)
+3. **LoRA升级**: r=16→32(模型容量2x)
+
+### E30完成前必须做的
+- [ ] 备份best.pth→qsm_v14_e30_best_backup.pth
+- [ ] 备份last.pth→qsm_v14_e30_last_backup.pth
+- [ ] 检查磁盘空间(需>5GB可用)
+- [ ] 验证v13_clean_dataset.json完整性
+
+### E31代码变更
+1. **LoRA升级**: r=16→32, alpha=32→64
+2. **Curriculum**: get_max_difficulty()自动升级(已实现✅)
+3. **SGDR**: scheduler自动重启(已实现✅)
+4. **accum参数**: 添加--accum=8支持(需实现)
+5. **optimizer重建**: LoRA参数变化→新建optimizer
+
+### 实施步骤(E30完成后)
+```bash
+# 1. 备份
+cp qsm_v14_best.pth qsm_v14_e30_best_backup.pth
+cp qsm_v14_last.pth qsm_v14_e30_last_backup.pth
+
+# 2. 修改训练脚本
+# - 添加LoRA升级逻辑
+# - 添加accum=8支持
+# - 重建optimizer
+
+# 3. 重启systemd
+sudo systemctl restart qsm-v14-train
+
+# 4. 监控E31训练
+tail -f /tmp/qsm_v14_train_systemd.log
+```
+
+### 预期E31结果
+- **Val**: 可能暂时升高(4.39→4.5-5.0), 类似E11
+- **E32-E40**: 快速下降, E40预测3.5-4.0
+- **E50**: 预测Val<3.0(🔥首次<3!)
+
+### 风险管理
+- OOM: LoRA r=32→参数增多→需监控内存
+- 数据: diff=4数据需确保质量
+- 备份: best.pth必须在重启前备份!
