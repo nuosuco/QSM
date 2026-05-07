@@ -10684,3 +10684,52 @@ lr 0.0003 + diff=4数据→打破4.3x plateau
 2. **开发P1字典替换**: 准备语义类别字典
 3. **开发P1代码切换**: 彝文+中文混合数据
 4. **P2回译等Val<1.5**: 可能需要V15-V16
+
+## 研究#397: V14 Dropout实施方案(备用) (2026-05-07)
+
+### 触发条件
+Gap>0.7时实施(当前E17 Gap=0.50, 还未触发)
+
+### Dropout添加位置
+V14是Encoder-Decoder, Dropout加在哪里最有效?
+
+| 位置 | 效果 | 对Val影响 |
+|------|------|----------|
+| Encoder Self-Attn后 | ★★ | 可能降低(Encoder学不好) |
+| Encoder FFN后 | ★★★ | 适中 |
+| Decoder Self-Attn后 | ★★★ | 适中 |
+| Decoder Cross-Attn后 | ★★★★ | **最有效** |
+| Decoder FFN后 | ★★★ | 适中 |
+| Embedding层 | ★★ | 可能降低 |
+
+### 推荐: 在Cross-Attention后加Dropout
+```python
+class DecoderLayer(nn.Module):
+    def forward(self, x, enc_out, ...):
+        # Self-Attention
+        x = x + self.dropout(self.self_attn(x, x, x))
+        # Cross-Attention + Dropout ← 这里最有效!
+        x = x + self.dropout(self.cross_attn(x, enc_out, enc_out))
+        # FFN
+        x = x + self.dropout(self.ffn(x))
+        return x
+```
+
+### 为什么Cross-Attn Dropout最有效?
+1. **防止对齐过拟合**: 模型过度依赖特定token对齐
+2. **迫使学习多种对齐**: 随机丢弃→学习冗余对齐
+3. **对低资源有利**: 强制模型从有限数据学更鲁棒的对齐
+
+### 代码变更(3行)
+```python
+# train_v14_alibi.py
+self.dropout = nn.Dropout(p=0.1)  # 新增
+
+# DecoderLayer.forward
+x = x + self.dropout(cross_attn_out)  # 新增
+```
+
+### 实施时间线
+- **E20**: 检查Gap, 如果>0.7→实施
+- **E31**: SGDR重启后Gap可能降低→可能不需要
+- **保守策略**: 优先等E31, 如果E31后Gap仍大再加
