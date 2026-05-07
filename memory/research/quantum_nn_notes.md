@@ -11191,3 +11191,66 @@ if epoch == 31 and args.lora_r == 16:
 - E30完成: 备份best.pth
 - E31: SGDR重启+diff=4数据+LoRA r→32
 - E31-E40: 快速下降期
+
+## 研究#406: 变分量子电路用于NMT (2026-05-07)
+
+### 变分量子电路(VQC)原理
+VQC = 参数化量子门 + 测量 → 经典优化
+```
+|0⟩ → Rz(θ₁) → Ry(θ₂) → CNOT → 测量 → 经典输出
+|0⟩ → Rz(θ₃) → Ry(θ₄) → ↗       → 概率分布
+```
+
+### VQC作为嵌入层(QuantumEmbeddingV3)
+```
+1. SPM编码 → 经典向量 x ∈ R^d
+2. 数据编码: |x⟩ = Rz(x₁)Ry(x₂)...|0⟩
+3. 变分层: 参数化门序列
+4. 测量: ⟨Z_i⟩ → 经典特征向量
+5. 送入Transformer
+```
+
+### 参数效率
+- VQC: n_qubits × 2参数(每个qubit的Rz+Ry)
+- 8 qubits → 16参数 per layer
+- 3层VQC → 48参数(极少!)
+- 但表达力受量子比特数限制
+
+### QSM实现路径
+```python
+# 使用QEntL VM的9量子门模拟VQC
+class QuantumEmbeddingV3(nn.Module):
+    def __init__(self, d_model, n_qubits=8, n_layers=3):
+        self.n_qubits = n_qubits
+        self.n_layers = n_layers
+        # 参数化旋转角
+        self.theta = nn.Parameter(torch.randn(n_layers, n_qubits, 2))
+    
+    def forward(self, x):
+        # 经典→量子编码
+        for layer in range(self.n_layers):
+            for q in range(self.n_qubits):
+                # Rz(theta) + Ry(phi)
+                qubits[q] = rz(self.theta[layer, q, 0], qubits[q])
+                qubits[q] = ry(self.theta[layer, q, 1], qubits[q])
+            # 纠缠层
+            for q in range(self.n_qubits - 1):
+                qubits = cnot(qubits, q, q+1)
+        # 测量
+        return measure_all(qubits)  # → d_model维特征
+```
+
+### 优势
+1. **指数级状态空间**: n qubits → 2^n维Hilbert空间
+2. **参数高效**: 少参数+大表达力
+3. **天然并行**: 量子态叠加=并行计算
+
+### 挑战
+1. **模拟开销**: 经典模拟VQC O(2^n)→8 qubits=256维可行
+2. **梯度**: 参数移位法则(parameter shift rule)计算梯度
+3. ** barren plateaus**: 随机初始化→梯度消失
+
+### 时间线
+- **V16**: 4-qubit VQC嵌入实验(16维→d_model投影)
+- **V17**: 8-qubit VQC+参数移位梯度
+- **V18+**: 真实量子硬件(QPU)部署
