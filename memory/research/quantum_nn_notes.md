@@ -11748,3 +11748,42 @@ ExecStart=... train_v14_alibi.py \
 - 总降: 0.60(E11→E20)
 - **最惊人的**: lr=0.000008(接近0!)仍然Best!
 - 说明: 即使极小的lr也能找到微小的改进空间
+
+## 研究#416: V14 E21 lr=0.0003确认 - SGDR周期分析 (2026-05-07)
+
+### SGDR周期配置
+- T_0=10, t_mult=2
+- Cycle1: E1-E10 (10 epochs)
+- Cycle2: E11-E30 (20 epochs)  
+- Cycle3: E31-E70 (40 epochs)
+
+### 但E21 lr=0.0003!
+这意味着Cycle2内部有重启!
+检查: T_0=10, t_mult=1(不是2!)
+- Cycle1: E1-E10
+- Cycle2: E11-E20
+- Cycle3: E21-E30 ← 当前!
+- Cycle4: E31-E40
+
+### 修正理解
+**t_mult=1!** 每个cycle都是10 epochs!
+- E1-E10: Cycle1 (lr 0.0003→0)
+- E11-E20: Cycle2 (lr 0.0003→0)
+- E21-E30: Cycle3 (lr 0.0003→0) ← 现在开始!
+- E31-E40: Cycle4 (diff=4数据!)
+
+### 这改变了E31计划!
+- E31不是特殊的"大重启"→只是下一个10-epoch cycle
+- diff=4升级在E31(get_max_difficulty自动触发)
+- **E21已经开始新cycle! lr回到0.0003**
+
+### E21-E30预测(Cycle3)
+- E21: lr=0.0003→Val可能暂时升高(类似E11)
+- E22-E25: Val快速下降
+- E26-E30: lr→0, Val饱和
+- 预测E25 Val≈4.2-4.3
+
+### 关键: E21新cycle=新学习机会!
+- lr=0.0003→模型可以跳出当前局部最小值
+- 但数据仍然是diff≤3→需要E31才升级diff=4
+- **E21-E30可能再降0.1-0.2!**
