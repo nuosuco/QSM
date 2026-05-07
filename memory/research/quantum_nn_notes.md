@@ -11021,3 +11021,60 @@ Gap=0.59, 从E17的0.50增到0.59(+0.09/epoch)
 **E19是否继续Best?**
 - 是→lr=0.000030仍有效→继续训练
 - 否→lr太低→考虑提前实施accum=8或Dropout
+
+## 研究#403: V15语言前缀token改进方案 (2026-05-07)
+
+### 问题
+V14模型不知道输入是什么语言、输出应该是什么语言
+→模型需要从数据中隐式学习语言方向
+
+### 方案: 添加语言前缀token
+```python
+# 输入序列前加语言标记
+zh→en: "[ZH] 你好世界" → "[EN] hello world"
+en→zh: "[EN] hello world" → "[ZH] 你好世界"
+yi→zh: "[YI] ⱨₒₘₕₒ" → "[ZH] 你好"
+```
+
+### SPM词汇表添加3个特殊token
+```python
+# qsm_spm_v15.model
+special_tokens = ["[ZH]", "[EN]", "[YI]"]
+# 编码时在输入前加目标语言前缀
+```
+
+### 优点
+1. **显式语言指示**: 模型明确知道输出语言
+2. **多方向训练**: 同一模型处理6种方向(zh↔en↔yi)
+3. **减少语言混淆**: 不再靠猜测输出语言
+4. **兼容现有架构**: 只需改SPM+数据处理
+
+### 实施步骤
+1. SPM添加[ZH]/[EN]/[YI]三个token
+2. 训练数据格式: 输入加源语言前缀, 输出加目标语言前缀
+3. 编译器: encode时自动添加前缀
+4. 推理: 用户指定目标语言→添加前缀
+
+### 代码变更(训练脚本)
+```python
+# 数据加载
+for item in dataset:
+    src_lang = detect_lang(item['input'])  # zh/en/yi
+    tgt_lang = detect_lang(item['output'])
+    src_text = f"[{src_lang}] {item['input']}"
+    tgt_text = f"[{tgt_lang}] {item['output']}"
+```
+
+### 与V14兼容性
+- V14 SPM 16K→V15 SPM 16K+3(token数不变, 替换3个unused)
+- 或V15 SPM 20K(更大词汇+3前缀)
+
+### V15完整改进清单
+| 改进 | 优先级 | 效果 |
+|------|--------|------|
+| 语言前缀token | P0 | ★★★★★ |
+| 方向标记 | P0 | ★★★★★ |
+| accum=8 | P0 | ★★★★ |
+| 更大SPM 20K | P1 | ★★★ |
+| Dropout p=0.1 | P2 | ★★ |
+| Cross-Attn头数×2 | P2 | ★★ |
