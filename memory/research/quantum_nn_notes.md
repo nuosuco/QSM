@@ -11545,3 +11545,71 @@ optimizer = torch.optim.AdamW(
 ### 关键: 重建optimizer!
 - 参数shape变了→旧optimizer的momentum/variance不匹配
 - 必须新建optimizer→SGDR重启正好配合!
+
+## 研究#413: V14 accum=8实现细节(最终版) (2026-05-07)
+
+### 当前问题
+- batch_size=8, 71K数据→~8900步/epoch
+- 梯度噪声大→Loss波动±1.0(研究#350)
+- 噪声导致Gap增大(0.65@E19)
+
+### accum=8代码变更
+```python
+# train_v14_alibi.py 修改点
+
+# 1. 添加参数
+parser.add_argument('--accum', type=int, default=1, help='gradient accumulation steps')
+
+# 2. 修改训练循环
+accum_steps = args.accum  # 8
+optimizer.zero_grad()
+
+for batch_idx, batch in enumerate(train_loader):
+    loss = model(batch)
+    loss = loss / accum_steps  # 归一化!
+    loss.backward()
+    
+    if (batch_idx + 1) % accum_steps == 0:
+        optimizer.step()
+        optimizer.zero_grad()
+        
+    # 日志
+    if batch_idx % 200 == 0:
+        print(f"E{epoch}/{args.epochs} B{(batch_idx+1)//accum_steps} "
+              f"L:{loss.item()*accum_steps:.4f} "  # 显示真实loss
+              f"acc:{min(batch_idx+1, accum_steps)}/{accum_steps}")
+
+# 3. 确保最后一次累积也更新
+remaining = len(train_loader) % accum_steps
+if remaining > 0:
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+### 效果预测
+| 指标 | accum=1(当前) | accum=8 |
+|------|--------------|---------|
+| 等效batch | 8 | 64 |
+| 梯度噪声 | 高±1.0 | 低±0.25 |
+| 步数/epoch | ~8900 | ~1100 |
+| Gap | 0.65(E19) | 预计<0.3 |
+| epoch时间 | ~3.5h | ~3.5h(不变!) |
+
+### 为什么epoch时间不变?
+- 总计算量不变(8900×1 vs 1100×8)
+- 梯度累积是零成本(只多一次optimizer.step)
+- 唯一区别: 日志频率降低
+
+### E31实施计划
+1. E30完成后备份
+2. 修改train_v14_alibi.py添加--accum=8
+3. 同时升级LoRA r=16→32
+4. 重启systemd: --resume --accum=8
+5. SGDR自动重启+新optimizer
+
+### 配合SGDR
+- accum=8不影响SGDR调度
+- 但等效batch=64→可能需要调整lr
+- **经验法则**: batch 8x→lr 2-4x
+- 当前lr=0.0003→建议0.0006-0.001
+- **保守方案**: lr=0.0006(2x), 观察E31效果
