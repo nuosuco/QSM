@@ -12287,3 +12287,65 @@ elif op == 0x3F:  # MODULO
 - Cycle2(E11-E20): 4.99→4.39 = 降0.60
 - Cycle3(E21-E22+): 4.40→4.35 = 已降0.05(2 epochs)
 - **预计Cycle3总降**: 0.15-0.20(E21-E30)
+
+## 研究#428: QEntL运算符完整表+架构更新 (2026-05-07)
+
+### QEntL完整运算符表(2026-05-08更新)
+
+#### 算术运算符(乘除级)
+| 运算符 | 符号/关键字 | OpCode | 返回类型 |
+|--------|-----------|--------|---------|
+| 乘 | * | MUL(0x22) | int×int→int, float×any→float |
+| 除 | / | DIV(0x23) | 总是float |
+| 取模 | % 或 取模 | MOD(0x24) | int%int→int✅ |
+| 整除 | 整除 | FLOOR_DIV(0x26) | 总是int✅ |
+
+#### 算术运算符(加减级)
+| 运算符 | 符号 | OpCode | 返回类型 |
+|--------|------|--------|---------|
+| 加 | + | ADD(0x20) | int+int→int, str+str→str |
+| 减 | - | SUB(0x21) | int-int→int |
+
+#### 比较运算符
+| 运算符 | 符号 | OpCode |
+|--------|------|--------|
+| 等于 | == | EQ(0x30) |
+| 不等 | != | NEQ(0x31) |
+| 小于 | < | LT(0x32) |
+| 大于 | > | GT(0x33) |
+| ≤ | <= | LTE(0x34) |
+| ≥ | >= | GTE(0x35) |
+
+#### 逻辑运算符
+| 运算符 | 关键字 | OpCode |
+|--------|--------|--------|
+| 且 | 且 | LOGICAL_AND(0xCE) |
+| 或 | 或 | LOGICAL_OR(0xCF) |
+
+### 编译器→VM运算符映射流程
+```
+源码: a 取模 b
+  ↓ 词法分析 → IDENTIFIER('取模')
+  ↓ 语法分析 → _parse_multiplication匹配IDENTIFIER'取模'
+  ↓ AST → BinaryOp(value='取模', children=[a, b])
+  ↓ 代码生成 → OpCode.MOD(0x24)
+  ↓ QBC → {"op":"MOD", "code":36}
+  ↓ VM加载 → OP_MAP['MOD']→OpCode.MOD
+  ↓ VM执行 → a%b, int检查→int返回
+```
+
+### 今日运算符重大更新
+1. **取模关键字**: `a 取模 b` 正式可用(编译器+VM)
+2. **整除关键字**: `a 整除 b` 正式可用(新增OpCode)
+3. **MOD int返回**: int%int→int(不再float)
+4. **FLOOR_DIV**: 全新OpCode 0x26, int(a//b)→int
+
+### 已知问题
+- ⚠️ `幂`运算符缺失(用自定义快速幂函数替代)
+- ⚠️ 负数取模: Python语义(-1%26=25), QEntL继承✅
+- ⚠️ 范围数(variable n) bug仍存在
+
+### 测试覆盖
+- 取模: 12取模8=4✅, GCD✅, 左旋转✅, 凯撒加密✅
+- 整除: 10整除3=3✅, 二分查找✅
+- 1327/1327 ALL PASS
