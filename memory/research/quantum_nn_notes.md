@@ -12193,3 +12193,49 @@ elif op == 0x3F:  # MODULO
 - Cycle3第2epoch就Best→SGDR重启非常有效!
 - 证明: lr=0.0003重启比lr→0更好
 - E23-E25可能连续Best
+
+## 研究#426: QEntL 整除运算符实现方案 (2026-05-07)
+
+### 动机
+- 当前除法`/`总是返回float(8/3=2.6667)
+- 数组索引需要int: arr[a/b]→float索引报错
+- `取整(a/b)`有效但冗长
+- 整除是高频操作,需要原生支持
+
+### 方案: 添加`整除`关键字
+- 中缀运算符: `a 整除 b` → `a // b` → int
+- 编译器: IDENTIFIER'整除' → OpCode.FLOOR_DIV(新增)
+- VM: `a // b` → int
+
+### 实施步骤
+1. **VM**: 添加FLOOR_DIV OpCode(0x25)
+   ```python
+   elif op == 0x25:  # FLOOR_DIV
+       b = self.stack.pop()
+       a = self.stack.pop()
+       self.stack.append(int(a // b) if b != 0 else 0)
+   ```
+
+2. **编译器**: OpCode枚举添加FLOOR_DIV=0x25
+3. **编译器**: _parse_multiplication匹配IDENTIFIER'整除'
+4. **编译器**: 运算符映射'整除'→OpCode.FLOOR_DIV
+
+### 优先级
+- 与乘除取模同级(左结合)
+- `a + b 整除 c` → `a + (b 整除 c)`
+
+### 示例
+```qentl
+让 idx = 10 整除 3   # 3
+让 mid = (lo + hi) 整除 2  # 中点
+让页码 = n 整除 每页数量
+```
+
+### 与取模修复类似
+- 取模修复: 编译器+VM, 已完成✅
+- 整除: 同样模式, 可以立即实施
+
+### 但考虑: 是否必要?
+- `取整(a/b)`已经工作
+- 整除只是语法糖
+- **优先级P3**: 不紧急, V15再做
