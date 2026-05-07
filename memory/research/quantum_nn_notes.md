@@ -11613,3 +11613,91 @@ if remaining > 0:
 - **经验法则**: batch 8x→lr 2-4x
 - 当前lr=0.0003→建议0.0006-0.001
 - **保守方案**: lr=0.0006(2x), 观察E31效果
+
+## 研究#414: V14 E31三重升级完整代码方案 (2026-05-07)
+
+### 三重升级清单
+1. ✅ SGDR重启(lr→0.0006, 已实现)
+2. ✅ Curriculum升级(diff→4, 已实现)
+3. 🔧 LoRA r=16→32(需代码)
+4. 🔧 accum=8(需代码)
+
+### train_v14_alibi.py修改汇总
+
+```python
+# ===== 修改1: 添加accum参数 =====
+parser.add_argument('--accum', type=int, default=1)
+
+# ===== 修改2: LoRA升级参数 =====
+parser.add_argument('--lora_upgrade_rank', type=int, default=0,
+                    help='upgrade LoRA rank to this value at resume')
+
+# ===== 修改3: 训练循环accum =====
+accum = args.accum
+optimizer.zero_grad()
+for batch_idx, batch in enumerate(train_loader):
+    loss, _ = model(batch)
+    loss = loss / accum
+    loss.backward()
+    
+    if (batch_idx + 1) % accum == 0:
+        optimizer.step()
+        scheduler.step()  # ⚠️ scheduler也按accum步进!
+        optimizer.zero_grad()
+    
+    if batch_idx % (200 * accum) == 0:
+        real_loss = loss.item() * accum
+        step = (batch_idx + 1) // accum
+        print(f"E{epoch}/{args.epochs} B{step} L:{real_loss:.4f}")
+
+# 剩余步处理
+if (batch_idx + 1) % accum != 0:
+    optimizer.step()
+    scheduler.step()
+    optimizer.zero_grad()
+
+# ===== 修改4: LoRA升级函数 =====
+def upgrade_lora_rank(model, new_rank):
+    """升级LoRA rank: 16→32"""
+    for name, param in model.named_parameters():
+        if 'lora_B' in name and param.shape[1] < new_rank:
+            old = param.data
+            new = torch.randn(old.shape[0], new_rank) * 0.01
+            new[:, :old.shape[1]] = old
+            param.data = new
+            param.requires_grad_(True)
+        elif 'lora_A' in name and param.shape[0] < new_rank:
+            old = param.data
+            new = torch.randn(new_rank, old.shape[1]) * 0.01
+            new[:old.shape[0], :] = old
+            param.data = new
+            param.requires_grad_(True)
+
+# ===== 修改5: resume时升级LoRA =====
+if args.resume and args.lora_upgrade_rank > 0:
+    model = load_model(args.resume)
+    upgrade_lora_rank(model, args.lora_upgrade_rank)
+    # 重建optimizer(shape变了!)
+    optimizer = create_optimizer(model)
+    scheduler = create_scheduler(optimizer)  # SGDR重启
+```
+
+### systemd service修改
+```ini
+ExecStart=... train_v14_alibi.py \
+    --resume Models/QSM/bin/qsm_v14_last.pth \
+    --accum 8 \
+    --lora_upgrade_rank 32 \
+    --sgdr_tmult 2 \
+    ...
+```
+
+### 关键注意
+1. **scheduler.step()必须在accum步时调用**
+   - 否则lr调度不正确!
+2. **optimizer必须在LoRA升级后重建**
+   - 旧optimizer的momentum buffer shape不匹配
+3. **real_loss = loss.item() * accum**
+   - 显示真实loss而非归一化loss
+4. **等待E30完成后统一修改**
+   - 避免中途修改导致训练中断
