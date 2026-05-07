@@ -11787,3 +11787,46 @@ ExecStart=... train_v14_alibi.py \
 - lr=0.0003→模型可以跳出当前局部最小值
 - 但数据仍然是diff≤3→需要E31才升级diff=4
 - **E21-E30可能再降0.1-0.2!**
+
+## 研究#417: QEntL 取模运算符bug (2026-05-07)
+
+### 问题
+QEntL中 `a 取模 b` 返回float(因为除法返回float)
+- 12 取模 8 → 可能返回 4.0 或 0.8(取模实现错误?)
+- 在GCD测试中直接用取模导致空返回
+
+### 临时解决方案
+```qentl
+让 t = a - 取整(a / b) * b
+```
+手动实现整数取模: 取整(a/b)*b + 余数 = a
+
+### 根因
+QEntL VM的取模运算符实现可能直接用了Python的%
+但Python中 12 % 8 = 4 (正确!)
+问题可能是: QEntL的取模返回float → 当循环条件 b!=0 永远为True(4.0!=0)
+
+### 修复方案(VM)
+```python
+# qbc_vm.py MODULO handler
+case 0x3F:  # MODULO
+    b = self.stack.pop()
+    a = self.stack.pop()
+    result = a % b
+    # 保持类型一致: 如果输入都是int→返回int
+    if isinstance(a, int) and isinstance(b, int):
+        result = int(result)
+    self.stack.append(result)
+```
+
+### 更好的修复: 统一整数运算
+- 加减乘: int+int→int ✅
+- 除法: int/int→float (Python3语义, 正确)
+- 取模: int%int→int ❌(当前可能返回float)
+- **取整(除法)**: 取整(a/b) → int✅
+
+### 优先级
+- **P1**: 取模应返回int(int输入时)
+- 影响算法: GCD/素数判断/数组索引
+- 但有workaround(手动取模), 不紧急
+- V15修复
