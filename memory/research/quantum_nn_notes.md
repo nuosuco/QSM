@@ -12349,3 +12349,92 @@ elif op == 0x3F:  # MODULO
 - 取模: 12取模8=4✅, GCD✅, 左旋转✅, 凯撒加密✅
 - 整除: 10整除3=3✅, 二分查找✅
 - 1327/1327 ALL PASS
+
+## 研究#429: V14 E31 accum=8+LoRA升级代码准备 (2026-05-07)
+
+### 等待E30完成后实施
+当前E23, 还有7个epoch到E31
+
+### train_v14_alibi.py修改清单
+
+#### 1. 添加--accum参数
+```python
+parser.add_argument('--accum', type=int, default=1, 
+                    help='gradient accumulation steps')
+```
+
+#### 2. 修改训练循环
+```python
+accum = args.accum
+optimizer.zero_grad()
+for batch_idx, batch in enumerate(train_loader):
+    loss, _ = model(batch)
+    loss = loss / accum
+    loss.backward()
+    
+    if (batch_idx + 1) % accum == 0:
+        optimizer.step()
+        scheduler.step()  # ⚠️ 按accum步调度
+        optimizer.zero_grad()
+    
+    if batch_idx % (200 * accum) == 0:
+        real_loss = loss.item() * accum
+        step = (batch_idx + 1) // accum
+        print(f"E{epoch}/{args.epochs} B{step} L:{real_loss:.4f}")
+
+# 处理剩余步
+if (batch_idx + 1) % accum != 0:
+    optimizer.step()
+    scheduler.step()
+    optimizer.zero_grad()
+```
+
+#### 3. 添加--lora_upgrade_rank参数
+```python
+parser.add_argument('--lora_upgrade_rank', type=int, default=0)
+```
+
+#### 4. LoRA升级函数
+```python
+def upgrade_lora_rank(model, new_rank):
+    for name, param in model.named_parameters():
+        if 'lora_B' in name and param.shape[-1] < new_rank:
+            old = param.data
+            new = torch.randn(*old.shape[:-1], new_rank) * 0.01
+            new[..., :old.shape[-1]] = old
+            param.data = new
+        elif 'lora_A' in name and param.shape[0] < new_rank:
+            old = param.data
+            new = torch.randn(new_rank, *old.shape[1:]) * 0.01
+            new[:old.shape[0], :] = old
+            param.data = new
+```
+
+#### 5. Resume时升级
+```python
+if args.resume and args.lora_upgrade_rank > 0:
+    model = load_checkpoint(args.resume)
+    upgrade_lora_rank(model, args.lora_upgrade_rank)
+    # 必须重建optimizer!
+    optimizer = create_optimizer(model, lr=args.lr)
+    scheduler = create_scheduler(optimizer)
+```
+
+#### 6. systemd修改
+```ini
+ExecStart=... train_v14_alibi.py \
+    --resume Models/QSM/bin/qsm_v14_last.pth \
+    --accum 8 \
+    --lr 0.0006 \
+    --lora_upgrade_rank 32 \
+    --sgdr_t0 10 --sgdr_tmult 1 \
+    ...
+```
+
+### 实施顺序(E30完成后)
+1. 备份best.pth和last.pth
+2. 修改train_v14_alibi.py
+3. 测试语法(py_compile)
+4. 修改systemd service
+5. 重启训练
+6. 监控E31开始
