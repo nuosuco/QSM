@@ -10421,3 +10421,61 @@ Label Smoothing: target=[ε/K, ε/K, 1-ε+ε/K, ε/K,...]
 - 动态ε: 训练初期ε=0.1, 后期ε=0.05(退火)
 - Adaptive LS: 困难样本ε=0.05, 简单样本ε=0.1
 - **但当前优先级低**: ε=0.1已足够好
+
+## 研究#392: V14 accum=8实施详细代码变更 (2026-05-07)
+
+### 当前问题
+batch=8→有效batch=8→梯度噪声大→Loss波动±1.0
+(研究#379: E15 B200=3.90, B400=4.21, B600=4.07, B800=4.51→±0.5)
+
+### accum=8代码变更清单
+```python
+# train_v14_alibi.py 需修改3处:
+
+# 1. 添加参数
+parser.add_argument('--accum', type=int, default=8,
+                    help='gradient accumulation steps')
+
+# 2. 训练循环修改
+accum_count = 0
+optimizer.zero_grad()
+
+for batch in dataloader:
+    loss = model(batch) / args.accum  # 除以accum!
+    loss.backward()
+    accum_count += 1
+    
+    if accum_count >= args.accum:
+        optimizer.step()
+        optimizer.zero_grad()
+        accum_count = 0
+
+# 3. 日志打印
+if batch_idx % args.accum == 0:
+    print(f"E{epoch} B{batch_idx//args.accum} L:{loss.item()*args.accum:.4f}")
+```
+
+### 关键注意事项
+1. **loss必须除以accum**: 否则梯度会放大8倍!
+2. **日志batch数要除以accum**: 否则显示B56000不是B7000
+3. **scheduler.step不变**: 仍按epoch计算
+4. **validation不变**: 全量验证集
+5. **OOM风险**: accum不增加内存(只累积梯度)
+
+### systemd参数更新
+```
+ExecStart=... train_v14_alibi.py --resume --accum 8 ...
+```
+
+### 预期效果
+| 指标 | batch=8 | accum=8(有效64) |
+|------|---------|-----------------|
+| 梯度噪声 | ±1.0 | ±0.25(4x降低) |
+| Val稳定性 | 4.0-5.0 | 4.3-4.5 |
+| 训练速度 | ~3.5h/epoch | ~3.5h/epoch(不变) |
+| 内存 | 4.5GB | 4.5GB(不变) |
+
+### 实施时机
+- **E18或E19完成时**: 修改训练脚本+重启systemd
+- 不需要等E31! 越早实施越好
+- 但需要短暂的训练暂停(5-10分钟)
