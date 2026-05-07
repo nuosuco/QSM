@@ -11873,3 +11873,74 @@ Cycle3(E21)开头Train升高到4.5+!
 | 首epoch | Val 4.99 | Val 4.5? | 起点更低 |
 | 中期 | E15: 4.49 | E25: 4.2? | 期待更优 |
 | 末期 | E20: 4.39 | E30: 4.2? | 期待新Best |
+
+## 研究#419: QEntL 取模运算符VM修复 (2026-05-07)
+
+### 问题回顾(#417)
+- `取模`是关键字/运算符,不是函数
+- `a 取模 b` 在编译器中被解析为MODULO运算
+- 但VM执行时可能返回float(因为Python的%操作)
+
+### 验证测试
+```python
+# Python中:
+12 % 8  # = 4 (int✅)
+12.0 % 8  # = 4.0 (float!)
+```
+问题: 如果VM中stack值已经是float(来自除法), %运算返回float
+
+### 根因
+1. QEntL除法总返回float(设计决定)
+2. 但取模应返回int(整数取模是基本需求)
+3. VM的MODULO handler没有类型检查
+
+### 修复方案(qbc_vm.py)
+```python
+# 当前(可能有bug):
+elif op == 0x3F:  # MODULO
+    b = self.stack.pop()
+    a = self.stack.pop()
+    self.stack.append(a % b)
+
+# 修复后:
+elif op == 0x3F:  # MODULO
+    b = self.stack.pop()
+    a = self.stack.pop()
+    result = a % b
+    # int输入→int输出
+    if isinstance(a, int) and isinstance(b, int):
+        result = int(result)
+    self.stack.append(result)
+```
+
+### 同时修复: 除法应提供整除选项
+- 当前: `a / b` → float(正确, Python3语义)
+- 建议: 添加 `整除` 关键字 → `a // b` → int
+- 或: 让 `取整(a/b)` 保持当前方式
+
+### 取模作为函数调用的语法问题
+```qentl
+# ❌ 编译错误(取模被当作函数调用):
+code = 97 + 取整((code - 97 + shift) 取模 26)
+
+# ✅ 正确(取模是中缀运算符):
+code = 97 + 取整((code - 97 + shift) 取模 26)
+# 但括号嵌套有问题!
+
+# ✅ 最佳workaround: 自定义函数
+取模26: 函数(n) {
+    让 r = n - 取整(n / 26) * 26
+    如果 r < 0 { r = r + 26 }
+    返回 取整(r)
+}
+```
+
+### 实施优先级
+- **P1**: VM MODULO handler添加int类型检查
+- **P2**: 编译器确保取模运算符优先级正确
+- **P3**: 添加`整除`关键字
+
+### 当前workaround足够
+- 自定义取模函数工作正常
+- 凯撒加密测试已通过
+- VM修复可以等下次集中更新
