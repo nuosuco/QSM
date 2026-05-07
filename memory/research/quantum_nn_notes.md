@@ -12019,3 +12019,63 @@ code = 97 + 取整((code - 97 + shift) 取模 26)
 - E23 Val: 预测4.30-4.35
 - E24 Val: 预测4.25-4.30
 - E25 Val: 预测**4.20-4.25**🔥
+
+## 研究#422: V14 accum=8与lr关系 - 需要调整吗? (2026-05-07)
+
+### 问题
+accum=8→等效batch从8→64
+linear scaling rule: lr应按比例增加
+但SGDR已有自己的lr调度
+
+### Linear Scaling Rule
+```
+lr_new = lr_base × (batch_new / batch_base)
+```
+- 当前: lr_base=0.0003, batch=8
+- accum=8: batch=64→lr=0.0003×8=0.0024
+- **但这对SGDR可能太激进!**
+
+### Warmup Scaling Rule(更保守)
+```
+lr_new = lr_base × sqrt(batch_new / batch_base)
+```
+- lr=0.0003×sqrt(8)=0.0003×2.83=0.00085
+- 更安全, 但可能不够
+
+### 实践中的选择
+| 方案 | accum=8时lr | 风险 |
+|------|-----------|------|
+| A: 不改lr | 0.0003 | 保守, 可能训练太慢 |
+| B: sqrt scaling | 0.00085 | 适中✅ |
+| C: linear scaling | 0.0024 | 激进, 可能不稳定 |
+| D: 2x | 0.0006 | 折中✅✅ |
+
+### 推荐方案D: lr×2=0.0006
+1. 不完全按linear scaling(太激进)
+2. 2x比sqrt(2.83x)更保守
+3. 对CPU训练更稳定
+4. 如果E31后Val不降→可以再增加
+
+### 实施方式
+```bash
+# 修改SGDR的base_lr
+--lr 0.0006  # 原来0.0003
+--accum 8
+--sgdr_t0 10
+```
+
+### 同时考虑: SGDR T_0是否要增大?
+- accum=8→步数减少8倍
+- 但每个"步"包含8个micro-batch的梯度
+- T_0=10 epoch不变(按epoch算, 不按步算)
+- **不需要改T_0!**
+
+### E31完整配置
+```
+--lr 0.0006
+--accum 8
+--sgdr_t0 10
+--sgdr_tmult 1
+--lora_upgrade_rank 32
+--resume qsm_v14_last.pth
+```
