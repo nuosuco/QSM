@@ -10733,3 +10733,71 @@ x = x + self.dropout(cross_attn_out)  # 新增
 - **E20**: 检查Gap, 如果>0.7→实施
 - **E31**: SGDR重启后Gap可能降低→可能不需要
 - **保守策略**: 优先等E31, 如果E31后Gap仍大再加
+
+## 研究#398: V14 INT8量化部署方案 (2026-05-07)
+
+### 量化原理
+FP32权重→INT8: W_int8 = round(W_fp32 / scale)
+- 模型大小: 4x压缩(64MB→16MB)
+- 推理速度: 2-4x加速(CPU整数运算更快)
+- 精度损失: 通常<0.1%(V7-Small已验证✅)
+
+### V14量化参数
+```python
+# V14模型: 15.97M参数, d_model=256
+# FP32: 15.97M * 4B = 63.9MB
+# INT8: 15.97M * 1B = 15.97MB
+
+import torch
+def quantize_model(model):
+    model.int8_quantized = True
+    for name, param in model.named_parameters():
+        if param.dtype == torch.float32:
+            # 动态量化(运行时量化激活值)
+            param.data = torch.quantize_per_tensor(
+                param.data, 
+                scale=param.data.abs().max() / 127,
+                zero_point=0,
+                dtype=torch.qint8
+            )
+```
+
+### PyTorch动态量化(推荐)
+```python
+import torch.quantization as quant
+
+model = torch.load('qsm_v14_best.pth')
+quantized = quant.quantize_dynamic(
+    model,
+    {nn.Linear},  # 只量化Linear层
+    dtype=torch.qint8
+)
+torch.save(quantized, 'qsm_v14_int8.pth')
+```
+
+### 部署配置
+```python
+# API加载INT8模型
+model = torch.load('qsm_v14_int8.pth')
+model.eval()
+
+# SPM编码
+sp = spm.SentenceProcessor('qsm_spm_v14_yi.model')
+
+# Beam Search
+beam = BeamSearch(beam_size=5, ...)
+```
+
+### 内存估算
+| 组件 | FP32 | INT8 |
+|------|------|------|
+| 模型权重 | 64MB | 16MB |
+| SPM模型 | 2MB | 2MB |
+| KV Cache | 256KB | 128KB |
+| 推理缓冲 | 100MB | 50MB |
+| **总计** | ~166MB | ~68MB |
+
+### 部署时间线
+- **Val<3.5时**: INT8量化+基础API
+- **Val<2.5时**: +KV Cache+Beam Search优化
+- **Val<2.0时**: +语言前缀token+方向标记
