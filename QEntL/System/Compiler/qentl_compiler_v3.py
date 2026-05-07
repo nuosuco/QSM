@@ -28,7 +28,7 @@ class OpCode(Enum):
     SUB = 0x21
     MUL = 0x22
     DIV = 0x23
-    MOD = 0x24
+    MOD = 0x24; FLOOR_DIV = 0x26
 
     # 比较运算
     EQ = 0x30
@@ -1091,7 +1091,7 @@ class Parser:
     def _parse_multiplication(self):
         left = self._parse_factor()
         while self._current().type in (TokenType.STAR, TokenType.SLASH, TokenType.PERCENT) or \
-              (self._current().type == TokenType.IDENTIFIER and self._current().value == '取模'):
+              (self._current().type == TokenType.IDENTIFIER and self._current().value in ('取模', '整除')):
             op = self._advance().value
             right = self._parse_primary()
             left = ASTNode('BinaryOp', value=op, children=[left, right])
@@ -1619,7 +1619,7 @@ class CodeGenerator:
             self._gen_node(node.children[1])
             op_map = {
                 '+': OpCode.ADD, '-': OpCode.SUB,
-                '*': OpCode.MUL, '/': OpCode.DIV, '%': OpCode.MOD, '取模': OpCode.MOD,
+                '*': OpCode.MUL, '/': OpCode.DIV, '%': OpCode.MOD, '取模': OpCode.MOD, '整除': OpCode.FLOOR_DIV,
                 '==': OpCode.EQ, '!=': OpCode.NEQ,
                 '<': OpCode.LT, '>': OpCode.GT,
                 '<=': OpCode.LTE, '>=': OpCode.GTE,

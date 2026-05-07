@@ -12,7 +12,7 @@ from typing import Dict, List, Any, Optional
 class OpCode(Enum):
     NOP = 0x00; HALT = 0x01
     LOAD_CONST = 0x10; LOAD_VAR = 0x11; STORE_VAR = 0x12; LOAD_FIELD = 0x13; GLOBAL_DECL = 0x25; STORE_FIELD = 0x14
-    ADD = 0x20; SUB = 0x21; MUL = 0x22; DIV = 0x23; MOD = 0x24
+    ADD = 0x20; SUB = 0x21; MUL = 0x22; DIV = 0x23; MOD = 0x24; FLOOR_DIV = 0x26
     EQ = 0x30; NEQ = 0x31; LT = 0x32; GT = 0x33; LTE = 0x34; GTE = 0x35
     JUMP = 0x40; JUMP_IF_FALSE = 0x41; JUMP_IF_TRUE = 0x42; CALL = 0x43; RETURN = 0x44
     LOOP_START = 0x45; LOOP_END = 0x46
@@ -366,25 +366,35 @@ class QBCVirtualMachine:
             elif len(self.stack) >= 1:
                 self.stack.pop()
             self.ip += 1
-        elif op in (OpCode.ADD, OpCode.SUB, OpCode.MUL, OpCode.DIV, OpCode.MOD):
+        elif op in (OpCode.ADD, OpCode.SUB, OpCode.MUL, OpCode.DIV, OpCode.MOD, OpCode.FLOOR_DIV):
             if len(self.stack) >= 2:
                 b = self.stack.pop()
                 a = self.stack.pop()
                 try:
-                    if op == OpCode.ADD: result = a + b
-                    elif op == OpCode.SUB: result = a - b
-                    elif op == OpCode.MUL: result = a * b
-                    elif op == OpCode.DIV: result = a / b if b != 0 else 0
-                    elif op == OpCode.MOD: result = a % b if b != 0 else 0
-                    else: result = 0
-                    self.stack.append(result)
+                        if op == OpCode.ADD:
+                            result = a + b
+                        elif op == OpCode.SUB:
+                            result = a - b
+                        elif op == OpCode.MUL:
+                            result = a * b
+                        elif op == OpCode.DIV:
+                            result = a / b if b != 0 else 0
+                        elif op == OpCode.MOD:
+                            result = a % b if b != 0 else 0
+                            if isinstance(a, int) and isinstance(b, int):
+                                result = int(result)
+                        elif op == OpCode.FLOOR_DIV:
+                            result = int(a // b) if b != 0 else 0
+                        else:
+                            result = 0
+                        self.stack.append(result)
                 except (TypeError, ValueError):
                     # String concatenation for ADD
                     if op == OpCode.ADD:
                         self.stack.append(str(a) + str(b))
                     else:
                         self.stack.append(0)
-            self.ip += 1
+                self.ip += 1
 
         elif op in (OpCode.EQ, OpCode.NEQ, OpCode.LT, OpCode.GT, OpCode.LTE, OpCode.GTE):
             if len(self.stack) >= 2:
