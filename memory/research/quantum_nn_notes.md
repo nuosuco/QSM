@@ -10479,3 +10479,59 @@ ExecStart=... train_v14_alibi.py --resume --accum 8 ...
 - **E18或E19完成时**: 修改训练脚本+重启systemd
 - 不需要等E31! 越早实施越好
 - 但需要短暂的训练暂停(5-10分钟)
+
+## 研究#393: V14 Beam Search推理优化方案 (2026-05-07)
+
+### 当前beam search配置(V7-Small API)
+- beam_size=5
+- ngram_blocking=3
+- rep_penalty=1.5
+- min_len=3
+
+### V14部署时beam search改进
+
+#### 1. Length Penalty (长度惩罚)
+```python
+# 标准beam search偏向短输出
+# 添加长度惩罚使输出长度与输入匹配
+lp = ((5 + len(hyp)) / (5 + 1)) ** alpha  # alpha=0.6
+score = log_prob / lp
+```
+- 彝文→英文: 输出更短→需要正alpha
+- 英文→彝文: 输出更长→需要负alpha或不用
+
+#### 2. Coverage Penalty (覆盖惩罚)
+```python
+# 防止重复注意同一位置
+cp = beta * sum(min(attn[i], 1.0))  # beta=0.3
+score = log_prob + cp
+```
+- Google NMT论文提出
+- 对翻译质量有帮助
+
+#### 3. Diverse Beam Search
+- 每组beam加diversity penalty
+- 防止所有beam输出相似结果
+- 对低资源模型特别有用
+
+#### 4. 集束+采样混合
+- Top-k采样(温度0.7)
+- 前2 beam + 后3 采样
+- 平衡确定性和多样性
+
+### V14部署beam search配置(推荐)
+```python
+beam_size = 5
+ngram_blocking = 3
+rep_penalty = 1.5
+length_penalty_alpha = 0.6  # 新增!
+coverage_penalty_beta = 0.3  # 新增!
+min_len = 3
+max_len = 128  # ALiBi外推
+temperature = 0.7  # 采样温度
+```
+
+### 部署时间线
+- Val<3.5时: 基础beam search
+- Val<2.5时: 添加length+coverage penalty
+- Val<2.0时: 多样化策略
