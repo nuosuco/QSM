@@ -11136,3 +11136,58 @@ Phase 3: diff=4数据补充(每次+30)
 当前E19→还需52个epoch才能用到diff=5
 →**不需要急着补充diff=5!**
 →**优先补充diff=3-4**(E11-E70期间用得最多)
+
+## 研究#405: V14 LoRA Rank升级E31实施计划 (2026-05-07)
+
+### 当前LoRA配置
+- r=16, alpha=32
+- 目标模块: q_proj, v_proj, k_proj, out_proj, ff_w
+- 可训练参数: ~1.6% of 15.97M ≈ 255K
+
+### E31升级: r=16→32
+- 新增可训练参数: ~510K(3.2%)
+- alpha同步: 32→64
+- **效果**: 模型容量翻倍, 更多可学习参数
+
+### 实施方式
+```python
+# 方案A: 直接升级(简单)
+# 1. 加载best.pth(r=16)
+# 2. 创建r=32的新LoRA层
+# 3. 复制旧权重到新权重(A[:16,:]=A_old, B[:,:16]=B_old)
+# 4. 新增部分随机初始化
+# 5. 继续训练
+
+# 方案B: 渐进升级(更安全)
+# 1. E31: 冻结旧r=16, 添加新r=16并行LoRA
+# 2. E32-E40: 只训练新LoRA
+# 3. E41: 合并两个LoRA→r=32
+```
+
+### 推荐方案A(简单直接)
+理由:
+- SGDR重启时lr高→可以安全地重新训练所有LoRA
+- 新增的参数会被随机初始化+高lr快速适应
+- 不需要复杂的冻结逻辑
+
+### 代码变更
+```python
+# train_v14_alibi.py
+if epoch == 31 and args.lora_r == 16:
+    # 升级LoRA rank
+    model.upgrade_lora_rank(new_r=32)
+    # 重建optimizer(新参数需要新优化器状态)
+    optimizer = torch.AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=args.lr
+    )
+```
+
+### 预期效果
+- r=32: 模型容量2x→可能更好地学习diff=4数据
+- 与SGDR重启+新数据协同→3重提升!
+
+### 时间线
+- E30完成: 备份best.pth
+- E31: SGDR重启+diff=4数据+LoRA r→32
+- E31-E40: 快速下降期
