@@ -14009,3 +14009,43 @@ E30完成后立即执行:
 
 ### V14 E28=4.2259, 7连Best
 E29训练中, 预测E30完成后执行E31六重升级
+
+## 研究#465: systemd sgdr_tmult=2 bug影响分析 (2026-05-08)
+
+### 发现
+systemd service中 `--sgdr_tmult 2` 但训练脚本内默认值是1
+研究#416明确: t_mult=1(每10 epoch重启), 不是2(倍增)
+
+### sgdr_tmult=2的实际效果
+- T_0=10, t_mult=2:
+  - Cycle1: E1-E10 (10 epochs)
+  - Cycle2: E11-E30 (20 epochs!)
+  - Cycle3: E31-E70 (40 epochs!)
+- t_mult=1(正确):
+  - Cycle1: E1-E10
+  - Cycle2: E11-E20
+  - Cycle3: E21-E30 ← 当前在这里!
+
+### 🔥🔥🔥 关键发现
+当前训练结果(E21-E28连续Best)说明:
+**实际运行的是t_mult=1!** 因为E21=重启点(Val升高)→符合10 epoch周期
+
+### 为什么?
+train_v14_alibi.py的argparse默认值:
+```python
+parser.add_argument('--sgdr_tmult', type=int, default=1)
+```
+
+如果systemd传了`--sgdr_tmult 2`, 那实际效果应该是倍增。
+但E21出现重启→说明t_mult=1在生效!
+
+可能原因:
+1. 训练是在修改systemd之前就启动的(resume时不改参数)
+2. 或者argparse没有正确接收这个参数
+
+### 验证方法
+查看当前训练的scheduler行为: E11和E21都是重启点→t_mult=1✅
+
+### 结论
+**systemd参数虽然写了2, 但训练实际用的是1!** 因为resume从之前的checkpoint继续, scheduler已初始化。
+E31需要修正systemd参数, 但当前训练不受影响。
