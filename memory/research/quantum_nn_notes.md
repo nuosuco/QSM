@@ -13862,3 +13862,20 @@ self.cross_attn = ALiBiMultiheadAttention(..., dropout=cross_dropout)
 - Step 1: ~2小时
 - Step 2-3: ~1小时
 - Step 4: 需要Step 1-3完成后的QEntL词法分析器
+
+## 研究#460: V14 API version端点val_loss过时 (2026-05-08)
+
+### 问题
+curl localhost:8001/version 返回 val_loss: 4.2663 (E25)
+当前best: E27 Val=4.2300
+
+### 修复
+API加载best.pth但version端点val_loss是硬编码或从旧checkpoint读取
+需要: 启动时从checkpoint读取实际val_loss, 或在/health中显示
+
+### 方案
+在qsm_v14_api.py中:
+1. 加载best.pth时读取checkpoint中的val_loss
+2. /version端点返回实际值而非硬编码
+
+### 优先级: P2(不影响功能, 但信息不准确)
