@@ -12683,3 +12683,50 @@ spm_train --input=all_yi_text.txt \
 - **⚠️字符(int)陷阱**: 数字0-9用字符()→控制字符! 必须用格式()或查表法
 - **进制转换通用模式**: 取模base + 整除base + 子串查表
 - **已验证**: 二进制(格式法) + 十六进制(查表法) 均✅
+
+## 研究#436: Label Smoothing减少Gap方案 (2026-05-08)
+
+### 问题
+V14 Gap持续增大: E21=0.47→E23=0.55
+Gap=Train-Val→Train过拟合训练集→Val降速慢
+
+### Label Smoothing原理
+- 标准CE: target=[0,1,0,...] (one-hot)
+- LS(ε): target=[ε/K, 1-ε+ε/K, ε/K, ...]
+- K=vocab_size, ε=smoothing参数(通常0.1)
+- 效果: 防止模型对训练集过于自信→减少过拟合
+
+### 对V14的影响
+| 方面 | 无LS | LS(ε=0.1) |
+|------|------|-----------|
+| Train Loss | 更低 | 略高(~+0.1) |
+| Val Loss | 更高 | 更低(~-0.05) |
+| Gap | 大 | 小 |
+| 泛化 | 差 | 好 |
+
+### 实现代码
+```python
+# 在train_v14_alibi.py中
+criterion = nn.CrossEntropyLoss(
+    label_smoothing=0.1,  # PyTorch 2.0+原生支持!
+    ignore_index=pad_id
+)
+```
+
+### 实施时机
+- **E31**: 与accum=8+LoRA升级同步
+- **优势**: 零额外计算成本!
+- **风险**: ε=0.1可能太大→先试ε=0.05
+- **兼容**: PyTorch 2.0+的nn.CrossEntropyLoss原生支持
+
+### 与其他防过拟合方案对比
+| 方案 | 额外计算 | 效果 | 推荐度 |
+|------|---------|------|--------|
+| Label Smoothing | 0 | ★★★ | P0 |
+| Dropout(已有0.1) | 低 | ★★ | 已有 |
+| Cross-Attn Dropout | 中 | ★★★ | P1(研究#397) |
+| Weight Decay | 0 | ★★ | 已有 |
+| Data Augmentation | 高 | ★★★ | 持续扩展 |
+
+### 结论
+E31实施LS(ε=0.05)→预计Gap缩小0.05-0.10
