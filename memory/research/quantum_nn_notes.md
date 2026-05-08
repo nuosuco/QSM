@@ -12945,3 +12945,70 @@ def beam_search_with_penalties(model, src, beam_size=5,
 - 翻译输出长度更合理(不再过短)
 - 减少重复词汇
 - BLEU分数提升1-2分
+
+## 研究#441: V15语言前缀Token详细方案 (2026-05-08)
+
+### 动机
+V14当前翻译方向由input/output隐式决定
+但模型有时会混淆方向→输出错误语言
+显式语言前缀→模型明确知道目标语言
+
+### 方案设计
+在输入序列前添加语言前缀token:
+```
+[ZH] 你好 → [EN] hello
+[EN] hello → [ZH] 你好  
+[YI] <彝文> → [ZH] <中文>
+[ZH] <中文> → [YI] <彝文>
+```
+
+### SPM修改
+```python
+# 在SPM词汇表中添加3个特殊token
+user_defined_symbols = [
+    "[ZH]",   # 目标: 中文
+    "[EN]",   # 目标: 英文  
+    "[YI]",   # 目标: 彝文
+    ...existing彝文字符...
+]
+```
+
+### 训练数据修改
+```python
+# 当前: {"input": "你好", "output": "hello", "type": "zh-en"}
+# 修改: {"input": "[EN] 你好", "output": "hello", "type": "zh-en"}
+
+def add_lang_prefix(data):
+    lang_map = {"zh": "[ZH]", "en": "[EN]", "yi": "[YI]"}
+    target_lang = data["type"].split("-")[-1]  # e.g. "en"
+    prefix = lang_map[target_lang]
+    data["input"] = prefix + " " + data["input"]
+    return data
+```
+
+### 推理时使用
+```python
+# 中文→英文
+input_text = "[EN] 你好"  # 告诉模型目标语言是英文
+
+# 中文→彝文
+input_text = "[YI] 你好"  # 告诉模型目标语言是彝文
+
+# 自动检测: 无前缀→模型自行判断(回退模式)
+```
+
+### 优势
+1. **消除方向歧义**: 模型明确知道目标语言
+2. **零额外参数**: 仅3个新token
+3. **向后兼容**: 无前缀→原模式
+4. **多任务增强**: 同一模型处理所有方向
+
+### 实施时机
+- **V15**: 随SPM 20K一起实施(研究#434)
+- **V14可实验**: 在当前16K SPM中添加3个token
+- 但需要重新训练所有数据的tokenizer
+
+### 风险
+- 训练数据需要全部重新tokenize
+- 前3-5个epoch可能性能下降(适应新token)
+- 但长期效果: 方向准确率接近100%
