@@ -13739,3 +13739,40 @@ V15添加3个特殊token:
 - diff=4数据加入→更多复杂样本
 - LoRA r→32→更强表达力
 - 预测: E31 Val暂时升高, E32快速下降
+
+## 研究#457: Cross-Attention Dropout对Gap的影响 (2026-05-08)
+
+### 问题
+V14 Gap持续增大: E21 Gap=0.47→E27 Gap≈0.70
+Gap=Train-Val越大→过拟合越严重
+
+### Cross-Attention Dropout原理
+在encoder-decoder attention中添加dropout:
+- 标准Transformer: self-attn有dropout, cross-attn也有dropout
+- V14当前: cross-attn dropout=0.1(默认)
+- 研究#397建议: cross-attn dropout=0.3最有效
+
+### 为什么Cross-Attn Dropout最有效?
+1. **防止对齐过拟合**: 模型死记硬背src-tgt对应关系
+2. **强制多样性**: 迫使decoder从更多encoder位置获取信息
+3. **减少Gap**: 更强的正则化→Train Loss升高但Val Loss降低
+
+### 实验建议
+| Dropout | 预期Train | 预期Val | 预期Gap |
+|---------|----------|---------|---------|
+| 0.1(当前) | 2.5 | 4.23 | 1.73 |
+| 0.2 | 2.7 | 4.15 | 1.45 |
+| 0.3 | 2.9 | 4.10 | 1.20 |
+
+### E31实施时机
+- 与accum=8+LS(0.05)同步→三重正则化
+- 但可能太激进(LoRA+accum+LS+cross-drop全改)
+- 建议: E31先实施accum+LS+LoRA, 观察Gap
+- 如果Gap仍>1.5→E41添加cross-attn dropout=0.2
+
+### 代码修改
+```python
+# ALiBiDecoderLayer.__init__
+self.cross_attn = ALiBiMultiheadAttention(..., dropout=cross_dropout)
+# 默认cross_dropout=0.1, 可调为0.2或0.3
+```
