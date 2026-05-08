@@ -13579,3 +13579,75 @@ Label Smoothing: y_smooth=[ε/K, ε/K, ..., 1-ε+ε/K, ..., ε/K]
 - 默认0.05(研究#436推荐)
 - CrossEntropyLoss(label_smoothing=0.05, ignore_index=pad_id)
 - ✅语法检查通过
+
+## 研究#454: E31六重升级完整操作清单 (2026-05-08)
+
+### 前提条件
+- E30完成, Val结果记录
+- best.pth备份到qsm_v14_best_e30_backup.pth
+- 磁盘空间>10GB
+
+### Step 1: 停止当前训练
+```bash
+systemctl stop qsm-v14-train
+```
+
+### Step 2: 备份当前最佳模型
+```bash
+cd /root/.openclaw/workspace/Models/QSM/bin
+cp qsm_v14_best.pth qsm_v14_best_e30_backup.pth
+cp qsm_v14_last.pth qsm_v14_last_e30_backup.pth
+```
+
+### Step 3: 升级LoRA rank 16→32
+```bash
+python3 upgrade_lora_r32.py qsm_v14_best.pth qsm_v14_best_r32.pth
+```
+
+### Step 4: 修改训练参数
+```bash
+# E31启动命令:
+python3 train_v14_alibi.py \
+  --resume qsm_v14_best_r32.pth \
+  --lora_r 32 \
+  --lr 0.0006 \
+  --accum_steps 8 \
+  --label_smoothing 0.05 \
+  --max_difficulty 4 \
+  --epochs 100
+```
+
+### Step 5: 更新systemd service
+```ini
+# /etc/systemd/system/qsm-v14-train.service
+ExecStart=... train_v14_alibi.py \
+  --resume .../qsm_v14_best_r32.pth \
+  --lora_r 32 --lr 0.0006 --accum_steps 8 \
+  --label_smoothing 0.05 --max_difficulty 4
+```
+
+### Step 6: 启动训练
+```bash
+systemctl daemon-reload
+systemctl start qsm-v14-train
+```
+
+### ⚠️ 验证清单
+- [ ] best.pth已备份(不会被覆盖!)
+- [ ] LoRA r=32 checkpoint已生成
+- [ ] scheduler.step()在accum block内(已修复✅)
+- [ ] label_smoothing=0.05(已添加✅)
+- [ ] max_difficulty=4(动态函数已实现✅)
+- [ ] lr=0.0006(2x折中,研究#422✅)
+
+### 预期结果
+- E31: Val暂时升高(4.5-4.8)→正常!
+- E32-E33: 快速下降→4.1-4.3
+- E40: Val≈3.5-3.8(比E26降0.5-0.8)
+
+### 回退方案
+如果E31-E33 Val持续>5.0:
+1. 停止训练
+2. 从backup恢复best.pth
+3. 降低lr到0.0003
+4. 减少accum到4
