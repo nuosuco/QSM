@@ -13012,3 +13012,64 @@ input_text = "[YI] 你好"  # 告诉模型目标语言是彝文
 - 训练数据需要全部重新tokenize
 - 前3-5个epoch可能性能下降(适应新token)
 - 但长期效果: 方向准确率接近100%
+
+## 研究#442: QEntL自举3阶段路线图细化 (2026-05-08)
+
+### 当前状态
+- 编译器: qentl_compiler_v3.py (Python)
+- VM: qbc_vm.py (Python)
+- 测试: 2196/2196 ALL PASS
+- 64+内置函数, 取模+整除关键字
+
+### 自举3阶段路线
+
+#### Phase 1: QEntL重写编译器 (目标: 编译器自举)
+当前Python编译器→QEntL源码重写
+
+**可行性分析**:
+- 编译器核心: 词法分析+语法分析+代码生成
+- 需要的QEntL能力:
+  - ✅ 字符串操作(子串/长度/连接)
+  - ✅ 字典/数组(符号表/AST)
+  - ✅ 递归函数(解析表达式)
+  - ✅ 文件IO(读源码/写QBC)
+  - ❌ 正则表达式(词法分析需要→可用手写DFA替代)
+  - ❌ 复杂数据结构(AST→用字典嵌套)
+
+**关键挑战**:
+1. 符号表管理: 需要字典嵌套→QEntL字典已支持
+2. 递归下降解析: 函数递归→QEntL已支持
+3. 文件IO: 读文件/写文件→QEntL已支持(6个IO内置)
+4. QBC JSON输出: 格式化输出→格式()已支持
+
+**预估代码量**: ~800-1000行QEntL代码
+
+#### Phase 2: C VM替代Python VM
+qvm_boot.c → 加载QBC → C实现的VM执行
+
+**可行性**:
+- C VM只需实现: 栈操作+64+内置函数+OpCode分发
+- 优势: 执行速度100x+ (C vs Python)
+- 挑战: 所有内置函数需C实现
+- 代码量: ~2000-3000行C
+
+#### Phase 3: 服务自举
+QEntL编译器(QEntL源码)→编译自身→QBC
+C VM执行QBC→编译新QEntL代码
+
+**完整自举链**:
+```
+qvm_boot.c → 加载compiler.qbc → 执行
+compiler.qbc读parser.qentl → 编译 → parser.qbc
+compiler.qbc读codegen.qentl → 编译 → codegen.qbc
+C VM执行parser.qbc+codegen.qbc → 编译新源码
+```
+
+### 优先级
+- **P0**: 完善QEntL语言能力(为Phase1准备)
+  - 正则/模式匹配(或手写DFA)
+  - 字典嵌套/复杂数据结构
+  - 错误处理/异常机制
+- **P1**: 开始Phase1(QEntL重写词法分析器)
+- **P2**: C VM(Phase2)
+- **P3**: 完整自举(Phase3)
