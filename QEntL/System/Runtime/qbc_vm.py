@@ -721,6 +721,15 @@ class QBCVirtualMachine:
                         self.stack.append(arr)
                     else:
                         self.stack.append(arr)
+            elif func_name == '追加':
+                if len(self.stack) >= 2:
+                    item = self.stack.pop()
+                    arr = self.stack.pop()
+                    if isinstance(arr, list):
+                        arr.append(item)
+                    self.stack.append(arr)
+                else:
+                    self.stack.append(arr)
             elif func_name == '弹出':
                 if self.stack:
                     arr = self.stack.pop()
