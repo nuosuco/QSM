@@ -12823,3 +12823,63 @@ E31实施LS(ε=0.05)→预计Gap缩小0.05-0.10
 - 🔥Val<4.25: E26-E27可能到达
 - 🔥Val<4.20: E31六重升级后
 - 🔥Val<3.50: 大幅改进后(Q1目标)
+
+## 研究#439: KV Cache实现方案(2-3x推理加速) (2026-05-08)
+
+### 当前推理瓶颈
+- V7-Small API: 逐token生成, 每步重复计算K/V
+- 序列长度128, 每步O(seq_len)→总O(seq_len²)
+- KV Cache→每步O(1)→总O(seq_len)
+
+### 原理
+标准自回归推理:
+```
+Step 1: K,V = proj(x1)      → 1组KV
+Step 2: K,V = proj(x1,x2)   → 2组KV (重复计算x1!)
+Step 3: K,V = proj(x1,x2,x3)→ 3组KV (重复计算x1,x2!)
+```
+
+KV Cache:
+```
+Step 1: cache_K=[k1], cache_V=[v1]
+Step 2: k2,v2 = proj(x2); cache_K+=[k2]; 只算x2对已cache的attention
+Step 3: k3,v3 = proj(x3); cache_K+=[k3]; 只算x3
+```
+
+### 实现要点
+```python
+class QSMModel(nn.Module):
+    def forward(self, x, past_kv=None, use_cache=False):
+        new_kv = []
+        for i, layer in enumerate(self.layers):
+            x, kv = layer.self_attn(
+                x, 
+                past_kv=past_kv[i] if past_kv else None,
+                use_cache=use_cache
+            )
+            new_kv.append(kv)
+        return x, new_kv if use_cache else None
+
+# 推理循环
+past_kv = None
+for step in range(max_len):
+    logits, past_kv = model(next_token, past_kv=past_kv, use_cache=True)
+    next_token = sample(logits)
+```
+
+### 内存开销
+- V7-Small(192d/3层/3头): 每token缓存 3×2×192×3 = 3.5KB
+- 序列128: 128×3.5KB = 448KB (完全可接受!)
+- V14(256d/4层/4头): 每token 4×2×256×4 = 8KB, 128token=1MB
+
+### 预期加速
+| 序列长度 | 无Cache | 有Cache | 加速比 |
+|---------|---------|---------|--------|
+| 32 | 1024步 | 63步 | 16x |
+| 64 | 4096步 | 127步 | 32x |
+| 128 | 16384步 | 255步 | 64x |
+
+### 实施时机
+- **V14 Val<4.0后**: API部署V14替换V7-Small
+- 与INT8量化(已部署)叠加→总加速4-6x
+- 需要修改API的generate()函数
