@@ -13365,3 +13365,63 @@ Val 2.0(V15) → 基本对话 🔶
 Val 1.0(V15+GPU) → 流畅输出 ✅
 Val 0.5(V16) → 高质量输出 ✅
 ```
+
+## 研究#450: LoRA Rank升级 r=16→32 理论分析 (2026-05-08)
+
+### LoRA回顾
+LoRA(Low-Rank Adaptation): W = W₀ + BA
+- W₀: 冻结的预训练权重(d×d)
+- B: d×r, A: r×d
+- 可训练参数: 2×d×r (vs 全量微调 d²)
+- r=16→32: 参数量翻倍, 但仍仅占3.2%总参数
+
+### r=16 vs r=32 对比
+| 指标 | r=16 | r=32 | 变化 |
+|------|------|------|------|
+| 可训练参数/V14 | ~0.5M | ~1.0M | +100% |
+| 占总参数比例 | 1.6% | 3.2% | +1.6% |
+| 矩阵表达力 | rank-16 | rank-32 | +16维子空间 |
+| 内存增量 | ~2MB | ~4MB | +2MB |
+| 训练速度 | 基准 | -5% | 几乎无影响 |
+
+### 🔥 为什么E31是最佳升级时机?
+1. **SGDR重启**: lr回到0.0003+0.0006=0.0006
+   - 大学习率+更多参数→快速探索新子空间
+   - 小学习率+少参数→容易困在局部最优
+
+2. **diff=4数据**: 复杂任务需要更高rank
+   - 简单翻译: rank-16足够(当前已学会基本词汇)
+   - 复杂推理/长文本: 需要rank-32表达更复杂模式
+
+3. **LoRA初始化**: B=0, A=Kaiming
+   - 升级时只需要重新初始化新增的维度
+   - 已有rank-16部分可以保留!
+
+### 实现方案
+```python
+# 升级LoRA rank: 16→32
+def upgrade_lora_rank(model, old_r=16, new_r=32):
+    for name, module in model.named_modules():
+        if isinstance(module, LoRALinear):
+            old_B = module.lora_B.data  # [d, 16]
+            old_A = module.lora_A.data  # [16, d]
+            # 扩展B和A
+            new_B = torch.zeros(d, new_r)
+            new_B[:, :old_r] = old_B  # 保留旧权重
+            new_A = torch.randn(new_r, d) * 0.01  # 新维度随机初始化
+            new_A[:old_r, :] = old_A  # 保留旧权重
+            module.lora_B = nn.Parameter(new_B)
+            module.lora_A = nn.Parameter(new_A)
+            module.r = new_r
+```
+
+### 预期效果
+- 表达力提升: rank-32可以拟合更复杂的注意力模式
+- 对彝文语法: SOV语序/形容词后置需要更高rank来学习
+- 对长文本: 段落级输出需要更长的依赖关系
+- 预计Val降0.2-0.5(E31-E40 vs E21-E30对比)
+
+### ⚠️ 风险
+- rank太大→过拟合(但V14数据80K条, 1M可训练参数, 比=80:1, 安全)
+- 内存: +2MB(总计~5MB LoRA), 完全可接受
+- 与accum=8交互: 更稳定梯度×更大参数空间→更好收敛
