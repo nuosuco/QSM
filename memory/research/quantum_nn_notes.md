@@ -13425,3 +13425,69 @@ def upgrade_lora_rank(model, old_r=16, new_r=32):
 - rank太大→过拟合(但V14数据80K条, 1M可训练参数, 比=80:1, 安全)
 - 内存: +2MB(总计~5MB LoRA), 完全可接受
 - 与accum=8交互: 更稳定梯度×更大参数空间→更好收敛
+
+## 研究#451: Gradient Accumulation(accum=8)深度分析 (2026-05-08)
+
+### 核心概念
+Gradient Accumulation = 将一个大batch拆成多个小batch, 累积梯度后一次性更新
+- 等效batch_size = micro_batch × accum_steps
+- V14当前: batch=8, accum=1 → 等效batch=8
+- E31升级: batch=8, accum=8 → 等效batch=64
+
+### 为什么accum=8对V14至关重要?
+1. **当前问题(batch=8)**:
+   - 71K数据÷8≈8900步/epoch
+   - 每步仅8个样本→梯度噪声大→Loss波动±1.0
+   - 噪声比(signal/noise)≈8:1
+   
+2. **accum=8后(batch等效64)**:
+   - 梯度噪声降√8≈2.83倍
+   - 噪声比→64:1 (8倍提升!)
+   - Loss波动±0.35(预计降70%)
+   - 训练步数不变(仍是8900步, 只是8步才更新一次)
+
+### 内存分析
+| 项目 | accum=1 | accum=8 | 变化 |
+|------|---------|---------|------|
+| 前向内存 | 336MB | 336MB | 不变! |
+| 梯度内存 | ~100MB | ~100MB | 不变! |
+| 总内存 | ~4.5GB | ~4.5GB | 不变! |
+| 速度 | 基准 | x1.0 | 几乎不变! |
+
+**关键**: accum不增加内存! 只是累积梯度除以8后再更新
+
+### 实现方案
+```python
+# train_v14_alibi.py 修改
+accum_steps = 8  # 新增参数
+optimizer.zero_grad()
+
+for i, batch in enumerate(dataloader):
+    loss = model(batch) / accum_steps  # 除以accum
+    loss.backward()                     # 累积梯度
+    train_loss += loss.item() * accum_steps
+    
+    if (i + 1) % accum_steps == 0:
+        optimizer.step()               # 8步才更新一次
+        optimizer.zero_grad()
+        scheduler.step()               # scheduler按更新步数
+```
+
+### 🔥 lr调整策略
+- accum=8 → 等效batch增8倍
+- Linear scaling: lr×8=0.0024(太激进!)
+- **推荐lr=0.0006**(2x折中, 研究#422)
+- 原因: CPU训练+小模型, 激进lr易发散
+- SGDR重启配合: E31 lr=0.0006正好
+
+### 与其他E31升级的交互
+1. **SGDR重启**: lr=0.0006 + 大batch→稳定探索
+2. **LoRA r=32**: 更多参数+更稳定梯度→更好收敛
+3. **LS(0.05)**: 标签平滑+大batch→防止过自信
+4. **diff=4数据**: 复杂数据+稳定梯度→学到更多
+
+### 预期效果
+- Val Loss波动: ±1.0→±0.35
+- 收敛速度: 可能略慢(8步才更新)但更稳定
+- E31-E40总降: 预计比E21-E30多降0.3-0.5
+- Gap缩小: LS+accum→Gap减少0.05-0.10
