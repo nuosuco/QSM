@@ -18,6 +18,7 @@ SPM_PATH = os.path.join(WORKSPACE, 'Models/QSM/bin/qsm_spm_v14_yi.model')
 
 model = None
 best_val = 0
+best_epoch = 0
 sp = None
 
 BOS_ID = 1
@@ -25,7 +26,7 @@ EOS_ID = 2
 PAD_ID = 0
 
 def load_model():
-    global model, sp, best_val
+    global model, sp, best_val, best_epoch
     sp = spm.SentencePieceProcessor()
     sp.load(SPM_PATH)
     
@@ -56,7 +57,8 @@ def load_model():
     model.eval()
     
     best_val = ckpt.get("best_val", 0)
-    print(f"✅ V14 loaded: E{ckpt['epoch']} Val={best_val:.4f} Vocab={vocab_size}")
+    best_epoch = ckpt.get("epoch", 0)
+    print(f"✅ V14 loaded: E{best_epoch} Val={best_val:.4f} Vocab={vocab_size}")
 
 @torch.no_grad()
 def translate(text, max_len=64, beam_size=3, rep_penalty=2.5):
@@ -114,7 +116,7 @@ def health():
     return jsonify({
         "model": "QSM V14 ALiBi",
         "status": "healthy" if model else "not_loaded",
-        "epoch": 25,
+        "epoch": best_epoch,
         "val_loss": best_val,
         "vocab_size": 16000,
         "architecture": "ALiBi + SPM16K + LoRA"
