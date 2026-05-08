@@ -1386,6 +1386,12 @@ class QBCVirtualMachine:
         # Execute top-level declarations before the function
         # (enum/class/interface/import/variable definitions)
         func_ip = self.functions[func_name]
+        # If ip=0 is a function entry, no top-level declarations exist
+        # Skip the while loop entirely and go directly to target function
+        if 0 in set(self.functions.values()):
+            self.ip = func_ip
+            self.stack = []
+            return self.run(max_steps)
         self.ip = 0
         self.running = True
         steps = 0
