@@ -14049,3 +14049,53 @@ parser.add_argument('--sgdr_tmult', type=int, default=1)
 ### 结论
 **systemd参数虽然写了2, 但训练实际用的是1!** 因为resume从之前的checkpoint继续, scheduler已初始化。
 E31需要修正systemd参数, 但当前训练不受影响。
+
+## 研究#466: E31 systemd参数完整修正方案 (2026-05-08)
+
+### 当前systemd错误参数
+```
+--sgdr_tmult 2    ← 应为1!
+--accum_steps 4   ← 应为8!
+--label_smoothing 0.1 ← 应为0.05!
+--lora_r 16       ← 应为32!
+--lr 0.0003       ← 应为0.0006!
+```
+
+### E31正确systemd命令
+```
+python3 Models/QSM/train_v14_alibi.py \
+  --data Models/QSM/bin/v13_clean_dataset.json \
+  --spm_model Models/QSM/bin/qsm_spm_v14_yi.model \
+  --epochs 100 \
+  --batch_size 8 \
+  --accum_steps 8 \
+  --lr 0.0006 \
+  --d_model 256 \
+  --n_heads 4 \
+  --n_layers 4 \
+  --d_ff 1024 \
+  --max_len 128 \
+  --dropout 0.1 \
+  --scheduler sgdr \
+  --sgdr_t0 10 \
+  --sgdr_tmult 1 \
+  --lora_r 32 \
+  --label_smoothing 0.05 \
+  --output_dir Models/QSM/bin \
+  --resume Models/QSM/bin/qsm_v14_best_r32.pth
+```
+
+### E31执行步骤(研究#454更新版)
+1. systemctl stop qsm-v14-train
+2. cd Models/QSM/bin && cp qsm_v14_best.pth qsm_v14_best_e30_backup.pth
+3. python3 upgrade_lora_r32.py qsm_v14_best.pth qsm_v14_best_r32.pth
+4. 验证: python3 -c "import torch; c=torch.load('qsm_v14_best_r32.pth',map_location='cpu'); print(c['lora_r'])"
+5. 更新systemd service文件(用上面的完整命令)
+6. systemctl daemon-reload && systemctl start qsm-v14-train
+7. 监控E31前100 batches确认正常
+
+### 预期E31行为
+- Val暂时升高(4.5-5.0): lr从0.0002→0.0006 + 新LoRA维度
+- E32: 快速下降(4.3-4.5)
+- E35: 低于E28(4.1-4.2)
+- E40: 3.8-4.0
