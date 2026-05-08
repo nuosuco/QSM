@@ -12883,3 +12883,65 @@ for step in range(max_len):
 - **V14 Val<4.0后**: API部署V14替换V7-Small
 - 与INT8量化(已部署)叠加→总加速4-6x
 - 需要修改API的generate()函数
+
+## 研究#440: Beam Search优化方案(Length+Coverage Penalty) (2026-05-08)
+
+### 当前Beam Search问题
+- 已有: n-gram blocking + rep_penalty=1.5 + min_len=3
+- 问题: 短输出偏好(短序列log_prob更高)
+- 问题: 重复覆盖同一词组(coverage不足)
+
+### Length Penalty (α=0.6)
+```
+score = log_prob / (length ^ α)
+```
+- α=0: 无惩罚(偏好短序列)
+- α=0.6: 推荐值(平衡长短)
+- α=1.0: 完全按长度归一化
+
+### Coverage Penalty (β=0.3)
+```
+coverage = Σ_t attention_t
+coverage_penalty = β * Σ_t min(1, coverage_t)
+```
+- 防止attention反复关注同一位置
+- Google NMT论文(Tu et al., 2016)提出
+
+### 实现代码
+```python
+def beam_search_with_penalties(model, src, beam_size=5, 
+                                max_len=128, alpha=0.6, beta=0.3):
+    beams = [(0.0, [BOS])]
+    coverage = torch.zeros(src_len)
+    
+    for step in range(max_len):
+        new_beams = []
+        for score, seq in beams:
+            logits = model.decode(seq, src)
+            log_probs = F.log_softmax(logits, dim=-1)
+            topk = torch.topk(log_probs, beam_size)
+            
+            for i in range(beam_size):
+                new_score = score + topk.values[i]
+                # Length penalty
+                len_pen = ((5 + len(seq)) / (5 + 1)) ** alpha
+                # Coverage penalty  
+                cov_pen = beta * torch.sum(torch.log(
+                    torch.min(coverage, torch.ones_like(coverage))))
+                final_score = new_score / len_pen + cov_pen
+                new_beams.append((final_score, seq + [topk.indices[i]]))
+        
+        beams = sorted(new_beams, key=lambda x: x[0], reverse=True)[:beam_size]
+    
+    return beams[0][1]
+```
+
+### 实施优先级
+- P1: Length Penalty(最简单最有效)
+- P2: Coverage Penalty(需保存attention权重)
+- 当前V7-Small API可先加length_penalty
+
+### 预期效果
+- 翻译输出长度更合理(不再过短)
+- 减少重复词汇
+- BLEU分数提升1-2分
