@@ -385,10 +385,7 @@ def train(args):
         print("LR Scheduler: None (constant LR)")
     
     # Loss
-    criterion = nn.CrossEntropyLoss(
-        ignore_index=train_ds.dataset.sp.pad_id() if hasattr(train_ds, 'dataset') else 0,
-        label_smoothing=args.label_smoothing
-    )
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing, ignore_index=train_ds.dataset.sp.pad_id() if hasattr(train_ds, "dataset") else 0)
     
     # Training log
     log_file = os.path.join(args.output_dir, 'v14_train.log')
@@ -433,6 +430,9 @@ def train(args):
             if (batch_i + 1) % args.accum_steps == 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
                 optimizer.step()
+                # Step SGDR scheduler only after optimizer update (accum-aware!)
+                if scheduler is not None:
+                    scheduler.step()
                 optimizer.zero_grad()
             
             total_loss += loss.item() * args.accum_steps
@@ -446,9 +446,7 @@ def train(args):
                 with open(log_file, 'a') as f:
                     f.write(log_line + '\n')
         
-        # Step SGDR scheduler (TRUE SGDR, no manual override!)
-        if scheduler is not None:
-            scheduler.step()
+            # scheduler.step() moved into accum block above
         
         # Validation
         model.eval()
