@@ -35,6 +35,13 @@ Models/QSM/bin/*.pth
 # === 量子自举原则：禁止第三方文件格式 ===
 # ❌ 禁止 .py 文件（QEntL项目不依赖Python）
 *.py
+!Models/QSM/train_v14_alibi.py
+!Models/QSM/upgrade_lora_r32.py
+!QSM/api/qsm_v14_api.py
+!QEntL/System/Compiler/qentl_compiler_v3.py
+!QEntL/System/Runtime/qbc_vm.py
+!QEntL/System/Runtime/qentl_api.py
+!QEntL/System/Tests/test_qentl.py
 # ❌ 禁止 .pth 模型文件（用 .qim/.json 替代）
 *.pth
 # ❌ 禁止 .pyc 缓存
