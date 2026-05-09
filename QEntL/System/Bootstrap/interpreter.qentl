@@ -1,0 +1,113 @@
+# QEntL自举Phase2: 多语句解释器
+# 支持赋值+变量引用+四则运算+分号分隔多语句
+
+让 src = ""
+让 pos = 0
+让 vars = []
+
+跳空白: 函数() {
+    全局 pos
+    当(pos < 长度(src) 且 子串(src, pos, 1) == " ") { pos = pos + 1 }
+}
+
+读标识符: 函数() {
+    全局 pos
+    跳空白()
+    让 word = ""
+    当(pos < 长度(src) 且 是字母(子串(src, pos, 1))) {
+        word = word + 子串(src, pos, 1)
+        pos = pos + 1
+    }
+    返回 word
+}
+
+读数字: 函数() {
+    全局 pos
+    跳空白()
+    让 num = ""
+    当(pos < 长度(src) 且 是数字(子串(src, pos, 1))) {
+        num = num + 子串(src, pos, 1)
+        pos = pos + 1
+    }
+    返回 转整数(num)
+}
+
+读运算符: 函数() {
+    全局 pos
+    跳空白()
+    如果(pos >= 长度(src)) { 返回 "" }
+    让 ch = 子串(src, pos, 1)
+    如果(ch == "+" 或 ch == "-" 或 ch == "*" 或 ch == ">") {
+        pos = pos + 1
+        返回 ch
+    }
+    返回 ""
+}
+
+查变量: 函数(name) {
+    全局 vars
+    让 i = 0
+    当(i < 长度(vars)) {
+        如果(vars[i] == name) { 返回 vars[i + 1] }
+        i = i + 2
+    }
+    返回 0
+}
+
+存变量: 函数(name, val) {
+    全局 vars
+    让 i = 0
+    当(i < 长度(vars)) {
+        如果(vars[i] == name) { vars[i + 1] = val; 返回 0 }
+        i = i + 2
+    }
+    追加(vars, name)
+    追加(vars, val)
+    返回 0
+}
+
+解析值: 函数() {
+    全局 pos
+    跳空白()
+    如果(pos < 长度(src) 且 是数字(子串(src, pos, 1))) { 返回 读数字() }
+    让 name = 读标识符()
+    如果(长度(name) > 0) { 返回 查变量(name) }
+    返回 0
+}
+
+解析表达式: 函数() {
+    全局 pos
+    让 left = 解析值()
+    让 op = 读运算符()
+    如果(op == "") { 返回 left }
+    让 right = 解析值()
+    如果(op == "+") { 返回 left + right }
+    如果(op == "-") { 返回 left - right }
+    如果(op == "*") { 返回 left * right }
+    如果(op == ">") { 如果(left > right) { 返回 1 } 返回 0 }
+    返回 left
+}
+
+解析语句: 函数() {
+    全局 pos
+    跳空白()
+    让 kw = 读标识符()
+    跳空白()
+    pos = pos + 1  # skip =
+    让 val = 解析表达式()
+    存变量(kw, val)
+    返回 0
+}
+
+运行: 函数(s) {
+    全局 src; 全局 pos; 全局 vars
+    vars = []
+    src = s; pos = 0
+    当(pos < 长度(src)) {
+        解析语句()
+        跳空白()
+        如果(pos < 长度(src) 且 子串(src, pos, 1) == ";") { pos = pos + 1 }
+        跳空白()
+    }
+    返回 查变量("result")
+}
