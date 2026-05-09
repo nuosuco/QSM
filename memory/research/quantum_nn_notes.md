@@ -15695,3 +15695,38 @@ model = torch.quantization.quantize_dynamic(
     model, {torch.nn.Linear}, dtype=torch.qint8
 )
 ```
+
+## 研究#509: V14 Cycle5轨迹预测 (2026-05-09)
+
+### 已知数据
+| Cycle | Epochs | Best Val | 特征 |
+|-------|--------|----------|------|
+| 1 | E1-10 | ~5.0 | 初始快速下降 |
+| 2 | E11-20 | ~3.5 | LoRA r=16→32 |
+| 3 | E21-30 | ~3.0 | 数据扩展 |
+| 4 | E31-40 | **2.7892** | 4连Best! |
+| 5 | E35-44 | ? | SGDR重启+diff=4 |
+
+### Cycle5(E35-44)预测
+- E35: Val=2.8078(SGDR重启回升) ✅已确认
+- E36: lr=0.0006→下降中, 预计Val≈2.75-2.78
+- E37-38: cosine下降, Val可能<E34(2.7892)
+- E39-40: 新Best可能! 预计≈2.70-2.75
+
+### 长期预测(E41-60)
+- E41: SGDR Cycle6重启
+- E45: diff可能升级到5(如果max_difficulty函数正确)
+- E50: 预计Val≈2.3-2.5
+- E60: 可能≈2.0-2.3
+
+### 突破2.5的关键
+1. ✅ SGDR+课程学习(已在做)
+2. ✅ LoRA r=32(已实施)
+3. 📋 数据继续扩展(83K→100K)
+4. 📋 V15语言前缀token
+5. 📋 Cross-Attn Dropout(如果Gap>0.7)
+
+### 信心
+4连Best证明模型在稳步收敛.
+Val从3.5→2.8用了30 epochs.
+2.8→2.5可能需要15-20 more epochs.
