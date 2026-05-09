@@ -14293,3 +14293,36 @@ if 0 in set(self.functions.values()):
 ### 预期时间
 - 实现简化版: 1-2小时
 - 与Python版对比: 30分钟
+
+## 研究#472: V14 E31六重升级启动记录 (2026-05-09)
+
+### E30结果
+- Val=4.2036, **9连Best!** E11→E30: 4.99→4.20 (总降0.79)
+- Cycle3完美收官
+
+### E31六重升级内容
+1. **SGDR重启**: lr从0.000174→0.000300(cosine起点) ✅
+2. **diff=4数据**: 22K→82K samples(3.7倍!) ✅
+3. **LoRA r→32**: 96个矩阵16→32, 可训练参数13.2M ✅
+4. **accum=8**: 梯度累积8步, 等效batch=64, Loss波动降75% ✅
+5. **Label Smoothing ε=0.05**: 缓解overconfidence ✅
+6. **lr=0.0006**: SGDR max_lr=0.0006(2x而非linear scaling) ✅
+
+### 技术问题与修复
+- **optimizer shape mismatch**: LoRA r=16→32后optimizer state不匹配
+- 解决方案: fresh checkpoint(只含model_state+元数据, 不含optimizer_state)
+- 训练脚本: `if 'optimizer_state' in ckpt: optimizer.load_state_dict(...)`
+- **systemd日志缓冲**: PYTHONUNBUFFERED=1解决
+
+### E31训练状态
+- B800, L=2.5271, lr=0.0006, 20.9min
+- SGDR Cycle4: E31-E40, lr从0.0006 cosine→1e-6
+- 预测: Val暂时升高(diff=4新数据)→E32-35快速下降→E40≈3.6-3.8
+
+### QEntL自举Phase1突破!
+- 用QEntL写词法分析器: "x = 42 + y" → [ID:x, SYM:=, NUM:42, SYM:+, ID:y]
+- 5个辅助函数: 是字母/是数字/是空白/词法分析+主函数
+- 数组传参修复是关键前提!
+
+### 磁盘清理
+- 80%→77%, 删除旧V7/V13中间checkpoint(~600MB)
