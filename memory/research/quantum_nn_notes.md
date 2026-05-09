@@ -14997,3 +14997,52 @@ QBC指令: [LOAD_CONST 5, LOAD_CONST 3, ADD, STORE_VAR x, LOAD_VAR x, PRINT, HAL
 2. if: 条件跳转OP_JUMP_IF_FALSE+标签
 3. 表达式链: 递归编译表达式(已验证)
 4. 函数调用: OP_CALL+参数+返回地址
+
+## 研究#492: QEntL自举编译器if条件跳转设计 (2026-05-09)
+
+### 当前状态
+✅ 多赋值+链式表达式+print → x=5+3;y=x*2;print 16
+
+### if条件跳转需要的OpCode
+```
+OP_JUMP_IF_FALSE = 0x31  # 条件为0时跳转
+OP_JUMP = 0x30           # 无条件跳转
+OP_COMPARE_GT = 0x20
+OP_COMPARE_LT = 0x21
+OP_COMPARE_EQ = 0x22
+```
+
+### 编译"if x > 3 then y = 1"
+```
+LOAD_VAR x
+LOAD_CONST 3
+COMPARE_GT
+JUMP_IF_FALSE else_label
+LOAD_CONST 1
+STORE_VAR y
+else_label:
+  (继续下一条语句)
+```
+
+### 挑战: 标签/地址
+QEntL没有指针或代码地址! 解决方案:
+1. **绝对地址**: 在JUMP_IF_FALSE后填写目标pc值
+2. **需要两遍编译**: 第一遍生成代码, 记录跳转目标; 第二遍回填地址
+3. **或单遍+修补**: 先放占位符(0), 编译完if体后回填实际地址
+
+### 单遍+修补实现
+```
+# if cond then body
+编译条件()           # 生成比较指令
+追加(code, JUMP_IF_FALSE)
+让 patch_pos = 长度(code)
+追加(code, 0)        # 占位符
+编译body()
+code[patch_pos] = 长度(code)  # 回填跳转目标
+```
+
+### QEntL数组元素赋值
+`code[patch_pos] = val` 已支持! ✅(IndexAssign)
+
+### 下一步
+实现: "if x > 3 then y = 1; print y" → 条件跳转自举
