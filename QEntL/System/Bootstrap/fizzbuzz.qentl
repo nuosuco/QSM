@@ -1,0 +1,15 @@
+# FizzBuzz经典算法 — QEntL自举验证
+# 1-15: 3的倍数Fizz, 5的倍数Buzz, 15的倍数FizzBuzz
+
+主函数: 函数() {
+    让 i = 1
+    当(i <= 15) {
+        让 mod3 = i 取模 3
+        让 mod5 = i 取模 5
+        如果(mod3 == 0 且 mod5 == 0) { 打印("FizzBuzz") }
+        否则如果(mod3 == 0) { 打印("Fizz") }
+        否则如果(mod5 == 0) { 打印("Buzz") }
+        否则 { 打印(i) }
+        i = i + 1
+    }
+}

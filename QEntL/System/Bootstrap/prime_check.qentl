@@ -1,0 +1,13 @@
+# 素数判断算法 — QEntL自举验证
+# is_prime(17)=1, is_prime(15)=0
+
+主函数: 函数() {
+    让 n = 17
+    让 is_prime = 1
+    让 i = 2
+    当(i < n) {
+        如果(n 取模 i == 0) { is_prime = 0; i = n }
+        i = i + 1
+    }
+    打印(is_prime)
+}

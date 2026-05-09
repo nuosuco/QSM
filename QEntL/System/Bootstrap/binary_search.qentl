@@ -1,0 +1,26 @@
+# 二分查找算法 — QEntL自举验证
+# 在有序数组中查找目标值, 返回索引(-1=未找到)
+
+主函数: 函数() {
+    让 arr = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]
+    让 target = 7
+    让 left = 0
+    让 right = 9
+    让 found = -1
+    
+    当(left <= right) {
+        让 mid = (left + right) 整除 2
+        如果(arr[mid] == target) {
+            found = mid
+            left = right + 1
+        }
+        否则如果(arr[mid] < target) {
+            left = mid + 1
+        }
+        否则 {
+            right = mid - 1
+        }
+    }
+    
+    打印(found)
+}
