@@ -15609,3 +15609,43 @@ E36-40应该会再次创新Best.
 - Stage2: 1-2天
 - Stage3-4: 2-3天  
 - Stage5: 需要突破token类型识别
+
+## 研究#507: MoE轻量版设计 (2026-05-09)
+
+### Mixture of Experts (MoE) 原理
+- 多个FFN"专家", 每次只激活top-K个
+- 训练: 所有专家参数更新, 但每次只用K个
+- 推理: 只计算K个专家→速度接近小模型
+- 参数量大但计算量小!
+
+### V15 MoE轻量版
+- 4个专家, top-1路由(每次只用1个)
+- 每个专家: d_ff=1024 (与V14相同)
+- 总参数: 4x FFN参数 + 路由参数
+- 但每次推理只算1个FFN→速度不变!
+
+### 参数估算
+V14 FFN: d_model=256 → d_ff=1024 → 256K参数/层
+4专家: 4 * 256K = 1M参数/层
+4层: 4M额外参数
+路由: 256*4 = 1K/层 → 4K
+总增加: ~4M参数 (16.37M → ~20M)
+
+### 内存影响
+- 参数4M×4bytes = 16MB额外
+- 训练: 所有专家梯度→64MB额外
+- 当前训练5.5GB → 5.6GB ✅ 可行!
+
+### 路由设计
+```python
+class Top1Router:
+    def forward(self, x):
+        # x: [batch, seq, d_model]
+        logits = self.gate(x)  # [batch, seq, num_experts]
+        top1 = argmax(logits, dim=-1)
+        expert_output = experts[top1](x)
+        return expert_output
+```
+
+### 时机
+Val<2.5后考虑, 优先级低于语言前缀token
