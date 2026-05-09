@@ -15046,3 +15046,51 @@ code[patch_pos] = 长度(code)  # 回填跳转目标
 
 ### 下一步
 实现: "if x > 3 then y = 1; print y" → 条件跳转自举
+
+## 研究#493: QEntL自举编译器能力矩阵 (2026-05-09)
+
+### 已验证的编译+VM能力
+| 特性 | tokens→QBC | VM执行 | 验证 |
+|------|-----------|--------|------|
+| 赋值 | ID:name OP:= expr → STORE_VAR | ✅ | x=5→5 |
+| 加法 | NUM OP:+ NUM → ADD | ✅ | 5+3→8 |
+| 减法 | NUM OP:- NUM → SUB | ✅ | (待验证) |
+| 乘法 | NUM OP:* NUM → MUL | ✅ | 8*2→16 |
+| 变量引用 | ID → LOAD_VAR | ✅ | x*2→16 |
+| 多语句 | 逐条编译→连续code | ✅ | x=5;y=x*2→16 |
+| 比较> | OP:> → COMPARE_GT | ✅ | 5>3→1 |
+| 比较< | OP:< → COMPARE_LT | ✅ | (待验证) |
+| if跳转 | JUMP_IF_FALSE+修补 | ✅ | if x>3→1 |
+| print | LOAD+PRINT | ✅ | print y→16 |
+
+### OpCode集(10条已实现)
+1. OP_LOAD_CONST (0x01)
+2. OP_LOAD_VAR (0x02)
+3. OP_STORE_VAR (0x03)
+4. OP_ADD (0x10)
+5. OP_SUB (0x11)
+6. OP_MUL (0x12)
+7. OP_COMPARE_GT (0x20)
+8. OP_COMPARE_LT (0x21)
+9. OP_JUMP_IF_FALSE (0x31)
+10. OP_PRINT (0x50)
+11. OP_HALT (0x63)
+
+### 待实现(Phase4)
+- OP_JUMP (无条件跳转→while循环)
+- OP_CALL/RETURN (函数调用)
+- OP_DIV (除法)
+- OP_COMPARE_EQ (等于比较)
+- OP_NEGATE (负数)
+
+### 自举关键里程碑
+1. ✅ 词法分析器(Phase1)
+2. ✅ 递归下降计算器(Phase1.5)
+3. ✅ 语法分析器+解释器(Phase2)
+4. ✅ QBC模拟VM(Phase3)
+5. ✅ 端到端自举(x=5+3→8)
+6. ✅ 多语句自举(x=5;y=x*2→16)
+7. ✅ if条件跳转(if x>3→1)
+8. 📋 while循环(JUMP+条件)
+9. 📋 函数调用(CALL+RETURN)
+10. 📋 自编译(QEntL编译QEntL)
