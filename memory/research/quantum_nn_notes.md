@@ -15293,3 +15293,45 @@ V15(6层384d): 预估训练7GB
 3. d_model=384, n_layers=6, d_ff=1536
 4. 预估参数: ~35M(LoRA r=32 → 训练~2M)
 5. 训练内存: ~5GB ✅
+
+## 研究#499: Speculative Decoding推理加速 (2026-05-09)
+
+### 原理
+用小模型(draft)快速生成K个token, 大模型(target)一次验证
+- 小模型: 1步1token, 快但不太准
+- 大模型: 1步验证K个token, 慢但准
+- 平均接受率p: 每次验证接受p*K个token
+
+### 数学分析
+- 无SD: 1 token/大模型步
+- 有SD: E[接受数] = 1 + p + p² + ... + p^(K-1) = (1-p^K)/(1-p)
+- p=0.8, K=5: 1+0.8+0.64+0.512+0.41 = 3.36x加速
+- p=0.9, K=5: 1+0.9+0.81+0.73+0.66 = 4.10x加速
+
+### QSM应用
+- Draft模型: V7-Small(4.5M, 192d/3层) — 极快
+- Target模型: V14(16.4M, 256d/4层+LoRA) — 较慢
+- K=4: 每次draft生成4 token, target一次验证
+- 预估加速: ~2.5-3x (p≈0.7-0.8)
+
+### 实现方案
+```python
+def speculative_decode(draft, target, prompt, K=4):
+    draft_tokens = []
+    for _ in range(K):
+        t = draft.generate(prompt + draft_tokens)
+        draft_tokens.append(t)
+    # Target验证: 一次forward出K+1个logits
+    target_logits = target(prompt + draft_tokens)
+    accepted = 0
+    for i in range(K):
+        if accept_criterion(target_logits[i], draft_tokens[i]):
+            accepted += 1
+        else:
+            break
+    return draft_tokens[:accepted+1]  # +1来自target修正
+```
+
+### 优先级
+KV Cache(2-3x) > Speculative Decoding(2-4x) > INT8量化(2x)
+但SD与KV Cache可叠加! 理论上可达5-8x总加速
