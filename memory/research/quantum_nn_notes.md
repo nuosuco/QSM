@@ -14681,3 +14681,32 @@ E31完成后(Val<4.0), 开始V15设计
 4. **Phase3**: 代码生成器(AST→QBC)
 5. **Phase4**: 自编译(用QEntL编译QEntL)
 6. **Phase5**: C启动器+QVM原生运行
+
+## 研究#483: V14 API lora_r=32升级 + 形状不匹配修复 (2026-05-09)
+
+### 问题
+V14 API脚本qsm_v14_api.py中lora_r=16(硬编码), 但E31训练后best.pth的LoRA已升级到r=32
+→ 加载checkpoint时shape mismatch: [32,256] vs [16,256]
+
+### 修复
+`sed -i 's/lora_r=16/lora_r=32/' QSM/api/qsm_v14_api.py`
+
+### 经验教训
+1. **API脚本参数必须与训练checkpoint匹配!**
+2. **LoRA rank变更后所有组件必须同步更新:**
+   - 训练脚本 ✅ (systemd已更新)
+   - API脚本 ✅ (本次修复)
+   - upgrade脚本 ✅ (已独立)
+3. **建议**: API应从checkpoint自动读取lora_r, 而不是硬编码
+
+### V14 API当前状态
+- 端口: 8001
+- Epoch: 31, Val: 2.8813
+- LoRA r=32 ✅
+- 动态health/version端点 ✅
+- hard ban + rep_penalty=2.5 ✅
+- INT8量化 ✅
+
+### 未来改进
+API应实现: `ckpt = torch.load(path); lora_r = ckpt.get('lora_r', 16)`
+这样无论LoRA rank怎么变都能自动适配
