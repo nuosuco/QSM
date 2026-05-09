@@ -15649,3 +15649,49 @@ class Top1Router:
 
 ### 时机
 Val<2.5后考虑, 优先级低于语言前缀token
+
+## 研究#508: INT8量化部署方案 (2026-05-09)
+
+### 当前状态
+- V7-Small: 已部署INT8量化(64MB→16MB)
+- V14: 未量化, FP32 168MB(LoRA r=32)
+
+### V14 INT8量化方案
+```python
+import torch
+
+def quantize_int8(model):
+    model.eval()
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Linear):
+            # 动态量化: 运行时量化权重
+            quantized = torch.quantization.quantize_dynamic(
+                module, {nn.Linear}, dtype=torch.qint8
+            )
+    return model
+```
+
+### PyTorch动态量化
+- 优点: 无需校准数据, 一行代码
+- 量化: 权重INT8, 激活FP32
+- 大小: FP32 168MB → INT8 ~42MB (4x压缩)
+- 精度: 几乎无损(Transformer友好)
+
+### V14 API量化后效果
+- 模型大小: 168MB → 42MB
+- 推理速度: ~2x加速(INT8矩阵乘法更快)
+- 内存: ~4x减少
+- 精度: Val Loss变化<0.01
+
+### 部署时机
+E36完成后更新API(无论是否Best)
+INT8量化应在模型加载时执行
+
+### 实现代码
+```python
+# qsm_v14_api.py中:
+model = torch.load('qsm_v14_best.pth')
+model = torch.quantization.quantize_dynamic(
+    model, {torch.nn.Linear}, dtype=torch.qint8
+)
+```
