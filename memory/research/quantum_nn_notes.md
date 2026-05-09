@@ -14710,3 +14710,43 @@ V14 API脚本qsm_v14_api.py中lora_r=16(硬编码), 但E31训练后best.pth的Lo
 ### 未来改进
 API应实现: `ckpt = torch.load(path); lora_r = ckpt.get('lora_r', 16)`
 这样无论LoRA rank怎么变都能自动适配
+
+## 研究#484: QEntL自举完整路线图 (2026-05-09)
+
+### 当前完成状态
+| Phase | 组件 | 状态 | 说明 |
+|-------|------|------|------|
+| Phase1 | 词法分析器 | ✅ | lexer.qentl, ASCII tokens |
+| Phase1.5 | 递归下降计算器 | ✅ | calculator.qentl, 四则+括号 |
+| Phase2 | 语法分析器 | 📋 | 需解析赋值/函数/控制流→AST |
+| Phase3 | 代码生成器 | 📋 | AST→QBC字节码 |
+| Phase4 | 自编译 | 📋 | 用QEntL编译QEntL源码 |
+| Phase5 | C启动器 | 📋 | qvm_boot.c加载QBC内核 |
+
+### 新增基础设施
+- **转整数()**: str→int, 错误返回0
+- **转浮点()**: str→float, 错误返回0.0
+- 这两个函数让Phase2语法分析器可以直接解析数字token
+
+### Phase2实现方案
+1. 扩展词法分析器支持中文关键字
+2. 定义AST格式: 嵌套字典数组
+3. 实现语句解析: 赋值/函数定义/如果/当/返回
+4. 实现表达式解析: 已在Phase1.5验证!
+
+### Phase3代码生成器
+- AST遍历→QBC指令序列
+- 需要定义QBC指令的QEntL常量
+- 挑战: 如何在QEntL中生成二进制QBC文件?
+
+### Phase5 C启动器(qvm_boot.c)
+- 已有初始版本
+- 加载kernel.qbc到QVM
+- 启动后交出控制权
+- 唯一允许的外部依赖(C语言)
+
+### 预计时间
+- Phase2: 2-3天(语法分析器是最复杂的部分)
+- Phase3: 1-2天(代码生成相对直接)
+- Phase4: 1天(自编译验证)
+- Phase5: 已有初始版本, 需与QVM集成
