@@ -15335,3 +15335,64 @@ def speculative_decode(draft, target, prompt, K=4):
 ### 优先级
 KV Cache(2-3x) > Speculative Decoding(2-4x) > INT8量化(2x)
 但SD与KV Cache可叠加! 理论上可达5-8x总加速
+
+## 研究#500: 🔥500篇里程碑! KV Cache实现方案 (2026-05-09)
+
+### KV Cache原理
+Transformer自回归生成时, 每步计算attention需要K/V矩阵.
+KV Cache保存已计算的K/V, 避免重复计算:
+- 无Cache: 每步O(n²d) 全序列重算
+- 有Cache: 每步O(nd) 只算新token
+
+### 加速效果
+序列长度128: ~128x理论加速(实际3-5x,因内存开销)
+QSM V14 API beam=5: 3-5x加速
+
+### 实现方案
+```python
+class QSMWithKVCache:
+    def __init__(self, model):
+        self.model = model
+        self.k_cache = {}  # {layer_idx: [batch, heads, seq, d_k]}
+        self.v_cache = {}
+    
+    def generate_step(self, x, pos):
+        # 1. Embedding + ALiBi
+        h = self.model.embed(x)
+        # 2. Transformer layers
+        for i, layer in enumerate(self.model.layers):
+            # Self-Attn with cache
+            q = layer.q_proj(h[:, -1:])  # 只算最后一个token
+            k_new = layer.k_proj(h[:, -1:])
+            v_new = layer.v_proj(h[:, -1:])
+            # 拼接cache
+            k = cat([self.k_cache[i], k_new], dim=2)
+            v = cat([self.v_cache[i], v_new], dim=2)
+            self.k_cache[i] = k
+            self.v_cache[i] = v
+            # Attention
+            attn = softmax(q @ k.transpose() / sqrt(d_k) + alibi_bias)
+            h = attn @ v + layer.ff(h)
+        # 3. Output
+        return self.model.lm_head(h[:, -1])
+```
+
+### 内存开销估算(V14)
+- 4层, 4头, d_k=64, batch=1, max_seq=128
+- 每层K+V: 2 * 1 * 4 * 128 * 64 * 4bytes = 256KB
+- 4层总计: 1MB (极小!)
+- FP16: 512KB
+
+### 与Speculative Decoding叠加
+1. KV Cache: 3-5x (单步加速)
+2. Speculative Decoding: 2-4x (减少步数)
+3. 总加速: 6-20x (理论)
+实际预估: 5-8x (考虑overhead)
+
+### 🔥500篇研究回顾
+#1: QSM初始架构 (2026-04-20)
+#100: V5训练完成 (2026-04-25)
+#200: V7-Small部署 (2026-04-28)
+#300: QEntL for循环 (2026-05-01)
+#400: V14 Cycle1 (2026-05-06)
+#500: KV Cache+14算法自举! (2026-05-09) 🔥
