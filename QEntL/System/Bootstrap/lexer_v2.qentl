@@ -1,0 +1,52 @@
+# 词法分析器V2 — QEntL自举编译器核心
+# 支持: ID/NUM/OP(+-*=<>) LP/RP
+# 输入: 源码字符串 → 输出: token扁平数组
+
+主函数: 函数() {
+    让 src = "y=x+3"
+    让 tokens = []
+    让 pos = 0
+    让 len = 长度(src)
+    
+    当(pos < len) {
+        让 ch = 子串(src, pos, 1)
+        当(pos < len 且 ch == " ") {
+            pos = pos + 1
+            如果(pos < len) { ch = 子串(src, pos, 1) }
+        }
+        如果(pos >= len) { 返回 0 }
+        ch = 子串(src, pos, 1)
+        
+        如果(ch == "+") { 追加(tokens, "OP"); 追加(tokens, "+"); pos = pos + 1 }
+        否则如果(ch == "-") { 追加(tokens, "OP"); 追加(tokens, "-"); pos = pos + 1 }
+        否则如果(ch == "*") { 追加(tokens, "OP"); 追加(tokens, "*"); pos = pos + 1 }
+        否则如果(ch == "=") { 追加(tokens, "OP"); 追加(tokens, "="); pos = pos + 1 }
+        否则如果(ch == ">") { 追加(tokens, "OP"); 追加(tokens, ">"); pos = pos + 1 }
+        否则如果(ch == "<") { 追加(tokens, "OP"); 追加(tokens, "<"); pos = pos + 1 }
+        否则如果(ch == "(") { 追加(tokens, "LP"); 追加(tokens, "("); pos = pos + 1 }
+        否则如果(ch == ")") { 追加(tokens, "RP"); 追加(tokens, ")"); pos = pos + 1 }
+        否则如果(ch >= "0" 且 ch <= "9") {
+            让 num = ""; 让 done = 0
+            当(pos < len 且 done == 0) {
+                ch = 子串(src, pos, 1)
+                如果(ch >= "0" 且 ch <= "9") { num = num + ch; pos = pos + 1 }
+                否则 { done = 1 }
+            }
+            追加(tokens, "NUM"); 追加(tokens, num)
+        }
+        否则 {
+            让 id = ""; 让 done = 0
+            当(pos < len 且 done == 0) {
+                ch = 子串(src, pos, 1)
+                如果(ch != " " 且 ch != "+" 且 ch != "-" 且 ch != "*" 且 ch != "=" 且 ch != ">" 且 ch != "<" 且 ch != "(" 且 ch != ")") {
+                    id = id + ch; pos = pos + 1
+                }
+                否则 { done = 1 }
+            }
+            追加(tokens, "ID"); 追加(tokens, id)
+        }
+    }
+    
+    让 i = 0
+    当(i < 长度(tokens)) { 打印(tokens[i]); i = i + 1 }
+}
