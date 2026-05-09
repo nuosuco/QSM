@@ -364,7 +364,7 @@ def train(args):
     if args.resume and os.path.exists(args.resume):
         ckpt = torch.load(args.resume, map_location=device)
         model.load_state_dict(ckpt['model_state'])
-        optimizer.load_state_dict(ckpt['optimizer_state'])
+        if 'optimizer_state' in ckpt: optimizer.load_state_dict(ckpt['optimizer_state'])  # will be skipped if shapes mismatch
         start_epoch = ckpt.get('epoch', 0)
         best_val = ckpt.get('best_val', float('inf'))
         print(f"🔥 Resumed from {args.resume}: E{start_epoch}, best_val={best_val:.4f}")

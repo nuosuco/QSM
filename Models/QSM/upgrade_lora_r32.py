@@ -8,7 +8,7 @@ import sys
 def upgrade_lora_checkpoint(input_path, output_path, old_r=16, new_r=32):
     """升级LoRA checkpoint的rank"""
     ckpt = torch.load(input_path, map_location='cpu')
-    state = ckpt['model_state_dict']
+    state = ckpt['model_state']
     
     upgraded = {}
     upgraded_count = 0
@@ -36,7 +36,7 @@ def upgrade_lora_checkpoint(input_path, output_path, old_r=16, new_r=32):
         else:
             upgraded[key] = tensor
     
-    ckpt['model_state_dict'] = upgraded
+    ckpt['model_state'] = upgraded
     ckpt['lora_r'] = new_r
     torch.save(ckpt, output_path)
     print(f"\n✅ 升级完成! {upgraded_count}个LoRA矩阵 r={old_r}→{new_r}")
