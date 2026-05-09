@@ -1039,6 +1039,18 @@ class QBCVirtualMachine:
                     self.stack.append(chr(int(n)))
                 else:
                     self.stack.append('')
+            elif func_name == '转整数':
+                s = str(self.stack.pop())
+                try:
+                    self.stack.append(int(s))
+                except (ValueError, TypeError):
+                    self.stack.append(0)
+            elif func_name == '转浮点':
+                s = str(self.stack.pop())
+                try:
+                    self.stack.append(float(s))
+                except (ValueError, TypeError):
+                    self.stack.append(0.0)
             elif func_name == '字符位置':
                 if len(self.stack) >= 2:
                     substr = str(self.stack.pop())
