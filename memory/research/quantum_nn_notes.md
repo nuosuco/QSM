@@ -14500,3 +14500,36 @@ E31完成后(Val<4.0), 开始V15设计
 - E40 Val vs E30 Val(4.20): 如果<4.0=成功
 - Gap(Train-Val): 如果Gap缩小=过拟合减轻
 - E31-35下降速率: 如果比E22-30快=LoRA升级有效
+
+## 研究#478: V14 E31进度估算 + accum=8效率 (2026-05-09)
+
+### E31训练统计
+- 81905 samples, batch=8, accum=8
+- 有效batch_size = 8×8 = 64
+- Steps/epoch = 81905/64 ≈ 1280
+- 当前B6800, 但注意: B计数是micro-batch不是optimizer step!
+- micro-batches = B6800 × batch_size(8) = 实际处理了54400样本
+- 实际optimizer steps = 6800/8 = 850 steps
+- 850/1280 = 66%完成
+
+### 时间估算
+- 181min已用, 66%完成
+- 预计E31总时间 ≈ 181/0.66 ≈ 274min ≈ 4.5h
+- 比Cycle3(3.3h/epoch)更长, 原因:
+  1. accum=8: 每step要8次forward+backward
+  2. 数据量82K vs 71K: +15%样本
+  3. diff=4数据更长: 更多tokens/样本
+
+### 对比Cycle3
+| 指标 | Cycle3(E21-30) | Cycle4(E31) |
+|------|---------------|-------------|
+| 数据量 | 71K | 82K |
+| accum | 4 | 8 |
+| batch/step | 32 | 64 |
+| steps/epoch | ~2200 | ~1280 |
+| time/epoch | 3.3h | ~4.5h(估) |
+| lr_max | 0.0003 | 0.0006 |
+
+### Loss趋势
+- B200: 4.11 → B6800: 2.34
+- 下降曲线正常, 无异常
