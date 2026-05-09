@@ -15169,3 +15169,46 @@ OP_POP_ARG = 0x43   # 弹出参数
 
 ### 时机
 while/if已验证→函数调用是Phase4的核心目标
+
+## 研究#496: 递归函数调用设计 (2026-05-09)
+
+### 当前函数调用能力
+- ✅ 单参数函数: double(5)=10
+- OP_CALL: 保存ret_pc, 弹出参数→func_x, 跳转
+- OP_RETURN: pc=ret_pc, 返回值在栈顶
+- OP_LOAD_PARAM: push func_x到栈
+
+### 递归需要的扩展
+1. **多返回地址**: call_stack[]替代单一ret_pc
+2. **多参数帧**: 每次调用独立的func_x
+3. **栈式调用**: LIFO, 后进先出
+
+### Fibonacci递归: fib(n) = fib(n-1) + fib(n-2)
+```
+CALL fib(n):
+  call_stack.push(ret_pc)
+  param_stack.push(func_x)  # 保存当前参数
+  func_x = pop()  # 新参数n
+  ret_pc = ...
+  pc = fib_addr
+  
+RETURN:
+  result = pop()
+  pc = call_stack.pop()
+  func_x = param_stack.pop()  # 恢复参数
+  push(result)
+```
+
+### 挑战
+QEntL没有结构体/类! 只能用扁平数组模拟:
+- call_stack = [ret1, ret2, ...]
+- param_stack = [x1, x2, ...]
+- 手动追加/弹出
+
+### 更实际的方案: 先实现多参数
+add(a, b) = a + b 需要两个参数:
+- OP_CALL: 弹出b, 弹出a → func_a=a, func_b=b
+- OP_LOAD_PARAM_A(67), OP_LOAD_PARAM_B(68)
+
+### 优先级
+1. 多参数函数 → 2. 递归 → 3. 自编译
