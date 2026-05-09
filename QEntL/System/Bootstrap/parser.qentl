@@ -1,12 +1,18 @@
-# QEntL自举Phase2: 简化语法分析器
-# 解析赋值语句: "x = 表达式"
-# 支持四则运算(无优先级, 左到右)
+# QEntL自举Phase2: 语法分析器
+# 解析赋值语句 + if条件语句 → AST数组
+# 修复: 读数字/读标识符前必须跳空白!
 
 让 src = ""
 让 pos = 0
 
+跳空白: 函数() {
+    全局 pos
+    当(pos < 长度(src) 且 子串(src, pos, 1) == " ") { pos = pos + 1 }
+}
+
 读标识符: 函数() {
     全局 pos
+    跳空白()
     让 word = ""
     当(pos < 长度(src) 且 是字母(子串(src, pos, 1))) {
         word = word + 子串(src, pos, 1)
@@ -17,6 +23,7 @@
 
 读数字: 函数() {
     全局 pos
+    跳空白()
     让 num = ""
     当(pos < 长度(src) 且 是数字(子串(src, pos, 1))) {
         num = num + 子串(src, pos, 1)
@@ -25,34 +32,64 @@
     返回 转整数(num)
 }
 
-跳空白: 函数() {
+读运算符: 函数() {
     全局 pos
-    当(pos < 长度(src) 且 子串(src, pos, 1) == " ") { pos = pos + 1 }
+    跳空白()
+    如果(pos >= 长度(src)) { 返回 "" }
+    让 ch = 子串(src, pos, 1)
+    如果(ch == "+" 或 ch == "-" 或 ch == "*" 或 ch == "/" 或 ch == ">" 或 ch == "<") {
+        pos = pos + 1
+        返回 ch
+    }
+    返回 ""
 }
 
 解析表达式: 函数() {
     全局 pos
-    让 val = 读数字()
-    跳空白()
-    当(pos < 长度(src)) {
-        让 ch = 子串(src, pos, 1)
-        如果(ch == "+") { pos = pos + 1; 跳空白(); val = val + 读数字() }
-        否则如果(ch == "-") { pos = pos + 1; 跳空白(); val = val - 读数字() }
-        否则如果(ch == "*") { pos = pos + 1; 跳空白(); val = val * 读数字() }
-        否则如果(ch == "/") { pos = pos + 1; 跳空白(); val = val 整除 读数字() }
-        否则 { 返回 val }
-        跳空白()
-    }
-    返回 val
+    让 left = 读数字()
+    让 op = 读运算符()
+    如果(op == "") { 返回 left }
+    让 right = 读数字()
+    如果(op == "+") { 返回 left + right }
+    如果(op == "-") { 返回 left - right }
+    如果(op == "*") { 返回 left * right }
+    如果(op == ">") { 如果(left > right) { 返回 1 } 返回 0 }
+    如果(op == "<") { 如果(left < right) { 返回 1 } 返回 0 }
+    返回 left
 }
 
-解析语句: 函数(s) {
+解析语句: 函数() {
+    全局 pos
+    跳空白()
+    让 kw = 读标识符()
+    
+    如果(kw == "if") {
+        让 cond = 解析表达式()
+        读标识符()  # skip then
+        让 var = 读标识符()
+        跳空白()
+        pos = pos + 1  # skip =
+        让 val = 解析表达式()
+        让 ast = []
+        追加(ast, "if")
+        追加(ast, cond)
+        追加(ast, var)
+        追加(ast, val)
+        返回 ast
+    }
+    
+    跳空白()
+    pos = pos + 1  # skip =
+    让 val = 解析表达式()
+    让 ast = []
+    追加(ast, "assign")
+    追加(ast, kw)
+    追加(ast, val)
+    返回 ast
+}
+
+解析: 函数(s) {
     全局 src; 全局 pos
     src = s; pos = 0
-    让 name = 读标识符()
-    跳空白()
-    pos = pos + 1  # 跳过 =
-    跳空白()
-    让 value = 解析表达式()
-    返回 name + "=" + 格式("{}", value)
+    返回 解析语句()
 }
