@@ -15419,3 +15419,43 @@ class QSMWithKVCache:
 - E40: 预计≈2.3-2.5
 
 ### API已更新E34 val=2.7892
+
+## 研究#502: V15语言前缀token详细设计 (2026-05-09)
+
+### 问题
+V14模型不知道应该输出什么语言→混合输出
+
+### 方案: 输入前缀token
+```
+[ZH] 你好 → 你好
+[EN] hello → hello  
+[YI] 彝文 → 彝文
+```
+
+### SPM词汇表扩展
+- V14 SPM 16K: 4166彝文user_symbols
+- V15 SPM 20K: 增加3个前缀token + 更多彝文(→7000)
+
+### 前缀token实现
+```python
+# 在SPM训练前, 保留3个special token
+special_tokens = ["[ZH]", "[EN]", "[YI]"]
+
+# 训练数据格式
+# zh→en: "[EN] 中文句子" → "english sentence"
+# en→zh: "[ZH] english sentence" → "中文句子"
+# zh→yi: "[YI] 中文句子" → "彝文句子"
+```
+
+### 代码修改(train_v15.py)
+1. Dataset.__getitem__: 在input前加prefix token
+2. SPM: 添加[ZH]/[EN]/[YI]到special tokens
+3. 推理API: 根据目标语言加对应前缀
+
+### 预期效果
+- 解决语言混淆问题
+- Val Loss可能下降0.1-0.2(更确定性)
+- 支持三语互译9种方向
+
+### 时机
+V14 Val<2.5后启动V15训练
