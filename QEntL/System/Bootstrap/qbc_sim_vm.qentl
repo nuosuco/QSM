@@ -1,0 +1,57 @@
+# QEntL自举Phase3: QBC模拟虚拟机
+# 用QEntL数组存储指令, 模拟栈式VM执行
+# 支持: LOAD_CONST/LOAD_VAR/STORE_VAR/ADD/SUB/MUL/PRINT/HALT
+
+让 stack = []
+让 vars = []
+让 pc = 0
+让 code = []
+
+让 OP_LOAD_CONST = 1
+让 OP_LOAD_VAR = 2
+让 OP_STORE_VAR = 3
+让 OP_ADD = 16
+让 OP_SUB = 17
+让 OP_MUL = 18
+让 OP_PRINT = 80
+让 OP_HALT = 99
+
+弹出值: 函数() {
+    全局 stack
+    让 val = stack[长度(stack) - 1]
+    让 new_stack = []
+    让 i = 0
+    当(i < 长度(stack) - 1) {
+        追加(new_stack, stack[i])
+        i = i + 1
+    }
+    stack = new_stack
+    返回 val
+}
+
+执行: 函数() {
+    全局 stack; 全局 vars; 全局 pc; 全局 code
+    pc = 0
+    当(pc < 长度(code)) {
+        让 op = code[pc]
+        pc = pc + 1
+        
+        如果(op == OP_LOAD_CONST) { 追加(stack, code[pc]); pc = pc + 1 }
+        否则如果(op == OP_LOAD_VAR) {
+            让 name = code[pc]; 让 i = 0; 让 val = 0
+            当(i < 长度(vars)) { 如果(vars[i] == name) { val = vars[i + 1] }; i = i + 2 }
+            追加(stack, val); pc = pc + 1
+        }
+        否则如果(op == OP_STORE_VAR) {
+            让 name = code[pc]; 让 val = 弹出值(); 让 i = 0; 让 found = 0
+            当(i < 长度(vars)) { 如果(vars[i] == name) { vars[i + 1] = val; found = 1 }; i = i + 2 }
+            如果(found == 0) { 追加(vars, name); 追加(vars, val) }; pc = pc + 1
+        }
+        否则如果(op == OP_ADD) { 让 b = 弹出值(); 让 a = 弹出值(); 追加(stack, a + b) }
+        否则如果(op == OP_SUB) { 让 b = 弹出值(); 让 a = 弹出值(); 追加(stack, a - b) }
+        否则如果(op == OP_MUL) { 让 b = 弹出值(); 让 a = 弹出值(); 追加(stack, a * b) }
+        否则如果(op == OP_PRINT) { 打印(弹出值()) }
+        否则如果(op == OP_HALT) { 返回 0 }
+    }
+    返回 0
+}

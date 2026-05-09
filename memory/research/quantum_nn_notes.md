@@ -14883,3 +14883,44 @@ V14模型在多语言数据中, 同一语义的中/英/彝表达相互干扰.
 
 ### 时机
 V14 Val<2.0后启动V15, 预计E40左右
+
+## 研究#489: QEntL自举Phase3代码生成器设计 (2026-05-09)
+
+### 目标
+用QEntL写的代码生成器, 接受AST数组, 输出QBC字节码
+
+### QBC指令集(48条OpCode)
+```
+LOAD_CONST=0x01 LOAD_VAR=0x02 STORE_VAR=0x03
+BINARY_ADD=0x10 BINARY_SUB=0x11 BINARY_MUL=0x12
+BINARY_DIV=0x13 FLOOR_DIV=0x26 MOD=0x27
+COMPARE_GT=0x20 COMPARE_LT=0x21 COMPARE_EQ=0x22
+JUMP=0x30 JUMP_IF_FALSE=0x31
+CALL=0x40 RETURN=0x41
+PRINT=0x50 BUILTIN_CALL=0x60
+```
+
+### 代码生成策略
+AST→QBC的关键映射:
+```
+[assign, x, 5]     → LOAD_CONST 5; STORE_VAR "x"
+[assign, y, x+3]   → LOAD_VAR "x"; LOAD_CONST 3; BINARY_ADD; STORE_VAR "y"
+[if, cond, var, val]→ LOAD_VAR/CONST cond; COMPARE; JUMP_IF_FALSE else; 
+                       LOAD_CONST val; STORE_VAR var; else:
+```
+
+### 挑战
+1. QBC是数字编码, QEntL只能生成字符串→需用字符代码()或查表
+2. 变量名→字符串引用(不能真正编译, 只能模拟)
+3. 真正的QBC是二进制文件, QEntL无法直接写入
+
+### 可行方案
+Phase3先做"QBC模拟器": 用QEntL数组存储指令序列
+每个指令=[opcode, operand1, operand2]
+然后用模拟的VM执行这个数组
+
+### 这就是完整的自举链!
+QEntL源码 → QEntL词法分析器 → tokens
+→ QEntL语法分析器 → AST
+→ QEntL代码生成器 → 指令数组
+→ QEntL模拟VM → 执行结果
