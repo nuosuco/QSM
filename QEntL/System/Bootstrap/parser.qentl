@@ -1,0 +1,58 @@
+# QEntL自举Phase2: 简化语法分析器
+# 解析赋值语句: "x = 表达式"
+# 支持四则运算(无优先级, 左到右)
+
+让 src = ""
+让 pos = 0
+
+读标识符: 函数() {
+    全局 pos
+    让 word = ""
+    当(pos < 长度(src) 且 是字母(子串(src, pos, 1))) {
+        word = word + 子串(src, pos, 1)
+        pos = pos + 1
+    }
+    返回 word
+}
+
+读数字: 函数() {
+    全局 pos
+    让 num = ""
+    当(pos < 长度(src) 且 是数字(子串(src, pos, 1))) {
+        num = num + 子串(src, pos, 1)
+        pos = pos + 1
+    }
+    返回 转整数(num)
+}
+
+跳空白: 函数() {
+    全局 pos
+    当(pos < 长度(src) 且 子串(src, pos, 1) == " ") { pos = pos + 1 }
+}
+
+解析表达式: 函数() {
+    全局 pos
+    让 val = 读数字()
+    跳空白()
+    当(pos < 长度(src)) {
+        让 ch = 子串(src, pos, 1)
+        如果(ch == "+") { pos = pos + 1; 跳空白(); val = val + 读数字() }
+        否则如果(ch == "-") { pos = pos + 1; 跳空白(); val = val - 读数字() }
+        否则如果(ch == "*") { pos = pos + 1; 跳空白(); val = val * 读数字() }
+        否则如果(ch == "/") { pos = pos + 1; 跳空白(); val = val 整除 读数字() }
+        否则 { 返回 val }
+        跳空白()
+    }
+    返回 val
+}
+
+解析语句: 函数(s) {
+    全局 src; 全局 pos
+    src = s; pos = 0
+    让 name = 读标识符()
+    跳空白()
+    pos = pos + 1  # 跳过 =
+    跳空白()
+    让 value = 解析表达式()
+    返回 name + "=" + 格式("{}", value)
+}
