@@ -15122,3 +15122,50 @@ Val下降趋缓说明模型正在接近当前架构+数据的瓶颈.
 1. 更多数据(当前82K→100K+)
 2. V15语言前缀token
 3. 更大模型(但受7.4GB内存限制)
+
+## 研究#495: QEntL自举函数调用设计 (2026-05-09)
+
+### 当前能力
+✅ 赋值+算术+比较+if+while+print+多语句
+✅ 1+2+...+100=5050 (真正有意义的程序!)
+
+### 函数调用需要的OpCode
+```
+OP_CALL = 0x40      # 调用函数
+OP_RETURN = 0x41    # 返回
+OP_PUSH_ARG = 0x42  # 压入参数
+OP_POP_ARG = 0x43   # 弹出参数
+```
+
+### 编译"def add(a, b) { return a + b }"
+```
+# 函数体存储在code末尾
+# add入口: pc=XX
+  LOAD_VAR a
+  LOAD_VAR b
+  ADD
+  RETURN
+  
+# 调用: add(3, 5)
+  PUSH_ARG 3
+  PUSH_ARG 5
+  CALL XX        # 跳到函数入口
+  STORE_VAR result  # 返回值在栈顶
+```
+
+### 挑战
+1. **变量作用域**: 函数参数a/b vs 全局变量
+   - 方案: 函数调用时保存全局vars, 创建局部vars
+   - 返回时恢复全局vars
+2. **返回地址**: CALL需要记录返回位置
+   - 方案: 用call_stack数组保存返回地址
+3. **参数传递**: 按顺序压入参数栈
+   - 方案: args_stack, 函数入口pop参数到局部vars
+
+### 实现计划
+1. 先实现无参数函数(def f() { ... })
+2. 再添加参数(def f(a,b) { ... })
+3. 最后添加返回值(return expr)
+
+### 时机
+while/if已验证→函数调用是Phase4的核心目标
