@@ -15248,3 +15248,48 @@ V14在7.4GB内存下已接近极限:
 V15可能需要:
 - 梯度检查点(训练慢2x但省40%内存)
 - 或租用更大服务器(8-16GB)
+
+## 研究#498: Gradient Checkpointing内存优化 (2026-05-09)
+
+### 问题
+V14训练峰值~5.5GB/7.4GB, V15需更大模型(d=384/6层)但内存不够
+
+### Gradient Checkpointing原理
+正常反向传播: 保存每层激活值→内存O(n)
+Checkpoint: 只保存部分层→重算其余→内存O(√n)
+
+### 实现方式(PyTorch)
+```python
+from torch.utils.checkpoint import checkpoint
+
+# 正常:
+x = self.layer1(x)
+x = self.layer2(x)
+
+# Checkpoint:
+x = checkpoint(self.layer1, x)
+x = checkpoint(self.layer2, x)
+```
+
+### 内存节省估算
+V14(4层256d): 训练5.5GB
+- 4层激活: ~1.5GB
+- Checkpoint每2层: 节省~0.75GB
+- 总训练: 5.5-0.75=4.75GB
+
+V15(6层384d): 预估训练7GB
+- 6层激活: ~3GB
+- Checkpoint每3层: 节省~2GB
+- 总训练: 7-2=5GB ✅ 可行!
+
+### 代价
+- 训练速度慢~30%(重算额外一遍)
+- V14 228m/epoch → ~300m/epoch
+- 但可以在7.4GB服务器上训练384d模型!
+
+### V15实施计划
+1. 在train_v15中添加gradient_checkpointing
+2. 每2层设一个checkpoint
+3. d_model=384, n_layers=6, d_ff=1536
+4. 预估参数: ~35M(LoRA r=32 → 训练~2M)
+5. 训练内存: ~5GB ✅
