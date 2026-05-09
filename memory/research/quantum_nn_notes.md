@@ -15459,3 +15459,41 @@ special_tokens = ["[ZH]", "[EN]", "[YI]"]
 
 ### 时机
 V14 Val<2.5后启动V15训练
+
+## 研究#503: ALiBi外推能力验证 (2026-05-09)
+
+### ALiBi原理回顾
+- 训练时: seq_len=128, 相对位置偏置m*h/(2^i)
+- 推理时: 可以外推到更长序列(理论上无限)
+- 不需要修改位置编码
+
+### 外推测试方案
+1. 训练: max_len=128
+2. 推理: 逐步增加输入长度→256→512→1024
+3. 监控: Perplexity是否保持稳定
+
+### 关键问题
+ALiBi外推时, m斜率不变但相对距离增加→
+- 短距离attention更focused
+- 长距离attention更分散
+- 可能导致长文本遗忘
+
+### V14 API测试计划
+```python
+# 测试不同长度输入的翻译质量
+for length in [32, 64, 128, 256]:
+    prompt = generate_test_input(length)
+    result = translate(prompt)
+    ppl = compute_perplexity(result)
+    print(f"len={length}, ppl={ppl}")
+```
+
+### 预期
+- 128以内: 正常(ALiBi训练范围)
+- 128-256: 轻微退化但可用
+- 256-512: 明显退化但非完全崩溃
+- 512+: 可能严重退化
+
+### 对QSM的影响
+彝文输入通常较短(单句<50 tokens), ALiBi外推不是瓶颈.
+段落级翻译(128-256)可能受益于外推能力.
