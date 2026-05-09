@@ -46,7 +46,7 @@ def load_model():
         d_ff=d_ff,
         max_len=max_len,
         dropout=0.0,
-        lora_r=16
+        lora_r=32
     )
     
     state = ckpt['model_state']
