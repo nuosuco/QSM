@@ -17453,3 +17453,53 @@ wait = 0  # 从warmup结束开始计数
   - diff=2: 10K (对话/短语)
   - diff=1: 10K (词汇扩展)
   - 彝文: 15K+ (重点!)
+
+## 研究#556: V15语言前缀Token训练流程 (2026-05-10)
+
+### 当前问题
+V14不知道翻译方向: 输入"你好"→应该输出"hello"还是彝文?
+模型无法区分目标语言!
+
+### 解决方案: 语言前缀Token
+在decoder输入的开头添加语言标识:
+```
+输入: 你好  →  解码器: [EN] hello
+输入: 你好  →  解码器: [YI] 彝文你好
+输入: hello →  解码器: [ZH] 你好
+```
+
+### 训练数据格式
+```json
+{
+    "input": "你好",
+    "output": "[EN] hello",
+    "target_lang": "en"
+}
+```
+
+### SPM处理
+1. [ZH]/[EN]/[YI]作为user_defined_symbols加入SPM
+2. tokenize时这些token保持完整
+3. decoder输入以语言token开头
+
+### 模型输入输出
+```
+encoder_input: 你好 → [你, 好]
+decoder_input: [EN], <s> → 自回归生成
+decoder_output: [EN], hello, </s>
+```
+
+### 推理API
+```
+POST /api/v15/translate
+{
+    "text": "你好",
+    "target_lang": "en"  → 添加[EN]前缀
+}
+```
+
+### 预期收益
+1. 消除翻译方向歧义
+2. 减少语言混杂输出
+3. 支持三语互译(9个方向)
+4. 更好地控制输出语言
