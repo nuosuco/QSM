@@ -16562,3 +16562,79 @@ E39的lr比E38低很多(0.000208→0.000016)
 - 消除翻译方向歧义(当前模型不知道要翻译成什么语言)
 - 提升多语言一致性
 - 减少语言混杂输出
+
+## 研究#533: V14过拟合确认! (2026-05-10)
+
+### 最终数据
+| Epoch | Train | Val | Gap |
+|-------|-------|-----|-----|
+| E34 | 2.45 | **2.7892** | 0.34 | ← BEST
+| E35 | 2.33 | 2.8078 | 0.48 |
+| E36 | 2.25 | 2.8293 | 0.58 |
+| E37 | 2.17 | 2.8472 | 0.68 |
+| E38 | 2.11 | 2.8689 | 0.76 |
+| E39 | 2.05 | 2.8870 | 0.84 |
+
+### 结论
+1. **Val连续5个epoch上升** (2.79→2.89)
+2. **Gap持续扩大** (0.34→0.84)
+3. **过拟合确认!**
+
+### 行动决策
+- ✅ E34 = V14最终Best (Val=2.7892)
+- ✅ V14继续训练到E50(观察), 但不期待新Best
+- ✅ API保持E34模型
+- ✅ 开始V15准备工作
+
+### V14总结
+- 总训练: 39/100 epochs
+- Best: E34 Val=2.7892
+- 从E1(4.99)到E34(2.79): -44% ✅
+- 过拟合原因: LoRA r=32参数多 + 数据重复
+
+## 研究#534: V15训练脚本核心改进 (2026-05-10)
+
+### V14→V15 变更清单
+
+#### 1. 学习率调度: SGDR → Warmup+Cosine
+```python
+def get_lr(step, warmup_steps=1000, max_lr=0.0006, min_lr=0.00001, total_steps=50000):
+    if step < warmup_steps:
+        return max_lr * step / warmup_steps
+    progress = (step - warmup_steps) / (total_steps - warmup_steps)
+    return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
+```
+优点: 平滑下降, 无SGDR重启导致的Val回升
+
+#### 2. Cross-Attention Dropout
+```python
+self.cross_attn_dropout = nn.Dropout(0.15)
+# 在cross_attn输出后应用
+x = self.cross_attn_dropout(x)
+```
+
+#### 3. Weight Decay
+```python
+optimizer = AdamW(model.parameters(), lr=0.0006, weight_decay=0.01)
+```
+
+#### 4. LoRA r=16 (从32降低)
+可训练参数: 1.6M → 0.8M
+减少过拟合风险
+
+#### 5. Label Smoothing ε=0.1 (从0.05增加)
+更强的正则化效果
+
+#### 6. 语言前缀Token [ZH]/[EN]/[YI]
+SPM 20K包含这3个特殊token
+
+#### 7. Early Stopping patience=10
+连续10个epoch无新Best → 停止训练
+
+#### 8. 数据: 100K+条
+减少数据重复, 增加diversity
+
+### V15预期
+- 过拟合大幅减少(Gap<0.5)
+- Val<2.5 可能在E20-30达到
+- 最终Val目标: <2.0
