@@ -16870,3 +16870,46 @@ def get_lr(step, warmup_steps=2000, max_lr=0.0006, min_lr=0.00001, total_steps=8
 2. Cosine decay to min_lr
 3. Early Stopping patience=10
 4. 不使用LR restart
+
+## 研究#541: V15 Early Stopping实现 (2026-05-10)
+
+### V14过拟合教训
+- E34 Best后, E35-40连续6epoch Val上升
+- 浪费了6×4h=24h算力
+- 需要自动检测并停止
+
+### Early Stopping算法
+```python
+patience = 10  # 容忍10个epoch无改善
+best_val = float('inf')
+wait = 0
+
+for epoch in range(max_epochs):
+    train_loss = train()
+    val_loss = validate()
+    
+    if val_loss < best_val:
+        best_val = val_loss
+        wait = 0
+        save_best_model()
+    else:
+        wait += 1
+        if wait >= patience:
+            print(f"Early stopping at epoch {epoch}")
+            break
+```
+
+### V15参数
+- patience=10 (比V14浪费的6epoch多4epoch缓冲)
+- 恢复best模型权重(不使用last)
+
+### 为什么patience=10不是5?
+- Cosine LR后期下降很慢
+- 偶尔有微小改善(0.01级别)
+- 需要足够容忍度避免过早停止
+- 10 epochs ≈ 40h, 可接受
+
+### 配合Warmup+Cosine
+- Warmup期(2-3 epochs)不算patience
+- 从warmup结束开始计数
+- 这样避免warmup期间的loss波动触发early stop
