@@ -17338,3 +17338,54 @@ echo "✅ 研究#552"
 ### 数据: 83,359→83,841 (+482条!)
 ### 研究: #512→#552 (41篇!)
 ### V15准备: 数据100K+ / SPM 20K / 训练脚本
+
+## 研究#553: V15训练脚本编写计划 (2026-05-10)
+
+### 基于V14脚本的修改清单
+
+#### 1. 导入变更
+- `torch.optim.Adam` → `torch.optim.AdamW`
+- 添加`math.cos`用于cosine调度
+
+#### 2. 模型变更
+- LoRA r: 32 → 16
+- 添加`self.cross_attn_dropout = nn.Dropout(0.15)`
+- SPM vocab: 16000 → 20000
+
+#### 3. 优化器变更
+```python
+optimizer = AdamW(model.parameters(), lr=0.0006, weight_decay=0.01)
+```
+
+#### 4. 学习率调度
+```python
+# Warmup + Cosine (替代SGDR)
+warmup_steps = 2000
+if step < warmup_steps:
+    lr = max_lr * step / warmup_steps
+else:
+    progress = (step - warmup_steps) / (total_steps - warmup_steps)
+    lr = min_lr + 0.5 * (max_lr - min_lr) * (1 + cos(pi * progress))
+```
+
+#### 5. Label Smoothing
+- 0.05 → 0.1
+
+#### 6. 语言前缀
+- 训练数据添加[ZH]/[EN]/[YI]前缀
+
+#### 7. Early Stopping
+```python
+patience = 10
+wait = 0  # 从warmup结束开始计数
+```
+
+#### 8. 数据路径
+- 使用100K+数据集
+- SPM 20K模型
+
+### 编写顺序
+1. 先复制V14脚本
+2. 逐项修改
+3. 本地测试(小数据+5 steps)
+4. 完整训练
