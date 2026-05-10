@@ -16956,3 +16956,60 @@ optimizer = torch.optim.AdamW(
 - V14 Gap=0.90 (几乎无正则化)
 - V15 目标Gap<0.5
 - 代价: Val可能略高(~0.1-0.2), 但泛化更好
+
+## 研究#543: V15完整架构总结 (2026-05-10)
+
+### V14→V15 变更对照表
+
+| 组件 | V14 | V15 | 改进目的 |
+|------|-----|-----|---------|
+| LoRA r | 32 | 16 | 减少过拟合 |
+| LR调度 | SGDR T0=10 | Warmup+Cosine | 消除Val跳升 |
+| Cross-Attn Dropout | 0 | 0.15 | 防过拟合 |
+| Weight Decay | 0 | 0.01(AdamW) | 正则化 |
+| Label Smoothing | 0.05 | 0.1 | 更强正则化 |
+| SPM词汇 | 16K | 20K | 彝文覆盖 |
+| 语言前缀 | 无 | [ZH]/[EN]/[YI] | 方向明确 |
+| Early Stopping | 无 | patience=10 | 避免浪费 |
+| 数据量 | 83K | 100K+ | 减少重复 |
+| accum_steps | 8 | 16 | 更稳定梯度 |
+
+### 预期效果
+- Gap: 0.90→<0.5 (4重正则化)
+- Val: 2.79→<2.5 (新数据+SPM20K)
+- 有效epoch: 50%→100% (无SGDR重启)
+- 训练时长: ~40h→自动停止(Early Stopping)
+
+### 启动条件清单
+1. ✅ V14过拟合确认(E40=2.9034)
+2. ⬜ 数据≥100K (当前83,755)
+3. ⬜ SPM 20K训练完成
+4. ⬜ V15训练脚本编写完成
+5. ⬜ best.pth备份
+
+### V15脚本核心变更(相对V14)
+```python
+# 1. AdamW
+optimizer = AdamW(params, lr=0.0006, weight_decay=0.01)
+
+# 2. Warmup+Cosine
+scheduler = CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-5)
+# 前2000步手动warmup
+
+# 3. Cross-Attn Dropout
+self.cross_attn_dropout = nn.Dropout(0.15)
+
+# 4. 语言前缀
+if target_lang == 'en': prefix = '[EN]'
+elif target_lang == 'zh': prefix = '[ZH]'
+elif target_lang == 'yi': prefix = '[YI]'
+
+# 5. Early Stopping
+if wait >= patience: break
+```
+
+### 时间规划
+- 数据100K: 明天
+- SPM 20K: 明天(~2h)
+- V15脚本: 明天(~4h)
+- V15启动: 明晚!
