@@ -15917,3 +15917,41 @@ Cycle5的Best可能在E39-40出现.
 - Phase4: ~60% (函数✅, 递归📋, 自编译📋)
 - Phase5(C启动器): 0%
 - 总进度: ~75%
+
+## 研究#515: Cross-Attn Dropout时机判断 (2026-05-10)
+
+### 当前Gap分析
+E34: Val-Train = 2.79-2.45 = 0.34
+E36: Val-Train = 2.83-2.25 = 0.58
+
+Gap在0.3-0.6之间波动, SGDR重启期Gap较大.
+
+### Cross-Attn Dropout原理
+在cross-attention层添加dropout(p=0.1-0.3)
+- 减少decoder对encoder输出的过度依赖
+- 增加泛化能力
+- 降低Val-Train Gap
+
+### 实施条件
+- Gap>0.7时: 必须实施
+- Gap 0.5-0.7: 可选, 但有收益
+- Gap<0.5: 不需要
+
+### 当前判断
+Gap=0.34-0.58 → 不需要Cross-Attn Dropout!
+Gap<0.7, 模型泛化良好.
+
+### 预测
+随着训练继续(E40+), Gap可能缩小到0.3以下.
+如果Gap扩大到>0.7, 立即实施.
+
+### 实现代码(备用)
+```python
+# train_v14_alibi.py
+self.cross_attn_dropout = nn.Dropout(0.1)
+# 在cross_attn输出后:
+x = self.cross_attn_dropout(x)
+```
+
+### 结论
+暂不实施, 但保持监控.
