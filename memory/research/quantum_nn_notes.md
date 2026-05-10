@@ -16116,3 +16116,36 @@ Collatz=第34个!
 ### 结论
 V14收敛速度放缓, 但仍在学习.
 E38-40是Cycle5关键窗口!
+
+## 研究#521: QEntL递归Scope修复 (2026-05-10)
+
+### 问题
+Fibonacci递归fib(n)=fib(n-1)+fib(n-2)返回错误结果
+fib(4)=2(应=3), fib(5)=3(应=5)
+
+### 根因
+VM使用flat namespace(variables字典), 递归调用时:
+1. CALL fib(3): 修改n=3, 创建局部a/b
+2. RETURN: 旧代码只恢复参数n, 不清理局部a/b
+3. fib(4)的a被fib(3)内部的a覆盖!
+
+### 修复方案
+- **CALL**: saved_scope = dict(self.variables) 保存完整scope
+- **RETURN**: 
+  1. 删除callee新创建的变量(current_keys - saved_keys)
+  2. 恢复所有保存的变量值(跳过全局变量)
+
+### 关键设计决策
+- **全局变量不被恢复**: 用`全局`关键字声明的变量跨函数持久
+- **没有全局关键字的变量被恢复**: 函数内修改的外部变量在RETURN后恢复
+- 这是正确的语义: 没有全局声明=局部修改
+
+### 测试结果
+- Fibonacci递归: fib(0..10)全部正确✅
+- 全局变量: 计数3次=3✅ (需加"全局"关键字)
+- 6796/6800通过 (4个OOP方法调用预存bug)
+
+### 教训
+1. VM flat namespace是递归的天敌
+2. Scope保存/恢复是最可靠的方案
+3. 全局变量关键字不可省略
