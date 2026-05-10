@@ -16913,3 +16913,46 @@ for epoch in range(max_epochs):
 - Warmup期(2-3 epochs)不算patience
 - 从warmup结束开始计数
 - 这样避免warmup期间的loss波动触发early stop
+
+## 研究#542: V15 Weight Decay + AdamW (2026-05-10)
+
+### 为什么需要Weight Decay?
+V14使用Adam(lr=0.0006)无weight decay
+→ 参数自由增长→过拟合(Gap=0.90)
+
+### AdamW vs Adam+L2
+- Adam+L2: weight decay与梯度耦合→adaptive lr抵消decay
+- AdamW: decoupled weight decay→独立控制正则化
+
+### V15实现
+```python
+# AdamW optimizer (PyTorch内置)
+optimizer = torch.optim.AdamW(
+    model.parameters(),
+    lr=0.0006,
+    weight_decay=0.01,  # 标准值
+    betas=(0.9, 0.999)
+)
+```
+
+### Weight Decay率选择
+| 值 | 效果 |
+|----|------|
+| 0 | 无正则化(V14现状) |
+| 0.001 | 轻度 |
+| 0.01 | 中度(推荐) |
+| 0.05 | 强度 |
+| 0.1 | 太强(小模型可能欠拟合) |
+
+### V15组合正则化策略
+1. Weight Decay = 0.01 (AdamW)
+2. Cross-Attn Dropout = 0.15
+3. Label Smoothing = 0.1
+4. LoRA r = 16 (更少参数)
+
+这4重正则化应该能控制Gap<0.5
+
+### 预期
+- V14 Gap=0.90 (几乎无正则化)
+- V15 目标Gap<0.5
+- 代价: Val可能略高(~0.1-0.2), 但泛化更好
