@@ -16170,3 +16170,63 @@ VM使用flat namespace(variables字典), 递归调用时:
 1. E38完成后看Val是否开始下降(cosine期)
 2. 继续数据扩展(目标100K+)
 3. QEntL自编译Stage3(中文关键字)
+
+## 研究#523: E38 cosine下降期观察 (2026-05-10)
+
+### E38 lr轨迹
+- B400: lr=0.000585 (高lr区)
+- B1600: lr=0.000585→0.000208 (开始下降!)
+- B7000: lr=0.000208 (低lr区, cosine下降中)
+
+### 关键判断
+E38的lr已经进入SGDR cosine下降期!
+对比E37: lr在0.000477-0.000058间波动(仍在高区)
+E38: lr降到0.000208(更低!), 说明cosine在继续下降
+
+### 预期
+- E38 Val应该比E37(2.8472)更低
+- 如果E38 Val<2.7892 → 新Best! 🔥
+- E39-40: lr继续下降, 可能出新Best
+
+### 为什么E37 Val反而比E36高?
+E37可能还在cosine重启的lr上升期
+E38才是真正的cosine下降开始
+
+## 研究#524: V15训练优化方案 (2026-05-10)
+
+### 当前V14瓶颈
+- E1-37完成, Val=2.7892(E34 Best)
+- 收敛速度放缓: ~0.05/4 epochs
+- 达到Val<2.0可能需要E80+
+
+### V15优化清单
+1. **Warmup+Cosine Decay**: 替代纯SGDR
+   - Warmup: 前500 steps lr从0→max
+   - Cosine: 平滑下降到min_lr
+   - 优点: 避免初期大梯度, 稳定训练
+
+2. **Gradient Accumulation**: accum=16(从8)
+   - 等效batch=128, 更稳定的梯度
+   - 需要调整lr: 0.0006→0.0008
+
+3. **语言前缀token**: [ZH]/[EN]/[YI]
+   - 帮助模型区分翻译方向
+   - 减少语言混淆, 提升方向性
+
+4. **SPM 20K词汇**: 从16K扩展
+   - 彝文4166→7000
+   - 减少UNK, 提升彝文质量
+
+5. **Gradient Checkpointing**: 6层384d
+   - 节省~2GB显存(CPU上省内存)
+   - 允许更大模型
+
+### 实施优先级
+1. 语言前缀token(最简单, 效果明显)
+2. Warmup+Cosine(替代SGDR)
+3. SPM 20K(需要重新训练SPM)
+4. Gradient Checkpointing(需要修改模型)
+5. accum=16(简单调整)
+
+### 目标
+V15 Val<2.0 → 可用翻译质量
