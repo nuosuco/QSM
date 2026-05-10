@@ -17527,3 +17527,43 @@ POST /api/v15/translate
 
 ### 研究: #512→#557 (46篇!)
 ### 排序五剑客+汉诺塔+杨辉三角+快速幂 = 递归完全验证
+
+## 研究#558: V15数据语言前缀标注方案 (2026-05-10)
+
+### 当前数据格式
+```json
+{"input": "你好", "output": "hello", "type": "zh-en", "difficulty": 1}
+```
+
+### V15数据格式(添加语言前缀)
+```json
+{"input": "你好", "output": "[EN] hello", "target_lang": "en", "source_lang": "zh"}
+```
+
+### 标注规则
+1. zh→en: output前加[EN]
+2. en→zh: output前加[ZH]
+3. zh→yi: output前加[YI]
+4. yi→zh: output前加[ZH]
+5. yi→en: output前加[EN]
+6. en→yi: output前加[YI]
+
+### 现有数据转换脚本
+```python
+for item in data:
+    typ = item['type']
+    if 'zh-en' in typ: item['output'] = '[EN] ' + item['output']
+    elif 'en-zh' in typ: item['output'] = '[ZH] ' + item['output']
+    elif 'zh-yi' in typ: item['output'] = '[YI] ' + item['output']
+    # ...等
+```
+
+### SPM处理
+[ZH]/[EN]/[YI] 作为完整token, 不会被拆分
+需要在SPM训练时设为user_defined_symbols
+
+### 注意事项
+1. 前缀只在output端添加, input端不加
+2. 推理时根据target_lang参数添加对应前缀
+3. decoder的输入序列: [LANG] + <s> + ...
+4. 这个改动不影响encoder, 只影响decoder输入
