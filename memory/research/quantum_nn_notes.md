@@ -16821,3 +16821,52 @@ class DecoderLayer(nn.Module):
 self-attention影响decoder自回归生成
 cross-attention才是信息瓶颈(容易记忆encoder输出)
 所以只dropout cross-attention
+
+## 研究#540: V15 Warmup+Cosine LR调度器 (2026-05-10)
+
+### 为什么放弃SGDR?
+V14 SGDR T_0=10, t_mult=1 导致:
+1. 每次重启Val Loss跳升0.1-0.2
+2. 重启后需要5+epoch恢复
+3. 有效训练epoch减少50%
+4. 过拟合仍在重启间加剧
+
+### Warmup+Cosine方案
+```python
+import math
+
+def get_lr(step, warmup_steps=2000, max_lr=0.0006, min_lr=0.00001, total_steps=80000):
+    if step < warmup_steps:
+        # 线性warmup
+        return max_lr * step / warmup_steps
+    else:
+        # cosine decay
+        progress = (step - warmup_steps) / (total_steps - warmup_steps)
+        return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
+```
+
+### 参数选择
+- warmup_steps=2000 (约2.5 epochs @ batch=8)
+- max_lr=0.0006 (与V14相同)
+- min_lr=0.00001 (接近0但不停)
+- total_steps=80000 (~100 epochs)
+
+### 优势
+1. 平滑下降, 无跳升
+2. Warmup稳定初期训练
+3. Cosine后期缓慢衰减, 接近最优
+4. 配合Early Stopping更有效
+
+### 与SGDR对比
+| 特性 | SGDR | Warmup+Cosine |
+|------|------|---------------|
+| Val跳升 | 有(重启时) | 无 |
+| 有效epoch | 50% | 100% |
+| 过拟合控制 | 差 | 好(配合dropout) |
+| 实现复杂度 | 中 | 低 |
+
+### V15完整LR策略
+1. Warmup 2000 steps
+2. Cosine decay to min_lr
+3. Early Stopping patience=10
+4. 不使用LR restart
