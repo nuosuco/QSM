@@ -16775,3 +16775,49 @@ V14(Best 2.79) → V15(新数据+架构) → V16(SPM 20K)
 - 数据准备: ~2小时
 - SPM训练: ~30分钟
 - 验证: ~1小时
+
+## 研究#539: Cross-Attention Dropout实现细节 (2026-05-10)
+
+### 问题
+V14 Gap=0.84, 过拟合严重
+Cross-Attention是encoder-decoder架构中最容易过拟合的部分
+
+### 方案
+在decoder的cross-attention层添加Dropout
+
+### 代码修改(训练脚本)
+```python
+class DecoderLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_ff, dropout=0.15):
+        super().__init__()
+        self.self_attn = MultiHeadAttention(d_model, n_heads)
+        self.cross_attn = MultiHeadAttention(d_model, n_heads)
+        self.cross_attn_dropout = nn.Dropout(dropout)  # 新增!
+        self.ffn = FeedForward(d_model, d_ff)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+    
+    def forward(self, x, enc_out, mask=None):
+        x = self.norm1(x + self.self_attn(x, x, x))
+        cross = self.cross_attn(x, enc_out, enc_out, mask)
+        x = self.norm2(x + self.cross_attn_dropout(cross))  # dropout在residual前
+        x = self.norm3(x + self.ffn(x))
+        return x
+```
+
+### Dropout率选择
+- 0.1: 轻度正则化
+- 0.15: 中度(V15选择)
+- 0.2: 强度(可能欠拟合)
+- 0.3: 太强(小模型会欠拟合)
+
+### 预期效果
+- Gap从0.84降到<0.5
+- Val可能略高(训练时dropout→推理时无)
+- 整体泛化性大幅提升
+
+### 为什么不Dropout self-attention?
+self-attention影响decoder自回归生成
+cross-attention才是信息瓶颈(容易记忆encoder输出)
+所以只dropout cross-attention
