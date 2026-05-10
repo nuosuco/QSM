@@ -16405,3 +16405,48 @@ V14继续训练到E50, 如果Val>3.0:
 
 ### 总计: 39大算法!
 ### 自举进度: Phase1-3=100%, Phase4≈65%, 总≈77%
+
+## 研究#529: V15架构设计 (2026-05-10)
+
+### V14教训
+1. LoRA r=32参数太多→过拟合
+2. 83K数据训练100 epochs→数据不足
+3. SGDR可能不适合小数据(重启后lr太高)
+4. 没有Cross-Attn Dropout→Gap扩大
+
+### V15架构
+```
+d_model: 256 (不变)
+n_heads: 4 (不变)
+n_layers: 4 (不变)
+d_ff: 1024 (不变)
+vocab: 20000 (从16K扩展)
+max_len: 256 (从128扩展)
+```
+
+### V15训练策略
+1. **数据**: 100K+条(从83K扩展)
+2. **LoRA r=16**: 从32降低, 减少可训练参数
+3. **Warmup+Cosine Decay**: 替代SGDR
+   - warmup_steps = 1000
+   - max_lr = 0.0006
+   - min_lr = 0.00001
+   - total_steps = 50000
+4. **Cross-Attn Dropout**: p=0.15
+5. **Weight Decay**: 0.01
+6. **Label Smoothing**: ε=0.1(从0.05增加)
+7. **语言前缀token**: [ZH]/[EN]/[YI]
+8. **Early Stopping**: patience=10 epochs
+9. **accum=16**: 等效batch=128
+
+### V15预期
+- 可训练参数: ~0.8M (vs V14 1.6M)
+- 过拟合风险大幅降低
+- 更大vocab减少UNK
+- 语言前缀提升方向性
+
+### 实施时间线
+1. V14完成E40-50(或提前停止)
+2. 准备V15数据(100K+)
+3. 训练SPM 20K
+4. 启动V15训练
