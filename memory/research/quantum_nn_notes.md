@@ -16739,3 +16739,39 @@ V14(Best 2.79) → V15(新数据+架构) → V16(SPM 20K)
 1. 等E40结果(确认过拟合趋势)
 2. V15准备工作: 数据100K+, SPM 20K, 训练脚本
 3. QEntL自编译Stage3
+
+## 研究#538: V15 SPM 20K训练方案 (2026-05-10)
+
+### 当前SPM 16K
+- vocab_size: 16000
+- 彝文user_symbols: 4166
+- 中文/英文/特殊: ~11K
+- 问题: 彝文覆盖率不足, UNK太多
+
+### V15 SPM 20K设计
+- vocab_size: 20000
+- 彝文user_symbols: 7000 (从4166扩展)
+- 新增: [ZH]/[EN]/[YI] 语言前缀token
+- 中文/英文: ~12K
+- 特殊token: <unk>/<s>/</s>/[ZH]/[EN]/[YI]
+
+### 彝文扩展(4166→7000)
+需要新增2834个彝文字符, 来源:
+1. 通用彝文Unicode补充(更多U+F2xxx)
+2. 凉山规范彝文(A000-A48F)
+3. 常用组合字符
+
+### 训练数据准备
+1. 合并所有v13数据到单一文件
+2. 添加新数据(目标100K+)
+3. 训练SPM: `spm_train --input=data.txt --model_prefix=qsm_spm_v15 --vocab_size=20000 --user_defined_symbols=[ZH],[EN],[YI],彝文字符...`
+
+### 迁移影响
+- 所有训练数据需要重新tokenize
+- 模型embedding/output层从16K→20K
+- checkpoint不兼容(词汇变化)
+
+### 时间估算
+- 数据准备: ~2小时
+- SPM训练: ~30分钟
+- 验证: ~1小时
