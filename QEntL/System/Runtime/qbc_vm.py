@@ -530,11 +530,9 @@ class QBCVirtualMachine:
                 self.call_stack.append(self.ip + 1)
                 # Get parameter names from QBC metadata (function_params)
                 param_names = self.function_params.get(func_name, [])
-                # Save current values of params (for recursive calls)
-                saved_params = {}
-                for pname in param_names:
-                    saved_params[pname] = self.variables.get(pname)
-                self.call_stack_params.append(saved_params)
+                # Save entire variable scope for recursive calls
+                saved_scope = dict(self.variables)
+                self.call_stack_params.append(saved_scope)
                 # Bind arguments in reverse order (stack is LIFO)
                 for pname in reversed(param_names):
                     if self.stack:
@@ -594,18 +592,25 @@ class QBCVirtualMachine:
                 self.ip += 1
 
         elif op == OpCode.RETURN:
-            # Restore saved params (for recursive calls)
-            # But don't restore global variables - they persist across calls
+            # Full scope restore: save/restore all variables except globals
             if self.call_stack_params:
-                saved = self.call_stack_params.pop()
-                for pname, old_val in saved.items():
-                    if pname in self.global_vars:
-                        continue  # Skip global variables
+                saved_scope = self.call_stack_params.pop()
+                # Remove variables created by callee (not in caller's scope)
+                current_keys = set(self.variables.keys())
+                saved_keys = set(saved_scope.keys())
+                for nk in current_keys - saved_keys:
+                    if nk not in self.global_vars:
+                        del self.variables[nk]
+                # Restore all saved values EXCEPT global variables
+                # Global vars keep their modified values across function calls
+                for vname, old_val in saved_scope.items():
+                    if vname in self.global_vars:
+                        continue  # Globals persist across calls
                     if old_val is None:
-                        if pname in self.variables:
-                            del self.variables[pname]
+                        if vname in self.variables:
+                            del self.variables[vname]
                     else:
-                        self.variables[pname] = old_val
+                        self.variables[vname] = old_val
             if self.call_stack:
                 ret_addr = self.call_stack.pop()
                 ret_val = self.stack.pop() if self.stack else None
