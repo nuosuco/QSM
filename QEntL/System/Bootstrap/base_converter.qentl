@@ -1,0 +1,23 @@
+# 通用进制转换 — QEntL自举验证
+# 支持2-16任意进制
+
+让 digits = "0123456789ABCDEF"
+
+转换进制: 函数(n, base) {
+    全局 digits
+    让 result = ""
+    当(n > 0) {
+        让 d = n 取模 base
+        让 ch = 子串(digits, d, 1)
+        result = ch + result
+        n = n 整除 base
+    }
+    返回 result
+}
+
+主函数: 函数() {
+    让 b2 = 转换进制(255, 2)
+    让 b8 = 转换进制(255, 8)
+    让 b16 = 转换进制(255, 16)
+    打印(b2); 打印(b8); 打印(b16)
+}
