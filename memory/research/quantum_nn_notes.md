@@ -17832,3 +17832,40 @@ QEntL已具备自编译所需的所有特性:
 - V15训练脚本必须使用新SPM模型
 - 旧checkpoint不兼容(词汇变化)
 - 必须从scratch训练V15
+
+## 研究#567: V15训练脚本编写计划 (2026-05-11)
+
+### V14→V15 8大改进总结
+| # | 改进 | V14 | V15 | 预期效果 |
+|---|------|-----|-----|---------|
+| 1 | LoRA rank | r=32 | r=16 | 减少过拟合 |
+| 2 | Cross-Attn Dropout | 0 | 0.15 | Gap从0.94→<0.3 |
+| 3 | LR调度 | SGDR | Warmup+Cosine | 稳定起步+平滑衰减 |
+| 4 | 语言前缀 | 无 | [ZH]/[EN]/[YI] | 明确输出语言 |
+| 5 | SPM | 16K | 20K | 4166→7000彝文 |
+| 6 | Early Stopping | 无 | patience=10 | 自动停止 |
+| 7 | Label Smoothing | 0.05 | 0.1 | 更强正则化 |
+| 8 | Optimizer | Adam | AdamW wd=0.01 | 权重衰减 |
+
+### V15脚本结构
+```python
+# train_v15.py 核心改进
+1. QuantumEmbeddingV2 + 语言感知
+2. ALiBi位置编码(保留)
+3. Cross-Attention Dropout p=0.15
+4. LoRA r=16, alpha=32
+5. AdamW(weight_decay=0.01)
+6. Warmup+Cosine LR
+7. Label Smoothing ε=0.1
+8. Early Stopping patience=10
+9. 语言前缀[ZH]/[EN]/[YI]
+10. SPM 20K词汇
+11. accum=16(比V14的8更大)
+12. 动态difficulty(保留)
+```
+
+### 关键注意
+- V15从scratch训练(词汇变化,旧checkpoint不兼容)
+- 需先完成SPM 20K训练
+- 数据标注需添加语言前缀
+- 建议数据扩展到90K+再开始V15
