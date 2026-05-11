@@ -19050,3 +19050,61 @@ SGDR:  /\  /\  /\  /\  (锯齿形, 多次重启)
 Cosine: /‾‾‾‾‾\_______ (平滑, 单次衰减)
 
 V15选择: 平滑>震荡 ✅
+
+## 研究#594: Early Stopping机制详解 (2026-05-11)
+
+### V14惨痛教训
+V14无Early Stopping → 过拟合12+epoch才手动发现
+E34=Best(2.7892) → E46=3.0089, 浪费12×3.8h=45.6h算力!
+
+### Early Stopping原理
+监控验证集指标, 连续N次无改善则停止训练
+
+### V15配置
+- patience = 10 (连续10 epoch Val无改善)
+- min_delta = 0.001 (改善<0.001不算改善)
+- 监控: Val Loss (越小越好)
+- restore_best_weights = True (回退到最佳epoch)
+
+### 实现伪代码
+```python
+best_val = float('inf')
+patience_counter = 0
+
+for epoch in range(max_epochs):
+    train_loss = train_one_epoch()
+    val_loss = validate()
+    
+    if val_loss < best_val - min_delta:
+        best_val = val_loss
+        patience_counter = 0
+        save_best_model()
+    else:
+        patience_counter += 1
+    
+    if patience_counter >= patience:
+        print(f"Early stopping at epoch {epoch}")
+        restore_best_model()
+        break
+```
+
+### 为什么patience=10
+- V14从E34到E46(12epoch)才确认过拟合
+- patience=10给足够缓冲但不会浪费太多
+- 结合SGDR/Cosine: LR周期可能有短暂Val上升
+- 10 epoch ≈ 38h训练时间(可接受的最大浪费)
+
+### V14如果用了Early Stopping
+- E34=Best → E44触发停止(10 epoch无改善)
+- 节省E44-E46=2epoch=7.6h ✅
+- 但更理想: patience=5, E39停止, 节省更多
+
+### V15可能结果
+- 如果V15不过拟合: Early Stop可能永不触发
+- 如果过拟合: 在patience=10内自动停止
+- 最佳情况: Val持续下降到<2.0, 自然完成100 epoch
+
+### 与checkpoint配合
+- best.pth: Val最低时保存(永远不覆盖)
+- last.pth: 每epoch保存(用于resume)
+- Early Stop触发后: 从best.pth加载模型部署
