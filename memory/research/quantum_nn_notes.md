@@ -19647,3 +19647,68 @@ V15 Cosine: /‾‾‾‾‾‾\_______ (平滑, 单次衰减)
 - scheduler.step()在optimizer.step()之后调用
 - gradient accumulation时scheduler不受影响
 - Early Stopping时自然停止, scheduler无关
+
+## 研究#606: V15 Early Stopping代码实现 (2026-05-11)
+
+### PyTorch实现
+```python
+class EarlyStopping:
+    def __init__(self, patience=10, min_delta=0.001, 
+                 save_path='qsm_v15_best.pth'):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.save_path = save_path
+        self.best_val = float('inf')
+        self.counter = 0
+        self.should_stop = False
+    
+    def __call__(self, val_loss, model):
+        if val_loss < self.best_val - self.min_delta:
+            # 改善! 保存best模型
+            self.best_val = val_loss
+            self.counter = 0
+            torch.save({
+                'model_state': model.state_dict(),
+                'best_val': val_loss,
+            }, self.save_path)
+            return False  # 不停止
+        else:
+            # 未改善
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.should_stop = True
+                return True  # 停止!
+            return False
+
+# 训练循环中使用
+early_stopper = EarlyStopping(patience=10, min_delta=0.001)
+
+for epoch in range(max_epochs):
+    train_loss = train_one_epoch(model, dataloader, optimizer, scheduler)
+    val_loss = validate(model, val_dataloader)
+    
+    print(f"E{epoch+1} Train:{train_loss:.4f} Val:{val_loss:.4f}")
+    
+    if early_stopper(val_loss, model):
+        print(f"Early stopping at epoch {epoch+1}!")
+        print(f"Best Val: {early_stopper.best_val:.4f}")
+        break
+
+# 训练结束后加载best模型
+checkpoint = torch.load('qsm_v15_best.pth')
+model.load_state_dict(checkpoint['model_state'])
+```
+
+### V15配置
+- patience=10: 连续10 epoch Val无改善则停止
+- min_delta=0.001: 改善<0.001不算改善
+- 自动保存best模型(永不覆盖已有best)
+
+### 与V14对比
+V14: 无Early Stopping → 过拟合12+epoch
+V15: Early Stopping → 最多浪费10 epoch(~38h)
+
+### 保存策略
+- qsm_v15_best.pth: Val最低时保存(覆盖式)
+- qsm_v15_last.pth: 每epoch保存(用于resume)
+- qsm_v15_best_backup.pth: 训练前备份
