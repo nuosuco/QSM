@@ -18458,3 +18458,64 @@ fib/归并/快速/汉诺塔/组合数/快速幂
 10. ✅ 回溯+图遍历+DP
 
 ### 结论: QEntL是完备的编程语言, 具备自举所需全部特性!
+
+## 研究#581: V15 SPM 20K训练执行方案 (2026-05-11)
+
+### SPM训练命令
+```bash
+# 1. 提取所有文本到单一文件
+python3 << 'PYEOF'
+import json
+data = json.load(open('v13_clean_dataset.json'))
+with open('spm_train_data.txt', 'w') as f:
+    for item in data:
+        f.write(item['input'] + '\n')
+        f.write(item['output'] + '\n')
+PYEOF
+
+# 2. 准备user_symbols(彝文)
+python3 << 'PYEOF'
+import json
+vocab = json.load(open('v4_vocab.json'))
+yi_chars = [c for c, info in vocab.items() if info.get('type') == 'yi']
+with open('yi_user_symbols.txt', 'w') as f:
+    for c in yi_chars:
+        f.write(c + '\n')
+PYEOF
+
+# 3. 训练SPM 20K
+spm_train \
+  --input=spm_train_data.txt \
+  --model_prefix=qsm_spm_v15 \
+  --vocab_size=20000 \
+  --character_coverage=1.0 \
+  --model_type=bpe \
+  --user_defined_symbols_file=yi_user_symbols.txt \
+  --control_symbols=[ZH],[EN],[YI] \
+  --num_threads=8
+```
+
+### 关键参数
+- vocab_size=20000 (V14=16000, +4000)
+- character_coverage=1.0 (覆盖所有字符)
+- model_type=bpe (字节对编码)
+- user_defined_symbols: 保留彝文字符+3个语言前缀
+- control_symbols: [ZH]/[EN]/[YI]
+
+### 训练时间预估
+- 84K数据, ~2M行文本
+- CPU 128核: ~10-30分钟
+- 输出: qsm_spm_v15.model + qsm_spm_v15.vocab
+
+### 验证
+```python
+import sentencepiece as spm
+sp = spm.SentencePieceProcessor()
+sp.Load('qsm_spm_v15.model')
+print(sp.Get_piece_size())  # 应=20000
+print(sp.EncodeAsIds('[ZH]你好'))  # 测试语言前缀
+```
+
+### 执行时机
+- V14停止后立即执行
+- SPM训练不依赖GPU, 可与V15脚本编写并行
