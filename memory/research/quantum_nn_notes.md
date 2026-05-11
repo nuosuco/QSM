@@ -19326,3 +19326,73 @@ Step 7: V15训练启动 (1h配置+测试)
 - Gap全程<0.5
 - Early Stop自然触发或Val<2.0
 - 无重复模式/英文碎片
+
+## 研究#600: 🎉第600篇! KV Cache推理加速实现 (2026-05-11)
+
+### 里程碑: 600篇研究笔记!
+
+### KV Cache原理
+自回归生成时, 每步重新计算所有K/V是浪费的
+→ 缓存已计算的K/V, 只计算新token的K/V
+
+### 标准Attention(无Cache)
+```python
+# 每步重新计算所有token
+K = W_k(encoder_output)  # (seq_len, d_model)
+V = W_v(encoder_output)  # (seq_len, d_model)
+# 对decoder每个位置都重算
+```
+
+### KV Cache实现
+```python
+class KVCache:
+    def __init__(self):
+        self.key_cache = {}   # layer_id -> tensor
+        self.value_cache = {} # layer_id -> tensor
+    
+    def update(self, layer_id, new_key, new_value):
+        if layer_id not in self.key_cache:
+            self.key_cache[layer_id] = new_key
+            self.value_cache[layer_id] = new_value
+        else:
+            self.key_cache[layer_id] = torch.cat([self.key_cache[layer_id], new_key], dim=0)
+            self.value_cache[layer_id] = torch.cat([self.value_cache[layer_id], new_value], dim=0)
+        return self.key_cache[layer_id], self.value_cache[layer_id]
+    
+    def clear(self):
+        self.key_cache.clear()
+        self.value_cache.clear()
+```
+
+### QSM V15 Cross-Attention KV Cache
+Encoder端K/V在生成时不变 → 一次性计算, 缓存!
+
+```python
+# V15推理流程
+encoder_output = model.encode(input_ids)
+# 计算并缓存encoder K/V(只算一次!)
+enc_key = W_k(encoder_output)    # 缓存
+enc_value = W_v(encoder_output)  # 缓存
+
+# 自回归生成
+for step in range(max_len):
+    # decoder self-attention: 需要增量cache
+    # decoder cross-attention: 使用缓存的enc_key/enc_value
+    output = model.decode_step(last_token, enc_key, enc_value, dec_self_cache)
+    next_token = output.argmax(-1)
+```
+
+### 加速效果
+- Encoder-Decoder Cross-Attn: 2x加速(不重算encoder端)
+- Decoder Self-Attn: 1.5x加速(不重算历史token)
+- **总计: ~3x推理加速**
+
+### V15实现优先级
+1. Cross-Attn KV Cache (最简单, 2x加速)
+2. Self-Attn KV Cache (中等, 额外1.5x)
+3. 两者结合 → 3x加速
+
+### 内存开销
+KV Cache: 2 × n_layers × d_model × seq_len × batch_size
+V15: 2 × 4 × 256 × 128 × 1 = 256KB (极小!)
+→ KV Cache对QSM几乎零额外开销
