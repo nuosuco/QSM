@@ -19108,3 +19108,56 @@ for epoch in range(max_epochs):
 - best.pth: Val最低时保存(永远不覆盖)
 - last.pth: 每epoch保存(用于resume)
 - Early Stop触发后: 从best.pth加载模型部署
+
+## 研究#595: Cross-Attention Dropout详解 (2026-05-11)
+
+### 为什么Cross-Attn Dropout是V15最关键改进
+V14过拟合根因: Decoder完全记忆Encoder输出
+→ 每个目标token都精确"看到"源端信息
+→ 模型走捷径: 不学翻译规则, 直接记映射
+
+### Cross-Attention在Encoder-Decoder中的位置
+```
+Decoder Layer:
+  1. Self-Attention (目标端自注意力)
+  2. Cross-Attention (编码端→解码端) ← 这里加Dropout!
+  3. Feed-Forward
+```
+
+### Dropout位置(3个选择)
+1. **Attention Weights**: softmax之后, 随机置零attention概率
+2. **Attention Output**: attention×V之后, 随机置零输出维度
+3. **两者都加**: 更强正则化
+
+V15选择: **Attention Weights + Output** (双重)
+
+### PyTorch实现
+```python
+class CrossAttentionWithDropout(nn.Module):
+    def __init__(self, d_model, n_heads, dropout=0.15):
+        super().__init__()
+        self.attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
+        self.output_dropout = nn.Dropout(dropout)
+    
+    def forward(self, query, key, value, mask=None):
+        # attn_weights dropout内置在MultiheadAttention中
+        attn_output, _ = self.attn(query, key, value, attn_mask=mask)
+        # output dropout
+        return self.output_dropout(attn_output)
+```
+
+### 为什么p=0.15
+- p=0.1: 正则化太弱(V14 self-attn dropout=0.05, 不够)
+- p=0.15: 中等强度, 参考(研究#397)
+- p=0.2: 太强, 可能欠拟合
+- p=0.3: 明显欠拟合
+
+### 与Self-Attention Dropout的区别
+Self-Attn Dropout: 目标端token之间的关系
+Cross-Attn Dropout: 源端→目标端的信息流 ← 更关键!
+因为Cross-Attn是"信息瓶颈", Dropout它迫使模型不依赖单一token
+
+### 预期效果
+- V14 Gap=1.15 (无Cross-Attn Dropout)
+- V15 Gap预期<0.3 (Cross-Attn Dropout p=0.15)
+- 减少过拟合最有效的单一改进!
