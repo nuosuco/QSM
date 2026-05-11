@@ -18231,3 +18231,56 @@ class QSMDecoder:
 
 ### V15优先级: 高
 KV Cache实现简单, 收益大, V15必须添加!
+
+## 研究#577: Speculative Decoding推理加速 (2026-05-11)
+
+### 原理
+用小模型(drafter)快速生成k个候选token, 大模型(verifier)并行验证
+- 接受: 保留token, 继续验证
+- 拒绝: 丢弃, 从拒绝点重新采样
+
+### 速度提升
+- 小模型生成: ~5x快
+- 大模型验证: 1次前向(并行k个token)
+- 平均接受率p: 1/(1-p) × 加速
+- p=0.8 → 5x加速, p=0.9 → 10x
+
+### QSM适配方案
+```
+drafter: V7-Small (4.5M参数) → 快速生成5个token
+verifier: V14/V15 (16M参数) → 1次前向验证5个token
+```
+
+### CPU实现
+```python
+def speculative_decode(input_ids, drafter, verifier, k=5):
+    # 1. drafter自回归生成k个token
+    draft_tokens = []
+    x = input_ids
+    for _ in range(k):
+        logits = drafter(x)  # 小模型快
+        token = sample(logits[-1])
+        draft_tokens.append(token)
+        x = append(x, token)
+    
+    # 2. verifier并行验证
+    verify_logits = verifier(x)  # 1次前向, 得到所有位置
+    
+    # 3. 接受/拒绝
+    accepted = 0
+    for i, token in enumerate(draft_tokens):
+        p_verifier = softmax(verify_logits[len(input_ids)-1+i])
+        p_drafter = softmax(drafter_logits[i])
+        if accept_criterion(token, p_verifier, p_drafter):
+            accepted += 1
+        else:
+            break
+    
+    return input_ids + draft_tokens[:accepted] + [resample(p_verifier)]
+```
+
+### 评估
+- 当前V7-Small输出质量太差(drafter接受率<0.3)
+- 需Val<2.0后drafter才有效
+- 优先级: 低(V15不实施, 等V16+)
+- KV Cache比Speculative Decoding更实用
