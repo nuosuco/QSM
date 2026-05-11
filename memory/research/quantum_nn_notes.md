@@ -18937,3 +18937,65 @@ V14 SPM 16K: 彝文4166个user_symbols
 - 彝文字符覆盖率: 4166→7000
 - 英文子词更合理
 - 语言前缀实现可控输出
+
+## 研究#592: 语言前缀[ZH]/[EN]/[YI]实现细节 (2026-05-11)
+
+### 灵感来源: mBART (Liu et al., 2020)
+mBART在decoder输入开头添加语言token控制输出语言
+- 输入: "hello world" + [ZH] → 输出: "你好世界"
+- 输入: "你好世界" + [EN] → 输出: "hello world"
+
+### QSM V15实现方案
+
+#### 1. SPM添加control symbols
+```
+user_defined_symbols:
+  - [ZH]  # id=16000
+  - [EN]  # id=16001
+  - [YI]  # id=16002
+```
+
+#### 2. 训练数据格式
+```json
+{
+  "input": "[EN]hello world",
+  "output": "[ZH]你好世界"
+}
+```
+- input前缀指定源语言
+- output前缀指定目标语言
+
+#### 3. Encoder输入处理
+```python
+def add_lang_prefix(text, lang):
+    return f"[{lang}]{text}"
+```
+
+#### 4. Decoder训练
+- teacher forcing时: decoder输入 = [BOS] + [LANG] + target_tokens
+- decoder输入的第一个token是语言前缀
+
+#### 5. 推理时
+```python
+# 强制输出中文
+encoded_input = spm.encode("[ZH]" + source_text)
+# decoder第一个token = [ZH]
+```
+
+### 关键优势
+1. **可控输出语言**: 用户指定[ZH]/[EN]/[YI]
+2. **零样本翻译**: 训练zh→en后, 可尝试en→zh(共享表示)
+3. **单模型三方向**: 不需要3个独立模型
+4. **彝文输出激活**: [YI]前缀激活彝文生成路径
+
+### V15训练数据改造
+- zh→en: input加[ZH], output加[EN]
+- en→zh: input加[EN], output加[ZH]
+- zh→yi: input加[ZH], output加[YI] (如果有彝文数据)
+- 当前只有zh↔en, V15先实现2方向
+
+### 注意事项
+- [ZH]/[EN]/[YI]是特殊token, 不参与分词
+- 必须在SPM训练时添加为user_defined_symbols
+- 前缀token的embedding需要充分训练
+- warmup期间前缀token可能不稳定, 需要监控
