@@ -1,0 +1,20 @@
+# 快速排序 - O(n log n)avg pivot分治
+快速排序: 函数(arr) {
+    让 n = 长度(arr)
+    如果(n <= 1) { 返回 arr }
+    让 pivot = arr[0]; 让 left = []; 让 right = []
+    让 i = 1
+    当(i < n) {
+        如果(arr[i] < pivot) { 追加(left, arr[i]) }
+        否则 { 追加(right, arr[i]) }
+        i = i + 1
+    }
+    让 sl = 快速排序(left); 让 sr = 快速排序(right)
+    让 result = []
+    让 j = 0
+    当(j < 长度(sl)) { 追加(result, sl[j]); j = j + 1 }
+    追加(result, pivot)
+    让 k = 0
+    当(k < 长度(sr)) { 追加(result, sr[k]); k = k + 1 }
+    返回 result
+}

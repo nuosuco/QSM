@@ -1,0 +1,23 @@
+# 归并排序 - O(n log n) 分治递归
+合并: 函数(a, b) {
+    让 na = 长度(a); 让 nb = 长度(b)
+    让 result = []; 让 i = 0; 让 j = 0
+    当(i < na) {
+        如果(j >= nb) { break }
+        如果(a[i] <= b[j]) { 追加(result, a[i]); i = i + 1 }
+        否则 { 追加(result, b[j]); j = j + 1 }
+    }
+    当(i < na) { 追加(result, a[i]); i = i + 1 }
+    当(j < nb) { 追加(result, b[j]); j = j + 1 }
+    返回 result
+}
+归并排序: 函数(arr) {
+    让 n = 长度(arr)
+    如果(n <= 1) { 返回 arr }
+    让 mid = n 整除 2
+    让 left = []; 让 right = []
+    让 i = 0
+    当(i < mid) { 追加(left, arr[i]); i = i + 1 }
+    当(i < n) { 追加(right, arr[i]); i = i + 1 }
+    返回 合并(归并排序(left), 归并排序(right))
+}
