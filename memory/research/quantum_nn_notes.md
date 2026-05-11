@@ -17687,3 +17687,33 @@ decoder_input = [prefix_id] + tokenizer.encode(output)
 ```python
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 ```
+
+## 研究#562: QEntL 2D DP能力突破 (2026-05-11)
+
+### 编辑距离(Levenshtein Distance)
+- 2D DP: dp[i][j] 二维数组操作
+- 插入/删除/替换三种操作取最小
+- kitten→sitting=3, hello→world=4
+
+### QEntL DP算法完整列表
+| # | 算法 | 维度 | ✅ |
+|---|------|------|-----|
+| 1 | 爬楼梯 | 1D | ✅ |
+| 2 | Kadane最大子数组 | 1D | ✅ |
+| 3 | 零钱兑换 | 1D | ✅ |
+| 4 | LIS最长递增子序列 | 1D | ✅ |
+| 5 | 编辑距离 | 2D | ✅ |
+
+### 2D DP的意义
+1. 二维数组创建+初始化 ✅
+2. dp[i][j]双重索引 ✅
+3. 嵌套循环+条件最小值 ✅
+4. 证明QEntL具备完整DP能力
+
+### 算法总数: 55+!
+- 数论12+排序5+DP5+字符串10+递归5+数学4+进制4+搜索1 = 55+
+
+### 下一步算法
+- 0-1背包问题(2D DP)
+- 最长公共子序列(2D DP)
+- 矩阵链乘法
