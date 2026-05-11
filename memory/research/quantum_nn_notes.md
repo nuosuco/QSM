@@ -17629,3 +17629,61 @@ DP算法证明QEntL具备:
 4. 最优子结构思维
 
 QEntL = 完备的编程语言!
+
+## 研究#561: V15训练脚本核心代码 (2026-05-11)
+
+### 1. Warmup+Cosine LR
+```python
+def get_lr(step, warmup_steps, max_lr, min_lr, total_steps):
+    if step < warmup_steps:
+        return max_lr * step / warmup_steps
+    progress = (step - warmup_steps) / (total_steps - warmup_steps)
+    return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
+```
+
+### 2. AdamW Optimizer
+```python
+optimizer = torch.optim.AdamW(
+    model.parameters(), lr=0.0006, weight_decay=0.01, betas=(0.9, 0.999)
+)
+```
+
+### 3. Cross-Attention Dropout
+```python
+class DecoderLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_ff, dropout=0.15):
+        self.cross_attn_dropout = nn.Dropout(dropout)
+    def forward(self, x, enc_out, mask=None):
+        cross = self.cross_attn(x, enc_out, enc_out, mask)
+        x = self.norm2(x + self.cross_attn_dropout(cross))
+```
+
+### 4. LoRA r=16
+```python
+lora_config = LoRAConfig(r=16, alpha=32, dropout=0.05)
+```
+
+### 5. Early Stopping
+```python
+best_val = float('inf'); wait = 0; patience = 10
+for epoch in range(max_epochs):
+    val_loss = validate()
+    if val_loss < best_val:
+        best_val = val_loss; wait = 0; save_best()
+    else:
+        wait += 1
+        if wait >= patience: break
+```
+
+### 6. 语言前缀
+```python
+if target_lang == 'en': prefix = '[EN]'
+elif target_lang == 'zh': prefix = '[ZH]'
+elif target_lang == 'yi': prefix = '[YI]'
+decoder_input = [prefix_id] + tokenizer.encode(output)
+```
+
+### 7. Label Smoothing=0.1
+```python
+criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+```
