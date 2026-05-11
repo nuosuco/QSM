@@ -18319,3 +18319,88 @@ def speculative_decode(input_ids, drafter, verifier, k=5):
 - 目标Val: <2.0 (V14=2.79, -28%)
 - 8大改进组合效果预估: -0.5~0.8
 - Early Stopping防止重蹈V14覆辙
+
+## 研究#579: V15训练脚本关键实现 (2026-05-11)
+
+### 1. Cross-Attention Dropout实现
+```python
+class DecoderLayerWithDropout(nn.Module):
+    def __init__(self, d_model, n_heads, d_ff, dropout=0.15):
+        super().__init__()
+        self.self_attn = MultiHeadAttention(d_model, n_heads)
+        self.cross_attn = MultiHeadAttention(d_model, n_heads)
+        self.cross_attn_dropout = nn.Dropout(dropout)  # ← 关键!
+        self.ffn = FeedForward(d_model, d_ff)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+    
+    def forward(self, x, enc_out, src_mask=None, tgt_mask=None):
+        # Self-attention (无额外dropout, 保持V14行为)
+        x = self.norm1(x + self.self_attn(x, x, x, tgt_mask))
+        # Cross-attention + Dropout (V15关键改进!)
+        cross_out = self.cross_attn(x, enc_out, enc_out, src_mask)
+        x = self.norm2(x + self.cross_attn_dropout(cross_out))
+        # FFN
+        x = self.norm3(x + self.ffn(x))
+        return x
+```
+
+### 2. Warmup+Cosine实现
+```python
+class WarmupCosineScheduler:
+    def __init__(self, optimizer, warmup_steps, total_steps, max_lr, min_lr):
+        self.optimizer = optimizer
+        self.warmup_steps = warmup_steps
+        self.total_steps = total_steps
+        self.max_lr = max_lr
+        self.min_lr = min_lr
+    
+    def step(self, step):
+        if step < self.warmup_steps:
+            lr = self.max_lr * step / self.warmup_steps
+        else:
+            progress = (step - self.warmup_steps) / max(1, self.total_steps - self.warmup_steps)
+            lr = self.min_lr + 0.5 * (self.max_lr - self.min_lr) * (1 + math.cos(math.pi * progress))
+        for pg in self.optimizer.param_groups:
+            pg['lr'] = lr
+```
+
+### 3. Early Stopping实现
+```python
+class EarlyStopping:
+    def __init__(self, patience=10, min_delta=0.0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_val = float('inf')
+        self.wait = 0
+    
+    def step(self, val_loss):
+        if val_loss < self.best_val - self.min_delta:
+            self.best_val = val_loss
+            self.wait = 0
+            return False  # 继续训练
+        else:
+            self.wait += 1
+            if self.wait >= self.patience:
+                return True  # 停止!
+            return False
+```
+
+### 4. 语言前缀训练数据格式
+```python
+def add_language_prefix(dataset, spm_model):
+    for item in dataset:
+        output = item['output']
+        if contains_yi_unicode(output):
+            item['prefix_token'] = '[YI]'
+        elif is_chinese(output):
+            item['prefix_token'] = '[ZH]'
+        else:
+            item['prefix_token'] = '[EN]'
+    return dataset
+```
+
+### V15脚本=V14+以上4个改进
+文件: Models/QSM/train_v15.py
+预计: ~800行(V14=600行+200行新功能)
