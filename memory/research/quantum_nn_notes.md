@@ -19526,3 +19526,69 @@ spm_train \
 - SPM训练: ~30min
 - 验证: ~15min
 - 总计: ~1h
+
+## 研究#604: V15 Cross-Attention Dropout代码实现 (2026-05-11)
+
+### PyTorch实现
+```python
+class QSMDecoderLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_ff, dropout=0.1, 
+                 cross_attn_dropout=0.15):
+        super().__init__()
+        # Self-Attention (目标端)
+        self.self_attn = nn.MultiheadAttention(
+            d_model, n_heads, dropout=dropout
+        )
+        # Cross-Attention (编码→解码) - 关键改进!
+        self.cross_attn = nn.MultiheadAttention(
+            d_model, n_heads, dropout=cross_attn_dropout  # 0.15!
+        )
+        self.cross_attn_output_dropout = nn.Dropout(cross_attn_dropout)
+        # Feed-Forward
+        self.ff = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_ff, d_model),
+            nn.Dropout(dropout)
+        )
+        # LayerNorms
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
+    
+    def forward(self, x, enc_output, tgt_mask=None, tgt_key_padding_mask=None):
+        # 1. Self-Attention
+        x2, _ = self.self_attn(x, x, x, attn_mask=tgt_mask,
+                               key_padding_mask=tgt_key_padding_mask)
+        x = self.norm1(x + x2)
+        
+        # 2. Cross-Attention (带强Dropout!)
+        x2, _ = self.cross_attn(x, enc_output, enc_output)
+        x2 = self.cross_attn_output_dropout(x2)  # 额外output dropout
+        x = self.norm2(x + x2)
+        
+        # 3. Feed-Forward
+        x2 = self.ff(x)
+        x = self.norm3(x + x2)
+        
+        return x
+```
+
+### LoRA集成
+Cross-Attention的Q/K/V/O投影也需要LoRA!
+```python
+# LoRA应用于cross_attn
+lora_cross_q = LoRALinear(d_model, d_model, r=16)
+lora_cross_k = LoRALinear(d_model, d_model, r=16)
+lora_cross_v = LoRALinear(d_model, d_model, r=16)
+lora_cross_o = LoRALinear(d_model, d_model, r=16)
+```
+
+### Dropout模式(p=0.15)
+训练时: 15%的attention权重被随机置零
+→ 模型不能依赖任何单一源端token
+→ 必须学习鲁棒的翻译规则
+
+推理时: Dropout关闭(所有连接可用)
+→ 完整的注意力能力用于翻译
