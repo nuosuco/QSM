@@ -19472,3 +19472,57 @@ Step 3: 格式验证
 V5教训: 大写字母G/M/H/W/F不在6924词汇表中
 V15 SPM 20K: 英文子词更细, 但仍建议训练数据用全小写
 → 减少UNK, 提高学习效率
+
+## 研究#603: SPM 20K训练数据准备清单 (2026-05-11)
+
+### 输入数据格式
+SPM需要一个纯文本文件, 每行一句
+- 中文行: 从v13_clean_dataset.json的input/output提取
+- 英文行: 同上
+- 彝文行: 从彝文专题数据提取
+
+### 准备步骤
+1. 从v13_clean_dataset.json提取所有文本
+2. 分离中文/英文/彝文
+3. 合并为一个大文本文件
+4. 生成user_symbols文件(7000彝文字符+3语言前缀)
+
+### user_symbols文件格式(每行一个)
+```
+[ZH]
+[EN]
+[YI]
+� réserv... (7000个彝文字符)
+```
+
+### SPM训练命令
+```bash
+spm_train \
+  --input=spm_training_data.txt \
+  --model_prefix=qsm_spm_v15 \
+  --vocab_size=20000 \
+  --character_coverage=0.9999 \
+  --model_type=unigram \
+  --user_defined_symbols_file=yi_symbols_v15.txt \
+  --input_sentence_size=100000 \
+  --shuffle_input_sentence=true
+```
+
+### 验证步骤
+1. spm_encode编码测试句
+2. spm_decode解码验证
+3. 检查[ZH]/[EN]/[YI]是否为独立token
+4. 检查彝文字符是否为独立token(不被拆分)
+5. 统计UNK率(应<1%)
+
+### 彝文字符提取
+从v4_vocab.json的4120个彝文字符
++ 训练数据中出现的额外彝文字符
+→ 合并去重 → 目标7000个
+
+### 预期耗时
+- 数据提取: ~5min
+- 符号文件生成: ~10min
+- SPM训练: ~30min
+- 验证: ~15min
+- 总计: ~1h
