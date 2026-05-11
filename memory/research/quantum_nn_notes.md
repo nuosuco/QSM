@@ -18639,3 +18639,50 @@ V15(r=16): 预期Gap<0.3
    - r=16是最佳折中
 
 ### 结论: V15 LoRA r=16是正确选择
+
+## 研究#585: V15训练超参数完整配置 (2026-05-11)
+
+### V15 vs V14 超参数对比
+| 参数 | V14 | V15 | 变化理由 |
+|------|-----|-----|---------|
+| d_model | 256 | 256 | 保持 |
+| n_heads | 4 | 4 | 保持 |
+| n_layers | 4 | 4 | 保持 |
+| d_ff | 1024 | 1024 | 保持 |
+| vocab_size | 16000 | 20000 | 彝文扩展 |
+| LoRA rank | 32 | 16 | 减少过拟合 |
+| LoRA alpha | 64 | 32 | α=2r标准 |
+| LoRA dropout | 0.05 | 0.05 | 保持 |
+| Cross-Attn Dropout | 0 | 0.15 | **关键!** |
+| Position Encoding | ALiBi | ALiBi | 保持(CPU友好) |
+| optimizer | Adam | AdamW | weight_decay=0.01 |
+| lr_max | 0.0006 | 0.0006 | 保持 |
+| lr_min | - | 0.00001 | Cosine最低 |
+| LR schedule | SGDR | Warmup+Cosine | 更稳定 |
+| warmup_steps | - | 2000 | ~2 epochs |
+| label_smoothing | 0.05 | 0.1 | 更强正则化 |
+| accum_steps | 8 | 16 | 更稳定梯度 |
+| weight_decay | 0 | 0.01 | AdamW |
+| early_stopping | 无 | patience=10 | 自动停止 |
+| 语言前缀 | 无 | [ZH]/[EN]/[YI] | 输出控制 |
+| max_difficulty | 动态 | 动态 | 保持课程学习 |
+| batch_size | 8 | 4 | (accum=16补偿) |
+| max_epochs | 100 | 100 | Early Stop控制 |
+
+### V15预计参数量
+- Base: 256×4×4 = ~16M (同V14)
+- LoRA r=16: ~128K可训练参数 (V14=256K)
+- 总可训练: ~128K (减少50%)
+- 固定参数: ~16M (同V14)
+
+### V15训练速度预估
+- batch=4, accum=16 → 有效batch=64
+- 每epoch: 84K/64 = ~1313步
+- 每步: ~0.5s (CPU) → 每epoch ~11min?
+- 实际可能~3-4h/epoch (考虑开销)
+
+### 关键里程碑
+- E1: Val应该<5.0 (V14 E1=4.99)
+- E10: Val应该<3.0 (V14用了~15epoch)
+- E30: Val应该<2.5 (V14 Best=2.79)
+- Early Stop触发: Gap连续10epoch>0
