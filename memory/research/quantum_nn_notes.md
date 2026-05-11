@@ -18136,3 +18136,98 @@ V14 Best Val=2.79 → 仍在Phase1初期
 
 ### LLaMA3/Mistral都用RoPE
 但它们有GPU, CPU场景ALiBi更实用
+
+## 研究#575: V15数据语言前缀标注实现 (2026-05-11)
+
+### 语言前缀方案
+在decoder_input添加语言标识token:
+- [ZH] → 中文输出
+- [EN] → 英文输出
+- [YI] → 彝文输出
+
+### 数据标注流程
+```python
+for item in dataset:
+    output = item['output']
+    # 检测输出语言
+    if contains_yi_chars(output):
+        item['prefix'] = '[YI]'
+    elif is_mostly_chinese(output):
+        item['prefix'] = '[ZH]'
+    else:
+        item['prefix'] = '[EN]'
+```
+
+### SPM词汇添加
+在SPM 20K模型中添加3个特殊token:
+```python
+spm = spm.SentencePieceProcessor()
+spm.SetVocabs(['[ZH]', '[EN]', '[YI]'] + original_vocab)
+```
+
+### 训练时使用
+```python
+# decoder输入: [语言前缀] + target_tokens
+prefix_id = spm.piece_to_id(prefix_token)
+decoder_input = [prefix_id] + encoded_target[:-1]
+```
+
+### 推理时使用
+```python
+# 用户指定目标语言
+def translate(text, target_lang='zh'):
+    prefix = {'zh': '[ZH]', 'en': '[EN]', 'yi': '[YI]'}[target_lang]
+    decoder_input = [spm.piece_to_id(prefix)]
+    # 自回归生成...
+```
+
+### 优势
+1. 消除语言歧义(同一输入可能翻译到不同语言)
+2. 允许单模型处理三语方向
+3. 推理时显式控制输出语言
+4. 类似mBART的语言token方案(已被验证有效)
+
+## 研究#576: KV Cache推理优化详解 (2026-05-11)
+
+### 标准Attention(无Cache)
+每步t生成token时, 重新计算所有1..t的K和V
+总计算: O(t²d) for t tokens → t步生成=O(t³d)
+
+### KV Cache优化
+存储已计算的K[1..t]和V[1..t], 新步只需:
+1. 计算新token的q_t, k_t, v_t
+2. 追加k_t到K_cache, v_t到V_cache
+3. attention = softmax(q_t @ K_cache^T / √d) @ V_cache
+总计算: O(t²d) → 节省2/3重复计算
+
+### QSM实现
+```python
+class QSMDecoder:
+    def __init__(self):
+        self.k_cache = None  # [batch, n_heads, seq_len, d_head]
+        self.v_cache = None
+    
+    def generate_step(self, x, step):
+        q, k, v = self.qkv_proj(x).chunk(3)
+        if self.k_cache is not None:
+            k = torch.cat([self.k_cache, k], dim=2)
+            v = torch.cat([self.v_cache, v], dim=2)
+        self.k_cache = k
+        self.v_cache = v
+        # ALiBi bias
+        attn = q @ k.transpose(-2,-1) / math.sqrt(d_head)
+        attn += self.alibi_bias(step, k.size(2))
+        attn = F.softmax(attn, dim=-1) @ v
+        return self.out_proj(attn)
+```
+
+### 内存开销
+- V14: 4层×4头×d_head=64×2(float16)=2KB/token
+- 128 tokens = 256KB → 微不足道
+
+### 速度提升
+- 无Cache: beam=5, 128 tokens → ~30s
+- 有Cache: beam=5, 128 tokens → ~10s (3x!)
+
+### V15优先级: 高
+KV Cache实现简单, 收益大, V15必须添加!
