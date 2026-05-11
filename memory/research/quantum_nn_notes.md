@@ -18894,3 +18894,46 @@ optimizer = torch.optim.AdamW(
 ### 注意: LoRA参数不需要weight_decay!
 只对LoRA的A/B矩阵应用wd, 冻结的base模型不受影响
 (V15中trainable_params只有LoRA, 所以自然正确)
+
+## 研究#591: SPM 16K→20K词汇扩展策略 (2026-05-11)
+
+### 为什么扩展词汇
+V14 SPM 16K: 彝文4166个user_symbols
+- 但实际彝文数据中使用>5000个不同字符
+- UNK token过多 → 翻译质量差
+- 英文子词切分不够细
+
+### 20K词汇分配
+| 类别 | 16K | 20K | 变化 |
+|------|-----|-----|------|
+| 彝文 | 4166 | 7000 | +2834 |
+| 中文 | ~6000 | ~7000 | +1000 |
+| 英文 | ~4000 | ~4500 | +500 |
+| 特殊 | ~1834 | ~1500 | -334 |
+| 总计 | 16000 | 20000 | +4000 |
+
+### 语言前缀Control Symbols
+添加3个特殊token:
+- [ZH] → 中文输出
+- [EN] → 英文输出
+- [YI] → 彝文输出
+
+### SPM训练参数
+- vocab_size: 20000
+- character_coverage: 0.9999
+- user_defined_symbols: 7000彝文 + 3语言前缀
+- model_type: unigram
+- input_sentence_size: 100000
+
+### 训练步骤
+1. 准备文本文件(所有中/英/彝文数据)
+2. 生成user_symbols文件(7000彝文+3前缀)
+3. spm_train --input=... --model_prefix=qsm_spm_v15 --vocab_size=20000
+4. 验证: 编码/解码测试
+5. 转换为PyTorch嵌入层
+
+### 预期效果
+- UNK率: 从~5%降到~1%
+- 彝文字符覆盖率: 4166→7000
+- 英文子词更合理
+- 语言前缀实现可控输出
