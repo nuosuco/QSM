@@ -18686,3 +18686,43 @@ V15(r=16): 预期Gap<0.3
 - E10: Val应该<3.0 (V14用了~15epoch)
 - E30: Val应该<2.5 (V14 Best=2.79)
 - Early Stop触发: Gap连续10epoch>0
+
+## 研究#586: Gradient Accumulation理论 (2026-05-11)
+
+### 原理
+模拟大batch_size: 每micro_step计算梯度但不更新,
+accum_steps次后才平均梯度并更新参数
+
+effective_batch_size = micro_batch × accum_steps
+
+### V14 vs V15
+| | V14 | V15 |
+|--|-----|-----|
+| micro_batch | 8 | 4 |
+| accum_steps | 8 | 16 |
+| effective_batch | 64 | 64 |
+| 实际内存 | 8×seq×d | 4×seq×d (减半!) |
+
+### V15 accum=16的好处
+1. **内存减半**: micro_batch=4 vs 8
+2. **梯度更稳定**: 16步平均 > 8步平均
+3. **LR需调整**: accum翻倍→LR可提高
+   - V14: accum=8, lr=0.0006
+   - V15: accum=16, lr=0.0006 (保持, Warmup补偿)
+
+### 数学推导
+梯度方差: Var(g) ∝ 1/batch_size
+accum=16: Var(g)/accum=8 → 方差减半
+→ 训练更稳定 → 减少过拟合风险
+
+### 内存预算
+- V14 micro_batch=8: ~4.5GB (接近7.4GB上限)
+- V15 micro_batch=4: ~2.5GB (安全余量)
+- 加上Cross-Attn Dropout额外开销: ~0.2GB
+- V15总计: ~2.7GB ✅ 安全!
+
+### 注意事项
+1. 梯度累积期间不能更新参数
+2. BN/Dropout等层行为可能不同(QSM用LN, 无影响)
+3. 需要在optimizer.step()前检查accum计数
+4. warmup_steps应基于有效batch计算
