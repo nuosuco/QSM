@@ -18763,3 +18763,52 @@ V15: Gap预期<0.3 (多防线组合)
 - ✅ Gap<0.5全程
 - ✅ Early Stop自然触发(或Val<2.0)
 - ✅ 无重复模式/英文碎片
+
+## 研究#588: Transformer架构演进到QSM (2026-05-11)
+
+### 经典Transformer (Vaswani 2017)
+- Encoder-Decoder, 6层, 512d, 8头
+- 正弦位置编码
+- 完全可训练
+
+### QSM V1-V5: 基础翻译模型
+- Encoder-Decoder, 3层, 256d, 4头
+- Learned位置编码
+- 词汇6.9K, 纯翻译
+
+### QSM V7-Small: 量子嵌入引入
+- 3层, 192d, 3头, 768ff
+- QuantumEmbeddingV1 (初步)
+- SPM分词, INT8量化部署
+
+### QSM V14: 大规模训练
+- 4层, 256d, 4头, 1024ff
+- ALiBi位置编码(替代learned PE)
+- LoRA r=32, SGDR调度
+- SPM 16K词汇, 课程学习
+- Best Val=2.7892 但严重过拟合
+
+### QSM V15: 抗过拟合版(设计中)
+- 4层, 256d, 4头, 1024ff (结构不变)
+- ALiBi位置编码(保持)
+- LoRA r=16(减半), Warmup+Cosine
+- Cross-Attn Dropout=0.15
+- AdamW+Label Smoothing=0.1
+- SPM 20K词汇, 语言前缀[ZH]/[EN]/[YI]
+- Early Stopping patience=10
+- 目标: Val<2.0
+
+### QSM未来路线(V16+)
+- 量子纠缠嵌入(研究#583)
+- KV Cache推理加速(研究#576)
+- RoPE位置编码(研究#574)
+- Speculative Decoding(研究#577)
+- 对话能力Phase2(研究#573)
+- VQC量子电路集成(研究#572)
+
+### 关键洞察
+QSM不需要更大模型, 需要:
+1. 更好的正则化(V15解决)
+2. 更多的数据(84K→100K+)
+3. 更好的数据质量(difficulty标注)
+4. 更好的解码策略(KV Cache+Beam)
