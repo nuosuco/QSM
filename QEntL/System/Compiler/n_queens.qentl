@@ -1,0 +1,35 @@
+# N皇后问题 - 经典回溯算法
+安全: 函数(board, row, col) {
+    让 i = 0
+    当(i < row) {
+        如果(board[i] == col) { 返回 0 }
+        如果(board[i] - i == col - row) { 返回 0 }
+        如果(board[i] + i == col + row) { 返回 0 }
+        i = i + 1
+    }
+    返回 1
+}
+
+求解N皇后: 函数(n) {
+    让 board = []
+    让 i = 0
+    当(i < n) { 追加(board, -1); i = i + 1 }
+    让 count = 0
+    让 row = 0
+    当(row >= 0) {
+        board[row] = board[row] + 1
+        让 found = 0
+        当(board[row] < n 且 found == 0) {
+            如果(安全(board, row, board[row]) == 1) { found = 1 }
+            否则 { board[row] = board[row] + 1 }
+        }
+        如果(found == 1) {
+            如果(row == n - 1) { count = count + 1; board[row] = n }
+            否则 { row = row + 1; board[row] = -1 }
+        } 否则 {
+            board[row] = -1
+            row = row - 1
+        }
+    }
+    返回 count
+}

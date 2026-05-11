@@ -1,0 +1,83 @@
+# QEntL DP算法集合 - 10大经典动态规划
+
+爬楼梯: 函数(n) {
+    如果(n <= 2) { 返回 n }
+    让 a = 1; 让 b = 2; 让 i = 3
+    当(i <= n) { 让 c = a + b; a = b; b = c; i = i + 1 }
+    返回 b
+}
+
+kadane: 函数(arr) {
+    让 max_sum = arr[0]; 让 cur = arr[0]
+    让 i = 1
+    当(i < 长度(arr)) {
+        如果(cur + arr[i] > arr[i]) { cur = cur + arr[i] }
+        否则 { cur = arr[i] }
+        如果(cur > max_sum) { max_sum = cur }
+        i = i + 1
+    }
+    返回 max_sum
+}
+
+零钱兑换: 函数(coins, amount) {
+    让 dp = []
+    让 i = 0
+    当(i <= amount) { 追加(dp, 999999); i = i + 1 }
+    dp[0] = 0
+    让 i = 1
+    当(i <= amount) {
+        让 j = 0
+        当(j < 长度(coins)) {
+            如果(coins[j] <= i 且 dp[i - coins[j]] + 1 < dp[i]) {
+                dp[i] = dp[i - coins[j]] + 1
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    返回 dp[amount]
+}
+
+LIS: 函数(arr) {
+    让 n = 长度(arr)
+    让 dp = []
+    让 i = 0
+    当(i < n) { 追加(dp, 1); i = i + 1 }
+    让 j = 1
+    当(j < n) {
+        让 k = 0
+        当(k < j) {
+            如果(arr[k] < arr[j] 且 dp[k] + 1 > dp[j]) { dp[j] = dp[k] + 1 }
+            k = k + 1
+        }
+        j = j + 1
+    }
+    让 max_len = 1
+    让 m = 0
+    当(m < n) { 如果(dp[m] > max_len) { max_len = dp[m] }; m = m + 1 }
+    返回 max_len
+}
+
+子集和: 函数(arr, target) {
+    让 n = 长度(arr)
+    让 dp = []
+    让 i = 0
+    当(i <= n) {
+        让 row = []; 让 j = 0
+        当(j <= target) { 追加(row, 0); j = j + 1 }
+        追加(dp, row); i = i + 1
+    }
+    i = 0
+    当(i <= n) { dp[i][0] = 1; i = i + 1 }
+    i = 1
+    当(i <= n) {
+        让 j = 1
+        当(j <= target) {
+            dp[i][j] = dp[i - 1][j]
+            如果(arr[i - 1] <= j 且 dp[i - 1][j - arr[i - 1]] == 1) { dp[i][j] = 1 }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    返回 dp[n][target]
+}

@@ -18001,3 +18001,57 @@ def chunked_attention(Q, K, V, chunk_size=64):
 - 但chunked方式可减少peak内存→允许更大batch_size
 - 优先级: 低(V15序列短, 内存不是瓶颈)
 - 更适合未来长序列场景(Val<1.0后对话能力)
+
+## 研究#572: VQC变分量子电路与QSM结合 (2026-05-11)
+
+### VQC基本结构
+1. 编码层: 经典数据→量子态 |ψ(x)⟩ = U_enc(x)|0⟩
+2. 变分层: 可训练参数化量子门 U(θ) = RY(θ₁)CNOT RY(θ₂)...
+3. 测量层: 量子态→经典值 ⟨Z⟩ = ⟨ψ|Z|ψ⟩
+
+### 与QSM结合方案
+**方案1: QuantumEmbeddingV2增强**
+- 当前: 语言感知量子嵌入(经典实现)
+- 升级: 用VQC编码层替换经典embedding
+- 优势: 量子叠加态天然适合多语言表示
+
+**方案2: 量子注意力**
+- 标准: softmax(QK^T/√d)V
+- 量子: VQC处理Q/K对, 输出attention weight
+- 优势: 指数级状态空间 → 更丰富的attention模式
+
+**方案3: 量子解码器**
+- 经典: Linear→Softmax→token选择
+- 量子: VQC→测量→概率分布→token采样
+- 优势: 天然概率分布, 无需softmax
+
+### CPU实现策略
+```python
+# VQC模拟(无GPU)
+class SimulatedVQC:
+    def __init__(self, n_qubits, depth):
+        self.n_qubits = n_qubits
+        self.params = np.random.randn(depth, n_qubits, 3)
+    
+    def forward(self, x):
+        # 状态向量模拟
+        state = np.zeros(2**self.n_qubits)
+        state[0] = 1.0  # |000...0⟩
+        # 编码
+        state = self.encode(state, x)
+        # 变分层
+        for layer in self.params:
+            state = self.apply_layer(state, layer)
+        # 测量
+        return self.measure(state)
+```
+
+### 计算成本
+- n_qubits=8: 256维状态向量, 可行
+- n_qubits=16: 65536维, 需优化
+- 当前CPU: 8 qubits VQC ~0.1ms/样本
+
+### V15应用建议
+- 不在V15引入(复杂度太高)
+- V16/V17考虑QuantumEmbedding增强
+- 先完成基础训练能力(Val<2.0)
