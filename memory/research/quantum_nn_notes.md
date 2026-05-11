@@ -18999,3 +18999,54 @@ encoded_input = spm.encode("[ZH]" + source_text)
 - 必须在SPM训练时添加为user_defined_symbols
 - 前缀token的embedding需要充分训练
 - warmup期间前缀token可能不稳定, 需要监控
+
+## 研究#593: Warmup+Cosine LR调度详解 (2026-05-11)
+
+### 为什么V15放弃SGDR
+V14 SGDR问题:
+1. T_0=10, t_mult=1 → 每10 epoch重启一次
+2. 重启时LR突然跳高 → 训练震荡
+3. 重启后optimizer state与高LR不匹配
+4. 课程学习阶段转换≠LR重启点(对齐失败)
+
+### Warmup+Cosine优势
+1. 平滑启动: LR从0线性升到max
+2. 平滑衰减: Cosine曲线缓慢降低
+3. 无震荡: 没有突然的LR跳变
+4. 与课程学习兼容: LR自然下降配合难度上升
+
+### 数学公式
+Warmup阶段 (step < warmup_steps):
+  lr = lr_max × step / warmup_steps
+
+Cosine阶段 (step >= warmup_steps):
+  lr = lr_min + 0.5 × (lr_max - lr_min) × (1 + cos(π × progress))
+  progress = (step - warmup_steps) / (total_steps - warmup_steps)
+
+### V15配置
+- lr_max = 0.0006
+- lr_min = 0.00001
+- warmup_steps = 2000 (约2 epochs)
+- total_steps = 84000 / 64 × 100 = ~131K steps
+
+### PyTorch实现
+```python
+from torch.optim.lr_scheduler import LambdaLR
+import math
+
+def get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps, lr_min=1e-5):
+    def lr_lambda(step):
+        if step < warmup_steps:
+            return step / warmup_steps
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        return lr_min_ratio + 0.5 * (1 - lr_min_ratio) * (1 + math.cos(math.pi * progress))
+    
+    lr_min_ratio = lr_min / optimizer.defaults['lr']
+    return LambdaLR(optimizer, lr_lambda)
+```
+
+### 对比图(概念)
+SGDR:  /\  /\  /\  /\  (锯齿形, 多次重启)
+Cosine: /‾‾‾‾‾\_______ (平滑, 单次衰减)
+
+V15选择: 平滑>震荡 ✅
