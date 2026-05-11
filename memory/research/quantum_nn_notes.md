@@ -19592,3 +19592,58 @@ lora_cross_o = LoRALinear(d_model, d_model, r=16)
 
 推理时: Dropout关闭(所有连接可用)
 → 完整的注意力能力用于翻译
+
+## 研究#605: V15 Warmup+Cosine LR调度代码实现 (2026-05-11)
+
+### PyTorch实现
+```python
+import math
+from torch.optim.lr_scheduler import LambdaLR
+
+def get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps,
+                                      lr_min_ratio=0.0167):  # 0.00001/0.0006
+    """
+    V15 LR调度: Warmup + Cosine Decay
+    lr_min_ratio = lr_min / lr_max = 0.00001 / 0.0006 ≈ 0.0167
+    """
+    def lr_lambda(step):
+        if step < warmup_steps:
+            # Warmup: 线性从0升到lr_max
+            return float(step) / float(max(1, warmup_steps))
+        # Cosine: 从lr_max降到lr_min
+        progress = float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+        return lr_min_ratio + (1.0 - lr_min_ratio) * cosine
+    
+    return LambdaLR(optimizer, lr_lambda)
+
+# 使用
+optimizer = torch.optim.AdamW(trainable_params, lr=0.0006, weight_decay=0.01)
+warmup_steps = 2000  # ~2 epochs
+total_steps = len(dataloader) * max_epochs  # ~131K
+scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
+
+# 训练循环中
+for step, batch in enumerate(dataloader):
+    loss = train_step(batch)
+    loss.backward()
+    
+    if (step + 1) % accum_steps == 0:
+        optimizer.step()
+        scheduler.step()  # 每个optimizer.step后调用
+        optimizer.zero_grad()
+```
+
+### V15 vs V14 LR轨迹
+V14 SGDR: /\  /\  /\  /\  (每10 epoch重启, 锯齿形)
+V15 Cosine: /‾‾‾‾‾‾\_______ (平滑, 单次衰减)
+
+### 关键参数
+- warmup_steps=2000: 约前2个epoch
+- total_steps: 需要根据数据量和max_epochs精确计算
+- lr_min_ratio=0.0167: lr从0.0006→0.00001
+
+### 注意
+- scheduler.step()在optimizer.step()之后调用
+- gradient accumulation时scheduler不受影响
+- Early Stopping时自然停止, scheduler无关
