@@ -19182,3 +19182,50 @@ Cross-Attn Dropout: 源端→目标端的信息流 ← 更关键!
 15. 回文数+数位和
 
 ### QEntL总计: 80+种算法!
+
+## 研究#597: Label Smoothing实现详解 (2026-05-11)
+
+### 原理
+标准交叉熵: target=one-hot → 模型过度自信
+Label Smoothing: target=(1-ε)*one_hot + ε/K → 软标签
+
+### 数学
+P(y=k|x) = (1-ε) * 1_{k=y} + ε/K
+
+V14: ε=0.05 → 95%正确类 + 5%均匀
+V15: ε=0.1  → 90%正确类 + 10%均匀 (更强)
+
+### PyTorch实现
+```python
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, vocab_size, padding_idx=0, smoothing=0.1):
+        super().__init__()
+        self.criterion = nn.KLDivLoss(reduction='none')
+        self.padding_idx = padding_idx
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+        self.vocab_size = vocab_size
+    
+    def forward(self, pred, target):
+        # pred: (batch, seq, vocab) log_softmax
+        # target: (batch, seq)
+        true_dist = torch.zeros_like(pred)
+        true_dist.fill_(self.smoothing / (self.vocab_size - 2))
+        true_dist.scatter_(2, target.unsqueeze(-1), self.confidence)
+        true_dist[:, :, self.padding_idx] = 0
+        mask = (target == self.padding_idx)
+        true_dist[mask] = 0
+        loss = self.criterion(pred, true_dist)
+        return loss.sum(dim=-1).masked_fill(mask, 0).sum() / (~mask).sum()
+```
+
+### 为什么V15用ε=0.1
+1. V14 ε=0.05: 仍严重过拟合(Gap=1.15)
+2. ε=0.1: 文献常用值(原Transformer论文)
+3. ε=0.15+: 太强, 可能欠拟合
+4. ε=0.1 + 其他4重正则化 → 组合效果更强
+
+### 与V14的差异
+V14: Label Smoothing ε=0.05 + 无Cross-Attn Dropout + Adam(无wd)
+V15: Label Smoothing ε=0.1 + Cross-Attn Dropout=0.15 + AdamW(wd=0.01)
+→ 三重正则化叠加, 预期Gap<0.3
