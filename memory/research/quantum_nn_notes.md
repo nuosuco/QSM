@@ -17956,3 +17956,48 @@ QEntL DP能力 ≈ C/Python/Java
 
 ### DP全覆盖
 1D: ✅ | 2D: ✅ | 区间: ✅ | 判定: ✅ | 计数: ✅ | 优化: ✅
+
+## 研究#571: Flash Attention原理与QSM适配 (2026-05-11)
+
+### Flash Attention核心思想
+传统Attention: O(N²)内存, 需存储完整NxN attention矩阵
+Flash Attention: O(N)内存, 分块计算+在线softmax
+
+### IO感知算法
+1. 分块: Q/K/V切分为block_size×d的块
+2. 在线Softmax: 逐块更新max/sum, 不需完整矩阵
+3. 重计算: backward时重新计算attention(省内存)
+4. GPU优化: 利用SRAM(快)→HBM(慢)层次
+
+### CPU适配分析
+**问题**: Flash Attention依赖GPU SRAM层次
+**CPU等价**: L1/L2 Cache → RAM
+
+### QSM CPU方案: Chunked Attention
+```python
+def chunked_attention(Q, K, V, chunk_size=64):
+    # 分块计算, 减少内存峰值
+    N = Q.shape[0]
+    output = zeros_like(Q)
+    for i in range(0, N, chunk_size):
+        Qi = Q[i:i+chunk_size]
+        for j in range(0, N, chunk_size):
+            Kj, Vj = K[j:j+chunk_size], V[j:j+chunk_size]
+            scores = Qi @ Kj.T / sqrt(d)
+            # 在线softmax更新
+            ...
+    return output
+```
+
+### 内存节省
+| 方法 | 内存 | 速度 |
+|------|------|------|
+| 标准 | O(N²) | 1x |
+| Flash/CPU | O(N) | 0.8x |
+
+### V15应用
+- QSM d_model=256, 序列~128 tokens
+- N²=128²=16384, 内存本身不大
+- 但chunked方式可减少peak内存→允许更大batch_size
+- 优先级: 低(V15序列短, 内存不是瓶颈)
+- 更适合未来长序列场景(Val<1.0后对话能力)
