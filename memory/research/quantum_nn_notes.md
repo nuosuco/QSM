@@ -18726,3 +18726,40 @@ accum=16: Var(g)/accum=8 → 方差减半
 2. BN/Dropout等层行为可能不同(QSM用LN, 无影响)
 3. 需要在optimizer.step()前检查accum计数
 4. warmup_steps应基于有效batch计算
+
+## 研究#587: V14→V15过拟合对策完整总结 (2026-05-11)
+
+### V14过拟合根因分析
+1. **LoRA r=32过大**: 参数256K >> 数据84K → 记忆训练集
+2. **无Cross-Attn Dropout**: Decoder自由记忆Encoder输出
+3. **SGDR重启**: 重启后优化器状态丢失, 加剧震荡
+4. **Label Smoothing=0.05**: 不够强
+5. **无Early Stopping**: 过拟合后继续训练12+epoch
+6. **无Weight Decay**: Adam无正则化
+
+### V15六重过拟合防线
+| 防线 | 机制 | 预期效果 |
+|------|------|---------|
+| 1 | LoRA r=16 | 可训练参数减半 |
+| 2 | Cross-Attn Dropout=0.15 | 阻止记忆Encoder输出 |
+| 3 | Label Smoothing=0.1 | 更强软标签正则化 |
+| 4 | AdamW weight_decay=0.01 | L2正则化 |
+| 5 | Early Stopping patience=10 | 自动停止 |
+| 6 | Warmup+Cosine(替代SGDR) | 平滑LR衰减, 无震荡重启 |
+
+### 预期Gap对比
+V14: Gap=1.15 (Train=1.83, Val=2.99)
+V15: Gap预期<0.3 (多防线组合)
+
+### 历史教训
+- V7-Small: 随机初始化更好(每epoch递增)
+- V8-V10: 数据质量>数量(噪声48%→垃圾)
+- V12: 小验证集不可信
+- V13: 清洗数据效果极显著
+- V14: LoRA r太大导致过拟合
+
+### V15成功标准
+- ✅ Val持续下降至少20 epoch
+- ✅ Gap<0.5全程
+- ✅ Early Stop自然触发(或Val<2.0)
+- ✅ 无重复模式/英文碎片
