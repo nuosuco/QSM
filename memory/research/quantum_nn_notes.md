@@ -19229,3 +19229,50 @@ class LabelSmoothingLoss(nn.Module):
 V14: Label Smoothing ε=0.05 + 无Cross-Attn Dropout + Adam(无wd)
 V15: Label Smoothing ε=0.1 + Cross-Attn Dropout=0.15 + AdamW(wd=0.01)
 → 三重正则化叠加, 预期Gap<0.3
+
+## 研究#598: V15训练脚本完整代码框架 (2026-05-11)
+
+### V15脚本结构(基于V14改进)
+```
+train_v15.py
+├── 导入
+│   ├── torch, math, json, os, argparse
+│   ├── sentencepiece (SPM 20K)
+│   └── LabelSmoothingLoss, EarlyStopping
+├── 模型定义
+│   ├── ALiBiPositionEncoding (保持V14)
+│   ├── QuantumEmbeddingV2 (保持V14)
+│   ├── LoRALinear (r=16, alpha=32)
+│   ├── CrossAttentionDropout (NEW! p=0.15)
+│   ├── DecoderLayer (含Cross-Attn Dropout)
+│   └── QSMTransformer (256d/4层/4头/1024ff)
+├── 数据加载
+│   ├── SPM 20K编码
+│   ├── 语言前缀[ZH]/[EN]/[YI]添加 (NEW!)
+│   ├── difficulty过滤(课程学习)
+│   └── 双向训练(zh↔en)
+├── 训练循环
+│   ├── AdamW(lr=0.0006, wd=0.01) (NEW!)
+│   ├── Warmup+Cosine调度 (NEW!)
+│   ├── LabelSmoothingLoss(ε=0.1) (从0.05提升)
+│   ├── Gradient Accumulation(accum=16) (从8提升)
+│   ├── Early Stopping(patience=10) (NEW!)
+│   └── 课程学习(动态max_difficulty)
+└── 检查点
+    ├── best.pth (Val最低保存, 永不覆盖)
+    ├── last.pth (每epoch保存, 用于resume)
+    └── --resume支持
+```
+
+### 关键改动清单(V14→V15)
+1. ✅ LoRA r=32→16
+2. ✅ Cross-Attn Dropout p=0→0.15
+3. ✅ Adam→AdamW(wd=0.01)
+4. ✅ SGDR→Warmup+Cosine
+5. ✅ Label Smoothing ε=0.05→0.1
+6. ✅ accum=8→16
+7. ✅ Early Stopping patience=10
+8. ✅ 语言前缀[ZH]/[EN]/[YI]
+9. ✅ SPM 16K→20K
+
+### 预计行数: ~800行(基于V14 ~700行+~100行新增)
