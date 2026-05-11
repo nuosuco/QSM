@@ -18549,3 +18549,52 @@ print(sp.EncodeAsIds('[ZH]你好'))  # 测试语言前缀
 - Best=E34 Val=2.7892 (不可打破)
 - Gap=1.15 (严重过拟合)
 - 建议立即停止
+
+## 研究#583: 量子纠缠在QSM中的应用路线 (2026-05-11)
+
+### 量子纠缠核心概念
+两个粒子纠缠后, 测量一个立即确定另一个(超距关联)
+|ψ⟩ = α|00⟩ + β|11⟩
+
+### 三种纠缠应用方案
+
+#### 方案1: 量子注意力纠缠
+标准Attention: a_ij = softmax(Q_i · K_j)
+纠缠Attention: a_ij = |⟨ψ_i|ψ_j⟩|² (量子态内积)
+
+优势: 天然表达token间的深层关联
+劣势: 需要量子态表示, CPU模拟开销大
+
+#### 方案2: 量子嵌入纠缠
+QuantumEmbeddingV2当前: 经典语言感知嵌入
+升级: 纠缠态嵌入 = 同一语言的token共享纠缠态
+
+```python
+# 语言纠缠嵌入
+class EntangledLanguageEmbedding:
+    def __init__(self, d_model, n_langs=3):
+        self.lang_entangle = nn.Parameter(
+            torch.randn(n_langs, d_model) / math.sqrt(d_model)
+        )
+    
+    def forward(self, x, lang_id):
+        base = self.base_embed(x)
+        entangle = self.lang_entangle[lang_id]
+        return base * entangle  # 纠缠调制
+```
+
+#### 方案3: 量子Beam Search
+生成时利用纠缠态选择最相干的token序列
+- 不是独立选择每个token
+- 而是选择最相干的token组合(纠缠选择)
+
+### 实施优先级
+1. V15: 无量子元素(基础训练能力优先)
+2. V16: 方案2(纠缠嵌入, 最简单)
+3. V17: 方案1(量子注意力, 中等)
+4. V18+: 方案3(量子Beam Search, 最复杂)
+
+### 前置条件
+- Val<2.0 (基础能力建立)
+- SPM 20K稳定运行
+- 训练数据100K+
