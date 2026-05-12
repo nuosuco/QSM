@@ -19825,3 +19825,65 @@ def get_sample_weights(dataset, max_diff):
 - 减少简单数据主导训练的问题
 - 高难度数据(句子/文化)得到更多学习机会
 - 配合Warmup: 初始只学简单→逐渐加入复杂
+
+## 研究#609: V15训练脚本整合方案 (2026-05-12)
+
+### 所有V15改进代码段汇总(已研究)
+1. ✅ 研究#597: Label Smoothing ε=0.1
+2. ✅ 研究#604: Cross-Attention Dropout p=0.15
+3. ✅ 研究#605: Warmup+Cosine LR调度
+4. ✅ 研究#606: Early Stopping patience=10
+5. ✅ 研究#607: 语言前缀[ZH]/[EN]/[YI]
+6. ✅ 研究#608: 课程学习+动态difficulty
+
+### V15脚本结构(最终版)
+```python
+# train_v15.py (~800行)
+
+# === 导入 ===
+import torch, math, json, os, argparse
+import sentencepiece as spm
+
+# === 模型定义 (基于V14) ===
+class QSMTransformer(nn.Module):  # 保持V14结构
+    - ALiBi位置编码
+    - QuantumEmbeddingV2
+    - LoRA r=16 (从32降)
+    - Cross-Attn Dropout p=0.15 (新增!)
+    - 4层/256d/4头/1024ff
+
+# === 数据加载 ===
+class QSMDataset:
+    - SPM 20K编码 (从16K升级)
+    - 语言前缀添加 (新增!)
+    - difficulty过滤 (课程学习)
+    - 双向训练 zh↔en
+
+# === 训练组件 ===
+- LabelSmoothingLoss(ε=0.1)     # 从0.05升级
+- AdamW(lr=0.0006, wd=0.01)     # 从Adam升级
+- Warmup+Cosine调度              # 从SGDR升级
+- EarlyStopping(patience=10)     # 新增!
+- GradientAccumulation(accum=16) # 从8升级
+
+# === 训练循环 ===
+for epoch in range(max_epochs):
+    max_diff = get_max_difficulty(epoch)
+    dataset.set_filter(max_diff)
+    train_loss = train_one_epoch(...)
+    val_loss = validate(...)
+    if early_stopper(val_loss, model): break
+
+# === 检查点 ===
+- best.pth: Val最低保存
+- last.pth: 每epoch保存
+- --resume: 从last.pth恢复
+```
+
+### V15启动前提
+1. 数据≥90K (当前84,929, 差~5K)
+2. SPM 20K训练完成
+3. 脚本编写+测试通过
+4. best.pth备份
+
+### 预计V15启动时间: 数据到90K后约5h
