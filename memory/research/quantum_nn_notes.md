@@ -20074,3 +20074,69 @@ scheduler = get_cosine_schedule_with_warmup(
     lr_min_ratio=0.0167   # lr_min=0.00001
 )
 ```
+
+## 研究#613: V15 SPM 20K训练数据准备脚本 (2026-05-12)
+
+### 提取脚本设计
+```python
+import json, re
+
+def extract_texts_for_spm(dataset_path, output_path):
+    """从v13_clean_dataset.json提取所有文本行"""
+    with open(dataset_path) as f:
+        data = json.load(f)
+    
+    lines = set()
+    for item in data:
+        inp = item.get('input', '')
+        out = item.get('output', '')
+        lines.add(inp)
+        lines.add(out)
+    
+    with open(output_path, 'w') as f:
+        for line in sorted(lines):
+            f.write(line + '\n')
+    
+    return len(lines)
+
+def extract_yi_symbols(vocab_path, data_path, output_path):
+    """从vocab和数据中提取所有彝文字符"""
+    with open(vocab_path) as f:
+        vocab = json.load(f)
+    
+    # 已知彝文
+    yi_chars = set()
+    for token, idx in vocab.get('yi', {}).items():
+        for c in token:
+            if '\uf2000' <= c <= '\ufffff':
+                yi_chars.add(c)
+    
+    # 从数据中扫描
+    with open(data_path) as f:
+        data = json.load(f)
+    for item in data:
+        for field in ['input', 'output']:
+            for c in item.get(field, ''):
+                if '\uf2000' <= c <= '\ufffff':
+                    yi_chars.add(c)
+    
+    # 写入user_symbols
+    with open(output_path, 'w') as f:
+        f.write('[ZH]\n[EN]\n[YI]\n')
+        for c in sorted(yi_chars):
+            f.write(c + '\n')
+    
+    return len(yi_chars)
+```
+
+### 执行步骤
+1. extract_texts_for_spm → spm_training_data.txt (~170K行)
+2. extract_yi_symbols → yi_symbols_v15.txt (3前缀+7000彝文)
+3. spm_train → qsm_spm_v15.model + qsm_spm_v15.vocab
+
+### 验证清单
+- [ ] [ZH]/[EN]/[YI] 是否为独立token
+- [ ] 彝文字符是否不被拆分
+- [ ] vocab_size=20000
+- [ ] 常用中文/英文词是否保留
+- [ ] UNK率<1%
