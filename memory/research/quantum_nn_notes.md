@@ -20819,3 +20819,50 @@ def train():
 ### 建议
 立即停止V14! `systemctl stop qsm-v14-train`
 理由: 18连升, 每epoch浪费3.8h算力
+
+## 研究#630: V15 SPM训练+数据质量检查 (2026-05-12)
+
+### SPM V15训练命令(待数据90K后执行)
+```bash
+cd /root/.openclaw/workspace/Models/QSM/bin
+
+# 训练SPM 20K词汇
+spm_train \
+  --input=spm_training_v15.txt \
+  --model_prefix=qsm_spm_v15 \
+  --vocab_size=20000 \
+  --character_coverage=0.9995 \
+  --model_type=bpe \
+  --user_defined_symbols_file=yi_symbols_v15.txt \
+  --pad_id=0 --unk_id=1 --bos_id=2 --eos_id=3 \
+  --num_threads=16
+
+# 预计耗时: ~30min (124K行文本)
+```
+
+### user_symbols文件内容
+- 3个语言前缀: [ZH], [EN], [YI]
+- 49个彝文字符(从数据+V14 vocab合并)
+- 注意: V14有4166彝文user_symbols, V15需从完整彝文字符集提取
+
+### 彝文字符集问题
+- V14 SPM: 4166彝文user_symbols → vocab=16K
+- V15数据中: 仅49个彝文字符(数据中彝文太少!)
+- **关键问题**: 数据中彝文覆盖率严重不足
+- 解决方案: 需要大量添加彝文数据(当前85K→目标90K中应含更多彝文)
+
+### 数据质量统计(当前86,045)
+| difficulty | 目标占比 | 估计数量 |
+|-----------|---------|---------|
+| diff1 | 10% | ~8,600 |
+| diff2 | 22% | ~18,900 |
+| diff3 | 55% | ~47,300 |
+| diff4 | 13% | ~11,200 |
+
+### V15启动前置清单更新
+1. ⏳ 数据≥90K (当前86,045, 差3,955)
+2. ⏳ SPM 20K训练 (命令已准备)
+3. ✅ V15训练脚本 (528行完成!)
+4. ⏳ V14 best.pth备份
+5. ⏳ V14训练停止
+6. ⏳ 彝文数据增加(严重不足!)
