@@ -19712,3 +19712,56 @@ V15: Early Stopping → 最多浪费10 epoch(~38h)
 - qsm_v15_best.pth: Val最低时保存(覆盖式)
 - qsm_v15_last.pth: 每epoch保存(用于resume)
 - qsm_v15_best_backup.pth: 训练前备份
+
+## 研究#607: V15语言前缀数据处理实现 (2026-05-12)
+
+### 数据预处理代码
+```python
+def add_language_prefix(data_item, spm_model):
+    """为训练数据添加语言前缀"""
+    input_text = data_item['input']
+    output_text = data_item['output']
+    
+    # 检测输入语言
+    input_lang = detect_language(input_text)  # 'zh', 'en', 'yi'
+    output_lang = detect_language(output_text)
+    
+    # 添加前缀
+    prefixed_input = f"[{input_lang.upper()}]{input_text}"
+    prefixed_output = f"[{output_lang.upper()}]{output_text}"
+    
+    # SPM编码
+    input_ids = spm_model.encode(prefixed_input)
+    output_ids = spm_model.encode(prefixed_output)
+    
+    return input_ids, output_ids
+
+def detect_language(text):
+    """简单语言检测"""
+    if any('\u4e00' <= c <= '\u9fff' for c in text):
+        # 含CJK统一汉字
+        if any('\uf2000' <= c <= '\ufffff' for c in text):
+            return 'yi'  # 含彝文字符
+        return 'zh'
+    return 'en'  # 默认英文
+```
+
+### 语言检测注意事项
+1. 彝文Unicode范围: U+F2000-U+F2FFF, U+F222E-U+FFB53
+2. 中文Unicode范围: U+4E00-U+9FFF
+3. 英文: 纯ASCII字母
+4. 混合文本: 取主要语言(彝文优先, 因为最稀有)
+
+### 训练数据格式变化
+V14格式: {"input": "你好", "output": "hello"}
+V15格式: {"input": "[ZH]你好", "output": "[EN]hello"}
+
+### 推理时
+用户指定输出语言:
+- /translate?text=你好&target=en → [ZH]你好 → [EN]hello
+- /translate?text=你好&target=yi → [ZH]你好 → [YI]彝文
+
+### 语言前缀的3个好处
+1. **可控输出**: 用户指定目标语言
+2. **零样本翻译**: 训练zh↔en后可能泛化到en→yi
+3. **单模型多方向**: 不需要3个独立模型
