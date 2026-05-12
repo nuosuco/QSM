@@ -21051,3 +21051,29 @@ def generate(model, src, src_lang, tgt_lang, max_len=128):
 
 ### 冲刺计划
 18轮×200条 = 3,600条 → 86,399 + 3,600 = 89,999 → ≈90K!
+
+## 研究#636: V15模型实例化测试通过! (2026-05-13)
+
+### 实测结果
+- ✅ QSMTransformerV15实例化成功
+- ✅ 参数量: 18,332,960 (18.33M)
+- ✅ LabelSmoothingLoss(ε=0.1) 正常
+- ✅ EarlyStopping(patience=10) 正常
+- ✅ 课程学习: E0→diff1, E2→diff2, E8→diff3, E20→diff4
+
+### V15 vs V14参数对比
+| | V14 | V15 |
+|---|-----|-----|
+| 总参数 | 16.37M | 18.33M |
+| vocab | 16K | 20K |
+| lora_r | 32 | 16 |
+
+### V15增加的参数来源
+- vocab 16K→20K: +embedding(4K×256=1.024M) +proj(256×20K=5.12M) - 减少(256×16K=4.096M)
+- 净增: ~1.96M (主要来自更大的vocab)
+- LoRA r=16反而减少了可训练参数，但全参数仍18.33M
+
+### 注意
+- 当前测试是全参数可训练(未冻结base)
+- 实际训练应只训练LoRA参数
+- 需要在脚本中添加freeze_base逻辑
