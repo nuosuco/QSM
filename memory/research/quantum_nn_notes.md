@@ -21247,3 +21247,36 @@ spm.SentencePieceTrainer.train(
 7. systemctl daemon-reload
 8. systemctl start qsm-v15-train
 9. 首批日志检查
+
+## 研究#643: V15 SPM训练数据重新提取完成 (2026-05-13)
+
+### SPM V15训练数据
+- spm_training_v15.txt: 125,838行 (来自87,261条数据)
+- yi_symbols_v15.txt: 3语言前缀 + 4,120彝文字符
+
+### SPM训练命令(可立即执行!)
+```bash
+cd /root/.openclaw/workspace/Models/QSM/bin
+python3 -c "
+import sentencepiece as spm
+spm.SentencePieceTrainer.train(
+    input='spm_training_v15.txt',
+    model_prefix='qsm_spm_v15',
+    vocab_size=20000,
+    character_coverage=0.9995,
+    user_defined_symbols_file='yi_symbols_v15.txt',
+    model_type='bpe',
+    split_digits=True,
+    byte_fallback=True
+)
+"
+```
+
+### V15启动进度
+- ✅ 数据: 87,261条 (差2,739到90K)
+- ✅ SPM训练数据已提取: 125,838行
+- ✅ 彝文symbols已更新: 4,120+3
+- ✅ V15脚本536行就绪
+- ✅ systemd service模板就绪
+- ⬜ 训练SPM 20K (~30min, 等数据90K后)
+- ⬜ 停V14 + 备份 + 启V15
