@@ -20924,3 +20924,52 @@ def generate(model, src, src_lang, tgt_lang, max_len=128):
 - seq_len=128: 理论3x加速
 - 内存增加: ~2x (K/V缓存)
 - 适用场景: API推理 (batch_size=1)
+
+## 研究#633: V15训练启动详细时间线 (2026-05-12)
+
+### 当前状态
+- V13数据: 86,287条 (距90K差3,713)
+- V14 E53训练中 (严重过拟合, 18连升)
+- V15脚本: 528行, 语法验证✅
+- SPM训练数据: 已准备(124K行+49彝文+3前缀)
+
+### 数据扩展进度
+- 今日已新增: ~1,600条 (从84,755→86,287)
+- 每轮+80条, 还需47轮
+- 按当前速度: ~4h达90K (约19:00 UTC / 03:00 GMT+8)
+
+### V15启动步骤(严格顺序!)
+1. **数据≥90K** ← 等待中
+2. **重新提取SPM训练数据** (数据到90K后)
+3. **训练SPM 20K** (~30min)
+4. **停止V14** `systemctl stop qsm-v14-train`
+5. **备份V14 best.pth** `cp qsm_v14_best.pth qsm_v14_best_backup2.pth`
+6. **V15脚本最终检查** (确认SPM路径+vocab_size)
+7. **创建V15 systemd service**
+8. **启动V15训练!**
+
+### V15训练参数最终确认
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| d_model | 256 | 同V14 |
+| n_heads | 4 | 同V14 |
+| n_layers | 4 | 同V14 |
+| d_ff | 1024 | 同V14 |
+| lora_r | 16 | V14=32, V15减半 |
+| vocab_size | 20000 | V14=16K |
+| cross_dropout | 0.15 | V14=0, 核心改进! |
+| label_smoothing | 0.1 | V14=0.05 |
+| optimizer | AdamW | V14=Adam |
+| weight_decay | 0.01 | V14=0 |
+| scheduler | Warmup+Cosine | V14=SGDR |
+| accum | 16 | V14=8 |
+| early_stop | patience=10 | V14=无 |
+| lang_prefix | [ZH]/[EN]/[YI] | V14=无 |
+| 预估参数量 | ~16M (LoRA r=16) | V14=16.37M |
+
+### V15预期效果
+- Cross-Attn Dropout(0.15): 预计Val改善0.3-0.5
+- AdamW+Cosine: 更稳定收敛
+- Early Stopping: 避免V14式过拟合
+- 语言前缀: 更好的多语言区分
+- 课程学习: 循序渐进
