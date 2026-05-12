@@ -20330,3 +20330,46 @@ def train():
 
 ### +KV Cache(推理3x加速, 研究#610)
 ### +SPM 20K (从16K升, 研究#591/613)
+
+## 研究#615: V15数据质量检查统计 (2026-05-12)
+
+### 当前v13_clean_dataset.json分布分析
+需要执行的关键检查:
+1. difficulty分布: diff1/diff2/diff3/diff4各占多少?
+2. 语言方向: zh→en vs en→zh比例
+3. 重复率: 是否有残留重复?
+4. 长度分布: 输入/输出平均token长度
+5. 彝文数据: 彝文相关条目数量
+
+### V15数据质量改进目标(研究#602)
+- diff1: 从35%→20% (词汇级降权)
+- diff3/4: 从40%→60% (句子/文化级加权)
+- 英文全小写 (已确保)
+- 去除<unk>标记
+- 去除空输入/输出
+- 去除超长句子(>512 tokens)
+
+### 建议执行命令
+```bash
+python3 -c "
+import json
+with open('v13_clean_dataset.json') as f: data=json.load(f)
+diffs={1:0,2:0,3:0,4:0}
+types={}
+for d in data:
+    diff=d.get('difficulty',1)
+    diffs[diff]=diffs.get(diff,0)+1
+    t=d.get('type','unknown').split('-')[-1]
+    types[t]=types.get(t,0)+1
+print('Difficulty:',diffs)
+print('Total:',len(data))
+print('Types:',len(types))
+"
+```
+
+### 90K目标差距
+当前: 85,215
+目标: 90,000
+差距: ~4,785条
+→ 按当前速度(44条/轮)还需~109轮
+→ 需要大批量生成加速
