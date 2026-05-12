@@ -21077,3 +21077,45 @@ def generate(model, src, src_lang, tgt_lang, max_len=128):
 - 当前测试是全参数可训练(未冻结base)
 - 实际训练应只训练LoRA参数
 - 需要在脚本中添加freeze_base逻辑
+
+## 研究#637: V15 freeze_base + LoRA只训练 (2026-05-13)
+
+### 问题
+V15当前18.33M参数全部可训练, 但LoRA设计意图是只训练LoRA参数
+
+### freeze_base逻辑
+```python
+def freeze_base_and_train_lora(model):
+    # 冻结所有base参数
+    for name, param in model.named_parameters():
+        if 'lora_A' not in name and 'lora_B' not in name:
+            param.requires_grad = False
+    
+    # 统计可训练参数
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in model.parameters())
+    return total, trainable
+```
+
+### 预期LoRA可训练参数
+每个LoRALinear有:
+- lora_A: [r, in_features] = [16, 256] = 4,096
+- lora_B: [out_features, r] = [256, 16] = 4,096 (for d_model→d_model)
+
+每层LoRA数量:
+- Encoder: W_q, W_k, W_v, W_o (4个) + FFN W1, W2 (2个) = 6
+- Decoder: W_q, W_k, W_v, W_o (4个) + Cross W_q, W_k, W_v, W_o (4个) + FFN (2个) = 10
+- 总LoRA: 4×6 + 4×10 = 64个
+
+但d_model≠d_ff的层参数不同:
+- d_model→d_ff(1024): lora_A=[16,256], lora_B=[1024,16] = 4096+16384 = 20,480
+- d_ff(1024)→d_model: lora_A=[16,1024], lora_B=[256,16] = 16384+4096 = 20,480
+
+粗估: 
+- d_model层: 64 × (4096+4096) = 64 × 8192 = 524,288
+- d_ff层: 8 × 20480 = 163,840
+- 总LoRA可训练: ~688K (0.688M)
+- 占总参数: 688K/18.33M = 3.75%
+
+### 下一步
+在V15脚本中添加freeze_base逻辑 + 只用AdamW训练LoRA参数
