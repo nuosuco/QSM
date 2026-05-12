@@ -21307,3 +21307,38 @@ spm.SentencePieceTrainer.train(
 1. 数据≥90K (差2,685条)
 2. 训练SPM 20K (~30min)
 3. 停V14 + 备份 + 启V15
+
+## 研究#645: V15 vs V14训练速度对比 (2026-05-13)
+
+### V14训练速度(实测)
+- 每epoch: ~230min (3.8h)
+- 100 epoch配置
+- 已完成E55, Best=E34 Val=2.7892
+- 过拟合E35-55: 20连升, 纯浪费
+
+### V15训练速度预估
+- 参数量: 18.33M(V15) vs 16.37M(V14) → +12%
+- 但LoRA只训练0.721M(V15) vs ~1.6M(V14)
+- LoRA训练参数少55%! → optimizer step更快
+- accum=16(V15) vs accum=8(V14) → 每step处理2x数据
+- 每epoch steps: 87K/8/16=675 (V15) vs 77K/8/8=~1200 (V14)
+- V15每epoch: ~675 steps × 时间/step
+- 估计: V15每epoch ~2-2.5h (比V14快~40%)
+
+### V15预期训练时长
+- Early Stop patience=10
+- 如果好: ~20-30 epoch后Best, 再10 epoch → stop
+- 总: ~30-40 epoch × 2.5h = 75-100h (3-4天)
+- 如果差: 10 epoch + patience=10 → 20 epoch stop → 50h
+
+### V15相比V14的关键改进
+1. SPM 20K(更多token覆盖, 减少UNK)
+2. LoRA r=16(正则化更强, 减少过拟合)
+3. Cross-Attn Dropout 0.15(减少过拟合)
+4. Label Smoothing 0.1(减少过拟合)
+5. Early Stopping(防止浪费算力!)
+6. Warmup+Cosine(比SGDR更稳定)
+7. 课程学习(从易到难)
+8. 语言前缀(引导生成方向)
+9. AdamW(更好的权重衰减)
+10. 数据87K+(比V14的77K多13%)
