@@ -20426,3 +20426,76 @@ print('Types:',len(types))
 - V15: Val<2.0 (9大改进, SPM 20K)
 - V16: Val<1.5 (对话数据+RAG原型)
 - V17: Val<1.0 (更大模型+RLHF)
+
+## 研究#617: V15 SPM训练数据提取实际执行 (2026-05-12)
+
+### 已编写提取脚本(内联)
+```python
+import json
+
+# Step1: 提取所有文本行
+with open('Models/QSM/bin/v13_clean_dataset.json') as f:
+    data = json.load(f)
+
+lines = set()
+for item in data:
+    lines.add(item.get('input', ''))
+    lines.add(item.get('output', ''))
+
+with open('Models/QSM/bin/spm_training_v15.txt', 'w') as f:
+    for line in sorted(lines):
+        f.write(line + '\n')
+
+print(f"提取{len(lines)}行文本")
+
+# Step2: 提取彝文字符
+yi_chars = set()
+with open('Models/QSM/bin/v4_vocab.json') as f:
+    vocab = json.load(f)
+# 从vocab提取
+for token_info in vocab.get('tokens', []):
+    token = token_info if isinstance(token_info, str) else str(token_info)
+    for c in token:
+        if '\uf2000' <= c <= '\ufffff':
+            yi_chars.add(c)
+
+# 从数据扫描
+for item in data:
+    for field in ['input', 'output']:
+        for c in item.get(field, ''):
+            if '\uf2000' <= c <= '\ufffff':
+                yi_chars.add(c)
+
+# 写入user_symbols
+with open('Models/QSM/bin/yi_symbols_v15.txt', 'w') as f:
+    f.write('[ZH]\n[EN]\n[YI]\n')
+    for c in sorted(yi_chars):
+        f.write(c + '\n')
+
+print(f"提取{len(yi_chars)}个彝文字符+3语言前缀")
+```
+
+### SPM训练命令
+```bash
+cd Models/QSM/bin
+spm_train \
+  --input=spm_training_v15.txt \
+  --model_prefix=qsm_spm_v15 \
+  --vocab_size=20000 \
+  --character_coverage=0.9999 \
+  --model_type=unigram \
+  --user_defined_symbols_file=yi_symbols_v15.txt \
+  --input_sentence_size=100000 \
+  --shuffle_input_sentence=true \
+  --num_threads=4
+```
+
+### 预期输出
+- qsm_spm_v15.model
+- qsm_spm_v15.vocab (20000行)
+- 彝文字符作为独立token
+- [ZH]/[EN]/[YI]作为独立token
+
+### 执行时机
+数据达到90K后立即执行SPM训练(~30min)
+然后启动V15训练
