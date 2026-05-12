@@ -21223,3 +21223,27 @@ spm.SentencePieceTrainer.train(
 - ⬜ 训练SPM 20K (等数据≥90K)
 - ⬜ 创建systemd service
 - ⬜ 停V14 + 备份 + 启V15
+
+## 研究#642: V15数据路径+systemd service (2026-05-13)
+
+### 修正内容
+- 数据路径: 'v13_clean_dataset.json' → 绝对路径
+- SPM路径: 已在#641修正
+- 所有相对路径已清除 ✅
+
+### V15 systemd service
+- 路径: /etc/systemd/system/qsm-v15-train.service
+- 日志: /tmp/qsm_v15_train_systemd.log
+- WorkingDir: /root/.openclaw/workspace/Models/QSM
+- PYTHONUNBUFFERED=1 ✅
+
+### V15启动顺序(最终版)
+1. 数据≥90K ← 还差2,785条
+2. 重新提取SPM训练数据
+3. 训练SPM 20K
+4. systemctl stop qsm-v14-train
+5. cp qsm_v14_best.pth qsm_v14_best_backup2.pth
+6. cp /tmp/qsm-v15-train.service /etc/systemd/system/
+7. systemctl daemon-reload
+8. systemctl start qsm-v15-train
+9. 首批日志检查
