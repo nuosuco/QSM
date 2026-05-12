@@ -21370,3 +21370,23 @@ spm.SentencePieceTrainer.train(
 - Phase3(E8-19): max_difficulty=3 → 75,070条
 - Phase4(E20+): max_difficulty=4 → 87,446条
 - 全部: 87,822条(含diff5)
+
+## 研究#647: SPM V15 20K训练成功! (2026-05-13)
+
+### 训练结果
+- ✅ SPM V15训练完成! vocab_size=20000
+- 用户自定义符号: 4,123个 (3前缀+4,120彝文)
+- 英文分词: quantum/superposition/is/the/core/concept ✅
+- 中文分词: 量子叠加态/是量子力学/的核心/概念 ✅
+- SPM模型: qsm_spm_v15.model + qsm_spm_v15.vocab
+
+### V15启动条件更新
+- ✅ V15脚本536行就绪
+- ✅ SPM 20K训练完成!
+- ✅ systemd service模板就绪
+- ⬜ 数据≥90K (当前87,495, 差2,505)
+- ⬜ 停V14 + 备份 + 启V15
+
+### 注意: SPM用125K行数据训练
+等数据到90K后需重新提取SPM数据并重训练!
+或者现在先用87K数据的SPM启动V15, 差别不大
