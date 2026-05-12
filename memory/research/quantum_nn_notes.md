@@ -19958,3 +19958,68 @@ class CachedDecoderLayer(nn.Module):
 1. Cross-Attn Cache最优先(编码器只算1次)
 2. Self-Attn Cache其次(逐token生成加速)
 3. 两者都加后推理速度≈3x
+
+## 研究#611: V15 Label Smoothing实现代码 (2026-05-12)
+
+### PyTorch实现
+```python
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, vocab_size, padding_idx=0, 
+                 smoothing=0.1, temperature=1.0):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.padding_idx = padding_idx
+        self.smoothing = smoothing
+        self.confidence = 1.0 - smoothing
+        self.temperature = temperature
+    
+    def forward(self, logits, target):
+        """
+        logits: (batch, seq_len, vocab_size) - 模型输出
+        target: (batch, seq_len) - 目标token id
+        """
+        # 展平
+        logits = logits.view(-1, self.vocab_size)
+        target = target.view(-1)
+        
+        # 创建平滑标签
+        true_dist = torch.zeros_like(logits)
+        true_dist.fill_(self.smoothing / (self.vocab_size - 2))
+        true_dist.scatter_(1, target.unsqueeze(1), self.confidence)
+        true_dist[:, self.padding_idx] = 0  # padding位置不计算
+        
+        # mask掉padding位置的target
+        mask = (target == self.padding_idx)
+        true_dist[mask] = 0
+        
+        # KL散度损失
+        log_probs = F.log_softmax(logits / self.temperature, dim=-1)
+        loss = -true_dist * log_probs
+        loss = loss.sum(dim=-1)
+        
+        # 只对非padding位置求平均
+        n_tokens = (~mask).sum()
+        loss = loss.sum() / max(n_tokens, 1)
+        
+        return loss
+```
+
+### V15 vs V14 Label Smoothing
+V14: ε=0.05 (研究#397已实现)
+V15: ε=0.1 (更强平滑, 更好泛化)
+
+### 为什么ε=0.1?
+- NMT标准: 0.1是最常用值(Vaswani 2017)
+- V14 ε=0.05过于保守, 过拟合仍严重
+- ε=0.1→模型对正确答案只分配90%概率
+- 剩余10%分给其他非padding token
+→ 防止模型过度自信→减少过拟合
+
+### V15完整损失函数
+```python
+criterion = LabelSmoothingLoss(
+    vocab_size=20000,  # SPM 20K
+    padding_idx=0,
+    smoothing=0.1      # V15: 从0.05升级到0.1
+)
+```
