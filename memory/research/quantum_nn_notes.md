@@ -21390,3 +21390,63 @@ spm.SentencePieceTrainer.train(
 ### 注意: SPM用125K行数据训练
 等数据到90K后需重新提取SPM数据并重训练!
 或者现在先用87K数据的SPM启动V15, 差别不大
+
+## 研究#648: V15完整启动计划 (2026-05-13)
+
+### 当前状态 (23:38 UTC)
+- 数据: 87,561条 (差2,439到90K)
+- SPM V15: ✅ 已训练20K
+- V15脚本: ✅ 536行, 所有路径绝对化
+- V14: E56运行中, Val 3.13 (21连升, Best E34=2.7892)
+
+### 90K冲刺进度
+- 已完成14轮, 每轮+120条
+- 还需~20轮 → ~60min
+- 预计00:40 UTC达标
+
+### V15启动步骤(精确!)
+```bash
+# 1. 停止V14
+systemctl stop qsm-v14-train
+
+# 2. 备份V14 best
+cd /root/.openclaw/workspace/Models/QSM/bin
+cp qsm_v14_best.pth qsm_v14_best_backup2.pth
+
+# 3. 重新提取SPM数据(数据已更新)
+cd /root/.openclaw/workspace
+python3 -c "
+import json
+with open('Models/QSM/bin/v13_clean_dataset.json') as f:
+    d = json.load(f)
+lines = set()
+for item in d:
+    for k in ['input','output']:
+        t = item.get(k,'').strip()
+        if t: lines.add(t)
+with open('Models/QSM/bin/spm_training_v15.txt','w') as f:
+    for l in sorted(lines): f.write(l+'\n')
+print(f'SPM数据: {len(lines)}行')
+"
+
+# 4. 重训练SPM (可选, 87K vs 90K差别不大)
+# python3 Models/QSM/bin/train_spm_v15.py
+
+# 5. 部署V15 service
+cp /tmp/qsm-v15-train.service /etc/systemd/system/
+systemctl daemon-reload
+
+# 6. 启动V15!
+systemctl start qsm-v15-train
+systemctl status qsm-v15-train
+
+# 7. 检查首批日志
+tail -20 /tmp/qsm_v15_train_systemd.log
+```
+
+### V15训练预期
+- 每epoch: ~2-2.5h
+- Early Stop patience=10
+- 如果好: 20-30 epoch → Best → 10 epoch → stop
+- 总时间: 3-4天
+- 目标: Val < 2.0 (Phase1)
