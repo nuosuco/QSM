@@ -21280,3 +21280,30 @@ spm.SentencePieceTrainer.train(
 - ✅ systemd service模板就绪
 - ⬜ 训练SPM 20K (~30min, 等数据90K后)
 - ⬜ 停V14 + 备份 + 启V15
+
+## 研究#644: V15 argparse路径全部绝对路径化 (2026-05-13)
+
+### 修正内容
+- --data: → /root/.openclaw/workspace/Models/QSM/bin/v13_clean_dataset.json
+- --spm: → /root/.openclaw/workspace/Models/QSM/bin/qsm_spm_v15.model
+- --save_dir: → /root/.openclaw/workspace/Models/QSM/bin/
+
+### V15脚本完整性检查 ✅
+- 模型定义 ✅
+- freeze_base + LoRA ✅
+- LabelSmoothing ✅
+- EarlyStopping ✅
+- Warmup+Cosine ✅
+- 课程学习 ✅
+- 语言前缀 ✅
+- AdamW ✅
+- Cross-Attn Dropout ✅
+- SPM绝对路径 ✅
+- 数据绝对路径 ✅
+- argparse默认值绝对路径 ✅
+- 语法验证 ✅
+
+### V15已完全就绪！只需:
+1. 数据≥90K (差2,685条)
+2. 训练SPM 20K (~30min)
+3. 停V14 + 备份 + 启V15
