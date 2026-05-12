@@ -20866,3 +20866,61 @@ spm_train \
 4. ⏳ V14 best.pth备份
 5. ⏳ V14训练停止
 6. ⏳ 彝文数据增加(严重不足!)
+
+## 研究#631: V15 KV Cache推理加速实现 (2026-05-12)
+
+### KV Cache原理
+标准自回归解码: 每步重新计算所有K,V → O(n²)
+KV Cache: 缓存已计算的K,V → 每步只算新token的Q → O(n)
+
+### 实现方式
+```python
+class KVCache:
+    def __init__(self):
+        self.self_k = None  # [B, H, L, D]
+        self.self_v = None
+        self.cross_k = None  # [B, H, S, D] (编码器输出, 只算一次)
+        self.cross_v = None
+    
+    def update_self(self, k, v):
+        if self.self_k is None:
+            self.self_k = k
+            self.self_v = v
+        else:
+            self.self_k = torch.cat([self.self_k, k], dim=2)
+            self.self_v = torch.cat([self.self_v, v], dim=2)
+        return self.self_k, self.self_v
+    
+    def set_cross(self, k, v):
+        self.cross_k = k
+        self.cross_v = v
+```
+
+### 推理流程
+```python
+def generate(model, src, src_lang, tgt_lang, max_len=128):
+    # 1. Encode (只执行一次)
+    enc_out = model.encode(src, src_lang)
+    
+    # 2. Decode (自回归, 逐步生成)
+    cache = KVCache()
+    # 首步: 计算cross K/V并缓存
+    # 后续: 只计算新token的Q, 复用缓存
+    
+    for t in range(max_len):
+        # 只编码最新token (而非全序列)
+        tgt_emb = model.token_emb(tgt[:, -1:])
+        # Self-attn: Q=new_token, K/V=cache
+        # Cross-attn: Q=new_token, K/V=cached enc_out
+        out = model.decode_step(tgt_emb, enc_out, cache)
+        next_token = out.argmax(-1)
+        tgt = torch.cat([tgt, next_token], dim=1)
+        if next_token == eos_id: break
+    
+    return tgt
+```
+
+### 加速效果预估
+- seq_len=128: 理论3x加速
+- 内存增加: ~2x (K/V缓存)
+- 适用场景: API推理 (batch_size=1)
