@@ -20729,3 +20729,58 @@ for epoch in range(max_epochs):
     # checkpoint every epoch
     save_checkpoint('qsm_v15_last.pth', epoch, model, optimizer, scheduler)
 ```
+
+## 研究#626: V15数据加载+训练循环设计 (2026-05-12)
+
+### QSMDataset设计
+```python
+class QSMDataset:
+    def __init__(self, data, spm, max_len=256, max_difficulty=4):
+        # 1. 按difficulty过滤(课程学习)
+        # 2. 检测语言方向(zh→en, en→zh, yi→zh等)
+        # 3. 添加语言前缀: src=[ZH]+tokens, tgt=[EN]+tokens
+        # 4. SPM编码 + 截断/padding
+        
+    def detect_language(self, text):
+        # 中文: 含CJK字符
+        # 英文: 全ASCII
+        # 彝文: 含U+F2000+字符
+        # 返回: 0=[ZH], 1=[EN], 2=[YI]
+```
+
+### 训练循环核心
+```python
+def train():
+    model = QSMTransformerV15(cfg)
+    optimizer = AdamW(trainable_params, lr=cfg.lr, 
+                      weight_decay=cfg.weight_decay,
+                      betas=cfg.betas, eps=cfg.eps)
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer, cfg.warmup_steps, total_steps)
+    criterion = LabelSmoothingLoss(cfg.vocab_size, 
+                                    smoothing=cfg.label_smoothing)
+    early_stop = EarlyStopping(cfg.early_stop_patience)
+    
+    for epoch in range(cfg.max_epochs):
+        max_diff = get_max_difficulty(epoch)
+        # 重建dataloader(过滤difficulty)
+        train_loss = train_one_epoch(...)
+        val_loss = validate(...)
+        early_stop(val_loss, model)
+        if early_stop.should_stop: break
+        save_checkpoint(...)
+```
+
+### V15 vs V14关键差异
+| 特性 | V14 | V15 |
+|------|-----|-----|
+| 数据过滤 | 无(全量) | 课程学习(按difficulty) |
+| 优化器 | Adam | AdamW(decay=0.01) |
+| 调度器 | SGDR | Warmup+Cosine |
+| 停止策略 | 手动 | Early Stop(patience=10) |
+| 损失函数 | CE+LS0.05 | CE+LS0.1 |
+| 累积步数 | 8 | 16 |
+| Cross Dropout | 0 | 0.15 |
+| 语言信号 | 无 | [ZH]/[EN]/[YI]前缀 |
+| LoRA r | 32 | 16 |
+| 词汇量 | 16K | 20K |
