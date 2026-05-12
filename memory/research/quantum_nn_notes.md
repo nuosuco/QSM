@@ -21198,3 +21198,28 @@ spm.SentencePieceTrainer.train(
 - 每epoch: ~2-3h (CPU, batch=8, accum=16)
 - 估计50 epoch: ~100-150h (但有Early Stop!)
 - 如果好: ~30 epoch后Early Stop → ~60-90h
+
+## 研究#641: V15脚本最终检查+修正 (2026-05-13)
+
+### 修正内容
+- SPM路径: 'qsm_spm_v15.model' → 绝对路径 '/root/.openclaw/workspace/Models/QSM/bin/qsm_spm_v15.model'
+- 数据路径: 'v13_clean_dataset.json' (需在运行时传入或改为绝对路径)
+
+### V15脚本就绪状态
+- ✅ 模型定义: QSMTransformerV15 (18.33M)
+- ✅ freeze_base + LoRA only (0.721M/3.93%)
+- ✅ LabelSmoothingLoss (ε=0.1)
+- ✅ EarlyStopping (patience=10)
+- ✅ Warmup+Cosine scheduler
+- ✅ 课程学习 (4阶段)
+- ✅ 语言前缀 [ZH]/[EN]/[YI]
+- ✅ AdamW (weight_decay=0.01)
+- ✅ Cross-Attn Dropout (0.15)
+- ✅ SPM绝对路径修正
+- ✅ 语法验证通过 (536行)
+
+### 待完成
+- ⬜ 数据路径也需绝对路径化
+- ⬜ 训练SPM 20K (等数据≥90K)
+- ⬜ 创建systemd service
+- ⬜ 停V14 + 备份 + 启V15
