@@ -20023,3 +20023,54 @@ criterion = LabelSmoothingLoss(
     smoothing=0.1      # V15: 从0.05升级到0.1
 )
 ```
+
+## 研究#612: V15 AdamW优化器实现代码 (2026-05-12)
+
+### PyTorch使用
+```python
+# V14: Adam (耦合weight_decay)
+# optimizer = torch.optim.Adam(trainable_params, lr=0.0006)
+
+# V15: AdamW (解耦weight_decay)
+optimizer = torch.optim.AdamW(
+    trainable_params,
+    lr=0.0006,
+    betas=(0.9, 0.98),    # NMT标准
+    eps=1e-9,
+    weight_decay=0.01      # L2正则化解耦!
+)
+```
+
+### Adam vs AdamW区别
+```
+Adam:  θ = θ - lr * (m / √v + λθ)     # weight_decay耦合在梯度中
+AdamW: θ = θ - lr * (m / √v) - lr*λ*θ  # weight_decay解耦
+
+关键: AdamW中weight_decay不影响自适应学习率
+→ 更好的正则化效果
+→ Loshchilov & Hutter (2019) 证明更优
+```
+
+### weight_decay=0.01选择依据
+- BERT默认: 0.01
+- GPT系列: 0.01
+- Transformer NMT: 0.01-0.1
+- V14无weight_decay → 过拟合严重
+- V15: 0.01是保守起点, 可以后续调到0.05
+
+### V15 optimizer配置总结
+```python
+optimizer = torch.optim.AdamW(
+    trainable_params,
+    lr=0.0006,            # 峰值LR (accum=16, 等效lr=0.0006)
+    betas=(0.9, 0.98),    # NMT标准 (不是0.999!)
+    eps=1e-9,
+    weight_decay=0.01     # 解耦L2, 防过拟合
+)
+scheduler = get_cosine_schedule_with_warmup(
+    optimizer,
+    warmup_steps=2000,
+    total_steps=total_steps,
+    lr_min_ratio=0.0167   # lr_min=0.00001
+)
+```
