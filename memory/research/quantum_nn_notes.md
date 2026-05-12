@@ -19765,3 +19765,63 @@ V15格式: {"input": "[ZH]你好", "output": "[EN]hello"}
 1. **可控输出**: 用户指定目标语言
 2. **零样本翻译**: 训练zh↔en后可能泛化到en→yi
 3. **单模型多方向**: 不需要3个独立模型
+
+## 研究#608: V15课程学习+动态difficulty (2026-05-12)
+
+### V14课程学习(已有)
+动态max_difficulty随epoch增长:
+- E1-10: max_diff=1 (词汇级)
+- E11-20: max_diff=2 (短语级)
+- E21-30: max_diff=3 (句子级)
+- E31+: max_diff=4 (文化专题)
+
+### V15改进
+V15保持相同策略, 但结合SGDR→Warmup+Cosine
+- LR warmup期(前2 epoch): max_diff=1
+- LR高峰期(E3-15): max_diff逐渐增长1→2→3
+- LR衰减期(E15+): max_diff=4(全部数据)
+
+### 实现代码
+```python
+def get_max_difficulty(epoch, total_epochs=100):
+    """动态max_difficulty"""
+    if epoch < 2:
+        return 1  # Warmup: 只学简单数据
+    elif epoch < 8:
+        return 2  # 短语级
+    elif epoch < 20:
+        return 3  # 句子级
+    else:
+        return 4  # 全部数据(含文化专题)
+
+def filter_by_difficulty(dataset, max_diff):
+    """过滤训练数据"""
+    return [item for item in dataset 
+            if item.get('difficulty', 1) <= max_diff]
+```
+
+### V15改进: 数据比例调整
+V14问题: diff1数据过多(35%), 模型走捷径
+V15方案: 动态采样权重
+```python
+def get_sample_weights(dataset, max_diff):
+    weights = []
+    for item in dataset:
+        diff = item.get('difficulty', 1)
+        if diff > max_diff:
+            weights.append(0)  # 不采样
+        elif diff == 1:
+            weights.append(0.5)  # 降权
+        elif diff == 2:
+            weights.append(1.0)
+        elif diff == 3:
+            weights.append(1.5)  # 加权
+        else:
+            weights.append(2.0)  # 高难度加权
+    return weights
+```
+
+### 预期效果
+- 减少简单数据主导训练的问题
+- 高难度数据(句子/文化)得到更多学习机会
+- 配合Warmup: 初始只学简单→逐渐加入复杂
