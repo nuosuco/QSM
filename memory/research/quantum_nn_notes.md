@@ -19887,3 +19887,74 @@ for epoch in range(max_epochs):
 4. best.pth备份
 
 ### 预计V15启动时间: 数据到90K后约5h
+
+## 研究#610: V15 KV Cache实现细节 (2026-05-12)
+
+### 核心思想
+推理时缓存Self-Attn和Cross-Attn的K/V矩阵, 避免重复计算
+
+### 代码实现
+```python
+class CachedDecoderLayer(nn.Module):
+    def __init__(self, d_model, n_heads, d_ff, 
+                 dropout=0.1, cross_dropout=0.15):
+        super().__init__()
+        self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
+        self.cross_attn = nn.MultiheadAttention(d_model, n_heads, dropout=cross_dropout)
+        # ... (同研究#604)
+        self.cross_attn_dropout = nn.Dropout(cross_dropout)
+        self.norms = nn.ModuleList([nn.LayerNorm(d_model) for _ in range(3)])
+    
+    def forward(self, x, enc_output, 
+                self_cache=None, cross_cache=None,
+                tgt_mask=None):
+        # 1. Self-Attention with KV Cache
+        if self_cache is not None:
+            # 增量: 只计算新token的Q, K/V拼接缓存
+            q = x[-1:]  # 只取最后一个新token
+            k = torch.cat([self_cache['k'], self.attn_k(x)], dim=0)
+            v = torch.cat([self_cache['v'], self.attn_v(x)], dim=0)
+            new_self_cache = {'k': k, 'v': v}
+            attn_out, _ = self.self_attn(q, k, v, attn_mask=tgt_mask)
+            attn_out = attn_out.expand_as(x)  # 恢复seq维度
+        else:
+            # 首次: 全量计算
+            k = self.attn_k(x)
+            v = self.attn_v(x)
+            new_self_cache = {'k': k, 'v': v}
+            attn_out, _ = self.self_attn(x, x, x, attn_mask=tgt_mask)
+        
+        x = self.norms[0](x + attn_out)
+        
+        # 2. Cross-Attention (enc_output不变, 只需缓存1次)
+        if cross_cache is not None:
+            x2, _ = self.cross_attn(x, cross_cache['k'], cross_cache['v'])
+        else:
+            enc_k = self.cross_k(enc_output)
+            enc_v = self.cross_v(enc_output)
+            cross_cache = {'k': enc_k, 'v': enc_v}
+            x2, _ = self.cross_attn(x, enc_k, enc_v)
+        
+        x2 = self.cross_attn_dropout(x2)
+        x = self.norms[1](x + x2)
+        
+        # 3. FFN
+        x = self.norms[2](x + self.ff(x))
+        
+        return x, new_self_cache, cross_cache
+```
+
+### 性能分析
+- Cross-Attn Cache: 编码器输出不变, K/V只需计算1次
+- Self-Attn Cache: 每步只需计算1个新token的Q/K/V
+- 加速比: 序列长度20时约3x, 长度50时约5x
+
+### 内存开销
+- d_model=256, n_layers=4, batch=1
+- 每层缓存: 2 * seq_len * 256 * 4bytes ≈ 2KB/token
+- 4层总计: ~8KB/token → 50token序列仅400KB ✅
+
+### V15实现优先级
+1. Cross-Attn Cache最优先(编码器只算1次)
+2. Self-Attn Cache其次(逐token生成加速)
+3. 两者都加后推理速度≈3x
