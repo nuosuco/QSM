@@ -21148,3 +21148,53 @@ def freeze_base_and_train_lora(model):
 
 ### 下一步
 将freeze_base逻辑加入V15训练脚本
+
+## 研究#640: V15 SPM 20K训练流程 (2026-05-13)
+
+### 当前状态
+- 数据: 87,087条 (距90K差2,913)
+- V14 E55开始(20连升, 无意义训练)
+
+### V15启动条件检查清单
+1. ✅ 数据≥90K ← 还差2,913条, ~24轮(200条/轮)
+2. ⬜ 重新提取SPM训练数据 (spm_training_v15.txt)
+3. ⬜ 训练SPM 20K模型 (~30min)
+4. ⬜ 停止V14 systemctl stop qsm-v14-train
+5. ⬜ 备份V14 best.pth → qsm_v14_best_backup2.pth
+6. ⬜ V15脚本最终检查 (vocab_size=20000, spm路径)
+7. ⬜ 创建V15 systemd service
+8. ⬜ 启动V15训练!
+
+### SPM训练命令(研究#630)
+```bash
+cd /root/.openclaw/workspace/Models/QSM/bin
+python3 -c "
+import sentencepiece as spm
+spm.SentencePieceTrainer.train(
+    input='spm_training_v15.txt',
+    model_prefix='qsm_spm_v15',
+    vocab_size=20000,
+    character_coverage=0.9995,
+    user_defined_symbols_file='yi_symbols_v15.txt',
+    model_type='bpe',
+    split_digits=True,
+    byte_fallback=True
+)
+"
+```
+
+### V15关键参数
+- SPM vocab: 20K (vs V14的16K)
+- LoRA r=16 (vs V14的32)
+- 可训练参数: 0.721M (3.93%)
+- Cross-Attn Dropout: 0.15
+- Label Smoothing: 0.1
+- Warmup+Cosine (vs V14 SGDR)
+- Early Stopping patience=10
+- 课程学习4阶段
+- 语言前缀: [ZH]/[EN]/[YI]
+
+### 预估训练时间
+- 每epoch: ~2-3h (CPU, batch=8, accum=16)
+- 估计50 epoch: ~100-150h (但有Early Stop!)
+- 如果好: ~30 epoch后Early Stop → ~60-90h
