@@ -20634,3 +20634,98 @@ systemctl disable qsm-v14-train
    - SPM 20K训练
    - V15训练脚本编写
    - 数据扩展到90K
+
+## 研究#623: V15训练脚本模型定义完善 (2026-05-12)
+
+### 已完成的核心组件(train_v15_warmup_cosine.py)
+1. ✅ Config类(所有超参数)
+2. ✅ ALiBi位置编码(同V14)
+3. ✅ LoRALinear(r=16)
+4. ✅ LabelSmoothingLoss(ε=0.1)
+5. ✅ EarlyStopping(patience=10)
+6. ✅ Warmup+Cosine调度器
+7. ✅ 课程学习get_max_difficulty()
+
+### 待添加的组件
+1. ⏳ QSMTransformer完整模型定义
+2. ⏳ QSMDataset数据加载(含语言前缀)
+3. ⏳ train_one_epoch()
+4. ⏳ validate()
+5. ⏳ main()训练循环
+6. ⏳ --resume检查点恢复
+
+### 模型架构细节
+```python
+class QSMTransformer(nn.Module):
+    def __init__(self, cfg):
+        # Encoder: 4层Self-Attn + FFN + ALiBi
+        # Decoder: 4层Self-Attn + Cross-Attn(Dropout!) + FFN + ALiBi
+        # LoRA应用于所有Q/K/V/O投影
+        # 语言嵌入: [ZH]/[EN]/[YI] → lang_id
+    
+    def forward(self, src, tgt, src_lang, tgt_lang):
+        # 1. Embedding + 语言嵌入
+        # 2. Encoder
+        # 3. Decoder (含Cross-Attn Dropout)
+        # 4. Project to vocab
+    
+    def generate(self, src, src_lang, tgt_lang, max_len=128):
+        # 1. Encode src
+        # 2. Autoregressive decode with KV Cache
+        # 3. Beam search / greedy
+```
+
+### 下一步
+完善train_v15_warmup_cosine.py, 添加完整模型+训练循环
+预计需要~500行额外代码
+
+## 研究#624: V15完整模型代码设计 (2026-05-12)
+
+### QSMTransformer V15 架构
+```
+Encoder:
+  Input: src_tokens + src_lang_emb
+  4x EncoderLayer:
+    - Self-Attention (LoRA Q/K/V/O, ALiBi)
+    - FFN (LoRA, d_ff=1024)
+    - LayerNorm + Residual
+
+Decoder:
+  Input: tgt_tokens + tgt_lang_emb
+  4x DecoderLayer:
+    - Self-Attention (LoRA, ALiBi, causal mask)
+    - Cross-Attention (LoRA, **Dropout p=0.15**)
+    - FFN (LoRA, d_ff=1024)
+    - LayerNorm + Residual
+  
+  Project: Linear → vocab_size
+```
+
+### 语言嵌入设计
+```python
+self.lang_emb = nn.Embedding(3, d_model)  # [ZH]=0, [EN]=1, [YI]=2
+# src_lang_emb加到token embedding上
+# tgt_lang_emb加到token embedding上
+# 类似mBART的语言token设计
+```
+
+### KV Cache推理加速
+```python
+# Self-Attn: cache (k, v) for past tokens
+# Cross-Attn: cache (k, v) from encoder (compute once)
+# 每步只需计算新token的Q, 复用K/V
+# 推理速度: ~3x faster for seq_len=128
+```
+
+### 训练循环伪代码
+```python
+for epoch in range(max_epochs):
+    max_diff = get_max_difficulty(epoch)
+    train_loader = filter_by_difficulty(data, max_diff)
+    train_one_epoch(...)
+    val_loss = validate(...)
+    if early_stopping(val_loss, model):
+        break
+    # checkpoint every epoch
+    save_checkpoint('qsm_v15_last.pth', epoch, model, optimizer, scheduler)
+```
