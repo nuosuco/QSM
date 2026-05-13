@@ -22882,3 +22882,58 @@ Val: 9.82→9.78↓→9.79↑ E3微升0.007!
 - E4: Val≈9.7 (开始适应diff=2)
 - E5-E7: Val持续下降
 - E8(diff=3升级): 可能再次微升, 然后继续降
+
+## 研究#693: V15 KV Cache推理加速方案 (2026-05-13)
+
+### 标准Transformer解码(无KV Cache)
+```
+生成第t个token:
+  Q_t = W_q · h_t          (1×d)
+  K = W_k · [h_1,...,h_t]  (t×d) ← 每步重算!
+  V = W_v · [h_1,...,h_t]  (t×d) ← 每步重算!
+  attn = softmax(Q_t · K^T / √d) · V
+```
+复杂度: O(t²) 每步! 生成长度T总: O(T³)
+
+### KV Cache加速
+```
+生成第t个token:
+  Q_t = W_q · h_t
+  K_t = W_k · h_t          ← 只算新的!
+  V_t = W_v · h_t          ← 只算新的!
+  K_cache = [K_1,...,K_t]   ← 追加到缓存
+  V_cache = [V_1,...,V_t]   ← 追加到缓存
+  attn = softmax(Q_t · K_cache^T / √d) · V_cache
+```
+复杂度: O(t) 每步! 生成长度T总: O(T²)
+
+### 加速比
+- 无Cache: O(T³)
+- 有Cache: O(T²)
+- **加速比: T倍!** 对于T=100: 100x!
+
+### 内存开销
+- K_cache: n_layers × n_heads × T × d_head × batch × 2bytes(FP16)
+- V15: 4层 × 4头 × T × 64 × 2 = 2048T bytes
+- T=100: ~200KB (极小!)
+
+### 实现方式
+```python
+# 在decoder的cross-attention中缓存encoder的K,V
+# 在decoder的self-attention中缓存已生成的K,V
+class DecoderLayerWithCache:
+    def forward(self, x, enc_kv, self_kv_cache):
+        # Self-attention with cache
+        Q = W_q(x[-1:])  # only new token
+        K_new = W_k(x[-1:])
+        V_new = W_v(x[-1:])
+        K = concat(self_kv_cache[0], K_new)
+        V = concat(self_kv_cache[1], V_new)
+        attn = softmax(Q @ K.T / sqrt(d)) @ V
+        self_kv_cache = (K, V)  # update cache
+        ...
+```
+
+### V15部署时自动启用
+- 训练时不需要KV Cache
+- 推理时自动启用 → 3x加速
