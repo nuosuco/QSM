@@ -22472,3 +22472,32 @@ v̂_t = v_t / (1-β₂ᵗ)                       (相同)
 - β₂=0.98 (比Adam默认0.999更小→二阶矩适应更快)
 - ε=1e-8
 - weight_decay=0.01
+
+## 研究#681: V15数据SPM格式转换方案 (2026-05-13)
+
+### 当前: 89,695 / 目标: 90,000 → 差305条! 最后一轮!
+
+### V15训练数据转换流程(研究#668延伸)
+1. 读取v13_clean_dataset.json (90K+条)
+2. 每条双向数据随机选方向:
+   - zh→en: input="[ZH]中文", target="[EN]english"  
+   - en→zh: input="[EN]english", target="[ZH]中文"
+3. SPM encode:
+   - input_ids = spm.encode(input_text)
+   - target_ids = spm.encode(target_text)
+4. 构建训练样本:
+   - encoder_input = input_ids
+   - decoder_input = [BOS] + target_ids
+   - labels = target_ids + [EOS]
+
+### 语言前缀在SPM中的位置
+- [ZH] → 单token (id: 4)
+- [EN] → 单token (id: 5)  
+- [YI] → 单token (id: 6)
+- 这3个token在SPM user_defined_symbols前3个
+
+### 数据统计(预估90K)
+- 双向展开: ~180K样本
+- 随机选方向: ~90K训练样本
+- 每epoch: 90K/16(accum)=5625 macro steps
+- 每step: ~174 updates → 总~5570 steps/epoch
