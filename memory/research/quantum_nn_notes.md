@@ -21450,3 +21450,46 @@ tail -20 /tmp/qsm_v15_train_systemd.log
 - 如果好: 20-30 epoch → Best → 10 epoch → stop
 - 总时间: 3-4天
 - 目标: Val < 2.0 (Phase1)
+
+## 研究#649: V15 KV Cache推理加速 (2026-05-13)
+
+### KV Cache原理
+- Decoder自注意力: 每步需要所有历史K,V
+- KV Cache: 缓存已计算的K,V, 新步只计算最新token的K,V
+- 速度提升: O(n²) → O(n) (推理时)
+- 内存开销: 需存储 2 × n_layers × batch × seq_len × d_model
+
+### 实现方案(推理时, 不影响训练)
+```python
+def generate_with_kv_cache(model, sp, prompt, max_len=128):
+    # 1. 编码prompt
+    ids = sp.Encode(prompt)
+    
+    # 2. 初始化KV Cache
+    kv_cache = [None] * model.n_layers
+    
+    # 3. 逐步生成
+    for i in range(max_len):
+        if i == 0:
+            # 首次: 处理整个prompt
+            logits, kv_cache = model.forward_with_cache(ids, kv_cache)
+        else:
+            # 后续: 只处理最新token
+            logits, kv_cache = model.forward_with_cache([next_id], kv_cache, start_pos=len(ids)+i-1)
+        
+        next_id = logits.argmax(-1)[-1].item()
+        ids.append(next_id)
+        if next_id == sp.eos_id():
+            break
+    
+    return sp.Decode(ids)
+```
+
+### 预期推理加速
+- V14无KV Cache: ~30s/句
+- V15+KV Cache: ~10s/句 (3x加速)
+- 配合INT8量化: ~5s/句 (6x加速)
+
+### 计划
+V15训练完成后再添加KV Cache到API推理代码
+当前V15脚本专注训练, 不含推理代码
