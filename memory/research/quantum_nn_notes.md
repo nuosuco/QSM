@@ -21937,3 +21937,23 @@ output = attn_weights @ V
 - early_stopping_patience=10
 - 语言前缀: [ZH]/[EN]/[YI]
 - 数据: v13_clean_dataset.json (88K+, V13清洗)
+
+## 研究#665: 90K冲刺最后阶段 (2026-05-13)
+
+### 当前: 88,635 / 目标: 90,000
+- 差: 1,365条
+- 13轮 × ~3min ≈ 39min
+- 预计09:30 UTC达标!
+
+### 达标后立即执行V15启动(研究#664)
+1. systemctl stop qsm-v14-train
+2. cp qsm_v14_best.pth qsm_v14_best_backup2.pth
+3. cp /tmp/qsm-v15-train.service /etc/systemd/system/
+4. systemctl daemon-reload
+5. systemctl start qsm-v15-train
+6. tail -30 /tmp/qsm_v15_train_systemd.log
+
+### V14训练可随时停止
+- E58已严重过拟合(Val>3.1)
+- Best=E34=2.7892, 不会再打破
+- 继续训练纯浪费算力
