@@ -21820,3 +21820,45 @@ for name, param in model.named_parameters():
 - 内存占用减半 → 更安全的训练
 - 梯度估计等价 → 相同训练质量
 - 配合LoRA r=16 → 总内存~400MB ✅
+
+## 研究#662: Cross-Attention Dropout p=0.15 详解 (2026-05-13)
+
+### 位置
+- 应用在decoder的cross-attention层
+- 即encoder-decoder注意力: Q来自decoder, K/V来自encoder
+- 注意: self-attention不做dropout(已经有LoRA正则)
+
+### 原理
+```python
+# 标准cross-attention
+attn = softmax(Q @ K.T / √d) @ V
+
+# +CrossDropout
+attn_weights = softmax(Q @ K.T / √d)
+attn_weights = dropout(attn_weights, p=0.15)  # 随机置15%为0
+attn_weights = attn_weights / (1 - p)  # 缩放保持期望
+output = attn_weights @ V
+```
+
+### 为什么有效? (研究#397/595)
+1. **防止decoder过度依赖encoder特定位置**
+   - 无dropout: decoder总是attend相同的encoder token
+   - 有dropout: 15%的连接随机断开→强迫学习多种attend模式
+   
+2. **类似数据增强效果**
+   - 每步看到不同的encoder表示子集
+   - 等效于encoder输出有噪声→模型更鲁棒
+
+3. **与V14过拟合的因果关系**
+   - V14无CrossDropout→decoder死记硬背encoder
+   - 训练Loss低但Val高(泛化差)
+   - Gap=1.5严重!
+
+### p=0.15的选择
+- p=0.1: 不够(小数据集仍易过拟合)
+- p=0.15: 适中(参考BART/MBART)
+- p=0.2+: 过强(信息损失太多)
+
+### 预期效果
+- V14 Gap=1.5 → V15预期Gap<0.5
+- 翻译质量显著提升(不再死记硬背)
