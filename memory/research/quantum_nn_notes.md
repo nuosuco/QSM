@@ -22301,3 +22301,32 @@ lr = η_max * step / warmup_steps
 - min_lr = 0.0
 - total_epochs = 100 (Early Stop patience=10)
 - steps_per_epoch ≈ 5570 (89K/16/2=2781 micro_steps → 174 macro_steps × 32 = ~5570)
+
+## 研究#676: V15语言前缀[ZH]/[EN]/[YI]训练影响 (2026-05-13)
+
+### 语言前缀原理(参考mBART, Liu et al. 2020)
+- mBART在decoder输入开头添加语言标记
+- 告诉模型"目标语言是什么"
+- 单token开销, 但消除了方向歧义
+
+### V15实现
+- 3个SPM特殊token: [ZH], [EN], [YI]
+- 训练样本: input="[ZH]中文句子", target="[EN]english sentence"
+- 双向数据随机选方向
+
+### 对V14问题的改善
+1. **V14方向混淆**: zh→en和en→zh共享decoder, 模型不知道该输出哪种语言
+2. **V14英文碎片**: 没有方向信号→模型有时混入英文→碎片
+3. **V15明确信号**: [EN]前缀→decoder知道必须输出英文
+4. **V15消除歧义**: 同样的源语言, [ZH]和[EN]前缀决定不同输出
+
+### 数据转换规则(研究#668)
+| 原始对 | 方向 | input | target |
+|--------|------|-------|--------|
+| (zh, en) | zh→en | [ZH]中文 | [EN]english |
+| (zh, en) | en→zh | [EN]english | [ZH]中文 |
+
+### 预期效果
+- 消除翻译方向歧义 → 减少输出中语言混杂
+- 每个前缀token被训练~44K次(88K/2) → 充分学习
+-彝文前缀[YI]为未来彝文翻译铺路
