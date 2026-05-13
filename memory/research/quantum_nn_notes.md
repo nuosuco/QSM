@@ -22025,3 +22025,44 @@ attn = attn + m * distances  # 线性偏置
 ### V15具体参数
 - n_heads=4, slopes = 2^(-8/4) = [0.5, 0.25, 0.125, 0.0625]
 - 每个head有不同斜率→多尺度位置感知
+
+## 研究#668: V15语言前缀在训练数据中的实际应用 (2026-05-13)
+
+### 当前数据格式
+```json
+{"input": "量子计算是未来的方向", "output": "quantum computing is the future direction", "type": "zh-en-xxx", "difficulty": 4}
+```
+
+### V15训练时的转换
+```python
+def build_v15_sample(item):
+    # 判断目标语言
+    if item['type'].startswith('zh-en-'):
+        # 中文→英文: 前缀[EN]
+        src = "[EN]" + item['input']
+        tgt = item['output']
+    elif item['type'].startswith('en-zh-'):
+        # 英文→中文: 前缀[ZH]
+        src = "[ZH]" + item['input']
+        tgt = item['output']
+    else:
+        # 双向数据: 随机选方向
+        if random.random() < 0.5:
+            src = "[EN]" + item['input']
+            tgt = item['output']
+        else:
+            src = "[ZH]" + item['output']
+            tgt = item['input']
+    return src, tgt
+```
+
+### 关键点
+1. [ZH]/[EN]/[YI]在SPM中是单token(不分词)
+2. 前缀告诉模型输出用什么语言
+3. 双向数据随机增强方向鲁棒性
+4. 未来加彝文: [YI]前缀→彝文输出
+
+### 消融实验(未来)
+- 无前缀: 模型不知道输出语言→可能混乱
+- 有前缀: 明确方向→翻译更准确
+- 参考: mBART用语言ID token, 效果显著
