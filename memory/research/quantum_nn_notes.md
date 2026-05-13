@@ -21505,3 +21505,19 @@ V15训练完成后再添加KV Cache到API推理代码
 
 ### V15完全就绪!
 唯一阻塞: 数据≥90K (当前87,677, 差2,323)
+
+## 研究#651: 90K冲刺倒计时 (2026-05-13)
+
+### 当前: 87,751 / 目标: 90,000
+- 差: 2,249条
+- 每轮+120条, 还需19轮 (~57min)
+- 预计01:05 UTC达标!
+
+### 达标后立即执行
+1. systemctl stop qsm-v14-train
+2. cp qsm_v14_best.pth qsm_v14_best_backup2.pth
+3. 重新提取SPM数据 + 重训练SPM (可选)
+4. cp /tmp/qsm-v15-train.service /etc/systemd/system/
+5. systemctl daemon-reload
+6. systemctl start qsm-v15-train
+7. 首批日志检查!
