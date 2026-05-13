@@ -22367,3 +22367,50 @@ Dropout: attn_weights = softmax(QK^T/√d)
 - Gap从1.5降到<0.5 (3x改善)
 - decoder学习语义而非记忆位置
 - 翻译质量显著提升(减少重复/碎片)
+
+## 研究#678: V15 Early Stopping patience=10机制详解 (2026-05-13)
+
+### 算法伪代码
+```
+best_val_loss = ∞
+patience_counter = 0
+patience = 10
+
+for epoch in range(1, 101):
+    train_loss = train_one_epoch()
+    val_loss = validate()
+    
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        save_checkpoint("best.pth")
+        patience_counter = 0
+    else:
+        patience_counter += 1
+    
+    save_checkpoint("last.pth")  # for resume
+    
+    if patience_counter >= patience:
+        print(f"Early stopping at E{epoch}! Best={best_val_loss}")
+        break
+```
+
+### V14 vs V15对比
+| | V14 | V15 |
+|---|---|---|
+| Early Stop | 无 | patience=10 |
+| 最大epoch | 100 | 100 |
+| 实际有效epoch | 35 (E34 Best) | 预计20-25 |
+| 浪费epoch | 65! | ~10 |
+| 浪费时间 | 250h! | ~25h |
+
+### 五重防过拟合如何协同
+1. **CrossDrop p=0.15**: 防止decoder死记encoder (结构性)
+2. **Label Smoothing ε=0.1**: 防止过度自信 (目标函数)
+3. **AdamW wd=0.01**: 参数衰减 (优化器)
+4. **LoRA r=16**: 限制可训练参数 (架构性)
+5. **Early Stop p=10**: 自动止损 (训练策略)
+
+→ 即使前4重不够, Early Stop兜底保证不浪费算力!
+
+### 达标后(90K)立即启动V15!
+差475条!
