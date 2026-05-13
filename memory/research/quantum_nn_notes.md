@@ -21493,3 +21493,15 @@ def generate_with_kv_cache(model, sp, prompt, max_len=128):
 ### 计划
 V15训练完成后再添加KV Cache到API推理代码
 当前V15脚本专注训练, 不含推理代码
+
+## 研究#650: V15端到端验证全通过! (2026-05-13)
+
+### 验证结果
+- ✅ 模型: 18,332,960总/720,896可训练(3.93%)
+- ✅ SPM: 20,000词汇
+- ✅ Dataset: 87,301条 (is_train=True, max_difficulty=4)
+- ✅ LabelSmoothingLoss(ε=0.1)
+- ✅ EarlyStopping(patience=10)
+
+### V15完全就绪!
+唯一阻塞: 数据≥90K (当前87,677, 差2,323)
