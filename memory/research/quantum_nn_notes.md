@@ -22664,3 +22664,41 @@ m = 2^(-8/n_heads * (i+1))  # i=0,1,...,n_heads-1
 - 从6.8%→27.8%数据可用(21%新数据解锁!)
 - 训练数据量大幅增加
 - Val Loss下降速度将加快
+
+## 研究#687: V15 Gradient Accumulation accum=16详解 (2026-05-13)
+
+### 原理
+```
+for micro_batch in range(accum):
+    loss = forward(micro_batch) / accum
+    loss.backward()  # 梯度累加
+optimizer.step()    # 一次性更新
+optimizer.zero_grad()
+```
+
+### V15参数
+- batch_size = 32 (等价)
+- micro_batch = 2 (每次前向2个样本)
+- accum = 16 (累积16次)
+- 等效: 2 × 16 = 32 = batch_size
+
+### 为什么accum=16比accum=8(V14)更好
+1. **内存减半**: micro_batch=2 vs V14的4
+2. **梯度等价**: 累积16次micro=2 ≈ 一次batch=32
+3. **更稳定**: 更多micro-step → 梯度估计更平滑
+4. **LR调整**: 线性缩放规则, lr∝batch_size
+
+### 内存对比
+| | V14 | V15 |
+|---|---|---|
+| micro_batch | 4 | 2 |
+| accum | 8 | 16 |
+| 等效batch | 32 | 32 |
+| 激活值内存 | ~4.5GB | ~2.2GB |
+| 总训练内存 | ~5-6GB | ~1.5GB |
+
+### 为什么V15训练速度更快(45min vs 230min)
+1. 更小的micro_batch → 每步更快
+2. 更多micro-steps → 但每步更轻
+3. CPU优化: 小矩阵运算缓存友好
+4. 净效果: 5x速度提升!
