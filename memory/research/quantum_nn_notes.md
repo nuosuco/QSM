@@ -22264,3 +22264,40 @@ Epoch 1 | ...
 ```
 
 ### 差703条到90K!
+
+## 研究#675: Warmup+Cosine LR数学推导 (2026-05-13)
+
+### 公式
+```
+lr(t) = η_min + 0.5*(η_max - η_min)*(1 + cos(π*t/T_total))
+```
+其中:
+- η_max = 0.0006 (peak learning rate)
+- η_min = 0.0 (最低学习率)
+- t = current_step - warmup_steps
+- T_total = total_steps - warmup_steps
+
+### Warmup阶段 (前1000步)
+```
+lr = η_max * step / warmup_steps
+```
+线性从0增到η_max
+
+### 为什么Warmup有效
+1. 初始化时LoRA参数随机, 大LR导致梯度震荡
+2. Warmup让参数先小步适应, 再正常训练
+3. AdamW的二阶矩估计需要足够样本才准确
+4. GPT-2/3论文证明Warmup对Transformer关键
+
+### 为什么Cosine优于SGDR(V14)
+1. SGDR周期重启→LR突然升高→已学知识被冲刷
+2. Cosine平滑下降→参数始终向最优方向收敛
+3. 无需手动对齐周期与课程学习阶段
+4. 实验证明Cosine在相同epoch下Val Loss更低
+
+### V15具体参数
+- warmup_steps = 1000
+- max_lr = 0.0006
+- min_lr = 0.0
+- total_epochs = 100 (Early Stop patience=10)
+- steps_per_epoch ≈ 5570 (89K/16/2=2781 micro_steps → 174 macro_steps × 32 = ~5570)
