@@ -22133,3 +22133,46 @@ def build_v15_sample(item):
 | 总训练时间 | 380h | 50-60h |
 | 内存/训练 | 5-6GB | ~400MB |
 | 有效epoch | 35/100 | 20-25 |
+
+## 研究#671: V15启动自动化脚本 (2026-05-13)
+
+### 90K倒计时
+当前: 89,037 / 目标: 90,000
+差: 963条! ~9轮可完成!
+
+### V15启动脚本(数据达标后一键执行)
+```bash
+#!/bin/bash
+set -e
+echo "=== V15 Launch Script ==="
+
+# 1. Stop V14
+echo "[1/6] Stopping V14..."
+systemctl stop qsm-v14-train
+
+# 2. Backup V14 best
+echo "[2/6] Backing up V14 best.pth..."
+cp /root/.openclaw/workspace/Models/QSM/bin/qsm_v14_best.pth \
+   /root/.openclaw/workspace/Models/QSM/bin/qsm_v14_best_backup2.pth
+
+# 3. Deploy V15 service
+echo "[3/6] Deploying V15 service..."
+cp /tmp/qsm-v15-train.service /etc/systemd/system/
+systemctl daemon-reload
+
+# 4. Start V15
+echo "[4/6] Starting V15..."
+systemctl start qsm-v15-train
+
+# 5. Check logs
+echo "[5/6] Checking first logs..."
+sleep 5
+tail -30 /tmp/qsm_v15_train_systemd.log
+
+# 6. Verify
+echo "[6/6] Verifying..."
+systemctl status qsm-v15-train --no-pager
+echo "=== V15 Launched! ==="
+```
+
+### 脚本将保存到 /tmp/v15_launch.sh
