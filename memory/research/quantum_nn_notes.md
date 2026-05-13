@@ -21986,3 +21986,42 @@ output = attn_weights @ V
 ### V15改进建议
 - diff1可继续增加(基础词汇是根基)
 - 90K目标后重点增加diff2(diff3太多diff2太少)
+
+## 研究#667: 位置编码对比 ALiBi vs RoPE vs Learned (2026-05-13)
+
+### 对比表
+| 特性 | Learned PE | RoPE | ALiBi |
+|------|-----------|------|-------|
+| 参数量 | 额外max_len×d | 0 | 0 |
+| CPU友好 | ✅ | ❌(三角函数) | ✅✅ |
+| 外推能力 | ❌(受限于训练长度) | ✅(相对位置) | ✅✅(任意长度) |
+| 实现复杂度 | 简单 | 中等 | 极简 |
+| 训练稳定性 | 一般 | 好 | 好 |
+| 长序列表现 | 差 | 好 | 好 |
+
+### V15选择: ALiBi ✅
+1. **CPU训练**: 无GPU→三角函数计算慢, ALiBi是简单线性偏置
+2. **外推能力强**: 训练256长度可推理512+
+3. **零参数**: 不占模型参数, 不占内存
+4. **实现极简**: attention_score += m * [1,2,3,...,seq_len]
+5. **V14已验证**: ALiBi在V14中工作正常
+
+### ALiBi原理 (Press et al., 2022)
+```python
+# 标准attention
+attn = Q @ K.T / √d
+
+# ALiBi: 加入线性偏置
+slopes = 2^(-8/n_heads)  # 每个头不同斜率
+m = slopes.unsqueeze(1)  # [n_heads, 1]
+distances = [0, 1, 2, ..., seq_len-1]  # 相对距离
+attn = attn + m * distances  # 线性偏置
+
+# 近处token偏置小→关注多
+# 远处token偏置大→关注少
+# = 归纳偏置: 位置越远相关性越低
+```
+
+### V15具体参数
+- n_heads=4, slopes = 2^(-8/4) = [0.5, 0.25, 0.125, 0.0625]
+- 每个head有不同斜率→多尺度位置感知
