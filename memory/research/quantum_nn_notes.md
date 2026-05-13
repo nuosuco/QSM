@@ -21605,3 +21605,36 @@ def build_input(source, target_lang):
 - 当前数据: 50% zh→en, 50% en→zh
 - V15增加: [ZH]source→中文target, [EN]source→英文target
 - 未来加彝文: [YI]source→彝文target
+
+## 研究#655: V15 Warmup+Cosine LR调度 vs V14 SGDR (2026-05-13)
+
+### V14 SGDR问题
+- SGDR周期重启: T_0=10, t_mult=1
+- 重启后LR突然跳高→打破已学到的特征
+- 与课程学习max_difficulty不同步
+- LoRA r变化后必须reset optimizer(研究#480)
+
+### V15 Warmup+Cosine Annealing
+```
+LR(t) = {
+  min_lr + (max_lr - min_lr) * t / warmup_steps,  t < warmup_steps  [warmup]
+  min_lr + 0.5 * (max_lr - min_lr) * (1 + cos(π*(t-warmup)/total)),  t >= warmup
+}
+```
+
+### 优势
+1. **平滑下降**: 无突变, 已学特征不被破坏
+2. **Warmup稳定初期**: 前N步从小LR逐渐增大, 避免早期梯度爆炸
+3. **末端趋近min_lr**: 精细调优, 类似SGD末期的微小学习率效果
+4. **超参简单**: 只需warmup_steps和max_lr/min_lr
+
+### V15具体参数
+- warmup_steps = total_steps * 0.06 (6% warmup比例)
+- max_lr = 0.0006 (accum=16, 2x base lr)
+- min_lr = 0.00001 (1/60 of max)
+- total_steps由数据量自动计算
+
+### 参考
+- Loshchilov(2017): Cosine Annealing比Step Decay更优
+- GPT-3: Warmup 0.75B tokens (375步)
+- LLaMA: Cosine with min_lr=0.1*max_lr
