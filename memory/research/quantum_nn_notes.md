@@ -21574,3 +21574,34 @@ V15训练完成后再添加KV Cache到API推理代码
 音乐理论/舞蹈/摄影/电影/烹饪/园艺/宠物/收藏
 气象学/地质学/海洋学/考古学/人类学/人口学
 数学分析/代数/几何/概率论/统计学/运筹学
+
+## 研究#654: V15语言前缀Token详细设计 (2026-05-13)
+
+### 原理 (参考mBART/Language-Aware)
+- 在encoder输入前添加语言标识token
+- 模型学到: [ZH]开头→输出中文, [EN]开头→输出英文, [YI]开头→输出彝文
+- SPM V15已包含3个前缀token在user_defined_symbols中
+
+### 实现方式
+```python
+# 训练数据构造
+def build_input(source, target_lang):
+    prefix = {"zh": "[ZH]", "en": "[EN]", "yi": "[YI]"}[target_lang]
+    return prefix + source  # 拼接在输入最前面
+
+# 训练时
+# input:  "[EN]你好世界"  → target: "hello world"
+# input:  "[ZH]hello world" → target: "你好世界"
+# input:  "[YI]你好世界"  → target: "彝文翻译"
+```
+
+### 优势
+1. 单模型多方向翻译(6个方向: zh↔en, zh↔yi, en↔yi)
+2. 无需多个模型或配置切换
+3. 前缀token在SPM中已是单token(不分词)
+4. Attention自然学习到prefix→输出语言映射
+
+### 数据构造策略
+- 当前数据: 50% zh→en, 50% en→zh
+- V15增加: [ZH]source→中文target, [EN]source→英文target
+- 未来加彝文: [YI]source→彝文target
