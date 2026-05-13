@@ -21748,3 +21748,42 @@ LR(t) = {
 ### 组合效果
 Early Stopping + LoRA r=16 + CrossDropout + LabelSmoothing + AdamW
 = 五重防过拟合 → 模型在最佳点自动停止
+
+## 研究#660: V15 freeze_base+LoRA-only详解 (2026-05-13)
+
+### 原理
+- 冻结预训练权重W₀: requires_grad=False
+- 只训练LoRA低秩矩阵A和B: requires_grad=True
+- W = W₀ + BA, 仅更新A和B
+- 冻结层仍参与forward, 只是grad不回传
+
+### V15具体实现
+```python
+model = QSMTransformerV15(cfg)
+# freeze all
+for name, param in model.named_parameters():
+    param.requires_grad = False
+# unfreeze LoRA only
+for name, param in model.named_parameters():
+    if 'lora_A' in name or 'lora_B' in name:
+        param.requires_grad = True
+```
+
+### 参数对比
+| | V14 | V15 |
+|---|-----|------|
+| 总参数 | 16.37M | 18.33M |
+| 可训练 | 1.6M (9.8%) | 0.72M (3.93%) |
+| LoRA r | 32 | 16 |
+| LoRA块数 | ~200 | 128 |
+
+### 为什么更少参数反而更好?
+1. **更少参数→更难过拟合** (V14核心问题!)
+2. **更强的正则化效果** (冻结=天然的强正则)
+3. **LoRA r=16是理论最优** (Hu 2021: r=4-16最好)
+4. **基础模型权重被保护** 不会因小数据集扭曲
+
+### 内存优势
+- V14: 训练~5-6GB (LoRA r=32)
+- V15: 训练~400MB (LoRA r=16) ✅
+- 剩余内存→可增大batch或数据量
