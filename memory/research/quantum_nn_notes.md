@@ -21719,3 +21719,32 @@ LR(t) = {
 - Cross-Attn Dropout p=0.15: 随机丢弃15%的encoder-decoder连接
 - Label Smoothing ε=0.1: 软化目标分布
 - 两者组合: 输入端+输出端双重正则化→最大防过拟合
+
+## 研究#659: Early Stopping patience=10 分析 (2026-05-13)
+
+### V14问题: 无Early Stopping!
+- V14跑了100 epoch, E35后全是浪费
+- E35-E55 = 20 epoch × 3.8h = 76h纯浪费!
+- Train 1.6 vs Val 3.1, Gap=1.5严重过拟合
+
+### V15: EarlyStopping(patience=10)
+- 每2步验证一次(V14每epoch)
+- 连续10次验证无改善→停止训练
+- 保存best.pth + last.pth
+
+### patience=10的选择依据
+| patience | 优点 | 缺点 |
+|----------|------|------|
+| 5 | 快速停止, 省算力 | 可能错过plateau后的突破 |
+| 10 | 平衡, 允许短暂波动 | 最多浪费~3.3h(10×20min) |
+| 20 | 更宽容, 适合SGDR | 可能浪费更多 |
+
+### V15预估
+- 每epoch~2-2.5h, 每20min验证
+- patience=10 = 最多容忍200min(3.3h)无改善
+- 预期Best在E15-25之间, Total~40-60h训练
+- 比V14的380h节省85%算力!
+
+### 组合效果
+Early Stopping + LoRA r=16 + CrossDropout + LabelSmoothing + AdamW
+= 五重防过拟合 → 模型在最佳点自动停止
