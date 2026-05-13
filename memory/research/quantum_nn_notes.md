@@ -21787,3 +21787,36 @@ for name, param in model.named_parameters():
 - V14: 训练~5-6GB (LoRA r=32)
 - V15: 训练~400MB (LoRA r=16) ✅
 - 剩余内存→可增大batch或数据量
+
+## 研究#661: V15 梯度累积 accum=16 详解 (2026-05-13)
+
+### 原理
+- 小batch无法充分利用GPU/CPU并行 → 梯度累积模拟大batch
+- 每accum步才更新一次参数
+- 有效batch = micro_batch × accum_steps
+- V15: micro_batch=2, accum=16 → effective_batch=32
+
+### V14 vs V15
+| | V14 | V15 |
+|---|-----|------|
+| micro_batch | 4 | 2 |
+| accum | 8 | 16 |
+| effective_batch | 32 | 32 |
+| 内存/batch | 高(4样本) | 低(2样本) |
+
+### 为什么V15用更小micro_batch+更大accum?
+1. **内存安全**: micro_batch=2更省内存(400MB vs 800MB)
+2. **训练更稳定**: 更多累积步→梯度估计更准确
+3. **相同有效batch**: 32不变, 训练动态等价
+4. **LR调整**: accum=16→lr=0.0006(2x base 0.0003)
+
+### 数学证明
+梯度累积等价于大batch:
+- 大batch: g = (1/N) Σ ∇L(xᵢ)
+- 累积: g = (1/accum) Σ gⱼ, where gⱼ = (1/micro) Σ ∇L(xᵢ)
+- 两者相同!
+
+### 预期收益
+- 内存占用减半 → 更安全的训练
+- 梯度估计等价 → 相同训练质量
+- 配合LoRA r=16 → 总内存~400MB ✅
