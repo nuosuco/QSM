@@ -22330,3 +22330,40 @@ lr = η_max * step / warmup_steps
 - 消除翻译方向歧义 → 减少输出中语言混杂
 - 每个前缀token被训练~44K次(88K/2) → 充分学习
 -彝文前缀[YI]为未来彝文翻译铺路
+
+## 研究#677: Cross-Attention Dropout p=0.15 深入分析 (2026-05-13)
+
+### 核心问题: V14为什么过拟合?
+- V14 Gap≈1.5 (Val 2.79 vs Train 1.3)
+- 根因: decoder的cross-attention死记硬背encoder输出
+- 小模型+小数据→decoder走捷径: 直接复制encoder表示
+
+### Cross-Attention Dropout原理
+```
+标准: attn_output = softmax(QK^T/√d)V
+Dropout: attn_weights = softmax(QK^T/√d)
+         attn_weights = dropout(attn_weights, p=0.15)
+         attn_output = attn_weights @ V
+```
+- 在attention weights上随机丢弃15%的连接
+- decoder不能依赖任何单个encoder位置
+- 被迫学习鲁棒的语义表示
+
+### p=0.15的理论依据
+1. p太小(0.05): 正则化不够, 仍会过拟合
+2. p太大(0.3): 信息丢失太多, 训练困难
+3. p=0.15: 平衡点 (Srivastava et al. 2014推荐0.1-0.2)
+4. 15%≈每6-7个token丢弃1个, 类似人类阅读跳词
+
+### 与Self-Attention Dropout的区别
+| | Self-Attn Dropout | Cross-Attn Dropout |
+|---|---|---|
+| 位置 | encoder/decoder内部 | encoder→decoder |
+| 效果 | 防止单词内部过拟合 | 防止decoder死记encoder |
+| V14 | p=0.1 | 无! |
+| V15 | p=0.1 | p=0.15 ✅ |
+
+### 预期效果
+- Gap从1.5降到<0.5 (3x改善)
+- decoder学习语义而非记忆位置
+- 翻译质量显著提升(减少重复/碎片)
