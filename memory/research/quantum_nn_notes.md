@@ -22590,3 +22590,43 @@ L = -Σ_k q(k)·log(p(k))
 - E5: ~5.0 
 - E10: ~4.0
 - E20: ~3.0 (目标Best<2.5需要更多epoch)
+
+## 研究#685: ALiBi位置编码实现细节 (2026-05-13)
+
+### ALiBi原理 (Press et al. 2022)
+标准Transformer: x = token_emb + pos_emb
+ALiBi: x = token_emb (无位置嵌入!)
+     attention_scores = QK^T/√d + m·alibi_bias
+
+### alibi_bias矩阵
+```
+对于位置i查询位置k:
+bias[i][k] = m · (k - i)    (k < i时为负)
+```
+- k=i: bias=0 (自身)
+- k<i: bias<0 (过去位置, 距离越远越负)
+- m: 每个注意力头的斜率
+
+### 斜率m的计算
+```python
+m = 2^(-8/n_heads * (i+1))  # i=0,1,...,n_heads-1
+# V15: n_heads=4
+# m_0 = 2^(-2) = 0.25
+# m_1 = 2^(-4) = 0.0625
+# m_2 = 2^(-6) = 0.015625
+# m_3 = 2^(-8) = 0.00390625
+```
+
+### V15 ALiBi优势
+1. 零参数! 不需要位置嵌入层
+2. CPU友好! 只需加法偏置
+3. 外推能力强! 训练512长度→推理可超1024
+4. 比RoPE简单! RoPE需要复数旋转
+
+### ALiBi在Encoder和Decoder中的差异
+- Encoder: 双向attention → 不适用ALiBi!
+- Decoder: 因果mask → ALiBi完美适用
+- V15: Encoder用learned PE, Decoder用ALiBi
+
+### ⚠️ 实际检查V15代码
+需确认V15是否正确实现了ALiBi
