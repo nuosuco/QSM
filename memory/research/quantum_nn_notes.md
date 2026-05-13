@@ -22702,3 +22702,35 @@ optimizer.zero_grad()
 2. 更多micro-steps → 但每步更轻
 3. CPU优化: 小矩阵运算缓存友好
 4. 净效果: 5x速度提升!
+
+## 研究#688: V15 Warmup+Cosine LR实际执行 (2026-05-13)
+
+### V15训练参数
+- warmup_steps = 1000
+- max_lr = 0.0006
+- min_lr = 0.0
+- total epochs = 100 (Early Stop patience=10)
+- steps_per_epoch ≈ 5570 (90K/32=2812 samples → 176 macro_steps × 32 accum)
+
+### Warmup期间(E1前半段)
+- step 0: lr=0
+- step 500: lr=0.0003 (一半)
+- step 1000: lr=0.0006 (peak!)
+
+### Cosine期间(E1后半段开始)
+- 逐渐平滑下降
+- E10: lr≈0.00055
+- E25: lr≈0.0004
+- E50: lr≈0.00015
+- E100: lr≈0.0
+
+### V14 SGDR对比(回忆)
+- V14: T_0=10, 每10 epoch一个SGDR周期
+- 周期重启时LR从0.0003突然跳高→冲刷已学知识
+- V14 E35后Val上升 = SGDR重启导致灾难性遗忘
+
+### V15 Cosine为什么更好
+1. 永不重启! LR持续下降→参数持续收敛
+2. 配合Early Stop: 在LR已经很低时自动停止
+3. 无突变→无灾难性遗忘
+4. Warmup保证初始稳定→Cosine保证收敛
