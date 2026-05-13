@@ -21521,3 +21521,36 @@ V15训练完成后再添加KV Cache到API推理代码
 5. systemctl daemon-reload
 6. systemctl start qsm-v15-train
 7. 首批日志检查!
+
+## 研究#652: V15为什么比V14更好? (2026-05-13)
+
+### V14失败原因分析
+1. **过拟合严重**: E35-55连续21 epoch Val上升 (2.79→3.13)
+2. **LoRA r=32太大**: 训练参数1.6M(9.8%), 容易过拟合
+3. **SGDR周期不匹配**: cycle重启时机与课程学习不同步
+4. **无Early Stopping**: 浪费64.6h在过拟合上
+5. **无Cross-Attn Dropout**: decoder过度依赖encoder特定位置
+6. **Label Smoothing太小**: ε=0.05不够
+7. **数据77K含噪声**: V12数据48%噪声残留
+8. **Adam vs AdamW**: 解耦weight_decay更优
+
+### V15针对性改进
+| 问题 | V14 | V15改进 |
+|------|-----|---------|
+| 过拟合 | LoRA r=32 (9.8%) | LoRA r=16 (3.93%) |
+| 无Early Stop | 100 epoch全跑 | patience=10自动停 |
+| Cross依赖 | 无Dropout | p=0.15随机丢弃 |
+| Label Smoothing | ε=0.05 | ε=0.1 |
+| 优化器 | Adam | AdamW(wd=0.01) |
+| 调度器 | SGDR | Warmup+Cosine |
+| 数据 | 77K(含噪声) | 87K+(V13清洗) |
+| SPM | 16K | 20K(更多覆盖) |
+| 语言引导 | 无 | [ZH]/[EN]/[YI]前缀 |
+
+### V15预期效果
+- 过拟合风险大幅降低(LoRA r小+Dropout+LS+ES)
+- 数据量+13%且更干净
+- SPM 20K减少UNK token
+- 语言前缀引导翻译方向
+- Early Stop防止浪费算力
+- 预期: Best Val < 2.5 (vs V14的2.79)
