@@ -21904,3 +21904,36 @@ output = attn_weights @ V
 ✅ LoRA-only实测通过
 ✅ 端到端验证全通过
 ⬜ 数据≥90K (当前88,569, 差1,431)
+
+## 研究#664: V15启动前最终检查清单 (2026-05-13)
+
+### ✅ 已完成
+1. ✅ 训练脚本536行 (train_v15_warmup_cosine.py)
+2. ✅ SPM 20K (qsm_spm_v15.model, vocab=20000)
+3. ✅ LoRA-only实测 (0.721M可训练, 3.93%)
+4. ✅ 端到端验证 (模型+数据+损失+早停)
+5. ✅ systemd模板 (/tmp/qsm-v15-train.service)
+6. ✅ 所有路径绝对化
+7. ✅ argparse默认值绝对路径
+8. ✅ 语法验证通过
+
+### ⬜ 待完成(数据到90K后执行)
+1. 停V14: `systemctl stop qsm-v14-train`
+2. 备份best: `cp qsm_v14_best.pth qsm_v14_best_backup2.pth`
+3. 可选: 重提取SPM数据+重训SPM(88K差别不大可跳过)
+4. 部署service: `cp /tmp/qsm-v15-train.service /etc/systemd/system/ && systemctl daemon-reload`
+5. 启动V15: `systemctl start qsm-v15-train`
+6. 检查首批日志: `tail -30 /tmp/qsm_v15_train_systemd.log`
+7. 确认E1开始训练
+
+### 关键参数确认
+- d_model=256, n_heads=4, n_layers=4, d_ff=1024
+- LoRA r=16, alpha=32
+- lr=0.0006 (2x base for accum=16)
+- warmup_ratio=0.06
+- weight_decay=0.01 (AdamW)
+- label_smoothing=0.1
+- cross_attn_dropout=0.15
+- early_stopping_patience=10
+- 语言前缀: [ZH]/[EN]/[YI]
+- 数据: v13_clean_dataset.json (88K+, V13清洗)
