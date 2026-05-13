@@ -21638,3 +21638,24 @@ LR(t) = {
 - Loshchilov(2017): Cosine Annealing比Step Decay更优
 - GPT-3: Warmup 0.75B tokens (375步)
 - LLaMA: Cosine with min_lr=0.1*max_lr
+
+## 研究#656: SPM V15 vs V14 分词对比 (2026-05-13)
+
+### 结果
+| 句子 | V14 tokens | V15 tokens | 改进 |
+|------|-----------|-----------|------|
+| 量子叠加态是量子计算的基础 | 4 | 3 | -25% |
+| neural network transformer... | 9 | 6 | -33% |
+| 人工智能与机器学习的未来发展 | 6 | 6 | 持平 |
+| deep learning and natural... | 7 | 6 | -14% |
+
+### 关键发现
+1. **英文分词改进最大!** V15对英文术语token数减少33%
+2. 中文分词基本持平(中文本身分词效率高)
+3. 更少token = 更短序列 = 更好训练(attention计算量O(n²))
+4. SPM 20K的额外4K词汇主要吸收了英文术语和常见搭配
+
+### V15预期收益
+- 英文序列更短→训练/推理更快
+- UNK=0 (两个SPM都无UNK)
+- 更好的子词覆盖减少碎片化
