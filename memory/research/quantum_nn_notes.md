@@ -22235,3 +22235,32 @@ echo "=== V15 Launched! ==="
 ### 结论: 完全够用!
 V15训练只需~400MB, 比V14的5-6GB少92%
 启动V15后总内存~1.25GB, 远低于7.4GB上限
+
+## 研究#674: V15 systemd service + 启动脚本验证 (2026-05-13)
+
+### systemd service配置(/tmp/qsm-v15-train.service)
+- ✅ WorkingDirectory: /root/.openclaw/workspace/Models/QSM
+- ✅ ExecStart: python3 train_v15_warmup_cosine.py
+- ✅ PYTHONUNBUFFERED=1
+- ✅ 日志: /tmp/qsm_v15_train_systemd.log
+- ✅ Restart=no (训练完成不重启)
+- ✅ WantedBy=multi-user.target (开机自启)
+
+### 启动脚本(/tmp/v15_launch.sh)
+1. systemctl stop qsm-v14-train
+2. cp best.pth → backup2.pth
+3. cp service → /etc/systemd/system/
+4. systemctl daemon-reload
+5. systemctl start qsm-v15-train
+6. tail日志验证
+
+### 预期E1日志输出
+```
+V15 training script framework loaded!
+Config: d=256, h=4, L=4, ff=1024, lora_r=16, vocab=20000
+Loading data from: /root/.../v13_clean_dataset.json
+Loading SPM from: /root/.../qsm_spm_v15.model
+Epoch 1 | ...
+```
+
+### 差703条到90K!
