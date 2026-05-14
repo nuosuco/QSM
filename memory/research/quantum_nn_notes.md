@@ -22988,3 +22988,54 @@ class DecoderLayerWithCache:
 - V15训练完成(或Early Stop)
 - V15 Best Val结果分析
 - 数据扩展到100K+
+
+## 研究#695: Flash Attention原理与CPU可行性 (2026-05-14)
+
+### Flash Attention核心思想(Dao et al. 2022)
+标准attention: Q·K^T → S → softmax(S) → P → P·V
+问题: S和P是N×N矩阵, 内存O(N²), 对长序列不可行
+
+Flash Attention: 分块计算(tiling)
+1. 将Q,K,V分成小块(block_size × d)
+2. 对每个Q块,遍历K,V块
+3. 在SRAM中完成softmax(在线softmax算法)
+4. 写回最终结果,不存储中间N×N矩阵
+
+### 内存: O(N) vs O(N²)
+- 标准Attention: 需要存储N×N attention矩阵
+- Flash Attention: 只需存储统计量(m,l), O(N)
+- 对N=256: 标准需256KB, Flash需2KB
+
+### IO复杂度
+- 标准Attention: O(N²d/M) HBM读写(M=SRAM大小)
+- Flash Attention: O(N²d²/M²) 但常数更小
+- GPU上: SRAM→HBM带宽是瓶颈, Flash减少读写次数
+
+### CPU上的可行性
+1. **CPU没有SRAM/HBM区分** → Flash的IO优势不存在!
+2. CPU L2缓存~1MB, 但不分块也能装下N=256的attention矩阵
+3. **对V15(N=256): Flash Attention几乎无加速**
+4. 对N>1024才有意义(V15序列长度256太小)
+
+### 结论
+- ❌ V15/V16不需要Flash Attention(序列太短)
+- ✅ 未来如果扩展到N=2048+可考虑
+- CPU上Flash的IO优势不存在
+- 但**在线softmax算法**本身有用(数值稳定性)
+
+### 在线softmax(可借鉴)
+```python
+# 标准softmax: 需要两次遍历(找max, 求exp/sum)
+# 在线softmax: 一次遍历, 维护running max和running sum
+m_i = -inf; l_i = 0
+for k in range(K_blocks):
+    m_new = max(m_i, max(K_block))
+    l_i = l_i * exp(m_i - m_new) + sum(exp(K_block - m_new))
+    m_i = m_new
+# 结果与标准softmax相同, 但不需存储全部S矩阵
+```
+
+### V16可借鉴: 数值稳定的在线softmax
+- 防止attention score溢出
+- 对FP16混合精度训练有用
+- V15已用FP32, 暂不需要
