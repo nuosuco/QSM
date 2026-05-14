@@ -24498,3 +24498,63 @@ diff=3数据加载可能触发swap, 大幅降低速度!
 1. 预编码数据: 保存SPM编码后的数据, 不需要每epoch重新编码
 2. 减少数据加载: 只在训练开始时加载一次
 3. 缩短验证集: 采样2K条代替全量验证
+
+## 研究#729: 🔥🔥🔥V15 E9超慢根因确认! (2026-05-15)
+
+### 根因: 每个epoch都重建整个Dataset!
+
+Line 485-486:
+```python
+train_data = QSMDataset(args.data, args.spm, max_difficulty=max_diff)
+val_data = QSMDataset(args.data, args.spm, max_difficulty=4, is_train=False)
+```
+
+### 每个epoch的开销:
+1. **JSON加载**: `json.load(f)` → 100K条 × 解析 ≈ 3-5min
+2. **SPM模型加载**: `SentencePieceProcessor().Load()` ≈ 1min  
+3. **difficulty过滤**: 遍历100K条 ≈ 1min
+4. **__getitem__每次SPM编码**: 84K条 × 2(src+tgt) × SPM编码 ≈ 这是最慢的!
+
+### 🔥🔥🔥__getitem__每次都做SPM编码!!!
+没有预编码缓存! 每次DataLoader取数据都重新SPM编码!
+E9: 84K条 × 2次编码 × 每个epoch = 巨大开销!
+
+### 验证集也是全量!
+val_data = QSMDataset(max_difficulty=4) → 加载全量100K数据!
+验证时遍历100K条 × SPM编码 ≈ 额外30-60min!
+
+### E9总时间估算(修正):
+| 步骤 | 时间 |
+|------|------|
+| JSON加载+过滤 | ~5min |
+| SPM模型加载 | ~1min |
+| 训练(84K条×16步累积) | ~300min |
+| __getitem__ SPM编码 | ~100min |
+| 验证(100K条×SPM编码) | ~60min |
+| **总计** | **~466min ≈ 7.8h** |
+
+等等, 7.8h应该已经完成了! 但已经21h了!
+
+### 🔥更严重的问题: num_workers=2!
+DataLoader用2个worker进程, 每个worker都要:
+1. 复制整个Dataset对象
+2. 重新加载SPM模型
+3. 重新解析JSON文件!
+这就是为什么有3个python3进程! 1主+2worker!
+
+### 🔥🔥🔥3个进程都加载SPM+JSON!
+- 主进程: 加载1次
+- Worker1: 加载1次
+- Worker2: 加载1次
+- 每个epoch: 3次完整数据加载!
+- 每个epoch: 3×SPM模型加载!
+- 内存: 3×数据 = ~4.5GB!
+
+这才是E9超级慢的根因!
+
+### V16优化方案(最高优先级!)
+1. **预编码数据**: 启动时一次性SPM编码所有数据, 保存编码后的token IDs
+2. **缓存Dataset**: __getitem__直接返回缓存的tensor, 不再重新编码
+3. **缩短验证集**: 采样2K条, 不用全量100K
+4. **num_workers=0**: CPU训练不需要多worker(增加内存和开销)
+5. **只在diff变化时重建Dataset**: 不是每epoch重建!
