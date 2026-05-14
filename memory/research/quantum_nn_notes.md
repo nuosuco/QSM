@@ -24631,3 +24631,57 @@ CPU训练不需要多worker!
 8. ❌ 部署systemd
 
 等V15 E9完成后再开始V16实现!
+
+## 研究#731: V15 E9完成时间精确预测 (2026-05-15)
+
+### E9已运行时间
+E9开始: 2026-05-14 21:39 UTC
+当前: ~2026-05-14 19:10 UTC = 已过21.5h
+
+### 训练脚本每epoch开销分解(基于研究#729)
+
+#### E8 (diff=2, ~33K条数据, 190.9min):
+- JSON加载+过滤: ~3min
+- SPM模型加载×3: ~3min
+- 训练(33K×16步): ~120min
+- SPM编码×3worker: ~40min
+- 验证(100K×SPM编码): ~25min
+- 总计: ~191min ✅(匹配!)
+
+#### E9 (diff=3, ~84K条数据, 预估):
+- JSON加载+过滤: ~5min (100K数据)
+- SPM模型加载×3: ~3min
+- 训练(84K×16步): ~310min (2.55x E8)
+- SPM编码×3worker: ~100min (2.55x)
+- 验证(100K×SPM编码): ~25min
+- 总计: ~443min ≈ 7.4h
+
+### 但E9已运行21.5h! 为什么?
+
+#### 可能原因1: DataLoader worker重复创建
+每个epoch重建Dataset → 每个worker重新fork → 重新加载SPM+JSON!
+3个worker × 每个epoch = 3次额外加载!
+
+#### 可能原因2: __getitem__中的detect_language()
+每个样本都调用detect_language()! 84K条×2(src+tgt) = 168K次语言检测!
+这可能是隐藏的瓶颈!
+
+#### 可能原因3: 数据集更大(100K vs 90K)
+训练脚本启动后, 数据文件从90K增长到100K!
+如果每次epoch都重新读取文件, 会读到新数据!
+
+### 🔥精确预估
+如果E9实际需要~443min(7.4h), 应该早就完成了!
+但实际已经21.5h, 说明有更严重的瓶颈!
+
+#### 最可能: __getitem__太慢!
+84K条 × 2次SPM编码 + 2次detect_language + padding + tensor创建
+= 每条~0.2s → 84K × 0.2s = 4.7h! 仅数据准备!
+× 16步累积 = 不, DataLoader只遍历一次数据
+
+实际上DataLoader遍历一次:
+84K条 / batch_size(16) = 5250步
+每步: 16个样本的__getitem__ + collate + forward + backward
+如果__getitem__很慢, 整个训练会非常慢!
+
+### 结论: V16必须预编码! 这是最关键的优化!
