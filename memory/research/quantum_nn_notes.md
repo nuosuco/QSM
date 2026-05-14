@@ -24685,3 +24685,106 @@ E9开始: 2026-05-14 21:39 UTC
 如果__getitem__很慢, 整个训练会非常慢!
 
 ### 结论: V16必须预编码! 这是最关键的优化!
+
+## 研究#732: V16预编码Dataset实现方案 (2026-05-15)
+
+### 核心思路: 启动时一次性编码, __getitem__直接返回tensor
+
+### 实现方案
+
+```python
+class QSMPreEncodedDataset(Dataset):
+    """预编码数据集 - 启动时编码一次, 训练时零开销"""
+    
+    def __init__(self, data_path, spm_model, max_len=256, max_difficulty=4):
+        import sentencepiece as spm
+        sp = spm.SentencePieceProcessor()
+        sp.Load(spm_model)
+        
+        with open(data_path) as f:
+            all_data = json.load(f)
+        
+        filtered = [d for d in all_data if d.get('difficulty', 3) <= max_difficulty]
+        logger.info(f"Encoding {len(filtered)} samples with SPM...")
+        
+        self.items = []
+        lang_tokens = {'[ZH]': 0, '[EN]': 1, '[YI]': 2}
+        
+        for idx, item in enumerate(filtered):
+            src_text = item['input']
+            tgt_text = item['output']
+            src_lang = detect_language(src_text)
+            tgt_lang = detect_language(tgt_text)
+            
+            # SPM编码
+            src_ids = sp.EncodeAsIds(src_text)[:max_len-1]
+            tgt_ids = sp.EncodeAsIds(tgt_text)[:max_len-1]
+            
+            # 语言前缀
+            lang_keys = list(lang_tokens.keys())
+            src_prefix = sp.PieceToId(lang_keys[src_lang]) if src_lang < 3 else 0
+            tgt_prefix = sp.PieceToId(lang_keys[tgt_lang]) if tgt_lang < 3 else 0
+            
+            src_ids = [src_prefix] + src_ids
+            tgt_ids = [tgt_prefix] + tgt_ids
+            
+            # Padding
+            src_len = len(src_ids)
+            tgt_len = len(tgt_ids)
+            src_padded = src_ids + [0] * (max_len - src_len)
+            tgt_padded = tgt_ids + [0] * (max_len - tgt_len)
+            
+            tgt_input = [2] + tgt_padded[:-1]
+            
+            self.items.append({
+                'src': torch.tensor(src_padded, dtype=torch.long),
+                'tgt_input': torch.tensor(tgt_input, dtype=torch.long),
+                'tgt_output': torch.tensor(tgt_padded, dtype=torch.long),
+                'src_mask': torch.tensor([1]*src_len + [0]*(max_len-src_len), dtype=torch.long),
+                'tgt_mask': torch.tensor([1]*tgt_len + [0]*(max_len-tgt_len), dtype=torch.long),
+                'src_lang': torch.tensor(src_lang, dtype=torch.long),
+                'tgt_lang': torch.tensor(tgt_lang, dtype=torch.long),
+            })
+            
+            if idx % 10000 == 0:
+                logger.info(f"  Encoded {idx}/{len(filtered)}")
+        
+        logger.info(f"Encoding complete! {len(self.items)} samples cached.")
+    
+    def __len__(self): return len(self.items)
+    
+    def __getitem__(self, idx):
+        return self.items[idx]  # 直接返回预计算tensor!
+```
+
+### 内存估算
+- 每条样本: 5个tensor × max_len(256) × 8bytes = ~10KB
+- 100K条: ~1GB内存
+- 可以接受! (7.4GB服务器, 训练用3-4GB, 总共5GB)
+
+### 速度提升
+- V15: 每条__getitem__ ≈ 0.2s (SPM+detect_lang+padding)
+- V16: 每条__getitem__ ≈ 0.00001s (直接返回dict)
+- 84K条训练: 84K × 0.2s = 4.7h → 84K × 0.01ms = 0.84s!
+- **加速5600x!!!**
+
+### 预编码启动时间
+- 100K条 × SPM编码 ≈ 5-10min
+- 一次性开销, 后续所有epoch都受益!
+
+### 验证集采样
+```python
+val_data = Subset(full_encoded_data, random.sample(range(len(full)), 2000))
+```
+验证从60min→3min!
+
+### V16训练总时间(预编码后)
+| 项目 | 时间 |
+|------|------|
+| 预编码(1次) | 10min |
+| 每epoch训练 | ~300min |
+| 每epoch验证 | ~3min |
+| 每epoch总计 | ~303min |
+| E1-E20 | ~6060min ≈ 4.2天 |
+| vs V15 E1-E20 | ~9300min ≈ 6.5天 |
+| **加速1.5x!** |
