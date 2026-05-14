@@ -24558,3 +24558,76 @@ DataLoader用2个worker进程, 每个worker都要:
 3. **缩短验证集**: 采样2K条, 不用全量100K
 4. **num_workers=0**: CPU训练不需要多worker(增加内存和开销)
 5. **只在diff变化时重建Dataset**: 不是每epoch重建!
+
+## 研究#730: V16训练脚本5大优化 (2026-05-15)
+
+### 基于研究#729发现的E9超慢根因
+
+### 优化1: 预编码数据缓存 (最高优先级!)
+```python
+class QSMCachedDataset(Dataset):
+    def __init__(self, data_path, spm_model, max_len=256, max_difficulty=4):
+        # 一次性加载+编码所有数据
+        sp = spm.SentencePieceProcessor()
+        sp.Load(spm_model)
+        with open(data_path) as f:
+            all_data = json.load(f)
+        filtered = [d for d in all_data if d.get('difficulty',3) <= max_difficulty]
+        
+        self.encoded = []
+        for item in filtered:
+            src_ids = sp.EncodeAsIds(item['input'])[:max_len-1]
+            tgt_ids = sp.EncodeAsIds(item['output'])[:max_len-1]
+            # 预计算所有tensor
+            self.encoded.append(prepare_tensors(src_ids, tgt_ids))
+    
+    def __len__(self): return len(self.encoded)
+    def __getitem__(self, idx): return self.encoded[idx]  # 直接返回!
+```
+**加速**: 消除每epoch的SPM编码开销! 预计每epoch省100+min!
+
+### 优化2: 缩短验证集
+```python
+# 随机采样2K条作为验证集
+val_data = QSMDataset(..., max_samples=2000)
+```
+**加速**: 验证时间从60min→3min! (20x!)
+
+### 优化3: num_workers=0
+CPU训练不需要多worker! 
+- 当前3个进程各加载SPM+JSON → 内存3x!
+- 改为num_workers=0 → 1个进程, 内存1x!
+**加速**: 省去进程间数据复制开销!
+
+### 优化4: 取消课程学习
+全量数据从E1开始训练:
+- 不需要每epoch重建Dataset!
+- 一次预编码, 永久使用!
+**加速**: 省去每epoch的JSON加载+过滤!
+
+### 优化5: LoRA r=32
+更多可训练参数 → 更好的学习容量
+- 0.721M → 1.44M可训练参数
+- 占比: 3.93% → 7.86%
+
+### V16训练时间预估(优化后)
+| 项目 | V15 | V16 | 加速 |
+|------|-----|-----|------|
+| 数据加载 | 每epoch 5min | 1次 10min | N/A |
+| SPM编码 | 每epoch 100min | 预编码 1次 | 20x |
+| 训练计算 | ~300min | ~300min | 1x |
+| 验证 | 60min | 3min | 20x |
+| 每epoch总计 | ~466min | ~313min | 1.5x |
+| E1-E20总计 | ~9300min(6.5天) | ~6260min(4.3天) | 1.5x |
+
+### V16训练脚本实现计划
+1. ✅ 研究#729: 根因分析完成
+2. ❌ 实现预编码Dataset
+3. ❌ 实现验证集采样
+4. ❌ num_workers=0
+5. ❌ 取消课程学习
+6. ❌ LoRA r=32
+7. ❌ 完整测试
+8. ❌ 部署systemd
+
+等V15 E9完成后再开始V16实现!
