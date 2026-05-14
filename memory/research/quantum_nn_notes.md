@@ -23039,3 +23039,43 @@ for k in range(K_blocks):
 - 防止attention score溢出
 - 对FP16混合精度训练有用
 - V15已用FP32, 暂不需要
+
+## 研究#696: Speculative Decoding推理加速 (2026-05-14)
+
+### 核心思想(Leviathan et al. 2023, Chen et al. 2023)
+用小模型(草案模型)快速生成k个token候选, 大模型(验证模型)并行验证
+
+### 流程
+1. 小模型draft自回归生成k个token: t1,t2,...,tk
+2. 大模型一次forward验证这k个token
+3. 从第一个被拒绝的token处截断
+4. 接受的token直接输出, 被拒绝处从大模型分布重采样
+
+### 加速比
+- 接受率α: 每个token被大模型接受的概率
+- 期望接受数: α/(1-α) × (1-α^k) ≈ α×k (当α高时)
+- 加速比: 1/(1-α) 到 (k+1)/2
+- 典型α=0.8, k=5: 加速2-3x
+
+### CPU上的适用性
+**关键: 需要并行验证!**
+- GPU: 大模型验证k个token与1个token几乎同时(并行计算)
+- CPU: 无并行优势, 逐个验证与逐个生成差异不大
+- **❌ CPU上Speculative Decoding几乎无加速**
+
+### QSM V15/V16分析
+- QSM在CPU上运行 → ❌ Speculative Decoding不适用
+- 但如果未来部署GPU → ✅ 可用V7-Small作为draft, V14/V15作为验证
+- V7-Small(4.5M) + V15(18.3M) = 不错的draft-verify对
+
+### CPU上更有效的推理优化
+1. ✅ KV Cache (3x加速, O(N²)→O(N))
+2. ✅ INT8量化 (2x加速, FP32→INT8)
+3. ✅ 算子融合 (减少Python开销)
+4. ❌ Speculative Decoding (需GPU并行)
+5. ❌ Flash Attention (需GPU SRAM)
+
+### 结论: QSM CPU推理优化优先级
+1. KV Cache (最有效)
+2. INT8量化 (已实现)
+3. 算子融合 (需torch.compile或C++重写)
