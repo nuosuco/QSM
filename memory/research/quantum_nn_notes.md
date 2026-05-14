@@ -24271,3 +24271,50 @@ V15 E8: Val暴跌0.16 → grokking! 模型突然泛化!
 ### ⚠️保守预测
 - 也可能E9 Val微升(diff=3新数据适应)
 - 但总体趋势是下降!
+
+## 研究#724: E8 Best逻辑bug? (2026-05-14)
+
+### 异常发现!
+E8日志显示: `Best:9.7805` 但 `Val:9.6194`!
+9.6194 < 9.7805, 应该更新Best!
+
+### 可能原因
+1. Best比较逻辑有bug: 可能用了>而不是<
+2. Best文件保存逻辑有bug
+3. Best变量没有正确更新
+
+### 实际影响
+- best.pth可能没有保存E8的最优权重!
+- last.pth保存了E8权重, 但best.pth可能仍是E5的!
+- 这意味着如果训练中断恢复, 可能用错误的best!
+
+### 需要检查训练脚本中best逻辑
+```python
+# 应该是这样:
+if val_loss < best_val_loss:
+    best_val_loss = val_loss
+    torch.save(model.state_dict(), best_path)
+```
+
+### 如果best.pth确实是旧的
+- 不影响继续训练(last.pth是E8的)
+- 但部署API时可能用错误的best.pth
+- 需要手动用last.pth替换best.pth!
+
+### 紧急行动
+1. 检查best.pth是否是E8的
+2. 如果不是, 用last.pth替换best.pth
+3. 检查训练脚本best逻辑是否有bug
+4. 修复bug(如果存在)
+
+### 🔥🔥🔥这可能是一个严重bug!
+如果best.pth保存的是旧权重, Early Stop也会基于错误的best!
+patience计数器不会触发, 因为best_val_loss没有更新!
+这意味着训练会继续(好事!), 但best权重文件是错的!
+
+### 研究#724更新: Best逻辑✅无bug!
+- best.pth包含E8的best_val=9.6194 ✅
+- 日志显示"Best:9.7805"是显示bug(取的是变量旧值)
+- 实际best文件正确保存了E8权重
+- min_delta=0.001, 9.6194 < 9.7805-0.001, 所以触发了更新
+- Early Stop patience正确重置!
