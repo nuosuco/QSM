@@ -25062,3 +25062,193 @@ class MultiTaskLoRA:
 
 ### V17适用(V16先验证预编码+num_workers=0)
 等V16训练完成, 评估三语效果后再决定是否需要多任务LoRA
+
+## 研究#738: V15 E9是否应该终止? (2026-05-15)
+
+### 当前状态
+- E9已运行28h+ (从5/14 21:39 UTC开始)
+- E8应7.4h完成但E9已28h (3.8x预期)
+- Worker死锁: 2个worker CPU=0%
+- 主进程CPU=97% MEM=18.4%
+- last.pth未更新(仍为E8末保存)
+
+### 🔥🔥🔥关键问题: E9可能永远不会完成!
+
+#### 可能性1: E9正在正常训练(只是极慢)
+- diff=3数据84K条, 比E8的33K条多2.5x
+- Worker死锁=主进程独自做数据加载+训练
+- 预估: 84K条 / batch(4) / accum(16) = 1313步
+- 每步~5s(含数据加载) → 6565s ≈ 110min
+- 但28h=1680min! 远超110min!
+- → 不太可能是正常训练!
+
+#### 可能性2: E9卡在某个step(死循环?)
+- 某条数据导致SPM编码死循环?
+- 某条数据过长导致OOM→swap→极慢?
+- 进程CPU 97%说明在计算, 不是等待I/O
+
+#### 可能性3: E9在swap中挣扎
+- MEM 5.7/7.4G = 77%
+- 主进程+2个worker × 1.7GB = 5.1GB
+- 系统+API = 2.3GB
+- 总需7.4GB > 7.4GB! → **频繁swap!**
+- CPU 97%可能在swap而不是真正训练!
+
+### 🔥🔥🔥根因: 内存不足导致swap!
+
+### 计算验证
+- 主进程: 18.4% × 7.4G = 1.36GB (模型+优化器+数据)
+- Worker1: 18.3% × 7.4G = 1.35GB (SPM+数据副本)
+- Worker2: 18.3% × 7.4G = 1.35GB (SPM+数据副本)
+- 合计: 4.06GB
+- 系统+API(8000/8001/8003): ~1.5GB
+- 总计: 5.56GB ← 低于7.4GB, 应该够...
+
+等等, 但free显示5.7G used! 其中包含buff/cache!
+实际available可能更低!
+
+### 决策: 继续等E9完成
+- 终止E9会丢失28h的训练进度
+- 如果E9最终完成, 我们能看到diff=3数据的效果
+- 如果E9再过4h(32h总计)仍无输出, 则考虑终止
+
+### 🔥如果终止E9: 下一步是V16!
+- num_workers=0: 省2×1.35GB = 2.7GB!
+- 预编码Dataset: 省去__getitem__的SPM编码
+- 取消课程学习: 全量数据从头训练
+- V16训练速度: ~303min/epoch(vs V15的466min)
+
+## 研究#739: 🔥🔥🔥SWAP确认! E9极慢真正根因! (2026-05-15)
+
+### 🔥🔥🔥SWAP使用1.1GB!
+```
+Mem: 7.4Gi used 4.6Gi free 1.9Gi buff/cache 1.2Gi available 2.7Gi
+Swap: 8.0Gi used 1.1Gi free 6.9Gi
+```
+
+### 为什么有SWAP?
+- 主进程: 18.4% × 7.4G = 1.36GB
+- Worker1: 18.3% × 7.4G = 1.35GB (死锁但占内存!)
+- Worker2: 18.3% × 7.4G = 1.35GB (死锁但占内存!)
+- 合计训练进程: 4.06GB
+- 系统+3API: ~1.5GB
+- 总需: 5.56GB → 物理内存够!
+
+### 但available=2.7G, 为什么swap?
+- buff/cache占1.2G → 进程内存压力→内核swap出部分页面
+- Worker虽然CPU=0%, 但占了2.7GB内存(2×1.35G)!
+- 这2.7GB是**完全浪费的**! Worker不做任何工作!
+
+### 🔥🔥🔥解决方案: 终止V15 E9, 启动V16(num_workers=0)!
+- 终止V15: 释放4.06GB(主+2worker)
+- 启动V16: 只需1.36GB(主进程, 无worker)
+- 省2.7GB! 消除swap!
+- 训练速度预计提升3-5x!
+
+### V15 E9已训练30h无输出
+- E8: 190.9min (3.2h)
+- E9: 已30h, 0输出
+- 如果正常训练E9应该8h完成
+- 30h/8h = 3.75x慢 → 正好是swap slowdown!
+
+### 🔥🔥🔥决策: 终止V15 E9, 立即启动V16!
+
+## 研究#740: V16训练脚本设计方案 (2026-05-15)
+
+### 基于V15代码分析的V16改动清单
+
+#### V15问题(逐行确认):
+1. Line 495/497: `num_workers=2` → Worker死锁+2.7GB内存浪费+1.1GB swap
+2. Line 301-365: `__getitem__` 每次调用SPM编码+detect_language → 极慢
+3. Line 481-487: 每epoch重建Dataset → 重复SPM加载+JSON加载+过滤
+4. Line 489-490: 验证集=5%全量(~5K条) → 验证太慢
+5. Line 425: `batch_size=8` → 可能太大(accum=16, 实际bs=128)
+6. 课程学习: max_diff每epoch变化 → 重建Dataset
+
+#### V16改动(6处):
+
+##### 改动1: QSMPreEncodedDataset (替代QSMDataset)
+```python
+class QSMPreEncodedDataset:
+    def __init__(self, data_path, spm_model, max_len=256, max_difficulty=4, max_samples=None):
+        import sentencepiece as spm
+        sp = spm.SentencePieceProcessor()
+        sp.Load(spm_model)
+        with open(data_path) as f:
+            all_data = json.load(f)
+        filtered = [d for d in all_data if d.get('difficulty',3) <= max_difficulty]
+        if max_samples and len(filtered) > max_samples:
+            random.seed(42)
+            filtered = random.sample(filtered, max_samples)
+        
+        lang_tokens = {'[ZH]': 0, '[EN]': 1, '[YI]': 2}
+        lang_keys = list(lang_tokens.keys())
+        
+        self.items = []
+        for item in filtered:
+            src_text = item['input']
+            tgt_text = item['output']
+            src_lang = detect_language(src_text)
+            tgt_lang = detect_language(tgt_text)
+            src_ids = sp.EncodeAsIds(src_text)[:max_len-1]
+            tgt_ids = sp.EncodeAsIds(tgt_text)[:max_len-1]
+            src_prefix = sp.PieceToId(lang_keys[src_lang]) if src_lang < 3 else 0
+            tgt_prefix = sp.PieceToId(lang_keys[tgt_lang]) if tgt_lang < 3 else 0
+            src_ids = [src_prefix] + src_ids
+            tgt_ids = [tgt_prefix] + tgt_ids
+            src_len = len(src_ids)
+            tgt_len = len(tgt_ids)
+            src_pad = src_ids + [0]*(max_len-src_len)
+            tgt_pad = tgt_ids + [0]*(max_len-tgt_len)
+            tgt_input = [2] + tgt_pad[:-1]
+            self.items.append({
+                'src': torch.tensor(src_pad, dtype=torch.long),
+                'tgt_input': torch.tensor(tgt_input, dtype=torch.long),
+                'tgt_output': torch.tensor(tgt_pad, dtype=torch.long),
+                'src_mask': torch.tensor([1]*src_len+[0]*(max_len-src_len), dtype=torch.long),
+                'tgt_mask': torch.tensor([1]*tgt_len+[0]*(max_len-tgt_len), dtype=torch.long),
+                'src_lang': torch.tensor(src_lang, dtype=torch.long),
+                'tgt_lang': torch.tensor(tgt_lang, dtype=torch.long),
+            })
+        
+    def __len__(self): return len(self.items)
+    def __getitem__(self, idx): return self.items[idx]
+```
+
+##### 改动2: num_workers=0
+```python
+train_loader = DataLoader(train_data, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
+val_loader = DataLoader(val_data, batch_size=cfg.batch_size, shuffle=False, num_workers=0)
+```
+
+##### 改动3: 取消课程学习, 数据只建1次
+```python
+train_data = QSMPreEncodedDataset(args.data, args.spm, max_difficulty=4)
+val_data = QSMPreEncodedDataset(args.data, args.spm, max_difficulty=4, max_samples=2000)
+for epoch in range(start_epoch, cfg.max_epochs):
+    train_loader = DataLoader(train_data, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_data, batch_size=cfg.batch_size, shuffle=False, num_workers=0)
+    # 不再重建Dataset!
+```
+
+##### 改动4: LoRA r=32
+```python
+cfg.lora_r = 32  # 从16→32
+```
+
+##### 改动5: 验证集2000条(从5K→2K)
+```python
+val_data = QSMPreEncodedDataset(args.data, args.spm, max_difficulty=4, max_samples=2000)
+```
+
+##### 改动6: SPM 25K (待训练)
+- 当前SPM 20K, V16扩展到25K
+
+### 预期效果
+| 指标 | V15 | V16 |
+|------|-----|-----|
+| 内存 | 4.06GB+1.1GB swap | 1.36GB (无swap!) |
+| 每epoch | 466min+ | ~303min |
+| 预编码启动 | 0min(但每epoch5min) | 10min(1次) |
+| __getitem__ | 1.3ms/条 | 0.001ms/条 |
+| 验证 | 100K条 60min | 2K条 3min |
