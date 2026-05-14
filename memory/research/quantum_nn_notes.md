@@ -24840,3 +24840,103 @@ val_data = Subset(full_encoded_data, random.sample(range(len(full)), 2000))
 - 彝文字符100%覆盖!
 - V16优化方案完整!
 - 10万+数据!
+
+## 研究#734: E9完成时间精确估算 (2026-05-15)
+
+### 已知数据
+- E9开始: 21:39 UTC (5/14)
+- 当前: ~20:40 UTC (5/15) = 已过23h
+- 训练进程CPU时间: 1366min (22.8h)
+
+### E8数据量 vs E9数据量
+- E8: diff≤2 = 33,559条 → 190.9min
+- E9: diff≤3 = 84,748条 → 应该约 190.9 × (84748/33559) = 482min = 8h
+
+### 但E9已运行23h! 3倍于预期!
+
+### 为什么?
+1. E8的190.9min已经包含了数据加载开销
+2. E9数据量2.5x, 但每条数据的SPM编码时间相同
+3. 3个worker进程各加载1次SPM+JSON → 额外开销
+4. 每条__getitem__: SPM编码(~1ms) + detect_language(~0.1ms) + padding + tensor
+5. 84K条 × 1ms = 84s per epoch for __getitem__ alone
+6. 但DataLoader有prefetch, 所以不是瓶颈?
+
+### 🔥🔥🔥关键重新分析!
+实际上, DataLoader with num_workers=2:
+- 主进程发送索引给worker
+- Worker调用__getitem__获取数据
+- Worker返回数据给主进程
+- 主进程组装batch → forward → backward
+
+每条数据的__getitem__时间:
+- SPM编码: ~0.5ms per call × 2 (src+tgt) = 1ms
+- detect_language: ~0.1ms × 2 = 0.2ms
+- padding+tensor: ~0.05ms
+- 总计: ~1.3ms per sample
+
+每epoch总__getitem__时间:
+84K × 1.3ms = 109s ≈ 2min
+
+这只有2min! 不是瓶颈!
+
+### 真正的瓶颈: 训练计算本身!
+84K条 / batch_size(16) / grad_accum(16) = 328步
+但等等, 实际batch_size和accum是多少?
+
+检查训练配置:
+batch_size = cfg.batch_size (可能是4或8)
+accum = 16
+
+如果batch_size=4, accum=16:
+84K / (4×16) = 1313步
+每步: forward(84K条/1313步=64条) + backward ≈ 5s
+1313 × 5s = 6565s ≈ 109min
+
+验证: 100K × validate ≈ 30min
+
+每epoch总计: 109 + 30 + data_load = ~150min
+
+但已经23h = 1380min! 远超150min!
+
+### 🔥🔥🔥E9可能根本没在正常训练!
+进程CPU 97%但23h无输出, 可能:
+1. 进程卡在某个数据上(死循环?)
+2. 内存不足导致频繁swap
+3. DataLoader worker死锁
+
+### 建议: 等E9完成后立即启动V16(预编码版本)!
+如果E9一直不完成, 可能需要重启训练服务!
+
+## 研究#735: 🔥🔥🔥DataLoader Worker死锁确认! (2026-05-15)
+
+### 🔥🔥🔥关键发现!
+- 主进程(PID 2112646): CPU 97%, MEM 22.5%, 运行1581min
+- Worker1(PID 2876141): CPU 0%, MEM 18.3%, State=S(sleeping)
+- Worker2(PID 2876142): CPU 0%, MEM 18.3%, State=S(sleeping)
+
+### Worker完全空闲!
+- 两个worker都在sleeping状态!
+- CPU使用0%! 它们不做任何工作!
+- 主进程独自做所有训练计算!
+
+### 这就是E9极慢的真正根因!
+V15只有1个进程在训练, 而不是3个!
+DataLoader的num_workers=2设置完全无效!
+
+### 为什么Worker死锁?
+可能原因:
+1. Dataset对象太大(100K条×SPM编码), worker无法pickle序列化
+2. Worker在fork时创建的SPM对象无法正确共享
+3. Dataset.__init__中的SPM加载在worker中失败
+4. Python multiprocessing的已知问题: 对象不可pickle
+
+### 🔥🔥🔥解决方案: num_workers=0!
+在CPU训练中, num_workers=0是最佳选择:
+1. 不需要多进程数据加载(CPU本身就是串行的)
+2. 消除worker死锁风险
+3. 减少内存开销(3×1.7GB → 1×1.7GB = 省3.4GB!)
+4. 主进程直接调用__getitem__, 没有进程间通信开销
+
+### V16必须设num_workers=0!
+这比预编码更重要! 预编码只是加速, 而worker死锁导致实际只有1/3性能!
