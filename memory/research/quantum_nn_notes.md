@@ -24940,3 +24940,125 @@ DataLoader的num_workers=2设置完全无效!
 
 ### V16必须设num_workers=0!
 这比预编码更重要! 预编码只是加速, 而worker死锁导致实际只有1/3性能!
+
+## 研究#736: V16训练脚本完整设计 (2026-05-15)
+
+### 基于研究#735的Worker死锁发现 + #732的预编码方案
+
+### V16训练脚本核心改动(6处)
+
+#### 改动1: 预编码Dataset (消除__getitem__的SPM编码)
+```python
+class QSMPreEncodedDataset(Dataset):
+    def __init__(self, data_path, spm_model, max_len=256, max_difficulty=4):
+        sp = spm.SentencePieceProcessor()
+        sp.Load(spm_model)
+        with open(data_path) as f:
+            all_data = json.load(f)
+        filtered = [d for d in all_data if d.get('difficulty',3) <= max_difficulty]
+        
+        self.items = []
+        for item in filtered:
+            # 一次性编码所有数据
+            encoded = self._encode_item(sp, item, max_len)
+            self.items.append(encoded)
+    
+    def __len__(self): return len(self.items)
+    def __getitem__(self, idx): return self.items[idx]
+```
+
+#### 改动2: num_workers=0 (消除Worker死锁)
+```python
+train_loader = DataLoader(train_subset, batch_size=cfg.batch_size, 
+                          shuffle=True, num_workers=0)  # 🔥0!
+```
+
+#### 改动3: 取消课程学习 (全量数据从一开始)
+```python
+# 不再每epoch重建Dataset!
+train_data = QSMPreEncodedDataset(args.data, args.spm, max_difficulty=4)
+val_data = QSMPreEncodedDataset(args.data, args.spm, max_difficulty=4, 
+                                 max_samples=2000)  # 🔥验证集2K!
+```
+
+#### 改动4: 验证集采样 (从100K→2K)
+```python
+def __init__(self, ..., max_samples=None):
+    ...
+    if max_samples and len(self.items) > max_samples:
+        random.seed(42)
+        self.items = random.sample(self.items, max_samples)
+```
+
+#### 改动5: LoRA r=32
+```python
+lora_r = 32  # 从16→32, 可训练参数2x
+```
+
+#### 改动6: 训练循环不再重建Dataset
+```python
+# V15(慢):
+for epoch in range(max_epochs):
+    train_data = QSMDataset(...)  # 🔥每epoch重建!
+    val_data = QSMDataset(...)    # 🔥每epoch重建!
+
+# V16(快):
+train_data = QSMPreEncodedDataset(...)  # 🔥只建1次!
+val_data = QSMPreEncodedDataset(..., max_samples=2000)
+for epoch in range(max_epochs):
+    train_one_epoch(model, DataLoader(train_data, ...), ...)
+    validate(model, DataLoader(val_data, ...), ...)
+```
+
+### V16训练速度预估
+| 项目 | V15 | V16 | 加速比 |
+|------|-----|-----|--------|
+| Dataset创建 | 每epoch 5min | 1次 10min | ~200x |
+| __getitem__ | 1.3ms/条 | 0.001ms/条 | 1300x |
+| Worker开销 | 3进程×1.7GB | 1进程 | 省3.4GB |
+| 验证 | 100K条 60min | 2K条 3min | 20x |
+| 实际训练 | 主进程独占 | 同 | 1x |
+| **每epoch** | **~466min** | **~303min** | **1.5x** |
+
+### 🔥🔥🔥V16实施优先级
+1. **num_workers=0** — 立即修复Worker死锁!
+2. **预编码Dataset** — 消除SPM重复编码!
+3. **验证集2K** — 20x验证加速!
+4. **取消课程学习** — 简化训练循环!
+5. **LoRA r=32** — 更多学习容量!
+6. **SPM 25K** — 更好的分词!
+
+### 实施计划
+等V15 E9完成后, 立即创建V16训练脚本并部署!
+
+## 研究#737: 多任务LoRA按语言切换 (2026-05-15)
+
+### 背景(研究#705结论: MoE不适用, 多任务LoRA更适合)
+
+### 方案: 按语言前缀切换LoRA adapter
+```python
+class MultiTaskLoRA:
+    def __init__(self, base_model, lora_adapters):
+        self.base = base_model
+        self.adapters = {
+            '[ZH]': lora_adapters[0],  # 中文LoRA
+            '[EN]': lora_adapters[1],  # 英文LoRA
+            '[YI]': lora_adapters[2],  # 彝文LoRA
+        }
+    
+    def forward(self, x, lang_prefix):
+        # 基础模型 + 对应语言LoRA
+        base_out = self.base(x)
+        adapter = self.adapters[lang_prefix]
+        lora_out = adapter(x)
+        return base_out + lora_out
+```
+
+### 优势
+1. 每个语言有专门LoRA → 彝文不过拟合到中英模式
+2. 基础模型共享 → 跨语言迁移
+3. 仅增加3×0.721M = 2.16M参数(可控)
+4. CPU训练每个adapter独立 → 无额外内存
+
+### V17适用(V16先验证预编码+num_workers=0)
+等V16训练完成, 评估三语效果后再决定是否需要多任务LoRA
