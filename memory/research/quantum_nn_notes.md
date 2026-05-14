@@ -23177,3 +23177,59 @@ V15的Gap=0.24在训练初期是正常的(数据少, Train和Val都高)
 关键看后续epoch Gap是否保持在0.5以下
 
 ### 结论: V15 CrossDrop+Label Smoothing正在起效!
+
+## 研究#700: 🎉700篇里程碑! V15训练策略总结 (2026-05-14)
+
+### 700篇研究笔记回顾
+从#1到#700, 覆盖了:
+- 量子神经网络基础(VQC/PQC/量子门/纠缠)
+- Transformer架构改进(ALiBi/RoPE/LoRA/CrossDrop)
+- 训练策略(SGDR/Cosine/Warmup/课程学习/Early Stop)
+- 推理优化(KV Cache/INT8/Flash Attn/Speculative Decoding)
+- 数据工程(SPM/数据清洗/difficulty标注/语言前缀)
+- QEntL自举(5阶段路线/编译器/VM/中文关键字)
+- 量子算法(Shor/Grover/QFT/QKD/量子纠错)
+- 彝文规范(通用彝文/Unicode/字体/书写系统)
+
+### V1→V15演进总结
+| 版本 | 参数 | Val Best | 关键改进 |
+|------|------|----------|---------|
+| V1 | 6M | 0.375(不可信) | 基础encoder-decoder |
+| V5 | 7.5M | 2.1879 | 全小写英文 |
+| V7-Small | 4.5M | 2.6531 | QuantumEmbeddingV2 |
+| V12 | 16M | 2.9259 | 清洗数据+随机初始化 |
+| V14 | 16.4M | 2.7892 | ALiBi+SGDR+LoRA r=32 |
+| V15 | 18.3M | 9.78(E2) | 9大改进+五重防过拟合 |
+
+### V15九大改进清单
+1. ✅ ALiBi位置编码(替代learned PE)
+2. ✅ Cross-Attention Dropout p=0.15
+3. ✅ Warmup+Cosine Annealing(替代SGDR)
+4. ✅ 语言前缀token[ZH]/[EN]/[YI]
+5. ✅ SPM 20K词汇(从16K扩展)
+6. ✅ Early Stopping patience=10
+7. ✅ Label Smoothing ε=0.1
+8. ✅ AdamW(weight_decay=0.01)
+9. ✅ LoRA r=16(0.72M可训练)
+
+### 五重防过拟合体系
+1. CrossDrop p=0.15
+2. Label Smoothing ε=0.1
+3. Early Stopping patience=10
+4. LoRA只训练3.93%参数
+5. AdamW解耦weight_decay
+
+### V16展望(基于#694路线图)
+1. 取消课程学习→全量数据训练
+2. 缩短验证集→2K采样
+3. SPM 25K词汇
+4. LoRA r=32→1.44M可训练
+5. micro_batch=4
+预期: 训练时间80h vs V15的235h, Val<2.0
+
+### 下一个100篇(#700-#800)重点
+- V15训练结果深度分析
+- V16架构设计+训练
+- QEntL自编译Stage3(中文关键字→自编译)
+- 彝文数据大幅扩展(当前仅49字符在数据中!)
+- 量子自举路线推进
