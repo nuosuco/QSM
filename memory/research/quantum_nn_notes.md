@@ -25395,3 +25395,44 @@ WantedBy=multi-user.target
 | 验证 | 100K条 60min+ | 2K条 3min |
 | Worker | 2个死锁(0%) | 0个(无死锁) |
 | LoRA参数 | 0.721M | ~1.44M (r=32) |
+
+## 研究#745: V15继续 vs V16切换决策 (2026-05-15)
+
+### V15 E10状态
+- E10开始: 07:09 UTC (已过2.3h)
+- 预计完成: 16:39 UTC (~9.5h)
+- Worker死锁+1.1GB swap持续
+- diff=3数据, 同E9
+
+### V16优势(定量)
+| 优势 | 效果 |
+|------|------|
+| 无worker | 省2.7GB内存, 消除swap |
+| 预编码 | __getitem__ 1300x加速 |
+| 验证2K | 验证20x加速 |
+| LoRA32 | 2x可训练参数 |
+| 无课程 | 全量数据从头学 |
+
+### V15继续的代价
+- 每epoch 9.5h (因swap)
+- 假设E10-20: 11×9.5h = 104.5h = 4.3天
+- 但V16每epoch只需~303min = 5h
+- V16训练20epoch: 100h ≈ 4.2天
+- 但V16训练50epoch = 10.5天 vs V15训练11epoch = 4.3天
+
+### 🔥🔥🔥关键决策: 不要终止V15! 让V15和V16并行!
+- V15继续训练(E10+), 产出best.pth
+- 同时创建V16 systemd service, 用不同save_dir
+- V16从头开始训练(随机初始化LoRA, 保留base weights)
+- 两个训练并行: V15用E8 best base, V16用同base+LoRA32
+- **但7.4GB内存不够两个训练!**
+
+### 最终决策: 等V15 E10完成, 然后切换到V16
+- V15 E10完成后, 记录Val结果
+- 终止V15, 启动V16
+- V16从base weights开始(不用V15的LoRA, 因为LoRA r不同: 16→32)
+- V16预计50-100epoch, 每epoch 5h, 总10-21天
+
+### 💡优化: V16可以先训练10epoch看效果
+- 如果V16 E10 Val < V15 E10 Val → V16更优!
+- 如果V16 E10 Val > V15 E10 Val → 继续V15
