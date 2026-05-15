@@ -25436,3 +25436,23 @@ WantedBy=multi-user.target
 ### 💡优化: V16可以先训练10epoch看效果
 - 如果V16 E10 Val < V15 E10 Val → V16更优!
 - 如果V16 E10 Val > V15 E10 Val → 继续V15
+
+## 研究#746: V16 systemd service就绪 (2026-05-15)
+
+### V16部署流程(E10完成后):
+1. `systemctl stop qsm-v15-train` — 停止V15
+2. `cp bin/qsm_v15_best.pth bin/qsm_v15_best_backup_e10.pth` — 备份
+3. `cp /tmp/qsm-v16-train.service /etc/systemd/system/` — 安装service
+4. `systemctl daemon-reload` — 重载配置
+5. `systemctl enable qsm-v16-train` — 开机自启
+6. `systemctl start qsm-v16-train` — 启动V16!
+7. `tail -f /tmp/qsm_v16_train_systemd.log` — 监控
+
+### V16预期:
+- 预编码10min + 每epoch ~303min
+- 无swap! 无worker死锁! 
+- LoRA r=32 → 1.44M可训练参数
+- 全量数据(diff 1-4)从头训练
+- 验证集2K(20x加速)
+
+### 切换时机: V15 E10完成后(预计16:39 UTC)
