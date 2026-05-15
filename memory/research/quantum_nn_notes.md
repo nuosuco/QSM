@@ -26048,3 +26048,47 @@ QEntL字符串索引s[i]返回的是**字符串字符**本身(如"("),
 - 10-30epoch: 学习复杂模式
 - 30+epoch: 对话/长文本能力提升
 - 需要持续扩展高质量对话数据!
+
+## 研究#762: KV Cache推理加速详解 (2026-05-15)
+
+### KV Cache原理
+标准Transformer decoder推理时:
+- 生成第t个token需要对所有1..t个token做attention
+- 计算量: O(t²) 对每个新token
+- 总计算量: O(n²) 对序列长度n
+
+KV Cache优化:
+- 缓存已计算的Key和Value矩阵
+- 生成第t个token时, 只需计算新token的Q
+- 用缓存的K,V做attention
+- 计算量: O(t) 对每个新token
+- 总计算量: O(n) 对序列长度n
+
+### 3倍加速的来源
+| 操作 | 无Cache | 有Cache |
+|------|---------|---------|
+| 每步计算 | 完整attention | 1步新token |
+| K,V计算 | 重复计算 | 缓存复用 |
+| 内存 | 低 | 高(存K,V) |
+| 速度 | 基准 | **~3x** |
+
+### 内存开销
+- 每层: 2 × d_model × seq_len × batch_size
+- 4层: 8 × 256 × seq_len × batch_size
+- batch=1, seq=128: 8×256×128×4bytes = 1MB (可忽略!)
+- QSM模型小, KV Cache内存开销极低!
+
+### V16实现
+```python
+# 在MultiHeadAttention.forward中:
+if self.use_kv_cache and not self.training:
+    if cache_k is not None:
+        k = torch.cat([cache_k, k], dim=1)
+        v = torch.cat([cache_v, v], dim=1)
+    return output, k, v  # 缓存K,V
+```
+
+### 🔥结论: QSM V16应该启用KV Cache!
+- 推理3x加速
+- 内存开销1MB(可忽略)
+- 仅在推理时使用, 训练不受影响
