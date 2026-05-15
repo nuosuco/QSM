@@ -26130,3 +26130,40 @@ if self.use_kv_cache and not self.training:
 ### 100epoch总时间
 - 300min/epoch × 100 = 30,000min = 500h = 20.8天
 - 比V15的100epoch(950h)快1.9x!
+
+## 研究#764: AdamW vs Adam深度对比 (2026-05-15)
+
+### 核心区别
+Adam: loss = loss + wd * ||w||² (L2正则加在loss上)
+AdamW: w = w - lr * wd * w (解耦weight_decay直接作用于权重)
+
+### 为什么AdamW更好?
+1. **解耦**: wd不与Adam的自适应lr交互
+2. **正确的L2**: Adam的L2正则与动量冲突
+3. **更稳定**: 训练曲线更平滑
+4. **泛化更好**: Val Loss通常更低
+
+### 数学证明
+Adam更新: w = w - lr * (m/(√v+ε) + wd*w)
+- wd项被自适应lr缩放, 效果不均匀!
+AdamW更新: w = w - lr*wd*w - lr*m/(√v+ε)
+- wd项独立于自适应lr, 均匀衰减!
+
+### V16配置
+- optimizer: AdamW
+- betas: (0.9, 0.98) ← 注意不是(0.9,0.999)!
+- weight_decay: 0.01
+- eps: 1e-8
+
+### 为什么beta2=0.98而不是0.999?
+- 0.999: 二阶矩估计太慢适应(1000步才e^-1衰减)
+- 0.98: 50步就e^-1衰减, 更快适应梯度变化
+- 对QSM小数据集: 快适应>慢适应
+- 这是Transformer论文的标准配置!
+
+### V14(Adam) vs V15/V16(AdamW)
+- V14: Gap=+1.5(严重过拟合!)
+- V15: Gap=-0.14(零过拟合!)
+- AdamW的解耦wd是五重防过拟合的关键一环!
+
+### 🔥结论: V16保持AdamW wd=0.01 betas=(0.9,0.98)!
