@@ -26635,3 +26635,46 @@ V16 scheduler在epoch循环内每epoch重建!
 - E1完成后: 检查V16 E1结果
 - 如果V16 E1 Val<9.0: 继续V16
 - 如果V16 E1 Val>=9.5: 停V16启动V17
+
+## 研究#778: V17脚本验证 + systemd部署 (2026-05-15)
+
+### V17脚本验证清单
+- [x] 语法验证通过! py_compile OK
+- [x] max_seq_len = 128 ✅
+- [x] 真预编码 DatasetV2 ✅ (__init__一次性编码)
+- [x] scheduler移出epoch循环 ✅
+- [x] 保存路径: qsm_v17_best.pth / qsm_v17_last.pth ✅
+- [ ] 需要验证: 预编码内存占用
+- [ ] 需要验证: seq=128的实际训练速度
+
+### V17 systemd service模板
+```ini
+[Unit]
+Description=QSM V17 Training (seq=128, pre-encoded)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/.openclaw/workspace/Models/QSM
+ExecStart=/usr/bin/python3 train_v17_seq128.py \
+  --data /root/.openclaw/workspace/Models/QSM/bin/v13_clean_dataset.json \
+  --spm /root/.openclaw/workspace/Models/QSM/bin/qsm_spm_v15.model \
+  --save_dir /root/.openclaw/workspace/Models/QSM/bin \
+  --epochs 100
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### V16→V17切换决策
+- V16 E1完成后检查Val Loss
+- 如果V16 E1 Val > 9.5: 停V16, 启V17
+- 如果V16 E1 Val < 9.0: 继续V16到E3, 然后比较
+- V17优势: 3x速度(6.5h vs 19h/epoch)
+- V16 E1还需要~8h才能看到结果
+
+### 🔥结论: V16 E1完成后立即切换V17! 
+无论Val多少, 19h/epoch不可接受! V17 6.5h才是可持续的!
