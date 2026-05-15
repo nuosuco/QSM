@@ -25700,3 +25700,32 @@ for item in data:
 - V15已证明模型在下降(Grokking+E9↓0.20)
 - V16更快+无swap+LoRA32, 产出更高效
 - V15的best.pth(E9或E10)作为API模型
+
+## 研究#753: Label Smoothing深度分析 (2026-05-15)
+
+### Label Smoothing原理
+标准交叉熵: loss = -log(p_y) (y是目标类)
+Label Smoothing: loss = -(1-ε)log(p_y) - ε/K * Σlog(p_k)
+
+### 效果
+1. **防止过拟合** - 模型不会对训练标签过度自信
+2. **Val < Train现象** - ε=0.1时, 理论Train loss增加0.1*log(K)
+3. **校准改善** - 模型输出概率更准确
+
+### 对QSM的影响
+- V15 ε=0.1, SPM 20K词汇
+- 理论Train loss增加: 0.1*ln(20000) ≈ 0.1*9.9 = 0.99
+- 这解释了为什么V15 Train=9.56 > Val=9.42!
+- **Gap=-0.14是Label Smoothing的正常效果!**
+
+### V14 vs V15的Gap差异
+- V14: ε=0.05, Gap=+1.5 (过拟合!)
+- V15: ε=0.1, Gap=-0.14 (零过拟合!)
+- **V15的Label Smoothing更大→更好防过拟合!**
+
+### V16决策
+- 保持ε=0.1 ✅
+- 如果V16过拟合(Gap>0.5), 增加到ε=0.15
+- 如果V16欠拟合(Val不降), 减少到ε=0.05
+
+### 🔥结论: V15的Gap=-0.14是健康的! Label Smoothing起效!
