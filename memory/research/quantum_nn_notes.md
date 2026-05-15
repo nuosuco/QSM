@@ -25341,3 +25341,57 @@ val_data = QSMPreEncodedDataset(args.data, args.spm, max_difficulty=4, max_sampl
 - E1→E8: 7epoch降0.20 (每epoch↓0.03)
 - E8→E9: 1epoch降0.20! (7x加速!)
 - 这是指数下降的开始!
+
+## 研究#744: V16训练脚本部署方案 (2026-05-15)
+
+### V16脚本已完成(541行, 语法✅)
+
+### 部署时机: V15 E10完成后
+- E10预计完成: ~16:39 UTC (5/15 00:39 GMT+8, 已过!)
+- 实际可能因swap+worker死锁再需9.5h
+- E10开始于07:09 UTC, 预计完成~16:39 UTC
+
+### 部署步骤
+1. 终止V15训练: `systemctl stop qsm-v15-train`
+2. 备份V15 best.pth: `cp qsm_v15_best.pth qsm_v15_best_backup.pth`
+3. 训练SPM V16 25K(如果需要, 或继续用V15 SPM 20K)
+4. 部署V16 systemd service
+5. 启动V16: `systemctl start qsm-v16-train`
+
+### 🔥重要: V16是否需要新SPM?
+- V15 SPM 20K已经包含4123个彝文字符
+- V16 SPM 25K会多5K词汇(更多中文/英文子词)
+- 但训练SPM需要时间+数据准备
+- **建议: V16先用V15 SPM 20K, 后续再升级到25K**
+
+### V16 systemd service配置
+```ini
+[Unit]
+Description=QSM V16 Training (Pre-encoded, LoRA r=32)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/.openclaw/workspace/Models/QSM
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 train_v16_preencoded.py \
+    --data /root/.openclaw/workspace/Models/QSM/bin/v13_clean_dataset.json \
+    --spm /root/.openclaw/workspace/Models/QSM/bin/qsm_spm_v15.model \
+    --save_dir /root/.openclaw/workspace/Models/QSM/bin \
+    --max_epochs 100
+Restart=no
+StandardOutput=append:/tmp/qsm_v16_train_systemd.log
+StandardError=append:/tmp/qsm_v16_train_systemd.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### V16 vs V15预期效果
+| 指标 | V15 E9 | V16 预期 |
+|------|--------|----------|
+| 内存 | 4.06GB+1.1GB swap | ~1.5GB (无swap!) |
+| 每epoch | 569.7min | ~303min |
+| 验证 | 100K条 60min+ | 2K条 3min |
+| Worker | 2个死锁(0%) | 0个(无死锁) |
+| LoRA参数 | 0.721M | ~1.44M (r=32) |
