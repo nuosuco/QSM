@@ -26203,3 +26203,52 @@ AdamW更新: w = w - lr*wd*w - lr*m/(√v+ε)
 - 优化后: ~0.8s/句 ← 实时对话级别!
 
 ### 🔥目标: V16 API实时对话!
+
+## 研究#766: 多任务LoRA按语言切换方案 (2026-05-15)
+
+### 核心思想
+不同语言使用不同的LoRA权重, 共享base模型:
+- base model: 冻结的QSMTransformerV15
+- LoRA-ZH: 中文LoRA权重
+- LoRA-EN: 英文LoRA权重
+- LoRA-YI: 彝文LoRA权重
+
+### 实现方式
+```python
+class MultiTaskLoRA:
+    def __init__(self, base_model, lora_weights):
+        self.base = base_model  # 共享
+        self.loras = {
+            'ZH': load_lora('lora_zh.pth'),
+            'EN': load_lora('lora_en.pth'),
+            'YI': load_lora('lora_yi.pth'),
+        }
+    
+    def forward(self, x, lang):
+        # 1. base forward
+        h = self.base(x)
+        # 2. 注入对应语言LoRA
+        h = self.loras[lang].apply(h)
+        return h
+```
+
+### 优势
+1. **参数效率**: 3个LoRA只需3×1.44M=4.32M额外参数
+2. **语言特化**: 每个LoRA专注一种语言模式
+3. **灵活切换**: 推理时根据[ZH]/[EN]/[YI]前缀选择
+4. **独立训练**: 每个LoRA可以单独fine-tune
+
+### 适用时机
+- V17+: 当V16 Val<3.0时
+- 当前V16仍是单LoRA训练所有语言
+- 多任务LoRA是Phase2对话能力的优化方向
+
+### 训练策略
+1. 先用单LoRA训练V16到Val<3.0
+2. 然后3路LoRA分别fine-tune:
+   - LoRA-ZH: 只用zh类数据
+   - LoRA-EN: 只用en类数据  
+   - LoRA-YI: 只用yi类数据
+3. 每路LoRA仅需1-2epoch fine-tune
+
+### 🔥结论: V17方案! 等V16 Val<3.0!
