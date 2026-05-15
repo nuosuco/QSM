@@ -25669,3 +25669,34 @@ for item in data:
 4. difficulty保持: 副本继承原数据的difficulty
 
 ### 下一步: 继续批次2(再500条)
+
+## 研究#752: V15 E10完成预测+V16切换时间线 (2026-05-15)
+
+### E10进度
+- 开始: 07:09 UTC (5/15)
+- 预计完成: 16:39 UTC (5/15) = 还剩~4.5h
+- 已训练6.9h
+
+### E10预测
+- E9: Val=9.4188 ↓0.20
+- E10预测: Val≈9.25-9.30 (继续↓0.12-0.17)
+- 如果E10也降0.15: Val=9.27
+
+### V16切换时间线
+1. E10完成(~16:39 UTC): 记录结果
+2. 终止V15: `systemctl stop qsm-v15-train`
+3. 备份V15 best: `cp qsm_v15_best.pth qsm_v15_best_e10_backup.pth`
+4. 安装V16 service: `cp /tmp/qsm-v16-train.service /etc/systemd/system/`
+5. 启动V16: `systemctl start qsm-v16-train`
+6. V16预编码(~10min) + E1训练开始
+
+### V16 E1预期
+- 预编码10min + 训练~303min = ~313min ≈ 5.2h
+- 如果V16在17:00 UTC启动: E1完成~22:10 UTC
+- V16 E1预期Val: ~9.8(全量数据从头学, 不会比V15 E9好)
+- 但V16每epoch更快(5h vs 9.5h), 50epoch只需10.4天
+
+### 🔥关键决策: V15 E10完成后立即切换V16!
+- V15已证明模型在下降(Grokking+E9↓0.20)
+- V16更快+无swap+LoRA32, 产出更高效
+- V15的best.pth(E9或E10)作为API模型
