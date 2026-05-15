@@ -25549,3 +25549,43 @@ WantedBy=multi-user.target
 - 当前三语6向数据已经加了前缀
 - 但历史数据(tatoeba等)没有前缀
 - V16应使用detect_language()推断(保持现状)
+
+## 研究#749: 位置编码对比及QSM选择 (2026-05-15)
+
+### 主流位置编码方案
+
+| 方案 | 原理 | 优点 | 缺点 | CPU友好 |
+|------|------|------|------|---------|
+| Learned PE | 可学习位置embedding | 灵活 | 无法外推 | ✅ |
+| Sinusoidal | sin/cos固定编码 | 无参数,可外推 | 外推有限 | ✅ |
+| RoPE | 旋转位置编码 | 相对位置,外推好 | 实现复杂,GPU友好 | ❌ |
+| ALiBi | 线性偏置注意力 | 简单,CPU友好,外推强 | 绝对位置信息弱 | ✅✅ |
+| xPos | 指数衰减RoPE | 长序列好 | 复杂 | ❌ |
+| NoPE | 无位置编码(解码器) | 简单 | 仅限自回归 | ✅ |
+
+### QSM选择: ALiBi (已实现)
+
+#### ALiBi优势(对QSM)
+1. **零参数开销** - 不增加模型参数
+2. **CPU完美** - 仅在attention score加线性偏置
+3. **外推能力强** - 训练256长度可推理512+
+4. **实现简单** - 3行代码:
+```python
+# ALiBi in attention
+slopes = 2**(-8 * torch.arange(1, n_heads+1) / n_heads)
+alibi = slopes.unsqueeze(1).unsqueeze(1) * torch.arange(seq_len).unsqueeze(0).unsqueeze(0)
+attn_scores = attn_scores + alibi  # 加到attention score上
+```
+
+#### 为何不用RoPE?
+1. QSM在CPU训练 - RoPE的旋转矩阵计算开销大
+2. 序列长度短(max=256) - RoPE优势不明显
+3. 实现复杂 - 需要修改QKV计算
+4. GPU训练时RoPE才有加速效果
+
+#### V14/V15/V16确认使用ALiBi ✅
+这是正确的选择! CPU训练+短序列+外推需求 → ALiBi最优!
+
+### 参考文献
+- Press et al. (2022) "Train Short, Test Long: Attention with Linear Biases Enables Input Length Extrapolation" (ALiBi原论文)
+- Su et al. (2024) "RoFormer: Enhanced Transformer with Rotary Position Embedding" (RoPE)
