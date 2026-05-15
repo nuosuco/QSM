@@ -26315,3 +26315,39 @@ V16 E1: 预测Val≈9.8-10.0 (全量数据, 随机初始化)
 | V16 E1 | ~295min | 109K(全量) | 0.0027min |
 
 ### 🔥🔥🔥V16每样本0.0027min vs V15 0.0067min = 2.5x加速!
+
+## 研究#769: 🔥🔥🔥V16 E1=19h! 每batch 4.985s! (2026-05-15)
+
+### 实测数据
+- **每batch: 4.985s (4985ms)** — batch=8, seq=256, 19M参数
+- **每epoch: 13686 batch × 4.985s = 19.0h!**
+- 已运行7h → E1还需12h → 约08:00 CST完成
+
+### 为什么之前估5h?
+- 简单attention测试(4层×4头)=1.3h — 只测了attention
+- 没考虑: embedding×2 + FFN×2×4层 + cross-attention×4层 + LoRA矩阵乘法
+- 完整模型forward+backward远比单层attention慢!
+
+### V16 vs V15速度对比
+| 版本 | 数据量 | E1时间 | 每batch |
+|------|--------|--------|---------|
+| V15 E1 | ~8K(diff1) | 50min | ~0.4s |
+| V15 E9 | ~85K(diff3) | 570min | ~4.0s |
+| V16 E1 | 109K(全量) | ~1140min(19h) | ~4.985s |
+
+### 🔥V16每batch 5s vs V15 E9 4s — 正常!
+- V16 LoRA r=32(更多参数) vs V15 r=16 → 略慢
+- 但V16无课程学习, 数据更多 → 总时间更长
+
+### 关键决策: 19h/epoch可接受吗?
+- 100 epochs → 1900h = 79天! 太长!
+- 但有Early Stopping(patience=10)
+- 如果10 epoch不降就停 → 最多190h = 8天
+- 实际可能5-10个epoch就有足够下降
+
+### 🔥优化方向(V17)
+1. **减batch_size=4**: 更频繁gradient step, 但每step更快
+2. **减max_seq_len=128**: 长文本截断, attention O(n²)降4x
+3. **减n_layers=3**: 模型小点, 3层够用
+4. **混合精度FP16**: CPU不支持... 
+5. **梯度累积减到8**: 更频繁更新
