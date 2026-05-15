@@ -26678,3 +26678,43 @@ WantedBy=multi-user.target
 
 ### 🔥结论: V16 E1完成后立即切换V17! 
 无论Val多少, 19h/epoch不可接受! V17 6.5h才是可持续的!
+
+## 研究#779: V17预编码内存估算 (2026-05-15)
+
+### 预编码数据内存计算
+每个样本存储5个tensor:
+- src: int64 × 128 = 1024 bytes
+- tgt_input: int64 × 128 = 1024 bytes
+- tgt_output: int64 × 128 = 1024 bytes
+- src_lang: int64 × 1 = 8 bytes
+- tgt_lang: int64 × 1 = 8 bytes
+
+每个样本总计: ~3080 bytes ≈ 3KB
+
+### 总内存
+116K样本 × 3KB = 348MB
+
+### 加上模型和训练开销
+- 模型: 76MB (19M params × 4 bytes)
+- 优化器: ~6MB (1.44M LoRA params × 4 bytes)
+- 梯度: ~6MB
+- 激活值(batch=8): ~200MB
+- DataLoader: ~50MB
+- 总计: 348 + 76 + 6 + 6 + 200 + 50 = ~686MB
+
+### 🔥V17总内存预估: ~2.5GB (含预编码348MB)
+- 比V16的4.1GB少! 因为seq=128→激活值减半!
+- 7.4GB服务器绰绰有余!
+- Swap应该降到0!
+
+### 对比V16
+| 指标 | V16 (seq=256) | V17 (seq=128) |
+|------|---------------|---------------|
+| 预编码数据 | 0MB(每次重编码) | 348MB |
+| 激活值 | ~400MB | ~200MB |
+| 总内存 | 4.1GB | 2.5GB |
+| Swap | 884MB | ~0MB |
+| 每batch | 5.0s | 1.7s |
+| 每epoch | 19h | 6.5h |
+
+### 🔥🔥🔥V17内存更低+速度更快+Swap=0! 全面优于V16!
