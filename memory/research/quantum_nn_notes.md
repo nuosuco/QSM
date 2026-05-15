@@ -26747,3 +26747,54 @@ WantedBy=multi-user.target
 而V16 E1还需要7h → 约05:00 UTC
 
 ### 结论: V16 E1完成后立即切换V17!
+
+## 研究#781: V17进一步加速方案 (2026-05-15)
+
+### V17实测: 2.333s/batch (seq=128, batch=8)
+### 问题: 8.9h/epoch仍太慢! 需要进一步优化!
+
+### 方案1: 减小d_ff (1024→768)
+- FFN占总计算~40%
+- d_ff 1024→768: FFN计算量减25%
+- 预估: 2.333×0.75≈1.75s/batch
+- 每epoch: 6.7h
+- 参数量: 19M→16M
+
+### 方案2: 减小n_layers (4→3)
+- 每层attention+FFN
+- 4层→3层: 计算量减25%
+- 预估: 2.333×0.75≈1.75s/batch
+- 每epoch: 6.7h
+- 参数量: 19M→14M
+- ⚠️ 模型容量降低
+
+### 方案3: 增大batch_size (8→16)
+- 更好利用CPU并行
+- 但内存增加: 需额外~200MB
+- 预估: batch翻倍→1.5x(不是2x因为内存开销)
+- 每epoch步数减半→epoch时间不变!
+- ❌ 不帮助: 每epoch总计算量不变
+
+### 方案4: d_ff=768 + n_layers=3
+- 双重减负!
+- 预估: 1.4s/batch
+- 每epoch: 5.3h
+- 参数量: ~12M
+- V7-Small是4.5M参数可用! 12M也够!
+
+### 🔥🔥🔥推荐: 方案4! d_ff=768 + n_layers=3!
+- 5.3h/epoch → 100epochs = 22天
+- Early Stopping patience=10 → 最53h = 2.2天停
+- 模型12M参数足够(比V7-Small 4.5M大2.7x)
+- 记忆: 小模型+大数据 >> 大模型+小数据
+
+### V17B配置(方案4)
+```python
+d_model = 256
+n_heads = 4
+n_layers = 3  # 4→3
+d_ff = 768    # 1024→768
+vocab_size = 20000
+max_seq_len = 128
+lora_r = 32
+```
