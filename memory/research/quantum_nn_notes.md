@@ -26167,3 +26167,39 @@ AdamW更新: w = w - lr*wd*w - lr*m/(√v+ε)
 - AdamW的解耦wd是五重防过拟合的关键一环!
 
 ### 🔥结论: V16保持AdamW wd=0.01 betas=(0.9,0.98)!
+
+## 研究#765: QSM自举路线图 - 量化部署 (2026-05-15)
+
+### 当前API模型部署
+| 端口 | 模型 | 大小 | 格式 |
+|------|------|------|------|
+| 8000 | V7-Small+INT8 | 42MB | INT8量化 |
+| 8001 | V14 ALiBi | 168MB | FP32 |
+| 8003 | QEntL | - | Python |
+
+### INT8量化方案(已验证)
+- FP32→INT8: 模型大小4x缩小
+- V7-Small: 168MB→42MB ✅已部署!
+- V14: 168MB→42MB (待部署)
+- V16: ~76MB→19MB (LoRA合并后更小)
+
+### 量化部署时间线
+1. **V16 E1完成**: 检查best.pth质量
+2. **V16 best < V14 best(2.79)**: 部署V16到API
+3. **INT8量化V16**: 76MB→19MB
+4. **替换V14 API**: 端口8001
+5. **V14 best备份**: 保留作为fallback
+
+### CPU推理优化优先级(确认)
+1. KV Cache: 3x加速 ✅(已设计, 待V16部署)
+2. INT8量化: 2x加速+4x缩小 ✅(已验证)
+3. 算子融合: ~1.3x (需PyTorch 2.0 compile)
+4. Flash Attention: ❌(N=256无加速)
+5. Speculative Decoding: ❌(CPU无加速)
+
+### 总推理加速预期
+- KV Cache(3x) × INT8(2x) = **6x加速!**
+- 当前V7-Small推理: ~5s/句
+- 优化后: ~0.8s/句 ← 实时对话级别!
+
+### 🔥目标: V16 API实时对话!
