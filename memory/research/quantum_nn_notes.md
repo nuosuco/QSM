@@ -25729,3 +25729,51 @@ Label Smoothing: loss = -(1-ε)log(p_y) - ε/K * Σlog(p_k)
 - 如果V16欠拟合(Val不降), 减少到ε=0.05
 
 ### 🔥结论: V15的Gap=-0.14是健康的! Label Smoothing起效!
+
+## 研究#754: Cross-Attention Dropout深度分析 (2026-05-15)
+
+### CrossDrop原理
+在encoder-decoder架构中, decoder的cross-attention层
+随机丢弃encoder输出的key-value连接, 迫使模型不依赖
+单一encoder位置, 学会从多个位置获取信息。
+
+### QSM V15实现
+```python
+self.cross_attn = MultiHeadAttention(
+    d_model, n_heads, 
+    dropout=cfg.cross_attn_dropout,  # 0.15
+    lora_r=cfg.lora_r, alpha=cfg.lora_alpha)
+```
+
+### 效果对比
+| 模型 | CrossDrop | Gap(Train-Val) | 过拟合? |
+|------|-----------|----------------|---------|
+| V14 | 无 | +1.5 | ✅严重过拟合 |
+| V15 | p=0.15 | -0.14 | ❌零过拟合! |
+
+### 为什么p=0.15有效?
+1. **信息瓶颈** - 每次forward随机丢弃15%的encoder信息
+2. **鲁棒学习** - 模型必须学会从不完整的encoder信息解码
+3. **类似Dropout** - 但只作用于cross-attention, 更有针对性
+4. **防过拟合** - 不让decoder过度依赖特定encoder token
+
+### p值选择
+- p=0.0: 无保护, V14过拟合(Gap=+1.5)
+- p=0.1: 轻度保护
+- p=0.15: V15当前, 效果好(Gap=-0.14)
+- p=0.2: 可能过度丢失信息
+- p=0.3: 太强, 可能欠拟合
+
+### V16决策
+- 保持cross_attn_dropout=0.15 ✅
+- 如果V16过拟合(Gap>0.5): 增加到0.2
+- 如果V16欠拟合: 减少到0.1
+
+### 🔥V15的五重防过拟合体系
+1. Label Smoothing ε=0.1
+2. Cross-Attention Dropout p=0.15
+3. AdamW weight_decay=0.01
+4. Early Stopping patience=10
+5. LoRA (only 0.721M trainable, 冻结base)
+
+这5个机制共同作用, 让V15 Gap=-0.14! ✅
