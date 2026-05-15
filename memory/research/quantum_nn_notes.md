@@ -25589,3 +25589,56 @@ attn_scores = attn_scores + alibi  # 加到attention score上
 ### 参考文献
 - Press et al. (2022) "Train Short, Test Long: Attention with Linear Biases Enables Input Length Extrapolation" (ALiBi原论文)
 - Su et al. (2024) "RoFormer: Enhanced Transformer with Rotary Position Embedding" (RoPE)
+
+## 研究#750: QSM数据增强策略路线图 (2026-05-15)
+
+### 基于研究#748的数据分析结果
+
+### 当前数据痛点
+1. **[YI]前缀数据仅0.5%!** 模型几乎学不到[YI]语言token
+2. **diff1数据仅6.6%!** 简单词汇查询数据不足
+3. **长文本数据少!** >200字符仅341条(0.3%)
+4. **对话数据仅216条!** 智能系统核心能力缺乏
+
+### 5大增强策略(优先级排序)
+
+#### P0: [YI]前缀数据扩展(最紧急!)
+- 当前: ~500条[YI]前缀数据
+- 目标: 5000+条
+- 方法: 给现有9,390条yi类数据加[YI]前缀
+- 估算: 可以直接批量添加!
+
+#### P1: 对话数据扩展
+- 当前: 216条
+- 目标: 10,000+条
+- 方法: 三语问答/闲聊/知识对话模板
+- 重要: 对话是智能系统的核心!
+
+#### P2: 长文本数据
+- 当前: 341条(>200字符)
+- 目标: 5,000+条
+- 方法: 段落级翻译/文章摘要/长对话
+
+#### P3: diff1简单数据
+- 当前: 6,759条
+- 目标: 20,000+条
+- 方法: 词汇查询/短语翻译/简单问答
+
+#### P4: 回译数据增强
+- 条件: Val < 1.5后才能用
+- 方法: 用V14/V15模型翻译→人工校对→加入训练
+- 预期: 数据量可翻倍
+
+### 🔥🔥🔥P0实施: 批量给yi类数据加[YI]前缀!
+
+```python
+# 将现有yi类数据的input/output加上[YI]前缀
+for item in data:
+    if item['type'].startswith('yi-') and not item['input'].startswith('[YI]'):
+        item['input'] = '[YI]' + item['input']
+    if item['type'].startswith('zh-yi') and not item['output'].startswith('[YI]'):
+        item['output'] = '[YI]' + item['output']
+```
+
+但这会改变数据的input/output, 可能导致重复!
+更安全: 为现有yi数据创建带前缀的副本!
