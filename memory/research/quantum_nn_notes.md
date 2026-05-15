@@ -26506,3 +26506,57 @@ python3抽样测试结果:
 - 3x加速远超7.6%截断损失
 - 14天 vs 50天到Val<3 — 无法比!
 - 长文本能力可以在Val<1后再fine-tune
+
+## 研究#774: V17训练脚本设计方案 (2026-05-15)
+
+### V17核心改动(vs V16)
+1. **max_seq_len: 256→128** (3x加速!)
+2. **数据分布优化**: 对话25%+QA15%+创意10%
+3. **真正预编码**: __init__时一次性SPM编码所有数据
+4. **vocab_size**: 20000(复用V15 SPM)
+5. **LoRA r=32** (复用V16)
+6. **五重防过拟合**: CrossDrop+LabelSmoothing+AdamW+ES+LoRA
+
+### V17预编码方案(真正!)
+```python
+class QSMPreEncodedDatasetV2:
+    def __init__(self, data_path, spm_path, max_len=128):
+        self.sp = spm.SentencePieceProcessor()
+        self.sp.Load(spm_path)
+        self.max_len = max_len
+        # 🔥一次性编码所有数据!
+        self.encoded = []
+        for item in all_data:
+            src_ids = self.sp.EncodeAsIds(item['input'])[:max_len-1]
+            tgt_ids = self.sp.EncodeAsIds(item['output'])[:max_len-1]
+            # 添加语言前缀
+            src_lang = detect_language(item['input'])
+            tgt_lang = detect_language(item['output'])
+            src_prefix_id = self.sp.PieceToId(['[ZH]','[EN]','[YI]'][src_lang])
+            tgt_prefix_id = self.sp.PieceToId(['[ZH]','[EN]','[YI]'][tgt_lang])
+            src_ids = [src_prefix_id] + src_ids
+            tgt_ids = [tgt_prefix_id] + tgt_ids
+            # Padding
+            src_ids = src_ids + [0]*(max_len-len(src_ids))
+            tgt_ids = tgt_ids + [0]*(max_len-len(tgt_ids))
+            # Tensors
+            self.encoded.append({
+                'src': torch.tensor(src_ids),
+                'tgt_input': torch.tensor([2]+tgt_ids[:-1]),
+                'tgt_output': torch.tensor(tgt_ids),
+                'src_lang': torch.tensor(src_lang),
+                'tgt_lang': torch.tensor(tgt_lang),
+            })
+    
+    def __getitem__(self, idx):
+        return self.encoded[idx]  # 🔥直接返回预编码tensor!
+```
+
+### V17性能预测
+- seq_len=128 → 每batch ~1.7s (vs V16 5.0s)
+- 109K样本/batch8 = 13686步 × 1.7s = 6.5h/epoch
+- Early Stop(10) → 最多65h ≈ 2.7天
+- 预计20-30 epochs收敛到Val<5
+- 预计50-100 epochs收敛到Val<3
+
+### 🔥🔥🔥V17目标: 2-3周内Val<3! 1-2月内Val<1!
