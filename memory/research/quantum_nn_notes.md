@@ -27205,3 +27205,46 @@ Val无损+4.2x加速+3.3h/epoch=可持续训练!
 ### 下一步: 大批量生成对话数据!
 每个场景50-100条 × 50场景 = 2,500-5,000条/轮
 需要6-11轮达到29K目标!
+
+## 研究#796: 多任务LoRA按语言切换 (2026-05-16)
+
+### 核心思想(研究#766/776)
+不同语言使用不同的LoRA权重:
+- LoRA_ZH: 中文任务专用LoRA
+- LoRA_EN: 英文任务专用LoRA  
+- LoRA_YI: 彝文任务专用LoRA
+
+### 架构设计
+```python
+class MultiTaskLoRA(nn.Module):
+    def __init__(self, in_features, out_features, r=16, n_tasks=3):
+        self.lora_A = nn.ParameterList([
+            nn.Parameter(torch.randn(in_features, r))
+            for _ in range(n_tasks)
+        ])
+        self.lora_B = nn.ParameterList([
+            nn.Parameter(torch.zeros(r, out_features))
+            for _ in range(n_tasks)
+        ])
+    
+    def forward(self, x, task_id):
+        return x @ self.lora_A[task_id] @ self.lora_B[task_id]
+```
+
+### 参数量计算
+- 单LoRA: 256×16 + 16×256 = 8,192 per layer
+- 3任务LoRA: 8,192 × 3 = 24,576 per layer
+- V17C(3层×4矩阵×4LoRA块): 24,576 × 48 = 1,179,648
+- 额外: 1.18M × 3 = 3.54M (vs 当前0.98M)
+- 总可训练: 3.54M (22.1% of 16M)
+
+### 🔥🔥🔥优势!
+1. 彝文LoRA独立训练! 不受中文/英文干扰!
+2. 按语言前缀[ZH]/[EN]/[YI]自动切换!
+3. 每个语言LoRA可以学到该语言的专用模式!
+4. 解决彝文训练数据少但需要专用表示的问题!
+
+### 实现时间线
+- V17C训练到Val<3.0: 约5天
+- 然后切换V17D(多任务LoRA)
+- V17D重点训练彝文能力!
