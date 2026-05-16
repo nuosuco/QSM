@@ -28045,3 +28045,51 @@ E10→9.48 - 0.05×9 = **9.03**
 建议V17C训练到E20(Val可能~8.5)
 然后切换V18(138K新数据)
 V18起始Val可能比V17C E20更低!
+
+## 研究#819: RoPE vs ALiBi - V19位置编码决策 (2026-05-17)
+
+### 当前QSM: ALiBi位置编码
+- 优点: 简单, CPU友好, 外推强
+- 缺点: 相对位置衰减快, 长序列衰减
+
+### RoPE (Rotary Position Embedding)
+- LLaMA/Mistral/Gemma的选择
+- 优点: 
+  1. 相对位置编码, 自然外推
+  2. 旋转矩阵保持注意力内积
+  3. 更好的长序列性能
+- 缺点:
+  1. 计算量稍大(sin/cos)
+  2. 需要complex操作
+  3. CPU上比ALiBi慢约5%
+
+### 实现方式
+```python
+def rope(x, seq_len, dim):
+    pos = torch.arange(seq_len)
+    freqs = 1.0 / (10000 ** (torch.arange(0, dim, 2) / dim))
+    angles = pos.unsqueeze(1) * freqs.unsqueeze(0)
+    cos_val = angles.cos()
+    sin_val = angles.sin()
+    # rotate half
+    x1, x2 = x[..., :dim//2], x[..., dim//2:]
+    return torch.cat([x1*cos - x2*sin, x1*sin + x2*cos], -1)
+```
+
+### 🔥🔥🔥V19决策: 保持ALiBi!
+理由:
+1. CPU训练为主, ALiBi更快
+2. 当前seq=128, ALiBi完全够用
+3. ALiBi外推已经很好
+4. RoPE的5%开销在CPU上不可忽略
+
+### 🔥何时切换RoPE?
+- V19+: 当seq_len扩展到256+
+- 当模型部署到GPU时
+- 当前ALiBi是最优选择!
+
+### V19最终架构
+- SwiGLU (FFN)
+- GQA g=2 (Attention)
+- ALiBi (位置编码, 保持!)
+- d=256, L=3, h=4, d_ff=1024
