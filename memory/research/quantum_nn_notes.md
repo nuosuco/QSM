@@ -26935,3 +26935,40 @@ scaler.update()
 - CPU 98.3%, MEM 3.4GB, Swap 762Mi
 - 已运行46min/270min(E1)
 - 3API全200✅ DISK79%
+
+## 研究#788: V17C训练优化与内存分析 (2026-05-16)
+
+### V17C实测内存对比
+| 版本 | MEM | Swap | 每batch | 每epoch |
+|------|-----|------|---------|---------|
+| V16 | 4.5GB | 884MB-1.0GB | 4.985s | 19h |
+| V17C | 3.1-3.4GB | 762MB | 1.171s | 4.5h |
+
+### 🔥V17C Swap仍有762MB!
+原因: 预编码348MB数据+tensor的Python对象开销
+每个样本5个tensor × Python对象头(~100B) = 500B额外
+116K × 500B = 58MB Python对象头
+总计: 348MB + 58MB = 406MB 预编码数据
+
+### 减少Swap方案
+1. 减少验证集(2000→1000): 省~7MB
+2. 用numpy替代torch.tensor存预编码: 省50%内存
+3. 增加swapiness: echo 10 > /proc/sys/vm/swappiness
+
+### 🔥🔥🔥关键发现: Swap 762MB不是训练问题!
+- V16 Swap 1.0GB 训练正常
+- V17C Swap 762MB 更低
+- 4.5h/epoch是核心优势! Swap不影响速度
+
+### V17C收敛预测(基于V16 E1 Val=9.43)
+| Epoch | 预测Val | 说明 |
+|-------|---------|------|
+| E1 | ~9.4 | 随机初始化 |
+| E5 | ~8.5 | 快速下降 |
+| E10 | ~7.5 | 稳定下降 |
+| E20 | ~5.5 | 逐渐收敛 |
+| E50 | ~3.0 | 接近可用 |
+| E100 | ~1.5-2.0 | Early Stop可能 |
+
+### 🔥V17C 100epochs = 18.8天! 
+ES patience=10 → 如果50epoch后无改善, 55epoch停(10.3天)
