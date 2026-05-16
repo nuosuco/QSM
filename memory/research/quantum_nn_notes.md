@@ -28226,3 +28226,53 @@ checkpoint = torch.load("qsm_v17c_best.pth")
 1. cp qsm_v17c_best.pth qsm_v17c_best_e10_backup.pth
 2. V18用V17C best作为起点
 3. V18 best单独保存: qsm_v18_best.pth
+
+## 研究#823: KV Cache推理部署方案 (2026-05-17)
+
+### 当前API推理流程
+1. 用户请求 → Flask → 模型generate() → 返回
+2. 每次请求重新计算所有KV → O(n²)时间
+3. V7-Small: ~5s/句, V14: ~8s/句
+
+### KV Cache优化后
+1. 缓存已计算的K/V矩阵
+2. 只计算新token的K/V → O(n)时间
+3. 理论加速: 3x (5s→1.7s, 8s→2.7s)
+
+### 🔥🔥🔥V18 API KV Cache实现
+```python
+class QSMInference:
+    def __init__(self, model, spm):
+        self.model = model
+        self.spm = spm
+        self.kv_cache = None
+    
+    def generate(self, input_text, max_len=50):
+        tokens = self.spm.encode(input_text)
+        # 编码输入(一次性, 填充KV cache)
+        enc_out, kv = self.model.encode(tokens)
+        # 逐token生成(利用KV cache)
+        for i in range(max_len):
+            next_token, kv = self.model.decode_step(
+                last_token, kv_cache=kv
+            )
+            if next_token == EOS:
+                break
+            tokens.append(next_token)
+        return self.spm.decode(tokens)
+```
+
+### BF16推理加速
+- 模型权重: FP32→BF16 (内存减半)
+- 推理计算: BF16 (1.5x加速 on AVX512_BF16)
+- 组合: KV Cache(3x) × BF16(1.5x) = **4.5x**
+
+### 部署时间线
+- V18 Val<3.0: 实现KV Cache API
+- V18 Val<1.5: 加入BF16推理
+- 目标: 0.5s/句 (实时对话!)
+
+### V14 API (当前端口8001)
+- V14 best Val=2.7892
+- 仍是最可用的翻译模型
+- KV Cache后: 8s→2.7s/句
