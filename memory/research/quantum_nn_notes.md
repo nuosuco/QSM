@@ -28129,3 +28129,52 @@ def rope(x, seq_len, dim):
 ### 结论: CPU上Flash Attention效果有限
 但F.scaled_dot_product_attention仍值得用!
 PyTorch内部会优化CPU路径!
+
+## 研究#821: 课程学习V2 - 彝文优先调度 (2026-05-17)
+
+### V14课程学习回顾
+- Phase 1: difficulty=1-2 (基础)
+- Phase 2: difficulty=3 (中等)
+- Phase 3: difficulty=4-5 (困难)
+- 问题: V14最终过拟合! 课程学习+SGDR对齐不够灵活
+
+### V18课程学习V2方案
+不需要手动切换Phase! 使用**软课程学习**:
+
+### 🔥🔥🔥软课程学习 = 基于Loss的数据加权
+```python
+# 每个样本根据当前loss动态调整权重
+# 简单样本loss低→权重低(已学好)
+# 困难样本loss高→权重高(需加强)
+sample_weight = min(loss / avg_loss, 2.0)
+```
+
+### 优势
+1. 自动适应: 不需要手动Phase切换
+2. 持续学习: 简单样本不丢弃,只是权重低
+3. 聚焦难点: 当前loss高的样本得到更多训练
+4. 彝文优先: 彝文样本初始loss高→自动获得高权重!
+
+### 🔥🔥🔥对V18的意义
+V18数据含24,720彝文字符数据
+彝文是全新模态→初始loss极高
+软课程学习→彝文自动获得高权重!
+模型会优先学彝文!
+
+### 实现方式
+1. 每个batch记录per-sample loss
+2. 计算移动平均loss_per_sample
+3. 下一个epoch按loss加权采样
+
+### 替代方案: 温度采样
+```python
+# 温度T从高到低
+# T高: 均匀采样(探索)
+# T低: 聚焦高loss(利用)
+prob = softmax(loss / T)
+```
+
+### V18决策: 先不用课程学习!
+V17C没有课程学习也在稳定下降
+V18首先验证新数据效果
+如果V18下降速度变慢, 再加软课程学习V18b
