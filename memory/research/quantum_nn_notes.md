@@ -27427,3 +27427,40 @@ class MultiTaskLoRA(nn.Module):
 ### 🔥🔥🔥V17C E5-E10是关键窗口!
 如果E5 Val<9.0: 训练非常成功!
 如果E10 Val<8.0: 可能提前达到Val<3.0!
+
+## 研究#802: torch.compile() CPU加速 (2026-05-16)
+
+### torch.compile() for CPU
+PyTorch 2.x引入的JIT编译优化:
+- 融合算子减少内存访问
+- 自动优化计算图
+- CPU上也有效(不如GPU明显)
+
+### QSM推理加速方案组合
+| 优化 | 加速 | 实现难度 |
+|------|------|----------|
+| KV Cache | 3x | 低(已实现) |
+| BF16推理 | 1.5x | 低 |
+| torch.compile | 1.3-2x | 中 |
+| INT8量化 | 2x | 中(已部署V7) |
+| ONNX Runtime | 1.5-2x | 中 |
+
+### 🔥🔥🔥最优推理组合
+BF16 + torch.compile + KV Cache:
+- 1.5x × 1.5x × 3x = **6.75x推理加速!**
+- 当前V7-Small: ~5s/句
+- 优化后: ~0.74s/句! 实时对话!
+
+### 实现方式
+```python
+model = torch.compile(model, mode="reduce-overhead")
+with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+    output = model.generate(...)
+```
+
+### ⚠️ 注意
+- torch.compile首次调用慢(编译时间)
+- CPU上效果不如GPU明显
+- 需要PyTorch 2.0+
+
+### 下一步: V17C Val<3.0后实现推理优化
