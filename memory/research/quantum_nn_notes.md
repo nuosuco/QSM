@@ -28526,3 +28526,52 @@ V18用V17C E10 best作为起点(含彝文数据)
 - 总量: ✅ 139K
 
 V18可以先启动, 对话数据持续扩展后在V19中使用
+
+## 研究#830: V19 SwiGLU实现细节 (2026-05-17)
+
+### SwiGLU = Swish + GLU (LLaMA同款)
+标准FFN: FFN(x) = ReLU(xW₁ + b₁)W₂ + b₂
+SwiGLU: FFN(x) = (Swish(xW₁) ⊗ xV)W₂
+
+### Swish激活函数
+Swish(x) = x × σ(βx) = x × sigmoid(βx)
+当β=1: Swish(x) = x × sigmoid(x)
+- 平滑非单调: 允许负值输出
+- 自门控: sigmoid决定信息通过量
+- 比ReLU更好: LLaMA/PaLM/Llama2均使用
+
+### 🔥🔥🔥QSM V19实现
+```python
+class SwiGLUFFN(nn.Module):
+    def __init__(self, d_model, d_ff):
+        self.w1 = LoRALinear(d_model, d_ff)
+        self.w2 = LoRALinear(d_ff, d_model)
+        self.w3 = LoRALinear(d_model, d_ff)  # V门控
+    
+    def forward(self, x):
+        # Swish(xW1) ⊗ xW3 → W2
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+```
+
+### 参数变化
+| 组件 | V17C | V19 |
+|------|------|-----|
+| FFN | 2个LoRA(W1,W2) | 3个LoRA(W1,W2,W3) |
+| d_ff | 768 | 768(但实际容量更大) |
+| 参数增加 | - | +25% FFN参数 |
+
+### 🔥🔥🔥V19预期效果
+1. SwiGLU比ReLU训练更稳定
+2. 门控机制→更好的信息选择
+3. LLaMA证明SwiGLU显著优于ReLU
+4. 代价: +25%参数→训练慢~20%
+
+### V19时间线
+1. V18验证数据效果 → Val<5.0
+2. V19=V18+SwiGLU+GQA → 预计5/18-5/19
+3. V19训练50 epochs
+4. 目标: Val<3.0 (可用翻译质量!)
+
+### GQA(g=2)组合
+SwiGLU(FFN) + GQA(Attention) = V19核心
+两者独立, 可分别消融实验
