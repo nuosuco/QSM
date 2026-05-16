@@ -27733,3 +27733,46 @@ V18才是真正的突破点!
 - 新rank需要全新的学习率调整
 
 ### V19 = V18 best + r=64 + fresh optimizer
+
+## 研究#811: V18训练脚本设计 (2026-05-16)
+
+### V18 = V17C best + 138K新数据
+
+### V18脚本修改清单
+1. 数据路径: v13_clean_dataset.json (138K, 含彝文)
+2. 预编码: 重新生成DatasetV2
+3. 起始权重: V17C best.pth (Val=9.3358)
+4. 架构: 同V17C (d=256/h=4/L=3/ff=768)
+5. LoRA: r=32, alpha=64
+6. Scheduler: warmup+cosine (fresh start!)
+7. BF16: ✅
+8. seq_len: 128
+
+### 🔥🔥🔥V18关键区别
+- V17C: 117K数据(0%彝文字符)
+- V18: 138K数据(42.6%含彝文字符!)
+- 新增24,720条彝文字符数据
+- 新增1,000+条对话数据
+- 新增300+条QA数据
+
+### 预编码时间估算
+- 117K数据: ~15min
+- 138K数据: ~18min (+18%)
+- 彝文字符短,预编码应该更快
+
+### V18 E1预测
+- 继续训练: E1 Val应低于V17C E3(9.34)
+- 新数据引入: 可能有短期Val上升
+- 但2-3个epoch后应稳定下降
+
+### 启动时机
+- V17C E10完成 (~明早10:00 UTC)
+- 备份V17C best.pth
+- 生成V18预编码
+- 启动V18训练!
+
+### ⚠️ V17C → V18 切换步骤
+1. systemctl stop qsm-v17c-train
+2. cp qsm_v17c_best.pth qsm_v17c_best_e10_backup.pth
+3. 修改数据路径+重新预编码
+4. systemctl restart qsm-v17c-train (或新service)
