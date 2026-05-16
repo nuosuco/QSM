@@ -28093,3 +28093,39 @@ def rope(x, seq_len, dim):
 - GQA g=2 (Attention)
 - ALiBi (位置编码, 保持!)
 - d=256, L=3, h=4, d_ff=1024
+
+## 研究#820: Flash Attention与CPU训练 (2026-05-17)
+
+### Flash Attention是什么?
+- 2022年Tri Dao提出
+- 通过分块计算(tiling)减少HBM访问
+- GPU上: 2-4x加速, 内存从O(N²)→O(N)
+
+### Flash Attention原理
+1. **分块计算**: 将Q/K/V分成小块, 在SRAM中计算
+2. **在线softmax**: 逐块更新softmax, 不需要全部存入HBM
+3. **重计算**: backward时重算attention, 而非存储
+
+### 🔥CPU上Flash Attention有用吗?
+- CPU没有SRAM/HBM的巨大差距
+- CPU缓存L1/L2/L3 <--> DRAM 也有差距!
+- 但CPU分块大小不同(cache line=64B)
+
+### CPU优化方向
+1. **分块计算**: 对CPU L2 cache优化(256KB-1MB)
+2. **避免softmax全量计算**: 在线softmax
+3. **内存带宽优化**: 减少DRAM访问
+
+### PyTorch 2.x SDPA
+- torch.nn.functional.scaled_dot_product_attention
+- 自动选择最优实现(Flash/MemoryEfficient/Math)
+- CPU上可能用math fallback
+
+### 🔥🔥🔥QSM V18/V19优化
+1. 使用torch.compile() (研究#802)
+2. 使用F.scaled_dot_product_attention (替代手动attention)
+3. BF16 + SDPA = CPU上1.5x加速
+
+### 结论: CPU上Flash Attention效果有限
+但F.scaled_dot_product_attention仍值得用!
+PyTorch内部会优化CPU路径!
