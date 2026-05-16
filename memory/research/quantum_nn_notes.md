@@ -28178,3 +28178,51 @@ prob = softmax(loss / T)
 V17C没有课程学习也在稳定下降
 V18首先验证新数据效果
 如果V18下降速度变慢, 再加软课程学习V18b
+
+## 研究#822: V18训练脚本框架 (2026-05-17)
+
+### V18 = V17C架构 + 138K新数据(含彝文)
+
+### V18 vs V17C关键区别
+1. **数据**: 138K(含24,720彝文) vs 117K(0彝文)
+2. **预编码**: 重新生成DatasetV2
+3. **起始权重**: V17C best (Val=9.26)
+4. **架构**: 完全相同(d=256/h=4/L=3/ff=768)
+5. **LoRA**: r=32, alpha=64
+6. **BF16**: ✅
+
+### V18启动时机
+- V17C E10完成 (~08:00 UTC 5/17)
+- 或V17C E20完成 (~18:00 UTC 5/17)
+- 建议: E10后备份best, 继续到E20
+- E20后启动V18, V17C保留作baseline
+
+### 🔥🔥🔥V18预期
+- 新数据引入彝文→短期Val可能上升
+- 但彝文是新学习信号→1-2个epoch后恢复下降
+- E5后应该比V17C同期更低(数据更多更好)
+
+### V18脚本修改清单
+```python
+# 1. 数据路径
+dataset_path = "v13_clean_dataset.json"  # 138K
+
+# 2. 预编码
+class DatasetV2:
+    def __init__(self, data, spm, seq_len):
+        self.encoded = []  # 一次性编码
+        for item in data:
+            src = spm.encode(item['input'])
+            tgt = spm.encode(item['output'])
+            self.encoded.append((src, tgt))
+
+# 3. 起始权重
+checkpoint = torch.load("qsm_v17c_best.pth")
+
+# 4. 同V17C架构+训练参数
+```
+
+### 备份策略
+1. cp qsm_v17c_best.pth qsm_v17c_best_e10_backup.pth
+2. V18用V17C best作为起点
+3. V18 best单独保存: qsm_v18_best.pth
