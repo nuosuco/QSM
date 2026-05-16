@@ -27902,3 +27902,39 @@ class SwiGLU(nn.Module):
 ```
 
 ### 结论: V18验证后, V19加入SwiGLU!
+
+## 研究#815: Grouped Query Attention (GQA) (2026-05-16)
+
+### GQA = Multi-Query Attention与Multi-Head Attention的折中
+- MHA: 每个head独立K/V → h组K/V
+- MQA: 所有head共享1组K/V → 1组K/V
+- GQA: 分组共享 → g组K/V (1 < g < h)
+
+### QSM当前: MHA (h=4头, 4组K/V)
+### GQA方案: g=2组K/V (4头共享2组)
+
+### GQA优势
+1. **推理加速**: KV Cache减少50% (4→2组)
+2. **内存节省**: KV Cache从2×2×128×4=2KB→1KB
+3. **质量接近MHA**: 研究表明g=h/2几乎无损
+4. **长序列更好**: Cache小→支持更长上下文
+
+### 内存计算(QSM V17C)
+- MHA KV Cache: 2×L×d×h×seq = 2×3×256×4×128 = 786KB
+- GQA KV Cache: 2×L×d×g×seq = 2×3×256×2×128 = 393KB
+- 节省: 393KB (50%)
+
+### 🔥🔥🔥V19架构改进路线
+1. **SwiGLU** (研究#814): FFN层改进
+2. **GQA g=2** (本研究): Attention层改进
+3. **RoPE位置编码**: 替换ALiBi (如果V19 Val<3.0)
+4. **d_ff=1024**: 配合SwiGLU扩展
+
+### ⚠️ GQA实现注意事项
+- K/V投影: d→(d/h)×g 而非 (d/h)×h
+- 需要expand K/V到所有head
+- LoRA: 对K/V投影的LoRA维度也减半
+
+### 实现优先级
+V18验证新数据效果后, V19加入GQA+SwiGLU!
+两个改进组合可能降Val 0.5-1.0!
