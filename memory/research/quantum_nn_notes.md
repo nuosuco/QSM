@@ -26820,3 +26820,43 @@ lora_r = 32
 - 配置: d=256, h=4, L=3, ff=768, lora_r=32, vocab=20K, seq=128
 
 ### V16 E1完成后立即切换V17B!
+
+## 研究#784: CPU混合精度训练可行性 (2026-05-15)
+
+### AMP (Automatic Mixed Precision) on CPU
+- PyTorch支持CPU上的torch.bfloat16
+- `torch.autocast(device_type="cpu", dtype=torch.bfloat16)`
+- 优点: 减少内存带宽需求→可能加速1.3-1.5x
+- 缺点: CPU bfloat16支持需要AVX512_BF16指令集
+
+### 检查CPU是否支持BF16
+AMD EPYC 9754 (Zen4) → 支持AVX512_BF16! ✅
+
+### 预期加速
+| 精度 | 每batch | 每epoch(V17B) | 内存 |
+|------|---------|---------------|------|
+| FP32 | 1.821s | 6.9h | ~2.0GB |
+| BF16 | ~1.3s | ~4.9h | ~1.2GB |
+
+### V17B + BF16 = 4.9h/epoch!
+- 100epochs = 20天(vs FP32 29天)
+- 内存1.2GB! Swap=0!
+
+### 实现方式
+```python
+scaler = torch.cpu.amp.GradScaler()
+with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+    logits = model(src, tgt_input, src_lang, tgt_lang)
+    loss = criterion(logits.view(-1, vocab), tgt_output.view(-1))
+scaler.scale(loss).backward()
+scaler.step(optimizer)
+scaler.update()
+```
+
+### ⚠️ 注意事项
+1. LoRA参数需要保持FP32! (混合精度训练LoRA需要master weights)
+2. Label Smoothing与BF16兼容
+3. CrossEntropyLoss支持BF16
+4. 需要GradScaler防止underflow
+
+### 🔥🔥🔥V17C方案: V17B + BF16! 预计4.9h/epoch!
