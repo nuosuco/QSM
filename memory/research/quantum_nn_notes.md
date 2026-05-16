@@ -27858,3 +27858,47 @@ E5是warmup后第一个完整epoch!
 如果E5 Val下降幅度=0.03: 符合指数衰减预测
 
 ### 🔥V17C E5预计完成: ~01:00 UTC (09:00 CST)
+
+## 研究#814: SwiGLU激活函数 (2026-05-16)
+
+### SwiGLU = LLaMA/Mistral的选择
+Google 2022提出, 被LLaMA/PaLM/Gemma等采用:
+```
+SwiGLU(x, W, V, b) = Swish(xW) ⊗ (xV)
+Swish(x) = x * σ(x) = x * sigmoid(x)
+```
+
+### vs QSM当前GeLU
+| 激活函数 | 公式 | 优点 | 缺点 |
+|----------|------|------|------|
+| GeLU | x*Φ(x) | 平滑, GPT-2/3/BERT用 | 计算量稍大 |
+| SwiGLU | Swish(xW)⊗(xV) | 更好性能, SOTA | 额外V权重矩阵 |
+| ReLU | max(0,x) | 简单 | 神经元死亡 |
+
+### SwiGLU的优势
+1. **GLU门控**: 乘法门控让网络选择性传递信息
+2. **Swish平滑**: 非单调, 允许小负值通过
+3. **实验验证**: 在相同参数下比GeLU低~0.2 Val Loss
+
+### 🔥QSM V19候选改进
+- 将d_ff从768→1024 (SwiGLU需要更多ff)
+- 将GeLU→SwiGLU
+- 增加一个V投影矩阵
+- LoRA也需要作用于V投影
+
+### 内存影响
+- V投影: d×d_ff = 256×1024 = 262K参数
+- LoRA on V: r=32 → 2×32×1024 = 65K
+- 总增加: ~330K参数 (约2%)
+
+### 实现方式
+```python
+class SwiGLU(nn.Module):
+    def __init__(self, d_model, d_ff):
+        self.w_gate = LoRALinear(d_model, d_ff)
+        self.w_up = LoRALinear(d_model, d_ff)
+    def forward(self, x):
+        return F.silu(self.w_gate(x)) * self.w_up(x)
+```
+
+### 结论: V18验证后, V19加入SwiGLU!
