@@ -28805,3 +28805,56 @@ GQA: Wk(256×128) + Wv(256×128) = 65.5K/层
 - V18 E10完成 → 评估
 - V18 Val<5.0 → 启动V19
 - 预计5/19-5/20
+
+## 研究#836: V18切换SOP (2026-05-17)
+
+### V18切换标准操作流程(SOP)
+
+#### Step 1: 等待V17C E10完成
+- journalctl -u qsm-v17c-train | tail -5
+- 记录E10 Val Loss
+
+#### Step 2: 备份V17C best
+```bash
+cd /root/.openclaw/workspace/Models/QSM/bin
+cp qsm_v17c_best.pth qsm_v17c_best_e10_backup.pth
+ls -la qsm_v17c_best*.pth
+```
+
+#### Step 3: V17C继续训练(不停止!)
+- V17C继续到E20作为baseline对照
+- 不需要修改systemd service
+
+#### Step 4: 启动V18(单独服务)
+```bash
+# 创建V18 systemd service
+# 关键: 不与V17C冲突(可以等V17C到E20后再启动)
+# 或者: 停止V17C, 启动V18
+
+# 方案A: 串行(推荐, 7.4G内存不够两个训练)
+1. 停止V17C: systemctl stop qsm-v17c-train
+2. 备份best
+3. 启动V18: python3 train_v18_from_v17c.py
+4. V18完成后再恢复V17C继续训练
+
+# 方案B: V17C训练到E20后自动切换
+# 在V17C脚本中加max_epochs=20
+# 完成后手动启动V18
+```
+
+#### Step 5: V18训练参数
+- 从V17C best加载权重
+- 重新预编码139K数据(SPM V15)
+- optimizer重新初始化(fresh start!)
+- lr=0.0006 (同V17C)
+- warmup=2000 steps
+- 50 epochs + early stopping
+
+#### Step 6: 监控V18
+- 每小时检查日志
+- 关注E1 Val是否比V17C E1高
+- E3-5后应该恢复下降趋势
+
+### 🔥🔥🔥决策: V17C E10后串行切换
+内存不够同时跑两个训练!
+先停V17C→启动V18→V18跑完再恢复V17C
