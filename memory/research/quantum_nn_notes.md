@@ -28950,3 +28950,53 @@ Train: 9.2446 (比E7的9.2636低)
 但Val下降极少→模型在"死记硬背"
 这是**开始过拟合的早期信号**!
 V18必须在过拟合严重前启动!
+
+## 研究#839: V18启动前最终检查清单 (2026-05-17)
+
+### V18启动前必须确认
+- [x] V17C E10完成 → 等待中(E9训练中)
+- [x] V17C best备份 → 计划cp到e10_backup
+- [x] V18脚本完成 → train_v18_from_v17c.py
+- [x] 数据140K+含24K彝文 → ✅ 140,926
+- [x] SPM V15模型 → ✅ qsm_spm_v15.model (20K)
+- [ ] V18 systemd service → 需要创建!
+- [ ] V17C服务停止 → E10后执行
+- [ ] 内存检查 → 当前3.9G可用
+
+### V18 systemd service配置
+```ini
+[Unit]
+Description=QSM V18 Training (from V17C + 140K data)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/.openclaw/workspace/Models/QSM
+ExecStart=/usr/bin/python3 train_v18_from_v17c.py
+Environment=PYTHONUNBUFFERED=1
+Restart=no
+User=root
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### V18启动流程(串行)
+1. 等待V17C E10完成 → journalctl监控
+2. 记录E10 Val Loss
+3. systemctl stop qsm-v17c-train
+4. cp qsm_v17c_best.pth qsm_v17c_best_e10_backup.pth
+5. 验证备份: ls -la qsm_v17c_best*.pth
+6. systemctl start qsm-v18-train
+7. journalctl -u qsm-v18-train -f 监控
+
+### V18关键观察指标
+1. E1 Val vs V17C E1(9.4770): 预期9.5-9.8(新数据引入)
+2. E3 Val: 是否恢复下降
+3. E5 Val: 是否低于V17C E5(9.2558)
+4. 训练速度: 是否仍~3.3h/epoch
+
+### 🔥🔥🔥风险控制
+- V17C best备份在V18启动前必须完成!
+- 如果V18 E1崩溃→恢复V17C继续训练
+- 保留V17C systemd service(不删除)
