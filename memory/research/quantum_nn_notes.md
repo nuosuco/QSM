@@ -28575,3 +28575,65 @@ class SwiGLUFFN(nn.Module):
 ### GQA(g=2)组合
 SwiGLU(FFN) + GQA(Attention) = V19核心
 两者独立, 可分别消融实验
+
+## 研究#831: V19 GQA分组查询注意力 (2026-05-17)
+
+### MHA vs MQA vs GQA
+| 类型 | Q头数 | K/V头数 | KV Cache | 质量 |
+|------|-------|---------|----------|------|
+| MHA | 4 | 4 | 4份 | 最高 |
+| MQA | 4 | 1 | 1份 | 最低 |
+| GQA(g=2) | 4 | 2 | 2份 | 接近MHA |
+
+### 🔥🔥🔥GQA(g=2)实现
+V17C: d=256, h=4, d_head=64
+V19 GQA: g=2, 每组2个Q头共享1个K/V头
+
+```python
+class GroupedQueryAttention(nn.Module):
+    def __init__(self, d_model, n_heads, n_groups):
+        self.n_heads = n_heads  # 4
+        self.n_groups = n_groups  # 2 (g=2)
+        self.heads_per_group = n_heads // n_groups  # 2
+        self.d_head = d_model // n_heads  # 64
+        
+        # Q: 4头, K/V: 2组
+        self.Wq = LoRALinear(d_model, d_model)
+        self.Wk = LoRALinear(d_model, d_model // self.heads_per_group)
+        self.Wv = LoRALinear(d_model, d_model // self.heads_per_group)
+        self.Wo = LoRALinear(d_model, d_model)
+    
+    def forward(self, x, alibi_bias):
+        B, T, D = x.shape
+        Q = self.Wq(x).view(B, T, self.n_heads, self.d_head)
+        K = self.Wk(x).view(B, T, self.n_groups, self.d_head)
+        V = self.Wv(x).view(B, T, self.n_groups, self.d_head)
+        
+        # 扩展K/V: [B,T,2,64] → [B,T,4,64]
+        K = K.repeat_interleave(self.heads_per_group, dim=2)
+        V = V.repeat_interleave(self.heads_per_group, dim=2)
+        
+        # 标准attention计算
+        attn = (Q @ K.transpose(-2,-1)) / sqrt(d_head) + alibi_bias
+        attn = softmax(attn)
+        out = (attn @ V).reshape(B, T, D)
+        return self.Wo(out)
+```
+
+### KV Cache节省
+- MHA: 每层存4组KV → 4×64×2×T = 512T
+- GQA: 每层存2组KV → 2×64×2×T = 256T
+- **节省50%!** 推理内存减半!
+
+### 推理加速
+- KV Cache减半→内存带宽减半
+- 但需要repeat_interleave→少量计算开销
+- 净效果: 推理加速1.3x (LLaMA2实测)
+
+### V19参数变化
+| | V17C | V19 |
+|--|------|-----|
+| Wk | 256×256 | 256×128 |
+| Wv | 256×256 | 256×128 |
+| 总参数 | 16M | ~15M(-6%) |
+| KV Cache | 4份 | 2份(-50%) |
