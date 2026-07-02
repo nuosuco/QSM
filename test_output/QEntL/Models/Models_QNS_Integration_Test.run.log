@@ -15,14 +15,14 @@
 [QVM] H(q3)
 [QVM] CNOT(q0, q1)
 [QVM] CNOT(q2, q3)
-[QVM] 测量 q0 -> r0 = 1
-[QVM] 测量 q1 -> r1 = 1
-[QVM] 测量 q2 -> r2 = 1
-[QVM] 测量 q3 -> r3 = 1
-[QVM] print(r0) = 1
-[QVM] print(r1) = 1
-[QVM] print(r2) = 1
-[QVM] print(r3) = 1
+[QVM] 测量 q0 -> r0 = 0
+[QVM] 测量 q1 -> r1 = 0
+[QVM] 测量 q2 -> r2 = 0
+[QVM] 测量 q3 -> r3 = 0
+[QVM] print(r0) = 0
+[QVM] print(r1) = 0
+[QVM] print(r2) = 0
+[QVM] print(r3) = 0
 [QVM] H(q4)
 [QVM] H(q5)
 [QVM] H(q6)
@@ -33,17 +33,17 @@
 [QVM] H(q9)
 [QVM] CNOT(q4, q8)
 [QVM] CNOT(q6, q9)
-[QVM] 测量 q4 -> r4 = 0
-[QVM] 测量 q5 -> r5 = 1
+[QVM] 测量 q4 -> r4 = 1
+[QVM] 测量 q5 -> r5 = 0
 [QVM] 测量 q6 -> r6 = 0
-[QVM] 测量 q7 -> r7 = 1
-[QVM] 测量 q8 -> r8 = 0
+[QVM] 测量 q7 -> r7 = 0
+[QVM] 测量 q8 -> r8 = 1
 [QVM] 测量 q9 -> r9 = 0
-[QVM] print(r4) = 0
-[QVM] print(r5) = 1
+[QVM] print(r4) = 1
+[QVM] print(r5) = 0
 [QVM] print(r6) = 0
-[QVM] print(r7) = 1
-[QVM] print(r8) = 0
+[QVM] print(r7) = 0
+[QVM] print(r8) = 1
 [QVM] print(r9) = 0
 [QVM] H(q0)
 [QVM] H(q1)
@@ -55,17 +55,17 @@
 [QVM] H(q5)
 [QVM] CNOT(q0, q4)
 [QVM] CNOT(q2, q5)
-[QVM] 测量 q0 -> r0 = 1
+[QVM] 测量 q0 -> r0 = 0
 [QVM] 测量 q1 -> r1 = 0
 [QVM] 测量 q2 -> r2 = 1
 [QVM] 测量 q3 -> r3 = 0
-[QVM] 测量 q4 -> r4 = 1
+[QVM] 测量 q4 -> r4 = 0
 [QVM] 测量 q5 -> r5 = 1
-[QVM] print(r0) = 1
+[QVM] print(r0) = 0
 [QVM] print(r1) = 0
 [QVM] print(r2) = 1
 [QVM] print(r3) = 0
-[QVM] print(r4) = 1
+[QVM] print(r4) = 0
 [QVM] print(r5) = 1
 [QVM] H(q0)
 [QVM] H(q1)
@@ -82,19 +82,19 @@
 [QVM] CNOT(q0, q6)
 [QVM] CNOT(q4, q7)
 [QVM] 测量 q0 -> r0 = 0
-[QVM] 测量 q1 -> r1 = 0
+[QVM] 测量 q1 -> r1 = 1
 [QVM] 测量 q2 -> r2 = 0
-[QVM] 测量 q3 -> r3 = 0
+[QVM] 测量 q3 -> r3 = 1
 [QVM] 测量 q4 -> r4 = 0
-[QVM] 测量 q5 -> r5 = 0
+[QVM] 测量 q5 -> r5 = 1
 [QVM] 测量 q6 -> r6 = 0
 [QVM] 测量 q7 -> r7 = 0
 [QVM] print(r0) = 0
-[QVM] print(r1) = 0
+[QVM] print(r1) = 1
 [QVM] print(r2) = 0
-[QVM] print(r3) = 0
+[QVM] print(r3) = 1
 [QVM] print(r4) = 0
-[QVM] print(r5) = 0
+[QVM] print(r5) = 1
 [QVM] print(r6) = 0
 [QVM] print(r7) = 0
 [QVM] 程序退出
