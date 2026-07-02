@@ -40,6 +40,21 @@ def peek(line, p):
         return '';
     return line[p];
 
+// 跳过到指定字符（支持多行，跨换行查找）
+def skip_to_multi(lines, start_idx, start_p, target):
+    var total = len(lines);
+    var idx = start_idx;
+    var p = start_p;
+    while idx < total:
+        var line = lines[idx];
+        while p < len(line):
+            if line[p] == target:
+                return [idx, p];
+            p = p + 1;
+        idx = idx + 1;
+        p = 0;
+    return [total, 0];
+
 // 读取标识符（直到空白、{、(、=、,、) 等分隔符）
 def read_identifier(line, p):
     var name = '';
@@ -52,6 +67,18 @@ def read_identifier(line, p):
         name = name + ch;
         p = p + 1;
     return [name, p];
+
+// 清理行内注释（找到第一个 // 并截断，跳过 # 行注释）
+def trim_comment(line):
+    var i = 0;
+    var l = len(line);
+    while i < l - 1:
+        if line[i] == '/' && line[i + 1] == '/':
+            return line.substring(0, i);
+        if line[i] == '#':
+            return line.substring(0, i);
+        i = i + 1;
+    return line;
 
 // 读取直到结束符（返回 [字符串, 新位置]）
 def read_until(line, p, end_char):
@@ -153,8 +180,81 @@ def parse_quantum_module(line, p):
 
     return [true, p];
 
-// ---- 3. 类型/类定义解析 ----
-// 解析 "类型 <name> {"
+// 多行量子模块解析：编译 { ... } 模块体中的量子指令
+def parse_module_multi(lines, line_idx):
+    var line = lines[line_idx];
+    var total = len(lines);
+
+    // 跳过"量子模块"关键字（4字符）
+    var p = 4;
+    p = skip_whitespace(line, p);
+
+    // 读取模块名
+    var name_result = read_identifier(line, p);
+    var module_name = name_result[0];
+    p = name_result[1];
+
+    // 找 {
+    var brace_result = skip_to_multi(lines, line_idx, p, '{');
+    var brace_idx = brace_result[0];
+    var brace_p = brace_result[1];
+
+    if brace_idx >= total:
+        return [false, 0];
+
+    // 收集模块体
+    var body_lines = [];
+    var body_count = 0;
+    var search_idx = brace_idx + 1;
+    var body_start_p = brace_p + 1;
+    var current_line = lines[brace_idx];
+
+    while body_start_p < len(current_line):
+        var ch = current_line[body_start_p];
+        if ch == '}' || ch == '\n' || ch == '\r':
+            break;
+        body_start_p = body_start_p + 1;
+    fi;
+    if body_start_p >= len(current_line):
+        search_idx = brace_idx + 1;
+    fi;
+
+    var found_end = false;
+    while search_idx < total:
+        var bline = trim_comment(lines[search_idx]).trim();
+        if starts_with(bline, 0, "}"):
+            found_end = true;
+            break;
+        if len(bline) > 0:
+            body_lines[body_count] = bline;
+            body_count = body_count + 1;
+        search_idx = search_idx + 1;
+
+    if !found_end:
+        print("[parser_high] 警告: 量子模块 \"" + module_name + "\" 缺少结束 }");
+
+    // 输出模块初始化
+    write_opcode(OP_INIT_MODULE);
+    write_string(module_name);
+
+    // 逐行编译量子指令
+    var compiled = 0;
+    var bi = 0;
+    while bi < body_count:
+        var bp = skip_whitespace(body_lines[bi], 0);
+        var gate_ok = parse_quantum_inline(body_lines[bi], bp);
+        if gate_ok[0]:
+            compiled = compiled + 1;
+        bi = bi + 1;
+
+    var consumed = search_idx - line_idx;
+    return [true, consumed];
+
+// ---- 3. 类型/类定义解析（单行声明 + 多行字段）----
+// 单行模式: parse_type(line, p)  解析 "类型 <name> {" 并输出OP_DEFINE_CLASS
+// 多行模式: parse_type_multi(lines, line_idx)  解析 { 字段... } 并输出字段
+// 解析 "类型 <name> { 字段列表 }"
+
 def parse_type(line, p):
     p = p + 2;  // 跳过"类型"
 
@@ -166,54 +266,395 @@ def parse_type(line, p):
     // 跳过到 {
     p = skip_to(line, p, '{');
 
-    // 记录类型
+    // 记录类型（字段数占位0，parse_type_multi会更新）
+    var class_idx = g_class_count;
     g_classes[g_class_count] = [type_name, 0];
     g_class_count = g_class_count + 1;
 
-    // 写入字节码
+    // 写入字节码（类型声明）
     write_opcode(OP_DEFINE_CLASS);
     write_string(type_name);
-    write_u8(g_class_count - 1);
+    write_u8(class_idx);
 
     return [true, p];
 
-// ---- 4. 函数定义解析 ----
-// 解析 "函数 <name>(<params>) -> <return> {"
+// 多行类型解析：收集字段并输出 OP_STORE_MEMBER
+def parse_type_multi(lines, line_idx):
+    var line = lines[line_idx];
+    var total = len(lines);
+
+    // 跳过"类型"关键字
+    var p = 2;
+    p = skip_whitespace(line, p);
+
+    // 读取类型名
+    var name_result = read_identifier(line, p);
+    var type_name = name_result[0];
+    p = name_result[1];
+
+    // 找 {
+    var brace_result = skip_to_multi(lines, line_idx, p, '{');
+    var brace_idx = brace_result[0];
+    var brace_p = brace_result[1];
+
+    if brace_idx >= total:
+        return [false, 0];  // 未找到 {
+
+    // 收集字段（{ ... } 之间）
+    var fields = [];
+    var field_count = 0;
+    var search_idx = brace_idx + 1;
+    var found_end = false;
+    var body_start_p = brace_p + 1;
+
+    // 从 { 所在行继续读取
+    var current_line = lines[brace_idx];
+    while body_start_p < len(current_line):
+        var ch = current_line[body_start_p];
+        if ch == '}' || ch == '\n' || ch == '\r':
+            break;
+        body_start_p = body_start_p + 1;
+        search_idx = brace_idx;
+    // 若 { 后面就是 } 或换行，从下一行开始
+    if body_start_p >= len(current_line):
+        search_idx = brace_idx + 1;
+        body_start_p = 0;
+
+    while search_idx < total:
+        var fld = trim_comment(lines[search_idx]);
+        // 去掉首尾空白
+        fld = fld.trim();
+        // 找到 } 则结束
+        if starts_with(fld, 0, "}"):
+            found_end = true;
+            break;
+        if len(fld) > 0:
+            fields[field_count] = fld;
+            field_count = field_count + 1;
+        search_idx = search_idx + 1;
+
+    if !found_end:
+        print("[parser_high] 警告: 类型 \"" + type_name + "\" 缺少结束 }");
+
+    // 更新字段计数
+    g_classes[g_class_count - 1][1] = field_count;
+
+    // 输出字段字节码（OP_STORE_MEMBER per field）
+    var fi = 0;
+    while fi < field_count:
+        write_opcode(OP_STORE_MEMBER);
+        write_string(type_name);
+        write_string(fields[fi]);
+        fi = fi + 1;
+
+    // 返回跳过的行数
+    var consumed = search_idx - line_idx;
+    return [true, consumed];
+
+// ---- 4. 函数定义解析（单行声明 + 多行函数体）----
+// 支持 "函数" 或 "def" 关键字
+// 单行模式: parse_function(line, p)  解析 "函数 <name>(<params>) -> <return> {" 输出OP_DEFINE_FUNC
+// 多行模式: parse_function_multi(lines, line_idx)  解析函数体并输出量子指令字节码
+// 解析 "def/函数 <name>(<params>) -> <return> { 函数体 }"
+
 def parse_function(line, p):
-    p = p + 2;  // 跳过"函数"
+    // 确定关键字长度（"def"=3 或 "函数"=2）
+    var kw_len = 0;
+    if starts_with(line, p, "def"):
+        kw_len = 3;
+    else if starts_with(line, p, "函数"):
+        kw_len = 2;
+    else:
+        return [false, p];
+
+    p = p + kw_len;
+
+    // 跳过空白
+    p = skip_whitespace(line, p);
 
     // 读取函数名
     var name_result = read_identifier(line, p);
     var func_name = name_result[0];
     p = name_result[1];
 
-    // 解析返回类型（跳过参数到 -> 或 {）
+    // 解析参数列表（( ... )）
+    var param_count = 0;
+    var param_list = [];
+    if peek(line, p) == '(':
+        p = p + 1;  // 跳过 (
+        while p < len(line) && line[p] != ')' && line[p] != '\0':
+            if line[p] == ',':
+                param_count = param_count + 1;
+            p = p + 1;
+        if param_count > 0:
+            param_count = param_count + 1;
+        // 跳过 )
+        if p < len(line) && line[p] == ')':
+            p = p + 1;
+    fi;
+
+    // 跳过空白
+    p = skip_whitespace(line, p);
+
+    // 解析返回类型（-> ...）
     var return_type = "void";
-    while p < len(line) && line[p] != '\0' && line[p] != '\n'
-          && line[p] != '\r' && line[p] != '\t' && line[p] != '{':
-        if starts_with(line, p, "->"):
-            p = p + 2;
-            p = skip_whitespace(line, p);
-            var rt_result = read_until(line, p, '{');
-            return_type = rt_result[0];
-            p = rt_result[1];
-            break;
-        p = p + 1;
+    if starts_with(line, p, "->"):
+        p = p + 2;
+        p = skip_whitespace(line, p);
+        var rt_result = read_until(line, p, '{');
+        return_type = rt_result[0];
+        p = rt_result[1];
+    fi;
 
     // 跳过到 {
     p = skip_to(line, p, '{');
 
     // 记录函数
-    g_functions[g_function_count] = [func_name, return_type, 0];
+    var func_idx = g_function_count;
+    g_functions[g_function_count] = [func_name, return_type, param_count];
     g_function_count = g_function_count + 1;
 
-    // 写入字节码
+    // 写入字节码（函数定义）
     write_opcode(OP_DEFINE_FUNC);
     write_string(func_name);
     write_string(return_type);
-    write_u8(g_function_count - 1);
+    write_u8(func_idx);
+
+    // 输出参数字节码（OP_DEF_PARAM per param）
+    var pi = 0;
+    while pi < param_count:
+        write_opcode(OP_DEF_PARAM);
+        write_string(func_name);
+        write_u8(pi);
+        pi = pi + 1;
 
     return [true, p];
+
+// 多行函数解析：编译 { ... } 函数体为量子指令字节码
+def parse_function_multi(lines, line_idx):
+    var line = lines[line_idx];
+    var total = len(lines);
+
+    // 跳过关键字（def 或 函数）
+    var kw_len = 0;
+    if starts_with(line, 0, "def"):
+        kw_len = 3;
+    else if starts_with(line, 0, "函数"):
+        kw_len = 2;
+    else:
+        return [false, 0];
+
+    var p = kw_len;
+    p = skip_whitespace(line, p);
+
+    // 读取函数名
+    var name_result = read_identifier(line, p);
+    var func_name = name_result[0];
+    p = name_result[1];
+
+    // 跳过参数列表 (...)
+    if peek(line, p) == '(':
+        while p < len(line) && line[p] != ')':
+            p = p + 1;
+        if p < len(line):
+            p = p + 1;  // 跳过 )
+    fi;
+    p = skip_whitespace(line, p);
+
+    // 跳过返回类型 -> ...
+    if starts_with(line, p, "->"):
+        p = skip_to(line, p, '{');
+    fi;
+
+    // 找 {
+    var brace_result = skip_to_multi(lines, line_idx, p, '{');
+    var brace_idx = brace_result[0];
+    var brace_p = brace_result[1];
+
+    if brace_idx >= total:
+        return [false, 0];
+
+    // 收集函数体（{ ... } 之间的量子指令行）
+    var body_lines = [];
+    var body_count = 0;
+    var search_idx = brace_idx + 1;
+    var body_start_p = brace_p + 1;
+    var current_line = lines[brace_idx];
+
+    // 若 { 后在同一行有内容，先检查
+    while body_start_p < len(current_line):
+        var ch = current_line[body_start_p];
+        if ch == '}' || ch == '\n' || ch == '\r':
+            break;
+        body_start_p = body_start_p + 1;
+    fi;
+    if body_start_p >= len(current_line):
+        search_idx = brace_idx + 1;
+    fi;
+
+    var found_end = false;
+    while search_idx < total:
+        var bline = trim_comment(lines[search_idx]).trim();
+        if starts_with(bline, 0, "}"):
+            found_end = true;
+            break;
+        if len(bline) > 0:
+            body_lines[body_count] = bline;
+            body_count = body_count + 1;
+        search_idx = search_idx + 1;
+
+    if !found_end:
+        print("[parser_high] 警告: 函数 \"" + func_name + "\" 缺少结束 }");
+
+    // 记录函数（多行模式）
+    var func_idx = g_function_count;
+    g_functions[g_function_count] = [func_name, "void", 0];
+    g_function_count = g_function_count + 1;
+
+    // 输出函数定义头部
+    write_opcode(OP_DEFINE_FUNC);
+    write_string(func_name);
+    write_string("void");
+    write_u8(func_idx);
+
+    // 输出函数体标记
+    write_byte(255);  // BC_FUNC_BODY 标记
+    write_u8(body_count);
+
+    // 逐行编译量子指令（调用 qcl_parser 的 parse_quantum_instruction）
+    var compiled = 0;
+    var bi = 0;
+    while bi < body_count:
+        var bp = skip_whitespace(body_lines[bi], 0);
+        // 内联解析量子指令
+        var gate_ok = parse_quantum_inline(body_lines[bi], bp);
+        if gate_ok[0]:
+            compiled = compiled + 1;
+        bi = bi + 1;
+
+    // 函数体结束标记
+    write_byte(254);  // BC_FUNC_END 标记
+
+    // 更新函数信息
+    g_functions[func_idx][1] = compiled + " quantum instructions";
+
+    var consumed = search_idx - line_idx;
+    return [true, consumed];
+
+// 内联解析量子指令（与 qcl_parser.qentl 对齐的简化版）
+// 用于函数体编译，返回 [成功标志, 新位置]
+def parse_quantum_inline(line, p):
+    var l = len(line);
+
+    // init N
+    if starts_with(line, p, "init "):
+        p = p + 5;
+        var n_val = parse_uint(line, p);
+        p = skip_whitespace(line, n_val[1]);
+        write_opcode(OP_INIT_N);
+        write_u8(n_val[0] & 0xFF);
+        write_u8((n_val[0] >> 8) & 0xFF);
+        return [true, p];
+
+    // 单量子比特门 H|X|Y|Z|T|S qid
+    var gate_map = [["H", OP_H], ["X", OP_X], ["Y", OP_Y], ["Z", OP_Z], ["T", OP_T], ["S", OP_S]];
+    var gi = 0;
+    while gi < 6:
+        var gname = gate_map[gi][0];
+        var gop = gate_map[gi][1];
+        if starts_with(line, p, gname + " ") && p + len(gname) < l && line[p + len(gname)] == ' ':
+            p = p + len(gname) + 1;
+            var qid_val = parse_uint(line, p);
+            write_opcode(gop);
+            write_u8(qid_val[0]);
+            return [true, qid_val[1]];
+        gi = gi + 1;
+
+    // CNOT ctrl tgt
+    if starts_with(line, p, "CNOT "):
+        p = p + 5;
+        var ctrl_val = parse_uint(line, p);
+        p = ctrl_val[1];
+        while p < l && (line[p] == ' ' || line[p] == '\t'):
+            p = p + 1;
+        var tgt_val = parse_uint(line, p);
+        write_opcode(OP_CNOT);
+        write_u8(ctrl_val[0]);
+        write_u8(tgt_val[0]);
+        return [true, tgt_val[1]];
+
+    // MEASURE qid reg
+    if starts_with(line, p, "MEASURE "):
+        p = p + 8;
+        var qid_val = parse_uint(line, p);
+        p = qid_val[1];
+        while p < l && (line[p] == ' ' || line[p] == '\t'):
+            p = p + 1;
+        var reg_val = parse_uint(line, p);
+        write_opcode(OP_MEASURE);
+        write_u8(qid_val[0]);
+        write_u8(reg_val[0]);
+        return [true, reg_val[1]];
+
+    // PRINT reg
+    if starts_with(line, p, "PRINT "):
+        p = p + 6;
+        var reg_val = parse_uint(line, p);
+        write_opcode(OP_PRINT);
+        write_u8(reg_val[0]);
+        return [true, reg_val[1]];
+
+    // SWAP a b
+    if starts_with(line, p, "SWAP "):
+        p = p + 5;
+        var a_val = parse_uint(line, p);
+        p = a_val[1];
+        while p < l && (line[p] == ' ' || line[p] == '\t'):
+            p = p + 1;
+        var b_val = parse_uint(line, p);
+        write_opcode(OP_SWAP);
+        write_u8(a_val[0]);
+        write_u8(b_val[0]);
+        return [true, b_val[1]];
+
+    // RESET qid
+    if starts_with(line, p, "RESET "):
+        p = p + 6;
+        var qid_val = parse_uint(line, p);
+        write_opcode(OP_RESET);
+        write_u8(qid_val[0]);
+        return [true, qid_val[1]];
+
+    // BARRIER
+    if starts_with(line, p, "BARRIER"):
+        write_opcode(OP_BARRIER);
+        return [true, p + 7];
+
+    // STOP
+    if starts_with(line, p, "STOP"):
+        write_opcode(OP_STOP);
+        return [true, p + 4];
+
+    // EXIT
+    if starts_with(line, p, "EXIT"):
+        write_opcode(OP_EXIT);
+        return [true, p + 4];
+
+    // 中文控制流关键字
+    if starts_with(line, p, "否则"):
+        write_opcode(OP_ELSE);
+        return [true, p + 2];
+    if starts_with(line, p, "循环"):
+        write_opcode(OP_WHILE);
+        return [true, p + 2];
+    if starts_with(line, p, "跳出"):
+        write_opcode(OP_BREAK);
+        return [true, p + 2];
+    if starts_with(line, p, "继续"):
+        write_opcode(OP_CONTINUE);
+        return [true, p + 2];
+
+    return [false, p];
 
 // ---- 5. if条件解析 ----
 // 解析 "如果 (<condition>) {"
@@ -548,8 +989,8 @@ def parse_high_level(line):
     if starts_with(line, p, "类型"):
         return parse_type(line, p);
 
-    // 4. 函数
-    if starts_with(line, p, "函数"):
+// ---- 4. 函数（"函数" 或 "def" 关键字）----
+    if starts_with(line, p, "函数") || starts_with(line, p, "def"):
         return parse_function(line, p);
 
     // 5. 如果
@@ -671,6 +1112,94 @@ def parse_high_source(source):
     var result = parse_high_lines(lines);
     return result;
 
+// 解析完整源码（多行模式）：处理 def/函数/类型/量子模块 的 { ... } 函数体
+// 与 qcl_bootstrap_phase2 对齐：函数体逐行编译为量子指令字节码
+def parse_high_source_multi(source):
+    clear_bytecode();
+    var lines = source.split('\n');
+    return parse_high_lines_multi(lines);
+
+// 多行批量解析：对含 { ... } 的高级语法进行函数体编译
+def parse_high_lines_multi(lines):
+    var total = len(lines);
+    var i = 0;
+    var compiled = 0;
+    var func_defs = 0;
+    var type_defs = 0;
+    var module_defs = 0;
+    var skipped = 0;
+
+    while i < total:
+        var line = trim_comment(lines[i]).trim();
+
+        // 跳过空行和注释行
+        if len(line) == 0:
+            i = i + 1;
+            skipped = skipped + 1;
+            continue;
+        if line[0] == '/' || line[0] == '#':
+            i = i + 1;
+            skipped = skipped + 1;
+            continue;
+
+        var p = 0;
+        p = skip_whitespace(line, p);
+
+        // 1. 函数定义（def / 函数）— 最高优先级，使用多行解析
+        if starts_with(line, p, "def") || starts_with(line, p, "函数"):
+            var res = parse_function_multi(lines, i);
+            if res[0]:
+                compiled = compiled + 1;
+                func_defs = func_defs + 1;
+                i = i + res[1];  // 跳过函数体
+                if res[1] == 0:
+                    i = i + 1;
+                continue;
+        fi;
+
+        // 2. 类型定义（类型）
+        if starts_with(line, p, "类型"):
+            var res = parse_type_multi(lines, i);
+            if res[0]:
+                compiled = compiled + 1;
+                type_defs = type_defs + 1;
+                i = i + res[1];
+                if res[1] == 0:
+                    i = i + 1;
+                continue;
+        fi;
+
+        // 3. 量子模块
+        if starts_with(line, p, "量子模块"):
+            var res = parse_module_multi(lines, i);
+            if res[0]:
+                compiled = compiled + 1;
+                module_defs = module_defs + 1;
+                i = i + res[1];
+                if res[1] == 0:
+                    i = i + 1;
+                continue;
+        fi;
+
+        // 4. 单行高级语法（导入、if、return、new、operator等）
+        var high_result = parse_high_level(line);
+        if high_result[0]:
+            compiled = compiled + 1;
+        fi;
+
+        i = i + 1;
+    fi;
+
+    print("[parser_high_multi] 多行解析完成:");
+    print("  编译行: " + compiled + "/" + total);
+    print("  函数定义: " + func_defs);
+    print("  类型定义: " + type_defs);
+    print("  模块定义: " + module_defs);
+    print("  跳过行: " + skipped);
+    print("  字节码大小: " + bytecode_len() + " 字节");
+
+    return [compiled, total, func_defs, type_defs, module_defs, bytecode_len()];
+
 // ==================== 初始化高级语法解析器 ====================
 
 def init_high_parser():
@@ -706,6 +1235,14 @@ export parse_variable_assignment;
 export parse_high_level;
 export parse_high_lines;
 export parse_high_source;
+export parse_high_lines_multi;
+export parse_high_source_multi;
+export parse_function_multi;
+export parse_type_multi;
+export parse_module_multi;
+export parse_quantum_inline;
+export trim_comment;
+export skip_to_multi;
 export init_high_parser;
 export skip_whitespace;
 export starts_with;

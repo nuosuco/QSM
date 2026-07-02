@@ -80,6 +80,14 @@ const OP_RANDOM = 138;         // 随机数
 const OP_LENGTH = 139;         // 获取长度
 const OP_EXIT_CODE = 140;      // 退出码
 
+// 字节码标记 (254-255)
+const BC_FUNC_BODY = 255;      // 函数体起始标记
+const BC_FUNC_END = 254;       // 函数体结束标记
+
+// QCL 文件魔数
+const QCLF_MAGIC = 0x51434C46; // "QCLF"
+const QCLF_VERSION = 1;
+
 // ==================== 字节码缓冲区 ====================
 
 // 全局字节码缓冲区（初始化空数组）
@@ -115,10 +123,10 @@ def write_u32(value):
 
 // 写入字符串（长度前缀 + UTF-8 字节）
 def write_string(s):
-    var len = len(s);
+    var sl = len(s);
     var i = 0;
-    write_u16(len);
-    while i < len:
+    write_u16(sl);
+    while i < sl:
         write_byte(ord(s[i]));
         i = i + 1;
 
@@ -138,15 +146,56 @@ def bytecode_len():
 def get_bytecode():
     return bytecode;
 
-// 写入 QCL 文件头（魔数 + 版本）
-def write_header():
+// 写入 QCL 文件头到指定缓冲区（目标数组）
+def write_header_to(buf):
     // QCL 魔数: 0x51434C46 ("QCLF")
-    write_u32(0x51434C46);
-    write_u16(1);  // 版本 1
-    write_u16(0);  // 预留
+    // 小端序: 46 4C 43 51
+    buf.append(0x46);
+    buf.append(0x4C);
+    buf.append(0x43);
+    buf.append(0x51);
+    // 版本 1 (小端序)
+    buf.append(1);
+    buf.append(0);
+    // 预留
+    buf.append(0);
+    buf.append(0);
+
+// 写入 QCL 文件头（到全局字节码缓冲区）
+def write_header():
+    write_header_to(bytecode);
 
 // 输出完整 .qbc 文件（头部 + 字节码）
 def emit_file():
     var header = [];
     write_header_to(header);
     return header.concat(bytecode);
+
+// ==================== 导出 ====================
+
+export OP_NOP; export OP_H; export OP_X; export OP_Z; export OP_CNOT;
+export OP_MEASURE; export OP_RESET; export OP_SWAP; export OP_LOAD_REG;
+export OP_STORE_REG; export OP_JUMP; export OP_JZ; export OP_ADD;
+export OP_SUB; export OP_MUL; export OP_DIV; export OP_PRINT;
+export OP_EXIT; export OP_BARRIER; export OP_INIT_N; export OP_STOP;
+export OP_LOAD_CONST; export OP_STORE_VAR; export OP_LOAD_VAR;
+export OP_T; export OP_S; export OP_Y;
+export OP_IMPORT; export OP_DEFINE_CLASS; export OP_DEFINE_FUNC;
+export OP_DEF_PARAM; export OP_INIT_MODULE; export OP_SET_CONFIG;
+export OP_LOAD_ARRAY; export OP_STORE_ARRAY; export OP_RETURN;
+export OP_IF; export OP_ELSE; export OP_WHILE; export OP_BREAK;
+export OP_CONTINUE; export OP_FUNC_CALL; export OP_NEW; export OP_ASSIGN;
+export OP_LOAD_MEMBER; export OP_STORE_MEMBER; export OP_LOAD_LOCAL;
+export OP_STORE_LOCAL; export OP_PUSH_ZERO; export OP_PUSH_ONE;
+export OP_PUSH_FALSE; export OP_PUSH_TRUE; export OP_PUSH_NULL;
+export OP_EQUAL; export OP_NOT_EQUAL; export OP_LESS; export OP_GREATER;
+export OP_LESS_EQ; export OP_GREATER_EQ; export OP_RETURN_VAL;
+export OP_RETURN_OBJ; export OP_RETURN_EMPTY; export OP_ARRAY_LITERAL;
+export OP_OBJECT_LITERAL; export OP_STRING_CONCAT; export OP_RANDOM;
+export OP_LENGTH; export OP_EXIT_CODE;
+export BC_FUNC_BODY; export BC_FUNC_END;
+export QCLF_MAGIC; export QCLF_VERSION;
+export write_byte; export write_opcode; export write_u8; export write_u16;
+export write_u32; export write_string; export write_symbol;
+export write_header_to; export clear_bytecode; export bytecode_len;
+export get_bytecode; export write_header; export emit_file;

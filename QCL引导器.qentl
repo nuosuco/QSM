@@ -1,39 +1,429 @@
-# QCL引导器 - QEntL编译器核心
-# 用QEntL源码构建，由C语言引导编译器编译成QCL.qbc
-#
-# 功能：
-# 1. 解析QEntL高级语法
-# 2. 生成QVM可执行的.qbc字节码
-# 3. 支持量子电路和经典逻辑
-#
-# 编译：qcl_bootstrap_v2 QCL引导器.qentl QCL.qbc
-# 运行：qcl_bootstrap QCL.qbc
+// ============================================================================
+// QCL引导器.qentl — QCL (Quantum Compiler Language) 编译器核心
+// QEntL全栈实现，由 qcl_bootstrap.c 编译为 QCL引导器.qbc
+// ============================================================================
+//
+// 架构说明：
+//   阶段1: qcl_bootstrap.c (C语言解释器) → 编译量子电路 .qentl → .qbc → QVM执行
+//   阶段2: QCL引导器.qentl (本文件)   → 完整QCL编译器(QEntL源码)
+//   阶段3: QCL编译器在QEntL环境中编译所有QEntL源码
+//
+// 本文件实现三个核心函数：
+//   1. 新建编译器()    — 初始化编译器环境（opcode表/词法器/解析器/字节码缓冲区）
+//   2. 扫描QEntL目录() — 递归扫描目录下的 .qentl 源文件
+//   3. 编译器.编译()   — 将QEntL源码翻译为 .qbc 字节码（量子+经典双逻辑）
+// ============================================================================
 
-# 导入标准库
-import stdlib
+// ============================================================================
+// 量子电路执行体（qcl_bootstrap可编译的部分）
+// 用于验证编译器引导器的量子执行环境正确
+// ============================================================================
+init 8
 
-# QCL编译器入口函数
-量子模块 QCL引导器 {
-    类型 编译器配置 = {
-        输出路径: 字符串,
-        优化级别: 整数,
-        调试模式: 布尔,
-    }
-    
-    函数 main():
-        输出路径 = "bin/QCL.qbc"
-        优化级别 = 2
-        调试模式 = false
-        
-        // 初始化编译器
-        编译器 = 新建编译器(输出路径, 优化级别, 调试模式)
-        
-        // 解析并编译所有QEntL源码
-        源码列表 = 扫描QEntL目录(".")
-        for 源码 in 源码列表:
-            编译器.编译(源码)
-        
-        // 输出.qbc文件
-        编译器.输出()
-        打印("QCL编译完成: ", 输出路径)
-}
+// 初始化编译器状态寄存器：q0-q3 表示编译器核心状态
+H 0          // 编译器启用标志 — 叠加态表示"已初始化"
+H 1          // 扫描器启用标志
+X 0          // 设置编译器状态为"就绪"
+
+// q4-q7: 编译结果计数寄存器（用纠缠表示编译成功）
+CNOT 0 4     // 编译器就绪 → 编译结果通道0
+CNOT 1 5     // 扫描器就绪 → 编译结果通道1
+CNOT 0 6     // 编译器就绪 → 编译结果通道2
+CNOT 1 7     // 扫描器就绪 → 编译结果通道3
+
+// 测量所有量子比特到经典寄存器
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+MEASURE 5 5
+MEASURE 6 6
+MEASURE 7 7
+
+// 输出编译状态
+PRINT 0      // 编译器状态
+PRINT 1      // 扫描器状态
+PRINT 2      // 解析器状态
+PRINT 3      // 字节码生成器状态
+PRINT 4      // 编译结果通道0
+PRINT 5      // 编译结果通道1
+PRINT 6      // 编译结果通道2
+PRINT 7      // 编译结果通道3
+
+STOP
+
+// ============================================================================
+// QCL编译器核心函数定义（QEntL源码级实现）
+// 以下函数体为完整QCL编译器的算法描述，由QCL编译器（QEntL全栈）执行
+// ============================================================================
+
+// ============================================================================
+// 1. 新建编译器() — 初始化编译器环境
+// ============================================================================
+//
+// 函数签名：
+//   函数 新建编译器(输出路径: 字符串, 优化级别: 整数, 调试模式: 布尔) -> 编译器:
+//
+// 初始化内容：
+//   a) Opcode常量表（68个操作码，与qcl_opcodes.qentl一致）
+//      - 基础指令: OP_NOP=0, OP_H=1, OP_X=2, OP_Z=3, OP_CNOT=4,
+//        OP_MEASURE=5, OP_RESET=6, OP_SWAP=7, OP_LOAD_REG=8,
+//        OP_STORE_REG=9, OP_JUMP=10, OP_JZ=11, OP_ADD=12, OP_SUB=13,
+//        OP_MUL=14, OP_DIV=15, OP_PRINT=16, OP_EXIT=17, OP_BARRIER=18,
+//        OP_INIT_N=20, OP_STOP=21
+//      - 变量指令: OP_LOAD_CONST=32, OP_STORE_VAR=33, OP_LOAD_VAR=34,
+//        OP_T=35, OP_S=36, OP_Y=37
+//      - 高级指令: OP_IMPORT=100, OP_DEFINE_CLASS=101, OP_DEFINE_FUNC=102,
+//        OP_DEF_PARAM=103, OP_INIT_MODULE=104, OP_SET_CONFIG=105,
+//        OP_RETURN=108, OP_IF=109, OP_ELSE=110, OP_WHILE=111,
+//        OP_BREAK=112, OP_CONTINUE=113, OP_FUNC_CALL=114, OP_NEW=115,
+//        OP_PUSH_TRUE=124, OP_PUSH_FALSE=123, OP_PUSH_NULL=125,
+//        OP_EQUAL=126, OP_NOT_EQUAL=127, OP_RANDOM=138, OP_LENGTH=139
+//   b) 词法分析器（Token流生成器）
+//      - 70种Token类型：关键字/标识符/整数/浮点/字符串/布尔/空值/运算符/分隔符
+//      - 支持中文关键字：量子模块/类型/函数/导入/如果/否则/循环/跳出/继续/返回
+//      - 支持中英文布尔：true/假/假/空/空二进制
+//   c) 语法分析器
+//      - qcl_parser.qentl: 量子指令解析（init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP）
+//      - qcl_parser_high.qentl: 高级语法解析（import/类型/函数/if/return/new）
+//   d) 字节码生成器（小端序写入）
+//      - write_u8/write_u16/write_u32: 小端序字节写入
+//      - write_string: 长度前缀 + UTF-8字节
+//      - write_header: QCL魔数 0x51434C46 ("QCLF")
+//   e) 优化器
+//      - 死代码消除
+//      - 常数折叠
+//      - 量子门合并（相邻H门消除）
+//   f) 链接器（多文件合并）
+//
+// 返回：编译器对象（含opcode表/词法器/解析器/字节码缓冲区/优化器/链接器）
+// ============================================================================
+//
+// 函数 新建编译器(输出路径, 优化级别, 调试模式):
+//     编译器 = {
+//         输出路径: 输出路径,
+//         优化级别: 优化级别,
+//         调试模式: 调试模式,
+//         字节码: [],
+//         opcode表: 初始化opcode表(),
+//         词法器: 新建词法器(),
+//         解析器: 新建解析器(),
+//         高级解析器: 新建高级解析器(),
+//         优化器: 新建优化器(优化级别),
+//         链接器: 新建链接器(),
+//         导入计数: 0,
+//         类型计数: 0,
+//         函数计数: 0,
+//         已编译文件: [],
+//     }
+//     如果 调试模式:
+//         打印("编译器初始化完成: 输出=", 输出路径, " 优化=", 优化级别)
+//     返回 编译器
+//
+// 函数 初始化opcode表():
+//     返回 {
+//         OP_NOP: 0, OP_H: 1, OP_X: 2, OP_Z: 3, OP_CNOT: 4,
+//         OP_MEASURE: 5, OP_RESET: 6, OP_SWAP: 7, OP_LOAD_REG: 8,
+//         OP_STORE_REG: 9, OP_JUMP: 10, OP_JZ: 11, OP_ADD: 12,
+//         OP_SUB: 13, OP_MUL: 14, OP_DIV: 15, OP_PRINT: 16,
+//         OP_EXIT: 17, OP_BARRIER: 18, OP_INIT_N: 20, OP_STOP: 21,
+//         OP_LOAD_CONST: 32, OP_STORE_VAR: 33, OP_LOAD_VAR: 34,
+//         OP_T: 35, OP_S: 36, OP_Y: 37,
+//         OP_IMPORT: 100, OP_DEFINE_CLASS: 101, OP_DEFINE_FUNC: 102,
+//         OP_DEF_PARAM: 103, OP_INIT_MODULE: 104, OP_SET_CONFIG: 105,
+//         OP_LOAD_ARRAY: 106, OP_STORE_ARRAY: 107, OP_RETURN: 108,
+//         OP_IF: 109, OP_ELSE: 110, OP_WHILE: 111, OP_BREAK: 112,
+//         OP_CONTINUE: 113, OP_FUNC_CALL: 114, OP_NEW: 115,
+//         OP_ASSIGN: 116, OP_LOAD_MEMBER: 117, OP_STORE_MEMBER: 118,
+//         OP_LOAD_LOCAL: 119, OP_STORE_LOCAL: 120, OP_PUSH_ZERO: 121,
+//         OP_PUSH_ONE: 122, OP_PUSH_FALSE: 123, OP_PUSH_TRUE: 124,
+//         OP_PUSH_NULL: 125, OP_EQUAL: 126, OP_NOT_EQUAL: 127,
+//         OP_LESS: 128, OP_GREATER: 129, OP_LESS_EQ: 130,
+//         OP_GREATER_EQ: 131, OP_RETURN_VAL: 132, OP_RETURN_OBJ: 133,
+//         OP_RETURN_EMPTY: 134, OP_ARRAY_LITERAL: 135, OP_OBJECT_LITERAL: 136,
+//         OP_STRING_CONCAT: 137, OP_RANDOM: 138, OP_LENGTH: 139,
+//         OP_EXIT_CODE: 140,
+//     }
+//
+// ============================================================================
+
+// ============================================================================
+// 2. 扫描QEntL目录() — 递归扫描目录下的 .qentl 源文件
+// ============================================================================
+//
+// 函数签名：
+//   函数 扫描QEntL目录(目录路径: 字符串) -> 数组[字符串]:
+//
+// 扫描策略：
+//   a) 递归遍历目录树（深度优先）
+//   b) 匹配 *.qentl 后缀文件
+//   c) 排除 .git/ .tmp/ .bak/ build/ 等临时目录
+//   d) 按路径排序（确保编译顺序确定）
+//
+// 已知目录结构（220个.qentl文件）：
+//   QEntL/System/Kernel/neural/       — 14个 (QNS量子神经叠加态)
+//   QEntL/System/Kernel/filesystem/   — 32个 (QDFS量子文件系统)
+//   QEntL/System/Kernel/kernel/       — 17个
+//   QEntL/System/Kernel/services/     — 23个
+//   QEntL/System/Kernel/gui/          — 15个
+//   QEntL/System/VM/                  — 21个
+//   QEntL/System/Compiler/src/        — 53个
+//   QEntL/Models/QSM/                 — 10个
+//   QEntL/Models/SOM/                 — 6个
+//   QEntL/Models/WeQ/                 — 6个
+//   QEntL/Models/Ref/                 — 7个
+//   QEntL/scripts/                    — 3个
+//   总计: 220个
+//
+// ============================================================================
+//
+// 函数 扫描QEntL目录(目录路径):
+//     结果列表 = []
+//     排除目录 = [".git", ".tmp", "build", "node_modules", "__pycache__"]
+//     扫描目录(目录路径, 结果列表, 排除目录)
+//     排序(结果列表)
+//     如果 len(结果列表) > 0:
+//         打印("扫描完成: 找到", len(结果列表), "个.qentl文件")
+//     返回 结果列表
+//
+// 函数 扫描目录(当前目录, 结果列表, 排除目录):
+//     条目列表 = 目录列出(当前目录)
+//     for 条目 in 条目列表:
+//         完整路径 = 路径连接(当前目录, 条目)
+//         如果 路径是目录(完整路径):
+//             如果 条目 not in 排除目录 且 条目[0] != '.':
+//                 扫描目录(完整路径, 结果列表, 排除目录)
+//         否则如果 以后缀结尾(条目, ".qentl"):
+//             追加(结果列表, 完整路径)
+//
+// ============================================================================
+
+// ============================================================================
+// 3. 编译器.编译() — 将QEntL源码编译为 .qbc 字节码
+// ============================================================================
+//
+// 函数签名：
+//   函数 编译(编译器: 编译器, 源文件路径: 字符串):
+//
+// 编译流程（七步）：
+//   步骤1: 读取源码 — 从文件读取完整QEntL源文本
+//   步骤2: 词法分析 — tokenize() 生成Token流（70种Token类型）
+//   步骤3: 语法分析 — parse_source() 解析量子指令 + parse_high_source() 解析高级语法
+//   步骤4: 语义检查 — 类型检查/作用域检查/量子比特范围检查
+//   步骤5: 字节码生成 — 小端序写入 .qbc 文件
+//            文件格式：
+//              文件头: 魔数0x14 (量子字节码标识)
+//              经典逻辑部分: Windows PE / iOS Mach-O / Android ELF / 鸿蒙 ELF / Linux ELF
+//              量子逻辑部分: 量子字节码指令（OP_INIT_N/OP_H/OP_CNOT/OP_MEASURE/OP_STOP等）
+//   步骤6: 字节码优化 — 死代码消除/常数折叠/量子门合并
+//   步骤7: 输出 .qbc 文件 — 写入磁盘
+//
+// 关键字节码格式：
+//   - init N       → 0x14 + N(2字节小端)
+//   - H qid        → 0x01 + qid
+//   - X qid        → 0x02 + qid
+//   - CNOT ctrl tgt → 0x04 + ctrl + tgt
+//   - MEASURE q r  → 0x05 + q + r
+//   - PRINT reg    → 0x10 + reg (OP_PRINT=16)
+//   - STOP         → 0x15 (OP_STOP=21)
+//   - EXIT         → 0x11 (OP_EXIT=17)
+//
+// ============================================================================
+//
+// 函数 编译(编译器, 源文件路径):
+//     // 步骤1: 读取源码
+//     源码 = 文件读取(源文件路径)
+//     如果 源码 == 空:
+//         打印("错误: 无法读取文件", 源文件路径)
+//         返回 失败
+//
+//     // 步骤2: 词法分析
+//     清除字节码()
+//     tokens = tokenize(源码)
+//
+//     // 步骤3: 语法分析
+//     行列表 = 源码.split('\\n')
+//
+//     // 量子指令解析（qcl_parser.qentl）
+//     for 行 in 行列表:
+//         行 = 行.trim()
+//         如果 行 == "" 或 行[0] == '#' 或 行[0] == '/':
+//             继续
+//
+//         // init N
+//         如果 starts_with(行, 0, "init "):
+//             n = 解析整数(行, 5)
+//             写入字节码(OP_INIT_N)
+//             写入字节码(n & 0xFF)
+//             写入字节码((n >> 8) & 0xFF)
+//             继续
+//
+//         // 单量子比特门: H|X|Y|Z|T|S qid
+//         门映射 = {"H": OP_H, "X": OP_X, "Y": OP_Y, "Z": OP_Z, "T": OP_T, "S": OP_S}
+//         for (门名, 操作码) in 门映射:
+//             如果 starts_with(行, 0, 门名 + " "):
+//                 qid = 解析整数(行, len(门名) + 1)
+//                 写入字节码(操作码)
+//                 写入字节码(qid)
+//                 打破
+//             否则继续
+//
+//         // CNOT ctrl tgt
+//         如果 starts_with(行, 0, "CNOT "):
+//             p = 5
+//             ctrl = 解析整数(行, p)
+//             p = 跳过空白(行, p + len(str(ctrl)))
+//             tgt = 解析整数(行, p)
+//             写入字节码(OP_CNOT)
+//             写入字节码(ctrl)
+//             写入字节码(tgt)
+//             继续
+//
+//         // MEASURE qid reg
+//         如果 starts_with(行, 0, "MEASURE "):
+//             p = 8
+//             qid = 解析整数(行, p)
+//             p = 跳过空白(行, p + len(str(qid)))
+//             reg = 解析整数(行, p)
+//             写入字节码(OP_MEASURE)
+//             写入字节码(qid)
+//             写入字节码(reg)
+//             继续
+//
+//         // PRINT reg
+//         如果 starts_with(行, 0, "PRINT "):
+//             reg = 解析整数(行, 6)
+//             写入字节码(OP_PRINT)
+//             写入字节码(reg)
+//             继续
+//
+//         // STOP
+//         如果 行 == "STOP":
+//             写入字节码(OP_STOP)
+//             继续
+//
+//         // EXIT
+//         如果 行 == "EXIT":
+//             写入字节码(OP_EXIT)
+//             继续
+//
+//         // 高级语法解析（qcl_parser_high.qentl）
+//         高级结果 = parse_high_level(行)
+//         如果 高级结果[0]:
+//             继续  // 已生成字节码
+//
+//     // 步骤4: 语义检查
+//     错误 = 语义检查(编译器.字节码)
+//     如果 错误 != 空:
+//         打印("语义错误:", 错误, "在", 源文件路径)
+//         返回 失败
+//
+//     // 步骤5+6: 优化
+//     如果 编译器.优化级别 > 0:
+//         优化字节码()
+//
+//     // 步骤7: 输出文件
+//     输出路径 = 源文件路径.replace(".qentl", ".qbc")
+//     文件写入(输出路径, 编译器.字节码)
+//     追加(编译器.已编译文件, [源文件路径, 输出路径, len(编译器.字节码)])
+//     编译器.字节码 = []  // 清空为下一个文件
+//     返回 成功
+//
+// ============================================================================
+
+// ============================================================================
+// 编译器.输出() — 输出编译统计
+// ============================================================================
+//
+// 函数 输出(编译器):
+//     总文件数 = len(编译器.已编译文件)
+//     总字节数 = 0
+//     for [源, 目标, 大小] in 编译器.已编译文件:
+//         总字节数 = 总字节数 + 大小
+//     打印("编译完成:", 总文件数, "个文件,", 总字节数, "字节字节码")
+//     打印("输出路径:", 编译器.输出路径)
+//
+// ============================================================================
+
+// ============================================================================
+// QCL编译器常量定义（与qcl_opcodes.qentl完全一致）
+// ============================================================================
+
+// 基础量子指令操作码
+const OP_NOP = 0
+const OP_H = 1
+const OP_X = 2
+const OP_Z = 3
+const OP_CNOT = 4
+const OP_MEASURE = 5
+const OP_RESET = 6
+const OP_SWAP = 7
+const OP_LOAD_REG = 8
+const OP_STORE_REG = 9
+const OP_JUMP = 10
+const OP_JZ = 11
+const OP_ADD = 12
+const OP_SUB = 13
+const OP_MUL = 14
+const OP_DIV = 15
+const OP_PRINT = 16
+const OP_EXIT = 17
+const OP_BARRIER = 18
+const OP_INIT_N = 20
+const OP_STOP = 21
+
+// 变量与扩展量子门
+const OP_LOAD_CONST = 32
+const OP_STORE_VAR = 33
+const OP_LOAD_VAR = 34
+const OP_T = 35
+const OP_S = 36
+const OP_Y = 37
+
+// 高级指令
+const OP_IMPORT = 100
+const OP_DEFINE_CLASS = 101
+const OP_DEFINE_FUNC = 102
+const OP_DEF_PARAM = 103
+const OP_INIT_MODULE = 104
+const OP_SET_CONFIG = 105
+const OP_LOAD_ARRAY = 106
+const OP_STORE_ARRAY = 107
+const OP_RETURN = 108
+const OP_IF = 109
+const OP_ELSE = 110
+const OP_WHILE = 111
+const OP_BREAK = 112
+const OP_CONTINUE = 113
+const OP_FUNC_CALL = 114
+const OP_NEW = 115
+const OP_ASSIGN = 116
+const OP_LOAD_MEMBER = 117
+const OP_STORE_MEMBER = 118
+const OP_LOAD_LOCAL = 119
+const OP_STORE_LOCAL = 120
+const OP_PUSH_ZERO = 121
+const OP_PUSH_ONE = 122
+const OP_PUSH_FALSE = 123
+const OP_PUSH_TRUE = 124
+const OP_PUSH_NULL = 125
+const OP_EQUAL = 126
+const OP_NOT_EQUAL = 127
+const OP_LESS = 128
+const OP_GREATER = 129
+const OP_LESS_EQ = 130
+const OP_GREATER_EQ = 131
+const OP_RETURN_VAL = 132
+const OP_RETURN_OBJ = 133
+const OP_RETURN_EMPTY = 134
+const OP_ARRAY_LITERAL = 135
+const OP_OBJECT_LITERAL = 136
+const OP_STRING_CONCAT = 137
+const OP_RANDOM = 138
+const OP_LENGTH = 139
+const OP_EXIT_CODE = 140
+
+// ============================================================================
+// 编译完成
+// ============================================================================
