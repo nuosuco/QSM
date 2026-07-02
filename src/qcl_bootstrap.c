@@ -15,6 +15,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <unistd.h>
 
 #define MAGIC "QntL"
 #define VERSION "2.0.0-bootstrap"
@@ -415,7 +416,7 @@ static int parse_number(const char **p) {
     int j = 0;
     int is_float = 0;
     
-    while ((*p >= '0' && *p <= '9') || *p == '.') {
+    while (**p >= '0' && **p <= '9' || **p == '.') {
         if (j < 31) num_str[j++] = **p;
         if (**p == '.') is_float = 1;
         (*p)++;
