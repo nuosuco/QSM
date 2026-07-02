@@ -180,23 +180,41 @@ static void write_string(const char *s) {
 // ==================== 高级语法解析 ====================
 
 static int parse_import(const char **p) {
-    // 解析 "导入 <path> 作为 <alias>"
-    (*p) += 2; // 跳过"导入"
+    // 解析 "导入 <path> 作为 <alias>" 或 "import <path> as <alias>"
+    
+    // 跳过"import "或"导入 "
+    if (strncmp(*p, "import ", 7) == 0) {
+        (*p) += 7;
+    } else if (strncmp(*p, "导入", 2) == 0) {
+        (*p) += 2;
+        // 跳过空白
+        while (**p == ' ' || **p == '\t') (*p)++;
+    } else {
+        return 0;
+    }
     
     // 跳过空白和引号
     while (**p == ' ' || **p == '\t' || **p == '"') (*p)++;
     
     // 读取模块路径
     int j = 0;
-    while (**p != '"' && **p != '\0' && j < MAX_SYM_NAME-1) {
+    while (**p != '"' && **p != '\0' && **p != '\n' && j < MAX_SYM_NAME-1) {
         g_imports[g_import_count].path[j++] = **p;
         (*p)++;
     }
     g_imports[g_import_count].path[j] = '\0';
     
+    // 跳过引号和空白
+    while (**p == '"' || **p == ' ' || **p == '\t') (*p)++;
+    
     // 跳过"作为"或"as"
-    while (**p == ' ' || **p == '\t' || **p == '"' || **p == '作' || **p == '为' || **p == ' ') (*p)++;
-    if (strncmp(*p, "as ", 3) == 0) (*p) += 3;
+    if (strncmp(*p, "as", 2) == 0) {
+        (*p) += 2;
+        while (**p == ' ' || **p == '\t') (*p)++;
+    } else if (strncmp(*p, "作为", 2) == 0) {
+        (*p) += 2;
+        while (**p == ' ' || **p == '\t') (*p)++;
+    }
     
     // 读取别名
     j = 0;
@@ -640,16 +658,11 @@ int compile_file_v2(const char *input_path, const char *output_path) {
         }
         p = code; // 重置指针
         
-        // 高级语法处理 - 只处理量子门操作（bootstrap阶段）
-        // 其他高级语法在QCL编译器中处理，不写入字节码
-        
-        // 量子门操作（QVM执行）- 只处理基本量子门
+        // 量子门操作（QVM执行）- 基本量子门
         if (strncmp(p, "init ", 5) == 0) {
-            // 简化的init处理
-            p += 5;  // 跳过"init "
+            p += 5;
             unsigned int n = 0;
             while (*p >= '0' && *p <= '9') { n = n * 10 + (*p - '0'); p++; }
-            // 跳过空白
             while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
             write_opcode(OP_INIT_N);
             write_u8(n & 0xFF);
@@ -657,7 +670,6 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             found_code = 1;
         }
         else if (strncmp(p, "H ", 2) == 0 || strncmp(p, "X ", 2) == 0 || strncmp(p, "Y ", 2) == 0 || strncmp(p, "Z ", 2) == 0 || strncmp(p, "T ", 2) == 0 || strncmp(p, "S ", 2) == 0) {
-            // 简化的单量子比特门
             Opcode op = OP_H;
             if (strncmp(p, "H ", 2) == 0) op = OP_H;
             else if (strncmp(p, "X ", 2) == 0) op = OP_X;
@@ -665,11 +677,9 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             else if (strncmp(p, "Z ", 2) == 0) op = OP_Z;
             else if (strncmp(p, "T ", 2) == 0) op = OP_T;
             else if (strncmp(p, "S ", 2) == 0) op = OP_S;
-            
-            p += 2; // 跳过门名和空格
+            p += 2;
             int qid = 0;
             while (*p >= '0' && *p <= '9') { qid = qid * 10 + (*p - '0'); p++; }
-            
             write_opcode(op);
             write_u8(qid);
             found_code = 1;
@@ -678,10 +688,8 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             p += 5;
             int ctrl = 0, tgt = 0;
             while (*p >= '0' && *p <= '9') { ctrl = ctrl * 10 + (*p - '0'); p++; }
-            // 只跳过空格和tab，不跳过换行（防止读到下一行）
             while (*p == ' ' || *p == '\t') p++;
             while (*p >= '0' && *p <= '9') { tgt = tgt * 10 + (*p - '0'); p++; }
-            
             write_opcode(OP_CNOT);
             write_u8(ctrl);
             write_u8(tgt);
@@ -693,7 +701,6 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             while (*p >= '0' && *p <= '9') { qid = qid * 10 + (*p - '0'); p++; }
             while (*p == ' ' || *p == '\t') p++;
             while (*p >= '0' && *p <= '9') { reg = reg * 10 + (*p - '0'); p++; }
-            
             write_opcode(OP_MEASURE);
             write_u8(qid);
             write_u8(reg);
@@ -715,7 +722,31 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             write_opcode(OP_EXIT);
             found_code = 1;
         }
-        // else/其他关键字
+        // 高级语法处理 - 调用parse_函数解析高级QEntL语法
+        else if (strncmp(p, "import", 6) == 0) {
+            char *p2 = p;
+            if (parse_import(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, "量子模块", 4) == 0) {
+            char *p2 = p;
+            if (parse_quantum_module(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, "类型", 2) == 0) {
+            char *p2 = p;
+            if (parse_type(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, "函数", 2) == 0) {
+            char *p2 = p;
+            if (parse_function(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, "如果", 2) == 0) {
+            char *p2 = p;
+            if (parse_if(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, "返回", 2) == 0) {
+            char *p2 = p;
+            if (parse_return(&p2)) found_code = 1;
+        }
         else if (strncmp(p, "否则", 2) == 0) {
             write_opcode(OP_ELSE);
             found_code = 1;
@@ -732,7 +763,6 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             write_opcode(OP_CONTINUE);
             found_code = 1;
         }
-        // 函数调用
         else if (strstr(p, "()")) {
             write_opcode(OP_FUNC_CALL);
             // 提取函数名
@@ -742,6 +772,22 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             fname[j] = '\0';
             write_string(fname);
             found_code = 1;
+        }
+        else if (strncmp(p, "new", 3) == 0) {
+            char *p2 = p;
+            if (parse_new(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, ".长度", 3) == 0) {
+            char *p2 = p;
+            if (parse_length(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, "随机", 2) == 0) {
+            char *p2 = p;
+            if (parse_random(&p2)) found_code = 1;
+        }
+        else if (strncmp(p, "导入", 2) == 0) {
+            char *p2 = p;
+            if (parse_import(&p2)) found_code = 1;
         }
     }
     
