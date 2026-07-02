@@ -1,0 +1,75 @@
+// 端到端数据流: QNS训练→QDFS检索
+// QNS训练电路输出(分类标签)→QDFS检索电路作为查询键
+// 32量子比特: q0-q11 QNS输出 / q12-q23 QDFS查询键 / q24-q31 QDFS结果
+// R6深度实现: 实质量子数据流
+
+init 32
+
+// ===== 阶段1: QNS训练器输出 (q0-q11) =====
+// 模拟QNS训练器前向传播后的输出
+H 0
+H 1
+H 2
+H 3
+// 输出嵌入叠加态
+X 0  // 激活标记
+CNOT 0 4
+CNOT 1 5
+CNOT 2 6
+CNOT 3 7
+// 嵌入→输出映射
+T 4
+S 5
+T 6
+S 7
+// 相位调制
+MEASURE 4 12
+MEASURE 5 13
+MEASURE 6 14
+MEASURE 7 15
+// QNS输出→经典寄存器(q12-q15作为QDFS查询键)
+
+// ===== 阶段2: QDFS量子检索 (q12-q23) =====
+// 将QNS输出作为检索键
+H 8
+H 9
+H 10
+H 11
+// QNS额外输出比特
+CNOT 8 16
+CNOT 9 17
+CNOT 10 18
+CNOT 11 19
+// 查询键→目录索引
+
+// QDFS文件哈希编码
+H 20
+H 21
+H 22
+H 23
+// 文件索引叠加
+
+// ===== 阶段3: QDFS检索匹配 =====
+// 查询键与文件索引纠缠匹配
+CNOT 12 20
+CNOT 13 21
+CNOT 14 22
+CNOT 15 23
+// 量子检索匹配
+
+// 结果输出纠缠
+CNOT 20 24
+CNOT 21 25
+CNOT 22 26
+CNOT 23 27
+// 检索结果
+
+// 结果测量
+MEASURE 24 28
+MEASURE 25 29
+MEASURE 26 30
+MEASURE 27 31
+// 测量检索结果
+
+PRINT "端到端QNS→QDFS数据流完成"
+STOP

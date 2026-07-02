@@ -1,0 +1,29 @@
+# 只排除超大文件（>100MB）
+data/*.pdf
+data/《通用彝文字典》.pdf
+data/《通用彝文字典》_上册.pdf
+data/《通用彝文字典》_下册.pdf
+data/滇川黔桂彝文字典*.pdf
+
+# 日志文件（如果太大）
+models/*.log
+
+# 临时文件
+*.tmp
+*.swp
+*~
+tmp/
+.tmp/
+
+# Git内部
+.git.broken/
+.git.backup/
+.git.old/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

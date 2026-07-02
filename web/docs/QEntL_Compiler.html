@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>QEntL量子编译器 - QSM开发文档中心</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:#0a0a2e;color:#e0e0e0;display:flex;min-height:100vh}
+.sidebar{width:280px;height:100vh;overflow-y:auto;background:#0d0d3a;border-right:1px solid #1a1a4a;padding:15px;position:fixed;left:0;top:0;z-index:100}
+.sidebar h2{color:#00d2ff;font-size:16px;margin-bottom:15px;padding:0 5px}
+.sidebar .section-title{color:#576574;font-size:11px;text-transform:uppercase;margin:12px 0 6px 5px;letter-spacing:1px}
+.sidebar ul{list-style:none}
+.sidebar li{margin:2px 0}
+.sidebar a{color:#7f8fa6;text-decoration:none;font-size:13px;display:block;padding:6px 10px;border-radius:6px;transition:all 0.2s;line-height:1.4}
+.sidebar a:hover{background:rgba(0,210,255,0.08);color:#00d2ff}
+.main{margin-left:280px;padding:30px 40px;flex:1;min-height:100vh}
+.main h1{color:#00d2ff;font-size:24px;margin-bottom:8px}
+.main .meta{color:#576574;font-size:12px;margin-bottom:20px}
+.main .content{background:#0d0d3a;border:1px solid #1a1a4a;border-radius:12px;padding:25px;line-height:1.8;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.main .content h2{color:#7b2ff7;margin:20px 0 10px;font-size:18px}
+.main .content h3{color:#00d2ff;margin:15px 0 8px;font-size:15px}
+.main .content p{margin-bottom:10px;color:#b0b0c0}
+.main .content table{width:100%;border-collapse:collapse;margin:10px 0}
+.main .content th,.main .content td{padding:8px 10px;border:1px solid #2a2a5a;text-align:left;font-size:13px}
+.main .content th{background:#1a1a4a;color:#00d2ff}
+.main .content td{background:#0a0a2e}
+.main .content pre{background:#0a0a2e;padding:12px;border-radius:8px;overflow-x:auto;margin:10px 0;font-size:13px}
+.main .content code{background:#1a1a4a;padding:1px 5px;border-radius:3px;color:#00d2ff;font-size:13px}
+.main .content ul,.main .content ol{margin:8px 0 8px 20px}
+.main .content li{margin:4px 0;font-size:14px}
+.back-btn{display:inline-block;margin-bottom:15px;color:#00d2ff;text-decoration:none;padding:6px 14px;border:1px solid #00d2ff;border-radius:8px;font-size:13px;transition:all 0.2s}
+.back-btn:hover{background:rgba(0,210,255,0.1)}
+.nav-bar{position:fixed;top:0;left:280px;right:0;height:40px;background:#0d0d3a;border-bottom:1px solid #1a1a4a;display:flex;align-items:center;padding:0 20px;z-index:99}
+.nav-bar a{color:#7f8fa6;text-decoration:none;font-size:12px;margin-right:15px;padding:4px 8px;border-radius:4px}
+.nav-bar a:hover{color:#00d2ff;background:rgba(0,210,255,0.05)}
+</style>
+</head>
+<body>
+
+<div class="main">
+<a href="index.html" class="back-btn">← 文档中心首页</a>
+
+<h1>QEntL量子编译器</h1>
+<div class="content">// QEntL 量子编译器 - 将 QEntL 源代码编译为 QBC 字节码
+// 词法分析 + 语法分析 + 代码生成
+
+// 词法分析器
+函数 词法分析(源代码) -&gt; 令牌[] {
+    令牌列表 = []
+    当前位置 = 0
+    
+    当 (当前位置 &lt; 源代码长度) {
+        c = 源代码[当前位置]
+        
+        // 跳过空白
+        如果 (c == ' ' 或 c == '\n' 或 c == '\t') {
+            当前位置++
+            继续
+        }
+        
+        // 关键字识别
+        如果 (c == '量' 或 c == '子' 或 c == '函' 或 c == '数') {
+            令牌 = 识别_关键字(源代码, 当前位置)
+            令牌列表.添加(令牌)
+            当前位置 += 令牌长度
+            继续
+        }
+        
+        // 标识符识别
+        如果 (c 是字母或下划线) {
+            标识符 = 提取_标识符(源代码, 当前位置)
+            令牌 = {类型: "标识符", 值: 标识符}
+            令牌列表.添加(令牌)
+            当前位置 += 标识符长度
+            继续
+        }
+        
+        // 数字识别
+        如果 (c 是数字) {
+            数字 = 提取_数字(源代码, 当前位置)
+            令牌 = {类型: "数字", 值: 数字}
+            令牌列表.添加(令牌)
+            当前位置 += 数字长度
+            继续
+        }
+        
+        // 运算符识别
+        如果 (c == '+' 或 c == '-' 或 c == '*' 或 c == '/') {
+            令牌 = {类型: "运算符", 值: c}
+            令牌列表.添加(令牌)
+            当前位置++
+            继续
+        }
+        
+        // 分隔符识别
+        如果 (c == '(' 或 c == ')' 或 c == '{' 或 c == '}' 或 c == '[' 或 c == ']') {
+            令牌 = {类型: "分隔符", 值: c}
+            令牌列表.添加(令牌)
+            当前位置++
+            继续
+        }
+        
+        当前位置++
+    }
+    
+    返回 令牌列表
+}
+
+// 语法分析器
+函数 语法分析(令牌列表) -&gt; AST {
+    当前节点 = 0
+    AST = 解析_程序(令牌列表, 当前节点)
+    返回 AST
+}
+
+函数 解析_程序(令牌列表, 位置) -&gt; AST {
+    程序节点 = {类型: "程序", 子节点: []}
+    
+    当 (位置 &lt; 令牌列表长度) {
+        令牌 = 令牌列表[位置]
+        
+        如果 (令牌类型 == "声明") {
+            声明节点 = 解析_声明(令牌列表, 位置)
+            程序节点.子节点.添加(声明节点)
+            位置 = 声明节点.结束位置
+        } 其他 {
+            位置++
+        }
+    }
+    
+    返回 程序节点
+}
+
+// 代码生成器
+函数 生成_字节码(AST) -&gt; 字节码[] {
+    字节码 = []
+    
+    对于 节点 在 AST.子节点 中 {
+        指令 = 生成_指令(节点)
+        字节码.添加全部(指令)
+    }
+    
+    字节码.添加({操作码: QBC_STOP})
+    返回 字节码
+}
+
+函数 生成_指令(节点) -&gt; 指令[] {
+    根据 (节点.类型) {
+        情况 "变量声明":
+            返回 [{操作码: QBC_LOAD, 操作数: 节点.值}]
+        情况 "函数调用":
+            返回 [{操作码: QBC_CALL, 操作数: 节点.函数名}]
+        情况 "量子门":
+            返回 [{操作码: 节点.门类型, 操作数: 节点.目标量子比特}]
+        情况 "测量":
+            返回 [{操作码: QBC_MEASURE, 操作数: 节点.量子比特}]
+        默认:
+            返回 []
+    }
+}
+
+// 主程序
+主程序() {
+    源代码 = "加载 QEntL 操作系统核心"
+    
+    // 词法分析
+    令牌列表 = 词法分析(源代码)
+    
+    // 语法分析
+    AST = 语法分析(令牌列表)
+    
+    // 代码生成
+    字节码 = 生成_字节码(AST)
+    
+    保存_字节码(字节码, "qentl_core.qbc")
+    
+    返回 "QEntL 编译完成"
+}
+</div>
+</div>
+</body>
+</html>

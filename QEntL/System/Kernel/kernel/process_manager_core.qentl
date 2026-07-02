@@ -1,0 +1,725 @@
+/**
+ * QEntL量子进程管理器核心模块
+ * QuantumGene: QG-KERNEL-PROCCORE-X6P9-1714120855
+ * EntanglementStrength: 0.92
+ */
+
+quantum_program ProcessManagerCore {
+    metadata {
+        name: "QEntL量子进程管理器核心",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的进程管理器核心模块，提供进程创建、终止和控制功能",
+        quantum_gene: "QG-KERNEL-PROCCORE-X6P9-1714120855",
+        entanglement_strength: 0.92
+    }
+
+    state {
+        // 内核引用
+        kernel_reference: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 基础模块引用
+        base_module: null,
+        
+        // 内存管理器引用
+        memory_manager: null,
+        
+        // 量子内存管理器引用
+        quantum_memory_manager: null,
+        
+        // 默认时间片（毫秒）
+        default_time_slice: 10,
+        
+        // 默认堆栈大小（字节）
+        default_stack_size: 1024 * 1024, // 1MB
+        
+        // 默认量子寄存器数量
+        default_quantum_registers: 8,
+        
+        // 默认进程优先级
+        default_priority: null, // 将在初始化时设置
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化进程管理器核心模块
+    initialize(kernel_ref, base, memory_mgr, quantum_memory_mgr, config) {
+        kernel_log("初始化进程管理器核心模块...");
+        
+        // 保存模块引用
+        this.kernel_reference = kernel_ref;
+        this.base_module = base;
+        this.memory_manager = memory_mgr;
+        this.quantum_memory_manager = quantum_memory_mgr;
+        
+        // 验证基础模块已初始化
+        if (!base || !base.initialized) {
+            this.add_error("无法初始化进程管理器核心：基础模块未初始化");
+            return false;
+        }
+        
+        // 验证内存管理器
+        if (!memory_mgr) {
+            this.add_error("无法初始化进程管理器核心：内存管理器未提供");
+            return false;
+        }
+        
+        // 应用配置
+        if (config) {
+            if (config.default_time_slice) {
+                this.default_time_slice = config.default_time_slice;
+            }
+            
+            if (config.default_stack_size) {
+                this.default_stack_size = config.default_stack_size;
+            }
+            
+            if (config.default_quantum_registers) {
+                this.default_quantum_registers = config.default_quantum_registers;
+            }
+        }
+        
+        // 设置默认优先级
+        this.default_priority = this.base_module.process_priorities.NORMAL;
+        
+        this.initialized = true;
+        kernel_log("进程管理器核心模块初始化完成");
+        
+        return true;
+    }
+
+    // 重置进程管理器核心模块
+    reset() {
+        kernel_log("重置进程管理器核心模块...");
+        
+        // 保留模块引用
+        const kernel_ref = this.kernel_reference;
+        const base = this.base_module;
+        const memory_mgr = this.memory_manager;
+        const quantum_memory_mgr = this.quantum_memory_manager;
+        
+        // 重置错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 重置配置为默认值
+        this.default_time_slice = 10;
+        this.default_stack_size = 1024 * 1024;
+        this.default_quantum_registers = 8;
+        
+        // 恢复模块引用
+        this.kernel_reference = kernel_ref;
+        this.base_module = base;
+        this.memory_manager = memory_mgr;
+        this.quantum_memory_manager = quantum_memory_mgr;
+        
+        kernel_log("进程管理器核心模块已重置");
+    }
+
+    // 创建新进程
+    create_process(image_path, args, flags) {
+        if (!this.initialized) {
+            this.add_error("无法创建进程：进程管理器核心未初始化");
+            return null;
+        }
+        
+        kernel_log(`创建新进程: ${image_path}`);
+        
+        // 从路径中提取进程名称
+        const path_parts = image_path.split('/');
+        const file_name = path_parts[path_parts.length - 1];
+        const process_name = file_name.split('.')[0] || "unknown";
+        
+        // 获取新的进程ID
+        const pid = this.base_module.get_new_pid();
+        
+        // 确定进程优先级
+        let priority = this.default_priority;
+        if (flags) {
+            if ((flags & this.base_module.process_creation_flags.HIGH_PRIORITY) !== 0) {
+                priority = this.base_module.process_priorities.HIGH;
+            } else if ((flags & this.base_module.process_creation_flags.REALTIME) !== 0) {
+                priority = this.base_module.process_priorities.REALTIME;
+            }
+        }
+        
+        // 确定是否为内核进程
+        const is_kernel = flags 器 (flags & this.base_module.process_creation_flags.KERNEL) !== 0 : false;
+        
+        // 确定是否为量子进程
+        const is_quantum = flags 器 (flags & this.base_module.process_creation_flags.QUANTUM) !== 0 : false;
+        
+        // 确定初始状态
+        const initial_state = flags && (flags & this.base_module.process_creation_flags.SUSPENDED) !== 0 
+            器 this.base_module.process_states.CREATED 
+            : this.base_module.process_states.READY;
+        
+        // 获取当前运行的进程作为父进程
+        const parent_pid = this.base_module.current_pid;
+        
+        // 为进程分配内存
+        const memory_map = this.allocate_process_memory(pid, is_quantum);
+        if (!memory_map) {
+            this.add_error(`无法为进程 ${pid} (${process_name}) 分配内存`);
+            return null;
+        }
+        
+        // 创建进程描述符
+        const process = {
+            pid: pid,
+            name: process_name,
+            state: initial_state,
+            priority: priority,
+            flags: flags || this.base_module.process_creation_flags.NONE,
+            creation_time: Date.now(),
+            execution_time: 0,
+            last_scheduled: 0,
+            time_slice: this.default_time_slice,
+            parent_pid: parent_pid,
+            children: [],
+            context: {
+                registers: {},
+                program_counter: 0,
+                stack_pointer: memory_map.stack_base + memory_map.stack_size,
+                quantum_registers: is_quantum 器 this.initialize_quantum_registers() : null
+            },
+            memory_map: memory_map,
+            image_path: image_path,
+            args: args || [],
+            exit_code: null,
+            is_kernel: is_kernel,
+            is_quantum: is_quantum,
+            waiting_reason: null,
+            wait_start_time: null
+        };
+        
+        // 添加到进程表
+        this.base_module.process_table[pid] = process;
+        
+        // 如果不是挂起状态，添加到就绪队列
+        if (initial_state === this.base_module.process_states.READY) {
+            this.base_module.ready_queues[priority].push(pid);
+        }
+        
+        // 如果有父进程，将此进程添加为子进程
+        if (parent_pid !== null && this.base_module.process_table[parent_pid]) {
+            this.base_module.process_table[parent_pid].children.push(pid);
+        }
+        
+        // 更新统计信息
+        this.base_module.statistics.total_processes_created++;
+        this.base_module.statistics.active_processes++;
+        if (is_kernel) {
+            this.base_module.statistics.kernel_processes++;
+        }
+        if (is_quantum) {
+            this.base_module.statistics.quantum_processes++;
+        }
+        
+        kernel_log(`进程创建成功: PID ${pid}, 名称: ${process_name}, 优先级: ${this.base_module.get_priority_name(priority)}`);
+        
+        return pid;
+    }
+
+    // 为进程分配内存
+    allocate_process_memory(pid, is_quantum) {
+        kernel_log(`为进程 ${pid} 分配内存空间`);
+        
+        try {
+            // 分配代码段
+            const code_segment = this.memory_manager.allocate_segment(this.default_stack_size, {
+                pid: pid,
+                type: "code",
+                readable: true,
+                writable: false,
+                executable: true
+            });
+            
+            if (!code_segment) {
+                this.add_error(`无法为进程 ${pid} 分配代码段`);
+                return null;
+            }
+            
+            // 分配数据段
+            const data_segment = this.memory_manager.allocate_segment(this.default_stack_size, {
+                pid: pid,
+                type: "data",
+                readable: true,
+                writable: true,
+                executable: false
+            });
+            
+            if (!data_segment) {
+                // 释放已分配的代码段
+                this.memory_manager.free_segment(code_segment.base);
+                this.add_error(`无法为进程 ${pid} 分配数据段`);
+                return null;
+            }
+            
+            // 分配堆段
+            const heap_segment = this.memory_manager.allocate_segment(this.default_stack_size, {
+                pid: pid,
+                type: "heap",
+                readable: true,
+                writable: true,
+                executable: false
+            });
+            
+            if (!heap_segment) {
+                // 释放已分配的段
+                this.memory_manager.free_segment(code_segment.base);
+                this.memory_manager.free_segment(data_segment.base);
+                this.add_error(`无法为进程 ${pid} 分配堆段`);
+                return null;
+            }
+            
+            // 分配栈段
+            const stack_segment = this.memory_manager.allocate_segment(this.default_stack_size, {
+                pid: pid,
+                type: "stack",
+                readable: true,
+                writable: true,
+                executable: false
+            });
+            
+            if (!stack_segment) {
+                // 释放已分配的段
+                this.memory_manager.free_segment(code_segment.base);
+                this.memory_manager.free_segment(data_segment.base);
+                this.memory_manager.free_segment(heap_segment.base);
+                this.add_error(`无法为进程 ${pid} 分配栈段`);
+                return null;
+            }
+            
+            // 如果是量子进程，则分配量子内存
+            let quantum_segment = null;
+            if (is_quantum && this.quantum_memory_manager) {
+                quantum_segment = this.quantum_memory_manager.allocate_quantum_segment(this.default_quantum_registers, {
+                    pid: pid,
+                    type: "quantum_registers"
+                });
+                
+                if (!quantum_segment) {
+                    this.add_warning(`无法为量子进程 ${pid} 分配量子内存，将以非量子模式运行`);
+                }
+            }
+            
+            // 创建内存映射
+            const memory_map = {
+                code_base: code_segment.base,
+                code_size: code_segment.size,
+                data_base: data_segment.base,
+                data_size: data_segment.size,
+                heap_base: heap_segment.base,
+                heap_size: heap_segment.size,
+                heap_current: heap_segment.base, // 当前堆指针
+                stack_base: stack_segment.base,
+                stack_size: stack_segment.size,
+                quantum_segment: quantum_segment
+            };
+            
+            kernel_log(`进程 ${pid} 内存分配成功`);
+            return memory_map;
+            
+        } catch (error) {
+            this.add_error(`为进程 ${pid} 分配内存时发生错误: ${error.message || "未知错误"}`);
+            return null;
+        }
+    }
+
+    // 初始化量子寄存器
+    initialize_quantum_registers() {
+        const registers = {};
+        for (let i = 0; i < this.default_quantum_registers; i++) {
+            registers[`q${i}`] = {
+                state: "|0>", // 初始状态为|0>
+                entangled_with: null
+            };
+        }
+        return registers;
+    }
+
+    // 终止进程
+    terminate_process(pid, exit_code, reason) {
+        if (!this.initialized) {
+            this.add_error("无法终止进程：进程管理器核心未初始化");
+            return false;
+        }
+        
+        if (!this.base_module.process_exists(pid)) {
+            this.add_error(`无法终止进程：PID ${pid} 不存在`);
+            return false;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        
+        // 如果进程已经终止，直接返回
+        if (process.state === this.base_module.process_states.TERMINATED) {
+            this.add_warning(`进程 ${pid} 已经处于终止状态`);
+            return true;
+        }
+        
+        kernel_log(`终止进程: PID ${pid}, 名称: ${process.name}, 退出码: ${exit_code || 0}`);
+        
+        // 保存退出码
+        process.exit_code = exit_code || 0;
+        
+        // 移出调度队列
+        this.remove_from_queues(pid);
+        
+        // 递归终止子进程
+        const children = [...process.children];
+        for (const child_pid of children) {
+            this.terminate_process(child_pid, -1, this.base_module.termination_reasons.PARENT_TERMINATED);
+        }
+        
+        // 如果当前正在运行的进程是被终止的进程，清除当前进程引用
+        if (this.base_module.current_pid === pid) {
+            this.base_module.current_pid = null;
+        }
+        
+        // 更新进程状态
+        process.state = this.base_module.process_states.TERMINATED;
+        
+        // 更新终止原因
+        process.termination_reason = reason || this.base_module.termination_reasons.NORMAL;
+        
+        // 释放进程资源
+        this.free_process_resources(pid);
+        
+        // 更新统计信息
+        this.base_module.statistics.active_processes--;
+        this.base_module.statistics.terminated_processes++;
+        
+        // 通知父进程（如果有）
+        if (process.parent_pid !== null && this.base_module.process_exists(process.parent_pid)) {
+            const parent = this.base_module.process_table[process.parent_pid];
+            
+            // 如果父进程正在等待此子进程，唤醒父进程
+            if (parent.state === this.base_module.process_states.WAITING && 
+                parent.waiting_reason === "CHILD" &&
+                parent.waiting_for_pid === pid) {
+                
+                this.unblock_process(process.parent_pid);
+            }
+            
+            // 从父进程的子进程列表中移除此进程
+            const index = parent.children.indexOf(pid);
+            if (index !== -1) {
+                parent.children.splice(index, 1);
+            }
+        }
+        
+        kernel_log(`进程 ${pid} 已终止`);
+        return true;
+    }
+
+    // 从所有队列中移除进程
+    remove_from_queues(pid) {
+        // 从就绪队列中移除
+        for (const priority in this.base_module.ready_queues) {
+            const queue = this.base_module.ready_queues[priority];
+            const index = queue.indexOf(pid);
+            if (index !== -1) {
+                queue.splice(index, 1);
+            }
+        }
+        
+        // 从等待队列中移除
+        for (const reason in this.base_module.waiting_queues) {
+            const queue = this.base_module.waiting_queues[reason];
+            const index = queue.indexOf(pid);
+            if (index !== -1) {
+                queue.splice(index, 1);
+            }
+        }
+    }
+
+    // 释放进程资源
+    free_process_resources(pid) {
+        const process = this.base_module.process_table[pid];
+        
+        if (!process || !process.memory_map) {
+            return;
+        }
+        
+        kernel_log(`释放进程 ${pid} 的资源`);
+        
+        try {
+            // 释放内存段
+            if (process.memory_map.code_base) {
+                this.memory_manager.free_segment(process.memory_map.code_base);
+            }
+            
+            if (process.memory_map.data_base) {
+                this.memory_manager.free_segment(process.memory_map.data_base);
+            }
+            
+            if (process.memory_map.heap_base) {
+                this.memory_manager.free_segment(process.memory_map.heap_base);
+            }
+            
+            if (process.memory_map.stack_base) {
+                this.memory_manager.free_segment(process.memory_map.stack_base);
+            }
+            
+            // 释放量子段（如果有）
+            if (process.is_quantum && process.memory_map.quantum_segment && this.quantum_memory_manager) {
+                this.quantum_memory_manager.free_quantum_segment(process.memory_map.quantum_segment.id);
+            }
+            
+            // 清除内存映射
+            process.memory_map = null;
+            
+            kernel_log(`进程 ${pid} 资源已释放`);
+            
+        } catch (error) {
+            this.add_error(`释放进程 ${pid} 资源时发生错误: ${error.message || "未知错误"}`);
+        }
+    }
+
+    // 阻塞进程
+    block_process(pid, reason, wait_data) {
+        if (!this.initialized) {
+            this.add_error("无法阻塞进程：进程管理器核心未初始化");
+            return false;
+        }
+        
+        if (!this.base_module.process_exists(pid)) {
+            this.add_error(`无法阻塞进程：PID ${pid} 不存在`);
+            return false;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        
+        // 检查进程是否可以被阻塞
+        if (process.state === this.base_module.process_states.TERMINATED) {
+            this.add_warning(`无法阻塞已终止的进程：PID ${pid}`);
+            return false;
+        }
+        
+        if (process.state === this.base_module.process_states.WAITING) {
+            this.add_warning(`进程已经处于阻塞状态：PID ${pid}`);
+            return true;
+        }
+        
+        kernel_log(`阻塞进程: PID ${pid}, 原因: ${reason}`);
+        
+        // 从就绪队列移除
+        const priority_queue = this.base_module.ready_queues[process.priority];
+        const index = priority_queue.indexOf(pid);
+        if (index !== -1) {
+            priority_queue.splice(index, 1);
+        }
+        
+        // 更新进程状态
+        process.state = this.base_module.process_states.WAITING;
+        process.waiting_reason = reason;
+        process.wait_start_time = Date.now();
+        process.wait_data = wait_data || null;
+        
+        // 添加到相应的等待队列
+        // 确保等待原因是有效的队列名称
+        const queue_name = reason in this.base_module.waiting_queues 器 reason : "OTHER";
+        this.base_module.waiting_queues[queue_name].push(pid);
+        
+        kernel_log(`进程 ${pid} 已阻塞, 等待原因: ${reason}`);
+        return true;
+    }
+
+    // 解除进程阻塞
+    unblock_process(pid) {
+        if (!this.initialized) {
+            this.add_error("无法解除进程阻塞：进程管理器核心未初始化");
+            return false;
+        }
+        
+        if (!this.base_module.process_exists(pid)) {
+            this.add_error(`无法解除进程阻塞：PID ${pid} 不存在`);
+            return false;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        
+        // 检查进程是否处于等待状态
+        if (process.state !== this.base_module.process_states.WAITING) {
+            this.add_warning(`进程不处于阻塞状态：PID ${pid}`);
+            return false;
+        }
+        
+        kernel_log(`解除进程阻塞: PID ${pid}`);
+        
+        // 从等待队列中移除
+        const reason = process.waiting_reason || "OTHER";
+        const queue_name = reason in this.base_module.waiting_queues 器 reason : "OTHER";
+        const wait_queue = this.base_module.waiting_queues[queue_name];
+        const index = wait_queue.indexOf(pid);
+        if (index !== -1) {
+            wait_queue.splice(index, 1);
+        }
+        
+        // 清除等待信息
+        process.waiting_reason = null;
+        process.wait_start_time = null;
+        process.wait_data = null;
+        
+        // 更新进程状态并添加到就绪队列
+        process.state = this.base_module.process_states.READY;
+        this.base_module.ready_queues[process.priority].push(pid);
+        
+        kernel_log(`进程 ${pid} 已解除阻塞，加入就绪队列`);
+        return true;
+    }
+
+    // 更改进程优先级
+    change_process_priority(pid, new_priority) {
+        if (!this.initialized) {
+            this.add_error("无法更改进程优先级：进程管理器核心未初始化");
+            return false;
+        }
+        
+        if (!this.base_module.process_exists(pid)) {
+            this.add_error(`无法更改进程优先级：PID ${pid} 不存在`);
+            return false;
+        }
+        
+        // 检查新优先级是否有效
+        if (!(new_priority in this.base_module.process_priorities)) {
+            this.add_error(`无效的优先级值: ${new_priority}`);
+            return false;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        const old_priority = process.priority;
+        
+        // 如果优先级相同，不做任何更改
+        if (old_priority === new_priority) {
+            return true;
+        }
+        
+        kernel_log(`更改进程优先级: PID ${pid}, ${this.base_module.get_priority_name(old_priority)} -> ${this.base_module.get_priority_name(new_priority)}`);
+        
+        // 如果进程在就绪队列中，需要从旧队列移除并添加到新队列
+        if (process.state === this.base_module.process_states.READY) {
+            // 从旧优先级队列中移除
+            const old_queue = this.base_module.ready_queues[old_priority];
+            const index = old_queue.indexOf(pid);
+            if (index !== -1) {
+                old_queue.splice(index, 1);
+            }
+            
+            // 添加到新优先级队列
+            this.base_module.ready_queues[new_priority].push(pid);
+        }
+        
+        // 更新进程的优先级
+        process.priority = new_priority;
+        
+        kernel_log(`进程 ${pid} 优先级已更改为 ${this.base_module.get_priority_name(new_priority)}`);
+        return true;
+    }
+
+    // 获取进程退出状态
+    get_exit_status(pid) {
+        if (!this.base_module.process_exists(pid)) {
+            this.add_error(`无法获取进程退出状态：PID ${pid} 不存在`);
+            return null;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        
+        // 只有已终止的进程才有退出状态
+        if (process.state !== this.base_module.process_states.TERMINATED) {
+            return null;
+        }
+        
+        return {
+            exit_code: process.exit_code,
+            termination_reason: process.termination_reason,
+            execution_time: process.execution_time
+        };
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`进程管理器核心错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`进程管理器核心警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+
+    // 检查进程健康状态
+    check_process_health(pid) {
+        if (!this.base_module.process_exists(pid)) {
+            return null;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        
+        // 已终止的进程不需要健康检查
+        if (process.state === this.base_module.process_states.TERMINATED) {
+            return {
+                status: "terminated",
+                pid: pid,
+                exit_code: process.exit_code
+            };
+        }
+        
+        // 检查进程等待是否超时
+        if (process.state === this.base_module.process_states.WAITING && process.wait_start_time) {
+            const wait_time = Date.now() - process.wait_start_time;
+            const timeout_threshold = 60000; // 1分钟
+            
+            if (wait_time > timeout_threshold) {
+                return {
+                    status: "warning",
+                    pid: pid,
+                    message: `进程等待时间过长 (${Math.round(wait_time / 1000)}秒)`,
+                    reason: process.waiting_reason
+                };
+            }
+        }
+        
+        // 基本健康状况
+        return {
+            status: "healthy",
+            pid: pid,
+            state: this.base_module.get_state_name(process.state),
+            execution_time: process.execution_time
+        };
+    }
+}
+
+// 导出进程管理器核心模块
+export ProcessManagerCore; 

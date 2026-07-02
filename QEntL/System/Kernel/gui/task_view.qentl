@@ -1,0 +1,1069 @@
+// QEntL 任务视图
+// 版本: 1.0.0
+// 作者: QSM团队
+// 量子基因码: QSM-TASK-4321-L987
+// 描述: 实现系统任务管理、可视化和交互功能
+
+// 类型定义
+type TaskStatus {
+    PENDING,               // 待处理
+    RUNNING,               // 运行中
+    PAUSED,                // 已暂停
+    COMPLETED,             // 已完成
+    FAILED,                // 已失败
+    CANCELED,              // 已取消
+    QUANTUM_PROCESSING     // 量子处理中
+}
+
+type TaskPriority {
+    LOWEST,                // 最低
+    LOW,                   // 低
+    NORMAL,                // 普通
+    HIGH,                  // 高
+    HIGHEST,               // 最高
+    CRITICAL               // 关键
+}
+
+type TaskType {
+    SYSTEM,                // 系统任务
+    USER,                  // 用户任务
+    BACKGROUND,            // 后台任务
+    SERVICE,               // 服务任务
+    QUANTUM,               // 量子任务
+    IO,                    // IO任务
+    NETWORK,               // 网络任务
+    COMPUTATION            // 计算任务
+}
+
+type ViewMode {
+    LIST,                  // 列表视图
+    CARD,                  // 卡片视图
+    TIMELINE,              // 时间线视图
+    KANBAN,                // 看板视图
+    GRID,                  // 网格视图
+    TREE,                  // 树形视图
+    QUANTUM_DIMENSIONAL    // 量子维度视图
+}
+
+type Task {
+    id: String,                     // 任务ID
+    name: String,                   // 任务名称
+    description: String,            // 任务描述
+    type: TaskType,                 // 任务类型
+    status: TaskStatus,             // 任务状态
+    priority: TaskPriority,         // 任务优先级
+    progress: Float,                // 进度(0-1)
+    userId: String,                 // 用户ID
+    processId: String,              // 进程ID
+    appId: String,                  // 应用ID
+    createTime: DateTime,           // 创建时间
+    startTime: DateTime,            // 开始时间
+    endTime: DateTime,              // 结束时间
+    lastUpdated: DateTime,          // 最后更新时间
+    estimatedDuration: Int,         // 预计持续时间(毫秒)
+    actualDuration: Int,            // 实际持续时间(毫秒)
+    cpuUsage: Float,                // CPU使用率
+    memoryUsage: Int,               // 内存使用量(KB)
+    dependencies: List<String>,     // 依赖任务ID
+    children: List<String>,         // 子任务ID
+    tags: List<String>,             // 标签
+    metadata: Map<String, Any>,     // 元数据
+    permissionLevel: Int,           // 权限级别
+    visibilityLevel: Int,           // 可见性级别
+    quantumState: Object            // 量子状态
+}
+
+type TaskFilter {
+    statuses: List<TaskStatus>,     // 状态过滤
+    priorities: List<TaskPriority>, // 优先级过滤
+    types: List<TaskType>,          // 类型过滤
+    userIds: List<String>,          // 用户ID过滤
+    appIds: List<String>,           // 应用ID过滤
+    dateRange: {start: DateTime, end: DateTime}, // 日期范围
+    tags: List<String>,             // 标签过滤
+    searchText: String,             // 搜索文本
+    customFilters: Map<String, Any> // 自定义过滤器
+}
+
+type TaskSorting {
+    field: String,                  // 排序字段
+    direction: String,              // 排序方向(asc, desc)
+    secondary: {field: String, direction: String} // 次要排序
+}
+
+type TaskGroup {
+    id: String,                     // 分组ID
+    name: String,                   // 分组名称
+    groupBy: String,                // 分组依据
+    tasks: List<String>,            // 任务ID列表
+    color: String,                  // 颜色
+    collapsed: Bool,                // 是否折叠
+    metadata: Map<String, Any>      // 元数据
+}
+
+type TaskViewState {
+    id: String,                     // 视图状态ID
+    name: String,                   // 名称
+    mode: ViewMode,                 // 视图模式
+    filters: TaskFilter,            // 过滤器
+    sorting: TaskSorting,           // 排序
+    groups: List<TaskGroup>,        // 分组
+    visibleColumns: List<String>,   // 可见列
+    expanded: List<String>,         // 展开的项
+    selected: List<String>,         // 选中的项
+    customState: Map<String, Any>   // 自定义状态
+}
+
+// 配置
+config {
+    // 基本设置
+    defaultViewMode: ViewMode.LIST,          // 默认视图模式
+    refreshIntervalMs: 1000,                 // 刷新间隔(毫秒)
+    maxVisibleTasks: 500,                    // 最大可见任务数
+    maxTaskHistory: 1000,                    // 最大任务历史记录数
+    
+    // 可视化设置
+    taskColorMapping: {
+        // 状态颜色映射
+        status: {
+            PENDING: "#3498db",
+            RUNNING: "#2ecc71",
+            PAUSED: "#f39c12",
+            COMPLETED: "#27ae60",
+            FAILED: "#e74c3c",
+            CANCELED: "#95a5a6",
+            QUANTUM_PROCESSING: "#9b59b6"
+        },
+        // 优先级颜色映射
+        priority: {
+            LOWEST: "#bdc3c7",
+            LOW: "#3498db",
+            NORMAL: "#2ecc71",
+            HIGH: "#f39c12",
+            HIGHEST: "#e67e22",
+            CRITICAL: "#e74c3c"
+        }
+    },
+    
+    // 任务管理设置
+    autoRefresh: true,                       // 是否自动刷新
+    showCompletedTasks: true,                // 是否显示已完成任务
+    keepFailedTasksFor: 1440,                // 保留失败任务的分钟数
+    removeCompletedAfter: 60,                // 移除已完成任务的分钟数
+    groupByDefault: "status",                // 默认分组方式
+    
+    // 高级设置
+    enableTaskPrediction: true,              // 启用任务预测
+    useMachineLearning: true,                // 使用机器学习
+    quantumVisualization: true,              // 量子可视化
+    enableTaskDependencies: true,            // 启用任务依赖关系
+    showResourceUtilization: true            // 显示资源利用率
+}
+
+// 服务状态
+state {
+    initialized: Bool = false,                      // 服务是否已初始化
+    tasks: Map<String, Task> = {},                  // 所有任务 <taskId, Task>
+    taskHistory: List<Task> = [],                   // 任务历史记录
+    
+    // 视图状态
+    currentViewState: TaskViewState = null,         // 当前视图状态
+    savedViewStates: Map<String, TaskViewState> = {}, // 保存的视图状态 <viewId, TaskViewState>
+    
+    // 选择和交互状态
+    selectedTaskIds: List<String> = [],             // 选中的任务ID
+    expandedTaskIds: List<String> = [],             // 展开的任务ID
+    draggedTaskId: String = "",                     // 正在拖动的任务ID
+    
+    // 过滤和排序状态
+    activeFilter: TaskFilter = null,                // 活动过滤器
+    activeSorting: TaskSorting = null,              // 活动排序
+    
+    // 统计和监控
+    taskStats: {                                   // 任务统计
+        byStatus: Map<TaskStatus, Int>,             // 按状态统计
+        byPriority: Map<TaskPriority, Int>,         // 按优先级统计
+        byType: Map<TaskType, Int>,                 // 按类型统计
+        byUser: Map<String, Int>,                   // 按用户统计
+        totalActive: Int,                           // 总活动任务
+        totalPending: Int,                          // 总待处理任务
+        completedToday: Int,                        // 今日完成任务
+        failedToday: Int                            // 今日失败任务
+    },
+    
+    // 更新和刷新
+    lastRefresh: DateTime = null,                   // 最后刷新时间
+    refreshInProgress: Bool = false,                // 刷新是否正在进行
+    
+    // 事件监听器
+    onTaskUpdatedListeners: List<Object> = [],      // 任务更新事件监听器
+    onTaskSelectionListeners: List<Object> = [],    // 任务选择事件监听器
+    onViewChangedListeners: List<Object> = []       // 视图变更事件监听器
+}
+
+// 公共函数
+function initialize(customConfig: Object = null): Bool {
+    if (state.initialized) {
+        return true; // 已经初始化
+    }
+    
+    // 合并自定义配置(如果有)
+    if (customConfig != null) {
+        config = _mergeConfigs(config, customConfig);
+    }
+    
+    // 初始化任务统计
+    _initializeTaskStats();
+    
+    // 初始化默认视图状态
+    _initializeDefaultViewState();
+    
+    // 启动自动刷新(如果启用)
+    if (config.autoRefresh) {
+        _startAutoRefresh();
+    }
+    
+    state.initialized = true;
+    return true;
+}
+
+// 添加任务
+function addTask(task: Task): String {
+    _checkInitialized();
+    
+    // 生成任务ID(如果未提供)
+    if (!task.id) {
+        task.id = _generateId();
+    }
+    
+    // 设置创建时间
+    task.createTime = task.createTime || DateTime.now();
+    
+    // 设置默认值
+    task.status = task.status || TaskStatus.PENDING;
+    task.priority = task.priority || TaskPriority.NORMAL;
+    task.progress = task.progress || 0;
+    task.lastUpdated = DateTime.now();
+    
+    // 添加任务
+    state.tasks[task.id] = task;
+    
+    // 更新任务统计
+    _updateTaskStats();
+    
+    // 触发任务更新事件
+    _triggerEvent("taskUpdated", {
+        taskId: task.id,
+        task: task,
+        action: "add",
+        timestamp: DateTime.now()
+    });
+    
+    return task.id;
+}
+
+// 更新任务
+function updateTask(taskId: String, updates: Object): Bool {
+    _checkInitialized();
+    
+    // 检查任务是否存在
+    if (!state.tasks.hasKey(taskId)) {
+        return false;
+    }
+    
+    let task = state.tasks[taskId];
+    let oldStatus = task.status;
+    let oldProgress = task.progress;
+    
+    // 应用更新
+    for (let key in updates) {
+        if (task.hasKey(key)) {
+            task[key] = updates[key];
+        }
+    }
+    
+    // 更新最后更新时间
+    task.lastUpdated = DateTime.now();
+    
+    // 如果状态变为已完成，设置结束时间和实际持续时间
+    if (oldStatus != TaskStatus.COMPLETED && task.status == TaskStatus.COMPLETED) {
+        task.endTime = DateTime.now();
+        if (task.startTime) {
+            task.actualDuration = DateTime.now().getTime() - task.startTime.getTime();
+        }
+    }
+    
+    // 如果状态变为运行中，设置开始时间
+    if (oldStatus != TaskStatus.RUNNING && task.status == TaskStatus.RUNNING) {
+        if (!task.startTime) {
+            task.startTime = DateTime.now();
+        }
+    }
+    
+    // 更新任务
+    state.tasks[taskId] = task;
+    
+    // 如果状态已变更或进度有显著变化，添加到历史记录
+    if (oldStatus != task.status || Math.abs(oldProgress - task.progress) >= 0.1) {
+        _addToTaskHistory(task);
+    }
+    
+    // 更新任务统计
+    _updateTaskStats();
+    
+    // 触发任务更新事件
+    _triggerEvent("taskUpdated", {
+        taskId: taskId,
+        task: task,
+        action: "update",
+        timestamp: DateTime.now(),
+        changes: updates
+    });
+    
+    return true;
+}
+
+// 删除任务
+function removeTask(taskId: String): Bool {
+    _checkInitialized();
+    
+    // 检查任务是否存在
+    if (!state.tasks.hasKey(taskId)) {
+        return false;
+    }
+    
+    let task = state.tasks[taskId];
+    
+    // 移除任务
+    state.tasks.remove(taskId);
+    
+    // 从选择和展开列表中移除
+    state.selectedTaskIds = state.selectedTaskIds.filter(id => id != taskId);
+    state.expandedTaskIds = state.expandedTaskIds.filter(id => id != taskId);
+    
+    // 添加到历史记录
+    task.status = TaskStatus.CANCELED;
+    _addToTaskHistory(task);
+    
+    // 更新任务统计
+    _updateTaskStats();
+    
+    // 触发任务更新事件
+    _triggerEvent("taskUpdated", {
+        taskId: taskId,
+        task: task,
+        action: "remove",
+        timestamp: DateTime.now()
+    });
+    
+    return true;
+}
+
+// 获取任务
+function getTask(taskId: String): Task {
+    _checkInitialized();
+    
+    if (!state.tasks.hasKey(taskId)) {
+        return null;
+    }
+    
+    return state.tasks[taskId];
+}
+
+// 获取所有任务
+function getAllTasks(filter: TaskFilter = null, sorting: TaskSorting = null): List<Task> {
+    _checkInitialized();
+    
+    let tasks = [];
+    
+    // 收集所有任务
+    for (let taskId in state.tasks) {
+        tasks.push(state.tasks[taskId]);
+    }
+    
+    // 应用过滤器
+    if (filter) {
+        tasks = _filterTasks(tasks, filter);
+    }
+    
+    // 应用排序
+    if (sorting) {
+        tasks = _sortTasks(tasks, sorting);
+    }
+    
+    return tasks;
+}
+
+// 设置视图模式
+function setViewMode(mode: ViewMode): Bool {
+    _checkInitialized();
+    
+    // 更新当前视图状态
+    if (state.currentViewState) {
+        state.currentViewState.mode = mode;
+        
+        // 触发视图变更事件
+        _triggerEvent("viewChanged", {
+            viewState: state.currentViewState,
+            change: "mode",
+            newValue: mode,
+            timestamp: DateTime.now()
+        });
+        
+        return true;
+    }
+    
+    return false;
+}
+
+// 应用过滤器
+function applyFilter(filter: TaskFilter): Bool {
+    _checkInitialized();
+    
+    // 更新活动过滤器
+    state.activeFilter = filter;
+    
+    // 更新当前视图状态
+    if (state.currentViewState) {
+        state.currentViewState.filters = filter;
+        
+        // 触发视图变更事件
+        _triggerEvent("viewChanged", {
+            viewState: state.currentViewState,
+            change: "filter",
+            newValue: filter,
+            timestamp: DateTime.now()
+        });
+    }
+    
+    return true;
+}
+
+// 应用排序
+function applySorting(sorting: TaskSorting): Bool {
+    _checkInitialized();
+    
+    // 更新活动排序
+    state.activeSorting = sorting;
+    
+    // 更新当前视图状态
+    if (state.currentViewState) {
+        state.currentViewState.sorting = sorting;
+        
+        // 触发视图变更事件
+        _triggerEvent("viewChanged", {
+            viewState: state.currentViewState,
+            change: "sorting",
+            newValue: sorting,
+            timestamp: DateTime.now()
+        });
+    }
+    
+    return true;
+}
+
+// 分组任务
+function groupTasks(groupBy: String): List<TaskGroup> {
+    _checkInitialized();
+    
+    // 获取应用过滤和排序后的任务
+    let tasks = getAllTasks(state.activeFilter, state.activeSorting);
+    
+    // 按指定字段分组
+    let groups = {};
+    
+    for (let i = 0; i < tasks.length; i++) {
+        let task = tasks[i];
+        let groupValue = task[groupBy];
+        
+        // 如果是数组类型的字段，为每个值创建组
+        if (Array.isArray(groupValue)) {
+            for (let j = 0; j < groupValue.length; j++) {
+                let value = groupValue[j];
+                if (!groups.hasKey(value)) {
+                    groups[value] = [];
+                }
+                groups[value].push(task.id);
+            }
+        } else {
+            // 处理非数组字段
+            if (!groups.hasKey(groupValue)) {
+                groups[groupValue] = [];
+            }
+            groups[groupValue].push(task.id);
+        }
+    }
+    
+    // 创建任务组列表
+    let taskGroups = [];
+    
+    for (let groupValue in groups) {
+        let groupId = "group_" + _generateId();
+        let color = _getColorForGroup(groupBy, groupValue);
+        
+        taskGroups.push(TaskGroup {
+            id: groupId,
+            name: groupValue.toString(),
+            groupBy: groupBy,
+            tasks: groups[groupValue],
+            color: color,
+            collapsed: false,
+            metadata: {}
+        });
+    }
+    
+    // 更新当前视图状态
+    if (state.currentViewState) {
+        state.currentViewState.groups = taskGroups;
+        
+        // 触发视图变更事件
+        _triggerEvent("viewChanged", {
+            viewState: state.currentViewState,
+            change: "grouping",
+            newValue: groupBy,
+            timestamp: DateTime.now()
+        });
+    }
+    
+    return taskGroups;
+}
+
+// 设置任务选择
+function setTaskSelection(taskIds: List<String>): Bool {
+    _checkInitialized();
+    
+    // 更新选中的任务ID
+    state.selectedTaskIds = taskIds;
+    
+    // 更新当前视图状态
+    if (state.currentViewState) {
+        state.currentViewState.selected = taskIds;
+    }
+    
+    // 触发任务选择事件
+    _triggerEvent("taskSelection", {
+        selectedTaskIds: taskIds,
+        count: taskIds.length,
+        timestamp: DateTime.now()
+    });
+    
+    return true;
+}
+
+// 展开/折叠任务
+function toggleTaskExpand(taskId: String): Bool {
+    _checkInitialized();
+    
+    // 检查任务是否存在
+    if (!state.tasks.hasKey(taskId)) {
+        return false;
+    }
+    
+    // 检查任务是否已展开
+    let expanded = state.expandedTaskIds.includes(taskId);
+    
+    if (expanded) {
+        // 折叠任务
+        state.expandedTaskIds = state.expandedTaskIds.filter(id => id != taskId);
+    } else {
+        // 展开任务
+        state.expandedTaskIds.push(taskId);
+    }
+    
+    // 更新当前视图状态
+    if (state.currentViewState) {
+        state.currentViewState.expanded = state.expandedTaskIds;
+    }
+    
+    return true;
+}
+
+// 保存当前视图状态
+function saveViewState(name: String): String {
+    _checkInitialized();
+    
+    // 确保当前视图状态存在
+    if (!state.currentViewState) {
+        return "";
+    }
+    
+    // 创建视图状态副本
+    let viewStateCopy = {...state.currentViewState};
+    viewStateCopy.id = _generateId();
+    viewStateCopy.name = name;
+    
+    // 保存视图状态
+    state.savedViewStates[viewStateCopy.id] = viewStateCopy;
+    
+    return viewStateCopy.id;
+}
+
+// 加载保存的视图状态
+function loadViewState(viewId: String): Bool {
+    _checkInitialized();
+    
+    // 检查视图状态是否存在
+    if (!state.savedViewStates.hasKey(viewId)) {
+        return false;
+    }
+    
+    // 加载视图状态
+    state.currentViewState = {...state.savedViewStates[viewId]};
+    
+    // 应用过滤器和排序
+    state.activeFilter = state.currentViewState.filters;
+    state.activeSorting = state.currentViewState.sorting;
+    
+    // 更新选择和展开状态
+    state.selectedTaskIds = state.currentViewState.selected;
+    state.expandedTaskIds = state.currentViewState.expanded;
+    
+    // 触发视图变更事件
+    _triggerEvent("viewChanged", {
+        viewState: state.currentViewState,
+        change: "loadState",
+        newValue: viewId,
+        timestamp: DateTime.now()
+    });
+    
+    return true;
+}
+
+// 刷新任务视图
+function refreshTaskView(): Bool {
+    _checkInitialized();
+    
+    // 如果刷新正在进行，返回
+    if (state.refreshInProgress) {
+        return false;
+    }
+    
+    // 设置刷新状态
+    state.refreshInProgress = true;
+    state.lastRefresh = DateTime.now();
+    
+    // 清理过期任务
+    _cleanExpiredTasks();
+    
+    // 更新任务统计
+    _updateTaskStats();
+    
+    // 重置刷新状态
+    state.refreshInProgress = false;
+    
+    return true;
+}
+
+// 获取任务统计
+function getTaskStats(): Object {
+    _checkInitialized();
+    
+    return state.taskStats;
+}
+
+// 添加事件监听器
+function addEventListener(eventName: String, callback: Function): String {
+    _checkInitialized();
+    
+    let listenerId = _generateId();
+    
+    // 根据事件类型添加监听器
+    switch (eventName) {
+        case "taskUpdated":
+            state.onTaskUpdatedListeners.push({id: listenerId, callback: callback});
+            break;
+        case "taskSelection":
+            state.onTaskSelectionListeners.push({id: listenerId, callback: callback});
+            break;
+        case "viewChanged":
+            state.onViewChangedListeners.push({id: listenerId, callback: callback});
+            break;
+        default:
+            return "";
+    }
+    
+    return listenerId;
+}
+
+// 移除事件监听器
+function removeEventListener(eventName: String, listenerId: String): Bool {
+    _checkInitialized();
+    
+    // 根据事件类型移除监听器
+    switch (eventName) {
+        case "taskUpdated":
+            state.onTaskUpdatedListeners = state.onTaskUpdatedListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "taskSelection":
+            state.onTaskSelectionListeners = state.onTaskSelectionListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "viewChanged":
+            state.onViewChangedListeners = state.onViewChangedListeners.filter(listener => listener.id != listenerId);
+            break;
+        default:
+            return false;
+    }
+    
+    return true;
+}
+
+// 内部函数
+
+// 检查服务是否已初始化
+function _checkInitialized() {
+    if (!state.initialized) {
+        throw "任务视图尚未初始化";
+    }
+}
+
+// 合并配置
+function _mergeConfigs(baseConfig: Object, customConfig: Object): Object {
+    // 简单合并对象
+    let result = baseConfig.clone();
+    
+    for (let key in customConfig) {
+        if (result.hasKey(key)) {
+            if (typeof result[key] == "object" && typeof customConfig[key] == "object") {
+                result[key] = _mergeConfigs(result[key], customConfig[key]);
+            } else {
+                result[key] = customConfig[key];
+            }
+        }
+    }
+    
+    return result;
+}
+
+// 初始化任务统计
+function _initializeTaskStats() {
+    state.taskStats = {
+        byStatus: {},
+        byPriority: {},
+        byType: {},
+        byUser: {},
+        totalActive: 0,
+        totalPending: 0,
+        completedToday: 0,
+        failedToday: 0
+    };
+    
+    // 初始化状态统计
+    for (let status in TaskStatus) {
+        state.taskStats.byStatus[status] = 0;
+    }
+    
+    // 初始化优先级统计
+    for (let priority in TaskPriority) {
+        state.taskStats.byPriority[priority] = 0;
+    }
+    
+    // 初始化类型统计
+    for (let type in TaskType) {
+        state.taskStats.byType[type] = 0;
+    }
+}
+
+// 初始化默认视图状态
+function _initializeDefaultViewState() {
+    state.currentViewState = TaskViewState {
+        id: "default",
+        name: "默认视图",
+        mode: config.defaultViewMode,
+        filters: TaskFilter {
+            statuses: [],
+            priorities: [],
+            types: [],
+            userIds: [],
+            appIds: [],
+            dateRange: {start: null, end: null},
+            tags: [],
+            searchText: "",
+            customFilters: {}
+        },
+        sorting: TaskSorting {
+            field: "priority",
+            direction: "desc",
+            secondary: {field: "createTime", direction: "desc"}
+        },
+        groups: [],
+        visibleColumns: ["name", "status", "priority", "progress", "createTime"],
+        expanded: [],
+        selected: [],
+        customState: {}
+    };
+    
+    // 默认按状态分组
+    if (config.groupByDefault) {
+        groupTasks(config.groupByDefault);
+    }
+}
+
+// 启动自动刷新
+function _startAutoRefresh() {
+    // 实际实现会使用定时器或异步任务
+    // 这里只是一个示例
+}
+
+// 过滤任务
+function _filterTasks(tasks: List<Task>, filter: TaskFilter): List<Task> {
+    // 应用过滤器
+    return tasks.filter(task => {
+        // 状态过滤
+        if (filter.statuses && filter.statuses.length > 0) {
+            if (!filter.statuses.includes(task.status)) {
+                return false;
+            }
+        }
+        
+        // 优先级过滤
+        if (filter.priorities && filter.priorities.length > 0) {
+            if (!filter.priorities.includes(task.priority)) {
+                return false;
+            }
+        }
+        
+        // 类型过滤
+        if (filter.types && filter.types.length > 0) {
+            if (!filter.types.includes(task.type)) {
+                return false;
+            }
+        }
+        
+        // 用户ID过滤
+        if (filter.userIds && filter.userIds.length > 0) {
+            if (!filter.userIds.includes(task.userId)) {
+                return false;
+            }
+        }
+        
+        // 应用ID过滤
+        if (filter.appIds && filter.appIds.length > 0) {
+            if (!filter.appIds.includes(task.appId)) {
+                return false;
+            }
+        }
+        
+        // 日期范围过滤
+        if (filter.dateRange && filter.dateRange.start && filter.dateRange.end) {
+            if (task.createTime < filter.dateRange.start || task.createTime > filter.dateRange.end) {
+                return false;
+            }
+        }
+        
+        // 标签过滤
+        if (filter.tags && filter.tags.length > 0) {
+            if (!task.tags) return false;
+            let hasTag = false;
+            for (let i = 0; i < filter.tags.length; i++) {
+                if (task.tags.includes(filter.tags[i])) {
+                    hasTag = true;
+                    break;
+                }
+            }
+            if (!hasTag) return false;
+        }
+        
+        // 搜索文本过滤
+        if (filter.searchText && filter.searchText.trim() != "") {
+            let searchText = filter.searchText.toLowerCase();
+            let taskText = (task.name + " " + task.description).toLowerCase();
+            if (!taskText.includes(searchText)) {
+                return false;
+            }
+        }
+        
+        return true;
+    });
+}
+
+// 排序任务
+function _sortTasks(tasks: List<Task>, sorting: TaskSorting): List<Task> {
+    // 应用排序
+    return tasks.sort((a, b) => {
+        // 主要排序
+        let aValue = a[sorting.field];
+        let bValue = b[sorting.field];
+        
+        let result;
+        if (aValue < bValue) {
+            result = sorting.direction === "asc" 器 -1 : 1;
+        } else if (aValue > bValue) {
+            result = sorting.direction === "asc" 器 1 : -1;
+        } else {
+            // 相等，使用次要排序
+            if (sorting.secondary) {
+                let aSecondary = a[sorting.secondary.field];
+                let bSecondary = b[sorting.secondary.field];
+                
+                if (aSecondary < bSecondary) {
+                    result = sorting.secondary.direction === "asc" 器 -1 : 1;
+                } else if (aSecondary > bSecondary) {
+                    result = sorting.secondary.direction === "asc" 器 1 : -1;
+                } else {
+                    result = 0;
+                }
+            } else {
+                result = 0;
+            }
+        }
+        
+        return result;
+    });
+}
+
+// 获取分组颜色
+function _getColorForGroup(groupBy: String, groupValue: Any): String {
+    // 根据分组类型和值获取颜色
+    if (groupBy === "status" && config.taskColorMapping.status.hasKey(groupValue)) {
+        return config.taskColorMapping.status[groupValue];
+    } else if (groupBy === "priority" && config.taskColorMapping.priority.hasKey(groupValue)) {
+        return config.taskColorMapping.priority[groupValue];
+    } else {
+        // 为其他分组类型生成一致的颜色
+        let colors = ["#3498db", "#2ecc71", "#e74c3c", "#f39c12", "#9b59b6", "#1abc9c", "#e67e22", "#34495e"];
+        let hash = 0;
+        for (let i = 0; i < groupValue.toString().length; i++) {
+            hash = (hash << 5) - hash + groupValue.toString().charCodeAt(i);
+            hash |= 0; // 转换为32位整数
+        }
+        return colors[Math.abs(hash) % colors.length];
+    }
+}
+
+// 添加到任务历史
+function _addToTaskHistory(task: Task) {
+    // 添加任务的副本到历史记录
+    let taskCopy = {...task};
+    state.taskHistory.push(taskCopy);
+    
+    // 限制历史记录大小
+    if (state.taskHistory.length > config.maxTaskHistory) {
+        state.taskHistory.shift();
+    }
+}
+
+// 清理过期任务
+function _cleanExpiredTasks() {
+    let now = DateTime.now();
+    let tasksToRemove = [];
+    
+    // 查找过期任务
+    for (let taskId in state.tasks) {
+        let task = state.tasks[taskId];
+        
+        // 移除已完成且超出保留时间的任务
+        if (task.status === TaskStatus.COMPLETED) {
+            if (task.endTime && (now.getTime() - task.endTime.getTime()) > config.removeCompletedAfter * 60 * 1000) {
+                tasksToRemove.push(taskId);
+            }
+        }
+        
+        // 移除失败且超出保留时间的任务
+        if (task.status === TaskStatus.FAILED) {
+            if (task.endTime && (now.getTime() - task.endTime.getTime()) > config.keepFailedTasksFor * 60 * 1000) {
+                tasksToRemove.push(taskId);
+            }
+        }
+    }
+    
+    // 移除过期任务
+    for (let i = 0; i < tasksToRemove.length; i++) {
+        let taskId = tasksToRemove[i];
+        let task = state.tasks[taskId];
+        
+        // 添加到历史记录
+        _addToTaskHistory(task);
+        
+        // 移除任务
+        state.tasks.remove(taskId);
+    }
+}
+
+// 更新任务统计
+function _updateTaskStats() {
+    // 重置统计
+    _initializeTaskStats();
+    
+    let today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // 统计所有任务
+    for (let taskId in state.tasks) {
+        let task = state.tasks[taskId];
+        
+        // 按状态统计
+        if (state.taskStats.byStatus.hasKey(task.status)) {
+            state.taskStats.byStatus[task.status]++;
+        }
+        
+        // 按优先级统计
+        if (state.taskStats.byPriority.hasKey(task.priority)) {
+            state.taskStats.byPriority[task.priority]++;
+        }
+        
+        // 按类型统计
+        if (state.taskStats.byType.hasKey(task.type)) {
+            state.taskStats.byType[task.type]++;
+        }
+        
+        // 按用户统计
+        if (task.userId) {
+            if (!state.taskStats.byUser.hasKey(task.userId)) {
+                state.taskStats.byUser[task.userId] = 0;
+            }
+            state.taskStats.byUser[task.userId]++;
+        }
+        
+        // 活动任务计数
+        if (task.status === TaskStatus.RUNNING) {
+            state.taskStats.totalActive++;
+        }
+        
+        // 待处理任务计数
+        if (task.status === TaskStatus.PENDING) {
+            state.taskStats.totalPending++;
+        }
+        
+        // 今日完成计数
+        if (task.status === TaskStatus.COMPLETED && task.endTime && task.endTime >= today) {
+            state.taskStats.completedToday++;
+        }
+        
+        // 今日失败计数
+        if (task.status === TaskStatus.FAILED && task.endTime && task.endTime >= today) {
+            state.taskStats.failedToday++;
+        }
+    }
+}
+
+// 触发事件
+function _triggerEvent(eventName: String, eventData: Object) {
+    // 根据事件类型触发相应的事件
+    let listeners = [];
+    
+    switch (eventName) {
+        case "taskUpdated":
+            listeners = state.onTaskUpdatedListeners;
+            break;
+        case "taskSelection":
+            listeners = state.onTaskSelectionListeners;
+            break;
+        case "viewChanged":
+            listeners = state.onViewChangedListeners;
+            break;
+    }
+    
+    // 调用所有监听器
+    for (let i = 0; i < listeners.length; i++) {
+        try {
+            listeners[i].callback(eventData);
+        } catch (e) {
+            // 记录错误但不中断执行
+        }
+    }
+}
+
+// 生成随机ID
+function _generateId(): String {
+    return "id_" + Math.random().toString(36).substring(2, 15);
+} 

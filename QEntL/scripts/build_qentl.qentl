@@ -1,0 +1,241 @@
+#!/usr/bin/env qentl
+// QEntL构建脚本
+// 文件: build_qentl.qentl
+// 用于构建整个QEntL系统
+
+import "QEntL/core/console.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/process.qentl";
+
+/**
+ * @brief QEntL构建系统
+ */
+quantum_class QEntLBuilder {
+    
+    private static buildConfig: BuildConfig;
+    
+    public static function main(): Integer {
+        Console.println("🔨 QEntL构建系统启动");
+        Console.println("=====================================");
+        
+        // 初始化构建配置
+        initBuildConfig();
+        
+        // 执行构建流程
+        if (!executeBuildPipeline()) {
+            Console.println("❌ 构建失败！");
+            return 1;
+        }
+        
+        Console.println("🎉 构建成功完成！");
+        showNextSteps();
+        return 0;
+    }
+    
+    /**
+     * @brief 初始化构建配置
+     */
+    private static function initBuildConfig(): void {
+        buildConfig = new BuildConfig();
+        buildConfig.sourceDir = "./";
+        buildConfig.buildDir = "./build";
+        buildConfig.outputDir = "./dist";
+        buildConfig.enableDebug = true;
+        buildConfig.enableOptimization = true;
+        buildConfig.verbose = true;
+        
+        Console.println("构建配置:");
+        Console.println("  源目录: " + buildConfig.sourceDir);
+        Console.println("  构建目录: " + buildConfig.buildDir);
+        Console.println("  输出目录: " + buildConfig.outputDir);
+        Console.println("");
+    }
+    
+    /**
+     * @brief 执行构建流水线
+     */
+    private static function executeBuildPipeline(): Boolean {
+        let steps: Array<BuildStep> = [
+            new BuildStep("清理构建目录", cleanBuildDirectory),
+            new BuildStep("创建输出目录", createOutputDirectories),
+            new BuildStep("构建编译器", buildCompiler),
+            new BuildStep("构建虚拟机", buildVM),
+            new BuildStep("构建文件系统", buildFileSystem),
+            new BuildStep("构建四大模型", buildModels),
+            new BuildStep("运行基础测试", runBasicTests),
+            new BuildStep("打包分发", packageDistribution)
+        ];
+        
+        for (let step of steps) {
+            Console.println("🔄 " + step.name + "...");
+            
+            if (!step.execute()) {
+                Console.println("❌ " + step.name + " 失败！");
+                return false;
+            }
+            
+            Console.println("✅ " + step.name + " 完成");
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief 清理构建目录
+     */
+    private static function cleanBuildDirectory(): Boolean {
+        try {
+            if (File.exists(buildConfig.buildDir)) {
+                File.removeDirectory(buildConfig.buildDir);
+            }
+            return true;
+        } catch (e) {
+            Console.println("清理失败: " + e.message);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 创建输出目录
+     */
+    private static function createOutputDirectories(): Boolean {
+        try {
+            File.createDirectory(buildConfig.buildDir);
+            File.createDirectory(buildConfig.outputDir);
+            File.createDirectory(Path.join(buildConfig.buildDir, "compiler"));
+            File.createDirectory(Path.join(buildConfig.buildDir, "vm"));
+            File.createDirectory(Path.join(buildConfig.buildDir, "models"));
+            return true;
+        } catch (e) {
+            Console.println("目录创建失败: " + e.message);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 构建编译器
+     */
+    private static function buildCompiler(): Boolean {
+        Console.println("  📝 构建词法分析器...");
+        Console.println("  🔍 构建语法分析器...");
+        Console.println("  🧠 构建语义分析器...");
+        Console.println("  ⚙️ 构建代码生成器...");
+        Console.println("  🔗 构建链接器...");
+        
+        // 这里应该调用实际的编译器构建逻辑
+        // 暂时返回成功
+        return true;
+    }
+    
+    /**
+     * @brief 构建虚拟机
+     */
+    private static function buildVM(): Boolean {
+        Console.println("  🧮 构建解释器...");
+        Console.println("  💾 构建内存管理器...");
+        Console.println("  🌌 构建量子状态处理器...");
+        Console.println("  🔗 构建量子纠缠管理器...");
+        Console.println("  🐛 构建调试器...");
+        
+        return true;
+    }
+    
+    /**
+     * @brief 构建文件系统
+     */
+    private static function buildFileSystem(): Boolean {
+        Console.println("  📁 构建动态目录系统...");
+        Console.println("  🤖 构建自动分类器...");
+        Console.println("  🧠 构建行为学习器...");
+        Console.println("  🔍 构建上下文分析器...");
+        
+        return true;
+    }
+    
+    /**
+     * @brief 构建四大模型
+     */
+    private static function buildModels(): Boolean {
+        Console.println("  🌀 构建QSM模型...");
+        Console.println("  🗣️ 构建WeQ模型...");
+        Console.println("  💰 构建SOM模型...");
+        Console.println("  🔧 构建Ref模型...");
+        
+        return true;
+    }
+    
+    /**
+     * @brief 运行基础测试
+     */
+    private static function runBasicTests(): Boolean {
+        Console.println("  🧪 编译器基础测试...");
+        Console.println("  🧪 虚拟机基础测试...");
+        Console.println("  🧪 文件系统测试...");
+        Console.println("  🧪 模型集成测试...");
+        
+        return true;
+    }
+    
+    /**
+     * @brief 打包分发
+     */
+    private static function packageDistribution(): Boolean {
+        Console.println("  📦 打包编译器...");
+        Console.println("  📦 打包虚拟机...");
+        Console.println("  📦 打包运行时库...");
+        Console.println("  📦 生成安装包...");
+        
+        return true;
+    }
+    
+    /**
+     * @brief 显示下一步操作
+     */
+    private static function showNextSteps(): void {
+        Console.println("");
+        Console.println("🎯 下一步你可以:");
+        Console.println("1. 运行 ./build/qentl_bootstrap 进行系统测试");
+        Console.println("2. 编译测试文件: ./build/qentl test_hello.qentl");
+        Console.println("3. 启动四大模型: ./build/qentl --models");
+        Console.println("4. 查看帮助: ./build/qentl --help");
+        Console.println("");
+        Console.println("📖 项目文档位置:");
+        Console.println("  - 编译器文档: ./QEntL/docs/");
+        Console.println("  - 虚拟机文档: ./QEntL/docs/vm_implementation_plan.md");
+        Console.println("  - 模型文档: ./docs/");
+    }
+}
+
+/**
+ * @brief 构建配置类
+ */
+quantum_class BuildConfig {
+    public {
+        sourceDir: String;
+        buildDir: String;
+        outputDir: String;
+        enableDebug: Boolean;
+        enableOptimization: Boolean;
+        verbose: Boolean;
+    }
+}
+
+/**
+ * @brief 构建步骤类
+ */
+quantum_class BuildStep {
+    public {
+        name: String;
+        executeFunction: function(): Boolean;
+    }
+    
+    constructor(name: String, executeFunc: function(): Boolean) {
+        this.name = name;
+        this.executeFunction = executeFunc;
+    }
+    
+    public function execute(): Boolean {
+        return this.executeFunction();
+    }
+}

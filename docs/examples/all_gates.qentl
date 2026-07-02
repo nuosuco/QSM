@@ -1,0 +1,32 @@
+# QEntL test with variable assignments and all gate types
+# Tests: init, H, X, Z, CNOT, MEASURE, PRINT, STOP, let
+
+init 3                          # Initialize 3 qubits
+
+# Single-qubit gates
+H 0                             # Put qubit 0 in superposition
+X 1                             # Flip qubit 1
+Z 2                             # Phase flip qubit 2
+
+# Two-qubit gate
+CNOT 0 1                        # Entangle qubits 0 and 1
+
+# Variable assignments (commented out - LET opcode not yet implemented in compiler)
+# let n = 3
+# let half = 1
+
+# More gates using different qubits
+H 0
+X 2
+
+# Measurements
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+
+# Print states
+PRINT 0
+PRINT 1
+PRINT 2
+
+STOP

@@ -1,0 +1,541 @@
+/**
+ * @file file_watcher.qentl
+ * @brief QEntL源文件监视器，用于自动检测文件变更并触发编译
+ * 
+ * 量子基因编码: QGC-FILEWATCHER-2024062901
+ * 量子纠缠信道: QEC-COMPILER-UTILS-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/process.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/fs.qentl";
+import "QEntL/core/event.qentl";
+import "QEntL/core/timer.qentl";
+
+/**
+ * @enum FileEventType
+ * @brief 文件事件类型
+ */
+quantum_enum FileEventType {
+    CREATED,    // 文件创建
+    MODIFIED,   // 文件修改
+    DELETED,    // 文件删除
+    RENAMED     // 文件重命名
+}
+
+/**
+ * @class FileEvent
+ * @brief 文件事件
+ */
+quantum_class FileEvent {
+    public {
+        type: FileEventType;   // 事件类型
+        path: String;          // 文件路径
+        oldPath: String;       // 旧文件路径（仅重命名时有效）
+        timestamp: Number;     // 事件时间戳
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(type: FileEventType, path: String, oldPath: String = "") {
+        this.type = type;
+        this.path = path;
+        this.oldPath = oldPath;
+        this.timestamp = Date.now();
+    }
+}
+
+/**
+ * @class FileWatcher
+ * @brief 文件监视器
+ */
+quantum_class FileWatcher {
+    private {
+        watchPaths: Array<String>;                // 监视路径列表
+        filePatterns: Array<String>;              // 文件匹配模式
+        excludePatterns: Array<String>;           // 排除匹配模式
+        eventHandlers: Map<FileEventType, Array<Function>>;   // 事件处理函数
+        watchHandles: Array<any>;                 // 监视句柄列表
+        fileHashes: Map<String, String>;          // 文件哈希值缓存
+        debounceTimer: Timer;                     // 防抖定时器
+        debounceDelay: Number;                    // 防抖延迟(毫秒)
+        pendingEvents: Array<FileEvent>;          // 待处理事件
+        isRunning: Boolean;                       // 是否正在运行
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.watchPaths = new Array<String>();
+        this.filePatterns = new Array<String>();
+        this.filePatterns.push("*.qentl"); // 默认监视QEntL文件
+        this.filePatterns.push("*.qent");
+        this.filePatterns.push("*.qjs");
+        
+        this.excludePatterns = new Array<String>();
+        this.excludePatterns.push("node_modules/**"); // 默认排除node_modules目录
+        this.excludePatterns.push("build/**");      // 默认排除build目录
+        this.excludePatterns.push(".git/**");       // 默认排除.git目录
+        
+        this.eventHandlers = new Map<FileEventType, Array<Function>>();
+        this.watchHandles = new Array<any>();
+        this.fileHashes = new Map<String, String>();
+        
+        this.debounceDelay = 300;
+        this.debounceTimer = new Timer(this.processPendingEvents.bind(this), this.debounceDelay);
+        this.pendingEvents = new Array<FileEvent>();
+        this.isRunning = false;
+        
+        // 初始化事件处理器映射
+        this.eventHandlers.set(FileEventType.CREATED, new Array<Function>());
+        this.eventHandlers.set(FileEventType.MODIFIED, new Array<Function>());
+        this.eventHandlers.set(FileEventType.DELETED, new Array<Function>());
+        this.eventHandlers.set(FileEventType.RENAMED, new Array<Function>());
+    }
+    
+    /**
+     * @brief 添加监视路径
+     */
+    public function addWatchPath(path: String): void {
+        if (!this.watchPaths.includes(path)) {
+            this.watchPaths.push(path);
+            
+            // 如果已经启动，则立即开始监视新路径
+            if (this.isRunning) {
+                this.startWatchingPath(path);
+            }
+        }
+    }
+    
+    /**
+     * @brief 添加文件匹配模式
+     */
+    public function addFilePattern(pattern: String): void {
+        if (!this.filePatterns.includes(pattern)) {
+            this.filePatterns.push(pattern);
+        }
+    }
+    
+    /**
+     * @brief 添加排除匹配模式
+     */
+    public function addExcludePattern(pattern: String): void {
+        if (!this.excludePatterns.includes(pattern)) {
+            this.excludePatterns.push(pattern);
+        }
+    }
+    
+    /**
+     * @brief 清除所有监视路径
+     */
+    public function clearWatchPaths(): void {
+        this.stopWatching();
+        this.watchPaths = new Array<String>();
+    }
+    
+    /**
+     * @brief 清除所有文件匹配模式
+     */
+    public function clearFilePatterns(): void {
+        this.filePatterns = new Array<String>();
+    }
+    
+    /**
+     * @brief 清除所有排除匹配模式
+     */
+    public function clearExcludePatterns(): void {
+        this.excludePatterns = new Array<String>();
+    }
+    
+    /**
+     * @brief 设置防抖延迟
+     */
+    public function setDebounceDelay(delay: Number): void {
+        this.debounceDelay = delay;
+        this.debounceTimer.setDelay(delay);
+    }
+    
+    /**
+     * @brief 开始监视
+     */
+    public function startWatching(): void {
+        if (this.isRunning) {
+            return; // 已经在运行
+        }
+        
+        this.isRunning = true;
+        
+        // 初始化文件哈希值缓存
+        this.indexInitialFiles();
+        
+        // 开始监视所有路径
+        for (const path of this.watchPaths) {
+            this.startWatchingPath(path);
+        }
+    }
+    
+    /**
+     * @brief 停止监视
+     */
+    public function stopWatching(): void {
+        if (!this.isRunning) {
+            return; // 已经停止
+        }
+        
+        this.isRunning = false;
+        
+        // 清除防抖定时器
+        this.debounceTimer.stop();
+        
+        // 关闭所有监视句柄
+        for (const handle of this.watchHandles) {
+            handle.close();
+        }
+        
+        this.watchHandles = new Array<any>();
+    }
+    
+    /**
+     * @brief 添加事件处理函数
+     */
+    public function on(eventType: FileEventType, handler: Function): void {
+        if (this.eventHandlers.has(eventType)) {
+            const handlers = this.eventHandlers.get(eventType);
+            handlers.push(handler);
+        }
+    }
+    
+    /**
+     * @brief 移除事件处理函数
+     */
+    public function off(eventType: FileEventType, handler: Function): void {
+        if (this.eventHandlers.has(eventType)) {
+            const handlers = this.eventHandlers.get(eventType);
+            const index = handlers.indexOf(handler);
+            if (index !== -1) {
+                handlers.splice(index, 1);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取监视的文件列表
+     */
+    public function getWatchedFiles(): Array<String> {
+        const result = new Array<String>();
+        
+        for (const path of this.fileHashes.keys()) {
+            result.push(path);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取文件的最后修改时间
+     */
+    public function getFileModTime(filePath: String): Number {
+        try {
+            const stats = FS.statSync(filePath);
+            return stats.mtime.getTime();
+        } catch (e) {
+            return 0;
+        }
+    }
+    
+    /**
+     * @brief 检查文件是否匹配
+     */
+    private function isFileMatched(filePath: String): Boolean {
+        const fileName = Path.basename(filePath);
+        
+        // 检查是否应该排除
+        for (const pattern of this.excludePatterns) {
+            if (this.matchPattern(filePath, pattern)) {
+                return false;
+            }
+        }
+        
+        // 检查是否匹配
+        for (const pattern of this.filePatterns) {
+            if (this.matchPattern(fileName, pattern)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * @brief 启动对特定路径的监视
+     */
+    private function startWatchingPath(dirPath: String): void {
+        try {
+            const watcher = FS.watch(
+                dirPath,
+                { recursive: true },
+                this.handleFileChange.bind(this)
+            );
+            
+            this.watchHandles.push(watcher);
+        } catch (e) {
+            Console.writeLine(`错误: 无法监视路径 '${dirPath}': ${e}`);
+        }
+    }
+    
+    /**
+     * @brief 索引初始文件列表
+     */
+    private function indexInitialFiles(): void {
+        this.fileHashes.clear();
+        
+        for (const dirPath of this.watchPaths) {
+            this.indexDirectory(dirPath);
+        }
+    }
+    
+    /**
+     * @brief 递归索引目录
+     */
+    private function indexDirectory(dirPath: String): void {
+        try {
+            const entries = FS.readdirSync(dirPath);
+            
+            for (const entry of entries) {
+                const fullPath = Path.join(dirPath, entry);
+                
+                // 检查是否排除
+                let shouldExclude = false;
+                for (const pattern of this.excludePatterns) {
+                    if (this.matchPattern(fullPath, pattern)) {
+                        shouldExclude = true;
+                        break;
+                    }
+                }
+                
+                if (shouldExclude) {
+                    continue;
+                }
+                
+                try {
+                    const stats = FS.statSync(fullPath);
+                    
+                    if (stats.isDirectory()) {
+                        // 递归索引子目录
+                        this.indexDirectory(fullPath);
+                    } else if (stats.isFile() && this.isFileMatched(fullPath)) {
+                        // 计算并缓存文件哈希值
+                        const hash = this.computeFileHash(fullPath);
+                        if (hash) {
+                            this.fileHashes.set(fullPath, hash);
+                        }
+                    }
+                } catch (statErr) {
+                    // 忽略无法访问的文件
+                }
+            }
+        } catch (e) {
+            Console.writeLine(`错误: 无法索引目录 '${dirPath}': ${e}`);
+        }
+    }
+    
+    /**
+     * @brief 计算文件哈希值
+     */
+    private function computeFileHash(filePath: String): String {
+        try {
+            const content = FS.readFileSync(filePath, "utf8");
+            // 简单哈希，实际实现可能需要更复杂的哈希算法
+            return content.length.toString() + "-" + this.getFileModTime(filePath);
+        } catch (e) {
+            return "";
+        }
+    }
+    
+    /**
+     * @brief 处理文件变更事件
+     */
+    private function handleFileChange(eventType: String, filename: String): void {
+        if (!filename) return;
+        
+        // 处理不同监视路径的情况
+        let fullPath = "";
+        for (const watchPath of this.watchPaths) {
+            const testPath = Path.join(watchPath, filename);
+            if (FS.existsSync(testPath)) {
+                fullPath = testPath;
+                break;
+            }
+        }
+        
+        // 如果找不到文件，可能是已删除
+        if (!fullPath && eventType === "rename") {
+            // 检查是否是删除事件
+            for (const path of this.fileHashes.keys()) {
+                if (path.endsWith(filename)) {
+                    fullPath = path;
+                    break;
+                }
+            }
+        }
+        
+        if (!fullPath) return;
+        
+        // 检查是否应该处理此文件
+        if (!this.isFileMatched(fullPath)) return;
+        
+        let fileEvent = null;
+        
+        if (eventType === "change") {
+            // 文件修改
+            const newHash = this.computeFileHash(fullPath);
+            const oldHash = this.fileHashes.get(fullPath);
+            
+            if (newHash && oldHash !== newHash) {
+                this.fileHashes.set(fullPath, newHash);
+                fileEvent = new FileEvent(FileEventType.MODIFIED, fullPath);
+            }
+        } else if (eventType === "rename") {
+            // 可能是创建、删除或重命名
+            if (FS.existsSync(fullPath)) {
+                // 文件存在，可能是创建或重命名
+                const newHash = this.computeFileHash(fullPath);
+                
+                if (this.fileHashes.has(fullPath)) {
+                    // 已存在记录，更新哈希
+                    this.fileHashes.set(fullPath, newHash);
+                    fileEvent = new FileEvent(FileEventType.MODIFIED, fullPath);
+                } else {
+                    // 新文件
+                    this.fileHashes.set(fullPath, newHash);
+                    fileEvent = new FileEvent(FileEventType.CREATED, fullPath);
+                }
+            } else {
+                // 文件不存在，是删除
+                if (this.fileHashes.has(fullPath)) {
+                    this.fileHashes.delete(fullPath);
+                    fileEvent = new FileEvent(FileEventType.DELETED, fullPath);
+                }
+            }
+        }
+        
+        if (fileEvent) {
+            // 将事件加入待处理队列
+            this.pendingEvents.push(fileEvent);
+            
+            // 重置防抖定时器
+            this.debounceTimer.restart();
+        }
+    }
+    
+    /**
+     * @brief 处理待处理的事件
+     */
+    private function processPendingEvents(): void {
+        if (this.pendingEvents.length === 0) return;
+        
+        // 合并和去重事件
+        const events = this.consolidateEvents(this.pendingEvents);
+        this.pendingEvents = new Array<FileEvent>();
+        
+        // 触发事件
+        for (const event of events) {
+            this.triggerEvent(event);
+        }
+    }
+    
+    /**
+     * @brief 合并和去重事件
+     */
+    private function consolidateEvents(events: Array<FileEvent>): Array<FileEvent> {
+        const result = new Array<FileEvent>();
+        const processedFiles = new Map<String, FileEvent>();
+        
+        // 对事件按照时间戳排序
+        events.sort((a, b) => a.timestamp - b.timestamp);
+        
+        for (const event of events) {
+            const filePath = event.path;
+            
+            // 特殊处理删除事件
+            if (event.type === FileEventType.DELETED) {
+                if (processedFiles.has(filePath)) {
+                    const prevEvent = processedFiles.get(filePath);
+                    
+                    // 如果之前是创建事件，两者相互抵消
+                    if (prevEvent.type === FileEventType.CREATED) {
+                        processedFiles.delete(filePath);
+                    } else {
+                        // 否则替换为删除事件
+                        processedFiles.set(filePath, event);
+                    }
+                } else {
+                    processedFiles.set(filePath, event);
+                }
+                continue;
+            }
+            
+            // 处理其他事件
+            if (processedFiles.has(filePath)) {
+                const prevEvent = processedFiles.get(filePath);
+                
+                // 对于同一文件的多次修改，保留最后一次
+                if (prevEvent.type === FileEventType.MODIFIED && event.type === FileEventType.MODIFIED) {
+                    processedFiles.set(filePath, event);
+                }
+                // 其他情况保持不变
+            } else {
+                processedFiles.set(filePath, event);
+            }
+        }
+        
+        // 将Map转换为数组
+        for (const event of processedFiles.values()) {
+            result.push(event);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 触发事件
+     */
+    private function triggerEvent(event: FileEvent): void {
+        if (this.eventHandlers.has(event.type)) {
+            const handlers = this.eventHandlers.get(event.type);
+            
+            for (const handler of handlers) {
+                try {
+                    handler(event);
+                } catch (e) {
+                    Console.writeLine(`错误: 事件处理函数执行失败: ${e}`);
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 简单的模式匹配实现
+     */
+    private function matchPattern(str: String, pattern: String): Boolean {
+        // 转换为正则表达式
+        let regexPattern = pattern
+            .replace(/\./g, "\\.")   // 转义点号
+            .replace(/\*\*/g, ".*")  // ** 匹配任意路径
+            .replace(/\*/g, "[^/]*") // * 匹配除/外的任意字符
+            .replace(/\?/g, ".");    // ? 匹配单个字符
+        
+        // 创建正则表达式对象
+        const regex = new RegExp("^" + regexPattern + "$");
+        
+        return regex.test(str);
+    }
+}
+
+export { FileWatcher, FileEvent, FileEventType }; 

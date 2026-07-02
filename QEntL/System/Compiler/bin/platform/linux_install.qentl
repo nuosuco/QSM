@@ -1,0 +1,693 @@
+/**
+ * @file linux_install.qentl
+ * @brief QEntL编译器Linux平台特定安装支持
+ * 
+ * 量子基因编码: QGC-LINUX-INSTALL-2024062901
+ * 量子纠缠信道: QEC-PLATFORM-INSTALL-03
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/process.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/fs.qentl";
+import "QEntL/core/os.qentl";
+
+/**
+ * @enum LinuxDistribution
+ * @brief Linux发行版类型
+ */
+quantum_enum LinuxDistribution {
+    UNKNOWN,
+    DEBIAN,     // Debian, Ubuntu, etc.
+    REDHAT,     // RHEL, Fedora, CentOS
+    SUSE,       // openSUSE, SLES
+    ARCH,       // Arch Linux
+    GENTOO      // Gentoo Linux
+}
+
+/**
+ * @class LinuxInstaller
+ * @brief Linux平台特定安装操作
+ */
+quantum_class LinuxInstaller {
+    private {
+        installPath: String;      // 安装路径
+        binPath: String;          // 二进制文件路径
+        verbose: Boolean;         // 详细输出
+        distribution: LinuxDistribution; // Linux发行版类型
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(installPath: String, verbose: Boolean = false) {
+        this.installPath = installPath;
+        this.binPath = Path.join(installPath, "bin");
+        this.verbose = verbose;
+        this.distribution = this.detectDistribution();
+    }
+    
+    /**
+     * @brief 检测Linux发行版
+     */
+    private function detectDistribution(): LinuxDistribution {
+        try {
+            this.log("检测Linux发行版...");
+            
+            // 读取/etc/os-release文件
+            if (FS.existsSync("/etc/os-release")) {
+                const content = FS.readFileSync("/etc/os-release", "utf8");
+                
+                if (content.indexOf("ID=debian") !== -1 || 
+                    content.indexOf("ID=ubuntu") !== -1 ||
+                    content.indexOf("ID_LIKE=debian") !== -1) {
+                    this.log("检测到Debian系发行版");
+                    return LinuxDistribution.DEBIAN;
+                }
+                
+                if (content.indexOf("ID=fedora") !== -1 || 
+                    content.indexOf("ID=rhel") !== -1 || 
+                    content.indexOf("ID=centos") !== -1 ||
+                    content.indexOf("ID_LIKE=fedora") !== -1 ||
+                    content.indexOf("ID_LIKE=rhel") !== -1) {
+                    this.log("检测到Red Hat系发行版");
+                    return LinuxDistribution.REDHAT;
+                }
+                
+                if (content.indexOf("ID=opensuse") !== -1 || 
+                    content.indexOf("ID=sles") !== -1 ||
+                    content.indexOf("ID_LIKE=suse") !== -1) {
+                    this.log("检测到SUSE系发行版");
+                    return LinuxDistribution.SUSE;
+                }
+                
+                if (content.indexOf("ID=arch") !== -1 || 
+                    content.indexOf("ID=manjaro") !== -1 ||
+                    content.indexOf("ID_LIKE=arch") !== -1) {
+                    this.log("检测到Arch系发行版");
+                    return LinuxDistribution.ARCH;
+                }
+                
+                if (content.indexOf("ID=gentoo") !== -1) {
+                    this.log("检测到Gentoo系发行版");
+                    return LinuxDistribution.GENTOO;
+                }
+            }
+            
+            // 检查其他标识文件
+            if (FS.existsSync("/etc/debian_version")) {
+                this.log("检测到Debian系发行版");
+                return LinuxDistribution.DEBIAN;
+            }
+            
+            if (FS.existsSync("/etc/redhat-release")) {
+                this.log("检测到Red Hat系发行版");
+                return LinuxDistribution.REDHAT;
+            }
+            
+            if (FS.existsSync("/etc/SuSE-release")) {
+                this.log("检测到SUSE系发行版");
+                return LinuxDistribution.SUSE;
+            }
+            
+            if (FS.existsSync("/etc/arch-release")) {
+                this.log("检测到Arch系发行版");
+                return LinuxDistribution.ARCH;
+            }
+            
+            if (FS.existsSync("/etc/gentoo-release")) {
+                this.log("检测到Gentoo系发行版");
+                return LinuxDistribution.GENTOO;
+            }
+            
+            this.log("无法确定Linux发行版类型，使用通用方法");
+            return LinuxDistribution.UNKNOWN;
+        } catch (e) {
+            this.log(`检测Linux发行版失败: ${e}`, true);
+            return LinuxDistribution.UNKNOWN;
+        }
+    }
+    
+    /**
+     * @brief 执行Linux特定安装步骤
+     */
+    public function install(): Boolean {
+        this.log("执行Linux特定安装步骤...");
+        
+        // 创建符号链接
+        if (!this.createSymlinks()) {
+            this.log("创建符号链接失败", true);
+            return false;
+        }
+        
+        // 更新系统配置
+        if (!this.updateSystemConfig()) {
+            this.log("更新系统配置失败", true);
+            // 这不是严重错误，可以继续安装
+        }
+        
+        // 创建桌面集成
+        if (!this.createDesktopIntegration()) {
+            this.log("创建桌面集成失败", true);
+            // 这不是严重错误，可以继续安装
+        }
+        
+        // 创建手册页
+        if (!this.createManPages()) {
+            this.log("创建手册页失败", true);
+            // 这不是严重错误，可以继续安装
+        }
+        
+        this.log("Linux特定安装步骤完成");
+        return true;
+    }
+    
+    /**
+     * @brief 创建符号链接
+     */
+    private function createSymlinks(): Boolean {
+        try {
+            this.log("创建符号链接...");
+            
+            // Linux常用的可执行文件位置
+            const linkTarget = "/usr/local/bin";
+            
+            // 确保目标目录存在
+            if (!FS.existsSync(linkTarget)) {
+                FS.mkdirSync(linkTarget);
+            }
+            
+            // 创建qentl命令的符号链接
+            const binFile = Path.join(this.binPath, "qentl");
+            const linkFile = Path.join(linkTarget, "qentl");
+            
+            // 删除已存在的链接
+            if (FS.existsSync(linkFile)) {
+                FS.unlinkSync(linkFile);
+            }
+            
+            // 创建新链接
+            FS.symlinkSync(binFile, linkFile);
+            
+            // 设置正确的权限
+            Process.execute("chmod", ["+x", binFile]);
+            
+            this.log(`已创建符号链接: ${linkFile} -> ${binFile}`);
+            return true;
+        } catch (e) {
+            this.log(`创建符号链接失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 更新系统配置
+     */
+    private function updateSystemConfig(): Boolean {
+        try {
+            this.log("更新系统配置...");
+            
+            // 添加环境变量配置
+            this.updateEnvironmentVariables();
+            
+            // 更新ldconfig配置
+            this.updateLdConfig();
+            
+            return true;
+        } catch (e) {
+            this.log(`更新系统配置失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 更新环境变量
+     */
+    private function updateEnvironmentVariables(): Boolean {
+        try {
+            // 创建/etc/profile.d目录下的脚本，全局有效
+            const profileDir = "/etc/profile.d";
+            const profileFile = Path.join(profileDir, "qentl.sh");
+            
+            // 检查是否有权限写入
+            if (FS.existsSync(profileDir) && this.hasWritePermission(profileDir)) {
+                const content = `# QEntL编译器环境变量
+export QENTL_HOME="${this.installPath}"
+export PATH="$QENTL_HOME/bin:$PATH"
+`;
+                FS.writeFileSync(profileFile, content);
+                Process.execute("chmod", ["644", profileFile]);
+                this.log(`已创建环境变量配置: ${profileFile}`);
+            } else {
+                // 没有权限，添加到用户配置文件
+                const homeDir = Process.getEnvironmentVariable("HOME");
+                
+                // 检查常见的shell配置文件
+                const bashrcPath = Path.join(homeDir, ".bashrc");
+                const profilePath = Path.join(homeDir, ".profile");
+                const zshrcPath = Path.join(homeDir, ".zshrc");
+                
+                const content = `
+# QEntL编译器环境变量
+export QENTL_HOME="${this.installPath}"
+export PATH="$QENTL_HOME/bin:$PATH"
+`;
+                
+                if (FS.existsSync(bashrcPath)) {
+                    let bashrcContent = FS.readFileSync(bashrcPath, "utf8");
+                    if (bashrcContent.indexOf("QENTL_HOME") === -1) {
+                        FS.appendFileSync(bashrcPath, content);
+                        this.log(`已更新用户配置: ${bashrcPath}`);
+                    }
+                }
+                
+                if (FS.existsSync(profilePath)) {
+                    let profileContent = FS.readFileSync(profilePath, "utf8");
+                    if (profileContent.indexOf("QENTL_HOME") === -1) {
+                        FS.appendFileSync(profilePath, content);
+                        this.log(`已更新用户配置: ${profilePath}`);
+                    }
+                }
+                
+                if (FS.existsSync(zshrcPath)) {
+                    let zshrcContent = FS.readFileSync(zshrcPath, "utf8");
+                    if (zshrcContent.indexOf("QENTL_HOME") === -1) {
+                        FS.appendFileSync(zshrcPath, content);
+                        this.log(`已更新用户配置: ${zshrcPath}`);
+                    }
+                }
+            }
+            
+            return true;
+        } catch (e) {
+            this.log(`更新环境变量失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 更新ldconfig配置
+     */
+    private function updateLdConfig(): Boolean {
+        try {
+            const libPath = Path.join(this.installPath, "lib");
+            const ldConfigDir = "/etc/ld.so.conf.d";
+            const ldConfigFile = Path.join(ldConfigDir, "qentl.conf");
+            
+            // 检查是否有权限写入
+            if (FS.existsSync(ldConfigDir) && this.hasWritePermission(ldConfigDir)) {
+                const content = `# QEntL编译器库文件目录
+${libPath}
+`;
+                FS.writeFileSync(ldConfigFile, content);
+                Process.execute("chmod", ["644", ldConfigFile]);
+                this.log(`已创建动态链接库配置: ${ldConfigFile}`);
+                
+                // 运行ldconfig更新缓存
+                Process.execute("ldconfig");
+            } else {
+                this.log("无法写入ldconfig配置，需要手动添加库目录到LD_LIBRARY_PATH");
+            }
+            
+            return true;
+        } catch (e) {
+            this.log(`更新ldconfig配置失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 创建桌面集成
+     */
+    private function createDesktopIntegration(): Boolean {
+        try {
+            this.log("创建桌面集成...");
+            
+            // 桌面条目目录
+            const applicationsDir = "/usr/share/applications";
+            const desktopFile = Path.join(applicationsDir, "qentl.desktop");
+            
+            // 检查是否有权限写入
+            if (FS.existsSync(applicationsDir) && this.hasWritePermission(applicationsDir)) {
+                const content = `[Desktop Entry]
+Name=QEntL Compiler
+Comment=QEntL量子语言编译器
+Exec=${Path.join(this.binPath, "qentl")}
+Icon=${Path.join(this.installPath, "share", "icons", "qentl.png")}
+Terminal=true
+Type=Application
+Categories=Development;IDE;
+Keywords=qentl;compiler;programming;
+`;
+                FS.writeFileSync(desktopFile, content);
+                Process.execute("chmod", ["644", desktopFile]);
+                this.log(`已创建桌面条目: ${desktopFile}`);
+                
+                // 更新桌面数据库
+                Process.execute("update-desktop-database", [applicationsDir]);
+            } else {
+                this.log("无法写入桌面条目，跳过桌面集成");
+            }
+            
+            return true;
+        } catch (e) {
+            this.log(`创建桌面集成失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 创建手册页
+     */
+    private function createManPages(): Boolean {
+        try {
+            this.log("创建手册页...");
+            
+            // 手册页目录
+            const manDir = "/usr/share/man/man1";
+            const manFile = Path.join(manDir, "qentl.1");
+            
+            // 检查是否有权限写入
+            if (FS.existsSync(manDir) && this.hasWritePermission(manDir)) {
+                const manContent = `.TH QENTL 1 "${new Date().toISOString().split('T')[0]}" "QEntL 1.0" "QEntL Manual"
+.SH NAME
+qentl \- QEntL量子语言编译器
+.SH SYNOPSIS
+.B qentl
+[options] [file...]
+.SH DESCRIPTION
+QEntL是一种基于量子计算原理的编程语言，用于开发在量子环境中运行的应用程序。
+.SH OPTIONS
+.TP
+.B \-h, \-\-help
+显示帮助信息并退出
+.TP
+.B \-v, \-\-version
+显示版本信息并退出
+.TP
+.B \-c, \-\-compile
+编译源文件
+.TP
+.B \-o, \-\-output <file>
+指定输出文件
+.TP
+.B \-O, \-\-optimize <level>
+指定优化级别（0-3）
+.TP
+.B \-d, \-\-debug
+启用调试信息
+.SH EXAMPLES
+.TP
+编译单个文件:
+.B qentl \-c program.qentl
+.TP
+指定输出文件:
+.B qentl \-c program.qentl \-o program.qbc
+.TP
+启用最高优化级别:
+.B qentl \-c program.qentl \-O3
+.SH FILES
+.TP
+.I /usr/local/bin/qentl
+QEntL编译器可执行文件
+.TP
+.I /usr/local/include/qentl
+QEntL头文件目录
+.TP
+.I /usr/local/lib/qentl
+QEntL库文件目录
+.SH AUTHORS
+QEntL Project Team
+.SH REPORTING BUGS
+Report bugs to <bugs@qentl.org>
+.SH COPYRIGHT
+Copyright © 2024 QEntL Project Team. All rights reserved.
+.SH SEE ALSO
+The full documentation for
+.B qentl
+is available at https://qentl.org/docs/
+`;
+                
+                FS.writeFileSync(manFile, manContent);
+                Process.execute("chmod", ["644", manFile]);
+                this.log(`已创建手册页: ${manFile}`);
+                
+                // 更新man数据库
+                Process.execute("mandb");
+            } else {
+                this.log("无法写入手册页，跳过手册页创建");
+            }
+            
+            return true;
+        } catch (e) {
+            this.log(`创建手册页失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 创建软件包
+     */
+    public function createPackage(outputDir: String): Boolean {
+        try {
+            switch (this.distribution) {
+                case LinuxDistribution.DEBIAN:
+                    return this.createDebPackage(outputDir);
+                case LinuxDistribution.REDHAT:
+                    return this.createRpmPackage(outputDir);
+                case LinuxDistribution.ARCH:
+                    return this.createPacmanPackage(outputDir);
+                default:
+                    this.log("不支持当前发行版的软件包创建，将创建通用安装包");
+                    return this.createTarPackage(outputDir);
+            }
+        } catch (e) {
+            this.log(`创建软件包失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 创建Debian软件包
+     */
+    private function createDebPackage(outputDir: String): Boolean {
+        // 此处实现Debian软件包创建逻辑
+        // 由于实现复杂度较高，这里只提供概要
+        this.log("创建Debian软件包...");
+        this.log("注意：完整软件包创建功能需要进一步实现");
+        return true;
+    }
+    
+    /**
+     * @brief 创建RPM软件包
+     */
+    private function createRpmPackage(outputDir: String): Boolean {
+        // 此处实现RPM软件包创建逻辑
+        // 由于实现复杂度较高，这里只提供概要
+        this.log("创建RPM软件包...");
+        this.log("注意：完整软件包创建功能需要进一步实现");
+        return true;
+    }
+    
+    /**
+     * @brief 创建Pacman软件包
+     */
+    private function createPacmanPackage(outputDir: String): Boolean {
+        // 此处实现Pacman软件包创建逻辑
+        // 由于实现复杂度较高，这里只提供概要
+        this.log("创建Pacman软件包...");
+        this.log("注意：完整软件包创建功能需要进一步实现");
+        return true;
+    }
+    
+    /**
+     * @brief 创建通用tar软件包
+     */
+    private function createTarPackage(outputDir: String): Boolean {
+        // 此处实现通用tar包创建逻辑
+        this.log("创建通用tar软件包...");
+        
+        const packageFile = Path.join(outputDir, "qentl-1.0.tar.gz");
+        Process.execute("tar", ["-czf", packageFile, "-C", this.installPath, "."]);
+        
+        this.log(`已创建软件包: ${packageFile}`);
+        return true;
+    }
+    
+    /**
+     * @brief 卸载Linux特定安装项
+     */
+    public function uninstall(): Boolean {
+        this.log("卸载Linux特定安装项...");
+        
+        // 删除符号链接
+        this.removeSymlinks();
+        
+        // 清理系统配置
+        this.cleanSystemConfig();
+        
+        // 删除桌面集成
+        this.removeDesktopIntegration();
+        
+        // 删除手册页
+        this.removeManPages();
+        
+        this.log("Linux特定卸载完成");
+        return true;
+    }
+    
+    /**
+     * @brief 删除符号链接
+     */
+    private function removeSymlinks(): Boolean {
+        try {
+            this.log("删除符号链接...");
+            
+            // Linux常用的可执行文件位置
+            const linkTarget = "/usr/local/bin";
+            const linkFile = Path.join(linkTarget, "qentl");
+            
+            // 删除链接
+            if (FS.existsSync(linkFile)) {
+                FS.unlinkSync(linkFile);
+                this.log(`已删除符号链接: ${linkFile}`);
+            }
+            
+            return true;
+        } catch (e) {
+            this.log(`删除符号链接失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 清理系统配置
+     */
+    private function cleanSystemConfig(): Boolean {
+        try {
+            this.log("清理系统配置...");
+            
+            // 删除环境变量配置
+            const profileFile = "/etc/profile.d/qentl.sh";
+            if (FS.existsSync(profileFile) && this.hasWritePermission("/etc/profile.d")) {
+                FS.unlinkSync(profileFile);
+                this.log(`已删除环境变量配置: ${profileFile}`);
+            }
+            
+            // 删除ldconfig配置
+            const ldConfigFile = "/etc/ld.so.conf.d/qentl.conf";
+            if (FS.existsSync(ldConfigFile) && this.hasWritePermission("/etc/ld.so.conf.d")) {
+                FS.unlinkSync(ldConfigFile);
+                this.log(`已删除动态链接库配置: ${ldConfigFile}`);
+                
+                // 运行ldconfig更新缓存
+                Process.execute("ldconfig");
+            }
+            
+            // 清理用户配置文件中的环境变量
+            const homeDir = Process.getEnvironmentVariable("HOME");
+            this.cleanUserConfigFile(Path.join(homeDir, ".bashrc"));
+            this.cleanUserConfigFile(Path.join(homeDir, ".profile"));
+            this.cleanUserConfigFile(Path.join(homeDir, ".zshrc"));
+            
+            return true;
+        } catch (e) {
+            this.log(`清理系统配置失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 清理用户配置文件
+     */
+    private function cleanUserConfigFile(filePath: String): void {
+        if (FS.existsSync(filePath)) {
+            let content = FS.readFileSync(filePath, "utf8");
+            content = content.replace(/# QEntL编译器环境变量[^\n]*\n[^\n]*QENTL_HOME[^\n]*\n[^\n]*PATH[^\n]*\n/g, "");
+            FS.writeFileSync(filePath, content);
+            this.log(`已清理配置文件: ${filePath}`);
+        }
+    }
+    
+    /**
+     * @brief 删除桌面集成
+     */
+    private function removeDesktopIntegration(): Boolean {
+        try {
+            this.log("删除桌面集成...");
+            
+            // 删除桌面条目
+            const desktopFile = "/usr/share/applications/qentl.desktop";
+            if (FS.existsSync(desktopFile) && this.hasWritePermission("/usr/share/applications")) {
+                FS.unlinkSync(desktopFile);
+                this.log(`已删除桌面条目: ${desktopFile}`);
+                
+                // 更新桌面数据库
+                Process.execute("update-desktop-database", ["/usr/share/applications"]);
+            }
+            
+            return true;
+        } catch (e) {
+            this.log(`删除桌面集成失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 删除手册页
+     */
+    private function removeManPages(): Boolean {
+        try {
+            this.log("删除手册页...");
+            
+            // 删除手册页
+            const manFile = "/usr/share/man/man1/qentl.1";
+            if (FS.existsSync(manFile) && this.hasWritePermission("/usr/share/man/man1")) {
+                FS.unlinkSync(manFile);
+                this.log(`已删除手册页: ${manFile}`);
+                
+                // 更新man数据库
+                Process.execute("mandb");
+            }
+            
+            return true;
+        } catch (e) {
+            this.log(`删除手册页失败: ${e}`, true);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 检查目录是否可写
+     */
+    private function hasWritePermission(dirPath: String): Boolean {
+        try {
+            // 检查是否可写
+            const testFile = Path.join(dirPath, `.qentl_test_${Date.now()}`);
+            FS.writeFileSync(testFile, "test");
+            FS.unlinkSync(testFile);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 日志输出
+     */
+    private function log(message: String, isError: Boolean = false): void {
+        if (this.verbose || isError) {
+            if (isError) {
+                Console.writeLine(`错误: ${message}`);
+            } else {
+                Console.writeLine(message);
+            }
+        }
+    }
+}
+
+// 导出类供主安装脚本使用
+export { LinuxInstaller, LinuxDistribution }; 

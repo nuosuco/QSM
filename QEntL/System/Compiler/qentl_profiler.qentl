@@ -1,0 +1,808 @@
+/**
+ * @file qentl_profiler.qentl
+ * @brief QEntL编译器性能分析器 - 提供全面的性能剖析功能
+ * 
+ * 量子基因编码: QGC-COMPILER-PROFILER-2024062801
+ * 量子纠缠信道: QEC-COMPILER-PROFILER-01
+ * 版本: 1.0.0
+ * 
+ * 功能概述:
+ * 1. 编译阶段性能分析 (词法、语法、语义、代码生成)
+ * 2. 量子门操作性能统计
+ * 3. 字节码执行性能分析
+ * 4. 内存使用分析
+ * 5. 量子态演化追踪
+ * 6. 性能瓶颈检测
+ * 7. 分析报告生成
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/time.qentl";
+import "QEntL/core/math.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/compiler/src/frontend/lexer/lexer.qentl";
+import "QEntL/compiler/src/frontend/parser/parser.qentl";
+import "QEntL/compiler/src/backend/bytecode/bytecode_generator.qentl";
+import "QEntL/compiler/src/backend/ir/ir_generator.qentl";
+
+// ==================== 性能指标类型 ====================
+
+quantum_enum MetricType {
+    WALL_CLOCK_TIME,     // 挂钟时间
+    CPU_TIME,            // CPU时间
+    MEMORY_USAGE,        // 内存使用
+    GATE_COUNT,          // 门操作计数
+    QUANTUM_STATE_SIZE,  // 量子态大小
+    BYTECODE_SIZE,       // 字节码大小
+    TOKEN_COUNT,         // 词法分析token数
+    AST_NODE_COUNT,      // AST节点数
+    IR_INSTRUCTION_COUNT,// IR指令数
+    COMPILE_ERRORS,      // 编译错误数
+    WARNING_COUNT,       // 警告数
+}
+
+// ==================== 采样点 ====================
+
+/**
+ * @class SamplePoint
+ * @brief 性能采样点
+ */
+quantum_class SamplePoint {
+    private {
+        name: String;
+        timestamp: Number;
+        metrics: Map<MetricType, Number>;
+        cpuTime: Number;
+        memoryUsed: Number;
+        details: Map<String, String>;
+    }
+    
+    constructor(name: String) {
+        this.name = name;
+        this.timestamp = Time.now();
+        this.metrics = new Map<MetricType, Number>();
+        this.cpuTime = 0;
+        this.memoryUsed = 0;
+        this.details = new Map<String, String>();
+    }
+    
+    public function setMetric(type: MetricType, value: Number): void {
+        this.metrics.set(type, value);
+    }
+    
+    public function getMetric(type: MetricType): Number {
+        return this.metrics.get(type);
+    }
+    
+    public function setCpuTime(time: Number): void {
+        this.cpuTime = time;
+    }
+    
+    public function getCpuTime(): Number {
+        return this.cpuTime;
+    }
+    
+    public function setMemoryUsed(bytes: Number): void {
+        this.memoryUsed = bytes;
+    }
+    
+    public function getMemoryUsed(): Number {
+        return this.memoryUsed;
+    }
+    
+    public function setDetail(key: String, value: String): void {
+        this.details.set(key, value);
+    }
+    
+    public function getDetail(key: String): String {
+        return this.details.get(key);
+    }
+    
+    public function getName(): String {
+        return this.name;
+    }
+    
+    public function getTimestamp(): Number {
+        return this.timestamp;
+    }
+    
+    public function toString(): String {
+        let result = "SamplePoint[" + this.name + "] ts=" + this.timestamp;
+        for (let type of this.metrics.keys()) {
+            result = result + " " + type + "=" + this.metrics.get(type);
+        }
+        return result;
+    }
+}
+
+// ==================== 性能区间 ====================
+
+/**
+ * @class PerformanceInterval
+ * @brief 性能区间 - 包含起始和结束采样点
+ */
+quantum_class PerformanceInterval {
+    private {
+        name: String;
+        start: SamplePoint;
+        end: SamplePoint;
+        children: Array<PerformanceInterval>;
+    }
+    
+    constructor(name: String, start: SamplePoint) {
+        this.name = name;
+        this.start = start;
+        this.end = null;
+        this.children = new Array<PerformanceInterval>();
+    }
+    
+    public function setEnd(end: SamplePoint): void {
+        this.end = end;
+    }
+    
+    public function addChild(interval: PerformanceInterval): void {
+        this.children.push(interval);
+    }
+    
+    public function getDuration(): Number {
+        if (this.end == null) return 0;
+        return this.end.getTimestamp() - this.start.getTimestamp();
+    }
+    
+    public function getCpuDuration(): Number {
+        if (this.end == null) return 0;
+        return this.end.getCpuTime() - this.start.getCpuTime();
+    }
+    
+    public function getMemoryDelta(): Number {
+        if (this.end == null) return 0;
+        return this.end.getMemoryUsed() - this.start.getMemoryUsed();
+    }
+    
+    public function getName(): String {
+        return this.name;
+    }
+    
+    public function getChildren(): Array<PerformanceInterval> {
+        return this.children;
+    }
+    
+    public function toString(): String {
+        let duration = this.getDuration();
+        let cpuDur = this.getCpuDuration();
+        let memDelta = this.getMemoryDelta();
+        return "Interval[" + this.name + "] dur=" + duration.toFixed(3) + "ms" +
+               " cpu=" + cpuDur.toFixed(3) + "ms" +
+               " mem_delta=" + memDelta + "B" +
+               " children=" + this.children.length;
+    }
+}
+
+// ==================== 量子门性能统计 ====================
+
+/**
+ * @class GatePerformanceStats
+ * @brief 单个量子门的性能统计
+ */
+quantum_class GatePerformanceStats {
+    private {
+        gateName: String;
+        totalCount: Number;
+        totalTime: Number;
+        minTime: Number;
+        maxTime: Number;
+        totalQubits: Number;
+        totalEntanglements: Number;
+    }
+    
+    constructor(gateName: String) {
+        this.gateName = gateName;
+        this.totalCount = 0;
+        this.totalTime = 0;
+        this.minTime = Number.MAX_VALUE;
+        this.maxTime = 0;
+        this.totalQubits = 0;
+        this.totalEntanglements = 0;
+    }
+    
+    public function recordExecution(duration: Number, qubitCount: Number = 1, entanglements: Number = 0): void {
+        this.totalCount++;
+        this.totalTime += duration;
+        if (duration < this.minTime) this.minTime = duration;
+        if (duration > this.maxTime) this.maxTime = duration;
+        this.totalQubits += qubitCount;
+        this.totalEntanglements += entanglements;
+    }
+    
+    public function getAverageTime(): Number {
+        if (this.totalCount == 0) return 0;
+        return this.totalTime / this.totalCount;
+    }
+    
+    public function getTotalCount(): Number {
+        return this.totalCount;
+    }
+    
+    public function getTotalTime(): Number {
+        return this.totalTime;
+    }
+    
+    public function getMinTime(): Number {
+        return this.minTime;
+    }
+    
+    public function getMaxTime(): Number {
+        return this.maxTime;
+    }
+    
+    public function getGateName(): String {
+        return this.gateName;
+    }
+    
+    public function toString(): String {
+        return this.gateName + ": count=" + this.totalCount +
+               " avg=" + this.getAverageTime().toFixed(4) + "ms" +
+               " min=" + this.minTime.toFixed(4) + "ms" +
+               " max=" + this.maxTime.toFixed(4) + "ms" +
+               " total=" + this.totalTime.toFixed(3) + "ms";
+    }
+}
+
+// ==================== 编译阶段性能分析器 ====================
+
+/**
+ * @class CompilerProfiler
+ * @brief 编译器性能分析器
+ */
+quantum_class CompilerProfiler {
+    private {
+        enabled: Boolean;
+        rootInterval: PerformanceInterval;
+        currentInterval: PerformanceInterval;
+        samplePoints: Array<SamplePoint>;
+        gateStats: Map<String, GatePerformanceStats>;
+        totalCompileTime: Number;
+        peakMemory: Number;
+        compilationStages: Array<String>;
+        stageTimings: Map<String, Number>;
+        bottlenecks: Array<String>;
+    }
+    
+    constructor(enabled: Boolean = true) {
+        this.enabled = enabled;
+        this.rootInterval = new PerformanceInterval("Compilation", new SamplePoint("start"));
+        this.samplePoints = new Array<SamplePoint>();
+        this.gateStats = new Map<String, GatePerformanceStats>();
+        this.totalCompileTime = 0;
+        this.peakMemory = 0;
+        this.compilationStages = new Array<String>();
+        this.stageTimings = new Map<String, Number>();
+        this.bottlenecks = new Array<String>();
+    }
+    
+    /**
+     * @brief 开始分析一个编译阶段
+     */
+    public function startStage(stageName: String): void {
+        if (!this.enabled) return;
+        
+        let startSample = new SamplePoint(stageName + "_start");
+        startSample.setMetric(MetricType.WALL_CLOCK_TIME, Time.now());
+        startSample.setDetail("stage", stageName);
+        this.samplePoints.push(startSample);
+        
+        let interval = new PerformanceInterval(stageName, startSample);
+        
+        if (this.currentInterval != null) {
+            this.currentInterval.addChild(interval);
+        } else {
+            this.rootInterval.addChild(interval);
+        }
+        
+        this.currentInterval = interval;
+        this.compilationStages.push(stageName);
+        Console.debug("[PROFILER] 开始分析阶段: " + stageName);
+    }
+    
+    /**
+     * @brief 结束一个编译阶段
+     */
+    public function endStage(stageName: String): void {
+        if (!this.enabled) return;
+        
+        let endSample = new SamplePoint(stageName + "_end");
+        endSample.setMetric(MetricType.WALL_CLOCK_TIME, Time.now());
+        endSample.setDetail("stage", stageName);
+        this.samplePoints.push(endSample);
+        
+        if (this.currentInterval != null && 
+            this.currentInterval.getName() == stageName) {
+            this.currentInterval.setEnd(endSample);
+            let duration = this.currentInterval.getDuration();
+            this.stageTimings.set(stageName, duration);
+            Console.debug("[PROFILER] 完成阶段: " + stageName + " (" + duration.toFixed(3) + "ms)");
+            this.currentInterval = this.currentInterval.getParent();
+        }
+    }
+    
+    /**
+     * @brief 记录量子门执行性能
+     */
+    public function recordGatePerformance(
+        gateName: String,
+        duration: Number,
+        qubitCount: Number = 1,
+        entanglements: Number = 0
+    ): void {
+        if (!this.enabled) return;
+        
+        if (!this.gateStats.has(gateName)) {
+            this.gateStats.set(gateName, new GatePerformanceStats(gateName));
+        }
+        let stats = this.gateStats.get(gateName)!;
+        stats.recordExecution(duration, qubitCount, entanglements);
+    }
+    
+    /**
+     * @brief 记录内存使用情况
+     */
+    public function recordMemoryUsage(bytes: Number): void {
+        if (!this.enabled) return;
+        if (bytes > this.peakMemory) {
+            this.peakMemory = bytes;
+        }
+    }
+    
+    /**
+     * @brief 标记性能瓶颈
+     */
+    public function markBottleneck(description: String, severity: Number): void {
+        if (!this.enabled) return;
+        this.bottlenecks.push(description + " [severity=" + severity + "]");
+    }
+    
+    /**
+     * @brief 生成性能分析报告
+     */
+    public function generateReport(): String {
+        if (!this.enabled) return "";
+        
+        let report = "";
+        report = report + "========================================\n";
+        report = report + "   QEntL 编译器性能分析报告\n";
+        report = report + "========================================\n\n";
+        
+        // 总体统计
+        let totalTime = 0;
+        for (let t of this.stageTimings.values()) {
+            totalTime += t;
+        }
+        
+        report = report + "【总体统计】\n";
+        report = report + "  总编译时间: " + totalTime.toFixed(3) + " ms\n";
+        report = report + "  峰值内存: " + this.peakMemory + " bytes\n";
+        report = report + "  分析阶段数: " + this.compilationStages.length + "\n";
+        report = report + "  采样点数: " + this.samplePoints.length + "\n";
+        report = report + "\n";
+        
+        // 各阶段耗时
+        report = report + "【编译阶段耗时】\n";
+        report = report + "  " + "Stage".padEnd(30) + "Time (ms)".padRight(15) + "Percent\n";
+        report = report + "  " + "-".repeat(60) + "\n";
+        
+        for (let stage of this.compilationStages) {
+            let time = this.stageTimings.get(stage);
+            if (time != null && totalTime > 0) {
+                let pct = (time / totalTime * 100).toFixed(1);
+                report = report + "  " + stage.padEnd(30) + time.toFixed(3).padRight(15) + pct + "%\n";
+            }
+        }
+        report = report + "\n";
+        
+        // 量子门性能
+        report = report + "【量子门性能统计】\n";
+        if (this.gateStats.size() > 0) {
+            report = report + "  " + "Gate".padEnd(15) + "Count".padRight(8) + 
+                     "Avg(ms)".padRight(12) + "Total(ms)".padRight(12) + "Min(ms)".padRight(10) + "Max(ms)\n";
+            report = report + "  " + "-".repeat(70) + "\n";
+            
+            for (let name of this.gateStats.keys()) {
+                let stats = this.gateStats.get(name)!;
+                report = report + "  " + stats.toString() + "\n";
+            }
+        } else {
+            report = report + "  (无量子门性能数据)\n";
+        }
+        report = report + "\n";
+        
+        // 性能瓶颈
+        if (this.bottlenecks.length > 0) {
+            report = report + "【性能瓶颈】\n";
+            for (let bn of this.bottlenecks) {
+                report = report + "  !! " + bn + "\n";
+            }
+        }
+        
+        report = report + "\n========================================\n";
+        report = report + "  报告结束\n";
+        report = report + "========================================\n";
+        
+        return report;
+    }
+    
+    /**
+     * @brief 保存报告到文件
+     */
+    public function saveReport(filepath: String): Boolean {
+        let report = this.generateReport();
+        if (report == "") return false;
+        
+        try {
+            let file = File.open(filepath, "w");
+            file.write(report);
+            file.close();
+            Console.info("性能报告已保存到: " + filepath);
+            return true;
+        } catch (e) {
+            Console.error("保存性能报告失败: " + e.toString());
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 获取门性能统计
+     */
+    public function getGateStats(): Map<String, GatePerformanceStats> {
+        return this.gateStats;
+    }
+    
+    /**
+     * @brief 获取阶段计时
+     */
+    public function getStageTimings(): Map<String, Number> {
+        return this.stageTimings;
+    }
+    
+    /**
+     * @brief 重置分析器
+     */
+    public function reset(): void {
+        this.samplePoints = new Array<SamplePoint>();
+        this.gateStats = new Map<String, GatePerformanceStats>();
+        this.compilationStages = new Array<String>();
+        this.stageTimings = new Map<String, Number>();
+        this.bottlenecks = new Array<String>();
+        this.peakMemory = 0;
+    }
+}
+
+// ==================== 量子虚拟机性能分析器 ====================
+
+/**
+ * @class QuantumVMProfiler
+ * @brief 量子虚拟机性能分析器
+ */
+quantum_class QuantumVMProfiler {
+    private {
+        enabled: Boolean;
+        totalGatesExecuted: Number;
+        totalCycles: Number;
+        gateTypeCounts: Map<String, Number>;
+        gateTypeTimes: Map<String, Number>;
+        measurementCount: Number;
+        entanglementCount: Number;
+        resetCount: Number;
+        maxQubits: Number;
+        currentQubits: Number;
+        memoryAllocations: Number;
+        memoryFreed: Number;
+        startTimestamp: Number;
+        endTimestamp: Number;
+        gateHistory: Array<MapEntry<String, Number>>;
+    }
+    
+    constructor(enabled: Boolean = true) {
+        this.enabled = enabled;
+        this.totalGatesExecuted = 0;
+        this.totalCycles = 0;
+        this.gateTypeCounts = new Map<String, Number>();
+        this.gateTypeTimes = new Map<String, Number>();
+        this.measurementCount = 0;
+        this.entanglementCount = 0;
+        this.resetCount = 0;
+        this.maxQubits = 0;
+        this.currentQubits = 0;
+        this.memoryAllocations = 0;
+        this.memoryFreed = 0;
+        this.startTimestamp = Time.now();
+        this.gateHistory = new Array<MapEntry<String, Number>>();
+    }
+    
+    /**
+     * @brief 记录量子门执行
+     */
+    public function recordGateExecution(
+        gateType: String,
+        duration: Number,
+        qubitCount: Number = 1
+    ): void {
+        if (!this.enabled) return;
+        
+        this.totalGatesExecuted++;
+        this.totalCycles++;
+        this.currentQubits = Math.max(this.currentQubits, qubitCount);
+        
+        // 更新门类型计数
+        if (!this.gateTypeCounts.has(gateType)) {
+            this.gateTypeCounts.set(gateType, 0);
+            this.gateTypeTimes.set(gateType, 0);
+        }
+        this.gateTypeCounts.set(gateType, this.gateTypeCounts.get(gateType)! + 1);
+        this.gateTypeTimes.set(gateType, this.gateTypeTimes.get(gateType)! + duration);
+        
+        // 历史记录
+        this.gateHistory.push({ key: gateType, value: duration });
+    }
+    
+    /**
+     * @brief 记录测量操作
+     */
+    public function recordMeasurement(): void {
+        if (!this.enabled) return;
+        this.measurementCount++;
+    }
+    
+    /**
+     * @brief 记录纠缠操作
+     */
+    public function recordEntanglement(): void {
+        if (!this.enabled) return;
+        this.entanglementCount++;
+    }
+    
+    /**
+     * @brief 记录重置操作
+     */
+    public function recordReset(): void {
+        if (!this.enabled) return;
+        this.resetCount++;
+    }
+    
+    /**
+     * @brief 记录量子比特分配
+     */
+    public function recordQubitAllocation(count: Number): void {
+        if (!this.enabled) return;
+        this.currentQubits += count;
+        this.maxQubits = Math.max(this.maxQubits, this.currentQubits);
+        this.memoryAllocations += count;
+    }
+    
+    /**
+     * @brief 记录量子比特释放
+     */
+    public function recordQubitRelease(count: Number): void {
+        if (!this.enabled) return;
+        this.currentQubits -= count;
+        this.memoryFreed += count;
+    }
+    
+    /**
+     * @brief 结束分析
+     */
+    public function stop(): void {
+        this.endTimestamp = Time.now();
+    }
+    
+    /**
+     * @brief 生成虚拟机性能报告
+     */
+    public function generateReport(): String {
+        if (!this.enabled) return "";
+        
+        let report = "";
+        report = report + "========================================\n";
+        report = report + "   QVM 量子虚拟机性能报告\n";
+        report = report + "========================================\n\n";
+        
+        let execTime = this.endTimestamp - this.startTimestamp;
+        
+        report = report + "【执行统计】\n";
+        report = report + "  执行时间: " + execTime.toFixed(3) + " ms\n";
+        report = report + "  总门操作: " + this.totalGatesExecuted + "\n";
+        report = report + "  总周期: " + this.totalCycles + "\n";
+        report = report + "  平均门延迟: ";
+        if (this.totalGatesExecuted > 0) {
+            report = report + (execTime / this.totalGatesExecuted).toFixed(4) + " ms\n";
+        } else {
+            report = report + "N/A\n";
+        }
+        report = report + "  峰值量子比特: " + this.maxQubits + "\n";
+        report = report + "  当前量子比特: " + this.currentQubits + "\n";
+        report = report + "  测量次数: " + this.measurementCount + "\n";
+        report = report + "  纠缠次数: " + this.entanglementCount + "\n";
+        report = report + "  重置次数: " + this.resetCount + "\n";
+        report = report + "\n";
+        
+        report = report + "【门类型分布】\n";
+        report = report + "  " + "Gate Type".padEnd(15) + "Count".padRight(10) + 
+                 "TotalTime(ms)".padRight(15) + "AvgTime(ms)\n";
+        report = report + "  " + "-".repeat(55) + "\n";
+        
+        for (let type of this.gateTypeCounts.keys()) {
+            let count = this.gateTypeCounts.get(type)!;
+            let totalTime = this.gateTypeTimes.get(type)!;
+            let avgTime = count > 0 ? totalTime / count : 0;
+            report = report + "  " + type.padEnd(15) + count.toString().padRight(10) +
+                     totalTime.toFixed(4).padRight(15) + avgTime.toFixed(4) + "\n";
+        }
+        
+        report = report + "\n【内存统计】\n";
+        report = report + "  分配操作: " + this.memoryAllocations + "\n";
+        report = report + "  释放操作: " + this.memoryFreed + "\n";
+        
+        report = report + "\n========================================\n";
+        return report;
+    }
+    
+    /**
+     * @brief 重置分析器
+     */
+    public function reset(): void {
+        this.totalGatesExecuted = 0;
+        this.totalCycles = 0;
+        this.gateTypeCounts = new Map<String, Number>();
+        this.gateTypeTimes = new Map<String, Number>();
+        this.measurementCount = 0;
+        this.entanglementCount = 0;
+        this.resetCount = 0;
+        this.maxQubits = 0;
+        this.currentQubits = 0;
+        this.memoryAllocations = 0;
+        this.memoryFreed = 0;
+        this.startTimestamp = Time.now();
+        this.gateHistory = new Array<MapEntry<String, Number>>();
+    }
+}
+
+// ==================== 性能分析器管理器 ====================
+
+/**
+ * @class ProfilerManager
+ * @brief 统一性能分析器管理器
+ */
+quantum_class ProfilerManager {
+    private {
+        compilerProfiler: CompilerProfiler;
+        vmProfiler: QuantumVMProfiler;
+        enabled: Boolean;
+        reportFormat: String;
+        outputDir: String;
+    }
+    
+    constructor(enabled: Boolean = true, outputDir: String = "./reports") {
+        this.compilerProfiler = new CompilerProfiler(true);
+        this.vmProfiler = new QuantumVMProfiler(true);
+        this.enabled = enabled;
+        this.reportFormat = "text";
+        this.outputDir = outputDir;
+    }
+    
+    /**
+     * @brief 开始编译分析
+     */
+    public function startCompilationAnalysis(): void {
+        if (!this.enabled) return;
+        this.compilerProfiler.startStage("compilation");
+    }
+    
+    /**
+     * @brief 结束编译分析
+     */
+    public function endCompilationAnalysis(): void {
+        if (!this.enabled) return;
+        this.compilerProfiler.endStage("compilation");
+    }
+    
+    /**
+     * @brief 开始VM分析
+     */
+    public function startVMAnalysis(): void {
+        if (!this.enabled) return;
+        this.vmProfiler.reset();
+    }
+    
+    /**
+     * @brief 结束VM分析
+     */
+    public function endVMAnalysis(): void {
+        if (!this.enabled) return;
+        this.vmProfiler.stop();
+    }
+    
+    /**
+     * @brief 记录门性能
+     */
+    public function recordGatePerformance(
+        gateName: String,
+        duration: Number,
+        qubitCount: Number = 1
+    ): void {
+        if (!this.enabled) return;
+        this.compilerProfiler.recordGatePerformance(gateName, duration, qubitCount);
+        this.vmProfiler.recordGateExecution(gateName, duration, qubitCount);
+    }
+    
+    /**
+     * @brief 生成综合报告
+     */
+    public function generateComprehensiveReport(): String {
+        if (!this.enabled) return "";
+        
+        let report = "";
+        report = report + this.compilerProfiler.generateReport();
+        report = report + "\n\n";
+        report = report + this.vmProfiler.generateReport();
+        return report;
+    }
+    
+    /**
+     * @brief 保存综合报告
+     */
+    public function saveComprehensiveReport(filepath: String): Boolean {
+        let report = this.generateComprehensiveReport();
+        if (report == "") return false;
+        
+        try {
+            let file = File.open(filepath, "w");
+            file.write(report);
+            file.close();
+            Console.info("综合性能报告已保存到: " + filepath);
+            return true;
+        } catch (e) {
+            Console.error("保存报告失败: " + e.toString());
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 获取编译器分析器
+     */
+    public function getCompilerProfiler(): CompilerProfiler {
+        return this.compilerProfiler;
+    }
+    
+    /**
+     * @brief 获取VM分析器
+     */
+    public function getVMProfiler(): QuantumVMProfiler {
+        return this.vmProfiler;
+    }
+    
+    /**
+     * @brief 启用/禁用分析
+     */
+    public function setEnabled(enabled: Boolean): void {
+        this.enabled = enabled;
+        Console.info("性能分析器: " + (enabled ? "已启用" : "已禁用"));
+    }
+    
+    public function isEnabled(): Boolean {
+        return this.enabled;
+    }
+}
+
+// ==================== 模块导出 ====================
+
+export {
+    MetricType,
+    SamplePoint,
+    PerformanceInterval,
+    GatePerformanceStats,
+    CompilerProfiler,
+    QuantumVMProfiler,
+    ProfilerManager
+};

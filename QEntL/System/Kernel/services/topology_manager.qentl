@@ -1,0 +1,791 @@
+// QEntL Network Topology Manager Service
+// Version: 1.0.0
+// Author: QEntL Dev Team
+// QGeneCode: TNM-QN3-742-XR5
+
+// Type definitions for topology elements
+enum NodeType {
+    QUANTUM,
+    CLASSICAL,
+    HYBRID
+}
+
+enum LinkType {
+    QUANTUM_CHANNEL,
+    CLASSICAL_CHANNEL,
+    ENTANGLEMENT,
+    VIRTUAL
+}
+
+enum TopologyChangeType {
+    NODE_ADDED,
+    NODE_REMOVED,
+    LINK_ADDED,
+    LINK_REMOVED,
+    NODE_UPDATED,
+    LINK_UPDATED,
+    TOPOLOGY_RESET
+}
+
+// Configuration for the topology manager
+const config = {
+    // Network scanning and discovery
+    scanInterval: 60000,          // 毫秒间隔自动拓扑扫描
+    discoveryTimeout: 30000,      // 发现操作超时
+    maxNodes: 1000,               // 拓扑中最大节点数
+    maxLinks: 5000,               // 拓扑中最大链接数
+    
+    // Visualization and access
+    visualizationEnabled: true,   // 启用拓扑可视化
+    persistTopology: true,        // 在重启之间保持拓扑
+    topologyStoragePath: "./data/network_topology.qdb",
+    
+    // Analysis settings
+    pathfindingAlgorithm: "quantum_astar", // 默认寻路算法
+    redundancyAnalysis: true,     // 网络冗余分析
+    bottleneckDetection: true,    // 检测网络瓶颈
+    
+    // Security settings
+    validateNodeIdentity: true,   // 添加前验证节点身份
+    encryptTopologyData: true,    // 存储时加密拓扑数据
+    
+    // Advanced quantum settings
+    trackEntanglementResources: true,  // 跟踪节点间的量子纠缠
+    estimateQuantumCapacity: true      // 估算量子通道容量
+};
+
+// Service state
+const state = {
+    // Initialization state
+    initialized: false,
+    
+    // Topology elements
+    nodes: {},                  // 节点ID到节点数据的映射
+    links: {},                  // 链接ID到链接数据的映射
+    
+    // Runtime data
+    discoveryInProgress: false,
+    lastScanTime: null,
+    scanTimer: null,
+    changeListeners: {},
+    topologyVersion: 0,
+    
+    // Analysis caches
+    pathCache: {},             // 缓存的路径结果
+    metricsCache: {},          // 缓存的网络指标
+    
+    // Visualization data
+    visualizationData: null
+};
+
+// Public functions
+
+// Initialize the service
+function initialize(customConfig = {}) {
+    if (state.initialized) {
+        return { success: true, message: "Already initialized" };
+    }
+    
+    // Merge default and custom configurations
+    mergeConfig(customConfig);
+    
+    // Setup initial state
+    setupInitialState();
+    
+    // Load persisted topology if enabled
+    if (config.persistTopology) {
+        loadTopology();
+    }
+    
+    // Start discovery if configured
+    if (config.scanInterval > 0) {
+        scheduleTopologyScan();
+    }
+    
+    state.initialized = true;
+    return { success: true, message: "Topology manager initialized" };
+}
+
+// Add a node to the topology
+function addNode(nodeData) {
+    checkInitialized();
+    
+    const { id, type, address, capabilities } = nodeData;
+    
+    if (!id || !type || !address) {
+        return { success: false, message: "Missing required node data" };
+    }
+    
+    if (state.nodes[id]) {
+        return { success: false, message: "Node already exists", nodeId: id };
+    }
+    
+    if (Object.keys(state.nodes).length >= config.maxNodes) {
+        return { success: false, message: "Maximum node limit reached" };
+    }
+    
+    // Validate node identity if configured
+    if (config.validateNodeIdentity && !validateNodeIdentity(nodeData)) {
+        return { success: false, message: "Node identity validation failed" };
+    }
+    
+    // Add the node
+    state.nodes[id] = {
+        ...nodeData,
+        addedAt: Date.now(),
+        status: "ONLINE",
+        links: []
+    };
+    
+    // Update topology version
+    state.topologyVersion++;
+    
+    // Notify listeners
+    notifyTopologyChange({
+        type: TopologyChangeType.NODE_ADDED,
+        nodeId: id,
+        data: state.nodes[id]
+    });
+    
+    return { success: true, message: "Node added successfully", nodeId: id };
+}
+
+// Add a link between nodes
+function addLink(linkData) {
+    checkInitialized();
+    
+    const { id, sourceId, targetId, type, properties } = linkData;
+    
+    if (!id || !sourceId || !targetId || !type) {
+        return { success: false, message: "Missing required link data" };
+    }
+    
+    if (!state.nodes[sourceId] || !state.nodes[targetId]) {
+        return { success: false, message: "Source or target node not found" };
+    }
+    
+    if (state.links[id]) {
+        return { success: false, message: "Link already exists", linkId: id };
+    }
+    
+    if (Object.keys(state.links).length >= config.maxLinks) {
+        return { success: false, message: "Maximum link limit reached" };
+    }
+    
+    // Add the link
+    state.links[id] = {
+        ...linkData,
+        addedAt: Date.now(),
+        status: "ACTIVE"
+    };
+    
+    // Update node references
+    state.nodes[sourceId].links.push(id);
+    state.nodes[targetId].links.push(id);
+    
+    // Update topology version
+    state.topologyVersion++;
+    
+    // Clear path cache as topology changed
+    state.pathCache = {};
+    
+    // Notify listeners
+    notifyTopologyChange({
+        type: TopologyChangeType.LINK_ADDED,
+        linkId: id,
+        data: state.links[id]
+    });
+    
+    return { success: true, message: "Link added successfully", linkId: id };
+}
+
+// Remove a node and all its links
+function removeNode(nodeId) {
+    checkInitialized();
+    
+    if (!state.nodes[nodeId]) {
+        return { success: false, message: "Node not found" };
+    }
+    
+    // Remove all links connected to this node
+    const nodeLinks = [...state.nodes[nodeId].links];
+    nodeLinks.forEach(linkId => {
+        if (state.links[linkId]) {
+            removeLink(linkId, true); // Silent removal
+        }
+    });
+    
+    // Store node data for event
+    const nodeData = state.nodes[nodeId];
+    
+    // Remove the node
+    delete state.nodes[nodeId];
+    
+    // Update topology version
+    state.topologyVersion++;
+    
+    // Clear path cache as topology changed
+    state.pathCache = {};
+    
+    // Notify listeners
+    notifyTopologyChange({
+        type: TopologyChangeType.NODE_REMOVED,
+        nodeId: nodeId,
+        data: nodeData
+    });
+    
+    return { success: true, message: "Node and all its links removed" };
+}
+
+// Remove a link between nodes
+function removeLink(linkId, silent = false) {
+    checkInitialized();
+    
+    if (!state.links[linkId]) {
+        return { success: false, message: "Link not found" };
+    }
+    
+    const linkData = state.links[linkId];
+    const { sourceId, targetId } = linkData;
+    
+    // Update node references
+    if (state.nodes[sourceId]) {
+        state.nodes[sourceId].links = state.nodes[sourceId].links.filter(id => id !== linkId);
+    }
+    
+    if (state.nodes[targetId]) {
+        state.nodes[targetId].links = state.nodes[targetId].links.filter(id => id !== linkId);
+    }
+    
+    // Remove the link
+    delete state.links[linkId];
+    
+    // Update topology version
+    state.topologyVersion++;
+    
+    // Clear path cache as topology changed
+    state.pathCache = {};
+    
+    // Notify listeners (unless silent)
+    if (!silent) {
+        notifyTopologyChange({
+            type: TopologyChangeType.LINK_REMOVED,
+            linkId: linkId,
+            data: linkData
+        });
+    }
+    
+    return { success: true, message: "Link removed successfully" };
+}
+
+// Find path between two nodes
+function findPath(sourceId, targetId, options = {}) {
+    checkInitialized();
+    
+    if (!state.nodes[sourceId]) {
+        return { success: false, message: "Source node not found" };
+    }
+    
+    if (!state.nodes[targetId]) {
+        return { success: false, message: "Target node not found" };
+    }
+    
+    // Generate cache key
+    const cacheKey = generatePathCacheKey(sourceId, targetId, options);
+    
+    // Return cached result if available and topology hasn't changed
+    if (state.pathCache[cacheKey] && state.pathCache[cacheKey].version === state.topologyVersion) {
+        return state.pathCache[cacheKey].result;
+    }
+    
+    // Determine algorithm to use
+    const algorithm = options.algorithm || config.pathfindingAlgorithm;
+    
+    // Execute pathfinding
+    const pathResult = executePathfinding(sourceId, targetId, algorithm, options);
+    
+    // Cache the result
+    state.pathCache[cacheKey] = {
+        version: state.topologyVersion,
+        result: pathResult
+    };
+    
+    return pathResult;
+}
+
+// Get a snapshot of the current topology
+function getTopologySnapshot(filter = {}) {
+    checkInitialized();
+    
+    // Apply filters to nodes and links if provided
+    let filteredNodes = Object.values(state.nodes);
+    let filteredLinks = Object.values(state.links);
+    
+    if (filter.nodeTypes) {
+        filteredNodes = filteredNodes.filter(node => filter.nodeTypes.includes(node.type));
+    }
+    
+    if (filter.linkTypes) {
+        filteredLinks = filteredLinks.filter(link => filter.linkTypes.includes(link.type));
+    }
+    
+    if (filter.region) {
+        filteredNodes = filteredNodes.filter(node => node.region === filter.region);
+    }
+    
+    return {
+        success: true,
+        version: state.topologyVersion,
+        timestamp: Date.now(),
+        nodes: filteredNodes,
+        links: filteredLinks,
+        nodeCount: filteredNodes.length,
+        linkCount: filteredLinks.length
+    };
+}
+
+// Register for topology change events
+function addEventListener(eventName, callback) {
+    checkInitialized();
+    
+    if (!callback || typeof callback !== 'function') {
+        return { success: false, message: "Invalid callback function" };
+    }
+    
+    // Generate listener ID
+    const listenerId = generateListenerId();
+    
+    // Initialize listeners array if needed
+    if (!state.changeListeners[eventName]) {
+        state.changeListeners[eventName] = {};
+    }
+    
+    // Add listener
+    state.changeListeners[eventName][listenerId] = callback;
+    
+    return { 
+        success: true, 
+        message: "Event listener registered", 
+        listenerId: listenerId 
+    };
+}
+
+// Remove topology change event listener
+function removeEventListener(eventName, listenerId) {
+    checkInitialized();
+    
+    if (!state.changeListeners[eventName] || !state.changeListeners[eventName][listenerId]) {
+        return { success: false, message: "Listener not found" };
+    }
+    
+    // Remove listener
+    delete state.changeListeners[eventName][listenerId];
+    
+    return { success: true, message: "Event listener removed" };
+}
+
+// Initiate discovery of network topology
+function discoverTopology(options = {}) {
+    checkInitialized();
+    
+    if (state.discoveryInProgress) {
+        return { success: false, message: "Discovery already in progress" };
+    }
+    
+    state.discoveryInProgress = true;
+    
+    // Start discovery process (implementation depends on network setup)
+    const discoveryTimeout = options.timeout || config.discoveryTimeout;
+    
+    // This would be implemented to use network services to discover nodes
+    startNetworkDiscovery(discoveryTimeout)
+        .then(results => {
+            processDiscoveryResults(results);
+            state.discoveryInProgress = false;
+        })
+        .catch(error => {
+            state.discoveryInProgress = false;
+            logError("Topology discovery failed", error);
+        });
+    
+    return { 
+        success: true, 
+        message: "Topology discovery initiated", 
+        estimatedCompletionTime: Date.now() + discoveryTimeout 
+    };
+}
+
+// Calculate network metrics
+function calculateNetworkMetrics() {
+    checkInitialized();
+    
+    // Metrics to calculate
+    const metrics = {
+        nodeCount: Object.keys(state.nodes).length,
+        linkCount: Object.keys(state.links).length,
+        density: 0,
+        averageDegree: 0,
+        diameter: 0,
+        connectivity: 0,
+        clusteringCoefficient: 0,
+        quantumResourceMetrics: {}
+    };
+    
+    // Basic metrics
+    if (metrics.nodeCount > 1) {
+        metrics.density = (2 * metrics.linkCount) / (metrics.nodeCount * (metrics.nodeCount - 1));
+        metrics.averageDegree = (2 * metrics.linkCount) / metrics.nodeCount;
+    }
+    
+    // More complex metrics would be calculated here
+    // These are computationally expensive, so they're calculated on demand
+    
+    // Cache the results
+    state.metricsCache = {
+        timestamp: Date.now(),
+        version: state.topologyVersion,
+        metrics: metrics
+    };
+    
+    return {
+        success: true,
+        metrics: metrics
+    };
+}
+
+// Internal functions
+
+// Check if service is initialized
+function checkInitialized() {
+    if (!state.initialized) {
+        throw new Error("Topology manager not initialized");
+    }
+}
+
+// Merge custom configuration with defaults
+function mergeConfig(customConfig) {
+    Object.keys(customConfig).forEach(key => {
+        if (config.hasOwnProperty(key)) {
+            config[key] = customConfig[key];
+        }
+    });
+}
+
+// Setup initial state structures
+function setupInitialState() {
+    state.nodes = {};
+    state.links = {};
+    state.pathCache = {};
+    state.metricsCache = {};
+    state.changeListeners = {
+        nodeAdded: {},
+        nodeRemoved: {},
+        linkAdded: {},
+        linkRemoved: {},
+        topologyChanged: {}
+    };
+}
+
+// Schedule regular topology scans
+function scheduleTopologyScan() {
+    if (state.scanTimer) {
+        clearTimeout(state.scanTimer);
+    }
+    
+    state.scanTimer = setTimeout(() => {
+        if (state.initialized && !state.discoveryInProgress) {
+            discoverTopology();
+        }
+        scheduleTopologyScan();
+    }, config.scanInterval);
+}
+
+// Generate a unique ID for event listeners
+function generateListenerId() {
+    return 'listener_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Generate cache key for path results
+function generatePathCacheKey(sourceId, targetId, options) {
+    return `${sourceId}_${targetId}_${JSON.stringify(options)}`;
+}
+
+// Execute pathfinding algorithm
+function executePathfinding(sourceId, targetId, algorithm, options) {
+    // Implementation would depend on algorithm selected
+    // Basic placeholder implementation
+    
+    // For a simple example, we'll use a basic approach
+    const visited = {};
+    const queue = [{
+        nodeId: sourceId,
+        path: [],
+        links: []
+    }];
+    
+    while (queue.length > 0) {
+        const current = queue.shift();
+        
+        if (current.nodeId === targetId) {
+            // Path found
+            return {
+                success: true,
+                path: [...current.path, targetId],
+                links: current.links,
+                hops: current.path.length,
+                quality: calculatePathQuality(current.links)
+            };
+        }
+        
+        if (visited[current.nodeId]) continue;
+        visited[current.nodeId] = true;
+        
+        // Get all links from this node
+        const nodeLinks = state.nodes[current.nodeId].links || [];
+        
+        for (const linkId of nodeLinks) {
+            const link = state.links[linkId];
+            if (!link) continue;
+            
+            // Determine the connected node
+            const nextNodeId = link.sourceId === current.nodeId 器 link.targetId : link.sourceId;
+            
+            if (!visited[nextNodeId]) {
+                queue.push({
+                    nodeId: nextNodeId,
+                    path: [...current.path, current.nodeId],
+                    links: [...current.links, linkId]
+                });
+            }
+        }
+    }
+    
+    // No path found
+    return {
+        success: false,
+        message: "No path found between nodes"
+    };
+}
+
+// Calculate quality metrics for a path
+function calculatePathQuality(linkIds) {
+    // Implementation would calculate metrics like:
+    // - Total latency
+    // - Bandwidth
+    // - Reliability
+    // - Quantum fidelity
+    
+    // Placeholder implementation
+    let totalLatency = 0;
+    let minBandwidth = Infinity;
+    let reliability = 1.0;
+    
+    linkIds.forEach(linkId => {
+        const link = state.links[linkId];
+        if (link && link.properties) {
+            totalLatency += link.properties.latency || 0;
+            minBandwidth = Math.min(minBandwidth, link.properties.bandwidth || Infinity);
+            reliability *= (link.properties.reliability || 1.0);
+        }
+    });
+    
+    return {
+        latency: totalLatency,
+        bandwidth: minBandwidth === Infinity 器 0 : minBandwidth,
+        reliability: reliability
+    };
+}
+
+// Load persisted topology from storage
+function loadTopology() {
+    // Implementation would load from config.topologyStoragePath
+    // Placeholder implementation
+    try {
+        // This would be replaced with actual file loading logic
+        logInfo("Loading topology from storage");
+        // Actual implementation would restore state.nodes and state.links
+    } catch (error) {
+        logError("Failed to load topology from storage", error);
+    }
+}
+
+// Save current topology to storage
+function saveTopology() {
+    if (!config.persistTopology) return;
+    
+    // Implementation would save to config.topologyStoragePath
+    // Placeholder implementation
+    try {
+        // This would be replaced with actual file saving logic
+        logInfo("Saving topology to storage");
+        // Actual implementation would save state.nodes and state.links
+    } catch (error) {
+        logError("Failed to save topology to storage", error);
+    }
+}
+
+// Process results from network discovery
+function processDiscoveryResults(results) {
+    if (!results || !results.nodes) return;
+    
+    // Add or update discovered nodes
+    results.nodes.forEach(nodeData => {
+        if (state.nodes[nodeData.id]) {
+            // Update existing node
+            updateNode(nodeData.id, nodeData);
+        } else {
+            // Add new node
+            addNode(nodeData);
+        }
+    });
+    
+    // Add or update discovered links
+    if (results.links) {
+        results.links.forEach(linkData => {
+            if (state.links[linkData.id]) {
+                // Update existing link
+                updateLink(linkData.id, linkData);
+            } else {
+                // Add new link
+                addLink(linkData);
+            }
+        });
+    }
+    
+    // Update last scan time
+    state.lastScanTime = Date.now();
+    
+    // Save topology if configured
+    if (config.persistTopology) {
+        saveTopology();
+    }
+}
+
+// Validate node identity
+function validateNodeIdentity(nodeData) {
+    // Implementation would validate cryptographic identity
+    // Placeholder implementation
+    return true;
+}
+
+// Start network discovery process
+function startNetworkDiscovery(timeout) {
+    // This would be implemented using actual network discovery
+    // Placeholder implementation
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve({
+                nodes: [],
+                links: []
+            });
+        }, timeout);
+    });
+}
+
+// Notify listeners of topology changes
+function notifyTopologyChange(event) {
+    // Notify specific event listeners
+    const eventListeners = state.changeListeners[event.type] || {};
+    Object.values(eventListeners).forEach(callback => {
+        try {
+            callback(event);
+        } catch (error) {
+            logError("Error in topology event listener", error);
+        }
+    });
+    
+    // Notify general topology change listeners
+    const generalListeners = state.changeListeners.topologyChanged || {};
+    Object.values(generalListeners).forEach(callback => {
+        try {
+            callback(event);
+        } catch (error) {
+            logError("Error in general topology event listener", error);
+        }
+    });
+}
+
+// Update an existing node
+function updateNode(nodeId, newData) {
+    if (!state.nodes[nodeId]) return false;
+    
+    // Store old data for comparison
+    const oldData = {...state.nodes[nodeId]};
+    
+    // Update node data (preserve certain fields)
+    Object.keys(newData).forEach(key => {
+        if (key !== 'id' && key !== 'addedAt' && key !== 'links') {
+            state.nodes[nodeId][key] = newData[key];
+        }
+    });
+    
+    // Update topology version
+    state.topologyVersion++;
+    
+    // Notify listeners
+    notifyTopologyChange({
+        type: TopologyChangeType.NODE_UPDATED,
+        nodeId: nodeId,
+        oldData: oldData,
+        newData: state.nodes[nodeId]
+    });
+    
+    return true;
+}
+
+// Update an existing link
+function updateLink(linkId, newData) {
+    if (!state.links[linkId]) return false;
+    
+    // Store old data for comparison
+    const oldData = {...state.links[linkId]};
+    
+    // Update link data (preserve certain fields)
+    Object.keys(newData).forEach(key => {
+        if (key !== 'id' && key !== 'addedAt' && key !== 'sourceId' && key !== 'targetId') {
+            state.links[linkId][key] = newData[key];
+        }
+    });
+    
+    // Update topology version
+    state.topologyVersion++;
+    
+    // Clear path cache as link properties changed
+    state.pathCache = {};
+    
+    // Notify listeners
+    notifyTopologyChange({
+        type: TopologyChangeType.LINK_UPDATED,
+        linkId: linkId,
+        oldData: oldData,
+        newData: state.links[linkId]
+    });
+    
+    return true;
+}
+
+// Log utility functions
+function logInfo(message) {
+    // Would integrate with system logging service
+    console.log(`[TopologyManager] INFO: ${message}`);
+}
+
+function logError(message, error) {
+    // Would integrate with system error service
+    console.error(`[TopologyManager] ERROR: ${message}`, error);
+}
+
+// Export the service functions
+export {
+    initialize,
+    addNode,
+    removeNode,
+    addLink,
+    removeLink,
+    findPath,
+    getTopologySnapshot,
+    addEventListener,
+    removeEventListener,
+    discoverTopology,
+    calculateNetworkMetrics
+}; 

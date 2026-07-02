@@ -1,0 +1,201 @@
+# Aurora Engine - 记忆加载器 QEntL版本
+# 加载和管理记忆文件
+
+# 量子基因编码
+QG-DOC-IMPL-MEMORY-LOADER-D4E5F6A7
+
+# 纠缠态
+ENTANGLE_STATE: ACTIVE
+
+# 纠缠对象
+ENTANGLED_OBJECTS: [
+  "QSM/aurora/aurora_engine.qentl"
+]
+
+// ============================================================
+// 记忆加载器 - QEntL版本
+// ============================================================
+
+quantum_class MemoryLoader {
+  // 核心属性
+  public memory_dir: String = "/root/.codebuddy/projects/root/memory"
+  private cache: Map<String, String> = {}
+  private metadata: Map<String, Object> = {}
+  
+  // ============================================================
+  // 初始化
+  // ============================================================
+  
+  public function init(dir: String) {
+    if dir != "" {
+      memory_dir = dir
+    }
+    cache.clear()
+    metadata.clear()
+  }
+  
+  // ============================================================
+  // 加载所有记忆文件
+  // ============================================================
+  
+  public function load_all(): Map<String, String> {
+    print("正在加载记忆文件: " + memory_dir)
+    
+    cache.clear()
+    metadata.clear()
+    
+    if !directory_exists(memory_dir) {
+      print("记忆目录不存在: " + memory_dir)
+      return cache
+    }
+    
+    var md_files = list_files(memory_dir, "*.md")
+    print("找到 " + md_files.length + " 个记忆文件")
+    
+    for file in md_files {
+      try {
+        var content = read_file(file.path)
+        cache[file.name] = content
+        
+        // 解析frontmatter元数据
+        var meta = parse_frontmatter(content, file.path)
+        metadata[file.name] = meta
+        
+        print("  ✅ " + file.name + ": " + meta.description)
+      } catch (Exception e) {
+        print("  ⚠ 加载失败 " + file.name + ": " + e.message)
+      }
+    }
+    
+    print("记忆加载完成: " + cache.length + " 个文件")
+    return cache
+  }
+  
+  // ============================================================
+  // 按名称获取特定记忆
+  // ============================================================
+  
+  public function get_by_name(name: String): String {
+    if cache.contains(name) {
+      return cache[name]
+    }
+    
+    var filepath = memory_dir + "/" + name + ".md"
+    if file_exists(filepath) {
+      var content = read_file(filepath)
+      cache[name] = content
+      metadata[name] = {
+        path: filepath,
+        loaded_at: format_timestamp(current_timestamp())
+      }
+      return content
+    }
+    
+    return ""
+  }
+  
+  // ============================================================
+  // 获取所有元数据
+  // ============================================================
+  
+  public function get_metadata(): Map<String, Object> {
+    return metadata
+  }
+  
+  // ============================================================
+  // 列出所有记忆文件名
+  // ============================================================
+  
+  public function list_all(): Array<String> {
+    return cache.keys()
+  }
+  
+  // ============================================================
+  // 生成上下文提示词
+  // ============================================================
+  
+  public function get_context_prompt(): String {
+    if cache.length == 0 {
+      load_all()
+    }
+    
+    var sections = []
+    
+    sections.append("=" * 60)
+    sections.append("AURORA ENGINE - 项目上下文 (从记忆加载)")
+    sections.append("生成时间: " + format_timestamp(current_timestamp()))
+    sections.append("记忆文件数量: " + cache.length)
+    sections.append("=" * 60)
+    sections.append("")
+    
+    for (name, content) in cache {
+      var meta = metadata.get(name, {})
+      var desc = meta.description || ""
+      
+      sections.append("=" * 40)
+      sections.append("# [" + name + "] — " + desc)
+      sections.append("=" * 40)
+      sections.append(content)
+      sections.append("")
+    }
+    
+    sections.append("=" * 60)
+    sections.append("记忆文件结束")
+    sections.append("=" * 60)
+    
+    return "\n".join(sections)
+  }
+  
+  // ============================================================
+  // 解析Frontmatter
+  // ============================================================
+  
+  private function parse_frontmatter(content: String, filepath: String): Object {
+    var meta = {
+      path: filepath,
+      loaded_at: format_timestamp(current_timestamp()),
+      size_bytes: file_size(filepath)
+    }
+    
+    // 解析YAML frontmatter
+    if content.starts_with("---") {
+      var parts = content.split("---", 3)
+      if parts.length >= 3 {
+        for line in parts[1].split("\n") {
+          if line.contains(":") {
+            var key = line.split(":")[0].trim()
+            var value = line.split(":")[1].trim().strip("\"").strip("'")
+            
+            if key in ["name", "description", "type"] {
+              meta[key] = value
+            }
+          }
+        }
+      }
+    }
+    
+    return meta
+  }
+}
+
+// ============================================================
+// 入口点 - 测试记忆加载器
+// ============================================================
+
+function main(): Integer {
+  var loader = new MemoryLoader()
+  loader.init("")
+  
+  var cache = loader.load_all()
+  print("\n加载了 " + cache.length + " 个记忆文件")
+  
+  var context = loader.get_context_prompt()
+  print("\n上下文长度: " + context.length + " 字符")
+  
+  return 0
+}
+
+// 量子基因编码: QE-DOC-MEM-LOAD-E8F9A0B1C2D3
+// 纠缠状态: 活跃
+// 纠缠对象: ['QSM/aurora/memory_loader.qentl']
+// 纠缠强度: 0.95

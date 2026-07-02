@@ -1,0 +1,1232 @@
+/* QSM量子协同创新生态系统 - 样式表 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* 量子叠加特效 */
+.quantum-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%);
+    animation: quantumPulse 8s ease-in-out infinite;
+}
+
+@keyframes quantumPulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.02); }
+}
+
+/* 头部样式 */
+.quantum-header {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.quantum-title {
+    color: white;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.quantum-title .quantum-particle {
+    font-size: 36px;
+    margin-right: 10px;
+    animation: particleSpin 10s linear infinite;
+    display: inline-block;
+}
+
+@keyframes particleSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.subtitle {
+    font-size: 14px;
+    opacity: 0.8;
+    margin-top: 5px;
+}
+
+.quantum-state-indicator {
+    display: flex;
+    align-items: center;
+    color: white;
+    font-size: 14px;
+}
+
+.state-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4ade80;
+    margin-right: 8px;
+    animation: dotPulse 2s ease-in-out infinite;
+}
+
+.state-dot.active {
+    background: #4ade80;
+}
+
+.state-dot.inactive {
+    background: #ef4444;
+    animation: none;
+}
+
+@keyframes dotPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* 导航栏 */
+.quantum-nav {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 15px 30px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.nav-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.nav-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.nav-btn.active {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: #60a5fa;
+}
+
+/* 主内容区 */
+.quantum-main {
+    padding: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.view {
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+.view.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.view-header h2 {
+    color: white;
+    font-size: 24px;
+}
+
+/* 量子按钮 */
+.quantum-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.quantum-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+/* 任务网格 */
+.quantum-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.task-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    color: white;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.task-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.task-card:hover::before {
+    left: 100%;
+}
+
+.task-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 15px;
+}
+
+.task-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.task-desc {
+    font-size: 14px;
+    opacity: 0.8;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.task-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.priority-indicator {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.priority-high {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.priority-medium {
+    background: rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
+}
+
+.priority-low {
+    background: rgba(34, 197, 94, 0.3);
+    color: #86efac;
+}
+
+/* 代理网格 */
+.agents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.agent-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    color: white;
+}
+
+.agent-avatar {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 15px;
+}
+
+.agent-name {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.agent-role {
+    font-size: 14px;
+    opacity: 0.8;
+    margin-bottom: 10px;
+}
+
+.agent-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin-bottom: 10px;
+}
+
+.agent-status.online {
+    background: rgba(34, 197, 94, 0.3);
+    color: #86efac;
+}
+
+.agent-status.offline {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.agent-meta {
+    fontSize: 12px;
+    opacity: 0.7;
+    margin-top: 15px;
+}
+
+/* 记忆系统 */
+.memory-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 25px;
+    color: white;
+}
+
+.memory-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.stat-label {
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+.memory-timeline {
+    margin-top: 20px;
+}
+
+.timeline-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid #667eea;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 0 8px 8px 0;
+}
+
+.timeline-time {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-bottom: 5px;
+}
+
+.timeline-content {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* 量子纠缠画布 */
+.entanglement-canvas-container {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#entanglementCanvas {
+    display: block;
+    width: 100%;
+}
+
+/* 模态框 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background: #1a1a2e;
+    border-radius: 12px;
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+    color: white;
+    position: relative;
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.close-btn:hover {
+    color: white;
+}
+
+.modal-content h3 {
+    margin-bottom: 20px;
+    font-size: 20px;
+}
+
+.modal-content input,
+.modal-content textarea,
+.modal-content select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+}
+
+.modal-content input:focus,
+.modal-content textarea:focus,
+.modal-content select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.modal-content textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* 加载动画 */
+.loading {
+    text-align: center;
+    color: white;
+    padding: 50px;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .quantum-header {
+        padding: 15px 20px;
+    }
+
+    .quantum-title {
+        font-size: 22px;
+    }
+
+    .quantum-nav {
+        padding: 10px 20px;
+    }
+
+    .nav-btn {
+        padding: 8px 15px;
+        font-size: 12px;
+        flex-grow: 1;
+    }
+
+    .quantum-main {
+        padding: 20px;
+    }
+
+    .quantum-grid,
+    .agents-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .view-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+}
+
+/* QEntL量子操作系统视图样式 */
+.qentl-overview {
+    display: grid;
+    gap: 30px;
+}
+
+.info-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 25px;
+    color: white;
+}
+
+.info-card h3 {
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+.info-card p {
+    font-size: 14px;
+    opacity: 0.9;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.qentl-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.feature-item {
+    background: rgba(102, 126, 234, 0.2);
+    padding: 12px 15px;
+    border-radius: 8px;
+    font-size: 13px;
+    border-left: 3px solid #667eea;
+}
+
+.deployment-modes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+}
+
+.deployment-modes h3 {
+    color: white;
+    font-size: 20px;
+    margin-bottom: 20px;
+    grid-column: 1 / -1;
+}
+
+.deployment-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    color: white;
+    display: flex;
+    gap: 15px;
+}
+
+.deployment-icon {
+    font-size: 48px;
+    flex-shrink: 0;
+}
+
+.deployment-content h4 {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.deployment-content p {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-bottom: 12px;
+}
+
+.terminal-list, .os-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.terminal, .os {
+    background: rgba(102, 126, 234, 0.2);
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.architecture-diagram {
+    margin-top: 30px;
+}
+
+.architecture-diagram h3 {
+    color: white;
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+.diagram-container {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 30px;
+}
+
+.diagram-box {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+}
+
+.diagram-box.qsm-layer {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.15);
+}
+
+.diagram-box.qentl-layer {
+    border-color: #764ba2;
+    background: rgba(118, 75, 162, 0.15);
+}
+
+.diagram-box.fs-layer {
+    border-color: #48bb78;
+    background: rgba(72, 187, 120, 0.15);
+}
+
+.box-label {
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.component-list {
+    font-size: 13px;
+    opacity: 0.9;
+    line-height: 1.8;
+}
+
+.component-list > div {
+    padding-left: 20px;
+    position: relative;
+}
+
+.component-list > div::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.diagram-arrow {
+    text-align: center;
+    font-size: 24px;
+    margin: 10px 0;
+    opacity: 0.7;
+}
+
+.quantum-models {
+    margin-top: 30px;
+}
+
+.quantum-models h3 {
+    color: white;
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+.models-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.model-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    color: white;
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.model-card:hover {
+    transform: translateY(-5px);
+}
+
+.model-card.qsm {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.model-card.som {
+    border-color: #48bb78;
+    background: rgba(72, 187, 120, 0.1);
+}
+
+.model-card.weq {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.model-card.ref {
+    border-color: #ec4899;
+    background: rgba(236, 72, 153, 0.1);
+}
+
+.model-icon {
+    font-size: 36px;
+    margin-bottom: 10px;
+}
+
+.model-card h4 {
+    font-size: 18px;
+    margin-bottom: 5px;
+}
+
+.model-card p {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.qentl-docs {
+    margin-top: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 25px;
+    color: white;
+}
+
+.qentl-docs h3 {
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.qentl-docs > p {
+    font-size: 14px;
+    opacity: 0.8;
+    margin-bottom: 20px;
+}
+
+.doc-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.doc-stat {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.doc-stat .stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 5px;
+}
+
+.doc-stat .stat-label {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* 三服务模式样式 */
+.service-modes-section {
+    margin-top: 30px;
+}
+
+.service-modes-section h3 {
+    color: white;
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.service-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 25px;
+    color: white;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.service-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.service-card.web-service {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.service-card.vm-service {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.service-card.native-service {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.service-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.service-card h4 {
+    font-size: 20px;
+    margin-bottom: 5px;
+}
+
+.service-status {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    font-size: 12px;
+    margin-bottom: 10px;
+}
+
+.service-card p {
+    font-size: 14px;
+    opacity: 0.8;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.service-features {
+    list-style: none;
+    font-size: 13px;
+    opacity: 0.9;
+    line-height: 1.8;
+}
+
+.service-features li {
+    padding-left: 5px;
+    margin-bottom: 8px;
+}
+
+.modes-note {
+    background: rgba(102, 126, 234, 0.2);
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    border: 1px solid rgba(102, 126, 234, 0.4);
+}
+
+/* 响应式QEntL视图 */
+@media (max-width: 768px) {
+    .deployment-modes {
+        grid-template-columns: 1fr;
+    }
+    
+    .models-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .qentl-features {
+        grid-template-columns: 1fr;
+    }
+    
+    .doc-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .services-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ========== 移动端优化 ========== */
+
+/* 平板设备 */
+@media screen and (max-width: 1024px) {
+  .qvm-container {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    padding: 10px;
+  }
+  
+  .qvm-section {
+    padding: 15px;
+  }
+  
+  .quantum-bits-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .demo-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 手机设备 */
+@media screen and (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  
+  .quantum-nav {
+    flex-wrap: wrap;
+    padding: 10px;
+  }
+  
+  .nav-brand {
+    font-size: 18px;
+    margin-bottom: 10px;
+    width: 100%;
+    text-align: center;
+  }
+  
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    gap: 15px;
+  }
+  
+  .qvm-container {
+    padding: 8px;
+    gap: 10px;
+  }
+  
+  .qvm-section {
+    padding: 12px;
+    border-radius: 10px;
+  }
+  
+  .qvm-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .qvm-title {
+    font-size: 16px;
+  }
+  
+  .qvm-controls {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  
+  .qvm-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 80px;
+    max-width: 120px;
+  }
+  
+  .quantum-bits-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .qubit-card {
+    padding: 10px;
+  }
+  
+  .qubit-name {
+    font-size: 14px;
+  }
+  
+  .qubit-state {
+    font-size: 12px;
+  }
+  
+  .demo-buttons {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  
+  .demo-btn {
+    padding: 10px;
+  }
+  
+  .demo-btn-icon {
+    font-size: 18px;
+  }
+  
+  .demo-btn-name {
+    font-size: 11px;
+  }
+  
+  .stats-summary {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .stats-panel,
+  .my-algorithms-section,
+  .tutorial-panel,
+  .stats-panel {
+    padding: 10px;
+  }
+  
+  .execution-log {
+    max-height: 150px;
+    font-size: 11px;
+  }
+  
+  .status-bar {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+  
+  #qbcEditor {
+    min-height: 120px;
+    font-size: 12px;
+    padding: 10px;
+  }
+  
+  .algorithm-demos {
+    margin-top: 10px;
+  }
+  
+  .demos-title {
+    font-size: 13px;
+  }
+  
+  .circuit-viz-section {
+    min-height: 80px;
+  }
+}
+
+/* 小屏幕手机 */
+@media screen and (max-width: 480px) {
+  .nav-brand {
+    font-size: 16px;
+  }
+  
+  .quantum-bits-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .qubit-card {
+    padding: 8px;
+  }
+  
+  .qvm-btn {
+    padding: 6px 8px;
+    font-size: 11px;
+    min-width: 70px;
+  }
+  
+  .demo-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .demo-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+  
+  .my-algo-header,
+  .tutorial-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .my-algo-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .tutorial-nav {
+    flex-direction: column;
+  }
+  
+  .tutorial-btn {
+    width: 100%;
+  }
+}
+
+/* 横屏手机 */
+@media screen and (max-width: 900px) and (orientation: landscape) {
+  .qvm-container {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .quantum-bits-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .qubit-card {
+    border-width: 2px;
+  }
+  
+  .qvm-btn {
+    border: 2px solid currentColor;
+  }
+}
+
+/* 减少动画模式 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .qubit-card::before,
+  .qubit-card::after {
+    animation: none;
+  }
+}
+
+/* 暗色模式增强 */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0a0a0f;
+  }
+  
+  .qvm-section {
+    background: rgba(20, 20, 30, 0.8);
+    border-color: rgba(138, 135, 255, 0.2);
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .qvm-btn,
+  .demo-btn,
+  .tutorial-btn,
+  .algo-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .qubit-card {
+    min-height: 80px;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .quantum-nav,
+  .qvm-controls,
+  .tutorial-panel,
+  .my-algorithms-section,
+  .stats-panel {
+    display: none !important;
+  }
+  
+  .qvm-container {
+    grid-template-columns: 1fr;
+  }
+  
+  body {
+    background: white;
+    color: black;
+  }
+  
+  .qvm-section {
+    background: white;
+    border: 1px solid #ccc;
+  }
+}

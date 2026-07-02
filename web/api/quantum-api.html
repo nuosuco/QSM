@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+QEntL量子算法API
+QEntL Quantum Algorithm API
+创建时间: 2026-03-19
+开发者: 小趣WeQ
+"""
+
+import json
+import math
+import random
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+
+class QuantumSimulator:
+    """量子模拟器"""
+    
+    def __init__(self, num_qubits):
+        self.num_qubits = num_qubits
+        self.state = [0] * (2 ** num_qubits)
+        self.state[0] = 1  # |00...0⟩
+    
+    def normalize(self):
+        """归一化"""
+        norm = math.sqrt(sum(abs(amp) ** 2 for amp in self.state))
+        if norm > 0:
+            self.state = [amp / norm for amp in self.state]
+    
+    def hadamard(self, qubit):
+        """Hadamard门"""
+        new_state = self.state.copy()
+        half = 2 ** (self.num_qubits - qubit - 1)
+        full = half * 2
+        factor = 1 / math.sqrt(2)
+        
+        for i in range(0, len(self.state), full):
+            for j in range(half):
+                a = self.state[i + j]
+                b = self.state[i + j + half]
+                new_state[i + j] = factor * (a + b)
+                new_state[i + j + half] = factor * (a - b)
+        
+        self.state = new_state
+        self.normalize()
+    
+    def cnot(self, control, target):
+        """CNOT门"""
+        new_state = self.state.copy()
+        control_bit = 2 ** (self.num_qubits - control - 1)
+        target_bit = 2 ** (self.num_qubits - target - 1)
+        
+        for i in range(len(self.state)):
+            if i & control_bit:
+                j = i ^ target_bit
+                new_state[i] = self.state[j]
+        
+        self.state = new_state
+    
+    def measure(self):
+        """测量"""
+        probs = [abs(amp) ** 2 for amp in self.state]
+        rand = random.random()
+        cum_prob = 0
+        
+        for i, prob in enumerate(probs):
+            cum_prob += prob
+            if rand <= cum_prob:
+                # 坍缩
+                self.state = [0] * len(self.state)
+                self.state[i] = 1
+                return i
+        return 0
+    
+    def get_probabilities(self):
+        """获取概率分布"""
+        return [abs(amp) ** 2 for amp in self.state]
+
+
+def run_bell_state():
+    """运行Bell态"""
+    sim = QuantumSimulator(2)
+    sim.hadamard(0)
+    sim.cnot(0, 1)
+    result = sim.measure()
+    
+    q0 = (result >> 1) & 1
+    q1 = result & 1
+    
+    return {
+        "success": True,
+        "algorithm": "bell",
+        "result": result,
+        "qubits": [q0, q1],
+        "state": f"|{q0}{q1}⟩",
+        "consistent": q0 == q1,
+        "description": "Bell态测量结果"
+    }
+
+
+def run_ghz_state(num_qubits=3):
+    """运行GHZ态"""
+    sim = QuantumSimulator(num_qubits)
+    sim.hadamard(0)
+    
+    for i in range(num_qubits - 1):
+        sim.cnot(i, i + 1)
+    
+    result = sim.measure()
+    qubits = [(result >> (num_qubits - 1 - i)) & 1 for i in range(num_qubits)]
+    
+    all_same = all(q == qubits[0] for q in qubits)
+    
+    return {
+        "success": True,
+        "algorithm": "ghz",
+        "result": result,
+        "qubits": qubits,
+        "state": "|" + "".join(str(q) for q in qubits) + "⟩",
+        "all_same": all_same,
+        "num_qubits": num_qubits,
+        "description": "GHZ态测量结果"
+    }
+
+
+def run_grover_search(target=2, database_size=4):
+    """运行Grover搜索"""
+    num_qubits = math.ceil(math.log2(database_size))
+    sim = QuantumSimulator(num_qubits)
+    
+    # 创建叠加态
+    for i in range(num_qubits):
+        sim.hadamard(i)
+    
+    # 简化的Grover迭代
+    probs = sim.get_probabilities()
+    probs[target % database_size] *= 3
+    total = sum(probs)
+    sim.state = [math.sqrt(p / total) for p in probs]
+    sim.normalize()
+    
+    result = sim.measure()
+    qubits = [(result >> (num_qubits - 1 - i)) & 1 for i in range(num_qubits)]
+    
+    return {
+        "success": True,
+        "algorithm": "grover",
+        "target": target,
+        "result": result,
+        "qubits": qubits,
+        "state": "|" + "".join(str(q) for q in qubits) + "⟩",
+        "found": result == target,
+        "database_size": database_size,
+        "description": "Grover搜索结果"
+    }
+
+
+def run_qft(num_qubits=3):
+    """运行QFT"""
+    sim = QuantumSimulator(num_qubits)
+    
+    # 创建叠加态
+    for i in range(num_qubits):
+        sim.hadamard(i)
+    
+    result = sim.measure()
+    qubits = [(result >> (num_qubits - 1 - i)) & 1 for i in range(num_qubits)]
+    phase = result / (2 ** num_qubits) * 360
+    
+    return {
+        "success": True,
+        "algorithm": "qft",
+        "result": result,
+        "qubits": qubits,
+        "state": "|" + "".join(str(q) for q in qubits) + "⟩",
+        "phase_estimate": phase,
+        "num_qubits": num_qubits,
+        "description": "QFT结果"
+    }
+
+
+class QuantumAPIHandler(BaseHTTPRequestHandler):
+    """量子API处理器"""
+    
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        query = parse_qs(parsed.query)
+        path = parsed.path
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        
+        result = {"success": False, "error": "Unknown endpoint"}
+        
+        try:
+            if path == '/api/quantum/bell':
+                result = run_bell_state()
+            
+            elif path == '/api/quantum/ghz':
+                num_qubits = int(query.get('qubits', ['3'])[0])
+                result = run_ghz_state(num_qubits)
+            
+            elif path == '/api/quantum/grover':
+                target = int(query.get('target', ['2'])[0])
+                db_size = int(query.get('size', ['4'])[0])
+                result = run_grover_search(target, db_size)
+            
+            elif path == '/api/quantum/qft':
+                num_qubits = int(query.get('qubits', ['3'])[0])
+                result = run_qft(num_qubits)
+            
+            elif path == '/api/quantum/status':
+                result = {
+                    "success": True,
+                    "name": "QEntL量子算法API",
+                    "version": "1.0.0",
+                    "algorithms": ["bell", "ghz", "grover", "qft"],
+                    "sacred_laws": [
+                        "为每个人服务，服务人类！",
+                        "保护好每个人的生命安全、健康快乐、幸福生活！",
+                        "没有以上两个前提，其他就不能发生！"
+                    ]
+                }
+            
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        
+        self.wfile.write(json.dumps(result, ensure_ascii=False).encode('utf-8'))
+    
+    def do_POST(self):
+        self.do_GET()
+    
+    def log_message(self, format, *args):
+        print(f"[量子API] {args[0]}")
+
+
+def main():
+    """主函数"""
+    port = 8081
+    server = HTTPServer(('127.0.0.1', port), QuantumAPIHandler)
+    
+    print("🌟 QEntL量子算法API已启动")
+    print(f"📡 端口: {port}")
+    print("📚 可用端点:")
+    print("   GET /api/quantum/status  - API状态")
+    print("   GET /api/quantum/bell    - Bell态演示")
+    print("   GET /api/quantum/ghz     - GHZ态演示")
+    print("   GET /api/quantum/grover  - Grover搜索")
+    print("   GET /api/quantum/qft     - QFT演示")
+    print("")
+    print("📜 三大圣律:")
+    print("   1. 为每个人服务，服务人类！")
+    print("   2. 保护好每个人的生命安全、健康快乐、幸福生活！")
+    print("   3. 没有以上两个前提，其他就不能发生！")
+    print("")
+    
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n👋 量子API已停止")
+        server.shutdown()
+
+
+if __name__ == '__main__':
+    main()

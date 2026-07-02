@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>QSM API Documentation</title>
+<style>
+body{font-family:system-ui,max-width:800px;margin:40px auto;padding:0 20px;color:#333}
+h1{color:#1a1a2e}h2{color:#16213e}h3{color:#0f3460}
+code{background:#f4f4f4;padding:2px 6px;border-radius:3px}
+pre{background:#1a1a2e;color:#eee;padding:16px;border-radius:8px;overflow-x:auto}
+.endpoint{border:1px solid #ddd;border-radius:8px;padding:16px;margin:12px 0}
+.method{font-weight:bold;color:#e94560}
+.new{background:#e94560;color:white;padding:2px 8px;border-radius:10px;font-size:12px}
+</style>
+</head>
+<body>
+<h1>🐾 QSM API Documentation</h1>
+<p>Base URL: <code>https://som.top</code></p>
+
+<h2>QEntL Quantum OS API</h2>
+<p>Prefix: <code>/api/qentl/</code> | 198 builtins | 🔥 Lambda support!</p>
+
+<div class="endpoint">
+<h3><span class="method">GET</span> /api/qentl/health</h3>
+<p>Health check</p>
+<pre>{"status":"healthy","builtin_count":198,"version":"3.0"}</pre>
+</div>
+
+<div class="endpoint">
+<h3><span class="method">POST</span> /api/qentl/run</h3>
+<p>Execute QEntL code</p>
+<pre>{"code":"打印(映射(x -> x * 2, [1,2,3,4,5]))"}
+→ {"output":["[2, 4, 6, 8, 10]"]}</pre>
+</div>
+
+<div class="endpoint">
+<h3><span class="method">POST</span> /api/qentl/compile</h3>
+<p>Compile QEntL to QBC bytecode</p>
+</div>
+
+<div class="endpoint">
+<h3><span class="method">GET</span> /api/qentl/builtins</h3>
+<p>List all 198 builtins</p>
+</div>
+
+<h3>🔥 Lambda Expressions (NEW!)</h3>
+<pre>
+映射(x -> x * 2, [1,2,3,4,5])        → [2, 4, 6, 8, 10]
+过滤(x -> x > 3, [1,2,3,4,5,6])      → [4, 5, 6]
+归约((a, b) -> a + b, [1,2,3,4,5])   → 15
+</pre>
+
+<h3>Higher-Order Functions</h3>
+<pre>
+函数 双倍(x) { 返回 x * 2 }
+映射(双倍, [1,2,3])  → [2, 4, 6]
+过滤(双倍, [1,2,3])  → filter by truthy return
+归约(双倍, [1,2,3])  → reduce with 2-arg function
+</pre>
+
+<h2>QSM Translation API</h2>
+<p>Prefix: <code>/api/</code> | Port 8000 | Model: V7-Small</p>
+
+<div class="endpoint">
+<h3><span class="method">POST</span> /translate</h3>
+<p>Translate text</p>
+<pre>{"text":"hello","source":"en","target":"zh"}</pre>
+</div>
+
+<div class="endpoint">
+<h3><span class="method">GET</span> /health</h3>
+<p>Health check</p>
+</div>
+
+<div class="endpoint">
+<h3><span class="method">GET</span> /models <span class="new">NEW!</span></h3>
+<p>All QSM training versions comparison</p>
+<pre>{"best":"V21 (Val 1.7002)","deployed":"V7-Small",
+ "versions":[{"version":"V21","val_loss":1.7002,params":"14.5M"},...]}</pre>
+</div>
+
+<div class="endpoint">
+<h3><span class="method">POST</span> /chat</h3>
+<p>Q1 智能对话</p>
+<pre>{"message":"你好"} → {"response":"...","model":"QSM Q1"}</pre>
+</div>
+
+<div class="endpoint">
+<h3><span class="method">GET</span> /model_info</h3>
+<p>Detailed model info (architecture, features)</p>
+</div>
+
+<h3><span class="new">NEW!</span> QEntL Batch & Languages</h3>
+<pre>
+// Batch execution (up to 20 programs)
+POST /api/qentl/batch
+{"programs":[{"code":"打印(1+2)"},{"code":"打印(√144)"}]}
+→ {"results":[{"index":0,"output":["3"]},{"index":1,"output":["12.0"]}]}
+
+// Language support info
+GET /api/qentl/languages
+→ {"supported":["彝文","中文","English"],"yi_trained_chars":4123}
+</pre>
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSM 系统状态</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:monospace;background:#0a0a1a;color:#e0e0ff;min-height:100vh;padding:20px}
+h1{text-align:center;color:#8080ff;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:15px;max-width:900px;margin:0 auto}
+.card{background:#111128;border:1px solid #3030ff;border-radius:8px;padding:15px}
+.card h3{color:#8080ff;margin-bottom:8px;font-size:0.9em}
+.status{display:inline-block;padding:2px 8px;border-radius:3px;font-size:0.8em;font-weight:bold}
+.ok{background:#2a6;color:#fff}
+.err{background:#a22;color:#fff}
+.info{font-size:0.8em;color:#6060c0;margin-top:5px;line-height:1.6}
+.refresh{display:block;margin:20px auto;padding:8px 20px;background:#3030ff;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.9em}
+</style>
+</head>
+<body>
+<h1>📡 QSM 系统状态</h1>
+<div class="grid" id="grid"></div>
+<button class="refresh" onclick="load()">🔄 刷新</button>
+<script>
+async function load(){
+const g=document.getElementById('grid');
+g.innerHTML='<div class="card"><h3>加载中...</h3></div>';
+const checks=[
+{name:'V5 翻译API',url:'/api/v5/health',key:'status'},
+{name:'Q1 翻译API',url:'/api/q1/health',key:'status'},
+{name:'QV4 API',url:'/api/qv4/health',key:'status'},
+{name:'V5训练状态',url:'/api/qv4/training-status',key:'training'},
+{name:'V6训练状态',url:'/api/v6/status',key:'training'},
+];
+let html='';
+for(const c of checks){
+try{
+const r=await fetch(c.url);
+const d=await r.json();
+const ok=d[c.key]==='healthy'||d[c.key]===true||d.training===true;
+let detail=JSON.stringify(d).substring(0,200);
+if(d.progress)detail=`E${d.progress.epoch} B${d.progress.batch}/${d.progress.total_batches} L:${d.progress.loss.toFixed(4)}`;
+if(d.last_epoch)detail+=` | Best Val:${d.last_epoch.best_val.toFixed(4)}`;
+html+=`<div class="card"><h3>${c.name}</h3><span class="status ${ok?'ok':'err'}">${ok?'正常':'异常'}</span><div class="info">${detail}</div></div>`;
+}catch(e){
+html+=`<div class="card"><h3>${c.name}</h3><span class="status err">连接失败</span><div class="info">${e.message}</div></div>`;
+}
+}
+g.innerHTML=html;
+}
+load();
+setInterval(load,30000);
+</script>
+</body>
+</html>

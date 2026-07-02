@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎭 量子态可视化 - QEntL量子操作系统 | som.top</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#050510,#0a0a2e,#16213e);min-height:100vh;color:#e0e0e0;}
+.app-header{background:rgba(5,5,20,0.92);border-bottom:1px solid rgba(138,135,255,0.25);padding:12px 20px;display:flex;align-items:center;gap:15px;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px);}
+.app-header a{color:#8a87ff;text-decoration:none;font-size:13px;}
+.app-header a:hover{text-decoration:underline;}
+.app-header h1{font-size:17px;color:#4ecdc4;}
+.app-header .ver{margin-left:auto;font-size:11px;color:#576574;}
+
+.container{max-width:1200px;margin:0 auto;padding:20px;}
+
+/* Tabs */
+.tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+.tab-btn{padding:8px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#999;cursor:pointer;font-size:12px;transition:all 0.2s;}
+.tab-btn:hover{background:rgba(138,135,255,0.12);color:#fff;}
+.tab-btn.active{background:rgba(138,135,255,0.25);border-color:rgba(138,135,255,0.5);color:#fff;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* Panels */
+.panel{background:rgba(255,255,255,0.03);border:1px solid rgba(138,135,255,0.15);border-radius:14px;padding:20px;margin-bottom:15px;}
+.panel h2{color:#8a87ff;font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.panel h3{color:#4ecdc4;font-size:14px;margin:12px 0 8px;}
+
+/* Canvas containers */
+.canvas-wrap{background:rgba(0,0,0,0.3);border-radius:10px;border:1px solid rgba(138,135,255,0.1);overflow:hidden;position:relative;}
+.canvas-wrap canvas{display:block;width:100%;}
+.canvas-label{position:absolute;top:8px;left:12px;font-size:10px;color:rgba(138,135,255,0.5);font-family:monospace;}
+
+/* Controls */
+.ctrl-row{display:flex;gap:12px;margin:10px 0;flex-wrap:wrap;align-items:center;}
+.ctrl-group{flex:1;min-width:150px;}
+.ctrl-group label{display:block;font-size:11px;color:#7f8fa6;margin-bottom:4px;}
+.ctrl-group input[type=range]{width:100%;accent-color:#8a87ff;height:4px;}
+.ctrl-group input[type=number],.ctrl-group select{width:100%;padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid rgba(138,135,255,0.2);border-radius:6px;color:#fff;font-size:12px;font-family:monospace;}
+.ctrl-group input:focus,.ctrl-group select:focus{outline:none;border-color:#8a87ff;}
+.ctrl-val{font-size:11px;color:#4ecdc4;font-family:monospace;float:right;}
+
+/* Buttons */
+.q-btn{padding:8px 16px;background:linear-gradient(135deg,#8a87ff,#6c63ff);border:none;border-radius:8px;color:#fff;font-size:12px;cursor:pointer;transition:all 0.2s;font-weight:bold;}
+.q-btn:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(138,135,255,0.4);}
+.q-btn.secondary{background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);color:#4ecdc4;}
+.q-btn.secondary:hover{background:rgba(78,205,196,0.25);}
+.q-btn.danger{background:rgba(255,107,107,0.15);border:1px solid rgba(255,107,107,0.3);color:#ff6b6b;}
+
+/* State info grid */
+.state-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:10px 0;}
+.state-cell{background:rgba(138,135,255,0.06);border:1px solid rgba(138,135,255,0.12);border-radius:8px;padding:10px;text-align:center;}
+.state-cell .sv{font-size:18px;font-weight:bold;color:#4ecdc4;font-family:monospace;}
+.state-cell .sl{font-size:10px;color:#7f8fa6;margin-top:2px;}
+
+/* Probability bars */
+.prob-bars{margin:10px 0;}
+.prob-bar{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.prob-bar .pb-label{width:35px;font-size:12px;color:#7f8fa6;text-align:right;font-family:monospace;}
+.prob-bar .pb-track{flex:1;height:14px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;}
+.prob-bar .pb-fill{height:100%;border-radius:4px;transition:width 0.5s ease;}
+.prob-bar .pb-val{width:55px;font-size:11px;color:#4ecdc4;font-family:monospace;}
+
+/* Preset circuits */
+.preset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:10px 0;}
+.preset-card{background:rgba(138,135,255,0.06);border:1px solid rgba(138,135,255,0.12);border-radius:10px;padding:12px;cursor:pointer;transition:all 0.2s;}
+.preset-card:hover{background:rgba(138,135,255,0.12);border-color:rgba(138,135,255,0.3);transform:translateY(-2px);}
+.preset-card h4{font-size:13px;color:#8a87ff;margin-bottom:3px;}
+.preset-card p{font-size:10px;color:#7f8fa6;line-height:1.3;}
+
+/* Circuit display */
+.circuit-display{background:rgba(0,0,0,0.3);border-radius:8px;padding:15px;font-family:monospace;font-size:12px;line-height:2;overflow-x:auto;}
+.circuit-qubit-line{display:flex;align-items:center;gap:4px;padding:2px 0;}
+.circuit-qubit-label{width:40px;color:#8a87ff;font-size:11px;}
+.circuit-wire{flex:1;height:2px;background:rgba(138,135,255,0.3);position:relative;}
+.circuit-gate{position:absolute;top:50%;transform:translate(-50%,-50%);width:30px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;color:#0a0a1a;}
+.gate-H{background:#4ecdc4;}.gate-X{background:#ff6b6b;}.gate-Y{background:#ffe66d;}
+.gate-Z{background:#95e1d3;}.gate-S{background:#dfe6e9;}.gate-T{background:#ffeaa7;}
+.gate-CNOT{background:#ff6b6b;}.gate-MEASURE{background:#a29bfe;}
+.gate-I{background:#b2bec3;}
+
+/* Multi-qubit selector */
+.qubit-selector{display:flex;gap:6px;margin:8px 0;}
+.qubit-btn{width:36px;height:36px;border-radius:8px;background:rgba(138,135,255,0.1);border:1px solid rgba(138,135,255,0.2);color:#8a87ff;font-size:14px;font-weight:bold;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;}
+.qubit-btn:hover{background:rgba(138,135,255,0.25);}
+.qubit-btn.active{background:rgba(138,135,255,0.35);border-color:#8a87ff;color:#fff;}
+
+/* Gate palette */
+.gate-palette{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0;}
+.gate-palette button{width:36px;height:36px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);font-size:12px;font-weight:bold;cursor:pointer;transition:all 0.2s;color:#0a0a1a;}
+.gate-palette button:hover{transform:scale(1.1);box-shadow:0 0 10px rgba(138,135,255,0.3);}
+.gate-palette button.active{border-color:#fff;box-shadow:0 0 12px rgba(255,255,255,0.3);}
+
+/* Footer */
+.app-footer{margin-top:30px;padding:15px;border-top:1px solid rgba(138,135,255,0.1);text-align:center;color:#576574;font-size:11px;}
+
+@media(max-width:600px){
+.state-grid{grid-template-columns:repeat(2,1fr);}
+.preset-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+<a href="/">← QEntL OS</a>
+<h1>🎭 量子态可视化</h1>
+<span class="ver">v3.0 | som.top</span>
+</div>
+
+<div class="container">
+
+<!-- Tabs -->
+<div class="tabs">
+<button class="tab-btn active" onclick="switchTab('single')">单量子比特</button>
+<button class="tab-btn" onclick="switchTab('multi')">多量子比特</button>
+<button class="tab-btn" onclick="switchTab('circuits')">量子电路</button>
+<button class="tab-btn" onclick="switchTab('presets')">预设电路</button>
+<button class="tab-btn" onclick="switchTab('entanglement')">量子纠缠</button>
+</div>
+
+<!-- Single Qubit View -->
+<div class="tab-content active" id="tab-single">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
+<div class="panel">
+<h2>🌐 布洛赫球</h2>
+<div class="canvas-wrap">
+<canvas id="blochCanvas" width="400" height="400"></canvas>
+<span class="canvas-label">Bloch Sphere | ψ⟩</span>
+</div>
+<div class="ctrl-row" style="margin-top:12px;">
+<div class="ctrl-group">
+<label>α 振幅 <span class="ctrl-val" id="alphaVal">1.00</span></label>
+<input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="1" oninput="updateSingleQubit()">
+</div>
+<div class="ctrl-group">
+<label>φ 角度 (度) <span class="ctrl-val" id="phiVal">0°</span></label>
+<input type="range" id="phiSlider" min="0" max="360" step="1" value="0" oninput="updateSingleQubit()">
+</div>
+</div>
+</div>
+
+<div class="panel">
+<h2>📊 量子态信息</h2>
+<div class="state-grid">
+<div class="state-cell"><div class="sv" id="si-state">|0⟩</div><div class="sl">态矢量</div></div>
+<div class="state-cell"><div class="sv" id="si-theta">0°</div><div class="sl">θ 极角</div></div>
+<div class="state-cell"><div class="sv" id="si-phi">0°</div><div class="sl">φ 方位角</div></div>
+<div class="state-cell"><div class="sv" id="si-p0">100%</div><div class="sl">P(|0⟩)</div></div>
+<div class="state-cell"><div class="sv" id="si-p1">0%</div><div class="sl">P(|1⟩)</div></div>
+<div class="state-cell"><div class="sv" id="si-coherence">1.000</div><div class="sl">相干性</div></div>
+<div class="state-cell"><div class="sv" id="si-bloch-x">0.000</div><div class="sl">Bloch X</div></div>
+<div class="state-cell"><div class="sv" id="si-bloch-y">0.000</div><div class="sl">Bloch Y</div></div>
+<div class="state-cell"><div class="sv" id="si-bloch-z">1.000</div><div class="sl">Bloch Z</div></div>
+</div>
+<div class="prob-bars" id="probBars">
+<div class="prob-bar"><span class="pb-label">|0⟩</span><div class="pb-track"><div class="pb-fill" id="bar0" style="width:100%;background:#4ecdc4;"></div></div><span class="pb-val" id="bar0val">100.0%</span></div>
+<div class="prob-bar"><span class="pb-label">|1⟩</span><div class="pb-track"><div class="pb-fill" id="bar1" style="width:0%;background:#ffe66d;"></div></div><span class="pb-val" id="bar1val">0.0%</span></div>
+</div>
+<div style="margin-top:12px;">
+<h3>🧮 常用量子门</h3>
+<div class="ctrl-row">
+<button class="q-btn secondary" onclick="applyGate('H')">H Hadamard</button>
+<button class="q-btn secondary" onclick="applyGate('X')">X Pauli-X</button>
+<button class="q-btn secondary" onclick="applyGate('Y')">Y Pauli-Y</button>
+<button class="q-btn secondary" onclick="applyGate('Z')">Z Pauli-Z</button>
+<button class="q-btn danger" onclick="resetSingle()">⟲ 重置</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Multi-Qubit View -->
+<div class="tab-content" id="tab-multi">
+<div class="panel">
+<h2>⚛️ 多量子比特态可视化</h2>
+<div class="qubit-selector" id="qubitSelector">
+<button class="qubit-btn active" onclick="setQubitCount(1)">1</button>
+<button class="qubit-btn" onclick="setQubitCount(2)">2</button>
+<button class="qubit-btn" onclick="setQubitCount(3)">3</button>
+<button class="qubit-btn" onclick="setQubitCount(4)">4</button>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:12px;">
+<div>
+<div class="canvas-wrap"><canvas id="multiCanvas" width="400" height="350"></canvas></div>
+</div>
+<div>
+<h3 style="color:#8a87ff;margin-bottom:8px;">态向量</h3>
+<div id="multiStateInfo" class="state-grid" style="grid-template-columns:repeat(2,1fr);"></div>
+<div style="margin-top:12px;">
+<h3 style="color:#4ecdc4;margin-bottom:8px;">概率分布</h3>
+<div id="multiProbBars"></div>
+</div>
+</div>
+</div>
+<div style="margin-top:12px;">
+<h3>🧮 多量子比特门</h3>
+<div class="ctrl-row">
+<button class="q-btn secondary" onclick="applyMultiGate('H0')">H on q0</button>
+<button class="q-btn secondary" onclick="applyMultiGate('H1')">H on q1</button>
+<button class="q-btn secondary" onclick="applyMultiGate('CNOT')">CNOT q0→q1</button>
+<button class="q-btn secondary" onclick="applyMultiGate('SWAP')">SWAP</button>
+<button class="q-btn danger" onclick="resetMulti()">⟲ 重置</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Circuits View -->
+<div class="tab-content" id="tab-circuits">
+<div class="panel">
+<h2>🔬 量子电路编辑器</h2>
+<div class="ctrl-row">
+<div class="ctrl-group" style="max-width:120px;">
+<label>量子比特数</label>
+<select id="circuitQubits" onchange="renderCircuit()">
+<option value="2">2</option>
+<option value="3" selected>3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+</select>
+</div>
+</div>
+<div class="gate-palette" id="gatePalette">
+<button class="gate-H" style="background:#4ecdc4;" onclick="selectGate('H')" title="Hadamard">H</button>
+<button style="background:#ff6b6b;color:#fff;" onclick="selectGate('X')" title="Pauli-X">X</button>
+<button style="background:#ffe66d;" onclick="selectGate('Y')" title="Pauli-Y">Y</button>
+<button style="background:#95e1d3;" onclick="selectGate('Z')" title="Pauli-Z">Z</button>
+<button style="background:#dfe6e9;" onclick="selectGate('S')" title="Phase S">S</button>
+<button style="background:#ffeaa7;" onclick="selectGate('T')" title="Phase T">T</button>
+<button style="background:#a29bfe;" onclick="selectGate('M')" title="测量">M</button>
+<button style="background:#636e72;color:#fff;" onclick="selectGate('I')" title="恒等门">I</button>
+</div>
+<div class="circuit-display" id="circuitDisplay"></div>
+<div class="ctrl-row" style="margin-top:10px;">
+<button class="q-btn" onclick="runCircuit()">▶ 运行电路</button>
+<button class="q-btn secondary" onclick="clearCircuit()">✕ 清空</button>
+<button class="q-btn secondary" onclick="exportCircuit()">📤 导出QBC</button>
+</div>
+<div id="circuitResult" style="margin-top:12px;"></div>
+</div>
+</div>
+
+<!-- Presets View -->
+<div class="tab-content" id="tab-presets">
+<div class="panel">
+<h2>📦 预设量子电路</h2>
+<p style="color:#7f8fa6;font-size:12px;margin-bottom:15px;">点击加载预设电路，查看量子算法的可视化表示</p>
+<div class="preset-grid" id="presetGrid"></div>
+</div>
+</div>
+
+<!-- Entanglement View -->
+<div class="tab-content" id="tab-entanglement">
+<div class="panel">
+<h2>🔗 量子纠缠可视化</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
+<div>
+<div class="canvas-wrap"><canvas id="entCanvas" width="400" height="350"></canvas></div>
+</div>
+<div>
+<h3 style="color:#8a87ff;margin-bottom:10px;">纠缠对配置</h3>
+<div class="ctrl-row">
+<div class="ctrl-group">
+<label>纠缠对数量</label>
+<select id="entPairCount" onchange="updateEntanglement()">
+<option value="2">2</option>
+<option value="3" selected>3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+</select>
+</div>
+<div class="ctrl-group">
+<label>纠缠强度</label>
+<input type="range" id="entStrength" min="0" max="1" step="0.05" value="0.95" oninput="updateEntanglement()">
+<span class="ctrl-val" id="entStrengthVal">0.95</span>
+</div>
+</div>
+<div id="entInfo" class="state-grid" style="grid-template-columns:repeat(2,1fr);"></div>
+<div style="margin-top:10px;">
+<h3 style="color:#4ecdc4;font-size:13px;">量子基因编码</h3>
+<pre style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;font-size:11px;color:#8a87ff;line-height:1.6;margin-top:5px;" id="entGeneEncoding">QGC-ENTANGLEMENT-2026062801
+ENTANGLE_STATE: ACTIVE
+ENTANGLE_STRENGTH: 0.95
+CHANNEL: primary_channel
+PROTOCOL: EPR-advanced</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="app-footer">
+<p>QEntL量子操作系统 v3.0 | 量子态可视化组件 | 量子基因编码: QGC-VIZ-20260628 | som.top</p>
+</div>
+</div>
+
+<script>
+// ===== Tab System =====
+function switchTab(name){
+document.querySelectorAll('.tab-btn').forEach(function(b,i){
+var names=['single','multi','circuits','presets','entanglement'];
+b.classList.toggle('active',names[i]===name);
+});
+document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');});
+document.getElementById('tab-'+name).classList.add('active');
+if(name==='single')updateSingleQubit();
+if(name==='multi')updateMultiQubit();
+if(name==='circuits')renderCircuit();
+if(name==='presets')renderPresets();
+if(name==='entanglement')updateEntanglement();
+}
+
+// ===== Single Qubit Bloch Sphere =====
+var alpha=1,phi=0;
+function updateSingleQubit(){
+alpha=parseFloat(document.getElementById('alphaSlider').value);
+phi=parseFloat(document.getElementById('phiSlider').value)*Math.PI/180;
+document.getElementById('alphaVal').textContent=alpha.toFixed(2);
+document.getElementById('phiVal').textContent=(phi*180/Math.PI).toFixed(0)+'°';
+
+var beta=Math.sqrt(1-alpha*alpha);
+var theta=2*Math.acos(alpha);
+var p0=alpha*alpha, p1=1-p0;
+var bx=Math.sin(theta)*Math.cos(phi);
+var by=Math.sin(theta)*Math.sin(phi);
+var bz=Math.cos(theta);
+
+document.getElementById('si-state').textContent='|ψ⟩ = '+alpha.toFixed(3)+'|0⟩ + '+beta.toFixed(3)+'|1⟩';
+document.getElementById('si-theta').textContent=(theta*180/Math.PI).toFixed(1)+'°';
+document.getElementById('si-phi').textContent=(phi*180/Math.PI).toFixed(1)+'°';
+document.getElementById('si-p0').textContent=(p0*100).toFixed(1)+'%';
+document.getElementById('si-p1').textContent=(p1*100).toFixed(1)+'%';
+document.getElementById('si-coherence').textContent=Math.sqrt(1-4*p0*p1).toFixed(3);
+document.getElementById('si-bloch-x').textContent=bx.toFixed(3);
+document.getElementById('si-bloch-y').textContent=by.toFixed(3);
+document.getElementById('si-bloch-z').textContent=bz.toFixed(3);
+document.getElementById('bar0').style.width=(p0*100)+'%';
+document.getElementById('bar1').style.width=(p1*100)+'%';
+document.getElementById('bar0val').textContent=(p0*100).toFixed(1)+'%';
+document.getElementById('bar1val').textContent=(p1*100).toFixed(1)+'%';
+
+drawBlochSphere(alpha,beta,phi);
+}
+
+function drawBlochSphere(a,b,ph){
+var c=document.getElementById('blochCanvas');
+var ctx=c.getContext('2d');
+var W=c.width,H=c.height,cx=W/2,cy=H/2,r=Math.min(W,H)/2-50;
+ctx.clearRect(0,0,W,H);
+
+// Sphere outline
+ctx.strokeStyle='rgba(138,135,255,0.25)';ctx.lineWidth=1;
+ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+
+// Equator ellipse
+ctx.beginPath();ctx.ellipse(cx,cy,r,r*0.28,0,0,Math.PI*2);ctx.stroke();
+
+// Vertical ellipse
+ctx.beginPath();ctx.ellipse(cx,cy,r*0.28,r,0,0,Math.PI*2);ctx.stroke();
+
+// Axes
+ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;
+ctx.beginPath();ctx.moveTo(cx-r-25,cy);ctx.lineTo(cx+r+25,cy);ctx.stroke();
+ctx.beginPath();ctx.moveTo(cx,cy-r-25);ctx.lineTo(cx,cy+r+25);ctx.stroke();
+
+// Labels
+ctx.fillStyle='#8a87ff';ctx.font='12px monospace';
+ctx.fillText('|0⟩',cx-12,cy-r-28);
+ctx.fillText('|1⟩',cx-12,cy+r+30);
+ctx.fillText('+x',cx+r+28,cy+5);
+ctx.fillText('-x',cx-r-38,cy+5);
+ctx.fillText('+y',cx+r*0.3+25,cy-r*0.28);
+ctx.fillText('-y',cx-r*0.3-30,cy-r*0.28);
+
+// State vector
+var theta=2*Math.acos(a);
+var px=cx+r*Math.sin(theta)*Math.cos(ph);
+var py=cy-r*Math.cos(theta);
+
+// Vector line
+ctx.strokeStyle='rgba(78,205,196,0.6)';ctx.lineWidth=2;
+ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(px,py);ctx.stroke();
+
+// Arrow
+var angle=Math.atan2(py-cy,px-cx);
+ctx.fillStyle='#4ecdc4';
+ctx.beginPath();ctx.moveTo(px,py);
+ctx.lineTo(px-12*Math.cos(angle-0.35),py-12*Math.sin(angle-0.35));
+ctx.lineTo(px-12*Math.cos(angle+0.35),py-12*Math.sin(angle+0.35));
+ctx.fill();
+
+// Point glow
+ctx.fillStyle='rgba(78,205,196,0.2)';
+ctx.beginPath();ctx.arc(px,py,18,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#4ecdc4';
+ctx.beginPath();ctx.arc(px,py,6,0,Math.PI*2);ctx.fill();
+
+// Phase arc
+if(Math.abs(ph)>0.05){
+ctx.strokeStyle='rgba(255,230,109,0.5)';ctx.lineWidth=1.5;
+ctx.beginPath();ctx.arc(cx,cy,r*0.4,0,-ph,ph>0);ctx.stroke();
+ctx.fillStyle='#ffe66d';ctx.font='10px monospace';
+ctx.fillText('φ',cx+r*0.45*Math.cos(-ph/2),cy+r*0.45*Math.sin(-ph/2)+4);
+}
+}
+
+function applyGate(g){
+var a=alpha;
+switch(g){
+case'H':{var na=(a+Math.sqrt(1-a*a))/Math.SQRT2;var nb=Math.sqrt(1-na*na);alpha=Math.max(0,Math.min(1,na));break;}
+case'X':{var temp=alpha;alpha=Math.sqrt(1-temp*temp);break;}
+case'Y':{alpha=Math.sqrt(1-alpha*alpha);break;}
+case'Z':{break;}
+}
+document.getElementById('alphaSlider').value=alpha;
+updateSingleQubit();
+}
+function resetSingle(){alpha=1;phi=0;document.getElementById('alphaSlider').value=1;document.getElementById('phiSlider').value=0;updateSingleQubit();}
+
+// ===== Multi-Qubit =====
+var multiQubits=2,multiStates=[1,0,0,0];
+function setQubitCount(n){
+multiQubits=n;
+document.querySelectorAll('.qubit-btn').forEach(function(b,i){b.classList.toggle('active',i===n-1);});
+resetMulti();
+updateMultiQubit();
+}
+function updateMultiQubit(){
+var dim=Math.pow(2,multiQubits);
+var c=document.getElementById('multiCanvas');
+var ctx=c.getContext('2d');
+var W=c.width,H=c.height;
+ctx.clearRect(0,0,W,H);
+
+// Draw Bloch spheres for each qubit
+var sphereR=Math.min(W/(multiQubits*2+1),H/3-30);
+var startX=(W-multiQubits*(sphereR*2+10))/2;
+var startY=H/2-sphereR;
+
+for(var i=0;i<multiQubits;i++){
+var sx=startX+i*(sphereR*2+10);
+var sy=startY+sphereR;
+
+// Sphere
+ctx.strokeStyle='rgba(138,135,255,0.25)';ctx.lineWidth=1;
+ctx.beginPath();ctx.arc(sx,sy,sphereR,0,Math.PI*2);ctx.stroke();
+ctx.beginPath();ctx.ellipse(sx,sy,sphereR,sphereR*0.25,0,0,Math.PI*2);ctx.stroke();
+
+// Labels
+ctx.fillStyle='#8a87ff';ctx.font='11px monospace';
+ctx.fillText('q'+i,sx-sphereR-20,sy+4);
+
+// |0⟩ |1⟩
+ctx.fillText('|0⟩',sx-8,sy-sphereR-8);
+ctx.fillText('|1⟩',sx-8,sy+sphereR+14);
+
+// State point based on amplitude
+var amp=Math.abs(multiStates[i])||0;
+var theta=2*Math.acos(Math.min(1,amp));
+var px=sx+sphereR*Math.sin(theta)*0.8;
+var py=sy-sphereR*Math.cos(theta)*0.8;
+
+ctx.fillStyle='#4ecdc4';
+ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();
+}
+
+// State info
+var infoDiv=document.getElementById('multiStateInfo');
+var html='';
+for(var i=0;i<dim;i++){
+var p=multiStates[i]*multiStates[i];
+html+='<div class="state-cell"><div class="sv">'+binStr(i,multiQubits)+'</div><div class="sl">P='+p.toFixed(3)+'</div></div>';
+}
+infoDiv.innerHTML=html;
+
+// Prob bars
+var barsDiv=document.getElementById('multiProbBars');
+html='';
+for(var i=0;i<dim;i++){
+var p=multiStates[i]*multiStates[i]*100;
+html+='<div class="prob-bar"><span class="pb-label">'+binStr(i,multiQubits)+'</span><div class="pb-track"><div class="pb-fill" style="width:'+p+'%;background:#4ecdc4;"></div></div><span class="pb-val">'+p.toFixed(1)+'%</span></div>';
+}
+barsDiv.innerHTML=html;
+}
+
+function binStr(n,d){var b=n.toString(2);while(b.length<d)b='0'+b;return b;}
+function resetMulti(){multiStates=new Array(Math.pow(2,multiQubits)).fill(0);multiStates[0]=1;updateMultiQubit();}
+function applyMultiGate(g){
+if(g==='H0'){multiStates[0]=1/Math.SQRT2;multiStates[1]=1/Math.SQRT2;}
+else if(g==='H1'){if(multiStates.length>2){multiStates[2]=1/Math.SQRT2;multiStates[3]=1/Math.SQRT2;}}
+else if(g==='CNOT'){
+var t=multiStates[0]+multiStates[3];
+multiStates[0]=multiStates[3];multiStates[3]=t-multiStates[3];
+multiStates[1]=multiStates[1];multiStates[2]=multiStates[2];
+}
+else if(g==='SWAP'){var tmp=multiStates[1];multiStates[1]=multiStates[2];multiStates[2]=tmp;}
+updateMultiQubit();
+}
+
+// ===== Circuit Editor =====
+var selectedGate='H',circuitGates=[],numQCbits=3;
+function selectGate(g){selectedGate=g;document.querySelectorAll('.gate-palette button').forEach(function(b){b.classList.toggle('active',b.textContent.trim()===g);});}
+function renderCircuit(){
+numQCbits=parseInt(document.getElementById('circuitQubits').value);
+var div=document.getElementById('circuitDisplay');
+var html='';
+for(var i=0;i<numQCbits;i++){
+html+='<div class="circuit-qubit-line"><span class="circuit-qubit-label">q'+i+'</span><div class="circuit-wire" id="wire'+i+'">';
+for(var j=0;j<circuitGates.length;j++){
+var gate=circuitGates[j];
+if(gate.qubit===i){
+var cls='gate-'+gate.type;
+var pos=(j/circuitGates.length)*100;
+html+='<div class="circuit-gate '+cls+'" style="left:'+pos+'%" onclick="removeGate('+j+')">'+gate.type+'</div>';
+}
+}
+html+='</div></div>';
+}
+div.innerHTML=html;
+}
+function removeGate(idx){circuitGates.splice(idx,1);renderCircuit();}
+function clearCircuit(){circuitGates=[];renderCircuit();document.getElementById('circuitResult').innerHTML='';}
+
+// Click on wire to add gate
+document.addEventListener('click',function(e){
+if(e.target.classList.contains('circuit-wire')){
+var wire=e.target;
+var rect=wire.getBoundingClientRect();
+var x=e.clientX-rect.left;
+var pos=Math.floor((x/rect.width)*8);
+var gate={type:selectedGate,qubit:parseInt(wire.id.replace('wire','')),position:pos};
+circuitGates.push(gate);
+renderCircuit();
+}
+});
+
+function runCircuit(){
+if(circuitGates.length===0){
+document.getElementById('circuitResult').innerHTML='<div style="color:#7f8fa6;font-size:12px;">⚠️ 请先添加量子门</div>';
+return;
+}
+var dim=Math.pow(2,numQCbits);
+var state=new Array(dim).fill(0);state[0]=1;
+
+// Simulate gates
+for(var i=0;i<circuitGates.length;i++){
+var g=circuitGates[i];
+if(g.type==='H'){
+// Apply H to qubit
+var newState=new Array(dim).fill(0);
+for(var s=0;s<dim;s++){
+if(s&(1<<g.qubit)){
+var s2=s^(1<<g.qubit);
+newState[s]+=state[s]/Math.SQRT2;
+newState[s2]+=state[s2]/Math.SQRT2;
+}else{
+var s2=s|(1<<g.qubit);
+newState[s]+=state[s]/Math.SQRT2;
+newState[s2]-=state[s2]/Math.SQRT2;
+}
+}
+state=newState;
+}
+}
+
+// Calculate probabilities
+var probs=[];
+for(var i=0;i<dim;i++){probs.push(state[i]*state[i]);}
+
+var html='<h3 style="color:#4ecdc4;margin-bottom:8px;">📊 运行结果</h3>';
+html+='<div class="prob-bars">';
+for(var i=0;i<dim;i++){
+html+='<div class="prob-bar"><span class="pb-label">'+binStr(i,numQCbits)+'</span><div class="pb-track"><div class="pb-fill" style="width:'+(probs[i]*100)+'%;background:#4ecdc4;"></div></div><span class="pb-val">'+(probs[i]*100).toFixed(1)+'%</span></div>';
+}
+html+='</div>';
+document.getElementById('circuitResult').innerHTML=html;
+}
+
+function exportCircuit(){
+var qbc='# 量子电路\n# QEntL Quantum Bytecode\n\n';
+for(var i=0;i<circuitGates.length;i++){
+var g=circuitGates[i];
+if(g.type==='M')qbc+='MEASURE q'+g.qubit+'\n';
+else qbc+=g.type+' q'+g.qubit+'\n';
+}
+alert('QBC代码:\n\n'+qbc);
+}
+
+// ===== Presets =====
+var presets=[
+{name:'Bell态制备',desc:'创建最大纠缠态 (|00⟩+|11⟩)/√2',gates:[{t:'H',q:0},{t:'CNOT',q:1,c:0}],
+qubits:2,code:'H q0\nCNOT q0 q1'},
+{name:'GHZ态',desc:'三量子比特最大纠缠态',gates:[{t:'H',q:0},{t:'CNOT',q:1,c:0},{t:'CNOT',q:2,c:0}],
+qubits:3,code:'H q0\nCNOT q0 q1\nCNOT q0 q2'},
+{name:'量子隐形传态',desc:'完整量子隐形传态协议',gates:[{t:'H',q:1},{t:'CNOT',q:2,c:1},{t:'CNOT',q:0,c:1},{t:'H',q:0},{t:'M',q:0},{t:'M',q:1}],
+qubits:3,code:'H q1\nCNOT q1 q2\nCNOT q1 q0\nH q0\nMEASURE q0\nMEASURE q1'},
+{name:'量子傅里叶变换',desc:'2量子比特QFT',gates:[{t:'H',q:1},{t:'S',q:0},{t:'CNOT',q:0,c:1},{t:'H',q:0}],
+qubits:2,code:'H q1\nS q0\nCNOT q1 q0\nH q0'},
+{name:'Grover搜索',desc:'单目标Grover迭代',gates:[{t:'H',q:0},{t:'H',q:1},{t:'X',q:0},{t:'X',q:1},{t:'CNOT',q:0,c:1},{t:'X',q:0},{t:'X',q:1},{t:'H',q:0},{t:'H',q:1}],
+qubits:2,code:'H q0\nH q1\nX q0\nX q1\nCNOT q1 q0\nX q0\nX q1\nH q0\nH q1'},
+{name:'量子随机数',desc:'产生真正的量子随机比特',gates:[{t:'H',q:0},{t:'M',q:0}],
+qubits:1,code:'H q0\nMEASURE q0'}
+];
+
+function renderPresets(){
+var grid=document.getElementById('presetGrid');
+var html='';
+for(var i=0;i<presets.length;i++){
+var p=presets[i];
+html+='<div class="preset-card" onclick="loadPreset('+i+')"><h4>'+p.name+'</h4><p>'+p.desc+'</p></div>';
+}
+grid.innerHTML=html;
+}
+
+function loadPreset(idx){
+var p=presets[idx];
+document.getElementById('circuitQubits').value=p.qubits;
+circuitGates=[];
+for(var i=0;i<p.gates.length;i++){
+circuitGates.push({type:p.gates[i].t,qubit:p.gates[i].q,position:i,controlQubit:p.gates[i].c||null});
+}
+renderCircuit();
+document.getElementById('circuitResult').innerHTML='<div style="padding:10px;background:rgba(138,135,255,0.08);border-radius:8px;font-size:12px;"><strong style="color:#8a87ff;">'+p.name+'</strong><br><span style="color:#7f8fa6;">'+p.desc+'</span><br><pre style="margin-top:8px;color:#4ecdc4;font-size:11px;">'+p.code.replace(/\n/g,'<br>')+'</pre></div>';
+switchTab('circuits');
+// Update tabs
+document.querySelectorAll('.tab-btn').forEach(function(b,i){var ns=['single','multi','circuits','presets','entanglement'];b.classList.toggle('active',ns[i]==='circuits');});
+document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');});
+document.getElementById('tab-circuits').classList.add('active');
+}
+
+// ===== Entanglement Visualization =====
+function updateEntanglement(){
+var count=parseInt(document.getElementById('entPairCount').value);
+var strength=parseFloat(document.getElementById('entStrength').value);
+document.getElementById('entStrengthVal').textContent=strength.toFixed(2);
+
+var c=document.getElementById('entCanvas');
+var ctx=c.getContext('2d');
+var W=c.width,H=c.height,cx=W/2,cy=H/2;
+ctx.clearRect(0,0,W,H);
+
+// Draw nodes in circle
+var nodes=[];
+for(var i=0;i<count;i++){
+var angle=(i/count)*Math.PI*2-Math.PI/2;
+var r=Math.min(W,H)/2-60;
+nodes.push({x:cx+r*Math.cos(angle),y:cy+r*Math.sin(angle),id:'q'+i});
+}
+
+// Draw connections
+for(var i=0;i<nodes.length;i++){
+for(var j=i+1;j<nodes.length;j++){
+var pulse=0.5+0.5*Math.sin(Date.now()/500+i+j);
+ctx.strokeStyle='rgba(138,135,255,'+(strength*0.5*pulse)+')';
+ctx.lineWidth=strength*3;
+ctx.beginPath();
+ctx.moveTo(nodes[i].x,nodes[i].y);
+ctx.lineTo(nodes[j].x,nodes[j].y);
+ctx.stroke();
+}
+}
+
+// Draw nodes
+for(var i=0;i<nodes.length;i++){
+var n=nodes[i];
+ctx.fillStyle='rgba(78,205,196,0.2)';
+ctx.beginPath();ctx.arc(n.x,n.y,25,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#4ecdc4';
+ctx.beginPath();ctx.arc(n.x,n.y,15,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#fff';ctx.font='bold 12px monospace';ctx.textAlign='center';
+ctx.fillText(n.id,n.x,n.y+4);
+}
+ctx.textAlign='left';
+
+// Info
+var info=document.getElementById('entInfo');
+var entCount=count*(count-1)/2;
+info.innerHTML='<div class="state-cell"><div class="sv">'+count+'</div><div class="sl">量子比特</div></div>'
++'<div class="state-cell"><div class="sv">'+entCount+'</div><div class="sl">纠缠对</div></div>'
++'<div class="state-cell"><div class="sv">'+(strength*100).toFixed(0)+'%</div><div class="sl">纠缠强度</div></div>'
++'<div class="state-cell"><div class="sv">ACTIVE</div><div class="sl">纠缠态</div></div>';
+
+// Gene encoding
+var ts=Date.now();
+document.getElementById('entGeneEncoding').textContent=
+'QGC-ENTANGLEMENT-'+ts.toString(36).toUpperCase()+'\nENTANGLE_STATE: ACTIVE\nENTANGLE_STRENGTH: '+strength.toFixed(2)+'\nENTANGLED_PAIRS: '+entCount+'\nCHANNEL: primary_channel\nPROTOCOL: EPR-advanced\nNODE_COUNT: '+count;
+}
+
+// Animate entanglement
+(function(){
+function animEnt(){
+if(document.getElementById('tab-entanglement').classList.contains('active')){
+updateEntanglement();
+}
+requestAnimationFrame(animEnt);
+}
+animEnt();
+})();
+
+// ===== Init =====
+updateSingleQubit();
+updateMultiQubit();
+renderCircuit();
+renderPresets();
+updateEntanglement();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Hello Bell - QEntL 示例程序
+# 创建 Bell 态: (|00> + |11>) / sqrt(2)
+
+init 2                           # 初始化2个量子比特
+
+H 0                               # Hadamard on qubit 0
+CNOT 0 1                          # CNOT control=0, target=1
+
+MEASURE 0 0                       # Measure qubit 0 -> register 0
+MEASURE 1 1                       # Measure qubit 1 -> register 1
+
+PRINT 0                           # Print quantum state at qubit 0
+STOP                              # Halt

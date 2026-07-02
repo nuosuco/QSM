@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>QEntL全栈操作系统核心 - QSM开发文档中心</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:#0a0a2e;color:#e0e0e0;display:flex;min-height:100vh}
+.sidebar{width:280px;height:100vh;overflow-y:auto;background:#0d0d3a;border-right:1px solid #1a1a4a;padding:15px;position:fixed;left:0;top:0;z-index:100}
+.sidebar h2{color:#00d2ff;font-size:16px;margin-bottom:15px;padding:0 5px}
+.sidebar .section-title{color:#576574;font-size:11px;text-transform:uppercase;margin:12px 0 6px 5px;letter-spacing:1px}
+.sidebar ul{list-style:none}
+.sidebar li{margin:2px 0}
+.sidebar a{color:#7f8fa6;text-decoration:none;font-size:13px;display:block;padding:6px 10px;border-radius:6px;transition:all 0.2s;line-height:1.4}
+.sidebar a:hover{background:rgba(0,210,255,0.08);color:#00d2ff}
+.main{margin-left:280px;padding:30px 40px;flex:1;min-height:100vh}
+.main h1{color:#00d2ff;font-size:24px;margin-bottom:8px}
+.main .meta{color:#576574;font-size:12px;margin-bottom:20px}
+.main .content{background:#0d0d3a;border:1px solid #1a1a4a;border-radius:12px;padding:25px;line-height:1.8;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.main .content h2{color:#7b2ff7;margin:20px 0 10px;font-size:18px}
+.main .content h3{color:#00d2ff;margin:15px 0 8px;font-size:15px}
+.main .content p{margin-bottom:10px;color:#b0b0c0}
+.main .content table{width:100%;border-collapse:collapse;margin:10px 0}
+.main .content th,.main .content td{padding:8px 10px;border:1px solid #2a2a5a;text-align:left;font-size:13px}
+.main .content th{background:#1a1a4a;color:#00d2ff}
+.main .content td{background:#0a0a2e}
+.main .content pre{background:#0a0a2e;padding:12px;border-radius:8px;overflow-x:auto;margin:10px 0;font-size:13px}
+.main .content code{background:#1a1a4a;padding:1px 5px;border-radius:3px;color:#00d2ff;font-size:13px}
+.main .content ul,.main .content ol{margin:8px 0 8px 20px}
+.main .content li{margin:4px 0;font-size:14px}
+.back-btn{display:inline-block;margin-bottom:15px;color:#00d2ff;text-decoration:none;padding:6px 14px;border:1px solid #00d2ff;border-radius:8px;font-size:13px;transition:all 0.2s}
+.back-btn:hover{background:rgba(0,210,255,0.1)}
+.nav-bar{position:fixed;top:0;left:280px;right:0;height:40px;background:#0d0d3a;border-bottom:1px solid #1a1a4a;display:flex;align-items:center;padding:0 20px;z-index:99}
+.nav-bar a{color:#7f8fa6;text-decoration:none;font-size:12px;margin-right:15px;padding:4px 8px;border-radius:4px}
+.nav-bar a:hover{color:#00d2ff;background:rgba(0,210,255,0.05)}
+</style>
+</head>
+<body>
+
+<div class="main">
+<a href="index.html" class="back-btn">← 文档中心首页</a>
+
+<h1>QEntL全栈操作系统核心</h1>
+<div class="content">// QEntL 全栈操作系统核心
+// 量子叠加态模型训练引擎
+
+// 量子门定义
+量子门 H {
+    创建 叠加态() {
+        量子比特 q = 0
+        H(q)
+        返回 q
+    }
+}
+
+量子门 X {
+    创建 翻转态(量子比特 q) {
+        X(q)
+        返回 q
+    }
+}
+
+量子门 CNOT {
+    创建 纠缠态(量子比特 q1, 量子比特 q2) {
+        H(q1)
+        CNOT(q1, q2)
+        返回 [q1, q2]
+    }
+}
+
+// 量子神经网络层
+量子层 输入层 {
+    维度: 4120 // 彝文字符数
+    量子比特: 输入_量子比特[4120]
+    
+    初始化() {
+        对于 i 从 0 到 4119 {
+            输入_量子比特[i] = 0
+        }
+    }
+    
+    编码_字符(字符 c) {
+        索引 = 查找_字符索引(c)
+        输入_量子比特[索引] = 1
+    }
+}
+
+量子层 隐藏层 {
+    维度: 1024
+    量子比特: 隐藏_量子比特[1024]
+    权重: 权重矩阵[1024][4120]
+    
+    前向传播(输入_量子比特[]) {
+        对于 i 从 0 到 1023 {
+            总和 = 0
+            对于 j 从 0 到 4119 {
+                总和 += 权重[i][j] * 输入_量子比特[j]
+            }
+            隐藏_量子比特[i] = 激活函数(总和)
+        }
+        返回 隐藏_量子比特
+    }
+}
+
+量子层 输出层 {
+    维度: 4120
+    量子比特: 输出_量子比特[4120]
+    权重: 输出权重矩阵[4120][1024]
+    
+    前向传播(隐藏_量子比特[]) {
+        对于 i 从 0 到 4119 {
+            总和 = 0
+            对于 j 从 0 到 1023 {
+                总和 += 输出权重[i][j] * 隐藏_量子比特[j]
+            }
+            输出_量子比特[i] = softmax(总和)
+        }
+        返回 输出_量子比特
+    }
+}
+
+// 量子训练引擎
+量子训练器 QSM_Trainer {
+    输入层: 输入层
+    隐藏层: 隐藏层
+    输出层: 输出层
+    
+    学习率: 0.001
+    批次大小: 32
+    训练轮数: 100
+    
+    训练(数据集) {
+        对于 epoch 从 0 到 训练轮数-1 {
+            损失 = 0
+            对于 批次 从 0 到 数据集大小/批次大小-1 {
+                输入_批次 = 获取_批次(数据集, 批次)
+                标签_批次 = 获取_标签(数据集, 批次)
+                
+                // 前向传播
+                隐藏输出 = 隐藏层.前向传播(输入_批次)
+                输出 = 输出层.前向传播(隐藏输出)
+                
+                // 计算损失
+                批次损失 = 交叉熵损失(输出, 标签_批次)
+                损失 += 批次损失
+                
+                // 反向传播
+                梯度 = 计算梯度(损失, 输出, 标签_批次)
+                更新权重(梯度)
+            }
+            
+            平均损失 = 损失 / (数据集大小/批次大小)
+            记录_训练日志(epoch, 平均损失)
+            
+            // 保存模型
+            如果 (平均损失 &lt; 最佳损失) {
+                最佳损失 = 平均损失
+                保存模型("best_model.qentl")
+            }
+        }
+    }
+    
+    更新权重(梯度) {
+        对于每个权重矩阵 W {
+            W = W - 学习率 * 梯度[W]
+        }
+    }
+}
+
+// 主程序
+主程序() {
+    // 初始化训练器
+    训练器 = 量子训练器()
+    
+    // 加载彝文数据
+    数据集 = 加载_数据("/root/.openclaw/workspace/QSM/data/")
+    
+    // 开始训练
+    训练器.训练(数据集)
+    
+    返回 "训练完成"
+}
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,589 @@
+/**
+ * @file parallel_builder.qentl
+ * @brief QEntL并行构建管理器
+ * 
+ * 量子基因编码: QGC-COMPILER-PARALBUILD-2024061904
+ * 量子纠缠信道: QEC-COMPILER-BUILD-02
+ */
+
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/set.qentl";
+import "QEntL/core/system.qentl";
+import "QEntL/core/thread.qentl";
+import "QEntL/core/queue.qentl";
+
+/**
+ * @enum TaskStatus
+ * @brief 任务状态枚举
+ */
+enum TaskStatus {
+    PENDING,    // 等待执行
+    RUNNING,    // 正在执行
+    COMPLETED,  // 已完成
+    FAILED      // 执行失败
+}
+
+/**
+ * @class BuildTask
+ * @brief 构建任务类
+ */
+class BuildTask {
+    public {
+        id: Integer;                // 任务ID
+        inputFile: String;          // 输入文件
+        outputFile: String;         // 输出文件
+        dependencies: Array<Integer>; // 依赖任务ID列表
+        dependents: Array<Integer>;   // 依赖于此任务的任务ID列表
+        status: TaskStatus;         // 任务状态
+        errorMessage: String;       // 错误信息
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param id 任务ID
+     * @param inputFile 输入文件
+     * @param outputFile 输出文件
+     */
+    constructor(id: Integer, inputFile: String, outputFile: String) {
+        this.id = id;
+        this.inputFile = inputFile;
+        this.outputFile = outputFile;
+        this.dependencies = new Array<Integer>();
+        this.dependents = new Array<Integer>();
+        this.status = TaskStatus.PENDING;
+        this.errorMessage = "";
+    }
+    
+    /**
+     * @brief 添加依赖任务
+     * @param taskId 依赖任务ID
+     */
+    public function addDependency(taskId: Integer): void {
+        if (!this.dependencies.contains(taskId)) {
+            this.dependencies.push(taskId);
+        }
+    }
+    
+    /**
+     * @brief 添加依赖此任务的任务
+     * @param taskId 依赖于此任务的任务ID
+     */
+    public function addDependent(taskId: Integer): void {
+        if (!this.dependents.contains(taskId)) {
+            this.dependents.push(taskId);
+        }
+    }
+    
+    /**
+     * @brief 检查任务是否可以执行
+     * @param taskMap 任务映射
+     * @return 是否可以执行
+     */
+    public function canExecute(taskMap: Map<Integer, BuildTask>): Boolean {
+        // 如果任务已经在执行或已完成，则不能再执行
+        if (this.status != TaskStatus.PENDING) {
+            return false;
+        }
+        
+        // 检查所有依赖任务是否已完成
+        for (let i = 0; i < this.dependencies.length; i++) {
+            let depId = this.dependencies[i];
+            let depTask = taskMap.get(depId);
+            
+            if (depTask.status != TaskStatus.COMPLETED) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+}
+
+/**
+ * @class BuildWorker
+ * @brief 构建工作线程
+ */
+class BuildWorker {
+    private {
+        id: Integer;                   // 工作线程ID
+        taskQueue: Queue<BuildTask>;   // 任务队列
+        compileCommand: String;        // 编译命令模板
+        running: Boolean;              // 是否正在运行
+        currentTask: BuildTask;        // 当前正在执行的任务
+        thread: Thread;                // 线程对象
+        finished: Boolean;             // 是否已完成所有任务
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param id 工作线程ID
+     * @param compileCommand 编译命令模板
+     */
+    constructor(id: Integer, compileCommand: String) {
+        this.id = id;
+        this.taskQueue = new Queue<BuildTask>();
+        this.compileCommand = compileCommand;
+        this.running = false;
+        this.currentTask = null;
+        this.thread = null;
+        this.finished = false;
+    }
+    
+    /**
+     * @brief 添加任务
+     * @param task 构建任务
+     */
+    public function addTask(task: BuildTask): void {
+        this.taskQueue.enqueue(task);
+    }
+    
+    /**
+     * @brief 启动工作线程
+     */
+    public function start(): void {
+        if (this.running) {
+            return;
+        }
+        
+        this.running = true;
+        this.finished = false;
+        this.thread = new Thread(this.run);
+        this.thread.start();
+    }
+    
+    /**
+     * @brief 停止工作线程
+     */
+    public function stop(): void {
+        this.running = false;
+        
+        if (this.thread != null) {
+            this.thread.join();
+            this.thread = null;
+        }
+    }
+    
+    /**
+     * @brief 线程执行函数
+     */
+    private function run(): void {
+        while (this.running && !this.taskQueue.isEmpty()) {
+            // 获取下一个任务
+            this.currentTask = this.taskQueue.dequeue();
+            
+            if (this.currentTask != null) {
+                // 更新任务状态
+                this.currentTask.status = TaskStatus.RUNNING;
+                
+                // 执行任务
+                let success = this.executeTask(this.currentTask);
+                
+                // 更新任务状态
+                if (success) {
+                    this.currentTask.status = TaskStatus.COMPLETED;
+                } else {
+                    this.currentTask.status = TaskStatus.FAILED;
+                }
+                
+                this.currentTask = null;
+            }
+        }
+        
+        this.finished = true;
+    }
+    
+    /**
+     * @brief 执行构建任务
+     * @param task 构建任务
+     * @return 是否成功
+     */
+    private function executeTask(task: BuildTask): Boolean {
+        System.println("工作线程 " + this.id + " 正在执行任务 " + task.id + ": " + task.inputFile);
+        
+        try {
+            // 准备命令
+            let command = this.compileCommand
+                .replace("{input}", task.inputFile)
+                .replace("{output}", task.outputFile);
+            
+            // 执行命令
+            let result = System.execute(command);
+            
+            if (result.exitCode != 0) {
+                task.errorMessage = "编译失败，退出码: " + result.exitCode + "\n" + result.stderr;
+                System.println("任务 " + task.id + " 失败: " + task.errorMessage);
+                return false;
+            }
+            
+            return true;
+        } catch (error) {
+            task.errorMessage = "执行异常: " + error;
+            System.println("任务 " + task.id + " 失败: " + task.errorMessage);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 检查工作线程是否已完成所有任务
+     * @return 是否已完成所有任务
+     */
+    public function isFinished(): Boolean {
+        return this.finished;
+    }
+    
+    /**
+     * @brief 获取工作线程ID
+     * @return 工作线程ID
+     */
+    public function getId(): Integer {
+        return this.id;
+    }
+    
+    /**
+     * @brief 获取当前正在执行的任务
+     * @return 当前任务
+     */
+    public function getCurrentTask(): BuildTask {
+        return this.currentTask;
+    }
+    
+    /**
+     * @brief 是否正在运行
+     * @return 是否正在运行
+     */
+    public function isRunning(): Boolean {
+        return this.running;
+    }
+}
+
+/**
+ * @class ParallelBuilder
+ * @brief 并行构建管理器
+ */
+class ParallelBuilder {
+    private {
+        tasks: Map<Integer, BuildTask>;     // 任务映射表
+        taskIdMap: Map<String, Integer>;    // 文件路径到任务ID的映射
+        workers: Array<BuildWorker>;        // 工作线程列表
+        maxWorkers: Integer;                // 最大工作线程数
+        compileCommand: String;             // 编译命令模板
+        nextTaskId: Integer;                // 下一个任务ID
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.tasks = new Map<Integer, BuildTask>();
+        this.taskIdMap = new Map<String, Integer>();
+        this.workers = new Array<BuildWorker>();
+        this.maxWorkers = Thread.getProcessorCount();
+        this.compileCommand = "qentlc {input} -o {output}";
+        this.nextTaskId = 0;
+    }
+    
+    /**
+     * @brief 设置最大工作线程数
+     * @param maxWorkers 最大工作线程数
+     */
+    public function setMaxWorkers(maxWorkers: Integer): void {
+        if (maxWorkers > 0) {
+            this.maxWorkers = maxWorkers;
+        }
+    }
+    
+    /**
+     * @brief 设置编译命令模板
+     * @param command 命令模板，可以包含 {input} 和 {output} 占位符
+     */
+    public function setCompileCommand(command: String): void {
+        if (command != "") {
+            this.compileCommand = command;
+        }
+    }
+    
+    /**
+     * @brief 创建构建任务
+     * @param inputFile 输入文件
+     * @param outputFile 输出文件
+     * @return 任务ID
+     */
+    public function createTask(inputFile: String, outputFile: String): Integer {
+        // 检查是否已存在相同输入文件的任务
+        if (this.taskIdMap.containsKey(inputFile)) {
+            return this.taskIdMap.get(inputFile);
+        }
+        
+        // 创建新任务
+        let taskId = this.nextTaskId++;
+        let task = new BuildTask(taskId, inputFile, outputFile);
+        
+        // 添加到映射表
+        this.tasks.set(taskId, task);
+        this.taskIdMap.set(inputFile, taskId);
+        
+        return taskId;
+    }
+    
+    /**
+     * @brief 添加任务依赖关系
+     * @param taskId 任务ID
+     * @param dependsOn 依赖的任务ID
+     * @return 是否成功添加依赖关系
+     */
+    public function addTaskDependency(taskId: Integer, dependsOn: Integer): Boolean {
+        if (!this.tasks.containsKey(taskId) || !this.tasks.containsKey(dependsOn)) {
+            return false;
+        }
+        
+        let task = this.tasks.get(taskId);
+        let depTask = this.tasks.get(dependsOn);
+        
+        // 添加依赖关系
+        task.addDependency(dependsOn);
+        depTask.addDependent(taskId);
+        
+        return true;
+    }
+    
+    /**
+     * @brief 根据输入文件获取任务ID
+     * @param inputFile 输入文件
+     * @return 任务ID，如果不存在则返回-1
+     */
+    public function getTaskId(inputFile: String): Integer {
+        if (this.taskIdMap.containsKey(inputFile)) {
+            return this.taskIdMap.get(inputFile);
+        }
+        return -1;
+    }
+    
+    /**
+     * @brief 执行构建
+     * @return 是否全部成功
+     */
+    public function runBuild(): Boolean {
+        // 创建工作线程
+        this.createWorkers();
+        
+        // 分配初始任务
+        this.assignTasks();
+        
+        // 等待所有任务完成
+        let success = this.waitForCompletion();
+        
+        // 停止所有工作线程
+        this.stopWorkers();
+        
+        return success;
+    }
+    
+    /**
+     * @brief 创建工作线程
+     */
+    private function createWorkers(): void {
+        let workerCount = Math.min(this.maxWorkers, this.tasks.size());
+        
+        for (let i = 0; i < workerCount; i++) {
+            let worker = new BuildWorker(i, this.compileCommand);
+            this.workers.push(worker);
+        }
+    }
+    
+    /**
+     * @brief 为工作线程分配任务
+     */
+    private function assignTasks(): void {
+        // 创建可执行任务队列
+        let executableTasks = new Queue<BuildTask>();
+        
+        // 找出所有可以立即执行的任务（没有依赖的任务）
+        let taskIds = this.tasks.keys();
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.tasks.get(taskIds[i]);
+            if (task.dependencies.length == 0) {
+                executableTasks.enqueue(task);
+            }
+        }
+        
+        // 分配初始任务给工作线程
+        this.distributeTasksToWorkers(executableTasks);
+        
+        // 启动所有工作线程
+        for (let i = 0; i < this.workers.length; i++) {
+            this.workers[i].start();
+        }
+    }
+    
+    /**
+     * @brief 将任务分配给工作线程
+     * @param executableTasks 可执行任务队列
+     */
+    private function distributeTasksToWorkers(executableTasks: Queue<BuildTask>): void {
+        // 平均分配任务给工作线程
+        let workerIndex = 0;
+        
+        while (!executableTasks.isEmpty()) {
+            let task = executableTasks.dequeue();
+            this.workers[workerIndex].addTask(task);
+            
+            // 轮询分配
+            workerIndex = (workerIndex + 1) % this.workers.length;
+        }
+    }
+    
+    /**
+     * @brief 等待所有任务完成
+     * @return 是否全部成功
+     */
+    private function waitForCompletion(): Boolean {
+        let allTasksCompleted = false;
+        let allWorkersStopped = false;
+        
+        // 定期检查任务状态，直到所有任务完成
+        while (!allTasksCompleted || !allWorkersStopped) {
+            // 休眠一段时间
+            Thread.sleep(100);
+            
+            // 检查任务状态
+            allTasksCompleted = this.checkTaskCompletion();
+            
+            // 找出新的可执行任务
+            let executableTasks = this.findExecutableTasks();
+            if (!executableTasks.isEmpty()) {
+                this.distributeTasksToWorkers(executableTasks);
+            }
+            
+            // 检查工作线程是否全部停止
+            allWorkersStopped = true;
+            for (let i = 0; i < this.workers.length; i++) {
+                if (!this.workers[i].isFinished()) {
+                    allWorkersStopped = false;
+                    break;
+                }
+            }
+        }
+        
+        // 检查是否有任务失败
+        let taskIds = this.tasks.keys();
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.tasks.get(taskIds[i]);
+            if (task.status == TaskStatus.FAILED) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief 检查任务是否全部完成
+     * @return 是否全部完成
+     */
+    private function checkTaskCompletion(): Boolean {
+        let taskIds = this.tasks.keys();
+        
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.tasks.get(taskIds[i]);
+            
+            // 如果有任务未完成，则返回false
+            if (task.status != TaskStatus.COMPLETED && task.status != TaskStatus.FAILED) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief 查找可执行的任务
+     * @return 可执行任务队列
+     */
+    private function findExecutableTasks(): Queue<BuildTask> {
+        let executableTasks = new Queue<BuildTask>();
+        let taskIds = this.tasks.keys();
+        
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.tasks.get(taskIds[i]);
+            
+            if (task.canExecute(this.tasks)) {
+                executableTasks.enqueue(task);
+            }
+        }
+        
+        return executableTasks;
+    }
+    
+    /**
+     * @brief 停止所有工作线程
+     */
+    private function stopWorkers(): void {
+        for (let i = 0; i < this.workers.length; i++) {
+            this.workers[i].stop();
+        }
+        
+        this.workers.clear();
+    }
+    
+    /**
+     * @brief 获取任务数量
+     * @return 任务数量
+     */
+    public function getTaskCount(): Integer {
+        return this.tasks.size();
+    }
+    
+    /**
+     * @brief 获取已完成的任务数量
+     * @return 已完成的任务数量
+     */
+    public function getCompletedTaskCount(): Integer {
+        let completedCount = 0;
+        let taskIds = this.tasks.keys();
+        
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.tasks.get(taskIds[i]);
+            if (task.status == TaskStatus.COMPLETED) {
+                completedCount++;
+            }
+        }
+        
+        return completedCount;
+    }
+    
+    /**
+     * @brief 获取失败的任务数量
+     * @return 失败的任务数量
+     */
+    public function getFailedTaskCount(): Integer {
+        let failedCount = 0;
+        let taskIds = this.tasks.keys();
+        
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.tasks.get(taskIds[i]);
+            if (task.status == TaskStatus.FAILED) {
+                failedCount++;
+            }
+        }
+        
+        return failedCount;
+    }
+    
+    /**
+     * @brief 清空所有任务
+     */
+    public function clearTasks(): void {
+        this.tasks.clear();
+        this.taskIdMap.clear();
+        this.nextTaskId = 0;
+    }
+}
+
+export {
+    TaskStatus,
+    BuildTask,
+    BuildWorker,
+    ParallelBuilder
+}; 

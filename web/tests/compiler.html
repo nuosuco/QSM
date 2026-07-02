@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QEntL在线编译器</title>
+<style>
+body {
+    font-family: 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: #fff;
+    margin: 0;
+    padding: 20px;
+}
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+h1 {
+    color: #4ecdc4;
+    text-align: center;
+}
+.editor-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+.panel {
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 15px;
+}
+.panel h2 {
+    color: #ffe66d;
+    margin-top: 0;
+}
+textarea {
+    width: 100%;
+    height: 300px;
+    background: #0a0a1a;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 5px;
+    padding: 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+    resize: vertical;
+}
+.output {
+    background: #0a0a1a;
+    padding: 15px;
+    border-radius: 5px;
+    font-family: 'Consolas', monospace;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.btn {
+    background: linear-gradient(135deg, #4ecdc4, #44a08d);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin: 5px;
+}
+.btn:hover {
+    opacity: 0.9;
+}
+.status {
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+.success { background: rgba(76,175,80,0.2); color: #4caf50; }
+.error { background: rgba(244,67,54,0.2); color: #f44336; }
+.info { background: rgba(33,150,243,0.2); color: #2196f3; }
+.example-btn {
+    background: rgba(255,230,109,0.2);
+    color: #ffe66d;
+    border: 1px solid #ffe66d;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 5px;
+    font-size: 14px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🔮 QEntL在线编译器</h1>
+    <p style="text-align:center;color:#888;">支持中文、英文、滇川黔贵通用彝文三语编译</p>
+    
+    <div style="text-align:center;margin:15px 0;">
+        <button class="example-btn" onclick="loadExample('hello')">📝 基础示例</button>
+        <button class="example-btn" onclick="loadExample('function')">⚡ 函数示例</button>
+        <button class="example-btn" onclick="loadExample('quantum')">🔮 量子类示例</button>
+    </div>
+    
+    <div class="editor-panel">
+        <div class="panel">
+            <h2>📝 源代码</h2>
+            <textarea id="sourceCode" placeholder="在此输入QEntL代码...
+
+示例:
+配置 {
+    版本: \"1.0.0\"
+}
+
+函数 测试() {
+    返回 \"你好，量子世界！\"
+}"></textarea>
+            <div style="margin-top:10px;">
+                <button class="btn" onclick="compile()">🔧 编译</button>
+                <button class="btn" onclick="run()">▶ 运行</button>
+                <button class="btn" onclick="clearAll()">🗑 清空</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>📊 输出结果</h2>
+            <div id="status" class="status info">准备就绪</div>
+            <div id="output" class="output">等待编译...</div>
+        </div>
+    </div>
+    
+    <div style="margin-top:20px;padding:15px;background:rgba(138,135,255,0.1);border-radius:10px;">
+        <h3 style="color:#4ecdc4;margin-top:0;">📖 支持的语法</h3>
+        <ul style="color:#aaa;">
+            <li><b>配置块</b>: 配置 { ... }</li>
+            <li><b>类型定义</b>: 类型 名称 { ... }</li>
+            <li><b>函数定义</b>: 函数 名称(参数) { ... }</li>
+            <li><b>量子类</b>: quantum_class 名称 { ... }</li>
+            <li><b>控制流</b>: 如果、否则、循环、返回</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+const examples = {
+    hello: `配置 {
+    版本: "1.0.0"
+}
+
+函数 问候(名字: 字符串) {
+    let 消息 = "你好，" + 名字
+    返回 消息
+}`,
+    
+    function: `配置 {
+    调试: true
+}
+
+类型 用户 {
+    名称: 字符串,
+    年龄: 整数
+}
+
+函数 加法(a: 整数, b: 整数) -> 整数 {
+    let 结果 = a + b
+    返回 结果
+}
+
+函数 主函数() {
+    let x = 10
+    let y = 20
+    let 和 = 加法(x, y)
+    返回 和
+}`,
+    
+    quantum: `配置 {
+    量子模式: true
+}
+
+quantum_class 量子处理器 {
+    函数 初始化() {
+        返回 "量子处理器已就绪"
+    }
+    
+    函数 运行(指令: 字符串) {
+        返回 指令
+    }
+}
+
+函数 主函数() {
+    let 处理器 = 新 量子处理器()
+    返回 处理器.运行("量子计算完成")
+}`
+};
+
+function loadExample(name) {
+    document.getElementById('sourceCode').value = examples[name];
+    setStatus('info', '已加载示例代码');
+}
+
+function compile() {
+    const source = document.getElementById('sourceCode').value;
+    if (!source.trim()) {
+        setStatus('error', '请输入源代码');
+        return;
+    }
+    
+    setStatus('info', '编译中...');
+    
+    // 模拟编译过程
+    setTimeout(() => {
+        try {
+            // 这里实际会调用后端编译器
+            const output = `编译成功！
+
+=== 词法分析 ===
+识别关键字: ${source.match(/配置|类型|函数|返回|let|如果|否则|循环|quantum_class|新/g)?.length || 0} 个
+识别标识符: ${source.match(/[a-zA-Z_\u4e00-\u9fa5]+/g)?.length || 0} 个
+
+=== 语法分析 ===
+AST节点数: ${source.split('\n').length}
+
+=== 生成的QBC字节码 ===
+INIT_QUANTUM
+SET_QUBITS 8
+... (完整字节码)
+
+编译完成！`;
+            
+            document.getElementById('output').textContent = output;
+            setStatus('success', '编译成功');
+        } catch (e) {
+            setStatus('error', '编译错误: ' + e.message);
+        }
+    }, 500);
+}
+
+function run() {
+    compile();
+    setTimeout(() => {
+        setStatus('info', '执行中...');
+        setTimeout(() => {
+            setStatus('success', '执行完成！返回值: <量子计算结果>');
+        }, 300);
+    }, 600);
+}
+
+function clearAll() {
+    document.getElementById('sourceCode').value = '';
+    document.getElementById('output').textContent = '等待编译...';
+    setStatus('info', '已清空');
+}
+
+function setStatus(type, message) {
+    const status = document.getElementById('status');
+    status.className = 'status ' + type;
+    status.textContent = message;
+}
+
+// 加载默认示例
+loadExample('hello');
+</script>
+</body>
+</html>

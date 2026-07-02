@@ -1,0 +1,688 @@
+/**
+ * @file quantum_state_processor.qentl
+ * @brief QEntL虚拟机的量子状态处理器实现
+ * 
+ * 量子基因编码: QGC-QUANTUM-STATE-PROCESSOR-2024062801
+ * 量子纠缠信道: QEC-VM-QUANTUM-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/math.qentl";
+import "QEntL/vm/src/core/quantum/complex.qentl";
+import "QEntL/vm/src/core/memory/memory_manager.qentl";
+
+/**
+ * @class QuantumState
+ * @brief 量子状态表示类
+ */
+quantum_class QuantumState {
+    private {
+        amplitudes: Array<Complex>;  // 量子态振幅
+        numQubits: Number;           // 量子比特数量
+        dimension: Number;           // 状态空间维度 = 2^numQubits
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param numQubits 量子比特数量
+     */
+    constructor(numQubits: Number) {
+        this.numQubits = numQubits;
+        this.dimension = Math.pow(2, numQubits);
+        this.amplitudes = new Array<Complex>(this.dimension);
+        
+        // 初始化为|0...0>状态
+        this.amplitudes[0] = new Complex(1, 0);
+        for (let i = 1; i < this.dimension; i++) {
+            this.amplitudes[i] = new Complex(0, 0);
+        }
+    }
+    
+    /**
+     * @brief 获取量子比特数量
+     */
+    public function getNumQubits(): Number {
+        return this.numQubits;
+    }
+    
+    /**
+     * @brief 获取状态空间维度
+     */
+    public function getDimension(): Number {
+        return this.dimension;
+    }
+    
+    /**
+     * @brief 获取振幅数组
+     */
+    public function getAmplitudes(): Array<Complex> {
+        return this.amplitudes;
+    }
+    
+    /**
+     * @brief 获取指定索引的振幅
+     */
+    public function getAmplitude(index: Number): Complex {
+        if (index < 0 || index >= this.dimension) {
+            throw new Error(`量子状态索引越界: ${index}`);
+        }
+        return this.amplitudes[index];
+    }
+    
+    /**
+     * @brief 设置指定索引的振幅
+     */
+    public function setAmplitude(index: Number, value: Complex): void {
+        if (index < 0 || index >= this.dimension) {
+            throw new Error(`量子状态索引越界: ${index}`);
+        }
+        this.amplitudes[index] = value;
+    }
+    
+    /**
+     * @brief 归一化量子态
+     */
+    public function normalize(): void {
+        let normSquared = 0;
+        
+        // 计算振幅模方和
+        for (let i = 0; i < this.dimension; i++) {
+            normSquared += this.amplitudes[i].normSquared();
+        }
+        
+        if (Math.abs(normSquared) < 1e-10) {
+            throw new Error("量子态向量长度接近零，无法归一化");
+        }
+        
+        const normFactor = 1.0 / Math.sqrt(normSquared);
+        
+        // 归一化每个振幅
+        for (let i = 0; i < this.dimension; i++) {
+            this.amplitudes[i] = this.amplitudes[i].multiply(normFactor);
+        }
+    }
+    
+    /**
+     * @brief 创建量子态副本
+     */
+    public function clone(): QuantumState {
+        const copy = new QuantumState(this.numQubits);
+        
+        for (let i = 0; i < this.dimension; i++) {
+            copy.amplitudes[i] = this.amplitudes[i].clone();
+        }
+        
+        return copy;
+    }
+    
+    /**
+     * @brief 将量子态重置为|0...0>状态
+     */
+    public function reset(): void {
+        for (let i = 0; i < this.dimension; i++) {
+            if (i === 0) {
+                this.amplitudes[i] = new Complex(1, 0);
+            } else {
+                this.amplitudes[i] = new Complex(0, 0);
+            }
+        }
+    }
+    
+    /**
+     * @brief 计算量子态的概率分布
+     */
+    public function getProbabilities(): Array<Number> {
+        const probs = new Array<Number>(this.dimension);
+        
+        for (let i = 0; i < this.dimension; i++) {
+            probs[i] = this.amplitudes[i].normSquared();
+        }
+        
+        return probs;
+    }
+    
+    /**
+     * @brief 量子态字符串表示
+     */
+    public function toString(): String {
+        let result = "";
+        const probs = this.getProbabilities();
+        
+        for (let i = 0; i < this.dimension; i++) {
+            const prob = probs[i];
+            if (prob > 1e-10) {  // 忽略概率接近零的项
+                const bitString = i.toString(2).padStart(this.numQubits, '0');
+                result += `${this.amplitudes[i].toString()}|${bitString}⟩ + `;
+            }
+        }
+        
+        // 移除末尾的 " + "
+        if (result.length > 0) {
+            result = result.substring(0, result.length - 3);
+        }
+        
+        return result;
+    }
+}
+
+/**
+ * @class QuantumGate
+ * @brief 量子门基类
+ */
+quantum_class QuantumGate {
+    private {
+        name: String;           // 门的名称
+        qubits: Array<Number>;  // 作用的量子比特索引
+        params: Array<Number>;  // 门参数（如旋转角度等）
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(name: String, qubits: Array<Number>, params: Array<Number> = null) {
+        this.name = name;
+        this.qubits = qubits;
+        this.params = params || new Array<Number>();
+    }
+    
+    /**
+     * @brief 获取门名称
+     */
+    public function getName(): String {
+        return this.name;
+    }
+    
+    /**
+     * @brief 获取作用的量子比特
+     */
+    public function getQubits(): Array<Number> {
+        return this.qubits;
+    }
+    
+    /**
+     * @brief 获取门参数
+     */
+    public function getParams(): Array<Number> {
+        return this.params;
+    }
+    
+    /**
+     * @brief 应用门操作到量子态
+     * @note 这是一个抽象方法，需要由子类实现
+     */
+    public function apply(state: QuantumState): void {
+        throw new Error("抽象方法必须被子类实现");
+    }
+}
+
+/**
+ * @class QuantumStateProcessor
+ * @brief 量子状态处理器
+ */
+quantum_class QuantumStateProcessor {
+    private {
+        states: Map<Number, QuantumState>;       // 量子态映射表
+        nextStateId: Number;                      // 下一个状态ID
+        memoryManager: MemoryManager;             // 内存管理器
+        maxQubits: Number;                        // 最大支持的量子比特数
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(memoryManager: MemoryManager, maxQubits: Number = 32) {
+        this.states = new Map<Number, QuantumState>();
+        this.nextStateId = 1;
+        this.memoryManager = memoryManager;
+        this.maxQubits = maxQubits;
+    }
+    
+    /**
+     * @brief 创建新的量子态
+     * @param numQubits 量子比特数量
+     * @return 量子态ID
+     */
+    public function createState(numQubits: Number): Number {
+        if (numQubits <= 0 || numQubits > this.maxQubits) {
+            throw new Error(`无效的量子比特数量: ${numQubits}`);
+        }
+        
+        const stateId = this.nextStateId++;
+        const state = new QuantumState(numQubits);
+        this.states.set(stateId, state);
+        
+        return stateId;
+    }
+    
+    /**
+     * @brief 释放量子态
+     * @param stateId 要释放的量子态ID
+     */
+    public function releaseState(stateId: Number): void {
+        if (!this.states.has(stateId)) {
+            throw new Error(`量子态不存在: ${stateId}`);
+        }
+        
+        this.states.delete(stateId);
+    }
+    
+    /**
+     * @brief 获取量子态
+     * @param stateId 量子态ID
+     */
+    public function getState(stateId: Number): QuantumState {
+        if (!this.states.has(stateId)) {
+            throw new Error(`量子态不存在: ${stateId}`);
+        }
+        
+        return this.states.get(stateId);
+    }
+    
+    /**
+     * @brief 应用单量子比特门
+     * @param stateId 量子态ID
+     * @param gateType 门类型
+     * @param qubitIdx 量子比特索引
+     * @param params 门参数
+     */
+    public function applySingleQubitGate(stateId: Number, gateType: String, qubitIdx: Number, params: Array<Number> = null): void {
+        const state = this.getState(stateId);
+        const numQubits = state.getNumQubits();
+        
+        if (qubitIdx < 0 || qubitIdx >= numQubits) {
+            throw new Error(`量子比特索引越界: ${qubitIdx}`);
+        }
+        
+        // 实现不同类型的单量子比特门
+        switch (gateType) {
+            case "X":
+                this.applyPauliX(state, qubitIdx);
+                break;
+            case "Y":
+                this.applyPauliY(state, qubitIdx);
+                break;
+            case "Z":
+                this.applyPauliZ(state, qubitIdx);
+                break;
+            case "H":
+                this.applyHadamard(state, qubitIdx);
+                break;
+            case "T":
+                this.applyTGate(state, qubitIdx);
+                break;
+            case "S":
+                this.applySGate(state, qubitIdx);
+                break;
+            case "Rx":
+                if (!params || params.length < 1) {
+                    throw new Error("Rx门需要一个角度参数");
+                }
+                this.applyRx(state, qubitIdx, params[0]);
+                break;
+            case "Ry":
+                if (!params || params.length < 1) {
+                    throw new Error("Ry门需要一个角度参数");
+                }
+                this.applyRy(state, qubitIdx, params[0]);
+                break;
+            case "Rz":
+                if (!params || params.length < 1) {
+                    throw new Error("Rz门需要一个角度参数");
+                }
+                this.applyRz(state, qubitIdx, params[0]);
+                break;
+            default:
+                throw new Error(`未支持的单量子比特门: ${gateType}`);
+        }
+    }
+    
+    /**
+     * @brief 应用两量子比特门
+     * @param stateId 量子态ID
+     * @param gateType 门类型
+     * @param qubitIdx1 第一个量子比特索引
+     * @param qubitIdx2 第二个量子比特索引
+     * @param params 门参数
+     */
+    public function applyTwoQubitGate(stateId: Number, gateType: String, qubitIdx1: Number, qubitIdx2: Number, params: Array<Number> = null): void {
+        const state = this.getState(stateId);
+        const numQubits = state.getNumQubits();
+        
+        if (qubitIdx1 < 0 || qubitIdx1 >= numQubits || qubitIdx2 < 0 || qubitIdx2 >= numQubits || qubitIdx1 === qubitIdx2) {
+            throw new Error(`量子比特索引无效: ${qubitIdx1}, ${qubitIdx2}`);
+        }
+        
+        // 实现不同类型的两量子比特门
+        switch (gateType) {
+            case "CNOT":
+                this.applyCNOT(state, qubitIdx1, qubitIdx2);
+                break;
+            case "SWAP":
+                this.applySWAP(state, qubitIdx1, qubitIdx2);
+                break;
+            case "CZ":
+                this.applyCZ(state, qubitIdx1, qubitIdx2);
+                break;
+            default:
+                throw new Error(`未支持的两量子比特门: ${gateType}`);
+        }
+    }
+    
+    /**
+     * @brief 测量量子比特
+     * @param stateId 量子态ID
+     * @param qubitIdx 量子比特索引
+     * @return 测量结果 (0 或 1)
+     */
+    public function measureQubit(stateId: Number, qubitIdx: Number): Number {
+        const state = this.getState(stateId);
+        const numQubits = state.getNumQubits();
+        
+        if (qubitIdx < 0 || qubitIdx >= numQubits) {
+            throw new Error(`量子比特索引越界: ${qubitIdx}`);
+        }
+        
+        // 计算测量为1的概率
+        const probOne = this.calculateProbabilityOfOne(state, qubitIdx);
+        
+        // 生成0到1之间的随机数
+        const rand = Math.random();
+        
+        // 根据概率决定测量结果
+        const result = rand < probOne ? 1 : 0;
+        
+        // 更新量子态（坍缩）
+        this.collapseState(state, qubitIdx, result);
+        
+        return result;
+    }
+    
+    /**
+     * @brief 计算qubit测量为1的概率
+     */
+    private function calculateProbabilityOfOne(state: QuantumState, qubitIdx: Number): Number {
+        const dimension = state.getDimension();
+        const amplitudes = state.getAmplitudes();
+        let probOne = 0;
+        
+        for (let i = 0; i < dimension; i++) {
+            // 检查第qubitIdx位是否为1
+            if ((i & (1 << qubitIdx)) !== 0) {
+                probOne += amplitudes[i].normSquared();
+            }
+        }
+        
+        return probOne;
+    }
+    
+    /**
+     * @brief 测量后坍缩量子态
+     */
+    private function collapseState(state: QuantumState, qubitIdx: Number, result: Number): void {
+        const dimension = state.getDimension();
+        const amplitudes = state.getAmplitudes();
+        
+        // 计算归一化因子
+        let normFactor = 0;
+        for (let i = 0; i < dimension; i++) {
+            // 检查第qubitIdx位是否与结果一致
+            const bitValue = (i & (1 << qubitIdx)) !== 0 ? 1 : 0;
+            if (bitValue === result) {
+                normFactor += amplitudes[i].normSquared();
+            }
+        }
+        
+        normFactor = 1.0 / Math.sqrt(normFactor);
+        
+        // 坍缩态并归一化
+        for (let i = 0; i < dimension; i++) {
+            const bitValue = (i & (1 << qubitIdx)) !== 0 ? 1 : 0;
+            if (bitValue === result) {
+                state.setAmplitude(i, amplitudes[i].multiply(normFactor));
+            } else {
+                state.setAmplitude(i, new Complex(0, 0));
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用Pauli-X门（比特反转门）
+     */
+    private function applyPauliX(state: QuantumState, qubitIdx: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        const oldAmplitudes = state.getAmplitudes().map(a => a.clone());
+        
+        for (let i = 0; i < dimension; i++) {
+            // 翻转第qubitIdx位
+            const j = i ^ mask;
+            state.setAmplitude(i, oldAmplitudes[j]);
+        }
+    }
+    
+    /**
+     * @brief 应用Pauli-Y门
+     */
+    private function applyPauliY(state: QuantumState, qubitIdx: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        const oldAmplitudes = state.getAmplitudes().map(a => a.clone());
+        
+        for (let i = 0; i < dimension; i++) {
+            // 翻转第qubitIdx位
+            const j = i ^ mask;
+            
+            // 检查第qubitIdx位是否为1
+            const bitValue = (i & mask) !== 0 ? 1 : 0;
+            
+            // 应用相位
+            if (bitValue === 0) {
+                state.setAmplitude(i, oldAmplitudes[j].multiply(new Complex(0, 1)));
+            } else {
+                state.setAmplitude(i, oldAmplitudes[j].multiply(new Complex(0, -1)));
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用Pauli-Z门
+     */
+    private function applyPauliZ(state: QuantumState, qubitIdx: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        
+        for (let i = 0; i < dimension; i++) {
+            // 检查第qubitIdx位是否为1
+            if ((i & mask) !== 0) {
+                state.setAmplitude(i, state.getAmplitude(i).multiply(-1));
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用Hadamard门
+     */
+    private function applyHadamard(state: QuantumState, qubitIdx: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        const factor = 1.0 / Math.sqrt(2);
+        const oldAmplitudes = state.getAmplitudes().map(a => a.clone());
+        
+        for (let i = 0; i < dimension; i++) {
+            // 翻转第qubitIdx位
+            const j = i ^ mask;
+            
+            // 检查第qubitIdx位是否为1
+            const bitValue = (i & mask) !== 0 ? 1 : 0;
+            
+            if (bitValue === 0) {
+                state.setAmplitude(i, oldAmplitudes[i].add(oldAmplitudes[j]).multiply(factor));
+            } else {
+                state.setAmplitude(i, oldAmplitudes[i ^ mask].subtract(oldAmplitudes[i]).multiply(factor));
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用T门
+     */
+    private function applyTGate(state: QuantumState, qubitIdx: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        
+        for (let i = 0; i < dimension; i++) {
+            // 检查第qubitIdx位是否为1
+            if ((i & mask) !== 0) {
+                state.setAmplitude(i, state.getAmplitude(i).multiply(new Complex(Math.cos(Math.PI / 4), Math.sin(Math.PI / 4))));
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用S门
+     */
+    private function applySGate(state: QuantumState, qubitIdx: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        
+        for (let i = 0; i < dimension; i++) {
+            // 检查第qubitIdx位是否为1
+            if ((i & mask) !== 0) {
+                state.setAmplitude(i, state.getAmplitude(i).multiply(new Complex(0, 1)));
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用Rx门（X轴旋转）
+     */
+    private function applyRx(state: QuantumState, qubitIdx: Number, theta: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        const oldAmplitudes = state.getAmplitudes().map(a => a.clone());
+        
+        const cos = Math.cos(theta / 2);
+        const sin = Math.sin(theta / 2);
+        
+        for (let i = 0; i < dimension; i++) {
+            // 翻转第qubitIdx位
+            const j = i ^ mask;
+            
+            // 应用旋转矩阵
+            const a = oldAmplitudes[i].multiply(cos);
+            const b = oldAmplitudes[j].multiply(new Complex(0, -sin));
+            state.setAmplitude(i, a.add(b));
+            
+            const c = oldAmplitudes[j].multiply(cos);
+            const d = oldAmplitudes[i].multiply(new Complex(0, -sin));
+            state.setAmplitude(j, c.add(d));
+        }
+    }
+    
+    /**
+     * @brief 应用Ry门（Y轴旋转）
+     */
+    private function applyRy(state: QuantumState, qubitIdx: Number, theta: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        const oldAmplitudes = state.getAmplitudes().map(a => a.clone());
+        
+        const cos = Math.cos(theta / 2);
+        const sin = Math.sin(theta / 2);
+        
+        for (let i = 0; i < dimension; i++) {
+            // 翻转第qubitIdx位
+            const j = i ^ mask;
+            
+            // 应用旋转矩阵
+            const a = oldAmplitudes[i].multiply(cos);
+            const b = oldAmplitudes[j].multiply(-sin);
+            state.setAmplitude(i, a.add(b));
+            
+            const c = oldAmplitudes[j].multiply(cos);
+            const d = oldAmplitudes[i].multiply(sin);
+            state.setAmplitude(j, c.add(d));
+        }
+    }
+    
+    /**
+     * @brief 应用Rz门（Z轴旋转）
+     */
+    private function applyRz(state: QuantumState, qubitIdx: Number, theta: Number): void {
+        const dimension = state.getDimension();
+        const mask = 1 << qubitIdx;
+        
+        const cos = Math.cos(theta / 2);
+        const sin = Math.sin(theta / 2);
+        const phase0 = new Complex(cos, -sin);
+        const phase1 = new Complex(cos, sin);
+        
+        for (let i = 0; i < dimension; i++) {
+            // 检查第qubitIdx位是否为1
+            if ((i & mask) === 0) {
+                state.setAmplitude(i, state.getAmplitude(i).multiply(phase0));
+            } else {
+                state.setAmplitude(i, state.getAmplitude(i).multiply(phase1));
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用CNOT门（控制非门）
+     */
+    private function applyCNOT(state: QuantumState, controlIdx: Number, targetIdx: Number): void {
+        const dimension = state.getDimension();
+        const controlMask = 1 << controlIdx;
+        const targetMask = 1 << targetIdx;
+        
+        for (let i = 0; i < dimension; i++) {
+            // 仅当控制位为1时才翻转目标位
+            if ((i & controlMask) !== 0) {
+                const j = i ^ targetMask;
+                // 交换振幅
+                const temp = state.getAmplitude(i).clone();
+                state.setAmplitude(i, state.getAmplitude(j));
+                state.setAmplitude(j, temp);
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用SWAP门
+     */
+    private function applySWAP(state: QuantumState, qubitIdx1: Number, qubitIdx2: Number): void {
+        const dimension = state.getDimension();
+        const mask1 = 1 << qubitIdx1;
+        const mask2 = 1 << qubitIdx2;
+        
+        for (let i = 0; i < dimension; i++) {
+            // 检查两位不同的情况
+            if (((i & mask1) !== 0) !== ((i & mask2) !== 0)) {
+                const j = i ^ mask1 ^ mask2;
+                // 交换振幅
+                const temp = state.getAmplitude(i).clone();
+                state.setAmplitude(i, state.getAmplitude(j));
+                state.setAmplitude(j, temp);
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用CZ门（控制Z门）
+     */
+    private function applyCZ(state: QuantumState, controlIdx: Number, targetIdx: Number): void {
+        const dimension = state.getDimension();
+        const controlMask = 1 << controlIdx;
+        const targetMask = 1 << targetIdx;
+        
+        for (let i = 0; i < dimension; i++) {
+            // 当控制位和目标位都为1时，添加相位
+            if ((i & controlMask) !== 0 && (i & targetMask) !== 0) {
+                state.setAmplitude(i, state.getAmplitude(i).multiply(-1));
+            }
+        }
+    }
+}
+
+export { QuantumState, QuantumGate, QuantumStateProcessor };

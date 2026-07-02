@@ -1,0 +1,255 @@
+/**
+ * @file bytecode_generator_cli.qentl
+ * @brief 量子字节码生成器命令行界面
+ * 
+ * 量子基因编码: QGC-BYTECODE-CLI-2024062801
+ * 量子纠缠信道: QEC-COMPILER-CLI-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/fs.qentl";
+import "QEntL/compiler/src/backend/bytecode/generator/quantum_bytecode_generator.qentl";
+import "QEntL/compiler/src/backend/ir/ir_node.qentl";
+import "QEntL/compiler/src/frontend/lexer/lexer.qentl";
+import "QEntL/compiler/src/frontend/parser/parser.qentl";
+import "QEntL/compiler/src/backend/ir/ir_builder.qentl";
+
+/**
+ * @class BytecodeGeneratorCLI
+ * @brief 量子字节码生成器命令行界面
+ */
+quantum_class BytecodeGeneratorCLI {
+    private {
+        inputFile: String;          // 输入文件
+        outputFile: String;         // 输出文件
+        includeDirectories: Array<String>; // 包含目录
+        optimizationLevel: Number;  // 优化级别
+        debugLevel: Number;         // 调试级别
+        verbose: Boolean;           // 详细输出
+        showHelp: Boolean;          // 显示帮助
+        showVersion: Boolean;       // 显示版本
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.inputFile = "";
+        this.outputFile = "";
+        this.includeDirectories = [];
+        this.optimizationLevel = 0;
+        this.debugLevel = 0;
+        this.verbose = false;
+        this.showHelp = false;
+        this.showVersion = false;
+    }
+    
+    /**
+     * @brief 解析命令行参数
+     * @param args 命令行参数
+     * @return 是否成功
+     */
+    public function parseArgs(args: Array<String>): Boolean {
+        let i = 0;
+        while (i < args.length) {
+            const arg = args[i];
+            
+            if (arg === "-o" || arg === "--output") {
+                if (i + 1 >= args.length) {
+                    Console.log("错误：缺少输出文件名");
+                    return false;
+                }
+                this.outputFile = args[i + 1];
+                i += 2;
+            } else if (arg === "-I" || arg === "--include") {
+                if (i + 1 >= args.length) {
+                    Console.log("错误：缺少包含目录");
+                    return false;
+                }
+                this.includeDirectories.push(args[i + 1]);
+                i += 2;
+            } else if (arg === "-O0" || arg === "-O1" || arg === "-O2" || arg === "-O3") {
+                this.optimizationLevel = parseInt(arg.substring(2));
+                i += 1;
+            } else if (arg === "-g0" || arg === "-g1" || arg === "-g2" || arg === "-g3") {
+                this.debugLevel = parseInt(arg.substring(2));
+                i += 1;
+            } else if (arg === "-v" || arg === "--verbose") {
+                this.verbose = true;
+                i += 1;
+            } else if (arg === "-h" || arg === "--help") {
+                this.showHelp = true;
+                i += 1;
+            } else if (arg === "--version") {
+                this.showVersion = true;
+                i += 1;
+            } else if (arg.startsWith("-")) {
+                Console.log(`错误：未知选项 ${arg}`);
+                return false;
+            } else {
+                // 输入文件
+                this.inputFile = arg;
+                i += 1;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief 显示帮助信息
+     */
+    public function showHelpInfo(): void {
+        Console.log("量子字节码生成器 - QEntL编译器组件");
+        Console.log("");
+        Console.log("用法：qbcgen [选项] 输入文件");
+        Console.log("");
+        Console.log("选项：");
+        Console.log("  -o, --output <file>    指定输出文件");
+        Console.log("  -I, --include <dir>    添加包含目录");
+        Console.log("  -O<level>              设置优化级别 (0-3)");
+        Console.log("  -g<level>              设置调试信息级别 (0-3)");
+        Console.log("  -v, --verbose          显示详细输出");
+        Console.log("  -h, --help             显示此帮助信息");
+        Console.log("  --version              显示版本信息");
+    }
+    
+    /**
+     * @brief 显示版本信息
+     */
+    public function showVersionInfo(): void {
+        Console.log("QEntL量子字节码生成器 v1.0.0");
+        Console.log("量子基因编码: QGC-BYTECODE-CLI-2024062801");
+        Console.log("量子纠缠信道: QEC-COMPILER-CLI-01");
+    }
+    
+    /**
+     * @brief 运行字节码生成器
+     * @return 是否成功
+     */
+    public function run(): Boolean {
+        // 处理帮助和版本信息
+        if (this.showHelp) {
+            this.showHelpInfo();
+            return true;
+        }
+        
+        if (this.showVersion) {
+            this.showVersionInfo();
+            return true;
+        }
+        
+        // 检查输入文件
+        if (this.inputFile === "") {
+            Console.log("错误：未指定输入文件");
+            return false;
+        }
+        
+        // 检查输入文件是否存在
+        if (!FS.existsSync(this.inputFile)) {
+            Console.log(`错误：输入文件 ${this.inputFile} 不存在`);
+            return false;
+        }
+        
+        // 如果未指定输出文件，则使用默认名称
+        if (this.outputFile === "") {
+            const extIndex = this.inputFile.lastIndexOf(".");
+            if (extIndex !== -1) {
+                this.outputFile = this.inputFile.substring(0, extIndex) + ".qbc";
+            } else {
+                this.outputFile = this.inputFile + ".qbc";
+            }
+        }
+        
+        // 显示编译信息
+        if (this.verbose) {
+            Console.log(`编译 ${this.inputFile} 到 ${this.outputFile}`);
+            Console.log(`优化级别: ${this.optimizationLevel}`);
+            Console.log(`调试级别: ${this.debugLevel}`);
+            Console.log("包含目录:");
+            for (const dir of this.includeDirectories) {
+                Console.log(`  ${dir}`);
+            }
+        }
+        
+        try {
+            // 读取输入文件
+            const sourceCode = FS.readFileSync(this.inputFile, "utf8");
+            
+            // 创建词法分析器
+            const lexer = new Lexer(sourceCode, this.inputFile);
+            
+            // 创建语法分析器
+            const parser = new Parser(lexer);
+            
+            // 解析生成AST
+            const ast = parser.parse();
+            
+            // 创建IR构建器
+            const irBuilder = new IRBuilder(ast);
+            
+            // 构建IR节点
+            const irNodes = irBuilder.build();
+            
+            // 创建字节码生成器
+            const bytecodeGenerator = new QuantumBytecodeGenerator();
+            
+            // 设置量子纠缠信息
+            bytecodeGenerator.setQuantumEntanglementInfo("ENTANGLE_STATE", "ACTIVE");
+            bytecodeGenerator.setQuantumEntanglementInfo("NODE_DEFAULT_STATE", "ACTIVE");
+            bytecodeGenerator.setQuantumEntanglementInfo("QUANTUM_BIT_ADAPTIVE", true);
+            bytecodeGenerator.setQuantumEntanglementInfo("OUTPUT_QUANTUM_GENE_ENCODING", true);
+            
+            // 生成字节码
+            const bytecode = bytecodeGenerator.generateBytecodeFromIR(irNodes);
+            
+            // 写入输出文件
+            FS.writeFileSync(this.outputFile, bytecode);
+            
+            // 输出成功信息
+            if (this.verbose) {
+                Console.log(`成功生成字节码文件 ${this.outputFile}`);
+                Console.log(`字节码大小: ${bytecode.length} 字节`);
+            }
+            
+            return true;
+        } catch (error) {
+            Console.log(`错误：${error.message}`);
+            if (this.verbose && error.stack) {
+                Console.log(error.stack);
+            }
+            return false;
+        }
+    }
+}
+
+/**
+ * @function main
+ * @brief 主函数
+ * @param args 命令行参数
+ * @return 退出码
+ */
+function main(args: Array<String>): Number {
+    const cli = new BytecodeGeneratorCLI();
+    
+    // 解析命令行参数
+    if (!cli.parseArgs(args.slice(1))) {
+        return 1;
+    }
+    
+    // 运行字节码生成器
+    if (!cli.run()) {
+        return 1;
+    }
+    
+    return 0;
+}
+
+// 程序入口
+main(process.args);
+
+export { BytecodeGeneratorCLI, main }; 

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>API测试 - 彝语翻译</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #eee; }
+        .test { margin: 10px 0; padding: 15px; background: #16213e; border-radius: 8px; }
+        .pass { color: #0f0; }
+        .fail { color: #f00; }
+        input { padding: 10px; width: 300px; font-size: 16px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        .result { margin-top: 10px; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <h1>🧪 彝语翻译API测试</h1>
+    
+    <div>
+        <input id="input" placeholder="输入中文" value="我吃饭">
+        <button onclick="test()">测试</button>
+    </div>
+    
+    <div id="result" class="result"></div>
+    
+    <h2>自动测试</h2>
+    <div id="tests"></div>
+    
+    <script>
+        async function test() {
+            const text = document.getElementById('input').value;
+            const res = await fetch('/api/?text=' + encodeURIComponent(text));
+            const data = await res.json();
+            document.getElementById('result').innerHTML = 
+                '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function runTests() {
+            const tests = [
+                {input: '我吃饭', expect_sov: true, desc: 'SOV: 我+饭+吃'},
+                {input: '我不吃饭', expect_sov: true, desc: '否定: 我+饭+不+吃'},
+                {input: '我看书', expect_sov: true, desc: 'SOV: 我+书+看'},
+                {input: '心', expect_translate: true, desc: '单字翻译'},
+                {input: '彝族', expect_info: true, desc: '知识回答'}
+            ];
+            
+            const container = document.getElementById('tests');
+            
+            for (const t of tests) {
+                const res = await fetch('/api/?text=' + encodeURIComponent(t.input));
+                const data = await res.json();
+                
+                let pass = false;
+                let detail = '';
+                
+                if (t.expect_sov) {
+                    pass = data.method && data.method.includes('sov');
+                    detail = `方法: ${data.method}`;
+                } else if (t.expect_translate) {
+                    pass = data.output && data.output !== data.input;
+                    detail = `输出: ${data.output}`;
+                } else if (t.expect_info) {
+                    pass = data.output && data.output.length > 10;
+                    detail = `回答: ${data.output.substring(0,20)}...`;
+                }
+                
+                container.innerHTML += `
+                    <div class="test">
+                        <span class="${pass ? 'pass' : 'fail'}">${pass ? '✓' : '✗'}</span>
+                        ${t.input} → ${t.desc}<br>
+                        ${detail}
+                    </div>
+                `;
+            }
+        }
+        
+        runTests();
+    </script>
+</body>
+</html>

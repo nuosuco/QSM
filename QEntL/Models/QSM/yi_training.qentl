@@ -1,0 +1,536 @@
+// QEntL Yi Character Recognition Training Script
+// 滇川黔桂彝文训练 - 量子叠加态模型
+// Model: QNS (Quantum Neural Superposition) for Yi text recognition
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+const VOCAB_SIZE = 4120;
+const EMBED_DIM = 256;
+const HIDDEN_DIM = 512;
+const LATENT_DIM = 128;
+const BATCH_SIZE = 32;
+const MAX_EPOCHS = 15;
+const LEARNING_RATE = 0.0005;
+const SEED = 42;
+
+// ============================================================================
+// QUANTUM NEURAL SUPERPOSITION (QNS) LAYER DEFINITIONS
+// ============================================================================
+
+// Quantum Embedding Layer - maps Yi characters to quantum superposition states
+function qns_embedding_init(vocab_size, embed_dim)
+    let weights = matrix_random(vocab_size, embed_dim, SEED)
+    let phases = matrix_zeros(vocab_size, embed_dim)
+    return {weights, phases, vocab_size, embed_dim}
+end
+
+// Quantum Attention Layer - uses quantum entanglement for attention
+function qns_attention_init(hidden_dim, num_heads)
+    let q_weights = matrix_random(hidden_dim, hidden_dim, SEED + 1)
+    let k_weights = matrix_random(hidden_dim, hidden_dim, SEED + 2)
+    let v_weights = matrix_random(hidden_dim, hidden_dim, SEED + 3)
+    let o_weights = matrix_random(hidden_dim, hidden_dim, SEED + 4)
+    return {q_weights, k_weights, v_weights, o_weights, hidden_dim, num_heads}
+end
+
+// Quantum Feed-Forward Layer with superposition activation
+function qns_ffn_init(input_dim, output_dim)
+    let w1 = matrix_random(input_dim, output_dim, SEED + 10)
+    let b1 = vector_zeros(output_dim)
+    let w2 = matrix_random(output_dim, input_dim, SEED + 11)
+    let b2 = vector_zeros(input_dim)
+    return {w1, b1, w2, b2}
+end
+
+// Quantum Encoder Block - combines embedding + attention + FFN
+function qns_encoder_block(embed_dim, hidden_dim, num_heads)
+    let attn = qns_attention_init(hidden_dim, num_heads)
+    let ffn = qns_ffn_init(hidden_dim, hidden_dim * 2)
+    return {attn, ffn, embed_dim, hidden_dim}
+end
+
+// ============================================================================
+// QUANTUM VIRTUAL MACHINE (QVM) OPERATIONS
+// ============================================================================
+
+// Apply Hadamard gate to create superposition
+function qvm_hadamard(qubit_index, num_qubits)
+    let amp0 = 1.0 / sqrt(2.0)
+    let amp1 = 1.0 / sqrt(2.0)
+    // In quantum state: |ψ⟩ = α|0⟩ + β|1⟩
+    // After H: |ψ⟩ = (α+β)/√2 |0⟩ + (α-β)/√2 |1⟩
+    return {amp0, amp1}
+end
+
+// Apply quantum rotation gate
+function qvm_rotation(angle, qubit_index)
+    let cos_a = cos(angle)
+    let sin_a = sin(angle)
+    return {cos_a, sin_a}
+end
+
+// Quantum measurement with collapse
+function qvm_measure(superposition, num_classes)
+    let probs = softmax(superposition)
+    let rand_val = random(0.0, 1.0)
+    let cumulative = 0.0
+    for i = 0 to num_classes - 1
+        cumulative = cumulative + probs[i]
+        if rand_val < cumulative
+            return i
+        end
+    end
+    return num_classes - 1
+end
+
+// Quantum entanglement between two qubits
+function qvm_entangle(qubit_a, qubit_b)
+    // Bell state: (|00⟩ + |11⟩) / √2
+    let bell_state = [0.7071, 0.0, 0.0, 0.7071]
+    return bell_state
+end
+
+// ============================================================================
+// QUANTUM DYNAMIC FILE SYSTEM (QDFS) OPERATIONS
+// ============================================================================
+
+// Save model to QDFS
+function qdfs_save_model(model_path, model_data)
+    let metadata = {
+        "model_type": "QNS_YiRecognition",
+        "vocab_size": VOCAB_SIZE,
+        "embed_dim": EMBED_DIM,
+        "hidden_dim": HIDDEN_DIM,
+        "epochs": model_data.epochs,
+        "loss": model_data.loss,
+        "accuracy": model_data.accuracy,
+        "timestamp": current_time(),
+        "quantum_signature": quantum_hash(model_data.weights)
+    }
+    let file_id = qdfs_create_file(model_path, model_data.weights)
+    qdfs_set_metadata(file_id, metadata)
+    qdfs_set_tag(file_id, "yi_language")
+    qdfs_set_tag(file_id, "character_recognition")
+    qdfs_set_tag(file_id, "tri_branch_sync")
+    return file_id
+end
+
+// Load model from QDFS
+function qdfs_load_model(model_path)
+    if qdfs_exists(model_path)
+        return qdfs_read_file(model_path)
+    end
+    return null
+end
+
+// ============================================================================
+// TRAINING PIPELINE
+// ============================================================================
+
+// Forward pass through QNS model
+function qns_forward(x, model)
+    // Step 1: Quantum embedding
+    let emb = matrix_lookup(model.embedding.weights, x)
+    let emb_phased = add_phase(emb, model.embedding.phases)
+    
+    // Step 2: Self-attention (quantum entanglement based)
+    let attn_output = self_attention(emb_phased, model.encoder.attn)
+    
+    // Step 3: Residual connection + layer norm
+    let residual = emb_phased + attn_output
+    let normalized = layer_norm(residual)
+    
+    // Step 4: Feed-forward with quantum activation
+    let ff_output = qns_ffn_forward(normalized, model.encoder.ffn)
+    
+    // Step 5: Final projection to vocabulary space
+    let logits = matrix_mul(ff_output, model.classifier.w)
+    let bias_add = logits + model.classifier.b
+    
+    return bias_add
+end
+
+// Quantum cross-entropy loss
+function qns_loss(predictions, targets)
+    let probs = softmax(predictions)
+    let loss = 0.0
+    for i = 0 to batch_size - 1
+        let target_idx = targets[i]
+        let prob_target = clamp(probs[i][target_idx], 1e-10, 1.0)
+        loss = loss - log(prob_target)
+    end
+    return loss / batch_size
+end
+
+// Backward pass - quantum gradient computation
+function qns_backward(x, targets, model)
+    let preds = qns_forward(x, model)
+    let loss = qns_loss(preds, targets)
+    
+    // Compute gradients through quantum layers
+    let grad_logits = softmax_grad(preds, targets)
+    let grad_classifier_w = matrix_outer(grad_logits, model.ffn_output)
+    let grad_classifier_b = sum(grad_logits, axis=0)
+    
+    // Gradient clipping (quantum stability)
+    let grad_norm = gradient_norm({grad_classifier_w, grad_classifier_b})
+    if grad_norm > 5.0
+        let scale = 5.0 / grad_norm
+        grad_classifier_w = grad_classifier_w * scale
+        grad_classifier_b = grad_classifier_b * scale
+    end
+    
+    return {loss, grad_classifier_w, grad_classifier_b}
+end
+
+// Adam optimizer step (quantum-aware)
+function qns_optimizer_step(model, grads, epoch, lr)
+    // Learning rate warmup + cosine decay
+    let warmup_steps = 1000
+    let total_steps = MAX_EPOCHS * (total_samples / BATCH_SIZE)
+    let step = epoch * (total_samples / BATCH_SIZE)
+    
+    let schedule_lr = lr
+    if step < warmup_steps
+        schedule_lr = lr * (step / warmup_steps)
+    else
+        let progress = (step - warmup_steps) / (total_steps - warmup_steps)
+        schedule_lr = lr * 0.5 * (1.0 + cos(progress * PI))
+    end
+    
+    // Update weights with momentum
+    for each layer in model.layers
+        layer.velocity = MOMENTUM * layer.velocity + schedule_lr * grads[layer.name]
+        layer.weights = layer.weights - layer.velocity
+    end
+end
+
+// ============================================================================
+// DATA LOADING & PREPROCESSING
+// ============================================================================
+
+function load_yi_data(data_dir)
+    let samples = []
+    let yi_files = glob(data_dir, "yi_*.jsonl")
+    let tri_files = glob(data_dir, "*彝文*.jsonl")
+    
+    for f in yi_files
+        let lines = read_jsonl(f)
+        for line in lines
+            if line.messages exists
+                let user_msg = line.messages[0].content
+                let assistant_msg = line.messages[1].content
+                if is_yi_text(user_msg)
+                    samples.append({input: user_msg, target: assistant_msg})
+                end
+            end
+        end
+    end
+    
+    for f in tri_files
+        let lines = read_jsonl(f)
+        for line in lines
+            if line.messages exists
+                let user_msg = line.messages[0].content
+                let assistant_msg = line.messages[1].content
+                if is_yi_text(user_msg)
+                    samples.append({input: user_msg, target: assistant_msg})
+                end
+            end
+        end
+    end
+    
+    return samples
+end
+
+// Build character-level vocabulary from Yi data
+function build_vocab(samples, max_vocab)
+    let char_counts = histogram()
+    for sample in samples
+        for ch in sample.input
+            char_counts[ch] = char_counts[ch] + 1
+        end
+    end
+    
+    let sorted = sort_by_count(char_counts, descending=true)
+    let vocab = {}
+    vocab["<PAD>"] = 0
+    vocab["<UNK>"] = 1
+    vocab["<SOS>"] = 2
+    vocab["<EOS>"] = 3
+    
+    let idx = 4
+    for (ch, count) in sorted
+        if idx >= max_vocab
+            break
+        end
+        vocab[ch] = idx
+        idx = idx + 1
+    end
+    
+    return vocab
+end
+
+// Encode text to quantum state vectors
+function encode_to_quantum(text, vocab, embed_dim)
+    let tokens = []
+    for ch in text
+        let tid = vocab.get(ch, 1)  // 1 = <UNK>
+        tokens.append(tid)
+    end
+    
+    // Pad or truncate to fixed length
+    while length(tokens) < MAX_SEQ_LEN
+        tokens.append(0)
+    end
+    tokens = tokens[0:MAX_SEQ_LEN]
+    
+    return tokens
+end
+
+// ============================================================================
+// MODEL ARCHITECTURE - QNS Yi Recognition Model
+// ============================================================================
+
+function build_qns_model(vocab_size, embed_dim, hidden_dim)
+    let model = {}
+    
+    // Embedding layer
+    model.embedding = qns_embedding_init(vocab_size, embed_dim)
+    
+    // Encoder block
+    model.encoder = qns_encoder_block(embed_dim, hidden_dim, 8)
+    
+    // Classifier head
+    model.classifier = {
+        w: matrix_random(hidden_dim, vocab_size, SEED + 20),
+        b: vector_zeros(vocab_size)
+    }
+    
+    // Momentum buffers
+    model.velocities = {}
+    
+    return model
+end
+
+// ============================================================================
+// TRAINING LOOP
+// ============================================================================
+
+function train_qns_model(data_dir, output_dir)
+    print(">>> QNS Yi Character Recognition Training")
+    print(">>> Using QEntL Full-Stack Quantum Pipeline")
+    print(">>> Data Directory: " + data_dir)
+    print(">>> Output Directory: " + output_dir)
+    print("")
+    
+    // Load and preprocess data
+    print("[1/6] Loading Yi training data...")
+    let samples = load_yi_data(data_dir)
+    print("    Loaded " + str(length(samples)) + " training samples")
+    
+    // Build vocabulary
+    print("[2/6] Building character vocabulary...")
+    let vocab = build_vocab(samples, VOCAB_SIZE)
+    print("    Vocabulary size: " + str(length(vocab)) + " characters")
+    
+    // Initialize QNS model
+    print("[3/6] Initializing QNS quantum neural superposition model...")
+    let model = build_qns_model(length(vocab), EMBED_DIM, HIDDEN_DIM)
+    print("    Architecture: Embed(" + str(EMBED_DIM) + ") -> Encoder(Hidden=" + str(HIDDEN_DIM) + ", Heads=8) -> Classifier(" + str(length(vocab)) + ")")
+    print("    Model parameters: ~" + str(count_parameters(model)) + "")
+    
+    // Prepare training data
+    print("[4/6] Preparing training batches...")
+    let train_pairs = prepare_batches(samples, vocab, BATCH_SIZE)
+    print("    Training batches: " + str(length(train_pairs)))
+    
+    // Training loop
+    print("[5/6] Starting quantum training (" + str(MAX_EPOCHS) + " epochs)...")
+    print("")
+    
+    let best_loss = infinity
+    let epoch_results = []
+    
+    for epoch = 0 to MAX_EPOCHS - 1
+        let epoch_loss = 0.0
+        let correct = 0
+        let total = 0
+        
+        // Process batches
+        for (batch_x, batch_y) in train_pairs
+            // Forward pass
+            let predictions = qns_forward(batch_x, model)
+            
+            // Compute loss
+            let batch_loss = qns_loss(predictions, batch_y)
+            epoch_loss = epoch_loss + batch_loss
+            
+            // Backward pass
+            let grads = qns_backward(batch_x, batch_y, model)
+            
+            // Optimizer step
+            qns_optimizer_step(model, grads, epoch, LEARNING_RATE)
+            
+            // Track accuracy
+            for i = 0 to BATCH_SIZE - 1
+                let pred_class = argmax(predictions[i])
+                if pred_class == batch_y[i]
+                    correct = correct + 1
+                end
+                total = total + 1
+            end
+        end
+        
+        let avg_loss = epoch_loss / length(train_pairs)
+        let accuracy = correct / max(total, 1)
+        
+        // Cosine annealing schedule
+        let epoch_progress = epoch / (MAX_EPOCHS - 1)
+        let current_lr = LEARNING_RATE * 0.5 * (1.0 + cos(epoch_progress * PI))
+        
+        print("    Epoch " + str(epoch + 1) + "/" + str(MAX_EPOCHS) + 
+              " | Loss: " + str(avg_loss) + 
+              " | Acc: " + str(round(accuracy * 100, 2)) + "%" +
+              " | LR: " + str(current_lr))
+        
+        epoch_results.append({epoch: epoch + 1, loss: avg_loss, accuracy: accuracy})
+        
+        if avg_loss < best_loss
+            best_loss = avg_loss
+            save_model_checkpoint(model, output_dir + "/best_model")
+        end
+        
+        // Quantum state preservation (save checkpoint every 3 epochs)
+        if (epoch + 1) % 3 == 0
+            save_model_checkpoint(model, output_dir + "/checkpoint_epoch_" + str(epoch + 1))
+        end
+    end
+    
+    print("")
+    print("    Training complete!")
+    print("    Best loss: " + str(best_loss))
+    
+    // Final evaluation
+    print("[6/6] Running final evaluation...")
+    let eval_results = evaluate_model(model, data_dir, vocab)
+    
+    // Save final model to QDFS
+    print("")
+    print("Saving model to QDFS...")
+    let model_data = {
+        epochs: MAX_EPOCHS,
+        loss: best_loss,
+        accuracy: eval_results.accuracy,
+        weights: serialize_model(model)
+    }
+    let file_id = qdfs_save_model(output_dir + "/yi_qns_model", model_data)
+    print("    Model saved with file_id: " + str(file_id))
+    print("    Quantum signature: " + str(quantum_hash(model_data.weights)))
+    
+    return {
+        best_loss: best_loss,
+        accuracy: eval_results.accuracy,
+        epoch_results: epoch_results,
+        file_id: file_id,
+        eval_results: eval_results
+    }
+end
+
+// ============================================================================
+// EVALUATION
+// ============================================================================
+
+function evaluate_model(model, data_dir, vocab)
+    let test_samples = load_yi_data(data_dir)
+    // Use last 10% as test set
+    let test_size = length(test_samples) / 10
+    let test_set = test_samples[length(test_samples) - test_size:]
+    
+    let correct = 0
+    let total = 0
+    let char_accuracies = {}
+    
+    for sample in test_set
+        let encoded = encode_to_quantum(sample.input, vocab, EMBED_DIM)
+        let predictions = qns_forward(encoded, model)
+        let pred_class = argmax(predictions)
+        
+        // Compare with expected output
+        if predict_matches(sample.target, pred_class, vocab)
+            correct = correct + 1
+        end
+        total = total + 1
+        
+        // Track per-character accuracy
+        for ch in sample.input
+            char_accuracies[ch] = char_accuracies.get(ch, {correct: 0, total: 0})
+            char_accuracies[ch].total = char_accuracies[ch].total + 1
+            if pred_class == char_accuracies[ch].expected
+                char_accuracies[ch].correct = char_accuracies[ch].correct + 1
+            end
+        end
+    end
+    
+    let accuracy = correct / max(total, 1)
+    
+    // Top-K accuracy
+    let top3_correct = 0
+    for sample in test_set
+        let encoded = encode_to_quantum(sample.input, vocab, EMBED_DIM)
+        let predictions = qns_forward(encoded, model)
+        let top3 = topk(predictions, 3)
+        if sample.target in top3
+            top3_correct = top3_correct + 1
+        end
+    end
+    let top3_accuracy = top3_correct / max(total, 1)
+    
+    // Character-level statistics
+    let char_acc_sum = 0.0
+    let char_acc_count = 0
+    for (ch, stats) in char_accuracies
+        if stats.total > 0
+            char_acc_sum = char_acc_sum + stats.correct / stats.total
+            char_acc_count = char_acc_count + 1
+        end
+    end
+    let avg_char_accuracy = char_acc_sum / max(char_acc_count, 1)
+    
+    print("    Total test samples: " + str(total))
+    print("    Character accuracy: " + str(round(accuracy * 100, 2)) + "%")
+    print("    Top-3 accuracy: " + str(round(top3_accuracy * 100, 2)) + "%")
+    print("    Avg character accuracy: " + str(round(avg_char_accuracy * 100, 2)) + "%")
+    
+    return {
+        accuracy: accuracy,
+        top3_accuracy: top3_accuracy,
+        avg_char_accuracy: avg_char_accuracy,
+        total_samples: total,
+        correct: correct
+    }
+end
+
+// ============================================================================
+// MAIN EXECUTION
+// ============================================================================
+
+print("=" * 60)
+print("  QEntL Full-Stack Yi Character Recognition Training")
+print("  Quantum Neural Superposition (QNS) Model")
+print("  滇川黔桂彝文训练系统")
+print("=" * 60)
+print("")
+
+// Execute training pipeline
+let results = train_qns_model("/root/QSM/data", "/root/QSM/models/yi_qns")
+
+print("")
+print("=" * 60)
+print("  TRAINING COMPLETE")
+print("  Final Accuracy: " + str(round(results.eval_results.accuracy * 100, 2)) + "%")
+print("  Top-3 Accuracy: " + str(round(results.eval_results.top3_accuracy * 100, 2)) + "%")
+print("  Best Loss: " + str(results.best_loss))
+print("  QDFS File ID: " + str(results.file_id))
+print("=" * 60)

@@ -1,0 +1,732 @@
+// 分类优化器 - 自动分类系统优化组件
+// 版本: 1.0.0
+// 作者: QEntL团队
+// 描述: 优化文件分类系统的性能、准确性和效率
+
+// 导入依赖
+import "../utils/logger.qentl";
+import "../utils/statistics.qentl";
+import "./auto_classifier.qentl";
+import "./behavior_learner.qentl";
+
+// 配置
+config OptimizerConfig {
+    优化间隔: 86400,              // 自动优化间隔，单位秒（默认1天）
+    最小类别样本数: 10,           // 类别优化所需的最小样本数
+    冗余类别相似度阈值: 0.85,     // 识别冗余类别的相似度阈值
+    合并类别相似度阈值: 0.75,     // 可合并类别的相似度阈值
+    最小类别使用频率: 5,          // 保留类别的最小使用频率
+    废弃类别天数: 30,             // 废弃未使用类别的天数
+    启用自动合并: true,           // 是否启用自动合并类别
+    启用自动拆分: true,           // 是否启用自动拆分类别
+    自动优化: true                // 是否启用自动优化
+}
+
+// 数据类型
+type 优化统计 {
+    开始时间: datetime,
+    结束时间: datetime,
+    优化前类别数: number,
+    优化后类别数: number,
+    合并类别数: number,
+    拆分类别数: number,
+    废弃类别数: number,
+    新增类别数: number,
+    优化前平均置信度: number,
+    优化后平均置信度: number
+}
+
+type 类别操作建议 {
+    操作类型: string,            // 合并、拆分、废弃、调整
+    目标类别: array<string>,     // 相关类别ID列表
+    建议理由: string,
+    预期提升: number,            // 预期提升的置信度
+    操作细节: any                // 具体操作细节
+}
+
+// 状态
+state {
+    优化历史: array<优化统计>,
+    上次优化时间: datetime,
+    优化状态: string,
+    当前建议: array<类别操作建议>
+}
+
+// 函数
+function 初始化(配置: OptimizerConfig) {
+    log.info("初始化分类优化器");
+    state.优化历史 = [];
+    state.上次优化时间 = new Date(0); // 1970-01-01
+    state.优化状态 = "就绪";
+    state.当前建议 = [];
+    
+    // 设置定期优化
+    if (配置.自动优化) {
+        _设置定期优化(配置.优化间隔);
+    }
+}
+
+function 开始优化过程(): boolean {
+    if (state.优化状态 === "优化中") {
+        log.warn("优化过程已在进行中");
+        return false;
+    }
+    
+    let 开始时间 = new Date();
+    state.优化状态 = "优化中";
+    log.info("开始分类系统优化");
+    
+    // 获取优化前统计
+    let 优化前统计 = auto_classifier.获取分类统计();
+    let 所有类别 = auto_classifier.获取所有类别();
+    
+    let 优化统计: 优化统计 = {
+        开始时间: 开始时间,
+        结束时间: null,
+        优化前类别数: 所有类别.length,
+        优化后类别数: 0,
+        合并类别数: 0,
+        拆分类别数: 0,
+        废弃类别数: 0,
+        新增类别数: 0,
+        优化前平均置信度: 优化前统计.平均置信度,
+        优化后平均置信度: 0
+    };
+    
+    // 分析类别关系
+    let 建议列表 = _生成优化建议(所有类别);
+    state.当前建议 = 建议列表;
+    
+    // 执行自动优化操作
+    if (config.启用自动合并) {
+        _执行合并操作(建议列表, 优化统计);
+    }
+    
+    if (config.启用自动拆分) {
+        _执行拆分操作(建议列表, 优化统计);
+    }
+    
+    // 清理废弃类别
+    _清理废弃类别(所有类别, 优化统计);
+    
+    // 更新优化后统计
+    let 优化后统计 = auto_classifier.获取分类统计();
+    所有类别 = auto_classifier.获取所有类别();
+    
+    优化统计.结束时间 = new Date();
+    优化统计.优化后类别数 = 所有类别.length;
+    优化统计.优化后平均置信度 = 优化后统计.平均置信度;
+    
+    // 保存优化历史
+    state.优化历史.unshift(优化统计);
+    if (state.优化历史.length > 10) {
+        state.优化历史.pop();
+    }
+    
+    // 更新优化时间
+    state.上次优化时间 = new Date();
+    state.优化状态 = "就绪";
+    
+    log.info(`分类系统优化完成，用时 ${(优化统计.结束时间.getTime() - 优化统计.开始时间.getTime()) / 1000} 秒`);
+    return true;
+}
+
+function 获取优化建议(): array<类别操作建议> {
+    // 如果没有当前建议或建议过期，重新生成
+    if (state.当前建议.length === 0 || _建议已过期()) {
+        let 所有类别 = auto_classifier.获取所有类别();
+        state.当前建议 = _生成优化建议(所有类别);
+    }
+    
+    return state.当前建议;
+}
+
+function 手动执行建议(建议ID: number): boolean {
+    if (建议ID < 0 || 建议ID >= state.当前建议.length) {
+        log.error(`无效的建议ID: ${建议ID}`);
+        return false;
+    }
+    
+    let 建议 = state.当前建议[建议ID];
+    let 优化统计: 优化统计 = {
+        开始时间: new Date(),
+        结束时间: null,
+        优化前类别数: auto_classifier.获取所有类别().length,
+        优化后类别数: 0,
+        合并类别数: 0,
+        拆分类别数: 0,
+        废弃类别数: 0,
+        新增类别数: 0,
+        优化前平均置信度: auto_classifier.获取分类统计().平均置信度,
+        优化后平均置信度: 0
+    };
+    
+    let 执行结果 = false;
+    
+    switch (建议.操作类型) {
+        case "合并":
+            执行结果 = _执行合并建议(建议, 优化统计);
+            break;
+        case "拆分":
+            执行结果 = _执行拆分建议(建议, 优化统计);
+            break;
+        case "废弃":
+            执行结果 = _执行废弃建议(建议, 优化统计);
+            break;
+        case "调整":
+            执行结果 = _执行调整建议(建议, 优化统计);
+            break;
+        default:
+            log.error(`未知的建议类型: ${建议.操作类型}`);
+            return false;
+    }
+    
+    if (执行结果) {
+        // 更新统计
+        优化统计.结束时间 = new Date();
+        优化统计.优化后类别数 = auto_classifier.获取所有类别().length;
+        优化统计.优化后平均置信度 = auto_classifier.获取分类统计().平均置信度;
+        
+        // 保存优化历史
+        state.优化历史.unshift(优化统计);
+        if (state.优化历史.length > 10) {
+            state.优化历史.pop();
+        }
+        
+        // 移除已执行的建议
+        state.当前建议.splice(建议ID, 1);
+        
+        log.info(`成功执行建议: ${建议.操作类型}`);
+    }
+    
+    return 执行结果;
+}
+
+function 获取优化历史(): array<优化统计> {
+    return state.优化历史;
+}
+
+function 获取类别问题报告(): any {
+    let 所有类别 = auto_classifier.获取所有类别();
+    let 问题报告 = {
+        冗余类别: [],
+        样本不足类别: [],
+        使用率低类别: [],
+        置信度低类别: []
+    };
+    
+    // 分析各类问题
+    for (let 类别 of 所有类别) {
+        // 样本不足
+        if (类别.样本文件.length < config.最小类别样本数) {
+            问题报告.样本不足类别.push({
+                类别ID: 类别.类别ID,
+                类别名称: 类别.类别名称,
+                当前样本数: 类别.样本文件.length,
+                建议样本数: config.最小类别样本数
+            });
+        }
+        
+        // 使用率低
+        if (类别.使用频率 < config.最小类别使用频率) {
+            问题报告.使用率低类别.push({
+                类别ID: 类别.类别ID,
+                类别名称: 类别.类别名称,
+                当前使用率: 类别.使用频率,
+                最低使用率: config.最小类别使用频率
+            });
+        }
+    }
+    
+    // 检查冗余类别
+    问题报告.冗余类别 = _找出冗余类别(所有类别);
+    
+    return 问题报告;
+}
+
+// 内部函数
+function _生成优化建议(所有类别: array<any>): array<类别操作建议> {
+    let 建议列表 = [];
+    
+    // 检查可合并类别
+    let 可合并类别 = _找出可合并类别(所有类别);
+    for (let 合并组 of 可合并类别) {
+        建议列表.push({
+            操作类型: "合并",
+            目标类别: 合并组.map(类别 => 类别.类别ID),
+            建议理由: `这些类别高度相似 (相似度 > ${config.合并类别相似度阈值})，建议合并以减少冗余`,
+            预期提升: 0.1,
+            操作细节: {
+                建议名称: _生成合并名称(合并组),
+                保留关键词: _合并关键词(合并组),
+                保留样本: _合并样本(合并组)
+            }
+        });
+    }
+    
+    // 检查可拆分类别
+    let 可拆分类别 = _找出可拆分类别(所有类别);
+    for (let 拆分项 of 可拆分类别) {
+        建议列表.push({
+            操作类型: "拆分",
+            目标类别: [拆分项.类别.类别ID],
+            建议理由: `该类别内部文件相似度低，包含${拆分项.子类别数}个明显子类别`,
+            预期提升: 0.15,
+            操作细节: {
+                建议子类别: 拆分项.建议子类别
+            }
+        });
+    }
+    
+    // 检查应废弃类别
+    let 废弃类别 = _找出废弃类别(所有类别);
+    for (let 类别 of 废弃类别) {
+        建议列表.push({
+            操作类型: "废弃",
+            目标类别: [类别.类别ID],
+            建议理由: `该类别使用频率过低(${类别.使用频率})且${config.废弃类别天数}天内无匹配`,
+            预期提升: 0.05,
+            操作细节: {
+                最后使用时间: 类别.最近匹配时间
+            }
+        });
+    }
+    
+    // 检查需调整类别
+    let 需调整类别 = _找出需调整类别(所有类别);
+    for (let 调整项 of 需调整类别) {
+        建议列表.push({
+            操作类型: "调整",
+            目标类别: [调整项.类别.类别ID],
+            建议理由: 调整项.理由,
+            预期提升: 0.08,
+            操作细节: 调整项.调整内容
+        });
+    }
+    
+    return 建议列表;
+}
+
+function _找出冗余类别(所有类别): array<any> {
+    let 冗余类别组 = [];
+    let 已处理类别 = new Set();
+    
+    for (let i = 0; i < 所有类别.length; i++) {
+        let 类别A = 所有类别[i];
+        if (已处理类别.has(类别A.类别ID)) continue;
+        
+        let 相似类别组 = [类别A];
+        
+        for (let j = i + 1; j < 所有类别.length; j++) {
+            let 类别B = 所有类别[j];
+            if (已处理类别.has(类别B.类别ID)) continue;
+            
+            let 相似度 = _计算类别相似度(类别A, 类别B);
+            if (相似度 >= config.冗余类别相似度阈值) {
+                相似类别组.push(类别B);
+                已处理类别.add(类别B.类别ID);
+            }
+        }
+        
+        if (相似类别组.length > 1) {
+            冗余类别组.push(相似类别组);
+        }
+    }
+    
+    return 冗余类别组;
+}
+
+function _找出可合并类别(所有类别): array<any> {
+    return _找出冗余类别(所有类别);
+}
+
+function _找出可拆分类别(所有类别): array<any> {
+    let 可拆分类别 = [];
+    
+    for (let 类别 of 所有类别) {
+        // 必须有足够的样本
+        if (类别.样本文件.length < config.最小类别样本数 * 2) {
+            continue;
+        }
+        
+        // 分析样本内部相似度
+        let 子类别 = _分析子类别(类别);
+        if (子类别.length >= 2) {
+            可拆分类别.push({
+                类别: 类别,
+                子类别数: 子类别.length,
+                建议子类别: 子类别
+            });
+        }
+    }
+    
+    return 可拆分类别;
+}
+
+function _找出废弃类别(所有类别): array<any> {
+    let 废弃类别 = [];
+    let 截止日期 = new Date();
+    截止日期.setDate(截止日期.getDate() - config.废弃类别天数);
+    
+    for (let 类别 of 所有类别) {
+        // 使用频率低且长期未使用
+        if (类别.使用频率 < config.最小类别使用频率 && 
+            (类别.最近匹配时间 === undefined || 类别.最近匹配时间 < 截止日期)) {
+            废弃类别.push(类别);
+        }
+    }
+    
+    return 废弃类别;
+}
+
+function _找出需调整类别(所有类别): array<any> {
+    let 需调整类别 = [];
+    
+    for (let 类别 of 所有类别) {
+        // 检查样本不足但使用频率高的类别
+        if (类别.样本文件.length < config.最小类别样本数 && 类别.使用频率 > config.最小类别使用频率 * 2) {
+            需调整类别.push({
+                类别: 类别,
+                理由: `样本数不足(${类别.样本文件.length})但使用频率高(${类别.使用频率})，建议增加样本`,
+                调整内容: {
+                    建议操作: "增加样本",
+                    目标样本数: config.最小类别样本数
+                }
+            });
+        }
+        
+        // 检查关键词过少的类别
+        if (类别.关键词.length < 3) {
+            需调整类别.push({
+                类别: 类别,
+                理由: `关键词数量过少(${类别.关键词.length})，影响识别准确度`,
+                调整内容: {
+                    建议操作: "增加关键词",
+                    建议关键词数: 5
+                }
+            });
+        }
+    }
+    
+    return 需调整类别;
+}
+
+function _计算类别相似度(类别A, 类别B): number {
+    let 总分 = 0;
+    let 总权重 = 0;
+    
+    // 比较关键词
+    if (类别A.关键词.length > 0 && 类别B.关键词.length > 0) {
+        let 关键词权重 = 0.4;
+        总权重 += 关键词权重;
+        
+        let 共同关键词 = 类别A.关键词.filter(词 => 类别B.关键词.includes(词));
+        let 关键词相似度 = 共同关键词.length / Math.max(类别A.关键词.length, 类别B.关键词.length);
+        总分 += 关键词相似度 * 关键词权重;
+    }
+    
+    // 比较文件类型
+    if (类别A.文件类型.length > 0 && 类别B.文件类型.length > 0) {
+        let 文件类型权重 = 0.3;
+        总权重 += 文件类型权重;
+        
+        let 共同类型 = 类别A.文件类型.filter(类型 => 类别B.文件类型.includes(类型));
+        let 类型相似度 = 共同类型.length / Math.max(类别A.文件类型.length, 类别B.文件类型.length);
+        总分 += 类型相似度 * 文件类型权重;
+    }
+    
+    // 比较分类规则
+    if (类别A.分类规则.length > 0 && 类别B.分类规则.length > 0) {
+        let 规则权重 = 0.3;
+        总权重 += 规则权重;
+        
+        let 共同规则 = 类别A.分类规则.filter(规则 => 类别B.分类规则.includes(规则));
+        let 规则相似度 = 共同规则.length / Math.max(类别A.分类规则.length, 类别B.分类规则.length);
+        总分 += 规则相似度 * 规则权重;
+    }
+    
+    // 如果总权重为0，返回0
+    if (总权重 === 0) {
+        return 0;
+    }
+    
+    return 总分 / 总权重;
+}
+
+function _生成合并名称(类别组): string {
+    // 选择使用频率最高的类别名称
+    类别组.sort((a, b) => b.使用频率 - a.使用频率);
+    return 类别组[0].类别名称;
+}
+
+function _合并关键词(类别组): array<string> {
+    let 关键词集合 = new Set();
+    
+    for (let 类别 of 类别组) {
+        类别.关键词.forEach(词 => 关键词集合.add(词));
+    }
+    
+    return Array.from(关键词集合);
+}
+
+function _合并样本(类别组): array<string> {
+    let 样本集合 = new Set();
+    
+    for (let 类别 of 类别组) {
+        类别.样本文件.forEach(样本 => 样本集合.add(样本));
+    }
+    
+    return Array.from(样本集合);
+}
+
+function _分析子类别(类别): array<any> {
+    // 此处简化实现，实际应使用聚类算法
+    // 分析样本文件特征，查找明显的子类别
+    return [];
+}
+
+function _执行合并操作(建议列表: array<类别操作建议>, 统计: 优化统计) {
+    let 合并建议 = 建议列表.filter(建议 => 建议.操作类型 === "合并");
+    
+    for (let 建议 of 合并建议) {
+        if (_执行合并建议(建议, 统计)) {
+            统计.合并类别数++;
+        }
+    }
+}
+
+function _执行拆分操作(建议列表: array<类别操作建议>, 统计: 优化统计) {
+    let 拆分建议 = 建议列表.filter(建议 => 建议.操作类型 === "拆分");
+    
+    for (let 建议 of 拆分建议) {
+        if (_执行拆分建议(建议, 统计)) {
+            统计.拆分类别数++;
+        }
+    }
+}
+
+function _清理废弃类别(所有类别: array<any>, 统计: 优化统计) {
+    let 废弃类别 = _找出废弃类别(所有类别);
+    
+    for (let 类别 of 废弃类别) {
+        if (auto_classifier.删除类别(类别.类别ID)) {
+            统计.废弃类别数++;
+            log.info(`已删除废弃类别: ${类别.类别名称} (${类别.类别ID})`);
+        }
+    }
+}
+
+function _执行合并建议(建议: 类别操作建议, 统计: 优化统计): boolean {
+    let 目标类别IDs = 建议.目标类别;
+    if (目标类别IDs.length < 2) {
+        return false;
+    }
+    
+    // 获取所有目标类别
+    let 类别组 = [];
+    for (let 类别ID of 目标类别IDs) {
+        let 类别 = auto_classifier.获取类别(类别ID);
+        if (类别) {
+            类别组.push(类别);
+        }
+    }
+    
+    if (类别组.length < 2) {
+        return false;
+    }
+    
+    // 创建合并后的类别
+    let 新类别名称 = 建议.操作细节.建议名称 || _生成合并名称(类别组);
+    let 新类别ID = "merged_" + Date.now();
+    
+    let 新类别 = {
+        类别ID: 新类别ID,
+        类别名称: 新类别名称,
+        父类别ID: "",
+        描述: `由${类别组.map(c => c.类别名称).join("、")}合并而来`,
+        关键词: 建议.操作细节.保留关键词 || _合并关键词(类别组),
+        文件类型: [],
+        分类规则: [],
+        样本文件: 建议.操作细节.保留样本 || _合并样本(类别组),
+        创建时间: new Date(),
+        修改时间: new Date(),
+        手动定义: false,
+        使用频率: 类别组.reduce((sum, c) => sum + c.使用频率, 0)
+    };
+    
+    // 合并文件类型
+    let 文件类型集合 = new Set();
+    for (let 类别 of 类别组) {
+        类别.文件类型.forEach(类型 => 文件类型集合.add(类型));
+    }
+    新类别.文件类型 = Array.from(文件类型集合);
+    
+    // 合并分类规则
+    let 规则集合 = new Set();
+    for (let 类别 of 类别组) {
+        类别.分类规则.forEach(规则 => 规则集合.add(规则));
+    }
+    新类别.分类规则 = Array.from(规则集合);
+    
+    // 创建新类别
+    if (!auto_classifier.创建类别(新类别)) {
+        log.error(`创建合并类别失败: ${新类别名称}`);
+        return false;
+    }
+    
+    // 删除旧类别
+    for (let 类别 of 类别组) {
+        auto_classifier.删除类别(类别.类别ID);
+    }
+    
+    log.info(`已合并${类别组.length}个类别为: ${新类别名称} (${新类别ID})`);
+    return true;
+}
+
+function _执行拆分建议(建议: 类别操作建议, 统计: 优化统计): boolean {
+    if (建议.目标类别.length !== 1) {
+        return false;
+    }
+    
+    let 类别ID = 建议.目标类别[0];
+    let 类别 = auto_classifier.获取类别(类别ID);
+    
+    if (!类别) {
+        return false;
+    }
+    
+    let 子类别列表 = 建议.操作细节.建议子类别;
+    if (!子类别列表 || 子类别列表.length < 2) {
+        return false;
+    }
+    
+    // 创建子类别
+    let 成功数 = 0;
+    for (let 子类别 of 子类别列表) {
+        let 新类别ID = "split_" + Date.now() + "_" + 成功数;
+        let 新类别 = {
+            类别ID: 新类别ID,
+            类别名称: 子类别.名称,
+            父类别ID: 类别ID,
+            描述: `由${类别.类别名称}拆分而来`,
+            关键词: 子类别.关键词 || [],
+            文件类型: 子类别.文件类型 || [],
+            分类规则: 子类别.分类规则 || [],
+            样本文件: 子类别.样本文件 || [],
+            创建时间: new Date(),
+            修改时间: new Date(),
+            手动定义: false,
+            使用频率: 0
+        };
+        
+        if (auto_classifier.创建类别(新类别)) {
+            成功数++;
+        }
+    }
+    
+    if (成功数 > 0) {
+        log.info(`已从类别 ${类别.类别名称} 拆分出 ${成功数} 个子类别`);
+        统计.新增类别数 += 成功数;
+        return true;
+    }
+    
+    return false;
+}
+
+function _执行废弃建议(建议: 类别操作建议, 统计: 优化统计): boolean {
+    if (建议.目标类别.length !== 1) {
+        return false;
+    }
+    
+    let 类别ID = 建议.目标类别[0];
+    let 类别 = auto_classifier.获取类别(类别ID);
+    
+    if (!类别) {
+        return false;
+    }
+    
+    if (auto_classifier.删除类别(类别ID)) {
+        统计.废弃类别数++;
+        log.info(`已删除废弃类别: ${类别.类别名称} (${类别ID})`);
+        return true;
+    }
+    
+    return false;
+}
+
+function _执行调整建议(建议: 类别操作建议, 统计: 优化统计): boolean {
+    if (建议.目标类别.length !== 1) {
+        return false;
+    }
+    
+    let 类别ID = 建议.目标类别[0];
+    let 类别 = auto_classifier.获取类别(类别ID);
+    
+    if (!类别) {
+        return false;
+    }
+    
+    if (!建议.操作细节 || !建议.操作细节.建议操作) {
+        return false;
+    }
+    
+    let 更新字段 = {};
+    
+    switch (建议.操作细节.建议操作) {
+        case "增加关键词":
+            // 实际实现中应生成新关键词
+            if (类别.关键词.length < 5) {
+                更新字段.关键词 = [...类别.关键词, "自动生成关键词"];
+            }
+            break;
+            
+        case "增加样本":
+            // 实际实现中应查找潜在样本
+            break;
+            
+        default:
+            return false;
+    }
+    
+    if (Object.keys(更新字段).length > 0) {
+        if (auto_classifier.更新类别(类别ID, 更新字段)) {
+            log.info(`已调整类别 ${类别.类别名称}: ${建议.操作细节.建议操作}`);
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+function _设置定期优化(间隔秒数: number) {
+    // 设置定期优化任务
+    scheduler.设置定期任务("分类优化", () => {
+        if (state.优化状态 !== "优化中") {
+            开始优化过程();
+        }
+    }, 间隔秒数);
+    
+    log.info(`已设置定期优化，间隔: ${间隔秒数}秒`);
+}
+
+function _建议已过期(): boolean {
+    // 检查建议是否已过期（超过1天）
+    if (state.当前建议.length === 0) {
+        return true;
+    }
+    
+    let 现在 = new Date();
+    let 一天毫秒 = 24 * 60 * 60 * 1000;
+    
+    return (现在.getTime() - state.上次优化时间.getTime()) > 一天毫秒;
+}
+
+// 导出接口
+export {
+    初始化,
+    开始优化过程,
+    获取优化建议,
+    手动执行建议,
+    获取优化历史,
+    获取类别问题报告
+} 

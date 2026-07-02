@@ -1,0 +1,484 @@
+/**
+ * QEntL量子资源估算器
+ * QuantumGene: QG-SERVICES-ESTIMATOR-2024042702
+ * EntanglementStrength: 0.93
+ */
+
+namespace QEntL.Services {
+
+    using System;
+    using System.Collections.Generic;
+    using QEntL.VM.Core.Instruction;
+    using QEntL.VM.Devices;
+    using QEntL.Compiler.IR;
+    
+    /**
+     * 量子资源类型
+     * 定义可以估算的量子资源类型
+     */
+    enum QuantumResourceType {
+        QUBITS,             // 量子比特数量
+        CIRCUIT_DEPTH,      // 电路深度
+        GATE_COUNT,         // 量子门数量
+        TWO_QUBIT_GATES,    // 双量子比特门数量
+        MEASUREMENT_COUNT,  // 测量操作数量
+        EXECUTION_TIME,     // 执行时间
+        MEMORY_USAGE,       // 内存使用
+        ERROR_RATE          // 错误率
+    }
+    
+    /**
+     * 量子资源估算结果
+     * 包含各种资源的估算结果
+     */
+    class QuantumResourceEstimation {
+        public int qubitCount;                // 量子比特数量
+        public int circuitDepth;              // 电路深度
+        public int totalGateCount;            // 总门数量
+        public int twoQubitGateCount;         // 双量子比特门数量
+        public int measurementCount;          // 测量操作数量
+        public double executionTime;          // 估计执行时间（毫秒）
+        public double memoryUsage;            // 估计内存使用（MB）
+        public double errorProbability;       // 估计错误概率
+        public Dictionary<string, int> gateBreakdown; // 各类门的数量明细
+        
+        // 构造函数
+        public QuantumResourceEstimation() {
+            this.qubitCount = 0;
+            this.circuitDepth = 0;
+            this.totalGateCount = 0;
+            this.twoQubitGateCount = 0;
+            this.measurementCount = 0;
+            this.executionTime = 0.0;
+            this.memoryUsage = 0.0;
+            this.errorProbability = 0.0;
+            this.gateBreakdown = new Dictionary<string, int>();
+        }
+        
+        // 获取估算结果摘要
+        public Dictionary<QuantumResourceType, object> getSummary() {
+            Dictionary<QuantumResourceType, object> summary = new Dictionary<QuantumResourceType, object>();
+            summary[QuantumResourceType.QUBITS] = this.qubitCount;
+            summary[QuantumResourceType.CIRCUIT_DEPTH] = this.circuitDepth;
+            summary[QuantumResourceType.GATE_COUNT] = this.totalGateCount;
+            summary[QuantumResourceType.TWO_QUBIT_GATES] = this.twoQubitGateCount;
+            summary[QuantumResourceType.MEASUREMENT_COUNT] = this.measurementCount;
+            summary[QuantumResourceType.EXECUTION_TIME] = this.executionTime;
+            summary[QuantumResourceType.MEMORY_USAGE] = this.memoryUsage;
+            summary[QuantumResourceType.ERROR_RATE] = this.errorProbability;
+            
+            return summary;
+        }
+        
+        // 获取详细报告
+        public string getDetailedReport() {
+            StringBuilder report = new StringBuilder();
+            
+            report.append("量子资源估算报告\n");
+            report.append("===================\n\n");
+            
+            report.append($"量子比特数量: {this.qubitCount}\n");
+            report.append($"电路深度: {this.circuitDepth}\n");
+            report.append($"总门数量: {this.totalGateCount}\n");
+            report.append($"双量子比特门数量: {this.twoQubitGateCount}\n");
+            report.append($"测量操作数量: {this.measurementCount}\n");
+            report.append($"估计执行时间: {this.executionTime:F2} 毫秒\n");
+            report.append($"估计内存使用: {this.memoryUsage:F2} MB\n");
+            report.append($"估计错误概率: {this.errorProbability:P2}\n\n");
+            
+            report.append("量子门分布:\n");
+            foreach (var entry in this.gateBreakdown) {
+                report.append($"  {entry.Key}: {entry.Value}\n");
+            }
+            
+            return report.toString();
+        }
+    }
+    
+    /**
+     * 设备特性模型
+     * 描述量子设备的特性，用于资源估算
+     */
+    class DeviceCharacteristics {
+        public int maxQubits;                  // 最大量子比特数
+        public int maxCircuitDepth;            // 最大电路深度
+        public double gateTime;                // 单量子比特门时间 (纳秒)
+        public double twoQubitGateTime;        // 双量子比特门时间 (纳秒)
+        public double measurementTime;         // 测量时间 (纳秒)
+        public double resetTime;               // 重置时间 (纳秒)
+        public double singleQubitErrorRate;    // 单量子比特门错误率
+        public double twoQubitErrorRate;       // 双量子比特门错误率
+        public double measurementErrorRate;    // 测量错误率
+        public double coherenceTime;           // 相干时间 (微秒)
+        public double memoryPerQubit;          // 每个量子比特的内存消耗 (KB)
+        
+        // 构造函数 - 默认值基于典型的超导量子计算机
+        public DeviceCharacteristics() {
+            this.maxQubits = 100;
+            this.maxCircuitDepth = 1000;
+            this.gateTime = 50.0;              // 50纳秒
+            this.twoQubitGateTime = 300.0;     // 300纳秒
+            this.measurementTime = 1000.0;     // 1微秒
+            this.resetTime = 500.0;            // 500纳秒
+            this.singleQubitErrorRate = 0.001; // 0.1%
+            this.twoQubitErrorRate = 0.01;     // 1%
+            this.measurementErrorRate = 0.05;  // 5%
+            this.coherenceTime = 100.0;        // 100微秒
+            this.memoryPerQubit = 16.0;        // 16KB
+        }
+        
+        // 构造预设设备特性 - 超导量子计算机
+        public static DeviceCharacteristics createSuperconducting() {
+            DeviceCharacteristics chars = new DeviceCharacteristics();
+            chars.maxQubits = 127;
+            chars.maxCircuitDepth = 1000;
+            chars.gateTime = 50.0;
+            chars.twoQubitGateTime = 300.0;
+            chars.measurementTime = 1000.0;
+            chars.resetTime = 500.0;
+            chars.singleQubitErrorRate = 0.001;
+            chars.twoQubitErrorRate = 0.01;
+            chars.measurementErrorRate = 0.05;
+            chars.coherenceTime = 100.0;
+            chars.memoryPerQubit = 16.0;
+            return chars;
+        }
+        
+        // 构造预设设备特性 - 离子阱量子计算机
+        public static DeviceCharacteristics createIonTrap() {
+            DeviceCharacteristics chars = new DeviceCharacteristics();
+            chars.maxQubits = 32;
+            chars.maxCircuitDepth = 5000;
+            chars.gateTime = 1000.0;           // 1微秒
+            chars.twoQubitGateTime = 2000.0;   // 2微秒
+            chars.measurementTime = 10000.0;   // 10微秒
+            chars.resetTime = 5000.0;          // 5微秒
+            chars.singleQubitErrorRate = 0.0001; // 0.01%
+            chars.twoQubitErrorRate = 0.001;   // 0.1%
+            chars.measurementErrorRate = 0.01; // 1%
+            chars.coherenceTime = 10000.0;     // 10毫秒
+            chars.memoryPerQubit = 16.0;
+            return chars;
+        }
+        
+        // 构造预设设备特性 - 光量子计算机
+        public static DeviceCharacteristics createPhotonic() {
+            DeviceCharacteristics chars = new DeviceCharacteristics();
+            chars.maxQubits = 20;
+            chars.maxCircuitDepth = 50;
+            chars.gateTime = 5.0;              // 5纳秒
+            chars.twoQubitGateTime = 50.0;     // 50纳秒
+            chars.measurementTime = 500.0;     // 500纳秒
+            chars.resetTime = 100.0;           // 100纳秒
+            chars.singleQubitErrorRate = 0.005; // 0.5%
+            chars.twoQubitErrorRate = 0.05;    // 5%
+            chars.measurementErrorRate = 0.1;  // 10%
+            chars.coherenceTime = 10.0;        // 10微秒
+            chars.memoryPerQubit = 8.0;
+            return chars;
+        }
+        
+        // 从设备创建特性
+        public static DeviceCharacteristics fromDevice(IQuantumDevice device) {
+            DeviceCharacteristics chars = new DeviceCharacteristics();
+            
+            QuantumDeviceCapabilities caps = device.getCapabilities();
+            chars.maxQubits = caps.maxQubits;
+            chars.maxCircuitDepth = caps.maxCircuitDepth;
+            chars.coherenceTime = caps.coherenceTime;
+            chars.singleQubitErrorRate = caps.gateErrorRate;
+            chars.twoQubitErrorRate = caps.gateErrorRate * 10; // 假设双量子比特门错误率是单门的10倍
+            chars.measurementErrorRate = caps.readoutErrorRate;
+            
+            // 获取门执行时间
+            chars.gateTime = caps.getGateExecutionTime("X") * 1000.0; // 转换为纳秒
+            chars.twoQubitGateTime = caps.getGateExecutionTime("CNOT") * 1000.0;
+            chars.measurementTime = 1000.0; // 默认值
+            
+            return chars;
+        }
+    }
+    
+    /**
+     * 量子资源估算器
+     * 用于估算量子程序所需的资源
+     */
+    class QuantumResourceEstimator {
+        private DeviceCharacteristics deviceCharacteristics; // 设备特性
+        
+        // 构造函数
+        public QuantumResourceEstimator(DeviceCharacteristics deviceCharacteristics = null) {
+            this.deviceCharacteristics = deviceCharacteristics ?? new DeviceCharacteristics();
+        }
+        
+        // 设置设备特性
+        public void setDeviceCharacteristics(DeviceCharacteristics characteristics) {
+            this.deviceCharacteristics = characteristics;
+        }
+        
+        // 估算指令列表
+        public QuantumResourceEstimation estimateInstructions(List<QuantumInstruction> instructions) {
+            QuantumResourceEstimation estimation = new QuantumResourceEstimation();
+            
+            // 逐层分析指令
+            Dictionary<int, int> qubitLayerMap = new Dictionary<int, int>(); // 记录每个量子比特的最后一层
+            int currentDepth = 0;
+            HashSet<int> usedQubits = new HashSet<int>();
+            
+            foreach (QuantumInstruction inst in instructions) {
+                // 根据指令类型累加资源
+                switch (inst.type) {
+                    case QuantumInstructionType.QGATE:
+                        processGate((QuantumGateInstruction)inst, estimation, qubitLayerMap, ref currentDepth, usedQubits);
+                        break;
+                        
+                    case QuantumInstructionType.QMEASURE:
+                        processMeasurement(inst, estimation, qubitLayerMap, ref currentDepth, usedQubits);
+                        break;
+                        
+                    case QuantumInstructionType.QALLOC:
+                        // 量子比特分配不增加电路深度
+                        int qubitCount = int.parse(inst.get_attribute("count", "1"));
+                        for (int i = 0; i < qubitCount; i++) {
+                            int qubitIndex = int.parse(inst.get_operands()[i]);
+                            usedQubits.add(qubitIndex);
+                            if (!qubitLayerMap.containsKey(qubitIndex)) {
+                                qubitLayerMap[qubitIndex] = 0;
+                            }
+                        }
+                        break;
+                        
+                    // 其他指令类型...
+                }
+            }
+            
+            // 设置最终的量子比特数量和电路深度
+            estimation.qubitCount = usedQubits.size();
+            estimation.circuitDepth = currentDepth;
+            
+            // 估算执行时间（纳秒）
+            double executionTime = 0.0;
+            executionTime += estimation.totalGateCount * this.deviceCharacteristics.gateTime;
+            executionTime += estimation.twoQubitGateCount * (this.deviceCharacteristics.twoQubitGateTime - this.deviceCharacteristics.gateTime); // 额外时间
+            executionTime += estimation.measurementCount * this.deviceCharacteristics.measurementTime;
+            estimation.executionTime = executionTime / 1000000.0; // 转换为毫秒
+            
+            // 估算内存使用
+            estimation.memoryUsage = estimation.qubitCount * this.deviceCharacteristics.memoryPerQubit / 1024.0; // 转换为MB
+            
+            // 估算错误概率
+            double errorProb = 1.0 - Math.pow(1.0 - this.deviceCharacteristics.singleQubitErrorRate, estimation.totalGateCount - estimation.twoQubitGateCount);
+            errorProb = 1.0 - (1.0 - errorProb) * Math.pow(1.0 - this.deviceCharacteristics.twoQubitErrorRate, estimation.twoQubitGateCount);
+            errorProb = 1.0 - (1.0 - errorProb) * Math.pow(1.0 - this.deviceCharacteristics.measurementErrorRate, estimation.measurementCount);
+            estimation.errorProbability = errorProb;
+            
+            return estimation;
+        }
+        
+        // 估算IR模块
+        public QuantumResourceEstimation estimateIRModule(IRModule module) {
+            // 将IR转换为指令
+            List<QuantumInstruction> instructions = convertIRToInstructions(module);
+            return estimateInstructions(instructions);
+        }
+        
+        // 处理量子门指令
+        private void processGate(QuantumGateInstruction gate, QuantumResourceEstimation estimation, 
+                                Dictionary<int, int> qubitLayerMap, ref int currentDepth, HashSet<int> usedQubits) {
+            
+            estimation.totalGateCount++;
+            
+            // 获取门类型和操作数
+            string gateType = gate.gateType.toString();
+            List<int> qubitIndices = new List<int>();
+            
+            foreach (string op in gate.get_operands()) {
+                int qubitIndex = int.parse(op);
+                qubitIndices.add(qubitIndex);
+                usedQubits.add(qubitIndex);
+                
+                // 确保每个量子比特都有层信息
+                if (!qubitLayerMap.containsKey(qubitIndex)) {
+                    qubitLayerMap[qubitIndex] = 0;
+                }
+            }
+            
+            // 更新门计数
+            if (!estimation.gateBreakdown.containsKey(gateType)) {
+                estimation.gateBreakdown[gateType] = 0;
+            }
+            estimation.gateBreakdown[gateType]++;
+            
+            // 检查是否为双量子比特门
+            if (qubitIndices.size() > 1) {
+                estimation.twoQubitGateCount++;
+            }
+            
+            // 计算此门操作的起始层
+            int startLayer = 0;
+            foreach (int qubitIndex in qubitIndices) {
+                startLayer = Math.max(startLayer, qubitLayerMap[qubitIndex]);
+            }
+            
+            // 更新电路深度和量子比特的层信息
+            int newLayer = startLayer + 1;
+            foreach (int qubitIndex in qubitIndices) {
+                qubitLayerMap[qubitIndex] = newLayer;
+            }
+            
+            currentDepth = Math.max(currentDepth, newLayer);
+        }
+        
+        // 处理测量指令
+        private void processMeasurement(QuantumInstruction measurement, QuantumResourceEstimation estimation,
+                                      Dictionary<int, int> qubitLayerMap, ref int currentDepth, HashSet<int> usedQubits) {
+            
+            estimation.measurementCount++;
+            
+            // 获取测量的量子比特
+            List<string> operands = measurement.get_operands();
+            if (operands.size() > 0) {
+                int qubitIndex = int.parse(operands[0]);
+                usedQubits.add(qubitIndex);
+                
+                // 确保量子比特有层信息
+                if (!qubitLayerMap.containsKey(qubitIndex)) {
+                    qubitLayerMap[qubitIndex] = 0;
+                }
+                
+                // 更新层信息
+                int newLayer = qubitLayerMap[qubitIndex] + 1;
+                qubitLayerMap[qubitIndex] = newLayer;
+                currentDepth = Math.max(currentDepth, newLayer);
+            }
+        }
+        
+        // 转换IR到量子指令
+        private List<QuantumInstruction> convertIRToInstructions(IRModule module) {
+            // 这是一个简化实现，实际情况下可能需要更复杂的转换
+            List<QuantumInstruction> instructions = new List<QuantumInstruction>();
+            
+            foreach (IRFunction func in module.functions) {
+                foreach (IRBasicBlock block in func.get_blocks()) {
+                    foreach (IRInstruction irInst in block.get_instructions()) {
+                        if (isQuantumInstruction(irInst)) {
+                            QuantumInstruction qInst = convertIRToQuantumInstruction(irInst);
+                            if (qInst != null) {
+                                instructions.add(qInst);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return instructions;
+        }
+        
+        // 判断IR指令是否为量子指令
+        private bool isQuantumInstruction(IRInstruction inst) {
+            return inst.get_type() == IRInstructionType.QGate || 
+                   inst.get_type() == IRInstructionType.QMeasure || 
+                   inst.get_type() == IRInstructionType.QEntangle || 
+                   inst.get_type() == IRInstructionType.QAlloc;
+        }
+        
+        // 转换IR指令到量子指令
+        private QuantumInstruction convertIRToQuantumInstruction(IRInstruction irInst) {
+            // 简化实现，实际应详细映射IR指令到量子指令
+            switch (irInst.get_type()) {
+                case IRInstructionType.QGate:
+                    QuantumGateInstruction gateInst = new QuantumGateInstruction();
+                    string gateType = irInst.get_attribute("gate_type");
+                    gateInst.gateType = Enum.Parse<QuantumGateType>(gateType.toUpperCase());
+                    gateInst.operands = irInst.get_operands();
+                    return gateInst;
+                    
+                case IRInstructionType.QMeasure:
+                    QuantumMeasureInstruction measureInst = new QuantumMeasureInstruction();
+                    measureInst.operands = irInst.get_operands();
+                    measureInst.basis = Enum.Parse<QuantumMeasurementBasis>(irInst.get_attribute("basis", "Z"));
+                    return measureInst;
+                    
+                case IRInstructionType.QEntangle:
+                    // 简化 - 转换为一系列门操作
+                    QuantumGateInstruction hadamard = new QuantumGateInstruction();
+                    hadamard.gateType = QuantumGateType.H;
+                    hadamard.operands = new List<string> { irInst.get_operands()[0] };
+                    
+                    QuantumGateInstruction cnot = new QuantumGateInstruction();
+                    cnot.gateType = QuantumGateType.CNOT;
+                    cnot.operands = new List<string> { irInst.get_operands()[0], irInst.get_operands()[1] };
+                    
+                    // 返回第一个指令，后续指令将在转换过程中丢失（简化实现）
+                    return hadamard;
+                    
+                case IRInstructionType.QAlloc:
+                    QuantumAllocInstruction allocInst = new QuantumAllocInstruction();
+                    allocInst.operands = irInst.get_operands();
+                    allocInst.count = int.parse(irInst.get_attribute("count", "1"));
+                    return allocInst;
+                    
+                default:
+                    return null;
+            }
+        }
+        
+        // 验证估算结果是否超出设备限制
+        public Dictionary<string, bool> validateEstimation(QuantumResourceEstimation estimation) {
+            Dictionary<string, bool> validation = new Dictionary<string, bool>();
+            
+            validation["qubits_valid"] = estimation.qubitCount <= this.deviceCharacteristics.maxQubits;
+            validation["depth_valid"] = estimation.circuitDepth <= this.deviceCharacteristics.maxCircuitDepth;
+            validation["coherence_valid"] = estimation.executionTime <= this.deviceCharacteristics.coherenceTime;
+            
+            // 综合验证
+            validation["overall_valid"] = validation["qubits_valid"] && 
+                                          validation["depth_valid"] && 
+                                          validation["coherence_valid"];
+            
+            return validation;
+        }
+        
+        // 生成资源优化建议
+        public string generateOptimizationSuggestions(QuantumResourceEstimation estimation) {
+            StringBuilder suggestions = new StringBuilder();
+            suggestions.append("资源优化建议:\n");
+            
+            Dictionary<string, bool> validation = validateEstimation(estimation);
+            
+            if (!validation["qubits_valid"]) {
+                suggestions.append("- 量子比特数量超出设备限制，尝试减少并行操作或分解为更小的电路\n");
+                suggestions.append($"  当前: {estimation.qubitCount}, 限制: {this.deviceCharacteristics.maxQubits}\n");
+            }
+            
+            if (!validation["depth_valid"]) {
+                suggestions.append("- 电路深度超出设备限制，尝试优化算法或使用浅层电路技术\n");
+                suggestions.append($"  当前: {estimation.circuitDepth}, 限制: {this.deviceCharacteristics.maxCircuitDepth}\n");
+            }
+            
+            if (!validation["coherence_valid"]) {
+                suggestions.append("- 执行时间可能超出量子比特相干时间，考虑使用量子纠错或分解为更小的电路\n");
+                suggestions.append($"  当前: {estimation.executionTime:F2}毫秒, 相干时间: {this.deviceCharacteristics.coherenceTime:F2}微秒\n");
+            }
+            
+            // 针对各类量子门的优化建议
+            if (estimation.gateBreakdown.containsKey("CNOT") && estimation.gateBreakdown["CNOT"] > 0.5 * estimation.totalGateCount) {
+                suggestions.append("- CNOT门使用过多，考虑优化算法减少纠缠操作\n");
+            }
+            
+            if (estimation.twoQubitGateCount > 0.3 * estimation.totalGateCount) {
+                suggestions.append("- 双量子比特门比例较高，这些门的错误率通常更高，请尝试减少使用\n");
+            }
+            
+            if (estimation.errorProbability > 0.5) {
+                suggestions.append("- 错误概率过高，建议使用量子纠错、量子错误缓解技术或重新设计算法\n");
+            }
+            
+            if (suggestions.toString().equals("资源优化建议:\n")) {
+                suggestions.append("- 当前量子程序资源使用情况良好，无需特别优化\n");
+            }
+            
+            return suggestions.toString();
+        }
+    }
+} 

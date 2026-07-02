@@ -1,0 +1,659 @@
+/**
+ * @file parallel_build_manager.qentl
+ * @brief QEntL并行构建管理器
+ * 
+ * 量子基因编码: QGC-COMPILER-PARBUILD-2024061906
+ * 量子纠缠信道: QEC-COMPILER-BUILD-02
+ */
+
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/set.qentl";
+import "QEntL/core/queue.qentl";
+import "QEntL/vm/src/core/os_interface/process.qentl";
+import "QEntL/compiler/src/backend/build/incremental_builder.qentl";
+
+/**
+ * @enum BuildTaskState
+ * @brief 构建任务状态
+ */
+enum BuildTaskState {
+    PENDING,    // 等待执行
+    RUNNING,    // 正在执行
+    COMPLETED,  // 已完成
+    FAILED      // 失败
+}
+
+/**
+ * @class BuildTask
+ * @brief 构建任务类，表示一个需要执行的构建任务
+ */
+class BuildTask {
+    public {
+        id: Integer;                // 任务ID
+        sourcePath: String;         // 源文件路径
+        outputPath: String;         // 输出文件路径
+        dependencies: Array<Integer>; // 依赖任务ID列表
+        dependents: Array<Integer>;   // 依赖此任务的任务ID列表
+        state: BuildTaskState;      // 任务状态
+        process: Process;           // 任务进程
+        startTime: Long;            // 开始时间（毫秒时间戳）
+        endTime: Long;              // 结束时间（毫秒时间戳）
+        exitCode: Integer;          // 进程退出码
+        output: String;             // 进程输出
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param id 任务ID
+     * @param sourcePath 源文件路径
+     * @param outputPath 输出文件路径
+     */
+    constructor(id: Integer, sourcePath: String, outputPath: String) {
+        this.id = id;
+        this.sourcePath = sourcePath;
+        this.outputPath = outputPath;
+        this.dependencies = new Array<Integer>();
+        this.dependents = new Array<Integer>();
+        this.state = BuildTaskState.PENDING;
+        this.process = null;
+        this.startTime = 0;
+        this.endTime = 0;
+        this.exitCode = 0;
+        this.output = "";
+    }
+    
+    /**
+     * @brief 添加依赖任务
+     * @param taskId 依赖任务ID
+     */
+    public function addDependency(taskId: Integer): void {
+        this.dependencies.push(taskId);
+    }
+    
+    /**
+     * @brief 添加依赖此任务的任务
+     * @param taskId 依赖此任务的任务ID
+     */
+    public function addDependent(taskId: Integer): void {
+        this.dependents.push(taskId);
+    }
+    
+    /**
+     * @brief 获取任务执行时间（毫秒）
+     * @return 任务执行时间
+     */
+    public function getExecutionTime(): Long {
+        if (this.state == BuildTaskState.RUNNING) {
+            return System.currentTimeMillis() - this.startTime;
+        } else if (this.state == BuildTaskState.COMPLETED || this.state == BuildTaskState.FAILED) {
+            return this.endTime - this.startTime;
+        } else {
+            return 0;
+        }
+    }
+    
+    /**
+     * @brief 检查任务是否可以执行
+     * @param taskMap 任务映射表
+     * @return 是否可以执行
+     */
+    public function canExecute(taskMap: Map<Integer, BuildTask>): Boolean {
+        if (this.state != BuildTaskState.PENDING) {
+            return false;
+        }
+        
+        // 检查所有依赖任务是否已完成
+        for (let i = 0; i < this.dependencies.length; i++) {
+            let depTaskId = this.dependencies[i];
+            let depTask = taskMap.get(depTaskId);
+            
+            if (depTask != null && depTask.state != BuildTaskState.COMPLETED) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief 启动任务
+     * @param command 编译命令
+     * @param args 命令参数
+     * @return 是否成功启动
+     */
+    public function start(command: String, args: Array<String>): Boolean {
+        try {
+            // 创建进程对象
+            let processArgs = new Array<String>();
+            processArgs.push(command);
+            
+            for (let i = 0; i < args.length; i++) {
+                processArgs.push(args[i]);
+            }
+            
+            processArgs.push(this.sourcePath);
+            processArgs.push("-o");
+            processArgs.push(this.outputPath);
+            
+            this.process = ProcessManager.createProcess(processArgs);
+            
+            // 启动进程
+            this.process.start();
+            this.state = BuildTaskState.RUNNING;
+            this.startTime = System.currentTimeMillis();
+            
+            return true;
+        } catch (e) {
+            System.println("启动构建任务失败：" + e.message);
+            this.state = BuildTaskState.FAILED;
+            this.output = "错误：" + e.message;
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 检查任务是否已完成
+     * @return 是否已完成
+     */
+    public function checkCompletion(): Boolean {
+        if (this.state != BuildTaskState.RUNNING || this.process == null) {
+            return true;
+        }
+        
+        try {
+            let processInfo = this.process.getInfo();
+            
+            if (!processInfo.isRunning) {
+                this.endTime = System.currentTimeMillis();
+                this.exitCode = processInfo.exitCode;
+                
+                // 读取进程输出
+                this.output = this.process.readOutput();
+                
+                // 更新任务状态
+                this.state = this.exitCode == 0 ? BuildTaskState.COMPLETED : BuildTaskState.FAILED;
+                
+                return true;
+            }
+        } catch (e) {
+            System.println("检查任务完成状态失败：" + e.message);
+            this.state = BuildTaskState.FAILED;
+            this.output = "错误：" + e.message;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * @brief 终止任务
+     */
+    public function terminate(): void {
+        if (this.state == BuildTaskState.RUNNING && this.process != null) {
+            try {
+                this.process.terminate();
+                this.endTime = System.currentTimeMillis();
+                this.state = BuildTaskState.FAILED;
+                this.output = "任务被终止";
+            } catch (e) {
+                System.println("终止任务失败：" + e.message);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取任务状态描述
+     * @return 状态描述
+     */
+    public function getStateDescription(): String {
+        switch (this.state) {
+            case BuildTaskState.PENDING:
+                return "等待中";
+            case BuildTaskState.RUNNING:
+                return "执行中";
+            case BuildTaskState.COMPLETED:
+                return "已完成";
+            case BuildTaskState.FAILED:
+                return "失败";
+            default:
+                return "未知";
+        }
+    }
+}
+
+/**
+ * @class BuildScheduler
+ * @brief 构建调度器类，负责安排任务的执行顺序
+ */
+class BuildScheduler {
+    private {
+        taskMap: Map<Integer, BuildTask>;       // 任务ID -> 任务对象
+        taskQueue: Queue<Integer>;              // 待执行的任务队列
+        runningTasks: Set<Integer>;             // 正在执行的任务集合
+        maxConcurrentTasks: Integer;            // 最大并发任务数
+        nextTaskId: Integer;                    // 下一个任务ID
+        compiler: String;                       // 编译器命令
+        compilerArgs: Array<String>;            // 编译器参数
+        verbose: Boolean;                       // 是否输出详细信息
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param compiler 编译器命令
+     * @param compilerArgs 编译器参数
+     * @param maxConcurrentTasks 最大并发任务数
+     * @param verbose 是否输出详细信息
+     */
+    constructor(compiler: String, compilerArgs: Array<String> = null, maxConcurrentTasks: Integer = 4, verbose: Boolean = false) {
+        this.taskMap = new Map<Integer, BuildTask>();
+        this.taskQueue = new Queue<Integer>();
+        this.runningTasks = new Set<Integer>();
+        this.maxConcurrentTasks = maxConcurrentTasks;
+        this.nextTaskId = 1;
+        this.compiler = compiler;
+        this.compilerArgs = compilerArgs != null ? compilerArgs : new Array<String>();
+        this.verbose = verbose;
+    }
+    
+    /**
+     * @brief 创建构建任务
+     * @param sourcePath 源文件路径
+     * @param outputPath 输出文件路径
+     * @return 任务ID
+     */
+    public function createTask(sourcePath: String, outputPath: String): Integer {
+        let taskId = this.nextTaskId++;
+        let task = new BuildTask(taskId, sourcePath, outputPath);
+        this.taskMap.set(taskId, task);
+        return taskId;
+    }
+    
+    /**
+     * @brief 添加任务依赖关系
+     * @param taskId 任务ID
+     * @param dependencyTaskId 依赖任务ID
+     */
+    public function addTaskDependency(taskId: Integer, dependencyTaskId: Integer): void {
+        let task = this.taskMap.get(taskId);
+        let depTask = this.taskMap.get(dependencyTaskId);
+        
+        if (task != null && depTask != null) {
+            task.addDependency(dependencyTaskId);
+            depTask.addDependent(taskId);
+        }
+    }
+    
+    /**
+     * @brief 基于文件依赖关系构建任务图
+     * @param filesToBuild 需要构建的文件列表
+     * @param outputDir 输出目录
+     * @param cache 构建缓存
+     * @return 任务ID列表
+     */
+    public function buildTaskGraph(filesToBuild: Array<String>, outputDir: String, cache: BuildCache): Array<Integer> {
+        let taskIds = new Array<Integer>();
+        let fileToTaskId = new Map<String, Integer>();
+        
+        // 创建任务
+        for (let i = 0; i < filesToBuild.length; i++) {
+            let sourcePath = filesToBuild[i];
+            
+            // 生成输出文件路径
+            let relativePath = this.getRelativePath(sourcePath);
+            let outputPath = outputDir + "/" + relativePath.substring(0, relativePath.lastIndexOf(".")) + ".qobj";
+            
+            let taskId = this.createTask(sourcePath, outputPath);
+            taskIds.push(taskId);
+            fileToTaskId.set(sourcePath, taskId);
+        }
+        
+        // 添加依赖关系
+        for (let i = 0; i < filesToBuild.length; i++) {
+            let sourcePath = filesToBuild[i];
+            let taskId = fileToTaskId.get(sourcePath);
+            
+            // 获取文件依赖
+            let depInfo = cache.getDependencyInfo(sourcePath);
+            if (depInfo != null) {
+                let deps = depInfo.getDependencies();
+                let depsArray = Array.fromSet(deps);
+                
+                for (let j = 0; j < depsArray.length; j++) {
+                    let depPath = depsArray[j];
+                    let depTaskId = fileToTaskId.get(depPath);
+                    
+                    if (depTaskId != null) {
+                        this.addTaskDependency(taskId, depTaskId);
+                    }
+                }
+            }
+        }
+        
+        return taskIds;
+    }
+    
+    /**
+     * @brief 获取文件的相对路径
+     * @param path 文件路径
+     * @return 相对路径
+     */
+    private function getRelativePath(path: String): String {
+        // 简单实现，只返回文件名
+        let lastSlash = path.lastIndexOf("/");
+        return lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+    }
+    
+    /**
+     * @brief 初始化任务队列
+     * @param taskIds 任务ID列表
+     */
+    public function initializeQueue(taskIds: Array<Integer>): void {
+        this.taskQueue.clear();
+        
+        // 将所有没有依赖的任务加入队列
+        for (let i = 0; i < taskIds.length; i++) {
+            let taskId = taskIds[i];
+            let task = this.taskMap.get(taskId);
+            
+            if (task != null && task.dependencies.length == 0) {
+                this.taskQueue.enqueue(taskId);
+            }
+        }
+    }
+    
+    /**
+     * @brief 执行构建任务
+     * @return 是否全部成功
+     */
+    public function execute(): Boolean {
+        let allTasksCompleted = true;
+        
+        // 开始执行任务
+        while (!this.taskQueue.isEmpty() || !this.runningTasks.isEmpty()) {
+            // 检查已完成的任务
+            this.checkCompletedTasks();
+            
+            // 启动新任务
+            this.startNewTasks();
+            
+            // 等待一段时间
+            System.sleep(50);
+        }
+        
+        // 检查是否所有任务都成功完成
+        let taskIds = Array.fromSet(this.taskMap.keys());
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.taskMap.get(taskIds[i]);
+            
+            if (task.state != BuildTaskState.COMPLETED) {
+                allTasksCompleted = false;
+                
+                if (this.verbose) {
+                    System.println("任务失败：" + task.sourcePath);
+                    System.println("  原因：" + task.output);
+                }
+            }
+        }
+        
+        return allTasksCompleted;
+    }
+    
+    /**
+     * @brief 检查已完成的任务
+     */
+    private function checkCompletedTasks(): void {
+        let completedTaskIds = new Array<Integer>();
+        let runningTaskIds = Array.fromSet(this.runningTasks);
+        
+        // 检查每个正在运行的任务
+        for (let i = 0; i < runningTaskIds.length; i++) {
+            let taskId = runningTaskIds[i];
+            let task = this.taskMap.get(taskId);
+            
+            if (task != null && task.checkCompletion()) {
+                completedTaskIds.push(taskId);
+                
+                if (this.verbose) {
+                    System.println("任务完成：" + task.sourcePath + "，状态：" + task.getStateDescription() + 
+                                  "，耗时：" + task.getExecutionTime() + "ms");
+                }
+                
+                // 如果任务成功完成，将其依赖者加入队列
+                if (task.state == BuildTaskState.COMPLETED) {
+                    for (let j = 0; j < task.dependents.length; j++) {
+                        let depTaskId = task.dependents[j];
+                        let depTask = this.taskMap.get(depTaskId);
+                        
+                        // 如果依赖任务可以执行，加入队列
+                        if (depTask != null && depTask.canExecute(this.taskMap)) {
+                            this.taskQueue.enqueue(depTaskId);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 从运行中任务列表中移除已完成的任务
+        for (let i = 0; i < completedTaskIds.length; i++) {
+            this.runningTasks.remove(completedTaskIds[i]);
+        }
+    }
+    
+    /**
+     * @brief 启动新任务
+     */
+    private function startNewTasks(): void {
+        while (!this.taskQueue.isEmpty() && this.runningTasks.size() < this.maxConcurrentTasks) {
+            let taskId = this.taskQueue.dequeue();
+            let task = this.taskMap.get(taskId);
+            
+            if (task != null && task.canExecute(this.taskMap)) {
+                if (task.start(this.compiler, this.compilerArgs)) {
+                    this.runningTasks.add(taskId);
+                    
+                    if (this.verbose) {
+                        System.println("启动任务：" + task.sourcePath);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 终止所有运行中的任务
+     */
+    public function terminateAllTasks(): void {
+        let runningTaskIds = Array.fromSet(this.runningTasks);
+        
+        for (let i = 0; i < runningTaskIds.length; i++) {
+            let taskId = runningTaskIds[i];
+            let task = this.taskMap.get(taskId);
+            
+            if (task != null) {
+                task.terminate();
+            }
+        }
+        
+        this.runningTasks.clear();
+    }
+    
+    /**
+     * @brief 获取构建统计信息
+     * @return 统计信息对象
+     */
+    public function getStatistics(): Map<String, any> {
+        let stats = new Map<String, any>();
+        
+        let totalTasks = 0;
+        let completedTasks = 0;
+        let failedTasks = 0;
+        let totalTime = 0;
+        
+        let taskIds = Array.fromSet(this.taskMap.keys());
+        for (let i = 0; i < taskIds.length; i++) {
+            let task = this.taskMap.get(taskIds[i]);
+            
+            totalTasks++;
+            
+            if (task.state == BuildTaskState.COMPLETED) {
+                completedTasks++;
+            } else if (task.state == BuildTaskState.FAILED) {
+                failedTasks++;
+            }
+            
+            totalTime += task.getExecutionTime();
+        }
+        
+        stats.set("totalTasks", totalTasks);
+        stats.set("completedTasks", completedTasks);
+        stats.set("failedTasks", failedTasks);
+        stats.set("pendingTasks", totalTasks - completedTasks - failedTasks);
+        stats.set("totalTime", totalTime);
+        stats.set("averageTime", totalTasks > 0 ? totalTime / totalTasks : 0);
+        
+        return stats;
+    }
+    
+    /**
+     * @brief 打印构建统计信息
+     */
+    public function printStatistics(): void {
+        let stats = this.getStatistics();
+        
+        System.println("构建统计信息:");
+        System.println("  总任务数: " + stats.get("totalTasks"));
+        System.println("  已完成: " + stats.get("completedTasks"));
+        System.println("  失败: " + stats.get("failedTasks"));
+        System.println("  等待中: " + stats.get("pendingTasks"));
+        System.println("  总耗时: " + stats.get("totalTime") + "ms");
+        System.println("  平均耗时: " + stats.get("averageTime") + "ms");
+    }
+}
+
+/**
+ * @class ParallelBuildManager
+ * @brief 并行构建管理器类，用于实现并行构建
+ */
+class ParallelBuildManager {
+    private {
+        incrementalBuilder: IncrementalBuilder; // 增量构建器
+        scheduler: BuildScheduler;              // 构建调度器
+        verbose: Boolean;                       // 是否输出详细信息
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param sourceDir 源码目录
+     * @param outputDir 输出目录
+     * @param compiler 编译器命令
+     * @param compilerArgs 编译器参数
+     * @param maxConcurrentTasks 最大并发任务数
+     * @param cachePath 缓存文件路径
+     * @param verbose 是否输出详细信息
+     */
+    constructor(sourceDir: String, outputDir: String, compiler: String, 
+                compilerArgs: Array<String> = null, maxConcurrentTasks: Integer = 4, 
+                cachePath: String = ".qentl-build-cache", verbose: Boolean = false) {
+        this.incrementalBuilder = new IncrementalBuilder(sourceDir, outputDir, cachePath, verbose);
+        this.scheduler = new BuildScheduler(compiler, compilerArgs, maxConcurrentTasks, verbose);
+        this.verbose = verbose;
+    }
+    
+    /**
+     * @brief 执行并行构建
+     * @return 是否成功
+     */
+    public function build(): Boolean {
+        try {
+            // 更新依赖关系
+            this.incrementalBuilder.updateDependencies();
+            
+            // 获取需要重新构建的文件
+            let filesToBuild = this.incrementalBuilder.getFilesToRebuild();
+            let allFiles = this.incrementalBuilder.getSourceFiles();
+            
+            // 打印构建统计信息
+            this.incrementalBuilder.printBuildStats(filesToBuild, allFiles.length);
+            
+            if (filesToBuild.length == 0) {
+                System.println("没有文件需要重新构建。");
+                return true;
+            }
+            
+            // 构建任务图
+            let cache = this.incrementalBuilder.getCache();
+            let outputDir = this.incrementalBuilder.getOutputDir();
+            let taskIds = this.scheduler.buildTaskGraph(filesToBuild, outputDir, cache);
+            
+            // 初始化任务队列
+            this.scheduler.initializeQueue(taskIds);
+            
+            // 执行构建任务
+            System.println("开始执行构建任务...");
+            let success = this.scheduler.execute();
+            
+            // 打印构建统计信息
+            this.scheduler.printStatistics();
+            
+            // 如果构建成功，更新文件信息
+            if (success) {
+                for (let i = 0; i < filesToBuild.length; i++) {
+                    this.incrementalBuilder.updateFileInfo(filesToBuild[i]);
+                }
+                
+                // 保存缓存
+                this.incrementalBuilder.saveCache();
+                
+                System.println("构建成功完成。");
+            } else {
+                System.println("构建失败，请查看错误信息。");
+            }
+            
+            return success;
+        } catch (e) {
+            System.println("构建过程中出错：" + e.message);
+            return false;
+        }
+    }
+    
+    /**
+     * @brief 终止构建
+     */
+    public function terminate(): void {
+        this.scheduler.terminateAllTasks();
+    }
+    
+    /**
+     * @brief 获取增量构建器
+     * @return 增量构建器
+     */
+    public function getIncrementalBuilder(): IncrementalBuilder {
+        return this.incrementalBuilder;
+    }
+    
+    /**
+     * @brief 获取构建调度器
+     * @return 构建调度器
+     */
+    public function getScheduler(): BuildScheduler {
+        return this.scheduler;
+    }
+    
+    /**
+     * @brief 获取源码目录
+     * @return 源码目录
+     */
+    public function getSourceDir(): String {
+        return this.incrementalBuilder.getSourceDir();
+    }
+    
+    /**
+     * @brief 获取输出目录
+     * @return 输出目录
+     */
+    public function getOutputDir(): String {
+        return this.incrementalBuilder.getOutputDir();
+    }
+} 

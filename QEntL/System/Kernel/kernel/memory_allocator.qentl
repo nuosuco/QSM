@@ -1,0 +1,604 @@
+/**
+ * QEntL内存分配器模块
+ * QuantumGene: QG-KERNEL-MALLOC-F6G7-1714187365
+ * EntanglementStrength: 0.89
+ */
+
+quantum_program MemoryAllocator {
+    metadata {
+        name: "QEntL内存分配器",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的内存分配器，负责经典内存和量子内存的分配与回收",
+        quantum_gene: "QG-KERNEL-MALLOC-F6G7-1714187365",
+        entanglement_strength: 0.89
+    }
+
+    state {
+        initialized: false,
+        kernel_reference: null,
+        
+        // 经典内存分配器配置
+        classic_memory: {
+            page_size: 4096,           // 4KB页大小
+            min_allocation: 16,         // 最小分配单位
+            total_memory: 0,            // 总物理内存
+            free_memory: 0,             // 可用物理内存
+            page_bitmap: [],            // 页位图
+            allocation_table: {},       // 分配表
+            heap_start: 0x10000000,     // 堆起始地址
+            heap_end: 0x20000000,       // 堆结束地址
+            current_break: 0x10000000   // 当前break位置
+        },
+        
+        // 内存分配策略
+        allocation_strategies: {
+            current: "best_fit",        // 当前策略
+            available: ["first_fit", "best_fit", "worst_fit", "next_fit"]
+        },
+        
+        // 分配统计
+        statistics: {
+            classic: {
+                allocations: 0,
+                frees: 0,
+                total_allocated: 0,
+                current_allocated: 0,
+                peak_usage: 0
+            },
+            quantum: {
+                allocations: 0,
+                frees: 0,
+                total_allocated: 0,
+                current_allocated: 0,
+                peak_usage: 0
+            }
+        },
+        
+        // 内存块大小分类
+        size_classes: [
+            16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536
+        ],
+        
+        // 空闲列表（按大小分类）
+        free_lists: {},
+        
+        // 量子内存分配器引用
+        quantum_memory: null
+    }
+
+    // 初始化内存分配器
+    initialize(kernel_ref, config) {
+        if (this.initialized) {
+            kernel_log("内存分配器已经初始化");
+            return true;
+        }
+
+        kernel_log("初始化内存分配器...");
+        
+        // 保存内核引用
+        this.kernel_reference = kernel_ref;
+        
+        // 设置经典内存配置
+        if (config && config.classic_memory) {
+            this.classic_memory = {
+                ...this.classic_memory,
+                ...config.classic_memory
+            };
+        }
+        
+        // 设置总内存大小和可用内存大小
+        this.classic_memory.total_memory = config.total_memory || (1024 * 1024 * 1024); // 默认1GB
+        this.classic_memory.free_memory = this.classic_memory.total_memory;
+        
+        // 初始化页位图
+        this.initialize_page_bitmap();
+        
+        // 初始化空闲列表
+        this.initialize_free_lists();
+        
+        // 获取量子内存引用
+        this.quantum_memory = kernel_ref.quantum_memory;
+        
+        this.initialized = true;
+        kernel_log("内存分配器初始化完成");
+        
+        return true;
+    }
+
+    // 初始化页位图
+    initialize_page_bitmap() {
+        const total_pages = Math.floor(this.classic_memory.total_memory / this.classic_memory.page_size);
+        kernel_log(`初始化页位图，总页数: ${total_pages}`);
+        
+        // 创建页位图，初始所有页面均为可用（0）
+        this.classic_memory.page_bitmap = new Array(total_pages).fill(0);
+        
+        // 保留部分页面用于内核（假设前64MB为内核空间）
+        const kernel_pages = Math.ceil(64 * 1024 * 1024 / this.classic_memory.page_size);
+        for (let i = 0; i < kernel_pages; i++) {
+            this.classic_memory.page_bitmap[i] = 1;
+        }
+        
+        this.classic_memory.free_memory -= kernel_pages * this.classic_memory.page_size;
+        
+        kernel_log(`页位图初始化完成，保留了${kernel_pages}页用于内核`);
+    }
+
+    // 初始化空闲列表
+    initialize_free_lists() {
+        kernel_log("初始化内存空闲列表...");
+        
+        // 为每个大小类别创建空闲列表
+        for (const size of this.size_classes) {
+            this.free_lists[size] = [];
+        }
+        
+        // 创建大块空闲列表
+        this.free_lists["large"] = [];
+        
+        kernel_log("内存空闲列表初始化完成");
+    }
+
+    // 分配经典内存
+    allocate(size, alignment, purpose) {
+        if (!this.initialized) {
+            kernel_log("错误：内存分配器未初始化");
+            return { success: false, error: "内存分配器未初始化" };
+        }
+        
+        // 确保分配大小至少为最小分配单位
+        if (size < this.classic_memory.min_allocation) {
+            size = this.classic_memory.min_allocation;
+        }
+        
+        // 应用内存对齐
+        if (alignment && alignment > 1) {
+            size = Math.ceil(size / alignment) * alignment;
+        }
+        
+        kernel_log(`请求分配${size}字节内存，用途：${purpose || "未指定"}`);
+        
+        // 检查可用内存
+        if (size > this.classic_memory.free_memory) {
+            kernel_log(`错误：内存不足，请求${size}字节，可用${this.classic_memory.free_memory}字节`);
+            return { success: false, error: "内存不足" };
+        }
+        
+        let memory_block;
+        
+        // 选择合适的分配方法
+        if (size <= Math.max(...this.size_classes)) {
+            // 使用小块分配
+            memory_block = this.allocate_from_size_class(size);
+        } else {
+            // 使用大块分配
+            memory_block = this.allocate_large_block(size);
+        }
+        
+        if (!memory_block.success) {
+            return memory_block;
+        }
+        
+        // 记录分配
+        const allocation_id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        this.classic_memory.allocation_table[allocation_id] = {
+            address: memory_block.address,
+            size: size,
+            actual_size: memory_block.actual_size,
+            allocation_time: Date.now(),
+            purpose: purpose || "未指定",
+            alignment: alignment || 1
+        };
+        
+        // 更新统计
+        this.statistics.classic.allocations++;
+        this.statistics.classic.total_allocated += size;
+        this.statistics.classic.current_allocated += size;
+        
+        if (this.statistics.classic.current_allocated > this.statistics.classic.peak_usage) {
+            this.statistics.classic.peak_usage = this.statistics.classic.current_allocated;
+        }
+        
+        // 更新可用内存
+        this.classic_memory.free_memory -= size;
+        
+        kernel_log(`内存分配成功，ID: ${allocation_id}, 地址: 0x${memory_block.address.toString(16)}, 大小: ${size}字节`);
+        
+        return {
+            success: true,
+            allocation_id: allocation_id,
+            address: memory_block.address,
+            size: size
+        };
+    }
+
+    // 从大小类别分配
+    allocate_from_size_class(size) {
+        // 找到适合的大小类别
+        let size_class = this.find_size_class(size);
+        
+        // 检查该大小类别的空闲列表
+        if (this.free_lists[size_class].length > 0) {
+            // 从空闲列表取出一个块
+            const block = this.free_lists[size_class].pop();
+            return {
+                success: true,
+                address: block.address,
+                actual_size: size_class
+            };
+        }
+        
+        // 如果没有可用的块，分配一个新页面并切分
+        return this.allocate_and_split_page(size_class);
+    }
+
+    // 找到合适的大小类别
+    find_size_class(size) {
+        for (const cls of this.size_classes) {
+            if (cls >= size) {
+                return cls;
+            }
+        }
+        return Math.max(...this.size_classes);
+    }
+
+    // 分配页面并切分为指定大小的块
+    allocate_and_split_page(size_class) {
+        // 分配一个页面
+        const page_allocation = this.allocate_pages(1);
+        if (!page_allocation.success) {
+            return page_allocation;
+        }
+        
+        // 计算可以切分出多少个指定大小的块
+        const blocks_per_page = Math.floor(this.classic_memory.page_size / size_class);
+        
+        // 将页面切分为多个块，最后一个直接返回，其他的添加到空闲列表
+        for (let i = 0; i < blocks_per_page - 1; i++) {
+            const block_address = page_allocation.address + (i * size_class);
+            this.free_lists[size_class].push({
+                address: block_address,
+                size: size_class
+            });
+        }
+        
+        // 返回最后一个块
+        const last_block_address = page_allocation.address + ((blocks_per_page - 1) * size_class);
+        return {
+            success: true,
+            address: last_block_address,
+            actual_size: size_class
+        };
+    }
+
+    // 分配页面
+    allocate_pages(count) {
+        // 查找连续的空闲页面
+        let start_page = -1;
+        let consecutive_pages = 0;
+        
+        for (let i = 0; i < this.classic_memory.page_bitmap.length; i++) {
+            if (this.classic_memory.page_bitmap[i] === 0) {
+                if (start_page === -1) {
+                    start_page = i;
+                }
+                consecutive_pages++;
+                
+                if (consecutive_pages === count) {
+                    break;
+                }
+            } else {
+                start_page = -1;
+                consecutive_pages = 0;
+            }
+        }
+        
+        // 检查是否找到足够的页面
+        if (consecutive_pages < count) {
+            kernel_log(`错误：找不到${count}个连续的空闲页面`);
+            return { success: false, error: "找不到连续的空闲页面" };
+        }
+        
+        // 标记页面为已使用
+        for (let i = start_page; i < start_page + count; i++) {
+            this.classic_memory.page_bitmap[i] = 1;
+        }
+        
+        // 计算页面地址
+        const page_address = start_page * this.classic_memory.page_size;
+        
+        return {
+            success: true,
+            address: page_address,
+            pages: count,
+            size: count * this.classic_memory.page_size
+        };
+    }
+
+    // 分配大块内存
+    allocate_large_block(size) {
+        // 计算需要的页数（向上取整）
+        const pages_needed = Math.ceil(size / this.classic_memory.page_size);
+        
+        // 分配连续页面
+        return this.allocate_pages(pages_needed);
+    }
+
+    // 释放经典内存
+    free(allocation_id) {
+        if (!this.initialized) {
+            kernel_log("错误：内存分配器未初始化");
+            return { success: false, error: "内存分配器未初始化" };
+        }
+        
+        // 检查分配ID是否存在
+        if (!this.classic_memory.allocation_table[allocation_id]) {
+            kernel_log(`错误：找不到内存分配ID ${allocation_id}`);
+            return { success: false, error: "找不到内存分配" };
+        }
+        
+        const allocation = this.classic_memory.allocation_table[allocation_id];
+        kernel_log(`释放内存分配 ${allocation_id}，地址: 0x${allocation.address.toString(16)}, 大小: ${allocation.size}字节`);
+        
+        // 根据大小选择释放方法
+        if (allocation.size <= Math.max(...this.size_classes)) {
+            // 释放小块内存
+            this.free_to_size_class(allocation.address, allocation.actual_size);
+        } else {
+            // 释放大块内存
+            this.free_pages(allocation.address, Math.ceil(allocation.size / this.classic_memory.page_size));
+        }
+        
+        // 更新统计
+        this.statistics.classic.frees++;
+        this.statistics.classic.current_allocated -= allocation.size;
+        
+        // 更新可用内存
+        this.classic_memory.free_memory += allocation.size;
+        
+        // 从分配表中移除
+        delete this.classic_memory.allocation_table[allocation_id];
+        
+        kernel_log(`内存分配 ${allocation_id} 已释放`);
+        
+        return { success: true };
+    }
+
+    // 将内存块释放回大小类别
+    free_to_size_class(address, size) {
+        // 找到合适的大小类别
+        let size_class = this.find_size_class(size);
+        
+        // 添加到空闲列表
+        this.free_lists[size_class].push({
+            address: address,
+            size: size_class
+        });
+    }
+
+    // 释放页面
+    free_pages(address, count) {
+        // 计算起始页索引
+        const start_page = Math.floor(address / this.classic_memory.page_size);
+        
+        // 标记页面为空闲
+        for (let i = start_page; i < start_page + count; i++) {
+            if (i < this.classic_memory.page_bitmap.length) {
+                this.classic_memory.page_bitmap[i] = 0;
+            }
+        }
+    }
+
+    // 分配量子内存的封装方法
+    allocate_quantum(qubit_count, purpose) {
+        if (!this.initialized) {
+            kernel_log("错误：内存分配器未初始化");
+            return { success: false, error: "内存分配器未初始化" };
+        }
+        
+        if (!this.quantum_memory) {
+            kernel_log("错误：量子内存管理器未初始化");
+            return { success: false, error: "量子内存管理器未初始化" };
+        }
+        
+        // 获取当前进程ID
+        const pid = this.kernel_reference.current_process_id || 0;
+        
+        // 调用量子内存管理器分配量子比特
+        const result = this.quantum_memory.allocate_qubits(pid, qubit_count, purpose);
+        
+        if (result.success) {
+            // 更新量子内存统计
+            this.statistics.quantum.allocations++;
+            this.statistics.quantum.total_allocated += qubit_count;
+            this.statistics.quantum.current_allocated += qubit_count;
+            
+            if (this.statistics.quantum.current_allocated > this.statistics.quantum.peak_usage) {
+                this.statistics.quantum.peak_usage = this.statistics.quantum.current_allocated;
+            }
+        }
+        
+        return result;
+    }
+
+    // 释放量子内存的封装方法
+    free_quantum(region_id) {
+        if (!this.initialized) {
+            kernel_log("错误：内存分配器未初始化");
+            return { success: false, error: "内存分配器未初始化" };
+        }
+        
+        if (!this.quantum_memory) {
+            kernel_log("错误：量子内存管理器未初始化");
+            return { success: false, error: "量子内存管理器未初始化" };
+        }
+        
+        // 获取当前进程ID
+        const pid = this.kernel_reference.current_process_id || 0;
+        
+        // 调用量子内存管理器释放量子比特
+        const result = this.quantum_memory.free_qubits(pid, region_id);
+        
+        if (result.success) {
+            // 更新量子内存统计
+            this.statistics.quantum.frees++;
+            // 注意：实际减少的量子比特数需要从量子内存管理器获取，这里简化处理
+        }
+        
+        return result;
+    }
+
+    // 获取内存分配器状态
+    get_status() {
+        return {
+            initialized: this.initialized,
+            classic_memory: {
+                total: this.classic_memory.total_memory,
+                free: this.classic_memory.free_memory,
+                used: this.classic_memory.total_memory - this.classic_memory.free_memory,
+                usage_percent: ((this.classic_memory.total_memory - this.classic_memory.free_memory) / 
+                              this.classic_memory.total_memory * 100).toFixed(2)
+            },
+            quantum_memory: this.quantum_memory 器 {
+                total: this.quantum_memory.total_qubits,
+                free: this.quantum_memory.available_qubits,
+                used: this.quantum_memory.total_qubits - this.quantum_memory.available_qubits,
+                usage_percent: ((this.quantum_memory.total_qubits - this.quantum_memory.available_qubits) / 
+                              this.quantum_memory.total_qubits * 100).toFixed(2)
+            } : null,
+            statistics: this.statistics,
+            allocation_strategy: this.allocation_strategies.current
+        };
+    }
+
+    // 设置内存分配策略
+    set_allocation_strategy(strategy) {
+        if (!this.allocation_strategies.available.includes(strategy)) {
+            kernel_log(`错误：不支持的分配策略 ${strategy}`);
+            return { success: false, error: "不支持的分配策略" };
+        }
+        
+        this.allocation_strategies.current = strategy;
+        kernel_log(`内存分配策略已设置为 ${strategy}`);
+        
+        return { success: true };
+    }
+
+    // 获取内存分配信息
+    get_allocation_info(allocation_id) {
+        if (!this.classic_memory.allocation_table[allocation_id]) {
+            return { success: false, error: "找不到内存分配" };
+        }
+        
+        const allocation = this.classic_memory.allocation_table[allocation_id];
+        
+        return {
+            success: true,
+            info: {
+                address: allocation.address,
+                size: allocation.size,
+                actual_size: allocation.actual_size,
+                allocation_time: allocation.allocation_time,
+                purpose: allocation.purpose,
+                alignment: allocation.alignment
+            }
+        };
+    }
+
+    // 调整内存分配大小（realloc）
+    reallocate(allocation_id, new_size) {
+        if (!this.initialized) {
+            kernel_log("错误：内存分配器未初始化");
+            return { success: false, error: "内存分配器未初始化" };
+        }
+        
+        // 检查分配ID是否存在
+        if (!this.classic_memory.allocation_table[allocation_id]) {
+            kernel_log(`错误：找不到内存分配ID ${allocation_id}`);
+            return { success: false, error: "找不到内存分配" };
+        }
+        
+        const allocation = this.classic_memory.allocation_table[allocation_id];
+        kernel_log(`调整内存分配 ${allocation_id} 大小，从 ${allocation.size} 到 ${new_size} 字节`);
+        
+        // 如果新大小小于或等于当前大小，不需要重新分配
+        if (new_size <= allocation.size) {
+            // 更新分配信息
+            const size_diff = allocation.size - new_size;
+            allocation.size = new_size;
+            
+            // 更新统计和可用内存
+            this.statistics.classic.current_allocated -= size_diff;
+            this.classic_memory.free_memory += size_diff;
+            
+            kernel_log(`内存分配 ${allocation_id} 大小已调整为 ${new_size} 字节，无需重新分配`);
+            
+            return {
+                success: true,
+                allocation_id: allocation_id,
+                address: allocation.address,
+                size: new_size
+            };
+        }
+        
+        // 分配新的内存块
+        const new_allocation = this.allocate(new_size, allocation.alignment, allocation.purpose);
+        if (!new_allocation.success) {
+            return new_allocation;
+        }
+        
+        // 复制内存内容（在实际系统中）
+        // 在这里简化为记录日志
+        kernel_log(`复制 ${allocation.size} 字节数据，从 0x${allocation.address.toString(16)} 到 0x${new_allocation.address.toString(16)}`);
+        
+        // 释放旧的内存块
+        this.free(allocation_id);
+        
+        kernel_log(`内存分配 ${allocation_id} 已重新分配为 ${new_allocation.allocation_id}，大小为 ${new_size} 字节`);
+        
+        return new_allocation;
+    }
+
+    // 重置内存分配器（通常用于测试）
+    reset() {
+        kernel_log("重置内存分配器...");
+        
+        // 保存内核引用和量子内存引用
+        const kernel_ref = this.kernel_reference;
+        const quantum_mem = this.quantum_memory;
+        
+        // 重置状态
+        this.initialized = false;
+        this.classic_memory.allocation_table = {};
+        this.classic_memory.page_bitmap = [];
+        this.free_lists = {};
+        this.statistics = {
+            classic: {
+                allocations: 0,
+                frees: 0,
+                total_allocated: 0,
+                current_allocated: 0,
+                peak_usage: 0
+            },
+            quantum: {
+                allocations: 0,
+                frees: 0,
+                total_allocated: 0,
+                current_allocated: 0,
+                peak_usage: 0
+            }
+        };
+        
+        // 重新初始化
+        this.initialize(kernel_ref);
+        this.quantum_memory = quantum_mem;
+        
+        kernel_log("内存分配器已重置");
+        
+        return true;
+    }
+}
+
+// 导出内存分配器模块
+export MemoryAllocator; 

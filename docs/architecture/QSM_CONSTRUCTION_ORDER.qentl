@@ -1,0 +1,231 @@
+// QSM量子叠加态模型 — 构建顺序指南
+// 量子基因编码: QGC-CONSTRUCTION-ORDER-20260630
+
+/**
+ * 核心原则（铁律）
+ */
+
+// 1. 全栈QEntL构建 — 禁止使用第三方库
+CONSTRAINT_FULLSTACK_QENTL: {
+    description: "所有代码必须使用QEntL语言实现，或使用C语言（仅用于启动引导）",
+    prohibited: [
+        "Python(.py)",
+        "Node.js(.js)",
+        "Java",
+        "Go",
+        "Rust",
+        "numpy",
+        "pytorch",
+        "tensorflow",
+        "OpenSSL",
+        "libcurl"
+    ],
+    allowed_deps: ["libc", "libm", "libpthread"]
+}
+
+// 2. 构建顺序 — 六层架构（严格依赖顺序）
+CONSTRAINT_CONSTRUCTION_ORDER: {
+    layer1: {
+        name: "C语言启动器",
+        description: "启动引导",
+        language: "C",
+        status: "COMPLETED"
+    },
+    layer2: {
+        name: "QVM量子虚拟机",
+        description: "环境基础",
+        language: "QEntL全栈",
+        runs_on: "C启动器",
+        status: "COMPLETED"
+    },
+    layer3: {
+        name: "QEntL编译器",
+        description: "编译工具",
+        language: "QEntL全栈",
+        runs_on: "QVM",
+        status: "COMPLETED"
+    },
+    layer4: {
+        name: "QDFS量子动态文件系统",
+        description: "叠加态并行运算基础",
+        language: "QEntL全栈",
+        runs_on: "QVM",
+        status: "COMPLETED"
+    },
+    layer5: {
+        name: "QNS量子神经叠加态",
+        description: "训练与推理",
+        language: "QEntL全栈",
+        runs_on: "QVM",
+        status: "IN_PROGRESS"
+    },
+    layer6: {
+        name: "四大模型应用层",
+        description: "QSM/SOM/WeQ/Ref",
+        language: "QEntL全栈",
+        runs_on: "QVM",
+        status: "PENDING"
+    }
+}
+
+// 3. 命名规范
+CONSTRAINT_NAMING: {
+    old_name: "量子神经网络 (QNN)",
+    new_name: "量子神经叠加态 (QNS)",
+    reason: "网络是线性的，叠加态是并行的平行宇宙"
+}
+
+// 4. 子代理沟通规范
+CONSTRAINT_SUBAGENT_COMMUNICATION: {
+    skill_required: true,
+    task_description_must_include: "QEntL全栈方案",
+    output_must_comply_with: ["铁律1", "铁律2", "铁律3"],
+    must_participate_full_flow: true,
+    no_closed_door_work: true
+}
+
+// 5. 训练→测试→迭代循环
+CONSTRAINT_TRAIN_TEST_ITERATE: {
+    flow: "训练 → 测试 → 评估 → 改进 → 更新API",
+    loop_until_success: true,
+    accuracy_threshold: 0.8,
+    update_web_api_on_success: true
+}
+
+/**
+ * 详细构建步骤
+ */
+
+// 第1步: C语言启动器 (已完成)
+STEP_C_BOOTSTRAP: {
+    files: ["src/qvm_boot.c"],
+    output: "bin/qvm_boot",
+    function: "启动QVM（QEntL全栈）",
+    status: "COMPLETED",
+    pushed: true
+}
+
+// 第2步: QVM量子虚拟机 (已完成)
+STEP_QVM: {
+    files: ["QEntL/System/VM/"],
+    output: "bin/qvm.qbc",
+    function: "量子比特管理、量子门操作、叠加态/纠缠态模拟、量子内存管理",
+    runs_on: "C启动器",
+    capability: "64量子比特、16经典寄存器、1024KB量子内存、19种操作码",
+    status: "COMPLETED",
+    pushed: true
+}
+
+// 第3步: QEntL编译器 (已完成)
+STEP_COMPILER: {
+    files: ["QEntL/System/Compiler/"],
+    output: "bin/qentl_compiler.qbc",
+    function: "将.qentl源码编译为.qbc字节码",
+    runs_on: "QVM",
+    status: "COMPLETED",
+    pushed: true
+}
+
+// 第4步: QDFS量子动态文件系统 (已完成)
+STEP_QDFS: {
+    qentl_files: ["QEntL/System/Kernel/filesystem/*.qentl"],
+    function: "叠加态文件管理、量子加密、纠缠关联、BB84密钥交换",
+    runs_on: "QVM",
+    test_pass: 38,
+    test_total: 38,
+    test_rate: "100%",
+    status: "COMPLETED",
+    pushed: true
+}
+
+// 第5步: QNS量子神经叠加态 (进行中)
+STEP_QNS: {
+    requirement: "必须用QEntL文件构建，不能用C语言！",
+    qentl_file: "QEntL/System/Kernel/neural/qns_training_pipeline.qentl",
+    qentl_lines: 754,
+    runs_on: "QVM",
+    dependencies: ["QVM环境", "QDFS文件系统"],
+    training_data: "data/yi_4120_merged_for_gemma.jsonl",
+    training_params: {
+        learning_rate: 0.01,
+        momentum: 0.9,
+        embed_dim: 128,
+        hidden_layers: [256, 128, 64],
+        vocab_size: 4120
+    },
+    train_command: "bin/qvm_boot bin/qns_training_pipeline.qbc data/yi_4120_merged_for_gemma.jsonl data/qns_model.dat 10",
+    test_command: "bin/qvm_boot bin/qns_training_pipeline.qbc test",
+    update_api_on_success: true,
+    status: "IN_PROGRESS"
+}
+
+// 第6步: 四大模型应用层 (待实现)
+STEP_FOUR_MODELS: {
+    models: [
+        "QSM量子叠加态模型",
+        "SOM量子平权经济模型",
+        "WeQ量子社交通信模型",
+        "Ref量子自反省管理模型"
+    ],
+    runs_on: "QVM",
+    status: "PENDING"
+}
+
+/**
+ * 并行工作分工
+ */
+
+SUBAGENT_ROLES: {
+    assistant: {
+        role: "整体协调、任务分配、进度监控、质量把关",
+        must_participate: "全流程"
+    },
+    subagent_A: {
+        role: "QNS训练管道",
+        must_participate: "训练→测试→迭代循环"
+    },
+    subagent_B: {
+        role: "QDFS扩展",
+        must_participate: "文件系统→QNS数据加载"
+    },
+    subagent_C: {
+        role: "QVM扩展与编译器完善",
+        must_participate: "QVM环境→QEntL编译"
+    },
+    subagent_D: {
+        role: "QSM四大模型应用层",
+        must_participate: "模型→Web桌面API"
+    },
+    subagent_E: {
+        role: "Web界面完善",
+        must_participate: "界面→API集成"
+    }
+}
+
+/**
+ * 子代理任务模板
+ */
+
+SUBAGENT_TASK_TEMPLATE: `
+项目位于/root/QSM，**必须完全使用QEntL全栈方案**，
+不能使用任何第三方库或经典实现！
+
+构建顺序: C启动器 → QVM → QEntL编译器 → QDFS → QNS → 四大模型
+
+重要:
+- 禁止使用.py/.js等第三方语言
+- 禁止使用numpy/pytorch等第三方库
+- 禁止使用OpenSSL等第三方C库
+- 量子神经网络改名为"量子神经叠加态"(QNS)
+- **必须参与整个跑通流程，禁止闭门造车！**
+- **所有组件（除C启动器外）必须在QVM上运行！**
+`
+
+/**
+ * 技能加载要求
+ */
+
+SKILL_LOADING_REQUIREMENT: {
+    subagent_must_load_skill: true,
+    assistant_must_confirm_subagent_awareness_before_assignment: true
+}

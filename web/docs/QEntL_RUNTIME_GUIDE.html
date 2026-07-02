@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>QEntL语言运行指南 - QSM开发文档中心</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:#0a0a2e;color:#e0e0e0;display:flex;min-height:100vh}
+.sidebar{width:280px;height:100vh;overflow-y:auto;background:#0d0d3a;border-right:1px solid #1a1a4a;padding:15px;position:fixed;left:0;top:0;z-index:100}
+.sidebar h2{color:#00d2ff;font-size:16px;margin-bottom:15px;padding:0 5px}
+.sidebar .section-title{color:#576574;font-size:11px;text-transform:uppercase;margin:12px 0 6px 5px;letter-spacing:1px}
+.sidebar ul{list-style:none}
+.sidebar li{margin:2px 0}
+.sidebar a{color:#7f8fa6;text-decoration:none;font-size:13px;display:block;padding:6px 10px;border-radius:6px;transition:all 0.2s;line-height:1.4}
+.sidebar a:hover{background:rgba(0,210,255,0.08);color:#00d2ff}
+.main{margin-left:280px;padding:30px 40px;flex:1;min-height:100vh}
+.main h1{color:#00d2ff;font-size:24px;margin-bottom:8px}
+.main .meta{color:#576574;font-size:12px;margin-bottom:20px}
+.main .content{background:#0d0d3a;border:1px solid #1a1a4a;border-radius:12px;padding:25px;line-height:1.8;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.main .content h2{color:#7b2ff7;margin:20px 0 10px;font-size:18px}
+.main .content h3{color:#00d2ff;margin:15px 0 8px;font-size:15px}
+.main .content p{margin-bottom:10px;color:#b0b0c0}
+.main .content table{width:100%;border-collapse:collapse;margin:10px 0}
+.main .content th,.main .content td{padding:8px 10px;border:1px solid #2a2a5a;text-align:left;font-size:13px}
+.main .content th{background:#1a1a4a;color:#00d2ff}
+.main .content td{background:#0a0a2e}
+.main .content pre{background:#0a0a2e;padding:12px;border-radius:8px;overflow-x:auto;margin:10px 0;font-size:13px}
+.main .content code{background:#1a1a4a;padding:1px 5px;border-radius:3px;color:#00d2ff;font-size:13px}
+.main .content ul,.main .content ol{margin:8px 0 8px 20px}
+.main .content li{margin:4px 0;font-size:14px}
+.back-btn{display:inline-block;margin-bottom:15px;color:#00d2ff;text-decoration:none;padding:6px 14px;border:1px solid #00d2ff;border-radius:8px;font-size:13px;transition:all 0.2s}
+.back-btn:hover{background:rgba(0,210,255,0.1)}
+.nav-bar{position:fixed;top:0;left:280px;right:0;height:40px;background:#0d0d3a;border-bottom:1px solid #1a1a4a;display:flex;align-items:center;padding:0 20px;z-index:99}
+.nav-bar a{color:#7f8fa6;text-decoration:none;font-size:12px;margin-right:15px;padding:4px 8px;border-radius:4px}
+.nav-bar a:hover{color:#00d2ff;background:rgba(0,210,255,0.05)}
+</style>
+</head>
+<body>
+
+<div class="main">
+<a href="index.html" class="back-btn">← 文档中心首页</a>
+
+<h1>QEntL语言运行指南</h1>
+<div class="content"># QEntL语言运行指南
+
+**日期**: 2025年6月12日  
+**系统**: QEntL量子编程语言生态系统
+
+## 🎯 QEntL文件运行流程
+
+### 完整的工具链
+
+```
+源代码(.qentl) → 编译器 → 字节码(.qobj) → 虚拟机 → 执行结果
+```
+
+## 🔧 运行QEntL文件的方法
+
+### 方法1: 一键编译并运行（推荐）
+
+```powershell
+# 使用QEntL主CLI工具，自动编译并运行
+.\QEntL\compiler\bin\cli\qentl_cli.qentl run test_hello.qentl
+
+# 或者使用完整路径
+.\QEntL\compiler\bin\qentl.qentl run .\tests\test_hello.qentl
+```
+
+### 方法2: 分步编译和运行
+
+#### 步骤1: 编译QEntL源文件
+```powershell
+# 编译单个文件
+.\QEntL\compiler\bin\cli\compiler_cli.qentl .\tests\test_hello.qentl -o .\build\
+
+# 编译后生成: .\build\test_hello.qobj
+```
+
+#### 步骤2: 运行字节码文件
+```powershell
+# 使用虚拟机运行字节码
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\test_hello.qobj
+
+# 或者使用虚拟机启动器
+.\QEntL\vm\bin\cli\vm_launcher.qentl .\build\test_hello.qobj
+```
+
+### 方法3: 开发环境自动编译
+
+```powershell
+# 启动自动编译器，监控文件变化
+.\QEntL\compiler\bin\cli\auto_compiler.qentl --watch .\tests --output .\build --verbose
+
+# 在另一个终端运行编译好的文件
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\test_hello.qobj
+```
+
+## 📁 文件类型说明
+
+### 源文件格式
+- **`.qentl`** - QEntL源代码文件
+- **`.qent`** - QEntL模块文件
+- **`.qjs`** - QEntL JavaScript扩展文件
+
+### 编译产物
+- **`.qobj`** - QEntL字节码对象文件
+- **`.qexe`** - QEntL可执行文件（链接后）
+- **`.qlib`** - QEntL库文件
+
+## 🚀 运行QEntL操作系统源文件
+
+### 运行文件系统组件
+```powershell
+# 编译文件系统组件
+.\QEntL\compiler\bin\cli\compiler_cli.qentl .\QEntL\src\filesystem\auto_classifier.qentl -o .\build\
+
+# 运行文件系统组件
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\auto_classifier.qobj
+```
+
+### 运行内核组件
+```powershell
+# 编译内核组件
+.\QEntL\compiler\bin\cli\compiler_cli.qentl .\QEntL\src\kernel\scheduler.qentl -o .\build\
+
+# 运行内核组件
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\scheduler.qobj
+```
+
+### 运行服务组件
+```powershell
+# 编译服务组件
+.\QEntL\compiler\bin\cli\compiler_cli.qentl .\QEntL\src\services\quantum_network.qentl -o .\build\
+
+# 运行服务组件
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\quantum_network.qobj
+```
+
+## 🎮 虚拟机运行模式
+
+### 1. 直接执行模式
+```powershell
+# 直接运行字节码文件
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj
+```
+
+### 2. 调试模式
+```powershell
+# 以调试模式运行
+.\QEntL\vm\bin\cli\debug_cli.qentl program.qobj
+```
+
+### 3. 量子可视化模式
+```powershell
+# 以量子状态可视化模式运行
+.\QEntL\vm\bin\cli\quantum_visualizer.qentl program.qobj
+```
+
+## ⚙️ 虚拟机参数配置
+
+### 内存配置
+```powershell
+# 设置内存限制为512MB
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj --memory 512
+```
+
+### 调试选项
+```powershell
+# 启用详细调试输出
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj --debug --verbose
+```
+
+### 性能优化
+```powershell
+# 设置优化级别
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj --optimize 2
+```
+
+## 🔄 完整的开发工作流
+
+### 1. 开发阶段
+```powershell
+# 启动自动编译器
+.\QEntL\compiler\bin\cli\auto_compiler.qentl --watch .\QEntL\src --output .\build
+
+# 编辑源文件 (在另一个终端/编辑器中)
+# 文件保存后自动编译
+```
+
+### 2. 测试阶段
+```powershell
+# 运行编译好的程序
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\your_program.qobj
+
+# 或者运行测试套件
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\test_suite.qobj
+```
+
+### 3. 部署阶段
+```powershell
+# 生成可执行文件
+.\QEntL\compiler\bin\cli\linker_cli.qentl --input .\build\ --output .\dist\app.qexe
+
+# 运行可执行文件
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\dist\app.qexe
+```
+
+## 🌟 QEntL操作系统的特殊运行方式
+
+### 启动QEntL操作系统
+```powershell
+# 编译整个操作系统内核
+.\QEntL\scripts\build_qentl.qentl --target os
+
+# 启动QEntL操作系统
+.\QEntL\vm\bin\cli\vm_launcher.qentl --os-mode .\build\qentl_os.qexe
+```
+
+### 双模式执行
+QEntL的创新特性：同一套代码可以：
+1. **在宿主系统上运行** - 作为普通应用程序
+2. **作为独立操作系统运行** - 直接在硬件上
+
+```powershell
+# 应用程序模式
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj
+
+# 操作系统模式
+.\QEntL\vm\bin\cli\vm_launcher.qentl --boot program.qobj
+```
+
+## 🔧 故障排除
+
+### 常见问题
+
+1. **找不到导入模块**
+```powershell
+# 设置模块搜索路径
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj --module-path .\QEntL\src
+```
+
+2. **内存不足**
+```powershell
+# 增加内存限制
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj --memory 1024
+```
+
+3. **性能问题**
+```powershell
+# 启用优化
+.\QEntL\vm\bin\cli\vm_cli.qentl run program.qobj --optimize 3
+```
+
+## 📝 示例命令
+
+### 运行Hello World
+```powershell
+# 编译
+.\QEntL\compiler\bin\cli\compiler_cli.qentl .\tests\test_hello.qentl -o .\build\
+
+# 运行
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\test_hello.qobj
+```
+
+### 运行编译器测试
+```powershell
+# 编译编译器测试
+.\QEntL\compiler\bin\cli\compiler_cli.qentl .\tests\test_compiler.qentl -o .\build\
+
+# 运行编译器测试
+.\QEntL\vm\bin\cli\vm_cli.qentl run .\build\test_compiler.qobj
+```
+
+这就是QEntL语言完整的运行机制！🚀
+</div>
+</div>
+</body>
+</html>

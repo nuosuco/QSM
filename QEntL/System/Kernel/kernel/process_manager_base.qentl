@@ -1,0 +1,380 @@
+/**
+ * QEntL量子进程管理器基础模块
+ * QuantumGene: QG-KERNEL-PROCBASE-L2M3-1714120854
+ * EntanglementStrength: 0.89
+ */
+
+quantum_program ProcessManagerBase {
+    metadata {
+        name: "QEntL量子进程管理器基础",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的进程管理器基础模块，提供进程状态管理和数据结构定义",
+        quantum_gene: "QG-KERNEL-PROCBASE-L2M3-1714120854",
+        entanglement_strength: 0.89
+    }
+
+    // 进程相关常量定义
+    constexpr process_states = {
+        CREATED: 0,       // 进程已创建但未就绪
+        READY: 1,         // 进程就绪，等待被调度
+        RUNNING: 2,       // 进程正在运行
+        WAITING: 3,       // 进程被阻塞，等待某事件
+        TERMINATED: 4     // 进程已终止
+    };
+
+    // 进程优先级定义
+    constexpr process_priorities = {
+        IDLE: 0,          // 空闲优先级
+        LOW: 1,           // 低优先级
+        NORMAL: 2,        // 普通优先级
+        HIGH: 3,          // 高优先级
+        REALTIME: 4       // 实时优先级
+    };
+
+    // 进程创建标志
+    constexpr process_creation_flags = {
+        NONE: 0x0000,            // 无特殊标志
+        KERNEL: 0x0001,          // 内核进程
+        QUANTUM: 0x0002,         // 量子进程
+        DETACHED: 0x0004,        // 分离的进程
+        SUSPENDED: 0x0008,       // 挂起状态创建
+        HIGH_PRIORITY: 0x0010,   // 高优先级
+        REALTIME: 0x0020,        // 实时优先级
+        ISOLATED: 0x0040,        // 内存隔离
+        NO_QUANTUM: 0x0080       // 禁止量子指令
+    };
+
+    // 调度器类型
+    constexpr scheduler_types = {
+        ROUND_ROBIN: 0,   // 时间片轮转
+        PRIORITY: 1,      // 优先级调度
+        QUANTUM_AWARE: 2  // 量子感知调度
+    };
+
+    // 进程终止原因
+    constexpr termination_reasons = {
+        NORMAL: 0,               // 正常终止
+        ERROR: 1,                // 错误终止
+        KILLED: 2,               // 被杀死
+        MEMORY_VIOLATION: 3,     // 内存访问违规
+        QUANTUM_ERROR: 4,        // 量子错误
+        TIMEOUT: 5,              // 超时
+        DEADLOCK: 6,             // 死锁
+        RESOURCE_UNAVAILABLE: 7  // 资源不可用
+    };
+
+    // 模块状态
+    state {
+        // 内核引用
+        kernel_reference: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 下一个可用的进程ID
+        next_pid: 1,
+        
+        // 当前运行的进程ID
+        current_pid: null,
+        
+        // 进程表，用于存储所有进程信息
+        process_table: {},
+        
+        // 就绪队列，按优先级分组
+        ready_queues: {
+            0: [], // 空闲
+            1: [], // 低
+            2: [], // 普通
+            3: [], // 高
+            4: []  // 实时
+        },
+        
+        // 等待队列，按等待原因分组
+        waiting_queues: {
+            "IO": [],        // IO等待
+            "LOCK": [],      // 锁等待
+            "SLEEP": [],     // 休眠
+            "QUANTUM": [],   // 量子运算等待
+            "CHILD": [],     // 等待子进程
+            "EVENT": [],     // 事件等待
+            "OTHER": []      // 其他等待
+        },
+        
+        // 进程统计信息
+        statistics: {
+            total_processes_created: 0,     // 创建的总进程数
+            active_processes: 0,            // 活动进程数
+            terminated_processes: 0,        // 终止的进程数
+            kernel_processes: 0,            // 内核进程数
+            quantum_processes: 0            // 量子进程数
+        },
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化进程管理器基础模块
+    initialize(kernel_ref) {
+        kernel_log("初始化进程管理器基础模块...");
+        
+        // 保存内核引用
+        this.kernel_reference = kernel_ref;
+        
+        // 重置状态
+        this.reset();
+        
+        // 创建空闲进程（PID 0）
+        this.create_idle_process();
+        
+        this.initialized = true;
+        kernel_log("进程管理器基础模块初始化完成");
+        
+        return true;
+    }
+
+    // 重置进程管理器状态
+    reset() {
+        // 保留内核引用，重置其他状态
+        const kernel_ref = this.kernel_reference;
+        
+        // 重置进程ID计数器
+        this.next_pid = 1;
+        
+        // 清空当前进程
+        this.current_pid = null;
+        
+        // 清空进程表
+        this.process_table = {};
+        
+        // 重置就绪队列
+        this.ready_queues = {
+            0: [], // 空闲
+            1: [], // 低
+            2: [], // 普通
+            3: [], // 高
+            4: []  // 实时
+        };
+        
+        // 重置等待队列
+        this.waiting_queues = {
+            "IO": [],
+            "LOCK": [],
+            "SLEEP": [],
+            "QUANTUM": [],
+            "CHILD": [],
+            "EVENT": [],
+            "OTHER": []
+        };
+        
+        // 重置统计信息
+        this.statistics = {
+            total_processes_created: 0,
+            active_processes: 0,
+            terminated_processes: 0,
+            kernel_processes: 0,
+            quantum_processes: 0
+        };
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 恢复内核引用
+        this.kernel_reference = kernel_ref;
+        
+        kernel_log("进程管理器状态已重置");
+    }
+
+    // 创建空闲进程
+    create_idle_process() {
+        kernel_log("创建空闲进程(PID 0)");
+        
+        // 创建空闲进程描述符
+        const idle_process = {
+            pid: 0,
+            name: "idle",
+            state: this.process_states.READY,
+            priority: this.process_priorities.IDLE,
+            flags: this.process_creation_flags.KERNEL,
+            creation_time: Date.now(),
+            execution_time: 0,
+            last_scheduled: 0,
+            time_slice: Number.MAX_SAFE_INTEGER, // 空闲进程的时间片无限长
+            parent_pid: null,
+            children: [],
+            context: {
+                registers: {},
+                program_counter: 0,
+                stack_pointer: 0,
+                quantum_registers: {}
+            },
+            memory_map: null,
+            exit_code: null,
+            is_kernel: true,
+            is_quantum: false,
+            waiting_reason: null,
+            wait_start_time: null
+        };
+        
+        // 添加到进程表
+        this.process_table[0] = idle_process;
+        
+        // 添加到空闲优先级就绪队列
+        this.ready_queues[this.process_priorities.IDLE].push(0);
+        
+        kernel_log("空闲进程创建完成");
+    }
+
+    // 获取新的进程ID
+    get_new_pid() {
+        const pid = this.next_pid++;
+        return pid;
+    }
+
+    // 获取进程状态名称
+    get_state_name(state) {
+        switch (state) {
+            case this.process_states.CREATED:
+                return "已创建";
+            case this.process_states.READY:
+                return "就绪";
+            case this.process_states.RUNNING:
+                return "运行中";
+            case this.process_states.WAITING:
+                return "等待中";
+            case this.process_states.TERMINATED:
+                return "已终止";
+            default:
+                return "未知状态";
+        }
+    }
+
+    // 获取优先级名称
+    get_priority_name(priority) {
+        switch (priority) {
+            case this.process_priorities.IDLE:
+                return "空闲";
+            case this.process_priorities.LOW:
+                return "低";
+            case this.process_priorities.NORMAL:
+                return "普通";
+            case this.process_priorities.HIGH:
+                return "高";
+            case this.process_priorities.REALTIME:
+                return "实时";
+            default:
+                return "未知优先级";
+        }
+    }
+
+    // 获取进程信息
+    get_process_info(pid) {
+        const process = this.process_table[pid];
+        
+        if (!process) {
+            this.add_warning(`无法获取进程信息：PID ${pid} 不存在`);
+            return null;
+        }
+        
+        // 返回进程的公开信息
+        return {
+            pid: process.pid,
+            name: process.name,
+            state: process.state,
+            state_name: this.get_state_name(process.state),
+            priority: process.priority,
+            priority_name: this.get_priority_name(process.priority),
+            is_kernel: process.is_kernel,
+            is_quantum: process.is_quantum,
+            creation_time: process.creation_time,
+            execution_time: process.execution_time,
+            parent_pid: process.parent_pid,
+            children: [...process.children],
+            waiting_reason: process.waiting_reason
+        };
+    }
+
+    // 获取所有进程列表
+    list_processes() {
+        const result = [];
+        
+        for (const pid in this.process_table) {
+            const process_info = this.get_process_info(Number(pid));
+            if (process_info) {
+                result.push(process_info);
+            }
+        }
+        
+        return result;
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`进程管理器错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`进程管理器警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+
+    // 获取统计信息
+    get_statistics() {
+        // 计算当前活动进程数
+        let active_processes = 0;
+        for (const pid in this.process_table) {
+            const process = this.process_table[pid];
+            if (process.state !== this.process_states.TERMINATED) {
+                active_processes++;
+            }
+        }
+        
+        // 更新统计信息
+        this.statistics.active_processes = active_processes;
+        
+        return { ...this.statistics };
+    }
+
+    // 检查进程是否存在
+    process_exists(pid) {
+        return !!this.process_table[pid];
+    }
+
+    // 检查进程是否处于指定状态
+    check_process_state(pid, state) {
+        const process = this.process_table[pid];
+        if (!process) return false;
+        
+        return process.state === state;
+    }
+}
+
+// 导出模块
+export ProcessManagerBase; 
+export ProcessManagerBase; 

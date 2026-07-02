@@ -1,0 +1,556 @@
+/**
+ * @file compiler.qentl
+ * @brief QEntL编译器主类
+ * 
+ * 量子基因编码: QGC-COMPILER-MAIN-2024062001
+ * 量子纠缠信道: QEC-COMPILER-CORE-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/time.qentl";
+import "QEntL/core/debug.qentl";
+
+import "QEntL/compiler/src/frontend/lexer/lexer.qentl";
+import "QEntL/compiler/src/frontend/parser/parser.qentl";
+import "QEntL/compiler/src/frontend/semantic/semantic_analyzer.qentl";
+import "QEntL/compiler/src/backend/ir/ir_generator.qentl";
+import "QEntL/compiler/src/backend/bytecode/bytecode_generator.qentl";
+import "QEntL/compiler/src/backend/bytecode/optimizer/bytecode_optimizer.qentl";
+import "QEntL/compiler/src/backend/linker/linker.qentl";
+import "QEntL/compiler/src/utils/source_file_manager.qentl";
+import "QEntL/compiler/src/diagnostic/error_reporter.qentl";
+
+/**
+ * @enum CompilationMode
+ * @brief 编译模式枚举
+ */
+quantum_enum CompilationMode {
+    SINGLE_FILE,    // 单文件编译
+    PROJECT,        // 项目编译
+    INCREMENTAL     // 增量编译
+}
+
+/**
+ * @class CompilerOptions
+ * @brief 编译器选项类
+ */
+quantum_class CompilerOptions {
+    public {
+        mode: CompilationMode;               // 编译模式
+        sourceDir: String;                   // 源码目录
+        outputDir: String;                   // 输出目录
+        entryFile: String;                   // 入口文件
+        optimizationLevel: OptimizationLevel; // 优化级别
+        generateDebugInfo: Boolean;          // 是否生成调试信息
+        verbose: Boolean;                    // 详细输出
+        includePatterns: Array<String>;      // 包含模式
+        excludePatterns: Array<String>;      // 排除模式
+        defines: Map<String, String>;        // 预定义宏
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.mode = CompilationMode.SINGLE_FILE;
+        this.sourceDir = "./";
+        this.outputDir = "./build";
+        this.entryFile = "";
+        this.optimizationLevel = OptimizationLevel.NORMAL;
+        this.generateDebugInfo = true;
+        this.verbose = false;
+        this.includePatterns = new Array<String>();
+        this.excludePatterns = new Array<String>();
+        this.defines = new Map<String, String>();
+        
+        // 默认包含 QEntL 文件
+        this.includePatterns.push("**/*.qentl");
+        this.includePatterns.push("**/*.qent");
+    }
+}
+
+/**
+ * @class CompilationResult
+ * @brief 编译结果类
+ */
+quantum_class CompilationResult {
+    public {
+        success: Boolean;          // 是否成功
+        errorCount: Integer;       // 错误数量
+        warningCount: Integer;     // 警告数量
+        compiledFiles: Integer;    // 编译的文件数量
+        duration: Integer;         // 编译时间（毫秒）
+        outputFiles: Array<String>; // 输出文件列表
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.success = true;
+        this.errorCount = 0;
+        this.warningCount = 0;
+        this.compiledFiles = 0;
+        this.duration = 0;
+        this.outputFiles = new Array<String>();
+    }
+    
+    /**
+     * @brief 转换为字符串
+     */
+    public function toString(): String {
+        let result = `编译${this.success ? "成功" : "失败"}`;
+        result += `\n错误数: ${this.errorCount}`;
+        result += `\n警告数: ${this.warningCount}`;
+        result += `\n编译文件数: ${this.compiledFiles}`;
+        result += `\n编译时间: ${this.duration}ms`;
+        
+        if (this.outputFiles.length > 0) {
+            result += "\n输出文件:";
+            for (let file of this.outputFiles) {
+                result += `\n  - ${file}`;
+            }
+        }
+        
+        return result;
+    }
+}
+
+/**
+ * @class Compiler
+ * @brief QEntL编译器主类
+ */
+quantum_class Compiler {
+    private {
+        options: CompilerOptions;              // 编译选项
+        sourceManager: SourceFileManager;      // 源文件管理器
+        errorReporter: ErrorReporter;          // 错误报告器
+        result: CompilationResult;             // 编译结果
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(options: CompilerOptions = new CompilerOptions()) {
+        this.options = options;
+        this.sourceManager = new SourceFileManager(options.sourceDir);
+        this.errorReporter = new ErrorReporter();
+        this.result = new CompilationResult();
+        
+        // 配置源文件管理器
+        for (let pattern of options.includePatterns) {
+            this.sourceManager.addIncludePattern(pattern);
+        }
+        
+        for (let pattern of options.excludePatterns) {
+            this.sourceManager.addExcludePattern(pattern);
+        }
+    }
+    
+    /**
+     * @brief 编译项目
+     */
+    public function compile(): CompilationResult {
+        let startTime = Time.currentTimeMillis();
+        
+        // 初始化结果
+        this.result = new CompilationResult();
+        
+        try {
+            // 根据编译模式执行不同的编译流程
+            switch (this.options.mode) {
+                case CompilationMode.SINGLE_FILE:
+                    this.compileSingleFile();
+                    break;
+                    
+                case CompilationMode.PROJECT:
+                    this.compileProject();
+                    break;
+                    
+                case CompilationMode.INCREMENTAL:
+                    this.compileIncremental();
+                    break;
+                    
+                default:
+                    this.errorReporter.error(
+                        "未知的编译模式", 
+                        new SourceLocation("", 0, 0)
+                    );
+                    this.result.success = false;
+                    break;
+            }
+        } catch (e) {
+            // 处理编译过程中的异常
+            this.errorReporter.error(
+                `编译异常: ${e.message}`, 
+                new SourceLocation("", 0, 0)
+            );
+            this.result.success = false;
+            
+            if (this.options.verbose) {
+                Debug.log(`编译异常堆栈: ${e.stack}`);
+            }
+        }
+        
+        // 更新结果
+        let endTime = Time.currentTimeMillis();
+        this.result.duration = endTime - startTime;
+        this.result.errorCount = this.errorReporter.getErrorCount();
+        this.result.warningCount = this.errorReporter.getWarningCount();
+        this.result.success = !this.errorReporter.hasErrors();
+        
+        // 输出编译总结
+        if (this.options.verbose || !this.result.success) {
+            this.errorReporter.printDiagnostics();
+        }
+        
+        this.errorReporter.printSummary();
+        
+        return this.result;
+    }
+    
+    /**
+     * @brief 编译单个文件
+     */
+    private function compileSingleFile(): void {
+        if (this.options.entryFile.length === 0) {
+            this.errorReporter.error(
+                "单文件编译模式下必须指定入口文件", 
+                new SourceLocation("", 0, 0)
+            );
+            return;
+        }
+        
+        let filePath = Path.isAbsolute(this.options.entryFile) 
+            ? this.options.entryFile 
+            : Path.join(this.options.sourceDir, this.options.entryFile);
+        
+        if (!File.exists(filePath)) {
+            this.errorReporter.error(
+                `找不到入口文件: ${filePath}`, 
+                new SourceLocation("", 0, 0)
+            );
+            return;
+        }
+        
+        this.log(`开始编译单个文件: ${filePath}`);
+        
+        // 加载源文件
+        let sourceFile = this.sourceManager.addSourceFile(filePath);
+        
+        // 编译文件
+        let outputFile = this.compileFile(filePath);
+        
+        if (outputFile.length > 0) {
+            this.result.outputFiles.push(outputFile);
+            this.result.compiledFiles = 1;
+        }
+    }
+    
+    /**
+     * @brief 编译项目
+     */
+    private function compileProject(): void {
+        this.log(`开始编译项目，源目录: ${this.options.sourceDir}`);
+        
+        // 扫描源文件
+        let fileCount = this.sourceManager.scanSourceFiles();
+        this.log(`找到 ${fileCount} 个源文件`);
+        
+        if (fileCount === 0) {
+            this.errorReporter.warning(
+                "没有找到任何源文件", 
+                new SourceLocation("", 0, 0)
+            );
+            return;
+        }
+        
+        // 获取所有需要编译的文件
+        let filesToCompile = this.sourceManager.getFilesToCompile();
+        
+        // 编译所有文件
+        for (let filePath of filesToCompile) {
+            let outputFile = this.compileFile(filePath);
+            
+            if (outputFile.length > 0) {
+                this.result.outputFiles.push(outputFile);
+                this.result.compiledFiles++;
+            }
+        }
+        
+        // 如果指定了入口文件，生成最终可执行文件
+        if (this.options.entryFile.length > 0) {
+            this.linkProject();
+        }
+    }
+    
+    /**
+     * @brief 增量编译
+     */
+    private function compileIncremental(): void {
+        this.log(`开始增量编译，源目录: ${this.options.sourceDir}`);
+        
+        // 扫描源文件
+        let fileCount = this.sourceManager.scanSourceFiles();
+        this.log(`找到 ${fileCount} 个源文件`);
+        
+        if (fileCount === 0) {
+            this.errorReporter.warning(
+                "没有找到任何源文件", 
+                new SourceLocation("", 0, 0)
+            );
+            return;
+        }
+        
+        // 检查文件变更
+        let changedFiles = this.sourceManager.checkFileChanges();
+        this.log(`检测到 ${changedFiles.length} 个文件变更`);
+        
+        // 获取所有需要编译的文件（包括依赖于变更文件的文件）
+        let filesToCompile = this.sourceManager.getFilesToCompile();
+        this.log(`需要编译 ${filesToCompile.length} 个文件`);
+        
+        // 编译所有需要编译的文件
+        for (let filePath of filesToCompile) {
+            let outputFile = this.compileFile(filePath);
+            
+            if (outputFile.length > 0) {
+                this.result.outputFiles.push(outputFile);
+                this.result.compiledFiles++;
+                
+                // 标记文件为已编译
+                this.sourceManager.markFileAsCompiled(filePath);
+            }
+        }
+        
+        // 如果指定了入口文件，链接项目
+        if (this.options.entryFile.length > 0) {
+            this.linkProject();
+        }
+    }
+    
+    /**
+     * @brief 编译单个文件
+     * @param filePath 文件路径
+     * @return 输出文件路径，或空字符串（编译失败）
+     */
+    private function compileFile(filePath: String): String {
+        this.log(`编译文件: ${filePath}`);
+        
+        // 获取源文件内容
+        let sourceFile = this.sourceManager.getSourceFile(filePath);
+        
+        if (sourceFile == null || sourceFile.content.length === 0) {
+            this.errorReporter.error(
+                `无法读取文件内容: ${filePath}`, 
+                new SourceLocation(filePath, 0, 0)
+            );
+            return "";
+        }
+        
+        let sourceCode = sourceFile.content;
+        
+        // 词法分析
+        this.log(`执行词法分析: ${filePath}`);
+        let lexer = new Lexer(sourceCode, filePath);
+        let tokens = lexer.scanTokens();
+        
+        // 处理词法错误
+        let lexerErrors = lexer.getErrors();
+        for (let error of lexerErrors) {
+            let location = new SourceLocation(filePath, error.line, error.column);
+            this.errorReporter.error(error.message, location);
+        }
+        
+        if (lexerErrors.length > 0) {
+            this.log(`词法分析失败, ${lexerErrors.length} 个错误`);
+            return "";
+        }
+        
+        // 语法分析
+        this.log(`执行语法分析: ${filePath}`);
+        let parser = new Parser(tokens, filePath);
+        let ast = parser.parse();
+        
+        // 处理语法错误
+        let parserErrors = parser.getErrors();
+        for (let error of parserErrors) {
+            let location = new SourceLocation(filePath, error.line, error.column);
+            this.errorReporter.error(error.message, location);
+        }
+        
+        if (parserErrors.length > 0) {
+            this.log(`语法分析失败, ${parserErrors.length} 个错误`);
+            return "";
+        }
+        
+        // 语义分析
+        this.log(`执行语义分析: ${filePath}`);
+        let semanticAnalyzer = new SemanticAnalyzer(ast, filePath);
+        semanticAnalyzer.analyze();
+        
+        // 处理语义错误
+        let semanticErrors = semanticAnalyzer.getErrors();
+        let semanticWarnings = semanticAnalyzer.getWarnings();
+        
+        for (let error of semanticErrors) {
+            let location = new SourceLocation(filePath, error.line, error.column);
+            this.errorReporter.error(error.message, location);
+        }
+        
+        for (let warning of semanticWarnings) {
+            let location = new SourceLocation(filePath, warning.line, warning.column);
+            this.errorReporter.warning(warning.message, location);
+        }
+        
+        if (semanticErrors.length > 0) {
+            this.log(`语义分析失败, ${semanticErrors.length} 个错误, ${semanticWarnings.length} 个警告`);
+            return "";
+        }
+        
+        // 收集依赖信息
+        let dependencies = semanticAnalyzer.getDependencies();
+        for (let dependency of dependencies) {
+            this.sourceManager.recordDependency(filePath, dependency);
+        }
+        
+        // 生成中间表示
+        this.log(`生成中间表示: ${filePath}`);
+        let irGenerator = new IRGenerator(ast, semanticAnalyzer.getSymbolTable());
+        let irModule = irGenerator.generate();
+        
+        // 字节码生成
+        this.log(`生成字节码: ${filePath}`);
+        let bytecodeGenerator = new BytecodeGenerator(irModule);
+        let bytecodeModule = bytecodeGenerator.generate();
+        
+        // 字节码优化
+        if (this.options.optimizationLevel !== OptimizationLevel.NONE) {
+            this.log(`优化字节码: ${filePath}`);
+            let bytecodeOptimizer = new BytecodeOptimizer(this.options.optimizationLevel);
+            bytecodeModule = bytecodeOptimizer.optimize(bytecodeModule);
+        }
+        
+        // 生成对象文件
+        this.log(`生成对象文件: ${filePath}`);
+        let outputPath = this.getOutputPath(filePath);
+        
+        try {
+            // 确保输出目录存在
+            File.createDirectory(Path.dirname(outputPath));
+            
+            // 序列化字节码模块到对象文件
+            bytecodeModule.serialize(outputPath);
+            
+            this.log(`对象文件写入: ${outputPath}`);
+            return outputPath;
+        } catch (e) {
+            this.errorReporter.error(
+                `无法写入对象文件: ${e.message}`, 
+                new SourceLocation(filePath, 0, 0)
+            );
+            return "";
+        }
+    }
+    
+    /**
+     * @brief 链接项目生成可执行文件
+     */
+    private function linkProject(): void {
+        if (this.result.outputFiles.length === 0) {
+            this.errorReporter.warning(
+                "没有可链接的对象文件", 
+                new SourceLocation("", 0, 0)
+            );
+            return;
+        }
+        
+        let entryFilePath = Path.isAbsolute(this.options.entryFile) 
+            ? this.options.entryFile 
+            : Path.join(this.options.sourceDir, this.options.entryFile);
+            
+        let entryObjectFile = this.getOutputPath(entryFilePath);
+        
+        if (!this.result.outputFiles.includes(entryObjectFile)) {
+            this.errorReporter.error(
+                `入口文件 ${this.options.entryFile} 未成功编译`, 
+                new SourceLocation("", 0, 0)
+            );
+            return;
+        }
+        
+        this.log(`链接项目，入口: ${entryObjectFile}`);
+        
+        // 创建链接器
+        let linker = new Linker();
+        
+        // 添加所有对象文件
+        for (let objectFile of this.result.outputFiles) {
+            linker.addObjectFile(objectFile);
+        }
+        
+        // 设置入口
+        linker.setEntryPoint(entryObjectFile);
+        
+        // 链接
+        let executablePath = Path.join(
+            this.options.outputDir, 
+            Path.basename(entryFilePath, Path.extname(entryFilePath)) + ".qexe"
+        );
+        
+        try {
+            // 执行链接
+            linker.link(executablePath, this.options.generateDebugInfo);
+            this.log(`生成可执行文件: ${executablePath}`);
+            
+            // 添加到输出文件列表
+            if (!this.result.outputFiles.includes(executablePath)) {
+                this.result.outputFiles.push(executablePath);
+            }
+        } catch (e) {
+            this.errorReporter.error(
+                `链接失败: ${e.message}`, 
+                new SourceLocation("", 0, 0)
+            );
+        }
+    }
+    
+    /**
+     * @brief 获取输出文件路径
+     */
+    private function getOutputPath(sourcePath: String): String {
+        let relativePath = Path.isAbsolute(sourcePath) 
+            ? Path.relative(this.options.sourceDir, sourcePath) 
+            : sourcePath;
+            
+        let outputPath = Path.join(
+            this.options.outputDir, 
+            Path.dirname(relativePath), 
+            Path.basename(sourcePath, Path.extname(sourcePath)) + ".qobj"
+        );
+        
+        return outputPath;
+    }
+    
+    /**
+     * @brief 记录日志
+     */
+    private function log(message: String): void {
+        if (this.options.verbose) {
+            Debug.log(message);
+        }
+    }
+}
+
+// 导出类
+export {
+    CompilationMode,
+    CompilerOptions,
+    CompilationResult,
+    Compiler
+};

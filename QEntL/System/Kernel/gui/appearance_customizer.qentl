@@ -1,0 +1,843 @@
+// QEntL 外观定制器
+// 版本: 1.0.0
+// 作者: QSM团队
+// 量子基因码: QSM-APPR-3456-D654
+// 描述: 实现系统外观的自定义和主题管理功能
+
+// 类型定义
+type ColorScheme {
+    primary: String,          // 主色
+    secondary: String,        // 辅助色
+    accent: String,           // 强调色
+    background: String,       // 背景色
+    surface: String,          // 表面色
+    error: String,            // 错误色
+    text: {                   // 文本颜色
+        primary: String,      // 主要文本
+        secondary: String,    // 次要文本
+        disabled: String,     // 禁用文本
+        hint: String          // 提示文本
+    },
+    quantum: {                // 量子相关颜色
+        primary: String,      // 量子主色
+        processing: String,   // 量子处理色
+        entangled: String     // 量子纠缠色
+    }
+}
+
+type ThemeType {
+    LIGHT,                    // 亮色主题
+    DARK,                     // 暗色主题
+    HIGH_CONTRAST,            // 高对比度主题
+    CUSTOM                    // 自定义主题
+}
+
+type FontSettings {
+    family: String,           // 字体族
+    size: {                   // 字体大小
+        small: Int,           // 小号
+        normal: Int,          // 正常
+        large: Int,           // 大号
+        extraLarge: Int       // 特大号
+    },
+    weight: String,           // 字重
+    lineHeight: Float,        // 行高
+    letterSpacing: Float      // 字间距
+}
+
+type AnimationSettings {
+    enabled: Bool,            // 是否启用
+    speed: Float,             // 速度(0.1-2.0)
+    type: String,             // 类型(slide, fade, scale, etc.)
+    easing: String,           // 缓动函数
+    particleEffects: Bool,    // 粒子效果
+    quantumEffects: Bool      // 量子效果
+}
+
+type IconSettings {
+    pack: String,             // 图标包
+    size: String,             // 大小(small, medium, large)
+    style: String,            // 样式(filled, outlined, rounded, sharp)
+    monochrome: Bool,         // 是否单色
+    customColor: String       // 自定义颜色
+}
+
+type UIComponentsSettings {
+    cornerRadius: Int,        // 圆角半径
+    buttonStyle: String,      // 按钮样式(text, outlined, contained)
+    inputStyle: String,       // 输入框样式(standard, filled, outlined)
+    cardElevation: Int,       // 卡片阴影高度
+    density: String,          // 密度(compact, normal, comfortable)
+    dialogStyle: String,      // 对话框样式(standard, fullscreen, bottomsheet)
+    tooltipStyle: String      // 工具提示样式(light, dark)
+}
+
+type Theme {
+    id: String,                        // 主题ID
+    name: String,                      // 名称
+    description: String,               // 描述
+    type: ThemeType,                   // 类型
+    version: String,                   // 版本
+    author: String,                    // 作者
+    colors: ColorScheme,               // 颜色方案
+    fonts: FontSettings,               // 字体设置
+    animations: AnimationSettings,     // 动画设置
+    icons: IconSettings,               // 图标设置
+    uiComponents: UIComponentsSettings, // UI组件设置
+    customCss: String,                 // 自定义CSS
+    previewImage: String,              // 预览图片
+    isDefault: Bool,                   // 是否为默认主题
+    isBuiltin: Bool,                   // 是否为内置主题
+    isEnabled: Bool,                   // 是否启用
+    dependencies: List<String>,        // 依赖
+    compatibilityVersion: String,      // 兼容性版本
+    metadata: Map<String, Any>         // 元数据
+}
+
+type BackgroundSettings {
+    type: String,             // 类型(color, image, video, slideshow, particles, gradient)
+    value: String,            // 值(颜色代码、URL等)
+    blur: Int,                // 模糊程度(0-20)
+    opacity: Float,           // 不透明度(0-1)
+    animation: String,        // 动画
+    interval: Int,            // 间隔(对于幻灯片)
+    gradientDirection: String, // 渐变方向
+    videoMuted: Bool,         // 视频是否静音
+    videoLoop: Bool,          // 视频是否循环
+    particleDensity: Int,     // 粒子密度
+    particleColor: String     // 粒子颜色
+}
+
+type ScreenElement {
+    id: String,               // 元素ID
+    type: String,             // 类型(widget, icon, shortcut, etc.)
+    position: {               // 位置
+        x: Int,               // X坐标
+        y: Int                // Y坐标
+    },
+    size: {                   // 大小
+        width: Int,           // 宽度
+        height: Int           // 高度
+    },
+    visible: Bool,            // 是否可见
+    opacity: Float,           // 不透明度
+    zIndex: Int,              // Z轴顺序
+    customStyle: String,      // 自定义样式
+    metadata: Object          // 元数据
+}
+
+// 配置
+config {
+    // 主题设置
+    activeTheme: "default_light",          // 活动主题
+    autoSwitchTheme: true,                 // 是否自动切换主题
+    autoSwitchSchedule: {                  // 自动切换时间表
+        lightStart: "07:00",               // 亮色主题开始时间
+        darkStart: "19:00"                 // 暗色主题开始时间
+    },
+    themeImportEnabled: true,              // 是否允许导入主题
+    themeExportEnabled: true,              // 是否允许导出主题
+    
+    // 外观设置
+    enableAnimations: true,                // 是否启用动画
+    enableQTransitions: true,              // 是否启用量子过渡
+    enableParticleEffects: true,           // 是否启用粒子效果
+    reducedMotion: false,                  // 是否减少动画
+    
+    // 背景设置
+    defaultBackgroundType: "gradient",     // 默认背景类型
+    randomizeBackground: false,            // 是否随机化背景
+    
+    // 布局设置
+    layoutGridSize: 8,                     // 布局网格大小
+    allowCustomScreenElements: true,       // 是否允许自定义屏幕元素
+    maxScreenElements: 20,                 // 最大屏幕元素数量
+    
+    // 高级设置
+    cssInjectionEnabled: false,            // 是否允许CSS注入
+    hardwareAccelerationEnabled: true,     // 是否启用硬件加速
+    experimentalFeaturesEnabled: false     // 是否启用实验性功能
+}
+
+// 服务状态
+state {
+    initialized: Bool = false,                 // 服务是否已初始化
+    themes: Map<String, Theme> = {},           // 主题 <themeId, Theme>
+    screenElements: Map<String, ScreenElement> = {}, // 屏幕元素 <elementId, ScreenElement>
+    
+    // 运行时状态
+    currentTheme: Theme = null,                // 当前主题
+    previousTheme: Theme = null,               // 上一个主题
+    backgroundSettings: BackgroundSettings = null, // 背景设置
+    cssCache: Map<String, String> = {},        // CSS缓存 <themeId, compiledCss>
+    
+    // 系统信息
+    systemInfo: {                              // 系统信息
+        darkModeEnabled: Bool = false,         // 系统深色模式是否启用
+        highContrastEnabled: Bool = false,     // 系统高对比度是否启用
+        reducedMotionEnabled: Bool = false,    // 系统减少动画是否启用
+        time: DateTime = null                  // 当前系统时间
+    },
+    
+    // 事件监听器
+    onThemeChangedListeners: List<Object> = [], // 主题变更事件监听器
+    onElementChangedListeners: List<Object> = [], // 元素变更事件监听器
+    onBackgroundChangedListeners: List<Object> = [] // 背景变更事件监听器
+}
+
+// 公共函数
+function initialize(customConfig: Object = null): Bool {
+    if (state.initialized) {
+        return true; // 已经初始化
+    }
+    
+    // 合并自定义配置(如果有)
+    if (customConfig != null) {
+        config = _mergeConfigs(config, customConfig);
+    }
+    
+    // 注册默认主题
+    _registerDefaultThemes();
+    
+    // 初始化系统信息
+    _initializeSystemInfo();
+    
+    // 设置活动主题
+    setActiveTheme(config.activeTheme);
+    
+    // 设置主题自动切换定时器
+    if (config.autoSwitchTheme) {
+        _setupAutoThemeSwitch();
+    }
+    
+    state.initialized = true;
+    return true;
+}
+
+// 注册主题
+function registerTheme(theme: Theme): String {
+    _checkInitialized();
+    
+    // 生成主题ID(如果未提供)
+    if (!theme.id) {
+        theme.id = _generateId();
+    }
+    
+    // 添加主题
+    state.themes[theme.id] = theme;
+    
+    // 预编译CSS
+    _compileThemeCSS(theme);
+    
+    return theme.id;
+}
+
+// 获取主题
+function getTheme(themeId: String): Theme {
+    _checkInitialized();
+    
+    if (!state.themes.hasKey(themeId)) {
+        return null;
+    }
+    
+    return state.themes[themeId];
+}
+
+// 获取所有主题
+function getAllThemes(): List<Theme> {
+    _checkInitialized();
+    
+    let themes = [];
+    
+    for (let themeId in state.themes) {
+        themes.push(state.themes[themeId]);
+    }
+    
+    return themes;
+}
+
+// 设置活动主题
+function setActiveTheme(themeId: String): Bool {
+    _checkInitialized();
+    
+    // 检查主题是否存在
+    if (!state.themes.hasKey(themeId)) {
+        return false;
+    }
+    
+    // 保存上一个主题
+    state.previousTheme = state.currentTheme;
+    
+    // 设置新主题
+    state.currentTheme = state.themes[themeId];
+    
+    // 应用主题
+    _applyTheme(state.currentTheme);
+    
+    // 触发主题变更事件
+    _triggerEvent("themeChanged", {
+        oldThemeId: state.previousTheme器.id,
+        newThemeId: themeId,
+        timestamp: DateTime.now()
+    });
+    
+    return true;
+}
+
+// 应用暗色主题
+function applyDarkTheme(): Bool {
+    _checkInitialized();
+    
+    // 查找第一个可用的暗色主题
+    for (let themeId in state.themes) {
+        let theme = state.themes[themeId];
+        if (theme.type == ThemeType.DARK && theme.isEnabled) {
+            return setActiveTheme(themeId);
+        }
+    }
+    
+    return false;
+}
+
+// 应用亮色主题
+function applyLightTheme(): Bool {
+    _checkInitialized();
+    
+    // 查找第一个可用的亮色主题
+    for (let themeId in state.themes) {
+        let theme = state.themes[themeId];
+        if (theme.type == ThemeType.LIGHT && theme.isEnabled) {
+            return setActiveTheme(themeId);
+        }
+    }
+    
+    return false;
+}
+
+// 创建自定义主题
+function createCustomTheme(baseThemeId: String, customizations: Object): String {
+    _checkInitialized();
+    
+    // 检查基础主题是否存在
+    if (!state.themes.hasKey(baseThemeId)) {
+        return null;
+    }
+    
+    let baseTheme = state.themes[baseThemeId];
+    
+    // 创建自定义主题
+    let customTheme = Theme {
+        id: _generateId(),
+        name: customizations.name || baseTheme.name + " (Custom)",
+        description: customizations.description || "Custom theme based on " + baseTheme.name,
+        type: ThemeType.CUSTOM,
+        version: "1.0.0",
+        author: "User",
+        colors: _mergeObjects(baseTheme.colors, customizations.colors || {}),
+        fonts: _mergeObjects(baseTheme.fonts, customizations.fonts || {}),
+        animations: _mergeObjects(baseTheme.animations, customizations.animations || {}),
+        icons: _mergeObjects(baseTheme.icons, customizations.icons || {}),
+        uiComponents: _mergeObjects(baseTheme.uiComponents, customizations.uiComponents || {}),
+        customCss: customizations.customCss || baseTheme.customCss,
+        previewImage: customizations.previewImage || baseTheme.previewImage,
+        isDefault: false,
+        isBuiltin: false,
+        isEnabled: true,
+        dependencies: baseTheme.dependencies || [],
+        compatibilityVersion: baseTheme.compatibilityVersion,
+        metadata: _mergeObjects(baseTheme.metadata || {}, customizations.metadata || {})
+    };
+    
+    // 注册自定义主题
+    let themeId = registerTheme(customTheme);
+    
+    return themeId;
+}
+
+// 设置背景
+function setBackground(settings: BackgroundSettings): Bool {
+    _checkInitialized();
+    
+    // 保存旧设置
+    let oldSettings = state.backgroundSettings;
+    
+    // 更新设置
+    state.backgroundSettings = settings;
+    
+    // 应用背景设置
+    _applyBackgroundSettings(settings);
+    
+    // 触发背景变更事件
+    _triggerEvent("backgroundChanged", {
+        oldSettings: oldSettings,
+        newSettings: settings,
+        timestamp: DateTime.now()
+    });
+    
+    return true;
+}
+
+// 获取背景设置
+function getBackgroundSettings(): BackgroundSettings {
+    _checkInitialized();
+    
+    return state.backgroundSettings;
+}
+
+// 添加屏幕元素
+function addScreenElement(element: ScreenElement): String {
+    _checkInitialized();
+    
+    // 检查是否超过最大元素数量
+    if (Object.keys(state.screenElements).length >= config.maxScreenElements) {
+        return null;
+    }
+    
+    // 生成元素ID(如果未提供)
+    if (!element.id) {
+        element.id = _generateId();
+    }
+    
+    // 添加元素
+    state.screenElements[element.id] = element;
+    
+    // 触发元素变更事件
+    _triggerEvent("elementChanged", {
+        type: "added",
+        elementId: element.id,
+        element: element,
+        timestamp: DateTime.now()
+    });
+    
+    return element.id;
+}
+
+// 更新屏幕元素
+function updateScreenElement(elementId: String, updates: Object): Bool {
+    _checkInitialized();
+    
+    // 检查元素是否存在
+    if (!state.screenElements.hasKey(elementId)) {
+        return false;
+    }
+    
+    let element = state.screenElements[elementId];
+    
+    // 应用更新
+    for (let key in updates) {
+        if (typeof updates[key] === "object" && element[key]) {
+            element[key] = _mergeObjects(element[key], updates[key]);
+        } else {
+            element[key] = updates[key];
+        }
+    }
+    
+    // 触发元素变更事件
+    _triggerEvent("elementChanged", {
+        type: "updated",
+        elementId: elementId,
+        element: element,
+        timestamp: DateTime.now()
+    });
+    
+    return true;
+}
+
+// 移除屏幕元素
+function removeScreenElement(elementId: String): Bool {
+    _checkInitialized();
+    
+    // 检查元素是否存在
+    if (!state.screenElements.hasKey(elementId)) {
+        return false;
+    }
+    
+    let element = state.screenElements[elementId];
+    
+    // 删除元素
+    delete state.screenElements[elementId];
+    
+    // 触发元素变更事件
+    _triggerEvent("elementChanged", {
+        type: "removed",
+        elementId: elementId,
+        element: element,
+        timestamp: DateTime.now()
+    });
+    
+    return true;
+}
+
+// 获取屏幕元素
+function getScreenElement(elementId: String): ScreenElement {
+    _checkInitialized();
+    
+    if (!state.screenElements.hasKey(elementId)) {
+        return null;
+    }
+    
+    return state.screenElements[elementId];
+}
+
+// 获取所有屏幕元素
+function getAllScreenElements(): List<ScreenElement> {
+    _checkInitialized();
+    
+    let elements = [];
+    
+    for (let elementId in state.screenElements) {
+        elements.push(state.screenElements[elementId]);
+    }
+    
+    return elements;
+}
+
+// 导出主题
+function exportTheme(themeId: String): Object {
+    _checkInitialized();
+    
+    // 如果不允许导出，返回null
+    if (!config.themeExportEnabled) {
+        return null;
+    }
+    
+    // 检查主题是否存在
+    if (!state.themes.hasKey(themeId)) {
+        return null;
+    }
+    
+    let theme = state.themes[themeId];
+    
+    // 创建导出对象
+    let exportData = {
+        theme: theme,
+        version: "1.0",
+        exportTime: DateTime.now()
+    };
+    
+    return exportData;
+}
+
+// 导入主题
+function importTheme(importData: Object): String {
+    _checkInitialized();
+    
+    // 如果不允许导入，返回null
+    if (!config.themeImportEnabled) {
+        return null;
+    }
+    
+    // 验证导入数据
+    if (!importData || !importData.theme) {
+        return null;
+    }
+    
+    let theme = importData.theme;
+    
+    // 确保主题有唯一ID
+    theme.id = theme.id + "_imported_" + Date.now();
+    
+    // 注册导入的主题
+    return registerTheme(theme);
+}
+
+// 添加事件监听器
+function addEventListener(eventName: String, callback: Function): String {
+    _checkInitialized();
+    
+    let listenerId = _generateId();
+    
+    // 根据事件类型添加监听器
+    switch (eventName) {
+        case "themeChanged":
+            state.onThemeChangedListeners.push({id: listenerId, callback: callback});
+            break;
+        case "elementChanged":
+            state.onElementChangedListeners.push({id: listenerId, callback: callback});
+            break;
+        case "backgroundChanged":
+            state.onBackgroundChangedListeners.push({id: listenerId, callback: callback});
+            break;
+        default:
+            return "";
+    }
+    
+    return listenerId;
+}
+
+// 移除事件监听器
+function removeEventListener(eventName: String, listenerId: String): Bool {
+    _checkInitialized();
+    
+    // 根据事件类型移除监听器
+    switch (eventName) {
+        case "themeChanged":
+            state.onThemeChangedListeners = state.onThemeChangedListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "elementChanged":
+            state.onElementChangedListeners = state.onElementChangedListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "backgroundChanged":
+            state.onBackgroundChangedListeners = state.onBackgroundChangedListeners.filter(listener => listener.id != listenerId);
+            break;
+        default:
+            return false;
+    }
+    
+    return true;
+}
+
+// 内部函数
+
+// 检查服务是否已初始化
+function _checkInitialized() {
+    if (!state.initialized) {
+        throw "外观定制器尚未初始化";
+    }
+}
+
+// 合并配置
+function _mergeConfigs(baseConfig: Object, customConfig: Object): Object {
+    // 简单合并对象
+    let result = baseConfig.clone();
+    
+    for (let key in customConfig) {
+        if (result.hasKey(key)) {
+            if (typeof result[key] == "object" && typeof customConfig[key] == "object") {
+                result[key] = _mergeConfigs(result[key], customConfig[key]);
+            } else {
+                result[key] = customConfig[key];
+            }
+        }
+    }
+    
+    return result;
+}
+
+// 合并对象
+function _mergeObjects(baseObj: Object, extendObj: Object): Object {
+    // 简单合并对象
+    if (!baseObj) return extendObj;
+    if (!extendObj) return baseObj;
+    
+    let result = baseObj.clone();
+    
+    for (let key in extendObj) {
+        if (result.hasKey(key)) {
+            if (typeof result[key] == "object" && typeof extendObj[key] == "object") {
+                result[key] = _mergeObjects(result[key], extendObj[key]);
+            } else {
+                result[key] = extendObj[key];
+            }
+        } else {
+            result[key] = extendObj[key];
+        }
+    }
+    
+    return result;
+}
+
+// 注册默认主题
+function _registerDefaultThemes() {
+    // 注册亮色主题
+    registerTheme(Theme {
+        id: "default_light",
+        name: "默认亮色",
+        description: "默认亮色主题",
+        type: ThemeType.LIGHT,
+        version: "1.0.0",
+        author: "QSM团队",
+        colors: ColorScheme {
+            primary: "#3498db",
+            secondary: "#2ecc71",
+            accent: "#e67e22",
+            background: "#ffffff",
+            surface: "#f5f5f5",
+            error: "#e74c3c",
+            text: {
+                primary: "#333333",
+                secondary: "#666666",
+                disabled: "#999999",
+                hint: "#bbbbbb"
+            },
+            quantum: {
+                primary: "#9b59b6",
+                processing: "#3498db",
+                entangled: "#1abc9c"
+            }
+        },
+        fonts: FontSettings {
+            family: "Quantum Sans, sans-serif",
+            size: {
+                small: 12,
+                normal: 14,
+                large: 16,
+                extraLarge: 20
+            },
+            weight: "normal",
+            lineHeight: 1.5,
+            letterSpacing: 0.5
+        },
+        animations: AnimationSettings {
+            enabled: true,
+            speed: 1.0,
+            type: "slide",
+            easing: "ease-in-out",
+            particleEffects: true,
+            quantumEffects: true
+        },
+        icons: IconSettings {
+            pack: "quantum",
+            size: "medium",
+            style: "rounded",
+            monochrome: false
+        },
+        uiComponents: UIComponentsSettings {
+            cornerRadius: 8,
+            buttonStyle: "contained",
+            inputStyle: "outlined",
+            cardElevation: 2,
+            density: "normal",
+            dialogStyle: "standard",
+            tooltipStyle: "dark"
+        },
+        isDefault: true,
+        isBuiltin: true,
+        isEnabled: true
+    });
+    
+    // 注册暗色主题
+    registerTheme(Theme {
+        id: "default_dark",
+        name: "默认暗色",
+        description: "默认暗色主题",
+        type: ThemeType.DARK,
+        version: "1.0.0",
+        author: "QSM团队",
+        colors: ColorScheme {
+            primary: "#3498db",
+            secondary: "#2ecc71",
+            accent: "#e67e22",
+            background: "#121212",
+            surface: "#1e1e1e",
+            error: "#e74c3c",
+            text: {
+                primary: "#ffffff",
+                secondary: "#cccccc",
+                disabled: "#999999",
+                hint: "#888888"
+            },
+            quantum: {
+                primary: "#9b59b6",
+                processing: "#3498db",
+                entangled: "#1abc9c"
+            }
+        },
+        fonts: FontSettings {
+            family: "Quantum Sans, sans-serif",
+            size: {
+                small: 12,
+                normal: 14,
+                large: 16,
+                extraLarge: 20
+            },
+            weight: "normal",
+            lineHeight: 1.5,
+            letterSpacing: 0.5
+        },
+        animations: AnimationSettings {
+            enabled: true,
+            speed: 1.0,
+            type: "fade",
+            easing: "ease-in-out",
+            particleEffects: true,
+            quantumEffects: true
+        },
+        icons: IconSettings {
+            pack: "quantum",
+            size: "medium",
+            style: "rounded",
+            monochrome: false
+        },
+        uiComponents: UIComponentsSettings {
+            cornerRadius: 8,
+            buttonStyle: "contained",
+            inputStyle: "filled",
+            cardElevation: 4,
+            density: "normal",
+            dialogStyle: "standard",
+            tooltipStyle: "light"
+        },
+        isDefault: false,
+        isBuiltin: true,
+        isEnabled: true
+    });
+}
+
+// 初始化系统信息
+function _initializeSystemInfo() {
+    // 在实际实现中，这里会获取系统信息
+    // 这里只是一个示例
+    state.systemInfo = {
+        darkModeEnabled: false,
+        highContrastEnabled: false,
+        reducedMotionEnabled: false,
+        time: DateTime.now()
+    };
+}
+
+// 设置主题自动切换定时器
+function _setupAutoThemeSwitch() {
+    // 在实际实现中，这里会设置定时器
+    // 这里只是一个示例
+}
+
+// 应用主题
+function _applyTheme(theme: Theme) {
+    // 在实际实现中，这里会应用主题到UI
+    // 这里只是一个示例
+}
+
+// 预编译主题CSS
+function _compileThemeCSS(theme: Theme) {
+    // 在实际实现中，这里会预编译主题CSS
+    // 这里只是一个示例
+}
+
+// 应用背景设置
+function _applyBackgroundSettings(settings: BackgroundSettings) {
+    // 在实际实现中，这里会应用背景设置
+    // 这里只是一个示例
+}
+
+// 触发事件
+function _triggerEvent(eventName: String, eventData: Object) {
+    // 根据事件类型触发相应的事件
+    let listeners = [];
+    
+    switch (eventName) {
+        case "themeChanged":
+            listeners = state.onThemeChangedListeners;
+            break;
+        case "elementChanged":
+            listeners = state.onElementChangedListeners;
+            break;
+        case "backgroundChanged":
+            listeners = state.onBackgroundChangedListeners;
+            break;
+    }
+    
+    // 调用所有监听器
+    for (let i = 0; i < listeners.length; i++) {
+        try {
+            listeners[i].callback(eventData);
+        } catch (e) {
+            // 记录错误但不中断执行
+        }
+    }
+}
+
+// 生成随机ID
+function _generateId(): String {
+    return "id_" + Math.random().toString(36).substring(2, 15);
+} 

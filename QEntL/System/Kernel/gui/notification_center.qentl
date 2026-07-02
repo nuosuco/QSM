@@ -1,0 +1,1057 @@
+// QEntL 通知中心
+// 版本: 1.0.0
+// 作者: QSM团队
+// 量子基因码: QSM-NOTF-3456-N765
+// 描述: 实现系统通知的管理、分发和交互功能
+
+// 类型定义
+type NotificationPriority {
+    LOW,                   // 低优先级
+    NORMAL,                // 正常优先级
+    HIGH,                  // 高优先级
+    URGENT,                // 紧急优先级
+    CRITICAL               // 关键优先级
+}
+
+type NotificationType {
+    SYSTEM,                // 系统通知
+    APPLICATION,           // 应用程序通知
+    USER,                  // 用户通知
+    SECURITY,              // 安全通知
+    PROCESS,               // 进程通知
+    UPDATE,                // 更新通知
+    QUANTUM,               // 量子事件通知
+    CUSTOM                 // 自定义通知
+}
+
+type NotificationStatus {
+    UNREAD,                // 未读
+    READ,                  // 已读
+    DISMISSED,             // 已忽略
+    ACTIONED,              // 已操作
+    EXPIRED,               // 已过期
+    SNOOZED                // 已暂停
+}
+
+type NotificationAction {
+    id: String,            // 操作ID
+    label: String,         // 操作标签
+    icon: String,          // 图标
+    primary: Bool,         // 是否为主操作
+    destructive: Bool,     // 是否为破坏性操作
+    callback: Function,    // 回调函数
+    requiresUnlock: Bool   // 是否需要解锁
+}
+
+type NotificationVisual {
+    icon: String,          // 图标
+    image: String,         // 图片
+    progress: Float,       // 进度(0-1)
+    color: String,         // 颜色
+    badge: String,         // 徽章
+    animation: String,     // 动画
+    quantumEffect: String  // 量子效果
+}
+
+type NotificationSummary {
+    count: Int,            // 通知数量
+    text: String,          // 摘要文本
+    groupKey: String,      // 分组键
+    priority: NotificationPriority // 优先级
+}
+
+type NotificationGroup {
+    id: String,            // 分组ID
+    title: String,         // 标题
+    key: String,           // 键
+    collapsed: Bool,       // 是否折叠
+    notifications: List<String>, // 通知ID列表
+    summary: NotificationSummary // 摘要
+}
+
+type Notification {
+    id: String,                       // 通知ID
+    title: String,                    // 标题
+    message: String,                  // 消息内容
+    detail: String,                   // 详细信息
+    type: NotificationType,           // 通知类型
+    priority: NotificationPriority,   // 优先级
+    status: NotificationStatus,       // 状态
+    sourceApp: String,                // 来源应用
+    sourceIcon: String,               // 来源图标
+    timestamp: DateTime,              // 时间戳
+    expiryTime: DateTime,             // 过期时间
+    actions: List<NotificationAction>, // 操作
+    visual: NotificationVisual,       // 视觉元素
+    groupKey: String,                 // 分组键
+    isSticky: Bool,                   // 是否固定
+    isInteractive: Bool,              // 是否可交互
+    requiresAttention: Bool,          // 是否需要注意
+    dismissOnAction: Bool,            // 操作后是否自动关闭
+    metadata: Map<String, Any>,       // 元数据
+    quantumState: Object              // 量子状态
+}
+
+type NotificationFilter {
+    types: List<NotificationType>,    // 类型过滤
+    priorities: List<NotificationPriority>, // 优先级过滤
+    statuses: List<NotificationStatus>, // 状态过滤
+    sourceApps: List<String>,         // 来源应用过滤
+    groupKeys: List<String>,          // 分组键过滤
+    fromTime: DateTime,               // 开始时间过滤
+    toTime: DateTime,                 // 结束时间过滤
+    searchText: String,               // 搜索文本
+    customFilter: Function            // 自定义过滤函数
+}
+
+// 配置
+config {
+    // 基本设置
+    maxNotifications: 100,             // 最大通知数量
+    defaultExpiryMinutes: 1440,        // 默认过期时间(分钟)
+    maxActionsPerNotification: 5,      // 每个通知的最大操作数
+    defaultSnoozeMinutes: 15,          // 默认暂停时间(分钟)
+    
+    // 显示设置
+    showNotificationPreview: true,     // 是否显示通知预览
+    groupNotifications: true,          // 是否分组通知
+    sortBy: "timestamp",               // 排序依据(timestamp, priority)
+    sortDirection: "desc",             // 排序方向(asc, desc)
+    showDismissed: false,              // 是否显示已忽略通知
+    
+    // 交互设置
+    clickAction: "expand",             // 点击操作(expand, dismiss, action)
+    swipeAction: "dismiss",            // 滑动操作(dismiss, snooze, action)
+    autoOpenUrgent: true,              // 是否自动打开紧急通知
+    requireUnlockForSensitive: true,   // 敏感通知是否需要解锁
+    
+    // 通知声音
+    sounds: {
+        normal: "notification.mp3",
+        high: "high_priority.mp3",
+        urgent: "urgent.mp3",
+        critical: "critical_alert.mp3"
+    },
+    
+    // 高级设置
+    useQuantumPrioritization: true,    // 是否使用量子优先级
+    intelligentGrouping: true,         // 是否使用智能分组
+    contextAwareNotifications: true,   // 是否启用上下文感知通知
+    predictiveNotifications: true      // 是否启用预测性通知
+}
+
+// 服务状态
+state {
+    initialized: Bool = false,                      // 服务是否已初始化
+    notifications: Map<String, Notification> = {},  // 通知 <notificationId, Notification>
+    
+    // 分组和过滤
+    notificationGroups: Map<String, NotificationGroup> = {}, // 通知分组 <groupKey, NotificationGroup>
+    activeFilter: NotificationFilter = null,        // 活动过滤器
+    
+    // 运行时状态
+    notificationQueue: List<Notification> = [],     // 通知队列
+    activeNotificationIds: List<String> = [],       // 活动通知ID
+    doNotDisturbActive: Bool = false,               // 勿扰模式是否活动
+    doNotDisturbEndTime: DateTime = null,           // 勿扰模式结束时间
+    
+    // 统计和监控
+    notificationStats: {                            // 通知统计
+        totalReceived: Int = 0,                     // 总接收数
+        totalUnread: Int = 0,                       // 总未读数
+        totalDismissed: Int = 0,                    // 总忽略数
+        totalActioned: Int = 0,                     // 总操作数
+        byType: Map<NotificationType, Int> = {},    // 按类型统计
+        byPriority: Map<NotificationPriority, Int> = {}, // 按优先级统计
+        bySourceApp: Map<String, Int> = {}          // 按来源应用统计
+    },
+    
+    // 事件监听器
+    onNotificationReceivedListeners: List<Object> = [], // 通知接收事件监听器
+    onNotificationActionListeners: List<Object> = [], // 通知操作事件监听器
+    onNotificationStateChangedListeners: List<Object> = [] // 通知状态变更事件监听器
+}
+
+// 公共函数
+function initialize(customConfig: Object = null): Bool {
+    if (state.initialized) {
+        return true; // 已经初始化
+    }
+    
+    // 合并自定义配置(如果有)
+    if (customConfig != null) {
+        config = _mergeConfigs(config, customConfig);
+    }
+    
+    // 初始化统计数据
+    _initializeNotificationStats();
+    
+    // 初始化默认过滤器
+    _initializeDefaultFilter();
+    
+    // 启动通知队列处理
+    _startNotificationProcessor();
+    
+    state.initialized = true;
+    return true;
+}
+
+// 发送通知
+function sendNotification(notification: Notification): String {
+    _checkInitialized();
+    
+    // 生成通知ID(如果未提供)
+    if (!notification.id) {
+        notification.id = _generateId();
+    }
+    
+    // 设置默认值
+    notification.timestamp = notification.timestamp || DateTime.now();
+    notification.status = notification.status || NotificationStatus.UNREAD;
+    notification.priority = notification.priority || NotificationPriority.NORMAL;
+    notification.type = notification.type || NotificationType.SYSTEM;
+    
+    // 设置过期时间(如果未提供)
+    if (!notification.expiryTime) {
+        notification.expiryTime = DateTime.now().addMinutes(config.defaultExpiryMinutes);
+    }
+    
+    // 如果处于勿扰模式，且不是紧急或关键优先级，加入队列
+    if (state.doNotDisturbActive && 
+        notification.priority != NotificationPriority.URGENT &&
+        notification.priority != NotificationPriority.CRITICAL) {
+        state.notificationQueue.push(notification);
+        
+        // 更新统计
+        state.notificationStats.totalReceived++;
+        _updateTypeStats(notification.type);
+        _updatePriorityStats(notification.priority);
+        _updateSourceStats(notification.sourceApp);
+        
+        return notification.id;
+    }
+    
+    // 添加通知
+    state.notifications[notification.id] = notification;
+    state.activeNotificationIds.push(notification.id);
+    
+    // 如果启用分组，将通知添加到相应的组
+    if (config.groupNotifications && notification.groupKey) {
+        _addNotificationToGroup(notification);
+    }
+    
+    // 更新统计
+    state.notificationStats.totalReceived++;
+    state.notificationStats.totalUnread++;
+    _updateTypeStats(notification.type);
+    _updatePriorityStats(notification.priority);
+    _updateSourceStats(notification.sourceApp);
+    
+    // 播放通知声音
+    _playNotificationSound(notification.priority);
+    
+    // 触发通知接收事件
+    _triggerEvent("notificationReceived", {
+        notificationId: notification.id,
+        notification: notification,
+        timestamp: DateTime.now()
+    });
+    
+    return notification.id;
+}
+
+// 更新通知
+function updateNotification(notificationId: String, updates: Object): Bool {
+    _checkInitialized();
+    
+    // 检查通知是否存在
+    if (!state.notifications.hasKey(notificationId)) {
+        return false;
+    }
+    
+    let notification = state.notifications[notificationId];
+    let oldStatus = notification.status;
+    let oldGroupKey = notification.groupKey;
+    
+    // 应用更新
+    for (let key in updates) {
+        if (notification.hasKey(key)) {
+            notification[key] = updates[key];
+        }
+    }
+    
+    // 更新通知
+    state.notifications[notificationId] = notification;
+    
+    // 如果分组键变更且启用分组，更新分组
+    if (config.groupNotifications && oldGroupKey != notification.groupKey) {
+        _removeNotificationFromGroup(notificationId, oldGroupKey);
+        _addNotificationToGroup(notification);
+    }
+    
+    // 如果状态变更，更新统计
+    if (oldStatus != notification.status) {
+        _updateStatusStats(oldStatus, notification.status);
+        
+        // 触发通知状态变更事件
+        _triggerEvent("notificationStateChanged", {
+            notificationId: notificationId,
+            notification: notification,
+            oldStatus: oldStatus,
+            newStatus: notification.status,
+            timestamp: DateTime.now()
+        });
+    }
+    
+    return true;
+}
+
+// 标记通知为已读
+function markAsRead(notificationId: String): Bool {
+    _checkInitialized();
+    
+    // 检查通知是否存在
+    if (!state.notifications.hasKey(notificationId)) {
+        return false;
+    }
+    
+    let notification = state.notifications[notificationId];
+    
+    // 如果已经是已读状态，直接返回成功
+    if (notification.status == NotificationStatus.READ) {
+        return true;
+    }
+    
+    // 更新状态
+    return updateNotification(notificationId, {
+        status: NotificationStatus.READ
+    });
+}
+
+// 忽略通知
+function dismissNotification(notificationId: String): Bool {
+    _checkInitialized();
+    
+    // 检查通知是否存在
+    if (!state.notifications.hasKey(notificationId)) {
+        return false;
+    }
+    
+    let notification = state.notifications[notificationId];
+    
+    // 如果是固定通知且不允许忽略，返回失败
+    if (notification.isSticky) {
+        return false;
+    }
+    
+    // 更新状态
+    let success = updateNotification(notificationId, {
+        status: NotificationStatus.DISMISSED
+    });
+    
+    // 从活动通知列表中移除
+    if (success) {
+        state.activeNotificationIds = state.activeNotificationIds.filter(id => id != notificationId);
+    }
+    
+    return success;
+}
+
+// 执行通知操作
+function performAction(notificationId: String, actionId: String): Bool {
+    _checkInitialized();
+    
+    // 检查通知是否存在
+    if (!state.notifications.hasKey(notificationId)) {
+        return false;
+    }
+    
+    let notification = state.notifications[notificationId];
+    
+    // 查找操作
+    let action = null;
+    for (let i = 0; i < notification.actions.length; i++) {
+        if (notification.actions[i].id == actionId) {
+            action = notification.actions[i];
+            break;
+        }
+    }
+    
+    // 如果找不到操作，返回失败
+    if (!action) {
+        return false;
+    }
+    
+    // 如果需要解锁但未解锁，返回失败
+    if (action.requiresUnlock && !_isDeviceUnlocked()) {
+        return false;
+    }
+    
+    // 执行回调
+    if (action.callback) {
+        try {
+            action.callback(notification);
+        } catch (e) {
+            // 忽略错误
+        }
+    }
+    
+    // 更新统计
+    state.notificationStats.totalActioned++;
+    
+    // 触发通知操作事件
+    _triggerEvent("notificationAction", {
+        notificationId: notificationId,
+        notification: notification,
+        actionId: actionId,
+        action: action,
+        timestamp: DateTime.now()
+    });
+    
+    // 如果配置为操作后自动关闭，忽略通知
+    if (notification.dismissOnAction) {
+        dismissNotification(notificationId);
+    } else {
+        // 否则标记为已操作
+        updateNotification(notificationId, {
+            status: NotificationStatus.ACTIONED
+        });
+    }
+    
+    return true;
+}
+
+// 暂停通知
+function snoozeNotification(notificationId: String, minutes: Int = null): Bool {
+    _checkInitialized();
+    
+    // 使用默认暂停时间(如果未提供)
+    minutes = minutes || config.defaultSnoozeMinutes;
+    
+    // 检查通知是否存在
+    if (!state.notifications.hasKey(notificationId)) {
+        return false;
+    }
+    
+    let notification = state.notifications[notificationId];
+    let snoozeUntil = DateTime.now().addMinutes(minutes);
+    
+    // 更新状态和过期时间
+    let success = updateNotification(notificationId, {
+        status: NotificationStatus.SNOOZED,
+        expiryTime: snoozeUntil
+    });
+    
+    // 从活动通知列表中移除
+    if (success) {
+        state.activeNotificationIds = state.activeNotificationIds.filter(id => id != notificationId);
+    }
+    
+    return success;
+}
+
+// 获取通知
+function getNotification(notificationId: String): Notification {
+    _checkInitialized();
+    
+    if (!state.notifications.hasKey(notificationId)) {
+        return null;
+    }
+    
+    return state.notifications[notificationId];
+}
+
+// 获取所有通知
+function getAllNotifications(filter: NotificationFilter = null): List<Notification> {
+    _checkInitialized();
+    
+    let notifications = [];
+    
+    for (let notificationId in state.notifications) {
+        notifications.push(state.notifications[notificationId]);
+    }
+    
+    // 应用过滤器
+    if (filter) {
+        notifications = _filterNotifications(notifications, filter);
+    } else if (state.activeFilter) {
+        notifications = _filterNotifications(notifications, state.activeFilter);
+    }
+    
+    // 应用排序
+    notifications = _sortNotifications(notifications);
+    
+    return notifications;
+}
+
+// 获取活动通知
+function getActiveNotifications(): List<Notification> {
+    _checkInitialized();
+    
+    let activeNotifications = [];
+    
+    for (let i = 0; i < state.activeNotificationIds.length; i++) {
+        let notificationId = state.activeNotificationIds[i];
+        if (state.notifications.hasKey(notificationId)) {
+            activeNotifications.push(state.notifications[notificationId]);
+        }
+    }
+    
+    // 应用排序
+    activeNotifications = _sortNotifications(activeNotifications);
+    
+    return activeNotifications;
+}
+
+// 设置过滤器
+function setFilter(filter: NotificationFilter): Bool {
+    _checkInitialized();
+    
+    state.activeFilter = filter;
+    return true;
+}
+
+// 清除过滤器
+function clearFilter(): Bool {
+    _checkInitialized();
+    
+    state.activeFilter = null;
+    return true;
+}
+
+// 获取通知分组
+function getNotificationGroups(): List<NotificationGroup> {
+    _checkInitialized();
+    
+    let groups = [];
+    
+    for (let groupKey in state.notificationGroups) {
+        groups.push(state.notificationGroups[groupKey]);
+    }
+    
+    return groups;
+}
+
+// 启用勿扰模式
+function enableDoNotDisturb(minutes: Int = 60): Bool {
+    _checkInitialized();
+    
+    state.doNotDisturbActive = true;
+    state.doNotDisturbEndTime = DateTime.now().addMinutes(minutes);
+    
+    return true;
+}
+
+// 禁用勿扰模式
+function disableDoNotDisturb(): Bool {
+    _checkInitialized();
+    
+    state.doNotDisturbActive = false;
+    state.doNotDisturbEndTime = null;
+    
+    // 处理队列中的通知
+    _processNotificationQueue();
+    
+    return true;
+}
+
+// 清除所有通知
+function clearAllNotifications(): Int {
+    _checkInitialized();
+    
+    let clearedCount = 0;
+    
+    // 遍历所有通知
+    for (let notificationId in state.notifications) {
+        let notification = state.notifications[notificationId];
+        
+        // 跳过固定通知
+        if (notification.isSticky) {
+            continue;
+        }
+        
+        // 标记为已忽略
+        if (updateNotification(notificationId, {
+            status: NotificationStatus.DISMISSED
+        })) {
+            clearedCount++;
+        }
+    }
+    
+    // 清空活动通知ID(保留固定通知)
+    state.activeNotificationIds = state.activeNotificationIds.filter(id => {
+        let notification = state.notifications[id];
+        return notification && notification.isSticky;
+    });
+    
+    return clearedCount;
+}
+
+// 获取通知统计
+function getNotificationStats(): Object {
+    _checkInitialized();
+    
+    return state.notificationStats;
+}
+
+// 添加事件监听器
+function addEventListener(eventName: String, callback: Function): String {
+    _checkInitialized();
+    
+    let listenerId = _generateId();
+    
+    // 根据事件类型添加监听器
+    switch (eventName) {
+        case "notificationReceived":
+            state.onNotificationReceivedListeners.push({id: listenerId, callback: callback});
+            break;
+        case "notificationAction":
+            state.onNotificationActionListeners.push({id: listenerId, callback: callback});
+            break;
+        case "notificationStateChanged":
+            state.onNotificationStateChangedListeners.push({id: listenerId, callback: callback});
+            break;
+        default:
+            return "";
+    }
+    
+    return listenerId;
+}
+
+// 移除事件监听器
+function removeEventListener(eventName: String, listenerId: String): Bool {
+    _checkInitialized();
+    
+    // 根据事件类型移除监听器
+    switch (eventName) {
+        case "notificationReceived":
+            state.onNotificationReceivedListeners = state.onNotificationReceivedListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "notificationAction":
+            state.onNotificationActionListeners = state.onNotificationActionListeners.filter(listener => listener.id != listenerId);
+            break;
+        case "notificationStateChanged":
+            state.onNotificationStateChangedListeners = state.onNotificationStateChangedListeners.filter(listener => listener.id != listenerId);
+            break;
+        default:
+            return false;
+    }
+    
+    return true;
+}
+
+// 内部函数
+
+// 检查服务是否已初始化
+function _checkInitialized() {
+    if (!state.initialized) {
+        throw "通知中心尚未初始化";
+    }
+}
+
+// 合并配置
+function _mergeConfigs(baseConfig: Object, customConfig: Object): Object {
+    // 简单合并对象
+    let result = baseConfig.clone();
+    
+    for (let key in customConfig) {
+        if (result.hasKey(key)) {
+            if (typeof result[key] == "object" && typeof customConfig[key] == "object") {
+                result[key] = _mergeConfigs(result[key], customConfig[key]);
+            } else {
+                result[key] = customConfig[key];
+            }
+        }
+    }
+    
+    return result;
+}
+
+// 初始化通知统计
+function _initializeNotificationStats() {
+    state.notificationStats = {
+        totalReceived: 0,
+        totalUnread: 0,
+        totalDismissed: 0,
+        totalActioned: 0,
+        byType: {},
+        byPriority: {},
+        bySourceApp: {}
+    };
+    
+    // 初始化类型统计
+    for (let type in NotificationType) {
+        state.notificationStats.byType[type] = 0;
+    }
+    
+    // 初始化优先级统计
+    for (let priority in NotificationPriority) {
+        state.notificationStats.byPriority[priority] = 0;
+    }
+}
+
+// 初始化默认过滤器
+function _initializeDefaultFilter() {
+    // 如果不显示已忽略通知，设置默认过滤器
+    if (!config.showDismissed) {
+        state.activeFilter = NotificationFilter {
+            types: [],
+            priorities: [],
+            statuses: [
+                NotificationStatus.UNREAD,
+                NotificationStatus.READ,
+                NotificationStatus.ACTIONED,
+                NotificationStatus.SNOOZED
+            ],
+            sourceApps: [],
+            groupKeys: [],
+            fromTime: null,
+            toTime: null,
+            searchText: "",
+            customFilter: null
+        };
+    }
+}
+
+// 启动通知处理器
+function _startNotificationProcessor() {
+    // 实际实现会使用定时器或异步任务
+    // 定期检查通知过期和勿扰模式结束
+    // 这里只是一个示例
+}
+
+// 添加通知到分组
+function _addNotificationToGroup(notification: Notification) {
+    let groupKey = notification.groupKey;
+    
+    // 如果分组不存在，创建分组
+    if (!state.notificationGroups.hasKey(groupKey)) {
+        state.notificationGroups[groupKey] = NotificationGroup {
+            id: _generateId(),
+            title: notification.sourceApp || groupKey,
+            key: groupKey,
+            collapsed: false,
+            notifications: [],
+            summary: NotificationSummary {
+                count: 0,
+                text: "",
+                groupKey: groupKey,
+                priority: NotificationPriority.NORMAL
+            }
+        };
+    }
+    
+    let group = state.notificationGroups[groupKey];
+    
+    // 添加通知到分组
+    if (!group.notifications.includes(notification.id)) {
+        group.notifications.push(notification.id);
+    }
+    
+    // 更新分组摘要
+    group.summary.count = group.notifications.length;
+    
+    // 更新分组优先级(使用组内最高优先级)
+    _updateGroupPriority(group);
+    
+    // 更新分组摘要文本
+    _updateGroupSummaryText(group);
+}
+
+// 从分组移除通知
+function _removeNotificationFromGroup(notificationId: String, groupKey: String) {
+    // 检查分组是否存在
+    if (!state.notificationGroups.hasKey(groupKey)) {
+        return;
+    }
+    
+    let group = state.notificationGroups[groupKey];
+    
+    // 从分组中移除通知
+    group.notifications = group.notifications.filter(id => id != notificationId);
+    
+    // 如果分组为空，移除分组
+    if (group.notifications.length == 0) {
+        state.notificationGroups.remove(groupKey);
+        return;
+    }
+    
+    // 更新分组摘要
+    group.summary.count = group.notifications.length;
+    
+    // 更新分组优先级
+    _updateGroupPriority(group);
+    
+    // 更新分组摘要文本
+    _updateGroupSummaryText(group);
+}
+
+// 更新分组优先级
+function _updateGroupPriority(group: NotificationGroup) {
+    let highestPriority = NotificationPriority.LOW;
+    
+    // 查找组内最高优先级
+    for (let i = 0; i < group.notifications.length; i++) {
+        let notificationId = group.notifications[i];
+        
+        if (state.notifications.hasKey(notificationId)) {
+            let notification = state.notifications[notificationId];
+            let priority = notification.priority;
+            
+            // 比较优先级
+            if (_getPriorityValue(priority) > _getPriorityValue(highestPriority)) {
+                highestPriority = priority;
+            }
+        }
+    }
+    
+    group.summary.priority = highestPriority;
+}
+
+// 更新分组摘要文本
+function _updateGroupSummaryText(group: NotificationGroup) {
+    // 简单示例，实际实现可能更复杂
+    group.summary.text = `${group.title}: ${group.notifications.length} 条通知`;
+}
+
+// 获取优先级数值
+function _getPriorityValue(priority: NotificationPriority): Int {
+    switch (priority) {
+        case NotificationPriority.LOW:
+            return 0;
+        case NotificationPriority.NORMAL:
+            return 1;
+        case NotificationPriority.HIGH:
+            return 2;
+        case NotificationPriority.URGENT:
+            return 3;
+        case NotificationPriority.CRITICAL:
+            return 4;
+        default:
+            return 1;
+    }
+}
+
+// 过滤通知
+function _filterNotifications(notifications: List<Notification>, filter: NotificationFilter): List<Notification> {
+    return notifications.filter(notification => {
+        // 类型过滤
+        if (filter.types && filter.types.length > 0) {
+            if (!filter.types.includes(notification.type)) {
+                return false;
+            }
+        }
+        
+        // 优先级过滤
+        if (filter.priorities && filter.priorities.length > 0) {
+            if (!filter.priorities.includes(notification.priority)) {
+                return false;
+            }
+        }
+        
+        // 状态过滤
+        if (filter.statuses && filter.statuses.length > 0) {
+            if (!filter.statuses.includes(notification.status)) {
+                return false;
+            }
+        }
+        
+        // 来源应用过滤
+        if (filter.sourceApps && filter.sourceApps.length > 0) {
+            if (!filter.sourceApps.includes(notification.sourceApp)) {
+                return false;
+            }
+        }
+        
+        // 分组键过滤
+        if (filter.groupKeys && filter.groupKeys.length > 0) {
+            if (!filter.groupKeys.includes(notification.groupKey)) {
+                return false;
+            }
+        }
+        
+        // 时间范围过滤
+        if (filter.fromTime) {
+            if (notification.timestamp < filter.fromTime) {
+                return false;
+            }
+        }
+        
+        if (filter.toTime) {
+            if (notification.timestamp > filter.toTime) {
+                return false;
+            }
+        }
+        
+        // 搜索文本过滤
+        if (filter.searchText && filter.searchText.trim() != "") {
+            let searchText = filter.searchText.toLowerCase();
+            let notificationText = (notification.title + " " + notification.message).toLowerCase();
+            if (!notificationText.includes(searchText)) {
+                return false;
+            }
+        }
+        
+        // 自定义过滤函数
+        if (filter.customFilter) {
+            try {
+                return filter.customFilter(notification);
+            } catch (e) {
+                return true;
+            }
+        }
+        
+        return true;
+    });
+}
+
+// 排序通知
+function _sortNotifications(notifications: List<Notification>): List<Notification> {
+    // 根据配置排序
+    return notifications.sort((a, b) => {
+        let aValue, bValue;
+        
+        if (config.sortBy == "timestamp") {
+            aValue = a.timestamp.getTime();
+            bValue = b.timestamp.getTime();
+        } else if (config.sortBy == "priority") {
+            aValue = _getPriorityValue(a.priority);
+            bValue = _getPriorityValue(b.priority);
+        } else {
+            // 默认按时间戳排序
+            aValue = a.timestamp.getTime();
+            bValue = b.timestamp.getTime();
+        }
+        
+        if (config.sortDirection == "asc") {
+            return aValue - bValue;
+        } else {
+            return bValue - aValue;
+        }
+    });
+}
+
+// 处理通知队列
+function _processNotificationQueue() {
+    // 如果勿扰模式活动，返回
+    if (state.doNotDisturbActive) {
+        return;
+    }
+    
+    // 处理队列中的所有通知
+    while (state.notificationQueue.length > 0) {
+        let notification = state.notificationQueue.shift();
+        sendNotification(notification);
+    }
+}
+
+// 播放通知声音
+function _playNotificationSound(priority: NotificationPriority) {
+    // 根据优先级选择声音
+    let sound;
+    
+    switch (priority) {
+        case NotificationPriority.LOW:
+        case NotificationPriority.NORMAL:
+            sound = config.sounds.normal;
+            break;
+        case NotificationPriority.HIGH:
+            sound = config.sounds.high;
+            break;
+        case NotificationPriority.URGENT:
+            sound = config.sounds.urgent;
+            break;
+        case NotificationPriority.CRITICAL:
+            sound = config.sounds.critical;
+            break;
+        default:
+            sound = config.sounds.normal;
+    }
+    
+    // 实际实现会播放声音
+    // 这里只是一个示例
+}
+
+// 更新类型统计
+function _updateTypeStats(type: NotificationType) {
+    if (state.notificationStats.byType.hasKey(type)) {
+        state.notificationStats.byType[type]++;
+    }
+}
+
+// 更新优先级统计
+function _updatePriorityStats(priority: NotificationPriority) {
+    if (state.notificationStats.byPriority.hasKey(priority)) {
+        state.notificationStats.byPriority[priority]++;
+    }
+}
+
+// 更新来源应用统计
+function _updateSourceStats(sourceApp: String) {
+    if (!sourceApp) return;
+    
+    if (!state.notificationStats.bySourceApp.hasKey(sourceApp)) {
+        state.notificationStats.bySourceApp[sourceApp] = 0;
+    }
+    
+    state.notificationStats.bySourceApp[sourceApp]++;
+}
+
+// 更新状态统计
+function _updateStatusStats(oldStatus: NotificationStatus, newStatus: NotificationStatus) {
+    // 更新未读计数
+    if (oldStatus == NotificationStatus.UNREAD && newStatus != NotificationStatus.UNREAD) {
+        state.notificationStats.totalUnread = Math.max(0, state.notificationStats.totalUnread - 1);
+    } else if (oldStatus != NotificationStatus.UNREAD && newStatus == NotificationStatus.UNREAD) {
+        state.notificationStats.totalUnread++;
+    }
+    
+    // 更新已忽略计数
+    if (oldStatus != NotificationStatus.DISMISSED && newStatus == NotificationStatus.DISMISSED) {
+        state.notificationStats.totalDismissed++;
+    }
+    
+    // 更新已操作计数
+    if (oldStatus != NotificationStatus.ACTIONED && newStatus == NotificationStatus.ACTIONED) {
+        state.notificationStats.totalActioned++;
+    }
+}
+
+// 检查设备是否已解锁
+function _isDeviceUnlocked(): Bool {
+    // 实际实现会检查设备锁定状态
+    // 这里只是一个示例
+    return true;
+}
+
+// 触发事件
+function _triggerEvent(eventName: String, eventData: Object) {
+    // 根据事件类型触发相应的事件
+    let listeners = [];
+    
+    switch (eventName) {
+        case "notificationReceived":
+            listeners = state.onNotificationReceivedListeners;
+            break;
+        case "notificationAction":
+            listeners = state.onNotificationActionListeners;
+            break;
+        case "notificationStateChanged":
+            listeners = state.onNotificationStateChangedListeners;
+            break;
+    }
+    
+    // 调用所有监听器
+    for (let i = 0; i < listeners.length; i++) {
+        try {
+            listeners[i].callback(eventData);
+        } catch (e) {
+            // 记录错误但不中断执行
+        }
+    }
+}
+
+// 生成随机ID
+function _generateId(): String {
+    return "id_" + Math.random().toString(36).substring(2, 15);
+} 

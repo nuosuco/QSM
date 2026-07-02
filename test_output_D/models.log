@@ -1,0 +1,16 @@
+=== AGENT D: COMPILE BIG FOUR MODELS (QSM/SOM/WeQ/Ref) (Thu Jul  2 11:56:02 AM CST 2026) ===
+--- Compiling QSM entry circuits ---
+--- Compiling SOM entry circuits ---
+--- Compiling WeQ entry circuits ---
+--- Compiling Ref entry circuits ---
+
+--- Running big-four entry QBCs ---
+qsm_entry: qsm_entry.qbc
+[QVM] 执行完成: 16 周期, 10 门操作
+som_entry: som_entry.qbc
+[QVM] 执行完成: 24 周期, 16 门操作
+weq_entry: weq_entry.qbc
+[QVM] 执行完成: 24 周期, 16 门操作
+ref_entry: ref_entry.qbc
+[QVM] 执行完成: 32 周期, 22 门操作
+=== AGENT D DONE (Thu Jul  2 11:56:03 AM CST 2026) ===

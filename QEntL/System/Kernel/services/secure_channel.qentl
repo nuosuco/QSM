@@ -1,0 +1,1026 @@
+/**
+ * QEntL安全通道服务
+ * 版本: 1.0.0
+ * 作者: QEntL团队
+ * 描述: 提供量子加密的安全通信通道
+ * 量子基因编码: QG-SECURE-CHANNEL-N8P7-1714135300
+ * 纠缠强度: 0.95
+ */
+
+import "../utils/logger.qentl";
+import "../utils/time.qentl";
+import "../utils/crypto.qentl";
+import "../utils/quantum_key_distribution.qentl";
+import "./error_service.qentl";
+import "./quantum_network.qentl";
+
+/**
+ * 通道类型
+ */
+export const ChannelTypes = {
+  QUANTUM_ENCRYPTED: "quantum-encrypted", // 量子加密通道
+  HYBRID_ENCRYPTED: "hybrid-encrypted",   // 混合加密通道
+  CLASSICAL_TLS: "classical-tls",         // 经典TLS通道
+  DIRECT: "direct"                        // 直接通道（无加密）
+};
+
+/**
+ * 通道状态
+ */
+export const ChannelStatus = {
+  OPEN: "open",           // 开放
+  CLOSED: "closed",       // 关闭
+  NEGOTIATING: "negotiating", // 协商中
+  DEGRADED: "degraded",   // 降级
+  ERROR: "error"          // 错误状态
+};
+
+/**
+ * 安全通道配置
+ */
+export const SecureChannelConfig = {
+  // 默认通道类型
+  defaultChannelType: ChannelTypes.QUANTUM_ENCRYPTED,
+  
+  // 密钥更新间隔 (毫秒)
+  keyRefreshInterval: 300000, // 5分钟
+  
+  // 最小量子密钥长度 (比特)
+  minQuantumKeyLength: 2048,
+  
+  // 最大会话生存期 (毫秒)
+  maxSessionLifetime: 86400000, // 24小时
+  
+  // 会话缓存大小
+  sessionCacheSize: 100,
+  
+  // 加密设置
+  encryption: {
+    // 量子加密算法
+    quantumAlgorithm: "qAES-256",
+    
+    // 经典加密算法
+    classicalAlgorithm: "AES-256-GCM",
+    
+    // 密钥交换算法
+    keyExchangeAlgorithm: "QECDHE",
+    
+    // 哈希算法
+    hashAlgorithm: "QSHA-384"
+  },
+  
+  // 认证设置
+  authentication: {
+    // 认证模式: "mutual", "server", "client", "none"
+    mode: "mutual",
+    
+    // 证书验证: true, false
+    verifyCertificates: true,
+    
+    // 量子认证
+    useQuantumAuthentication: true
+  },
+  
+  // 安全设置
+  security: {
+    // 前向保密
+    perfectForwardSecrecy: true,
+    
+    // 防量子攻击保护
+    quantumResistant: true,
+    
+    // 允许的密码套件
+    allowedCipherSuites: [
+      "QECDHE-QRSA-QAES256-QSHA384",
+      "QECDHE-QECDSA-QAES256-QSHA384",
+      "ECDHE-RSA-AES256-GCM-SHA384"
+    ],
+    
+    // 通道超时 (毫秒)
+    channelTimeout: 60000
+  }
+};
+
+/**
+ * 安全通道状态
+ */
+export const SecureChannelState = {
+  // 服务是否已初始化
+  initialized: false,
+  
+  // 活动通道 (channelId -> channelInfo)
+  activeChannels: {},
+  
+  // 通道计数
+  channelCount: 0,
+  
+  // 密钥缓存 (nodeId -> keyInfo)
+  keyCache: {},
+  
+  // 会话缓存 (sessionId -> sessionInfo)
+  sessionCache: {},
+  
+  // 活动密钥交换 (exchangeId -> exchangeInfo)
+  activeKeyExchanges: {},
+  
+  // 定时器
+  timers: {
+    keyRefresh: null,
+    sessionCleanup: null
+  },
+  
+  // 事件监听器
+  eventListeners: {
+    channelOpened: [],
+    channelClosed: [],
+    channelError: [],
+    keyRefreshed: [],
+    securityAlert: []
+  }
+};
+
+/**
+ * 初始化安全通道服务
+ * 
+ * @param {Object} config - 服务配置参数
+ * @returns {boolean} - 是否初始化成功
+ */
+export function initialize(config = {}) {
+  logger.info("[安全通道] 正在初始化安全通道服务...");
+  
+  // 合并配置
+  mergeConfig(config);
+  
+  try {
+    // 初始化加密模块
+    initializeCrypto();
+    
+    // 启动密钥刷新定时器
+    SecureChannelState.timers.keyRefresh = setInterval(
+      refreshAllKeys,
+      SecureChannelConfig.keyRefreshInterval
+    );
+    
+    // 启动会话清理定时器
+    SecureChannelState.timers.sessionCleanup = setInterval(
+      cleanupExpiredSessions,
+      SecureChannelConfig.maxSessionLifetime / 4
+    );
+    
+    SecureChannelState.initialized = true;
+    logger.info("[安全通道] 安全通道服务初始化成功");
+    
+    return true;
+  } catch (error) {
+    logger.error(`[安全通道] 安全通道服务初始化失败: ${error.message}`);
+    error_service.reportError(
+      error_service.ErrorLevels.ERROR,
+      error_service.ErrorTypes.SECURITY,
+      `安全通道服务初始化失败: ${error.message}`,
+      "secure_channel"
+    );
+    return false;
+  }
+}
+
+/**
+ * 打开安全通道
+ * 
+ * @param {string} remoteNodeId - 远程节点ID
+ * @param {Object} options - 通道选项
+ * @returns {Promise<string>} - 通道ID
+ */
+export async function openChannel(remoteNodeId, options = {}) {
+  checkInitialized();
+  
+  // 检查是否已存在活动通道
+  const existingChannel = findChannelByNodeId(remoteNodeId);
+  if (existingChannel && existingChannel.status === ChannelStatus.OPEN) {
+    logger.info(`[安全通道] 复用现有通道: ${existingChannel.id}`);
+    return existingChannel.id;
+  }
+  
+  const channelType = options.channelType || SecureChannelConfig.defaultChannelType;
+  logger.info(`[安全通道] 正在打开到节点 ${remoteNodeId} 的${channelType}通道`);
+  
+  try {
+    // 生成通道ID
+    const channelId = generateChannelId();
+    
+    // 更新通道状态
+    SecureChannelState.activeChannels[channelId] = {
+      id: channelId,
+      remoteNodeId,
+      type: channelType,
+      status: ChannelStatus.NEGOTIATING,
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      options,
+      security: {
+        encryptionAlgorithm: null,
+        keyExchangeAlgorithm: null,
+        keyLength: 0,
+        cipherSuite: null,
+        forwardSecrecy: false
+      },
+      statistics: {
+        messagesSent: 0,
+        messagesReceived: 0,
+        bytesSent: 0,
+        bytesReceived: 0,
+        errors: 0
+      }
+    };
+    
+    // 建立网络连接
+    const connectionId = await quantum_network.connectToNode(remoteNodeId);
+    if (!connectionId) {
+      throw new Error(`无法连接到节点: ${remoteNodeId}`);
+    }
+    
+    // 执行密钥交换
+    const keyMaterial = await performKeyExchange(channelId, remoteNodeId, channelType);
+    
+    // 设置通道加密参数
+    setupChannelEncryption(channelId, keyMaterial);
+    
+    // 协商完成，通道打开
+    SecureChannelState.activeChannels[channelId].status = ChannelStatus.OPEN;
+    SecureChannelState.channelCount++;
+    
+    // 触发通道打开事件
+    triggerEvent("channelOpened", { 
+      channelId, 
+      remoteNodeId, 
+      channelType 
+    });
+    
+    logger.info(`[安全通道] 通道已打开: ${channelId}, 远程节点: ${remoteNodeId}`);
+    return channelId;
+  } catch (error) {
+    logger.error(`[安全通道] 打开通道失败: ${error.message}`);
+    error_service.reportError(
+      error_service.ErrorLevels.ERROR,
+      error_service.ErrorTypes.SECURITY,
+      `打开安全通道失败: ${error.message}`,
+      "secure_channel",
+      { remoteNodeId, channelType }
+    );
+    throw error;
+  }
+}
+
+/**
+ * 关闭安全通道
+ * 
+ * @param {string} channelId - 通道ID
+ * @returns {boolean} - 是否关闭成功
+ */
+export function closeChannel(channelId) {
+  checkInitialized();
+  
+  // 检查通道是否存在
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    logger.warn(`[安全通道] 关闭通道失败: 通道不存在 ${channelId}`);
+    return false;
+  }
+  
+  logger.info(`[安全通道] 正在关闭通道: ${channelId}`);
+  
+  try {
+    // 发送通道关闭消息
+    if (channel.status === ChannelStatus.OPEN) {
+      sendCloseNotification(channelId);
+    }
+    
+    // 更新通道状态
+    channel.status = ChannelStatus.CLOSED;
+    
+    // 清理通道资源
+    cleanupChannelResources(channelId);
+    
+    // 从活动通道中移除
+    delete SecureChannelState.activeChannels[channelId];
+    SecureChannelState.channelCount--;
+    
+    // 触发通道关闭事件
+    triggerEvent("channelClosed", { 
+      channelId, 
+      remoteNodeId: channel.remoteNodeId 
+    });
+    
+    logger.info(`[安全通道] 通道已关闭: ${channelId}`);
+    return true;
+  } catch (error) {
+    logger.error(`[安全通道] 关闭通道失败: ${channelId}, 错误: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 通过通道发送加密消息
+ * 
+ * @param {string} channelId - 通道ID
+ * @param {any} data - 要发送的数据
+ * @param {Object} options - 发送选项
+ * @returns {Promise<boolean>} - 是否发送成功
+ */
+export async function sendSecureMessage(channelId, data, options = {}) {
+  checkInitialized();
+  
+  // 检查通道是否存在且开放
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    throw new Error(`通道不存在: ${channelId}`);
+  }
+  
+  if (channel.status !== ChannelStatus.OPEN) {
+    throw new Error(`通道未开放: ${channelId}, 当前状态: ${channel.status}`);
+  }
+  
+  logger.debug(`[安全通道] 正在通过通道发送消息: ${channelId}`);
+  
+  try {
+    // 准备消息
+    const message = {
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      data,
+      options
+    };
+    
+    // 加密消息
+    const encryptedMessage = encryptMessage(channelId, message);
+    
+    // 发送消息
+    await quantum_network.sendQuantumState(
+      channel.remoteNodeId,
+      { type: "secure_message", content: encryptedMessage },
+      { priority: options.priority || "normal" }
+    );
+    
+    // 更新通道状态
+    channel.lastActivity = Date.now();
+    channel.statistics.messagesSent++;
+    channel.statistics.bytesSent += getMessageSize(message);
+    
+    return true;
+  } catch (error) {
+    logger.error(`[安全通道] 发送安全消息失败: ${error.message}`);
+    
+    // 记录错误并更新统计
+    channel.statistics.errors++;
+    
+    // 如果错误严重，标记通道为降级
+    if (isChannelDegradingError(error)) {
+      channel.status = ChannelStatus.DEGRADED;
+      triggerEvent("channelError", { 
+        channelId, 
+        error: error.message 
+      });
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * 接收安全消息
+ * 
+ * @param {string} channelId - 通道ID
+ * @param {number} timeout - 超时时间 (毫秒)
+ * @returns {Promise<any>} - 接收到的解密数据
+ */
+export async function receiveSecureMessage(channelId, timeout = 30000) {
+  checkInitialized();
+  
+  // 检查通道是否存在且开放
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    throw new Error(`通道不存在: ${channelId}`);
+  }
+  
+  if (channel.status !== ChannelStatus.OPEN) {
+    throw new Error(`通道未开放: ${channelId}, 当前状态: ${channel.status}`);
+  }
+  
+  logger.debug(`[安全通道] 正在接收通道消息: ${channelId}`);
+  
+  return new Promise((resolve, reject) => {
+    // 创建消息监听器
+    const messageListener = (data) => {
+      if (data.type === "secure_message" && data.channelId === channelId) {
+        try {
+          // 更新通道状态
+          channel.lastActivity = Date.now();
+          channel.statistics.messagesReceived++;
+          channel.statistics.bytesReceived += getMessageSize(data.content);
+          
+          // 解密消息
+          const decryptedMessage = decryptMessage(channelId, data.content);
+          
+          // 移除监听器
+          quantum_network.removeEventListener("messageReceived", messageListener);
+          
+          resolve(decryptedMessage.data);
+        } catch (error) {
+          reject(error);
+        }
+      }
+    };
+    
+    // 添加消息监听器
+    quantum_network.addEventListener("messageReceived", messageListener);
+    
+    // 设置超时
+    setTimeout(() => {
+      quantum_network.removeEventListener("messageReceived", messageListener);
+      reject(new Error(`接收安全消息超时: ${channelId}`));
+    }, timeout);
+  });
+}
+
+/**
+ * 刷新通道密钥
+ * 
+ * @param {string} channelId - 通道ID
+ * @returns {Promise<boolean>} - 是否刷新成功
+ */
+export async function refreshChannelKey(channelId) {
+  checkInitialized();
+  
+  // 检查通道是否存在且开放
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    logger.warn(`[安全通道] 刷新密钥失败: 通道不存在 ${channelId}`);
+    return false;
+  }
+  
+  if (channel.status !== ChannelStatus.OPEN) {
+    logger.warn(`[安全通道] 刷新密钥失败: 通道未开放 ${channelId}`);
+    return false;
+  }
+  
+  logger.info(`[安全通道] 正在刷新通道密钥: ${channelId}`);
+  
+  try {
+    // 执行密钥交换
+    const keyMaterial = await performKeyExchange(
+      channelId, 
+      channel.remoteNodeId, 
+      channel.type
+    );
+    
+    // 更新通道加密参数
+    setupChannelEncryption(channelId, keyMaterial);
+    
+    // 触发密钥刷新事件
+    triggerEvent("keyRefreshed", { channelId });
+    
+    logger.info(`[安全通道] 通道密钥已刷新: ${channelId}`);
+    return true;
+  } catch (error) {
+    logger.error(`[安全通道] 刷新通道密钥失败: ${channelId}, 错误: ${error.message}`);
+    
+    // 记录错误并更新统计
+    channel.statistics.errors++;
+    
+    // 如果错误严重，标记通道为降级
+    if (isChannelDegradingError(error)) {
+      channel.status = ChannelStatus.DEGRADED;
+      triggerEvent("channelError", { 
+        channelId, 
+        error: error.message 
+      });
+    }
+    
+    return false;
+  }
+}
+
+/**
+ * 获取通道信息
+ * 
+ * @param {string} channelId - 通道ID
+ * @returns {Object|null} - 通道信息
+ */
+export function getChannelInfo(channelId) {
+  checkInitialized();
+  
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    return null;
+  }
+  
+  // 返回通道信息（不包含敏感数据）
+  return {
+    id: channel.id,
+    remoteNodeId: channel.remoteNodeId,
+    type: channel.type,
+    status: channel.status,
+    createdAt: channel.createdAt,
+    lastActivity: channel.lastActivity,
+    security: {
+      encryptionAlgorithm: channel.security.encryptionAlgorithm,
+      keyExchangeAlgorithm: channel.security.keyExchangeAlgorithm,
+      keyLength: channel.security.keyLength,
+      cipherSuite: channel.security.cipherSuite,
+      forwardSecrecy: channel.security.forwardSecrecy
+    },
+    statistics: { ...channel.statistics }
+  };
+}
+
+/**
+ * 添加事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否添加成功
+ */
+export function addEventListener(event, listener) {
+  if (!SecureChannelState.eventListeners[event]) {
+    logger.warn(`[安全通道] 未知的事件类型: ${event}`);
+    return false;
+  }
+  
+  SecureChannelState.eventListeners[event].push(listener);
+  return true;
+}
+
+/**
+ * 移除事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否移除成功
+ */
+export function removeEventListener(event, listener) {
+  if (!SecureChannelState.eventListeners[event]) {
+    return false;
+  }
+  
+  const index = SecureChannelState.eventListeners[event].indexOf(listener);
+  if (index !== -1) {
+    SecureChannelState.eventListeners[event].splice(index, 1);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * 获取服务状态
+ * 
+ * @returns {Object} - 服务状态信息
+ */
+export function getStatus() {
+  return {
+    initialized: SecureChannelState.initialized,
+    activeChannels: SecureChannelState.channelCount,
+    activeKeyExchanges: Object.keys(SecureChannelState.activeKeyExchanges).length,
+    keyCacheSize: Object.keys(SecureChannelState.keyCache).length,
+    sessionCacheSize: Object.keys(SecureChannelState.sessionCache).length
+  };
+}
+
+// ============= 内部函数 =============
+
+/**
+ * 检查服务是否已初始化
+ */
+function checkInitialized() {
+  if (!SecureChannelState.initialized) {
+    throw new Error("安全通道服务尚未初始化");
+  }
+}
+
+/**
+ * 合并服务配置
+ */
+function mergeConfig(config) {
+  // 合并顶级配置
+  for (const key in config) {
+    if (typeof config[key] === "object" && config[key] !== null) {
+      SecureChannelConfig[key] = {
+        ...SecureChannelConfig[key],
+        ...config[key]
+      };
+    } else {
+      SecureChannelConfig[key] = config[key];
+    }
+  }
+}
+
+/**
+ * 初始化加密模块
+ */
+function initializeCrypto() {
+  // 初始化加密和量子密钥分发模块
+  crypto.initialize({
+    defaultAlgorithm: SecureChannelConfig.encryption.classicalAlgorithm,
+    quantumResistant: SecureChannelConfig.security.quantumResistant
+  });
+  
+  quantum_key_distribution.initialize({
+    keyLength: SecureChannelConfig.minQuantumKeyLength,
+    refreshInterval: SecureChannelConfig.keyRefreshInterval
+  });
+  
+  logger.info("[安全通道] 加密模块初始化完成");
+}
+
+/**
+ * 生成通道ID
+ */
+function generateChannelId() {
+  const timestamp = Date.now().toString(16);
+  const random = Math.random().toString(16).substring(2, 8);
+  
+  return `SC-${timestamp}-${random}`;
+}
+
+/**
+ * 生成消息ID
+ */
+function generateMessageId() {
+  const timestamp = Date.now().toString(16);
+  const random = Math.random().toString(16).substring(2, 6);
+  
+  return `MSG-${timestamp}-${random}`;
+}
+
+/**
+ * 查找与特定节点的通道
+ */
+function findChannelByNodeId(nodeId) {
+  for (const channelId in SecureChannelState.activeChannels) {
+    const channel = SecureChannelState.activeChannels[channelId];
+    if (channel.remoteNodeId === nodeId) {
+      return channel;
+    }
+  }
+  return null;
+}
+
+/**
+ * 执行密钥交换
+ */
+async function performKeyExchange(channelId, remoteNodeId, channelType) {
+  logger.info(`[安全通道] 执行密钥交换: ${channelId}`);
+  
+  // 基于通道类型选择密钥交换方法
+  if (channelType === ChannelTypes.QUANTUM_ENCRYPTED) {
+    return await performQuantumKeyExchange(channelId, remoteNodeId);
+  } else if (channelType === ChannelTypes.HYBRID_ENCRYPTED) {
+    return await performHybridKeyExchange(channelId, remoteNodeId);
+  } else if (channelType === ChannelTypes.CLASSICAL_TLS) {
+    return await performClassicalKeyExchange(channelId, remoteNodeId);
+  } else {
+    throw new Error(`不支持的通道类型: ${channelType}`);
+  }
+}
+
+/**
+ * 执行量子密钥交换
+ */
+async function performQuantumKeyExchange(channelId, remoteNodeId) {
+  // 注册密钥交换
+  const exchangeId = `QKE-${channelId}-${Date.now()}`;
+  SecureChannelState.activeKeyExchanges[exchangeId] = {
+    id: exchangeId,
+    channelId,
+    remoteNodeId,
+    startTime: Date.now(),
+    completed: false
+  };
+  
+  try {
+    // 创建量子纠缠
+    const entanglementId = await quantum_network.createEntanglement(remoteNodeId, {
+      fidelity: 0.95
+    });
+    
+    // 执行量子密钥分发
+    const keyMaterial = await quantum_key_distribution.performQKD(
+      remoteNodeId,
+      entanglementId,
+      {
+        keyLength: SecureChannelConfig.minQuantumKeyLength,
+        algorithm: "BB84-E91-HYBRID"
+      }
+    );
+    
+    // 缓存密钥
+    SecureChannelState.keyCache[remoteNodeId] = {
+      material: keyMaterial,
+      generated: Date.now(),
+      expires: Date.now() + SecureChannelConfig.keyRefreshInterval
+    };
+    
+    // 更新密钥交换状态
+    SecureChannelState.activeKeyExchanges[exchangeId].completed = true;
+    delete SecureChannelState.activeKeyExchanges[exchangeId];
+    
+    return keyMaterial;
+  } catch (error) {
+    // 删除密钥交换记录
+    delete SecureChannelState.activeKeyExchanges[exchangeId];
+    
+    logger.error(`[安全通道] 量子密钥交换失败: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * 执行混合密钥交换
+ */
+async function performHybridKeyExchange(channelId, remoteNodeId) {
+  // 执行量子和经典密钥交换
+  const quantumKey = await performQuantumKeyExchange(channelId, remoteNodeId);
+  const classicalKey = await performClassicalKeyExchange(channelId, remoteNodeId);
+  
+  // 混合密钥材料
+  return crypto.combineKeyMaterial(quantumKey, classicalKey);
+}
+
+/**
+ * 执行经典密钥交换
+ */
+async function performClassicalKeyExchange(channelId, remoteNodeId) {
+  // 模拟经典密钥交换
+  // TODO: 实现实际的经典密钥交换逻辑
+  
+  // 生成临时密钥
+  const keyMaterial = crypto.generateKeyPair(
+    SecureChannelConfig.encryption.keyExchangeAlgorithm
+  );
+  
+  return keyMaterial;
+}
+
+/**
+ * 设置通道加密参数
+ */
+function setupChannelEncryption(channelId, keyMaterial) {
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    throw new Error(`通道不存在: ${channelId}`);
+  }
+  
+  // 设置加密算法
+  let encryptionAlgorithm;
+  if (channel.type === ChannelTypes.QUANTUM_ENCRYPTED) {
+    encryptionAlgorithm = SecureChannelConfig.encryption.quantumAlgorithm;
+  } else if (channel.type === ChannelTypes.HYBRID_ENCRYPTED) {
+    encryptionAlgorithm = `${SecureChannelConfig.encryption.quantumAlgorithm}+${SecureChannelConfig.encryption.classicalAlgorithm}`;
+  } else {
+    encryptionAlgorithm = SecureChannelConfig.encryption.classicalAlgorithm;
+  }
+  
+  // 更新通道安全参数
+  channel.security = {
+    encryptionAlgorithm,
+    keyExchangeAlgorithm: SecureChannelConfig.encryption.keyExchangeAlgorithm,
+    keyLength: keyMaterial.keyLength || SecureChannelConfig.minQuantumKeyLength,
+    cipherSuite: SecureChannelConfig.security.allowedCipherSuites[0],
+    forwardSecrecy: SecureChannelConfig.security.perfectForwardSecrecy
+  };
+  
+  // 创建会话
+  const sessionId = `SESSION-${channelId}-${Date.now()}`;
+  SecureChannelState.sessionCache[sessionId] = {
+    id: sessionId,
+    channelId,
+    keyMaterial,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + SecureChannelConfig.maxSessionLifetime,
+    active: true
+  };
+  
+  // 关联会话到通道
+  channel.sessionId = sessionId;
+}
+
+/**
+ * 加密消息
+ */
+function encryptMessage(channelId, message) {
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    throw new Error(`通道不存在: ${channelId}`);
+  }
+  
+  const session = SecureChannelState.sessionCache[channel.sessionId];
+  if (!session) {
+    throw new Error(`会话不存在: ${channel.sessionId}`);
+  }
+  
+  // 序列化消息
+  const messageData = JSON.stringify(message);
+  
+  // 加密消息
+  const encrypted = crypto.encrypt(
+    messageData,
+    session.keyMaterial.key,
+    {
+      algorithm: channel.security.encryptionAlgorithm,
+      associatedData: channelId // 绑定到通道ID
+    }
+  );
+  
+  return encrypted;
+}
+
+/**
+ * 解密消息
+ */
+function decryptMessage(channelId, encryptedMessage) {
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    throw new Error(`通道不存在: ${channelId}`);
+  }
+  
+  const session = SecureChannelState.sessionCache[channel.sessionId];
+  if (!session) {
+    throw new Error(`会话不存在: ${channel.sessionId}`);
+  }
+  
+  // 解密消息
+  const decrypted = crypto.decrypt(
+    encryptedMessage,
+    session.keyMaterial.key,
+    {
+      algorithm: channel.security.encryptionAlgorithm,
+      associatedData: channelId // 验证通道ID
+    }
+  );
+  
+  // 解析消息
+  return JSON.parse(decrypted);
+}
+
+/**
+ * 发送通道关闭通知
+ */
+function sendCloseNotification(channelId) {
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    return;
+  }
+  
+  try {
+    // 发送关闭通知
+    const closeMessage = {
+      type: "channel_close",
+      channelId,
+      timestamp: Date.now()
+    };
+    
+    // 加密消息
+    const encryptedMessage = encryptMessage(channelId, closeMessage);
+    
+    // 发送消息（不等待响应）
+    quantum_network.sendQuantumState(
+      channel.remoteNodeId,
+      { type: "secure_message", content: encryptedMessage },
+      { priority: "high" }
+    ).catch(error => {
+      logger.warn(`[安全通道] 发送关闭通知失败: ${error.message}`);
+    });
+  } catch (error) {
+    logger.warn(`[安全通道] 发送关闭通知失败: ${error.message}`);
+  }
+}
+
+/**
+ * 清理通道资源
+ */
+function cleanupChannelResources(channelId) {
+  const channel = SecureChannelState.activeChannels[channelId];
+  if (!channel) {
+    return;
+  }
+  
+  // 清理会话
+  if (channel.sessionId && SecureChannelState.sessionCache[channel.sessionId]) {
+    SecureChannelState.sessionCache[channel.sessionId].active = false;
+  }
+  
+  // 清理其他资源
+  // TODO: 实现其他资源清理
+}
+
+/**
+ * 清理过期会话
+ */
+function cleanupExpiredSessions() {
+  logger.debug("[安全通道] 清理过期会话");
+  
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const sessionId in SecureChannelState.sessionCache) {
+    const session = SecureChannelState.sessionCache[sessionId];
+    
+    // 检查会话是否过期
+    if (!session.active || now > session.expiresAt) {
+      delete SecureChannelState.sessionCache[sessionId];
+      cleanedCount++;
+    }
+  }
+  
+  // 限制会话缓存大小
+  if (Object.keys(SecureChannelState.sessionCache).length > SecureChannelConfig.sessionCacheSize) {
+    // 按创建时间排序
+    const sortedSessions = Object.values(SecureChannelState.sessionCache).sort(
+      (a, b) => a.createdAt - b.createdAt
+    );
+    
+    // 移除最旧的会话
+    const toRemove = sortedSessions.length - SecureChannelConfig.sessionCacheSize;
+    for (let i = 0; i < toRemove; i++) {
+      delete SecureChannelState.sessionCache[sortedSessions[i].id];
+      cleanedCount++;
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    logger.debug(`[安全通道] 已清理 ${cleanedCount} 个过期或最旧会话`);
+  }
+}
+
+/**
+ * 刷新所有通道密钥
+ */
+function refreshAllKeys() {
+  logger.debug("[安全通道] 刷新所有通道密钥");
+  
+  for (const channelId in SecureChannelState.activeChannels) {
+    const channel = SecureChannelState.activeChannels[channelId];
+    
+    // 仅刷新开放通道
+    if (channel.status === ChannelStatus.OPEN) {
+      refreshChannelKey(channelId).catch(error => {
+        logger.warn(`[安全通道] 自动刷新通道密钥失败: ${channelId}, 错误: ${error.message}`);
+      });
+    }
+  }
+}
+
+/**
+ * 获取消息大小（字节）
+ */
+function getMessageSize(message) {
+  return JSON.stringify(message).length;
+}
+
+/**
+ * 检查错误是否会导致通道降级
+ */
+function isChannelDegradingError(error) {
+  // TODO: 实现更复杂的错误分析
+  const degradingErrors = [
+    "密钥交换失败",
+    "加密失败",
+    "解密失败",
+    "认证失败",
+    "完整性检查失败"
+  ];
+  
+  return degradingErrors.some(err => error.message.includes(err));
+}
+
+/**
+ * 触发事件
+ */
+function triggerEvent(eventName, eventData) {
+  if (!SecureChannelState.eventListeners[eventName]) {
+    return;
+  }
+  
+  for (const listener of SecureChannelState.eventListeners[eventName]) {
+    try {
+      listener(eventData);
+    } catch (e) {
+      logger.warn(`[安全通道] 事件监听器执行失败: ${e.message}`);
+    }
+  }
+}
+
+// 导出安全通道服务模块
+export default {
+  initialize,
+  openChannel,
+  closeChannel,
+  sendSecureMessage,
+  receiveSecureMessage,
+  refreshChannelKey,
+  getChannelInfo,
+  addEventListener,
+  removeEventListener,
+  getStatus,
+  ChannelTypes,
+  ChannelStatus
+}; 

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QSM量子翻译 + 量子电路</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Courier New',monospace;background:#0a0a1a;color:#e0e0ff;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a0030,#0a1a3a);padding:20px;text-align:center;border-bottom:1px solid #3030ff}
+.header h1{font-size:1.5em;color:#8080ff}
+.main{max-width:800px;margin:15px auto;padding:0 15px}
+.tabs{display:flex;gap:0;margin-bottom:15px}
+.tab{padding:10px 20px;background:#111128;border:1px solid #3030ff;cursor:pointer;color:#6060c0;font-family:inherit;font-size:0.85em}
+.tab.active{background:#1a1a3a;color:#8080ff;border-bottom:none}
+.tab:first-child{border-radius:8px 0 0 0}.tab:last-child{border-radius:0 8px 0 0}
+.box{background:#111128;border:1px solid #3030ff;border-radius:0 8px 8px 8px;overflow:hidden}
+.box-header{background:#1a1a3a;padding:10px 15px;color:#8080ff;font-size:0.85em}
+.input-area{padding:15px}
+textarea{width:100%;min-height:80px;background:transparent;color:#e0e0ff;border:1px solid #3030ff;border-radius:4px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;outline:none}
+.btn-row{padding:0 15px 15px;display:flex;gap:8px;flex-wrap:wrap}
+button{background:#4040ff;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.85em}
+button:hover{background:#5050ff}
+.output{padding:15px;min-height:60px;white-space:pre-wrap;font-size:13px;color:#a0ffa0}
+.panel{display:none}.panel.active{display:block}
+.gate-grid{display:flex;flex-wrap:wrap;gap:8px;padding:15px}
+.gate-btn{background:#2020c0;border:1px solid #4040ff;border-radius:4px;padding:6px 12px;color:#a0a0ff;cursor:pointer;font-family:inherit;font-size:0.85em}
+.gate-btn:hover{background:#3030ff;color:#fff}
+.circuit-display{padding:10px 15px;font-size:0.85em;color:#6060c0;min-height:30px;border-top:1px solid #2020c0}
+.info{font-size:0.75em;color:#4040c0;text-align:center;padding:10px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚛ QSM 量子翻译 + 量子电路</h1>
+  <div style="color:#6060c0;font-size:0.8em">彝文·中文·英文翻译 | 量子门·测量·Bell态 | <a href="/" style="color:#8080ff">首页</a></div>
+</div>
+<div class="main">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('translate')">🌐 翻译</div>
+    <div class="tab" onclick="switchTab('qentl')">⚙ QEntL</div>
+    <div class="tab" onclick="switchTab('quantum')">⚛ 量子电路</div>
+  </div>
+  <div class="box">
+    <!-- 翻译面板 -->
+    <div class="panel active" id="panel-translate">
+      <div class="box-header">📝 输入文本 (中文/彝文/英文)</div>
+      <div class="input-area">
+        <textarea id="translate-input" placeholder="输入要翻译的文本...">你好</textarea>
+      </div>
+      <div class="btn-row">
+        <button onclick="doTranslate()">⚛ 量子翻译</button>
+      </div>
+      <div class="output" id="translate-output">等待翻译...</div>
+    </div>
+    <!-- QEntL面板 -->
+    <div class="panel" id="panel-qentl">
+      <div class="box-header">⚙ QEntL量子编程</div>
+      <div class="input-area">
+        <textarea id="qentl-input" placeholder="编写QEntL代码...">quantum_program 测试 {
+    setup: 函数() {
+        量子门 H 0
+        量子门 CNOT 0 1
+        测量 0
+        测量 1
+        LOG("Bell态测量完成!")
+    }
+}</textarea>
+      </div>
+      <div class="btn-row">
+        <button onclick="doCompile()">▶ 编译执行</button>
+      </div>
+      <div class="output" id="qentl-output">等待编译...</div>
+    </div>
+    <!-- 量子电路面板 -->
+    <div class="panel" id="panel-quantum">
+      <div class="box-header">⚛ 量子门构建器</div>
+      <div class="gate-grid">
+        <div class="gate-btn" onclick="addGate('H')">H</div>
+        <div class="gate-btn" onclick="addGate('X')">X</div>
+        <div class="gate-btn" onclick="addGate('Y')">Y</div>
+        <div class="gate-btn" onclick="addGate('Z')">Z</div>
+        <div class="gate-btn" onclick="addGate('S')">S</div>
+        <div class="gate-btn" onclick="addGate('T')">T</div>
+        <div class="gate-btn" onclick="addGate('RX')">RX</div>
+        <div class="gate-btn" onclick="addGate('RZ')">RZ</div>
+        <div class="gate-btn" onclick="addGate('CNOT')">CNOT</div>
+        <div class="gate-btn" onclick="addMeasure()">📏测量</div>
+        <div class="gate-btn" onclick="addEntangle()">🔗纠缠</div>
+        <div class="gate-btn" onclick="presetBell()">⚡Bell</div>
+        <div class="gate-btn" onclick="clearCircuit()">🗑清空</div>
+      </div>
+      <div class="circuit-display" id="circuit-display">电路: (空)</div>
+      <div class="btn-row">
+        <button onclick="runCircuit()">▶ 执行电路</button>
+        <span style="color:#6060c0;font-size:0.8em;line-height:32px">比特数:</span>
+        <input type="number" id="n-qubits" value="2" min="1" max="8" style="width:50px;background:#0a0a20;color:#e0e0ff;border:1px solid #3030ff;border-radius:4px;padding:4px;text-align:center">
+      </div>
+      <div class="output" id="quantum-output">构建量子电路并执行...</div>
+    </div>
+  </div>
+</div>
+<div class="info">QSM V4 · 5.7M · Val 1.47 · Beam Search · <a href="/api-docs.html" style="color:#5050ff">API文档</a></div>
+<script>
+let gates=[];
+function switchTab(name){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));event.target.classList.add('active');document.getElementById('panel-'+name).classList.add('active')}
+async function doTranslate(){const t=document.getElementById('translate-input').value;const o=document.getElementById('translate-output');o.textContent='翻译中...';try{const r=await fetch('/api/qv4/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});const d=await r.json();o.textContent=d.translation||d.error||'无结果'}catch(e){o.textContent='错误:'+e.message}}
+async function doCompile(){const s=document.getElementById('qentl-input').value;const o=document.getElementById('qentl-output');o.textContent='编译中...';try{const r=await fetch('/api/qv4/compile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:s})});const d=await r.json();o.textContent=d.success?'✅ 编译成功!\n指令数: '+d.instructions_count+'\n函数: '+JSON.stringify(d.functions)+'\n\nQBC:\n'+JSON.stringify(d.qbc,null,2).substring(0,500):'❌ '+d.error}catch(e){o.textContent='错误:'+e.message}}
+function addGate(name){gates.push({name,target:0});updateCircuit()}
+function addMeasure(){gates.push({name:'M',type:'measure',target:0});updateCircuit()}
+function presetBell(){gates=[{name:'H',target:0},{name:'CNOT',control:0,target:1},{name:'M',type:'measure',target:0},{name:'M',type:'measure',target:1}];updateCircuit()}
+function addEntangle(){gates.push({name:'ENTANGLE',control:0,target:1});updateCircuit()}
+function clearCircuit(){gates=[];updateCircuit()}
+function updateCircuit(){const d=document.getElementById('circuit-display');if(!gates.length){d.textContent='电路: (空)';return}d.textContent='电路: '+gates.map(g=>g.name==='CNOT'||g.name==='ENTANGLE'?g.name+'('+g.control+','+g.target+')':g.name==='M'?'M('+g.target+')':g.name+'('+g.target+')').join(' → ')}
+async function runCircuit(){const o=document.getElementById('quantum-output');o.textContent='执行中...';const nq=parseInt(document.getElementById('n-qubits').value)||2;const gateList=gates.filter(g=>g.name!=='M').map(g=>(g.name==='CNOT'||g.name==='ENTANGLE')?{name:'CNOT',control:g.control||0,target:g.target||1}:{name:g.name,target:g.target||0});try{const r=await fetch('/api/qv4/quantum',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({gates:gateList,qubits:nq})});const d=await r.json();o.textContent=d.success?'✅ 执行成功!\n量子态: '+d.quantum_state+'\n输出: '+(d.output||[]).join(', '):'❌ '+d.error}catch(e){o.textContent='错误:'+e.message}}
+</script>
+</body>
+</html>

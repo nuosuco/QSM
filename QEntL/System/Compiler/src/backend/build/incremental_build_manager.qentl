@@ -1,0 +1,1493 @@
+/**
+ * @file incremental_build_manager.qentl
+ * @brief QEntL增量编译管理器
+ * 
+ * 量子基因编码: QGC-COMPILER-INCRBUILD-2024061903
+ * 量子纠缠信道: QEC-COMPILER-BUILD-01
+ */
+
+import "QEntL/core/string.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/set.qentl";
+import "QEntL/core/system.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/core/datetime.qentl";
+import "QEntL/compiler/src/backend/build/parallel_builder.qentl";
+import { FileSystem } from "../../../../vm/src/core/os_interface/file_system.qentl";
+import { Logger, LogLevel } from "../../../../vm/src/core/os_interface/logger.qentl";
+import { ParallelBuildScheduler } from "./parallel_build_scheduler.qentl";
+
+/**
+ * @class FileInfo
+ * @brief 文件信息，包含文件路径和修改时间
+ */
+class FileInfo {
+    public {
+        path: String;           // 文件路径
+        lastModified: Integer;  // 最后修改时间（Unix时间戳）
+        hash: String;           // 文件内容哈希值
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param path 文件路径
+     */
+    constructor(path: String) {
+        this.path = path;
+        this.update();
+    }
+    
+    /**
+     * @brief 更新文件信息
+     */
+    public function update(): void {
+        if (File.exists(this.path)) {
+            this.lastModified = File.getLastModifiedTime(this.path);
+            this.hash = this.calculateHash();
+        } else {
+            this.lastModified = 0;
+            this.hash = "";
+        }
+    }
+    
+    /**
+     * @brief 计算文件内容哈希值
+     * @return 哈希值
+     */
+    private function calculateHash(): String {
+        // 简单实现：使用文件内容的简化哈希算法
+        let content = File.readTextFile(this.path);
+        let hash = 0;
+        
+        for (let i = 0; i < content.length; i++) {
+            let char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // 转换为32位整数
+        }
+        
+        return hash.toString(16);
+    }
+    
+    /**
+     * @brief 检查文件是否已修改
+     * @param oldInfo 旧的文件信息
+     * @return 是否已修改
+     */
+    public function isModified(oldInfo: FileInfo): Boolean {
+        // 如果修改时间不同，则可能已修改
+        if (this.lastModified != oldInfo.lastModified) {
+            // 通过哈希值进一步确认是否真的修改了内容
+            return this.hash != oldInfo.hash;
+        }
+        return false;
+    }
+}
+
+/**
+ * @class DependencyGraph
+ * @brief 依赖图，表示文件之间的依赖关系
+ */
+class DependencyGraph {
+    private {
+        // 文件依赖关系：key为文件路径，value为直接依赖的文件路径数组
+        dependencies: Map<String, Array<String>>;
+        
+        // 反向依赖关系：key为文件路径，value为直接依赖于它的文件路径数组
+        reverseDependencies: Map<String, Array<String>>;
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.dependencies = new Map<String, Array<String>>();
+        this.reverseDependencies = new Map<String, Array<String>>();
+    }
+    
+    /**
+     * @brief 添加依赖关系
+     * @param source 源文件路径
+     * @param target 目标文件路径（被依赖的文件）
+     */
+    public function addDependency(source: String, target: String): void {
+        // 添加正向依赖
+        if (!this.dependencies.containsKey(source)) {
+            this.dependencies.set(source, new Array<String>());
+        }
+        let deps = this.dependencies.get(source);
+        if (!deps.contains(target)) {
+            deps.push(target);
+        }
+        
+        // 添加反向依赖
+        if (!this.reverseDependencies.containsKey(target)) {
+            this.reverseDependencies.set(target, new Array<String>());
+        }
+        let revDeps = this.reverseDependencies.get(target);
+        if (!revDeps.contains(source)) {
+            revDeps.push(source);
+        }
+    }
+    
+    /**
+     * @brief 删除文件及其依赖关系
+     * @param file 文件路径
+     */
+    public function removeFile(file: String): void {
+        // 移除正向依赖
+        if (this.dependencies.containsKey(file)) {
+            let deps = this.dependencies.get(file);
+            for (let i = 0; i < deps.length; i++) {
+                let target = deps[i];
+                // 更新目标文件的反向依赖
+                if (this.reverseDependencies.containsKey(target)) {
+                    let revDeps = this.reverseDependencies.get(target);
+                    let index = revDeps.indexOf(file);
+                    if (index >= 0) {
+                        revDeps.removeAt(index);
+                    }
+                }
+            }
+            this.dependencies.remove(file);
+        }
+        
+        // 移除反向依赖
+        if (this.reverseDependencies.containsKey(file)) {
+            let revDeps = this.reverseDependencies.get(file);
+            for (let i = 0; i < revDeps.length; i++) {
+                let source = revDeps[i];
+                // 更新源文件的正向依赖
+                if (this.dependencies.containsKey(source)) {
+                    let deps = this.dependencies.get(source);
+                    let index = deps.indexOf(file);
+                    if (index >= 0) {
+                        deps.removeAt(index);
+                    }
+                }
+            }
+            this.reverseDependencies.remove(file);
+        }
+    }
+    
+    /**
+     * @brief 获取文件的所有依赖（递归）
+     * @param file 文件路径
+     * @return 依赖文件路径的集合
+     */
+    public function getAllDependencies(file: String): Set<String> {
+        let result = new Set<String>();
+        this.collectDependencies(file, result);
+        return result;
+    }
+    
+    /**
+     * @brief 递归收集依赖
+     * @param file 当前文件
+     * @param result 结果集合
+     */
+    private function collectDependencies(file: String, result: Set<String>): void {
+        if (!this.dependencies.containsKey(file)) {
+            return;
+        }
+        
+        let deps = this.dependencies.get(file);
+        for (let i = 0; i < deps.length; i++) {
+            let dep = deps[i];
+            if (!result.contains(dep)) {
+                result.add(dep);
+                this.collectDependencies(dep, result);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取依赖于指定文件的所有文件（递归）
+     * @param file 文件路径
+     * @return 依赖于该文件的文件路径集合
+     */
+    public function getAllDependents(file: String): Set<String> {
+        let result = new Set<String>();
+        this.collectDependents(file, result);
+        return result;
+    }
+    
+    /**
+     * @brief 递归收集依赖于指定文件的所有文件
+     * @param file 当前文件
+     * @param result 结果集合
+     */
+    private function collectDependents(file: String, result: Set<String>): void {
+        if (!this.reverseDependencies.containsKey(file)) {
+            return;
+        }
+        
+        let revDeps = this.reverseDependencies.get(file);
+        for (let i = 0; i < revDeps.length; i++) {
+            let dep = revDeps[i];
+            if (!result.contains(dep)) {
+                result.add(dep);
+                this.collectDependents(dep, result);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取依赖图的节点（所有文件）
+     * @return 文件路径集合
+     */
+    public function getNodes(): Set<String> {
+        let result = new Set<String>();
+        
+        // 添加所有依赖源文件
+        let sources = this.dependencies.keys();
+        for (let i = 0; i < sources.length; i++) {
+            result.add(sources[i]);
+        }
+        
+        // 添加所有被依赖文件
+        let targets = this.reverseDependencies.keys();
+        for (let i = 0; i < targets.length; i++) {
+            result.add(targets[i]);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取文件的直接依赖
+     * @param file 文件路径
+     * @return 直接依赖的文件路径数组
+     */
+    public function getDirectDependencies(file: String): Array<String> {
+        if (this.dependencies.containsKey(file)) {
+            return this.dependencies.get(file).clone();
+        }
+        return new Array<String>();
+    }
+    
+    /**
+     * @brief 获取直接依赖于文件的文件
+     * @param file 文件路径
+     * @return 直接依赖于该文件的文件路径数组
+     */
+    public function getDirectDependents(file: String): Array<String> {
+        if (this.reverseDependencies.containsKey(file)) {
+            return this.reverseDependencies.get(file).clone();
+        }
+        return new Array<String>();
+    }
+    
+    /**
+     * @brief 保存依赖图到文件
+     * @param filename 文件名
+     */
+    public function saveToFile(filename: String): void {
+        let content = "{\n";
+        content += "  \"dependencies\": {\n";
+        
+        let sources = this.dependencies.keys();
+        for (let i = 0; i < sources.length; i++) {
+            let source = sources[i];
+            let deps = this.dependencies.get(source);
+            
+            content += "    \"" + source + "\": [";
+            for (let j = 0; j < deps.length; j++) {
+                content += "\"" + deps[j] + "\"";
+                if (j < deps.length - 1) {
+                    content += ", ";
+                }
+            }
+            content += "]";
+            
+            if (i < sources.length - 1) {
+                content += ",";
+            }
+            content += "\n";
+        }
+        
+        content += "  }\n";
+        content += "}";
+        
+        File.writeTextFile(filename, content);
+    }
+    
+    /**
+     * @brief 从文件加载依赖图
+     * @param filename 文件名
+     */
+    public function loadFromFile(filename: String): void {
+        // 由于QEntL语言限制，简化实现
+        if (!File.exists(filename)) {
+            return;
+        }
+        
+        // 这里应该有更完善的JSON解析逻辑
+        // 但由于QEntL语言限制，暂时不实现
+        System.println("警告: 从文件加载依赖图的功能暂未完全实现");
+    }
+    
+    /**
+     * @brief 清空依赖图
+     */
+    public function clear(): void {
+        this.dependencies.clear();
+        this.reverseDependencies.clear();
+    }
+}
+
+/**
+ * @class BuildCache
+ * @brief 构建缓存，记录上次构建的文件信息和依赖关系
+ */
+class BuildCache {
+    private {
+        fileInfos: Map<String, FileInfo>;      // 文件信息映射
+        dependencyGraph: DependencyGraph;      // 依赖图
+        cacheFile: String;                     // 缓存文件路径
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param cacheFile 缓存文件路径
+     */
+    constructor(cacheFile: String) {
+        this.fileInfos = new Map<String, FileInfo>();
+        this.dependencyGraph = new DependencyGraph();
+        this.cacheFile = cacheFile;
+    }
+    
+    /**
+     * @brief 添加或更新文件信息
+     * @param file 文件路径
+     */
+    public function updateFileInfo(file: String): void {
+        let fileInfo = new FileInfo(file);
+        this.fileInfos.set(file, fileInfo);
+    }
+    
+    /**
+     * @brief 添加依赖关系
+     * @param source 源文件路径
+     * @param target 目标文件路径（被依赖的文件）
+     */
+    public function addDependency(source: String, target: String): void {
+        this.dependencyGraph.addDependency(source, target);
+        
+        // 确保这些文件在缓存中
+        if (!this.fileInfos.containsKey(source)) {
+            this.updateFileInfo(source);
+        }
+        if (!this.fileInfos.containsKey(target)) {
+            this.updateFileInfo(target);
+        }
+    }
+    
+    /**
+     * @brief 检查文件是否已修改
+     * @param file 文件路径
+     * @return 是否已修改
+     */
+    public function isFileModified(file: String): Boolean {
+        if (!this.fileInfos.containsKey(file)) {
+            return true; // 如果缓存中没有，认为是新文件
+        }
+        
+        let oldInfo = this.fileInfos.get(file);
+        let newInfo = new FileInfo(file);
+        
+        return newInfo.isModified(oldInfo);
+    }
+    
+    /**
+     * @brief 获取需要重新构建的文件
+     * @param sourceFiles 源文件列表
+     * @return 需要重新构建的文件集合
+     */
+    public function getFilesToRebuild(sourceFiles: Array<String>): Set<String> {
+        let result = new Set<String>();
+        
+        // 检查每个源文件
+        for (let i = 0; i < sourceFiles.length; i++) {
+            let file = sourceFiles[i];
+            
+            // 如果文件已修改，添加它和所有依赖它的文件
+            if (this.isFileModified(file)) {
+                result.add(file);
+                
+                let dependents = this.dependencyGraph.getAllDependents(file);
+                let allDeps = dependents.toArray();
+                for (let j = 0; j < allDeps.length; j++) {
+                    result.add(allDeps[j]);
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 从文件系统中移除不存在的文件
+     */
+    public function cleanMissingFiles(): void {
+        let files = this.fileInfos.keys();
+        let filesToRemove = new Array<String>();
+        
+        for (let i = 0; i < files.length; i++) {
+            let file = files[i];
+            if (!File.exists(file)) {
+                filesToRemove.push(file);
+            }
+        }
+        
+        for (let i = 0; i < filesToRemove.length; i++) {
+            let file = filesToRemove[i];
+            this.fileInfos.remove(file);
+            this.dependencyGraph.removeFile(file);
+        }
+    }
+    
+    /**
+     * @brief 获取依赖图
+     * @return 依赖图
+     */
+    public function getDependencyGraph(): DependencyGraph {
+        return this.dependencyGraph;
+    }
+    
+    /**
+     * @brief 保存缓存到文件
+     */
+    public function save(): void {
+        // 保存依赖图
+        let depGraphFile = Path.getDirectoryName(this.cacheFile) + "/dependency_graph.json";
+        this.dependencyGraph.saveToFile(depGraphFile);
+        
+        // 保存文件信息
+        let content = "{\n";
+        content += "  \"fileInfos\": {\n";
+        
+        let files = this.fileInfos.keys();
+        for (let i = 0; i < files.length; i++) {
+            let file = files[i];
+            let info = this.fileInfos.get(file);
+            
+            content += "    \"" + file + "\": {\n";
+            content += "      \"lastModified\": " + info.lastModified + ",\n";
+            content += "      \"hash\": \"" + info.hash + "\"\n";
+            content += "    }";
+            
+            if (i < files.length - 1) {
+                content += ",";
+            }
+            content += "\n";
+        }
+        
+        content += "  },\n";
+        content += "  \"dependencyGraphFile\": \"" + depGraphFile + "\"\n";
+        content += "}";
+        
+        File.writeTextFile(this.cacheFile, content);
+    }
+    
+    /**
+     * @brief 从文件加载缓存
+     */
+    public function load(): void {
+        if (!File.exists(this.cacheFile)) {
+            return;
+        }
+        
+        // 由于QEntL语言限制，简化实现
+        System.println("警告: 从文件加载缓存的功能暂未完全实现");
+    }
+    
+    /**
+     * @brief 清空缓存
+     */
+    public function clear(): void {
+        this.fileInfos.clear();
+        this.dependencyGraph.clear();
+    }
+}
+
+/**
+ * @class IncrementalBuildManager
+ * @brief 增量构建管理器
+ */
+class IncrementalBuildManager {
+    private {
+        sourceDir: String;            // 源代码目录
+        outputDir: String;            // 输出目录
+        buildCache: BuildCache;       // 构建缓存
+        parallelBuilder: ParallelBuilder; // 并行构建器
+        includeDirs: Array<String>;   // 包含目录
+        sourceFiles: Array<String>;   // 源文件列表
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param sourceDir 源代码目录
+     * @param outputDir 输出目录
+     * @param cacheDir 缓存目录
+     */
+    constructor(sourceDir: String, outputDir: String, cacheDir: String) {
+        this.sourceDir = sourceDir;
+        this.outputDir = outputDir;
+        this.includeDirs = new Array<String>();
+        this.sourceFiles = new Array<String>();
+        
+        // 确保缓存目录存在
+        if (!File.exists(cacheDir)) {
+            File.createDirectory(cacheDir);
+        }
+        
+        let cacheFile = cacheDir + "/build_cache.json";
+        this.buildCache = new BuildCache(cacheFile);
+        
+        // 创建并行构建器
+        this.parallelBuilder = new ParallelBuilder();
+    }
+    
+    /**
+     * @brief 添加包含目录
+     * @param dir 包含目录路径
+     */
+    public function addIncludeDir(dir: String): void {
+        if (!this.includeDirs.contains(dir)) {
+            this.includeDirs.push(dir);
+        }
+    }
+    
+    /**
+     * @brief 添加源文件
+     * @param file 源文件路径
+     */
+    public function addSourceFile(file: String): void {
+        if (!this.sourceFiles.contains(file)) {
+            this.sourceFiles.push(file);
+        }
+    }
+    
+    /**
+     * @brief 添加源文件目录（递归）
+     * @param dir 源文件目录
+     * @param extension 文件扩展名筛选，例如 ".qentl"
+     */
+    public function addSourceDir(dir: String, extension: String): void {
+        if (!File.exists(dir)) {
+            System.println("警告: 目录不存在: " + dir);
+            return;
+        }
+        
+        let files = File.listFiles(dir, true);
+        for (let i = 0; i < files.length; i++) {
+            let file = files[i];
+            if (file.endsWith(extension)) {
+                this.addSourceFile(file);
+            }
+        }
+    }
+    
+    /**
+     * @brief 分析源文件依赖
+     * @param file 源文件路径
+     */
+    public function analyzeDependencies(file: String): void {
+        if (!File.exists(file)) {
+            return;
+        }
+        
+        // 读取文件内容
+        let content = File.readTextFile(file);
+        
+        // 分析导入语句
+        // 这里使用简单的字符串匹配，真实实现应该使用更复杂的解析
+        let lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            
+            // 寻找import语句
+            if (line.startsWith("import ")) {
+                let importPath = this.extractImportPath(line);
+                if (importPath != "") {
+                    // 解析导入路径为实际文件路径
+                    let dependencyFile = this.resolveImportPath(importPath);
+                    if (dependencyFile != "") {
+                        // 添加依赖关系
+                        this.buildCache.addDependency(file, dependencyFile);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 从import语句中提取路径
+     * @param importLine import语句
+     * @return 导入路径字符串
+     */
+    private function extractImportPath(importLine: String): String {
+        // 匹配双引号中的内容
+        let startIndex = importLine.indexOf('"');
+        if (startIndex == -1) {
+            return "";
+        }
+        
+        let endIndex = importLine.indexOf('"', startIndex + 1);
+        if (endIndex == -1) {
+            return "";
+        }
+        
+        return importLine.substring(startIndex + 1, endIndex);
+    }
+    
+    /**
+     * @brief 解析导入路径为实际文件路径
+     * @param importPath 导入路径
+     * @return 实际文件路径
+     */
+    private function resolveImportPath(importPath: String): String {
+        // 首先检查是否是相对路径
+        if (importPath.startsWith("./") || importPath.startsWith("../")) {
+            // 相对于当前文件的路径
+            // 由于无法获取当前处理的文件目录，这里简化实现
+            return "";
+        }
+        
+        // 在包含目录中查找
+        for (let i = 0; i < this.includeDirs.length; i++) {
+            let fullPath = this.includeDirs[i] + "/" + importPath;
+            if (File.exists(fullPath)) {
+                return fullPath;
+            }
+        }
+        
+        return "";
+    }
+    
+    /**
+     * @brief 准备增量构建
+     */
+    public function prepareIncrementalBuild(): void {
+        // 加载缓存
+        this.buildCache.load();
+        
+        // 清理不存在的文件
+        this.buildCache.cleanMissingFiles();
+        
+        // 分析所有源文件的依赖
+        for (let i = 0; i < this.sourceFiles.length; i++) {
+            this.analyzeDependencies(this.sourceFiles[i]);
+        }
+    }
+    
+    /**
+     * @brief 执行增量构建
+     * @param maxWorkers 最大工作线程数
+     * @return 是否成功完成构建
+     */
+    public function build(maxWorkers: Integer): Boolean {
+        // 准备增量构建
+        this.prepareIncrementalBuild();
+        
+        // 获取需要重新构建的文件
+        let filesToRebuild = this.buildCache.getFilesToRebuild(this.sourceFiles);
+        
+        if (filesToRebuild.size() == 0) {
+            System.println("没有文件需要重新构建");
+            return true;
+        }
+        
+        System.println("需要重新构建的文件数量: " + filesToRebuild.size());
+        
+        // 准备任务
+        let filesToRebuildArray = filesToRebuild.toArray();
+        
+        // 获取依赖图
+        let depGraph = this.buildCache.getDependencyGraph();
+        
+        // 配置并行构建器
+        this.parallelBuilder.setMaxWorkers(maxWorkers);
+        
+        // 创建编译任务
+        for (let i = 0; i < filesToRebuildArray.length; i++) {
+            let sourceFile = filesToRebuildArray[i];
+            let outputFile = this.getOutputFilePath(sourceFile);
+            
+            let taskId = this.parallelBuilder.createTask(sourceFile, outputFile);
+            
+            // 添加依赖
+            let dependencies = depGraph.getDirectDependencies(sourceFile);
+            for (let j = 0; j < dependencies.length; j++) {
+                let dependency = dependencies[j];
+                // 如果依赖项也需要重新构建，则建立任务依赖关系
+                if (filesToRebuild.contains(dependency)) {
+                    let depTaskId = this.parallelBuilder.getTaskId(dependency);
+                    if (depTaskId != -1) {
+                        this.parallelBuilder.addTaskDependency(taskId, depTaskId);
+                    }
+                }
+            }
+        }
+        
+        // 执行构建
+        let success = this.parallelBuilder.runBuild();
+        
+        // 更新缓存
+        if (success) {
+            for (let i = 0; i < filesToRebuildArray.length; i++) {
+                this.buildCache.updateFileInfo(filesToRebuildArray[i]);
+            }
+            this.buildCache.save();
+        }
+        
+        return success;
+    }
+    
+    /**
+     * @brief 获取输出文件路径
+     * @param sourceFile 源文件路径
+     * @return 输出文件路径
+     */
+    private function getOutputFilePath(sourceFile: String): String {
+        // 移除源目录前缀
+        let relativePath = sourceFile;
+        if (sourceFile.startsWith(this.sourceDir)) {
+            relativePath = sourceFile.substring(this.sourceDir.length);
+            // 移除开头的斜杠
+            if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
+                relativePath = relativePath.substring(1);
+            }
+        }
+        
+        // 替换扩展名为 .qobj
+        let baseName = Path.getFileNameWithoutExtension(relativePath);
+        let dirName = Path.getDirectoryName(relativePath);
+        
+        // 构建输出路径
+        let outputPath = this.outputDir;
+        if (dirName != "") {
+            outputPath += "/" + dirName;
+            
+            // 确保输出目录存在
+            if (!File.exists(outputPath)) {
+                File.createDirectory(outputPath);
+            }
+        }
+        
+        return outputPath + "/" + baseName + ".qobj";
+    }
+    
+    /**
+     * @brief 清理构建
+     */
+    public function clean(): void {
+        // 清空缓存
+        this.buildCache.clear();
+        
+        // 删除输出目录中的所有文件
+        if (File.exists(this.outputDir)) {
+            let files = File.listFiles(this.outputDir, true);
+            for (let i = 0; i < files.length; i++) {
+                File.deleteFile(files[i]);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取依赖图
+     * @return 依赖图
+     */
+    public function getDependencyGraph(): DependencyGraph {
+        return this.buildCache.getDependencyGraph();
+    }
+    
+    /**
+     * @brief 设置并行构建器的编译命令
+     * @param command 编译命令模板，可以包含 {input} 和 {output} 占位符
+     */
+    public function setCompileCommand(command: String): void {
+        this.parallelBuilder.setCompileCommand(command);
+    }
+    
+    /**
+     * @brief 获取所有源文件
+     * @return 源文件数组
+     */
+    public function getSourceFiles(): Array<String> {
+        return this.sourceFiles.clone();
+    }
+}
+
+// 文件状态枚举
+enum FileStatus {
+    UNCHANGED,  // 文件未修改
+    MODIFIED,   // 文件已修改
+    NEW,        // 新文件
+    DELETED     // 文件已删除
+}
+
+// 文件依赖信息类
+class FileDependencyInfo {
+    // 文件路径
+    private path: string;
+    
+    // 最后修改时间
+    private lastModified: number;
+    
+    // 依赖的文件列表
+    private dependencies: string[] = [];
+    
+    // 被依赖的文件列表（反向依赖）
+    private dependents: string[] = [];
+    
+    // 构造函数
+    constructor(path: string) {
+        this.path = path;
+        this.lastModified = FileSystem.getFileModifiedTime(path);
+    }
+    
+    // 获取文件路径
+    public getPath(): string {
+        return this.path;
+    }
+    
+    // 获取最后修改时间
+    public getLastModified(): number {
+        return this.lastModified;
+    }
+    
+    // 更新最后修改时间
+    public updateLastModified(): void {
+        this.lastModified = FileSystem.getFileModifiedTime(this.path);
+    }
+    
+    // 添加依赖
+    public addDependency(dependencyPath: string): void {
+        if (!this.dependencies.includes(dependencyPath)) {
+            this.dependencies.push(dependencyPath);
+        }
+    }
+    
+    // 添加反向依赖
+    public addDependent(dependentPath: string): void {
+        if (!this.dependents.includes(dependentPath)) {
+            this.dependents.push(dependentPath);
+        }
+    }
+    
+    // 获取依赖列表
+    public getDependencies(): string[] {
+        return this.dependencies;
+    }
+    
+    // 获取反向依赖列表
+    public getDependents(): string[] {
+        return this.dependents;
+    }
+    
+    // 清除依赖
+    public clearDependencies(): void {
+        this.dependencies = [];
+    }
+    
+    // 清除反向依赖
+    public clearDependents(): void {
+        this.dependents = [];
+    }
+    
+    // 检查文件是否存在
+    public exists(): boolean {
+        return FileSystem.fileExists(this.path);
+    }
+    
+    // 检查文件是否已修改
+    public isModified(): boolean {
+        const currentTime = FileSystem.getFileModifiedTime(this.path);
+        return currentTime > this.lastModified;
+    }
+}
+
+// 增量构建管理器类
+// 负责检测文件变更并管理增量编译
+// 作者：Claude
+// 版本：1.0.0
+
+export class IncrementalBuildManager {
+    // 文件依赖信息映射表
+    private fileInfoMap: Map<string, FileDependencyInfo> = new Map();
+    
+    // 源文件目录
+    private sourceDirectory: string;
+    
+    // 输出目录
+    private outputDirectory: string;
+    
+    // 并行构建调度器
+    private buildScheduler: ParallelBuildScheduler;
+    
+    // 日志器
+    private logger: Logger;
+    
+    // 扫描的文件扩展名
+    private fileExtensions: string[] = [".qentl"];
+    
+    // 依赖扫描正则表达式（用于检测import语句）
+    private dependencyScanRegex: RegExp = /import\s+(?:[\w\s,{}*]+\s+from\s+)?["']([^"']+)["'];?/g;
+    
+    // 构造函数
+    constructor(
+        sourceDirectory: string,
+        outputDirectory: string,
+        buildScheduler: ParallelBuildScheduler = new ParallelBuildScheduler(),
+        logger: Logger = new Logger()
+    ) {
+        this.sourceDirectory = sourceDirectory;
+        this.outputDirectory = outputDirectory;
+        this.buildScheduler = buildScheduler;
+        this.logger = logger;
+    }
+    
+    // 扫描源目录中的所有文件
+    public scanSourceDirectory(): void {
+        this.logger.log(LogLevel.INFO, `扫描源代码目录: ${this.sourceDirectory}`);
+        
+        const files = this.findSourceFiles(this.sourceDirectory);
+        
+        this.logger.log(LogLevel.INFO, `找到 ${files.length} 个源文件`);
+        
+        // 创建或更新文件依赖信息
+        for (const filePath of files) {
+            this.getOrCreateFileInfo(filePath);
+        }
+        
+        // 检测文件依赖关系
+        for (const filePath of files) {
+            this.detectFileDependencies(filePath);
+        }
+        
+        // 更新反向依赖关系
+        this.updateReverseDependencies();
+    }
+    
+    // 查找源文件
+    private findSourceFiles(directory: string): string[] {
+        const result: string[] = [];
+        
+        try {
+            // 获取目录中的所有文件和子目录
+            const entries = FileSystem.getDirectoryEntries(directory);
+            
+            for (const entry of entries) {
+                const entryPath = FileSystem.joinPaths(directory, entry);
+                
+                // 如果是目录，递归扫描
+                if (FileSystem.isDirectory(entryPath)) {
+                    result.push(...this.findSourceFiles(entryPath));
+                } 
+                // 如果是文件且扩展名匹配，添加到结果中
+                else if (this.hasMatchingExtension(entry)) {
+                    result.push(entryPath);
+                }
+            }
+        } catch (error) {
+            this.logger.log(LogLevel.ERROR, `扫描目录失败: ${directory}: ${error}`);
+        }
+        
+        return result;
+    }
+    
+    // 检查文件扩展名是否匹配
+    private hasMatchingExtension(filePath: string): boolean {
+        for (const ext of this.fileExtensions) {
+            if (filePath.endsWith(ext)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // 获取或创建文件依赖信息
+    private getOrCreateFileInfo(filePath: string): FileDependencyInfo {
+        let fileInfo = this.fileInfoMap.get(filePath);
+        
+        if (!fileInfo) {
+            fileInfo = new FileDependencyInfo(filePath);
+            
+            // 如果是新文件，设置状态为新增
+            fileInfo.setStatus(FileStatus.ADDED);
+            
+            this.fileInfoMap.set(filePath, fileInfo);
+            
+            this.logger.log(LogLevel.DEBUG, `新增文件: ${filePath}`);
+        } else {
+            // 更新文件信息
+            const wasUpdated = fileInfo.updateFileInfo();
+            
+            if (!wasUpdated) {
+                this.logger.log(LogLevel.WARNING, `文件可能已删除: ${filePath}`);
+            }
+        }
+        
+        return fileInfo;
+    }
+    
+    // 检测文件的依赖关系
+    private detectFileDependencies(filePath: string): void {
+        const fileInfo = this.fileInfoMap.get(filePath);
+        
+        if (!fileInfo) {
+            return;
+        }
+        
+        // 清除旧的依赖关系
+        fileInfo.clearDependencies();
+        
+        try {
+            if (FileSystem.fileExists(filePath)) {
+                const content = FileSystem.readTextFile(filePath);
+                
+                // 解析import语句
+                const dependencies = this.parseImportStatements(content, filePath);
+                
+                // 添加依赖
+                for (const depPath of dependencies) {
+                    fileInfo.addDependency(depPath);
+                    
+                    // 确保依赖文件的信息也被创建
+                    this.getOrCreateFileInfo(depPath);
+                }
+                
+                this.logger.log(LogLevel.DEBUG, `文件 ${filePath} 依赖于 ${dependencies.length} 个文件`);
+            }
+        } catch (error) {
+            this.logger.log(LogLevel.ERROR, `解析文件依赖失败: ${filePath}: ${error}`);
+        }
+    }
+    
+    // 解析import语句
+    private parseImportStatements(content: string, filePath: string): string[] {
+        const dependencies: string[] = [];
+        
+        let match;
+        while ((match = this.dependencyScanRegex.exec(content)) !== null) {
+            let importPath = match[1];
+            
+            // 解析相对路径
+            if (importPath.startsWith("./") || importPath.startsWith("../")) {
+                const baseDir = FileSystem.getDirectoryPath(filePath);
+                importPath = FileSystem.resolvePath(baseDir, importPath);
+            }
+            
+            // 如果import路径没有扩展名，添加.qentl扩展名
+            if (!this.hasMatchingExtension(importPath)) {
+                importPath += ".qentl";
+            }
+            
+            // 检查文件是否存在
+            if (FileSystem.fileExists(importPath)) {
+                dependencies.push(importPath);
+            } else {
+                this.logger.log(LogLevel.WARNING, `导入的文件不存在: ${importPath} (从 ${filePath})`);
+            }
+        }
+        
+        return dependencies;
+    }
+    
+    // 更新反向依赖关系
+    private updateReverseDependencies(): void {
+        // 清除所有反向依赖
+        for (const fileInfo of this.fileInfoMap.values()) {
+            fileInfo.clearDependents();
+        }
+        
+        // 建立反向依赖关系
+        for (const fileInfo of this.fileInfoMap.values()) {
+            const filePath = fileInfo.getFilePath();
+            
+            for (const depPath of fileInfo.getDependencies()) {
+                const depInfo = this.fileInfoMap.get(depPath);
+                
+                if (depInfo) {
+                    depInfo.addDependent(filePath);
+                }
+            }
+        }
+    }
+    
+    // 检查文件修改
+    public checkForModifications(): Map<string, FileStatus> {
+        const modifiedFiles = new Map<string, FileStatus>();
+        
+        // 检查文件是否已修改
+        for (const [filePath, fileInfo] of this.fileInfoMap.entries()) {
+            // 如果文件之前被标记为已修改，重置状态
+            if (fileInfo.getStatus() !== FileStatus.UNCHANGED) {
+                fileInfo.resetStatus();
+            }
+            
+            const oldModTime = fileInfo.getLastModifiedTime();
+            fileInfo.updateFileInfo();
+            const newModTime = fileInfo.getLastModifiedTime();
+            
+            // 文件已被修改
+            if (oldModTime !== newModTime) {
+                if (newModTime === 0) {
+                    fileInfo.setStatus(FileStatus.DELETED);
+                    modifiedFiles.set(filePath, FileStatus.DELETED);
+                } else if (oldModTime === 0) {
+                    fileInfo.setStatus(FileStatus.ADDED);
+                    modifiedFiles.set(filePath, FileStatus.ADDED);
+                } else {
+                    fileInfo.setStatus(FileStatus.MODIFIED);
+                    modifiedFiles.set(filePath, FileStatus.MODIFIED);
+                }
+            }
+        }
+        
+        return modifiedFiles;
+    }
+    
+    // 获取需要重新构建的文件列表
+    public getFilesToRebuild(): string[] {
+        const filesToRebuild: string[] = [];
+        const modifiedFiles = this.checkForModifications();
+        
+        this.logger.log(LogLevel.INFO, `检测到 ${modifiedFiles.size} 个文件已修改`);
+        
+        // 如果没有文件修改，返回空列表
+        if (modifiedFiles.size === 0) {
+            return filesToRebuild;
+        }
+        
+        // 将修改的文件添加到重建列表
+        for (const [filePath, status] of modifiedFiles.entries()) {
+            if (status !== FileStatus.DELETED) {
+                filesToRebuild.push(filePath);
+                
+                this.logger.log(LogLevel.DEBUG, `需要重建: ${filePath} (已修改)`);
+            }
+        }
+        
+        // 查找受影响的文件（依赖于修改文件的文件）
+        const affectedFiles = this.findAffectedFiles(modifiedFiles);
+        
+        // 将受影响的文件添加到重建列表
+        for (const filePath of affectedFiles) {
+            if (!filesToRebuild.includes(filePath)) {
+                filesToRebuild.push(filePath);
+                
+                this.logger.log(LogLevel.DEBUG, `需要重建: ${filePath} (受影响)`);
+            }
+        }
+        
+        return filesToRebuild;
+    }
+    
+    // 查找受影响的文件
+    private findAffectedFiles(modifiedFiles: Map<string, FileStatus>): string[] {
+        const affectedFiles: string[] = [];
+        const processed = new Set<string>();
+        
+        // 对于每个修改的文件，查找其所有反向依赖
+        for (const [filePath, status] of modifiedFiles.entries()) {
+            this.findDependentFiles(filePath, affectedFiles, processed);
+        }
+        
+        return affectedFiles;
+    }
+    
+    // 递归查找依赖于指定文件的所有文件
+    private findDependentFiles(filePath: string, result: string[], processed: Set<string>): void {
+        // 避免循环依赖
+        if (processed.has(filePath)) {
+            return;
+        }
+        
+        processed.add(filePath);
+        
+        const fileInfo = this.fileInfoMap.get(filePath);
+        
+        if (!fileInfo) {
+            return;
+        }
+        
+        // 获取所有依赖于此文件的文件
+        const dependents = fileInfo.getDependents();
+        
+        for (const depPath of dependents) {
+            // 添加到结果列表
+            if (!result.includes(depPath)) {
+                result.push(depPath);
+            }
+            
+            // 递归查找更高层的依赖
+            this.findDependentFiles(depPath, result, processed);
+        }
+    }
+    
+    // 生成构建任务
+    public generateBuildTasks(
+        filesToRebuild: string[] = [],
+        compilerPath: string = "qentl",
+        compilerOptions: string = ""
+    ): void {
+        // 如果没有指定要重建的文件，获取所有需要重建的文件
+        if (filesToRebuild.length === 0) {
+            filesToRebuild = this.getFilesToRebuild();
+        }
+        
+        // 如果没有文件需要重建，返回
+        if (filesToRebuild.length === 0) {
+            this.logger.log(LogLevel.INFO, "没有文件需要重建");
+            return;
+        }
+        
+        this.logger.log(LogLevel.INFO, `生成 ${filesToRebuild.length} 个构建任务`);
+        
+        // 清除现有构建任务
+        this.buildScheduler.clearTasks();
+        
+        // 为每个需要重建的文件创建构建任务
+        for (const filePath of filesToRebuild) {
+            const fileInfo = this.fileInfoMap.get(filePath);
+            
+            if (!fileInfo) {
+                continue;
+            }
+            
+            // 计算输出文件路径
+            let outputPath = this.calculateOutputPath(filePath);
+            
+            // 创建编译命令
+            const command = `${compilerPath} compile ${filePath} --output=${outputPath} ${compilerOptions}`;
+            
+            // 获取依赖任务ID
+            const dependencies = this.getDependencyTaskIds(fileInfo);
+            
+            // 创建任务ID
+            const taskId = `build_${this.getTaskIdFromPath(filePath)}`;
+            
+            // 添加构建任务
+            this.buildScheduler.addTask(
+                taskId,
+                filePath,
+                outputPath,
+                command,
+                dependencies
+            );
+            
+            this.logger.log(LogLevel.DEBUG, `创建构建任务: ${taskId} (${filePath} -> ${outputPath})`);
+        }
+    }
+    
+    // 计算输出文件路径
+    private calculateOutputPath(filePath: string): string {
+        // 获取相对于源目录的路径
+        let relativePath = filePath.replace(this.sourceDirectory, "");
+        
+        // 移除开头的路径分隔符
+        if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
+            relativePath = relativePath.substring(1);
+        }
+        
+        // 替换扩展名
+        const outputFile = relativePath.replace(/\.qentl$/, ".qobj");
+        
+        // 组合输出路径
+        return FileSystem.joinPaths(this.outputDirectory, outputFile);
+    }
+    
+    // 从文件路径生成任务ID
+    private getTaskIdFromPath(filePath: string): string {
+        // 移除扩展名并替换路径分隔符
+        return filePath
+            .replace(/\.\w+$/, "")
+            .replace(/[\\\/]/g, "_")
+            .replace(/[\s\.-]+/g, "_");
+    }
+    
+    // 获取依赖任务ID列表
+    private getDependencyTaskIds(fileInfo: FileDependencyInfo): string[] {
+        const result: string[] = [];
+        
+        for (const depPath of fileInfo.getDependencies()) {
+            const depInfo = this.fileInfoMap.get(depPath);
+            
+            if (depInfo && depInfo.getStatus() !== FileStatus.UNCHANGED) {
+                const taskId = `build_${this.getTaskIdFromPath(depPath)}`;
+                result.push(taskId);
+            }
+        }
+        
+        return result;
+    }
+    
+    // 执行增量构建
+    public async performIncrementalBuild(
+        compilerPath: string = "qentl",
+        compilerOptions: string = ""
+    ): Promise<boolean> {
+        // 检查文件修改
+        const filesToRebuild = this.getFilesToRebuild();
+        
+        // 生成构建任务
+        this.generateBuildTasks(filesToRebuild, compilerPath, compilerOptions);
+        
+        // 如果没有任务，构建成功
+        if (this.buildScheduler.getTotalTaskCount() === 0) {
+            return true;
+        }
+        
+        // 启动构建
+        this.logger.log(LogLevel.INFO, `开始增量构建 ${this.buildScheduler.getTotalTaskCount()} 个文件`);
+        
+        const result = await this.buildScheduler.startBuild();
+        
+        if (result) {
+            this.logger.log(LogLevel.INFO, "增量构建成功完成");
+        } else {
+            this.logger.log(LogLevel.ERROR, "增量构建失败");
+        }
+        
+        return result;
+    }
+    
+    // 执行完整构建
+    public async performFullBuild(
+        compilerPath: string = "qentl",
+        compilerOptions: string = ""
+    ): Promise<boolean> {
+        // 扫描源目录
+        this.scanSourceDirectory();
+        
+        // 将所有文件标记为已修改
+        for (const fileInfo of this.fileInfoMap.values()) {
+            fileInfo.setStatus(FileStatus.MODIFIED);
+        }
+        
+        // 获取所有源文件
+        const allFiles = Array.from(this.fileInfoMap.keys());
+        
+        // 生成构建任务
+        this.generateBuildTasks(allFiles, compilerPath, compilerOptions);
+        
+        // 启动构建
+        this.logger.log(LogLevel.INFO, `开始完整构建 ${allFiles.length} 个文件`);
+        
+        const result = await this.buildScheduler.startBuild();
+        
+        if (result) {
+            this.logger.log(LogLevel.INFO, "完整构建成功完成");
+        } else {
+            this.logger.log(LogLevel.ERROR, "完整构建失败");
+        }
+        
+        return result;
+    }
+    
+    // 获取构建调度器
+    public getBuildScheduler(): ParallelBuildScheduler {
+        return this.buildScheduler;
+    }
+    
+    // 设置构建调度器
+    public setBuildScheduler(scheduler: ParallelBuildScheduler): void {
+        this.buildScheduler = scheduler;
+    }
+    
+    // 获取源目录
+    public getSourceDirectory(): string {
+        return this.sourceDirectory;
+    }
+    
+    // 设置源目录
+    public setSourceDirectory(directory: string): void {
+        this.sourceDirectory = directory;
+    }
+    
+    // 获取输出目录
+    public getOutputDirectory(): string {
+        return this.outputDirectory;
+    }
+    
+    // 设置输出目录
+    public setOutputDirectory(directory: string): void {
+        this.outputDirectory = directory;
+    }
+    
+    // 获取文件依赖信息
+    public getFileInfo(filePath: string): FileDependencyInfo {
+        return this.fileInfoMap.get(filePath);
+    }
+    
+    // 获取所有文件依赖信息
+    public getAllFileInfo(): FileDependencyInfo[] {
+        return Array.from(this.fileInfoMap.values());
+    }
+    
+    // 设置扫描的文件扩展名
+    public setFileExtensions(extensions: string[]): void {
+        this.fileExtensions = extensions;
+    }
+    
+    // 获取扫描的文件扩展名
+    public getFileExtensions(): string[] {
+        return this.fileExtensions;
+    }
+    
+    // 导出依赖图（用于可视化）
+    public exportDependencyGraph(): object {
+        const nodes: any[] = [];
+        const edges: any[] = [];
+        
+        // 创建节点
+        for (const [filePath, fileInfo] of this.fileInfoMap.entries()) {
+            nodes.push({
+                id: filePath,
+                label: FileSystem.getFileName(filePath),
+                status: this.getStatusString(fileInfo.getStatus())
+            });
+            
+            // 创建边（依赖关系）
+            for (const depPath of fileInfo.getDependencies()) {
+                edges.push({
+                    from: filePath,
+                    to: depPath
+                });
+            }
+        }
+        
+        return {
+            nodes,
+            edges
+        };
+    }
+    
+    // 获取状态字符串
+    private getStatusString(status: FileStatus): string {
+        switch (status) {
+            case FileStatus.UNCHANGED:
+                return "未变更";
+            case FileStatus.MODIFIED:
+                return "已修改";
+            case FileStatus.ADDED:
+                return "已新增";
+            case FileStatus.DELETED:
+                return "已删除";
+            default:
+                return "未知";
+        }
+    }
+}
+
+export {
+    FileInfo,
+    DependencyGraph,
+    BuildCache,
+    IncrementalBuildManager
+}; 

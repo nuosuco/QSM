@@ -1,0 +1,86 @@
+# Aurora Engine 配置 - QEntL版本
+
+# 量子基因编码
+QG-DOC-CONFIG-AURORA-F8D2E1A3
+
+# 纠缠态
+ENTANGLE_STATE: ACTIVE
+
+# 纠缠对象
+ENTANGLED_OBJECTS: [
+  "QSM/aurora/aurora_engine.qentl",
+  "QSM/aurora/memory_loader.qentl"
+]
+
+# 纠缠强度
+ENTANGLE_STRENGTH: 1.0
+
+// ============================================================
+// Aurora Engine 配置 - QEntL版本
+// ============================================================
+
+app: {
+  name: "Aurora Engine",
+  version: "2.0.0",
+  description: "QSM项目后台自主运转引擎 (QEntL全栈)",
+  language: "QEntL"
+}
+
+project: {
+  name: "QSM - Quantum Superposition Model",
+  base_dir: "/root/QSM",
+  memory_dir: "/root/.codebuddy/projects/root/memory",
+  workspace_dir: "/root/.openclaw/workspace",
+  memory_bank: "/root/QSM/memory_bank"
+}
+
+// 七步循环配置
+seven_steps: {
+  enabled: true,
+  min_step_interval: 1800,  // 30分钟
+  max_cycles_per_day: 24,
+  
+  steps: [
+    { id: "learning", name: "学习", description: "学习新知识（华经、量子科学、互联网资源）", cooldown: 3600 },
+    { id: "architecture", name: "构架", description: "基于学习设计架构（QEntL全栈操作系统）", cooldown: 3600 },
+    { id: "training", name: "训练", description: "执行训练（滇川黔桂彝文数据 → 量子叠加态模型）", cooldown: 7200 },
+    { id: "testing", name: "测试", description: "验证模型效果（QVM模拟器、推理测试）", cooldown: 3600 },
+    { id: "improvement", name: "改进", description: "根据测试结果修正架构和代码", cooldown: 3600 },
+    { id: "summary", name: "总结", description: "修正旧文档或写成新的开发文档", cooldown: 1800 },
+    { id: "memory", name: "记忆", description: "更新旧记忆或写成新记忆", cooldown: 1800 }
+  ]
+}
+
+// 企业微信推送配置
+wecom: {
+  enabled: true,
+  openclaw_gateway_url: "http://localhost:14121",
+  
+  daily_reports: [
+    { time: "09:00", type: "morning_brief" },
+    { time: "18:00", type: "evening_summary" }
+  ],
+  
+  alert: {
+    max_failures_before_alert: 3,
+    failure_window_seconds: 3600
+  }
+}
+
+// 任务队列
+task_queue: {
+  priority_tasks: [
+    { id: "qentl_compiler", name: "QEntL编译器完善", priority: 1, status: "pending" },
+    { id: "qvm_execution", name: "QVM执行引擎优化", priority: 2, status: "pending" },
+    { id: "yi_translation", name: "彝文翻译精度提升", priority: 3, status: "pending" },
+    { id: "documentation", name: "文档完善", priority: 4, status: "ongoing" }
+  ]
+}
+
+// 日志配置
+logging: {
+  level: "INFO",
+  file: "/var/log/aurora-engine.log",
+  max_size_mb: 50,
+  backup_count: 5
+}

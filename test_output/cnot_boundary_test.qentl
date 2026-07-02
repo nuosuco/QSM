@@ -1,0 +1,15 @@
+// CNOT boundary test: tgt should be digit, not ASCII
+init 6
+H 0
+H 1
+CNOT 0 5
+CNOT 1 4
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 4 2
+MEASURE 5 3
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+STOP

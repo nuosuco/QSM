@@ -1,0 +1,411 @@
+/**
+ * QEntL安全服务
+ * 版本: 1.0.0
+ * 作者: QEntL团队
+ * 描述: 提供系统级安全保护、加密解密和权限控制
+ * 量子基因编码: QG-SECURITY-SERVICE-E5F6-1714130100
+ * 纠缠强度: 1.0
+ */
+
+import "../utils/logger.qentl";
+import "../utils/crypto.qentl";
+import "../utils/quantum_random.qentl";
+
+/**
+ * 安全服务配置
+ */
+export const SecurityServiceConfig = {
+  // 加密算法: quantum, hybrid, aes256, chacha20
+  encryptionAlgorithm: "hybrid",
+  
+  // 加密强度 (比特)
+  encryptionStrength: 256,
+  
+  // 量子随机数生成器种子更新间隔 (毫秒)
+  quantumRandomSeedUpdateInterval: 3600000,
+  
+  // 密钥轮换间隔 (毫秒)
+  keyRotationInterval: 86400000,
+  
+  // 会话超时 (毫秒)
+  sessionTimeout: 1800000,
+  
+  // 登录尝试失败最大次数
+  maxLoginAttempts: 5,
+  
+  // 登录锁定时间 (毫秒)
+  loginLockoutDuration: 300000,
+  
+  // 是否启用量子安全通信
+  enableQuantumSecureCommunication: true,
+  
+  // 安全日志级别: debug, info, warn, error
+  securityLogLevel: "info"
+};
+
+/**
+ * 安全服务状态
+ */
+export const SecurityServiceState = {
+  // 服务是否已初始化
+  initialized: false,
+  
+  // 当前加密密钥
+  currentEncryptionKey: null,
+  
+  // 上次密钥更新时间
+  lastKeyRotationTime: 0,
+  
+  // 当前活跃会话
+  activeSessions: {},
+  
+  // 登录尝试计数器
+  loginAttempts: {},
+  
+  // 锁定的账户
+  lockedAccounts: {}
+};
+
+/**
+ * 初始化安全服务
+ * 
+ * @param {Object} config - 安全服务配置参数
+ * @returns {boolean} - 是否初始化成功
+ */
+export function initialize(config = {}) {
+  logger.info("[安全服务] 正在初始化安全服务...");
+  
+  // 合并配置
+  const mergedConfig = { ...SecurityServiceConfig, ...config };
+  Object.assign(SecurityServiceConfig, mergedConfig);
+  
+  try {
+    // 初始化量子随机数生成器
+    quantum_random.initialize();
+    
+    // 生成初始加密密钥
+    SecurityServiceState.currentEncryptionKey = generateEncryptionKey();
+    SecurityServiceState.lastKeyRotationTime = Date.now();
+    
+    // 设置密钥轮换定时器
+    setInterval(rotateEncryptionKey, SecurityServiceConfig.keyRotationInterval);
+    
+    // 设置量子随机数种子更新定时器
+    setInterval(
+      quantum_random.updateSeed,
+      SecurityServiceConfig.quantumRandomSeedUpdateInterval
+    );
+    
+    // 设置会话清理定时器
+    setInterval(cleanupSessions, 60000);
+    
+    SecurityServiceState.initialized = true;
+    logger.info("[安全服务] 安全服务初始化成功");
+    
+    return true;
+  } catch (error) {
+    logger.error(`[安全服务] 安全服务初始化失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 加密数据
+ * 
+ * @param {any} data - 要加密的数据
+ * @param {Object} options - 加密选项
+ * @returns {string} - 加密后的数据
+ */
+export function encrypt(data, options = {}) {
+  checkInitialized();
+  
+  const algorithm = options.algorithm || SecurityServiceConfig.encryptionAlgorithm;
+  const key = options.key || SecurityServiceState.currentEncryptionKey;
+  
+  return crypto.encrypt(data, key, algorithm);
+}
+
+/**
+ * 解密数据
+ * 
+ * @param {string} encryptedData - 已加密的数据
+ * @param {Object} options - 解密选项
+ * @returns {any} - 解密后的数据
+ */
+export function decrypt(encryptedData, options = {}) {
+  checkInitialized();
+  
+  const algorithm = options.algorithm || SecurityServiceConfig.encryptionAlgorithm;
+  const key = options.key || SecurityServiceState.currentEncryptionKey;
+  
+  return crypto.decrypt(encryptedData, key, algorithm);
+}
+
+/**
+ * 创建会话
+ * 
+ * @param {string} userId - 用户ID
+ * @param {Object} userData - 用户数据
+ * @returns {string} - 会话ID
+ */
+export function createSession(userId, userData = {}) {
+  checkInitialized();
+  
+  // 检查账户是否被锁定
+  if (isAccountLocked(userId)) {
+    throw new Error("账户已锁定，请稍后再试");
+  }
+  
+  // 生成会话ID
+  const sessionId = generateSessionId();
+  
+  // 创建会话
+  SecurityServiceState.activeSessions[sessionId] = {
+    userId,
+    userData,
+    createdAt: Date.now(),
+    lastActivityAt: Date.now()
+  };
+  
+  // 重置登录尝试次数
+  resetLoginAttempts(userId);
+  
+  logger.info(`[安全服务] 为用户 ${userId} 创建会话 ${sessionId}`);
+  
+  return sessionId;
+}
+
+/**
+ * 验证会话
+ * 
+ * @param {string} sessionId - 会话ID
+ * @returns {Object|null} - 会话数据或null（无效会话）
+ */
+export function validateSession(sessionId) {
+  checkInitialized();
+  
+  const session = SecurityServiceState.activeSessions[sessionId];
+  
+  if (!session) {
+    return null;
+  }
+  
+  // 检查会话是否过期
+  if (Date.now() - session.lastActivityAt > SecurityServiceConfig.sessionTimeout) {
+    destroySession(sessionId);
+    return null;
+  }
+  
+  // 更新会话活动时间
+  session.lastActivityAt = Date.now();
+  
+  return session;
+}
+
+/**
+ * 销毁会话
+ * 
+ * @param {string} sessionId - 会话ID
+ * @returns {boolean} - 是否成功销毁
+ */
+export function destroySession(sessionId) {
+  checkInitialized();
+  
+  if (SecurityServiceState.activeSessions[sessionId]) {
+    delete SecurityServiceState.activeSessions[sessionId];
+    logger.info(`[安全服务] 销毁会话 ${sessionId}`);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * 记录登录失败
+ * 
+ * @param {string} userId - 用户ID
+ * @returns {number} - 当前失败次数
+ */
+export function recordLoginFailure(userId) {
+  checkInitialized();
+  
+  if (!SecurityServiceState.loginAttempts[userId]) {
+    SecurityServiceState.loginAttempts[userId] = {
+      count: 0,
+      firstAttemptAt: Date.now()
+    };
+  }
+  
+  SecurityServiceState.loginAttempts[userId].count++;
+  const attempts = SecurityServiceState.loginAttempts[userId].count;
+  
+  // 检查是否需要锁定账户
+  if (attempts >= SecurityServiceConfig.maxLoginAttempts) {
+    lockAccount(userId);
+  }
+  
+  logger.warn(`[安全服务] 用户 ${userId} 登录失败 (${attempts}/${SecurityServiceConfig.maxLoginAttempts})`);
+  
+  return attempts;
+}
+
+/**
+ * 生成数据哈希
+ * 
+ * @param {any} data - 要哈希的数据
+ * @returns {string} - 哈希值
+ */
+export function hash(data) {
+  return crypto.hash(data);
+}
+
+/**
+ * 验证哈希
+ * 
+ * @param {any} data - 原始数据
+ * @param {string} hashValue - 哈希值
+ * @returns {boolean} - 是否匹配
+ */
+export function verifyHash(data, hashValue) {
+  return crypto.hash(data) === hashValue;
+}
+
+/**
+ * 获取服务状态
+ * 
+ * @returns {Object} - 服务状态信息
+ */
+export function getStatus() {
+  return {
+    initialized: SecurityServiceState.initialized,
+    activeSessions: Object.keys(SecurityServiceState.activeSessions).length,
+    lockedAccounts: Object.keys(SecurityServiceState.lockedAccounts).length,
+    lastKeyRotation: SecurityServiceState.lastKeyRotationTime
+  };
+}
+
+// ============= 内部函数 =============
+
+/**
+ * 检查服务是否已初始化
+ */
+function checkInitialized() {
+  if (!SecurityServiceState.initialized) {
+    throw new Error("安全服务尚未初始化");
+  }
+}
+
+/**
+ * 生成加密密钥
+ * 
+ * @returns {string} - 加密密钥
+ */
+function generateEncryptionKey() {
+  const keyBytes = quantum_random.generateBytes(SecurityServiceConfig.encryptionStrength / 8);
+  return crypto.bytesToBase64(keyBytes);
+}
+
+/**
+ * 生成会话ID
+ * 
+ * @returns {string} - 会话ID
+ */
+function generateSessionId() {
+  const randomBytes = quantum_random.generateBytes(32);
+  const timestamp = Date.now().toString();
+  
+  return crypto.hash(randomBytes + timestamp);
+}
+
+/**
+ * 轮换加密密钥
+ */
+function rotateEncryptionKey() {
+  logger.info("[安全服务] 轮换加密密钥");
+  
+  // 生成新密钥
+  SecurityServiceState.currentEncryptionKey = generateEncryptionKey();
+  SecurityServiceState.lastKeyRotationTime = Date.now();
+}
+
+/**
+ * 清理过期会话
+ */
+function cleanupSessions() {
+  const now = Date.now();
+  const timeout = SecurityServiceConfig.sessionTimeout;
+  
+  let expiredCount = 0;
+  
+  for (const sessionId in SecurityServiceState.activeSessions) {
+    const session = SecurityServiceState.activeSessions[sessionId];
+    
+    if (now - session.lastActivityAt > timeout) {
+      delete SecurityServiceState.activeSessions[sessionId];
+      expiredCount++;
+    }
+  }
+  
+  if (expiredCount > 0) {
+    logger.info(`[安全服务] 已清理 ${expiredCount} 个过期会话`);
+  }
+}
+
+/**
+ * 锁定账户
+ * 
+ * @param {string} userId - 用户ID
+ */
+function lockAccount(userId) {
+  SecurityServiceState.lockedAccounts[userId] = {
+    lockedAt: Date.now(),
+    expiresAt: Date.now() + SecurityServiceConfig.loginLockoutDuration
+  };
+  
+  logger.warn(`[安全服务] 由于多次登录失败，账户 ${userId} 已被锁定`);
+}
+
+/**
+ * 检查账户是否被锁定
+ * 
+ * @param {string} userId - 用户ID
+ * @returns {boolean} - 是否锁定
+ */
+function isAccountLocked(userId) {
+  const lockInfo = SecurityServiceState.lockedAccounts[userId];
+  
+  if (!lockInfo) {
+    return false;
+  }
+  
+  // 如果锁定已过期，解除锁定
+  if (Date.now() > lockInfo.expiresAt) {
+    delete SecurityServiceState.lockedAccounts[userId];
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * 重置登录尝试次数
+ * 
+ * @param {string} userId - 用户ID
+ */
+function resetLoginAttempts(userId) {
+  delete SecurityServiceState.loginAttempts[userId];
+}
+
+// 导出安全服务模块
+export default {
+  initialize,
+  encrypt,
+  decrypt,
+  createSession,
+  validateSession,
+  destroySession,
+  recordLoginFailure,
+  hash,
+  verifyHash,
+  getStatus
+}; 

@@ -1,0 +1,615 @@
+/**
+ * QEntL设备注册表
+ * QuantumGene: QG-KERNEL-DEVREG-B7K2-1714329850
+ * EntanglementStrength: 0.88
+ */
+
+quantum_program DeviceRegistry {
+    metadata {
+        name: "QEntL设备注册表",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的设备注册表，管理设备和驱动程序的注册",
+        quantum_gene: "QG-KERNEL-DEVREG-B7K2-1714329850",
+        entanglement_strength: 0.88
+    }
+
+    // 导入依赖模块
+    import DeviceFramework from "./device_framework.qentl";
+
+    state {
+        // 内核引用
+        kernel_reference: null,
+        
+        // 设备框架引用
+        device_framework: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 已注册的设备表
+        devices: {},
+        
+        // 已注册的驱动表
+        drivers: {},
+        
+        // 设备别名表
+        device_aliases: {},
+        
+        // 驱动类型映射表
+        driver_type_map: {},
+        
+        // 设备类型计数
+        device_type_counts: {},
+        
+        // 热插拔回调
+        hotplug_callbacks: [],
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化设备注册表
+    initialize(kernel_ref, device_framework_ref) {
+        kernel_log("初始化设备注册表...");
+        
+        // 保存引用
+        this.kernel_reference = kernel_ref;
+        this.device_framework = device_framework_ref || DeviceFramework;
+        
+        // 验证设备框架已初始化
+        if (!this.device_framework || !this.device_framework.initialized) {
+            this.add_error("无法初始化设备注册表：设备框架未初始化");
+            return false;
+        }
+        
+        this.initialized = true;
+        kernel_log("设备注册表初始化完成");
+        
+        return true;
+    }
+
+    // 重置设备注册表
+    reset() {
+        kernel_log("重置设备注册表...");
+        
+        // 保存引用
+        const kernel_ref = this.kernel_reference;
+        const device_framework = this.device_framework;
+        
+        // 关闭所有设备
+        for (const device_id in this.devices) {
+            this.unregister_device(device_id);
+        }
+        
+        // 卸载所有驱动
+        for (const driver_name in this.drivers) {
+            this.unregister_driver(driver_name);
+        }
+        
+        // 清空所有表
+        this.devices = {};
+        this.drivers = {};
+        this.device_aliases = {};
+        this.driver_type_map = {};
+        this.device_type_counts = {};
+        this.hotplug_callbacks = [];
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 恢复引用
+        this.kernel_reference = kernel_ref;
+        this.device_framework = device_framework;
+        
+        kernel_log("设备注册表已重置");
+    }
+
+    // 注册设备
+    register_device(device_descriptor) {
+        if (!this.initialized) {
+            this.add_error("无法注册设备：设备注册表未初始化");
+            return null;
+        }
+        
+        // 验证设备描述符
+        if (!this.device_framework.validate_device_descriptor(device_descriptor)) {
+            this.add_error(`设备注册失败：无效的设备描述符`);
+            return null;
+        }
+        
+        const device_id = device_descriptor.id;
+        
+        // 检查设备ID是否已存在
+        if (this.devices[device_id]) {
+            this.add_error(`设备注册失败：设备ID ${device_id} 已经存在`);
+            return null;
+        }
+        
+        // 检查驱动是否存在
+        const driver_name = device_descriptor.driver_name;
+        if (!this.drivers[driver_name]) {
+            this.add_warning(`设备 ${device_descriptor.name} 使用的驱动 ${driver_name} 尚未注册`);
+        }
+        
+        // 更新设备类型计数
+        const device_type = device_descriptor.type;
+        if (!this.device_type_counts[device_type]) {
+            this.device_type_counts[device_type] = 0;
+        }
+        this.device_type_counts[device_type]++;
+        
+        // 添加到设备表
+        this.devices[device_id] = {
+            ...device_descriptor,
+            registered_at: Date.now()
+        };
+        
+        // 如果设备有别名，添加到别名表
+        if (device_descriptor.aliases && Array.isArray(device_descriptor.aliases)) {
+            for (const alias of device_descriptor.aliases) {
+                this.device_aliases[alias] = device_id;
+            }
+        }
+        
+        // 如果驱动存在且有onDeviceRegistered回调，调用它
+        if (this.drivers[driver_name] && 
+            this.drivers[driver_name].interface && 
+            typeof this.drivers[driver_name].interface.onDeviceRegistered === 'function') {
+            
+            try {
+                this.drivers[driver_name].interface.onDeviceRegistered(device_descriptor);
+            } catch (error) {
+                this.add_warning(`驱动 ${driver_name} 处理设备注册事件时出错: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        kernel_log(`设备注册成功: ID ${device_id}, 名称 ${device_descriptor.name}, 类型 ${this.device_framework.get_device_type_description(device_type)}`);
+        
+        return device_id;
+    }
+
+    // 注销设备
+    unregister_device(device_id) {
+        if (!this.initialized) {
+            this.add_error("无法注销设备：设备注册表未初始化");
+            return false;
+        }
+        
+        // 检查设备是否存在
+        if (!this.devices[device_id]) {
+            this.add_error(`设备注销失败：设备ID ${device_id} 不存在`);
+            return false;
+        }
+        
+        const device = this.devices[device_id];
+        
+        // 从别名表中移除所有引用
+        if (device.aliases && Array.isArray(device.aliases)) {
+            for (const alias of device.aliases) {
+                delete this.device_aliases[alias];
+            }
+        }
+        
+        // 更新设备类型计数
+        const device_type = device.type;
+        if (this.device_type_counts[device_type]) {
+            this.device_type_counts[device_type]--;
+        }
+        
+        // 通知驱动
+        const driver_name = device.driver_name;
+        if (this.drivers[driver_name] && 
+            this.drivers[driver_name].interface && 
+            typeof this.drivers[driver_name].interface.onDeviceUnregistered === 'function') {
+            
+            try {
+                this.drivers[driver_name].interface.onDeviceUnregistered(device);
+            } catch (error) {
+                this.add_warning(`驱动 ${driver_name} 处理设备注销事件时出错: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        // 从设备表中移除
+        delete this.devices[device_id];
+        
+        kernel_log(`设备已注销: ID ${device_id}, 名称 ${device.name}`);
+        
+        return true;
+    }
+
+    // 注册驱动
+    register_driver(driver_descriptor) {
+        if (!this.initialized) {
+            this.add_error("无法注册驱动：设备注册表未初始化");
+            return false;
+        }
+        
+        // 验证驱动描述符
+        if (!this.device_framework.validate_driver_descriptor(driver_descriptor)) {
+            this.add_error(`驱动注册失败：无效的驱动描述符`);
+            return false;
+        }
+        
+        const driver_name = driver_descriptor.name;
+        
+        // 检查驱动是否已存在
+        if (this.drivers[driver_name]) {
+            this.add_error(`驱动注册失败：驱动 ${driver_name} 已经存在`);
+            return false;
+        }
+        
+        // 添加到驱动表
+        this.drivers[driver_name] = {
+            ...driver_descriptor,
+            registered_at: Date.now(),
+            devices_count: 0
+        };
+        
+        // 更新驱动类型映射
+        for (const device_type of driver_descriptor.supported_devices) {
+            if (!this.driver_type_map[device_type]) {
+                this.driver_type_map[device_type] = [];
+            }
+            
+            this.driver_type_map[device_type].push(driver_name);
+        }
+        
+        // 初始化驱动
+        if (driver_descriptor.interface && 
+            typeof driver_descriptor.interface.initialize === 'function') {
+            
+            try {
+                driver_descriptor.interface.initialize({
+                    kernel: this.kernel_reference,
+                    device_framework: this.device_framework,
+                    device_registry: this
+                });
+            } catch (error) {
+                this.add_warning(`驱动 ${driver_name} 初始化时出错: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        kernel_log(`驱动注册成功: ${driver_name}, 版本 ${driver_descriptor.version}, 厂商 ${driver_descriptor.vendor}`);
+        
+        return true;
+    }
+
+    // 注销驱动
+    unregister_driver(driver_name) {
+        if (!this.initialized) {
+            this.add_error("无法注销驱动：设备注册表未初始化");
+            return false;
+        }
+        
+        // 检查驱动是否存在
+        if (!this.drivers[driver_name]) {
+            this.add_error(`驱动注销失败：驱动 ${driver_name} 不存在`);
+            return false;
+        }
+        
+        const driver = this.drivers[driver_name];
+        
+        // 检查是否有设备正在使用此驱动
+        let devices_using_driver = false;
+        for (const device_id in this.devices) {
+            if (this.devices[device_id].driver_name === driver_name) {
+                devices_using_driver = true;
+                break;
+            }
+        }
+        
+        if (devices_using_driver) {
+            this.add_warning(`驱动 ${driver_name} 注销可能不完全，因为仍有设备在使用它`);
+        }
+        
+        // 调用驱动的cleanup函数
+        if (driver.interface && typeof driver.interface.cleanup === 'function') {
+            try {
+                driver.interface.cleanup();
+            } catch (error) {
+                this.add_warning(`驱动 ${driver_name} 清理时出错: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        // 从驱动类型映射中移除
+        for (const device_type in this.driver_type_map) {
+            const index = this.driver_type_map[device_type].indexOf(driver_name);
+            if (index !== -1) {
+                this.driver_type_map[device_type].splice(index, 1);
+            }
+        }
+        
+        // 从驱动表中移除
+        delete this.drivers[driver_name];
+        
+        kernel_log(`驱动已注销: ${driver_name}`);
+        
+        return true;
+    }
+
+    // 获取设备信息
+    get_device_info(device_id_or_alias) {
+        if (!this.initialized) {
+            this.add_error("无法获取设备信息：设备注册表未初始化");
+            return null;
+        }
+        
+        // 处理别名
+        let device_id = device_id_or_alias;
+        if (typeof device_id_or_alias === 'string' && this.device_aliases[device_id_or_alias]) {
+            device_id = this.device_aliases[device_id_or_alias];
+        }
+        
+        // 检查设备是否存在
+        if (!this.devices[device_id]) {
+            this.add_warning(`设备不存在: ${device_id_or_alias}`);
+            return null;
+        }
+        
+        const device = this.devices[device_id];
+        
+        // 更新最后访问时间
+        device.last_accessed = Date.now();
+        
+        return {
+            id: device.id,
+            name: device.name,
+            type: device.type,
+            type_description: this.device_framework.get_device_type_description(device.type),
+            driver_name: device.driver_name,
+            state: device.state,
+            state_description: this.device_framework.get_device_state_description(device.state),
+            properties: device.properties,
+            statistics: device.statistics,
+            created_at: device.created_at,
+            registered_at: device.registered_at,
+            last_accessed: device.last_accessed
+        };
+    }
+
+    // 获取驱动信息
+    get_driver_info(driver_name) {
+        if (!this.initialized) {
+            this.add_error("无法获取驱动信息：设备注册表未初始化");
+            return null;
+        }
+        
+        // 检查驱动是否存在
+        if (!this.drivers[driver_name]) {
+            this.add_warning(`驱动不存在: ${driver_name}`);
+            return null;
+        }
+        
+        const driver = this.drivers[driver_name];
+        
+        // 获取当前由此驱动管理的设备数
+        let devices_count = 0;
+        for (const device_id in this.devices) {
+            if (this.devices[device_id].driver_name === driver_name) {
+                devices_count++;
+            }
+        }
+        
+        // 更新设备计数
+        driver.devices_count = devices_count;
+        
+        return {
+            name: driver.name,
+            vendor: driver.vendor,
+            version: driver.version,
+            supported_devices: driver.supported_devices.map(type => ({
+                type,
+                description: this.device_framework.get_device_type_description(type)
+            })),
+            devices_count: devices_count,
+            registered_at: driver.registered_at
+        };
+    }
+
+    // 列出所有设备
+    list_devices(filter) {
+        if (!this.initialized) {
+            this.add_error("无法列出设备：设备注册表未初始化");
+            return [];
+        }
+        
+        const device_list = [];
+        
+        for (const device_id in this.devices) {
+            const device = this.devices[device_id];
+            
+            // 应用过滤条件
+            if (filter) {
+                // 按类型过滤
+                if (filter.type !== undefined && device.type !== filter.type) {
+                    continue;
+                }
+                
+                // 按驱动过滤
+                if (filter.driver_name && device.driver_name !== filter.driver_name) {
+                    continue;
+                }
+                
+                // 按状态过滤
+                if (filter.state !== undefined && device.state !== filter.state) {
+                    continue;
+                }
+            }
+            
+            // 添加到结果列表
+            device_list.push(this.get_device_info(device_id));
+        }
+        
+        return device_list;
+    }
+
+    // 列出所有驱动
+    list_drivers(filter) {
+        if (!this.initialized) {
+            this.add_error("无法列出驱动：设备注册表未初始化");
+            return [];
+        }
+        
+        const driver_list = [];
+        
+        for (const driver_name in this.drivers) {
+            const driver = this.drivers[driver_name];
+            
+            // 应用过滤条件
+            if (filter) {
+                // 按供应商过滤
+                if (filter.vendor && driver.vendor !== filter.vendor) {
+                    continue;
+                }
+                
+                // 按支持的设备类型过滤
+                if (filter.device_type !== undefined && !driver.supported_devices.includes(filter.device_type)) {
+                    continue;
+                }
+            }
+            
+            // 添加到结果列表
+            driver_list.push(this.get_driver_info(driver_name));
+        }
+        
+        return driver_list;
+    }
+
+    // 查找匹配设备类型的驱动
+    find_drivers_for_device_type(device_type) {
+        if (!this.initialized) {
+            this.add_error("无法查找驱动：设备注册表未初始化");
+            return [];
+        }
+        
+        if (!this.driver_type_map[device_type]) {
+            return [];
+        }
+        
+        return this.driver_type_map[device_type].map(driver_name => this.drivers[driver_name]);
+    }
+
+    // 添加热插拔回调
+    add_hotplug_callback(callback) {
+        if (!this.initialized) {
+            this.add_error("无法添加热插拔回调：设备注册表未初始化");
+            return false;
+        }
+        
+        if (typeof callback !== 'function') {
+            this.add_error("无法添加热插拔回调：回调必须是函数");
+            return false;
+        }
+        
+        this.hotplug_callbacks.push({
+            callback: callback,
+            registered_at: Date.now()
+        });
+        
+        return true;
+    }
+
+    // 触发热插拔事件
+    trigger_hotplug_event(event_type, device_id) {
+        if (!this.initialized) {
+            this.add_error("无法触发热插拔事件：设备注册表未初始化");
+            return false;
+        }
+        
+        // 检查设备是否存在
+        if (!this.devices[device_id]) {
+            this.add_error(`无法触发热插拔事件：设备ID ${device_id} 不存在`);
+            return false;
+        }
+        
+        const device = this.devices[device_id];
+        const event = {
+            type: event_type,
+            device_id: device_id,
+            device_name: device.name,
+            device_type: device.type,
+            driver_name: device.driver_name,
+            timestamp: Date.now()
+        };
+        
+        // 通知驱动
+        if (this.drivers[device.driver_name] && 
+            this.drivers[device.driver_name].interface && 
+            typeof this.drivers[device.driver_name].interface.onHotplugEvent === 'function') {
+            
+            try {
+                this.drivers[device.driver_name].interface.onHotplugEvent(event);
+            } catch (error) {
+                this.add_warning(`驱动 ${device.driver_name} 处理热插拔事件时出错: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        // 调用所有注册的回调
+        for (const callback_info of this.hotplug_callbacks) {
+            try {
+                callback_info.callback(event);
+            } catch (error) {
+                this.add_warning(`热插拔回调处理事件时出错: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        kernel_log(`触发热插拔事件: ${event_type}, 设备 ${device_id} (${device.name})`);
+        
+        return true;
+    }
+
+    // 获取设备统计信息
+    get_statistics() {
+        if (!this.initialized) {
+            this.add_error("无法获取统计信息：设备注册表未初始化");
+            return null;
+        }
+        
+        return {
+            total_devices: Object.keys(this.devices).length,
+            total_drivers: Object.keys(this.drivers).length,
+            device_type_counts: { ...this.device_type_counts },
+            hotplug_callbacks_count: this.hotplug_callbacks.length
+        };
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`设备注册表错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`设备注册表警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+}
+
+// 导出设备注册表模块
+export DeviceRegistry; 

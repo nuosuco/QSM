@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>应用商店 - QEntL</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        .store-container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 { color: #ffd700; margin: 0; }
+        .search-bar {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 25px;
+            padding: 15px 25px;
+            width: 100%;
+            max-width: 500px;
+            margin: 20px auto;
+            display: block;
+            color: #fff;
+            font-size: 16px;
+        }
+        .categories {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .category-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .category-btn:hover, .category-btn.active {
+            background: rgba(255,215,0,0.2);
+            border-color: #ffd700;
+        }
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .app-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        .app-card:hover {
+            background: rgba(255,215,0,0.1);
+            transform: translateY(-5px);
+        }
+        .app-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .app-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+        .app-info h3 {
+            margin: 0 0 5px 0;
+        }
+        .app-rating {
+            color: #ffd700;
+            font-size: 14px;
+        }
+        .app-desc {
+            color: #aaa;
+            font-size: 13px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        .app-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .app-size {
+            color: #666;
+            font-size: 12px;
+        }
+        .install-btn {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            border: none;
+            padding: 8px 20px;
+            border-radius: 15px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .installed {
+            background: rgba(78,205,196,0.3);
+            color: #4ecdc4;
+        }
+    </style>
+</head>
+<body>
+    <div class="store-container">
+        <div class="header">
+            <h1>🏪 QEntL应用商店</h1>
+            <p>量子应用 · 服务人类</p>
+        </div>
+        
+        <input type="text" class="search-bar" placeholder="🔍 搜索应用...">
+        
+        <div class="categories">
+            <button class="category-btn active">全部</button>
+            <button class="category-btn">⚛️ 量子工具</button>
+            <button class="category-btn">💼 办公</button>
+            <button class="category-btn">🎮 娱乐</button>
+            <button class="category-btn">📚 教育</button>
+        </div>
+        
+        <div class="apps-grid">
+            <div class="app-card">
+                <div class="app-header">
+                    <div class="app-icon" style="background: rgba(138,135,255,0.2);">⚛️</div>
+                    <div class="app-info">
+                        <h3>量子虚拟机</h3>
+                        <div class="app-rating">⭐⭐⭐⭐⭐ 5.0</div>
+                    </div>
+                </div>
+                <div class="app-desc">8量子比特模拟器，支持Grover、QFT等量子算法演示</div>
+                <div class="app-meta">
+                    <span class="app-size">已安装</span>
+                    <button class="install-btn installed">已安装</button>
+                </div>
+            </div>
+            
+            <div class="app-card">
+                <div class="app-header">
+                    <div class="app-icon" style="background: rgba(255,215,0,0.2);">💰</div>
+                    <div class="app-info">
+                        <h3>松麦钱包</h3>
+                        <div class="app-rating">⭐⭐⭐⭐⭐ 4.9</div>
+                    </div>
+                </div>
+                <div class="app-desc">SOM经济系统客户端，管理松麦币和福利项目</div>
+                <div class="app-meta">
+                    <span class="app-size">已安装</span>
+                    <button class="install-btn installed">已安装</button>
+                </div>
+            </div>
+            
+            <div class="app-card">
+                <div class="app-header">
+                    <div class="app-icon" style="background: rgba(78,205,196,0.2);">💬</div>
+                    <div class="app-info">
+                        <h3>WeQ通讯</h3>
+                        <div class="app-rating">⭐⭐⭐⭐⭐ 4.8</div>
+                    </div>
+                </div>
+                <div class="app-desc">量子加密通讯工具，支持纠缠传输和安全聊天</div>
+                <div class="app-meta">
+                    <span class="app-size">已安装</span>
+                    <button class="install-btn installed">已安装</button>
+                </div>
+            </div>
+            
+            <div class="app-card">
+                <div class="app-header">
+                    <div class="app-icon" style="background: rgba(255,107,107,0.2);">🎮</div>
+                    <div class="app-info">
+                        <h3>量子棋盘</h3>
+                        <div class="app-rating">⭐⭐⭐⭐ 4.5</div>
+                    </div>
+                </div>
+                <div class="app-desc">量子叠加态棋类游戏，体验量子世界乐趣</div>
+                <div class="app-meta">
+                    <span class="app-size">15 MB</span>
+                    <button class="install-btn">安装</button>
+                </div>
+            </div>
+            
+            <div class="app-card">
+                <div class="app-header">
+                    <div class="app-icon" style="background: rgba(150,206,148,0.2);">📚</div>
+                    <div class="app-info">
+                        <h3>彝文学习</h3>
+                        <div class="app-rating">⭐⭐⭐⭐⭐ 5.0</div>
+                    </div>
+                </div>
+                <div class="app-desc">滇川黔贵通用彝文学习工具，传承古老智慧</div>
+                <div class="app-meta">
+                    <span class="app-size">28 MB</span>
+                    <button class="install-btn">安装</button>
+                </div>
+            </div>
+            
+            <div class="app-card">
+                <div class="app-header">
+                    <div class="app-icon" style="background: rgba(69,183,209,0.2);">📊</div>
+                    <div class="app-info">
+                        <h3>数据可视化</h3>
+                        <div class="app-rating">⭐⭐⭐⭐ 4.6</div>
+                    </div>
+                </div>
+                <div class="app-desc">量子数据可视化工具，直观展示量子态</div>
+                <div class="app-meta">
+                    <span class="app-size">12 MB</span>
+                    <button class="install-btn">安装</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

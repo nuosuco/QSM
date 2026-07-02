@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V6 训练监控</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:monospace;background:#0a0a1a;color:#e0e0ff;min-height:100vh;padding:15px}
+h1{text-align:center;color:#8080ff;font-size:1.2em;margin-bottom:8px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:500px;margin:8px auto}
+.stat{background:#111128;border:1px solid #3030ff;border-radius:8px;padding:8px;text-align:center}
+.stat .val{font-size:1.3em;color:#80ff80;font-weight:bold}
+.stat .label{font-size:0.65em;color:#6060c0;margin-top:2px}
+.progress{max-width:500px;margin:10px auto;background:#111128;border:1px solid #3030ff;border-radius:8px;padding:10px}
+.progress-bar{height:24px;background:#1a1a3a;border-radius:12px;overflow:hidden;margin:6px 0}
+.progress-fill{height:100%;background:linear-gradient(90deg,#3030ff,#80ff80);border-radius:12px;transition:width 0.5s;text-align:center;line-height:24px;font-size:0.75em;color:#fff;font-weight:bold}
+.history{max-width:500px;margin:10px auto}
+.history h3{color:#6080ff;font-size:0.9em;margin-bottom:6px}
+.history-bar{display:flex;align-items:end;height:80px;gap:2px;padding:4px 0}
+.history-bar .bar{flex:1;background:linear-gradient(to top,#3030ff,#80ff80);border-radius:2px 2px 0 0;min-width:4px;position:relative}
+.history-bar .bar:hover::after{content:attr(data-info);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#202040;padding:2px 6px;border-radius:4px;font-size:0.6em;white-space:nowrap;color:#fff}
+.info{text-align:center;font-size:0.75em;color:#6060c0;margin:8px}
+a{color:#6080ff}
+</style>
+</head>
+<body>
+<h1>🚀 V6 Q-Embedding 训练监控</h1>
+<div class="stats" id="stats"></div>
+<div class="progress" id="progress">
+<div class="progress-bar"><div class="progress-fill" id="pbar">0%</div></div>
+<div style="display:flex;justify-content:space-between;font-size:0.7em;color:#6060c0">
+<span>Epoch 0</span><span>Epoch 30</span>
+</div>
+</div>
+<div class="history"><h3>📊 Val Loss 历史</h3><div class="history-bar" id="hbar"></div></div>
+<div class="info" id="info"><a href="/">← 返回桌面</a> | 30秒自动刷新</div>
+<script>
+const epochs=[];
+async function load(){
+  try{
+    const r=await fetch('/api/v6/status');const d=await r.json();
+    const p=d.progress||{};const le=d.last_epoch||{};
+    const epoch=p.epoch||0;const pct=(epoch/30*100).toFixed(1);
+    document.getElementById('pbar').style.width=pct+'%';
+    document.getElementById('pbar').textContent='E'+epoch+'/30 ('+pct+'%)';
+    const s=document.getElementById('stats');
+    s.innerHTML=`
+      <div class="stat"><div class="val">${epoch}</div><div class="label">Epoch</div></div>
+      <div class="stat"><div class="val">${p.loss?p.loss.toFixed(4):'-'}</div><div class="label">Batch Loss</div></div>
+      <div class="stat"><div class="val">${le.val_loss?le.val_loss.toFixed(4):'-'}</div><div class="label">Val Loss</div></div>
+      <div class="stat"><div class="val">${le.best_val?le.best_val.toFixed(4):'-'}</div><div class="label">Best Val</div></div>
+      <div class="stat"><div class="val">${p.learning_rate?(p.learning_rate*1e4).toFixed(2)+'e-4':'-'}</div><div class="label">LR</div></div>
+      <div class="stat"><div class="val">${d.process_running?'✅':'❌'}</div><div class="label">Running</div></div>
+    `;
+    document.getElementById('info').innerHTML=`<a href="/">← 返回桌面</a> | ${d.new_best?'🔥NEW BEST!':'训练中'} | 30秒刷新`;
+  }catch(e){document.getElementById('info').textContent='连接失败'}
+}
+load();setInterval(load,30000);
+</script>
+</body>
+</html>

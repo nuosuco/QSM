@@ -1,0 +1,832 @@
+/**
+ * QEntL资源服务
+ * 版本: 1.0.0
+ * 作者: QEntL团队
+ * 描述: 提供系统资源管理、监控和分配功能
+ * 量子基因编码: QG-RESOURCE-SERVICE-J1K2-1714130400
+ * 纠缠强度: 1.0
+ */
+
+import "../utils/logger.qentl";
+import "../utils/time.qentl";
+import "../utils/system_info.qentl";
+import "../utils/quantum_resource_manager.qentl";
+
+/**
+ * 资源服务配置
+ */
+export const ResourceServiceConfig = {
+  // 监控间隔 (毫秒)
+  monitorInterval: 5000,
+  
+  // CPU使用率警告阈值 (百分比)
+  cpuWarningThreshold: 80,
+  
+  // CPU使用率临界阈值 (百分比)
+  cpuCriticalThreshold: 95,
+  
+  // 内存使用率警告阈值 (百分比)
+  memoryWarningThreshold: 75,
+  
+  // 内存使用率临界阈值 (百分比)
+  memoryCriticalThreshold: 90,
+  
+  // 存储使用率警告阈值 (百分比)
+  storageWarningThreshold: 85,
+  
+  // 存储使用率临界阈值 (百分比)
+  storageCriticalThreshold: 95,
+  
+  // 量子资源使用率警告阈值 (百分比)
+  quantumResourceWarningThreshold: 70,
+  
+  // 量子资源使用率临界阈值 (百分比)
+  quantumResourceCriticalThreshold: 90,
+  
+  // 资源历史记录保留时间 (毫秒)
+  historyRetentionTime: 3600000,
+  
+  // 资源分配策略 (balanced, performance, energy-saving)
+  allocationStrategy: "balanced",
+  
+  // 是否启用自动资源优化
+  enableAutoOptimization: true,
+  
+  // 自动优化间隔 (毫秒)
+  autoOptimizationInterval: 300000
+};
+
+/**
+ * 资源服务状态
+ */
+export const ResourceServiceState = {
+  // 服务是否已初始化
+  initialized: false,
+  
+  // 监控定时器
+  monitorTimer: null,
+  
+  // 优化定时器
+  optimizationTimer: null,
+  
+  // 资源使用历史
+  history: {
+    cpu: [],
+    memory: [],
+    storage: [],
+    network: [],
+    quantumResources: []
+  },
+  
+  // 当前资源使用情况
+  current: {
+    cpu: {
+      usage: 0,
+      cores: 0,
+      status: "normal" // normal, warning, critical
+    },
+    memory: {
+      total: 0,
+      used: 0,
+      free: 0,
+      usage: 0,
+      status: "normal"
+    },
+    storage: {
+      total: 0,
+      used: 0,
+      free: 0,
+      usage: 0,
+      status: "normal"
+    },
+    network: {
+      bytesReceived: 0,
+      bytesSent: 0,
+      packetsReceived: 0,
+      packetsSent: 0,
+      status: "normal"
+    },
+    quantumResources: {
+      qubits: {
+        total: 0,
+        used: 0,
+        usage: 0,
+        status: "normal"
+      },
+      entanglements: {
+        total: 0,
+        used: 0,
+        usage: 0,
+        status: "normal"
+      }
+    }
+  },
+  
+  // 资源预留
+  reservations: {},
+  
+  // 事件监听器
+  eventListeners: {
+    warning: [],
+    critical: [],
+    normal: [],
+    changed: []
+  }
+};
+
+/**
+ * 初始化资源服务
+ * 
+ * @param {Object} config - 资源服务配置参数
+ * @returns {boolean} - 是否初始化成功
+ */
+export function initialize(config = {}) {
+  logger.info("[资源服务] 正在初始化资源服务...");
+  
+  // 合并配置
+  const mergedConfig = { ...ResourceServiceConfig, ...config };
+  Object.assign(ResourceServiceConfig, mergedConfig);
+  
+  try {
+    // 获取初始系统信息
+    updateSystemInformation();
+    
+    // 设置监控定时器
+    ResourceServiceState.monitorTimer = setInterval(
+      monitorResources,
+      ResourceServiceConfig.monitorInterval
+    );
+    
+    // 设置自动优化定时器
+    if (ResourceServiceConfig.enableAutoOptimization) {
+      ResourceServiceState.optimizationTimer = setInterval(
+        optimizeResources,
+        ResourceServiceConfig.autoOptimizationInterval
+      );
+    }
+    
+    ResourceServiceState.initialized = true;
+    logger.info("[资源服务] 资源服务初始化成功");
+    
+    return true;
+  } catch (error) {
+    logger.error(`[资源服务] 资源服务初始化失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 获取当前资源使用情况
+ * 
+ * @returns {Object} - 当前资源使用情况
+ */
+export function getCurrentUsage() {
+  checkInitialized();
+  return { ...ResourceServiceState.current };
+}
+
+/**
+ * 获取资源使用历史
+ * 
+ * @param {string} resourceType - 资源类型，可选值: cpu, memory, storage, network, quantumResources, all
+ * @param {number} timeRange - 时间范围 (毫秒)
+ * @returns {Object} - 资源使用历史
+ */
+export function getUsageHistory(resourceType = "all", timeRange = 3600000) {
+  checkInitialized();
+  
+  const now = Date.now();
+  const minTime = now - timeRange;
+  
+  if (resourceType === "all") {
+    const history = {};
+    
+    for (const type in ResourceServiceState.history) {
+      history[type] = ResourceServiceState.history[type].filter(
+        entry => entry.timestamp >= minTime
+      );
+    }
+    
+    return history;
+  } else if (ResourceServiceState.history[resourceType]) {
+    return ResourceServiceState.history[resourceType].filter(
+      entry => entry.timestamp >= minTime
+    );
+  }
+  
+  return [];
+}
+
+/**
+ * 预留资源
+ * 
+ * @param {string} requesterId - 请求者ID
+ * @param {Object} resources - 要预留的资源
+ * @param {number} resources.cpu - CPU核心数
+ * @param {number} resources.memory - 内存大小 (字节)
+ * @param {number} resources.storage - 存储大小 (字节)
+ * @param {number} resources.qubits - 量子比特数量
+ * @param {number} duration - 预留持续时间 (毫秒)，0表示永久
+ * @returns {string|null} - 预留ID或null（预留失败）
+ */
+export function reserveResources(requesterId, resources, duration = 0) {
+  checkInitialized();
+  
+  try {
+    // 检查资源是否可用
+    if (!areResourcesAvailable(resources)) {
+      logger.warn(`[资源服务] 资源预留失败: 资源不足 (请求者: ${requesterId})`);
+      return null;
+    }
+    
+    // 生成预留ID
+    const reservationId = generateReservationId();
+    
+    // 创建预留
+    ResourceServiceState.reservations[reservationId] = {
+      id: reservationId,
+      requesterId,
+      resources,
+      createdAt: Date.now(),
+      expiresAt: duration > 0 器 Date.now() + duration : 0,
+      active: true
+    };
+    
+    // 更新资源使用情况
+    updateResourceUsage();
+    
+    // 如果有过期时间，设置定时器自动释放
+    if (duration > 0) {
+      setTimeout(() => {
+        releaseResources(reservationId);
+      }, duration);
+    }
+    
+    logger.info(`[资源服务] 资源预留成功: ${reservationId} (请求者: ${requesterId})`);
+    
+    return reservationId;
+  } catch (error) {
+    logger.error(`[资源服务] 资源预留失败: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * 释放资源预留
+ * 
+ * @param {string} reservationId - 预留ID
+ * @returns {boolean} - 是否释放成功
+ */
+export function releaseResources(reservationId) {
+  checkInitialized();
+  
+  try {
+    const reservation = ResourceServiceState.reservations[reservationId];
+    
+    if (!reservation) {
+      logger.warn(`[资源服务] 释放资源失败: 预留不存在 (${reservationId})`);
+      return false;
+    }
+    
+    if (!reservation.active) {
+      logger.warn(`[资源服务] 释放资源失败: 预留已失效 (${reservationId})`);
+      return false;
+    }
+    
+    // 将预留标记为非活动
+    reservation.active = false;
+    
+    // 更新资源使用情况
+    updateResourceUsage();
+    
+    logger.info(`[资源服务] 资源已释放: ${reservationId}`);
+    
+    return true;
+  } catch (error) {
+    logger.error(`[资源服务] 释放资源失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 添加事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否添加成功
+ */
+export function addEventListener(event, listener) {
+  checkInitialized();
+  
+  if (!ResourceServiceState.eventListeners[event]) {
+    ResourceServiceState.eventListeners[event] = [];
+  }
+  
+  ResourceServiceState.eventListeners[event].push(listener);
+  return true;
+}
+
+/**
+ * 移除事件监听器
+ * 
+ * @param {string} event - 事件名称
+ * @param {Function} listener - 监听器函数
+ * @returns {boolean} - 是否移除成功
+ */
+export function removeEventListener(event, listener) {
+  checkInitialized();
+  
+  if (!ResourceServiceState.eventListeners[event]) {
+    return false;
+  }
+  
+  const index = ResourceServiceState.eventListeners[event].indexOf(listener);
+  if (index !== -1) {
+    ResourceServiceState.eventListeners[event].splice(index, 1);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * 手动触发资源优化
+ * 
+ * @returns {boolean} - 是否优化成功
+ */
+export function triggerOptimization() {
+  checkInitialized();
+  return optimizeResources();
+}
+
+/**
+ * 获取服务状态
+ * 
+ * @returns {Object} - 服务状态信息
+ */
+export function getStatus() {
+  return {
+    initialized: ResourceServiceState.initialized,
+    monitorActive: !!ResourceServiceState.monitorTimer,
+    optimizationActive: !!ResourceServiceState.optimizationTimer,
+    activeReservations: Object.values(ResourceServiceState.reservations).filter(r => r.active).length,
+    strategy: ResourceServiceConfig.allocationStrategy
+  };
+}
+
+/**
+ * 设置资源分配策略
+ * 
+ * @param {string} strategy - 资源分配策略
+ * @returns {boolean} - 是否设置成功
+ */
+export function setAllocationStrategy(strategy) {
+  checkInitialized();
+  
+  const validStrategies = ["balanced", "performance", "energy-saving"];
+  
+  if (!validStrategies.includes(strategy)) {
+    logger.warn(`[资源服务] 设置资源分配策略失败: 无效的策略 (${strategy})`);
+    return false;
+  }
+  
+  ResourceServiceConfig.allocationStrategy = strategy;
+  logger.info(`[资源服务] 资源分配策略已设置为: ${strategy}`);
+  
+  return true;
+}
+
+// ============= 内部函数 =============
+
+/**
+ * 检查服务是否已初始化
+ */
+function checkInitialized() {
+  if (!ResourceServiceState.initialized) {
+    throw new Error("资源服务尚未初始化");
+  }
+}
+
+/**
+ * 更新系统信息
+ */
+function updateSystemInformation() {
+  try {
+    // 获取CPU信息
+    const cpuInfo = system_info.getCpuInfo();
+    ResourceServiceState.current.cpu.cores = cpuInfo.cores;
+    ResourceServiceState.current.cpu.usage = cpuInfo.usage;
+    
+    // 获取内存信息
+    const memoryInfo = system_info.getMemoryInfo();
+    ResourceServiceState.current.memory.total = memoryInfo.total;
+    ResourceServiceState.current.memory.used = memoryInfo.used;
+    ResourceServiceState.current.memory.free = memoryInfo.free;
+    ResourceServiceState.current.memory.usage = (memoryInfo.used / memoryInfo.total) * 100;
+    
+    // 获取存储信息
+    const storageInfo = system_info.getStorageInfo();
+    ResourceServiceState.current.storage.total = storageInfo.total;
+    ResourceServiceState.current.storage.used = storageInfo.used;
+    ResourceServiceState.current.storage.free = storageInfo.free;
+    ResourceServiceState.current.storage.usage = (storageInfo.used / storageInfo.total) * 100;
+    
+    // 获取网络信息
+    const networkInfo = system_info.getNetworkInfo();
+    ResourceServiceState.current.network.bytesReceived = networkInfo.bytesReceived;
+    ResourceServiceState.current.network.bytesSent = networkInfo.bytesSent;
+    ResourceServiceState.current.network.packetsReceived = networkInfo.packetsReceived;
+    ResourceServiceState.current.network.packetsSent = networkInfo.packetsSent;
+    
+    // 获取量子资源信息
+    const quantumInfo = quantum_resource_manager.getResourceInfo();
+    ResourceServiceState.current.quantumResources.qubits.total = quantumInfo.qubits.total;
+    ResourceServiceState.current.quantumResources.qubits.used = quantumInfo.qubits.used;
+    ResourceServiceState.current.quantumResources.qubits.usage = 
+      (quantumInfo.qubits.used / quantumInfo.qubits.total) * 100;
+    
+    ResourceServiceState.current.quantumResources.entanglements.total = quantumInfo.entanglements.total;
+    ResourceServiceState.current.quantumResources.entanglements.used = quantumInfo.entanglements.used;
+    ResourceServiceState.current.quantumResources.entanglements.usage = 
+      (quantumInfo.entanglements.used / quantumInfo.entanglements.total) * 100;
+    
+    // 更新状态
+    updateResourceStatus();
+  } catch (error) {
+    logger.error(`[资源服务] 更新系统信息失败: ${error.message}`);
+  }
+}
+
+/**
+ * 更新资源状态
+ */
+function updateResourceStatus() {
+  const prev = {
+    cpu: ResourceServiceState.current.cpu.status,
+    memory: ResourceServiceState.current.memory.status,
+    storage: ResourceServiceState.current.storage.status,
+    qubits: ResourceServiceState.current.quantumResources.qubits.status,
+    entanglements: ResourceServiceState.current.quantumResources.entanglements.status
+  };
+  
+  // 更新CPU状态
+  if (ResourceServiceState.current.cpu.usage >= ResourceServiceConfig.cpuCriticalThreshold) {
+    ResourceServiceState.current.cpu.status = "critical";
+  } else if (ResourceServiceState.current.cpu.usage >= ResourceServiceConfig.cpuWarningThreshold) {
+    ResourceServiceState.current.cpu.status = "warning";
+  } else {
+    ResourceServiceState.current.cpu.status = "normal";
+  }
+  
+  // 更新内存状态
+  if (ResourceServiceState.current.memory.usage >= ResourceServiceConfig.memoryCriticalThreshold) {
+    ResourceServiceState.current.memory.status = "critical";
+  } else if (ResourceServiceState.current.memory.usage >= ResourceServiceConfig.memoryWarningThreshold) {
+    ResourceServiceState.current.memory.status = "warning";
+  } else {
+    ResourceServiceState.current.memory.status = "normal";
+  }
+  
+  // 更新存储状态
+  if (ResourceServiceState.current.storage.usage >= ResourceServiceConfig.storageCriticalThreshold) {
+    ResourceServiceState.current.storage.status = "critical";
+  } else if (ResourceServiceState.current.storage.usage >= ResourceServiceConfig.storageWarningThreshold) {
+    ResourceServiceState.current.storage.status = "warning";
+  } else {
+    ResourceServiceState.current.storage.status = "normal";
+  }
+  
+  // 更新量子资源状态
+  if (ResourceServiceState.current.quantumResources.qubits.usage >= ResourceServiceConfig.quantumResourceCriticalThreshold) {
+    ResourceServiceState.current.quantumResources.qubits.status = "critical";
+  } else if (ResourceServiceState.current.quantumResources.qubits.usage >= ResourceServiceConfig.quantumResourceWarningThreshold) {
+    ResourceServiceState.current.quantumResources.qubits.status = "warning";
+  } else {
+    ResourceServiceState.current.quantumResources.qubits.status = "normal";
+  }
+  
+  if (ResourceServiceState.current.quantumResources.entanglements.usage >= ResourceServiceConfig.quantumResourceCriticalThreshold) {
+    ResourceServiceState.current.quantumResources.entanglements.status = "critical";
+  } else if (ResourceServiceState.current.quantumResources.entanglements.usage >= ResourceServiceConfig.quantumResourceWarningThreshold) {
+    ResourceServiceState.current.quantumResources.entanglements.status = "warning";
+  } else {
+    ResourceServiceState.current.quantumResources.entanglements.status = "normal";
+  }
+  
+  // 检查状态变化并触发事件
+  if (prev.cpu !== ResourceServiceState.current.cpu.status) {
+    triggerEvent(ResourceServiceState.current.cpu.status, {
+      resource: "cpu",
+      previousStatus: prev.cpu,
+      currentStatus: ResourceServiceState.current.cpu.status,
+      usage: ResourceServiceState.current.cpu.usage
+    });
+  }
+  
+  if (prev.memory !== ResourceServiceState.current.memory.status) {
+    triggerEvent(ResourceServiceState.current.memory.status, {
+      resource: "memory",
+      previousStatus: prev.memory,
+      currentStatus: ResourceServiceState.current.memory.status,
+      usage: ResourceServiceState.current.memory.usage
+    });
+  }
+  
+  if (prev.storage !== ResourceServiceState.current.storage.status) {
+    triggerEvent(ResourceServiceState.current.storage.status, {
+      resource: "storage",
+      previousStatus: prev.storage,
+      currentStatus: ResourceServiceState.current.storage.status,
+      usage: ResourceServiceState.current.storage.usage
+    });
+  }
+  
+  if (prev.qubits !== ResourceServiceState.current.quantumResources.qubits.status) {
+    triggerEvent(ResourceServiceState.current.quantumResources.qubits.status, {
+      resource: "qubits",
+      previousStatus: prev.qubits,
+      currentStatus: ResourceServiceState.current.quantumResources.qubits.status,
+      usage: ResourceServiceState.current.quantumResources.qubits.usage
+    });
+  }
+  
+  if (prev.entanglements !== ResourceServiceState.current.quantumResources.entanglements.status) {
+    triggerEvent(ResourceServiceState.current.quantumResources.entanglements.status, {
+      resource: "entanglements",
+      previousStatus: prev.entanglements,
+      currentStatus: ResourceServiceState.current.quantumResources.entanglements.status,
+      usage: ResourceServiceState.current.quantumResources.entanglements.usage
+    });
+  }
+}
+
+/**
+ * 监控资源使用情况
+ */
+function monitorResources() {
+  try {
+    // 获取最新系统信息
+    updateSystemInformation();
+    
+    // 记录历史数据
+    const timestamp = Date.now();
+    
+    ResourceServiceState.history.cpu.push({
+      timestamp,
+      usage: ResourceServiceState.current.cpu.usage,
+      status: ResourceServiceState.current.cpu.status
+    });
+    
+    ResourceServiceState.history.memory.push({
+      timestamp,
+      total: ResourceServiceState.current.memory.total,
+      used: ResourceServiceState.current.memory.used,
+      free: ResourceServiceState.current.memory.free,
+      usage: ResourceServiceState.current.memory.usage,
+      status: ResourceServiceState.current.memory.status
+    });
+    
+    ResourceServiceState.history.storage.push({
+      timestamp,
+      total: ResourceServiceState.current.storage.total,
+      used: ResourceServiceState.current.storage.used,
+      free: ResourceServiceState.current.storage.free,
+      usage: ResourceServiceState.current.storage.usage,
+      status: ResourceServiceState.current.storage.status
+    });
+    
+    ResourceServiceState.history.network.push({
+      timestamp,
+      bytesReceived: ResourceServiceState.current.network.bytesReceived,
+      bytesSent: ResourceServiceState.current.network.bytesSent,
+      packetsReceived: ResourceServiceState.current.network.packetsReceived,
+      packetsSent: ResourceServiceState.current.network.packetsSent
+    });
+    
+    ResourceServiceState.history.quantumResources.push({
+      timestamp,
+      qubits: {
+        total: ResourceServiceState.current.quantumResources.qubits.total,
+        used: ResourceServiceState.current.quantumResources.qubits.used,
+        usage: ResourceServiceState.current.quantumResources.qubits.usage,
+        status: ResourceServiceState.current.quantumResources.qubits.status
+      },
+      entanglements: {
+        total: ResourceServiceState.current.quantumResources.entanglements.total,
+        used: ResourceServiceState.current.quantumResources.entanglements.used,
+        usage: ResourceServiceState.current.quantumResources.entanglements.usage,
+        status: ResourceServiceState.current.quantumResources.entanglements.status
+      }
+    });
+    
+    // 清理过期历史记录
+    cleanupHistory();
+    
+    // 触发资源变化事件
+    triggerEvent("changed", {
+      timestamp,
+      cpu: { ...ResourceServiceState.current.cpu },
+      memory: { ...ResourceServiceState.current.memory },
+      storage: { ...ResourceServiceState.current.storage },
+      network: { ...ResourceServiceState.current.network },
+      quantumResources: { ...ResourceServiceState.current.quantumResources }
+    });
+  } catch (error) {
+    logger.error(`[资源服务] 监控资源失败: ${error.message}`);
+  }
+}
+
+/**
+ * 清理过期历史记录
+ */
+function cleanupHistory() {
+  const minTime = Date.now() - ResourceServiceConfig.historyRetentionTime;
+  
+  for (const type in ResourceServiceState.history) {
+    ResourceServiceState.history[type] = ResourceServiceState.history[type].filter(
+      entry => entry.timestamp >= minTime
+    );
+  }
+}
+
+/**
+ * 优化资源分配
+ * 
+ * @returns {boolean} - 是否优化成功
+ */
+function optimizeResources() {
+  try {
+    logger.info("[资源服务] 正在执行资源优化...");
+    
+    // 根据当前策略优化资源
+    switch (ResourceServiceConfig.allocationStrategy) {
+      case "performance":
+        optimizeForPerformance();
+        break;
+      case "energy-saving":
+        optimizeForEnergySaving();
+        break;
+      case "balanced":
+      default:
+        optimizeForBalance();
+        break;
+    }
+    
+    logger.info("[资源服务] 资源优化完成");
+    return true;
+  } catch (error) {
+    logger.error(`[资源服务] 资源优化失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 平衡优化资源
+ */
+function optimizeForBalance() {
+  // 平衡CPU、内存和量子资源
+  quantum_resource_manager.optimizeResources({
+    strategy: "balanced",
+    prioritizeCritical: true
+  });
+}
+
+/**
+ * 针对性能优化资源
+ */
+function optimizeForPerformance() {
+  // 优先考虑CPU和量子处理性能
+  quantum_resource_manager.optimizeResources({
+    strategy: "performance",
+    prioritizeCritical: true,
+    scaleUpQubits: true
+  });
+}
+
+/**
+ * 针对节能优化资源
+ */
+function optimizeForEnergySaving() {
+  // 优先考虑能耗
+  quantum_resource_manager.optimizeResources({
+    strategy: "energy-saving",
+    consolidateResources: true
+  });
+}
+
+/**
+ * 更新资源使用情况
+ * 计算活动预留使用的资源
+ */
+function updateResourceUsage() {
+  // 重置量子资源使用计数
+  quantum_resource_manager.resetUsageCounters();
+  
+  // 计算所有活动预留
+  for (const reservationId in ResourceServiceState.reservations) {
+    const reservation = ResourceServiceState.reservations[reservationId];
+    
+    if (reservation.active) {
+      // 如果预留已过期，释放它
+      if (reservation.expiresAt > 0 && Date.now() > reservation.expiresAt) {
+        releaseResources(reservationId);
+        continue;
+      }
+      
+      // 更新资源使用计数
+      if (reservation.resources.qubits > 0) {
+        quantum_resource_manager.allocateQubits(reservation.resources.qubits);
+      }
+    }
+  }
+  
+  // 更新系统信息以反映新的使用情况
+  updateSystemInformation();
+}
+
+/**
+ * 检查资源是否可用
+ * 
+ * @param {Object} resources - 请求的资源
+ * @returns {boolean} - 资源是否可用
+ */
+function areResourcesAvailable(resources) {
+  // 检查CPU
+  if (resources.cpu && ResourceServiceState.current.cpu.status === "critical") {
+    return false;
+  }
+  
+  // 检查内存
+  if (resources.memory) {
+    const freeMemory = ResourceServiceState.current.memory.free;
+    if (resources.memory > freeMemory) {
+      return false;
+    }
+  }
+  
+  // 检查存储
+  if (resources.storage) {
+    const freeStorage = ResourceServiceState.current.storage.free;
+    if (resources.storage > freeStorage) {
+      return false;
+    }
+  }
+  
+  // 检查量子比特
+  if (resources.qubits) {
+    const freeQubits = 
+      ResourceServiceState.current.quantumResources.qubits.total - 
+      ResourceServiceState.current.quantumResources.qubits.used;
+    
+    if (resources.qubits > freeQubits) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * 生成预留ID
+ * 
+ * @returns {string} - 预留ID
+ */
+function generateReservationId() {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000000);
+  return `rsv-${timestamp}-${random}`;
+}
+
+/**
+ * 触发事件
+ * 
+ * @param {string} eventName - 事件名称
+ * @param {Object} eventData - 事件数据
+ */
+function triggerEvent(eventName, eventData) {
+  if (!ResourceServiceState.eventListeners[eventName]) {
+    return;
+  }
+  
+  for (const listener of ResourceServiceState.eventListeners[eventName]) {
+    try {
+      listener(eventData);
+    } catch (error) {
+      logger.warn(`[资源服务] 事件监听器执行失败: ${error.message}`);
+    }
+  }
+}
+
+// 导出资源服务模块
+export default {
+  initialize,
+  getCurrentUsage,
+  getUsageHistory,
+  reserveResources,
+  releaseResources,
+  addEventListener,
+  removeEventListener,
+  triggerOptimization,
+  setAllocationStrategy,
+  getStatus
+}; 

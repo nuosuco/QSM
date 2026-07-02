@@ -1,0 +1,673 @@
+/**
+ * @file entanglement_manager.qentl
+ * @brief 量子纠缠管理器实现
+ * 
+ * 量子基因编码: QGC-ENTANGLEMENT-MGR-2024062801
+ * 量子纠缠信道: QEC-VM-QUANTUM-02
+ */
+
+import "QEntL/core/map.qentl";
+import "QEntL/core/set.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/vm/src/core/quantum/complex.qentl";
+import "QEntL/vm/src/core/quantum/quantum_state_processor.qentl";
+
+/**
+ * @class EntanglementRelation
+ * @brief 表示两个量子状态之间的纠缠关系
+ */
+quantum_class EntanglementRelation {
+    private {
+        sourceStateId: Number;        // 源量子状态ID
+        targetStateId: Number;        // 目标量子状态ID
+        sourceQubits: Array<Number>;  // 源量子比特索引
+        targetQubits: Array<Number>;  // 目标量子比特索引
+        strength: Number;             // 纠缠强度 (0.0-1.0)
+        active: Boolean;              // 纠缠关系是否激活
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(source: Number, target: Number, 
+                sourceQubits: Array<Number>, targetQubits: Array<Number>,
+                strength: Number = 1.0) {
+        this.sourceStateId = source;
+        this.targetStateId = target;
+        this.sourceQubits = sourceQubits;
+        this.targetQubits = targetQubits;
+        this.strength = strength;
+        this.active = true;
+        
+        // 验证源和目标量子比特数量相同
+        if (sourceQubits.length !== targetQubits.length) {
+            throw new Error("源和目标量子比特数量必须相同");
+        }
+    }
+    
+    /**
+     * @brief 获取源量子状态ID
+     */
+    public function getSourceStateId(): Number {
+        return this.sourceStateId;
+    }
+    
+    /**
+     * @brief 获取目标量子状态ID
+     */
+    public function getTargetStateId(): Number {
+        return this.targetStateId;
+    }
+    
+    /**
+     * @brief 获取源量子比特索引数组
+     */
+    public function getSourceQubits(): Array<Number> {
+        return this.sourceQubits;
+    }
+    
+    /**
+     * @brief 获取目标量子比特索引数组
+     */
+    public function getTargetQubits(): Array<Number> {
+        return this.targetQubits;
+    }
+    
+    /**
+     * @brief 获取纠缠强度
+     */
+    public function getStrength(): Number {
+        return this.strength;
+    }
+    
+    /**
+     * @brief 设置纠缠强度
+     */
+    public function setStrength(value: Number): void {
+        if (value < 0.0 || value > 1.0) {
+            throw new Error("纠缠强度必须在0.0到1.0之间");
+        }
+        this.strength = value;
+    }
+    
+    /**
+     * @brief 判断纠缠关系是否激活
+     */
+    public function isActive(): Boolean {
+        return this.active;
+    }
+    
+    /**
+     * @brief 激活纠缠关系
+     */
+    public function activate(): void {
+        this.active = true;
+    }
+    
+    /**
+     * @brief 禁用纠缠关系
+     */
+    public function deactivate(): void {
+        this.active = false;
+    }
+    
+    /**
+     * @brief 获取纠缠关系的唯一标识符
+     */
+    public function getIdentifier(): String {
+        return `${this.sourceStateId}-${this.targetStateId}`;
+    }
+    
+    /**
+     * @brief 判断是否包含指定的量子比特
+     */
+    public function containsQubit(stateId: Number, qubitIdx: Number): Boolean {
+        if (stateId === this.sourceStateId) {
+            return this.sourceQubits.includes(qubitIdx);
+        } else if (stateId === this.targetStateId) {
+            return this.targetQubits.includes(qubitIdx);
+        }
+        return false;
+    }
+    
+    /**
+     * @brief 获取关联的量子比特索引
+     * @param stateId 状态ID
+     * @param qubitIdx 量子比特索引
+     * @return 关联状态ID和量子比特索引的数组，格式为 [stateId, qubitIdx]
+     */
+    public function getEntangledQubit(stateId: Number, qubitIdx: Number): Array<Number> {
+        if (stateId === this.sourceStateId) {
+            const index = this.sourceQubits.indexOf(qubitIdx);
+            if (index !== -1) {
+                return [this.targetStateId, this.targetQubits[index]];
+            }
+        } else if (stateId === this.targetStateId) {
+            const index = this.targetQubits.indexOf(qubitIdx);
+            if (index !== -1) {
+                return [this.sourceStateId, this.sourceQubits[index]];
+            }
+        }
+        return null;
+    }
+}
+
+/**
+ * @class EntanglementManager
+ * @brief 管理量子状态之间的纠缠关系
+ */
+quantum_class EntanglementManager {
+    private {
+        relations: Array<EntanglementRelation>;  // 纠缠关系数组
+        stateRelations: Map<Number, Set<Number>>;  // 状态ID到关系索引的映射
+        quantumProcessor: QuantumStateProcessor;  // 量子状态处理器引用
+        defaultActive: Boolean;                  // 默认激活状态
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(quantumProcessor: QuantumStateProcessor, defaultActive: Boolean = true) {
+        this.relations = [];
+        this.stateRelations = new Map<Number, Set<Number>>();
+        this.quantumProcessor = quantumProcessor;
+        this.defaultActive = defaultActive;
+    }
+    
+    /**
+     * @brief 创建两个量子状态之间的纠缠关系
+     * @return 关系ID
+     */
+    public function createEntanglement(
+        sourceStateId: Number, 
+        targetStateId: Number, 
+        sourceQubits: Array<Number>, 
+        targetQubits: Array<Number>,
+        strength: Number = 1.0
+    ): Number {
+        // 验证状态存在
+        this.validateStates(sourceStateId, targetStateId);
+        
+        // 验证量子比特索引
+        this.validateQubits(sourceStateId, sourceQubits);
+        this.validateQubits(targetStateId, targetQubits);
+        
+        // 检查这些量子比特是否已经纠缠
+        this.validateNoExistingEntanglement(sourceStateId, sourceQubits);
+        this.validateNoExistingEntanglement(targetStateId, targetQubits);
+        
+        // 创建纠缠关系
+        const relation = new EntanglementRelation(
+            sourceStateId, 
+            targetStateId, 
+            sourceQubits, 
+            targetQubits, 
+            strength
+        );
+        
+        // 设置默认激活状态
+        if (this.defaultActive) {
+            relation.activate();
+        } else {
+            relation.deactivate();
+        }
+        
+        // 添加到关系数组
+        const relationId = this.relations.length;
+        this.relations.push(relation);
+        
+        // 更新状态关系映射
+        this.addStateRelation(sourceStateId, relationId);
+        this.addStateRelation(targetStateId, relationId);
+        
+        return relationId;
+    }
+    
+    /**
+     * @brief 删除纠缠关系
+     */
+    public function removeEntanglement(relationId: Number): void {
+        if (relationId < 0 || relationId >= this.relations.length) {
+            throw new Error(`无效的纠缠关系ID: ${relationId}`);
+        }
+        
+        const relation = this.relations[relationId];
+        
+        // 从状态关系映射中删除
+        this.removeStateRelation(relation.getSourceStateId(), relationId);
+        this.removeStateRelation(relation.getTargetStateId(), relationId);
+        
+        // 将关系标记为无效（不从数组中删除以保持索引）
+        relation.deactivate();
+    }
+    
+    /**
+     * @brief 激活纠缠关系
+     */
+    public function activateEntanglement(relationId: Number): void {
+        if (relationId < 0 || relationId >= this.relations.length) {
+            throw new Error(`无效的纠缠关系ID: ${relationId}`);
+        }
+        
+        this.relations[relationId].activate();
+    }
+    
+    /**
+     * @brief 禁用纠缠关系
+     */
+    public function deactivateEntanglement(relationId: Number): void {
+        if (relationId < 0 || relationId >= this.relations.length) {
+            throw new Error(`无效的纠缠关系ID: ${relationId}`);
+        }
+        
+        this.relations[relationId].deactivate();
+    }
+    
+    /**
+     * @brief 设置纠缠强度
+     */
+    public function setEntanglementStrength(relationId: Number, strength: Number): void {
+        if (relationId < 0 || relationId >= this.relations.length) {
+            throw new Error(`无效的纠缠关系ID: ${relationId}`);
+        }
+        
+        this.relations[relationId].setStrength(strength);
+    }
+    
+    /**
+     * @brief 获取纠缠关系
+     */
+    public function getEntanglement(relationId: Number): EntanglementRelation {
+        if (relationId < 0 || relationId >= this.relations.length) {
+            throw new Error(`无效的纠缠关系ID: ${relationId}`);
+        }
+        
+        return this.relations[relationId];
+    }
+    
+    /**
+     * @brief 获取状态的所有纠缠关系
+     */
+    public function getStateEntanglements(stateId: Number): Array<Number> {
+        this.validateState(stateId);
+        
+        if (!this.stateRelations.has(stateId)) {
+            return [];
+        }
+        
+        const relationIndices = this.stateRelations.get(stateId);
+        const result = [];
+        
+        for (const relationId of relationIndices) {
+            if (this.relations[relationId].isActive()) {
+                result.push(relationId);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 测量量子比特并传播纠缠影响
+     * @param stateId 状态ID
+     * @param qubitIdx 量子比特索引
+     * @param measurementResult 测量结果 (0或1)
+     */
+    public function propagateEntanglementEffect(stateId: Number, qubitIdx: Number, measurementResult: Number): void {
+        this.validateState(stateId);
+        
+        if (!this.stateRelations.has(stateId)) {
+            return; // 没有纠缠关系，无需传播
+        }
+        
+        const relationIndices = this.stateRelations.get(stateId);
+        const visitedStates = new Set<Number>();
+        visitedStates.add(stateId);
+        
+        // 收集需要传播的纠缠关系
+        const propagationQueue = [];
+        
+        for (const relationId of relationIndices) {
+            const relation = this.relations[relationId];
+            
+            if (!relation.isActive()) {
+                continue;
+            }
+            
+            if (relation.containsQubit(stateId, qubitIdx)) {
+                const entangledInfo = relation.getEntangledQubit(stateId, qubitIdx);
+                if (entangledInfo !== null) {
+                    const [entangledStateId, entangledQubitIdx] = entangledInfo;
+                    
+                    // 添加到传播队列
+                    propagationQueue.push({
+                        stateId: entangledStateId,
+                        qubitIdx: entangledQubitIdx,
+                        result: measurementResult,
+                        strength: relation.getStrength()
+                    });
+                    
+                    visitedStates.add(entangledStateId);
+                }
+            }
+        }
+        
+        // 处理传播队列
+        while (propagationQueue.length > 0) {
+            const { stateId, qubitIdx, result, strength } = propagationQueue.shift();
+            
+            // 根据纠缠强度计算坍缩概率
+            // 如果强度为1.0，总是遵循源测量结果
+            // 如果强度较低，有一定概率保持独立状态
+            const random = Math.random();
+            if (random <= strength) {
+                // 执行状态坍缩
+                this.quantumProcessor.enforceQubitState(stateId, qubitIdx, result);
+                
+                // 递归传播到其他纠缠的量子比特
+                if (this.stateRelations.has(stateId)) {
+                    const furtherRelations = this.stateRelations.get(stateId);
+                    
+                    for (const furtherRelationId of furtherRelations) {
+                        const furtherRelation = this.relations[furtherRelationId];
+                        
+                        if (!furtherRelation.isActive()) {
+                            continue;
+                        }
+                        
+                        if (furtherRelation.containsQubit(stateId, qubitIdx)) {
+                            const entangledInfo = furtherRelation.getEntangledQubit(stateId, qubitIdx);
+                            if (entangledInfo !== null) {
+                                const [nextStateId, nextQubitIdx] = entangledInfo;
+                                
+                                // 如果这个状态尚未访问，添加到传播队列
+                                if (!visitedStates.has(nextStateId)) {
+                                    propagationQueue.push({
+                                        stateId: nextStateId,
+                                        qubitIdx: nextQubitIdx,
+                                        result: result,
+                                        // 强度在传播中会逐渐减弱
+                                        strength: strength * furtherRelation.getStrength()
+                                    });
+                                    
+                                    visitedStates.add(nextStateId);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 应用门操作并传播纠缠效果
+     */
+    public function propagateGateEffect(stateId: Number, gate: String, qubitIndices: Array<Number>, params: Array<Number> = null): void {
+        this.validateState(stateId);
+        
+        if (!this.stateRelations.has(stateId)) {
+            return; // 没有纠缠关系，无需传播
+        }
+        
+        const relationIndices = this.stateRelations.get(stateId);
+        const visitedStates = new Set<Number>();
+        visitedStates.add(stateId);
+        
+        // 收集需要传播的纠缠关系
+        const propagationQueue = [];
+        
+        for (const relationId of relationIndices) {
+            const relation = this.relations[relationId];
+            
+            if (!relation.isActive()) {
+                continue;
+            }
+            
+            // 检查门操作是否影响任何纠缠的量子比特
+            let affected = false;
+            const entangledOps = [];
+            
+            for (const qubitIdx of qubitIndices) {
+                if (relation.containsQubit(stateId, qubitIdx)) {
+                    affected = true;
+                    const entangledInfo = relation.getEntangledQubit(stateId, qubitIdx);
+                    if (entangledInfo !== null) {
+                        const [entangledStateId, entangledQubitIdx] = entangledInfo;
+                        entangledOps.push({
+                            sourceQubit: qubitIdx,
+                            targetStateId: entangledStateId,
+                            targetQubit: entangledQubitIdx
+                        });
+                    }
+                }
+            }
+            
+            if (affected) {
+                // 如果是单量子比特门，可以直接传播
+                if (qubitIndices.length === 1 && entangledOps.length === 1) {
+                    const { targetStateId, targetQubit } = entangledOps[0];
+                    
+                    propagationQueue.push({
+                        stateId: targetStateId,
+                        gate: gate,
+                        qubits: [targetQubit],
+                        params: params,
+                        strength: relation.getStrength()
+                    });
+                    
+                    visitedStates.add(targetStateId);
+                }
+                // 对于多量子比特门，需要考虑逻辑映射关系
+                else if (qubitIndices.length > 1 && gate === "CNOT" || gate === "CZ" || gate === "SWAP") {
+                    // 创建纠缠量子比特映射
+                    const qubitMap = new Map<Number, Number>();
+                    let allQubitsEntangled = true;
+                    
+                    for (const op of entangledOps) {
+                        qubitMap.set(op.sourceQubit, op.targetQubit);
+                    }
+                    
+                    // 检查所有量子比特是否都有纠缠
+                    for (const qubit of qubitIndices) {
+                        if (!qubitMap.has(qubit)) {
+                            allQubitsEntangled = false;
+                            break;
+                        }
+                    }
+                    
+                    // 只有当所有涉及的量子比特都有纠缠时才传播多量子比特门
+                    if (allQubitsEntangled) {
+                        const targetQubits = [];
+                        for (const qubit of qubitIndices) {
+                            targetQubits.push(qubitMap.get(qubit));
+                        }
+                        
+                        const targetStateId = entangledOps[0].targetStateId;
+                        
+                        propagationQueue.push({
+                            stateId: targetStateId,
+                            gate: gate,
+                            qubits: targetQubits,
+                            params: params,
+                            strength: relation.getStrength()
+                        });
+                        
+                        visitedStates.add(targetStateId);
+                    }
+                }
+            }
+        }
+        
+        // 处理传播队列
+        while (propagationQueue.length > 0) {
+            const { stateId, gate, qubits, params, strength } = propagationQueue.shift();
+            
+            // 根据纠缠强度决定是否应用门操作
+            const random = Math.random();
+            if (random <= strength) {
+                // 应用相应的门操作
+                if (qubits.length === 1) {
+                    this.quantumProcessor.applySingleQubitGate(stateId, gate, qubits[0], params);
+                } else if (qubits.length === 2) {
+                    this.quantumProcessor.applyTwoQubitGate(stateId, gate, qubits[0], qubits[1]);
+                }
+                
+                // 递归传播门效果
+                // 注意：这里可能需要防止无限循环，比如通过减少传播强度或限制深度
+                if (this.stateRelations.has(stateId)) {
+                    // 门操作的传播可能导致复杂的网络效应
+                    // 在此简化处理，只传播一层
+                    // 实际系统中可能需要更复杂的传播策略
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 验证状态ID
+     */
+    private function validateState(stateId: Number): void {
+        try {
+            this.quantumProcessor.getState(stateId);
+        } catch (e) {
+            throw new Error(`无效的量子状态ID: ${stateId}`);
+        }
+    }
+    
+    /**
+     * @brief 验证两个状态ID
+     */
+    private function validateStates(sourceStateId: Number, targetStateId: Number): void {
+        this.validateState(sourceStateId);
+        this.validateState(targetStateId);
+        
+        if (sourceStateId === targetStateId) {
+            throw new Error("源状态和目标状态不能相同");
+        }
+    }
+    
+    /**
+     * @brief 验证量子比特索引
+     */
+    private function validateQubits(stateId: Number, qubits: Array<Number>): void {
+        const state = this.quantumProcessor.getState(stateId);
+        const numQubits = state.getNumQubits();
+        
+        for (const qubit of qubits) {
+            if (qubit < 0 || qubit >= numQubits) {
+                throw new Error(`无效的量子比特索引: ${qubit}`);
+            }
+        }
+    }
+    
+    /**
+     * @brief 验证没有现有的纠缠
+     */
+    private function validateNoExistingEntanglement(stateId: Number, qubits: Array<Number>): void {
+        if (!this.stateRelations.has(stateId)) {
+            return;
+        }
+        
+        const relationIndices = this.stateRelations.get(stateId);
+        
+        for (const relationId of relationIndices) {
+            const relation = this.relations[relationId];
+            
+            if (!relation.isActive()) {
+                continue;
+            }
+            
+            for (const qubit of qubits) {
+                if (relation.containsQubit(stateId, qubit)) {
+                    throw new Error(`量子比特 ${qubit} 已经纠缠`);
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 将状态与关系ID关联
+     */
+    private function addStateRelation(stateId: Number, relationId: Number): void {
+        if (!this.stateRelations.has(stateId)) {
+            this.stateRelations.set(stateId, new Set<Number>());
+        }
+        
+        this.stateRelations.get(stateId).add(relationId);
+    }
+    
+    /**
+     * @brief 移除状态与关系ID的关联
+     */
+    private function removeStateRelation(stateId: Number, relationId: Number): void {
+        if (this.stateRelations.has(stateId)) {
+            this.stateRelations.get(stateId).delete(relationId);
+            
+            // 如果集合为空，删除映射项
+            if (this.stateRelations.get(stateId).size === 0) {
+                this.stateRelations.delete(stateId);
+            }
+        }
+    }
+}
+
+// 扩展QuantumStateProcessor以支持纠缠
+quantum_extension QuantumStateProcessor {
+    /**
+     * @brief 强制设置量子比特状态（用于纠缠传播）
+     */
+    public function enforceQubitState(stateId: Number, qubitIdx: Number, value: Number): void {
+        const state = this.getState(stateId);
+        const dimension = state.getDimension();
+        const amplitudes = state.getAmplitudes();
+        
+        // 计算归一化因子
+        let normFactor = 0;
+        for (let i = 0; i < dimension; i++) {
+            // 检查第qubitIdx位是否与结果一致
+            const bitValue = (i & (1 << qubitIdx)) !== 0 ? 1 : 0;
+            if (bitValue === value) {
+                normFactor += amplitudes[i].normSquared();
+            }
+        }
+        
+        // 如果概率为零，创建一个随机状态
+        if (Math.abs(normFactor) < 1e-10) {
+            normFactor = 1.0;
+            // 将所有可能的状态设置为等概率
+            let count = 0;
+            for (let i = 0; i < dimension; i++) {
+                const bitValue = (i & (1 << qubitIdx)) !== 0 ? 1 : 0;
+                if (bitValue === value) {
+                    count++;
+                }
+            }
+            
+            const amplitude = new Complex(1.0 / Math.sqrt(count), 0);
+            for (let i = 0; i < dimension; i++) {
+                const bitValue = (i & (1 << qubitIdx)) !== 0 ? 1 : 0;
+                if (bitValue === value) {
+                    state.setAmplitude(i, amplitude);
+                } else {
+                    state.setAmplitude(i, new Complex(0, 0));
+                }
+            }
+            return;
+        }
+        
+        normFactor = 1.0 / Math.sqrt(normFactor);
+        
+        // 坍缩态并归一化
+        for (let i = 0; i < dimension; i++) {
+            const bitValue = (i & (1 << qubitIdx)) !== 0 ? 1 : 0;
+            if (bitValue === value) {
+                state.setAmplitude(i, amplitudes[i].multiply(normFactor));
+            } else {
+                state.setAmplitude(i, new Complex(0, 0));
+            }
+        }
+    }
+}
+
+export { EntanglementRelation, EntanglementManager }; 

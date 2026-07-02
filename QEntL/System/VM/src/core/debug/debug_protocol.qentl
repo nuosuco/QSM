@@ -1,0 +1,326 @@
+/**
+ * @file debug_protocol.qentl
+ * @brief QEntL虚拟机调试协议定义
+ * 
+ * 量子基因编码: QGC-VM-DEBUGPROTO-2024062801
+ * 量子纠缠信道: QEC-VM-DEBUG-05
+ */
+
+// 调试消息类型
+export enum DebugMessageType {
+    // 请求消息
+    REQUEST = 1,
+    // 响应消息
+    RESPONSE = 2,
+    // 通知消息
+    NOTIFICATION = 3
+}
+
+// 调试命令
+export enum DebugCommand {
+    // 通用命令
+    INITIALIZE = 1,
+    TERMINATE = 2,
+    
+    // 执行控制
+    START = 10,
+    PAUSE = 11,
+    CONTINUE = 12,
+    STEP_OVER = 13,
+    STEP_INTO = 14,
+    STEP_OUT = 15,
+    RESTART = 16,
+    
+    // 断点管理
+    SET_BREAKPOINT = 20,
+    REMOVE_BREAKPOINT = 21,
+    ENABLE_BREAKPOINT = 22,
+    DISABLE_BREAKPOINT = 23,
+    LIST_BREAKPOINTS = 24,
+    CLEAR_BREAKPOINTS = 25,
+    
+    // 状态查询
+    GET_VARIABLES = 30,
+    GET_CALLSTACK = 31,
+    GET_SOURCE = 32,
+    EVALUATE_EXPRESSION = 33,
+    GET_MEMORY = 34,
+    GET_REGISTERS = 35,
+    
+    // 配置操作
+    GET_CONFIG = 40,
+    SET_CONFIG = 41,
+    RESET_CONFIG = 42,
+    
+    // 事件
+    EVENT_STOPPED = 50,
+    EVENT_CONTINUED = 51,
+    EVENT_EXITED = 52,
+    EVENT_BREAKPOINT_HIT = 53,
+    EVENT_OUTPUT = 54,
+    EVENT_ERROR = 55
+}
+
+// 调试错误码
+export enum DebugErrorCode {
+    // 成功
+    SUCCESS = 0,
+    // 未知错误
+    UNKNOWN_ERROR = 1,
+    // 通信错误
+    COMMUNICATION_ERROR = 2,
+    // 无效命令
+    INVALID_COMMAND = 3,
+    // 无效参数
+    INVALID_PARAMETER = 4,
+    // 调试器未初始化
+    NOT_INITIALIZED = 5,
+    // 无效状态（不能在当前状态执行请求的操作）
+    INVALID_STATE = 6,
+    // 内部错误
+    INTERNAL_ERROR = 7,
+    // 资源不存在
+    RESOURCE_NOT_FOUND = 8
+}
+
+// 调试停止原因
+export enum StopReason {
+    // 断点
+    BREAKPOINT = 1,
+    // 断言
+    ASSERTION = 2,
+    // 异常
+    EXCEPTION = 3,
+    // 暂停请求
+    PAUSE = 4,
+    // 单步执行
+    STEP = 5,
+    // 入口点
+    ENTRY = 6,
+    // 退出点
+    EXIT = 7
+}
+
+// 调试消息接口
+export interface DebugMessage {
+    // 消息类型
+    type: DebugMessageType;
+    // 命令
+    command: DebugCommand;
+    // 序列号
+    seq: number;
+}
+
+// 调试请求消息
+export interface DebugRequest extends DebugMessage {
+    // 消息类型为请求
+    type: DebugMessageType.REQUEST;
+    // 参数
+    arguments?: any;
+}
+
+// 调试响应消息
+export interface DebugResponse extends DebugMessage {
+    // 消息类型为响应
+    type: DebugMessageType.RESPONSE;
+    // 请求序列号
+    request_seq: number;
+    // 成功标志
+    success: boolean;
+    // 错误码
+    errorCode?: DebugErrorCode;
+    // 错误消息
+    errorMessage?: string;
+    // 响应体
+    body?: any;
+}
+
+// 调试通知消息
+export interface DebugNotification extends DebugMessage {
+    // 消息类型为通知
+    type: DebugMessageType.NOTIFICATION;
+    // 通知体
+    body?: any;
+}
+
+// 断点信息
+export interface BreakpointInfo {
+    // 断点ID
+    id: number;
+    // 断点类型
+    type: number;
+    // 位置
+    location: string | number;
+    // 是否启用
+    enabled: boolean;
+    // 命中次数
+    hitCount: number;
+    // 条件
+    condition?: string;
+}
+
+// 变量信息
+export interface VariableInfo {
+    // 变量名
+    name: string;
+    // 变量类型
+    type: string;
+    // 变量值
+    value: any;
+    // 变量地址
+    address?: number;
+}
+
+// 调用栈帧信息
+export interface StackFrameInfo {
+    // 帧ID
+    id: number;
+    // 函数名
+    name: string;
+    // 源文件
+    source?: string;
+    // 行号
+    line?: number;
+    // 列号
+    column?: number;
+}
+
+// 源代码信息
+export interface SourceInfo {
+    // 源文件路径
+    filePath: string;
+    // 当前行
+    currentLine: number;
+    // 源代码内容（行数组）
+    content: string[];
+}
+
+// 内存区域信息
+export interface MemoryInfo {
+    // 起始地址
+    address: number;
+    // 大小
+    size: number;
+    // 内容（十六进制字符串）
+    content: string;
+}
+
+// 停止事件信息
+export interface StoppedEventInfo {
+    // 停止原因
+    reason: StopReason;
+    // 描述
+    description?: string;
+    // 源文件
+    source?: string;
+    // 行号
+    line?: number;
+    // 列号
+    column?: number;
+    // 命中的断点ID（如果是断点导致的停止）
+    breakpointId?: number;
+}
+
+// 调试协议辅助类
+export class DebugProtocol {
+    // 当前序列号
+    private static currentSeq: number = 1;
+    
+    // 生成请求消息
+    public static createRequest(command: DebugCommand, args?: any): DebugRequest {
+        return {
+            type: DebugMessageType.REQUEST,
+            command: command,
+            seq: this.nextSeq(),
+            arguments: args
+        };
+    }
+    
+    // 生成成功响应消息
+    public static createResponse(request: DebugRequest, body?: any): DebugResponse {
+        return {
+            type: DebugMessageType.RESPONSE,
+            command: request.command,
+            seq: this.nextSeq(),
+            request_seq: request.seq,
+            success: true,
+            body: body
+        };
+    }
+    
+    // 生成错误响应消息
+    public static createErrorResponse(
+        request: DebugRequest,
+        errorCode: DebugErrorCode,
+        errorMessage: string
+    ): DebugResponse {
+        return {
+            type: DebugMessageType.RESPONSE,
+            command: request.command,
+            seq: this.nextSeq(),
+            request_seq: request.seq,
+            success: false,
+            errorCode: errorCode,
+            errorMessage: errorMessage
+        };
+    }
+    
+    // 生成通知消息
+    public static createNotification(command: DebugCommand, body?: any): DebugNotification {
+        return {
+            type: DebugMessageType.NOTIFICATION,
+            command: command,
+            seq: this.nextSeq(),
+            body: body
+        };
+    }
+    
+    // 获取下一个序列号
+    private static nextSeq(): number {
+        return this.currentSeq++;
+    }
+    
+    // 将消息序列化为JSON字符串
+    public static stringifyMessage(message: DebugMessage): string {
+        return JSON.stringify(message);
+    }
+    
+    // 从JSON字符串解析消息
+    public static parseMessage(json: string): DebugMessage {
+        try {
+            return JSON.parse(json) as DebugMessage;
+        } catch (e) {
+            throw new Error(`无法解析调试消息: ${e}`);
+        }
+    }
+    
+    // 创建停止事件通知
+    public static createStoppedEvent(info: StoppedEventInfo): DebugNotification {
+        return this.createNotification(DebugCommand.EVENT_STOPPED, info);
+    }
+    
+    // 创建继续事件通知
+    public static createContinuedEvent(): DebugNotification {
+        return this.createNotification(DebugCommand.EVENT_CONTINUED);
+    }
+    
+    // 创建退出事件通知
+    public static createExitedEvent(exitCode: number): DebugNotification {
+        return this.createNotification(DebugCommand.EVENT_EXITED, { exitCode });
+    }
+    
+    // 创建断点命中事件通知
+    public static createBreakpointHitEvent(breakpointId: number): DebugNotification {
+        return this.createNotification(DebugCommand.EVENT_BREAKPOINT_HIT, { breakpointId });
+    }
+    
+    // 创建输出事件通知
+    public static createOutputEvent(output: string, category: string = "console"): DebugNotification {
+        return this.createNotification(DebugCommand.EVENT_OUTPUT, { output, category });
+    }
+    
+    // 创建错误事件通知
+    public static createErrorEvent(error: string): DebugNotification {
+        return this.createNotification(DebugCommand.EVENT_ERROR, { error });
+    }
+} 

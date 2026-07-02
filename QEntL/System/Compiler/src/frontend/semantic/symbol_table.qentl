@@ -1,0 +1,227 @@
+/**
+ * @file symbol_table.qentl
+ * @brief 符号表实现
+ * 
+ * 量子基因编码: QGC-COMPILER-SYMTABLE-2024061901
+ * 量子纠缠信道: QEC-COMPILER-FRONTEND-02
+ */
+
+import "QEntL/core/map.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/compiler/frontend/parser/ast.qentl";
+
+/**
+ * @enum SymbolType
+ * @brief 符号类型枚举
+ */
+quantum_enum SymbolType {
+    VARIABLE,           // 变量
+    FUNCTION,           // 函数
+    CLASS,              // 类
+    QUANTUM_ENTITY,     // 量子实体
+    PARAMETER,          // 参数
+    FIELD,              // 字段
+    METHOD,             // 方法
+    IMPORT,             // 导入
+    TYPE,               // 类型
+    NAMESPACE           // 命名空间
+}
+
+/**
+ * @class Symbol
+ * @brief 符号信息
+ */
+quantum_class Symbol {
+    public {
+        name: String;           // 符号名称
+        type: SymbolType;       // 符号类型
+        dataType: String;       // 数据类型
+        scope: Integer;         // 作用域级别
+        node: ASTNode;          // 关联的AST节点
+        isQuantum: Boolean;     // 是否量子类型
+        isEntangled: Boolean;   // 是否被纠缠
+        isDefined: Boolean;     // 是否已定义
+        isUsed: Boolean;        // 是否被使用
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(name: String, type: SymbolType, dataType: String, scope: Integer, node: ASTNode, 
+                isQuantum: Boolean = false, isEntangled: Boolean = false) {
+        this.name = name;
+        this.type = type;
+        this.dataType = dataType;
+        this.scope = scope;
+        this.node = node;
+        this.isQuantum = isQuantum;
+        this.isEntangled = isEntangled;
+        this.isDefined = true;
+        this.isUsed = false;
+    }
+    
+    /**
+     * @brief 转为字符串
+     */
+    public function toString(): String {
+        let typeStr = "";
+        switch (this.type) {
+            case SymbolType.VARIABLE: typeStr = "变量"; break;
+            case SymbolType.FUNCTION: typeStr = "函数"; break;
+            case SymbolType.CLASS: typeStr = "类"; break;
+            case SymbolType.QUANTUM_ENTITY: typeStr = "量子实体"; break;
+            case SymbolType.PARAMETER: typeStr = "参数"; break;
+            case SymbolType.FIELD: typeStr = "字段"; break;
+            case SymbolType.METHOD: typeStr = "方法"; break;
+            case SymbolType.IMPORT: typeStr = "导入"; break;
+            case SymbolType.TYPE: typeStr = "类型"; break;
+            case SymbolType.NAMESPACE: typeStr = "命名空间"; break;
+        }
+        
+        let quantumStr = this.isQuantum ? "量子" : "经典";
+        let entangledStr = this.isEntangled ? "已纠缠" : "未纠缠";
+        let status = this.isDefined ? "已定义" : "未定义";
+        status += this.isUsed ? "/已使用" : "/未使用";
+        
+        return `${this.name}: ${typeStr}, 类型=${this.dataType}, 作用域=${this.scope}, ${quantumStr}, ${entangledStr}, ${status}`;
+    }
+}
+
+/**
+ * @class SymbolTable
+ * @brief 符号表实现
+ */
+quantum_class SymbolTable {
+    private {
+        scopes: Array<Map<String, Symbol>>;  // 作用域栈
+        currentScope: Integer;               // 当前作用域
+        errors: Array<String>;               // 错误信息
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.scopes = new Array<Map<String, Symbol>>();
+        this.scopes.push(new Map<String, Symbol>());  // 全局作用域
+        this.currentScope = 0;
+        this.errors = new Array<String>();
+    }
+    
+    /**
+     * @brief 进入新作用域
+     */
+    public function enterScope(): void {
+        this.scopes.push(new Map<String, Symbol>());
+        this.currentScope++;
+    }
+    
+    /**
+     * @brief 退出当前作用域
+     */
+    public function exitScope(): void {
+        if (this.currentScope > 0) {
+            // 检查未使用的变量
+            let scope = this.scopes[this.currentScope];
+            for (let entry of scope.entries()) {
+                let symbol = entry.value;
+                if (symbol.type == SymbolType.VARIABLE && !symbol.isUsed) {
+                    this.errors.push(`警告: 变量 '${symbol.name}' 在行 ${symbol.node.line} 定义但未使用`);
+                }
+            }
+            
+            this.scopes.pop();
+            this.currentScope--;
+        }
+    }
+    
+    /**
+     * @brief 定义符号
+     */
+    public function define(name: String, type: SymbolType, dataType: String, node: ASTNode, 
+                            isQuantum: Boolean = false, isEntangled: Boolean = false): void {
+        let symbol = new Symbol(name, type, dataType, this.currentScope, node, isQuantum, isEntangled);
+        let currentScopeMap = this.scopes[this.currentScope];
+        
+        // 检查是否已在当前作用域中定义
+        if (currentScopeMap.has(name)) {
+            this.errors.push(`错误: 重复定义 '${name}' 在行 ${node.line}`);
+            return;
+        }
+        
+        currentScopeMap.set(name, symbol);
+    }
+    
+    /**
+     * @brief 查找符号
+     */
+    public function resolve(name: String): Symbol? {
+        // 从当前作用域向上查找
+        for (let i = this.currentScope; i >= 0; i--) {
+            let symbol = this.scopes[i].get(name);
+            if (symbol != null) {
+                return symbol;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * @brief 使用符号
+     */
+    public function use(name: String, node: ASTNode): Symbol? {
+        let symbol = this.resolve(name);
+        if (symbol != null) {
+            symbol.isUsed = true;
+            return symbol;
+        }
+        
+        this.errors.push(`错误: 未定义的标识符 '${name}' 在行 ${node.line}`);
+        return null;
+    }
+    
+    /**
+     * @brief 标记符号为纠缠状态
+     */
+    public function entangle(name: String, node: ASTNode): Boolean {
+        let symbol = this.resolve(name);
+        if (symbol != null) {
+            if (!symbol.isQuantum) {
+                this.errors.push(`错误: 无法对非量子对象 '${name}' 进行纠缠操作，在行 ${node.line}`);
+                return false;
+            }
+            symbol.isEntangled = true;
+            return true;
+        }
+        
+        this.errors.push(`错误: 试图纠缠未定义的标识符 '${name}' 在行 ${node.line}`);
+        return false;
+    }
+    
+    /**
+     * @brief 获取错误列表
+     */
+    public function getErrors(): Array<String> {
+        return this.errors;
+    }
+    
+    /**
+     * @brief 获取符号表信息字符串
+     */
+    public function toString(): String {
+        let result = "符号表：\n";
+        
+        for (let i = 0; i < this.scopes.length; i++) {
+            result += `作用域 ${i}:\n`;
+            let scope = this.scopes[i];
+            
+            for (let entry of scope.entries()) {
+                result += `  ${entry.value.toString()}\n`;
+            }
+        }
+        
+        return result;
+    }
+} 

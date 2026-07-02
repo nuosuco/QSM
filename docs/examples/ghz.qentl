@@ -1,0 +1,13 @@
+# GHZ 态 - 3-qubit 纠缠
+
+init 3
+
+H 0
+CNOT 0 1
+CNOT 1 2
+
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+
+STOP

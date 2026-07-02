@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOM经济系统 - QEntL</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        .economy-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255,215,0,0.1);
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        .header h1 { color: #ffd700; margin: 0; }
+        .balance-card {
+            background: rgba(255,215,0,0.15);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .balance-amount {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .balance-label {
+            color: #aaa;
+            font-size: 14px;
+        }
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .benefit-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        .benefit-icon {
+            font-size: 24px;
+        }
+        .benefit-info {
+            flex: 1;
+            margin-left: 15px;
+        }
+        .benefit-title {
+            font-weight: bold;
+        }
+        .benefit-desc {
+            color: #aaa;
+            font-size: 12px;
+        }
+        .benefit-status {
+            color: #4ecdc4;
+        }
+        .transaction-list {
+            max-height: 300px;
+            overflow: auto;
+        }
+        .tx-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .tx-amount.positive { color: #4ecdc4; }
+        .tx-amount.negative { color: #ff6b6b; }
+        .quantum-sig {
+            font-size: 10px;
+            color: #666;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="economy-container">
+        <div class="header">
+            <h1>💰 SOM松麦经济系统</h1>
+            <p>量子平权经济 · 服务每个人</p>
+        </div>
+        
+        <div class="balance-card">
+            <div>
+                <div class="balance-label">松麦币余额 (SMC)</div>
+                <div class="balance-amount">1,250.00</div>
+                <div class="quantum-sig">QS_SOM_0x8a7f...</div>
+            </div>
+            <div style="text-align: right;">
+                <div class="balance-label">贡献度等级</div>
+                <div style="font-size: 24px; color: #ffd700;">⭐ Lv.3</div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">🏛️ 社会福利项目</div>
+            <div class="benefit-item">
+                <div class="benefit-icon">🏥</div>
+                <div class="benefit-info">
+                    <div class="benefit-title">医疗保障</div>
+                    <div class="benefit-desc">全民免费医疗 · 量子健康监控</div>
+                </div>
+                <div class="benefit-status">✅ 已激活</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">📚</div>
+                <div class="benefit-info">
+                    <div class="benefit-title">教育保障</div>
+                    <div class="benefit-desc">免费教育 · 量子学习辅助</div>
+                </div>
+                <div class="benefit-status">✅ 已激活</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">🏠</div>
+                <div class="benefit-info">
+                    <div class="benefit-title">住房保障</div>
+                    <div class="benefit-desc">平权住房 · 智能分配系统</div>
+                </div>
+                <div class="benefit-status">✅ 已激活</div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">📊 最近交易</div>
+            <div class="transaction-list">
+                <div class="tx-item">
+                    <div>
+                        <div>贡献奖励</div>
+                        <div class="quantum-sig">2026-03-07 18:30</div>
+                    </div>
+                    <div class="tx-amount positive">+50.00 SMC</div>
+                </div>
+                <div class="tx-item">
+                    <div>
+                        <div>服务消费</div>
+                        <div class="quantum-sig">2026-03-07 15:20</div>
+                    </div>
+                    <div class="tx-amount negative">-10.00 SMC</div>
+                </div>
+                <div class="tx-item">
+                    <div>
+                        <div>量子挖矿</div>
+                        <div class="quantum-sig">2026-03-07 12:00</div>
+                    </div>
+                    <div class="tx-amount positive">+100.00 SMC</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

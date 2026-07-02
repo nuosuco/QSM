@@ -1,0 +1,63 @@
+# QEntL Extended Test - Full Gate Coverage
+# Tests: H, X, Y, Z, T, S, CNOT, SWAP, RESET, BARRIER, MEASURE, PRINT
+
+# Initialize 6 qubits
+init 6
+
+# Test H gate on qubit 0
+H 0
+
+# Test X gate on qubit 1
+X 1
+
+# Test Y gate on qubit 2
+Y 2
+
+# Test Z gate on qubit 3
+Z 3
+
+# Test T gate on qubit 4
+T 4
+
+# Test S gate on qubit 5
+S 5
+
+# Create Bell state on qubits 0 and 1
+H 0
+CNOT 0 1
+
+# Create another Bell state on qubits 2 and 3
+H 2
+CNOT 2 3
+
+# Test SWAP on qubits 4 and 5
+SWAP 4 5
+
+# Test BARRIER
+BARRIER
+
+# Test RESET on qubit 0
+RESET 0
+
+# Measure all qubits into registers
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+MEASURE 5 5
+
+# Print measurement results
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+PRINT 5
+
+# Variable operations (commented out - LET opcode not yet implemented in compiler)
+# let a = 42
+# let b = 100
+
+# Stop
+STOP

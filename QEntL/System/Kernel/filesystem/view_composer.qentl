@@ -1,0 +1,475 @@
+/**
+ * QEntL视图组合器实现
+ * QuantumGene: QG-VCOMPOSE-F6J2-1714047300
+ * EntanglementStrength: 0.75
+ */
+
+import { ViewRenderer } from "./view_renderer.qentl";
+import { ViewCache } from "./view_cache.qentl";
+
+quantum_module ViewComposer {
+    // 模块元数据
+    metadata: {
+        name: "视图组合器",
+        version: "1.0.0",
+        description: "QEntL文件系统的视图组合器实现",
+        author: "QEntL开发团队",
+        quantum_gene: "QG-VCOMPOSE-F6J2-1714047300",
+        entanglement_strength: 0.75
+    },
+    
+    // 组合器配置
+    config: {
+        cache_enabled: true,             // 是否启用缓存
+        cache_ttl: 300,                  // 缓存有效期(秒)
+        nested_limit: 5,                 // 最大嵌套深度
+        composition_timeout: 5000,       // 组合超时(毫秒)
+        default_slot: "content",         // 默认插槽名
+        error_handler: null,             // 错误处理函数
+        parallel_rendering: true,        // 是否并行渲染
+        auto_refresh: false,             // 是否自动刷新
+        refresh_interval: 10000,         // 刷新间隔(毫秒)
+        slot_missing_strategy: "ignore", // 插槽缺失策略
+        data_merging_strategy: "deep"    // 数据合并策略
+    },
+    
+    // 组合器状态
+    state: {
+        renderer: null,                  // 渲染器实例
+        cache: null,                     // 缓存实例
+        registered_components: {},       // 已注册组件
+        compositions: {},                // 组合定义
+        current_composition: null,       // 当前组合
+        composition_stack: [],           // 组合堆栈
+        stack_level: 0,                  // 堆栈级别
+        initialized: false,              // 是否已初始化
+        stats: {                         // 统计信息
+            compositions: 0,             // 组合次数
+            components_rendered: 0,      // 渲染的组件数
+            composition_time: 0,         // 组合总时间
+            errors: 0                    // 错误数
+        }
+    },
+    
+    /**
+     * 初始化视图组合器
+     * @param {Object} options 初始化选项
+     * @returns {Boolean} 是否成功初始化
+     */
+    initialize: function(options) {
+        log("视图组合器", "初始化视图组合器");
+        
+        // 合并选项
+        this.config = Object.assign({}, this.config, options || {});
+        
+        // 检查依赖
+        if (!ViewRenderer) {
+            log("视图组合器", "未找到视图渲染器", "ERROR");
+            return false;
+        }
+        
+        // 初始化渲染器
+        this.state.renderer = ViewRenderer;
+        if (!this.state.renderer.state.initialized) {
+            this.state.renderer.initialize();
+        }
+        
+        // 初始化缓存
+        if (this.config.cache_enabled && ViewCache) {
+            this.state.cache = ViewCache;
+            if (!this.state.cache.state.initialized) {
+                this.state.cache.initialize({
+                    ttl: this.config.cache_ttl
+                });
+            }
+        }
+        
+        this.state.initialized = true;
+        log("视图组合器", "视图组合器初始化完成");
+        return true;
+    },
+    
+    /**
+     * 注册组件
+     * @param {String} name 组件名称
+     * @param {Object} definition 组件定义
+     * @returns {Boolean} 是否成功注册
+     */
+    registerComponent: function(name, definition) {
+        if (!this.state.initialized) {
+            throw new Error("视图组合器未初始化");
+        }
+        
+        if (!name || typeof name !== 'string') {
+            log("视图组合器", "注册组件失败：无效的组件名", "ERROR");
+            return false;
+        }
+        
+        if (!definition || typeof definition !== 'object') {
+            log("视图组合器", "注册组件失败：无效的组件定义", "ERROR");
+            return false;
+        }
+        
+        // 确保必需的字段存在
+        const requiredFields = ['template', 'slots'];
+        for (const field of requiredFields) {
+            if (!definition[field]) {
+                log("视图组合器", `注册组件失败：缺少必需字段 ${field}`, "ERROR");
+                return false;
+            }
+        }
+        
+        // 注册组件
+        this.state.registered_components[name] = {
+            template: definition.template,
+            slots: definition.slots || {},
+            defaults: definition.defaults || {},
+            methods: definition.methods || {},
+            hooks: definition.hooks || {},
+            data: definition.data || {},
+            created: Date.now()
+        };
+        
+        log("视图组合器", `注册组件成功: ${name}`);
+        return true;
+    },
+    
+    /**
+     * 定义组合
+     * @param {String} name 组合名称
+     * @param {Object} definition 组合定义
+     * @returns {Boolean} 是否成功定义
+     */
+    defineComposition: function(name, definition) {
+        if (!this.state.initialized) {
+            throw new Error("视图组合器未初始化");
+        }
+        
+        if (!name || typeof name !== 'string') {
+            log("视图组合器", "定义组合失败：无效的组合名", "ERROR");
+            return false;
+        }
+        
+        if (!definition || typeof definition !== 'object') {
+            log("视图组合器", "定义组合失败：无效的组合定义", "ERROR");
+            return false;
+        }
+        
+        // 确保必需的字段存在
+        if (!definition.root || typeof definition.root !== 'string') {
+            log("视图组合器", "定义组合失败：缺少根组件", "ERROR");
+            return false;
+        }
+        
+        // 检查根组件是否已注册
+        if (!this.state.registered_components[definition.root]) {
+            log("视图组合器", `定义组合失败：根组件 ${definition.root} 未注册`, "ERROR");
+            return false;
+        }
+        
+        // 定义组合
+        this.state.compositions[name] = {
+            root: definition.root,
+            slots: definition.slots || {},
+            data: definition.data || {},
+            components: definition.components || [],
+            created: Date.now()
+        };
+        
+        log("视图组合器", `定义组合成功: ${name}`);
+        return true;
+    },
+    
+    /**
+     * 渲染组合
+     * @param {String} name 组合名称
+     * @param {Object} data 数据
+     * @param {Object} options 选项
+     * @returns {Promise<String>} 渲染结果
+     */
+    renderComposition: async function(name, data, options) {
+        if (!this.state.initialized) {
+            throw new Error("视图组合器未初始化");
+        }
+        
+        // 检查组合是否已定义
+        if (!this.state.compositions[name]) {
+            throw new Error(`组合 ${name} 未定义`);
+        }
+        
+        log("视图组合器", `渲染组合: ${name}`);
+        const start_time = Date.now();
+        
+        // 合并选项
+        const merged_options = Object.assign({}, this.config, options || {});
+        
+        // 检查缓存
+        const cache_key = this._generateCacheKey(name, data);
+        if (this.state.cache && merged_options.cache_enabled) {
+            const cached = await this.state.cache.get(cache_key);
+            if (cached) {
+                log("视图组合器", `使用缓存的组合: ${name}`);
+                return cached;
+            }
+        }
+        
+        try {
+            // 设置当前组合
+            this.state.current_composition = this.state.compositions[name];
+            
+            // 重置组合堆栈
+            this.state.composition_stack = [];
+            this.state.stack_level = 0;
+            
+            // 合并数据
+            const merged_data = this._mergeData(
+                this.state.current_composition.data,
+                data || {}
+            );
+            
+            // 渲染组合
+            const result = await this._renderComponent(
+                this.state.current_composition.root,
+                merged_data,
+                this.state.current_composition.slots,
+                merged_options
+            );
+            
+            // 更新统计信息
+            this.state.stats.compositions++;
+            this.state.stats.composition_time += (Date.now() - start_time);
+            
+            // 缓存结果
+            if (this.state.cache && merged_options.cache_enabled) {
+                await this.state.cache.set(cache_key, result, {
+                    ttl: merged_options.cache_ttl,
+                    tags: ['composition', name]
+                });
+            }
+            
+            log("视图组合器", `组合渲染完成: ${name}, 耗时: ${Date.now() - start_time}ms`);
+            return result;
+        } catch (error) {
+            this.state.stats.errors++;
+            log("视图组合器", `渲染组合 ${name} 时出错: ${error.message}`, "ERROR");
+            
+            // 调用错误处理函数
+            if (typeof this.config.error_handler === 'function') {
+                return this.config.error_handler(error, name, data);
+            }
+            
+            throw error;
+        } finally {
+            // 清理状态
+            this.state.current_composition = null;
+            this.state.composition_stack = [];
+            this.state.stack_level = 0;
+        }
+    },
+    
+    /**
+     * 渲染单个组件
+     * @param {String} component 组件名称
+     * @param {Object} data 数据
+     * @param {Object} slots 插槽内容
+     * @returns {Promise<String>} 渲染结果
+     */
+    renderComponent: async function(component, data, slots) {
+        if (!this.state.initialized) {
+            throw new Error("视图组合器未初始化");
+        }
+        
+        // 检查组件是否已注册
+        if (!this.state.registered_components[component]) {
+            throw new Error(`组件 ${component} 未注册`);
+        }
+        
+        log("视图组合器", `渲染独立组件: ${component}`);
+        
+        try {
+            // 重置组合堆栈
+            this.state.composition_stack = [];
+            this.state.stack_level = 0;
+            
+            // 渲染组件
+            const result = await this._renderComponent(component, data || {}, slots || {});
+            
+            // 更新统计信息
+            this.state.stats.components_rendered++;
+            
+            return result;
+        } catch (error) {
+            this.state.stats.errors++;
+            log("视图组合器", `渲染组件 ${component} 时出错: ${error.message}`, "ERROR");
+            throw error;
+        } finally {
+            // 清理状态
+            this.state.composition_stack = [];
+            this.state.stack_level = 0;
+        }
+    },
+    
+    /**
+     * 清除组合缓存
+     * @param {String} name 组合名称
+     * @returns {Boolean} 是否成功清除
+     */
+    clearCache: async function(name) {
+        if (!this.state.initialized || !this.state.cache) {
+            return false;
+        }
+        
+        if (name) {
+            // 删除特定组合的缓存
+            return await this.state.cache.deleteByTag(name);
+        } else {
+            // 删除所有组合缓存
+            return await this.state.cache.deleteByTag('composition');
+        }
+    },
+    
+    /**
+     * 获取统计信息
+     * @returns {Object} 统计信息
+     */
+    getStatistics: function() {
+        if (!this.state.initialized) {
+            return null;
+        }
+        
+        return {
+            compositions: this.state.stats.compositions,
+            components_rendered: this.state.stats.components_rendered,
+            average_composition_time: this.state.stats.compositions > 0 
+                器 this.state.stats.composition_time / this.state.stats.compositions 
+                : 0,
+            errors: this.state.stats.errors,
+            registered_components: Object.keys(this.state.registered_components).length,
+            defined_compositions: Object.keys(this.state.compositions).length
+        };
+    },
+    
+    // 内部方法
+    
+    /**
+     * 渲染组件
+     * @private
+     */
+    _renderComponent: async function(component, data, slots, options) {
+        // 检查嵌套深度
+        if (this.state.stack_level >= this.config.nested_limit) {
+            throw new Error(`超出最大嵌套深度 ${this.config.nested_limit}`);
+        }
+        
+        // 检查组件是否已注册
+        const componentDef = this.state.registered_components[component];
+        if (!componentDef) {
+            throw new Error(`组件 ${component} 未注册`);
+        }
+        
+        log("视图组合器", `渲染组件: ${component}, 堆栈级别: ${this.state.stack_level}`);
+        
+        // 推入组合堆栈
+        this.state.composition_stack.push(component);
+        this.state.stack_level++;
+        
+        try {
+            // 合并组件数据
+            const componentData = this._mergeData(componentDef.defaults, componentDef.data, data);
+            
+            // 处理组件钩子
+            if (componentDef.hooks.beforeRender) {
+                await componentDef.hooks.beforeRender(componentData, slots);
+            }
+            
+            // 处理插槽内容
+            const processedSlots = {};
+            for (const slotName in componentDef.slots) {
+                const slotDef = componentDef.slots[slotName];
+                
+                if (slots[slotName]) {
+                    // 使用提供的插槽内容
+                    processedSlots[slotName] = slots[slotName];
+                } else if (slotDef.default) {
+                    // 使用默认内容
+                    processedSlots[slotName] = slotDef.default;
+                } else if (this.config.slot_missing_strategy === 'error') {
+                    throw new Error(`缺少插槽内容: ${slotName}`);
+                }
+            }
+            
+            // 处理方法
+            for (const methodName in componentDef.methods) {
+                componentData[methodName] = componentDef.methods[methodName];
+            }
+            
+            // 渲染模板
+            let result = await this.state.renderer.render(componentDef.template, componentData, options);
+            
+            // 替换插槽标记
+            for (const slotName in processedSlots) {
+                const slotContent = processedSlots[slotName];
+                const slotMarker = new RegExp(`\\{\\{\\s*#slot\\s+${slotName}\\s*\\}\\}`, 'g');
+                result = result.replace(slotMarker, slotContent);
+            }
+            
+            // 处理后渲染钩子
+            if (componentDef.hooks.afterRender) {
+                result = await componentDef.hooks.afterRender(result, componentData);
+            }
+            
+            return result;
+        } finally {
+            // 弹出组合堆栈
+            this.state.composition_stack.pop();
+            this.state.stack_level--;
+        }
+    },
+    
+    /**
+     * 生成缓存键
+     * @private
+     */
+    _generateCacheKey: function(name, data) {
+        // 创建数据的哈希
+        const dataStr = JSON.stringify(data || {});
+        let hash = 0;
+        
+        for (let i = 0; i < dataStr.length; i++) {
+            const char = dataStr.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // 转换为32位整数
+        }
+        
+        return `composition:${name}:${hash}`;
+    },
+    
+    /**
+     * 合并数据
+     * @private
+     */
+    _mergeData: function(...objects) {
+        if (this.config.data_merging_strategy === 'shallow') {
+            return Object.assign({}, ...objects);
+        } else {
+            // 深度合并
+            return objects.reduce((result, current) => {
+                if (!current) return result;
+                
+                for (const key in current) {
+                    if (typeof current[key] === 'object' && current[key] !== null && 
+                        typeof result[key] === 'object' && result[key] !== null) {
+                        result[key] = this._mergeData(result[key], current[key]);
+                    } else {
+                        result[key] = current[key];
+                    }
+                }
+                
+                return result;
+            }, {});
+        }
+    }
+};
+
+// 导出模块
+export ViewComposer; 

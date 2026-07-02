@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📚 文档中心 - QEntL量子操作系统 | som.top</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:linear-gradient(135deg,#0a0a1a 0%,#1a1a2e 50%,#16213e 100%);color:#e0e0e0;min-height:100vh}
+
+/* Header */
+.doc-header{background:rgba(10,10,30,0.95);border-bottom:1px solid rgba(138,135,255,0.3);padding:15px 25px;display:flex;align-items:center;gap:15px;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+.doc-header a{color:#8a87ff;text-decoration:none;font-size:14px}
+.doc-header a:hover{text-decoration:underline}
+.doc-header h1{font-size:20px;color:#4ecdc4}
+.doc-header .search-box{margin-left:auto;position:relative}
+.doc-header .search-box input{padding:8px 15px 8px 35px;background:rgba(255,255,255,0.08);border:1px solid rgba(138,135,255,0.3);border-radius:20px;color:#fff;font-size:13px;width:250px}
+.doc-header .search-box input:focus{outline:none;border-color:#8a87ff;width:300px;transition:all 0.3s}
+.doc-header .search-box::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px}
+
+/* Layout */
+.doc-layout{display:flex;min-height:calc(100vh - 56px)}
+
+/* Sidebar */
+.doc-sidebar{width:280px;min-width:280px;height:calc(100vh - 56px);overflow-y:auto;background:rgba(10,10,30,0.5);border-right:1px solid rgba(138,135,255,0.15);padding:15px 0;position:sticky;top:56px}
+.doc-sidebar::-webkit-scrollbar{width:4px}
+.doc-sidebar::-webkit-scrollbar-thumb{background:rgba(138,135,255,0.3);border-radius:2px}
+.doc-section{padding:8px 0}
+.doc-section-title{color:#576574;font-size:11px;text-transform:uppercase;padding:8px 20px;letter-spacing:1.5px;font-weight:bold}
+.doc-section a{display:flex;align-items:center;gap:8px;padding:7px 20px;color:#7f8fa6;text-decoration:none;font-size:13px;transition:all 0.15s;border-left:3px solid transparent}
+.doc-section a:hover{background:rgba(138,135,255,0.08);color:#00d2ff;border-left-color:#8a87ff}
+.doc-section a .sec-icon{font-size:14px;width:20px;text-align:center}
+
+/* Main Content */
+.doc-main{flex:1;padding:30px 40px;max-width:1200px}
+.doc-main h1{color:#00d2ff;font-size:28px;margin-bottom:8px}
+.doc-main .subtitle{color:#576574;font-size:14px;margin-bottom:30px}
+
+/* Stats Cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;margin-bottom:30px}
+.stat-card{background:rgba(138,135,255,0.06);border:1px solid rgba(138,135,255,0.15);border-radius:12px;padding:20px;text-align:center;transition:all 0.3s}
+.stat-card:hover{transform:translateY(-3px);border-color:rgba(138,135,255,0.4)}
+.stat-card .count{font-size:32px;font-weight:bold;background:linear-gradient(135deg,#8a87ff,#4ecdc4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:5px}
+.stat-card h3{color:#00d2ff;font-size:14px;margin-bottom:5px}
+.stat-card p{color:#7f8fa6;font-size:12px;line-height:1.4}
+
+/* Doc Categories */
+.doc-category{margin-bottom:30px}
+.doc-category h2{color:#7b2ff7;font-size:20px;margin-bottom:15px;padding-bottom:8px;border-bottom:1px solid rgba(123,47,255,0.2);display:flex;align-items:center;gap:10px}
+.doc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.doc-item{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:15px 18px;text-decoration:none;color:#e0e0e0;transition:all 0.2s;display:flex;align-items:flex-start;gap:12px}
+.doc-item:hover{background:rgba(138,135,255,0.1);border-color:rgba(138,135,255,0.3);transform:translateX(3px)}
+.doc-item .doc-icon{font-size:22px;flex-shrink:0;margin-top:2px}
+.doc-item .doc-info{flex:1}
+.doc-item .doc-title{font-size:14px;font-weight:bold;color:#00d2ff;margin-bottom:3px}
+.doc-item .doc-desc{font-size:12px;color:#7f8fa6;line-height:1.4}
+.doc-item .doc-tag{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(138,135,255,0.15);color:#8a87ff;white-space:nowrap;flex-shrink:0;margin-top:2px}
+
+/* Footer */
+.doc-footer{margin-top:40px;padding:20px;border-top:1px solid rgba(138,135,255,0.1);text-align:center;color:#576574;font-size:12px}
+
+/* Mobile */
+@media(max-width:768px){
+.doc-sidebar{display:none}
+.doc-main{padding:20px 15px}
+.doc-list{grid-template-columns:1fr}
+.doc-header .search-box input{width:150px}
+.doc-header .search-box input:focus{width:200px}
+}
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+<a href="/">← QEntL OS</a>
+<h1>📚 文档中心</h1>
+<div class="search-box">
+<input type="text" id="docSearch" placeholder="搜索文档..." oninput="filterDocs()">
+</div>
+</div>
+
+<div class="doc-layout">
+<!-- Sidebar Navigation -->
+<div class="doc-sidebar">
+<div class="doc-section">
+<div class="doc-section-title">📋 规划方案</div>
+<a href="MASTER_PLAN_COMPLETE.html"><span class="sec-icon">📋</span>全栈构建规划方案 v4.0</a>
+<a href="project_construction_plan.html"><span class="sec-icon">🏗️</span>项目构建步骤规划</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">📖 哲学基础</div>
+<a href="华经.html"><span class="sec-icon">📖</span>华经（卷一破魔）</a>
+<a href="量子工作原则与实践指南.html"><span class="sec-icon">⚖️</span>量子工作原则与实践指南</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">⚛️ 四大模型</div>
+<a href="qsm_implementation.html"><span class="sec-icon">⚛️</span>QSM 量子叠加态模型</a>
+<a href="som_implementation.html"><span class="sec-icon">💰</span>SOM 量子平权经济模型</a>
+<a href="weq_implementation.html"><span class="sec-icon">📡</span>WeQ 量子社交通信模型</a>
+<a href="ref_implementation.html"><span class="sec-icon">🔍</span>Ref 量子自反省管理模型</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">🖥️ 系统架构</div>
+<a href="QEntL_OS_Core.html"><span class="sec-icon">🖥️</span>QEntL 全栈操作系统核心</a>
+<a href="QEntL_OS_Components.html"><span class="sec-icon">🧩</span>QEntL 量子操作系统组件</a>
+<a href="QEntL_Compiler.html"><span class="sec-icon">💻</span>QEntL 量子编译器</a>
+<a href="QEntL_QNN_Engine.html"><span class="sec-icon">🧠</span>QEntL 量子神经网络引擎</a>
+<a href="QEntL_System_Calls.html"><span class="sec-icon">📞</span>QEntL 系统调用接口</a>
+<a href="QEntL_Yi_Data_Pipeline.html"><span class="sec-icon">🌏</span>QEntL 彝文数据处理管道</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">📚 编译器与虚拟机</div>
+<a href="README.html"><span class="sec-icon">📚</span>QEntL 量子编程生态系统概述</a>
+<a href="syntax.html"><span class="sec-icon">📝</span>QEntL 语言语法规范</a>
+<a href="compiler_implementation_plan.html"><span class="sec-icon">🔧</span>QEntL 编译器实现计划</a>
+<a href="vm_implementation_plan.html"><span class="sec-icon">🖥️</span>QEntL 虚拟机实现计划</a>
+<a href="installation_guide.html"><span class="sec-icon">📦</span>QEntL 安装介质完整指南</a>
+<a href="QEntL_BUILD_PLAN.html"><span class="sec-icon">🏭</span>QEntL 构建计划</a>
+<a href="qentl_environment_design.html"><span class="sec-icon">🌐</span>QEntL 操作系统环境设计</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">🔗 模型集成</div>
+<a href="models_integration_framework.html"><span class="sec-icon">🔗</span>量子模型综合集成框架</a>
+<a href="models_integration_details.html"><span class="sec-icon">📊</span>量子模型综合集成详情</a>
+<a href="整合工作计划v1.0.html"><span class="sec-icon">📅</span>整合工作计划 v1.0</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">🌌 生态系统</div>
+<a href="ecosystem_implementation_guide.html"><span class="sec-icon">📖</span>QEntL 生态系统实施指南</a>
+<a href="ecosystem_integration_plan.html"><span class="sec-icon">📋</span>QEntL 生态系统集成计划</a>
+<a href="量子协同创新生态系统设计.html"><span class="sec-icon">🌌</span>量子协同创新生态系统设计</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">🎓 学习研究</div>
+<a href="qwen_model_guide.html"><span class="sec-icon">📖</span>Qwen 模型指南</a>
+<a href="learning_modes_implementation.html"><span class="sec-icon">🎓</span>学习模式实现</a>
+<a href="open_source_quantum_models_2024_2025.html"><span class="sec-icon">📊</span>开源量子模型综述</a>
+<a href="your_hardware_analysis.html"><span class="sec-icon">💻</span>硬件分析</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">📐 示例代码</div>
+<a href="hello.html"><span class="sec-icon">👋</span>Hello Bell 示例</a>
+<a href="superposition.html"><span class="sec-icon">🌊</span>叠加态示例</a>
+<a href="bb84_protocol.html"><span class="sec-icon">🔐</span>BB84 量子密钥分发</a>
+<a href="teleportation.html"><span class="sec-icon">✨</span>量子隐形传态</a>
+<a href="grover_search.html"><span class="sec-icon">🔍</span>Grover 搜索算法</a>
+<a href="deutsch_jozsa.html"><span class="sec-icon">🧮</span>Deutsch-Jozsa 算法</a>
+<a href="qft_3qubit.html"><span class="sec-icon">📊</span>量子傅里叶变换</a>
+<a href="ghz.html"><span class="sec-icon">🔗</span>GHZ 态</a>
+<a href="quantum_walk.html"><span class="sec-icon">🚶</span>量子漫步</a>
+<a href="random_number.html"><span class="sec-icon">🎲</span>量子随机数</a>
+</div>
+<div class="doc-section">
+<div class="doc-section-title">📈 项目状态</div>
+<a href="project_cleanup_report.html"><span class="sec-icon">📊</span>项目清理报告</a>
+<a href="project_restructure_report.html"><span class="sec-icon">🔄</span>项目重构报告</a>
+<a href="bootstrap_problem_analysis.html"><span class="sec-icon">🔧</span>Bootstrap 问题分析</a>
+</div>
+</div>
+
+<!-- Main Content -->
+<div class="doc-main">
+<h1>🔮 QSM量子叠加态模型开发文档中心</h1>
+<p class="subtitle">QEntL全栈量子操作系统 | 四种量子模型 | 100+开发文档 | som.top</p>
+
+<div class="stats-grid">
+<div class="stat-card">
+<div class="count">57+</div>
+<h3>📄 开发文档</h3>
+<p>系统架构、四大模型、编译器、虚拟机、生态系统</p>
+</div>
+<div class="stat-card">
+<div class="count">4</div>
+<h3>⚛️ 量子模型</h3>
+<p>QSM叠加态 · SOM平权经济 · WeQ社交通信 · Ref自反省</p>
+</div>
+<div class="stat-card">
+<div class="count">11</div>
+<h3>📂 文档分类</h3>
+<p>规划方案 · 哲学基础 · 四大模型 · 系统架构 · 编译器 · 集成 · 生态 · 学习 · 示例 · 项目状态 · 核心</p>
+</div>
+<div class="stat-card">
+<div class="count">12+</div>
+<h3>📐 量子算法</h3>
+<p>Bell态 · Grover · QFT · BB84 · 隐形传态 · 量子漫步</p>
+</div>
+</div>
+
+<!-- 快速文档列表 -->
+<div class="doc-category">
+<h2>📋 规划方案</h2>
+<div class="doc-list">
+<a class="doc-item" href="MASTER_PLAN_COMPLETE.html">
+<span class="doc-icon">📋</span>
+<div class="doc-info"><div class="doc-title">QEntL全栈构建规划方案 v4.0</div><div class="doc-desc">完整的量子操作系统构建规划，涵盖三个部署模式</div></div>
+<span class="doc-tag">核心</span>
+</a>
+<a class="doc-item" href="project_construction_plan.html">
+<span class="doc-icon">🏗️</span>
+<div class="doc-info"><div class="doc-title">项目构建步骤规划</div><div class="doc-desc">详细的分步构建指南和里程碑</div></div>
+<span class="doc-tag">规划</span>
+</a>
+</div>
+</div>
+
+<div class="doc-category">
+<h2>📖 哲学基础</h2>
+<div class="doc-list">
+<a class="doc-item" href="华经.html">
+<span class="doc-icon">📖</span>
+<div class="doc-info"><div class="doc-title">华经（卷一破魔）</div><div class="doc-desc">QSM项目的哲学基础和量子世界观</div></div>
+<span class="doc-tag">哲学</span>
+</a>
+<a class="doc-item" href="量子工作原则与实践指南.html">
+<span class="doc-icon">⚖️</span>
+<div class="doc-info"><div class="doc-title">量子工作原则与实践指南</div><div class="doc-desc">三大圣律、如履薄冰原则等核心工作准则</div></div>
+<span class="doc-tag">原则</span>
+</a>
+</div>
+</div>
+
+<div class="doc-category">
+<h2>⚛️ 四大量子模型</h2>
+<div class="doc-list">
+<a class="doc-item" href="qsm_implementation.html">
+<span class="doc-icon">⚛️</span>
+<div class="doc-info"><div class="doc-title">QSM 量子叠加态模型</div><div class="doc-desc">核心计算模型，量子态管理、叠加、纠缠</div></div>
+<span class="doc-tag">核心</span>
+</a>
+<a class="doc-item" href="som_implementation.html">
+<span class="doc-icon">💰</span>
+<div class="doc-info"><div class="doc-title">SOM 量子平权经济模型</div><div class="doc-desc">经济计算、资源分配、松麦币体系</div></div>
+<span class="doc-tag">经济</span>
+</a>
+<a class="doc-item" href="weq_implementation.html">
+<span class="doc-icon">📡</span>
+<div class="doc-info"><div class="doc-title">WeQ 量子社交通信模型</div><div class="doc-desc">社交网络、知识管理、集体意识</div></div>
+<span class="doc-tag">社交</span>
+</a>
+<a class="doc-item" href="ref_implementation.html">
+<span class="doc-icon">🔍</span>
+<div class="doc-info"><div class="doc-title">Ref 量子自反省管理模型</div><div class="doc-desc">系统监控、自我修复、优化决策</div></div>
+<span class="doc-tag">管理</span>
+</a>
+</div>
+</div>
+
+<div class="doc-category">
+<h2>🖥️ 系统架构</h2>
+<div class="doc-list">
+<a class="doc-item" href="QEntL_OS_Core.html">
+<span class="doc-icon">🖥️</span>
+<div class="doc-info"><div class="doc-title">QEntL 全栈操作系统核心</div><div class="doc-desc">操作系统架构设计、内核机制</div></div>
+<span class="doc-tag">架构</span>
+</a>
+<a class="doc-item" href="QEntL_Compiler.html">
+<span class="doc-icon">💻</span>
+<div class="doc-info"><div class="doc-title">QEntL 量子编译器</div><div class="doc-desc">词法分析、语法分析、代码生成</div></div>
+<span class="doc-tag">编译器</span>
+</a>
+<a class="doc-item" href="QEntL_QNN_Engine.html">
+<span class="doc-icon">🧠</span>
+<div class="doc-info"><div class="doc-title">QEntL 量子神经网络引擎</div><div class="doc-desc">彝文训练框架、神经网络架构</div></div>
+<span class="doc-tag">AI</span>
+</a>
+<a class="doc-item" href="QEntL_System_Calls.html">
+<span class="doc-icon">📞</span>
+<div class="doc-info"><div class="doc-title">QEntL 系统调用接口</div><div class="doc-desc">文件/网络/内存管理等系统接口</div></div>
+<span class="doc-tag">API</span>
+</a>
+</div>
+</div>
+
+<div class="doc-category">
+<h2>🔗 模型集成</h2>
+<div class="doc-list">
+<a class="doc-item" href="models_integration_framework.html">
+<span class="doc-icon">🔗</span>
+<div class="doc-info"><div class="doc-title">量子模型综合集成框架</div><div class="doc-desc">统一集成架构、数据一致性、区块链集成</div></div>
+<span class="doc-tag">集成</span>
+</a>
+<a class="doc-item" href="models_integration_details.html">
+<span class="doc-icon">📊</span>
+<div class="doc-info"><div class="doc-title">量子模型综合集成详情</div><div class="doc-desc">四大模型状态映射、自动提问、知识转换</div></div>
+<span class="doc-tag">详情</span>
+</a>
+</div>
+</div>
+
+<div class="doc-category">
+<h2>🌌 生态系统</h2>
+<div class="doc-list">
+<a class="doc-item" href="ecosystem_implementation_guide.html">
+<span class="doc-icon">📖</span>
+<div class="doc-info"><div class="doc-title">QEntL 生态系统实施指南</div><div class="doc-desc">与QSM、SOM、Ref、WeQ的详细集成步骤</div></div>
+<span class="doc-tag">指南</span>
+</a>
+<a class="doc-item" href="ecosystem_integration_plan.html">
+<span class="doc-icon">📋</span>
+<div class="doc-info"><div class="doc-title">QEntL 生态系统集成计划</div><div class="doc-desc">战略目标、实施时间表、风险管理</div></div>
+<span class="doc-tag">计划</span>
+</a>
+<a class="doc-item" href="量子协同创新生态系统设计.html">
+<span class="doc-icon">🌌</span>
+<div class="doc-info"><div class="doc-title">量子协同创新生态系统设计</div><div class="doc-desc">代理协同、量子特性监督、创新协同机制</div></div>
+<span class="doc-tag">生态</span>
+</a>
+</div>
+</div>
+
+<div class="doc-category">
+<h2>📐 量子算法示例</h2>
+<div class="doc-list">
+<a class="doc-item" href="hello.html">
+<span class="doc-icon">👋</span>
+<div class="doc-info"><div class="doc-title">Hello Bell 示例</div><div class="doc-desc">贝尔态创建与量子纠缠演示</div></div>
+<span class="doc-tag">示例</span>
+</a>
+<a class="doc-item" href="grover_search.html">
+<span class="doc-icon">🔍</span>
+<div class="doc-info"><div class="doc-title">Grover 搜索算法</div><div class="doc-desc">量子搜索加速，O(√N)复杂度</div></div>
+<span class="doc-tag">算法</span>
+</a>
+<a class="doc-item" href="bb84_protocol.html">
+<span class="doc-icon">🔐</span>
+<div class="doc-info"><div class="doc-title">BB84 量子密钥分发</div><div class="doc-desc">量子通信安全协议</div></div>
+<span class="doc-tag">协议</span>
+</a>
+<a class="doc-item" href="teleportation.html">
+<span class="doc-icon">✨</span>
+<div class="doc-info"><div class="doc-title">量子隐形传态</div><div class="doc-desc">量子态传输协议</div></div>
+<span class="doc-tag">协议</span>
+</a>
+<a class="doc-item" href="qft_3qubit.html">
+<span class="doc-icon">📊</span>
+<div class="doc-info"><div class="doc-title">量子傅里叶变换 (3量子比特)</div><div class="doc-desc">Shor算法核心组件</div></div>
+<span class="doc-tag">算法</span>
+</a>
+<a class="doc-item" href="ghz.html">
+<span class="doc-icon">🔗</span>
+<div class="doc-info"><div class="doc-title">GHZ 态</div><div class="doc-desc">三量子比特最大纠缠态</div></div>
+<span class="doc-tag">示例</span>
+</a>
+</div>
+</div>
+
+<div class="doc-footer">
+<p>QSM量子叠加态模型 v4.0 | 中华ZhoHo + 小趣WeQ | © 2026</p>
+<p>文档自动生成 | 源码位于 /root/QSM/docs/ | 访问 <a href="https://som.top" style="color:#8a87ff">som.top</a></p>
+</div>
+</div>
+</div>
+
+<script>
+function filterDocs(){
+var q=document.getElementById('docSearch').value.toLowerCase();
+document.querySelectorAll('.doc-item').forEach(function(item){
+var text=item.textContent.toLowerCase();
+item.style.display=text.indexOf(q)>=0?'':'none';
+});
+document.querySelectorAll('.doc-section a').forEach(function(link){
+var text=link.textContent.toLowerCase();
+link.style.display=text.indexOf(q)>=0?'':'none';
+});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,425 @@
+/**
+ * QEntL系统调用模块
+ * QuantumGene: QG-KERNEL-SYSCALL-E5F6-1714129185
+ * EntanglementStrength: 0.90
+ */
+
+quantum_program SystemCalls {
+    metadata {
+        name: "QEntL系统调用管理器",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的系统调用模块，提供用户态和内核态之间的接口",
+        quantum_gene: "QG-KERNEL-SYSCALL-E5F6-1714129185",
+        entanglement_strength: 0.90
+    }
+
+    state {
+        initialized: false,
+        syscall_table: {},
+        syscall_count: 0,
+        last_syscall: {
+            number: 0,
+            pid: 0,
+            args: [],
+            result: null,
+            time: 0
+        },
+        syscall_statistics: {
+            total_calls: 0,
+            calls_per_type: {}
+        },
+        kernel_reference: null,
+        current_privilege_level: 0
+    }
+
+    // 初始化系统调用模块
+    initialize(kernel_ref) {
+        if (this.initialized) {
+            kernel_log("系统调用模块已经初始化");
+            return true;
+        }
+
+        kernel_log("初始化系统调用模块...");
+        
+        // 存储内核引用
+        this.kernel_reference = kernel_ref;
+        
+        // 注册系统调用
+        this.register_syscalls();
+        
+        this.initialized = true;
+        kernel_log(`系统调用模块初始化完成，注册了 ${this.syscall_count} 个系统调用`);
+        
+        return true;
+    }
+
+    // 注册系统调用
+    register_syscalls() {
+        kernel_log("注册系统调用...");
+        
+        // 进程管理系统调用
+        this.register_syscall(1, "process_create", this.syscall_process_create);
+        this.register_syscall(2, "process_exit", this.syscall_process_exit);
+        this.register_syscall(3, "process_wait", this.syscall_process_wait);
+        this.register_syscall(4, "process_info", this.syscall_process_info);
+        
+        // 内存管理系统调用
+        this.register_syscall(10, "memory_allocate", this.syscall_memory_allocate);
+        this.register_syscall(11, "memory_free", this.syscall_memory_free);
+        this.register_syscall(12, "memory_map", this.syscall_memory_map);
+        this.register_syscall(13, "memory_protect", this.syscall_memory_protect);
+        
+        // 文件系统调用
+        this.register_syscall(20, "file_open", this.syscall_file_open);
+        this.register_syscall(21, "file_close", this.syscall_file_close);
+        this.register_syscall(22, "file_read", this.syscall_file_read);
+        this.register_syscall(23, "file_write", this.syscall_file_write);
+        this.register_syscall(24, "file_seek", this.syscall_file_seek);
+        this.register_syscall(25, "file_stat", this.syscall_file_stat);
+        
+        // 设备管理系统调用
+        this.register_syscall(30, "device_open", this.syscall_device_open);
+        this.register_syscall(31, "device_close", this.syscall_device_close);
+        this.register_syscall(32, "device_read", this.syscall_device_read);
+        this.register_syscall(33, "device_write", this.syscall_device_write);
+        this.register_syscall(34, "device_ioctl", this.syscall_device_ioctl);
+        
+        // 量子系统调用
+        this.register_syscall(40, "quantum_allocate", this.syscall_quantum_allocate);
+        this.register_syscall(41, "quantum_free", this.syscall_quantum_free);
+        this.register_syscall(42, "quantum_gate", this.syscall_quantum_gate);
+        this.register_syscall(43, "quantum_measure", this.syscall_quantum_measure);
+        this.register_syscall(44, "quantum_entangle", this.syscall_quantum_entangle);
+        
+        // 系统信息和控制系统调用
+        this.register_syscall(50, "system_info", this.syscall_system_info);
+        this.register_syscall(51, "system_time", this.syscall_system_time);
+        this.register_syscall(52, "system_reboot", this.syscall_system_reboot);
+        this.register_syscall(53, "system_shutdown", this.syscall_system_shutdown);
+        
+        kernel_log("系统调用注册完成");
+    }
+
+    // 注册单个系统调用
+    register_syscall(number, name, handler) {
+        this.syscall_table[number] = {
+            name: name,
+            handler: handler,
+            calls: 0
+        };
+        
+        this.syscall_statistics.calls_per_type[number] = 0;
+        this.syscall_count++;
+        
+        kernel_log(`注册系统调用: ${number} (${name})`);
+    }
+
+    // 系统调用分发器
+    handle_syscall(number, process_id, args) {
+        if (!this.initialized) {
+            kernel_log("错误：系统调用模块未初始化");
+            return { success: false, error: "系统调用模块未初始化" };
+        }
+        
+        // 记录系统调用信息
+        this.last_syscall = {
+            number: number,
+            pid: process_id,
+            args: args,
+            time: Date.now(),
+            result: null
+        };
+        
+        // 检查系统调用号是否有效
+        if (!this.syscall_table[number]) {
+            kernel_log(`错误：无效的系统调用号 ${number}`);
+            return { success: false, error: "无效的系统调用号" };
+        }
+        
+        const syscall = this.syscall_table[number];
+        kernel_log(`处理系统调用: ${number} (${syscall.name}), 进程ID: ${process_id}`);
+        
+        // 更新统计信息
+        this.syscall_statistics.total_calls++;
+        this.syscall_statistics.calls_per_type[number]++;
+        syscall.calls++;
+        
+        try {
+            // 调用系统调用处理函数
+            const result = syscall.handler.apply(this, [process_id, ...args]);
+            
+            // 更新结果
+            this.last_syscall.result = result;
+            
+            return { success: true, result: result };
+        } catch (error) {
+            kernel_log(`系统调用 ${number} (${syscall.name}) 执行错误: ${error}`);
+            return { success: false, error: error.toString() };
+        }
+    }
+
+    // 检查进程权限
+    check_permission(process_id, required_level) {
+        // 实际实现将查询进程管理器以获取进程权限
+        // 这里简化为示例
+        return this.current_privilege_level <= required_level;
+    }
+
+    // 进程管理系统调用实现
+    syscall_process_create(process_id, image_path, args, flags) {
+        kernel_log(`系统调用: process_create(${image_path}, ${args}, ${flags})`);
+        
+        // 检查权限
+        if (!this.check_permission(process_id, 1)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        // 调用内核的进程创建函数
+        // 实际实现将委托给进程管理器
+        return this.kernel_reference.process_manager.create_process(image_path, args, flags);
+    }
+
+    syscall_process_exit(process_id, exit_code) {
+        kernel_log(`系统调用: process_exit(${exit_code})`);
+        
+        // 进程始终可以终止自己
+        return this.kernel_reference.process_manager.terminate_process(process_id, exit_code);
+    }
+
+    syscall_process_wait(process_id, target_pid) {
+        kernel_log(`系统调用: process_wait(${target_pid})`);
+        
+        // 检查权限
+        if (!this.check_permission(process_id, 1)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        return this.kernel_reference.process_manager.wait_process(process_id, target_pid);
+    }
+
+    syscall_process_info(process_id, target_pid) {
+        kernel_log(`系统调用: process_info(${target_pid})`);
+        
+        // 检查权限
+        if (!this.check_permission(process_id, 1)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        return this.kernel_reference.process_manager.get_process_info(target_pid);
+    }
+
+    // 内存管理系统调用实现
+    syscall_memory_allocate(process_id, size, type, flags) {
+        kernel_log(`系统调用: memory_allocate(${size}, ${type}, ${flags})`);
+        
+        // 检查权限
+        if (!this.check_permission(process_id, 1)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        return this.kernel_reference.memory_manager.allocate_memory(process_id, size, type, flags);
+    }
+
+    syscall_memory_free(process_id, address, size) {
+        kernel_log(`系统调用: memory_free(${address}, ${size})`);
+        
+        return this.kernel_reference.memory_manager.free_memory(process_id, address, size);
+    }
+
+    syscall_memory_map(process_id, physical_address, size, flags) {
+        kernel_log(`系统调用: memory_map(${physical_address}, ${size}, ${flags})`);
+        
+        // 检查权限 - 内存映射通常需要更高权限
+        if (!this.check_permission(process_id, 0)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        return this.kernel_reference.memory_manager.map_memory(process_id, physical_address, size, flags);
+    }
+
+    syscall_memory_protect(process_id, address, size, protection) {
+        kernel_log(`系统调用: memory_protect(${address}, ${size}, ${protection})`);
+        
+        return this.kernel_reference.memory_manager.protect_memory(process_id, address, size, protection);
+    }
+
+    // 文件系统调用实现
+    syscall_file_open(process_id, path, flags, mode) {
+        kernel_log(`系统调用: file_open(${path}, ${flags}, ${mode})`);
+        
+        return this.kernel_reference.filesystem.open_file(process_id, path, flags, mode);
+    }
+
+    syscall_file_close(process_id, file_descriptor) {
+        kernel_log(`系统调用: file_close(${file_descriptor})`);
+        
+        return this.kernel_reference.filesystem.close_file(process_id, file_descriptor);
+    }
+
+    syscall_file_read(process_id, file_descriptor, buffer, length) {
+        kernel_log(`系统调用: file_read(${file_descriptor}, buffer, ${length})`);
+        
+        return this.kernel_reference.filesystem.read_file(process_id, file_descriptor, buffer, length);
+    }
+
+    syscall_file_write(process_id, file_descriptor, buffer, length) {
+        kernel_log(`系统调用: file_write(${file_descriptor}, buffer, ${length})`);
+        
+        return this.kernel_reference.filesystem.write_file(process_id, file_descriptor, buffer, length);
+    }
+
+    syscall_file_seek(process_id, file_descriptor, offset, whence) {
+        kernel_log(`系统调用: file_seek(${file_descriptor}, ${offset}, ${whence})`);
+        
+        return this.kernel_reference.filesystem.seek_file(process_id, file_descriptor, offset, whence);
+    }
+
+    syscall_file_stat(process_id, path) {
+        kernel_log(`系统调用: file_stat(${path})`);
+        
+        return this.kernel_reference.filesystem.stat_file(process_id, path);
+    }
+
+    // 设备管理系统调用实现
+    syscall_device_open(process_id, device_path, flags) {
+        kernel_log(`系统调用: device_open(${device_path}, ${flags})`);
+        
+        // 检查权限
+        if (!this.check_permission(process_id, 1)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        return this.kernel_reference.device_manager.open_device(process_id, device_path, flags);
+    }
+
+    syscall_device_close(process_id, device_descriptor) {
+        kernel_log(`系统调用: device_close(${device_descriptor})`);
+        
+        return this.kernel_reference.device_manager.close_device(process_id, device_descriptor);
+    }
+
+    syscall_device_read(process_id, device_descriptor, buffer, length) {
+        kernel_log(`系统调用: device_read(${device_descriptor}, buffer, ${length})`);
+        
+        return this.kernel_reference.device_manager.read_device(process_id, device_descriptor, buffer, length);
+    }
+
+    syscall_device_write(process_id, device_descriptor, buffer, length) {
+        kernel_log(`系统调用: device_write(${device_descriptor}, buffer, ${length})`);
+        
+        return this.kernel_reference.device_manager.write_device(process_id, device_descriptor, buffer, length);
+    }
+
+    syscall_device_ioctl(process_id, device_descriptor, request, args) {
+        kernel_log(`系统调用: device_ioctl(${device_descriptor}, ${request})`);
+        
+        // 设备控制命令通常需要更高权限
+        if (!this.check_permission(process_id, 0)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        return this.kernel_reference.device_manager.ioctl_device(process_id, device_descriptor, request, args);
+    }
+
+    // 量子系统调用实现
+    syscall_quantum_allocate(process_id, num_qubits) {
+        kernel_log(`系统调用: quantum_allocate(${num_qubits})`);
+        
+        // 检查权限
+        if (!this.check_permission(process_id, 1)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        return this.kernel_reference.quantum_processor.allocate_qubits(process_id, num_qubits);
+    }
+
+    syscall_quantum_free(process_id, qubit_handle) {
+        kernel_log(`系统调用: quantum_free(${qubit_handle})`);
+        
+        return this.kernel_reference.quantum_processor.free_qubits(process_id, qubit_handle);
+    }
+
+    syscall_quantum_gate(process_id, gate_type, qubits, params) {
+        kernel_log(`系统调用: quantum_gate(${gate_type}, [${qubits}], ${params})`);
+        
+        return this.kernel_reference.quantum_processor.apply_gate(process_id, gate_type, qubits, params);
+    }
+
+    syscall_quantum_measure(process_id, qubit_handle) {
+        kernel_log(`系统调用: quantum_measure(${qubit_handle})`);
+        
+        return this.kernel_reference.quantum_processor.measure_qubit(process_id, qubit_handle);
+    }
+
+    syscall_quantum_entangle(process_id, qubit_1, qubit_2) {
+        kernel_log(`系统调用: quantum_entangle(${qubit_1}, ${qubit_2})`);
+        
+        return this.kernel_reference.quantum_processor.entangle_qubits(process_id, qubit_1, qubit_2);
+    }
+
+    // 系统信息和控制系统调用实现
+    syscall_system_info(process_id) {
+        kernel_log(`系统调用: system_info()`);
+        
+        return {
+            kernel_version: this.kernel_reference.version,
+            hostname: this.kernel_reference.hostname,
+            uptime: Date.now() - this.kernel_reference.boot_time,
+            load_average: this.kernel_reference.load_average,
+            memory_usage: this.kernel_reference.memory_manager.get_usage_stats(),
+            quantum_usage: this.kernel_reference.quantum_processor.get_usage_stats()
+        };
+    }
+
+    syscall_system_time(process_id) {
+        kernel_log(`系统调用: system_time()`);
+        
+        return {
+            timestamp: Date.now(),
+            uptime: Date.now() - this.kernel_reference.boot_time
+        };
+    }
+
+    syscall_system_reboot(process_id) {
+        kernel_log(`系统调用: system_reboot()`);
+        
+        // 重启系统需要最高权限
+        if (!this.check_permission(process_id, 0)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        // 实际实现将委托给内核重启系统
+        return this.kernel_reference.reboot();
+    }
+
+    syscall_system_shutdown(process_id) {
+        kernel_log(`系统调用: system_shutdown()`);
+        
+        // 关闭系统需要最高权限
+        if (!this.check_permission(process_id, 0)) {
+            return { success: false, error: "权限不足" };
+        }
+        
+        // 实际实现将委托给内核关闭系统
+        return this.kernel_reference.shutdown();
+    }
+
+    // 获取系统调用统计信息
+    get_statistics() {
+        return {
+            total_calls: this.syscall_statistics.total_calls,
+            calls_per_type: this.syscall_statistics.calls_per_type,
+            last_syscall: this.last_syscall
+        };
+    }
+
+    // 设置权限级别（用于测试）
+    set_privilege_level(level) {
+        this.current_privilege_level = level;
+        return true;
+    }
+}
+
+// 导出系统调用模块
+export SystemCalls; 

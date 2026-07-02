@@ -1,0 +1,239 @@
+/**
+ * @file random.qentl
+ * @brief 随机数生成器类
+ * 
+ * 量子基因编码: QGC-VM-RANDOM-2024061901
+ * 量子纠缠信道: QEC-VM-QUANTUM-03
+ */
+
+import "QEntL/core/math.qentl";
+import "QEntL/core/date.qentl";
+
+/**
+ * @class Random
+ * @brief 随机数生成器，支持量子状态测量
+ */
+quantum_class Random {
+    private {
+        // 种子值
+        seed: Integer;
+        
+        // 上一个随机数
+        lastValue: Integer;
+        
+        // 是否使用量子随机性
+        useQuantumRandomness: Boolean;
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param seed 随机数种子，默认使用当前时间
+     * @param useQuantumRandomness 是否使用量子随机性
+     */
+    constructor(seed: Integer = 0, useQuantumRandomness: Boolean = true) {
+        this.useQuantumRandomness = useQuantumRandomness;
+        
+        if (seed === 0) {
+            // 使用当前时间作为种子
+            this.seed = Date.now() & 0x7FFFFFFF;
+        } else {
+            this.seed = seed & 0x7FFFFFFF;  // 确保种子为正数
+        }
+        
+        this.lastValue = this.seed;
+    }
+    
+    /**
+     * @brief 生成下一个随机整数
+     * @return 32位随机整数
+     */
+    public function nextInt(): Integer {
+        if (this.useQuantumRandomness && this._hasQuantumSource()) {
+            return this._generateQuantumRandom();
+        } else {
+            return this._generateClassicalRandom();
+        }
+    }
+    
+    /**
+     * @brief 生成指定范围内的随机整数
+     * @param min 最小值（包含）
+     * @param max 最大值（包含）
+     * @return 指定范围内的随机整数
+     */
+    public function nextIntInRange(min: Integer, max: Integer): Integer {
+        if (min > max) {
+            throw new Error("最小值不能大于最大值");
+        }
+        
+        // 计算范围大小
+        let range = max - min + 1;
+        
+        // 生成随机数
+        let randomValue = this.nextInt();
+        if (randomValue < 0) randomValue = -randomValue;
+        
+        // 映射到指定范围
+        return min + (randomValue % range);
+    }
+    
+    /**
+     * @brief 生成0到1之间的随机浮点数
+     * @return 0到1之间的随机浮点数
+     */
+    public function nextDouble(): Float {
+        // 使用32位随机整数生成0到1之间的浮点数
+        let randomInt = this.nextInt();
+        if (randomInt < 0) randomInt = -randomInt;
+        
+        return randomInt / 2147483647.0;  // 2^31 - 1
+    }
+    
+    /**
+     * @brief 生成指定范围内的随机浮点数
+     * @param min 最小值（包含）
+     * @param max 最大值（不包含）
+     * @return 指定范围内的随机浮点数
+     */
+    public function nextDoubleInRange(min: Float, max: Float): Float {
+        if (min >= max) {
+            throw new Error("最小值必须小于最大值");
+        }
+        
+        // 生成0到1之间的随机数，然后映射到指定范围
+        return min + this.nextDouble() * (max - min);
+    }
+    
+    /**
+     * @brief 生成随机布尔值
+     * @param trueProbability 为true的概率，默认为0.5
+     * @return 随机布尔值
+     */
+    public function nextBoolean(trueProbability: Float = 0.5): Boolean {
+        if (trueProbability < 0 || trueProbability > 1) {
+            throw new Error("概率值必须在0到1之间");
+        }
+        
+        return this.nextDouble() < trueProbability;
+    }
+    
+    /**
+     * @brief 根据概率分布进行随机选择
+     * @param probabilities 概率数组
+     * @return 选中的索引
+     */
+    public function nextChoice(probabilities: Array<Float>): Integer {
+        let sum = 0.0;
+        
+        // 计算概率总和
+        for (let prob of probabilities) {
+            if (prob < 0) {
+                throw new Error("概率值不能为负数");
+            }
+            sum += prob;
+        }
+        
+        if (sum === 0) {
+            throw new Error("概率总和不能为零");
+        }
+        
+        // 生成0到sum之间的随机数
+        let random = this.nextDoubleInRange(0, sum);
+        
+        // 按概率选择
+        let cumulativeProb = 0.0;
+        for (let i = 0; i < probabilities.length; i++) {
+            cumulativeProb += probabilities[i];
+            if (random < cumulativeProb) {
+                return i;
+            }
+        }
+        
+        // 防止浮点误差，默认返回最后一个元素
+        return probabilities.length - 1;
+    }
+    
+    /**
+     * @brief 设置随机数种子
+     * @param seed 新的种子值
+     */
+    public function setSeed(seed: Integer): void {
+        this.seed = seed & 0x7FFFFFFF;  // 确保种子为正数
+        this.lastValue = this.seed;
+    }
+    
+    /**
+     * @brief 设置是否使用量子随机性
+     * @param useQuantumRandomness 是否使用量子随机性
+     */
+    public function setUseQuantumRandomness(useQuantumRandomness: Boolean): void {
+        this.useQuantumRandomness = useQuantumRandomness;
+    }
+    
+    /**
+     * @brief 检查是否有量子随机源可用
+     * @return 是否有量子随机源
+     */
+    private function _hasQuantumSource(): Boolean {
+        // 在实际实现中，这里应该检查系统是否有量子随机数生成器
+        // 在这个模拟实现中，假设有50%的概率可用
+        return Math.random() < 0.5;
+    }
+    
+    /**
+     * @brief 生成量子随机数
+     * @return 基于量子随机源的随机整数
+     */
+    private function _generateQuantumRandom(): Integer {
+        // 在实际实现中，这里应该使用量子随机数生成器
+        // 在这个模拟实现中，使用一个伪随机算法模拟量子随机性
+        
+        // 基于时间和上一个随机值生成新的随机值
+        let time = Date.now();
+        let x = (this.lastValue ^ time) & 0x7FFFFFFF;
+        x = (x * 1103515245 + 12345) & 0x7FFFFFFF;
+        
+        this.lastValue = x;
+        return x;
+    }
+    
+    /**
+     * @brief 生成经典随机数
+     * @return 基于线性同余法的伪随机整数
+     */
+    private function _generateClassicalRandom(): Integer {
+        // 使用线性同余法生成伪随机数
+        this.lastValue = (this.lastValue * 1103515245 + 12345) & 0x7FFFFFFF;
+        return this.lastValue;
+    }
+    
+    /**
+     * @brief 生成指定长度的随机字节数组
+     * @param length 字节数组长度
+     * @return 随机字节数组
+     */
+    public function nextBytes(length: Integer): Array<Integer> {
+        if (length <= 0) {
+            throw new Error("长度必须为正数");
+        }
+        
+        let bytes = new Array<Integer>(length);
+        
+        for (let i = 0; i < length; i++) {
+            bytes[i] = this.nextIntInRange(0, 255);
+        }
+        
+        return bytes;
+    }
+    
+    /**
+     * @brief 模拟量子测量结果
+     * @param probabilities 测量结果的概率分布
+     * @return 测量结果的索引
+     */
+    public function quantumMeasurement(probabilities: Array<Float>): Integer {
+        return this.nextChoice(probabilities);
+    }
+}
+
+export { Random }; 

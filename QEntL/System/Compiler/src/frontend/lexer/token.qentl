@@ -1,0 +1,304 @@
+/**
+ * @file token.qentl
+ * @brief QEntL编译器标记定义
+ * 
+ * 量子基因编码: QGC-COMPILER-TOKEN-2024061901
+ * 量子纠缠信道: QEC-COMPILER-FRONTEND-01
+ */
+
+import "QEntL/core/string.qentl";
+
+/**
+ * @enum TokenType
+ * @brief 标记类型枚举
+ */
+quantum_enum TokenType {
+    // 特殊标记
+    EOF,                // 文件结束
+    IDENTIFIER,         // 标识符
+    
+    // 字面值标记
+    INTEGER,            // 整数
+    FLOAT,              // 浮点数
+    STRING,             // 字符串
+    
+    // 括号和分隔符
+    LEFT_PAREN,         // (
+    RIGHT_PAREN,        // )
+    LEFT_BRACE,         // {
+    RIGHT_BRACE,        // }
+    LEFT_BRACKET,       // [
+    RIGHT_BRACKET,      // ]
+    COMMA,              // ,
+    DOT,                // .
+    SEMICOLON,          // ;
+    COLON,              // :
+    
+    // 运算符
+    PLUS,               // +
+    MINUS,              // -
+    STAR,               // *
+    SLASH,              // /
+    PERCENT,            // %
+    EQUAL,              // =
+    BANG,               // !
+    LESS,               // <
+    GREATER,            // >
+    
+    // 复合运算符
+    PLUS_EQUAL,         // +=
+    MINUS_EQUAL,        // -=
+    STAR_EQUAL,         // *=
+    SLASH_EQUAL,        // /=
+    PERCENT_EQUAL,      // %=
+    EQUAL_EQUAL,        // ==
+    BANG_EQUAL,         // !=
+    LESS_EQUAL,         // <=
+    GREATER_EQUAL,      // >=
+    
+    // 逻辑运算符
+    AND,                // &&
+    OR,                 // ||
+    
+    // 位运算符
+    BITWISE_AND,        // &
+    BITWISE_OR,         // |
+    BITWISE_XOR,        // ^
+    BITWISE_NOT,        // ~
+    
+    // 其他特殊符号
+    ARROW,              // ->
+    AT,                 // @
+    
+    // 基本关键字
+    KW_FUNCTION,        // function
+    KW_VAR,             // var
+    KW_LET,             // let
+    KW_CONST,           // const
+    KW_IF,              // if
+    KW_ELSE,            // else
+    KW_FOR,             // for
+    KW_WHILE,           // while
+    KW_DO,              // do
+    KW_BREAK,           // break
+    KW_CONTINUE,        // continue
+    KW_RETURN,          // return
+    KW_TRUE,            // true
+    KW_FALSE,           // false
+    KW_NULL,            // null
+    KW_THIS,            // this
+    KW_SUPER,           // super
+    KW_IMPORT,          // import
+    KW_EXPORT,          // export
+    KW_CLASS,           // class
+    KW_EXTENDS,         // extends
+    KW_PUBLIC,          // public
+    KW_PRIVATE,         // private
+    KW_PROTECTED,       // protected
+    KW_STATIC,          // static
+    KW_NEW,             // new
+    KW_DELETE,          // delete
+    KW_TRY,             // try
+    KW_CATCH,           // catch
+    KW_FINALLY,         // finally
+    KW_THROW,           // throw
+    
+    // 量子关键字
+    KW_QUANTUM,         // quantum
+    KW_QNEW,            // qnew
+    KW_QMEASURE,        // qmeasure
+    KW_QENTANGLE,       // qentangle
+    KW_SUPERPOS,        // superpos
+    KW_QSTATE,          // qstate
+    KW_QBIT,            // qbit
+    KW_QUANTUM_ENTITY,  // quantum_entity
+    KW_QUANTUM_CLASS,   // quantum_class
+    KW_QUANTUM_FUNCTION, // quantum_function
+    KW_QUANTUM_PROGRAM, // quantum_program
+    KW_ENTANGLE,        // entangle
+    
+    // 量子特有操作符
+    OP_ENTANGLE,        // ~ (量子纠缠操作符)
+    OP_SUPERPOS,        // ? (量子叠加操作符)
+    OP_MEASURE,         // @ (量子测量操作符)
+    OP_COLLAPSE         // ! (量子坍缩操作符，与逻辑非重载)
+}
+
+/**
+ * @class Token
+ * @brief 标记类
+ */
+quantum_class Token {
+    // 公开属性
+    public {
+        type: TokenType;       // 标记类型
+        lexeme: String;        // 词素（标记的文本表示）
+        literal: Any;          // 字面值
+        line: Integer;         // 行号
+        column: Integer;       // 列号
+    }
+    
+    /**
+     * @brief 构造函数
+     * @param type 标记类型
+     * @param lexeme 词素
+     * @param literal 字面值
+     * @param line 行号
+     * @param column 列号
+     */
+    constructor(type: TokenType, lexeme: String, literal: Any = null, line: Integer = 0, column: Integer = 0) {
+        this.type = type;
+        this.lexeme = lexeme;
+        this.literal = literal;
+        this.line = line;
+        this.column = column;
+    }
+    
+    /**
+     * @brief 将标记转换为字符串表示
+     * @return 字符串表示
+     */
+    public function toString(): String {
+        let typeStr = this.typeToString();
+        
+        if (this.literal == null) {
+            return `${typeStr} '${this.lexeme}' (${this.line}:${this.column})`;
+        } else {
+            return `${typeStr} '${this.lexeme}' = ${this.literal} (${this.line}:${this.column})`;
+        }
+    }
+    
+    /**
+     * @brief 将标记类型转换为字符串
+     * @return 类型字符串
+     */
+    private function typeToString(): String {
+        switch (this.type) {
+            case TokenType.EOF: return "EOF";
+            case TokenType.IDENTIFIER: return "IDENTIFIER";
+            case TokenType.INTEGER: return "INTEGER";
+            case TokenType.FLOAT: return "FLOAT";
+            case TokenType.STRING: return "STRING";
+            
+            case TokenType.LEFT_PAREN: return "LEFT_PAREN";
+            case TokenType.RIGHT_PAREN: return "RIGHT_PAREN";
+            case TokenType.LEFT_BRACE: return "LEFT_BRACE";
+            case TokenType.RIGHT_BRACE: return "RIGHT_BRACE";
+            case TokenType.LEFT_BRACKET: return "LEFT_BRACKET";
+            case TokenType.RIGHT_BRACKET: return "RIGHT_BRACKET";
+            case TokenType.COMMA: return "COMMA";
+            case TokenType.DOT: return "DOT";
+            case TokenType.SEMICOLON: return "SEMICOLON";
+            case TokenType.COLON: return "COLON";
+            
+            case TokenType.PLUS: return "PLUS";
+            case TokenType.MINUS: return "MINUS";
+            case TokenType.STAR: return "STAR";
+            case TokenType.SLASH: return "SLASH";
+            case TokenType.PERCENT: return "PERCENT";
+            case TokenType.EQUAL: return "EQUAL";
+            case TokenType.BANG: return "BANG";
+            case TokenType.LESS: return "LESS";
+            case TokenType.GREATER: return "GREATER";
+            
+            case TokenType.PLUS_EQUAL: return "PLUS_EQUAL";
+            case TokenType.MINUS_EQUAL: return "MINUS_EQUAL";
+            case TokenType.STAR_EQUAL: return "STAR_EQUAL";
+            case TokenType.SLASH_EQUAL: return "SLASH_EQUAL";
+            case TokenType.PERCENT_EQUAL: return "PERCENT_EQUAL";
+            case TokenType.EQUAL_EQUAL: return "EQUAL_EQUAL";
+            case TokenType.BANG_EQUAL: return "BANG_EQUAL";
+            case TokenType.LESS_EQUAL: return "LESS_EQUAL";
+            case TokenType.GREATER_EQUAL: return "GREATER_EQUAL";
+            
+            case TokenType.AND: return "AND";
+            case TokenType.OR: return "OR";
+            
+            case TokenType.BITWISE_AND: return "BITWISE_AND";
+            case TokenType.BITWISE_OR: return "BITWISE_OR";
+            case TokenType.BITWISE_XOR: return "BITWISE_XOR";
+            case TokenType.BITWISE_NOT: return "BITWISE_NOT";
+            
+            case TokenType.ARROW: return "ARROW";
+            case TokenType.AT: return "AT";
+            
+            // 基本关键字
+            case TokenType.KW_FUNCTION: return "KW_FUNCTION";
+            case TokenType.KW_VAR: return "KW_VAR";
+            case TokenType.KW_LET: return "KW_LET";
+            case TokenType.KW_CONST: return "KW_CONST";
+            case TokenType.KW_IF: return "KW_IF";
+            case TokenType.KW_ELSE: return "KW_ELSE";
+            case TokenType.KW_FOR: return "KW_FOR";
+            case TokenType.KW_WHILE: return "KW_WHILE";
+            case TokenType.KW_DO: return "KW_DO";
+            case TokenType.KW_BREAK: return "KW_BREAK";
+            case TokenType.KW_CONTINUE: return "KW_CONTINUE";
+            case TokenType.KW_RETURN: return "KW_RETURN";
+            case TokenType.KW_TRUE: return "KW_TRUE";
+            case TokenType.KW_FALSE: return "KW_FALSE";
+            case TokenType.KW_NULL: return "KW_NULL";
+            case TokenType.KW_THIS: return "KW_THIS";
+            case TokenType.KW_SUPER: return "KW_SUPER";
+            case TokenType.KW_IMPORT: return "KW_IMPORT";
+            case TokenType.KW_EXPORT: return "KW_EXPORT";
+            case TokenType.KW_CLASS: return "KW_CLASS";
+            case TokenType.KW_EXTENDS: return "KW_EXTENDS";
+            case TokenType.KW_PUBLIC: return "KW_PUBLIC";
+            case TokenType.KW_PRIVATE: return "KW_PRIVATE";
+            case TokenType.KW_PROTECTED: return "KW_PROTECTED";
+            case TokenType.KW_STATIC: return "KW_STATIC";
+            case TokenType.KW_NEW: return "KW_NEW";
+            case TokenType.KW_DELETE: return "KW_DELETE";
+            case TokenType.KW_TRY: return "KW_TRY";
+            case TokenType.KW_CATCH: return "KW_CATCH";
+            case TokenType.KW_FINALLY: return "KW_FINALLY";
+            case TokenType.KW_THROW: return "KW_THROW";
+            
+            // 量子关键字
+            case TokenType.KW_QUANTUM: return "KW_QUANTUM";
+            case TokenType.KW_QNEW: return "KW_QNEW";
+            case TokenType.KW_QMEASURE: return "KW_QMEASURE";
+            case TokenType.KW_QENTANGLE: return "KW_QENTANGLE";
+            case TokenType.KW_SUPERPOS: return "KW_SUPERPOS";
+            case TokenType.KW_QSTATE: return "KW_QSTATE";
+            case TokenType.KW_QBIT: return "KW_QBIT";
+            case TokenType.KW_QUANTUM_ENTITY: return "KW_QUANTUM_ENTITY";
+            case TokenType.KW_QUANTUM_CLASS: return "KW_QUANTUM_CLASS";
+            case TokenType.KW_QUANTUM_FUNCTION: return "KW_QUANTUM_FUNCTION";
+            case TokenType.KW_QUANTUM_PROGRAM: return "KW_QUANTUM_PROGRAM";
+            case TokenType.KW_ENTANGLE: return "KW_ENTANGLE";
+            
+            // 量子特有操作符
+            case TokenType.OP_ENTANGLE: return "OP_ENTANGLE";
+            case TokenType.OP_SUPERPOS: return "OP_SUPERPOS";
+            case TokenType.OP_MEASURE: return "OP_MEASURE";
+            case TokenType.OP_COLLAPSE: return "OP_COLLAPSE";
+            
+            default: return `UNKNOWN(${this.type})`;
+        }
+    }
+    
+    /**
+     * @brief 检查标记是否为指定类型
+     * @param type 标记类型
+     * @return 是否匹配
+     */
+    public function is(type: TokenType): Boolean {
+        return this.type == type;
+    }
+    
+    /**
+     * @brief 检查标记是否为指定类型之一
+     * @param types 标记类型数组
+     * @return 是否匹配任一类型
+     */
+    public function isOneOf(types: Array<TokenType>): Boolean {
+        for (let i = 0; i < types.length(); i++) {
+            if (this.type == types[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+} 

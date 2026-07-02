@@ -1,0 +1,773 @@
+// 量子进程间通信管理器
+// 文件: ipc_manager.qentl
+// 描述: 此模块管理QEntL操作系统中的进程间通信机制
+
+metadata {
+    name: "QEntL进程间通信管理器",
+    version: "1.0.0",
+    author: "QEntL团队",
+    description: "提供多种进程间通信机制，支持管道、消息队列、共享内存和信号",
+    quantum_gene: "QIPC-8721-4632-9510",
+    entanglement_strength: 0.85
+}
+
+quantum program IPCManager {
+    // 模块引用
+    state {
+        kernel_ref: ref,              // 内核引用
+        memory_manager: ref,          // 内存管理器引用
+        process_manager: ref,         // 进程管理器引用
+        
+        initialized: bool,            // 初始化状态
+        
+        // IPC资源追踪
+        pipes: map<int, object>,      // 管道表
+        message_queues: map<int, object>, // 消息队列表
+        shared_memory: map<int, object>,  // 共享内存表
+        semaphores: map<int, object>,     // 信号量表
+        
+        // 资源计数器
+        next_pipe_id: int,
+        next_queue_id: int,
+        next_shmem_id: int,
+        next_sem_id: int,
+        
+        // 错误与警告
+        errors: array<string>,
+        warnings: array<string>
+    }
+    
+    // 初始化IPC管理器
+    function initialize(kernel_ref, memory_manager_ref, process_manager_ref) {
+        if (this.initialized) {
+            this.addWarning("IPC管理器已经初始化");
+            return true;
+        }
+        
+        this.kernel_ref = kernel_ref;
+        this.memory_manager = memory_manager_ref;
+        this.process_manager = process_manager_ref;
+        
+        // 初始化资源表
+        this.pipes = {};
+        this.message_queues = {};
+        this.shared_memory = {};
+        this.semaphores = {};
+        
+        // 初始化计数器
+        this.next_pipe_id = 1;
+        this.next_queue_id = 1;
+        this.next_shmem_id = 1;
+        this.next_sem_id = 1;
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        this.initialized = true;
+        return true;
+    }
+    
+    // 重置IPC管理器状态
+    function reset() {
+        if (!this.initialized) {
+            this.addWarning("尝试重置未初始化的IPC管理器");
+            return false;
+        }
+        
+        // 清理所有IPC资源
+        this.clean_all_resources();
+        
+        // 重置资源表
+        this.pipes = {};
+        this.message_queues = {};
+        this.shared_memory = {};
+        this.semaphores = {};
+        
+        // 重置计数器
+        this.next_pipe_id = 1;
+        this.next_queue_id = 1;
+        this.next_shmem_id = 1;
+        this.next_sem_id = 1;
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        return true;
+    }
+    
+    // 清理所有IPC资源
+    function clean_all_resources() {
+        // 清理所有管道
+        for (let pipe_id in this.pipes) {
+            this.close_pipe(pipe_id);
+        }
+        
+        // 清理所有消息队列
+        for (let queue_id in this.message_queues) {
+            this.delete_message_queue(queue_id);
+        }
+        
+        // 清理所有共享内存
+        for (let shmem_id in this.shared_memory) {
+            this.detach_shared_memory(shmem_id);
+        }
+        
+        // 清理所有信号量
+        for (let sem_id in this.semaphores) {
+            this.delete_semaphore(sem_id);
+        }
+    }
+    
+    // ===== 管道操作 =====
+    
+    // 创建一个新的管道
+    function create_pipe() {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中创建管道");
+            return -1;
+        }
+        
+        const pipe_id = this.next_pipe_id++;
+        
+        // 分配管道缓冲区内存
+        const buffer = this.memory_manager.allocate(4096); // 4KB缓冲区
+        if (!buffer) {
+            this.addError("为管道分配内存失败");
+            return -1;
+        }
+        
+        this.pipes[pipe_id] = {
+            buffer: buffer,
+            read_pos: 0,
+            write_pos: 0,
+            size: 4096,
+            readers: [],
+            writers: [],
+            is_closed: false
+        };
+        
+        return pipe_id;
+    }
+    
+    // 关闭管道
+    function close_pipe(pipe_id) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中关闭管道");
+            return false;
+        }
+        
+        if (!this.pipes[pipe_id]) {
+            this.addError(`尝试关闭不存在的管道: ${pipe_id}`);
+            return false;
+        }
+        
+        const pipe = this.pipes[pipe_id];
+        
+        // 释放管道缓冲区
+        this.memory_manager.free(pipe.buffer);
+        
+        // 标记管道为关闭状态
+        pipe.is_closed = true;
+        
+        // 从管道表中移除
+        delete this.pipes[pipe_id];
+        
+        return true;
+    }
+    
+    // 向管道写入数据
+    function write_to_pipe(pipe_id, data, size, pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中写入管道");
+            return -1;
+        }
+        
+        if (!this.pipes[pipe_id]) {
+            this.addError(`尝试写入不存在的管道: ${pipe_id}`);
+            return -1;
+        }
+        
+        const pipe = this.pipes[pipe_id];
+        
+        if (pipe.is_closed) {
+            this.addError(`尝试写入已关闭的管道: ${pipe_id}`);
+            return -1;
+        }
+        
+        // 验证进程是否有权写入
+        if (pid && pipe.writers.indexOf(pid) === -1) {
+            this.addError(`进程 ${pid} 无权写入管道 ${pipe_id}`);
+            return -1;
+        }
+        
+        // 检查可用空间
+        const free_space = (pipe.read_pos <= pipe.write_pos) 
+            器 (pipe.size - pipe.write_pos + pipe.read_pos) 
+            : (pipe.read_pos - pipe.write_pos);
+            
+        if (free_space < size) {
+            // 阻塞或返回错误
+            return 0; // 暂时不阻塞，返回0表示无法写入
+        }
+        
+        // 写入数据
+        let bytes_written = 0;
+        for (let i = 0; i < size; i++) {
+            pipe.buffer[pipe.write_pos] = data[i];
+            pipe.write_pos = (pipe.write_pos + 1) % pipe.size;
+            bytes_written++;
+        }
+        
+        return bytes_written;
+    }
+    
+    // 从管道读取数据
+    function read_from_pipe(pipe_id, buffer, size, pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中读取管道");
+            return -1;
+        }
+        
+        if (!this.pipes[pipe_id]) {
+            this.addError(`尝试读取不存在的管道: ${pipe_id}`);
+            return -1;
+        }
+        
+        const pipe = this.pipes[pipe_id];
+        
+        if (pipe.is_closed) {
+            this.addError(`尝试读取已关闭的管道: ${pipe_id}`);
+            return -1;
+        }
+        
+        // 验证进程是否有权读取
+        if (pid && pipe.readers.indexOf(pid) === -1) {
+            this.addError(`进程 ${pid} 无权读取管道 ${pipe_id}`);
+            return -1;
+        }
+        
+        // 计算可读取的数据量
+        const available = (pipe.write_pos >= pipe.read_pos) 
+            器 (pipe.write_pos - pipe.read_pos) 
+            : (pipe.size - pipe.read_pos + pipe.write_pos);
+            
+        if (available === 0) {
+            // 管道为空
+            return 0;
+        }
+        
+        // 读取数据
+        const bytes_to_read = Math.min(size, available);
+        let bytes_read = 0;
+        
+        for (let i = 0; i < bytes_to_read; i++) {
+            buffer[i] = pipe.buffer[pipe.read_pos];
+            pipe.read_pos = (pipe.read_pos + 1) % pipe.size;
+            bytes_read++;
+        }
+        
+        return bytes_read;
+    }
+    
+    // ===== 消息队列操作 =====
+    
+    // 创建消息队列
+    function create_message_queue(max_messages, max_size) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中创建消息队列");
+            return -1;
+        }
+        
+        const queue_id = this.next_queue_id++;
+        
+        this.message_queues[queue_id] = {
+            messages: [],
+            max_messages: max_messages || 32,
+            max_size: max_size || 4096,
+            readers: [],
+            writers: [],
+            is_deleted: false
+        };
+        
+        return queue_id;
+    }
+    
+    // 删除消息队列
+    function delete_message_queue(queue_id) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中删除消息队列");
+            return false;
+        }
+        
+        if (!this.message_queues[queue_id]) {
+            this.addError(`尝试删除不存在的消息队列: ${queue_id}`);
+            return false;
+        }
+        
+        const queue = this.message_queues[queue_id];
+        
+        // 标记队列为删除状态
+        queue.is_deleted = true;
+        
+        // 从队列表中移除
+        delete this.message_queues[queue_id];
+        
+        return true;
+    }
+    
+    // 发送消息到队列
+    function send_message(queue_id, message, priority, pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中发送消息");
+            return false;
+        }
+        
+        if (!this.message_queues[queue_id]) {
+            this.addError(`尝试向不存在的消息队列发送: ${queue_id}`);
+            return false;
+        }
+        
+        const queue = this.message_queues[queue_id];
+        
+        if (queue.is_deleted) {
+            this.addError(`尝试向已删除的消息队列发送: ${queue_id}`);
+            return false;
+        }
+        
+        // 验证进程是否有权写入
+        if (pid && queue.writers.indexOf(pid) === -1) {
+            this.addError(`进程 ${pid} 无权向消息队列 ${queue_id} 发送消息`);
+            return false;
+        }
+        
+        // 检查队列是否已满
+        if (queue.messages.length >= queue.max_messages) {
+            this.addWarning(`消息队列 ${queue_id} 已满`);
+            return false;
+        }
+        
+        // 检查消息大小
+        if (message.length > queue.max_size) {
+            this.addError(`消息大小超过限制: ${message.length} > ${queue.max_size}`);
+            return false;
+        }
+        
+        // 添加消息到队列
+        queue.messages.push({
+            data: message,
+            priority: priority || 0,
+            timestamp: Date.now()
+        });
+        
+        // 根据优先级排序
+        queue.messages.sort((a, b) => b.priority - a.priority);
+        
+        return true;
+    }
+    
+    // 从队列接收消息
+    function receive_message(queue_id, pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中接收消息");
+            return null;
+        }
+        
+        if (!this.message_queues[queue_id]) {
+            this.addError(`尝试从不存在的消息队列接收: ${queue_id}`);
+            return null;
+        }
+        
+        const queue = this.message_queues[queue_id];
+        
+        if (queue.is_deleted) {
+            this.addError(`尝试从已删除的消息队列接收: ${queue_id}`);
+            return null;
+        }
+        
+        // 验证进程是否有权读取
+        if (pid && queue.readers.indexOf(pid) === -1) {
+            this.addError(`进程 ${pid} 无权从消息队列 ${queue_id} 接收消息`);
+            return null;
+        }
+        
+        // 队列是否为空
+        if (queue.messages.length === 0) {
+            return null;
+        }
+        
+        // 取出最高优先级的消息
+        const message = queue.messages.shift();
+        return message.data;
+    }
+    
+    // ===== 共享内存操作 =====
+    
+    // 创建共享内存段
+    function create_shared_memory(size) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中创建共享内存");
+            return -1;
+        }
+        
+        // 检查大小有效性
+        if (size <= 0) {
+            this.addError(`无效的共享内存大小: ${size}`);
+            return -1;
+        }
+        
+        const shmem_id = this.next_shmem_id++;
+        
+        // 分配共享内存
+        const memory = this.memory_manager.allocate(size);
+        if (!memory) {
+            this.addError(`分配共享内存失败: ${size} 字节`);
+            return -1;
+        }
+        
+        // 初始化共享内存对象
+        this.shared_memory[shmem_id] = {
+            memory: memory,
+            size: size,
+            attached_processes: [],
+            is_marked_for_deletion: false
+        };
+        
+        return shmem_id;
+    }
+    
+    // 附加进程到共享内存
+    function attach_shared_memory(shmem_id, pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中附加共享内存");
+            return null;
+        }
+        
+        if (!this.shared_memory[shmem_id]) {
+            this.addError(`尝试附加不存在的共享内存: ${shmem_id}`);
+            return null;
+        }
+        
+        const shmem = this.shared_memory[shmem_id];
+        
+        // 检查进程是否已附加
+        if (shmem.attached_processes.indexOf(pid) !== -1) {
+            this.addWarning(`进程 ${pid} 已附加到共享内存 ${shmem_id}`);
+            return shmem.memory;
+        }
+        
+        // 附加进程
+        shmem.attached_processes.push(pid);
+        
+        return shmem.memory;
+    }
+    
+    // 分离进程从共享内存
+    function detach_shared_memory(shmem_id, pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中分离共享内存");
+            return false;
+        }
+        
+        if (!this.shared_memory[shmem_id]) {
+            this.addError(`尝试分离不存在的共享内存: ${shmem_id}`);
+            return false;
+        }
+        
+        const shmem = this.shared_memory[shmem_id];
+        
+        // 从附加进程列表中移除
+        const index = shmem.attached_processes.indexOf(pid);
+        if (index !== -1) {
+            shmem.attached_processes.splice(index, 1);
+        }
+        
+        // 如果没有进程附加并且标记为删除，则删除共享内存
+        if (shmem.attached_processes.length === 0 && shmem.is_marked_for_deletion) {
+            return this.delete_shared_memory(shmem_id);
+        }
+        
+        return true;
+    }
+    
+    // 删除共享内存
+    function delete_shared_memory(shmem_id) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中删除共享内存");
+            return false;
+        }
+        
+        if (!this.shared_memory[shmem_id]) {
+            this.addError(`尝试删除不存在的共享内存: ${shmem_id}`);
+            return false;
+        }
+        
+        const shmem = this.shared_memory[shmem_id];
+        
+        // 如果仍有进程附加，则标记为删除
+        if (shmem.attached_processes.length > 0) {
+            shmem.is_marked_for_deletion = true;
+            return true;
+        }
+        
+        // 释放共享内存
+        this.memory_manager.free(shmem.memory);
+        
+        // 从共享内存表中移除
+        delete this.shared_memory[shmem_id];
+        
+        return true;
+    }
+    
+    // ===== 信号量操作 =====
+    
+    // 创建信号量
+    function create_semaphore(initial_value) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中创建信号量");
+            return -1;
+        }
+        
+        // 检查初始值有效性
+        if (initial_value < 0) {
+            this.addError(`无效的信号量初始值: ${initial_value}`);
+            return -1;
+        }
+        
+        const sem_id = this.next_sem_id++;
+        
+        // 初始化信号量对象
+        this.semaphores[sem_id] = {
+            value: initial_value,
+            waiting_processes: [],
+            is_deleted: false
+        };
+        
+        return sem_id;
+    }
+    
+    // 删除信号量
+    function delete_semaphore(sem_id) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中删除信号量");
+            return false;
+        }
+        
+        if (!this.semaphores[sem_id]) {
+            this.addError(`尝试删除不存在的信号量: ${sem_id}`);
+            return false;
+        }
+        
+        const sem = this.semaphores[sem_id];
+        
+        // 唤醒所有等待进程
+        for (let i = 0; i < sem.waiting_processes.length; i++) {
+            const pid = sem.waiting_processes[i];
+            this.process_manager.wakeup_process(pid);
+        }
+        
+        // 标记信号量为删除状态
+        sem.is_deleted = true;
+        
+        // 从信号量表中移除
+        delete this.semaphores[sem_id];
+        
+        return true;
+    }
+    
+    // 信号量P操作(减少)
+    function sem_wait(sem_id, pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中执行信号量等待");
+            return false;
+        }
+        
+        if (!this.semaphores[sem_id]) {
+            this.addError(`尝试在不存在的信号量上等待: ${sem_id}`);
+            return false;
+        }
+        
+        const sem = this.semaphores[sem_id];
+        
+        if (sem.is_deleted) {
+            this.addError(`尝试在已删除的信号量上等待: ${sem_id}`);
+            return false;
+        }
+        
+        // 尝试获取信号量
+        if (sem.value > 0) {
+            sem.value--;
+            return true;
+        } else {
+            // 将进程加入等待队列
+            sem.waiting_processes.push(pid);
+            // 阻塞进程
+            this.process_manager.block_process(pid, "WAITING_SEM", sem_id);
+            return false;
+        }
+    }
+    
+    // 信号量V操作(增加)
+    function sem_post(sem_id) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中执行信号量释放");
+            return false;
+        }
+        
+        if (!this.semaphores[sem_id]) {
+            this.addError(`尝试在不存在的信号量上释放: ${sem_id}`);
+            return false;
+        }
+        
+        const sem = this.semaphores[sem_id];
+        
+        if (sem.is_deleted) {
+            this.addError(`尝试在已删除的信号量上释放: ${sem_id}`);
+            return false;
+        }
+        
+        // 增加信号量值
+        sem.value++;
+        
+        // 如果有等待进程，唤醒其中一个
+        if (sem.waiting_processes.length > 0) {
+            const pid = sem.waiting_processes.shift();
+            this.process_manager.wakeup_process(pid);
+            // 减少信号量值，因为被唤醒的进程将获取信号量
+            sem.value--;
+        }
+        
+        return true;
+    }
+    
+    // ===== 信号机制 =====
+    
+    // 发送信号到进程
+    function send_signal(target_pid, signal_code, sender_pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中发送信号");
+            return false;
+        }
+        
+        // 验证目标进程存在
+        if (!this.process_manager.is_process_exist(target_pid)) {
+            this.addError(`尝试向不存在的进程发送信号: ${target_pid}`);
+            return false;
+        }
+        
+        // 验证信号码有效
+        if (signal_code < 0 || signal_code > 31) {
+            this.addError(`无效的信号码: ${signal_code}`);
+            return false;
+        }
+        
+        // 添加信号到进程信号队列
+        return this.process_manager.add_signal_to_process(target_pid, signal_code, sender_pid);
+    }
+    
+    // ===== 统计和维护 =====
+    
+    // 获取IPC资源统计
+    function get_statistics() {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中获取统计信息");
+            return null;
+        }
+        
+        return {
+            pipes_count: Object.keys(this.pipes).length,
+            message_queues_count: Object.keys(this.message_queues).length,
+            shared_memory_count: Object.keys(this.shared_memory).length,
+            semaphores_count: Object.keys(this.semaphores).length,
+            next_pipe_id: this.next_pipe_id,
+            next_queue_id: this.next_queue_id,
+            next_shmem_id: this.next_shmem_id,
+            next_sem_id: this.next_sem_id,
+            errors_count: this.errors.length,
+            warnings_count: this.warnings.length
+        };
+    }
+    
+    // 清理指定进程的所有IPC资源
+    function cleanup_process_resources(pid) {
+        if (!this.initialized) {
+            this.addError("尝试在未初始化的IPC管理器中清理进程资源");
+            return false;
+        }
+        
+        // 清理管道资源
+        for (let pipe_id in this.pipes) {
+            const pipe = this.pipes[pipe_id];
+            
+            // 从读写者列表中移除
+            const reader_index = pipe.readers.indexOf(pid);
+            if (reader_index !== -1) {
+                pipe.readers.splice(reader_index, 1);
+            }
+            
+            const writer_index = pipe.writers.indexOf(pid);
+            if (writer_index !== -1) {
+                pipe.writers.splice(writer_index, 1);
+            }
+            
+            // 如果没有读写者，关闭管道
+            if (pipe.readers.length === 0 && pipe.writers.length === 0) {
+                this.close_pipe(pipe_id);
+            }
+        }
+        
+        // 清理消息队列资源
+        for (let queue_id in this.message_queues) {
+            const queue = this.message_queues[queue_id];
+            
+            // 从读写者列表中移除
+            const reader_index = queue.readers.indexOf(pid);
+            if (reader_index !== -1) {
+                queue.readers.splice(reader_index, 1);
+            }
+            
+            const writer_index = queue.writers.indexOf(pid);
+            if (writer_index !== -1) {
+                queue.writers.splice(writer_index, 1);
+            }
+            
+            // 如果没有读写者，删除队列
+            if (queue.readers.length === 0 && queue.writers.length === 0) {
+                this.delete_message_queue(queue_id);
+            }
+        }
+        
+        // 清理共享内存资源
+        for (let shmem_id in this.shared_memory) {
+            this.detach_shared_memory(shmem_id, pid);
+        }
+        
+        // 清理信号量资源
+        for (let sem_id in this.semaphores) {
+            const sem = this.semaphores[sem_id];
+            
+            // 从等待列表中移除
+            const wait_index = sem.waiting_processes.indexOf(pid);
+            if (wait_index !== -1) {
+                sem.waiting_processes.splice(wait_index, 1);
+            }
+        }
+        
+        return true;
+    }
+    
+    // 添加错误信息
+    function addError(message) {
+        this.errors.push(message);
+        console.error(`IPC错误: ${message}`);
+    }
+    
+    // 添加警告信息
+    function addWarning(message) {
+        this.warnings.push(message);
+        console.warn(`IPC警告: ${message}`);
+    }
+}
+
+export IPCManager; 

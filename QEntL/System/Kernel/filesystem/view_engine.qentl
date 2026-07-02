@@ -1,0 +1,622 @@
+/**
+ * QEntL视图引擎实现
+ * QuantumGene: QG-VENGINE-C3F8-1714047000
+ * EntanglementStrength: 0.8
+ */
+
+quantum_module ViewEngine {
+    // 模块元数据
+    metadata: {
+        name: "视图引擎",
+        version: "1.0.0",
+        description: "QEntL文件系统的动态视图引擎实现",
+        author: "QEntL开发团队",
+        quantum_gene: "QG-VENGINE-C3F8-1714047000",
+        entanglement_strength: 0.8
+    },
+    
+    // 视图引擎配置
+    config: {
+        template_path: "/templates",    // 模板路径
+        cache_enabled: true,            // 是否启用缓存
+        cache_ttl: 3600,                // 缓存有效期(秒)
+        compression_enabled: true,      // 是否启用压缩
+        minify_output: true,            // 是否压缩输出
+        default_extension: ".qview",    // 默认视图扩展名
+        error_template: "error.qview",  // 错误模板
+        max_include_depth: 10,          // 最大包含深度
+        dynamic_reloading: true         // 是否动态重新加载
+    },
+    
+    // 视图引擎类型
+    types: {
+        // 视图模板
+        Template: {
+            id: String,                 // 模板ID
+            path: String,               // 模板路径
+            content: String,            // 模板内容
+            compiled: Object,           // 编译后的模板
+            dependencies: Array,        // 依赖的其他模板
+            last_modified: Number,      // 最后修改时间
+            metadata: Object            // 元数据
+        },
+        
+        // 渲染上下文
+        RenderContext: {
+            template_id: String,        // 模板ID
+            data: Object,               // 渲染数据
+            options: Object,            // 渲染选项
+            parent_context: Object,     // 父上下文
+            result: String,             // 渲染结果
+            partials: Object,           // 部分视图
+            helpers: Object,            // 辅助函数
+            start_time: Number,         // 开始时间
+            end_time: Number            // 结束时间
+        },
+        
+        // 视图引擎错误
+        ViewError: {
+            code: String,               // 错误代码
+            message: String,            // 错误消息
+            template_id: String,        // 模板ID
+            line: Number,               // 行号
+            column: Number,             // 列号
+            stack: String               // 堆栈跟踪
+        }
+    },
+    
+    // 视图引擎状态
+    state: {
+        templates: {},                  // 模板缓存
+        helpers: {},                    // 注册的辅助函数
+        partials: {},                   // 注册的部分视图
+        statistics: {                   // 统计信息
+            total_renders: 0,           // 总渲染次数
+            cache_hits: 0,              // 缓存命中次数
+            cache_misses: 0,            // 缓存未命中次数
+            average_render_time: 0,     // 平均渲染时间
+            total_errors: 0             // 总错误数
+        },
+        last_error: null,               // 最后一个错误
+        initialized: false              // 是否已初始化
+    },
+    
+    /**
+     * 初始化视图引擎
+     * @param {Object} options 初始化选项
+     * @returns {Boolean} 是否成功初始化
+     */
+    initialize: function(options) {
+        log("视图引擎", "初始化视图引擎");
+        
+        // 合并选项
+        this.config = Object.assign({}, this.config, options || {});
+        
+        // 注册内置辅助函数
+        this._registerBuiltinHelpers();
+        
+        // 注册内置部分视图
+        this._registerBuiltinPartials();
+        
+        this.state.initialized = true;
+        log("视图引擎", "视图引擎初始化完成");
+        return true;
+    },
+    
+    /**
+     * 加载模板
+     * @param {String} template_id 模板ID
+     * @param {String} path 模板路径（可选）
+     * @returns {Promise<Object>} 模板对象
+     */
+    loadTemplate: async function(template_id, path) {
+        if (!this.state.initialized) {
+            throw this._createError("ENGINE_NOT_INITIALIZED", "视图引擎未初始化", template_id);
+        }
+        
+        log("视图引擎", `加载模板: ${template_id}`);
+        
+        // 检查缓存
+        if (this.config.cache_enabled && this.state.templates[template_id]) {
+            const cached = this.state.templates[template_id];
+            
+            // 如果动态重新加载被禁用或模板是最新的，则使用缓存
+            if (!this.config.dynamic_reloading || await this._isTemplateFresh(cached)) {
+                this.state.statistics.cache_hits++;
+                log("视图引擎", `使用缓存的模板: ${template_id}`);
+                return cached;
+            }
+        }
+        
+        this.state.statistics.cache_misses++;
+        
+        // 确定模板路径
+        const template_path = path || this._resolveTemplatePath(template_id);
+        
+        try {
+            // 读取模板内容
+            const content = await this._readTemplateFile(template_path);
+            
+            // 解析模板依赖
+            const dependencies = this._parseTemplateDependencies(content);
+            
+            // 编译模板
+            const compiled = await this._compileTemplate(content, template_id);
+            
+            // 创建模板对象
+            const template = {
+                id: template_id,
+                path: template_path,
+                content: content,
+                compiled: compiled,
+                dependencies: dependencies,
+                last_modified: Date.now(),
+                metadata: this._extractTemplateMetadata(content)
+            };
+            
+            // 存储到缓存
+            if (this.config.cache_enabled) {
+                this.state.templates[template_id] = template;
+            }
+            
+            log("视图引擎", `模板加载成功: ${template_id}`);
+            return template;
+        } catch (error) {
+            const viewError = this._createError(
+                "TEMPLATE_LOAD_ERROR", 
+                `无法加载模板 ${template_id}: ${error.message}`,
+                template_id
+            );
+            this.state.last_error = viewError;
+            this.state.statistics.total_errors++;
+            throw viewError;
+        }
+    },
+    
+    /**
+     * 渲染模板
+     * @param {String} template_id 模板ID
+     * @param {Object} data 渲染数据
+     * @param {Object} options 渲染选项
+     * @returns {Promise<String>} 渲染结果
+     */
+    renderTemplate: async function(template_id, data, options) {
+        if (!this.state.initialized) {
+            throw this._createError("ENGINE_NOT_INITIALIZED", "视图引擎未初始化", template_id);
+        }
+        
+        log("视图引擎", `渲染模板: ${template_id}`);
+        const start_time = Date.now();
+        
+        try {
+            // 加载模板
+            const template = await this.loadTemplate(template_id);
+            
+            // 创建渲染上下文
+            const context = {
+                template_id: template_id,
+                data: data || {},
+                options: options || {},
+                parent_context: null,
+                result: "",
+                partials: Object.assign({}, this.state.partials),
+                helpers: Object.assign({}, this.state.helpers),
+                start_time: start_time,
+                end_time: 0
+            };
+            
+            // 执行渲染
+            context.result = await this._renderTemplateWithContext(template, context);
+            
+            // 应用后处理
+            if (options器.post_processors) {
+                for (const processor of options.post_processors) {
+                    context.result = await processor(context.result, context);
+                }
+            }
+            
+            // 压缩输出
+            if (this.config.minify_output && !options器.skip_minify) {
+                context.result = this._minifyOutput(context.result);
+            }
+            
+            // 更新统计信息
+            this.state.statistics.total_renders++;
+            const render_time = Date.now() - start_time;
+            this.state.statistics.average_render_time = 
+                (this.state.statistics.average_render_time * (this.state.statistics.total_renders - 1) + render_time) / 
+                this.state.statistics.total_renders;
+            
+            context.end_time = Date.now();
+            log("视图引擎", `模板渲染成功: ${template_id}, 耗时: ${render_time}ms`);
+            
+            return context.result;
+        } catch (error) {
+            // 如果是已知的视图错误，直接抛出
+            if (error.code) {
+                throw error;
+            }
+            
+            // 否则创建新的视图错误
+            const viewError = this._createError(
+                "RENDER_ERROR", 
+                `渲染模板 ${template_id} 失败: ${error.message}`,
+                template_id
+            );
+            this.state.last_error = viewError;
+            this.state.statistics.total_errors++;
+            
+            // 尝试渲染错误模板
+            try {
+                if (template_id !== this.config.error_template) {
+                    return await this.renderTemplate(this.config.error_template, { error: viewError });
+                }
+            } catch (err) {
+                // 错误模板也失败了，返回纯文本错误
+                return `Error: ${viewError.message}`;
+            }
+            
+            throw viewError;
+        }
+    },
+    
+    /**
+     * 注册辅助函数
+     * @param {String} name 函数名
+     * @param {Function} fn 函数实现
+     * @returns {Boolean} 是否成功注册
+     */
+    registerHelper: function(name, fn) {
+        if (typeof name !== 'string' || typeof fn !== 'function') {
+            log("视图引擎", "注册辅助函数失败：无效的参数", "ERROR");
+            return false;
+        }
+        
+        this.state.helpers[name] = fn;
+        log("视图引擎", `注册辅助函数: ${name}`);
+        return true;
+    },
+    
+    /**
+     * 注册部分视图
+     * @param {String} name 部分视图名
+     * @param {String} content 部分视图内容
+     * @returns {Boolean} 是否成功注册
+     */
+    registerPartial: function(name, content) {
+        if (typeof name !== 'string' || typeof content !== 'string') {
+            log("视图引擎", "注册部分视图失败：无效的参数", "ERROR");
+            return false;
+        }
+        
+        this.state.partials[name] = content;
+        log("视图引擎", `注册部分视图: ${name}`);
+        return true;
+    },
+    
+    /**
+     * 清除缓存
+     * @param {String} template_id 模板ID（可选，不提供则清除所有）
+     * @returns {Number} 清除的模板数量
+     */
+    clearCache: function(template_id) {
+        if (template_id) {
+            if (this.state.templates[template_id]) {
+                delete this.state.templates[template_id];
+                log("视图引擎", `清除模板缓存: ${template_id}`);
+                return 1;
+            }
+            return 0;
+        }
+        
+        const count = Object.keys(this.state.templates).length;
+        this.state.templates = {};
+        log("视图引擎", `清除所有模板缓存, 共 ${count} 个模板`);
+        return count;
+    },
+    
+    /**
+     * 获取引擎统计信息
+     * @returns {Object} 统计信息
+     */
+    getStatistics: function() {
+        return Object.assign({}, this.state.statistics);
+    },
+    
+    // 内部方法
+    
+    /**
+     * 创建视图错误
+     * @private
+     */
+    _createError: function(code, message, template_id, line, column) {
+        const error = {
+            code: code,
+            message: message,
+            template_id: template_id,
+            line: line || 0,
+            column: column || 0,
+            stack: (new Error()).stack
+        };
+        
+        return error;
+    },
+    
+    /**
+     * 解析模板依赖
+     * @private
+     */
+    _parseTemplateDependencies: function(content) {
+        const dependencies = [];
+        
+        // 匹配 {{> partial}} 语法
+        const partialRegex = /\{\{>\s*([^\s}]+)\s*\}\}/g;
+        let match;
+        
+        while ((match = partialRegex.exec(content)) !== null) {
+            dependencies.push(match[1]);
+        }
+        
+        // 匹配 {{include "template"}} 语法
+        const includeRegex = /\{\{include\s*["']([^"']+)["']\s*\}\}/g;
+        
+        while ((match = includeRegex.exec(content)) !== null) {
+            dependencies.push(match[1]);
+        }
+        
+        return [...new Set(dependencies)]; // 去重
+    },
+    
+    /**
+     * 提取模板元数据
+     * @private
+     */
+    _extractTemplateMetadata: function(content) {
+        const metadata = {};
+        
+        // 匹配 {{!-- @key: value --}} 语法
+        const metadataRegex = /\{\{!--\s*@(\w+):\s*(.+器)\s*--\}\}/g;
+        let match;
+        
+        while ((match = metadataRegex.exec(content)) !== null) {
+            const key = match[1].trim();
+            const value = match[2].trim();
+            metadata[key] = value;
+        }
+        
+        return metadata;
+    },
+    
+    /**
+     * 解析模板路径
+     * @private
+     */
+    _resolveTemplatePath: function(template_id) {
+        // 如果已经是路径（包含/或.），则直接使用
+        if (template_id.includes('/') || template_id.includes('.')) {
+            return template_id;
+        }
+        
+        // 否则，组合路径
+        return `${this.config.template_path}/${template_id}${this.config.default_extension}`;
+    },
+    
+    /**
+     * 检查模板是否是最新的
+     * @private
+     */
+    _isTemplateFresh: async function(template) {
+        // 在实际实现中，这里应该检查文件系统中的模板文件是否已更新
+        // 简化实现，假设模板在配置的缓存时间内始终是新鲜的
+        return (Date.now() - template.last_modified) < (this.config.cache_ttl * 1000);
+    },
+    
+    /**
+     * 读取模板文件
+     * @private
+     */
+    _readTemplateFile: async function(path) {
+        // 在实际实现中，这里应该从文件系统读取模板文件
+        // 简化实现，返回模拟的模板内容
+        if (path.includes("error")) {
+            return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error</title>
+</head>
+<body>
+    <h1>Error: {{error.message}}</h1>
+    <p>Template: {{error.template_id}}</p>
+    <p>Code: {{error.code}}</p>
+</body>
+</html>`;
+        }
+        
+        // 模拟普通模板
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{title}}</title>
+</head>
+<body>
+    <h1>{{title}}</h1>
+    <div>{{content}}</div>
+    {{#if showFooter}}
+    <footer>
+        {{> footer}}
+    </footer>
+    {{/if}}
+</body>
+</html>`;
+    },
+    
+    /**
+     * 编译模板
+     * @private
+     */
+    _compileTemplate: async function(content, template_id) {
+        // 在实际实现中，这里应该将模板内容编译为可执行的函数
+        // 简化实现，返回一个简单的模板函数
+        
+        try {
+            // 创建模板函数
+            const templateFn = function(data, helpers, partials) {
+                // 简单的模板替换逻辑
+                let result = content;
+                
+                // 替换变量 {{var}}
+                for (const key in data) {
+                    const value = data[key];
+                    const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+                    result = result.replace(regex, value);
+                }
+                
+                // 处理条件 {{#if var}}...{{/if}}
+                const ifRegex = /\{\{#if\s+(\w+)\}\}([\s\S]*器)\{\{\/if\}\}/g;
+                result = result.replace(ifRegex, (match, condition, content) => {
+                    return data[condition] 器 content : '';
+                });
+                
+                // 处理部分视图 {{> partial}}
+                const partialRegex = /\{\{>\s*(\w+)\s*\}\}/g;
+                result = result.replace(partialRegex, (match, partialName) => {
+                    return partials[partialName] || '';
+                });
+                
+                return result;
+            };
+            
+            return {
+                render: templateFn
+            };
+        } catch (error) {
+            throw new Error(`编译模板 ${template_id} 失败: ${error.message}`);
+        }
+    },
+    
+    /**
+     * 使用上下文渲染模板
+     * @private
+     */
+    _renderTemplateWithContext: async function(template, context) {
+        // 加载依赖的部分视图
+        await this._loadDependencies(template, context);
+        
+        // 执行模板渲染
+        return template.compiled.render(context.data, context.helpers, context.partials);
+    },
+    
+    /**
+     * 加载模板依赖
+     * @private
+     */
+    _loadDependencies: async function(template, context) {
+        const depth = context.options.include_depth || 0;
+        
+        if (depth >= this.config.max_include_depth) {
+            throw this._createError(
+                "MAX_INCLUDE_DEPTH_EXCEEDED",
+                `超过最大包含深度 ${this.config.max_include_depth}`,
+                template.id
+            );
+        }
+        
+        // 加载所有依赖
+        for (const dependency of template.dependencies) {
+            // 如果是部分视图且已存在，则跳过
+            if (context.partials[dependency]) {
+                continue;
+            }
+            
+            try {
+                // 加载依赖模板
+                const depTemplate = await this.loadTemplate(dependency);
+                
+                // 将其添加为部分视图
+                context.partials[dependency] = depTemplate.content;
+                
+                // 递归加载其依赖
+                const depContext = Object.assign({}, context, {
+                    template_id: dependency,
+                    parent_context: context,
+                    options: Object.assign({}, context.options, {
+                        include_depth: depth + 1
+                    })
+                });
+                
+                await this._loadDependencies(depTemplate, depContext);
+            } catch (error) {
+                log("视图引擎", `加载依赖 ${dependency} 失败: ${error.message}`, "WARNING");
+            }
+        }
+    },
+    
+    /**
+     * 压缩输出
+     * @private
+     */
+    _minifyOutput: function(content) {
+        // 简单的压缩逻辑：移除多余空白和注释
+        let result = content;
+        
+        // 移除HTML注释
+        result = result.replace(/<!--[\s\S]*器-->/g, '');
+        
+        // 移除多余空白
+        result = result.replace(/\s+/g, ' ');
+        
+        // 移除标签间的空白
+        result = result.replace(/>\s+</g, '><');
+        
+        return result.trim();
+    },
+    
+    /**
+     * 注册内置辅助函数
+     * @private
+     */
+    _registerBuiltinHelpers: function() {
+        // 条件判断
+        this.registerHelper('if', function(condition, options) {
+            return condition 器 options.fn(this) : options.inverse(this);
+        });
+        
+        // 循环
+        this.registerHelper('each', function(items, options) {
+            let result = '';
+            for (let i = 0; i < items.length; i++) {
+                result += options.fn(items[i]);
+            }
+            return result;
+        });
+        
+        // 格式化日期
+        this.registerHelper('formatDate', function(date, format) {
+            // 简单的日期格式化
+            const d = new Date(date);
+            return d.toLocaleDateString();
+        });
+        
+        // URL编码
+        this.registerHelper('urlencode', function(text) {
+            return encodeURIComponent(text);
+        });
+    },
+    
+    /**
+     * 注册内置部分视图
+     * @private
+     */
+    _registerBuiltinPartials: function() {
+        // 页脚
+        this.registerPartial('footer', '<div class="footer">Copyright © {{year}} QEntL</div>');
+        
+        // 导航
+        this.registerPartial('nav', '<nav><ul>{{#each items}}<li><a href="{{url}}">{{title}}</a></li>{{/each}}</ul></nav>');
+    }
+};
+
+// 导出模块
+export ViewEngine; 

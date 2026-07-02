@@ -1,0 +1,803 @@
+/**
+ * QEntL中断处理系统
+ * QuantumGene: QG-KERNEL-INTHDL-D4S1-1714387665
+ * EntanglementStrength: 0.89
+ */
+
+quantum_program InterruptHandler {
+    metadata {
+        name: "QEntL中断处理系统",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的中断处理系统，负责注册、触发和处理各种中断",
+        quantum_gene: "QG-KERNEL-INTHDL-D4S1-1714387665",
+        entanglement_strength: 0.89
+    }
+
+    // 中断类型常量
+    constexpr interrupt_types = {
+        HARDWARE: 0,      // 硬件中断
+        SOFTWARE: 1,      // 软件中断
+        QUANTUM: 2,       // 量子相关中断
+        SYSTEM: 3,        // 系统中断
+        TIMER: 4,         // 定时器中断
+        IPC: 5,           // 进程间通信中断
+        USER: 6,          // 用户定义中断
+        VIRTUAL: 7,       // 虚拟设备中断
+        DEBUG: 8,         // 调试中断
+        EXCEPTION: 9      // 异常中断
+    };
+
+    // 中断优先级常量
+    constexpr interrupt_priorities = {
+        CRITICAL: 0,      // 关键优先级
+        HIGH: 1,          // 高优先级
+        MEDIUM: 2,        // 中优先级
+        LOW: 3,           // 低优先级
+        BACKGROUND: 4     // 背景优先级
+    };
+
+    // 中断状态常量
+    constexpr interrupt_states = {
+        PENDING: 0,       // 等待处理
+        PROCESSING: 1,    // 正在处理
+        DEFERRED: 2,      // 延迟处理
+        COMPLETED: 3,     // 已完成
+        FAILED: 4         // 处理失败
+    };
+
+    // 模块状态
+    state {
+        // 内核引用
+        kernel_reference: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 中断处理器是否启用
+        enabled: true,
+        
+        // 中断处理器映射 {type => {vector => [{handler, priority, description}]}}
+        interrupt_handlers: {},
+        
+        // 默认处理器映射 {type => handler}
+        default_handlers: {},
+        
+        // 活跃中断队列 (优先级队列)
+        active_interrupts: [],
+        
+        // 延迟中断队列
+        deferred_interrupts: [],
+        
+        // 中断历史记录
+        interrupt_history: [],
+        
+        // 最大历史记录大小
+        max_history_size: 200,
+        
+        // 全局中断ID计数器
+        next_interrupt_id: 1,
+        
+        // 中断向量基础值 (类型 => 基础值)
+        vector_bases: {
+            0: 0x00,    // 硬件中断起始于 0x00
+            1: 0x80,    // 软件中断起始于 0x80
+            2: 0x100,   // 量子中断起始于 0x100
+            3: 0x180,   // 系统中断起始于 0x180
+            4: 0x1C0,   // 定时器中断起始于 0x1C0
+            5: 0x200,   // IPC中断起始于 0x200
+            6: 0x280,   // 用户中断起始于 0x280
+            7: 0x300,   // 虚拟设备中断起始于 0x300
+            8: 0x380,   // 调试中断起始于 0x380
+            9: 0x3C0    // 异常中断起始于 0x3C0
+        },
+        
+        // 统计信息
+        stats: {
+            total_interrupts: 0,
+            interrupts_by_type: {},
+            handlers_registered: 0,
+            successful_handling: 0,
+            failed_handling: 0,
+            deferred_handling: 0
+        },
+        
+        // 中断钩子 (pre/post处理)
+        interrupt_hooks: {
+            pre: [],   // 中断处理前钩子
+            post: []   // 中断处理后钩子
+        },
+        
+        // 中断嵌套级别
+        nesting_level: 0,
+        
+        // 最大允许嵌套级别
+        max_nesting_level: 16,
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化中断处理器
+    initialize(kernel_ref) {
+        kernel_log("初始化中断处理系统...");
+        
+        // 保存内核引用
+        this.kernel_reference = kernel_ref;
+        
+        // 为每种中断类型创建处理器映射
+        for (const type_name in this.interrupt_types) {
+            const type_id = this.interrupt_types[type_name];
+            this.interrupt_handlers[type_id] = {};
+            this.stats.interrupts_by_type[type_id] = 0;
+            
+            // 注册默认处理器
+            this.register_default_handler(type_id, this.create_default_handler(type_name, type_id));
+        }
+        
+        // 初始化队列
+        this.active_interrupts = [];
+        this.deferred_interrupts = [];
+        
+        // 启用中断处理器
+        this.enabled = true;
+        
+        this.initialized = true;
+        kernel_log("中断处理系统初始化完成");
+        
+        return true;
+    }
+
+    // 创建默认中断处理器
+    create_default_handler(type_name, type_id) {
+        return function(data, interrupt) {
+            kernel_log(`执行${type_name}中断的默认处理器: 向量 ${interrupt.vector}`);
+            
+            return {
+                handled: true,
+                result: {
+                    status: "default_handled",
+                    message: `默认处理了${type_name}中断`
+                }
+            };
+        };
+    }
+
+    // 注册默认处理器
+    register_default_handler(type_id, handler) {
+        this.default_handlers[type_id] = handler;
+        kernel_log(`已注册类型 ${type_id} 的默认中断处理器`);
+    }
+
+    // 重置中断处理器状态
+    reset() {
+        kernel_log("重置中断处理系统...");
+        
+        // 保存内核引用
+        const kernel_ref = this.kernel_reference;
+        
+        // 清空处理器映射
+        this.interrupt_handlers = {};
+        this.default_handlers = {};
+        
+        // 清空队列
+        this.active_interrupts = [];
+        this.deferred_interrupts = [];
+        
+        // 清空历史记录
+        this.interrupt_history = [];
+        
+        // 重置统计信息
+        this.stats = {
+            total_interrupts: 0,
+            interrupts_by_type: {},
+            handlers_registered: 0,
+            successful_handling: 0,
+            failed_handling: 0,
+            deferred_handling: 0
+        };
+        
+        // 重置中断钩子
+        this.interrupt_hooks = {
+            pre: [],
+            post: []
+        };
+        
+        // 重置嵌套级别
+        this.nesting_level = 0;
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 恢复内核引用
+        this.kernel_reference = kernel_ref;
+        
+        // 重置ID计数器
+        this.next_interrupt_id = 1;
+        
+        // 重新初始化
+        this.initialize(kernel_ref);
+        
+        kernel_log("中断处理系统已重置");
+    }
+
+    // 注册中断处理器
+    register_handler(type, vector, handler, options) {
+        if (!this.initialized) {
+            this.add_error("无法注册中断处理器：中断处理系统未初始化");
+            return false;
+        }
+        
+        // 检查类型和向量
+        if (!(type in this.interrupt_types) && !(Object.values(this.interrupt_types).includes(type))) {
+            this.add_error(`无法注册中断处理器：无效的中断类型 ${type}`);
+            return false;
+        }
+        
+        if (typeof vector !== 'number' || vector < 0) {
+            this.add_error(`无法注册中断处理器：无效的中断向量 ${vector}`);
+            return false;
+        }
+        
+        // 检查处理器函数
+        if (typeof handler !== 'function') {
+            this.add_error("无法注册中断处理器：处理器必须是函数");
+            return false;
+        }
+        
+        // 标准化类型为数字
+        const type_id = typeof type === 'string' 器 this.interrupt_types[type] : type;
+        
+        // 解析选项
+        const handler_options = options || {};
+        const priority = handler_options.priority !== undefined 器 handler_options.priority : this.interrupt_priorities.MEDIUM;
+        const description = handler_options.description || "未命名中断处理器";
+        
+        // 创建处理器记录
+        const handler_record = {
+            type: type_id,
+            vector: vector,
+            handler: handler,
+            priority: priority,
+            description: description,
+            registered_at: Date.now()
+        };
+        
+        // 如果处理器向量不存在，创建新的数组
+        if (!this.interrupt_handlers[type_id][vector]) {
+            this.interrupt_handlers[type_id][vector] = [];
+        }
+        
+        // 添加处理器到数组
+        this.interrupt_handlers[type_id][vector].push(handler_record);
+        
+        // 按优先级排序处理器
+        this.interrupt_handlers[type_id][vector].sort((a, b) => a.priority - b.priority);
+        
+        // 更新统计信息
+        this.stats.handlers_registered++;
+        
+        kernel_log(`中断处理器已注册: 类型 ${type_id}, 向量 ${vector}, 优先级 ${priority}`);
+        
+        return true;
+    }
+
+    // 注销中断处理器
+    unregister_handler(type, vector, handler) {
+        if (!this.initialized) {
+            this.add_error("无法注销中断处理器：中断处理系统未初始化");
+            return false;
+        }
+        
+        // 标准化类型为数字
+        const type_id = typeof type === 'string' 器 this.interrupt_types[type] : type;
+        
+        // 检查向量是否存在
+        if (!this.interrupt_handlers[type_id] || !this.interrupt_handlers[type_id][vector]) {
+            this.add_warning(`注销中断处理器失败：找不到类型 ${type_id} 向量 ${vector} 的处理器`);
+            return false;
+        }
+        
+        // 查找处理器
+        const handlers = this.interrupt_handlers[type_id][vector];
+        const index = handlers.findIndex(h => h.handler === handler);
+        
+        if (index === -1) {
+            this.add_warning(`注销中断处理器失败：处理器不存在`);
+            return false;
+        }
+        
+        // 移除处理器
+        handlers.splice(index, 1);
+        
+        kernel_log(`中断处理器已注销: 类型 ${type_id}, 向量 ${vector}`);
+        
+        return true;
+    }
+
+    // 注册中断处理钩子
+    register_hook(hook_type, hook_function) {
+        if (!this.initialized) {
+            this.add_error("无法注册中断钩子：中断处理系统未初始化");
+            return false;
+        }
+        
+        // 检查钩子类型
+        if (hook_type !== 'pre' && hook_type !== 'post') {
+            this.add_error(`无法注册中断钩子：无效的钩子类型 ${hook_type}`);
+            return false;
+        }
+        
+        // 检查钩子函数
+        if (typeof hook_function !== 'function') {
+            this.add_error("无法注册中断钩子：钩子必须是函数");
+            return false;
+        }
+        
+        // 添加钩子
+        this.interrupt_hooks[hook_type].push(hook_function);
+        
+        kernel_log(`中断${hook_type}钩子已注册`);
+        
+        return true;
+    }
+
+    // 注销中断处理钩子
+    unregister_hook(hook_type, hook_function) {
+        if (!this.initialized) {
+            this.add_error("无法注销中断钩子：中断处理系统未初始化");
+            return false;
+        }
+        
+        // 检查钩子类型
+        if (hook_type !== 'pre' && hook_type !== 'post') {
+            this.add_error(`无法注销中断钩子：无效的钩子类型 ${hook_type}`);
+            return false;
+        }
+        
+        // 查找钩子
+        const hooks = this.interrupt_hooks[hook_type];
+        const index = hooks.indexOf(hook_function);
+        
+        if (index === -1) {
+            this.add_warning(`注销中断钩子失败：钩子不存在`);
+            return false;
+        }
+        
+        // 移除钩子
+        hooks.splice(index, 1);
+        
+        kernel_log(`中断${hook_type}钩子已注销`);
+        
+        return true;
+    }
+
+    // 触发中断
+    trigger_interrupt(type, vector, data, options) {
+        if (!this.initialized) {
+            this.add_error("无法触发中断：中断处理系统未初始化");
+            return null;
+        }
+        
+        if (!this.enabled) {
+            this.add_warning("中断已禁用，忽略中断请求");
+            return null;
+        }
+        
+        // 标准化类型为数字
+        const type_id = typeof type === 'string' 器 this.interrupt_types[type] : type;
+        
+        // 解析选项
+        const interrupt_options = options || {};
+        const deferred = interrupt_options.deferred || false;
+        const priority = interrupt_options.priority !== undefined 器 
+                         interrupt_options.priority : this.get_default_priority(type_id);
+        
+        // 创建中断记录
+        const interrupt_id = this.next_interrupt_id++;
+        const interrupt = {
+            id: interrupt_id,
+            type: type_id,
+            vector: vector,
+            data: data || {},
+            priority: priority,
+            timestamp: Date.now(),
+            state: this.interrupt_states.PENDING,
+            deferred: deferred,
+            result: null
+        };
+        
+        // 更新统计信息
+        this.stats.total_interrupts++;
+        this.stats.interrupts_by_type[type_id] = (this.stats.interrupts_by_type[type_id] || 0) + 1;
+        
+        kernel_log(`触发中断: ID ${interrupt_id}, 类型 ${type_id}, 向量 ${vector}, 优先级 ${priority}`);
+        
+        // 添加到中断历史
+        this.add_to_history(interrupt);
+        
+        // 根据是否延迟处理，添加到相应队列
+        if (deferred) {
+            this.deferred_interrupts.push(interrupt);
+            this.stats.deferred_handling++;
+            
+            // 按优先级排序延迟队列
+            this.deferred_interrupts.sort((a, b) => a.priority - b.priority);
+            
+            kernel_log(`中断 ${interrupt_id} 已加入延迟处理队列`);
+        } else {
+            // 添加到活跃队列
+            this.active_interrupts.push(interrupt);
+            
+            // 按优先级排序活跃队列
+            this.active_interrupts.sort((a, b) => a.priority - b.priority);
+            
+            // 处理中断
+            this.process_next_interrupt();
+        }
+        
+        return interrupt_id;
+    }
+
+    // 获取中断类型的默认优先级
+    get_default_priority(type_id) {
+        switch (type_id) {
+            case this.interrupt_types.HARDWARE:
+            case this.interrupt_types.EXCEPTION:
+                return this.interrupt_priorities.CRITICAL;
+                
+            case this.interrupt_types.SYSTEM:
+            case this.interrupt_types.QUANTUM:
+                return this.interrupt_priorities.HIGH;
+                
+            case this.interrupt_types.TIMER:
+            case this.interrupt_types.IPC:
+                return this.interrupt_priorities.MEDIUM;
+                
+            case this.interrupt_types.SOFTWARE:
+            case this.interrupt_types.VIRTUAL:
+                return this.interrupt_priorities.LOW;
+                
+            case this.interrupt_types.USER:
+            case this.interrupt_types.DEBUG:
+                return this.interrupt_priorities.BACKGROUND;
+                
+            default:
+                return this.interrupt_priorities.MEDIUM;
+        }
+    }
+
+    // 处理下一个中断
+    process_next_interrupt() {
+        if (!this.initialized || !this.enabled) {
+            return false;
+        }
+        
+        // 检查是否有中断需要处理
+        if (this.active_interrupts.length === 0) {
+            return false;
+        }
+        
+        // 检查嵌套级别
+        if (this.nesting_level >= this.max_nesting_level) {
+            this.add_warning(`中断嵌套级别 (${this.nesting_level}) 超过最大值 (${this.max_nesting_level})，延迟处理`);
+            
+            // 将所有活跃中断移至延迟队列
+            while (this.active_interrupts.length > 0) {
+                const interrupt = this.active_interrupts.shift();
+                interrupt.deferred = true;
+                this.deferred_interrupts.push(interrupt);
+                this.stats.deferred_handling++;
+            }
+            
+            // 按优先级排序延迟队列
+            this.deferred_interrupts.sort((a, b) => a.priority - b.priority);
+            
+            return false;
+        }
+        
+        // 获取最高优先级的中断
+        const interrupt = this.active_interrupts.shift();
+        interrupt.state = this.interrupt_states.PROCESSING;
+        
+        kernel_log(`处理中断: ID ${interrupt.id}, 类型 ${interrupt.type}, 向量 ${interrupt.vector}`);
+        
+        // 增加嵌套级别
+        this.nesting_level++;
+        
+        // 执行前置钩子
+        this.execute_hooks('pre', interrupt);
+        
+        // 尝试处理中断
+        let result = null;
+        let handled = false;
+        
+        try {
+            // 查找处理器
+            const handlers = this.interrupt_handlers[interrupt.type][interrupt.vector];
+            
+            if (handlers && handlers.length > 0) {
+                // 调用所有注册的处理器
+                for (const handler_record of handlers) {
+                    try {
+                        const handler_result = handler_record.handler(interrupt.data, interrupt);
+                        
+                        if (handler_result && handler_result.handled) {
+                            handled = true;
+                            result = handler_result.result;
+                            
+                            if (handler_result.stop_propagation) {
+                                break;
+                            }
+                        }
+                    } catch (error) {
+                        this.add_warning(`中断处理器执行出错: ${error.message || "未知错误"}`);
+                    }
+                }
+            }
+            
+            // 如果没有处理器处理，使用默认处理器
+            if (!handled && this.default_handlers[interrupt.type]) {
+                try {
+                    const default_result = this.default_handlers[interrupt.type](interrupt.data, interrupt);
+                    
+                    if (default_result && default_result.handled) {
+                        handled = true;
+                        result = default_result.result;
+                    }
+                } catch (error) {
+                    this.add_warning(`默认中断处理器执行出错: ${error.message || "未知错误"}`);
+                }
+            }
+        } catch (error) {
+            this.add_error(`中断处理出错: ${error.message || "未知错误"}`);
+        }
+        
+        // 更新中断状态
+        if (handled) {
+            interrupt.state = this.interrupt_states.COMPLETED;
+            interrupt.result = result;
+            this.stats.successful_handling++;
+        } else {
+            interrupt.state = this.interrupt_states.FAILED;
+            this.stats.failed_handling++;
+            
+            kernel_log(`中断 ${interrupt.id} 处理失败：找不到适合的处理器`);
+        }
+        
+        // 减少嵌套级别
+        this.nesting_level--;
+        
+        // 执行后置钩子
+        this.execute_hooks('post', interrupt);
+        
+        // 更新历史记录中的中断状态
+        this.update_interrupt_in_history(interrupt);
+        
+        // 处理下一个中断
+        if (this.active_interrupts.length > 0) {
+            setTimeout(() => this.process_next_interrupt(), 0);
+        }
+        
+        return handled;
+    }
+
+    // 处理延迟中断
+    process_deferred_interrupts() {
+        if (!this.initialized || !this.enabled) {
+            return;
+        }
+        
+        // 检查是否有延迟中断需要处理
+        if (this.deferred_interrupts.length === 0) {
+            return;
+        }
+        
+        kernel_log(`处理延迟中断队列，共 ${this.deferred_interrupts.length} 个中断`);
+        
+        // 获取当前延迟中断队列的副本
+        const deferred = [...this.deferred_interrupts];
+        this.deferred_interrupts = [];
+        
+        // 将延迟中断移到活跃队列
+        for (const interrupt of deferred) {
+            interrupt.deferred = false;
+            this.active_interrupts.push(interrupt);
+        }
+        
+        // 按优先级排序活跃队列
+        this.active_interrupts.sort((a, b) => a.priority - b.priority);
+        
+        // 开始处理中断
+        this.process_next_interrupt();
+    }
+
+    // 执行中断钩子
+    execute_hooks(hook_type, interrupt) {
+        const hooks = this.interrupt_hooks[hook_type];
+        
+        if (!hooks || hooks.length === 0) {
+            return;
+        }
+        
+        for (const hook of hooks) {
+            try {
+                hook(interrupt);
+            } catch (error) {
+                this.add_warning(`中断${hook_type}钩子执行出错: ${error.message || "未知错误"}`);
+            }
+        }
+    }
+
+    // 启用中断处理器
+    enable() {
+        if (!this.initialized) {
+            this.add_error("无法启用中断处理器：中断处理系统未初始化");
+            return false;
+        }
+        
+        this.enabled = true;
+        kernel_log("中断处理器已启用");
+        
+        // 处理任何延迟的中断
+        if (this.deferred_interrupts.length > 0) {
+            this.process_deferred_interrupts();
+        }
+        
+        return true;
+    }
+
+    // 禁用中断处理器
+    disable() {
+        if (!this.initialized) {
+            this.add_error("无法禁用中断处理器：中断处理系统未初始化");
+            return false;
+        }
+        
+        this.enabled = false;
+        kernel_log("中断处理器已禁用");
+        
+        return true;
+    }
+
+    // 添加中断到历史记录
+    add_to_history(interrupt) {
+        this.interrupt_history.push({ ...interrupt });
+        
+        // 保持历史记录大小在限制范围内
+        if (this.interrupt_history.length > this.max_history_size) {
+            this.interrupt_history.shift();
+        }
+    }
+
+    // 更新历史记录中的中断状态
+    update_interrupt_in_history(interrupt) {
+        // 查找历史记录中的中断
+        const index = this.interrupt_history.findIndex(i => i.id === interrupt.id);
+        
+        if (index !== -1) {
+            // 更新状态和结果
+            this.interrupt_history[index].state = interrupt.state;
+            this.interrupt_history[index].result = interrupt.result;
+        }
+    }
+
+    // 获取中断详情
+    get_interrupt_info(interrupt_id) {
+        if (!this.initialized) {
+            this.add_error("无法获取中断信息：中断处理系统未初始化");
+            return null;
+        }
+        
+        // 在历史记录中查找中断
+        const interrupt = this.interrupt_history.find(i => i.id === interrupt_id);
+        
+        if (!interrupt) {
+            this.add_warning(`获取中断信息失败：找不到ID为 ${interrupt_id} 的中断`);
+            return null;
+        }
+        
+        return { ...interrupt };
+    }
+
+    // 获取中断状态名称
+    get_state_name(state) {
+        for (const name in this.interrupt_states) {
+            if (this.interrupt_states[name] === state) {
+                return name;
+            }
+        }
+        return "UNKNOWN";
+    }
+
+    // 获取中断类型名称
+    get_type_name(type) {
+        for (const name in this.interrupt_types) {
+            if (this.interrupt_types[name] === type) {
+                return name;
+            }
+        }
+        return "UNKNOWN";
+    }
+
+    // 获取统计信息
+    get_statistics() {
+        if (!this.initialized) {
+            this.add_error("无法获取统计信息：中断处理系统未初始化");
+            return null;
+        }
+        
+        const active_count = this.active_interrupts.length;
+        const deferred_count = this.deferred_interrupts.length;
+        const history_count = this.interrupt_history.length;
+        
+        // 格式化类型统计
+        const formatted_type_stats = {};
+        for (const type_id in this.stats.interrupts_by_type) {
+            const type_name = this.get_type_name(parseInt(type_id));
+            formatted_type_stats[type_name] = this.stats.interrupts_by_type[type_id];
+        }
+        
+        // 统计已注册的处理器
+        let registered_handlers = 0;
+        for (const type_id in this.interrupt_handlers) {
+            const type_handlers = this.interrupt_handlers[type_id];
+            for (const vector in type_handlers) {
+                registered_handlers += type_handlers[vector].length;
+            }
+        }
+        
+        return {
+            enabled: this.enabled,
+            active_interrupts: active_count,
+            deferred_interrupts: deferred_count,
+            history_size: history_count,
+            nesting_level: this.nesting_level,
+            registered_handlers: registered_handlers,
+            interrupts_by_type: formatted_type_stats,
+            successful_handling: this.stats.successful_handling,
+            failed_handling: this.stats.failed_handling,
+            deferred_handling: this.stats.deferred_handling,
+            total_interrupts: this.stats.total_interrupts
+        };
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`中断处理系统错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`中断处理系统警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+}
+
+// 导出中断处理器模块
+export InterruptHandler; 

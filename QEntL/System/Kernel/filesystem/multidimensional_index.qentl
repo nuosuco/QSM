@@ -1,0 +1,605 @@
+/**
+ * QEntL多维索引实现
+ * QuantumGene: QG-MINDEX-F7H3-1714046200
+ * EntanglementStrength: 0.75
+ */
+
+quantum_module MultidimensionalIndex {
+    // 模块元数据
+    metadata: {
+        name: "多维索引核心",
+        version: "1.0.0",
+        description: "QEntL文件系统的多维索引核心实现",
+        author: "QEntL开发团队",
+        quantum_gene: "QG-MINDEX-F7H3-1714046200",
+        entanglement_strength: 0.75
+    },
+    
+    // 多维索引配置
+    config: {
+        max_dimensions: 16,         // 最大维度数
+        default_dimensions: 4,      // 默认使用的维度数
+        max_entries_per_node: 1024, // 每个节点的最大条目数
+        max_index_depth: 8,         // 最大索引深度
+        parallel_search: true,      // 启用并行搜索
+        quantum_optimization: true  // 启用量子优化
+    },
+    
+    // 索引节点结构
+    types: {
+        // 索引条目
+        IndexEntry: {
+            key: String,           // 条目键
+            dimensions: Array,     // 维度值数组
+            reference: String,     // 引用的文件/对象ID
+            metadata: Object,      // 元数据
+            timestamp: Number      // 时间戳
+        },
+        
+        // 索引节点
+        IndexNode: {
+            id: String,            // 节点ID
+            level: Number,         // 节点级别
+            dimension: Number,     // 当前节点的维度
+            parent: String,        // 父节点ID
+            children: Array,       // 子节点ID数组
+            entries: Array,        // 条目数组
+            range: {               // 节点覆盖的范围
+                min: Array,        // 最小值
+                max: Array         // 最大值
+            },
+            stats: {               // 节点统计
+                entryCount: Number,    // 条目数量
+                childrenCount: Number, // 子节点数量
+                lastUpdate: Number     // 最后更新时间
+            }
+        },
+        
+        // 索引查询
+        IndexQuery: {
+            dimensions: Array,     // 查询的维度值数组
+            range: Boolean,        // 是否为范围查询
+            rangeMin: Array,       // 范围最小值
+            rangeMax: Array,       // 范围最大值
+            limit: Number,         // 结果限制
+            offset: Number,        // 结果偏移
+            orderBy: String,       // 排序字段
+            orderDirection: String // 排序方向
+        }
+    },
+    
+    // 索引状态
+    state: {
+        rootNodes: [],             // 根节点列表
+        dimensions: [],            // 维度定义
+        statistics: {              // 索引统计
+            totalNodes: 0,         // 节点总数
+            totalEntries: 0,       // 条目总数
+            maxDepth: 0,           // 最大深度
+            lastRebuild: 0         // 最后重建时间
+        },
+        parallelWorkers: 0         // 并行工作线程数
+    },
+    
+    /**
+     * 初始化多维索引
+     * @param {Object} options 初始化选项
+     * @returns {Boolean} 是否成功初始化
+     */
+    initialize: function(options) {
+        log("多维索引", "初始化多维索引系统");
+        
+        // 合并选项
+        const config = Object.assign({}, this.config, options || {});
+        
+        // 设置维度
+        this.state.dimensions = [];
+        for (let i = 0; i < config.default_dimensions; i++) {
+            this.state.dimensions.push({
+                id: `dim_${i}`,
+                name: `维度${i+1}`,
+                type: "numeric",
+                min: 0,
+                max: 100
+            });
+        }
+        
+        // 创建根节点
+        const rootNode = this._createNode("root", 0, 0);
+        this.state.rootNodes.push(rootNode);
+        
+        // 设置并行工作线程数
+        this.state.parallelWorkers = options器.parallelWorkers || 4;
+        
+        log("多维索引", `索引初始化完成，维度数: ${this.state.dimensions.length}`);
+        return true;
+    },
+    
+    /**
+     * 添加索引条目
+     * @param {Object} entry 索引条目
+     * @returns {Boolean} 是否成功添加
+     */
+    addEntry: function(entry) {
+        if (!entry || !entry.key || !Array.isArray(entry.dimensions)) {
+            log("多维索引", "添加条目失败：无效的条目数据", "ERROR");
+            return false;
+        }
+        
+        // 检查维度数量
+        if (entry.dimensions.length !== this.state.dimensions.length) {
+            log("多维索引", `维度数量不匹配：预期 ${this.state.dimensions.length}，实际 ${entry.dimensions.length}`, "ERROR");
+            return false;
+        }
+        
+        // 创建索引条目
+        const indexEntry = {
+            key: entry.key,
+            dimensions: entry.dimensions.slice(),
+            reference: entry.reference || entry.key,
+            metadata: entry.metadata || {},
+            timestamp: Date.now()
+        };
+        
+        // 添加到根节点
+        const success = this._insertEntryToNode(this.state.rootNodes[0], indexEntry);
+        
+        if (success) {
+            this.state.statistics.totalEntries++;
+            log("多维索引", `添加条目成功：${entry.key}`);
+        }
+        
+        return success;
+    },
+    
+    /**
+     * 查询索引
+     * @param {Object} query 查询条件
+     * @returns {Array} 查询结果
+     */
+    query: function(query) {
+        log("多维索引", "执行索引查询");
+        
+        // 处理查询参数
+        const indexQuery = {
+            dimensions: query.dimensions || [],
+            range: query.range || false,
+            rangeMin: query.rangeMin || [],
+            rangeMax: query.rangeMax || [],
+            limit: query.limit || 100,
+            offset: query.offset || 0,
+            orderBy: query.orderBy || "key",
+            orderDirection: query.orderDirection || "asc"
+        };
+        
+        // 执行查询
+        const results = [];
+        
+        if (this.config.parallel_search && this.state.parallelWorkers > 1) {
+            // 并行查询
+            log("多维索引", "使用并行搜索...");
+            this._parallelSearch(this.state.rootNodes[0], indexQuery, results);
+        } else {
+            // 串行查询
+            this._search(this.state.rootNodes[0], indexQuery, results);
+        }
+        
+        // 排序结果
+        this._sortResults(results, indexQuery.orderBy, indexQuery.orderDirection);
+        
+        // 应用分页
+        const paginatedResults = results.slice(
+            indexQuery.offset,
+            indexQuery.offset + indexQuery.limit
+        );
+        
+        log("多维索引", `查询完成，找到 ${results.length} 个结果，返回 ${paginatedResults.length} 个`);
+        return paginatedResults;
+    },
+    
+    /**
+     * 删除索引条目
+     * @param {String} key 条目键
+     * @returns {Boolean} 是否成功删除
+     */
+    removeEntry: function(key) {
+        log("多维索引", `删除条目：${key}`);
+        
+        const result = this._removeEntryFromNode(this.state.rootNodes[0], key);
+        
+        if (result) {
+            this.state.statistics.totalEntries--;
+            log("多维索引", `条目删除成功：${key}`);
+        } else {
+            log("多维索引", `未找到条目：${key}`, "WARNING");
+        }
+        
+        return result;
+    },
+    
+    /**
+     * 重建索引
+     * @returns {Boolean} 是否成功重建
+     */
+    rebuildIndex: function() {
+        log("多维索引", "开始重建索引");
+        
+        // 保存当前条目
+        const entries = this._getAllEntries();
+        
+        // 创建新的根节点
+        const newRoot = this._createNode("root", 0, 0);
+        
+        // 重新插入所有条目
+        let success = true;
+        for (const entry of entries) {
+            if (!this._insertEntryToNode(newRoot, entry)) {
+                success = false;
+                log("多维索引", `重新插入条目失败：${entry.key}`, "ERROR");
+            }
+        }
+        
+        if (success) {
+            // 替换根节点
+            this.state.rootNodes[0] = newRoot;
+            this.state.statistics.lastRebuild = Date.now();
+            log("多维索引", `索引重建完成，共 ${entries.length} 个条目`);
+        } else {
+            log("多维索引", "索引重建失败", "ERROR");
+        }
+        
+        return success;
+    },
+    
+    /**
+     * 获取索引统计信息
+     * @returns {Object} 统计信息
+     */
+    getStatistics: function() {
+        // 更新节点统计
+        this._updateNodeStatistics(this.state.rootNodes[0]);
+        
+        // 返回完整统计信息
+        return {
+            totalNodes: this.state.statistics.totalNodes,
+            totalEntries: this.state.statistics.totalEntries,
+            maxDepth: this.state.statistics.maxDepth,
+            lastRebuild: this.state.statistics.lastRebuild,
+            dimensions: this.state.dimensions.length,
+            rootNodes: this.state.rootNodes.length
+        };
+    },
+    
+    // 内部方法
+    
+    /**
+     * 创建索引节点
+     * @private
+     */
+    _createNode: function(id, level, dimension) {
+        const node = {
+            id: id || `node_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            level: level || 0,
+            dimension: dimension || 0,
+            parent: null,
+            children: [],
+            entries: [],
+            range: {
+                min: [],
+                max: []
+            },
+            stats: {
+                entryCount: 0,
+                childrenCount: 0,
+                lastUpdate: Date.now()
+            }
+        };
+        
+        // 初始化范围
+        for (let i = 0; i < this.state.dimensions.length; i++) {
+            node.range.min.push(0);
+            node.range.max.push(100);
+        }
+        
+        this.state.statistics.totalNodes++;
+        return node;
+    },
+    
+    /**
+     * 向节点插入条目
+     * @private
+     */
+    _insertEntryToNode: function(node, entry) {
+        // 如果节点有足够空间直接插入
+        if (node.entries.length < this.config.max_entries_per_node) {
+            node.entries.push(entry);
+            node.stats.entryCount++;
+            node.stats.lastUpdate = Date.now();
+            return true;
+        }
+        
+        // 节点已满，需要分裂或插入子节点
+        if (node.level < this.config.max_index_depth) {
+            // 如果没有子节点，进行分裂
+            if (node.children.length === 0) {
+                this._splitNode(node);
+            }
+            
+            // 找到合适的子节点
+            const childIndex = this._findBestChildForEntry(node, entry);
+            return this._insertEntryToNode(node.children[childIndex], entry);
+        }
+        
+        // 达到最大深度，强制添加到当前节点
+        node.entries.push(entry);
+        node.stats.entryCount++;
+        node.stats.lastUpdate = Date.now();
+        log("多维索引", `警告：节点 ${node.id} 超过最大条目数`, "WARNING");
+        return true;
+    },
+    
+    /**
+     * 分裂节点
+     * @private
+     */
+    _splitNode: function(node) {
+        log("多维索引", `分裂节点：${node.id}`);
+        
+        // 确定分裂维度
+        const splitDimension = (node.dimension + 1) % this.state.dimensions.length;
+        
+        // 创建两个子节点
+        const leftChild = this._createNode(`${node.id}_L`, node.level + 1, splitDimension);
+        const rightChild = this._createNode(`${node.id}_R`, node.level + 1, splitDimension);
+        
+        // 设置父子关系
+        leftChild.parent = node.id;
+        rightChild.parent = node.id;
+        node.children.push(leftChild, rightChild);
+        node.stats.childrenCount = 2;
+        
+        // 设置子节点范围
+        for (let d = 0; d < this.state.dimensions.length; d++) {
+            leftChild.range.min[d] = node.range.min[d];
+            leftChild.range.max[d] = node.range.max[d];
+            
+            rightChild.range.min[d] = node.range.min[d];
+            rightChild.range.max[d] = node.range.max[d];
+        }
+        
+        // 调整分裂维度的范围
+        const mid = (node.range.min[splitDimension] + node.range.max[splitDimension]) / 2;
+        leftChild.range.max[splitDimension] = mid;
+        rightChild.range.min[splitDimension] = mid;
+        
+        // 重新分配条目
+        const entries = node.entries;
+        node.entries = [];
+        node.stats.entryCount = 0;
+        
+        // 将原节点的条目重新插入
+        for (const entry of entries) {
+            if (entry.dimensions[splitDimension] < mid) {
+                leftChild.entries.push(entry);
+                leftChild.stats.entryCount++;
+            } else {
+                rightChild.entries.push(entry);
+                rightChild.stats.entryCount++;
+            }
+        }
+        
+        // 更新统计信息
+        this.state.statistics.maxDepth = Math.max(this.state.statistics.maxDepth, node.level + 1);
+    },
+    
+    /**
+     * 查找最佳子节点
+     * @private
+     */
+    _findBestChildForEntry: function(node, entry) {
+        for (let i = 0; i < node.children.length; i++) {
+            const child = node.children[i];
+            const dim = child.dimension;
+            
+            // 检查条目是否在子节点范围内
+            if (entry.dimensions[dim] >= child.range.min[dim] && 
+                entry.dimensions[dim] < child.range.max[dim]) {
+                return i;
+            }
+        }
+        
+        // 默认返回第一个子节点
+        return 0;
+    },
+    
+    /**
+     * 搜索节点
+     * @private
+     */
+    _search: function(node, query, results) {
+        // 检查节点范围是否与查询重叠
+        if (!this._isRangeOverlapping(node, query)) {
+            return;
+        }
+        
+        // 检查节点条目
+        for (const entry of node.entries) {
+            if (this._matchesQuery(entry, query)) {
+                results.push(entry);
+            }
+        }
+        
+        // 递归搜索子节点
+        for (const child of node.children) {
+            this._search(child, query, results);
+        }
+    },
+    
+    /**
+     * 并行搜索节点
+     * @private
+     */
+    _parallelSearch: function(node, query, results) {
+        // 在实际实现中，这里应该启动并行任务
+        // 简化为直接调用串行搜索
+        this._search(node, query, results);
+    },
+    
+    /**
+     * 检查条目是否匹配查询
+     * @private
+     */
+    _matchesQuery: function(entry, query) {
+        if (query.range) {
+            // 范围查询
+            for (let i = 0; i < entry.dimensions.length; i++) {
+                if (query.rangeMin[i] !== undefined && entry.dimensions[i] < query.rangeMin[i]) {
+                    return false;
+                }
+                if (query.rangeMax[i] !== undefined && entry.dimensions[i] >= query.rangeMax[i]) {
+                    return false;
+                }
+            }
+            return true;
+        } else if (query.dimensions.length > 0) {
+            // 精确维度查询
+            for (let i = 0; i < query.dimensions.length; i++) {
+                if (query.dimensions[i] !== undefined && 
+                    entry.dimensions[i] !== query.dimensions[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // 无查询条件，匹配所有
+        return true;
+    },
+    
+    /**
+     * 检查范围是否重叠
+     * @private
+     */
+    _isRangeOverlapping: function(node, query) {
+        if (!query.range) {
+            return true;
+        }
+        
+        for (let i = 0; i < node.range.min.length; i++) {
+            if (query.rangeMax[i] !== undefined && node.range.min[i] >= query.rangeMax[i]) {
+                return false;
+            }
+            if (query.rangeMin[i] !== undefined && node.range.max[i] <= query.rangeMin[i]) {
+                return false;
+            }
+        }
+        
+        return true;
+    },
+    
+    /**
+     * 排序结果
+     * @private
+     */
+    _sortResults: function(results, orderBy, orderDirection) {
+        results.sort((a, b) => {
+            let valA, valB;
+            
+            if (orderBy === "key") {
+                valA = a.key;
+                valB = b.key;
+            } else if (orderBy.startsWith("dim_")) {
+                const dimIndex = parseInt(orderBy.substring(4));
+                valA = a.dimensions[dimIndex];
+                valB = b.dimensions[dimIndex];
+            } else if (orderBy === "timestamp") {
+                valA = a.timestamp;
+                valB = b.timestamp;
+            } else {
+                valA = a.metadata[orderBy];
+                valB = b.metadata[orderBy];
+            }
+            
+            if (valA === valB) return 0;
+            
+            if (orderDirection === "asc") {
+                return valA < valB 器 -1 : 1;
+            } else {
+                return valA > valB 器 -1 : 1;
+            }
+        });
+    },
+    
+    /**
+     * 从节点删除条目
+     * @private
+     */
+    _removeEntryFromNode: function(node, key) {
+        // 在当前节点查找条目
+        const entryIndex = node.entries.findIndex(entry => entry.key === key);
+        if (entryIndex >= 0) {
+            // 找到条目，删除
+            node.entries.splice(entryIndex, 1);
+            node.stats.entryCount--;
+            node.stats.lastUpdate = Date.now();
+            return true;
+        }
+        
+        // 在子节点中搜索
+        for (const child of node.children) {
+            if (this._removeEntryFromNode(child, key)) {
+                return true;
+            }
+        }
+        
+        return false;
+    },
+    
+    /**
+     * 获取所有条目
+     * @private
+     */
+    _getAllEntries: function() {
+        const entries = [];
+        this._collectEntries(this.state.rootNodes[0], entries);
+        return entries;
+    },
+    
+    /**
+     * 收集节点中的条目
+     * @private
+     */
+    _collectEntries: function(node, entries) {
+        // 添加当前节点的条目
+        for (const entry of node.entries) {
+            entries.push(entry);
+        }
+        
+        // 递归处理子节点
+        for (const child of node.children) {
+            this._collectEntries(child, entries);
+        }
+    },
+    
+    /**
+     * 更新节点统计信息
+     * @private
+     */
+    _updateNodeStatistics: function(node) {
+        let entryCount = node.entries.length;
+        let childrenCount = node.children.length;
+        
+        // 递归更新子节点
+        for (const child of node.children) {
+            this._updateNodeStatistics(child);
+            entryCount += child.stats.entryCount;
+        }
+        
+        // 更新节点统计
+        node.stats.entryCount = entryCount;
+        node.stats.childrenCount = childrenCount;
+    }
+};
+
+// 导出模块
+export MultidimensionalIndex; 

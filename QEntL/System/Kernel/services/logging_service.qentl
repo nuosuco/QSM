@@ -1,0 +1,608 @@
+/**
+ * QEntL日志服务
+ * 版本: 1.0.0
+ * 作者: QEntL团队
+ * 描述: 提供系统级日志记录、过滤和存储
+ * 量子基因编码: QG-LOGGING-SERVICE-F7G8-1714130200
+ * 纠缠强度: 1.0
+ */
+
+import "../utils/file_system.qentl";
+import "../utils/time.qentl";
+import "../utils/quantum_thread_pool.qentl";
+
+/**
+ * 日志服务配置
+ */
+export const LoggingServiceConfig = {
+  // 日志级别: trace, debug, info, warn, error, fatal
+  logLevel: "info",
+  
+  // 日志文件路径
+  logFilePath: "./logs/qentl.log",
+  
+  // 每个日志文件最大大小 (字节)
+  maxLogFileSize: 10 * 1024 * 1024,
+  
+  // 保留的日志文件数量
+  maxLogFiles: 10,
+  
+  // 控制台输出
+  consoleOutput: true,
+  
+  // 格式化日志
+  formatLog: true,
+  
+  // 是否包含时间戳
+  includeTimestamp: true,
+  
+  // 是否包含日志级别
+  includeLogLevel: true,
+  
+  // 是否包含源位置
+  includeSourceLocation: true,
+  
+  // 是否启用异步日志
+  asyncLogging: true,
+  
+  // 异步日志缓冲区大小
+  asyncBufferSize: 1000,
+  
+  // 异步刷新间隔 (毫秒)
+  asyncFlushInterval: 1000,
+  
+  // 日志过滤器
+  filters: []
+};
+
+/**
+ * 日志服务状态
+ */
+export const LoggingServiceState = {
+  // 服务是否已初始化
+  initialized: false,
+  
+  // 当前日志文件
+  currentLogFile: null,
+  
+  // 当前日志文件大小
+  currentLogFileSize: 0,
+  
+  // 日志计数
+  logCount: 0,
+  
+  // 异步日志缓冲区
+  asyncBuffer: [],
+  
+  // 异步刷新定时器
+  asyncFlushTimer: null,
+  
+  // 异步日志线程池
+  asyncThreadPool: null
+};
+
+/**
+ * 日志级别
+ */
+export const LogLevels = {
+  TRACE: 0,
+  DEBUG: 1,
+  INFO: 2,
+  WARN: 3,
+  ERROR: 4,
+  FATAL: 5
+};
+
+/**
+ * 初始化日志服务
+ * 
+ * @param {Object} config - 日志服务配置参数
+ * @returns {boolean} - 是否初始化成功
+ */
+export function initialize(config = {}) {
+  console.log("[日志服务] 正在初始化日志服务...");
+  
+  // 合并配置
+  const mergedConfig = { ...LoggingServiceConfig, ...config };
+  Object.assign(LoggingServiceConfig, mergedConfig);
+  
+  try {
+    // 确保日志目录存在
+    const logDir = LoggingServiceConfig.logFilePath.substring(
+      0,
+      LoggingServiceConfig.logFilePath.lastIndexOf("/")
+    );
+    
+    file_system.ensureDirectoryExists(logDir);
+    
+    // 打开日志文件
+    LoggingServiceState.currentLogFile = LoggingServiceConfig.logFilePath;
+    
+    // 检查文件大小
+    if (file_system.fileExists(LoggingServiceState.currentLogFile)) {
+      LoggingServiceState.currentLogFileSize = file_system.getFileSize(
+        LoggingServiceState.currentLogFile
+      );
+      
+      // 如果文件太大，轮换日志
+      if (LoggingServiceState.currentLogFileSize >= LoggingServiceConfig.maxLogFileSize) {
+        rotateLogFile();
+      }
+    }
+    
+    // 如果启用异步日志，初始化线程池和定时器
+    if (LoggingServiceConfig.asyncLogging) {
+      LoggingServiceState.asyncThreadPool = quantum_thread_pool.create({
+        threads: 1,
+        name: "日志线程池"
+      });
+      
+      LoggingServiceState.asyncFlushTimer = setInterval(
+        flushAsyncBuffer,
+        LoggingServiceConfig.asyncFlushInterval
+      );
+    }
+    
+    LoggingServiceState.initialized = true;
+    
+    // 写入启动日志
+    writeLog(
+      LogLevels.INFO,
+      "日志服务",
+      "日志服务初始化成功",
+      "logging_service.qentl",
+      "initialize"
+    );
+    
+    console.log("[日志服务] 日志服务初始化成功");
+    
+    return true;
+  } catch (error) {
+    console.error(`[日志服务] 日志服务初始化失败: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 写入跟踪日志
+ * 
+ * @param {string} module - 模块名称
+ * @param {string} message - 日志消息
+ * @param {string} filename - 源文件名
+ * @param {string} functionName - 函数名
+ */
+export function trace(module, message, filename = "", functionName = "") {
+  writeLog(LogLevels.TRACE, module, message, filename, functionName);
+}
+
+/**
+ * 写入调试日志
+ * 
+ * @param {string} module - 模块名称
+ * @param {string} message - 日志消息
+ * @param {string} filename - 源文件名
+ * @param {string} functionName - 函数名
+ */
+export function debug(module, message, filename = "", functionName = "") {
+  writeLog(LogLevels.DEBUG, module, message, filename, functionName);
+}
+
+/**
+ * 写入信息日志
+ * 
+ * @param {string} module - 模块名称
+ * @param {string} message - 日志消息
+ * @param {string} filename - 源文件名
+ * @param {string} functionName - 函数名
+ */
+export function info(module, message, filename = "", functionName = "") {
+  writeLog(LogLevels.INFO, module, message, filename, functionName);
+}
+
+/**
+ * 写入警告日志
+ * 
+ * @param {string} module - 模块名称
+ * @param {string} message - 日志消息
+ * @param {string} filename - 源文件名
+ * @param {string} functionName - 函数名
+ */
+export function warn(module, message, filename = "", functionName = "") {
+  writeLog(LogLevels.WARN, module, message, filename, functionName);
+}
+
+/**
+ * 写入错误日志
+ * 
+ * @param {string} module - 模块名称
+ * @param {string} message - 日志消息
+ * @param {string} filename - 源文件名
+ * @param {string} functionName - 函数名
+ */
+export function error(module, message, filename = "", functionName = "") {
+  writeLog(LogLevels.ERROR, module, message, filename, functionName);
+}
+
+/**
+ * 写入致命错误日志
+ * 
+ * @param {string} module - 模块名称
+ * @param {string} message - 日志消息
+ * @param {string} filename - 源文件名
+ * @param {string} functionName - 函数名
+ */
+export function fatal(module, message, filename = "", functionName = "") {
+  writeLog(LogLevels.FATAL, module, message, filename, functionName);
+}
+
+/**
+ * 获取日志文件路径
+ * 
+ * @returns {string} - 当前日志文件路径
+ */
+export function getLogFilePath() {
+  checkInitialized();
+  return LoggingServiceState.currentLogFile;
+}
+
+/**
+ * 设置日志级别
+ * 
+ * @param {string} level - 日志级别
+ */
+export function setLogLevel(level) {
+  checkInitialized();
+  
+  if (LogLevels[level.toUpperCase()] !== undefined) {
+    LoggingServiceConfig.logLevel = level.toLowerCase();
+    info("日志服务", `日志级别已设置为: ${level}`);
+  } else {
+    warn("日志服务", `无效的日志级别: ${level}`);
+  }
+}
+
+/**
+ * 添加日志过滤器
+ * 
+ * @param {Function} filter - 过滤器函数
+ */
+export function addFilter(filter) {
+  checkInitialized();
+  LoggingServiceConfig.filters.push(filter);
+}
+
+/**
+ * 清除所有日志过滤器
+ */
+export function clearFilters() {
+  checkInitialized();
+  LoggingServiceConfig.filters = [];
+}
+
+/**
+ * 刷新日志缓冲区
+ * 强制将所有缓冲的日志写入磁盘
+ */
+export function flush() {
+  checkInitialized();
+  
+  if (LoggingServiceConfig.asyncLogging) {
+    flushAsyncBuffer();
+  }
+}
+
+/**
+ * 关闭日志服务
+ */
+export function shutdown() {
+  checkInitialized();
+  
+  info("日志服务", "正在关闭日志服务...");
+  
+  // 刷新缓冲区
+  flush();
+  
+  // 清理定时器
+  if (LoggingServiceState.asyncFlushTimer) {
+    clearInterval(LoggingServiceState.asyncFlushTimer);
+    LoggingServiceState.asyncFlushTimer = null;
+  }
+  
+  // 关闭线程池
+  if (LoggingServiceState.asyncThreadPool) {
+    LoggingServiceState.asyncThreadPool.shutdown();
+    LoggingServiceState.asyncThreadPool = null;
+  }
+  
+  LoggingServiceState.initialized = false;
+  
+  console.log("[日志服务] 日志服务已关闭");
+}
+
+// ============= 内部函数 =============
+
+/**
+ * 检查服务是否已初始化
+ */
+function checkInitialized() {
+  if (!LoggingServiceState.initialized) {
+    throw new Error("日志服务尚未初始化");
+  }
+}
+
+/**
+ * 写入日志
+ * 
+ * @param {number} level - 日志级别
+ * @param {string} module - 模块名称
+ * @param {string} message - 日志消息
+ * @param {string} filename - 源文件名
+ * @param {string} functionName - 函数名
+ */
+function writeLog(level, module, message, filename, functionName) {
+  // 如果服务未初始化，直接输出到控制台
+  if (!LoggingServiceState.initialized) {
+    console.log(`[${module}] ${message}`);
+    return;
+  }
+  
+  // 检查日志级别
+  const configLevel = LogLevels[LoggingServiceConfig.logLevel.toUpperCase()];
+  if (level < configLevel) {
+    return;
+  }
+  
+  // 创建日志对象
+  const logEntry = {
+    level,
+    levelName: getLevelName(level),
+    timestamp: time.now(),
+    module,
+    message,
+    filename,
+    functionName
+  };
+  
+  // 应用过滤器
+  for (const filter of LoggingServiceConfig.filters) {
+    if (!filter(logEntry)) {
+      return;
+    }
+  }
+  
+  // 格式化日志
+  const formattedLog = formatLogEntry(logEntry);
+  
+  // 输出到控制台
+  if (LoggingServiceConfig.consoleOutput) {
+    outputToConsole(logEntry, formattedLog);
+  }
+  
+  // 如果启用异步日志，添加到缓冲区
+  if (LoggingServiceConfig.asyncLogging) {
+    LoggingServiceState.asyncBuffer.push(formattedLog);
+    
+    // 如果缓冲区已满，强制刷新
+    if (LoggingServiceState.asyncBuffer.length >= LoggingServiceConfig.asyncBufferSize) {
+      flushAsyncBuffer();
+    }
+  } else {
+    // 同步写入日志文件
+    writeToLogFile(formattedLog);
+  }
+  
+  LoggingServiceState.logCount++;
+}
+
+/**
+ * 获取日志级别名称
+ * 
+ * @param {number} level - 日志级别
+ * @returns {string} - 级别名称
+ */
+function getLevelName(level) {
+  for (const [name, value] of Object.entries(LogLevels)) {
+    if (value === level) {
+      return name;
+    }
+  }
+  return "UNKNOWN";
+}
+
+/**
+ * 格式化日志条目
+ * 
+ * @param {Object} logEntry - 日志条目
+ * @returns {string} - 格式化后的日志字符串
+ */
+function formatLogEntry(logEntry) {
+  if (!LoggingServiceConfig.formatLog) {
+    return `[${logEntry.module}] ${logEntry.message}`;
+  }
+  
+  let formattedLog = "";
+  
+  // 添加时间戳
+  if (LoggingServiceConfig.includeTimestamp) {
+    formattedLog += `[${time.formatTimestamp(logEntry.timestamp)}] `;
+  }
+  
+  // 添加日志级别
+  if (LoggingServiceConfig.includeLogLevel) {
+    formattedLog += `[${logEntry.levelName}] `;
+  }
+  
+  // 添加模块
+  formattedLog += `[${logEntry.module}] `;
+  
+  // 添加消息
+  formattedLog += logEntry.message;
+  
+  // 添加源位置
+  if (LoggingServiceConfig.includeSourceLocation && logEntry.filename) {
+    formattedLog += ` (${logEntry.filename}`;
+    if (logEntry.functionName) {
+      formattedLog += `:${logEntry.functionName}`;
+    }
+    formattedLog += ")";
+  }
+  
+  return formattedLog;
+}
+
+/**
+ * 输出日志到控制台
+ * 
+ * @param {Object} logEntry - 日志条目
+ * @param {string} formattedLog - 格式化后的日志字符串
+ */
+function outputToConsole(logEntry, formattedLog) {
+  switch (logEntry.level) {
+    case LogLevels.TRACE:
+    case LogLevels.DEBUG:
+      console.log(formattedLog);
+      break;
+    case LogLevels.INFO:
+      console.info(formattedLog);
+      break;
+    case LogLevels.WARN:
+      console.warn(formattedLog);
+      break;
+    case LogLevels.ERROR:
+    case LogLevels.FATAL:
+      console.error(formattedLog);
+      break;
+    default:
+      console.log(formattedLog);
+  }
+}
+
+/**
+ * 写入日志到文件
+ * 
+ * @param {string} logText - 日志文本
+ */
+function writeToLogFile(logText) {
+  try {
+    // 检查是否需要轮换日志文件
+    checkRotation();
+    
+    // 添加换行符
+    const logLine = logText + "\n";
+    
+    // 追加到日志文件
+    file_system.appendToFile(LoggingServiceState.currentLogFile, logLine);
+    
+    // 更新文件大小
+    LoggingServiceState.currentLogFileSize += logLine.length;
+  } catch (error) {
+    console.error(`[日志服务] 写入日志文件失败: ${error.message}`);
+  }
+}
+
+/**
+ * 检查是否需要轮换日志文件
+ */
+function checkRotation() {
+  if (LoggingServiceState.currentLogFileSize >= LoggingServiceConfig.maxLogFileSize) {
+    rotateLogFile();
+  }
+}
+
+/**
+ * 轮换日志文件
+ */
+function rotateLogFile() {
+  try {
+    // 获取当前日志文件名（不含路径）
+    const basePath = LoggingServiceConfig.logFilePath;
+    const baseDir = basePath.substring(0, basePath.lastIndexOf("/") + 1);
+    const baseName = basePath.substring(basePath.lastIndexOf("/") + 1);
+    
+    // 移动现有日志文件
+    for (let i = LoggingServiceConfig.maxLogFiles - 1; i > 0; i--) {
+      const oldFile = `${baseDir}${baseName}.${i - 1}`;
+      const newFile = `${baseDir}${baseName}.${i}`;
+      
+      if (file_system.fileExists(oldFile)) {
+        file_system.moveFile(oldFile, newFile, true);
+      }
+    }
+    
+    // 移动当前日志文件
+    if (file_system.fileExists(basePath)) {
+      file_system.moveFile(basePath, `${baseDir}${baseName}.1`, true);
+    }
+    
+    // 重置文件大小
+    LoggingServiceState.currentLogFileSize = 0;
+    
+    console.log("[日志服务] 日志文件已轮换");
+  } catch (error) {
+    console.error(`[日志服务] 轮换日志文件失败: ${error.message}`);
+  }
+}
+
+/**
+ * 刷新异步缓冲区
+ */
+function flushAsyncBuffer() {
+  if (LoggingServiceState.asyncBuffer.length === 0) {
+    return;
+  }
+  
+  // 获取缓冲区日志
+  const logs = LoggingServiceState.asyncBuffer;
+  LoggingServiceState.asyncBuffer = [];
+  
+  // 在线程池中执行写入操作
+  if (LoggingServiceState.asyncThreadPool) {
+    LoggingServiceState.asyncThreadPool.execute({
+      func: batchWriteToLogFile,
+      args: [logs]
+    });
+  } else {
+    // 如果线程池不可用，同步写入
+    batchWriteToLogFile(logs);
+  }
+}
+
+/**
+ * 批量写入日志到文件
+ * 
+ * @param {Array<string>} logs - 日志行数组
+ */
+function batchWriteToLogFile(logs) {
+  try {
+    // 检查是否需要轮换日志文件
+    checkRotation();
+    
+    // 合并日志行
+    const logText = logs.join("\n") + "\n";
+    
+    // 追加到日志文件
+    file_system.appendToFile(LoggingServiceState.currentLogFile, logText);
+    
+    // 更新文件大小
+    LoggingServiceState.currentLogFileSize += logText.length;
+  } catch (error) {
+    console.error(`[日志服务] 批量写入日志文件失败: ${error.message}`);
+  }
+}
+
+// 导出日志服务模块
+export default {
+  initialize,
+  trace,
+  debug,
+  info,
+  warn,
+  error,
+  fatal,
+  getLogFilePath,
+  setLogLevel,
+  addFilter,
+  clearFilters,
+  flush,
+  shutdown
+}; 

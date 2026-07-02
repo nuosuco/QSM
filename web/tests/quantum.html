@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚛ QEntL 量子游乐场</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Courier New',monospace;background:#050510;color:#c0c0ff;min-height:100vh}
+.nav{background:#0a0a20;padding:12px;display:flex;align-items:center;gap:15px;border-bottom:1px solid #2020ff}
+.nav h1{font-size:1.2em;color:#6060ff}
+.nav a{color:#4040c0;font-size:0.85em;text-decoration:none}
+.main{max-width:900px;margin:10px auto;padding:0 12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.box{background:#0a0a20;border:1px solid #2020ff;border-radius:6px;overflow:hidden}
+.box h2{background:#101030;padding:8px 12px;font-size:0.85em;color:#5050ff}
+.box-body{padding:10px}
+.gates{display:flex;flex-wrap:wrap;gap:5px}
+.gbtn{background:#151540;border:1px solid #3030ff;border-radius:4px;padding:4px 8px;color:#7070ff;cursor:pointer;font-family:inherit;font-size:0.8em;min-width:32px;text-align:center}
+.gbtn:hover{background:#2020ff;color:#fff}
+.gbtn.sel{background:#3030ff;color:#fff;border-color:#5050ff}
+.circuit{background:#050515;border:1px solid #151540;border-radius:4px;padding:8px;min-height:40px;font-size:0.8em;color:#5050c0;word-break:break-all;margin-top:8px}
+.circuit .gate-tag{background:#2020a0;border-radius:3px;padding:1px 5px;color:#8080ff;margin:1px;display:inline-block}
+.result{background:#050515;border:1px solid #0a2020;border-radius:4px;padding:8px;min-height:60px;font-size:0.8em;color:#50ffa0;white-space:pre-wrap;margin-top:8px}
+.presets{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.pbtn{background:#101040;border:1px solid #2040ff;border-radius:4px;padding:6px 10px;color:#6060ff;cursor:pointer;font-family:inherit;font-size:0.8em}
+.pbtn:hover{background:#2040ff;color:#fff}
+select,input[type=number]{background:#0a0a20;color:#8080ff;border:1px solid #3030ff;border-radius:3px;padding:3px 6px;font-family:inherit;font-size:0.8em}
+.info{font-size:0.7em;color:#3030c0;text-align:center;padding:8px}
+.history{font-size:0.75em;color:#404080;max-height:100px;overflow-y:auto;margin-top:6px}
+.history div{padding:2px 0;border-bottom:1px solid #0a0a20}
+</style>
+</head>
+<body>
+<div class="nav">
+  <h1>⚛ QEntL 量子游乐场</h1>
+  <a href="/">首页</a>
+  <a href="/translate.html">翻译</a>
+  <a href="/qentl.html">QEntL编辑器</a>
+  <a href="/api-docs.html">API</a>
+</div>
+<div class="main">
+  <div class="grid">
+    <div class="box">
+      <h2>🔲 量子门</h2>
+      <div class="box-body">
+        <div style="font-size:0.75em;color:#4040c0;margin-bottom:5px">单比特门</div>
+        <div class="gates" id="single-gates">
+          <div class="gbtn" onclick="addGate('H')">H</div>
+          <div class="gbtn" onclick="addGate('X')">X</div>
+          <div class="gbtn" onclick="addGate('Y')">Y</div>
+          <div class="gbtn" onclick="addGate('Z')">Z</div>
+          <div class="gbtn" onclick="addGate('S')">S</div>
+          <div class="gbtn" onclick="addGate('T')">T</div>
+          <div class="gbtn" onclick="addGate('RX')">RX</div>
+          <div class="gbtn" onclick="addGate('RZ')">RZ</div>
+        </div>
+        <div style="font-size:0.75em;color:#4040c0;margin:8px 0 5px">双比特门 + 操作</div>
+        <div class="gates">
+          <div class="gbtn" onclick="addGate('CNOT')">CNOT</div>
+        <div class="gbtn" onclick="addGate('SWAP')">SWAP</div>
+          <div class="gbtn" onclick="addGate('ENTANGLE')">🔗纠缠</div>
+          <div class="gbtn" style="border-color:#205020;color:#50ff50" onclick="addMeasure()">📏测量</div>
+        </div>
+        <div style="margin-top:8px;font-size:0.8em;color:#4040c0">
+          目标比特: <input type="number" id="target-q" value="0" min="0" max="7" style="width:35px">
+          控制比特: <input type="number" id="ctrl-q" value="0" min="0" max="7" style="width:35px">
+        </div>
+      </div>
+    </div>
+    <div class="box">
+      <h2>⚡ 预设电路</h2>
+      <div class="box-body">
+        <div class="presets">
+          <div class="pbtn" onclick="preset('bell')">⚡ Bell态</div>
+          <div class="pbtn" onclick="preset('ghz')">🌟 GHZ态</div>
+          <div class="pbtn" onclick="preset('random')">🎲 量子随机</div>
+          <div class="pbtn" onclick="preset('phase')">🌀 相位演示</div>
+          <div class="pbtn" onclick="preset('rotation')">🔄 旋转演示</div>
+          <div class="pbtn" onclick="preset('swap')">🔀 SWAP</div>
+          <div class="pbtn" onclick="preset('teleport')">📡 隐形传态</div>
+          <div class="pbtn" style="border-color:#502020;color:#ff5050" onclick="clearAll()">🗑 清空</div>
+        </div>
+        <div style="font-size:0.8em;color:#4040c0">
+          量子比特数: <input type="number" id="n-qubits" value="2" min="1" max="8" style="width:40px">
+          <button onclick="runCircuit()" style="background:#2020ff;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;font-family:inherit;margin-left:8px">▶ 执行</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="box">
+    <h2>⚙ QEntL源码</h2>
+    <div class="box-body">
+      <textarea id="qentl-source" style="width:100%;min-height:60px;background:#050515;color:#8080ff;border:1px solid #2020ff;border-radius:4px;padding:8px;font-family:inherit;font-size:0.8em;resize:vertical">quantum_program 测试 {
+    bell态: 函数() {
+        纠缠 0 1
+        测量 0
+        测量 1
+    }
+}</textarea>
+      <div style="margin-top:6px">
+        <input id="qentl-func" value="bell态" style="background:#050515;color:#8080ff;border:1px solid #2020ff;border-radius:3px;padding:3px 6px;font-family:inherit;font-size:0.8em;width:100px" placeholder="函数名">
+        <button onclick="runQentL()" style="background:#2020ff;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;font-family:inherit">▶ 编译执行</button>
+      </div>
+    </div>
+  </div>
+  <div class="box">
+    <h2>📋 量子电路</h2>
+    <div class="box-body">
+      <div class="circuit" id="circuit-display">点击量子门构建电路...</div>
+      <div class="result" id="result-display">等待执行...</div>
+      <div class="history" id="history"></div>
+    </div>
+  </div>
+</div>
+<div class="info">QEntL V1.4 · 9量子门 · 3关键词(量子门/纠缠/测量) · <a href="/api-docs.html" style="color:#4040ff">API</a></div>
+<script>
+let gates=[];
+function addGate(name){
+  const tq=parseInt(document.getElementById('target-q').value)||0;
+  const cq=parseInt(document.getElementById('ctrl-q').value)||0;
+  if(name==='CNOT'||name==='ENTANGLE')gates.push({name,control:cq,target:tq});
+  else gates.push({name,target:tq});
+  updateCircuit();
+}
+function addMeasure(){
+  const tq=parseInt(document.getElementById('target-q').value)||0;
+  gates.push({name:'M',target:tq});
+  updateCircuit();
+}
+function preset(name){
+    if(name==='func'){
+        document.getElementById('qentl-source').value=`quantum_program 函数演示 {
+    加法: 函数(a: 整数, b: 整数) {
+        让 r = a + b
+        返回 r
+    }
+    问候: 函数(名字: 字符串) {
+        让 msg = "你好，" + 名字 + "！"
+        返回 msg
+    }
+    setup: 函数() {
+        让 结果 = 加法(3, 5)
+        LOG(结果)
+        让 问候语 = 问候("世界")
+        LOG(问候语)
+    }
+}`;
+        compileSource(); return;
+    }
+    if(name==='teleport'){gates=[{name:'H',target:1},{name:'CNOT',control:1,target:2},{name:'CNOT',control:0,target:1},{name:'H',target:0},{name:'M',target:0},{name:'M',target:1},{name:'M',target:2}];document.getElementById('n-qubits').value=3;updateCircuit();return}
+    if(name==='swap'){gates=[{name:'X',target:0},{name:'SWAP',control:0,target:1},{name:'M',target:0},{name:'M',target:1}];document.getElementById('n-qubits').value=2;updateCircuit();return}
+  clearAll();
+  if(name==='bell'){gates=[{name:'H',target:0},{name:'CNOT',control:0,target:1},{name:'M',target:0},{name:'M',target:1}]}
+  else if(name==='ghz'){gates=[{name:'H',target:0},{name:'CNOT',control:0,target:1},{name:'CNOT',control:0,target:2},{name:'M',target:0},{name:'M',target:1},{name:'M',target:2}];document.getElementById('n-qubits').value=3}
+  else if(name==='random'){gates=[{name:'H',target:0},{name:'M',target:0}]}
+  else if(name==='phase'){gates=[{name:'H',target:0},{name:'S',target:0},{name:'T',target:0},{name:'M',target:0}]}
+  else if(name==='rotation'){gates=[{name:'RX',target:0},{name:'RZ',target:0},{name:'M',target:0}]}
+  updateCircuit();
+}
+function clearAll(){gates=[];document.getElementById('result-display').textContent='等待执行...';updateCircuit()}
+function updateCircuit(){
+  const d=document.getElementById('circuit-display');
+  if(!gates.length){d.innerHTML='点击量子门构建电路...';return}
+  d.innerHTML=gates.map(g=>{
+    const label=g.name==='M'?'📏M('+g.target+')':g.name==='CNOT'||g.name==='ENTANGLE'?g.name+'('+g.control+','+g.target+')':g.name+'('+g.target+')';
+    return '<span class="gate-tag">'+label+'</span>';
+  }).join(' → ');
+}
+async function runQentL(){
+    const r=document.getElementById("result-display");
+    const s=document.getElementById("qentl-source").value;
+    const fn=document.getElementById("qentl-func").value||"setup";
+    r.textContent="⚛ 编译中...";
+    try{
+      const res=await fetch("/api/qv4/circuit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:s,function:fn})});
+      const d=await res.json();
+      if(d.success){r.textContent="✅ 成功!\n量子态: "+d.quantum_state+"\n输出: "+(d.output||[]).join(", ")+"\n\n"+d.circuit}else{r.textContent="❌ "+d.error}
+    }catch(e){r.textContent="❌ "+e.message}
+  }
+
+async function runCircuit(){
+  const r=document.getElementById('result-display');
+  const h=document.getElementById('history');
+  r.textContent='⚛ 执行中...';
+  const nq=parseInt(document.getElementById('n-qubits').value)||2;
+  const gl=gates.filter(g=>g.name!=='M').map(g=>(g.name==='CNOT'||g.name==='ENTANGLE')?{name:'CNOT',control:g.control||0,target:g.target||1}:{name:g.name,target:g.target||0});
+  try{
+    const res=await fetch('/api/qv4/circuit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({gates:gl,qubits:nq})});
+    const d=await res.json();
+    if(d.success){
+      let circuitTxt=d.circuit?'\n\n'+d.circuit:'';r.textContent='✅ 执行成功!\n量子态: '+d.quantum_state+'\n输出: '+(d.output||[]).join(', ')+circuitTxt;
+      h.innerHTML='<div>'+new Date().toLocaleTimeString()+' → '+d.quantum_state+'</div>'+h.innerHTML;
+    }else r.textContent='❌ '+d.error;
+  }catch(e){r.textContent='❌ '+e.message}
+}
+</script>
+</body>
+</html>

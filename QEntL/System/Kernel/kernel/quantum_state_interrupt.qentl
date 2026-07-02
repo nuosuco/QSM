@@ -1,0 +1,891 @@
+/**
+ * QEntL量子状态中断处理器
+ * QuantumGene: QG-KERNEL-QSINT-P3Z9-1714387842
+ * EntanglementStrength: 0.95
+ */
+
+quantum_program QuantumStateInterruptHandler {
+    metadata {
+        name: "QEntL量子状态中断处理器",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "监控和处理量子状态的变化、退相干和测量结果",
+        quantum_gene: "QG-KERNEL-QSINT-P3Z9-1714387842",
+        entanglement_strength: 0.95
+    }
+
+    // 量子状态变化类型常量
+    constexpr quantum_state_changes = {
+        COHERENCE_CHANGE: 0,    // 相干性变化
+        DECOHERENCE: 1,         // 退相干
+        ENTANGLEMENT_CHANGE: 2, // 纠缠状态变化
+        SUPERPOSITION_CHANGE: 3,// 叠加状态变化
+        PHASE_SHIFT: 4,         // 相位变化
+        ERROR_DETECTED: 5,      // 检测到量子错误
+        MEASUREMENT_RESULT: 6,  // 测量结果
+        TELEPORTATION: 7,       // 量子隐形传态
+        GATE_OPERATION: 8,      // 量子门操作
+        QUBIT_STATE_CHANGE: 9   // 量子比特状态变化
+    };
+
+    // 量子状态变化优先级常量
+    constexpr quantum_priorities = {
+        CRITICAL: 0,      // 关键优先级（如错误检测）
+        HIGH: 1,          // 高优先级（如退相干）
+        MEDIUM: 2,        // 中优先级（如测量结果）
+        LOW: 3,           // 低优先级（如缓慢的相干性变化）
+        BACKGROUND: 4     // 背景优先级（如常规状态监控）
+    };
+
+    // 测量结果常量
+    constexpr measurement_results = {
+        ZERO: 0,          // |0⟩ 状态
+        ONE: 1,           // |1⟩ 状态
+        SUPERPOSITION: 2, // 叠加状态 (测量前塌缩)
+        ERROR: 3,         // 测量错误
+        UNKNOWN: 4        // 未知结果
+    };
+
+    // 模块状态
+    state {
+        // 内核引用
+        kernel_reference: null,
+        
+        // 中断处理器引用
+        interrupt_handler: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 监控状态
+        monitoring: false,
+        
+        // 量子状态变化处理器映射
+        // 格式: {change_type => [{handler, priority, description, options}]}
+        quantum_handlers: {},
+        
+        // 量子状态变化计数器
+        state_changes: {
+            total: 0,
+            by_type: {}
+        },
+        
+        // 量子错误统计
+        error_stats: {
+            total_errors: 0,
+            corrected_errors: 0,
+            uncorrectable_errors: 0,
+            error_types: {}
+        },
+        
+        // 最近的量子状态变化记录
+        recent_changes: [],
+        
+        // 最大记录数量
+        max_recent_changes: 100,
+        
+        // 量子纠缠对映射
+        // 跟踪纠缠配对: {qubit_id => [entangled_qubits]}
+        entanglement_map: {},
+        
+        // 量子比特状态缓存
+        // 格式: {qubit_id => {last_state, last_measured, coherence, entangled}}
+        qubit_state_cache: {},
+        
+        // 测量结果历史
+        measurement_history: [],
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化量子状态中断处理器
+    initialize(kernel_ref, interrupt_handler_ref) {
+        kernel_log("初始化量子状态中断处理器...");
+        
+        // 保存引用
+        this.kernel_reference = kernel_ref;
+        this.interrupt_handler = interrupt_handler_ref;
+        
+        // 检查中断处理器
+        if (!this.interrupt_handler || !this.interrupt_handler.initialized) {
+            this.add_error("无法初始化量子状态中断处理器：中断处理器未初始化");
+            return false;
+        }
+        
+        // 初始化量子状态变化处理器映射
+        for (const change_type in this.quantum_state_changes) {
+            const type_id = this.quantum_state_changes[change_type];
+            this.quantum_handlers[type_id] = [];
+            this.state_changes.by_type[type_id] = 0;
+        }
+        
+        // 注册到中断处理器 - 量子中断类型
+        const quantum_interrupt_type = this.interrupt_handler.interrupt_types.QUANTUM;
+        
+        // 注册各种量子状态变化的处理器
+        for (const change_type in this.quantum_state_changes) {
+            const type_id = this.quantum_state_changes[change_type];
+            const vector = 0x100 + type_id; // 量子中断向量起始于 0x100
+            
+            // 在中断处理器中注册此量子状态变化
+            this.interrupt_handler.register_handler(
+                quantum_interrupt_type,
+                vector,
+                (data, interrupt) => this.handle_quantum_interrupt(type_id, data, interrupt),
+                {
+                    priority: this.get_default_priority(type_id),
+                    description: `量子状态变化处理器: ${change_type}`
+                }
+            );
+        }
+        
+        // 注册默认错误处理
+        this.register_quantum_handler(
+            this.quantum_state_changes.ERROR_DETECTED,
+            (data) => this.default_error_handler(data),
+            {
+                priority: this.quantum_priorities.CRITICAL,
+                description: "默认量子错误处理器"
+            }
+        );
+        
+        // 注册默认退相干处理
+        this.register_quantum_handler(
+            this.quantum_state_changes.DECOHERENCE,
+            (data) => this.default_decoherence_handler(data),
+            {
+                priority: this.quantum_priorities.HIGH,
+                description: "默认退相干处理器"
+            }
+        );
+        
+        this.initialized = true;
+        this.start_monitoring();
+        
+        kernel_log("量子状态中断处理器初始化完成");
+        
+        return true;
+    }
+
+    // 获取量子状态变化的默认优先级
+    get_default_priority(change_type) {
+        switch (change_type) {
+            case this.quantum_state_changes.ERROR_DETECTED:
+                return this.quantum_priorities.CRITICAL;
+                
+            case this.quantum_state_changes.DECOHERENCE:
+            case this.quantum_state_changes.TELEPORTATION:
+                return this.quantum_priorities.HIGH;
+                
+            case this.quantum_state_changes.MEASUREMENT_RESULT:
+            case this.quantum_state_changes.ENTANGLEMENT_CHANGE:
+                return this.quantum_priorities.MEDIUM;
+                
+            case this.quantum_state_changes.COHERENCE_CHANGE:
+            case this.quantum_state_changes.PHASE_SHIFT:
+                return this.quantum_priorities.LOW;
+                
+            case this.quantum_state_changes.SUPERPOSITION_CHANGE:
+            case this.quantum_state_changes.GATE_OPERATION:
+            case this.quantum_state_changes.QUBIT_STATE_CHANGE:
+                return this.quantum_priorities.BACKGROUND;
+                
+            default:
+                return this.quantum_priorities.MEDIUM;
+        }
+    }
+
+    // 重置状态
+    reset() {
+        kernel_log("重置量子状态中断处理器...");
+        
+        // 保存引用
+        const kernel_ref = this.kernel_reference;
+        const interrupt_handler_ref = this.interrupt_handler;
+        
+        // 停止监控
+        this.stop_monitoring();
+        
+        // 清空处理器映射
+        this.quantum_handlers = {};
+        
+        // 重置统计信息
+        this.state_changes = {
+            total: 0,
+            by_type: {}
+        };
+        
+        // 重置错误统计
+        this.error_stats = {
+            total_errors: 0,
+            corrected_errors: 0,
+            uncorrectable_errors: 0,
+            error_types: {}
+        };
+        
+        // 清空记录
+        this.recent_changes = [];
+        this.entanglement_map = {};
+        this.qubit_state_cache = {};
+        this.measurement_history = [];
+        
+        // 清空错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 恢复引用
+        this.kernel_reference = kernel_ref;
+        this.interrupt_handler = interrupt_handler_ref;
+        
+        // 重新初始化
+        this.initialize(kernel_ref, interrupt_handler_ref);
+        
+        kernel_log("量子状态中断处理器已重置");
+    }
+
+    // 开始监控量子状态变化
+    start_monitoring() {
+        if (!this.initialized) {
+            this.add_error("无法开始监控：量子状态中断处理器未初始化");
+            return false;
+        }
+        
+        if (this.monitoring) {
+            kernel_log("量子状态监控已经在运行");
+            return true;
+        }
+        
+        this.monitoring = true;
+        kernel_log("开始监控量子状态变化");
+        
+        return true;
+    }
+
+    // 停止监控量子状态变化
+    stop_monitoring() {
+        if (!this.initialized) {
+            this.add_error("无法停止监控：量子状态中断处理器未初始化");
+            return false;
+        }
+        
+        if (!this.monitoring) {
+            kernel_log("量子状态监控已经停止");
+            return true;
+        }
+        
+        this.monitoring = false;
+        kernel_log("停止监控量子状态变化");
+        
+        return true;
+    }
+
+    // 注册量子状态变化处理器
+    register_quantum_handler(change_type, handler, options) {
+        if (!this.initialized) {
+            this.add_error("无法注册量子状态处理器：量子状态中断处理器未初始化");
+            return false;
+        }
+        
+        // 验证变化类型
+        if (!(change_type in this.quantum_state_changes) && !(Object.values(this.quantum_state_changes).includes(change_type))) {
+            this.add_error(`无法注册处理器：无效的量子状态变化类型 ${change_type}`);
+            return false;
+        }
+        
+        // 验证处理器函数
+        if (typeof handler !== 'function') {
+            this.add_error("无法注册处理器：处理器必须是函数");
+            return false;
+        }
+        
+        // 标准化类型为数字
+        const type_id = typeof change_type === 'string' 器 
+                        this.quantum_state_changes[change_type] : change_type;
+        
+        // 解析选项
+        const handler_options = options || {};
+        const priority = handler_options.priority !== undefined 器 
+                        handler_options.priority : this.get_default_priority(type_id);
+        const description = handler_options.description || "未命名量子状态处理器";
+        
+        // 创建处理器记录
+        const handler_record = {
+            type: type_id,
+            handler: handler,
+            priority: priority,
+            description: description,
+            options: handler_options,
+            registered_at: Date.now()
+        };
+        
+        // 添加到处理器映射
+        this.quantum_handlers[type_id].push(handler_record);
+        
+        // 按优先级排序
+        this.quantum_handlers[type_id].sort((a, b) => a.priority - b.priority);
+        
+        kernel_log(`量子状态处理器已注册: 类型 ${type_id}, 优先级 ${priority}`);
+        
+        return true;
+    }
+
+    // 注销量子状态变化处理器
+    unregister_quantum_handler(change_type, handler) {
+        if (!this.initialized) {
+            this.add_error("无法注销量子状态处理器：量子状态中断处理器未初始化");
+            return false;
+        }
+        
+        // 标准化类型为数字
+        const type_id = typeof change_type === 'string' 器 
+                        this.quantum_state_changes[change_type] : change_type;
+        
+        // 检查是否存在此类型的处理器
+        if (!this.quantum_handlers[type_id] || this.quantum_handlers[type_id].length === 0) {
+            this.add_warning(`注销处理器失败：找不到类型 ${type_id} 的处理器`);
+            return false;
+        }
+        
+        // 查找处理器
+        const index = this.quantum_handlers[type_id].findIndex(h => h.handler === handler);
+        
+        if (index === -1) {
+            this.add_warning(`注销处理器失败：处理器不存在`);
+            return false;
+        }
+        
+        // 移除处理器
+        this.quantum_handlers[type_id].splice(index, 1);
+        
+        kernel_log(`量子状态处理器已注销: 类型 ${type_id}`);
+        
+        return true;
+    }
+
+    // 触发量子状态变化中断
+    trigger_quantum_change(change_type, data) {
+        if (!this.initialized) {
+            this.add_error("无法触发量子状态变化：量子状态中断处理器未初始化");
+            return null;
+        }
+        
+        if (!this.monitoring) {
+            this.add_warning("量子状态监控已停止，忽略状态变化");
+            return null;
+        }
+        
+        // 标准化类型为数字
+        const type_id = typeof change_type === 'string' 器 
+                        this.quantum_state_changes[change_type] : change_type;
+        
+        // 验证类型
+        if (type_id === undefined || !this.quantum_handlers[type_id]) {
+            this.add_error(`无法触发量子状态变化：无效的变化类型 ${change_type}`);
+            return null;
+        }
+        
+        // 更新统计信息
+        this.state_changes.total++;
+        this.state_changes.by_type[type_id] = (this.state_changes.by_type[type_id] || 0) + 1;
+        
+        // 准备数据
+        const change_data = data || {};
+        change_data.timestamp = Date.now();
+        change_data.change_type = type_id;
+        
+        // 添加到最近变化记录
+        this.add_to_recent_changes(type_id, change_data);
+        
+        // 获取中断向量
+        const vector = 0x100 + type_id;
+        
+        // 通过中断处理器触发中断
+        const interrupt_id = this.interrupt_handler.trigger_interrupt(
+            this.interrupt_handler.interrupt_types.QUANTUM,
+            vector,
+            change_data,
+            {
+                priority: this.get_default_priority(type_id)
+            }
+        );
+        
+        return interrupt_id;
+    }
+
+    // 处理量子中断
+    handle_quantum_interrupt(change_type, data, interrupt) {
+        if (!this.initialized || !this.monitoring) {
+            return { handled: false };
+        }
+        
+        kernel_log(`处理量子状态变化: 类型 ${change_type}`);
+        
+        // 验证中断类型
+        if (interrupt.type !== this.interrupt_handler.interrupt_types.QUANTUM) {
+            this.add_warning(`收到非量子中断，忽略: ${interrupt.type}`);
+            return { handled: false };
+        }
+        
+        // 验证变化类型
+        if (!this.quantum_handlers[change_type]) {
+            this.add_warning(`未知的量子状态变化类型: ${change_type}`);
+            return { handled: false };
+        }
+        
+        // 查找适用的处理器
+        const handlers = this.quantum_handlers[change_type];
+        let handled = false;
+        let result = null;
+        
+        // 调用所有注册的处理器
+        for (const handler_record of handlers) {
+            try {
+                const handler_result = handler_record.handler(data, interrupt);
+                
+                if (handler_result && handler_result.handled) {
+                    handled = true;
+                    result = handler_result.result;
+                    
+                    // 如果处理器表示已完全处理，停止调用其他处理器
+                    if (handler_result.stop_propagation) {
+                        break;
+                    }
+                }
+            } catch (error) {
+                this.add_warning(`量子状态处理器执行出错: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        // 更新事件处理状态
+        if (handled) {
+            kernel_log(`量子状态变化已处理: 类型 ${change_type}`);
+        } else {
+            this.add_warning(`量子状态变化未处理: 类型 ${change_type}`);
+        }
+        
+        return {
+            handled: handled,
+            result: result
+        };
+    }
+
+    // 添加到最近变化记录
+    add_to_recent_changes(change_type, data) {
+        const change_record = {
+            id: this.state_changes.total,
+            type: change_type,
+            timestamp: data.timestamp,
+            data: { ...data }
+        };
+        
+        // 添加到最近变化记录
+        this.recent_changes.push(change_record);
+        
+        // 保持记录数量在限制范围内
+        if (this.recent_changes.length > this.max_recent_changes) {
+            this.recent_changes.shift();
+        }
+        
+        // 特殊处理某些类型的变化
+        this.process_specific_changes(change_type, data);
+    }
+
+    // 处理特定类型的量子状态变化
+    process_specific_changes(change_type, data) {
+        switch (change_type) {
+            case this.quantum_state_changes.ERROR_DETECTED:
+                // 更新错误统计
+                this.error_stats.total_errors++;
+                
+                // 更新错误类型统计
+                if (data.error_type) {
+                    this.error_stats.error_types[data.error_type] = 
+                        (this.error_stats.error_types[data.error_type] || 0) + 1;
+                }
+                
+                // 如果错误已纠正
+                if (data.corrected) {
+                    this.error_stats.corrected_errors++;
+                } else {
+                    this.error_stats.uncorrectable_errors++;
+                }
+                break;
+                
+            case this.quantum_state_changes.MEASUREMENT_RESULT:
+                // 添加到测量结果历史
+                if (data.qubit_id !== undefined && data.result !== undefined) {
+                    this.measurement_history.push({
+                        qubit_id: data.qubit_id,
+                        result: data.result,
+                        timestamp: data.timestamp
+                    });
+                    
+                    // 保持历史记录大小在限制范围内
+                    if (this.measurement_history.length > this.max_recent_changes) {
+                        this.measurement_history.shift();
+                    }
+                    
+                    // 更新缓存的量子比特状态
+                    this.update_qubit_state(data.qubit_id, {
+                        last_measured: data.result,
+                        last_measured_at: data.timestamp
+                    });
+                }
+                break;
+                
+            case this.quantum_state_changes.ENTANGLEMENT_CHANGE:
+                // 更新纠缠映射
+                if (data.qubit_id !== undefined && data.entangled_with !== undefined) {
+                    if (data.entangled) {
+                        // 添加纠缠
+                        this.add_entanglement(data.qubit_id, data.entangled_with);
+                    } else {
+                        // 移除纠缠
+                        this.remove_entanglement(data.qubit_id, data.entangled_with);
+                    }
+                }
+                break;
+                
+            case this.quantum_state_changes.QUBIT_STATE_CHANGE:
+                // 更新缓存的量子比特状态
+                if (data.qubit_id !== undefined) {
+                    this.update_qubit_state(data.qubit_id, data);
+                }
+                break;
+                
+            case this.quantum_state_changes.DECOHERENCE:
+                // 处理退相干事件
+                if (data.qubit_id !== undefined) {
+                    // 更新量子比特的相干性
+                    this.update_qubit_state(data.qubit_id, {
+                        coherence: data.coherence !== undefined 器 data.coherence : 0
+                    });
+                    
+                    // 如果相干性降至临界值以下，可能需要纠错
+                    if (data.coherence !== undefined && data.coherence < 0.3) {
+                        kernel_log(`量子比特 ${data.qubit_id} 的相干性低于临界值: ${data.coherence}`);
+                    }
+                }
+                break;
+        }
+    }
+
+    // 更新量子比特状态缓存
+    update_qubit_state(qubit_id, data) {
+        // 如果这个量子比特还没有缓存，创建一个
+        if (!this.qubit_state_cache[qubit_id]) {
+            this.qubit_state_cache[qubit_id] = {
+                last_state: null,
+                last_measured: null,
+                last_measured_at: null,
+                coherence: 1.0,
+                entangled: []
+            };
+        }
+        
+        // 更新缓存
+        const qubit_cache = this.qubit_state_cache[qubit_id];
+        
+        if (data.state !== undefined) {
+            qubit_cache.last_state = data.state;
+        }
+        
+        if (data.last_measured !== undefined) {
+            qubit_cache.last_measured = data.last_measured;
+        }
+        
+        if (data.last_measured_at !== undefined) {
+            qubit_cache.last_measured_at = data.last_measured_at;
+        }
+        
+        if (data.coherence !== undefined) {
+            qubit_cache.coherence = data.coherence;
+        }
+    }
+
+    // 添加纠缠关系
+    add_entanglement(qubit_id, entangled_with) {
+        // 确保纠缠映射存在
+        if (!this.entanglement_map[qubit_id]) {
+            this.entanglement_map[qubit_id] = [];
+        }
+        
+        if (!this.entanglement_map[entangled_with]) {
+            this.entanglement_map[entangled_with] = [];
+        }
+        
+        // 添加双向纠缠
+        if (!this.entanglement_map[qubit_id].includes(entangled_with)) {
+            this.entanglement_map[qubit_id].push(entangled_with);
+        }
+        
+        if (!this.entanglement_map[entangled_with].includes(qubit_id)) {
+            this.entanglement_map[entangled_with].push(qubit_id);
+        }
+        
+        // 更新量子比特的缓存状态
+        this.update_qubit_state(qubit_id, {
+            entangled: this.entanglement_map[qubit_id]
+        });
+        
+        this.update_qubit_state(entangled_with, {
+            entangled: this.entanglement_map[entangled_with]
+        });
+        
+        kernel_log(`量子比特 ${qubit_id} 和 ${entangled_with} 建立纠缠`);
+    }
+
+    // 移除纠缠关系
+    remove_entanglement(qubit_id, entangled_with) {
+        // 确保纠缠映射存在
+        if (this.entanglement_map[qubit_id]) {
+            const index = this.entanglement_map[qubit_id].indexOf(entangled_with);
+            if (index !== -1) {
+                this.entanglement_map[qubit_id].splice(index, 1);
+            }
+        }
+        
+        if (this.entanglement_map[entangled_with]) {
+            const index = this.entanglement_map[entangled_with].indexOf(qubit_id);
+            if (index !== -1) {
+                this.entanglement_map[entangled_with].splice(index, 1);
+            }
+        }
+        
+        // 更新量子比特的缓存状态
+        if (this.qubit_state_cache[qubit_id]) {
+            this.update_qubit_state(qubit_id, {
+                entangled: this.entanglement_map[qubit_id] || []
+            });
+        }
+        
+        if (this.qubit_state_cache[entangled_with]) {
+            this.update_qubit_state(entangled_with, {
+                entangled: this.entanglement_map[entangled_with] || []
+            });
+        }
+        
+        kernel_log(`量子比特 ${qubit_id} 和 ${entangled_with} 解除纠缠`);
+    }
+
+    // 默认量子错误处理器
+    default_error_handler(data) {
+        kernel_log(`处理量子错误: ${data.error_type || "未知错误类型"}`);
+        
+        // 如果提供了错误修复函数，尝试使用它
+        if (data.correction_function && typeof data.correction_function === 'function') {
+            try {
+                const correction_result = data.correction_function(data);
+                if (correction_result && correction_result.success) {
+                    kernel_log(`量子错误已修复: ${data.error_type}`);
+                    data.corrected = true;
+                    return { handled: true, result: { success: true, message: "错误已修复" } };
+                }
+            } catch (error) {
+                this.add_warning(`错误修复函数执行失败: ${error.message || "未知错误"}`);
+            }
+        }
+        
+        // 根据错误类型采取不同的默认修复策略
+        if (data.error_type === "bit_flip") {
+            // 尝试使用比特翻转码进行纠错
+            if (data.qubit_id !== undefined) {
+                kernel_log(`尝试修复量子比特 ${data.qubit_id} 的比特翻转错误`);
+                // 这里是简化的错误修复逻辑
+                return { handled: true, result: { success: true, message: "比特翻转已修复" } };
+            }
+        } else if (data.error_type === "phase_flip") {
+            // 尝试使用相位翻转码进行纠错
+            if (data.qubit_id !== undefined) {
+                kernel_log(`尝试修复量子比特 ${data.qubit_id} 的相位翻转错误`);
+                // 这里是简化的错误修复逻辑
+                return { handled: true, result: { success: true, message: "相位翻转已修复" } };
+            }
+        } else if (data.error_type === "measurement_error") {
+            // 处理测量错误
+            if (data.qubit_id !== undefined) {
+                kernel_log(`检测到量子比特 ${data.qubit_id} 的测量错误，尝试重新测量`);
+                // 这里是简化的重新测量逻辑
+                return { handled: true, result: { success: true, message: "已请求重新测量" } };
+            }
+        }
+        
+        // 如果没有成功修复，标记为未修复
+        data.corrected = false;
+        return { 
+            handled: true, 
+            result: { 
+                success: false, 
+                message: `无法修复错误: ${data.error_type || "未知错误类型"}` 
+            } 
+        };
+    }
+
+    // 默认退相干处理器
+    default_decoherence_handler(data) {
+        kernel_log(`处理退相干: 量子比特 ${data.qubit_id}, 相干性 ${data.coherence}`);
+        
+        // 检查是否可以应用相干性恢复
+        if (data.qubit_id !== undefined && data.coherence !== undefined) {
+            // 如果相干性极低，可能需要重新初始化
+            if (data.coherence < 0.1) {
+                kernel_log(`量子比特 ${data.qubit_id} 的相干性极低，需要重新初始化`);
+                return { 
+                    handled: true, 
+                    result: { 
+                        action: "reinitialize", 
+                        message: "量子比特需要重新初始化" 
+                    } 
+                };
+            }
+            
+            // 如果相干性较低但仍可恢复，尝试应用量子纠错
+            if (data.coherence < 0.5) {
+                kernel_log(`尝试恢复量子比特 ${data.qubit_id} 的相干性`);
+                // 这里是简化的相干性恢复逻辑
+                return { 
+                    handled: true, 
+                    result: { 
+                        action: "error_correction", 
+                        message: "应用量子纠错以恢复相干性" 
+                    } 
+                };
+            }
+            
+            // 如果相干性在可接受范围内，只记录但不采取行动
+            return { 
+                handled: true, 
+                result: { 
+                    action: "monitor", 
+                    message: "相干性在可接受范围内，继续监控" 
+                } 
+            };
+        }
+        
+        return { handled: false };
+    }
+
+    // 获取量子比特的状态信息
+    get_qubit_state(qubit_id) {
+        if (!this.initialized) {
+            this.add_error("无法获取量子比特状态：量子状态中断处理器未初始化");
+            return null;
+        }
+        
+        if (!this.qubit_state_cache[qubit_id]) {
+            return {
+                exists: false,
+                message: `量子比特 ${qubit_id} 未在缓存中找到`
+            };
+        }
+        
+        return {
+            exists: true,
+            state: this.qubit_state_cache[qubit_id].last_state,
+            last_measured: this.qubit_state_cache[qubit_id].last_measured,
+            last_measured_at: this.qubit_state_cache[qubit_id].last_measured_at,
+            coherence: this.qubit_state_cache[qubit_id].coherence,
+            entangled: this.qubit_state_cache[qubit_id].entangled || []
+        };
+    }
+
+    // 获取量子变化类型名称
+    get_change_type_name(change_type) {
+        for (const name in this.quantum_state_changes) {
+            if (this.quantum_state_changes[name] === change_type) {
+                return name;
+            }
+        }
+        return "UNKNOWN";
+    }
+
+    // 获取最近的量子状态变化
+    get_recent_changes(limit) {
+        if (!this.initialized) {
+            this.add_error("无法获取最近变化：量子状态中断处理器未初始化");
+            return [];
+        }
+        
+        const count = limit || this.max_recent_changes;
+        const recent = this.recent_changes.slice(-count);
+        
+        // 为每个变化添加类型名称
+        return recent.map(change => ({
+            ...change,
+            type_name: this.get_change_type_name(change.type)
+        }));
+    }
+
+    // 获取统计信息
+    get_statistics() {
+        if (!this.initialized) {
+            this.add_error("无法获取统计信息：量子状态中断处理器未初始化");
+            return null;
+        }
+        
+        // 格式化类型统计
+        const formatted_type_stats = {};
+        for (const type_id in this.state_changes.by_type) {
+            const type_name = this.get_change_type_name(parseInt(type_id));
+            formatted_type_stats[type_name] = this.state_changes.by_type[type_id];
+        }
+        
+        // 计算处理器数量
+        let total_handlers = 0;
+        for (const type_id in this.quantum_handlers) {
+            total_handlers += this.quantum_handlers[type_id].length;
+        }
+        
+        return {
+            initialized: this.initialized,
+            monitoring: this.monitoring,
+            total_changes: this.state_changes.total,
+            changes_by_type: formatted_type_stats,
+            recent_changes_count: this.recent_changes.length,
+            error_stats: { ...this.error_stats },
+            total_handlers: total_handlers,
+            total_entangled_pairs: Object.keys(this.entanglement_map).length,
+            monitored_qubits: Object.keys(this.qubit_state_cache).length,
+            measurement_history_count: this.measurement_history.length
+        };
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`量子状态中断处理器错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`量子状态中断处理器警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+}
+
+// 导出量子状态中断处理器模块
+export QuantumStateInterruptHandler; 

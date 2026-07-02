@@ -1,0 +1,53 @@
+╔══════════════════════════════════════╗
+║    QEntL Quantum Virtual Machine     ║
+║    Version 1.0.0                       ║
+╚══════════════════════════════════════╝
+
+[QVM] 量子虚拟机初始化完成 (v1.0.0)
+[QVM] 量子比特: 0/64
+[QVM] 经典寄存器: 16个
+[QVM] 量子内存: 1024 KB
+[QVM] 开始执行字节码 (100 bytes)
+[QVM] 初始化 28 个量子比特
+[QVM] H(q0)
+[QVM] H(q1)
+[QVM] H(q2)
+[QVM] H(q3)
+[QVM] H(q4)
+[QVM] H(q5)
+[QVM] H(q6)
+[QVM] H(q7)
+[QVM] H(q8)
+[QVM] X(q6)
+[QVM] X(q7)
+[QVM] CNOT(q6, q0)
+[QVM] CNOT(q7, q1)
+[QVM] CNOT(q8, q2)
+[QVM] T(q0)
+[QVM] T(q1)
+[QVM] S(q2)
+[QVM] S(q3)
+[QVM] Z(q4)
+[QVM] T(q5)
+[QVM] H(q18)
+[QVM] H(q19)
+[QVM] H(q20)
+[QVM] H(q21)
+[QVM] H(q22)
+[QVM] H(q23)
+[QVM] CNOT(q12, q18)
+[QVM] CNOT(q13, q19)
+[QVM] CNOT(q14, q20)
+[QVM] CNOT(q15, q21)
+[QVM] CNOT(q16, q22)
+[QVM] CNOT(q17, q23)
+[QVM] CNOT(q0, q18)
+[QVM] CNOT(q1, q19)
+[QVM] CNOT(q2, q20)
+[QVM] 测量 q0 -> r24 = 0
+[QVM] 测量 q1 -> r25 = 1
+[QVM] 测量 q2 -> r26 = 0
+[QVM] 测量 q18 -> r27 = 0
+[QVM] print(r0) = 0
+[QVM] 程序退出
+[QVM] 执行完成: 42 周期, 39 门操作

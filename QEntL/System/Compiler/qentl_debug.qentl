@@ -1,0 +1,795 @@
+/**
+ * @file qentl_debug.qentl
+ * @brief QEntL编译器调试模块 - 提供完整的调试支持
+ * 
+ * 量子基因编码: QGC-COMPILER-DEBUG-2024062801
+ * 量子纠缠信道: QEC-COMPILER-DEBUG-01
+ * 版本: 1.0.0
+ * 
+ * 功能概述:
+ * 1. 源码级调试器 (断点、单步、变量监视)
+ * 2. 字节码反汇编器
+ * 3. 编译过程追踪器
+ * 4. 错误诊断增强
+ * 5. 交互式调试会话
+ * 6. 量子态调试视图
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/map.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/time.qentl";
+import "QEntL/core/math.qentl";
+import "QEntL/compiler/src/frontend/lexer/lexer.qentl";
+import "QEntL/compiler/src/frontend/parser/parser.qentl";
+import "QEntL/compiler/src/frontend/parser/ast.qentl";
+import "QEntL/compiler/src/frontend/semantic/semantic_analyzer.qentl";
+import "QEntL/compiler/src/backend/ir/ir_generator.qentl";
+import "QEntL/compiler/src/backend/bytecode/bytecode_generator.qentl";
+import "QEntL/compiler/src/diagnostic/error_reporter.qentl";
+
+// ==================== 调试模式枚举 ====================
+
+quantum_enum DebugMode {
+    NONE,           // 无调试
+    SOURCE_LEVEL,   // 源码级调试
+    BYTECODE_LEVEL, // 字节码级调试
+    IR_LEVEL,       // IR级调试
+    FULL_TRACE,     // 完整追踪
+}
+
+// ==================== 断点类型 ====================
+
+quantum_enum BreakpointType {
+    SOURCE_LINE,           // 源码行号断点
+    SOURCE_RANGE,          // 源码范围断点
+    BYTECODE_OFFSET,       // 字节码偏移断点
+    FUNCTION_ENTRY,        // 函数入口断点
+    FUNCTION_EXIT,         // 函数出口断点
+    CONDITIONAL,           // 条件断点
+    EXCEPTION,             // 异常断点
+    QUANTUM_STATE_CHANGE,  // 量子态变化断点
+}
+
+// ==================== 断点类 ====================
+
+/**
+ * @class Breakpoint
+ * @brief 断点数据结构
+ */
+quantum_class Breakpoint {
+    private {
+        id: Number;
+        type: BreakpointType;
+        location: String;
+        condition: String;
+        enabled: Boolean;
+        hitCount: Number;
+        hitCountLimit: Number;
+        temporary: Boolean;
+        action: String;
+    }
+    
+    constructor(id: Number, type: BreakpointType, location: String) {
+        this.id = id;
+        this.type = type;
+        this.location = location;
+        this.condition = "";
+        this.enabled = true;
+        this.hitCount = 0;
+        this.hitCountLimit = 0;
+        this.temporary = false;
+        this.action = "";
+    }
+    
+    public function getId(): Number {
+        return this.id;
+    }
+    
+    public function getType(): BreakpointType {
+        return this.type;
+    }
+    
+    public function getLocation(): String {
+        return this.location;
+    }
+    
+    public function setCondition(condition: String): void {
+        this.condition = condition;
+    }
+    
+    public function getCondition(): String {
+        return this.condition;
+    }
+    
+    public function isEnabled(): Boolean {
+        return this.enabled;
+    }
+    
+    public function setEnabled(enabled: Boolean): void {
+        this.enabled = enabled;
+    }
+    
+    public function toggle(): void {
+        this.enabled = !this.enabled;
+    }
+    
+    public function isTemporary(): Boolean {
+        return this.temporary;
+    }
+    
+    public function setTemporary(temp: Boolean): void {
+        this.temporary = temp;
+    }
+    
+    public function getHitCount(): Number {
+        return this.hitCount;
+    }
+    
+    public function incrementHitCount(): Number {
+        this.hitCount++;
+        return this.hitCount;
+    }
+    
+    public function shouldTrigger(): Boolean {
+        if (!this.enabled) return false;
+        if (this.hitCountLimit > 0 && this.hitCount >= this.hitCountLimit) {
+            return false;
+        }
+        return true;
+    }
+    
+    public function toString(): String {
+        let status = this.enabled ? "enabled" : "disabled";
+        let temp = this.temporary ? " (temp)" : "";
+        return "BP#" + this.id + " [" + status + temp + "] " +
+               "type=" + this.type + " loc=" + this.location +
+               " hits=" + this.hitCount;
+    }
+}
+
+// ==================== 调试帧栈 ====================
+
+/**
+ * @class DebugFrame
+ * @brief 调试帧 - 记录每次函数调用的上下文
+ */
+quantum_class DebugFrame {
+    private {
+        functionName: String;
+        sourceFile: String;
+        lineNumber: Number;
+        locals: Map<String, String>;
+        capturedAt: Number;
+        frameId: Number;
+    }
+    
+    constructor(functionName: String, sourceFile: String, lineNumber: Number) {
+        this.functionName = functionName;
+        this.sourceFile = sourceFile;
+        this.lineNumber = lineNumber;
+        this.locals = new Map<String, String>();
+        this.capturedAt = Time.now();
+        this.frameId = DebugFrame.nextFrameId++;
+    }
+    
+    public function setLocal(name: String, value: String): void {
+        this.locals.set(name, value);
+    }
+    
+    public function getLocal(name: String): String {
+        return this.locals.get(name);
+    }
+    
+    public function getLocals(): Map<String, String> {
+        return this.locals;
+    }
+    
+    public function getFunctionName(): String {
+        return this.functionName;
+    }
+    
+    public function getSourceFile(): String {
+        return this.sourceFile;
+    }
+    
+    public function getLineNumber(): Number {
+        return this.lineNumber;
+    }
+    
+    public function toString(): String {
+        return "Frame#" + this.frameId + " " + this.functionName +
+               " at " + this.sourceFile + ":" + this.lineNumber;
+    }
+}
+
+// ==================== 调试会话 ====================
+
+/**
+ * @class DebugSession
+ * @brief 调试会话管理器
+ */
+quantum_class DebugSession {
+    private {
+        mode: DebugMode;
+        breakpoints: Array<Breakpoint>;
+        frameStack: Array<DebugFrame>;
+        isRunning: Boolean;
+        isPaused: Boolean;
+        currentLine: Number;
+        currentFile: String;
+        currentBytecodeOffset: Number;
+        watchExpressions: Array<String>;
+        logMessages: Array<String>;
+        sessionId: String;
+        startTime: Number;
+        nextBreakpointId: Number;
+        nextFrameId: Number;
+    }
+    
+    constructor(mode: DebugMode = DebugMode.SOURCE_LEVEL) {
+        this.mode = mode;
+        this.breakpoints = new Array<Breakpoint>();
+        this.frameStack = new Array<DebugFrame>();
+        this.isRunning = false;
+        this.isPaused = false;
+        this.currentLine = 0;
+        this.currentFile = "";
+        this.currentBytecodeOffset = 0;
+        this.watchExpressions = new Array<String>();
+        this.logMessages = new Array<String>();
+        this.sessionId = "debug-" + Time.now().toString();
+        this.startTime = Time.now();
+        this.nextBreakpointId = 1;
+        this.nextFrameId = 1;
+    }
+    
+    public function start(): void {
+        this.isRunning = true;
+        this.isPaused = false;
+        this.log("调试会话启动: " + this.sessionId);
+    }
+    
+    public function stop(): void {
+        this.isRunning = false;
+        this.isPaused = false;
+        this.log("调试会话停止");
+    }
+    
+    public function pause(): void {
+        this.isPaused = true;
+        this.log("调试暂停 at " + this.currentFile + ":" + this.currentLine);
+    }
+    
+    public function resume(): void {
+        this.isPaused = false;
+        this.log("调试恢复");
+    }
+    
+    public function stepOver(): void {
+        this.log("单步执行 (Step Over) at line " + this.currentLine);
+        this.currentLine++;
+    }
+    
+    public function stepInto(): void {
+        this.log("单步进入 (Step Into) at line " + this.currentLine);
+        this.currentLine++;
+    }
+    
+    public function stepOut(): void {
+        this.log("单步退出 (Step Out) at line " + this.currentLine);
+        if (this.frameStack.length > 0) {
+            this.frameStack.pop();
+        }
+    }
+    
+    public function addBreakpoint(type: BreakpointType, location: String, condition: String = ""): Breakpoint {
+        let bp = new Breakpoint(this.nextBreakpointId++, type, location);
+        if (condition != "") {
+            bp.setCondition(condition);
+        }
+        this.breakpoints.push(bp);
+        this.log("断点添加: " + bp.toString());
+        return bp;
+    }
+    
+    public function removeBreakpoint(id: Number): Boolean {
+        for (let i = 0; i < this.breakpoints.length; i++) {
+            if (this.breakpoints[i].getId() == id) {
+                this.breakpoints.splice(i, 1);
+                this.log("断点移除: #" + id);
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    public function getBreakpoints(): Array<Breakpoint> {
+        return this.breakpoints;
+    }
+    
+    public function getBreakpointAtLocation(location: String): Breakpoint {
+        for (let bp of this.breakpoints) {
+            if (bp.getLocation() == location && bp.isEnabled()) {
+                return bp;
+            }
+        }
+        return null;
+    }
+    
+    public function shouldHitBreakpoint(location: String): Breakpoint {
+        for (let bp of this.breakpoints) {
+            if (bp.getLocation() == location && bp.shouldTrigger()) {
+                bp.incrementHitCount();
+                if (bp.isTemporary()) {
+                    this.removeBreakpoint(bp.getId());
+                }
+                return bp;
+            }
+        }
+        return null;
+    }
+    
+    public function pushFrame(functionName: String, sourceFile: String, lineNumber: Number): DebugFrame {
+        let frame = new DebugFrame(functionName, sourceFile, lineNumber);
+        this.frameStack.push(frame);
+        this.log("帧入栈: " + frame.toString());
+        return frame;
+    }
+    
+    public function popFrame(): DebugFrame {
+        if (this.frameStack.length > 0) {
+            let frame = this.frameStack.pop();
+            this.log("帧出栈: " + frame.toString());
+            return frame;
+        }
+        return null;
+    }
+    
+    public function getFrameStack(): Array<DebugFrame> {
+        return this.frameStack;
+    }
+    
+    public function addWatchExpression(expr: String): void {
+        this.watchExpressions.push(expr);
+        this.log("监视表达式添加: " + expr);
+    }
+    
+    public function evaluateWatchExpressions(context: Map<String, String>): Map<String, String> {
+        let results = new Map<String, String>();
+        for (let expr of this.watchExpressions) {
+            // 简化求值: 直接从上下文中查找
+            if (context.has(expr)) {
+                results.set(expr, context.get(expr)!);
+            } else {
+                results.set(expr, "<未定义>");
+            }
+        }
+        return results;
+    }
+    
+    public function log(message: String): void {
+        let timestamp = (Time.now() - this.startTime).toFixed(3);
+        let entry = "[" + timestamp + "s] " + message;
+        this.logMessages.push(entry);
+        Console.debug(entry);
+    }
+    
+    public function getLogMessages(): Array<String> {
+        return this.logMessages;
+    }
+    
+    public function getStats(): Map<String, Number> {
+        let stats = new Map<String, Number>();
+        stats.set("breakpoints", this.breakpoints.length);
+        stats.set("frames", this.frameStack.length);
+        stats.set("messages", this.logMessages.length);
+        stats.set("elapsed", Time.now() - this.startTime);
+        return stats;
+    }
+    
+    public function getSessionId(): String {
+        return this.sessionId;
+    }
+    
+    public function toString(): String {
+        let stats = this.getStats();
+        return "DebugSession[" + this.sessionId + "] mode=" + this.mode +
+               " running=" + this.isRunning + " paused=" + this.isPaused +
+               " bp=" + stats.get("breakpoints") + " frames=" + stats.get("frames");
+    }
+}
+
+// ==================== 字节码反汇编器 ====================
+
+/**
+ * @class BytecodeDisassembler
+ * @brief QBC字节码反汇编器
+ */
+quantum_class BytecodeDisassembler {
+    
+    /**
+     * @brief 反汇编QBC字节码并生成可读文本
+     */
+    public static function disassemble(bytecode: Array<Number>): String {
+        let result = "";
+        result = result + "=== QBC 字节码反汇编 ===\n";
+        result = result + "总字节数: " + bytecode.length + "\n";
+        result = result + "---\n";
+        
+        let offset = 0;
+        let instructionCount = 0;
+        
+        while (offset < bytecode.length) {
+            let opcode = bytecode[offset];
+            let instrStart = offset;
+            let mnemonic = BytecodeDisassembler.opcodeToString(opcode);
+            offset++;
+            
+            let operands = "";
+            switch (opcode) {
+                case 0x14: // OP_INIT_N
+                    if (offset < bytecode.length) {
+                        operands = bytecode[offset].toString();
+                        offset++;
+                    }
+                    break;
+                case 0x01: case 0x02: case 0x03: case 0x10: // H, X, Z, PRINT
+                    if (offset < bytecode.length) {
+                        operands = "q" + bytecode[offset];
+                        offset++;
+                    }
+                    break;
+                case 0x04: case 0x05: // CNOT, MEASURE
+                    if (offset + 1 < bytecode.length) {
+                        operands = bytecode[offset].toString() + ", " + bytecode[offset + 1];
+                        offset += 2;
+                    }
+                    break;
+                case 0x0A: case 0x0B: // JUMP, JZ
+                    if (offset < bytecode.length) {
+                        operands = bytecode[offset].toString();
+                        offset++;
+                    }
+                    break;
+                case 0x20: case 0x21: case 0x22: // LOAD_CONST, STORE_VAR, LOAD_VAR
+                    if (offset + 1 < bytecode.length) {
+                        operands = bytecode[offset].toString() + ", " + bytecode[offset + 1];
+                        offset += 2;
+                    }
+                    break;
+                case 0x15: // OP_STOP
+                    operands = "";
+                    break;
+                default:
+                    operands = "(0x" + opcode.toString(16) + ")";
+                    break;
+            }
+            
+            result = result + "  [" + instructionCount + "] @" + instrStart +
+                     " " + mnemonic + " " + operands.trim() + "\n";
+            instructionCount++;
+        }
+        
+        result = result + "---\n";
+        result = result + "总指令数: " + instructionCount + "\n";
+        return result;
+    }
+    
+    private static function opcodeToString(opcode: Number): String {
+        switch (opcode) {
+            case 0x00: return "NOP";
+            case 0x01: return "H";
+            case 0x02: return "X";
+            case 0x03: return "Z";
+            case 0x04: return "CNOT";
+            case 0x05: return "MEASURE";
+            case 0x06: return "RESET";
+            case 0x07: return "SWAP";
+            case 0x08: return "LOAD_REG";
+            case 0x09: return "STORE_REG";
+            case 0x0A: return "JUMP";
+            case 0x0B: return "JZ";
+            case 0x0C: return "ADD";
+            case 0x0D: return "SUB";
+            case 0x0E: return "MUL";
+            case 0x0F: return "DIV";
+            case 0x10: return "PRINT";
+            case 0x14: return "INIT_N";
+            case 0x15: return "STOP";
+            case 0x20: return "LOAD_CONST";
+            case 0x21: return "STORE_VAR";
+            case 0x22: return "LOAD_VAR";
+            default: return "UNKNOWN(0x" + opcode.toString(16) + ")";
+        }
+    }
+    
+    /**
+     * @brief 生成字节码的图形化表示
+     */
+    public static function visualize(bytecode: Array<Number>): String {
+        let result = "";
+        result = result + "=== 字节码可视化 ===\n";
+        
+        for (let i = 0; i < bytecode.length; i++) {
+            let byte = bytecode[i];
+            let barLen = Math.floor(byte / 255.0 * 30);
+            let bar = "";
+            for (let j = 0; j < barLen; j++) {
+                bar = bar + "=";
+            }
+            result = result + "  @" + i + " " + byte.toString().padStart(3) + " [" + bar + "]\n";
+        }
+        
+        return result;
+    }
+}
+
+// ==================== 编译追踪器 ====================
+
+/**
+ * @class CompileTracer
+ * @brief 编译过程追踪器 - 记录编译各阶段信息
+ */
+quantum_class CompileTracer {
+    private {
+        stages: Array<String>;
+        stageTimes: Map<String, Number>;
+        stageDetails: Map<String, String>;
+        warnings: Array<String>;
+        errors: Array<String>;
+        activeStage: String;
+        stageStartTime: Number;
+    }
+    
+    constructor() {
+        this.stages = new Array<String>();
+        this.stageTimes = new Map<String, Number>();
+        this.stageDetails = new Map<String, String>();
+        this.warnings = new Array<String>();
+        this.errors = new Array<String>();
+        this.activeStage = "";
+        this.stageStartTime = Time.now();
+    }
+    
+    public function startStage(stageName: String): void {
+        this.activeStage = stageName;
+        this.stageStartTime = Time.now();
+        this.stages.push(stageName);
+        this.log("开始阶段: " + stageName);
+    }
+    
+    public function endStage(stageName: String, detail: String = ""): void {
+        if (this.activeStage == stageName) {
+            let elapsed = Time.now() - this.stageStartTime;
+            this.stageTimes.set(stageName, elapsed);
+            if (detail != "") {
+                this.stageDetails.set(stageName, detail);
+            }
+            this.log("完成阶段: " + stageName + " (" + elapsed.toFixed(3) + "ms)");
+            this.activeStage = "";
+        }
+    }
+    
+    public function addWarning(warning: String): void {
+        this.warnings.push(warning);
+        this.log("警告: " + warning);
+    }
+    
+    public function addError(error: String): void {
+        this.errors.push(error);
+        this.log("错误: " + error);
+    }
+    
+    public function log(message: String): void {
+        Console.debug("[TRACE] " + message);
+    }
+    
+    public function getReport(): String {
+        let result = "=== 编译追踪报告 ===\n";
+        result = result + "阶段顺序:\n";
+        for (let i = 0; i < this.stages.length; i++) {
+            let stage = this.stages[i];
+            let time = this.stageTimes.get(stage);
+            let detail = this.stageDetails.get(stage);
+            result = result + "  " + (i + 1) + ". " + stage;
+            if (time != null) result = result + " [" + time.toFixed(3) + "ms]";
+            if (detail != "") result = result + " - " + detail;
+            result = result + "\n";
+        }
+        
+        if (this.warnings.length > 0) {
+            result = result + "\n警告 (" + this.warnings.length + "):\n";
+            for (let w of this.warnings) {
+                result = result + "  ! " + w + "\n";
+            }
+        }
+        
+        if (this.errors.length > 0) {
+            result = result + "\n错误 (" + this.errors.length + "):\n";
+            for (let e of this.errors) {
+                result = result + "  X " + e + "\n";
+            }
+        }
+        
+        return result;
+    }
+}
+
+// ==================== 源码映射器 ====================
+
+/**
+ * @class SourceMapper
+ * @brief 源码行号到字节码偏移的映射
+ */
+quantum_class SourceMapper {
+    private {
+        sourceFile: String;
+        mappings: Array<MapEntry<Number, Number>>; // {line, bytecodeOffset}
+    }
+    
+    constructor(sourceFile: String) {
+        this.sourceFile = sourceFile;
+        this.mappings = new Array<MapEntry<Number, Number>>();
+    }
+    
+    public function addMapping(line: Number, bytecodeOffset: Number): void {
+        this.mappings.push({ key: line, value: bytecodeOffset });
+    }
+    
+    public function getBytecodeOffset(line: Number): Number {
+        for (let m of this.mappings) {
+            if (m.key == line) {
+                return m.value;
+            }
+        }
+        return -1;
+    }
+    
+    public function getLine(bytecodeOffset: Number): Number {
+        let closestLine = -1;
+        let closestOffset = -1;
+        for (let m of this.mappings) {
+            if (m.value <= bytecodeOffset && m.value > closestOffset) {
+                closestOffset = m.value;
+                closestLine = m.key;
+            }
+        }
+        return closestLine;
+    }
+    
+    public function getAllMappings(): Array<MapEntry<Number, Number>> {
+        return this.mappings;
+    }
+    
+    public function toString(): String {
+        let result = "SourceMapper[" + this.sourceFile + "] (" +
+                     this.mappings.length + " mappings)\n";
+        for (let m of this.mappings) {
+            result = result + "  line " + m.key + " -> offset " + m.value + "\n";
+        }
+        return result;
+    }
+}
+
+// ==================== 调试信息生成器 ====================
+
+/**
+ * @class DebugInfoGenerator
+ * @brief 从编译过程中生成调试信息
+ */
+quantum_class DebugInfoGenerator {
+    
+    /**
+     * @brief 从AST生成调试信息
+     */
+    public static function generateFromAST(
+        astRoot: ASTNode,
+        sourceFile: String
+    ): DebugInfo {
+        let mapper = new SourceMapper(sourceFile);
+        DebugInfoGenerator.collectMappings(astRoot, mapper);
+        
+        let info = new DebugInfo(sourceFile);
+        info.setSourceMapper(mapper);
+        return info;
+    }
+    
+    private static function collectMappings(
+        node: ASTNode,
+        mapper: SourceMapper
+    ): void {
+        if (node == null) return;
+        
+        if (node.getLine() > 0) {
+            mapper.addMapping(node.getLine(), node.getBytecodeOffset());
+        }
+        
+        for (let child of node.getChildren()) {
+            DebugInfoGenerator.collectMappings(child, mapper);
+        }
+    }
+}
+
+// ==================== 调试信息数据结构 ====================
+
+/**
+ * @class DebugInfo
+ * @brief 编译生成的调试信息
+ */
+quantum_class DebugInfo {
+    private {
+        sourceFile: String;
+        sourceMapper: SourceMapper;
+        symbolTable: Map<String, Number>;
+        constantPool: Array<String>;
+        functionTable: Array<String>;
+        generatedAt: Number;
+    }
+    
+    constructor(sourceFile: String) {
+        this.sourceFile = sourceFile;
+        this.symbolTable = new Map<String, Number>();
+        this.constantPool = new Array<String>();
+        this.functionTable = new Array<String>();
+        this.generatedAt = Time.now();
+    }
+    
+    public function setSourceMapper(mapper: SourceMapper): void {
+        this.sourceMapper = mapper;
+    }
+    
+    public function getSourceFile(): String {
+        return this.sourceFile;
+    }
+    
+    public function addSymbol(name: String, offset: Number): void {
+        this.symbolTable.set(name, offset);
+    }
+    
+    public function addConstant(value: String): void {
+        this.constantPool.push(value);
+    }
+    
+    public function addFunction(name: String): void {
+        this.functionTable.push(name);
+    }
+    
+    public function getSymbolTable(): Map<String, Number> {
+        return this.symbolTable;
+    }
+    
+    public function getConstantPool(): Array<String> {
+        return this.constantPool;
+    }
+    
+    public function getFunctionTable(): Array<String> {
+        return this.functionTable;
+    }
+    
+    public function toString(): String {
+        let result = "DebugInfo[" + this.sourceFile + "]\n";
+        result = result + "  Symbols: " + this.symbolTable.size() + "\n";
+        result = result + "  Constants: " + this.constantPool.length + "\n";
+        result = result + "  Functions: " + this.functionTable.length + "\n";
+        result = result + "  Generated: " + this.generatedAt + "\n";
+        return result;
+    }
+}
+
+// ==================== 模块导出 ====================
+
+export {
+    DebugMode,
+    BreakpointType,
+    Breakpoint,
+    DebugFrame,
+    DebugSession,
+    BytecodeDisassembler,
+    CompileTracer,
+    SourceMapper,
+    DebugInfoGenerator,
+    DebugInfo
+};

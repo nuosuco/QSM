@@ -1,0 +1,601 @@
+/**
+ * QEntL量子进程调度器模块
+ * QuantumGene: QG-KERNEL-PROCSCHED-X7F2-1714121450
+ * EntanglementStrength: 0.88
+ */
+
+quantum_program ProcessScheduler {
+    metadata {
+        name: "QEntL量子进程调度器",
+        version: "1.0.0",
+        author: "QEntL团队",
+        description: "QEntL操作系统的进程调度器，支持多种调度算法",
+        quantum_gene: "QG-KERNEL-PROCSCHED-X7F2-1714121450",
+        entanglement_strength: 0.88
+    }
+
+    state {
+        // 进程管理器基础模块引用
+        base_module: null,
+        
+        // 进程管理器核心模块引用
+        core_module: null,
+        
+        // 内核引用
+        kernel_reference: null,
+        
+        // 初始化状态
+        initialized: false,
+        
+        // 当前调度算法
+        current_scheduler: null,
+        
+        // 上次调度时间
+        last_schedule_time: 0,
+        
+        // 调度间隔（毫秒）
+        schedule_interval: 10,
+        
+        // 时间片默认值（毫秒）
+        default_time_slice: 10,
+        
+        // 最大优先级提升次数
+        max_priority_boosts: 3,
+        
+        // 量子进程优先级加权
+        quantum_priority_weight: 1.2,
+        
+        // 系统负载信息
+        system_load: {
+            one_minute: 0,
+            five_minutes: 0,
+            fifteen_minutes: 0,
+            last_update: 0
+        },
+        
+        // 错误信息
+        errors: [],
+        
+        // 警告信息
+        warnings: []
+    }
+
+    // 初始化进程调度器
+    initialize(kernel_ref, base, core, config) {
+        kernel_log("初始化进程调度器...");
+        
+        this.kernel_reference = kernel_ref;
+        this.base_module = base;
+        this.core_module = core;
+        
+        // 验证基础模块已初始化
+        if (!base || !base.initialized) {
+            this.add_error("无法初始化进程调度器：基础模块未初始化");
+            return false;
+        }
+        
+        // 验证核心模块已初始化
+        if (!core || !core.initialized) {
+            this.add_error("无法初始化进程调度器：核心模块未初始化");
+            return false;
+        }
+        
+        // 应用配置
+        if (config) {
+            if (config.scheduler_type !== undefined) {
+                this.current_scheduler = config.scheduler_type;
+            } else {
+                this.current_scheduler = this.base_module.scheduler_types.ROUND_ROBIN;
+            }
+            
+            if (config.schedule_interval !== undefined) {
+                this.schedule_interval = config.schedule_interval;
+            }
+            
+            if (config.default_time_slice !== undefined) {
+                this.default_time_slice = config.default_time_slice;
+            }
+            
+            if (config.quantum_priority_weight !== undefined) {
+                this.quantum_priority_weight = config.quantum_priority_weight;
+            }
+        } else {
+            // 默认使用轮转调度
+            this.current_scheduler = this.base_module.scheduler_types.ROUND_ROBIN;
+        }
+        
+        this.last_schedule_time = Date.now();
+        this.initialized = true;
+        
+        kernel_log(`进程调度器初始化完成，使用调度算法: ${this.get_scheduler_name()}`);
+        
+        return true;
+    }
+
+    // 重置调度器
+    reset() {
+        kernel_log("重置进程调度器...");
+        
+        // 保留模块引用
+        const kernel_ref = this.kernel_reference;
+        const base = this.base_module;
+        const core = this.core_module;
+        
+        // 重置错误和警告
+        this.errors = [];
+        this.warnings = [];
+        
+        // 重置配置为默认值
+        this.current_scheduler = this.base_module.scheduler_types.ROUND_ROBIN;
+        this.schedule_interval = 10;
+        this.default_time_slice = 10;
+        this.quantum_priority_weight = 1.2;
+        this.last_schedule_time = Date.now();
+        
+        // 重置系统负载
+        this.system_load = {
+            one_minute: 0,
+            five_minutes: 0,
+            fifteen_minutes: 0,
+            last_update: 0
+        };
+        
+        // 恢复模块引用
+        this.kernel_reference = kernel_ref;
+        this.base_module = base;
+        this.core_module = core;
+        
+        kernel_log("进程调度器已重置");
+    }
+
+    // 获取当前调度器名称
+    get_scheduler_name() {
+        switch (this.current_scheduler) {
+            case this.base_module.scheduler_types.ROUND_ROBIN:
+                return "轮转调度 (Round Robin)";
+            case this.base_module.scheduler_types.PRIORITY:
+                return "优先级调度 (Priority)";
+            case this.base_module.scheduler_types.MULTILEVEL_FEEDBACK:
+                return "多级反馈队列 (Multilevel Feedback Queue)";
+            case this.base_module.scheduler_types.QUANTUM_AWARE:
+                return "量子感知调度 (Quantum Aware)";
+            default:
+                return "未知调度算法";
+        }
+    }
+
+    // 更改调度算法
+    change_scheduler(scheduler_type) {
+        if (!this.initialized) {
+            this.add_error("无法更改调度算法：调度器未初始化");
+            return false;
+        }
+        
+        // 检查调度器类型是否有效
+        if (!(scheduler_type in this.base_module.scheduler_types)) {
+            this.add_error(`无效的调度器类型: ${scheduler_type}`);
+            return false;
+        }
+        
+        const old_scheduler = this.current_scheduler;
+        this.current_scheduler = scheduler_type;
+        
+        kernel_log(`调度算法已更改: ${this.get_scheduler_name(old_scheduler)} -> ${this.get_scheduler_name()}`);
+        
+        return true;
+    }
+
+    // 主调度函数
+    schedule() {
+        if (!this.initialized) {
+            this.add_error("无法执行调度：调度器未初始化");
+            return null;
+        }
+        
+        // 检查调度间隔
+        const current_time = Date.now();
+        if (current_time - this.last_schedule_time < this.schedule_interval) {
+            return this.base_module.current_pid;
+        }
+        
+        this.last_schedule_time = current_time;
+        
+        // 更新系统负载
+        this.update_system_load();
+        
+        // 根据当前调度算法选择下一个进程
+        let next_pid = null;
+        
+        switch (this.current_scheduler) {
+            case this.base_module.scheduler_types.ROUND_ROBIN:
+                next_pid = this.round_robin_schedule();
+                break;
+            case this.base_module.scheduler_types.PRIORITY:
+                next_pid = this.priority_schedule();
+                break;
+            case this.base_module.scheduler_types.MULTILEVEL_FEEDBACK:
+                next_pid = this.multilevel_feedback_schedule();
+                break;
+            case this.base_module.scheduler_types.QUANTUM_AWARE:
+                next_pid = this.quantum_aware_schedule();
+                break;
+            default:
+                next_pid = this.round_robin_schedule(); // 默认使用轮转调度
+        }
+        
+        // 如果没有找到下一个进程，返回当前进程或空闲进程
+        if (next_pid === null) {
+            next_pid = this.base_module.current_pid || this.base_module.idle_pid;
+        }
+        
+        // 如果当前有正在运行的进程且不是下一个要运行的进程，则保存当前进程的上下文
+        if (this.base_module.current_pid !== null && 
+            this.base_module.current_pid !== next_pid && 
+            this.base_module.process_exists(this.base_module.current_pid)) {
+            
+            const current_process = this.base_module.process_table[this.base_module.current_pid];
+            
+            // 只保存非终止状态进程的上下文
+            if (current_process.state !== this.base_module.process_states.TERMINATED) {
+                // 保存进程上下文
+                this.save_process_context(this.base_module.current_pid);
+                
+                // 如果进程仍在运行状态，将其放回就绪队列
+                if (current_process.state === this.base_module.process_states.RUNNING) {
+                    current_process.state = this.base_module.process_states.READY;
+                    this.base_module.ready_queues[current_process.priority].push(this.base_module.current_pid);
+                }
+            }
+        }
+        
+        // 切换到新进程
+        if (next_pid !== null && next_pid !== this.base_module.current_pid) {
+            // 恢复新进程的上下文
+            this.restore_process_context(next_pid);
+            
+            // 更新当前进程ID
+            this.base_module.current_pid = next_pid;
+            
+            // 更新进程状态
+            if (this.base_module.process_exists(next_pid)) {
+                const next_process = this.base_module.process_table[next_pid];
+                next_process.state = this.base_module.process_states.RUNNING;
+                next_process.last_scheduled = current_time;
+                
+                kernel_log(`调度器选择进程 PID ${next_pid} (${next_process.name}) 运行`);
+            }
+        }
+        
+        return next_pid;
+    }
+
+    // 轮转调度算法
+    round_robin_schedule() {
+        // 按优先级从高到低检查就绪队列
+        const priorities = Object.keys(this.base_module.ready_queues).sort((a, b) => b - a);
+        
+        for (const priority of priorities) {
+            const queue = this.base_module.ready_queues[priority];
+            
+            if (queue.length > 0) {
+                // 获取队列头部的进程ID
+                const next_pid = queue.shift();
+                
+                // 验证进程存在且状态为就绪
+                if (this.base_module.process_exists(next_pid) && 
+                    this.base_module.process_table[next_pid].state === this.base_module.process_states.READY) {
+                    return next_pid;
+                }
+            }
+        }
+        
+        // 如果没有就绪进程，返回null
+        return null;
+    }
+
+    // 优先级调度算法
+    priority_schedule() {
+        // 按优先级从高到低检查就绪队列
+        const priorities = Object.keys(this.base_module.ready_queues).sort((a, b) => b - a);
+        
+        for (const priority of priorities) {
+            const queue = this.base_module.ready_queues[priority];
+            
+            if (queue.length > 0) {
+                // 获取队列头部的进程ID
+                const next_pid = queue.shift();
+                
+                // 验证进程存在且状态为就绪
+                if (this.base_module.process_exists(next_pid) && 
+                    this.base_module.process_table[next_pid].state === this.base_module.process_states.READY) {
+                    return next_pid;
+                }
+            }
+        }
+        
+        // 如果没有就绪进程，返回null
+        return null;
+    }
+
+    // 多级反馈队列调度算法
+    multilevel_feedback_schedule() {
+        // 当前时间
+        const current_time = Date.now();
+        
+        // 按优先级从高到低检查就绪队列
+        const priorities = Object.keys(this.base_module.ready_queues).sort((a, b) => b - a);
+        
+        // 首先检查每个优先级队列的第一个进程
+        for (const priority of priorities) {
+            const queue = this.base_module.ready_queues[priority];
+            
+            if (queue.length > 0) {
+                // 获取队列头部的进程ID
+                const next_pid = queue.shift();
+                
+                // 验证进程存在且状态为就绪
+                if (this.base_module.process_exists(next_pid) && 
+                    this.base_module.process_table[next_pid].state === this.base_module.process_states.READY) {
+                    
+                    const process = this.base_module.process_table[next_pid];
+                    
+                    // 调整时间片 - 低优先级进程获得更大的时间片
+                    process.time_slice = this.default_time_slice * (1 + (this.base_module.process_priorities.REALTIME - process.priority) * 0.5);
+                    
+                    // 检查是否需要降低优先级
+                    // 只有在进程已经运行过并且不是最低优先级时才降低
+                    if (process.execution_time > 0 && process.priority > this.base_module.process_priorities.IDLE) {
+                        // 随着执行时间增加，逐渐降低优先级
+                        const priority_aging_threshold = 1000; // 1秒
+                        
+                        if (process.execution_time > priority_aging_threshold && 
+                            process.priority > this.base_module.process_priorities.LOW) {
+                            
+                            const new_priority = process.priority - 1;
+                            kernel_log(`多级反馈：降低进程 ${next_pid} 的优先级 ${this.base_module.get_priority_name(process.priority)} -> ${this.base_module.get_priority_name(new_priority)}`);
+                            
+                            process.priority = new_priority;
+                        }
+                    }
+                    
+                    return next_pid;
+                }
+            }
+        }
+        
+        // 如果没有就绪进程，返回null
+        return null;
+    }
+
+    // 量子感知调度算法
+    quantum_aware_schedule() {
+        // 创建量子进程和普通进程的权重表
+        const weighted_pids = [];
+        const quantum_pids = [];
+        const normal_pids = [];
+        
+        // 遍历所有就绪队列，收集所有就绪进程
+        for (const priority in this.base_module.ready_queues) {
+            const priority_num = parseInt(priority);
+            const queue = this.base_module.ready_queues[priority];
+            
+            for (const pid of queue) {
+                if (this.base_module.process_exists(pid) && 
+                    this.base_module.process_table[pid].state === this.base_module.process_states.READY) {
+                    
+                    const process = this.base_module.process_table[pid];
+                    
+                    // 为量子进程和普通进程分配不同的权重
+                    let weight = priority_num;
+                    
+                    if (process.is_quantum) {
+                        // 给量子进程更高的权重
+                        weight = weight * this.quantum_priority_weight;
+                        quantum_pids.push(pid);
+                    } else {
+                        normal_pids.push(pid);
+                    }
+                    
+                    weighted_pids.push({
+                        pid: pid,
+                        weight: weight
+                    });
+                }
+            }
+        }
+        
+        // 如果没有就绪进程，返回null
+        if (weighted_pids.length === 0) {
+            return null;
+        }
+        
+        // 如果有量子进程，优先考虑量子进程
+        if (quantum_pids.length > 0) {
+            // 从量子进程中随机选择一个（加权随机）
+            const quantum_weights = weighted_pids
+                .filter(p => quantum_pids.includes(p.pid))
+                .sort((a, b) => b.weight - a.weight);
+            
+            // 选择权重最高的几个进程
+            const top_count = Math.min(3, quantum_weights.length);
+            const selected_index = Math.floor(Math.random() * top_count);
+            const selected_pid = quantum_weights[selected_index].pid;
+            
+            // 从就绪队列中移除该进程
+            const process = this.base_module.process_table[selected_pid];
+            const queue = this.base_module.ready_queues[process.priority];
+            const index = queue.indexOf(selected_pid);
+            if (index !== -1) {
+                queue.splice(index, 1);
+            }
+            
+            return selected_pid;
+        }
+        
+        // 如果只有普通进程，按照优先级选择
+        const normal_weights = weighted_pids
+            .filter(p => normal_pids.includes(p.pid))
+            .sort((a, b) => b.weight - a.weight);
+        
+        const selected_pid = normal_weights[0].pid;
+        
+        // 从就绪队列中移除该进程
+        const process = this.base_module.process_table[selected_pid];
+        const queue = this.base_module.ready_queues[process.priority];
+        const index = queue.indexOf(selected_pid);
+        if (index !== -1) {
+            queue.splice(index, 1);
+        }
+        
+        return selected_pid;
+    }
+
+    // 保存进程上下文
+    save_process_context(pid) {
+        if (!this.base_module.process_exists(pid)) {
+            return false;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        
+        // 更新进程执行时间
+        if (process.last_scheduled) {
+            const run_time = Date.now() - process.last_scheduled;
+            process.execution_time += run_time;
+        }
+        
+        // 模拟保存寄存器和程序计数器等上下文
+        // 在真实系统中，这里会保存CPU寄存器状态
+        kernel_log(`保存进程 ${pid} 的上下文`);
+        
+        return true;
+    }
+
+    // 恢复进程上下文
+    restore_process_context(pid) {
+        if (!this.base_module.process_exists(pid)) {
+            return false;
+        }
+        
+        const process = this.base_module.process_table[pid];
+        
+        // 模拟恢复寄存器和程序计数器等上下文
+        // 在真实系统中，这里会恢复CPU寄存器状态
+        kernel_log(`恢复进程 ${pid} 的上下文`);
+        
+        return true;
+    }
+
+    // 更新系统负载
+    update_system_load() {
+        const current_time = Date.now();
+        
+        // 每10秒更新一次系统负载
+        if (current_time - this.system_load.last_update < 10000) {
+            return;
+        }
+        
+        // 计算活跃进程数
+        let active_count = 0;
+        for (const pid in this.base_module.process_table) {
+            const process = this.base_module.process_table[pid];
+            if (process.state === this.base_module.process_states.RUNNING || 
+                process.state === this.base_module.process_states.READY) {
+                active_count++;
+            }
+        }
+        
+        // 更新负载平均值
+        // 使用指数加权移动平均 (EWMA)
+        const alpha_1min = 1 - Math.exp(-10 / 60); // 1分钟衰减因子
+        const alpha_5min = 1 - Math.exp(-10 / 300); // 5分钟衰减因子
+        const alpha_15min = 1 - Math.exp(-10 / 900); // 15分钟衰减因子
+        
+        this.system_load.one_minute = this.system_load.one_minute * (1 - alpha_1min) + active_count * alpha_1min;
+        this.system_load.five_minutes = this.system_load.five_minutes * (1 - alpha_5min) + active_count * alpha_5min;
+        this.system_load.fifteen_minutes = this.system_load.fifteen_minutes * (1 - alpha_15min) + active_count * alpha_15min;
+        
+        this.system_load.last_update = current_time;
+    }
+
+    // 获取系统负载信息
+    get_system_load() {
+        return {
+            one_minute: this.system_load.one_minute.toFixed(2),
+            five_minutes: this.system_load.five_minutes.toFixed(2),
+            fifteen_minutes: this.system_load.fifteen_minutes.toFixed(2),
+            active_processes: this.base_module.statistics.active_processes,
+            total_processes: Object.keys(this.base_module.process_table).length,
+            last_update: this.system_load.last_update
+        };
+    }
+
+    // 优化调度参数
+    optimize_scheduling_parameters() {
+        // 根据系统负载调整调度参数
+        const load = this.system_load.one_minute;
+        
+        // 高负载时减少调度间隔，提高响应性
+        if (load > 2.0) {
+            this.schedule_interval = 5; // 5毫秒
+        } else if (load > 1.0) {
+            this.schedule_interval = 10; // 10毫秒
+        } else {
+            this.schedule_interval = 15; // 15毫秒
+        }
+        
+        // 根据量子进程比例调整量子权重
+        const total_processes = this.base_module.statistics.active_processes;
+        const quantum_processes = this.base_module.statistics.quantum_processes;
+        
+        if (total_processes > 0) {
+            const quantum_ratio = quantum_processes / total_processes;
+            
+            // 量子进程较少时给予更高权重
+            if (quantum_ratio < 0.1) {
+                this.quantum_priority_weight = 2.0;
+            } else if (quantum_ratio < 0.3) {
+                this.quantum_priority_weight = 1.5;
+            } else {
+                this.quantum_priority_weight = 1.2;
+            }
+        }
+        
+        kernel_log(`调度器参数已优化: 调度间隔=${this.schedule_interval}ms, 量子权重=${this.quantum_priority_weight}`);
+    }
+
+    // 添加错误信息
+    add_error(message) {
+        const error = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.errors.push(error);
+        kernel_log(`进程调度器错误: ${message}`);
+        
+        // 保持错误列表的大小在合理范围内
+        if (this.errors.length > 100) {
+            this.errors.shift();
+        }
+    }
+
+    // 添加警告信息
+    add_warning(message) {
+        const warning = {
+            timestamp: Date.now(),
+            message: message
+        };
+        
+        this.warnings.push(warning);
+        kernel_log(`进程调度器警告: ${message}`);
+        
+        // 保持警告列表的大小在合理范围内
+        if (this.warnings.length > 100) {
+            this.warnings.shift();
+        }
+    }
+}
+
+// 导出进程调度器模块
+export ProcessScheduler; 

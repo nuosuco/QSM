@@ -1,0 +1,417 @@
+/**
+ * @file bytecode_optimizer_cli.qentl
+ * @brief QEntL字节码优化器命令行界面
+ * 
+ * 量子基因编码: QGC-BYTECODE-OPT-CLI-2024062001
+ * 量子纠缠信道: QEC-COMPILER-CORE-01
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/process.qentl";
+import "QEntL/core/file.qentl";
+import "QEntL/core/path.qentl";
+import "QEntL/compiler/src/backend/bytecode/optimizer/bytecode_optimizer.qentl";
+
+/**
+ * @class ArgumentParser
+ * @brief 命令行参数解析器
+ */
+quantum_class ArgumentParser {
+    private {
+        args: Array<String>;            // 原始参数列表
+        options: Map<String, String>;   // 解析后的选项
+        positionalArgs: Array<String>;  // 位置参数
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(args: Array<String>) {
+        this.args = args;
+        this.options = new Map<String, String>();
+        this.positionalArgs = new Array<String>();
+        this.parse();
+    }
+    
+    /**
+     * @brief 解析参数
+     */
+    private function parse(): void {
+        for (let i = 0; i < this.args.length; i++) {
+            let arg = this.args[i];
+            
+            if (arg.startsWith("--")) {
+                // 长选项
+                let optionName = arg.substring(2);
+                let optionValue = "";
+                
+                // 检查是否有等号分隔的值
+                let equalsPos = optionName.indexOf("=");
+                if (equalsPos >= 0) {
+                    optionValue = optionName.substring(equalsPos + 1);
+                    optionName = optionName.substring(0, equalsPos);
+                } else if (i + 1 < this.args.length && !this.args[i + 1].startsWith("-")) {
+                    // 下一个参数不是选项，作为值
+                    optionValue = this.args[++i];
+                } else {
+                    // 布尔标志
+                    optionValue = "true";
+                }
+                
+                this.options.set(optionName, optionValue);
+            } else if (arg.startsWith("-")) {
+                // 短选项
+                let optionName = arg.substring(1);
+                let optionValue = "";
+                
+                if (i + 1 < this.args.length && !this.args[i + 1].startsWith("-")) {
+                    // 下一个参数不是选项，作为值
+                    optionValue = this.args[++i];
+                } else {
+                    // 布尔标志
+                    optionValue = "true";
+                }
+                
+                this.options.set(optionName, optionValue);
+            } else {
+                // 位置参数
+                this.positionalArgs.push(arg);
+            }
+        }
+    }
+    
+    /**
+     * @brief 获取选项值
+     */
+    public function getOption(name: String, defaultValue: String = ""): String {
+        if (this.options.has(name)) {
+            return this.options.get(name);
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * @brief 获取布尔选项值
+     */
+    public function getBoolOption(name: String, defaultValue: Boolean = false): Boolean {
+        if (this.options.has(name)) {
+            let value = this.options.get(name).toLowerCase();
+            return value === "true" || value === "yes" || value === "1";
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * @brief 获取整数选项值
+     */
+    public function getIntOption(name: String, defaultValue: Integer = 0): Integer {
+        if (this.options.has(name)) {
+            try {
+                return parseInt(this.options.get(name));
+            } catch (e) {
+                return defaultValue;
+            }
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * @brief 获取位置参数
+     */
+    public function getPositionalArgs(): Array<String> {
+        return this.positionalArgs;
+    }
+    
+    /**
+     * @brief 是否包含选项
+     */
+    public function hasOption(name: String): Boolean {
+        return this.options.has(name);
+    }
+}
+
+/**
+ * @class BytecodeOptimizerCLI
+ * @brief 字节码优化器命令行接口
+ */
+quantum_class BytecodeOptimizerCLI {
+    private {
+        parser: ArgumentParser;             // 参数解析器
+        optimizer: BytecodeOptimizer;       // 字节码优化器实例
+        inputFile: String;                  // 输入文件
+        outputFile: String;                 // 输出文件
+        verbose: Boolean;                   // 详细输出
+        optimizationLevel: Integer;         // 优化级别
+        preserveDebugInfo: Boolean;         // 保留调试信息
+        enabledPasses: Array<String>;       // 启用的优化通道
+        disabledPasses: Array<String>;      // 禁用的优化通道
+        inPlace: Boolean;                   // 原地优化
+    }
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor(args: Array<String>) {
+        this.parser = new ArgumentParser(args);
+        this.optimizer = new BytecodeOptimizer();
+        this.inputFile = "";
+        this.outputFile = "";
+        this.verbose = false;
+        this.optimizationLevel = 2;
+        this.preserveDebugInfo = true;
+        this.enabledPasses = new Array<String>();
+        this.disabledPasses = new Array<String>();
+        this.inPlace = false;
+    }
+    
+    /**
+     * @brief 运行命令行界面
+     */
+    public function run(): Integer {
+        // 显示帮助
+        if (this.parser.getBoolOption("help") || this.parser.getBoolOption("h")) {
+            this.printHelp();
+            return 0;
+        }
+        
+        // 显示版本
+        if (this.parser.getBoolOption("version") || this.parser.getBoolOption("v")) {
+            this.printVersion();
+            return 0;
+        }
+        
+        // 列出优化通道
+        if (this.parser.getBoolOption("list-passes")) {
+            this.listOptimizationPasses();
+            return 0;
+        }
+        
+        try {
+            // 解析选项
+            this.parseOptions();
+            
+            // 验证必要参数
+            if (!this.validateOptions()) {
+                return 1;
+            }
+            
+            // 配置字节码优化器
+            this.configureOptimizer();
+            
+            // 执行字节码优化
+            Console.writeLine("开始优化字节码...");
+            let startTime = Date.now();
+            let success = this.optimizer.optimize();
+            let endTime = Date.now();
+            
+            if (success) {
+                Console.writeLine(`字节码优化成功: ${this.outputFile}`);
+                if (this.verbose) {
+                    Console.writeLine(`优化用时: ${(endTime - startTime) / 1000.0} 秒`);
+                    
+                    // 显示优化统计信息
+                    let stats = this.optimizer.getOptimizationStats();
+                    Console.writeLine("优化统计信息:");
+                    Console.writeLine(`  执行的优化通道数: ${stats.passesExecuted}`);
+                    Console.writeLine(`  指令数量减少: ${stats.instructionsRemoved}`);
+                    Console.writeLine(`  代码大小减少: ${stats.bytesReduced} 字节`);
+                    Console.writeLine(`  优化前大小: ${stats.originalSize} 字节`);
+                    Console.writeLine(`  优化后大小: ${stats.optimizedSize} 字节`);
+                    Console.writeLine(`  大小减少百分比: ${stats.reductionPercentage.toFixed(2)}%`);
+                }
+                return 0;
+            } else {
+                Console.writeErrorLine("字节码优化失败");
+                return 1;
+            }
+        } catch (e) {
+            Console.writeErrorLine(`错误: ${e.message}`);
+            return 1;
+        }
+    }
+    
+    /**
+     * @brief 解析选项
+     */
+    private function parseOptions(): void {
+        // 获取位置参数（输入文件）
+        let positionalArgs = this.parser.getPositionalArgs();
+        if (positionalArgs.length > 0) {
+            this.inputFile = positionalArgs[0];
+        }
+        
+        // 输出文件
+        this.outputFile = this.parser.getOption("output", this.parser.getOption("o", ""));
+        
+        // 原地优化
+        this.inPlace = this.parser.getBoolOption("in-place") || this.parser.getBoolOption("i");
+        
+        if (this.outputFile === "" && this.inputFile !== "") {
+            if (this.inPlace) {
+                // 原地优化使用相同的输入文件名
+                this.outputFile = this.inputFile;
+            } else {
+                // 默认输出文件名为输入文件加上.opt后缀
+                let inputPath = Path.parse(this.inputFile);
+                this.outputFile = Path.join(inputPath.dir, inputPath.name + ".opt" + inputPath.ext);
+            }
+        }
+        
+        // 详细输出
+        this.verbose = this.parser.getBoolOption("verbose") || this.parser.getBoolOption("V");
+        
+        // 优化级别
+        this.optimizationLevel = this.parser.getIntOption("optimize", this.parser.getIntOption("O", 2));
+        
+        // 保留调试信息
+        this.preserveDebugInfo = this.parser.getBoolOption("preserve-debug", true);
+        if (this.parser.hasOption("strip-debug") || this.parser.hasOption("S")) {
+            this.preserveDebugInfo = false;
+        }
+        
+        // 启用的优化通道
+        let enabledPassesStr = this.parser.getOption("enable-passes", "");
+        if (enabledPassesStr.length > 0) {
+            let passes = enabledPassesStr.split(",");
+            for (let pass of passes) {
+                if (pass.trim().length > 0) {
+                    this.enabledPasses.push(pass.trim());
+                }
+            }
+        }
+        
+        // 禁用的优化通道
+        let disabledPassesStr = this.parser.getOption("disable-passes", "");
+        if (disabledPassesStr.length > 0) {
+            let passes = disabledPassesStr.split(",");
+            for (let pass of passes) {
+                if (pass.trim().length > 0) {
+                    this.disabledPasses.push(pass.trim());
+                }
+            }
+        }
+    }
+    
+    /**
+     * @brief 验证选项
+     */
+    private function validateOptions(): Boolean {
+        // 需要输入文件
+        if (this.inputFile === "") {
+            Console.writeErrorLine("错误: 未指定输入文件");
+            this.printHelp();
+            return false;
+        }
+        
+        // 验证输入文件存在
+        if (!File.exists(this.inputFile)) {
+            Console.writeErrorLine(`错误: 输入文件不存在: ${this.inputFile}`);
+            return false;
+        }
+        
+        // 验证优化级别有效
+        if (this.optimizationLevel < 0 || this.optimizationLevel > 3) {
+            Console.writeErrorLine(`错误: 无效的优化级别: ${this.optimizationLevel}, 应在0-3范围内`);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @brief 配置字节码优化器
+     */
+    private function configureOptimizer(): void {
+        // 设置输入文件
+        this.optimizer.setInputFile(this.inputFile);
+        
+        // 设置输出文件
+        this.optimizer.setOutputFile(this.outputFile);
+        
+        // 设置详细模式
+        this.optimizer.setVerbose(this.verbose);
+        
+        // 设置优化级别
+        this.optimizer.setOptimizationLevel(this.optimizationLevel);
+        
+        // 设置是否保留调试信息
+        this.optimizer.setPreserveDebugInfo(this.preserveDebugInfo);
+        
+        // 添加启用的优化通道
+        for (let pass of this.enabledPasses) {
+            this.optimizer.enableOptimizationPass(pass);
+        }
+        
+        // 添加禁用的优化通道
+        for (let pass of this.disabledPasses) {
+            this.optimizer.disableOptimizationPass(pass);
+        }
+    }
+    
+    /**
+     * @brief 打印帮助信息
+     */
+    private function printHelp(): void {
+        Console.writeLine("QEntL字节码优化器 - 量子纠缠式语言字节码优化工具");
+        Console.writeLine("");
+        Console.writeLine("用法: qentlopt [选项] 输入文件");
+        Console.writeLine("");
+        Console.writeLine("选项:");
+        Console.writeLine("  -h, --help               显示帮助信息");
+        Console.writeLine("  -v, --version            显示版本信息");
+        Console.writeLine("  -o, --output=FILE        指定输出文件名");
+        Console.writeLine("  -i, --in-place           原地优化，覆盖输入文件");
+        Console.writeLine("  -O, --optimize=LEVEL     设置优化级别 (0-3)，默认为2");
+        Console.writeLine("      --list-passes        列出所有可用的优化通道");
+        Console.writeLine("      --enable-passes=LIST 启用指定的优化通道，以逗号分隔");
+        Console.writeLine("      --disable-passes=LIST 禁用指定的优化通道，以逗号分隔");
+        Console.writeLine("      --preserve-debug     保留调试信息（默认）");
+        Console.writeLine("  -S, --strip-debug        移除调试信息");
+        Console.writeLine("  -V, --verbose            详细输出");
+        Console.writeLine("");
+        Console.writeLine("示例:");
+        Console.writeLine("  qentlopt -o optimized.qobj program.qobj");
+        Console.writeLine("  qentlopt -O3 -S -i program.qobj");
+        Console.writeLine("  qentlopt --enable-passes=deadcode,constprop,inlining program.qobj");
+    }
+    
+    /**
+     * @brief 打印版本信息
+     */
+    private function printVersion(): void {
+        Console.writeLine("QEntL字节码优化器 版本 1.0.0");
+        Console.writeLine("量子基因编码: QGC-BYTECODE-OPT-CLI-2024062001");
+        Console.writeLine("量子纠缠信道: QEC-COMPILER-CORE-01");
+    }
+    
+    /**
+     * @brief 列出所有优化通道
+     */
+    private function listOptimizationPasses(): void {
+        let passes = this.optimizer.getAvailableOptimizationPasses();
+        
+        Console.writeLine("可用的优化通道:");
+        Console.writeLine("");
+        
+        for (let pass of passes) {
+            Console.writeLine(`${pass.name} - ${pass.description}`);
+            Console.writeLine(`  优化级别: ${pass.minLevel} 及以上`);
+            Console.writeLine("");
+        }
+    }
+}
+
+/**
+ * @brief 主函数
+ */
+function main(args: Array<String>): Integer {
+    // 创建并运行命令行界面
+    let cli = new BytecodeOptimizerCLI(args);
+    return cli.run();
+}
+
+// 运行主函数并传递命令行参数
+let exitCode = main(Process.getCommandLineArgs().slice(1));
+Process.exit(exitCode); 

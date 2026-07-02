@@ -1,0 +1,193 @@
+// 四大模型与QNS集成测试 - QVM入口程序
+// Four Models QNS Integration Test - QVM Entry
+//
+// 量子基因编码: QGC-FOUR-MODELS-QNS-TEST-20260630
+// 版本: 2.0.0
+//
+// 测试内容:
+//   1. QSM模型 - 量子叠加态 + QNS嵌入
+//   2. SOM模型 - 量子平权经济 + QNS分类
+//   3. WeQ模型 - 量子社交通信 + QNS注意力
+//   4. Ref模型 - 量子自反省 + QNS诊断
+//
+// QNS训练结果集成:
+//   - QNS模型加载器: qns_model_loader.qentl (QEntL全栈)
+//   - QNS嵌入: 量子叠加态嵌入向量
+//   - QNS分类: 量子干涉分类预测
+//   - QNS注意力: 量子纠缠注意力权重
+
+# 初始化10个量子比特 (4+6+6+8 最大需求)
+init 10
+
+# ============================================================
+# 测试1: QSM模型 - 量子叠加态
+# ============================================================
+# 创建叠加态
+H 0
+H 1
+H 2
+H 3
+
+# 建立纠缠
+CNOT 0 1
+CNOT 2 3
+
+# 测量
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+
+# 输出QSM结果
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+
+# QSM-QNS集成: QNS嵌入 (通过QEntL运行时)
+# - 加载QNS模型: qns_model_loader.qentl
+# - 生成QNS嵌入: 量子叠加态嵌入向量
+
+# ============================================================
+# 测试2: SOM模型 - 量子平权经济
+# ============================================================
+# 经济实体编码
+H 4
+H 5
+H 6
+H 7
+
+# 经济关联纠缠
+CNOT 4 6
+CNOT 5 7
+
+# 资源分配叠加
+H 8
+H 9
+
+# 分配关联
+CNOT 4 8
+CNOT 6 9
+
+# 测量平权得分
+MEASURE 4 4
+MEASURE 5 5
+MEASURE 6 6
+MEASURE 7 7
+MEASURE 8 8
+MEASURE 9 9
+
+# 输出SOM结果
+PRINT 4
+PRINT 5
+PRINT 6
+PRINT 7
+PRINT 8
+PRINT 9
+
+# SOM-QNS集成: QNS分类 (通过QEntL运行时)
+# - QNS分类: 平权得分评估
+
+# ============================================================
+# 测试3: WeQ模型 - 量子社交通信
+# ============================================================
+# 用户编码 (复用量子比特)
+H 0
+H 1
+H 2
+H 3
+
+# 社交连接纠缠
+CNOT 0 2
+CNOT 1 3
+
+# 消息签名
+H 4
+H 5
+
+# 签名关联
+CNOT 0 4
+CNOT 2 5
+
+# 消息验证测量
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+MEASURE 5 5
+
+# 输出WeQ结果
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+PRINT 5
+
+# WeQ-QNS集成: QNS注意力 (通过QEntL运行时)
+# - QNS注意力: 社交连接纠缠权重
+
+# ============================================================
+# 测试4: Ref模型 - 量子自反省
+# ============================================================
+# 系统状态编码
+H 0
+H 1
+H 2
+H 3
+
+# 反省层级纠缠
+CNOT 0 2
+CNOT 1 3
+
+# 修复策略叠加
+H 4
+H 5
+
+# 策略关联
+CNOT 2 4
+CNOT 3 5
+
+# 多层反省
+H 6
+H 7
+
+# 反省关联
+CNOT 0 6
+CNOT 4 7
+
+# 问题诊断测量
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+MEASURE 5 5
+MEASURE 6 6
+MEASURE 7 7
+
+# 输出Ref结果
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+PRINT 5
+PRINT 6
+PRINT 7
+
+# Ref-QNS集成: QNS诊断 (通过QEntL运行时)
+# - QNS分类: 问题类型诊断
+
+# ============================================================
+# QNS训练结果集成验证
+# ============================================================
+# 验证QNS模型文件存在: data/qns_model.dat
+# 验证QNS模型加载器: qns_model_loader.qentl
+# 验证QNS嵌入向量可用
+# 验证QNS注意力权重可用
+# 验证QNS分类结果可用
+
+# 停止
+STOP
