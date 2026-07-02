@@ -1,0 +1,27 @@
+=== [B] 链接所有可执行文件 ===
+时间戳: Thu Jul  2 07:07:09 PM CST 2026
+
+--- 检查关键二进制 ---
+  ✅ qvm_boot 已链接 (17544 bytes)
+  ✅ qcl_bootstrap 已链接 (12880 bytes)
+  ✅ qcl_bootstrap_v2 已链接 (12880 bytes)
+  ✅ qentl_compiler 已链接 (12880 bytes)
+  ✅ qnn_runner 已链接 (21456 bytes)
+  ✅ yi_pipeline 已链接 (26528 bytes)
+  ❌ qdfs_driver 缺失 — 尝试重建...
+  ✅ qentl_bootmgr 已链接 (8464 bytes)
+
+--- 重建libqdfs.a ---
+
+--- 统计bin/目录 ---
+  bin/ ELF可执行文件总数: 35
+
+--- 列出关键ELF ---
+/root/QSM/bin/qvm_boot: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=6d8fb23d4e7b87b771cdf786457f20ea95f46bc8, for GNU/Linux 3.2.0, not stripped bin/qvm_boot (17544 bytes)
+/root/QSM/bin/qcl_bootstrap_v2: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=b1d0e0ce263b070f2c58fdc79ea6e2dc327e7199, for GNU/Linux 3.2.0, not stripped bin/qcl_bootstrap_v2 (12880 bytes)
+/root/QSM/bin/qentl_compiler: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=b1d0e0ce263b070f2c58fdc79ea6e2dc327e7199, for GNU/Linux 3.2.0, not stripped bin/qentl_compiler (12880 bytes)
+/root/QSM/bin/qnn_runner: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=d932a708a85e0a52223c11a2d5c35c54093811fc, for GNU/Linux 3.2.0, not stripped bin/qnn_runner (21456 bytes)
+/root/QSM/bin/yi_pipeline: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=4b2cab3630f92af5f766a26532fe8f83fb24a000, for GNU/Linux 3.2.0, not stripped bin/yi_pipeline (26528 bytes)
+/root/QSM/bin/qentl_bootmgr: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=fdab3e6e1bac60d3ac23898fcc972f749ee682c7, for GNU/Linux 3.2.0, not stripped bin/qentl_bootmgr (8464 bytes)
+
+=== [B] 链接完成 ===

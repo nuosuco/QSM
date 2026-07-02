@@ -1,0 +1,113 @@
+=== [D] 编译四大模型(QSM/SOM/WeQ/Ref) ===
+时间戳: Thu Jul  2 07:07:36 PM CST 2026
+
+--- 使用编译器: /root/QSM/bin/qentl_compiler ---
+
+=== 模型: QSM ===
+  QEntL源文件: 14
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/QSM/docs/project_plan/qsm_construction_plan.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/QSM/qsm_construction_plan.qbc
+[Bootstrap v2] 编译完成: 742 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: qsm_construction_plan.qbc
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/QSM/docs/project_plan/som_construction_plan.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/QSM/som_construction_plan.qbc
+[Bootstrap v2] 警告: 未找到可编译的量子代码
+[Bootstrap v2] 编译完成: 1 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: som_construction_plan.qbc
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/QSM/docs/project_plan/weq_construction_plan.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/QSM/weq_construction_plan.qbc
+[Bootstrap v2] 警告: 未找到可编译的量子代码
+[Bootstrap v2] 编译完成: 1 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: weq_construction_plan.qbc
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/QSM/docs/qsm_implementation.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/QSM/qsm_implementation.qbc
+[Bootstrap v2] 编译完成: 20128 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: qsm_implementation.qbc
+  ✅ 已存在: qsm_consciousness.qbc (跳过)
+  ✅ 已存在: qsm_core.qbc (跳过)
+  ✅ 已存在: qsm_entanglement.qbc (跳过)
+  ✅ 已存在: yi_training.qbc (跳过)
+  ✅ 已存在: yi_training_pipeline.qbc (跳过)
+  ✅ 已存在: qsm_entry.qbc (跳过)
+  ✅ 已存在: yi_training_pipeline_circuit.qbc (跳过)
+  ✅ 已存在: qsm_consciousness_circuit.qbc (跳过)
+  ✅ 已存在: qsm_entanglement_circuit.qbc (跳过)
+  ✅ 已存在: qsm_yi_training_circuit.qbc (跳过)
+
+=== 模型: SOM ===
+  QEntL源文件: 8
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/SOM/docs/project_plan/som_construction_plan.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/SOM/som_construction_plan.qbc
+[Bootstrap v2] 编译完成: 1251 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: som_construction_plan.qbc
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/SOM/docs/som_implementation.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/SOM/som_implementation.qbc
+[Bootstrap v2] 编译完成: 3282 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: som_implementation.qbc
+  ✅ 已存在: som_equality.qbc (跳过)
+  ✅ 已存在: som_core.qbc (跳过)
+  ✅ 已存在: som_core_part2.qbc (跳过)
+  ✅ 已存在: som_transaction.qbc (跳过)
+  ✅ 已存在: som_entry.qbc (跳过)
+  ✅ 已存在: som_transaction_circuit.qbc (跳过)
+
+=== 模型: WeQ ===
+  QEntL源文件: 8
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/WeQ/docs/project_plan/weq_construction_plan.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/WeQ/weq_construction_plan.qbc
+[Bootstrap v2] 编译完成: 222 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: weq_construction_plan.qbc
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/WeQ/docs/weq_implementation.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/WeQ/weq_implementation.qbc
+[Bootstrap v2] 编译完成: 3827 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: weq_implementation.qbc
+  ✅ 已存在: weq_core.qbc (跳过)
+  ✅ 已存在: weq_social.qbc (跳过)
+  ✅ 已存在: weq_learning.qbc (跳过)
+  ✅ 已存在: weq_entry.qbc (跳过)
+  ✅ 已存在: weq_learning_circuit.qbc (跳过)
+  ✅ 已存在: weq_social_interaction_circuit.qbc (跳过)
+
+=== 模型: Ref ===
+  QEntL源文件: 9
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/Ref/docs/project_plan/ref_construction_plan.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/Ref/ref_construction_plan.qbc
+[Bootstrap v2] 编译完成: 208 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: ref_construction_plan.qbc
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/Ref/docs/ref_implementation.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/Models/Ref/ref_implementation.qbc
+[Bootstrap v2] 编译完成: 3497 字节, 0 导入, 0 类型, 0 函数
+  ✅ 编译: ref_implementation.qbc
+  ✅ 已存在: ref_core.qbc (跳过)
+  ✅ 已存在: ref_monitoring.qbc (跳过)
+  ✅ 已存在: ref_optimization.qbc (跳过)
+  ✅ 已存在: ref_entry.qbc (跳过)
+  ✅ 已存在: ref_healing_circuit.qbc (跳过)
+  ✅ 已存在: ref_monitoring_circuit.qbc (跳过)
+  ✅ 已存在: ref_optimization_circuit.qbc (跳过)
+
+--- 编译entry点QBC到bin/根目录 ---
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/QSM/qsm_entry.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/qsm_entry.qbc
+[Bootstrap v2] 编译完成: 38 字节, 0 导入, 0 类型, 0 函数
+  ✅ bin/qsm_entry.qbc 已编译
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/SOM/som_entry.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/som_entry.qbc
+[Bootstrap v2] 编译完成: 58 字节, 0 导入, 0 类型, 0 函数
+  ✅ bin/som_entry.qbc 已编译
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/WeQ/weq_entry.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/weq_entry.qbc
+[Bootstrap v2] 编译完成: 58 字节, 0 导入, 0 类型, 0 函数
+  ✅ bin/weq_entry.qbc 已编译
+[Bootstrap v2] 编译: /root/QSM/QEntL/Models/Ref/ref_entry.qentl
+[Bootstrap v2] 输出: /root/QSM/bin/ref_entry.qbc
+[Bootstrap v2] 编译完成: 78 字节, 0 导入, 0 类型, 0 函数
+  ✅ bin/ref_entry.qbc 已编译
+
+=== [D] 四大模型编译完成: 总计39, 成功39, 失败0 ===
+
+--- 模型状态 ---
+  QSM: QBC=32 个
+  SOM: QBC=18 个
+  WeQ: QBC=18 个
+  Ref: QBC=20 个

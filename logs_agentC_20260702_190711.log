@@ -1,0 +1,34 @@
+=== [C] 运行QVM测试 ===
+时间戳: Thu Jul  2 07:07:11 PM CST 2026
+
+--- 测试核心QVM功能 ---
+
+=== 测试1: qvm_boot test ===
+q[2]: |1⟩ (已测量)
+=================
+
+
+=== 所有测试完成 ===
+
+=== 测试2: qentl_compiler CNOT ===
+  ✅ CNOT编译+执行通过
+
+=== 测试3: 四大模型QBC执行 ===
+  ✅ qsm_entry.qbc 执行通过
+  ✅ som_entry.qbc 执行通过
+  ✅ weq_entry.qbc 执行通过
+  ✅ ref_entry.qbc 执行通过
+
+=== 测试4: QNN引擎 ===
+Test PASSED - QNN engine working correctly.
+
+QNN Engine shutdown.
+
+=== 测试5: Yi Pipeline ===
+=====================================
+  Yi Language Data Pipeline (Phase 5)
+=====================================
+
+Data directory: /root/QSM/data
+
+=== [C] QVM测试完成: PASS=5 FAIL=0 SKIP=0 ===
