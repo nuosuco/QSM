@@ -1,0 +1,285 @@
+
+========== QSM ==========
+=== /root/QSM/QEntL/Models/QSM/qsm_consciousness_circuit.qbc ===
+[QVM] CNOT(q12, q0)
+[QVM] CNOT(q13, q1)
+[QVM] CNOT(q14, q2)
+[QVM] CNOT(q15, q3)
+[QVM] CNOT(q16, q4)
+[QVM] CNOT(q17, q5)
+[QVM] 测量 q12 -> r8 = 1 [简化模式]
+[QVM] 测量 q13 -> r9 = 0 [简化模式]
+[QVM] 测量 q14 -> r10 = 1 [简化模式]
+[QVM] 测量 q15 -> r11 = 1 [简化模式]
+[QVM] 测量 q16 -> r12 = 1 [简化模式]
+[QVM] 测量 q17 -> r13 = 1 [简化模式]
+[QVM] print(r0) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 34 周期, 34 门操作
+=== /root/QSM/QEntL/Models/QSM/qsm_consciousness.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 程序退出
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/QSM/qsm_core.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 程序退出
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/QSM/qsm_entanglement_circuit.qbc ===
+[QVM] CNOT(q16, q17)
+[QVM] CNOT(q17, q12)
+[QVM] H(q18)
+[QVM] CNOT(q18, q19)
+[QVM] CNOT(q1, q2)
+[QVM] H(q1)
+[QVM] 测量 q0 -> r8 = 1 [简化模式]
+[QVM] 测量 q1 -> r9 = 0 [简化模式]
+[QVM] 测量 q2 -> r10 = 1 [简化模式]
+[QVM] 测量 q3 -> r11 = 1 [简化模式]
+[QVM] 测量 q4 -> r12 = 1 [简化模式]
+[QVM] 测量 q5 -> r13 = 1 [简化模式]
+[QVM] print(r0) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 33 周期, 33 门操作
+=== /root/QSM/QEntL/Models/QSM/qsm_entanglement.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 程序退出
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/QSM/qsm_entry.qbc ===
+[QVM] H(q1)
+[QVM] H(q2)
+[QVM] H(q3)
+[QVM] CNOT(q0, q1)
+[QVM] CNOT(q2, q3)
+[QVM] 测量 q0 -> r0 = 1
+[QVM] 测量 q1 -> r1 = 0
+[QVM] 测量 q2 -> r2 = 1
+[QVM] 测量 q3 -> r3 = 1
+[QVM] print(r0) = 1
+[QVM] print(r1) = 0
+[QVM] print(r2) = 1
+[QVM] print(r3) = 1
+[QVM] 程序退出
+[QVM] 执行完成: 14 周期, 14 门操作
+=== /root/QSM/QEntL/Models/QSM/qsm_yi_training_circuit.qbc ===
+[QVM] CNOT(q18, q22)
+[QVM] CNOT(q19, q23)
+[QVM] CNOT(q20, q21)
+[QVM] CNOT(q22, q23)
+[QVM] CNOT(q20, q22)
+[QVM] 测量 q20 -> r8 = 1 [简化模式]
+[QVM] 测量 q21 -> r9 = 0 [简化模式]
+[QVM] 测量 q22 -> r10 = 1 [简化模式]
+[QVM] 测量 q23 -> r11 = 1 [简化模式]
+[QVM] print(r24) = 0 [简化模式]
+[QVM] print(r25) = 0 [简化模式]
+[QVM] print(r26) = 0 [简化模式]
+[QVM] print(r27) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 55 周期, 55 门操作
+=== /root/QSM/QEntL/Models/QSM/yi_training_pipeline_circuit.qbc ===
+[QVM] CNOT(q21, q25)
+[QVM] CNOT(q22, q26)
+[QVM] CNOT(q23, q27)
+[QVM] CNOT(q24, q25)
+[QVM] CNOT(q26, q27)
+[QVM] 测量 q20 -> r28 = 1 [简化模式]
+[QVM] 测量 q21 -> r29 = 0 [简化模式]
+[QVM] 测量 q22 -> r30 = 1 [简化模式]
+[QVM] 测量 q23 -> r31 = 1 [简化模式]
+[QVM] print(r28) = 1 [简化模式]
+[QVM] print(r29) = 0 [简化模式]
+[QVM] print(r30) = 1 [简化模式]
+[QVM] print(r31) = 1 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 67 周期, 67 门操作
+=== /root/QSM/QEntL/Models/QSM/yi_training_pipeline.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/QSM/yi_training.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 执行完成: 0 周期, 0 门操作
+
+========== Ref ==========
+=== /root/QSM/QEntL/Models/Ref/ref_core.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 程序退出
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/Ref/ref_entry.qbc ===
+[QVM] 测量 q3 -> r3 = 1
+[QVM] 测量 q4 -> r4 = 1
+[QVM] 测量 q5 -> r5 = 1
+[QVM] 测量 q6 -> r6 = 0
+[QVM] 测量 q7 -> r7 = 0
+[QVM] print(r0) = 1
+[QVM] print(r1) = 0
+[QVM] print(r2) = 1
+[QVM] print(r3) = 1
+[QVM] print(r4) = 1
+[QVM] print(r5) = 1
+[QVM] print(r6) = 0
+[QVM] print(r7) = 0
+[QVM] 程序退出
+[QVM] 执行完成: 30 周期, 30 门操作
+=== /root/QSM/QEntL/Models/Ref/ref_healing_circuit.qbc ===
+[QVM] CNOT(q16, q17)
+[QVM] CNOT(q18, q19)
+[QVM] CNOT(q16, q18)
+[QVM] CNOT(q8, q16)
+[QVM] CNOT(q10, q18)
+[QVM] 测量 q16 -> r4 = 1 [简化模式]
+[QVM] 测量 q17 -> r5 = 0 [简化模式]
+[QVM] 测量 q18 -> r6 = 1 [简化模式]
+[QVM] 测量 q19 -> r7 = 1 [简化模式]
+[QVM] print(r20) = 0 [简化模式]
+[QVM] print(r21) = 0 [简化模式]
+[QVM] print(r22) = 0 [简化模式]
+[QVM] print(r23) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 55 周期, 55 门操作
+=== /root/QSM/QEntL/Models/Ref/ref_monitoring_circuit.qbc ===
+[QVM] CNOT(q13, q17)
+[QVM] CNOT(q14, q18)
+[QVM] CNOT(q15, q19)
+[QVM] CNOT(q16, q17)
+[QVM] CNOT(q18, q19)
+[QVM] 测量 q8 -> r4 = 1 [简化模式]
+[QVM] 测量 q9 -> r5 = 0 [简化模式]
+[QVM] 测量 q10 -> r6 = 1 [简化模式]
+[QVM] 测量 q11 -> r7 = 1 [简化模式]
+[QVM] print(r20) = 0 [简化模式]
+[QVM] print(r21) = 0 [简化模式]
+[QVM] print(r22) = 0 [简化模式]
+[QVM] print(r23) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 48 周期, 48 门操作
+=== /root/QSM/QEntL/Models/Ref/ref_monitoring.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 程序退出
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/Ref/ref_optimization_circuit.qbc ===
+[QVM] CNOT(q10, q18)
+[QVM] CNOT(q11, q19)
+[QVM] CNOT(q16, q17)
+[QVM] CNOT(q18, q19)
+[QVM] CNOT(q16, q18)
+[QVM] 测量 q8 -> r4 = 1 [简化模式]
+[QVM] 测量 q9 -> r5 = 0 [简化模式]
+[QVM] 测量 q10 -> r6 = 1 [简化模式]
+[QVM] 测量 q11 -> r7 = 1 [简化模式]
+[QVM] print(r20) = 0 [简化模式]
+[QVM] print(r21) = 0 [简化模式]
+[QVM] print(r22) = 0 [简化模式]
+[QVM] print(r23) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 47 周期, 47 门操作
+=== /root/QSM/QEntL/Models/Ref/ref_optimization.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 程序退出
+[QVM] 执行完成: 0 周期, 0 门操作
+
+========== SOM ==========
+=== /root/QSM/QEntL/Models/SOM/som_core_part2.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 程序退出
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/SOM/som_core.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 初始化 0 个量子比特
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/SOM/som_entry.qbc ===
+[QVM] CNOT(q2, q5)
+[QVM] 测量 q0 -> r0 = 1
+[QVM] 测量 q1 -> r1 = 0
+[QVM] 测量 q2 -> r2 = 1
+[QVM] 测量 q3 -> r3 = 1
+[QVM] 测量 q4 -> r4 = 1
+[QVM] 测量 q5 -> r5 = 1
+[QVM] print(r0) = 1
+[QVM] print(r1) = 0
+[QVM] print(r2) = 1
+[QVM] print(r3) = 1
+[QVM] print(r4) = 1
+[QVM] print(r5) = 1
+[QVM] 程序退出
+[QVM] 执行完成: 22 周期, 22 门操作
+=== /root/QSM/QEntL/Models/SOM/som_equality.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/SOM/som_transaction_circuit.qbc ===
+[QVM] CNOT(q12, q18)
+[QVM] CNOT(q13, q19)
+[QVM] CNOT(q14, q20)
+[QVM] CNOT(q15, q21)
+[QVM] CNOT(q16, q22)
+[QVM] CNOT(q17, q23)
+[QVM] 测量 q12 -> r8 = 1 [简化模式]
+[QVM] 测量 q13 -> r9 = 0 [简化模式]
+[QVM] 测量 q14 -> r10 = 1 [简化模式]
+[QVM] 测量 q15 -> r11 = 1 [简化模式]
+[QVM] 测量 q18 -> r12 = 1 [简化模式]
+[QVM] 测量 q19 -> r13 = 1 [简化模式]
+[QVM] print(r0) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 44 周期, 44 门操作
+=== /root/QSM/QEntL/Models/SOM/som_transaction.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 执行完成: 0 周期, 0 门操作
+
+========== WeQ ==========
+=== /root/QSM/QEntL/Models/WeQ/weq_core.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/WeQ/weq_entry.qbc ===
+[QVM] CNOT(q2, q5)
+[QVM] 测量 q0 -> r0 = 1
+[QVM] 测量 q1 -> r1 = 0
+[QVM] 测量 q2 -> r2 = 1
+[QVM] 测量 q3 -> r3 = 1
+[QVM] 测量 q4 -> r4 = 1
+[QVM] 测量 q5 -> r5 = 1
+[QVM] print(r0) = 1
+[QVM] print(r1) = 0
+[QVM] print(r2) = 1
+[QVM] print(r3) = 1
+[QVM] print(r4) = 1
+[QVM] print(r5) = 1
+[QVM] 程序退出
+[QVM] 执行完成: 22 周期, 22 门操作
+=== /root/QSM/QEntL/Models/WeQ/weq_learning_circuit.qbc ===
+[QVM] CNOT(q13, q19)
+[QVM] CNOT(q14, q20)
+[QVM] CNOT(q15, q21)
+[QVM] CNOT(q16, q22)
+[QVM] CNOT(q17, q23)
+[QVM] CNOT(q0, q18)
+[QVM] CNOT(q1, q19)
+[QVM] CNOT(q2, q20)
+[QVM] 测量 q0 -> r8 = 1 [简化模式]
+[QVM] 测量 q1 -> r9 = 0 [简化模式]
+[QVM] 测量 q2 -> r10 = 1 [简化模式]
+[QVM] 测量 q18 -> r11 = 1 [简化模式]
+[QVM] print(r0) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 34 周期, 34 门操作
+=== /root/QSM/QEntL/Models/WeQ/weq_learning.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 执行完成: 0 周期, 0 门操作
+=== /root/QSM/QEntL/Models/WeQ/weq_social_interaction_circuit.qbc ===
+[QVM] CNOT(q17, q21)
+[QVM] CNOT(q18, q22)
+[QVM] CNOT(q19, q23)
+[QVM] CNOT(q20, q21)
+[QVM] CNOT(q22, q23)
+[QVM] 测量 q4 -> r8 = 1 [简化模式]
+[QVM] 测量 q8 -> r9 = 0 [简化模式]
+[QVM] 测量 q16 -> r10 = 1 [简化模式]
+[QVM] 测量 q20 -> r11 = 1 [简化模式]
+[QVM] print(r24) = 0 [简化模式]
+[QVM] print(r25) = 0 [简化模式]
+[QVM] print(r26) = 0 [简化模式]
+[QVM] print(r27) = 0 [简化模式]
+[QVM] 程序退出
+[QVM] 执行完成: 63 周期, 63 门操作
+=== /root/QSM/QEntL/Models/WeQ/weq_social.qbc ===
+[QVM] 初始化量子虚拟机
+[QVM] 执行完成: 0 周期, 0 门操作
