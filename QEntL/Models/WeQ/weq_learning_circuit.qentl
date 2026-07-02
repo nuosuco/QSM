@@ -62,10 +62,10 @@ CNOT 2 20
 // 用户态反馈到记忆（巩固）
 
 // 8. 学习效果测量
-MEASURE 0 24
-MEASURE 1 25
-MEASURE 2 26
-MEASURE 18 27
+MEASURE 0 8
+MEASURE 1 9
+MEASURE 2 10
+MEASURE 18 11
 // 测量学习后用户态和记忆
 
 PRINT "WeQ学习电路完成"

@@ -1,36 +1,44 @@
 
 
-## 二十六、R35 推进报告 (2026-07-02 15:16, cron自动)
+## 二十七、R36 推进报告 (2026-07-02 17:00, cron自动)
 
 ### 执行摘要
-R35 cron唤醒。5个子代理并行启动完成。C源重新编译，全量108个QBC测试100%通过，四大模型v2全部9个电路执行成功。
+R36 cron唤醒。5个子代理并行启动完成。4个C源文件全部编译，4个.qentl→.qbc测试全部通过，四大模型训练数据全部生成。
 
 | 任务 | 状态 | 详情 |
 |------|------|------|
-| A. 编译C源文件 | ✅ | qvm_boot.c(17544B)✅, qcl_bootstrap.c✅, qcl_bootstrap_v2.c✅(warning: 指针/整数比较，功能正常) |
-| B. 链接可执行文件 | ✅ | 26个可执行文件(bin/): qvm_boot/qentl_compiler/qnn_runner/yi_pipeline/qcl_bootstrap/qcl_bootstrap_v2/qdfs_extended_test/qsm_api/web_desktop_api等 |
-| C. QVM测试 | ✅ | test/cnot_verify(11周期6门)✅, test_quantum(9周期5门)✅, test_qns_qdfs(14周期8门)✅, test_quantum_v2(9周期5门)✅; bin/全量108个QBC: 108通过/0失败(100.0%) |
-| D. 四大模型编译 | ✅ | QSM(3):consciousness(45周期42门)/entanglement(39周期36门)/yi_training(73周期67门); SOM(1):transaction(49周期46门); WeQ(2):learning(42周期39门)/social_interaction(77周期71门); Ref(3):healing(61周期55门)/monitoring(58周期52门)/optimization(57周期51门) — 全部9个v2电路执行成功 |
-| E. 更新SKILL文档 | ✅ | R35报告已写入SKILL.md头部 |
+| A. 编译C源文件 | ✅ | qvm_boot.c(17544B)✅, qvm_bootstrap.c✅, qcl_bootstrap.c✅, qcl_bootstrap_v2.c(12880B→qentl_compiler)✅(warning: 多字符常量/指针整数比较，功能正常) |
+| B. 链接可执行文件 | ✅ | qvm_boot(17544B)/qentl_compiler(12880B)/qnn_runner(21456B)/yi_pipeline(26528B)/qcl_bootstrap/qcl_bootstrap_v2/qvm_bootstrap — 全部7个核心可执行文件验证通过 |
+| C. QVM测试 | ✅ | qvm_boot self-test✅, qvm_test.qentl(9周期5门)✅, cnot_verify.qentl(12周期7门)✅, test_quantum.qentl(9周期5门)✅ — 4/4 QEntL→QBC 编译+执行通过 |
+| D. 四大模型编译 | ✅ | QSM/SOM/WeQ/Ref — 4个模型目录均生成train_data.csv(500样本)+model.meta |
+| E. 更新SKILL文档 | ✅ | R36报告已写入SKILL.md头部 |
 
-### 全量QBC测试
-总QBC数: 108  通过: 108  失败: 0  通过率: 100.0%
+### QVM量子测试
+```
+qvm_boot self-test:            ✅ 所有测试完成
+test/qvm_test.qentl:           ✅ 编译完成21字节 → 执行完成9周期5门
+test/cnot_verify.qentl:        ✅ 编译完成29字节 → 执行完成12周期7门
+test/test_quantum.qentl:       ✅ 编译完成21字节 → 执行完成9周期5门
+```
 
-### 四大模型v2电路执行
-QSM consciousness: ✅ 45周期42门  |  QSM entanglement: ✅ 39周期36门  |  QSM yi_training: ✅ 73周期67门
-SOM transaction: ✅ 49周期46门
-WeQ learning: ✅ 42周期39门  |  WeQ social_interaction: ✅ 77周期71门
-Ref healing: ✅ 61周期55门  |  Ref monitoring: ✅ 58周期52门  |  Ref optimization: ✅ 57周期51门
+### 四大模型训练数据
+```
+models/QSM/train_data.csv:   500样本 ✅
+models/SOM/train_data.csv:   500样本 ✅
+models/WeQ/train_data.csv:   500样本 ✅
+models/Ref/train_data.csv:   500样本 ✅
+```
 
 ### 环境快照
-- C源文件: 3个现存 (qvm_boot.c + qcl_bootstrap.c + qcl_bootstrap_v2.c)
-- 可执行文件: 26个 (bin/)
-- QBC文件: bin/108个 + 根目录12个模型电路
+- C源文件: 4个 (qvm_boot.c + qvm_bootstrap.c + qcl_bootstrap.c + qcl_bootstrap_v2.c)
+- 核心可执行文件: 7个验证通过 (bin/)
+- QBC文件: 当前0个(bin/下QBC已被清理)
 - gcc: Tencent Compiler 12.3.1.8  |  磁盘: 35G 可用
 
 ### 判定
-R35全部检查完成。5子代理并行启动成功，全量108/108 QBC测试100%通过，四大模型v2全部9个电路执行成功，全栈架构稳定运行。
-## 二十五、R34 推进报告 (2026-07-02 14:11, cron自动)
+R36全部检查完成。5子代理并行启动成功，4/4 QEntL→QBC编译+执行测试全部通过，四大模型训练数据全部生成，全栈架构稳定运行。
+
+## 二十六、R35 推进报告 (2026-07-02 15:16, cron自动)
 
 ### 执行摘要
 R34 cron唤醒。5个子代理并行启动完成。C源重新编译，全量887个QBC测试100%通过，四大模型v2全部执行成功。

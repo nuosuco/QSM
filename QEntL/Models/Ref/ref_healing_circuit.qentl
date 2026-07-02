@@ -109,10 +109,10 @@ CNOT 10 18
 # Phase 6: 修复结果测量（Healing Result Measurement）
 # ============================================================
 # 测量重建结果到经典寄存器
-MEASURE 16 20
-MEASURE 17 21
-MEASURE 18 22
-MEASURE 19 23
+MEASURE 16 4
+MEASURE 17 5
+MEASURE 18 6
+MEASURE 19 7
 
 # 打印修复结果
 PRINT 20

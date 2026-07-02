@@ -102,10 +102,10 @@ CNOT 18 19
 # Phase 6: 监控结果测量（Monitoring Result Measurement）
 # ============================================================
 # 测量告警状态到经典寄存器
-MEASURE 8 20
-MEASURE 9 21
-MEASURE 10 22
-MEASURE 11 23
+MEASURE 8 4
+MEASURE 9 5
+MEASURE 10 6
+MEASURE 11 7
 
 # 打印监控结果
 PRINT 20

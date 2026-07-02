@@ -125,10 +125,10 @@ CNOT 20 22
 # Phase 7: 训练结果测量（Training Result Measurement）
 # ============================================================
 # 测量优化结果到经典寄存器
-MEASURE 20 24
-MEASURE 21 25
-MEASURE 22 26
-MEASURE 23 27
+MEASURE 20 8
+MEASURE 21 9
+MEASURE 22 10
+MEASURE 23 11
 
 # 打印训练结果
 PRINT 24
