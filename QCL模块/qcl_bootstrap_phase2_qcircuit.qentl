@@ -1,0 +1,16 @@
+// qcl_bootstrap_phase2 的纯量子电路提取
+// 原始文件735行，含大量def函数/类型/模块（C编译器跳过）
+// 本文件只提取可被C编译器编译的量子指令部分
+
+init 3
+H 0
+X 1
+CNOT 0 1
+CNOT 1 2
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+PRINT 0
+PRINT 1
+PRINT 2
+STOP

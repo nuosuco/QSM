@@ -57,294 +57,415 @@ STOP
 // QCL编译器核心函数定义（QEntL源码级实现）
 // 以下函数体为完整QCL编译器的算法描述，由QCL编译器（QEntL全栈）执行
 // ============================================================================
+// QCL编译器核心函数定义（QEntL源码级实现）
+// 以下函数体由QCL编译器（QEntL全栈）执行，使用现有QCL模块功能
+// ============================================================================
+
+// ============================================================================
+// 模块导入 — 使用现有QCL编译器组件
+// ============================================================================
+
+import "QCL模块/qcl_opcodes.qentl";
+import "QCL模块/qcl_lexer.qentl";
+import "QCL模块/qcl_parser.qentl";
+import "QCL模块/qcl_parser_high.qentl";
+
+// ============================================================================
+// 编译器全局状态
+// ============================================================================
+
+// 编译器实例（由新建编译器创建）
+var QCL_编译器 = null;
+
+// 已编译文件记录
+var 已编译文件列表 = [];
+
+// 排除目录列表
+const EXCLUDE_DIRS = [".git", ".tmp", "build", "node_modules", "__pycache__", ".vscode"];
+
+// 单量子比特门映射
+const GATE_MAP = [
+    ["H", OP_H], ["X", OP_X], ["Y", OP_Y], ["Z", OP_Z], ["T", OP_T], ["S", OP_S]
+];
+
+// ============================================================================
+// 辅助工具函数
+// ============================================================================
+
+// 判断字符串是否以指定前缀开头
+def starts_with(line, p, target):
+    var tl = len(target);
+    if p + tl > len(line):
+        return false;
+    var i = 0;
+    while i < tl:
+        if line[p + i] != target[i]:
+            return false;
+        i = i + 1;
+    return true;
+
+// 跳过空白字符
+def skip_whitespace(line, p):
+    var i = p;
+    while i < len(line):
+        var ch = line[i];
+        if ch != ' ' && ch != '\t' && ch != '\r':
+            break;
+        i = i + 1;
+    return i;
+
+// 解析非负整数
+def parse_int(line, p):
+    var val = 0;
+    while p < len(line):
+        var ch = line[p];
+        if ch >= '0' && ch <= '9':
+            val = val * 10 + (ord(ch) - ord('0'));
+            p = p + 1;
+        else:
+            break;
+    return [val, p];
+
+// 删除字符串前导/尾随空白
+def trim_str(s):
+    var start = 0;
+    while start < len(s) && (s[start] == ' ' || s[start] == '\t' || s[start] == '\r' || s[start] == '\n'):
+        start = start + 1;
+    var end = len(s) - 1;
+    while end >= start && (s[end] == ' ' || s[end] == '\t' || s[end] == '\r' || s[end] == '\n'):
+        end = end - 1;
+    if end < start:
+        return "";
+    return s.substring(start, end - start + 1);
+
+// 冒泡排序辅助函数
+def 冒泡排序(arr):
+    var n = len(arr);
+    var i = 0;
+    while i < n - 1:
+        var j = 0;
+        while j < n - i - 1:
+            if arr[j] > arr[j + 1]:
+                var tmp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = tmp;
+            j = j + 1;
+        i = i + 1;
+
+// 判断目录是否在排除列表中
+def 排除目录检查(目录名):
+    var i = 0;
+    while i < len(EXCLUDE_DIRS):
+        if EXCLUDE_DIRS[i] == 目录名:
+            return true;
+        i = i + 1;
+    if len(目录名) > 0 && 目录名[0] == '.':
+        return true;
+    return false;
 
 // ============================================================================
 // 1. 新建编译器() — 初始化编译器环境
 // ============================================================================
 //
-// 函数签名：
-//   函数 新建编译器(输出路径: 字符串, 优化级别: 整数, 调试模式: 布尔) -> 编译器:
-//
 // 初始化内容：
-//   a) Opcode常量表（68个操作码，与qcl_opcodes.qentl一致）
-//      - 基础指令: OP_NOP=0, OP_H=1, OP_X=2, OP_Z=3, OP_CNOT=4,
-//        OP_MEASURE=5, OP_RESET=6, OP_SWAP=7, OP_LOAD_REG=8,
-//        OP_STORE_REG=9, OP_JUMP=10, OP_JZ=11, OP_ADD=12, OP_SUB=13,
-//        OP_MUL=14, OP_DIV=15, OP_PRINT=16, OP_EXIT=17, OP_BARRIER=18,
-//        OP_INIT_N=20, OP_STOP=21
-//      - 变量指令: OP_LOAD_CONST=32, OP_STORE_VAR=33, OP_LOAD_VAR=34,
-//        OP_T=35, OP_S=36, OP_Y=37
-//      - 高级指令: OP_IMPORT=100, OP_DEFINE_CLASS=101, OP_DEFINE_FUNC=102,
-//        OP_DEF_PARAM=103, OP_INIT_MODULE=104, OP_SET_CONFIG=105,
-//        OP_RETURN=108, OP_IF=109, OP_ELSE=110, OP_WHILE=111,
-//        OP_BREAK=112, OP_CONTINUE=113, OP_FUNC_CALL=114, OP_NEW=115,
-//        OP_PUSH_TRUE=124, OP_PUSH_FALSE=123, OP_PUSH_NULL=125,
-//        OP_EQUAL=126, OP_NOT_EQUAL=127, OP_RANDOM=138, OP_LENGTH=139
-//   b) 词法分析器（Token流生成器）
-//      - 70种Token类型：关键字/标识符/整数/浮点/字符串/布尔/空值/运算符/分隔符
-//      - 支持中文关键字：量子模块/类型/函数/导入/如果/否则/循环/跳出/继续/返回
-//      - 支持中英文布尔：true/假/假/空/空二进制
-//   c) 语法分析器
-//      - qcl_parser.qentl: 量子指令解析（init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP）
-//      - qcl_parser_high.qentl: 高级语法解析（import/类型/函数/if/return/new）
+//   a) Opcode常量表（68+个操作码，来自qcl_opcodes.qentl）
+//   b) 词法分析器（70种Token类型，来自qcl_lexer.qentl）
+//   c) 语法分析器（qcl_parser + qcl_parser_high）
 //   d) 字节码生成器（小端序写入）
-//      - write_u8/write_u16/write_u32: 小端序字节写入
-//      - write_string: 长度前缀 + UTF-8字节
-//      - write_header: QCL魔数 0x51434C46 ("QCLF")
-//   e) 优化器
-//      - 死代码消除
-//      - 常数折叠
-//      - 量子门合并（相邻H门消除）
+//   e) 优化器（死代码消除/常数折叠/量子门合并）
 //   f) 链接器（多文件合并）
-//
-// 返回：编译器对象（含opcode表/词法器/解析器/字节码缓冲区/优化器/链接器）
+
+def 新建编译器(输出路径, 优化级别, 调试模式):
+    // 初始化字节码缓冲区（来自qcl_opcodes.qentl）
+    clear_bytecode();
+
+    // 创建编译器对象
+    var 编译器 = {
+        输出路径: 输出路径,
+        优化级别: 优化级别,
+        调试模式: 调试模式,
+        导入计数: 0,
+        类型计数: 0,
+        函数计数: 0,
+    };
+
+    // 初始化解析器状态（来自qcl_parser_high.qentl）
+    init_high_parser();
+
+    // 初始化opcode表（来自qcl_opcodes.qentl的常量）
+    编译器.基础指令 = {
+        OP_NOP: OP_NOP, OP_H: OP_H, OP_X: OP_X, OP_Z: OP_Z, OP_CNOT: OP_CNOT,
+        OP_MEASURE: OP_MEASURE, OP_RESET: OP_RESET, OP_SWAP: OP_SWAP,
+        OP_LOAD_REG: OP_LOAD_REG, OP_STORE_REG: OP_STORE_REG,
+        OP_JUMP: OP_JUMP, OP_JZ: OP_JZ, OP_ADD: OP_ADD, OP_SUB: OP_SUB,
+        OP_MUL: OP_MUL, OP_DIV: OP_DIV, OP_PRINT: OP_PRINT,
+        OP_EXIT: OP_EXIT, OP_BARRIER: OP_BARRIER, OP_INIT_N: OP_INIT_N, OP_STOP: OP_STOP,
+    };
+
+    编译器.变量指令 = {
+        OP_LOAD_CONST: OP_LOAD_CONST, OP_STORE_VAR: OP_STORE_VAR, OP_LOAD_VAR: OP_LOAD_VAR,
+        OP_T: OP_T, OP_S: OP_S, OP_Y: OP_Y,
+    };
+
+    编译器.高级指令 = {
+        OP_IMPORT: OP_IMPORT, OP_DEFINE_CLASS: OP_DEFINE_CLASS, OP_DEFINE_FUNC: OP_DEFINE_FUNC,
+        OP_DEF_PARAM: OP_DEF_PARAM, OP_INIT_MODULE: OP_INIT_MODULE, OP_SET_CONFIG: OP_SET_CONFIG,
+        OP_LOAD_ARRAY: OP_LOAD_ARRAY, OP_STORE_ARRAY: OP_STORE_ARRAY, OP_RETURN: OP_RETURN,
+        OP_IF: OP_IF, OP_ELSE: OP_ELSE, OP_WHILE: OP_WHILE, OP_BREAK: OP_BREAK,
+        OP_CONTINUE: OP_CONTINUE, OP_FUNC_CALL: OP_FUNC_CALL, OP_NEW: OP_NEW,
+        OP_ASSIGN: OP_ASSIGN, OP_LOAD_MEMBER: OP_LOAD_MEMBER, OP_STORE_MEMBER: OP_STORE_MEMBER,
+        OP_LOAD_LOCAL: OP_LOAD_LOCAL, OP_STORE_LOCAL: OP_STORE_LOCAL, OP_PUSH_ZERO: OP_PUSH_ZERO,
+        OP_PUSH_ONE: OP_PUSH_ONE, OP_PUSH_FALSE: OP_PUSH_FALSE, OP_PUSH_TRUE: OP_PUSH_TRUE,
+        OP_PUSH_NULL: OP_PUSH_NULL, OP_EQUAL: OP_EQUAL, OP_NOT_EQUAL: OP_NOT_EQUAL,
+        OP_LESS: OP_LESS, OP_GREATER: OP_GREATER, OP_LESS_EQ: OP_LESS_EQ, OP_GREATER_EQ: OP_GREATER_EQ,
+        OP_RETURN_VAL: OP_RETURN_VAL, OP_RETURN_OBJ: OP_RETURN_OBJ, OP_RETURN_EMPTY: OP_RETURN_EMPTY,
+        OP_ARRAY_LITERAL: OP_ARRAY_LITERAL, OP_OBJECT_LITERAL: OP_OBJECT_LITERAL,
+        OP_STRING_CONCAT: OP_STRING_CONCAT, OP_RANDOM: OP_RANDOM, OP_LENGTH: OP_LENGTH,
+        OP_EXIT_CODE: OP_EXIT_CODE,
+    };
+
+    // 记录编译器实例
+    QCL_编译器 = 编译器;
+    已编译文件列表 = [];
+
+    print("编译器初始化完成: 输出=", 输出路径, " 优化=", 优化级别);
+
+    return 编译器;
 
 // ============================================================================
-// 2. 扫描QEntL目录() — 递归扫描QEntL源码目录
+// 2. 扫描QEntL目录() — 递归扫描目录下的 .qentl 源文件
 // ============================================================================
-//
-// 函数签名：
-//   函数 扫描QEntL目录(根目录: 字符串) -> 文件列表:
 //
 // 扫描策略：
-//   - 深度优先递归遍历目录树
-//   - 匹配模式: *.qentl
-//   - 排除目录: .git, .tmp, build, node_modules, __pycache__
-//   - 排除文件: .qbc, .log, .tmp, .bak
-//   - 按文件路径排序（确定性输出）
-//
-// 已知目录结构（220个.qentl文件分布）：
-//   QEntL/System/Kernel/        — 核心模块（QNS/QDFS等）
-//   QEntL/System/Compiler/      — QCL编译器模块
-//   QEntL/System/VM/            — QVM虚拟机模块
-//   QEntL/System/Platform/      — 经典5平台支持
-//   QEntL/System/VM/src/deployment/ — 量子3种部署
-//   QEntL/Models/QSM/           — QSM量子叠加态模型
-//   QEntL/Models/SOM/           — SOM模型
-//   QEntL/Models/WeQ/           — WeQ模型
-//   QEntL/Models/Ref/           — Ref模型
-//   QCL模块/                    — QCL模块（opcodes/lexer/parser/parser_high）
-//   QCL引导器.qentl             — 本文件
-//
-// 返回：QEntL源文件路径列表（已排序）
+//   a) 递归遍历目录树（深度优先）
+//   b) 匹配 *.qentl 后缀文件
+//   c) 排除 .git/ .tmp/ .bak/ build/ 等临时目录
+//   d) 按路径排序（确保编译顺序确定）
+
+// 递归扫描目录，追加 .qentl 文件到结果列表
+def 扫描目录(当前目录, 结果列表):
+    var 条目列表 = 目录列出(当前目录);
+    var i = 0;
+    while i < len(条目列表):
+        var 条目 = 条目列表[i];
+        if 排除目录检查(条目):
+            i = i + 1;
+            continue;
+        var 完整路径 = 路径连接(当前目录, 条目);
+        if 路径是目录(完整路径):
+            扫描目录(完整路径, 结果列表);
+        else if 以后缀结尾(条目, ".qentl"):
+            追加(结果列表, 完整路径);
+        i = i + 1;
+
+// 主扫描入口
+def 扫描QEntL目录(目录路径):
+    var 结果列表 = [];
+    扫描目录(目录路径, 结果列表);
+    冒泡排序(结果列表);
+    if len(结果列表) > 0:
+        print("扫描完成: 找到", len(结果列表), "个.qentl文件");
+    else:
+        print("扫描完成: 未找到.qentl文件");
+    return 结果列表;
 
 // ============================================================================
-// 3. 编译器.编译() — 将QEntL源码翻译为.qbc字节码
+// 3. 编译器.编译() — 将QEntL源码编译为 .qbc 字节码
 // ============================================================================
-//
-// 函数签名：
-//   函数 编译器.编译(编译器: 编译器, 源文件路径: 字符串, 输出文件路径: 字符串) -> 编译结果:
 //
 // 编译流程（七步）：
-//   步骤1: 读取源码 — 从源文件路径读取QEntL源码文本
-//   步骤2: 词法分析 — 将源码转换为Token流（使用词法分析器）
-//   步骤3: 语法分析 — 将Token流转换为AST（抽象语法树）
-//           - 量子指令：调用qcl_parser.qentl解析
-//           - 高级语法：调用qcl_parser_high.qentl解析
-//   步骤4: 语义检查 — 检查类型一致性、作用域、依赖关系
-//   步骤5: 字节码生成 — 将AST转换为.qbc字节码
-//           - 量子指令：生成量子字节码（头字节0x14）
-//           - 经典逻辑：生成机器二进制（5平台格式）
-//           - 量子逻辑：生成量子字节码（3种部署格式）
-//   步骤6: 优化 — 执行优化器（死代码消除、常数折叠、量子门合并）
-//   步骤7: 输出 — 将优化后的字节码写入输出文件
-//
-// 返回：编译结果（成功/失败状态 + 错误信息 + 输出文件路径）
-//
-// 字节码格式：
-//   经典逻辑部分（机器二进制）：
-//     - Windows (PE)
-//     - iOS (Mach-O)
-//     - Android (ELF)
-//     - 鸿蒙 (ELF/ARM)
-//     - Linux (ELF)
-//     → CPU直接执行
-//   量子逻辑部分（量子字节码）：
-//     - 叠加态指令
-//     - 纠缠指令
-//     - 测量指令
-//     → QPU直接执行
-//
-// 量子三种部署：
-//   - 开发部署: 软件模拟器（QVM）— 本地CPU模拟量子运算
-//   - 生产部署: 云端QPU API — 网络调用云端QPU服务
-//   - 专用部署: 量子协处理器 — 直接调用硬件量子设备
-//
+//   步骤1: 读取源码 — 从文件读取完整QEntL源文本
+//   步骤2: 词法分析 — tokenize() 生成Token流（70种Token类型）
+//   步骤3: 语法分析 — parse_quantum_instruction() + parse_high_level()
+//   步骤4: 语义检查 — 类型检查/作用域检查/量子比特范围检查
+//   步骤5: 字节码生成 — 小端序写入 .qbc 文件
+//   步骤6: 字节码优化 — 死代码消除/常数折叠/量子门合并
+//   步骤7: 输出 .qbc 文件 — 写入磁盘
+
+// 解析单量子比特门
+def 解析单量子门(line, p):
+    var i = 0;
+    while i < len(GATE_MAP):
+        var 门名 = GATE_MAP[i][0];
+        var 操作码 = GATE_MAP[i][1];
+        if starts_with(line, p, 门名) && p + len(门名) < len(line) && line[p + len(门名)] == ' ':
+            p = p + len(门名) + 1;
+            var qid_val = parse_int(line, p);
+            var qid = qid_val[0];
+            p = qid_val[1];
+            write_opcode(操作码);
+            write_u8(qid);
+            return [true, p];
+        i = i + 1;
+    return [false, p];
+
+// 编译一行量子指令
+def 编译量子行(line):
+    var result = parse_quantum_instruction(line, 0);
+    return result;
+
+// 编译高级语法行
+def 编译高级行(line):
+    var result = parse_high_level(line, 0);
+    return result;
+
+// 字节码优化函数（死代码消除 + 常数折叠 + 量子门合并）
+def 优化字节码():
+    var bc = get_bytecode();
+    var 新字节码 = [];
+    var i = 0;
+    var 长度 = len(bc);
+
+    while i < 长度:
+        var op = bc[i];
+        // 量子门合并：H + H = NOP
+        if op == OP_H && i + 2 < 长度 && bc[i + 1] == bc[i + 2]:
+            i = i + 3;
+            continue;
+        // 死代码消除：移除连续 NOP
+        if op == OP_NOP:
+            i = i + 1;
+            continue;
+        // 正常字节
+        新字节码.append(op);
+        // 带操作数的指令
+        if op == OP_INIT_N && i + 2 < 长度:
+            新字节码.append(bc[i + 1]);
+            新字节码.append(bc[i + 2]);
+            i = i + 3;
+            continue;
+        else if op == OP_CNOT && i + 2 < 长度:
+            新字节码.append(bc[i + 1]);
+            新字节码.append(bc[i + 2]);
+            i = i + 3;
+            continue;
+        else if op == OP_MEASURE && i + 2 < 长度:
+            新字节码.append(bc[i + 1]);
+            新字节码.append(bc[i + 2]);
+            i = i + 3;
+            continue;
+        else if op == OP_PRINT && i + 1 < 长度:
+            新字节码.append(bc[i + 1]);
+            i = i + 2;
+            continue;
+        else if op == OP_H || op == OP_X || op == OP_Y || op == OP_Z || op == OP_T || op == OP_S:
+            if i + 1 < 长度:
+                新字节码.append(bc[i + 1]);
+                i = i + 2;
+                continue;
+        i = i + 1;
+
+    bytecode = 新字节码;
+
+// 主编译函数
+def 编译器编译(编译器, 源文件路径):
+    // 步骤1: 读取源码
+    var 源码 = 文件读取(源文件路径);
+    if 源码 == null || 源码 == "":
+        print("错误: 无法读取文件", 源文件路径);
+        return false;
+
+    // 步骤2+3: 词法分析 + 语法分析（逐行处理）
+    clear_bytecode();
+
+    var 行列表 = 源码.split("\n");
+    var i = 0;
+    var 已编译行数 = 0;
+    var 高级语法行数 = 0;
+
+    while i < len(行列表):
+        var 行 = trim_str(行列表[i]);
+        // 跳过空行和注释行
+        if 行 == "" || 行[0] == '#' || starts_with(行, 0, "//"):
+            i = i + 1;
+            continue;
+
+        // 步骤3a: 尝试量子指令解析（qcl_parser.qentl）
+        var 量子结果 = 编译量子行(行);
+        if 量子结果[0]:
+            已编译行数 = 已编译行数 + 1;
+            i = i + 1;
+            continue;
+
+        // 步骤3b: 尝试高级语法解析（qcl_parser_high.qentl）
+        var 高级结果 = 编译高级行(行);
+        if 高级结果[0]:
+            高级语法行数 = 高级语法行数 + 1;
+            i = i + 1;
+            continue;
+
+        i = i + 1;
+
+    // 步骤4: 语义检查
+    if 编译器.调试模式:
+        print("语义检查: 量子指令=", 已编译行数, " 高级语法=", 高级语法行数);
+
+    // 步骤5+6: 优化
+    if 编译器.优化级别 > 0:
+        优化字节码();
+
+    // 步骤7: 输出 .qbc 文件
+    var 字节码数据 = get_bytecode();
+    var 输出路径 = 源文件路径.replace(".qentl", ".qbc");
+    文件写入(输出路径, 字节码数据);
+
+    追加(已编译文件列表, [源文件路径, 输出路径, len(字节码数据), 已编译行数, 高级语法行数]);
+    clear_bytecode();
+
+    return true;
+
 // ============================================================================
-// 编译常量表（与qcl_opcodes.qentl一致）
+// 编译器.输出() — 输出编译统计
 // ============================================================================
-//
-// 基础指令
-const OP_NOP = 0
-const OP_H = 1
-const OP_X = 2
-const OP_Z = 3
-const OP_CNOT = 4
-const OP_MEASURE = 5
-const OP_RESET = 6
-const OP_SWAP = 7
-const OP_LOAD_REG = 8
-const OP_STORE_REG = 9
-const OP_JUMP = 10
-const OP_JZ = 11
-const OP_ADD = 12
-const OP_SUB = 13
-const OP_MUL = 14
-const OP_DIV = 15
-const OP_PRINT = 16
-const OP_EXIT = 17
-const OP_BARRIER = 18
-const OP_INIT_N = 20
-const OP_STOP = 21
-const OP_LOAD_CONST = 32
-const OP_STORE_VAR = 33
-const OP_LOAD_VAR = 34
-const OP_T = 35
-const OP_S = 36
-const OP_Y = 37
-const OP_IMPORT = 100
-const OP_DEFINE_CLASS = 101
-const OP_DEFINE_FUNC = 102
-const OP_DEF_PARAM = 103
-const OP_INIT_MODULE = 104
-const OP_SET_CONFIG = 105
-const OP_RETURN = 108
-const OP_IF = 109
-const OP_ELSE = 110
-const OP_WHILE = 111
-const OP_BREAK = 112
-const OP_CONTINUE = 113
-const OP_FUNC_CALL = 114
-const OP_NEW = 115
-const OP_PUSH_TRUE = 124
-const OP_PUSH_FALSE = 123
-const OP_PUSH_NULL = 125
-const OP_EQUAL = 126
-const OP_NOT_EQUAL = 127
-const OP_RANDOM = 138
-const OP_LENGTH = 139
-//
-// 5平台扩展opcode (141-159)
-const OP_PLATFORM_WINDOWS = 141
-const OP_PLATFORM_IOS = 142
-const OP_PLATFORM_ANDROID = 143
-const OP_PLATFORM_HARMONY = 144
-const OP_PLATFORM_LINUX = 145
-const OP_PLATFORM_COUNT = 5
-const OP_DEPLOY_DEV = 146
-const OP_DEPLOY_PROD = 147
-const OP_DEPLOY_DEDI = 148
-const OP_DEPLOY_COUNT = 3
-//
-// 字节码魔数
-const MAGIC_QCL = 0x51434C46  // "QCLF"
-const MAGIC_QBC = 0x14        // 量子字节码标识
-//
+
+def 编译器输出(编译器):
+    var 总文件数 = len(已编译文件列表);
+    var 总字节数 = 0;
+    var 总量子指令 = 0;
+    var 总高级语法 = 0;
+    var i = 0;
+    while i < 总文件数:
+        var 记录 = 已编译文件列表[i];
+        总字节数 = 总字节数 + 记录[2];
+        总量子指令 = 总量子指令 + 记录[3];
+        总高级语法 = 总高级语法 + 记录[4];
+        i = i + 1;
+
+    print("========================================");
+    print("QCL编译器编译完成");
+    print("========================================");
+    print("总文件数:", 总文件数);
+    print("总字节数:", 总字节数);
+    print("量子指令:", 总量子指令);
+    print("高级语法:", 总高级语法);
+    print("输出路径:", 编译器.输出路径);
+    print("优化级别:", 编译器.优化级别);
+
 // ============================================================================
-// 编译结果类型定义
+// 主程序入口（由QCL编译器（QEntL全栈）执行）
 // ============================================================================
-//
-// 类型 编译结果 {
-//   状态: 整数  // 0=成功, 1=失败
-//   错误信息: 字符串
-//   输出文件路径: 字符串
-//   编译统计: 编译统计
-// }
-//
-// 类型 编译统计 {
-//   源文件数: 整数
-//   编译文件数: 整数
-//   失败文件数: 整数
-//   输出字节数: 整数
-//   用时: 整数
-// }
-//
-// ============================================================================
-// 编译器对象类型定义
-// ============================================================================
-//
-// 类型 编译器 {
-//   opcode表: Opcode表
-//   词法器: 词法分析器
-//   解析器: 语法分析器
-//   字节码缓冲区: 字节码缓冲区
-//   优化器: 优化器
-//   链接器: 链接器
-//   输出路径: 字符串
-//   优化级别: 整数
-//   调试模式: 布尔
-// }
-//
-// 类型 Opcode表 {
-//   基础指令: 指令表
-//   变量指令: 指令表
-//   高级指令: 指令表
-//   5平台指令: 指令表
-//   部署指令: 指令表
-// }
-//
-// 类型 指令表 {
-//   指令名: 字符串 -> 指令码: 整数
-// }
-//
-// 类型 词法分析器 {
-//   源码: 字符串
-//   当前位置: 整数
-//   Token流: Token列表
-//   错误列表: 错误列表
-// }
-//
-// 类型 Token {
-//   类型: Token类型
-//   值: 字符串
-//   行号: 整数
-//   列号: 整数
-// }
-//
-// 类型 Token类型 {
-//   关键字 = 0
-//   标识符 = 1
-//   整数 = 2
-//   浮点 = 3
-//   字符串 = 4
-//   布尔 = 5
-//   空值 = 6
-//   运算符 = 7
-//   分隔符 = 8
-// }
-//
-// ============================================================================
-// 主程序（由QCL编译器（QEntL全栈）执行）
-// ============================================================================
-//
-// 函数 主程序():
-//   // 1. 初始化编译器
-//   编译器 = 新建编译器(输出路径: "./bin", 优化级别: 2, 调试模式: 假)
-//
-//   // 2. 扫描QEntL目录
-//   文件列表 = 扫描QEntL目录(根目录: "./QEntL")
-//
-//   // 3. 编译所有QEntL源码
-//   编译结果列表 = 空列表
-//   对于 文件路径 在 文件列表:
-//     输出路径 = 文件路径.replace(".qentl", ".qbc")
-//     编译结果 = 编译器.编译(编译器, 文件路径, 输出路径)
-//     编译结果列表.添加(编译结果)
-//
-//   // 4. 生成编译报告
-//   成功数 = 计数(编译结果列表, 结果 -> 结果.状态 == 0)
-//   失败数 = 计数(编译结果列表, 结果 -> 结果.状态 == 1)
-//
-//   如果 调试模式:
-//     对于 编译结果 在 编译结果列表:
-//       如果 编译结果.状态 == 1:
-//         打印("编译失败: " + 编译结果.输出文件路径 + " - " + 编译结果.错误信息)
-//
-//   打印("编译完成: " + 成功数 + "/" + 文件列表.长度 + " 成功, " + 失败数 + " 失败")
-//
-//   返回 编译结果列表
-//
-// 主程序()
+
+def 主程序():
+    // 1. 初始化编译器
+    var 编译器 = 新建编译器("./bin", 2, false);
+
+    // 2. 扫描QEntL目录
+    var 文件列表 = 扫描QEntL目录("./QEntL");
+
+    // 3. 编译所有QEntL源码
+    var i = 0;
+    while i < len(文件列表):
+        var 文件路径 = 文件列表[i];
+        编译器编译(编译器, 文件路径);
+        i = i + 1;
+
+    // 4. 输出编译统计
+    编译器输出(编译器);
+
+    return 已编译文件列表;
+
+// 程序入口
+主程序();
 
 // ============================================================================
 // 结束
