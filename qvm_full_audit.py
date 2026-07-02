@@ -12,8 +12,8 @@ qentl_files = sorted(glob.glob("QEntL/**/*.qbc", recursive=True))
 CORE = [
     "QEntL/System/Kernel/neural/qns_training_circuit.qbc",
     "QEntL/System/Kernel/neural/qns_backprop_circuit.qbc",
-    "QEntL/System/Kernel/neural/qns_qdfs_dataflow.qbc",
-    "QEntL/System/Kernel/neural/qns_qdfs_reverse_flow_circuit.qbc",
+    "QEntL/System/Kernel/qns_qdfs_dataflow.qbc",
+    "QEntL/System/Kernel/qns_qdfs_reverse_flow_circuit.qbc",
     "QEntL/System/Kernel/filesystem/qdfs_quantum_circuit.qbc",
     "QEntL/System/Kernel/filesystem/grover_search_circuit.qbc",
     "QEntL/Models/QSM/qsm_entanglement_circuit.qbc",
