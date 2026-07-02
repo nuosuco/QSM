@@ -1,0 +1,71 @@
+=== [A] 编译所有C源文件 ===
+--- QSM src/*.c ---
+  -> Compiling src/qcl_bootstrap.c ...
+src/qcl_bootstrap.c: In function ‘parse_import’:
+src/qcl_bootstrap.c:197:62: warning: multi-character character constant [-Wmultichar]
+  197 |     while (**p == ' ' || **p == '\t' || **p == '"' || **p == '作' || **p == '为' || **p == ' ') (*p)++;
+      |                                                              ^~~~
+src/qcl_bootstrap.c:197:77: warning: multi-character character constant [-Wmultichar]
+  197 |     while (**p == ' ' || **p == '\t' || **p == '"' || **p == '作' || **p == '为' || **p == ' ') (*p)++;
+      |                                                                             ^~~~
+src/qcl_bootstrap.c: In function ‘parse_number’:
+src/qcl_bootstrap.c:399:16: warning: comparison between pointer and integer
+  399 |     while ((*p >= '0' && *p <= '9') || *p == '.') {
+      |                ^~
+src/qcl_bootstrap.c:399:29: warning: comparison between pointer and integer
+  399 |     while ((*p >= '0' && *p <= '9') || *p == '.') {
+      |                             ^~
+src/qcl_bootstrap.c:399:43: warning: comparison between pointer and integer
+  399 |     while ((*p >= '0' && *p <= '9') || *p == '.') {
+      |                                           ^~
+     OK: bin/qcl_bootstrap
+  -> Compiling src/qcl_bootstrap_v2.c ...
+src/qcl_bootstrap_v2.c: In function ‘parse_import’:
+src/qcl_bootstrap_v2.c:197:62: warning: multi-character character constant [-Wmultichar]
+  197 |     while (**p == ' ' || **p == '\t' || **p == '"' || **p == '作' || **p == '为' || **p == ' ') (*p)++;
+      |                                                              ^~~~
+src/qcl_bootstrap_v2.c:197:77: warning: multi-character character constant [-Wmultichar]
+  197 |     while (**p == ' ' || **p == '\t' || **p == '"' || **p == '作' || **p == '为' || **p == ' ') (*p)++;
+      |                                                                             ^~~~
+src/qcl_bootstrap_v2.c: In function ‘parse_number’:
+src/qcl_bootstrap_v2.c:399:16: warning: comparison between pointer and integer
+  399 |     while ((*p >= '0' && *p <= '9') || *p == '.') {
+      |                ^~
+src/qcl_bootstrap_v2.c:399:29: warning: comparison between pointer and integer
+  399 |     while ((*p >= '0' && *p <= '9') || *p == '.') {
+      |                             ^~
+src/qcl_bootstrap_v2.c:399:43: warning: comparison between pointer and integer
+  399 |     while ((*p >= '0' && *p <= '9') || *p == '.') {
+      |                                           ^~
+     OK: bin/qcl_bootstrap_v2
+  -> Compiling src/qvm_boot.c ...
+     OK: bin/qvm_boot
+  -> Compiling src/qvm_bootstrap.c ...
+     OK: bin/qvm_bootstrap
+
+--- .openclaw/workspace/src/*.c ---
+  -> Compiling src/qentl_compiler.c ...
+     OK: bin/qentl_compiler
+  -> Compiling src/qnn_runner.c ...
+     OK: bin/qnn_runner
+  -> Compiling src/qvm_boot.c ...
+     OK: bin/qvm_boot
+  -> Compiling src/yi_pipeline.c ...
+     OK: bin/yi_pipeline
+--- QSM Installer qentl_bootmgr.c ---
+Installer/qentl_bootmgr.c: In function ‘qentl_system_init’:
+Installer/qentl_bootmgr.c:42:10: warning: implicit declaration of function ‘check_hardware_compatibility’ [-Wimplicit-function-declaration]
+   42 |     if (!check_hardware_compatibility()) {
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Installer/qentl_bootmgr.c:48:10: warning: implicit declaration of function ‘check_quantum_processor’ [-Wimplicit-function-declaration]
+   48 |     if (!check_quantum_processor()) {
+      |          ^~~~~~~~~~~~~~~~~~~~~~~
+Installer/qentl_bootmgr.c:53:10: warning: implicit declaration of function ‘check_memory_requirements’ [-Wimplicit-function-declaration]
+   53 |     if (!check_memory_requirements()) {
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+     OK: bin/qentl_bootmgr
+
+=== [A] 编译完成 ===
+-rwxr-xr-x 1 root root 12880 Jul  2 10:33 bin/qcl_bootstrap_v2
+-rwxr-xr-x 1 root root 17552 Jul  2 18:54 bin/qentl_compiler
+-rwxr-xr-x 1 root root 17544 Jul  2 18:54 bin/qvm_boot

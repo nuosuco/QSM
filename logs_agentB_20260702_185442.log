@@ -1,0 +1,58 @@
+=== [B] 链接所有可执行文件 ===
+  ✅ qvm_boot 已存在且为可执行文件 (17544 bytes)
+  ✅ qcl_bootstrap 已存在且为可执行文件 (12880 bytes)
+  ✅ qcl_bootstrap_v2 已存在且为可执行文件 (12880 bytes)
+  ✅ qentl_compiler 已存在且为可执行文件 (12880 bytes)
+  ✅ qnn_runner 已存在且为可执行文件 (21456 bytes)
+  ✅ yi_pipeline 已存在且为可执行文件 (26528 bytes)
+  ❌ qdfs_driver 缺失或损坏 — 尝试重链接...
+     ❌ 未找到源文件 src/qdfs_driver.c
+  ✅ qdfs_extended_test 已存在且为可执行文件 (67456 bytes)
+  ✅ qdfs_minimal_test 已存在且为可执行文件 (46408 bytes)
+  ✅ qdfs_test 已存在且为可执行文件 (46400 bytes)
+  ✅ qdfs_v2_test 已存在且为可执行文件 (50744 bytes)
+  ✅ qdfs_v4_test 已存在且为可执行文件 (55072 bytes)
+  ✅ qsm_api 已存在且为可执行文件 (13384 bytes)
+  ✅ web_desktop_api 已存在且为可执行文件 (22144 bytes)
+
+--- 检查已编译的可执行文件总数 ---
+  bin/ 中可执行文件总数: 35
+
+--- 列出所有关键二进制文件 ---
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/analyze_jsonl (8416 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/check_vocab (8432 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/check_vocab2 (8432 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/count_yi_chars (12856 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/debug_pipeline (12720 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qcl (12880 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qcl_bootstrap (12880 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qcl_bootstrap_linked (22520 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qcl_bootstrap_new (12880 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qcl_bootstrap_v2 (12880 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qcl_bootstrap_v2_linked (22520 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qdfs_driver_debug (60336 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qdfs_extended_test (67456 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qdfs_minimal_test (46408 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qdfs_test (46400 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qdfs_v2_test (50744 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qdfs_v4_test (55072 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qdfs_v4_test_debug (64984 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qentl_bootmgr (8464 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qentl_bootstrap (13240 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qentl_compiler (12880 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qnn_runner (21456 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qnn_runner_linked (21456 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qsm_api (13384 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qsm_api_linked (13416 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qvm (17544 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qvm_boot (17544 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qvm_boot_linked (17536 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qvm_bootstrap (12920 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/qvm_bootstrap_new (17544 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/test_extract (12464 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/web_desktop_api (22144 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/web_desktop_api_linked (22152 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/yi_pipeline (26528 bytes)
+  ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamic  bin/yi_pipeline_linked (26528 bytes)
+
+=== [B] 链接完成 (OK=13 MISSING=1) ===
