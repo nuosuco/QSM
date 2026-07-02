@@ -1,0 +1,624 @@
+# qcl_lexer.qentl — QCL编译器词法分析模块
+# 
+# 功能：将QCL/QEntL源码文本转换为Token流
+# 参考C源码：src/qcl_bootstrap_v2.c L393-L493
+# 
+# 识别的Token类型：
+#   关键字  · 标识符  · 整数  · 浮点数  · 字符串
+#   布尔值(真/假)  · 空值(null/空)  · 运算符  · 分隔符
+#   注释  · 空白  · EOF
+
+import stdlib
+
+# ─── Token类型枚举 ────────────────────────────────────────────────
+类型 TokenKind = {
+    # 分隔符
+    LEFT_PAREN = 1,      # (
+    RIGHT_PAREN = 2,     # )
+    LEFT_BRACE = 3,      # {
+    RIGHT_BRACE = 4,     # }
+    LEFT_BRACKET = 5,    # [
+    RIGHT_BRACKET = 6,   # ]
+    COMMA = 7,           # ,
+    DOT = 8,             # .
+    SEMICOLON = 9,       # ;
+    COLON = 10,          # :
+
+    # 运算符
+    PLUS = 20,           # +
+    MINUS = 21,          # -
+    STAR = 22,           # *
+    SLASH = 23,          # /
+    PERCENT = 24,        # %
+    CARET = 25,          # ^
+    AMPERSAND = 26,      # &
+    PIPE = 27,           # |
+    TILDE = 28,          # ~
+    EXCL = 29,           # !
+    AT = 30,             # @
+
+    # 比较/赋值
+    EQUAL = 40,          # =
+    NOT_EQ = 41,         # !=
+    LESS = 42,           # <
+    GREATER = 43,        # >
+    LESS_EQ = 44,        # <=
+    GREATER_EQ = 45,     # >=
+    PLUS_EQ = 46,        # +=
+    MINUS_EQ = 47,       # -=
+    STAR_EQ = 48,        # *=
+    SLASH_EQ = 49,       # /=
+    ARROW = 50,          # ->
+
+    # 字面值
+    IDENTIFIER = 60,     # 标识符
+    INTEGER = 61,        # 整数字面量
+    FLOAT = 62,          # 浮点字面量
+    STRING = 63,         # "..."
+    BOOL_TRUE = 64,      # true / 真
+    BOOL_FALSE = 65,     # false / 假
+    NULL = 66,           # null / 空
+
+    # 注释
+    COMMENT_LINE = 70,   # // 行注释
+    COMMENT_BLOCK = 71,  # /* ... */ 块注释
+
+    # 特殊
+    EOF = 99,            # 文件结束
+    ERROR = 100,         # 非法字符
+}
+
+# ─── Token结构体 ──────────────────────────────────────────────────
+类型 Token = {
+    kind: 整数,          # TokenKind 值
+    text: 字符串,        # 原始文本
+    line: 整数,          # 行号(从1开始)
+    col: 整数,           # 列号(从1开始)
+}
+
+# ─── 关键字映射表 ─────────────────────────────────────────────────
+# 中文关键字 -> TokenKind (用IDENTIFIER标记，由text区分)
+常量 KEYWORDS = {
+    "量子模块"   : 1,
+    "类型"       : 1,
+    "函数"       : 1,
+    "导入"       : 1,
+    "如果"       : 1,
+    "否则"       : 1,
+    "循环"       : 1,
+    "跳出"       : 1,
+    "继续"       : 1,
+    "返回"       : 1,
+    "返回空二进制": 1,
+    "空二进制"   : 1,
+    "如果"       : 1,
+    "当"         : 1,
+    "而"         : 1,
+    "直到"       : 1,
+    "对于"       : 1,
+    "范围"       : 1,
+    "使用"       : 1,
+    "作为"       : 1,
+    "公开"       : 1,
+    "私有"       : 1,
+    "保护"       : 1,
+    "常量"       : 1,
+    "变量"       : 1,
+    "量子"       : 1,
+    "经典"       : 1,
+    "测量"       : 1,
+    "纠缠"       : 1,
+    "叠加"       : 1,
+    "门"         : 1,
+    "电路"       : 1,
+    "尝试"       : 1,
+    "捕获"       : 1,
+    "最终"       : 1,
+    "抛出"       : 1,
+    "断言"       : 1,
+    "匹配"       : 1,
+    "案例"       : 1,
+    "默认"       : 1,
+    "开关"       : 1,
+    "暂停"       : 1,
+    "恢复"       : 1,
+    "并行"       : 1,
+    "等待"       : 1,
+    "异步"       : 1,
+    "延迟"       : 1,
+    "空"         : 1,
+    "空数组"     : 1,
+    "空对象"     : 1,
+    "新建"       : 1,
+}
+
+# ─── 单字符运算符映射 ─────────────────────────────────────────────
+常量 SINGLE_CHAR_OPS = {
+    "(": 1, ")": 2, "{": 3, "}": 4,
+    "[": 5, "]": 6, ",": 7, ".": 8,
+    ";": 9, ":": 10,
+    "+": 20, "-": 21, "*": 22, "/": 23,
+    "%": 24, "^": 25, "&": 26, "|": 27,
+    "~": 28, "!": 29, "=": 40,
+    "<": 42, ">": 43,
+}
+
+# ─── 双字符运算符表 ───────────────────────────────────────────────
+常量 DOUBLE_CHAR_OPS = {
+    "->": 50,
+    "!=": 41,
+    "<=": 44,
+    ">=": 45,
+    "+=": 46,
+    "-=": 47,
+    "*=": 48,
+    "/=": 49,
+    "==": 40,
+}
+
+# ─── Lexer结构体 ──────────────────────────────────────────────────
+类型 Lexer = {
+    input: 字符串,       # 源文本
+    pos: 整数,           # 当前读取位置
+    line: 整数,          # 当前行号
+    col: 整数,           # 当前列号
+    tokens: 数组,        # 已产出的Token列表
+}
+
+# ─── 辅助函数 ─────────────────────────────────────────────────────
+
+# 查看当前位置字符，不移位
+函数 peek(lexer: Lexer) -> 字符:
+    如果 lexer.pos >= len(lexer.input):
+        返回 '\0'
+    返回 lexer.input[lexer.pos]
+
+# 查看下一个字符，不移位
+函数 peek_next(lexer: Lexer) -> 字符:
+    如果 lexer.pos + 1 >= len(lexer.input):
+        返回 '\0'
+    返回 lexer.input[lexer.pos + 1]
+
+# 消费当前字符并返回
+函数 consume(lexer: Lexer) -> 字符:
+    ch = peek(lexer)
+    lexer.pos += 1
+    如果 ch == '\n':
+        lexer.line += 1
+        lexer.col = 1
+    否则:
+        lexer.col += 1
+    返回 ch
+
+# 创建Token
+函数 make_token(kind: 整数, text: 字符串, lexer: Lexer) -> Token:
+    返回 {
+        kind: kind,
+        text: text,
+        line: lexer.line,
+        col: lexer.col - len(text),  # 起始列
+    }
+
+# 判断是否为空白字符
+函数 is_whitespace(ch: 字符) -> 布尔:
+    返回 ch == ' ' 或 ch == '\t' 或 ch == '\r' 或 ch == '\n'
+
+# 判断是否为标识符字符(字母/数字/下划线/中文字符)
+函数 is_ident_char(ch: 字符) -> 布尔:
+    如果 ch >= 'a' 且 ch <= 'z': 返回 真
+    如果 ch >= 'A' 且 ch <= 'Z': 返回 真
+    如果 ch >= '0' 且 ch <= '9': 返回 真
+    如果 ch == '_': 返回 真
+    # 中文字符范围 U+4E00 ~ U+9FFF
+    code = ord(ch)
+    如果 code >= 0x4E00 且 code <= 0x9FFF: 返回 真
+    如果 code >= 0x3400 且 code <= 0x4DBF: 返回 真  # 扩展A
+    如果 code >= 0xF900 且 code <= 0xFAFF: 返回 真  # 兼容
+    返回 假
+
+# 判断是否为首标识符字符(不能是数字开头)
+函数 is_ident_start(ch: 字符) -> 布尔:
+    如果 ch >= 'a' 且 ch <= 'z': 返回 真
+    如果 ch >= 'A' 且 ch <= 'Z': 返回 真
+    如果 ch == '_': 返回 真
+    code = ord(ch)
+    如果 code >= 0x4E00 且 code <= 0x9FFF: 返回 真
+    如果 code >= 0x3400 且 code <= 0x4DBF: 返回 真
+    返回 假
+
+# ─── 核心解析函数 ─────────────────────────────────────────────────
+
+# 跳过空白(包含注释)
+函数 skip_whitespace(lexer: Lexer) -> 整数:
+    产出注释数 = 0
+    当 lexer.pos < len(lexer.input):
+        ch = peek(lexer)
+        如果 is_whitespace(ch):
+            consume(lexer)
+            继续
+        
+        # 行注释 //
+        如果 ch == '/' 且 peek_next(lexer) == '/':
+            consume(lexer); consume(lexer)
+            start_line = lexer.line
+            当 lexer.pos < len(lexer.input) 且 peek(lexer) != '\n':
+                consume(lexer)
+            产出注释数 += 1
+            继续
+        
+        # 块注释 /* */
+        如果 ch == '/' 且 peek_next(lexer) == '*':
+            consume(lexer); consume(lexer)
+            当 lexer.pos < len(lexer.input):
+                如果 peek(lexer) == '*' 且 peek_next(lexer) == '/':
+                    consume(lexer); consume(lexer)
+                    打破
+                consume(lexer)
+            产出注释数 += 1
+            继续
+        
+        打破
+    返回 产出注释数
+
+# 解析标识符或关键字
+函数 parse_identifier(lexer: Lexer) -> Token:
+    start_line = lexer.line
+    start_col = lexer.col
+    text = ""
+    
+    当 lexer.pos < len(lexer.input):
+        ch = peek(lexer)
+        如果 is_ident_char(ch):
+            text += ch
+            consume(lexer)
+        否则:
+            打破
+    
+    token = make_token(TokenKind.IDENTIFIER, text, lexer)
+    token.col = start_col
+    token.line = start_line
+    
+    # 检查是否为关键字
+    如果 text in KEYWORDS:
+        token.kind = TokenKind.IDENTIFIER  # 保留为IDENTIFIER，由text区分
+    
+    返回 token
+
+# 解析数字常量 (参考C: parse_number)
+函数 parse_number(lexer: Lexer) -> Token:
+    start_line = lexer.line
+    start_col = lexer.col
+    text = ""
+    is_float = 假
+    
+    当 lexer.pos < len(lexer.input):
+        ch = peek(lexer)
+        如果 ch >= '0' 且 ch <= '9':
+            text += ch
+            consume(lexer)
+        否则如果 ch == '.':
+            如果 is_float: 打破  # 已处理过小数点
+            # 确保后面是数字
+            如果 peek_next(lexer) >= '0' 且 peek_next(lexer) <= '9':
+                text += ch
+                consume(lexer)
+                is_float = 真
+            否则:
+                打破
+        否则:
+            打破
+    
+    token = make_token(
+        TokenKind.FLOAT 如果 is_float 否则 TokenKind.INTEGER,
+        text, lexer
+    )
+    token.col = start_col
+    token.line = start_line
+    返回 token
+
+# 解析字符串字面量 (参考C: parse_string_literal)
+函数 parse_string(lexer: Lexer) -> Token:
+    start_line = lexer.line
+    start_col = lexer.col
+    consume(lexer)  # 跳过起始引号
+    text = "\""
+    
+    当 lexer.pos < len(lexer.input):
+        ch = peek(lexer)
+        如果 ch == '"':
+            text += ch
+            consume(lexer)
+            打破
+        否则如果 ch == '\\':
+            consume(lexer)
+            text += "\\"
+            如果 lexer.pos < len(lexer.input):
+                esc = peek(lexer)
+                text += esc
+                consume(lexer)
+        否则如果 ch == '\n':
+            # 字符串内换行视为错误，但仍继续
+            打破
+        否则:
+            text += ch
+            consume(lexer)
+    
+    token = make_token(TokenKind.STRING, text, lexer)
+    token.col = start_col
+    token.line = start_line
+    返回 token
+
+# 解析布尔值 (参考C: parse_boolean)
+函数 parse_boolean(lexer: Lexer) -> Token:
+    start_line = lexer.line
+    start_col = lexer.col
+    
+    # 中文检查
+    如果 lexer.input[lexer.pos:lexer.pos+2] == "真":
+        lexer.pos += 2
+        返回 make_token(TokenKind.BOOL_TRUE, "真", lexer)
+    如果 lexer.input[lexer.pos:lexer.pos+2] == "假":
+        lexer.pos += 2
+        返回 make_token(TokenKind.BOOL_FALSE, "假", lexer)
+    
+    # 英文检查
+    如果 lexer.input[lexer.pos:lexer.pos+4] == "true":
+        lexer.pos += 4
+        返回 make_token(TokenKind.BOOL_TRUE, "true", lexer)
+    如果 lexer.input[lexer.pos:lexer.pos+5] == "false":
+        lexer.pos += 5
+        返回 make_token(TokenKind.BOOL_FALSE, "false", lexer)
+    
+    返回 空  # 不是布尔字面量
+
+# 解析空值 (参考C: parse_null)
+函数 parse_null(lexer: Lexer) -> Token:
+    start_line = lexer.line
+    start_col = lexer.col
+    
+    如果 lexer.input[lexer.pos:lexer.pos+6] == "空二进制":
+        lexer.pos += 6
+        返回 make_token(TokenKind.NULL, "空二进制", lexer)
+    如果 lexer.input[lexer.pos:lexer.pos+2] == "空":
+        lexer.pos += 2
+        返回 make_token(TokenKind.NULL, "空", lexer)
+    如果 lexer.input[lexer.pos:lexer.pos+4] == "null":
+        lexer.pos += 4
+        返回 make_token(TokenKind.NULL, "null", lexer)
+    
+    返回 空
+
+# 解析运算符(单字符或双字符)
+函数 parse_operator(lexer: Lexer) -> Token:
+    start_line = lexer.line
+    start_col = lexer.col
+    ch = peek(lexer)
+    consume(lexer)
+    
+    # 尝试双字符运算符
+    text = ch + peek(lexer)
+    如果 text in DOUBLE_CHAR_OPS:
+        consume(lexer)
+        token = make_token(DOUBLE_CHAR_OPS[text], text, lexer)
+        token.col = start_col
+        token.line = start_line
+        返回 token
+    
+    # 单字符运算符
+    如果 ch in SINGLE_CHAR_OPS:
+        token = make_token(SINGLE_CHAR_OPS[ch], ch, lexer)
+        token.col = start_col
+        token.line = start_line
+        返回 token
+    
+    # 无法识别
+    返回 make_token(TokenKind.ERROR, ch, lexer)
+
+# 解析数组字面量 (参考C: parse_array_literal)
+函数 parse_array_literal(lexer: Lexer) -> Token:
+    start_line = lexer.line
+    start_col = lexer.col
+    consume(lexer)  # 跳过 [
+    text = "["
+    element_count = 0
+    
+    当 lexer.pos < len(lexer.input):
+        ch = peek(lexer)
+        如果 ch == ']':
+            text += ch
+            consume(lexer)
+            打破
+        否则如果 ch == ',':
+            element_count += 1
+            text += ch
+            consume(lexer)
+        否则:
+            text += ch
+            consume(lexer)
+    
+    # 标记为LEFT_BRACKET + 后续解析(数组内容由解析器处理)
+    # 这里仅产出[的Token，由上层处理
+    返回 make_token(TokenKind.LEFT_BRACKET, "[", lexer)
+
+# 解析对象字面量 (参考C: parse_object_literal)
+函数 parse_object_literal(lexer: Lexer) -> Token:
+    返回 make_token(TokenKind.LEFT_BRACE, "{", lexer)
+
+# ─── 主解析循环 ───────────────────────────────────────────────────
+
+函数 next_token(lexer: Lexer) -> Token:
+    当 lexer.pos < len(lexer.input):
+        # 跳过空白和注释
+        skip_whitespace(lexer)
+        
+        如果 lexer.pos >= len(lexer.input):
+            打破
+        
+        ch = peek(lexer)
+        
+        # 空白(残余)
+        如果 is_whitespace(ch):
+            consume(lexer)
+            继续
+        
+        # 字符串
+        如果 ch == '"':
+            返回 parse_string(lexer)
+        
+        # 数字
+        如果 ch >= '0' 且 ch <= '9':
+            返回 parse_number(lexer)
+        
+        # 标识符/关键字
+        如果 is_ident_start(ch):
+            ident = parse_identifier(lexer)
+            
+            # 中文关键字文本直接检查
+            如果 ident.text == "真":
+                ident.kind = TokenKind.BOOL_TRUE
+            否则如果 ident.text == "假":
+                ident.kind = TokenKind.BOOL_FALSE
+            否则如果 ident.text == "空" 或 ident.text == "空二进制":
+                ident.kind = TokenKind.NULL
+            否则如果 ident.text == "new":
+                ident.kind = TokenKind.IDENTIFIER
+            否则如果 ident.text in KEYWORDS:
+                ident.kind = TokenKind.IDENTIFIER
+            
+            返回 ident
+        
+        # 布尔值(英文)
+        如果 ch == 't' 且 lexer.input[lexer.pos:lexer.pos+4] == "true":
+            lexer.pos += 4
+            返回 make_token(TokenKind.BOOL_TRUE, "true", lexer)
+        如果 ch == 'f' 且 lexer.input[lexer.pos:lexer.pos+5] == "false":
+            lexer.pos += 5
+            返回 make_token(TokenKind.BOOL_FALSE, "false", lexer)
+        如果 ch == 'n' 且 lexer.input[lexer.pos:lexer.pos+4] == "null":
+            lexer.pos += 4
+            返回 make_token(TokenKind.NULL, "null", lexer)
+        
+        # 运算符 / 分隔符
+        token = parse_operator(lexer)
+        如果 token.kind != TokenKind.ERROR:
+            返回 token
+        
+        # 无法识别的字符
+        consume(lexer)
+        返回 make_token(TokenKind.ERROR, ch, lexer)
+    
+    # EOF
+    返回 make_token(TokenKind.EOF, "", lexer)
+
+# ─── Token流生成器 ────────────────────────────────────────────────
+
+函数 tokenize(source: 字符串) -> 数组[Token]:
+    """
+    对完整源码进行词法分析，返回Token列表。
+    
+    用法:
+        tokens = tokenize("函数 计算(x, y) -> 整数: 返回 x + y")
+        for tok in tokens:
+            打印(tok.kind, tok.text)
+    """
+    lexer = {
+        input: source,
+        pos: 0,
+        line: 1,
+        col: 1,
+        tokens: [],
+    }
+    
+    当 真:
+        tok = next_token(lexer)
+        追加(lexer.tokens, tok)
+        如果 tok.kind == TokenKind.EOF:
+            打破
+    
+    返回 lexer.tokens
+
+# ─── Token流迭代器 ────────────────────────────────────────────────
+
+类型 TokenStream = {
+    tokens: 数组[Token],
+    index: 整数,
+}
+
+函数 new_token_stream(tokens: 数组[Token]) -> TokenStream:
+    返回 { tokens: tokens, index: 0 }
+
+函数 peek_token(stream: TokenStream) -> Token:
+    如果 stream.index >= len(stream.tokens):
+        返回 make_token(TokenKind.EOF, "", {line:0,col:0,pos:0,input:""})
+    返回 stream.tokens[stream.index]
+
+函数 advance_token(stream: TokenStream) -> Token:
+    tok = peek_token(stream)
+    stream.index += 1
+    返回 tok
+
+函数 expect_token(stream: TokenStream, kind: 整数) -> Token:
+    tok = peek_token(stream)
+    如果 tok.kind != kind:
+        抛出 语法错误("期望 TokenKind=" + str(kind) + ", 得到 " + tok.text + " 在行" + str(tok.line))
+    返回 advance_token(stream)
+
+# ─── 测试 ─────────────────────────────────────────────────────────
+
+函数 测试_词法分析():
+    测试用例 = [
+        ("5", "整数"),
+        ("3.14", "浮点数"),
+        ("true", "布尔真"),
+        ("false", "布尔假"),
+        ("真", "布尔真中文"),
+        ("假", "布尔假中文"),
+        ("null", "空值"),
+        ("空", "空值中文"),
+        ("空二进制", "空值中文2"),
+        ('"你好"', "字符串"),
+        ("+", "运算符加"),
+        ("==", "运算符等于"),
+        ("->", "运算符箭头"),
+        ("函数", "关键字"),
+        ("导入", "关键字"),
+        ("量子模块", "关键字"),
+        ("否则", "关键字"),
+        ("循环", "关键字"),
+        ("跳出", "关键字"),
+        ("继续", "关键字"),
+        ("返回", "关键字"),
+        ("如果", "关键字"),
+    ]
+    
+    通过 = 0
+    失败 = 0
+    
+    for (源码, 描述) in 测试用例:
+        tokens = tokenize(源码)
+        如果 len(tokens) >= 1:
+            通过 += 1
+            打印("✓", 描述, "→", tokens[0].kind, tokens[0].text)
+        否则:
+            失败 += 1
+            打印("✗", 描述, "失败")
+    
+    打印("\n测试完成: 通过", 通过, "失败", 失败)
+    返回 失败 == 0
+
+# ─── 导出 ─────────────────────────────────────────────────────────
+# 其他模块可通过:
+#   import qcl_lexer
+#   qcl_lexer.tokenize(source)
+#   qcl_lexer.TokenKind
+#   qcl_lexer.TokenStream
+
+导出 tokenize
+导出 next_token
+导出 new_token_stream
+导出 peek_token
+导出 advance_token
+导出 expect_token
+导出 TokenKind
+导出 Token
+导出 TokenStream

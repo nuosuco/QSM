@@ -1,0 +1,341 @@
+// ============================================================================
+// qcl_parser.qentl
+// QCL 编译器 — 量子指令解析模块
+// 从 src/qcl_bootstrap_v2.c (L646-L744) 移植
+// ============================================================================
+//
+// 职责：逐行解析 QCL 源码文本，识别量子指令关键字，
+// 将文本指令翻译为字节码指令（写入 bytecode 全局数组）。
+//
+// 支持的指令：
+//   init N         → OP_INIT_N + 量子比特数
+//   H|X|Y|Z|T|S q  → 单量子比特门 + 量子比特编号
+//   CNOT c t       → OP_CNOT + 控制位 + 目标位
+//   MEASURE q r    → OP_MEASURE + 量子比特编号 + 经典寄存器
+//   PRINT r        → OP_PRINT + 寄存器编号
+//   STOP           → OP_STOP
+//   EXIT           → OP_EXIT
+//   否则           → OP_ELSE
+//   循环           → OP_WHILE
+//   跳出           → OP_BREAK
+//   继续           → OP_CONTINUE
+//   func()         → OP_FUNC_CALL + 函数名
+// ============================================================================
+
+import "qcl_opcodes.qentl";
+
+// ==================== 辅助函数 ====================
+
+// 跳过前导空白字符（空格、制表符、回车）
+def skip_whitespace(p, line):
+    var i = p;
+    while i < len(line):
+        var ch = line[i];
+        if ch != ' ' && ch != '\t' && ch != '\r':
+            break;
+        i = i + 1;
+    return i;
+
+// 从位置 p 开始解析一个非负整数，返回 (值, 新位置)
+def parse_uint(line, p):
+    var val = 0;
+    var i = p;
+    while i < len(line):
+        var ch = line[i];
+        if ch >= '0' && ch <= '9':
+            val = val * 10 + (ord(ch) - ord('0'));
+            i = i + 1;
+        else:
+            break;
+    return [val, i];
+
+// 判断位置 p 开始的子串是否等于 target（前缀匹配）
+def starts_with(line, p, target):
+    var tl = len(target);
+    if p + tl > len(line):
+        return false;
+    var i = 0;
+    while i < tl:
+        if line[p + i] != target[i]:
+            return false;
+        i = i + 1;
+    return true;
+
+// 判断字符串是否包含子串 sub
+def contains_str(line, sub):
+    var sl = len(sub);
+    var ll = len(line);
+    var i = 0;
+    while i <= ll - sl:
+        if starts_with(line, i, sub):
+            return true;
+        i = i + 1;
+    return false;
+
+// 判断字符串是否包含"("字符（用于函数调用检测）
+def has_open_paren(line, p):
+    var i = p;
+    while i < len(line):
+        if line[i] == '(':
+            return true;
+        i = i + 1;
+    return false;
+
+// 字符串前缀匹配，返回前缀长度或 -1
+def str_prefix_len(line, p, target):
+    var tl = len(target);
+    if p + tl > len(line):
+        return -1;
+    var i = 0;
+    while i < tl:
+        if line[p + i] != target[i]:
+            return -1;
+        i = i + 1;
+    return tl;
+
+// ==================== 单量子比特门解析 ====================
+
+// 单量子比特门映射表
+const GATE_MAP = [
+    ["H", OP_H],
+    ["X", OP_X],
+    ["Y", OP_Y],
+    ["Z", OP_Z],
+    ["T", OP_T],
+    ["S", OP_S]
+];
+
+// 解析单量子比特门：gate qid
+// 例如 "H 0" → write_opcode(OP_H); write_u8(0);
+def parse_single_gate(line, p):
+    var matched = false;
+    var opcode = OP_H;
+
+    var i = 0;
+    while i < len(GATE_MAP):
+        var gname = GATE_MAP[i][0];
+        var gop   = GATE_MAP[i][1];
+        // 匹配 "H " / "X " 等（门名后有空格）
+        if starts_with(line, p, gname) && p + len(gname) < len(line) && line[p + len(gname)] == ' ':
+            opcode = gop;
+            matched = true;
+            p = p + len(gname) + 1;  // 跳过门名和空格
+            break;
+        i = i + 1;
+
+    if !matched:
+        return [false, p];
+
+    // 解析量子比特编号
+    var qid = 0;
+    var qid_val = parse_uint(line, p);
+    qid = qid_val[0];
+    p = qid_val[1];
+
+    write_opcode(opcode);
+    write_u8(qid);
+
+    return [true, p];
+
+// ==================== 主解析函数 ====================
+
+// 解析单行 QCL 源码，输出字节码
+// 返回 [成功标志, 新位置]
+// 模仿 C 源码 compile_file_v2 中 L646-L744 的分支逻辑
+def parse_quantum_instruction(line, p):
+    // 1) init N
+    if starts_with(line, p, "init ") && p + 5 <= len(line):
+        p = p + 5;
+        var n_val = parse_uint(line, p);
+        var n = n_val[0];
+        p = n_val[1];
+        p = skip_whitespace(line, p);
+        write_opcode(OP_INIT_N);
+        write_u8(n & 0xFF);
+        write_u8((n >> 8) & 0xFF);
+        return [true, p];
+
+    // 2) 单量子比特门: H|X|Y|Z|T|S qid
+    if starts_with(line, p, "H ") || starts_with(line, p, "X ") ||
+       starts_with(line, p, "Y ") || starts_with(line, p, "Z ") ||
+       starts_with(line, p, "T ") || starts_with(line, p, "S "):
+        var result = parse_single_gate(line, p);
+        return result;
+
+    // 3) CNOT ctrl tgt
+    if starts_with(line, p, "CNOT ") && p + 5 <= len(line):
+        p = p + 5;
+        var ctrl_val = parse_uint(line, p);
+        var ctrl = ctrl_val[0];
+        p = ctrl_val[1];
+        // 只跳过空格和制表符，不跳过换行（防止跨行读）
+        while p < len(line) && (line[p] == ' ' || line[p] == '\t'):
+            p = p + 1;
+        var tgt_val = parse_uint(line, p);
+        var tgt = tgt_val[0];
+        p = tgt_val[1];
+
+        write_opcode(OP_CNOT);
+        write_u8(ctrl);
+        write_u8(tgt);
+        return [true, p];
+
+    // 4) MEASURE qid reg
+    if starts_with(line, p, "MEASURE ") && p + 8 <= len(line):
+        p = p + 8;
+        var qid_val = parse_uint(line, p);
+        var qid = qid_val[0];
+        p = qid_val[1];
+        while p < len(line) && (line[p] == ' ' || line[p] == '\t'):
+            p = p + 1;
+        var reg_val = parse_uint(line, p);
+        var reg = reg_val[0];
+        p = reg_val[1];
+
+        write_opcode(OP_MEASURE);
+        write_u8(qid);
+        write_u8(reg);
+        return [true, p];
+
+    // 5) PRINT reg
+    if starts_with(line, p, "PRINT ") && p + 6 <= len(line):
+        p = p + 6;
+        var reg_val = parse_uint(line, p);
+        var reg = reg_val[0];
+        p = reg_val[1];
+
+        write_opcode(OP_PRINT);
+        write_u8(reg);
+        return [true, p];
+
+    // 6) STOP（精确匹配，不要求后续字符）
+    if starts_with(line, p, "STOP") && (p + 4 >= len(line) || line[p + 4] == ' ' || line[p + 4] == '\t' || line[p + 4] == '\n'):
+        write_opcode(OP_STOP);
+        return [true, p + 4];
+
+    // 7) EXIT
+    if starts_with(line, p, "EXIT") && (p + 4 >= len(line) || line[p + 4] == ' ' || line[p + 4] == '\t' || line[p + 4] == '\n'):
+        write_opcode(OP_EXIT);
+        return [true, p + 4];
+
+    // 8) 否则 (中文关键字)
+    if starts_with(line, p, "否则"):
+        write_opcode(OP_ELSE);
+        return [true, p + 2];
+
+    // 9) 循环
+    if starts_with(line, p, "循环"):
+        write_opcode(OP_WHILE);
+        return [true, p + 2];
+
+    // 10) 跳出
+    if starts_with(line, p, "跳出"):
+        write_opcode(OP_BREAK);
+        return [true, p + 2];
+
+    // 11) 继续
+    if starts_with(line, p, "继续"):
+        write_opcode(OP_CONTINUE);
+        return [true, p + 2];
+
+    // 12) 函数调用: 提取"("前的名称，输出 OP_FUNC_CALL + 字符串
+    if has_open_paren(line, p):
+        write_opcode(OP_FUNC_CALL);
+        // 提取函数名
+        var fname = "";
+        var j = p;
+        while j < len(line) && line[j] != '(' && line[j] != '\0':
+            fname = fname + line[j];
+            j = j + 1;
+        write_string(fname);
+        return [true, j];  // 返回到"("位置，调用者自行处理后续
+
+    // 未匹配任何指令
+    return [false, p];
+
+// ==================== 行级处理 ====================
+
+// 清理行内注释：找到第一个 "//" 并截断
+def strip_inline_comment(line):
+    var i = 0;
+    while i < len(line) - 1:
+        if line[i] == '/' && line[i + 1] == '/':
+            return line.substring(0, i);
+        i = i + 1;
+    return line;
+
+// 判断行是否为空行或纯注释行
+def is_empty_or_comment(line):
+    // 先跳过前导空白
+    var p = 0;
+    var ll = len(line);
+    while p < ll:
+        var ch = line[p];
+        if ch != ' ' && ch != '\t' && ch != '\r':
+            break;
+        p = p + 1;
+    if p >= ll:
+        return true;  // 全空白
+    if line[p] == '/' || line[p] == '\n' || line[p] == '\0' || line[p] == '#':
+        return true;  // 注释行或空行
+    return false;
+
+// 解析单行 QCL 源码（完整流程）
+// 输入：完整行字符串（含可能的注释和尾随换行）
+// 输出：[成功标志]
+def parse_line(line):
+    // 跳过空行和注释行
+    if is_empty_or_comment(line):
+        return [false, 0];
+
+    // 去掉行内注释
+    var code = strip_inline_comment(line);
+
+    // 去掉首尾空白
+    code = code.trim();
+
+    if len(code) == 0:
+        return [false, 0];
+
+    // 解析量子指令
+    var result = parse_quantum_instruction(code, 0);
+    return result;
+
+// ==================== 批量解析 ====================
+
+// 解析多行 QCL 源码
+// 输入：行数组 (string[])
+// 输出：[编译行数, 总行数]
+def parse_lines(lines):
+    var compiled = 0;
+    var total = len(lines);
+    var i = 0;
+    while i < total:
+        var result = parse_line(lines[i]);
+        if result[0]:
+            compiled = compiled + 1;
+        i = i + 1;
+    return [compiled, total];
+
+// 解析完整 QCL 源码（从原始文本到字节码）
+// 输入：完整源码字符串
+// 输出：[编译指令数, 总行数]
+def parse_source(source):
+    clear_bytecode();
+    var lines = source.split('\n');
+    var result = parse_lines(lines);
+    return result;
+
+// 导出供外部调用
+export parse_quantum_instruction;
+export parse_line;
+export parse_lines;
+export parse_source;
+export parse_single_gate;
+export parse_uint;
+export skip_whitespace;
+export strip_inline_comment;
+export is_empty_or_comment;
+export starts_with;
+export contains_str;
+export has_open_paren;

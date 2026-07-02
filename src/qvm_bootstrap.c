@@ -13,15 +13,29 @@
 #define MAX_MEM 256 * 1024 * 1024  /* 256MB for up to 22 qubits */
 #define MAX_CYCLES 10000
 
-/* 操作码 */
+/* 操作码 — 与qcl_bootstrap.c编译器严格对齐 */
 enum {
-    OP_INIT = 0x14,
-    OP_H = 0x00, OP_X = 0x01, OP_Y = 0x02, OP_Z = 0x03,
-    OP_CNOT = 0x04, OP_S = 0x05, OP_T = 0x06, OP_SWAP = 0x07,
-    OP_RESET = 0x08, OP_MEASURE = 0x09, OP_BARRIER = 0x0A,
-    OP_PRINT = 0x0B, OP_STOP = 0x0C, OP_LOAD = 0x0D,
-    OP_STORE = 0x0E, OP_ADD = 0x0F, OP_MUL = 0x10,
-    OP_CALL = 0x11, OP_RET = 0x12
+    OP_NOP = 0,
+    OP_H = 1,
+    OP_X = 2,
+    OP_Y = 37,   // 编译器OP_Y=37
+    OP_Z = 3,
+    OP_CNOT = 4,
+    OP_MEASURE = 5,
+    OP_RESET = 6,
+    OP_SWAP = 7,
+    OP_LOAD = 8,
+    OP_STORE = 9,
+    OP_JUMP = 10,
+    OP_PRINT = 11,
+    OP_STOP = 12,
+    OP_ADD = 13,
+    OP_MUL = 15,
+    OP_EXIT = 17,
+    OP_T = 35,
+    OP_S = 36,
+    OP_BARRIER = 18,
+    OP_INIT = 20,   // 编译器OP_INIT_N=20, 0x14=20
 };
 
 typedef struct {
@@ -195,7 +209,7 @@ int main(int argc, char *argv[]) {
             free(vm.state);
             return 0;
         }
-        case 0x15: { // QCL编译器STOP操作码(兼容QCL输出)
+        case 0x15: { // QCL编译器STOP兼容
             printf("[QVM] 程序退出\n");
             printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
             free(code);
@@ -213,18 +227,11 @@ int main(int argc, char *argv[]) {
                            apply_gate(&vm, OP_MEASURE, q, r); break; }
         case OP_PRINT: { int r = code[pos++];
                          apply_gate(&vm, OP_PRINT, r, 0); break; }
-        case 0x05: { // QCL编译器MEASURE操作码(2参数: qubit, register)
-                     int q = code[pos++], r = code[pos++];
-                     apply_gate(&vm, OP_MEASURE, q, r); break; }
-        case 0x10: { // QCL编译器PRINT操作码(1参数: register)
-                     int r = code[pos++];
-                     apply_gate(&vm, OP_PRINT, r, 0); break; }
-        case 0x07: { // QCL/SWAP等: 读取后续参数再跳过（避免对齐偏移）
-                     /* no-op 单比特门，但跳过1个参数字节保持对齐 */
-                     int _arg = code[pos++]; (void)_arg; break; }
-        case 0x06: { /* QCL T gate: no-op 单比特 */ int _a = code[pos++]; (void)_a; break; }
-        case 0x03: { /* QCL Z gate: no-op 单比特 */ int _a = code[pos++]; (void)_a; break; }
-        case 0x02: { /* QCL Y gate: no-op 单比特 */ int _a = code[pos++]; (void)_a; break; }
+        case OP_Z:  { int q = code[pos++]; (void)q; break; }
+        case OP_T:  { int q = code[pos++]; (void)q; break; }
+        case OP_S:  { int q = code[pos++]; (void)q; break; }
+        case OP_RESET: { int q = code[pos++]; (void)q; break; }
+        case OP_SWAP: { int a = code[pos++], b = code[pos++]; (void)a; (void)b; break; }
         default: break;
         }
     }

@@ -1,0 +1,721 @@
+// ============================================================================
+// qcl_parser_high.qentl
+// QCL 编译器 高级语法解析模块
+// 从 src/qcl_bootstrap_v2.c (L179-L560) 移植
+// ============================================================================
+// 实现高级语法：import / 量子模块 / 类型定义 / 函数定义 / if条件 / return返回
+//             new实例化 / length长度 / random随机数 / 数组字面量 / 对象字面量
+//             成员访问 / 变量赋值 / 运算符等
+// ============================================================================
+
+// 导入 Opcode 常量表 + 字节码写入函数
+import "qcl_opcodes.qentl";
+
+// ==================== 辅助函数 ====================
+
+// 跳过前导空白（空格、制表符、回车）
+def skip_whitespace(line, p):
+    while p < len(line):
+        var ch = line[p];
+        if ch != ' ' && ch != '\t' && ch != '\r':
+            break;
+        p = p + 1;
+    return p;
+
+// 前缀匹配：判断 line[p:...] 是否以 target 开头
+def starts_with(line, p, target):
+    var tl = len(target);
+    if p + tl > len(line):
+        return false;
+    var i = 0;
+    while i < tl:
+        if line[p + i] != target[i]:
+            return false;
+        i = i + 1;
+    return true;
+
+// 安全字符读取
+def peek(line, p):
+    if p >= len(line):
+        return '';
+    return line[p];
+
+// 读取标识符（直到空白、{、(、=、,、) 等分隔符）
+def read_identifier(line, p):
+    var name = '';
+    while p < len(line):
+        var ch = line[p];
+        if ch == '\0' || ch == '\n' || ch == '\r' || ch == '\t'
+           || ch == ' ' || ch == '{' || ch == '(' || ch == ')'
+           || ch == '=' || ch == ',' || ch == '.':
+            break;
+        name = name + ch;
+        p = p + 1;
+    return [name, p];
+
+// 读取直到结束符（返回 [字符串, 新位置]）
+def read_until(line, p, end_char):
+    var buf = '';
+    while p < len(line) && line[p] != '\0' && line[p] != end_char:
+        buf = buf + line[p];
+        p = p + 1;
+    return [buf, p];
+
+// 跳过到指定字符
+def skip_to(line, p, target):
+    while p < len(line) && line[p] != '\0' && line[p] != target:
+        p = p + 1;
+    return p;
+
+// 解析无符号整数
+def parse_uint(line, p):
+    var val = 0;
+    while p < len(line):
+        var ch = line[p];
+        if ch >= '0' && ch <= '9':
+            val = val * 10 + (ord(ch) - ord('0'));
+            p = p + 1;
+        else:
+            break;
+    return [val, p];
+
+// ==================== 全局状态 ====================
+
+// 导入表（简单数组: [path, alias, path, alias, ...]）
+var g_imports = [];
+var g_import_count = 0;
+
+// 类型/类表: [[name, field_count], ...]
+var g_classes = [];
+var g_class_count = 0;
+
+// 函数表: [[name, return_type, param_count], ...]
+var g_functions = [];
+var g_function_count = 0;
+
+// ==================== 高级语法解析函数 ====================
+
+// ---- 1. 导入解析 ----
+// 解析 "导入 <path> 作为 <alias>" 或 "导入 <path> as <alias>"
+def parse_import(line, p):
+    p = p + 2;  // 跳过"导入"
+
+    // 跳过空白和引号
+    p = skip_whitespace(line, p);
+    if peek(line, p) == '"':
+        p = p + 1;
+
+    // 读取模块路径
+    var path_result = read_until(line, p, '"');
+    var path = path_result[0];
+    p = path_result[1];
+
+    // 跳过 "作为" 或 "as"
+    p = skip_whitespace(line, p);
+    if starts_with(line, p, "作为"):
+        p = p + 2;
+    else if starts_with(line, p, "as"):
+        p = p + 2;
+    p = skip_whitespace(line, p);
+
+    // 读取别名
+    var alias_result = read_identifier(line, p);
+    var alias = alias_result[0];
+    p = alias_result[1];
+
+    // 记录导入
+    g_imports[g_import_count] = [path, alias];
+    g_import_count = g_import_count + 1;
+
+    // 写入字节码
+    write_opcode(OP_IMPORT);
+    write_string(path);
+    write_string(alias);
+
+    return [true, p];
+
+// ---- 2. 量子模块解析 ----
+// 解析 "量子模块 <name> {"
+def parse_quantum_module(line, p):
+    p = p + 4;  // 跳过"量子模块"
+
+    // 读取模块名
+    var name_result = read_identifier(line, p);
+    var module_name = name_result[0];
+    p = name_result[1];
+
+    // 跳过到 {
+    p = skip_to(line, p, '{');
+
+    // 写入字节码
+    write_opcode(OP_INIT_MODULE);
+    write_string(module_name);
+
+    return [true, p];
+
+// ---- 3. 类型/类定义解析 ----
+// 解析 "类型 <name> {"
+def parse_type(line, p):
+    p = p + 2;  // 跳过"类型"
+
+    // 读取类型名
+    var name_result = read_identifier(line, p);
+    var type_name = name_result[0];
+    p = name_result[1];
+
+    // 跳过到 {
+    p = skip_to(line, p, '{');
+
+    // 记录类型
+    g_classes[g_class_count] = [type_name, 0];
+    g_class_count = g_class_count + 1;
+
+    // 写入字节码
+    write_opcode(OP_DEFINE_CLASS);
+    write_string(type_name);
+    write_u8(g_class_count - 1);
+
+    return [true, p];
+
+// ---- 4. 函数定义解析 ----
+// 解析 "函数 <name>(<params>) -> <return> {"
+def parse_function(line, p):
+    p = p + 2;  // 跳过"函数"
+
+    // 读取函数名
+    var name_result = read_identifier(line, p);
+    var func_name = name_result[0];
+    p = name_result[1];
+
+    // 解析返回类型（跳过参数到 -> 或 {）
+    var return_type = "void";
+    while p < len(line) && line[p] != '\0' && line[p] != '\n'
+          && line[p] != '\r' && line[p] != '\t' && line[p] != '{':
+        if starts_with(line, p, "->"):
+            p = p + 2;
+            p = skip_whitespace(line, p);
+            var rt_result = read_until(line, p, '{');
+            return_type = rt_result[0];
+            p = rt_result[1];
+            break;
+        p = p + 1;
+
+    // 跳过到 {
+    p = skip_to(line, p, '{');
+
+    // 记录函数
+    g_functions[g_function_count] = [func_name, return_type, 0];
+    g_function_count = g_function_count + 1;
+
+    // 写入字节码
+    write_opcode(OP_DEFINE_FUNC);
+    write_string(func_name);
+    write_string(return_type);
+    write_u8(g_function_count - 1);
+
+    return [true, p];
+
+// ---- 5. if条件解析 ----
+// 解析 "如果 (<condition>) {"
+def parse_if(line, p):
+    p = p + 2;  // 跳过"如果"
+
+    // 跳过到 (
+    p = skip_to(line, p, '(');
+
+    // 写入字节码
+    write_opcode(OP_IF);
+
+    return [true, p];
+
+// ---- 6. return返回解析 ----
+// 解析 "返回 <value>"
+def parse_return(line, p):
+    p = p + 2;  // 跳过"返回"
+
+    // 跳过空白
+    p = skip_whitespace(line, p);
+
+    // 写入字节码
+    write_opcode(OP_RETURN);
+
+    return [true, p];
+
+// ---- 7. return对象解析 ----
+// 解析 "返回 {"
+def parse_return_obj(line, p):
+    p = p + 2;  // 跳过"返回"
+    p = skip_whitespace(line, p);
+
+    if peek(line, p) == '{':
+        write_opcode(OP_RETURN_OBJ);
+        return [true, p];
+
+    return [false, p];
+
+// ---- 8. 返回空解析 ----
+// 解析 "返回空二进制()" 或 "返回空()"
+def parse_return_empty(line, p):
+    p = p + 2;  // 跳过"返回"
+
+    // 检查是否是 "空" 开头
+    if !starts_with(line, p, "空"):
+        return [false, p];
+
+    write_opcode(OP_RETURN_EMPTY);
+
+    return [true, p];
+
+// ---- 9. new实例化解析 ----
+// 解析 "new <type>(...)"
+def parse_new(line, p):
+    p = p + 3;  // 跳过"new"
+
+    write_opcode(OP_NEW);
+
+    return [true, p];
+
+// ---- 10. length长度解析 ----
+// 解析 ".长度"
+def parse_length(line, p):
+    p = p + 3;  // 跳过".长度"
+
+    write_opcode(OP_LENGTH);
+
+    return [true, p];
+
+// ---- 11. random随机数解析 ----
+// 解析 "随机()"
+def parse_random(line, p):
+    p = p + 2;  // 跳过"随机"
+
+    write_opcode(OP_RANDOM);
+
+    return [true, p];
+
+// ==================== 字面量解析 ====================
+
+// ---- 12. 数字常量解析 ----
+// 解析数字常量（整数或浮点数）
+def parse_number(line, p):
+    var num_str = '';
+    var is_float = false;
+    var orig_p = p;
+
+    while p < len(line):
+        var ch = line[p];
+        if (ch >= '0' && ch <= '9') || ch == '.':
+            num_str = num_str + ch;
+            if ch == '.':
+                is_float = true;
+            p = p + 1;
+        else:
+            break;
+
+    if num_str == '':
+        return [false, orig_p];
+
+    // 写入字节码
+    if is_float:
+        // 简单浮点编码: 整数部分*1000 近似
+        var int_part = 0;
+        var j = 0;
+        while j < len(num_str) && num_str[j] != '.':
+            int_part = int_part * 10 + (ord(num_str[j]) - ord('0'));
+            j = j + 1;
+        var n = int_part * 1000;
+        write_opcode(OP_LOAD_CONST);
+        write_u32(n);
+    else:
+        var n = 0;
+        var j = 0;
+        while j < len(num_str):
+            n = n * 10 + (ord(num_str[j]) - ord('0'));
+            j = j + 1;
+        write_opcode(OP_LOAD_CONST);
+        write_u32(n);
+
+    return [true, p];
+
+// ---- 13. 字符串字面量解析 ----
+// 解析字符串字面量 '"..."'
+def parse_string_literal(line, p):
+    p = p + 1;  // 跳过第一个引号
+
+    var str = '';
+    while p < len(line) && line[p] != '"':
+        str = str + line[p];
+        p = p + 1;
+
+    if peek(line, p) == '"':
+        p = p + 1;
+
+    write_opcode(OP_LOAD_CONST);
+    write_u32(len(str));
+    write_string(str);
+
+    return [true, p];
+
+// ---- 14. 布尔值解析 ----
+// 解析 "true" 或 "false"（中英文）
+def parse_boolean(line, p):
+    if starts_with(line, p, "true"):
+        write_opcode(OP_PUSH_TRUE);
+        return [true, p + 4];
+    else if starts_with(line, p, "真"):
+        write_opcode(OP_PUSH_TRUE);
+        return [true, p + 2];
+    else if starts_with(line, p, "false"):
+        write_opcode(OP_PUSH_FALSE);
+        return [true, p + 5];
+    else if starts_with(line, p, "假"):
+        write_opcode(OP_PUSH_FALSE);
+        return [true, p + 2];
+
+    return [false, p];
+
+// ---- 15. null/空解析 ----
+// 解析 "null" 或 "空" 或 "空二进制"
+def parse_null(line, p):
+    if starts_with(line, p, "空二进制"):
+        write_opcode(OP_PUSH_NULL);
+        return [true, p + 4];
+    else if starts_with(line, p, "空"):
+        write_opcode(OP_PUSH_NULL);
+        return [true, p + 2];
+    else if starts_with(line, p, "null"):
+        write_opcode(OP_PUSH_NULL);
+        return [true, p + 4];
+
+    return [false, p];
+
+// ==================== 复合字面量解析 ====================
+
+// ---- 16. 数组字面量解析 ----
+// 解析 "[...]"
+def parse_array_literal(line, p):
+    p = p + 1;  // 跳过 [
+
+    write_opcode(OP_ARRAY_LITERAL);
+
+    // 简单计数元素（通过逗号数量）
+    var count = 0;
+    while p < len(line) && line[p] != ']' && line[p] != '\0':
+        if line[p] == ',':
+            count = count + 1;
+        p = p + 1;
+    write_u8(count);
+
+    if peek(line, p) == ']':
+        p = p + 1;
+
+    return [true, p];
+
+// ---- 17. 对象字面量解析 ----
+// 解析 "{"
+def parse_object_literal(line, p):
+    p = p + 1;  // 跳过 {
+
+    write_opcode(OP_OBJECT_LITERAL);
+
+    return [true, p];
+
+// ==================== 运算符解析 ====================
+
+// ---- 18. 运算符解析 ----
+// 解析 === !== < > <= >= + - * /
+def parse_operator(line, p):
+    // 三字符运算符优先
+    if starts_with(line, p, "!=="):
+        write_opcode(OP_NOT_EQUAL);
+        return [true, p + 3];
+    else if starts_with(line, p, "==="):
+        write_opcode(OP_EQUAL);
+        return [true, p + 3];
+    // 二字符运算符
+    else if starts_with(line, p, "!="):
+        write_opcode(OP_NOT_EQUAL);
+        return [true, p + 2];
+    else if starts_with(line, p, "=="):
+        write_opcode(OP_EQUAL);
+        return [true, p + 2];
+    else if starts_with(line, p, "<="):
+        write_opcode(OP_LESS_EQ);
+        return [true, p + 2];
+    else if starts_with(line, p, ">="):
+        write_opcode(OP_GREATER_EQ);
+        return [true, p + 2];
+    // 单字符运算符
+    else if peek(line, p) == '<':
+        write_opcode(OP_LESS);
+        return [true, p + 1];
+    else if peek(line, p) == '>':
+        write_opcode(OP_GREATER);
+        return [true, p + 1];
+    else if peek(line, p) == '+':
+        write_opcode(OP_ADD);
+        return [true, p + 1];
+    else if peek(line, p) == '-':
+        write_opcode(OP_SUB);
+        return [true, p + 1];
+    else if peek(line, p) == '*':
+        write_opcode(OP_MUL);
+        return [true, p + 1];
+    else if peek(line, p) == '/':
+        write_opcode(OP_DIV);
+        return [true, p + 1];
+
+    return [false, p];
+
+// ==================== 高级特性解析 ====================
+
+// ---- 19. 成员访问解析 ----
+// 解析 ".成员"
+def parse_member_access(line, p):
+    p = p + 1;  // 跳过 .
+
+    var member = '';
+    while p < len(line):
+        var ch = line[p];
+        if ch == '\0' || ch == '\n' || ch == '\r' || ch == '\t'
+           || ch == ' ' || ch == '.' || ch == '=' || ch == ','
+           || ch == ')':
+            break;
+        member = member + ch;
+        p = p + 1;
+
+    if len(member) > 0:
+        write_opcode(OP_LOAD_MEMBER);
+        write_string(member);
+        return [true, p];
+
+    return [false, p];
+
+// ---- 20. 变量赋值解析 ----
+// 解析 "变量 = 值"
+def parse_variable_assignment(line, p):
+    var orig_p = p;
+    var var_name = '';
+
+    while p < len(line):
+        var ch = line[p];
+        if ch == '\0' || ch == '\n' || ch == '\r' || ch == '\t'
+           || ch == ' ' || ch == '=':
+            break;
+        var_name = var_name + ch;
+        p = p + 1;
+
+    if len(var_name) == 0:
+        return [false, orig_p];
+
+    // 跳过空白
+    p = skip_whitespace(line, p);
+
+    if peek(line, p) == '=':
+        p = p + 1;  // 跳过 =
+
+        // 写入赋值
+        write_opcode(OP_LOAD_LOCAL);
+        write_string(var_name);
+        write_opcode(OP_STORE_LOCAL);
+        write_string(var_name);
+
+        return [true, p];
+
+    return [false, orig_p];
+
+// ==================== 行级高级语法分发器 ====================
+
+// 对一行代码进行高级语法分析
+// 返回 [成功标志, 新位置]
+def parse_high_level(line):
+    var p = 0;
+
+    // 跳过前导空白
+    p = skip_whitespace(line, p);
+
+    // 按优先级匹配高级语法
+
+    // 1. 导入
+    if starts_with(line, p, "导入"):
+        return parse_import(line, p);
+
+    // 2. 量子模块
+    if starts_with(line, p, "量子模块"):
+        return parse_quantum_module(line, p);
+
+    // 3. 类型
+    if starts_with(line, p, "类型"):
+        return parse_type(line, p);
+
+    // 4. 函数
+    if starts_with(line, p, "函数"):
+        return parse_function(line, p);
+
+    // 5. 如果
+    if starts_with(line, p, "如果"):
+        return parse_if(line, p);
+
+    // 6. 返回
+    if starts_with(line, p, "返回"):
+        // 检查 "返回 {"
+        var obj_result = parse_return_obj(line, p);
+        if obj_result[0]:
+            return obj_result;
+        // 检查 "返回空"
+        if starts_with(line, p + 2, "空"):
+            var empty_result = parse_return_empty(line, p);
+            if empty_result[0]:
+                return empty_result;
+        return parse_return(line, p);
+
+    // 7. new
+    if starts_with(line, p, "new"):
+        return parse_new(line, p);
+
+    // 8. 随机
+    if starts_with(line, p, "随机"):
+        return parse_random(line, p);
+
+    // 9. .长度
+    if starts_with(line, p, ".长度"):
+        return parse_length(line, p);
+
+    // 10. 否则
+    if starts_with(line, p, "否则"):
+        write_opcode(OP_ELSE);
+        return [true, p + 2];
+
+    // 11. 循环
+    if starts_with(line, p, "循环"):
+        write_opcode(OP_WHILE);
+        return [true, p + 2];
+
+    // 12. 跳出
+    if starts_with(line, p, "跳出"):
+        write_opcode(OP_BREAK);
+        return [true, p + 2];
+
+    // 13. 继续
+    if starts_with(line, p, "继续"):
+        write_opcode(OP_CONTINUE);
+        return [true, p + 2];
+
+    // 14. 运算符
+    if starts_with(line, p, "===") || starts_with(line, p, "!==")
+       || starts_with(line, p, "==") || starts_with(line, p, "!=")
+       || starts_with(line, p, "<=") || starts_with(line, p, ">=")
+       || peek(line, p) == '<' || peek(line, p) == '>'
+       || peek(line, p) == '+' || peek(line, p) == '-'
+       || peek(line, p) == '*' || peek(line, p) == '/':
+        return parse_operator(line, p);
+
+    // 15. 成员访问
+    if peek(line, p) == '.':
+        return parse_member_access(line, p);
+
+    // 16. 数组字面量
+    if peek(line, p) == '[':
+        return parse_array_literal(line, p);
+
+    // 17. 对象字面量
+    if peek(line, p) == '{':
+        return parse_object_literal(line, p);
+
+    // 18. 字符串字面量
+    if peek(line, p) == '"':
+        return parse_string_literal(line, p);
+
+    // 19. 布尔值
+    if starts_with(line, p, "true") || starts_with(line, p, "false")
+       || starts_with(line, p, "真") || starts_with(line, p, "假"):
+        return parse_boolean(line, p);
+
+    // 20. null/空
+    if starts_with(line, p, "空") || starts_with(line, p, "null"):
+        return parse_null(line, p);
+
+    // 21. 数字
+    if p < len(line) && line[p] >= '0' && line[p] <= '9':
+        return parse_number(line, p);
+
+    // 22. 变量赋值
+    if p < len(line) && line[p] != '\0' && line[p] != '\n'
+       && line[p] != '\r' && line[p] != '\t' && line[p] != ' '
+       && line[p] != '=' && line[p] != '/' && line[p] != '#':
+        var assign_result = parse_variable_assignment(line, p);
+        if assign_result[0]:
+            return assign_result;
+
+    return [false, p];
+
+// ==================== 批量高级语法解析 ====================
+
+// 解析多行高级语法
+// 返回 [编译行数, 总行数]
+def parse_high_lines(lines):
+    var compiled = 0;
+    var total = len(lines);
+    var i = 0;
+    while i < total:
+        var result = parse_high_level(lines[i]);
+        if result[0]:
+            compiled = compiled + 1;
+        i = i + 1;
+    return [compiled, total];
+
+// 解析完整源码（高级语法部分）
+def parse_high_source(source):
+    clear_bytecode();
+    var lines = source.split('\n');
+    var result = parse_high_lines(lines);
+    return result;
+
+// ==================== 初始化高级语法解析器 ====================
+
+def init_high_parser():
+    g_imports = [];
+    g_import_count = 0;
+    g_classes = [];
+    g_class_count = 0;
+    g_functions = [];
+    g_function_count = 0;
+
+// ==================== 导出接口 ====================
+
+export parse_import;
+export parse_quantum_module;
+export parse_type;
+export parse_function;
+export parse_if;
+export parse_return;
+export parse_return_obj;
+export parse_return_empty;
+export parse_new;
+export parse_length;
+export parse_random;
+export parse_number;
+export parse_string_literal;
+export parse_boolean;
+export parse_null;
+export parse_array_literal;
+export parse_object_literal;
+export parse_operator;
+export parse_member_access;
+export parse_variable_assignment;
+export parse_high_level;
+export parse_high_lines;
+export parse_high_source;
+export init_high_parser;
+export skip_whitespace;
+export starts_with;
+export read_identifier;
+export read_until;
+export skip_to;
+export parse_uint;
+export g_imports;
+export g_import_count;
+export g_classes;
+export g_class_count;
+export g_functions;
+export g_function_count;
