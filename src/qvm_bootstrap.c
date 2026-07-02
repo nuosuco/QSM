@@ -71,28 +71,29 @@ static complex_t c_mul(complex_t a, complex_t b) {
 static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
     int n = vm->qubits;
     int size = 1 << n;
-    
+
     vm->cycles++;
     vm->ops++;
-    
+
     // 简化模式: 量子比特>20时只记录门操作和测量，不展开态矢量
     if (vm->state == NULL) {
         if (opcode == OP_MEASURE) {
             int result = (rand() % 2);
             if (op2 < MAX_REGISTERS) vm->registers[op2] = result;
-            printf("[QVM] 测量 q%d -> r%d = %d [简化模式]\\n", op1, op2, result);
+            printf("[QVM] 测量 q%d -> r%d = %d [简化模式]\n", op1, op2, result);
         } else if (opcode == OP_PRINT) {
             int val = (op1 < MAX_REGISTERS) ? vm->registers[op1] : 0;
-            printf("[QVM] print(r%d) = %d [简化模式]\\n", op1, val);
+            printf("[QVM] print(r%d) = %d [简化模式]\n", op1, val);
         }
         return;
     }
-    
+
     complex_t *tmp = (complex_t *)calloc(size, sizeof(complex_t));
     if (!tmp) return;
 
     if (opcode == OP_H) {
         double s2 = 1.0 / sqrt(2.0);
+        if (op1 >= n) goto end_gate;  /* qubit超出范围，跳过避免越界 */
         memcpy(tmp, vm->state, sizeof(complex_t) * size);
         for (int s = 0; s < size; s++) {
             if (((s >> op1) & 1) == 1) {
@@ -105,6 +106,7 @@ static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
         }
         memcpy(vm->state, tmp, sizeof(complex_t) * size);
     } else if (opcode == OP_X) {
+        if (op1 >= n) goto end_gate;
         memcpy(tmp, vm->state, sizeof(complex_t) * size);
         for (int s = 0; s < size; s++) {
             int pair = s ^ (1 << op1);
@@ -112,11 +114,11 @@ static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
                 vm->state[s] = tmp[pair];
                 vm->state[pair] = tmp[s];
             } else if (pair == s) {
-                /* no-op if op1 bit doesn't exist (n < op1+1) */
                 vm->state[s] = tmp[s];
             }
         }
     } else if (opcode == OP_CNOT) {
+        if (op1 >= n || op2 >= n) goto end_gate;
         memcpy(tmp, vm->state, sizeof(complex_t) * size);
         for (int s = 0; s < size; s++) {
             if (((s >> op1) & 1) == 1) {
@@ -127,17 +129,17 @@ static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
         }
     } else if (opcode == OP_MEASURE) {
         int result = (rand() % 2);
-        vm->registers[op2] = result;
+        if (op2 < MAX_REGISTERS) vm->registers[op2] = result;
         printf("[QVM] 测量 q%d -> r%d = %d\n", op1, op2, result);
     } else if (opcode == OP_PRINT) {
-        printf("[QVM] print(r%d) = %d\n", op1, vm->registers[op1]);
+        int val = (op1 < MAX_REGISTERS) ? vm->registers[op1] : 0;
+        printf("[QVM] print(r%d) = %d\n", op1, val);
     } else if (opcode == OP_STOP) {
         /* STOP handled by main loop */
     } else {
-        /* 兼容QCL编译器字节码（不同opcode方案）：Z/S/T/SWAP/RESET/BARRIER等
-         * QCL: H=1,X=2,Z=3,CNOT=4,MEASURE=5,SWAP=7,PRINT=16,STOP=21
-         * 对于这些未知单比特门做no-op（态矢量不变），避免双free崩溃 */
+        /* 兼容QCL编译器字节码：Z/S/T/SWAP/RESET/BARRIER等做no-op */
     }
+end_gate:
     free(tmp);
 }
 
