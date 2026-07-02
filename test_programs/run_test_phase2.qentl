@@ -1,0 +1,18 @@
+// ============================================================================
+// run_test_phase2.qentl
+// 阶段2编译器测试脚本
+// ============================================================================
+
+import "QCL模块/qcl_bootstrap_phase2.qentl";
+
+// 编译测试程序
+var result = bootstrap_phase2(
+    "test_programs/test_phase2_def.qentl",
+    "test_programs/test_phase2_def.qbc"
+);
+
+if result == 0:
+    print("[TEST] 编译成功!");
+    print("[TEST] 字节码大小: " + bytecode_len() + " 字节");
+else:
+    print("[TEST] 编译失败: " + result);

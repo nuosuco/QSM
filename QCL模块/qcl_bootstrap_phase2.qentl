@@ -1,24 +1,33 @@
 // ============================================================================
 // qcl_bootstrap_phase2.qentl
-// 阶段2引导编译器 — 在C编译器之上，编译量子指令 + 简单函数
+// QCL 阶段2引导编译器 — 编译量子指令 + 简单函数定义（def）
+// ============================================================================
 //
-// 设计背景：
-//   C编译器(qcl_bootstrap_v2.c)只能编译量子指令子集：
-//     init / H / X / Y / Z / T / S / CNOT / MEASURE / PRINT / STOP / EXIT
-//     以及中文关键字(否则/循环/跳出/继续)和函数调用标记
-//   它不能编译：函数定义、类型、模块导入、高级控制流
+// 设计背景 — C编译器能力限制分析：
+//   现有C编译器(qcl_bootstrap_v2.c)只能编译以下量子指令子集：
+//     init / H / X / Y / Z / T / S / CNOT / SWAP / MEASURE / PRINT
+//     STOP / EXIT / 否则 / 循环 / 跳出 / 继续 / 函数调用
+//   C编译器对 def / 函数 关键字的处理方式：
+//     跳过高级语法（def、类型、模块、类），只提取函数名字符串
+//     输出：OP_DEFINE_FUNC + 函数名（无返回类型、无参数、无函数体）
+//     结果：函数定义丢失了函数体中的量子指令
 //
-//   阶段2编译器补充：
-//     1. 函数定义头部解析 → OP_DEFINE_FUNC
-//     2. 函数调用完整处理 → OP_FUNC_CALL + 参数
-//     3. 统一分发：量子指令 + 函数语法 → 字节码
+// 阶段2编译器补充：
+//   1. 完整函数定义编译：def 函数名: { 函数体 }
+//      函数体逐行编译为量子指令字节码，嵌入函数定义之后
+//   2. 函数调用编译：函数名(args) → OP_FUNC_CALL + 函数名 + 参数
+//   3. 多行函数体支持：读取 { ... } 之间的所有量子指令
+//   4. 统一分发：量子指令 + def函数定义 → 真正的量子字节码
 //
-// 本文件用QEntL编写，可直接在QVM/QEntL环境中运行。
+// 编译后输出：真正的量子字节码(.qbc)，不是文本描述
+//
+// 用法：在QEntL环境中运行
+//   bootstrap_phase2("输入文件.qentl", "输出文件.qbc")
 // ============================================================================
 
 // ==================== 1. Opcode 常量表 ====================
 
-// 基础指令
+// 基础指令 (0 - 31)
 const OP_NOP = 0;
 const OP_H = 1;
 const OP_X = 2;
@@ -41,7 +50,7 @@ const OP_BARRIER = 18;
 const OP_INIT_N = 20;
 const OP_STOP = 21;
 
-// 变量与常数
+// 变量与常数 (32 - 37)
 const OP_LOAD_CONST = 32;
 const OP_STORE_VAR = 33;
 const OP_LOAD_VAR = 34;
@@ -49,7 +58,7 @@ const OP_T = 35;
 const OP_S = 36;
 const OP_Y = 37;
 
-// 高级指令
+// 高级指令 (100 - 140)
 const OP_IMPORT = 100;
 const OP_DEFINE_CLASS = 101;
 const OP_DEFINE_FUNC = 102;
@@ -92,9 +101,12 @@ const OP_RANDOM = 138;
 const OP_LENGTH = 139;
 const OP_EXIT_CODE = 140;
 
+// 字节码标记（非标准opcode，用于内部结构）
+const BC_FUNC_BODY = 255;   // 函数体起始标记
+const BC_FUNC_END  = 254;   // 函数体结束标记
+
 // ==================== 2. 字节码缓冲区 ====================
 
-// 全局字节码数组
 var bytecode = [];
 
 def write_byte(value):
@@ -119,21 +131,30 @@ def write_u32(value):
     write_byte((value >> 24) & 0xFF);
 
 def write_string(s):
-    var len_s = len(s);
+    var sl = len(s);
+    write_u16(sl);
     var i = 0;
-    write_u16(len_s);
-    while i < len_s:
+    while i < sl:
         write_byte(ord(s[i]));
         i = i + 1;
 
 def clear_bytecode():
     bytecode = [];
 
+def bytecode_len():
+    return len(bytecode);
+
 def get_bytecode():
     return bytecode;
 
-def bytecode_len():
-    return len(bytecode);
+// 写入 QCL 文件头（魔数 + 版本）
+def write_file_header():
+    // 魔数: 0x51434C46 ("QCLF")
+    write_u32(0x51434C46);
+    // 版本 1
+    write_u16(1);
+    // 预留
+    write_u16(0);
 
 // ==================== 3. 辅助函数 ====================
 
@@ -157,6 +178,11 @@ def starts_with(line, p, target):
         i = i + 1;
     return true;
 
+def peek(line, p):
+    if p >= len(line):
+        return '';
+    return line[p];
+
 def read_uint(line, p):
     var val = 0;
     var l = len(line);
@@ -172,27 +198,49 @@ def read_uint(line, p):
 def read_until(line, p, end_char):
     var buf = '';
     var l = len(line);
-    while p < l && line[p] != end_char:
+    while p < l && line[p] != end_char && line[p] != '\0' && line[p] != '\n':
         buf = buf + line[p];
         p = p + 1;
     return [buf, p];
 
-def peek(line, p):
-    if p >= len(line):
+def strip_comment(line):
+    var i = 0;
+    var l = len(line);
+    while i < l - 1:
+        if line[i] == '/' && line[i + 1] == '/' || line[i] == '#':
+            return line.substring(0, i);
+        i = i + 1;
+    return line;
+
+def trim(line):
+    var i = 0;
+    var l = len(line);
+    while i < l && (line[i] == ' ' || line[i] == '\t'):
+        i = i + 1;
+    var j = l - 1;
+    while j >= i && (line[j] == ' ' || line[j] == '\t' || line[j] == '\r'):
+        j = j - 1;
+    if j < i:
         return '';
-    return line[p];
+    return line.substring(i, j + 1);
 
-// ==================== 4. 函数表 ====================
+// ==================== 4. 函数表（注册表） ====================
 
-// 函数注册表: [[name, return_type, param_count], ...]
-var func_table = [];
+var func_table = [];   // [[name, return_type, byte_offset], ...]
 var func_count = 0;
 
-// 通过索引查找函数名
-def lookup_func_by_idx(idx):
-    if idx >= 0 && idx < func_count:
-        return func_table[idx][0];
-    return '';
+def register_func(name, return_type, byte_offset):
+    func_table[func_count] = [name, return_type, byte_offset];
+    func_count = func_count + 1;
+    return func_count - 1;
+
+def lookup_func(name):
+    var i = 0;
+    while i < func_count:
+        if func_table[i][0] == name:
+            return i;
+        i = i + 1;
+    return -1;
 
 // ==================== 5. 量子指令解析器 ====================
 
@@ -206,7 +254,6 @@ const GATE_MAP = [
     ["S", OP_S]
 ];
 
-// 解析单量子比特门: gate qid
 def parse_single_gate(line, p):
     var matched = false;
     var opcode = OP_H;
@@ -215,6 +262,7 @@ def parse_single_gate(line, p):
     while i < gl:
         var gname = GATE_MAP[i][0];
         var gop   = GATE_MAP[i][1];
+        // 匹配门名后有空格
         if starts_with(line, p, gname) && p + len(gname) < len(line) && line[p + len(gname)] == ' ':
             opcode = gop;
             matched = true;
@@ -223,31 +271,30 @@ def parse_single_gate(line, p):
         i = i + 1;
 
     if !matched:
-        return [false, p];
+        return [false, p, 0];
 
     var qid_val = read_uint(line, p);
     write_opcode(opcode);
     write_u8(qid_val[0]);
-    return [true, qid_val[1]];
+    return [true, qid_val[1], 1];
 
 // 解析单行量子指令
-// 返回 [成功标志, 新位置]
-def parse_quantum(line, p):
+// 返回 [成功, 新位置, 编译指令数]
+def parse_quantum_gate(line, p):
     var l = len(line);
 
     // 1) init N
     if starts_with(line, p, "init "):
         p = p + 5;
         var n_val = read_uint(line, p);
-        var n = n_val[0];
         p = n_val[1];
         p = skip_whitespace(line, p);
         write_opcode(OP_INIT_N);
-        write_u8(n & 0xFF);
-        write_u8((n >> 8) & 0xFF);
-        return [true, p];
+        write_u8(n_val[0] & 0xFF);
+        write_u8((n_val[0] >> 8) & 0xFF);
+        return [true, p, 1];
 
-    // 2) 单量子比特门
+    // 2) 单量子比特门 H|X|Y|Z|T|S qid
     if starts_with(line, p, "H ") || starts_with(line, p, "X ") ||
        starts_with(line, p, "Y ") || starts_with(line, p, "Z ") ||
        starts_with(line, p, "T ") || starts_with(line, p, "S "):
@@ -264,7 +311,7 @@ def parse_quantum(line, p):
         write_opcode(OP_CNOT);
         write_u8(ctrl_val[0]);
         write_u8(tgt_val[0]);
-        return [true, tgt_val[1]];
+        return [true, tgt_val[1], 1];
 
     // 4) MEASURE qid reg
     if starts_with(line, p, "MEASURE "):
@@ -277,7 +324,7 @@ def parse_quantum(line, p):
         write_opcode(OP_MEASURE);
         write_u8(qid_val[0]);
         write_u8(reg_val[0]);
-        return [true, reg_val[1]];
+        return [true, reg_val[1], 1];
 
     // 5) PRINT reg
     if starts_with(line, p, "PRINT "):
@@ -285,174 +332,345 @@ def parse_quantum(line, p):
         var reg_val = read_uint(line, p);
         write_opcode(OP_PRINT);
         write_u8(reg_val[0]);
-        return [true, reg_val[1]];
+        return [true, reg_val[1], 1];
 
-    // 6) STOP
+    // 6) SWAP a b
+    if starts_with(line, p, "SWAP "):
+        p = p + 5;
+        var a_val = read_uint(line, p);
+        p = a_val[1];
+        while p < l && (line[p] == ' ' || line[p] == '\t'):
+            p = p + 1;
+        var b_val = read_uint(line, p);
+        write_opcode(OP_SWAP);
+        write_u8(a_val[0]);
+        write_u8(b_val[0]);
+        return [true, b_val[1], 1];
+
+    // 7) RESET qid
+    if starts_with(line, p, "RESET "):
+        p = p + 6;
+        var qid_val = read_uint(line, p);
+        write_opcode(OP_RESET);
+        write_u8(qid_val[0]);
+        return [true, qid_val[1], 1];
+
+    // 8) BARRIER
+    if starts_with(line, p, "BARRIER"):
+        write_opcode(OP_BARRIER);
+        return [true, p + 7, 1];
+
+    // 9) STOP
     if starts_with(line, p, "STOP"):
         write_opcode(OP_STOP);
-        return [true, p + 4];
+        return [true, p + 4, 1];
 
-    // 7) EXIT
+    // 10) EXIT
     if starts_with(line, p, "EXIT"):
         write_opcode(OP_EXIT);
-        return [true, p + 4];
+        return [true, p + 4, 1];
 
-    // 8) 中文关键字
+    // 11) 中文关键字
     if starts_with(line, p, "否则"):
         write_opcode(OP_ELSE);
-        return [true, p + 2];
+        return [true, p + 2, 1];
     if starts_with(line, p, "循环"):
         write_opcode(OP_WHILE);
-        return [true, p + 2];
+        return [true, p + 2, 1];
     if starts_with(line, p, "跳出"):
         write_opcode(OP_BREAK);
-        return [true, p + 2];
+        return [true, p + 2, 1];
     if starts_with(line, p, "继续"):
         write_opcode(OP_CONTINUE);
-        return [true, p + 2];
+        return [true, p + 2, 1];
 
-    return [false, p];
+    return [false, p, 0];
 
 // ==================== 6. 函数定义解析器 ====================
 
-// 解析函数定义头部: "函数 <name>(<params>) -> <return> {"
-// 阶段2编译器只处理函数头部（定义声明），函数体内容
-// 由阶段3+的完整编译器处理
-def parse_func_def(line, p):
-    // 跳过"函数"
-    p = p + 2;
+// 解析函数定义: def 函数名: { 函数体 }
+// 支持单行简写: def 函数名: 量子指令
+// 阶段2核心增强：编译函数体中的量子指令为字节码
+def parse_func_def(lines, line_idx):
+    var line = trim(strip_comment(lines[line_idx]));
+    var total = len(lines);
+
+    // 跳过 def 关键字（3字符）或 函数（2字符）
+    var keyword_len = 0;
+    if starts_with(line, 0, "def"):
+        keyword_len = 3;
+    else if starts_with(line, 0, "函数"):
+        keyword_len = 2;
+    else:
+        return [false, 0, 0];
+
+    // 跳过关键字后的空白
+    var p = keyword_len;
     p = skip_whitespace(line, p);
 
-    // 读取函数名
-    var name_result = read_until(line, p, '(');
-    var func_name = name_result[0];
-    p = name_result[1];
-
-    // 读取参数部分（直到 -> 或 { 或 )）
-    var params = '';
-    while p < len(line) && line[p] != '{' && line[p] != '->':
-        params = params + line[p];
+    // 读取函数名（直到 : 或 ( 或空白）
+    var func_name = '';
+    while p < len(line):
+        var ch = line[p];
+        if ch == ':' || ch == '(' || ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r':
+            break;
+        func_name = func_name + ch;
         p = p + 1;
 
-    // 跳过括号和参数
-    while p < len(line) && line[p] != '{' && line[p] != '->':
+    if len(func_name) == 0:
+        return [false, 0, 0];
+
+    // 跳过空白
+    p = skip_whitespace(line, p);
+
+    // 跳过冒号（如果有）
+    if peek(line, p) == ':':
         p = p + 1;
 
-    // 读取返回类型
+    // 跳过空白
+    p = skip_whitespace(line, p);
+
+    // 确定返回类型（默认为 void）
     var return_type = "void";
-    if starts_with(line, p, "->"):
-        p = p + 2;
-        p = skip_whitespace(line, p);
-        var rt_result = read_until(line, p, '{');
-        return_type = rt_result[0];
 
-    // 记录函数
-    func_table[func_count] = [func_name, return_type, 0];
-    func_count = func_count + 1;
+    // 检查是否是单行简写: def 函数名: 量子指令
+    // 如果当前字符不是 { 且行还未结束，尝试单行模式
+    if peek(line, p) != '{' && p < len(line):
+        // 单行模式：剩余内容作为函数体的一行
+        var body_line = line.substring(p, len(line));
+        var body_lines = [body_line];
+        var body_count = 1;
 
-    // 写入字节码: OP_DEFINE_FUNC + 函数名 + 返回类型 + 索引
+        // 注册函数
+        var byte_start = bytecode_len();
+        var func_idx = register_func(func_name, return_type, byte_start);
+
+        // 写入函数定义头部
+        write_opcode(OP_DEFINE_FUNC);
+        write_string(func_name);
+        write_string(return_type);
+        write_u8(func_idx);
+
+        // 写入函数体标记
+        write_byte(BC_FUNC_BODY);
+        write_u8(body_count);
+
+        // 编译函数体（单行）
+        var compiled = 0;
+        var bp = 0;
+        bp = skip_whitespace(body_lines[0], bp);
+        var gate_result = parse_quantum_gate(body_lines[0], bp);
+        if gate_result[0]:
+            compiled = 1;
+
+        // 写入函数体结束标记
+        write_byte(BC_FUNC_END);
+
+        return [true, 0, compiled];
+    fi;
+
+    // 多行模式：读取 { ... } 之间的内容
+    if peek(line, p) != '{':
+        return [false, 0, 0];
+
+    // 跳过 {
+    var brace_start_line = line_idx + 1;
+    var body_lines = [];
+    var body_count = 0;
+    var search_idx = brace_start_line;
+    var found_end = false;
+
+    while search_idx < total:
+        var body_line = trim(strip_comment(lines[search_idx]));
+        if starts_with(body_line, 0, "}"):
+            found_end = true;
+            break;
+        // 跳过空行和注释
+        if len(body_line) > 0:
+            body_lines[body_count] = body_line;
+            body_count = body_count + 1;
+        search_idx = search_idx + 1;
+
+    if !found_end:
+        // 未找到结束 }，警告但继续编译已收集的内容
+        print("[Phase2] 警告: 函数 \"" + func_name + "\" 缺少结束 }");
+
+    // 注册函数
+    var byte_start = bytecode_len();
+    var func_idx = register_func(func_name, return_type, byte_start);
+
+    // 写入函数定义头部
+    // 格式: OP_DEFINE_FUNC + 函数名 + 返回类型 + 函数索引
     write_opcode(OP_DEFINE_FUNC);
     write_string(func_name);
     write_string(return_type);
-    write_u8(func_count - 1);
+    write_u8(func_idx);
 
-    return [true, p];
+    // 写入函数体标记 + 体行数
+    write_byte(BC_FUNC_BODY);
+    write_u8(body_count);
+
+    // 逐行编译函数体中的量子指令
+    var compiled = 0;
+    var i = 0;
+    while i < body_count:
+        var bp = 0;
+        bp = skip_whitespace(body_lines[i], bp);
+        var gate_result = parse_quantum_gate(body_lines[i], bp);
+        if gate_result[0]:
+            compiled = compiled + 1;
+        i = i + 1;
+
+    // 写入函数体结束标记
+    write_byte(BC_FUNC_END);
+
+    // 返回跳过的行数（让调用者知道从哪一行继续）
+    var lines_consumed = search_idx - line_idx;
+    if !found_end:
+        lines_consumed = total - line_idx;
+
+    return [true, lines_consumed, compiled];
 
 // ==================== 7. 函数调用解析器 ====================
 
-// 解析函数调用: <func_name>(<args>)
-// 阶段2编译器：只输出函数调用指令和函数名
-// 参数在阶段3完整编译器中处理
+// 解析函数调用: 函数名(args) 或 函数名()
 def parse_func_call(line, p):
+    var l = len(line);
+
     // 找到 '(' 前的函数名
     var fname = '';
-    var l = len(line);
-    while p < l && line[p] != '(' && line[p] != '\0':
+    while p < l && line[p] != '(' && line[p] != '\0' && line[p] != ' ':
         fname = fname + line[p];
         p = p + 1;
 
     if len(fname) == 0:
-        return [false, p];
+        return [false, p, 0];
 
-    // 在函数表中查找
-    var found = false;
-    var i = 0;
-    while i < func_count:
-        if func_table[i][0] == fname:
-            found = true;
-            break;
-        i = i + 1;
+    // 跳过到 (
+    while p < l && line[p] != '(':
+        p = p + 1;
 
-    // 写入字节码: OP_FUNC_CALL + 函数名
+    if p >= l:
+        return [false, p, 0];
+
+    // 跳过 (
+    p = p + 1;
+
+    // 读取参数（简单计数逗号分隔的参数）
+    var arg_count = 0;
+    var arg_list = '';
+    while p < l && line[p] != ')':
+        if line[p] == ',':
+            arg_count = arg_count + 1;
+        arg_list = arg_list + line[p];
+        p = p + 1;
+    if arg_count > 0:
+        arg_count = arg_count + 1;
+
+    // 跳过 )
+    if p < l:
+        p = p + 1;
+
+    // 写入字节码
     write_opcode(OP_FUNC_CALL);
     write_string(fname);
+    write_u8(arg_count);
 
-    // 跳过到 ')'
-    while p < l && line[p] != ')':
-        p = p + 1;
-    if p < l:
-        p = p + 1; // 跳过 ')'
-
-    return [true, p];
+    return [true, p, 1];
 
 // ==================== 8. 行级分发器 ====================
 
 // 对一行代码进行统一解析
-// 优先级: 量子指令 > 函数定义 > 函数调用 > 忽略
-def parse_line_dispatch(line):
+// 优先级: 函数定义(def/函数) > 量子指令 > 函数调用
+// 返回 [成功, 跳过行数, 编译指令数, 类型标记]
+def parse_line(lines, line_idx):
+    var total = len(lines);
+    var line = trim(strip_comment(lines[line_idx]));
+
+    // 跳过空行
+    if len(line) == 0:
+        return [false, 0, 0, "empty"];
+
+    // 跳过纯注释行
+    if line[0] == '/' || line[0] == '#':
+        return [false, 0, 0, "comment"];
+
+    // 1) 函数定义（def 或 函数）— 最高优先级
+    if starts_with(line, 0, "def") || starts_with(line, 0, "函数"):
+        var result = parse_func_def(lines, line_idx);
+        return [result[0], result[1], result[2], "func_def"];
+
+    // 2) 量子指令
     var p = 0;
-    p = skip_whitespace(line, p);
+    var gate_result = parse_quantum_gate(line, p);
+    if gate_result[0]:
+        return [true, 0, gate_result[2], "quantum"];
 
-    // 1) 量子指令（C编译器已支持）
-    var result = parse_quantum(line, p);
-    if result[0]:
-        return [true, result[1], "quantum"];
+    // 3) 函数调用（包含括号的表达式）
+    var has_paren = false;
+    var ci = 0;
+    while ci < len(line):
+        if line[ci] == '(':
+            has_paren = true;
+            break;
+        ci = ci + 1;
 
-    // 2) 函数定义（阶段2新增）
-    if starts_with(line, p, "函数"):
-        result = parse_func_def(line, p);
-        if result[0]:
-            return [true, result[1], "func_def"];
-
-    // 3) 函数调用（阶段2增强：识别并处理参数）
-    if p < len(line) && line[p] == '(' && p > 0:
-        // 检查前面是否有函数名（跳过空白后）
-        p = p - 1;
-        while p >= 0 && line[p] == ' ':
-            p = p - 1;
-        if p >= 0:
-            result = parse_func_call(line, p);
-            if result[0]:
-                return [true, result[1], "func_call"];
+    if has_paren:
+        var call_result = parse_func_call(line, 0);
+        if call_result[0]:
+            return [true, 0, call_result[2], "func_call"];
 
     // 4) 未识别，跳过
-    return [false, p, "skip"];
+    return [false, 0, 0, "skip"];
 
 // ==================== 9. 文件级编译 ====================
 
-// 编译整个 QCL 文件
+// 编译整个 QCL/QEntL 文件
 // 输入: source 完整源码字符串
-// 输出: [编译指令数, 总行数, 函数定义数]
+// 输出: [编译指令数, 总行数, 函数定义数, 函数调用数, 字节码长度]
 def compile_source(source):
     clear_bytecode();
     func_table = [];
     func_count = 0;
 
+    // 写入文件头
+    write_file_header();
+
     var lines = source.split('\n');
     var total = len(lines);
     var compiled = 0;
     var func_defs = 0;
+    var func_calls = 0;
     var i = 0;
 
     while i < total:
-        var result = parse_line_dispatch(lines[i]);
+        var result = parse_line(lines, i);
+
         if result[0]:
             compiled = compiled + 1;
-        if result[2] == "func_def":
-            func_defs = func_defs + 1;
-        i = i + 1;
 
-    return [compiled, total, func_defs];
+        var type_tag = result[3];
+        if type_tag == "func_def":
+            func_defs = func_defs + 1;
+        if type_tag == "func_call":
+            func_calls = func_calls + 1;
+
+        // 如果是函数定义，跳过已处理的函数体行数
+        if result[1] > 0:
+            i = i + result[1];
+        else:
+            i = i + 1;
+
+    // 输出函数表（在字节码末尾）
+    write_u16(func_count);
+    var fi = 0;
+    while fi < func_count:
+        write_string(func_table[fi][0]);
+        write_string(func_table[fi][1]);
+        write_u32(func_table[fi][2]);
+        fi = fi + 1;
+
+    return [compiled, total, func_defs, func_calls, bytecode_len()];
 
 // ==================== 10. 文件输入输出 ====================
 
@@ -460,48 +678,58 @@ def compile_source(source):
 def read_source_file(path):
     return file_read(path);
 
-// 写入 .qbc 文件
+// 写入 .qbc 字节码文件（真正的二进制字节码）
 def write_bc_file(path):
     var data = bytecode;
     file_write(path, data);
 
 // ==================== 11. 引导主程序 ====================
 
+// 阶段2编译器主入口
+// 用法: bootstrap_phase2("输入文件", "输出文件")
 def bootstrap_phase2(input_path, output_path):
     var source = read_source_file(input_path);
     if source == null || len(source) == 0:
         print("[Phase2] 错误: 无法读取输入文件 " + input_path);
         return -1;
 
-    print("[Phase2] 编译: " + input_path);
+    print("==========================================");
+    print("[Phase2] 阶段2编译器启动");
+    print("[Phase2] 输入: " + input_path);
     print("[Phase2] 输出: " + output_path);
+    print("==========================================");
 
     var result = compile_source(source);
     var compiled = result[0];
-    var total = result[1];
+    var total    = result[1];
     var func_defs = result[2];
+    var func_calls = result[3];
+    var bc_len   = result[4];
 
-    print("[Phase2] 编译完成: " + compiled + "/" + total + " 行, " +
-          func_defs + " 个函数定义, " + bytecode_len() + " 字节");
+    print("[Phase2] 编译完成:");
+    print("  - 编译行: " + compiled + "/" + total);
+    print("  - 函数定义: " + func_defs);
+    print("  - 函数调用: " + func_calls);
+    print("  - 字节码大小: " + bc_len + " 字节");
 
-    if bytecode_len() == 0:
-        print("[Phase2] 警告: 未生成字节码");
+    if bc_len <= 6:  // 只有文件头（6字节），没有实际字节码
+        print("[Phase2] 警告: 未生成有效字节码");
         return -1;
 
     write_bc_file(output_path);
-    print("[Phase2] 已写入: " + output_path);
+    print("[Phase2] 字节码已写入: " + output_path);
+    print("[Phase2] 输出为真正的量子字节码(.qbc)");
 
     return 0;
 
 // ==================== 12. 导出接口 ====================
 
-export parse_quantum;
+export parse_quantum_gate;
 export parse_func_def;
 export parse_func_call;
-export parse_line_dispatch;
+export parse_line;
 export compile_source;
 export bootstrap_phase2;
-export clear_bytecode;
+export bytecode_len;
 export get_bytecode;
-export func_table;
-export func_count;
+export clear_bytecode;
