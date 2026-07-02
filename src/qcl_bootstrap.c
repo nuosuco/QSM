@@ -722,50 +722,12 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             write_opcode(OP_EXIT);
             found_code = 1;
         }
-        // 高级语法处理 - 调用parse_函数解析高级QEntL语法
-        else if (strncmp(p, "import", 6) == 0) {
-            char *p2 = p;
-            if (parse_import(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "量子模块", 4) == 0) {
-            char *p2 = p;
-            if (parse_quantum_module(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "类型", 2) == 0) {
-            char *p2 = p;
-            if (parse_type(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "函数", 2) == 0) {
-            char *p2 = p;
-            if (parse_function(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "如果", 2) == 0) {
-            char *p2 = p;
-            if (parse_if(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "返回", 2) == 0) {
-            char *p2 = p;
-            if (parse_return(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "否则", 2) == 0) {
-            write_opcode(OP_ELSE);
-            found_code = 1;
-        }
-        else if (strncmp(p, "循环", 2) == 0) {
-            write_opcode(OP_WHILE);
-            found_code = 1;
-        }
-        else if (strncmp(p, "跳出", 2) == 0) {
-            write_opcode(OP_BREAK);
-            found_code = 1;
-        }
-        else if (strncmp(p, "继续", 2) == 0) {
-            write_opcode(OP_CONTINUE);
-            found_code = 1;
-        }
+        // 高级语法处理 - 高级语法不写入字节码（C编译器只能处理量子指令子集）
+        // QCL编译器（QEntL全栈）在QEntL环境中运行，负责处理高级语法
+        
+        // 函数调用（记录函数名，不执行）
         else if (strstr(p, "()")) {
             write_opcode(OP_FUNC_CALL);
-            // 提取函数名
             char fname[MAX_SYM_NAME];
             int j = 0;
             while (*p != '(' && *p != '\0' && j < MAX_SYM_NAME-1) { fname[j++] = *p; p++; }
@@ -773,22 +735,7 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             write_string(fname);
             found_code = 1;
         }
-        else if (strncmp(p, "new", 3) == 0) {
-            char *p2 = p;
-            if (parse_new(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, ".长度", 3) == 0) {
-            char *p2 = p;
-            if (parse_length(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "随机", 2) == 0) {
-            char *p2 = p;
-            if (parse_random(&p2)) found_code = 1;
-        }
-        else if (strncmp(p, "导入", 2) == 0) {
-            char *p2 = p;
-            if (parse_import(&p2)) found_code = 1;
-        }
+    }
     }
     
     fclose(fin);
