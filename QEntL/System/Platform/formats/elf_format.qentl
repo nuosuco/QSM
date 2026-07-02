@@ -1,0 +1,583 @@
+/**
+ * @file elf_format.qentl
+ * @brief ELF 二进制格式规范 — Android/鸿蒙/Linux 通用格式
+ * 
+ * 量子基因编码: QGC-ELF-FORMAT-2026070301
+ * 量子纠缠信道: QEC-PLATFORM-ELF-01
+ * 版本: 1.0.0
+ * 
+ * 定义QEntL全栈在Android/鸿蒙/Linux平台上的经典二进制格式。
+ * 三个平台共享ELF格式，但各有特殊要求：
+ * 
+ * | 平台   | ELF类型          | 特殊要求                          |
+ * |--------|-----------------|----------------------------------|
+ * | Android| Executable/Shared| ART虚拟机、.so库、NDK ABI        |
+ * | 鸿蒙   | Executable/Shared| 鸿蒙签名认证、.hap包、.so库       |
+ * | Linux  | Executable/Shared| 标准ELF、动态链接、.so库          |
+ * 
+ * QEntL .qbc经典逻辑部分格式（ELF）：
+ * ┌────────────────────────────────────────────┐
+ * │  QEntL文件头 (16字节)                       │
+ * ├────────────────────────────────────────────┤
+ * │  ELF头部 (64字节)                           │
+ * │  - e_ident[16] (魔数 + 类 + 数据编码等)      │
+ * │  - e_type / e_machine / e_version           │
+ * │  - e_entry / e_phoff / e_shoff              │
+ * │  - e_flags / e_ehsize / e_phentsize         │
+ * │  - e_phnum / e_shentsize / e_shnum          │
+ * │  - e_shstrndx                                │
+ * ├────────────────────────────────────────────┤
+ * │  程序头表 (Program Headers)                  │
+ * │  - PT_INTERP (解释器路径)                   │
+ * │  - PT_LOAD (.text + .data + .qbc节)         │
+ * │  - PT_DYNAMIC (动态链接信息)                │
+ * ├────────────────────────────────────────────┤
+ * │  节头表 (Section Headers)                    │
+ * │  - .text (经典逻辑代码)                     │
+ * │  - .rodata (只读数据)                        │
+ * │  - .data (读写数据)                          │
+ * │  - .bss (未初始化数据)                       │
+ * │  - .qbc (QEntL量子字节码)                   │
+ * │  - .qdata (QEntL量子数据)                   │
+ * │  - .dynsym / .dynstr (动态符号)             │
+ * │  - .rela.text / .rela.data (重定位)         │
+ * ├────────────────────────────────────────────┤
+ * │  节数据 (Section Contents)                   │
+ * │  - 各节的数据内容                            │
+ * ├────────────────────────────────────────────┤
+ * │  节名字符串表 (.shstrtab)                    │
+ * └────────────────────────────────────────────┘
+ * 
+ * ELF魔数: 0x7F 0x45 0x4C 0x46 ("\x7FELF")
+ */
+
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Compiler/src/utils/binary_writer.qentl";
+
+// ==================== ELF常量定义 ====================
+
+/**
+ * ELF类（32/64位）
+ */
+quantum_enum ELF_CLASS {
+    ELFCLASS_NONE,  // 0x00 — 无效
+    ELFCLASS_32,    // 0x01 — 32位
+    ELFCLASS_64     // 0x02 — 64位
+}
+
+/**
+ * ELF数据编码（字节序）
+ */
+quantum_enum ELF_DATA {
+    ELFDATA_NONE,  // 0x00 — 无效
+    ELFDATA_2LSB,  // 0x01 — 小端
+    ELFDATA_2MSB   // 0x02 — 大端
+}
+
+/**
+ * ELF OS/ABI
+ */
+quantum_enum ELF_OSABI {
+    ELFOSABI_NONE,          // 0x00 — 通用
+    ELFOSABI_HPUX,          // 0x01 — HP-UX
+    ELFOSABI_NETBSD,        // 0x02 — NetBSD
+    ELFOSABI_LINUX,         // 0x03 — Linux
+    ELFOSABI_SOLARIS,       // 0x06 — Solaris
+    ELFOSABI_ARM,           // 0x0B — ARM
+    ELFOSABI_ARM_AEABI,     // 0x0C — ARM EABI
+    ELFOSABI_FREEBSD,       // 0x0D — FreeBSD
+    ELFOSABI_OPENBSD,       // 0x13 — OpenBSD
+    ELFOSABI_OPENVMS,       // 0x14 — OpenVMS
+    ELFOSABI_AIX,           // 0x15 — AIX
+    ELFOSABI_IRIX,          // 0x16 — IRIX
+    ELFOSABI_FBSD,          // 0x17 — FreeBSD
+    ELFOSABI_LINUX_ANDROID, // 0x03 — Linux Android（同Linux）
+    ELFOSABI_HARMONY,       // 0x64 — OpenHarmony（实验值）
+}
+
+/**
+ * ELF文件类型
+ */
+quantum_enum ELF_TYPE {
+    ET_NONE,   // 0x00 — 无效
+    ET_REL,    // 0x01 — 可重定位文件
+    ET_EXEC,   // 0x02 — 可执行文件
+    ET_DYN,    // 0x03 — 共享目标
+    ET_CORE    // 0x04 — 核心文件
+}
+
+/**
+ * ELF节类型
+ */
+quantum_enum ELF_SECTION {
+    SHT_NULL,              // 0x00 — 空
+    SHT_PROGBITS,          // 0x01 — 程序定义信息
+    SHT_SYMTAB,            // 0x02 — 符号表
+    SHT_STRTAB,            // 0x03 — 字符串表
+    SHT_RELA,              // 0x04 — RELA重定位
+    SHT_HASH,              // 0x05 — 符号哈希表
+    SHT_DYNAMIC,           // 0x06 — 动态链接信息
+    SHT_NOTE,              // 0x07 — 注释信息
+    SHT_NOBITS,            // 0x08 — 无数据节（如.bss）
+    SHT_REL,               // 0x09 — REL重定位
+    SHT_SHLIB,             // 0x0A — 保留
+    SHT_DYNSYM,            // 0x0B — 动态符号表
+    SHT_INIT_ARRAY,        // 0x0E — 初始化数组
+    SHT_FINI_ARRAY,        // 0x0F — 终结数组
+    SHT_PREINIT_ARRAY,     // 0x10 — 预初始化数组
+    SHT_GROUP,             // 0x11 — 节组
+    SHT_SYMTAB_SHNDX,      // 0x12 — 符号表索引扩展
+    SHT_GNU_HASH,          // 0x00000007 — GNU哈希表
+    SHT_GNU_VERDEF,        // 0x0000000D — 版本定义
+    SHT_GNU_VERNEED,       // 0x0000000E — 版本需求
+    SHT_GNU_VERSYM,        // 0x0000000F — 版本符号
+    SHT_ANDROID_REL,       // 0x60000000 — Android REL
+    SHT_QBC,               // 0x60000001 — QEntL量子字节码（扩展）
+    SHT_QDATA,             // 0x60000002 — QEntL量子数据（扩展）
+    SHT_ARM_EXIDX,         // 0x70000001 — ARM异常索引
+    SHT_ARM_PREEMPTMAP,    // 0x70000002 — ARM预取映射
+    SHT_ARM_ATTRIBUTES,    // 0x70000003 — ARM属性
+}
+
+/**
+ * ELF程序头类型
+ */
+quantum_enum ELF_PROGRAM {
+    PT_NULL,            // 0x00 — 空
+    PT_LOAD,            // 0x01 — 加载段
+    PT_DYNAMIC,         // 0x02 — 动态链接信息
+    PT_INTERP,          // 0x03 — 解释器路径
+    PT_NOTE,            // 0x04 — 注释信息
+    PT_SHLIB,           // 0x05 — 保留
+    PT_PHDR,            // 0x06 — 程序头表
+    PT_TLS,             // 0x07 — 线程局部存储
+    PT_GNU_EH_FRAME,    // 0x00000004 — GNU EH框架
+    PT_GNU_STACK,       // 0x00000006 — 栈属性
+    PT_GNU_RELRO,       // 0x00000008 — 只读重定位
+    PT_ARM_ARCHEXT,     // 0x70000003 — ARM架构扩展
+}
+
+/**
+ * ELF程序头标志
+ */
+quantum_enum ELF_PROGRAM_FLAG {
+    PF_X,   // 0x01 — 可执行
+    PF_W,   // 0x02 — 可写
+    PF_R    // 0x04 — 可读
+}
+
+/**
+ * ELF节头标志
+ */
+quantum_enum ELF_SECTION_FLAG {
+    SHF_WRITE,       // 0x00000001 — 可写
+    SHF_ALLOC,       // 0x00000002 — 运行时占用内存
+    SHF_EXECINSTR,   // 0x00000004 — 包含可执行指令
+    SHF_MERGE,       // 0x00000010 — 可合并
+    SHF_STRINGS,     // 0x00000020 — 包含字符串
+    SHF_INFO_LINK,   // 0x00000040 — sh_info包含节头索引
+    SHF_LINK_ORDER,  // 0x00000080 — 保持特定顺序
+    SHF_OS_NONCONFORM, // 0x00000100 — 不兼容OS
+    SHF_GROUP,       // 0x00000200 — 属于节组
+    SHF_TLS,         // 0x00000400 — 线程局部存储
+    SHF_EXCLUDE,     // 0x08000000 — 排除
+    SHF_COMPRESSED,  // 0x00002000 — 已压缩
+}
+
+// ==================== ELF头部结构 ====================
+
+/**
+ * @class ElfHeader
+ * @brief ELF文件头（64位）
+ */
+quantum_class ElfHeader {
+    private {
+        ident: Array<Number>;      // 16字节标识
+        e_type: Number;            // 文件类型
+        e_machine: Number;         // 机器类型
+        e_version: Number;         // 版本
+        e_entry: Number;           // 入口点地址
+        e_phoff: Number;           // 程序头表偏移
+        e_shoff: Number;           // 节头表偏移
+        e_flags: Number;           // 处理器标志
+        e_ehsize: Number;          // ELF头大小
+        e_phentsize: Number;       // 程序头表项大小
+        e_phnum: Number;           // 程序头表项数
+        e_shentsize: Number;       // 节头表项大小
+        e_shnum: Number;           // 节头表项数
+        e_shstrndx: Number;        // 节名字符串表索引
+    }
+
+    constructor() {
+        this.ident = new Array<Number>(16);
+        // ELF魔数
+        this.ident[0] = 0x7F;
+        this.ident[1] = 0x45;  // 'E'
+        this.ident[2] = 0x4C;  // 'L'
+        this.ident[3] = 0x46;  // 'F'
+        // EI_CLASS
+        this.ident[4] = ELF_CLASS.ELFCLASS_64;
+        // EI_DATA
+        this.ident[5] = ELF_DATA.ELFDATA_2LSB;
+        // EI_VERSION
+        this.ident[6] = 1;
+        // EI_OSABI
+        this.ident[7] = ELF_OSABI.ELFOSABI_LINUX;
+        // EI_ABIVERSION
+        this.ident[8] = 0;
+        // EI_PAD（8字节填充）
+        for (let i = 9; i < 16; i++) this.ident[i] = 0;
+
+        this.e_type = ELF_TYPE.ET_EXEC;
+        this.e_machine = 0;
+        this.e_version = 1;
+        this.e_entry = 0;
+        this.e_phoff = 0;
+        this.e_shoff = 0;
+        this.e_flags = 0;
+        this.e_ehsize = 64;
+        this.e_phentsize = 56;
+        this.e_phnum = 0;
+        this.e_shentsize = 64;
+        this.e_shnum = 0;
+        this.e_shstrndx = 0;
+    }
+
+    public function setType(t: Number): void { this.e_type = t; }
+    public function setMachine(m: Number): void { this.e_machine = m; }
+    public function setEntry(addr: Number): void { this.e_entry = addr; }
+    public function setPhoff(off: Number): void { this.e_phoff = off; }
+    public function setShoff(off: Number): void { this.e_shoff = off; }
+    public function setFlags(flags: Number): void { this.e_flags = flags; }
+    public function setPhnum(num: Number): void { this.e_phnum = num; }
+    public function setShnum(num: Number): void { this.e_shnum = num; }
+    public function setShstrndx(idx: Number): void { this.e_shstrndx = idx; }
+
+    public function setOsabi(osabi: Number): void { this.ident[7] = osabi; }
+
+    /**
+     * @brief 写入ELF头到二进制流
+     */
+    public function write(writer: BinaryWriter): void {
+        for (let b of this.ident) writer.writeUint8(b);
+        writer.writeUint16(this.e_type);
+        writer.writeUint16(this.e_machine);
+        writer.writeUint32(this.e_version);
+        writer.writeUint64(this.e_entry);
+        writer.writeUint64(this.e_phoff);
+        writer.writeUint64(this.e_shoff);
+        writer.writeUint32(this.e_flags);
+        writer.writeUint16(this.e_ehsize);
+        writer.writeUint16(this.e_phentsize);
+        writer.writeUint16(this.e_phnum);
+        writer.writeUint16(this.e_shentsize);
+        writer.writeUint16(this.e_shnum);
+        writer.writeUint16(this.e_shstrndx);
+    }
+}
+
+// ==================== ELF节头 ====================
+
+/**
+ * @class ElfSectionHeader
+ * @brief ELF节头（64位）
+ */
+quantum_class ElfSectionHeader {
+    private {
+        sh_name: Number;          // 节名在shstrtab中的索引
+        sh_type: Number;          // 节类型
+        sh_flags: Number;         // 节属性
+        sh_addr: Number;          // 运行时虚拟地址
+        sh_offset: Number;        // 文件偏移
+        sh_size: Number;          // 节大小
+        sh_link: Number;          // 关联节头索引
+        sh_info: Number;          // 节信息
+        sh_addralign: Number;     // 地址对齐
+        sh_entsize: Number;       // 表项大小
+    }
+
+    constructor(sh_type: Number, sh_flags: Number, sh_offset: Number, sh_size: Number) {
+        this.sh_name = 0;
+        this.sh_type = sh_type;
+        this.sh_flags = sh_flags;
+        this.sh_addr = 0;
+        this.sh_offset = sh_offset;
+        this.sh_size = sh_size;
+        this.sh_link = 0;
+        this.sh_info = 0;
+        this.sh_addralign = 1;
+        this.sh_entsize = 0;
+    }
+
+    public function getShname(): Number { return this.sh_name; }
+    public function getShType(): Number { return this.sh_type; }
+    public function getShFlags(): Number { return this.sh_flags; }
+    public function getShAddr(): Number { return this.sh_addr; }
+    public function getShOffset(): Number { return this.sh_offset; }
+    public function getShSize(): Number { return this.sh_size; }
+
+    public function setShName(idx: Number): void { this.sh_name = idx; }
+    public function setShAddr(addr: Number): void { this.sh_addr = addr; }
+    public function setShLink(link: Number): void { this.sh_link = link; }
+    public function setShInfo(info: Number): void { this.sh_info = info; }
+    public function setShAddralign(align: Number): void { this.sh_addralign = align; }
+    public function setShEntsize(ent: Number): void { this.sh_entsize = ent; }
+
+    public function write(writer: BinaryWriter): void {
+        writer.writeUint32(this.sh_name);
+        writer.writeUint32(this.sh_type);
+        writer.writeUint64(this.sh_flags);
+        writer.writeUint64(this.sh_addr);
+        writer.writeUint64(this.sh_offset);
+        writer.writeUint64(this.sh_size);
+        writer.writeUint32(this.sh_link);
+        writer.writeUint32(this.sh_info);
+        writer.writeUint64(this.sh_addralign);
+        writer.writeUint64(this.sh_entsize);
+    }
+}
+
+// ==================== ELF程序头 ====================
+
+/**
+ * @class ElfProgramHeader
+ * @brief ELF程序头（64位）
+ */
+quantum_class ElfProgramHeader {
+    private {
+        p_type: Number;       // 段类型
+        p_flags: Number;      // 段标志
+        p_offset: Number;     // 文件偏移
+        p_vaddr: Number;      // 虚拟地址
+        p_paddr: Number;      // 物理地址
+        p_filesz: Number;     // 文件大小
+        p_memsz: Number;      // 内存大小
+        p_align: Number;      // 对齐
+    }
+
+    constructor(p_type: Number, p_flags: Number) {
+        this.p_type = p_type;
+        this.p_flags = p_flags;
+        this.p_offset = 0;
+        this.p_vaddr = 0;
+        this.p_paddr = 0;
+        this.p_filesz = 0;
+        this.p_memsz = 0;
+        this.p_align = 0x1000;
+    }
+
+    public function write(writer: BinaryWriter): void {
+        writer.writeUint32(this.p_type);
+        writer.writeUint32(this.p_flags);
+        writer.writeUint64(this.p_offset);
+        writer.writeUint64(this.p_vaddr);
+        writer.writeUint64(this.p_paddr);
+        writer.writeUint64(this.p_filesz);
+        writer.writeUint64(this.p_memsz);
+        writer.writeUint64(this.p_align);
+    }
+}
+
+// ==================== ELF动态条目 ====================
+
+/**
+ * ELF动态标签
+ */
+quantum_enum ELF_DYNAMIC {
+    DT_NULL,         // 0x00 — 结束标记
+    DT_NEEDED,       // 0x01 — 依赖库
+    DT_PLTRELSZ,     // 0x02 — PLT重定位大小
+    DT_PLTGOT,       // 0x03 — PLT/GOT地址
+    DT_HASH,         // 0x05 — 哈希表
+    DT_STRTAB,       // 0x06 — 字符串表
+    DT_SYMTAB,       // 0x07 — 符号表
+    DT_REL,          // 0x08 — REL重定位
+    DT_RELSZ,        // 0x09 — REL大小
+    DT_RELENT,       // 0x0A — REL项大小
+    DT_STRSZ,        // 0x0B — 字符串表大小
+    DT_SYMENT,       // 0x0C — 符号表项大小
+    DT_BIND_NOW,     // 0x0D — 立即绑定
+    DT_FLAGS,        // 0x0E — 标志
+    DT_ENCODING,     // 0x0F — 编码
+    DT_RELA,         // 0x10 — RELA重定位
+    DT_RELASZ,       // 0x11 — RELA大小
+    DT_RELAENT,      // 0x12 — RELA项大小
+    DT_VERNEEDNUM,   // 0x14 — 版本需求数量
+    DT_VERSYM,       // 0x19 — 版本符号表
+    DT_FLAGS_1,      // 0x1D — 扩展标志
+    DT_GNU_HASH,     // 0x00000007 — GNU哈希表
+    DT_AUDIT,        // 0x00000009 — 审计
+    DT_MOVE,         // 0x0000000A — 移动
+    DT_MOVESZ,       // 0x0000000B — 移动大小
+    DT_MOVESYM,      // 0x0000000C — 移动符号
+    DT_SYMINFO,      // 0x0000000D — 符号信息
+    DT_SYMINFO_NUM,  // 0x0000000E — 符号数量
+    DT_POSFLAG_1,    // 0x0000001A — 位置无关标志
+}
+
+// ==================== 平台特定ELF生成器 ====================
+
+/**
+ * @class AndroidElfGenerator
+ * @brief Android ELF生成器
+ * 
+ * Android使用ART虚拟机（Android Runtime），支持ART/Dalvik混合执行。
+ * QEntL经典逻辑以ELF可执行文件形式嵌入APK包。
+ */
+quantum_class AndroidElfGenerator {
+    private {
+        header: ElfHeader;
+        arch: ArchID;
+    }
+
+    constructor(arch: ArchID) {
+        this.header = new ElfHeader();
+        this.header.setType(ELF_TYPE.ET_EXEC);
+        this.header.setMachine(ELF_MACHINE["EM_AARCH64"]);
+        this.header.setOsabi(ELF_OSABI.ELFOSABI_LINUX);
+        this.arch = arch;
+    }
+
+    public function createQbcSection(): ElfSectionHeader {
+        return new ElfSectionHeader(
+            ELF_SECTION.SHT_QBC,
+            ELF_SECTION_FLAG.SHF_ALLOC,
+            0, 0
+        );
+    }
+
+    public function createQdataSection(): ElfSectionHeader {
+        return new ElfSectionHeader(
+            ELF_SECTION.SHT_QDATA,
+            ELF_SECTION_FLAG.SHF_WRITE | ELF_SECTION_FLAG.SHF_ALLOC,
+            0, 0
+        );
+    }
+}
+
+/**
+ * @class HarmonyElfGenerator
+ * @brief 鸿蒙 ELF 生成器
+ * 
+ * OpenHarmony 使用基于Linux内核的鸿蒙内核，二进制格式兼容ELF。
+ * 但鸿蒙应用以HAP（HarmonyOS Application Package）形式分发，
+ * 需在ELF中嵌入鸿蒙签名认证信息。
+ */
+quantum_class HarmonyElfGenerator {
+    private {
+        header: ElfHeader;
+        arch: ArchID;
+        signatureBlockSize: Number;
+    }
+
+    constructor(arch: ArchID) {
+        this.header = new ElfHeader();
+        this.header.setType(ELF_TYPE.ET_EXEC);
+        this.header.setMachine(ELF_MACHINE["EM_AARCH64"]);
+        this.header.setOsabi(ELF_OSABI.ELFOSABI_HARMONY);
+        this.arch = arch;
+        this.signatureBlockSize = 0x200;
+    }
+
+    public function createQbcSection(): ElfSectionHeader {
+        return new ElfSectionHeader(
+            ELF_SECTION.SHT_QBC,
+            ELF_SECTION_FLAG.SHF_ALLOC,
+            0, 0
+        );
+    }
+
+    public function createQdataSection(): ElfSectionHeader {
+        return new ElfSectionHeader(
+            ELF_SECTION.SHT_QDATA,
+            ELF_SECTION_FLAG.SHF_WRITE | ELF_SECTION_FLAG.SHF_ALLOC,
+            0, 0
+        );
+    }
+
+    /**
+     * @brief 获取鸿蒙签名字段大小
+     */
+    public function getSignatureBlockSize(): Number {
+        return this.signatureBlockSize;
+    }
+}
+
+/**
+ * @class LinuxElfGenerator
+ * @brief Linux ELF 生成器（标准）
+ * 
+ * Linux是最常见的经典平台，支持标准ELF格式。
+ * QEntL生成的ELF可作为静态或动态链接的可执行文件。
+ */
+quantum_class LinuxElfGenerator {
+    private {
+        header: ElfHeader;
+        arch: ArchID;
+        isSharedLib: Boolean;
+    }
+
+    constructor(arch: ArchID, isSharedLib: Boolean = false) {
+        this.header = new ElfHeader();
+        this.header.setType(isSharedLib ? ELF_TYPE.ET_DYN : ELF_TYPE.ET_EXEC);
+        this.header.setMachine(ELF_MACHINE["EM_X86_64"]);
+        this.header.setOsabi(ELF_OSABI.ELFOSABI_LINUX);
+        this.arch = arch;
+        this.isSharedLib = isSharedLib;
+    }
+
+    public function createQbcSection(): ElfSectionHeader {
+        return new ElfSectionHeader(
+            ELF_SECTION.SHT_QBC,
+            ELF_SECTION_FLAG.SHF_ALLOC,
+            0, 0
+        );
+    }
+
+    public function createQdataSection(): ElfSectionHeader {
+        return new ElfSectionHeader(
+            ELF_SECTION.SHT_QDATA,
+            ELF_SECTION_FLAG.SHF_WRITE | ELF_SECTION_FLAG.SHF_ALLOC,
+            0, 0
+        );
+    }
+}
+
+// ==================== 标准ELF节布局 ====================
+
+/**
+ * QEntL .qbc经典ELF格式的标准节布局
+ * 
+ * 节名           | 类型              | 大小对齐  | 用途
+ * ──────────────|─────────────────|─────────|─────────────────────
+ * .text         | SHT_PROGBITS     | 16      | 经典逻辑代码
+ * .rodata       | SHT_PROGBITS     | 16      | 只读数据
+ * .data         | SHT_PROGBITS     | 8       | 读写数据
+ * .bss          | SHT_NOBITS       | 8       | 未初始化数据
+ * .qbc          | SHT_QBC          | 16      | QEntL量子字节码
+ * .qdata        | SHT_QDATA        | 8       | QEntL量子数据
+ * .dynsym       | SHT_DYNSYM       | 8       | 动态符号表
+ * .dynstr       | SHT_STRTAB       | 1       | 动态字符串表
+ * .rela.text    | SHT_RELA         | 8       | .text重定位
+ * .rela.data    | SHT_RELA         | 8       | .data重定位
+ * .shstrtab     | SHT_STRTAB       | 1       | 节名字符串表
+ */
+
+// ==================== 导出 ====================
+export {
+    ELF_CLASS,
+    ELF_DATA,
+    ELF_OSABI,
+    ELF_TYPE,
+    ELF_SECTION,
+    ELF_PROGRAM,
+    ELF_PROGRAM_FLAG,
+    ELF_SECTION_FLAG,
+    ELF_DYNAMIC,
+    ElfHeader,
+    ElfSectionHeader,
+    ElfProgramHeader,
+    AndroidElfGenerator,
+    HarmonyElfGenerator,
+    LinuxElfGenerator
+};

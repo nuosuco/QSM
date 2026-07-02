@@ -1,0 +1,506 @@
+/**
+ * @file binary_converter.qentl
+ * @brief 二进制转换框架 — 经典逻辑部分二进制格式转换
+ * 
+ * 量子基因编码: QGC-BINARY-CONVERTER-2026070301
+ * 量子纠缠信道: QEC-PLATFORM-CONVERSION-01
+ * 版本: 1.0.0
+ * 
+ * QEntL .qbc文件的双层架构：
+ * ┌─────────────────────────────────────────────┐
+ * │  QEntL统一文件头 (QBC_MAGIC 4字节 + 版本 2字节) │
+ * ├─────────────────────────────────────────────┤
+ * │  经典逻辑部分                                  │
+ * │  ┌─────────────────────────────────────────┐ │
+ * │  │ 平台选择索引 (2字节)                      │ │
+ * │  │ 平台二进制区                             │ │
+ * │  │ - Windows PE 区 (偏移+长度)               │ │
+ * │  │ - iOS Mach-O 区 (偏移+长度)              │ │
+ * │  │ - Android ELF 区 (偏移+长度)             │ │
+ * │  │ - 鸿蒙 ELF 区   (偏移+长度)              │ │
+ * │  │ - Linux ELF 区  (偏移+长度)              │ │
+ * │  └─────────────────────────────────────────┘ │
+ * ├─────────────────────────────────────────────┤
+ * │  量子逻辑部分                                  │
+ * │  ┌─────────────────────────────────────────┐ │
+ * │  │ QBC量子字节码 (叠加态/纠缠/测量指令)        │ │
+ * │  └─────────────────────────────────────────┘ │
+ * └─────────────────────────────────────────────┘
+ * 
+ * 核心功能：
+ * 1. .qbc 文件头解析（双格式混合文件）
+ * 2. 经典逻辑 → 目标平台二进制转换
+ * 3. 跨平台二进制提取（从.qbc中提取特定平台的二进制）
+ */
+
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Platform/formats/pe_format.qentl";
+import "QEntL/System/Platform/formats/macho_format.qentl";
+import "QEntL/System/Platform/formats/elf_format.qentl";
+import "QEntL/System/Platform/platform_registry.qentl";
+import "QEntL/System/Compiler/src/utils/binary_writer.qentl";
+
+// ==================== QBC文件头常量 ====================
+
+/**
+ * QEntL .qbc 文件魔数
+ */
+const QBC_MAGIC: Array<Number> = [0x51, 0x42, 0x43, 0x01]; // "QBC\x01"
+const QBC_VERSION: Number = 0x0001;  // 当前版本
+
+/**
+ * 经典平台索引
+ */
+quantum_enum QBC_PLATFORM_INDEX {
+    QBC_IDX_WINDOWS  = 0,   // 0
+    QBC_IDX_IOS      = 1,   // 1
+    QBC_IDX_ANDROID  = 2,   // 2
+    QBC_IDX_HARMONY  = 3,   // 3
+    QBC_IDX_LINUX    = 4,   // 4
+    QBC_IDX_COUNT    = 5    // 5
+}
+
+/**
+ * 每个平台二进制区头（8字节）
+ */
+quantum_class QbcPlatformBlock {
+    private {
+        platformId: Number;      // 平台ID（PlatformID枚举值）
+        reserved: Number;        // 保留
+        size: Number;            // 二进制数据大小
+        offset: Number;          // 相对QBC文件头的数据偏移
+        formatId: Number;        // 二进制格式ID
+        archId: Number;          // 架构ID
+    }
+
+    constructor(platformId: Number, formatId: Number, archId: Number) {
+        this.platformId = platformId;
+        this.reserved = 0;
+        this.size = 0;
+        this.offset = 0;
+        this.formatId = formatId;
+        this.archId = archId;
+    }
+
+    public function getPlatformId(): Number { return this.platformId; }
+    public function getSize(): Number { return this.size; }
+    public function getOffset(): Number { return this.offset; }
+    public function getFormatId(): Number { return this.formatId; }
+    public function getArchId(): Number { return this.archId; }
+
+    public function setSize(size: Number): void { this.size = size; }
+    public function setOffset(offset: Number): void { this.offset = offset; }
+
+    public function write(writer: BinaryWriter): void {
+        writer.writeUint8(this.platformId);
+        writer.writeUint8(this.formatId);
+        writer.writeUint16(this.archId);
+        writer.writeUint32(this.size);
+        writer.writeUint32(this.offset);
+    }
+
+    /**
+     * @brief 从二进制流读取
+     */
+    public static function read(reader: Array<Number>, pos: Number): QbcPlatformBlock {
+        let pb = new QbcPlatformBlock(0, 0, 0);
+        pb.platformId = reader[pos + 0];
+        pb.formatId = reader[pos + 1];
+        pb.archId = reader[pos + 2] | (reader[pos + 3] << 8);
+        pb.size = reader[pos + 4] | (reader[pos + 5] << 8) | (reader[pos + 6] << 16) | (reader[pos + 7] << 24);
+        pb.offset = reader[pos + 8] | (reader[pos + 9] << 8) | (reader[pos + 10] << 16) | (reader[pos + 11] << 24);
+        return pb;
+    }
+}
+
+// ==================== QBC文件头 ====================
+
+/**
+ * @class QbcHeader
+ * @brief QEntL .qbc 文件头
+ * 
+ * 文件头结构（32字节）：
+ * ┌──────────────────────────────────────────────┐
+ * │ QBC_MAGIC[4]    — "QBC\x01"                  │
+ * │ version[2]      — 版本                      │
+ * │ classicCount[2]  — 经典平台二进制区数量        │
+ * │ quantumSize[8]   — 量子逻辑部分大小            │
+ * │ quantumOffset[8] — 量子逻辑部分偏移            │
+ * │ reserved[8]      — 保留                      │
+ * └──────────────────────────────────────────────┘
+ */
+quantum_class QbcHeader {
+    private {
+        magic: Array<Number>;       // 魔数
+        version: Number;            // 版本
+        classicCount: Number;       // 经典平台二进制区数量
+        quantumSize: Number;        // 量子逻辑部分大小
+        quantumOffset: Number;      // 量子逻辑部分偏移
+        reserved: Number;           // 保留
+    }
+
+    constructor(classicCount: Number, quantumSize: Number) {
+        this.magic = new Array<Number>(4);
+        this.magic[0] = QBC_MAGIC[0];
+        this.magic[1] = QBC_MAGIC[1];
+        this.magic[2] = QBC_MAGIC[2];
+        this.magic[3] = QBC_MAGIC[3];
+        this.version = QBC_VERSION;
+        this.classicCount = classicCount;
+        this.quantumSize = quantumSize;
+        this.quantumOffset = 0;
+        this.reserved = 0;
+    }
+
+    public function getMagic(): Array<Number> { return this.magic; }
+    public function getVersion(): Number { return this.version; }
+    public function getClassicCount(): Number { return this.classicCount; }
+    public function getQuantumSize(): Number { return this.quantumSize; }
+    public function getQuantumOffset(): Number { return this.quantumOffset; }
+
+    public function setQuantumOffset(offset: Number): void { this.quantumOffset = offset; }
+    public function setQuantumSize(size: Number): void { this.quantumSize = size; }
+
+    public function write(writer: BinaryWriter): void {
+        for (let b of this.magic) writer.writeUint8(b);
+        writer.writeUint16(this.version);
+        writer.writeUint16(this.classicCount);
+        writer.writeUint64(this.quantumSize);
+        writer.writeUint64(this.quantumOffset);
+        writer.writeUint64(this.reserved);
+    }
+
+    /**
+     * @brief 从二进制流读取文件头
+     */
+    public static function read(reader: Array<Number>, pos: Number): QbcHeader {
+        let h = new QbcHeader(0, 0);
+        h.magic = new Array<Number>(4);
+        h.magic[0] = reader[pos + 0];
+        h.magic[1] = reader[pos + 1];
+        h.magic[2] = reader[pos + 2];
+        h.magic[3] = reader[pos + 3];
+        h.version = reader[pos + 4] | (reader[pos + 5] << 8);
+        h.classicCount = reader[pos + 6] | (reader[pos + 7] << 8);
+        // quantumSize (8 bytes little-endian)
+        h.quantumSize = 0;
+        for (let i = 0; i < 8; i++) h.quantumSize |= reader[pos + 8 + i] << (i * 8);
+        // quantumOffset (8 bytes)
+        h.quantumOffset = 0;
+        for (let i = 0; i < 8; i++) h.quantumOffset |= reader[pos + 16 + i] << (i * 8);
+        return h;
+    }
+
+    public function isValid(): Boolean {
+        return this.magic[0] == 0x51 && this.magic[1] == 0x42 &&
+               this.magic[2] == 0x43 && this.magic[3] == 0x01;
+    }
+}
+
+// ==================== 经典二进制区 ====================
+
+/**
+ * @class ClassicBinarySection
+ * @brief 经典二进制区域
+ * 
+ * 存储5个平台的经典逻辑二进制数据：
+ * ┌──────────────────────────────────────────┐
+ * │ 经典二进制区头（32字节）                   │
+ * │ - platformBlock[5] × 12字节 = 60字节     │
+ */
+quantum_class ClassicBinarySection {
+    private {
+        blocks: Array<QbcPlatformBlock>;
+        data: Array<Number>;  // 经典二进制数据
+    }
+
+    constructor(classicCount: Number) {
+        this.blocks = new Array<QbcPlatformBlock>();
+        this.data = new Array<Number>();
+        for (let i = 0; i < classicCount; i++) {
+            this.blocks.push(new QbcPlatformBlock(0, 0, 0));
+        }
+    }
+
+    public function setBlock(idx: Number, pb: QbcPlatformBlock): void {
+        if (idx >= 0 && idx < this.blocks.length) {
+            this.blocks[idx] = pb;
+        }
+    }
+
+    public function getBlock(idx: Number): QbcPlatformBlock {
+        if (idx >= 0 && idx < this.blocks.length) {
+            return this.blocks[idx];
+        }
+        return null;
+    }
+
+    public function getBlockCount(): Number {
+        return this.blocks.length;
+    }
+
+    public function setData(data: Array<Number>): void {
+        this.data = data;
+    }
+
+    public function getData(): Array<Number> {
+        return this.data;
+    }
+
+    public function extractPlatformData(platformId: Number): Array<Number> {
+        for (let block of this.blocks) {
+            if (block.getPlatformId() === platformId) {
+                let offset = block.getOffset();
+                let size = block.getSize();
+                let result = new Array<Number>(size);
+                for (let i = 0; i < size; i++) {
+                    result[i] = this.data[offset + i];
+                }
+                return result;
+            }
+        }
+        return new Array<Number>(0);
+    }
+
+    public function writeBlocks(writer: BinaryWriter): void {
+        for (let block of this.blocks) {
+            block.write(writer);
+        }
+    }
+}
+
+// ==================== 量子逻辑区 ====================
+
+/**
+ * @class QuantumBytecodeSection
+ * @brief 量子逻辑部分 — 量子字节码
+ */
+quantum_class QuantumBytecodeSection {
+    private {
+        data: Array<Number>;
+        checksum: Number;
+    }
+
+    constructor() {
+        this.data = new Array<Number>();
+        this.checksum = 0;
+    }
+
+    public function setData(data: Array<Number>): void {
+        this.data = data;
+        this.recomputeChecksum();
+    }
+
+    public function getData(): Array<Number> {
+        return this.data;
+    }
+
+    public function getSize(): Number {
+        return this.data.length;
+    }
+
+    public function getChecksum(): Number {
+        return this.checksum;
+    }
+
+    private function recomputeChecksum(): void {
+        this.checksum = 0;
+        for (let b of this.data) {
+            this.checksum = (this.checksum + b) & 0xFFFFFFFF;
+        }
+    }
+
+    public function write(writer: BinaryWriter): void {
+        for (let b of this.data) {
+            writer.writeUint8(b);
+        }
+    }
+}
+
+// ==================== 二进制转换器 ====================
+
+/**
+ * @class BinaryConverter
+ * @brief 二进制转换器 — 执行经典逻辑到目标平台二进制格式转换
+ */
+quantum_class BinaryConverter {
+    private {
+        registry: PlatformRegistry;
+        configManager: PlatformConfigManager;
+    }
+
+    constructor() {
+        this.registry = new PlatformRegistry();
+        this.configManager = new PlatformConfigManager();
+    }
+
+    /**
+     * @brief 转换经典逻辑为Windows PE格式
+     * @param classicData 经典逻辑数据
+     * @return PE二进制数据
+     */
+    public function convertToWindowsPE(classicData: Array<Number>): Array<Number> {
+        let writer = new BinaryWriter();
+        let gen = new PEGenerator(PE_MACHINE.MACH_AMD64, 0x1000, 0x140000000, PE_SUBSYSTEM.SUBSYSTEM_WINDOWS_CUI);
+        let sections = PEGenerator.createStandardSections();
+        for (let sec of sections) {
+            gen.addSection(sec);
+        }
+        gen.generateHeaders(writer);
+        return writer.getBuffer();
+    }
+
+    /**
+     * @brief 转换经典逻辑为iOS Mach-O格式
+     * @param classicData 经典逻辑数据
+     * @return Mach-O二进制数据
+     */
+    public function convertToIOSMachO(classicData: Array<Number>): Array<Number> {
+        let writer = new BinaryWriter();
+        let gen = new MachOGenerator(MACHO_CPUTYPE.CPU_TYPE_ARM64, MACHO_CPUSUBTYPE.CPU_SUBTYPE_ARM64_ALL, MACHO_FILETYPE.MH_EXECUTE);
+        let segments = MachOGenerator.createStandardSegments();
+        for (let seg of segments) {
+            gen.addSegment(seg);
+        }
+        gen.writeHeader(writer);
+        gen.writeLoadCommands(writer);
+        return writer.getBuffer();
+    }
+
+    /**
+     * @brief 转换经典逻辑为Android ELF格式
+     * @param classicData 经典逻辑数据
+     * @return ELF二进制数据
+     */
+    public function convertToAndroidELF(classicData: Array<Number>): Array<Number> {
+        let writer = new BinaryWriter();
+        let gen = new AndroidElfGenerator(ArchID.ARCH_ARM64);
+        let elfHeader = new ElfHeader();
+        elfHeader.setType(ELF_TYPE.ET_EXEC);
+        elfHeader.setMachine(ELF_MACHINE["EM_AARCH64"]);
+        elfHeader.setOsabi(ELF_OSABI.ELFOSABI_LINUX);
+        elfHeader.write(writer);
+        return writer.getBuffer();
+    }
+
+    /**
+     * @brief 转换经典逻辑为鸿蒙 ELF 格式
+     * @param classicData 经典逻辑数据
+     * @return ELF二进制数据
+     */
+    public function convertToHarmonyELF(classicData: Array<Number>): Array<Number> {
+        let writer = new BinaryWriter();
+        let gen = new HarmonyElfGenerator(ArchID.ARCH_ARM64);
+        let elfHeader = new ElfHeader();
+        elfHeader.setType(ELF_TYPE.ET_EXEC);
+        elfHeader.setMachine(ELF_MACHINE["EM_AARCH64"]);
+        elfHeader.setOsabi(ELF_OSABI.ELFOSABI_HARMONY);
+        elfHeader.write(writer);
+        return writer.getBuffer();
+    }
+
+    /**
+     * @brief 转换经典逻辑为Linux ELF格式
+     * @param classicData 经典逻辑数据
+     * @return ELF二进制数据
+     */
+    public function convertToLinuxELF(classicData: Array<Number>): Array<Number> {
+        let writer = new BinaryWriter();
+        let gen = new LinuxElfGenerator(ArchID.ARCH_X86_64, false);
+        let elfHeader = new ElfHeader();
+        elfHeader.setType(ELF_TYPE.ET_EXEC);
+        elfHeader.setMachine(ELF_MACHINE["EM_X86_64"]);
+        elfHeader.setOsabi(ELF_OSABI.ELFOSABI_LINUX);
+        elfHeader.write(writer);
+        return writer.getBuffer();
+    }
+
+    /**
+     * @brief 多平台转换 — 将所有5个平台的二进制打包到.qbc
+     * @param classicData 经典逻辑数据
+     * @param quantumData 量子字节码数据
+     * @return 完整.qbc文件数据
+     */
+    public function packMultiplatform(classicData: Array<Number>, quantumData: Array<Number>): Array<Number> {
+        let writer = new BinaryWriter();
+        let header = new QbcHeader(5, quantumData.length);
+
+        // 写入QBC文件头
+        header.write(writer);
+
+        // 经典二进制区头 — 5个平台块描述
+        let classicOffset = 32;  // QBC头大小
+
+        // 计算各平台二进制数据
+        let windowsPE = this.convertToWindowsPE(classicData);
+        let iosMachO = this.convertToIOSMachO(classicData);
+        let androidELF = this.convertToAndroidELF(classicData);
+        let harmonyELF = this.convertToHarmonyELF(classicData);
+        let linuxELF = this.convertToLinuxELF(classicData);
+
+        let classicDataStart = classicOffset + 5 * 12;  // 5个块描述 × 12字节
+        let dataOffset = classicDataStart;
+
+        // 块1: Windows PE
+        let pbWindows = new QbcPlatformBlock(PlatformID.PLATFORM_WINDOWS, BinaryFormatID.FORMAT_PE, ArchID.ARCH_X86_64);
+        pbWindows.setSize(windowsPE.length);
+        pbWindows.setOffset(dataOffset);
+        dataOffset += windowsPE.length;
+
+        // 块2: iOS Mach-O
+        let pbIOS = new QbcPlatformBlock(PlatformID.PLATFORM_IOS, BinaryFormatID.FORMAT_MACHO, ArchID.ARCH_ARM64);
+        pbIOS.setSize(iosMachO.length);
+        pbIOS.setOffset(dataOffset);
+        dataOffset += iosMachO.length;
+
+        // 块3: Android ELF
+        let pbAndroid = new QbcPlatformBlock(PlatformID.PLATFORM_ANDROID, BinaryFormatID.FORMAT_ELF, ArchID.ARCH_ARM64);
+        pbAndroid.setSize(androidELF.length);
+        pbAndroid.setOffset(dataOffset);
+        dataOffset += androidELF.length;
+
+        // 块4: 鸿蒙 ELF
+        let pbHarmony = new QbcPlatformBlock(PlatformID.PLATFORM_HARMONY, BinaryFormatID.FORMAT_ELF, ArchID.ARCH_ARM64);
+        pbHarmony.setSize(harmonyELF.length);
+        pbHarmony.setOffset(dataOffset);
+        dataOffset += harmonyELF.length;
+
+        // 块5: Linux ELF
+        let pbLinux = new QbcPlatformBlock(PlatformID.PLATFORM_LINUX, BinaryFormatID.FORMAT_ELF, ArchID.ARCH_X86_64);
+        pbLinux.setSize(linuxELF.length);
+        pbLinux.setOffset(dataOffset);
+        dataOffset += linuxELF.length;
+
+        // 写入5个块描述
+        pbWindows.write(writer);
+        pbIOS.write(writer);
+        pbAndroid.write(writer);
+        pbHarmony.write(writer);
+        pbLinux.write(writer);
+
+        // 写入各平台二进制数据
+        for (let b of windowsPE) writer.writeUint8(b);
+        for (let b of iosMachO) writer.writeUint8(b);
+        for (let b of androidELF) writer.writeUint8(b);
+        for (let b of harmonyELF) writer.writeUint8(b);
+        for (let b of linuxELF) writer.writeUint8(b);
+
+        // 量子逻辑部分
+        header.setQuantumOffset(writer.getPosition());
+        for (let b of quantumData) writer.writeUint8(b);
+
+        return writer.getBuffer();
+    }
+}
+
+// ==================== 导出 ====================
+export {
+    QBC_MAGIC,
+    QBC_VERSION,
+    QBC_PLATFORM_INDEX,
+    QbcPlatformBlock,
+    QbcHeader,
+    ClassicBinarySection,
+    QuantumBytecodeSection,
+    BinaryConverter
+};

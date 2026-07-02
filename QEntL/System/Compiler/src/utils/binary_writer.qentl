@@ -123,6 +123,17 @@ quantum_class BinaryWriter {
     }
     
     /**
+     * @brief 写入64位无符号整数（小端）
+     * @param value 整数值
+     */
+    public function writeUint64(value: Number): void {
+        this.ensureCapacity(8);
+        for (let i = 0; i < 8; i++) {
+            this.buffer.push((value >> (i * 8)) & 0xFF);
+        }
+    }
+
+    /**
      * @brief 写入64位浮点数
      * @param value 浮点数值
      */

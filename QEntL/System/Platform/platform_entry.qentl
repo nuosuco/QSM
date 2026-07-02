@@ -1,0 +1,316 @@
+/**
+ * @file platform_entry.qentl
+ * @brief 平台支持主入口 — QEntL经典5平台支持模块统一入口
+ * 
+ * 量子基因编码: QGC-PLATFORM-ENTRY-2026070301
+ * 量子纠缠信道: QEC-PLATFORM-ENTRY-01
+ * 版本: 1.0.0
+ * 
+ * 这是QEntL全栈经典5平台支持的统一入口模块。
+ * 提供以下核心API：
+ * - PlatformManager: 平台管理与元数据查询
+ * - PlatformBuilder: 多平台二进制构建器
+ * - PlatformProbe: 平台探测工具
+ */
+
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Platform/platform_registry.qentl";
+import "QEntL/System/Platform/conversion/binary_converter.qentl";
+import "QEntL/System/Platform/formats/pe_format.qentl";
+import "QEntL/System/Platform/formats/macho_format.qentl";
+import "QEntL/System/Platform/formats/elf_format.qentl";
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/map.qentl";
+
+// ==================== 平台管理器 ====================
+
+/**
+ * @class PlatformManager
+ * @brief 平台管理器 — 统一的平台管理接口
+ * 
+ * 核心API：
+ * - list(): 列出所有支持的平台
+ * - getMetadata(platformId): 获取平台元数据
+ * - detect(): 自动探测当前平台
+ * - getBinaryFormat(platformId): 获取平台二进制格式
+ */
+quantum_class PlatformManager {
+    private {
+        registry: PlatformRegistry;
+        detector: PlatformDetector;
+        configManager: PlatformConfigManager;
+    }
+
+    constructor() {
+        this.registry = new PlatformRegistry();
+        this.detector = new PlatformDetector();
+        this.configManager = new PlatformConfigManager();
+    }
+
+    /**
+     * @brief 列出所有支持的平台
+     */
+    public function list(): Array<PlatformMetadata> {
+        return this.registry.getAll();
+    }
+
+    /**
+     * @brief 获取平台元数据
+     */
+    public function getMetadata(platformId: PlatformID): PlatformMetadata {
+        return this.registry.getByPlatformId(platformId);
+    }
+
+    /**
+     * @brief 通过名称获取平台元数据
+     */
+    public function getByName(name: String): PlatformMetadata {
+        return this.registry.getByName(name);
+    }
+
+    /**
+     * @brief 通过OS类型获取平台元数据
+     */
+    public function getByOs(os: OSType): PlatformMetadata {
+        return this.registry.getByOs(os);
+    }
+
+    /**
+     * @brief 获取平台二进制格式
+     */
+    public function getBinaryFormat(platformId: PlatformID): BinaryFormatID {
+        let meta = this.getMetadata(platformId);
+        if (meta) {
+            return meta.getBinaryFormatId();
+        }
+        return BinaryFormatID.FORMAT_UNKNOWN;
+    }
+
+    /**
+     * @brief 获取平台默认架构
+     */
+    public function getArch(platformId: PlatformID): ArchID {
+        let meta = this.getMetadata(platformId);
+        if (meta) {
+            return meta.getArchId();
+        }
+        return ArchID.ARCH_UNKNOWN;
+    }
+
+    /**
+     * @brief 获取平台配置
+     */
+    public function getConfig(platformId: PlatformID): PlatformConfig {
+        return this.configManager.getConfig(platformId);
+    }
+
+    /**
+     * @brief 获取平台数量
+     */
+    public function getCount(): Number {
+        return this.registry.getCount();
+    }
+
+    /**
+     * @brief 列出平台名称（用于调试和日志）
+     */
+    public function listNames(): Array<String> {
+        return this.registry.listNames();
+    }
+
+    /**
+     * @brief 打印平台支持状态
+     */
+    public function printStatus(): void {
+        Console.writeLine("=== QEntL 经典5平台支持状态 ===");
+        Console.writeLine("");
+        Console.writeLine("| 平台ID | 平台名称          | 架构      | 二进制格式      | 文件后缀 |");
+        Console.writeLine("|--------|-------------------|-----------|-----------------|----------|");
+        
+        let platforms = this.list();
+        for (let meta of platforms) {
+            Console.writeLine("| " + 
+                meta.getPlatformId().toString().padStart(6) + " | " +
+                meta.getName().padEnd(17) + " | " +
+                ARCH_NAMES.get(meta.getArchId()).padEnd(9) + " | " +
+                FORMAT_NAMES.get(meta.getBinaryFormatId()).padEnd(15) + " | " +
+                meta.getDefaultBinarySuffix().padEnd(8) + " |"
+            );
+        }
+        
+        Console.writeLine("");
+        Console.writeLine("总计: " + this.getCount() + " 个平台");
+        Console.writeLine("===============================");
+    }
+}
+
+// ==================== 平台构建器 ====================
+
+/**
+ * @class PlatformBuilder
+ * @brief 平台构建器 — 多平台二进制构建
+ * 
+ * 构建QEntL编译产物为多平台.qbc文件：
+ * - 经典逻辑部分：5个平台的机器二进制
+ * - 量子逻辑部分：QBC量子字节码
+ */
+quantum_class PlatformBuilder {
+    private {
+        converter: BinaryConverter;
+        manager: PlatformManager;
+    }
+
+    constructor() {
+        this.converter = new BinaryConverter();
+        this.manager = new PlatformManager();
+    }
+
+    /**
+     * @brief 构建多平台.qbc文件
+     * @param classicData 经典逻辑数据
+     * @param quantumData 量子字节码数据
+     * @return 完整.qbc文件数据
+     */
+    public function build(classicData: Array<Number>, quantumData: Array<Number>): Array<Number> {
+        return this.converter.packMultiplatform(classicData, quantumData);
+    }
+
+    /**
+     * @brief 提取指定平台的经典二进制
+     * @param qbcData .qbc文件完整数据
+     * @param platformId 目标平台ID
+     * @return 该平台二进制数据
+     */
+    public function extractPlatform(qbcData: Array<Number>, platformId: Number): Array<Number> {
+        let header = QbcHeader.read(qbcData, 0);
+        if (!header.isValid()) {
+            throw new Error("无效的QBC文件头");
+        }
+        
+        let classicOffset = 32;
+        let blockCount = header.getClassicCount();
+        
+        for (let i = 0; i < blockCount; i++) {
+            let block = QbcPlatformBlock.read(qbcData, classicOffset + i * 12);
+            if (block.getPlatformId() === platformId) {
+                let dataStart = block.getOffset();
+                let dataSize = block.getSize();
+                let result = new Array<Number>(dataSize);
+                for (let j = 0; j < dataSize; j++) {
+                    result[j] = qbcData[dataStart + j];
+                }
+                return result;
+            }
+        }
+        
+        throw new Error("未找到平台 " + platformId + " 的二进制数据");
+    }
+
+    /**
+     * @brief 验证.qbc文件头
+     * @param qbcData .qbc文件数据
+     * @return 验证结果
+     */
+    public function validateHeader(qbcData: Array<Number>): Boolean {
+        if (qbcData.length < 32) {
+            return false;
+        }
+        let header = QbcHeader.read(qbcData, 0);
+        return header.isValid();
+    }
+}
+
+// ==================== 平台探测工具 ====================
+
+/**
+ * @class PlatformProbe
+ * @brief 平台探测工具
+ * 
+ * 功能：
+ * - 探测文件魔数并识别格式
+ * - 探测系统信息并识别当前平台
+ * - 生成平台诊断报告
+ */
+quantum_class PlatformProbe {
+
+    /**
+     * @brief 探测文件魔数
+     * @param magicBytes 文件前4字节
+     * @return 探测结果
+     */
+    public static function probeFileMagic(magicBytes: Array<Number>): String {
+        let format = PlatformDetector.detectFormatFromMagic(magicBytes);
+        let platform = PlatformDetector.inferPlatformFromFormat(format);
+        let formatName = FORMAT_NAMES.get(format);
+        let platformName = PLATFORM_NAMES.get(platform);
+        return "格式=" + formatName + " 平台=" + platformName;
+    }
+
+    /**
+     * @brief 生成平台诊断报告
+     */
+    public static function generateReport(): String {
+        let report = "";
+        report += "=== QEntL 平台诊断报告 ===\n";
+        report += "\n";
+        
+        // 1. 支持的平台列表
+        report += "【支持的平台】\n";
+        let manager = new PlatformManager();
+        for (let name of manager.listNames()) {
+            report += "  - " + name + "\n";
+        }
+        
+        // 2. 二进制格式映射
+        report += "\n【二进制格式映射】\n";
+        report += "  Windows  → PE (Portable Executable)\n";
+        report += "  iOS      → Mach-O\n";
+        report += "  Android  → ELF (Linux格式)\n";
+        report += "  鸿蒙     → ELF (Linux格式, OSABI=0x64)\n";
+        report += "  Linux    → ELF (Linux格式)\n";
+        
+        // 3. 架构映射
+        report += "\n【架构映射】\n";
+        report += "  Windows  → x86_64\n";
+        report += "  iOS      → ARM64 (AArch64)\n";
+        report += "  Android  → ARM64 (AArch64)\n";
+        report += "  鸿蒙     → ARM64 (AArch64)\n";
+        report += "  Linux    → x86_64 / ARM64\n";
+        
+        // 4. ELF魔数
+        report += "\n【ELF魔数验证】\n";
+        let elfMagic = ELF_MAGIC;
+        let hexStr = "";
+        for (let b of elfMagic) {
+            hexStr += b.toString(16).padStart(2, "0") + " ";
+        }
+        report += "  ELF: " + hexStr + " (\\x7FELF)\n";
+        
+        // 5. PE魔数
+        report += "  PE:  4D 5A  (MZ)\n";
+        
+        // 6. Mach-O魔数
+        report += "  Mach-O: CE FA ED FE  (little-endian)\n";
+        
+        report += "\n============================\n";
+        return report;
+    }
+}
+
+// ==================== 导出 ====================
+export {
+    PlatformManager,
+    PlatformBuilder,
+    PlatformProbe,
+    PlatformMetadataFactory,
+    PlatformRegistry,
+    PlatformDetector,
+    PlatformConfig,
+    PlatformConfigManager,
+    QbcHeader,
+    ClassicBinarySection,
+    QuantumBytecodeSection,
+    BinaryConverter
+};

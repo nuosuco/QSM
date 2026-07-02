@@ -20,6 +20,27 @@
 //   跳出           → OP_BREAK
 //   继续           → OP_CONTINUE
 //   func()         → OP_FUNC_CALL + 函数名
+//
+// 经典平台指令（2026-07-03 扩展）：
+//   目标平台 <平台>        → OP_SET_TARGET_PLATFORM + 平台ID(1-5)
+//   经典段                 → OP_EMIT_CLASSIC_HEADER
+//   量子段                 → OP_EMIT_QUANTUM_START
+//   结束经典段             → OP_EMIT_CLASSIC_END
+//   发射机器码 <字节值>    → OP_EMIT_MACHINE_BYTE
+//   发射机器码16 <值>      → OP_EMIT_MACHINE_U16
+//   发射机器码32 <值>      → OP_EMIT_MACHINE_U32
+//   发射机器码64 <值>      → OP_EMIT_MACHINE_U64
+//   发射PE头 <节数>       → OP_EMIT_PE_HEADER
+//   发射MachO头 <类型> <子类型> → OP_EMIT_MACHO_HEADER
+//   发射ELF头 <类> <数据> <机器> <osabi> → OP_EMIT_ELF_HEADER
+//   发射ARM64 <指令字>     → OP_EMIT_ARM64_INST
+//   发射x86_64 <长度> [字节...] → OP_EMIT_X86_64_INST
+//   段 <名称> <标志>       → OP_EMIT_SECTION
+//   符号表 <名称> <值> <大小> <类型> → OP_EMIT_SYMBOL
+//   链接脚本 <长度> <内容>   → OP_EMIT_LINKER_SCRIPT
+//   平台选择 <平台>        → OP_SELECT_PLATFORM
+//   结束平台               → OP_END_PLATFORM
+//   联合编译 <数量> <平台1> ... → OP_COMPILE_FOR_PLATFORMS
 // ============================================================================
 
 import "qcl_opcodes.qentl";
@@ -37,17 +58,17 @@ def skip_whitespace(p, line):
     return i;
 
 // 从位置 p 开始解析一个非负整数，返回 (值, 新位置)
+// 解析无符号整数（别名，与历史定义一致）
 def parse_uint(line, p):
     var val = 0;
-    var i = p;
-    while i < len(line):
-        var ch = line[i];
+    while p < len(line):
+        var ch = line[p];
         if ch >= '0' && ch <= '9':
             val = val * 10 + (ord(ch) - ord('0'));
-            i = i + 1;
+            p = p + 1;
         else:
             break;
-    return [val, i];
+    return [val, p];
 
 // 判断位置 p 开始的子串是否等于 target（前缀匹配）
 def starts_with(line, p, target):
@@ -81,6 +102,26 @@ def has_open_paren(line, p):
         i = i + 1;
     return false;
 
+// ==================== 平台标识常量映射 ====================
+
+// 平台名称 → 平台ID 映射表 (1-5)
+const PLATFORM_NAME_MAP = [
+    ["Linux",  1],
+    ["Windows",2],
+    ["iOS",    3],
+    ["Android",4],
+    ["鸿蒙",    5]
+];
+
+// 根据平台名称文本返回平台ID(1-5)，未找到返回0
+def resolve_platform_id(name):
+    var i = 0;
+    while i < len(PLATFORM_NAME_MAP):
+        if starts_with(name, 0, PLATFORM_NAME_MAP[i][0]) && len(name) == len(PLATFORM_NAME_MAP[i][0]):
+            return PLATFORM_NAME_MAP[i][1];
+        i = i + 1;
+    return 0;
+
 // 字符串前缀匹配，返回前缀长度或 -1
 def str_prefix_len(line, p, target):
     var tl = len(target);
@@ -92,6 +133,19 @@ def str_prefix_len(line, p, target):
             return -1;
         i = i + 1;
     return tl;
+
+// 读取下一个标识符（跳过空白），返回 [名称, 新位置]
+def read_next_ident(line, p):
+    p = skip_whitespace(line, p);
+    var name = "";
+    while p < len(line):
+        var ch = line[p];
+        if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n'
+           || ch == ',' || ch == ')' || ch == '=' || ch == ':':
+            break;
+        name = name + ch;
+        p = p + 1;
+    return [name, p];
 
 // ==================== 单量子比特门解析 ====================
 
@@ -250,6 +304,227 @@ def parse_quantum_instruction(line, p):
         write_string(fname);
         return [true, j];  // 返回到"("位置，调用者自行处理后续
 
+    // ==================== 经典平台指令（扩展 2026-07-03）====================
+
+    // 13) 目标平台 <平台名称>
+    if starts_with(line, p, "目标平台"):
+        p = p + 4;
+        var id_result = read_next_ident(line, p);
+        var id = resolve_platform_id(id_result[0]);
+        if id == 0:
+            return [false, p];  // 未知平台
+        write_opcode(OP_SET_TARGET_PLATFORM);
+        write_u8(id);
+        return [true, id_result[1]];
+
+    // 14) 经典段
+    if starts_with(line, p, "经典段"):
+        write_opcode(OP_EMIT_CLASSIC_HEADER);
+        return [true, p + 4];
+
+    // 15) 量子段
+    if starts_with(line, p, "量子段"):
+        write_opcode(OP_EMIT_QUANTUM_START);
+        return [true, p + 4];
+
+    // 16) 结束经典段
+    if starts_with(line, p, "结束经典段"):
+        write_opcode(OP_EMIT_CLASSIC_END);
+        return [true, p + 5];
+
+    // 17) 发射机器码 <字节值>
+    if starts_with(line, p, "发射机器码") && p + 6 < len(line) && line[p + 6] != '1':
+        p = p + 5;
+        p = skip_whitespace(line, p);
+        var val_result = parse_uint(line, p);
+        if val_result[0] > 255:
+            return [false, p];
+        write_opcode(OP_EMIT_MACHINE_BYTE);
+        write_u8(val_result[0]);
+        return [true, val_result[1]];
+
+    // 18) 发射机器码16 <值>
+    if starts_with(line, p, "发射机器码16"):
+        p = p + 7;
+        p = skip_whitespace(line, p);
+        var val_result = parse_uint(line, p);
+        if val_result[0] > 65535:
+            return [false, p];
+        write_opcode(OP_EMIT_MACHINE_U16);
+        write_u16(val_result[0]);
+        return [true, val_result[1]];
+
+    // 19) 发射机器码32 <值>
+    if starts_with(line, p, "发射机器码32"):
+        p = p + 7;
+        p = skip_whitespace(line, p);
+        var val_result = parse_uint(line, p);
+        write_opcode(OP_EMIT_MACHINE_U32);
+        write_u32(val_result[0]);
+        return [true, val_result[1]];
+
+    // 20) 发射机器码64 <值>
+    if starts_with(line, p, "发射机器码64"):
+        p = p + 7;
+        p = skip_whitespace(line, p);
+        var val_result = parse_uint(line, p);
+        write_opcode(OP_EMIT_MACHINE_U64);
+        // U64: 低32位 + 高32位(简化: 仅写入低32位，高位写0)
+        write_u32(val_result[0]);
+        write_u32(0);
+        return [true, val_result[1]];
+
+    // 21) 发射PE头 <节数>
+    if starts_with(line, p, "发射PE头"):
+        p = p + 5;
+        p = skip_whitespace(line, p);
+        var val_result = parse_uint(line, p);
+        write_opcode(OP_EMIT_PE_HEADER);
+        write_u8(val_result[0]);
+        return [true, val_result[1]];
+
+    // 22) 发射MachO头 <cpu_type> <cpu_subtype>
+    if starts_with(line, p, "发射MachO头"):
+        p = p + 7;
+        p = skip_whitespace(line, p);
+        var t_val = parse_uint(line, p);
+        var cpu_type = t_val[0];
+        p = t_val[1];
+        p = skip_whitespace(line, p);
+        var s_val = parse_uint(line, p);
+        var cpu_subtype = s_val[0];
+        write_opcode(OP_EMIT_MACHO_HEADER);
+        write_u32(cpu_type);
+        write_u32(cpu_subtype);
+        return [true, s_val[1]];
+
+    // 23) 发射ELF头 <class> <data> <machine> <osabi>
+    if starts_with(line, p, "发射ELF头"):
+        p = p + 6;
+        p = skip_whitespace(line, p);
+        var c_val = parse_uint(line, p); var c = c_val[0]; p = c_val[1];
+        p = skip_whitespace(line, p);
+        var d_val = parse_uint(line, p); var d = d_val[0]; p = d_val[1];
+        p = skip_whitespace(line, p);
+        var m_val = parse_uint(line, p); var m = m_val[0]; p = m_val[1];
+        p = skip_whitespace(line, p);
+        var o_val = parse_uint(line, p); var o = o_val[0]; p = o_val[1];
+        write_opcode(OP_EMIT_ELF_HEADER);
+        write_u8(c); write_u8(d); write_u16(m); write_u8(o);
+        return [true, p];
+
+    // 24) 发射ARM64 <指令字>
+    if starts_with(line, p, "发射ARM64"):
+        p = p + 6;
+        p = skip_whitespace(line, p);
+        var val_result = parse_uint(line, p);
+        write_opcode(OP_EMIT_ARM64_INST);
+        write_u32(val_result[0]);
+        return [true, val_result[1]];
+
+    // 25) 发射x86_64 <长度>
+    if starts_with(line, p, "发射x86_64"):
+        p = p + 8;
+        p = skip_whitespace(line, p);
+        var len_result = parse_uint(line, p);
+        var byte_count = len_result[0];
+        p = len_result[1];
+        write_opcode(OP_EMIT_X86_64_INST);
+        write_u8(byte_count);
+        // 读取后续字节（简化：读取下一个数字序列作为指令字节的十进制表示）
+        var bi = 0;
+        while bi < byte_count && p < len(line):
+            p = skip_whitespace(line, p);
+            if p >= len(line): break;
+            var b_val = parse_uint(line, p);
+            write_u8(b_val[0]);
+            p = b_val[1];
+            bi = bi + 1;
+        return [true, p];
+
+    // 26) 段 <名称> <标志>
+    if starts_with(line, p, "段"):
+        p = p + 1;
+        var name_result = read_next_ident(line, p);
+        var sec_name = name_result[0];
+        p = name_result[1];
+        p = skip_whitespace(line, p);
+        var flags_val = parse_uint(line, p);
+        var flags = flags_val[0];
+        p = flags_val[1];
+        write_opcode(OP_EMIT_SECTION);
+        write_string(sec_name);
+        write_u8(flags);
+        return [true, p];
+
+    // 27) 符号表 <名称> <值> <大小> <类型>
+    if starts_with(line, p, "符号表"):
+        p = p + 3;
+        var name_result = read_next_ident(line, p);
+        var sym_name = name_result[0];
+        p = name_result[1];
+        p = skip_whitespace(line, p);
+        var v_val = parse_uint(line, p); var v = v_val[0]; p = v_val[1];
+        p = skip_whitespace(line, p);
+        var sz_val = parse_uint(line, p); var sz = sz_val[0]; p = sz_val[1];
+        p = skip_whitespace(line, p);
+        var t_val = parse_uint(line, p); var st = t_val[0]; p = t_val[1];
+        write_opcode(OP_EMIT_SYMBOL);
+        write_string(sym_name);
+        write_u32(v);
+        write_u16(sz);
+        write_u8(st);
+        return [true, p];
+
+    // 28) 链接脚本 <长度> <内容>
+    if starts_with(line, p, "链接脚本"):
+        p = p + 4;
+        p = skip_whitespace(line, p);
+        var len_result = parse_uint(line, p);
+        var content_len = len_result[0];
+        p = len_result[1];
+        p = skip_whitespace(line, p);
+        write_opcode(OP_EMIT_LINKER_SCRIPT);
+        write_u16(content_len);
+        var content = line.substring(p, p + content_len);
+        write_string(content);
+        return [true, p + content_len];
+
+    // 29) 平台选择 <平台名称>
+    if starts_with(line, p, "平台选择"):
+        p = p + 4;
+        var id_result = read_next_ident(line, p);
+        var id = resolve_platform_id(id_result[0]);
+        if id == 0:
+            return [false, p];
+        write_opcode(OP_SELECT_PLATFORM);
+        write_u8(id);
+        return [true, id_result[1]];
+
+    // 30) 结束平台
+    if starts_with(line, p, "结束平台"):
+        write_opcode(OP_END_PLATFORM);
+        return [true, p + 4];
+
+    // 31) 联合编译 <数量> <平台1> ... <平台N>
+    if starts_with(line, p, "联合编译"):
+        p = p + 4;
+        p = skip_whitespace(line, p);
+        var count_val = parse_uint(line, p);
+        var count = count_val[0];
+        p = count_val[1];
+        write_opcode(OP_COMPILE_FOR_PLATFORMS);
+        write_u8(count);
+        var ci = 0;
+        while ci < count:
+            var id_result = read_next_ident(line, p);
+            var id = resolve_platform_id(id_result[0]);
+            if id != 0:
+                write_u8(id);
+            p = id_result[1];
+            ci = ci + 1;
+        return [true, p];
+
     // 未匹配任何指令
     return [false, p];
 
@@ -339,3 +614,5 @@ export is_empty_or_comment;
 export starts_with;
 export contains_str;
 export has_open_paren;
+export resolve_platform_id;
+export read_next_ident;

@@ -66,6 +66,28 @@ import stdlib
     # 特殊
     EOF = 99,            # 文件结束
     ERROR = 100,         # 非法字符
+
+    # 经典平台 Token (110-120)
+    PLATFORM_LINUX   = 110,  # "Linux"
+    PLATFORM_WINDOWS = 111,  # "Windows"
+    PLATFORM_IOS     = 112,  # "iOS"
+    PLATFORM_ANDROID = 113,  # "Android"
+    PLATFORM_HARMONY = 114,  # "鸿蒙"
+    TARGET_PLATFORM  = 115,  # "目标平台"
+    CLASSIC_SECTION  = 116,  # "经典段"
+    QUANTUM_SECTION  = 117,  # "量子段"
+    EMIT_INST        = 118,  # "发射"
+    PLATFORM_SELECT  = 119,  # "平台选择"
+    END_PLATFORM     = 120,  # "结束平台"
+    MULTI_COMPILE    = 121,  # "联合编译"
+    ARCH_ARM64       = 122,  # "ARM64"
+    ARCH_X86_64      = 123,  # "x86_64"
+    FORMAT_PE        = 124,  # "PE"
+    FORMAT_MACHO     = 125,  # "Mach-O" / "MachO"
+    FORMAT_ELF       = 126,  # "ELF"
+    SECTION_NAME     = 127,  # "段"
+    SYMTABLE         = 128,  # "符号表"
+    LINKER_SCRIPT    = 129,  # "链接脚本"
 }
 
 # ─── Token结构体 ──────────────────────────────────────────────────
@@ -130,6 +152,31 @@ import stdlib
     "空数组"     : 1,
     "空对象"     : 1,
     "新建"       : 1,
+    # 经典平台关键词
+    "目标平台"   : 1,
+    "经典段"     : 1,
+    "量子段"     : 1,
+    "发射"       : 1,
+    "机器码"     : 1,
+    "平台选择"   : 1,
+    "结束平台"   : 1,
+    "联合编译"   : 1,
+    "Windows"    : 1,
+    "iOS"        : 1,
+    "Android"    : 1,
+    "鸿蒙"       : 1,
+    "Linux"      : 1,
+    "PE"         : 1,
+    "MachO"      : 1,
+    "Mach-O"     : 1,
+    "ELF"        : 1,
+    "ARM64"      : 1,
+    "x86_64"     : 1,
+    "段"         : 1,
+    "符号表"     : 1,
+    "链接脚本"   : 1,
+    "经典"       : 1,
+    "目标架构"   : 1,
 }
 
 # ─── 单字符运算符映射 ─────────────────────────────────────────────
@@ -485,6 +532,48 @@ import stdlib
             否则如果 ident.text in KEYWORDS:
                 ident.kind = TokenKind.IDENTIFIER
             
+            # 经典平台关键字映射到专用Token类型
+            否则如果 ident.text == "Linux":
+                ident.kind = TokenKind.PLATFORM_LINUX
+            否则如果 ident.text == "Windows":
+                ident.kind = TokenKind.PLATFORM_WINDOWS
+            否则如果 ident.text == "iOS":
+                ident.kind = TokenKind.PLATFORM_IOS
+            否则如果 ident.text == "Android":
+                ident.kind = TokenKind.PLATFORM_ANDROID
+            否则如果 ident.text == "鸿蒙":
+                ident.kind = TokenKind.PLATFORM_HARMONY
+            否则如果 ident.text == "目标平台":
+                ident.kind = TokenKind.TARGET_PLATFORM
+            否则如果 ident.text == "经典段":
+                ident.kind = TokenKind.CLASSIC_SECTION
+            否则如果 ident.text == "量子段":
+                ident.kind = TokenKind.QUANTUM_SECTION
+            否则如果 ident.text == "发射":
+                ident.kind = TokenKind.EMIT_INST
+            否则如果 ident.text == "平台选择":
+                ident.kind = TokenKind.PLATFORM_SELECT
+            否则如果 ident.text == "结束平台":
+                ident.kind = TokenKind.END_PLATFORM
+            否则如果 ident.text == "联合编译":
+                ident.kind = TokenKind.MULTI_COMPILE
+            否则如果 ident.text == "ARM64":
+                ident.kind = TokenKind.ARCH_ARM64
+            否则如果 ident.text == "x86_64":
+                ident.kind = TokenKind.ARCH_X86_64
+            否则如果 ident.text == "PE":
+                ident.kind = TokenKind.FORMAT_PE
+            否则如果 ident.text == "Mach-O" 或 ident.text == "MachO":
+                ident.kind = TokenKind.FORMAT_MACHO
+            否则如果 ident.text == "ELF":
+                ident.kind = TokenKind.FORMAT_ELF
+            否则如果 ident.text == "段":
+                ident.kind = TokenKind.SECTION_NAME
+            否则如果 ident.text == "符号表":
+                ident.kind = TokenKind.SYMTABLE
+            否则如果 ident.text == "链接脚本":
+                ident.kind = TokenKind.LINKER_SCRIPT
+            
             返回 ident
         
         # 布尔值(英文)
@@ -563,6 +652,23 @@ import stdlib
         抛出 语法错误("期望 TokenKind=" + str(kind) + ", 得到 " + tok.text + " 在行" + str(tok.line))
     返回 advance_token(stream)
 
+# ─── 平台 ID 解析辅助函数 ──────────────────────────────────────────
+# 将平台 TokenKind 映射到平台编号(1-5)，供解析器使用
+# 常量 PLATFORM_ID: 1=Linux, 2=Windows, 3=iOS, 4=Android, 5=鸿蒙
+常量 PLATFORM_ID_MAP = {
+    110: 1,   # PLATFORM_LINUX   → 1
+    111: 2,   # PLATFORM_WINDOWS → 2
+    112: 3,   # PLATFORM_IOS     → 3
+    113: 4,   # PLATFORM_ANDROID → 4
+    114: 5,   # PLATFORM_HARMONY → 5
+}
+
+函数 resolve_platform_id(token_kind: 整数) -> 整数:
+    "根据 TokenKind 返回平台编号(1-5)，未知返回 0"
+    如果 token_kind in PLATFORM_ID_MAP:
+        返回 PLATFORM_ID_MAP[token_kind]
+    返回 0
+
 # ─── 测试 ─────────────────────────────────────────────────────────
 
 函数 测试_词法分析():
@@ -622,3 +728,4 @@ import stdlib
 导出 TokenKind
 导出 Token
 导出 TokenStream
+导出 resolve_platform_id

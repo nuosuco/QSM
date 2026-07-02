@@ -1,0 +1,317 @@
+/**
+ * @file platform_types.qentl
+ * @brief 经典5平台类型定义 — 平台/架构/操作系统/二进制格式枚举
+ * 
+ * 量子基因编码: QGC-PLATFORM-TYPES-2026070301
+ * 量子纠缠信道: QEC-PLATFORM-CORE-01
+ * 版本: 1.0.0
+ * 
+ * 定义QEntL全栈经典5平台支持的类型系统：
+ * - 平台枚举（Windows/iOS/Android/鸿蒙/Linux）
+ * - 架构枚举（x86_64/ARM64/RISC-V）
+ * - 二进制格式枚举（PE/Mach-O/ELF）
+ * - 平台特征标志
+ */
+
+import "QEntL/core/array.qentl";
+import "QEntL/core/string.qentl";
+import "QEntL/core/console.qentl";
+import "QEntL/core/map.qentl";
+
+// ==================== 平台枚举 ====================
+
+/**
+ * @enum PlatformID
+ * @brief 经典5平台标识符
+ * 
+ * 对应QEntL全栈经典逻辑部分支持的5个平台：
+ * - Windows PE (Windows桌面/服务器)
+ * - iOS Mach-O (iPhone/iPad/macOS)
+ * - Android ELF (ARM64移动设备)
+ * - 鸿蒙 ELF (OpenHarmony轻量系统)
+ * - Linux ELF (桌面/服务器/嵌入式)
+ */
+quantum_enum PlatformID {
+    PLATFORM_WINDOWS,    // 0x01 — Windows PE
+    PLATFORM_IOS,        // 0x02 — iOS Mach-O
+    PLATFORM_ANDROID,    // 0x03 — Android ELF
+    PLATFORM_HARMONY,    // 0x04 — 鸿蒙 ELF
+    PLATFORM_LINUX,      // 0x05 — Linux ELF
+    PLATFORM_UNKNOWN     // 0xFF — 未知平台
+}
+
+// ==================== 架构枚举 ====================
+
+/**
+ * @enum ArchID
+ * @brief 处理器架构标识符
+ */
+quantum_enum ArchID {
+    ARCH_X86_64,   // 0x01 — 64位x86
+    ARCH_ARM64,    // 0x02 — 64位ARM (AArch64)
+    ARCH_RISCV64,  // 0x03 — 64位RISC-V
+    ARCH_ARM32,    // 0x04 — 32位ARM
+    ARCH_X86,      // 0x05 — 32位x86
+    ARCH_UNKNOWN   // 0xFF — 未知架构
+}
+
+// ==================== 二进制格式枚举 ====================
+
+/**
+ * @enum BinaryFormatID
+ * @brief 经典二进制格式标识符
+ */
+quantum_enum BinaryFormatID {
+    FORMAT_PE,       // 0x01 — Portable Executable (Windows)
+    FORMAT_MACHO,    // 0x02 — Mach-O (iOS/macOS)
+    FORMAT_ELF,      // 0x03 — ELF (Android/鸿蒙/Linux)
+    FORMAT_UNKNOWN   // 0xFF — 未知格式
+}
+
+// ==================== 操作系统类型枚举 ====================
+
+/**
+ * @enum OSType
+ * @brief 目标操作系统类型
+ */
+quantum_enum OSType {
+    OS_WINDOWS,       // 0x01 — Microsoft Windows
+    OS_IOS,           // 0x02 — Apple iOS
+    OS_ANDROID,       // 0x03 — Google Android
+    OS_HARMONY,       // 0x04 — 华为OpenHarmony
+    OS_LINUX,         // 0x05 — Linux (各种发行版)
+    OS_UNKNOWN        // 0xFF — 未知操作系统
+}
+
+// ==================== 平台特征标志 ====================
+
+/**
+ * @enum PlatformFlag
+ * @brief 平台特性标志位
+ */
+quantum_enum PlatformFlag {
+    FLAG_HAS_REGISTRY,     // 0x001 — 支持注册表（Windows）
+    FLAG_HAS_APP_STORE,    // 0x002 — 应用商店分发（iOS/Android）
+    FLAG_HAS_SANDBOX,      // 0x004 — 沙箱隔离（iOS/Android/鸿蒙）
+    FLAG_HAS_SCRIPTABLE,   // 0x008 — 脚本可扩展（Linux/鸿蒙）
+    FLAG_HAS_CONTAINER,    // 0x010 — 容器支持（Linux/Android）
+    FLAG_HAS_TOUCH,        // 0x020 — 触摸交互（iOS/Android/鸿蒙）
+    FLAG_HAS_APPLE_AUTH,   // 0x040 — 代码签名（iOS）
+    FLAG_HAS_GOOGLE_AUTH,  // 0x080 — Google Play保护（Android）
+    FLAG_HAS_HARMONY_AUTH, // 0x100 — 鸿蒙签名认证
+    FLAG_HAS_DESKTOP,      // 0x200 — 桌面环境
+    FLAG_HAS_SERVER,       // 0x400 — 服务器能力
+    FLAG_HAS_EMBEDDED,     // 0x800 — 嵌入式设备
+}
+
+// ==================== 平台元数据 ====================
+
+/**
+ * @class PlatformMetadata
+ * @brief 平台元数据 — 包含平台所有描述性信息
+ */
+quantum_class PlatformMetadata {
+    private {
+        platformId: PlatformID;
+        archId: ArchID;
+        binaryFormatId: BinaryFormatID;
+        osType: OSType;
+        name: String;
+        description: String;
+        defaultBinarySuffix: String;
+        executableSuffix: String;
+        sharedLibSuffix: String;
+        flags: Array<PlatformFlag>;
+        minSdkVersion: String;
+        maxSdkVersion: String;
+    }
+
+    /**
+     * @brief 构造函数
+     */
+    constructor(platformId: PlatformID, archId: ArchID, binaryFormatId: BinaryFormatID, osType: OSType, name: String) {
+        this.platformId = platformId;
+        this.archId = archId;
+        this.binaryFormatId = binaryFormatId;
+        this.osType = osType;
+        this.name = name;
+        this.description = "";
+        this.defaultBinarySuffix = "";
+        this.executableSuffix = "";
+        this.sharedLibSuffix = "";
+        this.flags = new Array<PlatformFlag>();
+        this.minSdkVersion = "";
+        this.maxSdkVersion = "";
+    }
+
+    public function getPlatformId(): PlatformID { return this.platformId; }
+    public function getArchId(): ArchID { return this.archId; }
+    public function getBinaryFormatId(): BinaryFormatID { return this.binaryFormatId; }
+    public function getOsType(): OSType { return this.osType; }
+    public function getName(): String { return this.name; }
+    public function getDescription(): String { return this.description; }
+    public function getDefaultBinarySuffix(): String { return this.defaultBinarySuffix; }
+    public function getExecutableSuffix(): String { return this.executableSuffix; }
+    public function getSharedLibSuffix(): String { return this.sharedLibSuffix; }
+    public function getFlags(): Array<PlatformFlag> { return this.flags; }
+    public function hasFlag(flag: PlatformFlag): Boolean {
+        for (let f of this.flags) {
+            if (f === flag) return true;
+        }
+        return false;
+    }
+
+    public function setDescription(desc: String): void { this.description = desc; }
+    public function setDefaultBinarySuffix(suffix: String): void { this.defaultBinarySuffix = suffix; }
+    public function setExecutableSuffix(suffix: String): void { this.executableSuffix = suffix; }
+    public function setSharedLibSuffix(suffix: String): void { this.sharedLibSuffix = suffix; }
+    public function addFlag(flag: PlatformFlag): void { this.flags.push(flag); }
+    public function setSdkVersion(minVer: String, maxVer: String): void {
+        this.minSdkVersion = minVer;
+        this.maxSdkVersion = maxVer;
+    }
+}
+
+// ==================== 预定义平台元数据 ====================
+
+/**
+ * @class PlatformRegistry
+ * @brief 平台注册表 — 预定义所有经典5平台的元数据
+ * 
+ * 此模块在 platform_registry.qentl 中扩展，
+ * 这里只定义枚举和基本结构。
+ */
+
+// ==================== 平台描述映射 ====================
+
+/**
+ * 平台ID到名称的映射常量表
+ */
+const PLATFORM_NAMES: Map<PlatformID, String> = new Map<PlatformID, String>({
+    PlatformID.PLATFORM_WINDOWS: "Windows PE",
+    PlatformID.PLATFORM_IOS: "iOS Mach-O",
+    PlatformID.PLATFORM_ANDROID: "Android ELF",
+    PlatformID.PLATFORM_HARMONY: "鸿蒙 ELF",
+    PlatformID.PLATFORM_LINUX: "Linux ELF",
+    PlatformID.PLATFORM_UNKNOWN: "Unknown"
+});
+
+/**
+ * 平台ID到架构的默认映射
+ */
+const PLATFORM_DEFAULT_ARCH: Map<PlatformID, ArchID> = new Map<PlatformID, ArchID>({
+    PlatformID.PLATFORM_WINDOWS: ArchID.ARCH_X86_64,
+    PlatformID.PLATFORM_IOS: ArchID.ARCH_ARM64,
+    PlatformID.PLATFORM_ANDROID: ArchID.ARCH_ARM64,
+    PlatformID.PLATFORM_HARMONY: ArchID.ARCH_ARM64,
+    PlatformID.PLATFORM_LINUX: ArchID.ARCH_X86_64,
+    PlatformID.PLATFORM_UNKNOWN: ArchID.ARCH_UNKNOWN
+});
+
+/**
+ * 平台ID到二进制格式的映射
+ */
+const PLATFORM_BINARY_FORMAT: Map<PlatformID, BinaryFormatID> = new Map<PlatformID, BinaryFormatID>({
+    PlatformID.PLATFORM_WINDOWS: BinaryFormatID.FORMAT_PE,
+    PlatformID.PLATFORM_IOS: BinaryFormatID.FORMAT_MACHO,
+    PlatformID.PLATFORM_ANDROID: BinaryFormatID.FORMAT_ELF,
+    PlatformID.PLATFORM_HARMONY: BinaryFormatID.FORMAT_ELF,
+    PlatformID.PLATFORM_LINUX: BinaryFormatID.FORMAT_ELF,
+    PlatformID.PLATFORM_UNKNOWN: BinaryFormatID.FORMAT_UNKNOWN
+});
+
+/**
+ * 二进制格式名称映射
+ */
+const FORMAT_NAMES: Map<BinaryFormatID, String> = new Map<BinaryFormatID, String>({
+    BinaryFormatID.FORMAT_PE: "PE (Portable Executable)",
+    BinaryFormatID.FORMAT_MACHO: "Mach-O",
+    BinaryFormatID.FORMAT_ELF: "ELF (Executable and Linkable Format)",
+    BinaryFormatID.FORMAT_UNKNOWN: "Unknown"
+});
+
+/**
+ * 架构名称映射
+ */
+const ARCH_NAMES: Map<ArchID, String> = new Map<ArchID, String>({
+    ArchID.ARCH_X86_64: "x86_64",
+    ArchID.ARCH_ARM64: "ARM64 (AArch64)",
+    ArchID.ARCH_RISCV64: "RISC-V 64",
+    ArchID.ARCH_ARM32: "ARM32",
+    ArchID.ARCH_X86: "x86",
+    ArchID.ARCH_UNKNOWN: "Unknown"
+});
+
+// ==================== 格式常量 ====================
+
+/**
+ * 经典5平台的二进制格式汇总表
+ * 
+ | 平台     | 架构      | 二进制格式 | 文件后缀 | 执行后缀 | 动态库后缀    |
+ |---------|----------|-----------|---------|---------|-------------|
+ | Windows | x86_64   | PE        | .exe    | .exe    | .dll        |
+ | iOS     | ARM64    | Mach-O    | .app    | 无      | .dylib      |
+ | Android | ARM64    | ELF       | .apk    | 无      | .so         |
+ | 鸿蒙     | ARM64    | ELF       | .hap    | 无      | .so         |
+ | Linux   | x86_64   | ELF       | 无      | 无      | .so         |
+ */
+
+/**
+ * 二进制格式魔数（Magic Number）
+ */
+const FORMAT_MAGIC: Map<BinaryFormatID, Array<Number>> = new Map<BinaryFormatID, Array<Number>>({
+    BinaryFormatID.FORMAT_PE: [0x4D, 0x5A],              // "MZ"
+    BinaryFormatID.FORMAT_MACHO: [0xFE, 0xED, 0xFA, 0xCE], // 大端Mach-O
+    BinaryFormatID.FORMAT_ELF: [0x7F, 0x45, 0x4C, 0x46],    // "\x7FELF"
+    BinaryFormatID.FORMAT_UNKNOWN: []
+});
+
+/**
+ * PE格式常量
+ */
+const PE_MAGIC: Array<Number> = [0x4D, 0x5A];              // "MZ"
+const PE_NT_SIGNATURE: Array<Number> = [0x50, 0x45, 0x00, 0x00]; // "PE\0\0"
+
+/**
+ * Mach-O常量（大端）
+ */
+const MACHO_MAGIC_64_BE: Array<Number> = [0xFE, 0xED, 0xFA, 0xCE];
+const MACHO_MAGIC_64_LE: Array<Number> = [0xCE, 0xFA, 0xED, 0xFE];
+
+/**
+ * ELF常量
+ */
+const ELF_MAGIC: Array<Number> = [0x7F, 0x45, 0x4C, 0x46]; // "\x7FELF"
+
+/**
+ * ELF机器类型
+ */
+const ELF_MACHINE: Map<String, Number> = new Map<String, Number>({
+    "EM_386":    3,   // Intel 80386
+    "EM_ARM":    40,  // ARM
+    "EM_X86_64": 62,  // AMD x86-64
+    "EM_AARCH64": 183, // ARM AArch64
+    "EM_RISCV":  243  // RISC-V
+});
+
+// ==================== 导出 ====================
+export {
+    PlatformID,
+    ArchID,
+    BinaryFormatID,
+    OSType,
+    PlatformFlag,
+    PlatformMetadata,
+    PLATFORM_NAMES,
+    PLATFORM_DEFAULT_ARCH,
+    PLATFORM_BINARY_FORMAT,
+    FORMAT_NAMES,
+    ARCH_NAMES,
+    FORMAT_MAGIC,
+    PE_MAGIC,
+    PE_NT_SIGNATURE,
+    MACHO_MAGIC_64_BE,
+    MACHO_MAGIC_64_LE,
+    ELF_MAGIC,
+    ELF_MACHINE
+};

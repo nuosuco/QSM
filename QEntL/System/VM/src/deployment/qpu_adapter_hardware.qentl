@@ -1,0 +1,609 @@
+/**
+ * @file qpu_adapter_hardware.qentl
+ * @brief QEntL QPU硬件适配器 - 专用部署
+ * 
+ * 量子基因编码: QGC-DEPLOY-ADAPTER-HW-2026070301
+ * 量子纠缠信道: QEC-DEPLOY-ADAPTER-HW-01
+ * 版本: 1.0.0
+ * 
+ * 专用部署适配器，直接调用本地QPU硬件协处理器。
+ * 适用于：高性能量子计算、低延迟、专属设备、物理量子实验室。
+ * 
+ * 执行方式：
+ *   1. 通过QPU硬件驱动/设备文件直接通信
+ *   2. 将量子字节码转换为QPU脉冲信号
+ *   3. 直接读取QPU测量结果
+ * 
+ * 支持的硬件平台：
+ *   - IBM Quantum (超导量子比特)
+ *   - IonQ (囚禁离子)
+ *   - Rigetti (超导量子比特)
+ *   - QuEra (中性原子)
+ *   - 通用QPU协处理器 (PCIe/PCI)
+ */
+
+import "QEntL/System/VM/src/deployment/qpu_deployment_types.qentl";
+
+// ==================== 硬件平台枚举 ====================
+
+/**
+ * QPU硬件平台枚举
+ */
+quantum_enum QpuHardwarePlatform {
+    HW_PLATFORM_IBM     = 0,  // IBM超导量子处理器
+    HW_PLATFORM_IONQ    = 1,  // IonQ囚禁离子
+    HW_PLATFORM_RIGETTI = 2,  // Rigetti超导
+    HW_PLATFORM_QUEA    = 3,  // QuEra中性原子
+    HW_PLATFORM_GENERIC = 4,  // 通用QPU协处理器
+    HW_PLATFORM_UNKNOWN = 5   // 未知平台
+}
+
+// ==================== QPU硬件适配器类 ====================
+
+/**
+ * @class QpuAdapterHardware
+ * @brief QPU硬件协处理器适配器
+ * 
+ * 直接通过设备文件/硬件驱动与本地QPU硬件通信，
+ * 提供最低延迟的量子运算执行。
+ */
+quantum_class QpuAdapterHardware {
+    private {
+        initialized: Boolean;        // 是否已初始化
+        connected: Boolean;          // 是否已连接硬件
+        hardwarePath: String;        // 硬件设备路径
+        platform: Number;            // 硬件平台类型
+        numPhysicalQubits: Number;   // 物理量子比特数
+        numLogicalQubits: Number;    // 逻辑量子比特数
+        firmwareVersion: String;     // 固件版本
+        temperature: Number;         // QPU温度(毫开尔文)
+        coherenceTime: Number;       // 相干时间(微秒)
+        gateFidelity: Number;        // 门保真度
+        totalJobs: Number;           // 总作业数
+        successfulJobs: Number;      // 成功作业数
+        averageLatency: Number;      // 平均延迟(ns)
+        lastError: String;           // 最后错误信息
+        pulseQueue: Array<Bytes>;    // 脉冲队列
+        measurementBuffer: Array<Number>; // 测量缓冲区
+    }
+    
+    // 硬件平台标签映射
+    private constant Map<Number, String> PLATFORM_LABELS = {
+        0: "IBM Superconducting",
+        1: "IonQ Trapped Ion",
+        2: "Rigetti Superconducting",
+        3: "QuEra Neutral Atom",
+        4: "Generic QPU Coprocessor",
+        5: "Unknown"
+    };
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.initialized = false;
+        this.connected = false;
+        this.hardwarePath = "/dev/qpu0";
+        this.platform = HW_PLATFORM_GENERIC;
+        this.numPhysicalQubits = 0;
+        this.numLogicalQubits = 0;
+        this.firmwareVersion = "";
+        this.temperature = 0;
+        this.coherenceTime = 0;
+        this.gateFidelity = 0;
+        this.totalJobs = 0;
+        this.successfulJobs = 0;
+        this.averageLatency = 0;
+        this.lastError = "";
+        this.pulseQueue = [];
+        this.measurementBuffer = [];
+    }
+    
+    /**
+     * @brief 初始化适配器
+     * @param config 配置参数
+     * @return Boolean 初始化是否成功
+     */
+    public function initialize(config: Map): Boolean {
+        if (config != null) {
+            // 读取配置
+            if (config.containsKey("hardware_path")) {
+                this.hardwarePath = config.get("hardware_path");
+            }
+            if (config.containsKey("platform")) {
+                this.platform = config.get("platform");
+            }
+        }
+        
+        // 读取环境变量
+        let envPath = this.getEnvValue(ENV_VAR_HARDWARE_PATH);
+        if (envPath != "") {
+            this.hardwarePath = envPath;
+        }
+        
+        // 检测设备文件
+        if (!this.checkDeviceAvailable()) {
+            this.lastError = "hardware_device_not_found:" + this.hardwarePath;
+            return false;
+        }
+        
+        // 打开设备连接
+        if (!this.openDevice()) {
+            this.lastError = "hardware_device_open_failed:" + this.hardwarePath;
+            return false;
+        }
+        
+        // 获取硬件信息
+        this.hardwareInfo = this.queryHardwareInfo();
+        this.numPhysicalQubits = this.hardwareInfo["numQubits"];
+        this.numLogicalQubits = this.hardwareInfo["logicalQubits"];
+        this.platform = this.hardwareInfo["platform"];
+        this.firmwareVersion = this.hardwareInfo["firmwareVersion"];
+        this.temperature = this.hardwareInfo["temperature"];
+        this.coherenceTime = this.hardwareInfo["coherenceTime"];
+        this.gateFidelity = this.hardwareInfo["gateFidelity"];
+        
+        this.initialized = true;
+        this.connected = true;
+        return true;
+    }
+    
+    /**
+     * @brief 执行量子字节码
+     * @param bytecode 量子字节码
+     * @return Map 执行结果
+     */
+    public function execute(bytecode: Bytes): Map {
+        if (!this.initialized || !this.connected) {
+            return {
+                "success": false,
+                "error": "not_connected",
+                "message": "硬件QPU未连接"
+            };
+        }
+        
+        this.totalJobs += 1;
+        let startTime = this.getCurrentTimeNs();
+        
+        // Step 1: 字节码转脉冲
+        let pulseProgram = this.translateToPulses(bytecode);
+        if (pulseProgram == null) {
+            this.lastError = "pulse_translation_failed";
+            return {
+                "success": false,
+                "error": "pulse_translation_failed",
+                "message": "无法将字节码转换为脉冲程序"
+            };
+        }
+        
+        // Step 2: 提交脉冲程序到QPU
+        if (!this.submitPulseProgram(pulseProgram)) {
+            this.lastError = "pulse_submission_failed";
+            return {
+                "success": false,
+                "error": "pulse_submission_failed",
+                "message": "脉冲程序提交失败"
+            };
+        }
+        
+        // Step 3: 等待QPU执行完成
+        if (!this.waitForCompletion()) {
+            this.lastError = "execution_timeout";
+            return {
+                "success": false,
+                "error": "execution_timeout",
+                "message": "QPU执行超时"
+            };
+        }
+        
+        // Step 4: 读取测量结果
+        let measurements = this.readMeasurements();
+        let cycles = this.readCycleCount();
+        let gates = this.readGateCount();
+        
+        let latency = this.getCurrentTimeNs() - startTime;
+        
+        // 更新统计
+        this.successfulJobs += 1;
+        if (this.totalJobs == 1) {
+            this.averageLatency = latency;
+        } else {
+            this.averageLatency = (this.averageLatency * (this.totalJobs - 1) + latency) / this.totalJobs;
+        }
+        
+        return {
+            "success": true,
+            "adapter": "hardware",
+            "deploymentType": DEPLOY_ID_DEDI,
+            "cycles": cycles,
+            "gates": gates,
+            "measurements": measurements,
+            "latency": latency,
+            "latencyUnit": "ns",
+            "platform": this.getPlatformLabel(this.platform),
+            "physicalQubits": this.numPhysicalQubits
+        };
+    }
+    
+    /**
+     * @brief 初始化量子比特
+     * @param n 量子比特数量
+     * @return Boolean
+     */
+    public function initializeQubits(n: Number): Boolean {
+        if (!this.initialized) {
+            return false;
+        }
+        
+        if (n > this.numPhysicalQubits) {
+            this.lastError = "qubit_count_exceeded:" + n + ">" + this.numPhysicalQubits;
+            return false;
+        }
+        
+        // 发送QPU初始化命令
+        let cmd = this.buildInitCommand(n);
+        return this.sendCommand(cmd);
+    }
+    
+    /**
+     * @brief 应用量子门
+     * @param opcode 门操作码
+     * @param qubits 量子比特索引列表
+     * @return Boolean
+     */
+    public function applyGate(opcode: Number, qubits: Array): Boolean {
+        if (!this.initialized || !this.connected) {
+            return false;
+        }
+        
+        let cmd = this.buildGateCommand(opcode, qubits);
+        let success = this.sendCommand(cmd);
+        
+        if (success) {
+            // 等待门执行完成
+            this.waitForGateCompletion();
+        }
+        
+        return success;
+    }
+    
+    /**
+     * @brief 测量量子比特
+     * @param qubit 量子比特索引
+     * @return Number 测量结果 (0或1)
+     */
+    public function measure(qubit: Number): Number {
+        if (!this.initialized || !this.connected) {
+            return -1;
+        }
+        
+        // 发送测量命令
+        let cmd = this.buildMeasureCommand(qubit);
+        if (!this.sendCommand(cmd)) {
+            return -1;
+        }
+        
+        // 等待测量完成
+        if (!this.waitForMeasurement()) {
+            return -1;
+        }
+        
+        // 读取测量结果
+        return this.readMeasurementResult(qubit);
+    }
+    
+    /**
+     * @brief 关闭适配器
+     */
+    public function shutdown(): Void {
+        // 发送硬件复位命令
+        if (this.connected) {
+            this.sendCommand(this.buildResetCommand());
+            this.closeDevice();
+        }
+        
+        this.connected = false;
+        this.initialized = false;
+        this.pulseQueue = [];
+        this.measurementBuffer = [];
+    }
+    
+    /**
+     * @brief 获取部署类型ID
+     * @return Number
+     */
+    public function getDeploymentType(): Number {
+        return DEPLOY_ID_DEDI;
+    }
+    
+    /**
+     * @brief 获取适配器状态
+     * @return String
+     */
+    public function getStatus(): String {
+        if (!this.initialized) {
+            return "uninitialized";
+        }
+        return "connected,platform=" + this.getPlatformLabel(this.platform) +
+               ",qubits=" + this.numPhysicalQubits +
+               ",temp=" + this.temperature + "mK" +
+               ",fidelity=" + this.gateFidelity +
+               ",jobs=" + this.totalJobs +
+               ",avg_latency=" + this.averageLatency + "ns";
+    }
+    
+    /**
+     * @brief 获取连接状态
+     * @return Boolean
+     */
+    public function isConnected(): Boolean {
+        return this.connected;
+    }
+    
+    /**
+     * @brief 获取硬件平台
+     * @return Number
+     */
+    public function getPlatform(): Number {
+        return this.platform;
+    }
+    
+    /**
+     * @brief 获取平台标签
+     * @param platform 平台ID
+     * @return String
+     */
+    public function getPlatformLabel(platform: Number): String {
+        if (this.PLATFORM_LABELS.containsKey(platform)) {
+            return this.PLATFORM_LABELS.get(platform);
+        }
+        return "Unknown";
+    }
+    
+    /**
+     * @brief 获取硬件统计
+     * @return Map
+     */
+    public function getStats(): Map {
+        return {
+            "initialized": this.initialized,
+            "connected": this.connected,
+            "platform": this.getPlatformLabel(this.platform),
+            "platformId": this.platform,
+            "hardwarePath": this.hardwarePath,
+            "numPhysicalQubits": this.numPhysicalQubits,
+            "numLogicalQubits": this.numLogicalQubits,
+            "firmwareVersion": this.firmwareVersion,
+            "temperature": this.temperature,
+            "coherenceTime": this.coherenceTime,
+            "gateFidelity": this.gateFidelity,
+            "totalJobs": this.totalJobs,
+            "successfulJobs": this.successfulJobs,
+            "averageLatency": this.averageLatency,
+            "lastError": this.lastError,
+            "pulseQueueSize": this.pulseQueue.length,
+            "measurementBufferSize": this.measurementBuffer.length
+        };
+    }
+    
+    /**
+     * @brief 校准硬件
+     * @return Boolean
+     */
+    public function calibrate(): Boolean {
+        if (!this.initialized || !this.connected) {
+            return false;
+        }
+        
+        let result = this.sendCalibrationCommand();
+        return result["success"];
+    }
+    
+    /**
+     * @brief 读取错误日志
+     * @return String
+     */
+    public function readErrorLog(): String {
+        return this.lastError;
+    }
+    
+    // ==================== 私有辅助函数 ====================
+    
+    /**
+     * @brief 检查设备是否可用
+     * @return Boolean
+     */
+    private function checkDeviceAvailable(): Boolean {
+        return this.fileExists(this.hardwarePath);
+    }
+    
+    /**
+     * @brief 打开设备连接
+     * @return Boolean
+     */
+    private function openDevice(): Boolean {
+        // 通过设备文件打开硬件连接
+        return true; // 占位实现
+    }
+    
+    /**
+     * @brief 关闭设备连接
+     */
+    private function closeDevice() {
+        // 关闭设备文件
+    }
+    
+    /**
+     * @brief 查询硬件信息
+     * @return Map 硬件信息
+     */
+    private function queryHardwareInfo(): Map {
+        // 通过硬件命令查询信息
+        return {
+            "numQubits": 0,
+            "logicalQubits": 0,
+            "platform": HW_PLATFORM_GENERIC,
+            "firmwareVersion": "",
+            "temperature": 0,
+            "coherenceTime": 0,
+            "gateFidelity": 0
+        };
+    }
+    
+    /**
+     * @brief 字节码转脉冲
+     * @param bytecode 量子字节码
+     * @return Bytes 脉冲程序
+     */
+    private function translateToPulses(bytecode: Bytes): Bytes {
+        // 将量子字节码转换为QPU脉冲信号
+        return null; // 占位实现
+    }
+    
+    /**
+     * @brief 提交脉冲程序
+     * @param pulseProgram 脉冲程序
+     * @return Boolean
+     */
+    private function submitPulseProgram(pulseProgram: Bytes): Boolean {
+        // 通过设备文件写入脉冲程序
+        return true; // 占位实现
+    }
+    
+    /**
+     * @brief 等待执行完成
+     * @return Boolean
+     */
+    private function waitForCompletion(): Boolean {
+        // 轮询QPU状态直到完成
+        return true; // 占位实现
+    }
+    
+    /**
+     * @brief 读取测量结果
+     * @return Array<Number> 测量结果数组
+     */
+    private function readMeasurements(): Array<Number> {
+        return this.measurementBuffer;
+    }
+    
+    /**
+     * @brief 读取周期数
+     * @return Number
+     */
+    private function readCycleCount(): Number {
+        return 0; // 占位实现
+    }
+    
+    /**
+     * @brief 读取门操作数
+     * @return Number
+     */
+    private function readGateCount(): Number {
+        return 0; // 占位实现
+    }
+    
+    /**
+     * @brief 发送命令
+     * @param cmd 命令
+     * @return Boolean
+     */
+    private function sendCommand(cmd: Bytes): Boolean {
+        // 通过设备文件发送命令
+        return true; // 占位实现
+    }
+    
+    /**
+     * @brief 构建初始化命令
+     * @param n 量子比特数
+     * @return Bytes
+     */
+    private function buildInitCommand(n: Number): Bytes {
+        return null; // 占位实现
+    }
+    
+    /**
+     * @brief 构建量子门命令
+     * @param opcode 操作码
+     * @param qubits 量子比特索引
+     * @return Bytes
+     */
+    private function buildGateCommand(opcode: Number, qubits: Array): Bytes {
+        return null; // 占位实现
+    }
+    
+    /**
+     * @brief 构建测量命令
+     * @param qubit 量子比特索引
+     * @return Bytes
+     */
+    private function buildMeasureCommand(qubit: Number): Bytes {
+        return null; // 占位实现
+    }
+    
+    /**
+     * @brief 构建复位命令
+     * @return Bytes
+     */
+    private function buildResetCommand(): Bytes {
+        return null; // 占位实现
+    }
+    
+    /**
+     * @brief 等待门执行完成
+     */
+    private function waitForGateCompletion() {
+        // 轮询门完成状态
+    }
+    
+    /**
+     * @brief 等待测量完成
+     * @return Boolean
+     */
+    private function waitForMeasurement(): Boolean {
+        return true; // 占位实现
+    }
+    
+    /**
+     * @brief 读取单个测量结果
+     * @param qubit 量子比特索引
+     * @return Number
+     */
+    private function readMeasurementResult(qubit: Number): Number {
+        return 0; // 占位实现
+    }
+    
+    /**
+     * @brief 发送校准命令
+     * @return Map 校准结果
+     */
+    private function sendCalibrationCommand(): Map {
+        return {"success": false}; // 占位实现
+    }
+    
+    /**
+     * @brief 检查文件是否存在
+     * @param path 文件路径
+     * @return Boolean
+     */
+    private function fileExists(path: String): Boolean {
+        return false; // 占位实现
+    }
+    
+    /**
+     * @brief 获取环境变量值
+     * @param name 环境变量名
+     * @return String
+     */
+    private function getEnvValue(name: String): String {
+        return ""; // 占位实现
+    }
+    
+    /**
+     * @brief 获取当前时间(纳秒)
+     * @return Number
+     */
+    private function getCurrentTimeNs(): Number {
+        return 0; // 占位实现
+    }
+}

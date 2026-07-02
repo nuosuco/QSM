@@ -1,0 +1,518 @@
+/**
+ * @file macho_format.qentl
+ * @brief iOS Mach-O 二进制格式规范
+ * 
+ * 量子基因编码: QGC-MACHO-FORMAT-2026070301
+ * 量子纠缠信道: QEC-PLATFORM-MACHO-01
+ * 版本: 1.0.0
+ * 
+ * 定义QEntL全栈在iOS/macOS平台上的经典二进制格式：
+ * - Mach-O头部（MH_MAGIC_64）
+ * - 加载命令（LC_SEGMENT_64, LC_SYMTAB, LC_DYLD_INFO_ONLY）
+ * - 段（Segment）和节（Section）
+ * - QEntL量子数据节（__qbc,__qdata）
+ * - iOS代码签名布局
+ * 
+ * QEntL .qbc经典逻辑部分格式：
+ * ┌────────────────────────────────────────────┐
+ * │  QEntL文件头 (16字节)                       │
+ * ├────────────────────────────────────────────┤
+ * │  Mach-O头部 (28字节)                        │
+ * │  - magic (4字节): 0xCEFAEDFE (little-endian)│
+ * │  - cputype/cpusubtype                      │
+ * │  - filetype/command count                  │
+ * │  - sizeofcmds/flags                        │
+ * ├────────────────────────────────────────────┤
+ * │  加载命令区                                 │
+ * │  - LC_SEGMENT_64 (__TEXT)                 │
+ * │  - LC_SEGMENT_64 (__DATA)                 │
+ * │  - LC_SEGMENT_64 (__QBC)                  │
+ * │  - LC_SYMTAB / LC_DYLD_INFO_ONLY          │
+ * ├────────────────────────────────────────────┤
+ * │  段数据                                     │
+ * │  - __TEXT段 (__text, __const, __qbc)      │
+ * │  - __DATA段 (__data, __qdata)             │
+ * │  - __QBC段  (量子字节码)                   │
+ * └────────────────────────────────────────────┘
+ * 
+ * Mach-O魔数:
+ * - 64-bit LE: 0xCEFAEDFE (小端)
+ * - 64-bit BE: 0xFEEDFACF (大端)
+ */
+
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Compiler/src/utils/binary_writer.qentl";
+
+// ==================== Mach-O常量定义 ====================
+
+/**
+ * Mach-O CPU类型枚举
+ */
+quantum_enum MACHO_CPUTYPE {
+    CPU_TYPE_X86,       // 0x00000007 — Intel x86
+    CPU_TYPE_X86_64,    // 0x00000100 — Intel x86-64
+    CPU_TYPE_ARM,       // 0x0000000C — ARM
+    CPU_TYPE_ARM64,     // 0x00000100000000C — ARM64
+    CPU_TYPE_ARM64_32,  // 0x00000100000000D — ARM64 32-bit
+}
+
+/**
+ * Mach-O CPU子类型
+ */
+quantum_enum MACHO_CPUSUBTYPE {
+    CPU_SUBTYPE_X86_64_ALL,    // 0x03 — 通用x86-64
+    CPU_SUBTYPE_ARM64_ALL,     // 0x00 — 通用ARM64
+    CPU_SUBTYPE_ARM64_V8,      // 0x01 — ARM64 v8
+    CPU_SUBTYPE_ARM64E,        // 0x02 — ARM64E (Pointer Authentication)
+}
+
+/**
+ * Mach-O文件类型
+ */
+quantum_enum MACHO_FILETYPE {
+    MH_OBJECT,      // 0x01 — 目标文件
+    MH_EXECUTE,     // 0x02 — 可执行文件
+    MH_FVMLIB,      // 0x03 — 固定VM库
+    MH_CORE,        // 0x04 — 内核转储
+    MH_PRELOAD,     // 0x05 — 预加载可执行
+    MH_DYLIB,       // 0x06 — 动态库
+    MH_DYLINKER,    // 0x07 — 动态链接器
+    MH_BUNDLE,      // 0x08 — 动态库束
+    MH_DYLIB_STUB,  // 0x09 — 动态库桩
+    MH_DSYM,        // 0x0A — 调试符号文件
+}
+
+/**
+ * Mach-O加载命令类型
+ */
+quantum_enum MACHO_LOADCOMMAND {
+    LC_SEGMENT,            // 0x01 — 32位段
+    LC_SYMTAB,             // 0x02 — 符号表
+    LC_SYMSEG,             // 0x03 — 符号表与段
+    LC_THREAD,             // 0x04 — 线程
+    LC_UNIXTHREAD,         // 0x05 — Unix线程
+    LC_LOADFVMLIB,         // 0x06 — 加载FMV库
+    LC_IDFVMLIB,           // 0x07 — 标识FMV库
+    LC_PREPAGE,            // 0x08 — 预分页
+    LC_LOAD_DYLIB,         // 0x0C — 加载动态库
+    LC_ID_DYLIB,           // 0x0D — 标识动态库
+    LC_LOAD_DYLINKER,      // 0x0E — 加载动态链接器
+    LC_ID_DYLINKER,        // 0x0F — 标识动态链接器
+    LC_PREBOUND_DYLIB,     // 0x10 — 预绑定动态库
+    LC_ROUTINES,           // 0x11 — 子程序入口
+    LC_SUB_FRAMEWORK,      // 0x13 — 子框架
+    LC_SUB_UMBRELLA,       // 0x14 — 子伞
+    LC_SUB_LIBRARY,        // 0x15 — 子库
+    LC_SUB_CLIENT,         // 0x16 — 子客户端
+    LC_SUB_UMSHIELD,       // 0x17 — 子Umbrella Shield
+    LC_TWOLEVEL_HINTS,     // 0x18 — 两级提示
+    LC_PREBIND_CKSUM,      // 0x19 — 预绑定校验和
+    LC_SEGMENT_64,         // 0x19 — 64位段
+    LC_ROUTINES_64,        // 0x1A — 64位子程序入口
+    LC_UUID,               // 0x1B — UUID
+    LC_RPATH,              // 0x1C — 运行时搜索路径
+    LC_CODE_SIGNATURE,     // 0x1D — 代码签名
+    LC_SEGMENT_SPLIT_INFO, // 0x1E — 段分割信息
+    LC_FUNCTION_STARTS,    // 0x1F — 函数开始列表
+    LC_DATA_IN_CODE,       // 0x20 — 数据在代码中
+    LC_DYLIB_CODE_SIGN_DRS,// 0x21 — 代码签名DR
+    LC_LINKER_OPTION,      // 0x22 — 链接器选项
+    LC_LINKER_OPTIMIZATION_HINT, // 0x23 — 优化提示
+    LC_VERSION_MIN_MACOSX, // 0x24 — 最低macOS版本
+    LC_VERSION_MIN_IPHONEOS, // 0x25 — 最低iOS版本
+    LC_DYLD_ENVIRONMENT,   // 0x26 — 环境变量
+    LC_LOAD_DYLIB_FROM_MEMORY, // 0x28 — 从内存加载
+    LC_DYLD_INFO,          // 0x22 — dyld信息
+    LC_DYLD_INFO_ONLY,     // 0x22 — 仅dyld信息
+}
+
+/**
+ * Mach-O段保护标志
+ */
+quantum_enum MACHO_VM_PROT {
+    VM_PROT_READ,    // 0x01 — 可读
+    VM_PROT_WRITE,   // 0x02 — 可写
+    VM_PROT_EXECUTE, // 0x04 — 可执行
+}
+
+/**
+ * 段属性组合
+ */
+quantum_enum MACHO_SEGV {
+    SGV_TEXT,    // 0x03 — __TEXT段 (读+执行)
+    SGV_DATA,    // 0x06 — __DATA段 (读+写)
+    SGV_QBC,     // 0x03 — __QBC段 (读+执行)
+}
+
+// ==================== Mach-O头部结构 ====================
+
+/**
+ * @class MachOHeader
+ * @brief Mach-O文件头结构
+ */
+quantum_class MachOHeader {
+    private {
+        magic: Number;              // 魔数
+        cputype: Number;            // CPU类型
+        cpusubtype: Number;         // CPU子类型
+        filetype: Number;           // 文件类型
+        ncmds: Number;              // 加载命令数量
+        sizeofcmds: Number;         // 加载命令总大小
+        flags: Number;              // 标志
+    }
+
+    constructor(cputype: Number, cpusubtype: Number, filetype: Number, ncmds: Number) {
+        this.magic = 0xCEFAEDFE;    // Mach-O 64-bit little-endian
+        this.cputype = cputype;
+        this.cpusubtype = cpusubtype;
+        this.filetype = filetype;
+        this.ncmds = ncmds;
+        this.sizeofcmds = 0;
+        this.flags = 0x8000000;     // MH pie
+    }
+
+    public function getMagic(): Number { return this.magic; }
+    public function getCputype(): Number { return this.cputype; }
+    public function getCpusubtype(): Number { return this.cpusubtype; }
+    public function getFiletype(): Number { return this.filetype; }
+    public function getNcmds(): Number { return this.ncmds; }
+    public function getSizeofcmds(): Number { return this.sizeofcmds; }
+    public function getFlags(): Number { return this.flags; }
+
+    public function setSizeofcmds(size: Number): void { this.sizeofcmds = size; }
+    public function setFlags(flags: Number): void { this.flags = flags; }
+
+    /**
+     * @brief 写入Mach-O头到二进制流
+     */
+    public function write(writer: BinaryWriter): void {
+        writer.writeUint32(this.magic);
+        writer.writeUint32(this.cputype);
+        writer.writeUint32(this.cpusubtype);
+        writer.writeUint32(this.filetype);
+        writer.writeUint32(this.ncmds);
+        writer.writeUint32(this.sizeofcmds);
+        writer.writeUint32(this.flags);
+    }
+}
+
+// ==================== Mach-O段头 ====================
+
+/**
+ * @class MachOSegment
+ * @brief Mach-O段结构（LC_SEGMENT_64）
+ */
+quantum_class MachOSegment {
+    private {
+        cmd: Number;                // 加载命令类型
+        cmdsize: Number;            // 命令大小
+        segname: String;            // 段名（16字节）
+        vmaddr: Number;             // 虚拟地址
+        vmsize: Number;             // 虚拟大小
+        fileoff: Number;            // 文件偏移
+        filesize: Number;           // 文件大小
+        maxprot: Number;            // 最大保护
+        initprot: Number;           // 初始保护
+        nsects: Number;             // 节数
+        flags: Number;              // 段标志
+    }
+
+    constructor(segname: String, vmaddr: Number, vmsize: Number, fileoff: Number, nsects: Number) {
+        this.cmd = MACHO_LOADCOMMAND.LC_SEGMENT_64;
+        this.cmdsize = 72;  // 基本命令大小
+        this.segname = segname;
+        this.vmaddr = vmaddr;
+        this.vmsize = vmsize;
+        this.fileoff = fileoff;
+        this.filesize = 0;
+        this.maxprot = MACHO_VM_PROT.VM_PROT_READ | MACHO_VM_PROT.VM_PROT_EXECUTE;
+        this.initprot = this.maxprot;
+        this.nsects = nsects;
+        this.flags = 0;
+    }
+
+    public function getSegname(): String { return this.segname; }
+    public function getVmaddr(): Number { return this.vmaddr; }
+    public function getVmsize(): Number { return this.vmsize; }
+    public function getFileoff(): Number { return this.fileoff; }
+    public function getFilesize(): Number { return this.filesize; }
+    public function getMaxprot(): Number { return this.maxprot; }
+    public function getInitprot(): Number { return this.initprot; }
+    public function getNsects(): Number { return this.nsects; }
+    public function getFlags(): Number { return this.flags; }
+
+    public function setFilesize(size: Number): void { this.filesize = size; }
+    public function setMaxprot(prot: Number): void { this.maxprot = prot; }
+    public function setInitprot(prot: Number): void { this.initprot = prot; }
+    public function setFlags(flags: Number): void { this.flags = flags; }
+
+    /**
+     * @brief 写入段头到二进制流
+     */
+    public function write(writer: BinaryWriter): void {
+        writer.writeUint32(this.cmd);
+        writer.writeUint32(this.cmdsize + this.nsects * 80); // + section headers
+        writer.writeUint32(this.segname.length > 16 ? 0 : 0);
+        let segnameBytes = this.packSegname(this.segname);
+        for (let b of segnameBytes) { writer.writeUint8(b); }
+        writer.writeUint64(this.vmaddr);
+        writer.writeUint64(this.vmsize);
+        writer.writeUint64(this.fileoff);
+        writer.writeUint64(this.filesize);
+        writer.writeUint32(this.maxprot);
+        writer.writeUint32(this.initprot);
+        writer.writeUint32(this.nsects);
+        writer.writeUint32(this.flags);
+    }
+
+    private function packSegname(name: String): Array<Number> {
+        let result = new Array<Number>(16);
+        for (let i = 0; i < 16; i++) result[i] = 0;
+        for (let i = 0; i < Math.min(name.length, 16); i++) {
+            result[i] = name.charCodeAt(i);
+        }
+        return result;
+    }
+}
+
+// ==================== Mach-O节头 ====================
+
+/**
+ * @class MachOSection
+ * @brief Mach-O节结构
+ */
+quantum_class MachOSection {
+    private {
+        sectname: String;       // 节名（16字节）
+        segname: String;        // 段名（16字节）
+        addr: Number;           // 虚拟地址
+        size: Number;           // 节大小
+        offset: Number;         // 文件偏移
+        align: Number;          // 对齐
+        reloff: Number;         // 重定位表偏移
+        nreloc: Number;         // 重定位表项数
+        flags: Number;          // 节属性
+        reserved1: Number;      // 保留
+        reserved2: Number;      // 保留
+    }
+
+    constructor(sectname: String, segname: String, addr: Number, size: Number) {
+        this.sectname = sectname;
+        this.segname = segname;
+        this.addr = addr;
+        this.size = size;
+        this.offset = 0;
+        this.align = 4;
+        this.reloff = 0;
+        this.nreloc = 0;
+        this.flags = 0;
+        this.reserved1 = 0;
+        this.reserved2 = 0;
+    }
+
+    public function getSectname(): String { return this.sectname; }
+    public function getSegname(): String { return this.segname; }
+    public function getAddr(): Number { return this.addr; }
+    public function getSize(): Number { return this.size; }
+    public function getOffset(): Number { return this.offset; }
+    public function getFlags(): Number { return this.flags; }
+
+    public function setOffset(offset: Number): void { this.offset = offset; }
+    public function setAlign(align: Number): void { this.align = align; }
+    public function setFlags(flags: Number): void { this.flags = flags; }
+}
+
+// ==================== Mach-O符号表 ====================
+
+/**
+ * @class MachOSymtabCommand
+ * @brief 符号表加载命令（LC_SYMTAB）
+ */
+quantum_class MachOSymtabCommand {
+    private {
+        symoff: Number;   // 符号表偏移
+        nsyms: Number;    // 符号表项数
+        stroff: Number;   // 字符串表偏移
+        strsize: Number;  // 字符串表大小
+    }
+
+    constructor(symoff: Number, nsyms: Number, stroff: Number, strsize: Number) {
+        this.symoff = symoff;
+        this.nsyms = nsyms;
+        this.stroff = stroff;
+        this.strsize = strsize;
+    }
+
+    public function write(writer: BinaryWriter): void {
+        writer.writeUint32(MACHO_LOADCOMMAND.LC_SYMTAB);
+        writer.writeUint32(24);  // cmdsize
+        writer.writeUint32(this.symoff);
+        writer.writeUint32(this.nsyms);
+        writer.writeUint32(this.stroff);
+        writer.writeUint32(this.strsize);
+    }
+}
+
+// ==================== Mach-O UUID ====================
+
+/**
+ * @class MachOUuidCommand
+ * @brief UUID加载命令
+ */
+quantum_class MachOUuidCommand {
+    private {
+        uuid: Array<Number>;  // 16字节UUID
+    }
+
+    constructor(uuid: Array<Number>) {
+        this.uuid = uuid;
+    }
+
+    public function write(writer: BinaryWriter): void {
+        writer.writeUint32(MACHO_LOADCOMMAND.LC_UUID);
+        writer.writeUint32(24);  // cmdsize
+        for (let b of this.uuid) { writer.writeUint8(b); }
+    }
+}
+
+// ==================== Mach-O生成器 ====================
+
+/**
+ * @class MachOGenerator
+ * @brief Mach-O格式生成器
+ * 
+ * 生成QEntL编译产物的iOS Mach-O格式：
+ * 1. 写入Mach-O头
+ * 2. 写入加载命令（LC_SEGMENT_64 × 段数 + LC_SYMTAB + LC_UUID）
+ * 3. 写入段数据
+ * 4. 写入QEntL量子数据节
+ */
+quantum_class MachOGenerator {
+    private {
+        header: MachOHeader;
+        segments: Array<MachOSegment>;
+        sections: Array<Map<String, MachOSection>>;
+        uuid: Array<Number>;
+    }
+
+    constructor(cputype: Number, cpusubtype: Number, filetype: Number) {
+        this.header = new MachOHeader(cputype, cpusubtype, filetype, 4);
+        this.segments = new Array<MachOSegment>();
+        this.sections = new Array<Map<String, MachOSection>>();
+        // 默认UUID
+        this.uuid = new Array<Number>(16);
+        for (let i = 0; i < 16; i++) this.uuid[i] = i;
+    }
+
+    public function addSegment(segment: MachOSegment): void {
+        this.segments.push(segment);
+        this.header.ncmds++;
+    }
+
+    public function setUuid(uuid: Array<Number>): void {
+        this.uuid = uuid;
+    }
+
+    /**
+     * @brief 生成标准iOS段布局
+     */
+    public static function createStandardSegments(): Array<MachOSegment> {
+        return new Array<MachOSegment>({
+            new MachOSegment("__TEXT", 0x100000000, 0x1000, 0x0, 2),
+            new MachOSegment("__DATA", 0x100001000, 0x1000, 0x1000, 2),
+            new MachOSegment("__QBC", 0x100002000, 0x1000, 0x2000, 1)
+        });
+    }
+
+    /**
+     * @brief 生成标准iOS节布局
+     */
+    public static function createStandardSections(): Array<Map<String, MachOSection>> {
+        return new Array<Map<String, MachOSection>>({
+            new Map<String, MachOSection>({
+                "__text": new MachOSection("__text", "__TEXT", 0x100000000, 0x0),
+                "__qbc": new MachOSection("__qbc", "__TEXT", 0x100000400, 0x0)
+            }),
+            new Map<String, MachOSection>({
+                "__data": new MachOSection("__data", "__DATA", 0x100001000, 0x0),
+                "__qdata": new MachOSection("__qdata", "__DATA", 0x100001400, 0x0)
+            }),
+            new Map<String, MachOSection>({
+                "__qcode": new MachOSection("__qcode", "__QBC", 0x100002000, 0x0)
+            })
+        });
+    }
+
+    /**
+     * @brief 写入Mach-O头
+     */
+    public function writeHeader(writer: BinaryWriter): void {
+        this.header.write(writer);
+    }
+
+    /**
+     * @brief 写入所有加载命令
+     */
+    public function writeLoadCommands(writer: BinaryWriter): void {
+        // 写入段命令
+        for (let seg of this.segments) {
+            seg.write(writer);
+        }
+
+        // 写入UUID命令
+        let uuidCmd = new MachOUuidCommand(this.uuid);
+        uuidCmd.write(writer);
+
+        // 写入符号表命令
+        let symtabCmd = new MachOSymtabCommand(0, 0, 0, 0);
+        symtabCmd.write(writer);
+    }
+}
+
+// ==================== iOS代码签名布局 ====================
+
+/**
+ * @class MachOCodesignLayout
+ * @brief iOS代码签名字节布局
+ * 
+ * iOS应用必须经过代码签名才能安装运行。
+ * QEntL生成的Mach-O需要预留签名空间。
+ */
+quantum_class MachOCodesignLayout {
+    private {
+        codeDirectorySize: Number;   // CodeDirectory结构大小
+        codeSignatureSize: Number;   // 签名数据大小
+        superBlobSize: Number;       // SuperBlob大小
+    }
+
+    constructor() {
+        this.codeDirectorySize = 0x100;
+        this.codeSignatureSize = 0x200;
+        this.superBlobSize = 0x300;
+    }
+
+    public function getCodeDirectorySize(): Number { return this.codeDirectorySize; }
+    public function getCodeSignatureSize(): Number { return this.codeSignatureSize; }
+    public function getSuperBlobSize(): Number { return this.superBlobSize; }
+
+    public function estimateTotalSize(): Number {
+        return this.codeDirectorySize + this.codeSignatureSize + this.superBlobSize;
+    }
+}
+
+// ==================== 导出 ====================
+export {
+    MACHO_CPUTYPE,
+    MACHO_CPUSUBTYPE,
+    MACHO_FILETYPE,
+    MACHO_LOADCOMMAND,
+    MACHO_VM_PROT,
+    MACHO_SEGV,
+    MachOHeader,
+    MachOSegment,
+    MachOSection,
+    MachOSymtabCommand,
+    MachOUuidCommand,
+    MachOGenerator,
+    MachOCodesignLayout
+};

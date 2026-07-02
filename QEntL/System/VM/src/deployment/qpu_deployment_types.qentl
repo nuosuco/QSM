@@ -1,0 +1,118 @@
+/**
+ * @file qpu_deployment_types.qentl
+ * @brief QEntL量子3种部署类型常量定义
+ * 
+ * 量子基因编码: QGC-DEPLOY-TYPES-2026070301
+ * 量子纠缠信道: QEC-DEPLOY-TYPES-01
+ * 版本: 1.0.0
+ * 
+ * 定义QEntL量子逻辑支持的3种部署模式：
+ *   - 开发部署 (QVM虚拟机模拟)
+ *   - 生产部署 (云端QPU API)
+ *   - 专用部署 (QPU硬件协处理器)
+ */
+
+// ==================== 部署类型枚举 ====================
+
+/**
+ * 部署类型枚举
+ * @enum DeploymentType
+ */
+quantum_enum DeploymentType {
+    DEPLOY_DEV = 0,    // 开发部署: QVM虚拟机模拟
+    DEPLOY_PROD = 1,   // 生产部署: 云端QPU API
+    DEPLOY_DEDI = 2,   // 专用部署: QPU硬件协处理器
+    DEPLOY_AUTO = 3    // 自动检测: 由runtime_detector决定
+}
+
+// ==================== 部署类型常量 ====================
+
+// 部署类型字符串标签
+constant String DEPLOY_TYPE_LABELS = "qvm|cloud|hardware|auto";
+
+// 部署类型描述
+constant String DEPLOY_TYPE_DESCRIPTIONS = 
+    "QVM虚拟机模拟(开发)|云端QPU API(生产)|QPU硬件协处理器(专用)|自动检测";
+
+// 部署类型优先级 (数值越低优先级越高)
+constant Number DEPLOY_PRIORITY_DEDI = 1;   // 专用部署优先级最高
+constant Number DEPLOY_PRIORITY_PROD = 2;   // 生产部署次之
+constant Number DEPLOY_PRIORITY_DEV  = 3;   // 开发部署最低
+
+// 部署类型ID常量 (与枚举值一致)
+constant Number DEPLOY_ID_DEV  = 0;
+constant Number DEPLOY_ID_PROD = 1;
+constant Number DEPLOY_ID_DEDI = 2;
+constant Number DEPLOY_ID_AUTO = 3;
+
+// ==================== 环境标签常量 ====================
+
+constant String ENV_TAG_DEV   = "development";
+constant String ENV_TAG_PROD  = "production";
+constant String ENV_TAG_DEDI  = "dedicated";
+constant String ENV_TAG_AUTO  = "auto";
+
+// 部署类型的环境标签映射
+constant Map<String, String> DEPLOY_ENV_TAGS = {
+    "0": "development",
+    "1": "production",
+    "2": "dedicated",
+    "3": "auto"
+};
+
+// ==================== 环境变量常量 ====================
+
+constant String ENV_VAR_DEPLOY_TYPE   = "QPU_DEPLOY";
+constant String ENV_VAR_CLOUD_URL     = "QPU_CLOUD_URL";
+constant String ENV_VAR_CLOUD_TOKEN   = "QPU_CLOUD_TOKEN";
+constant String ENV_VAR_HARDWARE_PATH = "QPU_HARDWARE_PATH";
+constant String ENV_VAR_TIMEOUT_MS    = "QPU_TIMEOUT_MS";
+constant String ENV_VAR_RETRY_COUNT   = "QPU_RETRY_COUNT";
+
+// ==================== 默认配置常量 ====================
+
+constant Number DEFAULT_TIMEOUT_MS     = 30000;  // 默认超时30秒
+constant Number DEFAULT_RETRY_COUNT    = 3;      // 默认重试3次
+constant Number DEFAULT_QVM_MAX_QUBITS = 32;     // QVM默认最大量子比特数
+constant String DEFAULT_QVM_MEMORY     = "16GB"; // QVM默认内存限制
+constant String DEFAULT_CLOUD_ENDPOINT = "https://qpu.qentl.org/api/v1/execute";
+
+// ==================== 降级fallback链 ====================
+
+/**
+ * 默认降级链: hardware → cloud → qvm
+ * 当指定部署不可用时，按此链降级
+ */
+constant Array<Number> DEFAULT_FALLBACK_CHAIN = [2, 1, 0];
+
+// ==================== 部署状态常量 ====================
+
+constant Number DEPLOY_STATUS_OK       = 0;
+constant Number DEPLOY_STATUS_UNAVAILABLE = 1;
+constant Number DEPLOY_STATUS_TIMEOUT  = 2;
+constant Number DEPLOY_STATUS_ERROR    = 3;
+constant Number DEPLOY_STATUS_FALLBACK = 4;
+
+// ==================== 错误码常量 ====================
+
+constant Number DEPLOY_ERR_NONE        = 0;
+constant Number DEPLOY_ERR_NO_HARDWARE = -1;
+constant Number DEPLOY_ERR_CLOUD_DOWN  = -2;
+constant Number DEPLOY_ERR_AUTH_FAIL   = -3;
+constant Number DEPLOY_ERR_TIMEOUT     = -4;
+constant Number DEPLOY_ERR_NO_FALLBACK = -5;
+constant Number DEPLOY_ERR_INVALID_TYPE = -6;
+
+// ==================== 量子比特限制常量 ====================
+
+/**
+ * 各部署类型的量子比特限制
+ * DEV: 受物理内存限制 (2^N × 16 bytes)
+ * PROD: 由云服务商决定
+ * DEDI: 由物理QPU决定
+ */
+constant Map<Number, Number> DEPLOY_QUBIT_LIMITS = {
+    0: 32,   // QVM: 32量子比特 (约16GB内存)
+    1: 100,  // Cloud: 通常50-100+
+    2: 127   // Hardware: 目前IBM Condor等可达127+
+};

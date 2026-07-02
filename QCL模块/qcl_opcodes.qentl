@@ -80,6 +80,36 @@ const OP_RANDOM = 138;         // 随机数
 const OP_LENGTH = 139;         // 获取长度
 const OP_EXIT_CODE = 140;      // 退出码
 
+// ==================== 经典5平台 Opcode (141-160) ====================
+
+// 平台标识常量 (用于目标平台选择)
+const PLATFORM_LINUX   = 1;  // Linux ELF  (x86_64/ARM64)
+const PLATFORM_WINDOWS = 2;  // Windows PE (x86_64/ARM64)
+const PLATFORM_IOS     = 3;  // iOS Mach-O (ARM64)
+const PLATFORM_ANDROID = 4;  // Android ELF(ARM64)
+const PLATFORM_HARMONY = 5;  // 鸿蒙 ELF/ARM (ARM64)
+
+// 平台代码生成指令
+const OP_SET_TARGET_PLATFORM = 141;  // 设置目标平台  (平台ID)
+const OP_EMIT_CLASSIC_HEADER = 142;  // 发射经典逻辑段头（平台标识+魔数+大小）
+const OP_EMIT_MACHINE_BYTE   = 143;  // 发射单字节机器码 (字节值)
+const OP_EMIT_MACHINE_U16    = 144;  // 发射16位机器码 (小端序)
+const OP_EMIT_MACHINE_U32    = 145;  // 发射32位机器码 (小端序)
+const OP_EMIT_MACHINE_U64    = 146;  // 发射64位机器码 (小端序)
+const OP_EMIT_CLASSIC_END    = 147;  // 经典逻辑段结束标记
+const OP_EMIT_QUANTUM_START  = 148;  // 量子逻辑段开始标记（进入量子字节码）
+const OP_EMIT_PE_HEADER      = 149;  // 发射 Windows PE 文件头 (section_count)
+const OP_EMIT_MACHO_HEADER   = 150;  // 发射 iOS Mach-O 文件头 (cpu_type/cpu_subtype)
+const OP_EMIT_ELF_HEADER     = 151;  // 发射 ELF 文件头 (class/data/machine/osabi)
+const OP_EMIT_ARM64_INST     = 152;  // 发射 ARM64 指令 (32位指令字)
+const OP_EMIT_X86_64_INST    = 153;  // 发射 x86_64 指令字节序列 (长度+字节)
+const OP_EMIT_SECTION        = 154;  // 发射段/节头 (name_len + name + flags)
+const OP_EMIT_SYMBOL         = 155;  // 发射符号表项 (name + value + size + type)
+const OP_EMIT_LINKER_SCRIPT  = 156;  // 发射链接脚本片段 (length + content)
+const OP_SELECT_PLATFORM     = 157;  // 条件平台块开始 (平台ID), 仅目标平台匹配时编译后续
+const OP_END_PLATFORM        = 158;  // 条件平台块结束
+const OP_COMPILE_FOR_PLATFORMS = 159; // 多平台联合编译指令 (平台数量 + 平台ID列表)
+
 // 字节码标记 (254-255)
 const BC_FUNC_BODY = 255;      // 函数体起始标记
 const BC_FUNC_END = 254;       // 函数体结束标记
@@ -193,6 +223,15 @@ export OP_LESS_EQ; export OP_GREATER_EQ; export OP_RETURN_VAL;
 export OP_RETURN_OBJ; export OP_RETURN_EMPTY; export OP_ARRAY_LITERAL;
 export OP_OBJECT_LITERAL; export OP_STRING_CONCAT; export OP_RANDOM;
 export OP_LENGTH; export OP_EXIT_CODE;
+export PLATFORM_LINUX; export PLATFORM_WINDOWS; export PLATFORM_IOS;
+export PLATFORM_ANDROID; export PLATFORM_HARMONY;
+export OP_SET_TARGET_PLATFORM; export OP_EMIT_CLASSIC_HEADER;
+export OP_EMIT_MACHINE_BYTE; export OP_EMIT_MACHINE_U16; export OP_EMIT_MACHINE_U32;
+export OP_EMIT_MACHINE_U64; export OP_EMIT_CLASSIC_END; export OP_EMIT_QUANTUM_START;
+export OP_EMIT_PE_HEADER; export OP_EMIT_MACHO_HEADER; export OP_EMIT_ELF_HEADER;
+export OP_EMIT_ARM64_INST; export OP_EMIT_X86_64_INST; export OP_EMIT_SECTION;
+export OP_EMIT_SYMBOL; export OP_EMIT_LINKER_SCRIPT; export OP_SELECT_PLATFORM;
+export OP_END_PLATFORM; export OP_COMPILE_FOR_PLATFORMS;
 export BC_FUNC_BODY; export BC_FUNC_END;
 export QCLF_MAGIC; export QCLF_VERSION;
 export write_byte; export write_opcode; export write_u8; export write_u16;

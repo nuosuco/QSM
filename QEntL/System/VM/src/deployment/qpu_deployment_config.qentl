@@ -1,0 +1,476 @@
+/**
+ * @file qpu_deployment_config.qentl
+ * @brief QEntL部署配置管理模块
+ * 
+ * 量子基因编码: QGC-DEPLOY-CONFIG-2026070301
+ * 量子纠缠信道: QEC-DEPLOY-CONFIG-01
+ * 版本: 1.0.0
+ * 
+ * 管理量子3种部署的配置：
+ *   - 从环境变量读取配置
+ *   - 从配置文件读取配置
+ *   - 提供配置验证和默认值
+ *   - 支持运行时配置更新
+ */
+
+import "QEntL/System/VM/src/deployment/qpu_deployment_types.qentl";
+
+// ==================== 部署配置类 ====================
+
+/**
+ * @class QpuDeploymentConfig
+ * @brief 部署配置管理器
+ * 
+ * 统一管理所有部署相关的配置参数，
+ * 支持多种配置源和环境变量覆盖。
+ */
+quantum_class QpuDeploymentConfig {
+    private {
+        // 部署类型配置
+        deployMode: String;                          // 部署模式: "auto", "dev", "prod", "dedi"
+        fallbackChain: Array<Number>;                // 降级链
+        preferredType: Number;                       // 首选部署类型
+        
+        // QVM配置
+        qvmPath: String;                             // QVM可执行文件路径
+        qvmMaxQubits: Number;                        // QVM最大量子比特数
+        qvmMemoryLimit: String;                      // QVM内存限制
+        qvmVerbose: Boolean;                         // QVM详细输出
+        
+        // 云端配置
+        cloudEndpointUrl: String;                    // 云端API端点URL
+        cloudAuthToken: String;                      // 云端认证令牌
+        cloudTimeoutMs: Number;                      // 云端请求超时(ms)
+        cloudRetryCount: Number;                     // 云端重试次数
+        cloudProtocol: String;                       // 协议类型 ("http" 或 "grpc")
+        cloudBatchSize: Number;                      // 批量请求大小
+        cloudCompress: Boolean;                      // 是否压缩请求
+        
+        // 硬件配置
+        hardwarePath: String;                        // 硬件设备路径
+        hardwarePlatform: Number;                    // 硬件平台类型
+        hardwareTimeoutMs: Number;                   // 硬件操作超时(ms)
+        hardwareRetryCount: Number;                  // 硬件重试次数
+        hardwareCalibrate: Boolean;                  // 自动校准
+        hardwarePulseQueueSize: Number;              // 脉冲队列大小
+        hardwareMeasurementBuffer: Number;           // 测量缓冲区大小
+        
+        // 通用配置
+        globalTimeoutMs: Number;                     // 全局超时(ms)
+        globalRetryCount: Number;                    // 全局重试次数
+        enableLogging: Boolean;                      // 启用日志
+        logLevel: String;                            // 日志级别: "debug", "info", "warn", "error"
+        configFile: String;                          // 配置文件路径
+    }
+    
+    // 配置文件路径常量
+    private constant String DEFAULT_CONFIG_PATH = "QEntL/System/VM/config/qpu_deployment.json";
+    
+    /**
+     * @brief 构造函数
+     */
+    constructor() {
+        this.loadDefaults();
+    }
+    
+    /**
+     * @brief 加载默认配置值
+     */
+    private function loadDefaults(): Void {
+        this.deployMode = "auto";
+        this.fallbackChain = DEFAULT_FALLBACK_CHAIN;
+        this.preferredType = DEPLOY_ID_AUTO;
+        
+        this.qvmPath = "bin/qvm_bootstrap";
+        this.qvmMaxQubits = DEFAULT_QVM_MAX_QUBITS;
+        this.qvmMemoryLimit = DEFAULT_QVM_MEMORY;
+        this.qvmVerbose = false;
+        
+        this.cloudEndpointUrl = DEFAULT_CLOUD_ENDPOINT;
+        this.cloudAuthToken = "";
+        this.cloudTimeoutMs = DEFAULT_TIMEOUT_MS;
+        this.cloudRetryCount = DEFAULT_RETRY_COUNT;
+        this.cloudProtocol = "http";
+        this.cloudBatchSize = 100;
+        this.cloudCompress = false;
+        
+        this.hardwarePath = "/dev/qpu0";
+        this.hardwarePlatform = 4; // HW_PLATFORM_GENERIC
+        this.hardwareTimeoutMs = 60000;
+        this.hardwareRetryCount = 3;
+        this.hardwareCalibrate = false;
+        this.hardwarePulseQueueSize = 1024;
+        this.hardwareMeasurementBuffer = 256;
+        
+        this.globalTimeoutMs = DEFAULT_TIMEOUT_MS;
+        this.globalRetryCount = DEFAULT_RETRY_COUNT;
+        this.enableLogging = true;
+        this.logLevel = "info";
+        this.configFile = this.DEFAULT_CONFIG_PATH;
+    }
+    
+    /**
+     * @brief 从环境变量加载配置
+     */
+    public function loadFromEnv(): Void {
+        // 部署类型
+        let deployEnv = this.getEnvValue(ENV_VAR_DEPLOY_TYPE);
+        if (deployEnv != "") {
+            let val = this.parseInt(deployEnv);
+            if (val >= 0 && val <= 3) {
+                this.preferredType = val;
+                this.deployMode = this.typeToString(val);
+            }
+        }
+        
+        // 云端配置
+        let cloudUrl = this.getEnvValue(ENV_VAR_CLOUD_URL);
+        if (cloudUrl != "") {
+            this.cloudEndpointUrl = cloudUrl;
+        }
+        let cloudToken = this.getEnvValue(ENV_VAR_CLOUD_TOKEN);
+        if (cloudToken != "") {
+            this.cloudAuthToken = cloudToken;
+        }
+        
+        // 硬件配置
+        let hwPath = this.getEnvValue(ENV_VAR_HARDWARE_PATH);
+        if (hwPath != "") {
+            this.hardwarePath = hwPath;
+        }
+        
+        // 通用配置
+        let timeout = this.getEnvValue(ENV_VAR_TIMEOUT_MS);
+        if (timeout != "") {
+            this.globalTimeoutMs = this.parseInt(timeout);
+        }
+        let retry = this.getEnvValue(ENV_VAR_RETRY_COUNT);
+        if (retry != "") {
+            this.globalRetryCount = this.parseInt(retry);
+        }
+    }
+    
+    /**
+     * @brief 从配置文件加载配置
+     * @param path 配置文件路径
+     * @return Boolean 是否成功加载
+     */
+    public function loadFromConfig(path: String = null): Boolean {
+        let configPath = path != null ? path : this.configFile;
+        
+        // 检查配置文件是否存在
+        if (!this.fileExists(configPath)) {
+            return false;
+        }
+        
+        // 读取并解析JSON配置文件
+        let content = this.readJsonFile(configPath);
+        if (content == null) {
+            return false;
+        }
+        
+        // 应用配置
+        this.applyConfigObject(content);
+        return true;
+    }
+    
+    /**
+     * @brief 应用配置对象
+     * @param config 配置对象
+     */
+    private function applyConfigObject(config: Map): Void {
+        if (config.containsKey("deployment")) {
+            let deploy = config.get("deployment");
+            if (deploy.containsKey("mode")) {
+                this.deployMode = deploy.get("mode");
+                this.preferredType = this.stringToType(this.deployMode);
+            }
+            if (deploy.containsKey("fallback_chain")) {
+                this.fallbackChain = deploy.get("fallback_chain");
+            }
+        }
+        
+        if (config.containsKey("qvm")) {
+            let qvm = config.get("qvm");
+            if (qvm.containsKey("max_qubits")) {
+                this.qvmMaxQubits = qvm.get("max_qubits");
+            }
+            if (qvm.containsKey("memory_limit")) {
+                this.qvmMemoryLimit = qvm.get("memory_limit");
+            }
+        }
+        
+        if (config.containsKey("cloud")) {
+            let cloud = config.get("cloud");
+            if (cloud.containsKey("endpoint")) {
+                this.cloudEndpointUrl = cloud.get("endpoint");
+            }
+            if (cloud.containsKey("timeout_ms")) {
+                this.cloudTimeoutMs = cloud.get("timeout_ms");
+            }
+            if (cloud.containsKey("retry_count")) {
+                this.cloudRetryCount = cloud.get("retry_count");
+            }
+        }
+        
+        if (config.containsKey("hardware")) {
+            let hw = config.get("hardware");
+            if (hw.containsKey("driver_path")) {
+                this.hardwarePath = hw.get("driver_path");
+            }
+            if (hw.containsKey("firmware_version")) {
+                // 记录固件版本，用于兼容性检查
+            }
+        }
+    }
+    
+    /**
+     * @brief 验证配置
+     * @return Map 验证结果
+     */
+    public function validate(): Map {
+        let errors = [];
+        let warnings = [];
+        let isValid = true;
+        
+        // 验证部署类型
+        if (this.preferredType < 0 || this.preferredType > 3) {
+            errors.push("invalid_preferred_type:" + this.preferredType);
+            isValid = false;
+        }
+        
+        // 验证QVM配置
+        if (this.qvmMaxQubits < 1 || this.qvmMaxQubits > 64) {
+            warnings.push("qvm_max_qubits_out_of_range:" + this.qvmMaxQubits);
+        }
+        
+        // 验证云端配置
+        if (this.cloudTimeoutMs < 100 || this.cloudTimeoutMs > 300000) {
+            warnings.push("cloud_timeout_ms_out_of_range:" + this.cloudTimeoutMs);
+        }
+        
+        if (this.cloudRetryCount < 0 || this.cloudRetryCount > 10) {
+            warnings.push("cloud_retry_count_out_of_range:" + this.cloudRetryCount);
+        }
+        
+        // 验证硬件配置
+        if (this.hardwareTimeoutMs < 1000 || this.hardwareTimeoutMs > 600000) {
+            warnings.push("hardware_timeout_ms_out_of_range:" + this.hardwareTimeoutMs);
+        }
+        
+        // 验证日志级别
+        let validLevels = ["debug", "info", "warn", "error"];
+        let levelValid = false;
+        for (let i = 0; i < validLevels.length; i++) {
+            if (this.logLevel == validLevels[i]) {
+                levelValid = true;
+                break;
+            }
+        }
+        if (!levelValid) {
+            errors.push("invalid_log_level:" + this.logLevel);
+            isValid = false;
+        }
+        
+        // 验证降级链
+        let chainValid = true;
+        for (let i = 0; i < this.fallbackChain.length; i++) {
+            let val = this.fallbackChain[i];
+            if (val < 0 || val > 2) {
+                errors.push("invalid_fallback_chain_entry:" + val);
+                chainValid = false;
+                isValid = false;
+            }
+        }
+        
+        return {
+            "isValid": isValid,
+            "errors": errors,
+            "warnings": warnings,
+            "errorCount": errors.length,
+            "warningCount": warnings.length
+        };
+    }
+    
+    /**
+     * @brief 构建适配器配置
+     * @param deployType 部署类型ID
+     * @return Map 适配器配置
+     */
+    public function buildAdapterConfig(deployType: Number): Map {
+        switch (deployType) {
+            case DEPLOY_ID_DEV:
+                return {
+                    "qvm_path": this.qvmPath,
+                    "max_qubits": this.qvmMaxQubits,
+                    "memory_limit": this.qvmMemoryLimit,
+                    "verbose": this.qvmVerbose
+                };
+                
+            case DEPLOY_ID_PROD:
+                return {
+                    "endpoint_url": this.cloudEndpointUrl,
+                    "auth_token": this.cloudAuthToken,
+                    "timeout_ms": this.cloudTimeoutMs,
+                    "retry_count": this.cloudRetryCount,
+                    "protocol": this.cloudProtocol,
+                    "batch_size": this.cloudBatchSize,
+                    "compress": this.cloudCompress
+                };
+                
+            case DEPLOY_ID_DEDI:
+                return {
+                    "hardware_path": this.hardwarePath,
+                    "platform": this.hardwarePlatform,
+                    "timeout_ms": this.hardwareTimeoutMs,
+                    "retry_count": this.hardwareRetryCount,
+                    "calibrate": this.hardwareCalibrate,
+                    "pulse_queue_size": this.hardwarePulseQueueSize,
+                    "measurement_buffer": this.hardwareMeasurementBuffer
+                };
+                
+            default:
+                return {};
+        }
+    }
+    
+    /**
+     * @brief 获取完整配置摘要
+     * @return Map
+     */
+    public function getSummary(): Map {
+        return {
+            "deployMode": this.deployMode,
+            "preferredType": this.preferredType,
+            "preferredTypeLabel": this.typeToString(this.preferredType),
+            "fallbackChain": this.fallbackChain,
+            "qvm": {
+                "path": this.qvmPath,
+                "maxQubits": this.qvmMaxQubits,
+                "memoryLimit": this.qvmMemoryLimit
+            },
+            "cloud": {
+                "endpointUrl": this.cloudEndpointUrl,
+                "timeoutMs": this.cloudTimeoutMs,
+                "retryCount": this.cloudRetryCount,
+                "protocol": this.cloudProtocol
+            },
+            "hardware": {
+                "path": this.hardwarePath,
+                "platform": this.hardwarePlatform,
+                "timeoutMs": this.hardwareTimeoutMs,
+                "calibrate": this.hardwareCalibrate
+            },
+            "global": {
+                "timeoutMs": this.globalTimeoutMs,
+                "retryCount": this.globalRetryCount,
+                "enableLogging": this.enableLogging,
+                "logLevel": this.logLevel
+            },
+            "configFile": this.configFile
+        };
+    }
+    
+    // ==================== 设置器 ====================
+    
+    public function setDeployMode(mode: String) {
+        this.deployMode = mode;
+        this.preferredType = this.stringToType(mode);
+    }
+    
+    public function setPreferredType(type: Number) {
+        if (type >= 0 && type <= 3) {
+            this.preferredType = type;
+            this.deployMode = this.typeToString(type);
+        }
+    }
+    
+    public function setFallbackChain(chain: Array<Number>) {
+        this.fallbackChain = chain;
+    }
+    
+    public function setCloudEndpointUrl(url: String) {
+        this.cloudEndpointUrl = url;
+    }
+    
+    public function setCloudAuthToken(token: String) {
+        this.cloudAuthToken = token;
+    }
+    
+    public function setHardwarePath(path: String) {
+        this.hardwarePath = path;
+    }
+    
+    public function setLogLevel(level: String) {
+        this.logLevel = level;
+    }
+    
+    // ==================== 私有辅助函数 ====================
+    
+    private function typeToString(type: Number): String {
+        switch (type) {
+            case 0: return "dev";
+            case 1: return "prod";
+            case 2: return "dedi";
+            case 3: return "auto";
+            default: return "unknown";
+        }
+    }
+    
+    private function stringToType(s: String): Number {
+        switch (s) {
+            case "dev":    return 0;
+            case "prod":   return 1;
+            case "dedi":   return 2;
+            case "auto":   return 3;
+            default:       return 3;
+        }
+    }
+    
+    private function getEnvValue(name: String): String {
+        return ""; // 占位实现
+    }
+    
+    private function fileExists(path: String): Boolean {
+        return false; // 占位实现
+    }
+    
+    private function readJsonFile(path: String): Map {
+        return null; // 占位实现
+    }
+    
+    private function parseInt(s: String): Number {
+        let result = 0;
+        for (let i = 0; i < s.length; i++) {
+            let ch = s[i];
+            if (ch >= "0" && ch <= "9") {
+                result = result * 10 + (ch - "0");
+            }
+        }
+        return result;
+    }
+}
+
+// ==================== 便捷函数 ====================
+
+/**
+ * @brief 创建默认配置
+ * @return QpuDeploymentConfig
+ */
+function createDefaultConfig(): QpuDeploymentConfig {
+    let config = new QpuDeploymentConfig();
+    config.loadFromEnv();
+    config.loadFromConfig();
+    return config;
+}
+
+/**
+ * @brief 加载并验证配置
+ * @return Map 验证结果和配置摘要
+ */
+function loadAndValidateConfig(): Map {
+    let config = createDefaultConfig();
+    let validation = config.validate();
+    validation["configSummary"] = config.getSummary();
+    return validation;
+}
