@@ -736,7 +736,6 @@ int compile_file_v2(const char *input_path, const char *output_path) {
             found_code = 1;
         }
     }
-    }
     
     fclose(fin);
     
