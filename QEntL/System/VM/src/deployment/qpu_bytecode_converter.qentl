@@ -1,0 +1,534 @@
+/**
+ * @file qpu_bytecode_converter.qentl
+ * @brief QEntL量子字节码→部署平台转换器
+ * 
+ * 量子基因编码: QGC-DEPLOY-CONVERTER-2026070301
+ * 量子纠缠信道: QEC-DEPLOY-CONVERTER-01
+ * 版本: 1.0.0
+ * 
+ * 将通用量子字节码(.qbc)转换为三种部署平台格式：
+ *   - DEV:  直接透传至QVM (0x14标识, 无需转换)
+ *   - PROD: 云端QPU API格式 (JSON/HTTP请求体)
+ *   - DEDI: QPU硬件脉冲队列格式 (设备驱动字节序列)
+ * 
+ * 转换框架:
+ *   ┌──────────────┐    ┌──────────────────┐
+ *   │ 通用.qbc字节码│──→│ 部署目标识别     │
+ *   └──────────────┘    └────────┬─────────┘
+ *                                 │
+ *              ┌──────────────────┼──────────────────┐
+ *              ↓                  ↓                  ↓
+ *        ┌──────────┐      ┌──────────┐      ┌──────────┐
+ *        │ DEV: QVM │      │ PROD: API│      │ DEDI: HW │
+ *        │ 透传0x14 │      │ JSON封装 │      │ 脉冲队列 │
+ *        └──────────┘      └──────────┘      └──────────┘
+ */
+
+import "QEntL/System/VM/src/deployment/qpu_deployment_types.qentl";
+
+// ==================== 字节码转换器类 ====================
+
+/**
+ * @class QpuBytecodeConverter
+ * @brief 量子字节码部署平台转换器
+ */
+quantum_class QpuBytecodeConverter {
+    private {
+        targetDeployType: Number;     // 目标部署类型
+        numConversions: Number;       // 转换计数
+        conversionErrors: Number;     // 错误计数
+        lastConversionTime: Number;   // 上次转换耗时(ms)
+        optimizationEnabled: Boolean; // 是否启用优化
+        circuitName: String;          // 电路名称
+    }
+
+    /**
+     * @brief 构造函数
+     * @param target 目标部署类型
+     */
+    constructor(target: Number = DEPLOY_ID_DEV) {
+        this.targetDeployType = target;
+        this.numConversions = 0;
+        this.conversionErrors = 0;
+        this.lastConversionTime = 0;
+        this.optimizationEnabled = true;
+        this.circuitName = "unnamed";
+    }
+
+    /**
+     * @brief 设置目标部署类型
+     * @param target 部署类型ID
+     */
+    public function setTarget(target: Number): Void {
+        if (target >= 0 && target <= 2) {
+            this.targetDeployType = target;
+        }
+    }
+
+    /**
+     * @brief 设置电路名称
+     * @param name 电路名称
+     */
+    public function setCircuitName(name: String): Void {
+        this.circuitName = name;
+    }
+
+    // ==================== 主转换入口 ====================
+
+    /**
+     * @brief 将字节码转换为目标部署平台格式
+     * @param bytecode 输入字节码
+     * @return Map 转换结果 (success, targetFormat, payload, metadata)
+     */
+    public function convert(bytecode: Bytes): Map {
+        this.numConversions++;
+
+        if (bytecode == null || bytecode.length == 0) {
+            this.conversionErrors++;
+            return {
+                "success": false,
+                "error": "empty_bytecode",
+                "message": "输入字节码为空"
+            };
+        }
+
+        let target = this.targetDeployType;
+
+        switch (target) {
+            case DEPLOY_ID_DEV:
+                return this.convertToQvm(bytecode);
+
+            case DEPLOY_ID_PROD:
+                return this.convertToCloudApi(bytecode);
+
+            case DEPLOY_ID_DEDI:
+                return this.convertToHardwarePulse(bytecode);
+
+            default:
+                this.conversionErrors++;
+                return {
+                    "success": false,
+                    "error": "invalid_target",
+                    "message": "未知部署类型: " + target
+                };
+        }
+    }
+
+    // ==================== DEV: QVM透传 ====================
+
+    /**
+     * @brief 转换为QVM虚拟机格式 (DEV)
+     * 
+     * 策略: 直接透传 .qbc 字节码，无需格式转换。
+     * QVM识别 0x14 头部标识，直接执行量子门序列。
+     * 
+     * @param bytecode 通用量子字节码
+     * @return Map
+     */
+    private function convertToQvm(bytecode: Bytes): Map {
+        // 验证字节码头部 (0x14 = 量子字节码标识)
+        if (bytecode.length < 2) {
+            this.conversionErrors++;
+            return {
+                "success": false,
+                "error": "invalid_qbc_header",
+                "message": "QVM字节码头部缺失(需0x14标识)",
+                "targetFormat": "qvm_direct",
+                "originalSize": bytecode.length
+            };
+        }
+
+        let headerByte = bytecode[0];
+        let isValid = (headerByte == 0x14);
+
+        // 统计字节码结构
+        let numInstructions = this.countInstructions(bytecode);
+        let numQubits = bytecode.length >= 2 ? bytecode[1] : 0;
+
+        let result = {
+            "success": true,
+            "targetFormat": "qvm_direct",
+            "deployType": this.getDeployLabel(DEPLOY_ID_DEV),
+            "payload": bytecode,
+            "payloadSize": bytecode.length,
+            "encoding": "raw_qbc",
+            "metadata": {
+                "headerValid": isValid,
+                "headerByte": headerByte,
+                "numInstructions": numInstructions,
+                "numQubits": numQubits,
+                "optimized": false,
+                "circuitName": this.circuitName
+            }
+        };
+
+        return result;
+    }
+
+    // ==================== PROD: 云端API格式 ====================
+
+    /**
+     * @brief 转换为云端QPU API格式 (PROD)
+     * 
+     * 策略: 将.qbc字节码序列化为HTTP请求体JSON。
+     * 云端API协议:
+     *   POST /api/v1/execute
+     *   Content-Type: application/json
+     *   Headers: Authorization: Bearer <token>
+     *   Body: {
+     *     "version": 1,
+     *     "format": "qentl_qbc",
+     *     "bytecode": "<base64>",
+     *     "options": {
+     *       "shots": 1024,
+     *       "optimization_level": 2,
+     *       "noise_model": "realistic"
+     *     },
+     *     "metadata": {...}
+     *   }
+     * 
+     * @param bytecode 通用量子字节码
+     * @return Map
+     */
+    private function convertToCloudApi(bytecode: Bytes): Map {
+        if (bytecode == null || bytecode.length < 2) {
+            this.conversionErrors++;
+            return {
+                "success": false,
+                "error": "invalid_bytecode",
+                "message": "字节码无效，无法转换为API格式"
+            };
+        }
+
+        let base64Payload = this.toBase64(bytecode);
+        let numInstructions = this.countInstructions(bytecode);
+        let numQubits = bytecode.length >= 2 ? bytecode[1] : 0;
+
+        // 构建API请求体JSON结构
+        let apiPayload = {
+            "version": 1,
+            "format": "qentl_qbc",
+            "protocol": "http_json",
+            "circuitName": this.circuitName,
+            "bytecode": base64Payload,
+            "bytecodeSize": bytecode.length,
+            "options": {
+                "shots": 1024,
+                "optimization_level": 2,
+                "noise_model": "realistic",
+                "return_counts": true,
+                "return_statevector": false
+            },
+            "metadata": {
+                "numQubits": numQubits,
+                "numInstructions": numInstructions,
+                "deployType": "cloud",
+                "timestamp": 0,
+                "converterVersion": "1.0.0"
+            }
+        };
+
+        // 模拟JSON序列化(返回结构化对象)
+        let payload = this.toJsonString(apiPayload);
+
+        let result = {
+            "success": true,
+            "targetFormat": "cloud_api_json",
+            "deployType": this.getDeployLabel(DEPLOY_ID_PROD),
+            "payload": payload,
+            "payloadSize": payload.length,
+            "encoding": "base64+json",
+            "apiEndpoint": DEFAULT_CLOUD_ENDPOINT,
+            "metadata": {
+                "base64Length": base64Payload.length,
+                "originalSize": bytecode.length,
+                "expansionRatio": base64Payload.length / bytecode.length,
+                "shots": 1024,
+                "optimizationLevel": 2,
+                "numQubits": numQubits,
+                "numInstructions": numInstructions,
+                "circuitName": this.circuitName
+            }
+        };
+
+        return result;
+    }
+
+    // ==================== DEDI: QPU硬件脉冲格式 ====================
+
+    /**
+     * @brief 转换为QPU硬件脉冲队列格式 (DEDI)
+     * 
+     * 策略: 将通用量子字节码解码为QPU脉冲序列。
+     * 硬件脉冲格式:
+     *   [MAGIC 0xDE 0xED] [NUM_QUBITS] [NUM_PULSES]
+     *   [pulse1] [pulse2] ... [pulseN]
+     *   每个pulse: [gate_type] [qubit_idx] [duration_us] [amplitude] [phase]
+     * 
+     * 支持的门→脉冲映射:
+     *   H   → {gate:0x01, dur:100ns, amp:1.0, phase:0}
+     *   X   → {gate:0x02, dur:50ns, amp:1.0, phase:0}
+     *   CNOT→ {gate:0x04, dur:150ns, amp:1.0, phase:0, ctrl,tgt}
+     *   MEAS→ {gate:0x05, dur:1000ns, amp:0, phase:0}
+     * 
+     * @param bytecode 通用量子字节码
+     * @return Map
+     */
+    private function convertToHardwarePulse(bytecode: Bytes): Map {
+        if (bytecode == null || bytecode.length < 2) {
+            this.conversionErrors++;
+            return {
+                "success": false,
+                "error": "invalid_bytecode",
+                "message": "字节码无效，无法转换为脉冲队列"
+            };
+        }
+
+        let numQubits = bytecode.length >= 2 ? bytecode[1] : 0;
+        let pulses = this.decodeToPulses(bytecode);
+        let numPulses = pulses.length;
+
+        // 构建硬件脉冲块
+        let hardwarePayload = {
+            "magic": "0xDEED",
+            "version": 1,
+            "numQubits": numQubits,
+            "numPulses": numPulses,
+            "pulses": pulses,
+            "devicePath": "/dev/qpu0",
+            "platform": "generic"
+        };
+
+        let payload = this.toJsonString(hardwarePayload);
+
+        let result = {
+            "success": true,
+            "targetFormat": "hardware_pulse_queue",
+            "deployType": this.getDeployLabel(DEPLOY_ID_DEDI),
+            "payload": payload,
+            "payloadSize": payload.length,
+            "encoding": "pulse_sequence_json",
+            "metadata": {
+                "numQubits": numQubits,
+                "numPulses": numPulses,
+                "totalDurationUs": this.estimateDuration(pulses),
+                "devicePath": "/dev/qpu0",
+                "platform": "generic",
+                "circuitName": this.circuitName,
+                "originalSize": bytecode.length,
+                "pulseBreakdown": this.getPulseBreakdown(pulses)
+            }
+        };
+
+        return result;
+    }
+
+    // ==================== 脉冲解码辅助函数 ====================
+
+    /**
+     * @brief 将字节码解码为脉冲序列
+     * @param bytecode 量子字节码
+     * @return Array<Map> 脉冲列表
+     */
+    private function decodeToPulses(bytecode: Bytes): Array<Map> {
+        let pulses = [];
+        let pos = 2; // 跳过头部(0x14 + num_qubits)
+        let pulseId = 0;
+
+        // 脉冲参数表: [gate_type, duration_us, amplitude, phase]
+        let pulseParams = {
+            0:  [0x00, 0, 0, 0],       // STOP
+            1:  [0x01, 100, 1.0, 0],    // H
+            2:  [0x02, 50, 1.0, 0],     // X
+            3:  [0x03, 50, 1.0, 0],     // Y
+            4:  [0x04, 150, 1.0, 0],    // CNOT(2-qubit)
+            5:  [0x05, 1000, 0, 0],     // MEASURE
+            6:  [0x06, 100, 1.0, 0],    // Z
+            7:  [0x07, 100, 1.0, 0],    // S
+            8:  [0x08, 100, 1.0, 0],    // T
+            9:  [0x09, 200, 1.0, 0],    // SWAP(2-qubit)
+            10: [0x0A, 0, 0, 0],        // RESET
+            11: [0x0B, 0, 0, 0]         // PRINT
+        };
+
+        while (pos < bytecode.length) {
+            let opcode = bytecode[pos];
+            let params = pulseParams[opcode] != null ? pulseParams[opcode] : [opcode, 100, 1.0, 0];
+
+            let pulse = {
+                "pulseId": pulseId,
+                "gateType": params[0],
+                "opcode": opcode,
+                "durationUs": params[1],
+                "amplitude": params[2],
+                "phase": params[3]
+            };
+
+            // 处理单量子比特指令
+            if (pos + 1 < bytecode.length) {
+                pulse["qubit"] = bytecode[pos + 1];
+                pos += 2;
+            } else {
+                pos += 1;
+            }
+
+            // CNOT/SWAP: 多一个tgt量子比特
+            if (opcode == 4 || opcode == 9) {
+                if (pos < bytecode.length) {
+                    pulse["targetQubit"] = bytecode[pos];
+                    pos += 1;
+                }
+            }
+
+            pulses.push(pulse);
+            pulseId++;
+        }
+
+        return pulses;
+    }
+
+    /**
+     * @brief 估算脉冲总执行时间(us)
+     * @param pulses 脉冲列表
+     * @return Number 总时间(us)
+     */
+    private function estimateDuration(pulses: Array<Map>): Number {
+        let total = 0;
+        for (let i = 0; i < pulses.length; i++) {
+            total += pulses[i]["durationUs"];
+        }
+        return total;
+    }
+
+    /**
+     * @brief 获取脉冲类型分布
+     * @param pulses 脉冲列表
+     * @return Map 各类型计数
+     */
+    private function getPulseBreakdown(pulses: Array<Map>): Map {
+        let breakdown = {};
+        for (let i = 0; i < pulses.length; i++) {
+            let gtype = pulses[i]["gateType"];
+            let key = "gate_" + gtype;
+            if (!breakdown.containsKey(key)) {
+                breakdown.set(key, 0);
+            }
+            breakdown.set(key, breakdown.get(key) + 1);
+        }
+        return breakdown;
+    }
+
+    // ==================== 通用辅助函数 ====================
+
+    /**
+     * @brief 统计字节码中的指令数量
+     * @param bytecode 量子字节码
+     * @return Number 指令数
+     */
+    private function countInstructions(bytecode: Bytes): Number {
+        if (bytecode.length < 2) return 0;
+        let pos = 2;
+        let count = 0;
+        while (pos < bytecode.length) {
+            let opcode = bytecode[pos];
+            count++;
+            // 跳过操作数
+            if (opcode == 0) { pos += 1; break; }  // STOP
+            if (opcode == 4 || opcode == 9) { pos += 3; }  // CNOT/SWAP: ctrl+tgt
+            else { pos += 2; }  // 单量子比特指令: opcode+qubit
+        }
+        return count;
+    }
+
+    /**
+     * @brief 模拟Base64编码
+     * @param data 字节数组
+     * @return String Base64字符串
+     */
+    private function toBase64(data: Bytes): String {
+        // 简化模拟: 十六进制字符串
+        let result = "";
+        for (let i = 0; i < data.length; i++) {
+            let b = data[i];
+            let hex = (b < 16 ? "0" : "") + this.toHex(b);
+            result += hex;
+        }
+        return result;
+    }
+
+    /**
+     * @brief 字节转十六进制字符串
+     * @param b 字节值
+     * @return String
+     */
+    private function toHex(b: Number): String {
+        let digits = "0123456789ABCDEF";
+        return digits.charAt((b >> 4) & 0xF) + digits.charAt(b & 0xF);
+    }
+
+    /**
+     * @brief 模拟JSON序列化
+     * @param obj 对象
+     * @return String JSON字符串(简化表示)
+     */
+    private function toJsonString(obj: Map): String {
+        let parts = [];
+        for (let key in obj) {
+            let val = obj[key];
+            if (val != null) {
+                parts.push("[" + key + "]=<" + val + ">");
+            }
+        }
+        return "{" + parts.join(";") + "}";
+    }
+
+    /**
+     * @brief 获取部署类型标签
+     * @param typeId 部署类型ID
+     * @return String
+     */
+    private function getDeployLabel(typeId: Number): String {
+        return getDeploymentLabel(typeId);
+    }
+
+    /**
+     * @brief 获取转换器统计
+     * @return Map
+     */
+    public function getStats(): Map {
+        return {
+            "numConversions": this.numConversions,
+            "conversionErrors": this.conversionErrors,
+            "lastConversionTime": this.lastConversionTime,
+            "targetDeployType": this.targetDeployType,
+            "optimizationEnabled": this.optimizationEnabled,
+            "circuitName": this.circuitName
+        };
+    }
+}
+
+// ==================== 便捷函数 ====================
+
+/**
+ * @brief 快速转换: 字节码 → 目标平台
+ * @param bytecode 量子字节码
+ * @param target 部署类型 (0=QVM, 1=Cloud, 2=Hardware)
+ * @return Map
+ */
+function convertBytecode(bytecode: Bytes, target: Number): Map {
+    let converter = new QpuBytecodeConverter(target);
+    return converter.convert(bytecode);
+}
+
+/**
+ * @brief 三种部署格式对比转换
+ * @param bytecode 量子字节码
+ * @return Map 包含三种格式的结果
+ */
+function convertToAllFormats(bytecode: Bytes): Map {
+    let results = {};
+    results.set("dev_qvm", convertBytecode(bytecode, DEPLOY_ID_DEV));
+    results.set("prod_cloud", convertBytecode(bytecode, DEPLOY_ID_PROD));
+    results.set("dedi_hardware", convertBytecode(bytecode, DEPLOY_ID_DEDI));
+    return results;
+}
