@@ -71,8 +71,9 @@ typedef enum {
     OP_WHILE = 111,        // 循环
     OP_BREAK = 112,        // 跳出循环
     OP_CONTINUE = 113,     // 继续循环
-    OP_FUNC_CALL = 114,    // 函数调用
-    OP_NEW = 115,          // 创建对象
+    OP_FUNC_CALL = 114, // 函数调用
+    OP_FUNC_DEF = 150, // 函数定义
+    OP_NEW = 115, // 创建对象
     OP_ASSIGN = 116,       // 赋值
     OP_LOAD_MEMBER = 117,  // 加载成员
     OP_STORE_MEMBER = 118, // 存储成员
@@ -771,24 +772,45 @@ int compile_file_v2(const char *input_path, const char *output_path) {
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "用法: %s <input.qentl> [output.qbc]\n", argv[0]);
-        fprintf(stderr, "\nQCL引导编译器 v2 - 最小化C语言引导编译器\n");
-        fprintf(stderr, "将QEntL源码编译为QVM可执行的.qbc字节码\n");
-        fprintf(stderr, "\n支持指令:\n");
-        fprintf(stderr, "  量子门: init, H, X, Y, Z, T, S, CNOT, SWAP, MEASURE, RESET, BARRIER\n");
-        fprintf(stderr, "  高级语法: 导入, 量子模块, 类型, 函数, 如果, 返回, new, .长度, 随机\n");
-        fprintf(stderr, "  运算符: ===, !==, ==, !=, <, >, +, -, *, /\n");
-        fprintf(stderr, "  控制流: 否则, 循环, 跳出, 继续\n");
-        fprintf(stderr, "\n注: 高级QEntL语法(类定义、函数体等)会被简化处理\n");
+        fprintf(stderr, "用法: %s <input.qentl> [output.qbc]\\n", argv[0]);
+        fprintf(stderr, "\\nQCL引导编译器 v2 - 最小化C语言引导编译器\\n");
+        fprintf(stderr, "将QEntL源码编译为QVM可执行的.qbc字节码\\n");
+        fprintf(stderr, "\\n支持指令:\\n");
+        fprintf(stderr, "  量子门: init, H, X, Y, Z, T, S, CNOT, SWAP, MEASURE, RESET, BARRIER\\n");
+        fprintf(stderr, "  高级语法: 导入, 量子模块, 类型, 函数, 如果, 返回, new, .长度, 随机\\n");
+        fprintf(stderr, "  运算符: ===, !==, ==, !=, <, >, +, -, *, /\\n");
+        fprintf(stderr, "  控制流: 否则, 循环, 跳出, 继续\\n");
+        fprintf(stderr, "\\n注: 高级QEntL语法(类定义、函数体等)会被简化处理\\n");
         return 1;
     }
     
     const char *input = argv[1];
-    const char *output = (argc > 2) ? argv[2] : "output.qbc";
     
-    srand((unsigned int)time(NULL));
-    
-    int ret = compile_file_v2(input, output);
-    
-    return ret;
+    if (argc == 2) {
+        // 执行模式：编译成临时qbc，然后调用qvm_bootstrap执行
+        char tmp_qbc[512];
+        snprintf(tmp_qbc, sizeof(tmp_qbc), "/tmp/qcl_exec_%d.qbc", getpid());
+        
+        fprintf(stderr, "[QCL] 执行模式：编译 %s → %s\\n", input, tmp_qbc);
+        int ret = compile_file_v2(input, tmp_qbc);
+        if (ret != 0) {
+            fprintf(stderr, "[QCL] 编译失败\\n");
+            return ret;
+        }
+        
+        char cmd[1024];
+        snprintf(cmd, sizeof(cmd), "bin/qvm_bootstrap %s", tmp_qbc);
+        fprintf(stderr, "[QCL] 调用QVM执行 %s\\n", cmd);
+        ret = system(cmd);
+        
+        // 清理临时文件
+        remove(tmp_qbc);
+        return ret;
+    } else {
+        // 编译模式
+        const char *output = argv[2];
+        srand((unsigned int)time(NULL));
+        int ret = compile_file_v2(input, output);
+        return ret;
+    }
 }

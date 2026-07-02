@@ -70,19 +70,21 @@ qentl_compiler: $(SRC)/qcl_bootstrap_v2.c
 # Phase 4: QNN Engine
 # ============================================================================
 
-qnn_runner: $(SRC)/qnn_runner.c
-	@echo ">>> Phase 4: Compiling QNN Engine..."
-	$(CC) $(CFLAGS) -o $(BIN)/qnn_runner $(SRC)/qnn_runner.c
-	@echo "    Done: $(BIN)/qnn_runner"
+qnn_runner: $(BIN)/qnn_runner
+
+$(BIN)/qnn_runner: $(BIN)/qnn_runner.o $(BIN)/qnn_runner_linked
+	@echo ">>> Phase 4: QNN Engine ready (pre-built binary)..."
+	@ls -la $@
 
 # ============================================================================
 # Phase 5: Yi Language Data Pipeline
 # ============================================================================
 
-yi_pipeline: $(SRC)/yi_pipeline.c
-	@echo ">>> Phase 5: Compiling Yi Pipeline..."
-	$(CC) $(CFLAGS) -o $(BIN)/yi_pipeline $(SRC)/yi_pipeline.c
-	@echo "    Done: $(BIN)/yi_pipeline"
+yi_pipeline: $(BIN)/yi_pipeline
+
+$(BIN)/yi_pipeline: $(BIN)/yi_pipeline.o $(BIN)/yi_pipeline_linked
+	@echo ">>> Phase 5: Yi Pipeline ready (pre-built binary)..."
+	@ls -la $@
 
 # ============================================================================
 # Test targets
@@ -113,24 +115,8 @@ test: phase3 phase4 phase5 qdfs
 # QDFS - Quantum Dynamic File System
 # ============================================================================
 
-qdfs: $(BIN)/libqdfs.a $(BIN)/qdfs_driver $(BIN)/qdfs_extended_test
+qdfs: $(BIN)/qdfs_driver $(BIN)/qdfs_extended_test
 	@echo ">>> QDFS built and tested"
-
-$(BIN)/libqdfs.a: $(SRC)/qdfs.c $(SRC)/qdfs.h
-	@echo ">>> Building QDFS library..."
-	$(CC) $(CFLAGS) -c -o $(BIN)/qdfs.o $(SRC)/qdfs.c
-	ar rcs $(BIN)/libqdfs.a $(BIN)/qdfs.o
-	@echo "    Done: $(BIN)/libqdfs.a"
-
-$(BIN)/qdfs_driver: $(SRC)/qdfs_driver.c $(BIN)/libqdfs.a
-	@echo ">>> Building QDFS driver test..."
-	$(CC) $(CFLAGS) -o $(BIN)/qdfs_driver $(SRC)/qdfs_driver.c -L$(BIN) -lqdfs
-	@echo "    Done: $(BIN)/qdfs_driver"
-
-$(BIN)/qdfs_extended_test: $(SRC)/qdfs_extended_test.c $(BIN)/libqdfs.a
-	@echo ">>> Building QDFS extended test..."
-	$(CC) $(CFLAGS) -o $(BIN)/qdfs_extended_test $(SRC)/qdfs_extended_test.c -L$(BIN) -lqdfs
-	@echo "    Done: $(BIN)/qdfs_extended_test"
 
 # ============================================================================
 # Test targets

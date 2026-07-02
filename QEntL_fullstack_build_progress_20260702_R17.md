@@ -1,18 +1,18 @@
 # QEntL FullStack 构建进度报告
-## Cron唤醒: 2026-07-02 18:54:46 (轮次 R17)
+## Cron唤醒: 2026-07-02 20:52:36 (轮次 R17)
 
 ### 总体状态
 - C源文件: 4
 - 目标文件(.o): 39
-- 可执行文件: 35
+- 可执行文件: 32
 - QEntL文件: 513
-- QBC字节码: 1123
+- QBC字节码: 1185
 
 ### 四大模型 (QSM/SOM/WeQ/Ref)
-- QSM: 14 QEntL → 28 QBC
-- SOM: 8 QEntL → 16 QBC
-- WeQ: 8 QEntL → 16 QBC
-- Ref: 9 QEntL → 18 QBC
+- QSM: 14 QEntL → 32 QBC
+- SOM: 8 QEntL → 18 QBC
+- WeQ: 8 QEntL → 18 QBC
+- Ref: 9 QEntL → 20 QBC
 
 ### 关键二进制
 - ✅ qvm_boot
@@ -20,7 +20,7 @@
 - ✅ qcl_bootstrap_v2
 - ✅ qentl_compiler
 - ✅ qnn_runner
-- ✅ yi_pipeline
+- ❌ yi_pipeline (缺失)
 - ❌ qdfs_driver (缺失)
 
 ### 子代理执行情况

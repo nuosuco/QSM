@@ -1,0 +1,166 @@
+=== AgentC: QVM Tests ===
+Thu Jul  2 09:04:55 PM CST 2026
+--- QVM self-test ---
+╔══════════════════════════════════════╗
+║    QEntL Quantum Virtual Machine     ║
+║    Version 1.0.0                       ║
+╚══════════════════════════════════════╝
+
+[QVM] 量子虚拟机初始化完成 (v1.0.0)
+[QVM] 量子比特: 0/64
+[QVM] 经典寄存器: 16个
+[QVM] 量子内存: 1024 KB
+=== QVM 量子测试套件 ===
+
+
+>>> 测试: 叠加态 <<<
+[TEST] 叠加态 q0: (0.71)|0⟩ + (0.71)|1⟩)
+[TEST] 100次测量统计: |0⟩=52, |1⟩=48
+[TEST] 概率分布: |0⟩=52.0%, |1⟩=48.0%
+
+=== 量子态 ===
+q[0]: |0⟩ (已测量)
+=================
+
+
+>>> 测试: 贝尔态 (Bell State) <<<
+[TEST] 创建 q0=1, q1=2
+[TEST] H(q0) - 创建叠加态
+[TEST] CNOT(q0, q1) - 建立纠缠
+[TEST] 测量结果: q0=0, q1=0
+[TEST] 纠缠验证: ✓ 纠缠成功!
+
+=== 量子态 ===
+q[0]: |0⟩ (已测量)
+q[1]: |0⟩ (已测量)
+q[2]: |0⟩ (已测量)
+=================
+
+
+=== 所有测试完成 ===
+--- test_qvm_quick.qentl ---
+[Bootstrap v2] 编译: test_qvm_quick.qentl
+[Bootstrap v2] 输出: /tmp/_quick.qbc
+[Bootstrap v2] 编译完成: 29 字节, 0 导入, 0 类型, 0 函数
+╔══════════════════════════════════════╗
+║    QEntL Quantum Virtual Machine     ║
+║    Version 1.0.0                       ║
+╚══════════════════════════════════════╝
+
+[QVM] 量子虚拟机初始化完成 (v1.0.0)
+[QVM] 量子比特: 0/64
+[QVM] 经典寄存器: 16个
+[QVM] 量子内存: 1024 KB
+[QVM] 开始执行字节码 (29 bytes)
+[QVM] 初始化 3 个量子比特
+[QVM] H(q0)
+[QVM] X(q1)
+[QVM] CNOT(q0, q1)
+[QVM] CNOT(q1, q2)
+[QVM] 测量 q0 -> r0 = 0
+[QVM] 测量 q1 -> r1 = 0
+[QVM] 测量 q2 -> r2 = 0
+[QVM] print(r0) = 0
+[QVM] print(r1) = 0
+[QVM] print(r2) = 0
+[QVM] 程序退出
+[QVM] 执行完成: 12 周期, 7 门操作
+--- test/qvm_test.qentl ---
+[Bootstrap v2] 编译: test/qvm_test.qentl
+[Bootstrap v2] 输出: /tmp/_qvmtest.qbc
+[Bootstrap v2] 编译完成: 21 字节, 0 导入, 0 类型, 0 函数
+╔══════════════════════════════════════╗
+║    QEntL Quantum Virtual Machine     ║
+║    Version 1.0.0                       ║
+╚══════════════════════════════════════╝
+
+[QVM] 量子虚拟机初始化完成 (v1.0.0)
+[QVM] 量子比特: 0/64
+[QVM] 经典寄存器: 16个
+[QVM] 量子内存: 1024 KB
+[QVM] 开始执行字节码 (21 bytes)
+[QVM] 初始化 2 个量子比特
+[QVM] H(q0)
+[QVM] X(q0)
+[QVM] CNOT(q0, q1)
+[QVM] 测量 q0 -> r0 = 0
+[QVM] 测量 q1 -> r1 = 0
+[QVM] print(r0) = 0
+[QVM] print(r1) = 0
+[QVM] 程序退出
+[QVM] 执行完成: 9 周期, 5 门操作
+--- test/cnot_verify.qentl ---
+[Bootstrap v2] 编译: test/cnot_verify.qentl
+[Bootstrap v2] 输出: /tmp/_cnotv.qbc
+[Bootstrap v2] 编译完成: 29 字节, 0 导入, 0 类型, 0 函数
+╔══════════════════════════════════════╗
+║    QEntL Quantum Virtual Machine     ║
+║    Version 1.0.0                       ║
+╚══════════════════════════════════════╝
+
+[QVM] 量子虚拟机初始化完成 (v1.0.0)
+[QVM] 量子比特: 0/64
+[QVM] 经典寄存器: 16个
+[QVM] 量子内存: 1024 KB
+[QVM] 开始执行字节码 (29 bytes)
+[QVM] 初始化 3 个量子比特
+[QVM] H(q0)
+[QVM] X(q1)
+[QVM] CNOT(q0, q1)
+[QVM] CNOT(q1, q2)
+[QVM] 测量 q0 -> r0 = 0
+[QVM] 测量 q1 -> r1 = 0
+[QVM] 测量 q2 -> r2 = 0
+[QVM] print(r0) = 0
+[QVM] print(r1) = 0
+[QVM] print(r2) = 0
+[QVM] 程序退出
+[QVM] 执行完成: 12 周期, 7 门操作
+--- test/test_quantum.qentl ---
+[Bootstrap v2] 编译: test/test_quantum.qentl
+[Bootstrap v2] 输出: /tmp/_quantum.qbc
+[Bootstrap v2] 编译完成: 21 字节, 0 导入, 0 类型, 0 函数
+╔══════════════════════════════════════╗
+║    QEntL Quantum Virtual Machine     ║
+║    Version 1.0.0                       ║
+╚══════════════════════════════════════╝
+
+[QVM] 量子虚拟机初始化完成 (v1.0.0)
+[QVM] 量子比特: 0/64
+[QVM] 经典寄存器: 16个
+[QVM] 量子内存: 1024 KB
+[QVM] 开始执行字节码 (21 bytes)
+[QVM] 初始化 2 个量子比特
+[QVM] H(q0)
+[QVM] X(q0)
+[QVM] CNOT(q0, q1)
+[QVM] 测量 q0 -> r0 = 0
+[QVM] 测量 q1 -> r1 = 0
+[QVM] print(r0) = 0
+[QVM] print(r1) = 0
+[QVM] 程序退出
+[QVM] 执行完成: 9 周期, 5 门操作
+--- test/bell_state.qentl ---
+[Bootstrap v2] 编译: test/bell_state.qentl
+[Bootstrap v2] 输出: /tmp/_bell.qbc
+[Bootstrap v2] 编译完成: 19 字节, 0 导入, 0 类型, 0 函数
+╔══════════════════════════════════════╗
+║    QEntL Quantum Virtual Machine     ║
+║    Version 1.0.0                       ║
+╚══════════════════════════════════════╝
+
+[QVM] 量子虚拟机初始化完成 (v1.0.0)
+[QVM] 量子比特: 0/64
+[QVM] 经典寄存器: 16个
+[QVM] 量子内存: 1024 KB
+[QVM] 开始执行字节码 (19 bytes)
+[QVM] 初始化 2 个量子比特
+[QVM] H(q0)
+[QVM] CNOT(q0, q1)
+[QVM] 测量 q0 -> r0 = 0
+[QVM] 测量 q1 -> r1 = 0
+[QVM] print(r0) = 0
+[QVM] print(r1) = 0
+[QVM] 程序退出
+[QVM] 执行完成: 8 周期, 4 门操作
+=== AgentC DONE Thu Jul  2 09:04:55 PM CST 2026
