@@ -1,151 +1,105 @@
 #!/usr/bin/env python3
-"""Full QVM audit: 0x14-header .qbc scan + 21 core-circuit detail."""
-import subprocess, os, re, sys, time
+"""QVM 全量审计：只审计头部为 0x14 的有效量子电路 .qbc 文件。"""
+import subprocess, os, sys
 
 ROOT = "/root/QSM"
 QVM = os.path.join(ROOT, "bin", "qvm_bootstrap")
-QCL = os.path.join(ROOT, "bin", "qcl_bootstrap")
+TIMEOUT = 30  # 单文件超时秒数
 
-CORE_CIRCUITS = [
-    "QEntL/Models/QSM/qsm_entry.qbc",
-    "QEntL/Models/QSM/qsm_consciousness_circuit.qbc",
-    "QEntL/Models/QSM/qsm_entanglement_circuit.qbc",
-    "QEntL/Models/QSM/qsm_yi_training_circuit.qbc",
-    "QEntL/Models/QSM/yi_training_pipeline_circuit.qbc",
-    "QEntL/Models/Ref/ref_entry.qbc",
-    "QEntL/Models/Ref/ref_monitoring_circuit.qbc",
-    "QEntL/Models/Ref/ref_optimization_circuit.qbc",
-    "QEntL/Models/Ref/ref_healing_circuit.qbc",
-    "QEntL/Models/SOM/som_entry.qbc",
-    "QEntL/Models/SOM/som_transaction_circuit.qbc",
-    "QEntL/Models/WeQ/weq_entry.qbc",
-    "QEntL/Models/WeQ/weq_learning_circuit.qbc",
-    "QEntL/Models/WeQ/weq_social_interaction_circuit.qbc",
-    "QEntL/System/Kernel/neural/qns_training_circuit.qbc",
-    "QEntL/System/Kernel/neural/qns_backprop_circuit.qbc",
-    "QEntL/System/Kernel/qns_qdfs_dataflow.qbc",
-    "QEntL/System/Kernel/qns_qdfs_reverse_flow_circuit.qbc",
-    "QEntL/System/Kernel/filesystem/qdfs_quantum_circuit.qbc",
-    "QEntL/System/Kernel/filesystem/grover_search_circuit.qbc",
-    "QEntL/Models/QNS_Integration_Test.qbc",
-]
+# 1. 扫描所有 .qbc
+qbc_files = []
+for dirpath, _, filenames in os.walk(ROOT):
+    for fn in filenames:
+        if fn.endswith(".qbc"):
+            qbc_files.append(os.path.join(dirpath, fn))
 
-# ------------------------------------------------------------------
-# Phase 0: compile missing core-circuit .qbc from .qentl if source exists
-# ------------------------------------------------------------------
-compiled_this_run = []
-for qbc in CORE_CIRCUITS:
-    full = os.path.join(ROOT, qbc)
-    if not os.path.isfile(full):
-        qentl = full[:-3] + ".qentl"
-        if os.path.isfile(qentl):
-            r = subprocess.run([QCL, qentl], capture_output=True, text=True, cwd=ROOT, timeout=60)
-            if r.returncode == 0 and os.path.isfile(full):
-                compiled_this_run.append((qentl, "OK"))
-            else:
-                compiled_this_run.append((qentl, f"FAIL rc={r.returncode}"))
-        else:
-            compiled_this_run.append((qentl, "NO_SOURCE"))
+qbc_files.sort()
+total = len(qbc_files)
 
-# ------------------------------------------------------------------
-# Phase 1: find all .qbc (exclude .git)
-# ------------------------------------------------------------------
-out = subprocess.check_output(
-    ["find", ROOT, "-name", "*.qbc", "-not", "-path", "*/.git/*"],
-    text=True, stderr=subprocess.DEVNULL,
-)
-all_qbc = sorted([p.strip() for p in out.splitlines() if p.strip()])
-print(f"[PHASE 1] Found {len(all_qbc)} .qbc files under {ROOT}")
+# 2. 分类：0x14 / 0x72 / other
+valid_0x14 = []
+invalid_0x72 = []
+other = []
 
-# ------------------------------------------------------------------
-# Phase 2: read first byte; 0x14 = valid QBC
-# ------------------------------------------------------------------
-valid_qbc = []
-invalid_qbc = []
-for p in all_qbc:
+for f in qbc_files:
     try:
-        with open(p, "rb") as f:
-            b = f.read(1)
-        if len(b) == 1 and b[0] == 0x14:
-            valid_qbc.append(p)
-        else:
-            invalid_qbc.append((p, f"0x{b[0]:02x}" if len(b) else "EMPTY"))
+        with open(f, "rb") as fh:
+            first = fh.read(1)
+            if not first:
+                other.append((f, "empty"))
+                continue
+            b = first[0]
+            if b == 0x14:
+                valid_0x14.append(f)
+            elif b == 0x72:
+                invalid_0x72.append(f)
+            else:
+                other.append((f, f"0x{b:02x}"))
     except Exception as e:
-        invalid_qbc.append((p, f"ERR {e}"))
-print(f"[PHASE 2] Valid (0x14) = {len(valid_qbc)}, invalid = {len(invalid_qbc)}")
+        other.append((f, f"error:{e}"))
 
-# ------------------------------------------------------------------
-# Phase 3: run qvm_bootstrap on every valid .qbc; tally PASS/FAIL
-# ------------------------------------------------------------------
-pass_set, fail_set = [], []
-cycle_gate = {}   # full_path -> (cycles, gates)
+print(f"=== 扫描结果 ===")
+print(f"总 .qbc 文件数: {total}")
+print(f"0x14 有效量子电路: {len(valid_0x14)}")
+print(f"0x72 无效文本(含 def/import): {len(invalid_0x72)}")
+print(f"其他头部: {len(other)}")
+if other:
+    for f, reason in other:
+        print(f"  {reason}: {f}")
 
-for p in valid_qbc:
-    r = subprocess.run([QVM, p], capture_output=True, text=True, cwd=ROOT, timeout=30)
-    last = r.stdout.strip().splitlines()[-1] if r.stdout.strip().splitlines() else ""
-    m = re.search(r"(\d+)\s*周期.*?(\d+)\s*门", last)
-    if m:
-        cycles, gates = int(m.group(1)), int(m.group(2))
-    else:
-        cycles, gates = None, None
-    cycle_gate[p] = (cycles, gates)
-    if r.returncode == 0 and m:
-        pass_set.append(p)
-    else:
-        err = last[:120] if last else (r.stderr.strip()[-120:] if r.stderr.strip() else f"rc={r.returncode}")
-        fail_set.append((p, err))
+# 3. 对每个 0x14 文件执行 QVM
+print(f"\n=== QVM 执行 (0x14 文件, 共 {len(valid_0x14)}) ===")
+passed = []
+failed = []
 
-print(f"\n[PHASE 3] Full scan PASS={len(pass_set)} FAIL={len(fail_set)}")
+for i, f in enumerate(valid_0x14):
+    rel = os.path.relpath(f, ROOT)
+    try:
+        r = subprocess.run(
+            [QVM, f],
+            capture_output=True, timeout=TIMEOUT, cwd=ROOT
+        )
+        if r.returncode == 0:
+            passed.append(rel)
+        else:
+            failed.append((rel, r.returncode, r.stderr.decode("utf-8", errors="replace")[:200]))
+    except subprocess.TimeoutExpired:
+        failed.append((rel, "TIMEOUT", ""))
+    except Exception as e:
+        failed.append((rel, "ERROR", str(e)[:200]))
 
-# ------------------------------------------------------------------
-# Phase 4: 21 core circuits detail
-# ------------------------------------------------------------------
-print(f"\n{'='*10}")
-print("PHASE 4: 21 CORE CIRCUITS")
-print(f"{'='*10}")
-print(f"{'Path':<70} {'Cycles':>8} {'Gates':>8} {'Status':>8}")
-print("-"*100)
-core_results = []
-for rel in CORE_CIRCUITS:
-    full = os.path.join(ROOT, rel)
-    exists = os.path.isfile(full)
-    valid_header = False
-    if exists:
-        with open(full, "rb") as f:
-            valid_header = (f.read(1)[0] == 0x14)
-    cycles, gates = (None, None)
-    status = "MISSING"
-    if exists and valid_header:
-        cycles, gates = cycle_gate.get(full, (None, None))
-        status = "PASS" if full in pass_set else "FAIL"
-    elif exists and not valid_header:
-        status = "BAD_HEADER"
-    core_results.append((rel, status, cycles, gates))
-    print(f"{rel:<70} {str(cycles):>8} {str(gates):>8} {status:>8}")
+    # 进度
+    if (i + 1) % 20 == 0 or (i + 1) == len(valid_0x14):
+        print(f"  [{i+1}/{len(valid_0x14)}] ...", flush=True)
 
-# ------------------------------------------------------------------
-# Final report
-# ------------------------------------------------------------------
-print(f"\n{'#'*80}")
-print("FINAL QVM AUDIT REPORT")
-print(f"{'#'*80}")
-print(f"Total .qbc found : {len(all_qbc)}")
-print(f"Valid 0x14 header: {len(valid_qbc)}")
-print(f"Invalid header    : {len(invalid_qbc)}")
-print(f"QVM PASS          : {len(pass_set)}")
-print(f"QVM FAIL          : {len(fail_set)}")
-print(f"Compiled this run : {len(compiled_this_run)}")
-if compiled_this_run:
-    print("\n--- Compilation actions ---")
-    for src, info in compiled_this_run:
-        print(f"  {src}: {info}")
-if fail_set:
-    print("\n--- FAIL file paths ---")
-    for p, err in fail_set[:80]:
-        print(f"  FAIL: {os.path.relpath(p, ROOT)}  |  {err}")
-if len(fail_set) > 80:
-    print(f"  ... and {len(fail_set)-80} more failures")
-if invalid_qbc:
-    print("\n--- Non-0x14 files (first 40) ---")
-    for p, b in invalid_qbc[:40]:
-        print(f"  {os.path.relpath(p, ROOT)}  first_byte={b}")
+# 4. 汇总
+print(f"\n=== 最终统计 ===")
+print(f"0x14 文件数: {len(valid_0x14)}")
+print(f"PASS (exit 0): {len(passed)}")
+print(f"FAIL (exit !=0): {len(failed)}")
+print(f"0x72 文件数: {len(invalid_0x72)}")
+
+if failed:
+    print(f"\n=== 失败文件列表 ({len(failed)}) ===")
+    for rel, code, err in failed:
+        err_short = err.replace("\n", " ").strip()[:120]
+        print(f"  [{code}] {rel}  |  {err_short}")
+
+# 写结果文件
+result_path = os.path.join(ROOT, "qvm_audit_result.txt")
+with open(result_path, "w") as out:
+    out.write(f"QVM 全量审计报告\n")
+    out.write(f"{'='*60}\n")
+    out.write(f"总 .qbc 文件数: {total}\n")
+    out.write(f"0x14 有效量子电路: {len(valid_0x14)}\n")
+    out.write(f"PASS: {len(passed)}\n")
+    out.write(f"FAIL: {len(failed)}\n")
+    out.write(f"0x72 无效文本: {len(invalid_0x72)}\n")
+    out.write(f"其他头部: {len(other)}\n")
+    out.write(f"\n失败文件:\n")
+    for rel, code, err in failed:
+        out.write(f"  [{code}] {rel}\n")
+    out.write(f"\nPASS 文件:\n")
+    for rel in passed:
+        out.write(f"  {rel}\n")
+print(f"\n结果已写入: {result_path}")

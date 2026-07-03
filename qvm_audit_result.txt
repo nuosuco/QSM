@@ -1,0 +1,86 @@
+QVM 全量审计报告
+============================================================
+总 .qbc 文件数: 327
+0x14 有效量子电路: 74
+PASS: 74
+FAIL: 0
+0x72 无效文本: 232
+其他头部: 21
+
+失败文件:
+
+PASS 文件:
+  QCL引导器.qbc
+  QCL模块/qcl_bootstrap_phase2_qcircuit.qbc
+  QCL模块/qcl_compiler_phase2.qbc
+  QEntL/Models/Models_QNS_Integration_Test.qbc
+  QEntL/Models/QSM/qsm_consciousness_circuit.qbc
+  QEntL/Models/QSM/qsm_entanglement_circuit.qbc
+  QEntL/Models/QSM/qsm_entry.qbc
+  QEntL/Models/QSM/qsm_yi_training_circuit.qbc
+  QEntL/Models/QSM/yi_training_pipeline_circuit.qbc
+  QEntL/Models/Ref/ref_entry.qbc
+  QEntL/Models/Ref/ref_healing_circuit.qbc
+  QEntL/Models/Ref/ref_monitoring_circuit.qbc
+  QEntL/Models/Ref/ref_optimization_circuit.qbc
+  QEntL/Models/SOM/som_entry.qbc
+  QEntL/Models/SOM/som_transaction_circuit.qbc
+  QEntL/Models/WeQ/weq_entry.qbc
+  QEntL/Models/WeQ/weq_learning_circuit.qbc
+  QEntL/Models/WeQ/weq_social_interaction_circuit.qbc
+  QEntL/System/Kernel/filesystem/grover_search_circuit.qbc
+  QEntL/System/Kernel/filesystem/qdfs_quantum_circuit.qbc
+  QEntL/System/Kernel/neural/qns_backprop_circuit.qbc
+  QEntL/System/Kernel/neural/qns_training_circuit.qbc
+  QEntL/System/Kernel/qns_qdfs_dataflow.qbc
+  QEntL/System/Kernel/qns_qdfs_reverse_flow_circuit.qbc
+  QVM.qbc
+  cnot_test.qbc
+  docs/examples/all_gates.qbc
+  docs/examples/bb84_protocol.qbc
+  docs/examples/bell.qbc
+  docs/examples/compiler_selftest.qbc
+  docs/examples/comprehensive.qbc
+  docs/examples/deutsch_jozsa.qbc
+  docs/examples/ghz.qbc
+  docs/examples/grover_search.qbc
+  docs/examples/hello.qbc
+  docs/examples/qft_3qubit.qbc
+  docs/examples/quantum_walk.qbc
+  docs/examples/random_number.qbc
+  docs/examples/superposition.qbc
+  docs/examples/teleportation.qbc
+  test/bell_state.qbc
+  test/bell_test.qbc
+  test/bell_verify.qbc
+  test/cnot_boundary.qbc
+  test/cnot_chain.qbc
+  test/cnot_check.qbc
+  test/cnot_cron.qbc
+  test/cnot_cron_verify.qbc
+  test/cnot_final.qbc
+  test/cnot_test.qbc
+  test/cnot_verify.qbc
+  test/cnot_verify_cron.qbc
+  test/cnot_verify_live.qbc
+  test/cnot_verify_only.qbc
+  test/deploy_3choice_test.qbc
+  test/ghz_state.qbc
+  test/multi_test.qbc
+  test/qentl_test.qbc
+  test/quantum_memory.qbc
+  test/qvm_basic.qbc
+  test/qvm_cnot.qbc
+  test/qvm_comprehensive.qbc
+  test/qvm_test.qbc
+  test/qvm_verify.qbc
+  test/qvm_verify_full.qbc
+  test/single_qubit_gates.qbc
+  test/swap_gate.qbc
+  test/verify_full_pipeline.qbc
+  test_output/cnot_boundary_test.qbc
+  test_output/cnot_boundary_verify.qbc
+  test_output/cnot_verify_test.qbc
+  test_programs/test_phase2_full.qbc
+  tests/test_compiler.qbc
+  tests/test_extended.qbc
