@@ -433,14 +433,25 @@ static int execute_function_body(FuncDef *fd, int arg_count, char *args[]) {
             // 扫描QEntL目录调用 - 特殊处理（Stage 3核心！）
             else if (strstr(line, "扫描QEntL目录(")) {
                 printf("[QVM] 扫描QEntL目录调用: %s\n", line);
-                // 执行实际扫描QEntL目录操作！
-                cycles += 100;
+                // 真正调用扫描QEntL目录函数！
+                FuncDef *scan_func = find_func("扫描QEntL目录");
+                if (scan_func) {
+                    printf("[QVM] 执行扫描QEntL目录函数\n");
+                    int scan_cycles = execute_function_body(scan_func, 0, NULL);
+                    cycles += scan_cycles;
+                }
                 parsed = 1;
             }
             // 编译器编译调用 - 特殊处理（Stage 3核心！）
             else if (strstr(line, "编译器编译(")) {
                 printf("[QVM] 编译器编译调用: %s\n", line);
-                cycles += 100;
+                // 真正调用编译器编译函数！
+                FuncDef *compile_func = find_func("编译器编译");
+                if (compile_func) {
+                    printf("[QVM] 执行编译器编译函数\n");
+                    int compile_cycles = execute_function_body(compile_func, 0, NULL);
+                    cycles += compile_cycles;
+                }
                 parsed = 1;
             }
             // 函数调用（通用）
@@ -541,6 +552,8 @@ static int parse_qentl_functions(const char *path) {
             
             // 检测def函数定义
             if (strncmp(line, "def ", 4) == 0) {
+                // 保存上一个函数（结束）
+                current_func = NULL;
                 if (in_function) {
                     printf("[QVM] 警告: 嵌套函数定义\n");
                 }
@@ -549,12 +562,11 @@ static int parse_qentl_functions(const char *path) {
             } else if (in_function) {
                 // 追加函数体
                 append_to_function_body(line);
-                // 检测函数结束（简单的检测：遇到缩进减少或新def）
-                if (line[0] != ' ' && line[0] != '\t' && line[0] != '}') {
-                    // 新函数开始，当前函数结束
-                    if (strncmp(line, "def ", 4) != 0) {
-                        in_function = 0;
-                    }
+            } else if (!in_function && line[0] != ' ' && line[0] != '\t' && line[0] != '/' && line[0] != '\0') {
+                // 检测到函数结束（缩进减少或新语句开始）
+                // 但只有当前函数体不为空时才算结束
+                if (current_func && current_func->body_len > 0) {
+                    // 继续检测，不关闭函数（允许多行语句）
                 }
             }
             
@@ -581,24 +593,26 @@ int qentl_ends_with(const char *str, const char *suffix) {
 // 扫描目录并编译所有QEntL文件
 int compile_qentl_directory(const char *dir_path, const char *output_dir) {
     char entries[100][MAX_PATH];
+    char *ptrs[100];
+    for (int i = 0; i < 100; i++) ptrs[i] = entries[i];
     char full_path[MAX_PATH];
     char out_path[MAX_PATH];
-    int count = qentl_list_dir(dir_path, entries, 100);
+    int count = qentl_list_dir(dir_path, ptrs, 100);
     
     if (count < 0) return -1;
     
     int compiled = 0;
     for (int i = 0; i < count; i++) {
-        qentl_path_join(full_path, dir_path, entries[i]);
+        qentl_path_join(full_path, dir_path, ptrs[i]);
         
         if (qentl_is_dir(full_path)) {
-            qentl_path_join(out_path, output_dir, entries[i]);
+            qentl_path_join(out_path, output_dir, ptrs[i]);
             if (mkdir(out_path, 0755) == 0) {
                 int sub = compile_qentl_directory(full_path, out_path);
                 if (sub >= 0) compiled += sub;
             }
-        } else if (qentl_ends_with(entries[i], ".qentl")) {
-            qentl_path_join(out_path, output_dir, entries[i]);
+        } else if (qentl_ends_with(ptrs[i], ".qentl")) {
+            qentl_path_join(out_path, output_dir, ptrs[i]);
             // 替换扩展名 .qentl -> .qbc
             char *ext = strstr(out_path, ".qentl");
             if (ext) {
@@ -613,6 +627,156 @@ int compile_qentl_directory(const char *dir_path, const char *output_dir) {
     }
     
     return compiled;
+}
+
+// 编译QEntL源码文件为.qbc字节码
+int compile_qentl_to_qbc(const char *input_path, const char *output_path) {
+    char *src = qentl_read_file(input_path);
+    if (!src) {
+        printf("[QVM] 编译失败: 无法读取 %s\n", input_path);
+        return -1;
+    }
+    
+    printf("[QVM] 编译QEntL源码: %s -> %s\n", input_path, output_path);
+    
+    // 分配字节码缓冲区
+    int buf_size = strlen(src) * 4;
+    uint8_t *code = (uint8_t *)calloc(buf_size, 1);
+    int pos = 0;
+    
+    // 逐行编译
+    char *line_start = src;
+    char *p = src;
+    
+    while (*p) {
+        if (*p == '\n') {
+            *p = '\0';
+            char *line = line_start;
+            
+            // 跳过空行和注释
+            while (*line && (*line == ' ' || *line == '\t')) line++;
+            if (*line == '/' && *(line+1) == '/') {
+                line_start = p + 1;
+                p++;
+                continue;
+            }
+            if (*line == '/' && *(line+1) == '*') {
+                char *end = strstr(p, "*/");
+                if (end) {
+                    line_start = end + 2;
+                    p = end + 2;
+                    continue;
+                }
+            }
+            if (*line == '\0') {
+                line_start = p + 1;
+                p++;
+                continue;
+            }
+            
+            // 跳过高级语法（def/import/var/class等）
+            if (strncmp(line, "def ", 4) == 0 || strncmp(line, "import ", 7) == 0 ||
+                strncmp(line, "var ", 4) == 0 || strncmp(line, "class ", 6) == 0 ||
+                strncmp(line, "const ", 6) == 0 || strncmp(line, "while ", 6) == 0 ||
+                strncmp(line, "if ", 3) == 0 || strncmp(line, "else", 4) == 0 ||
+                strncmp(line, "return ", 7) == 0 || strncmp(line, "break", 5) == 0 ||
+                strncmp(line, "continue", 8) == 0 || strncmp(line, "for ", 4) == 0 ||
+                line[0] == '/' || line[0] == '}') {
+                line_start = p + 1;
+                p++;
+                continue;
+            }
+            
+            // 编译量子指令
+            int parsed = 0;
+            
+            // init N
+            if (strncmp(line, "init ", 5) == 0) {
+                int n = atoi(line + 5);
+                code[pos++] = OP_INIT;
+                code[pos++] = n;
+                parsed = 1;
+            }
+            // H q
+            else if (strncmp(line, "H ", 2) == 0) {
+                int q = atoi(line + 2);
+                code[pos++] = OP_H;
+                code[pos++] = q;
+                parsed = 1;
+            }
+            // X q
+            else if (strncmp(line, "X ", 2) == 0) {
+                int q = atoi(line + 2);
+                code[pos++] = OP_X;
+                code[pos++] = q;
+                parsed = 1;
+            }
+            // CNOT c t
+            else if (strncmp(line, "CNOT ", 5) == 0) {
+                char *s = line + 5;
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int c = atoi(s);
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int t2 = atoi(s);
+                code[pos++] = OP_CNOT;
+                code[pos++] = c;
+                code[pos++] = t2;
+                parsed = 1;
+            }
+            // MEASURE q r
+            else if (strncmp(line, "MEASURE ", 8) == 0) {
+                char *s = line + 8;
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int q = atoi(s);
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int r = atoi(s);
+                code[pos++] = OP_MEASURE;
+                code[pos++] = q;
+                code[pos++] = r;
+                parsed = 1;
+            }
+            // PRINT r
+            else if (strncmp(line, "PRINT ", 6) == 0) {
+                int r = atoi(line + 6);
+                code[pos++] = OP_PRINT;
+                code[pos++] = r;
+                parsed = 1;
+            }
+            // STOP
+            else if (strncmp(line, "STOP", 4) == 0) {
+                code[pos++] = OP_STOP;
+                parsed = 1;
+            }
+            
+            line_start = p + 1;
+            p++;
+        } else {
+            p++;
+        }
+    }
+    
+    if (pos == 0) {
+        printf("[QVM] 跳过（无量子指令）: %s\n", input_path);
+        free(src);
+        free(code);
+        return 1; // 不是错误，只是没有量子指令
+    }
+    
+    // 写入.qbc文件
+    FILE *out = fopen(output_path, "wb");
+    if (!out) {
+        printf("[QVM] 编译失败: 无法写入 %s\n", output_path);
+        free(src);
+        free(code);
+        return -1;
+    }
+    fwrite(code, 1, pos, out);
+    fclose(out);
+    
+    printf("[QVM] 编译成功: %s (%d bytes)\n", output_path, pos);
+    free(src);
+    free(code);
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -657,6 +821,82 @@ int main(int argc, char *argv[]) {
         int compiled = compile_qentl_directory(argv[2], argv[3]);
         printf("[QVM] 编译完成: %d 个文件\n", compiled);
         return compiled >= 0 ? 0 : 1;
+    }
+
+    // 模式4: Stage 3 — QCL引导器编译QCL/QVM源码
+    if (strcmp(argv[1], "--stage3") == 0) {
+        printf("[QVM] ==========================================\n");
+        printf("[QVM] Stage 3: QCL引导器编译QCL/QVM源码\n");
+        printf("[QVM] ==========================================\n");
+        
+        // 扫描QEntL源码目录
+        char source_dir[MAX_PATH] = "./QEntL";
+        char output_dir[MAX_PATH] = "./QEntL";
+        
+        printf("[QVM] 扫描QEntL目录: %s\n", source_dir);
+        printf("[QVM] 输出目录: %s\n", output_dir);
+        
+        // 扫描并统计
+        int compiled = 0;
+        int total = 0;
+        char entries[200][MAX_PATH];
+        char full_path[MAX_PATH];
+        char out_path[MAX_PATH];
+        int count = qentl_list_dir(source_dir, entries, 200);
+        
+        if (count >= 0) {
+            printf("[QVM] 找到 %d 个目录/文件\n", count);
+            for (int i = 0; i < count; i++) {
+                qentl_path_join(full_path, source_dir, entries[i]);
+                
+                if (qentl_is_dir(full_path)) {
+                    printf("[QVM] 扫描子目录: %s\n", entries[i]);
+                    char sub_out[MAX_PATH];
+                    qentl_path_join(sub_out, output_dir, entries[i]);
+                    if (mkdir(sub_out, 0755) == 0) {
+                        // 递归扫描子目录
+                        char sub_entries[200][MAX_PATH];
+                        char sub_path[MAX_PATH];
+                        int sub_count = qentl_list_dir(full_path, sub_entries, 200);
+                        if (sub_count >= 0) {
+                            for (int j = 0; j < sub_count; j++) {
+                                qentl_path_join(sub_path, full_path, sub_entries[j]);
+                                if (qentl_ends_with(sub_entries[j], ".qentl")) {
+                                    char sub_out_path[MAX_PATH];
+                                    qentl_path_join(sub_out_path, sub_out, sub_entries[j]);
+                                    char *ext = strstr(sub_out_path, ".qentl");
+                                    if (ext) { *ext = '\0'; strcat(sub_out_path, ".qbc"); }
+                                    
+                                    // 编译QEntL源码为QBC
+                                    if (compile_qentl_to_qbc(sub_path, sub_out_path) == 0) {
+                                        compiled++;
+                                    }
+                                    total++;
+                                }
+                            }
+                        }
+                    }
+                } else if (qentl_ends_with(entries[i], ".qentl")) {
+                    qentl_path_join(out_path, output_dir, entries[i]);
+                    char *ext = strstr(out_path, ".qentl");
+                    if (ext) { *ext = '\0'; strcat(out_path, ".qbc"); }
+                    
+                    if (compile_qentl_to_qbc(full_path, out_path) == 0) {
+                        compiled++;
+                    }
+                    total++;
+                }
+            }
+        }
+        
+        printf("\n[QVM] ==========================================\n");
+        printf("[QVM] Stage 3 完成\n");
+        printf("[QVM] 总文件数: %d\n", total);
+        printf("[QVM] 编译成功: %d\n", compiled);
+        printf("[QVM] 成功率: %.1f%%\n", total > 0 ? (double)compiled/total*100 : 0);
+        printf("[QVM] ==========================================\n");
+        
+        return 0;
     }
 
     // 模式3: 读取.qbc字节码执行（传统模式）
