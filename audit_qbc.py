@@ -1,121 +1,74 @@
 #!/usr/bin/env python3
-"""QVM Audit: classify all .qbc files, execute valid (0x14) circuits through qvm_bootstrap, count PASS/FAIL."""
-import os
-import subprocess
-from collections import defaultdict
+"""QSM QBC Audit: run bin/qvm_bootstrap on every 0x14 .qbc, report per-component stats."""
+import os, subprocess
 
 ROOT = "/root/QSM"
-QVM = os.path.join(ROOT, "bin", "qvm_bootstrap")
+QVM = f"{ROOT}/bin/qvm_bootstrap"
+TIMEOUT = 15
 
-def classify(rel):
-    """Return model category from relative path (no leading slash)."""
-    if rel.startswith("QEntL/System/Kernel/neural/") or rel.startswith("QEntL/System/Kernel/qns_qdfs"):
-        return "QNS"
-    if rel.startswith("QEntL/System/Kernel/filesystem/"):
-        return "QDFS"
-    if rel.startswith("QEntL/Models/QSM/"):
-        return "QSM"
-    if rel.startswith("QEntL/Models/Ref/"):
-        return "Ref"
-    if rel.startswith("QEntL/Models/SOM/"):
-        return "SOM"
-    if rel.startswith("QEntL/Models/WeQ/"):
-        return "WeQ"
-    if rel.startswith("QEntL/System/Compiler/"):
-        return "Compiler"
-    return "Other"
+COMPONENTS = [
+    ("QNS (neural)",       ["QEntL/System/Kernel/neural"]),
+    ("QDFS (filesystem)",  ["QEntL/System/Kernel/filesystem"]),
+    ("Models (四大模型)",   ["QEntL/Models"]),
+    ("QCL Compiler",       ["QEntL/System/Compiler"]),
+    ("VM",                 ["QEntL/System/VM"]),
+    ("Platform",           ["QEntL/System/Platform"]),
+    ("QPU 部署",           ["QEntL/System/VM/src/deployment"]),
+    ("QCL 模块",           ["QCL模块"]),
+    ("docs examples",      ["docs"]),
+]
 
-# Walk repo
-qbc_files = []
-for dirpath, dirnames, filenames in os.walk(ROOT):
-    # exclude .git
-    dirnames[:] = [d for d in dirnames if d != ".git"]
-    for fn in filenames:
-        if fn.endswith(".qbc"):
-            full = os.path.join(dirpath, fn)
-            qbc_files.append(full)
+def find_0x14(roots):
+    seen = set()
+    for base in roots:
+        for dp, _, fns in os.walk(os.path.join(ROOT, base)):
+            for f in fns:
+                if not f.endswith(".qbc"):
+                    continue
+                p = os.path.join(dp, f)
+                rel = os.path.relpath(p, ROOT)
+                if rel in seen:
+                    continue
+                seen.add(rel)
+                try:
+                    if open(p, "rb").read(1) == b"\x14":
+                        yield rel
+                except Exception:
+                    pass
 
-total = len(qbc_files)
-first_byte_counts = defaultdict(int)   # hex -> count
-valid_0x14 = 0
-invalid_0x72 = 0
-other_first = 0
-
-files_to_run = []  # list of (abs_path, rel_path, category)
-
-for fp in qbc_files:
-    rel = os.path.relpath(fp, ROOT)
+def run(rel):
     try:
-        with open(fp, "rb") as fh:
-            b0 = fh.read(1)
-            if len(b0) == 0:
-                first_byte_counts["0x00(empty)"] += 1
-                other_first += 1
-                continue
-            hb = f"0x{b0[0]:02x}"
-            first_byte_counts[hb] += 1
-            if b0[0] == 0x14:
-                valid_0x14 += 1
-                cat = classify(rel)
-                files_to_run.append((fp, rel, cat))
-            elif b0[0] == 0x72:
-                invalid_0x72 += 1
-            else:
-                other_first += 1
-    except Exception as e:
-        first_byte_counts["ERROR"] += 1
-        other_first += 1
-
-print(f"=== QBC WALK ===")
-print(f"Total .qbc files : {total}")
-print(f"Valid  0x14      : {valid_0x14}")
-print(f"Invalid 0x72     : {invalid_0x72}")
-print(f"Other first byte : {other_first}")
-print(f"First-byte distribution: {dict(first_byte_counts)}")
-print()
-
-# QVM execution
-passes = defaultdict(int)
-fails  = defaultdict(int)
-fail_files = []
-
-for fp, rel, cat in files_to_run:
-    try:
-        r = subprocess.run([QVM, fp], capture_output=True, timeout=30)
-        if r.returncode == 0:
-            passes[cat] += 1
-        else:
-            fails[cat] += 1
-            fail_files.append(rel)
+        r = subprocess.run([QVM, os.path.join(ROOT, rel)], capture_output=True, text=True, timeout=TIMEOUT)
+        out = (r.stderr or r.stdout).lower()
+        sf = any(s in out for s in ("segmentation fault", "segfault", "core dumped"))
+        return r.returncode == 0 and not sf, sf
     except subprocess.TimeoutExpired:
-        fails[cat] += 1
-        fail_files.append(rel)
-    except Exception as e:
-        fails[cat] += 1
-        fail_files.append(rel)
+        return False, False
+    except Exception:
+        return False, False
 
-total_pass = sum(passes.values())
-total_fail = sum(fails.values())
+def main():
+    print(f"{'='*72}\nQSM QBC Audit — bin/qvm_bootstrap\n{'='*72}")
+    grand = {"pass": 0, "fail": 0, "sf": 0}
+    for label, roots in COMPONENTS:
+        circuits = list(find_0x14(roots))
+        n = len(circuits)
+        if n == 0:
+            print(f"\n[{label}]  — no valid 0x14 .qbc")
+            continue
+        print(f"\n[{label}]  — {n} circuits")
+        p = s = f = 0
+        for rel in circuits:
+            ok, sf = run(rel)
+            if sf:
+                s += 1; f += 1
+            elif ok:
+                p += 1
+            else:
+                f += 1
+        print(f"  PASS={p}  FAIL={f}  SEGFaults={s}")
+        grand["pass"] += p; grand["fail"] += f; grand["sf"] += s
+    print(f"\n{'='*72}\nTOTAL: PASS={grand['pass']}  FAIL={grand['fail']}  SEGFaults={grand['sf']}")
 
-print(f"=== QVM AUDIT (0x14 files) ===")
-print(f"PASS : {total_pass}")
-print(f"FAIL : {total_fail}")
-print(f"EXECUTED : {total_pass + total_fail}")
-print()
-print("=== By model category ===")
-print(f"{'Category':<12}{'PASS':>8}{'FAIL':>8}{'TOTAL':>8}")
-print("-"*36)
-categories = ["QNS", "QDFS", "QSM", "Ref", "SOM", "WeQ", "Compiler", "Other"]
-for cat in categories:
-    p = passes[cat]
-    f = fails[cat]
-    t = p + f
-    if t > 0:
-        print(f"{cat:<12}{p:>8}{f:>8}{t:>8}")
-print("-"*36)
-print(f"{'TOTAL':<12}{total_pass:>8}{total_fail:>8}{total_pass+total_fail:>8}")
-
-if fail_files:
-    print(f"\n=== FAIL FILES ({len(fail_files)}) ===")
-    for f in fail_files:
-        print(f"  - {f}")
+if __name__ == "__main__":
+    main()

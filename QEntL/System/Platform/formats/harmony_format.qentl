@@ -3,6 +3,7 @@
 
 import "QEntL/System/Platform/platform_types.qentl"
 import "QEntL/System/Platform/formats/elf_format.qentl"
+import "QEntL/System/Deployment/development_mode.qentl";
 
 def create_harmony_binary(code, metadata):
     """创建鸿蒙平台二进制文件"""
