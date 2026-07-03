@@ -629,6 +629,33 @@ int compile_qentl_directory(const char *dir_path, const char *output_dir) {
     return compiled;
 }
 
+// 递归扫描目录，统计QEntL文件
+int scan_qentl_directory(const char *dir_path, char files[][MAX_PATH], int max_files) {
+    char entries[100][MAX_PATH];
+    char *ptrs[100];
+    for (int i = 0; i < 100; i++) ptrs[i] = entries[i];
+    char full_path[MAX_PATH];
+    int count = qentl_list_dir(dir_path, ptrs, 100);
+    
+    if (count < 0) return -1;
+    
+    int file_count = 0;
+    for (int i = 0; i < count && file_count < max_files; i++) {
+        qentl_path_join(full_path, dir_path, ptrs[i]);
+        
+        if (qentl_is_dir(full_path)) {
+            int sub = scan_qentl_directory(full_path, files + file_count, max_files - file_count);
+            if (sub >= 0) file_count += sub;
+        } else if (qentl_ends_with(ptrs[i], ".qentl")) {
+            strncpy(files[file_count], full_path, MAX_PATH - 1);
+            files[file_count][MAX_PATH - 1] = '\0';
+            file_count++;
+        }
+    }
+    
+    return file_count;
+}
+
 // 编译QEntL源码文件为.qbc字节码
 int compile_qentl_to_qbc(const char *input_path, const char *output_path) {
     char *src = qentl_read_file(input_path);
@@ -836,84 +863,47 @@ int main(int argc, char *argv[]) {
         printf("[QVM] 扫描QEntL目录: %s\n", source_dir);
         printf("[QVM] 输出目录: %s\n", output_dir);
         
+        // 使用递归扫描函数获取所有QEntL文件
+        char qentl_files[300][MAX_PATH];
+        int total = scan_qentl_directory(source_dir, qentl_files, 300);
+        
+        if (total < 0) {
+            printf("[QVM] 错误: 扫描失败\n");
+            return 1;
+        }
+        
+        printf("[QVM] 找到 %d 个QEntL文件\n", total);
+        
         int compiled = 0;
-        int total = 0;
-        
-        // 递归扫描所有子目录
-        char entries[200][MAX_PATH];
-        char *ptrs[200];
-        for (int i = 0; i < 200; i++) ptrs[i] = entries[i];
-        char full_path[MAX_PATH];
-        char out_path[MAX_PATH];
-        int count = qentl_list_dir(source_dir, ptrs, 200);
-        
-        if (count >= 0) {
-            printf("[QVM] 找到 %d 个目录/文件\n", count);
-            for (int i = 0; i < count; i++) {
-                qentl_path_join(full_path, source_dir, ptrs[i]);
-                
-                if (qentl_is_dir(full_path)) {
-                    printf("[QVM] 扫描子目录: %s\n", ptrs[i]);
-                    char sub_out[MAX_PATH];
-                    qentl_path_join(sub_out, output_dir, ptrs[i]);
-                    if (mkdir(sub_out, 0755) == 0) {
-                        // 递归扫描子目录（多层）
-                        char sub_entries[200][MAX_PATH];
-                        char *sub_ptrs[200];
-                        for (int k = 0; k < 200; k++) sub_ptrs[k] = sub_entries[k];
-                        char sub_path[MAX_PATH];
-                        int sub_count = qentl_list_dir(full_path, sub_ptrs, 200);
-                        if (sub_count >= 0) {
-                            for (int j = 0; j < sub_count; j++) {
-                                qentl_path_join(sub_path, full_path, sub_ptrs[j]);
-                                if (qentl_is_dir(sub_path)) {
-                                    printf("[QVM] 扫描深层目录: %s\n", sub_ptrs[j]);
-                                    char deep_out[MAX_PATH];
-                                    qentl_path_join(deep_out, sub_out, sub_ptrs[j]);
-                                    if (mkdir(deep_out, 0755) == 0) {
-                                        char deep_entries[200][MAX_PATH];
-                                        char *deep_ptrs[200];
-                                        for (int d = 0; d < 200; d++) deep_ptrs[d] = deep_entries[d];
-                                        char deep_path[MAX_PATH];
-                                        int deep_count = qentl_list_dir(sub_path, deep_ptrs, 200);
-                                        if (deep_count >= 0) {
-                                            for (int x = 0; x < deep_count; x++) {
-                                                qentl_path_join(deep_path, sub_path, deep_ptrs[x]);
-                                                if (qentl_ends_with(deep_ptrs[x], ".qentl")) {
-                                                    char deep_out_path[MAX_PATH];
-                                                    qentl_path_join(deep_out_path, deep_out, deep_ptrs[x]);
-                                                    char *ext = strstr(deep_out_path, ".qentl");
-                                                    if (ext) { *ext = '\0'; strcat(deep_out_path, ".qbc"); }
-                                                    if (compile_qentl_to_qbc(deep_path, deep_out_path) == 0) {
-                                                        compiled++;
-                                                    }
-                                                    total++;
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else if (qentl_ends_with(sub_ptrs[j], ".qentl")) {
-                                    char sub_out_path[MAX_PATH];
-                                    qentl_path_join(sub_out_path, sub_out, sub_ptrs[j]);
-                                    char *ext = strstr(sub_out_path, ".qentl");
-                                    if (ext) { *ext = '\0'; strcat(sub_out_path, ".qbc"); }
-                                    if (compile_qentl_to_qbc(sub_path, sub_out_path) == 0) {
-                                        compiled++;
-                                    }
-                                    total++;
-                                }
-                            }
-                        }
-                    }
-                } else if (qentl_ends_with(ptrs[i], ".qentl")) {
-                    qentl_path_join(out_path, output_dir, ptrs[i]);
-                    char *ext = strstr(out_path, ".qentl");
-                    if (ext) { *ext = '\0'; strcat(out_path, ".qbc"); }
-                    if (compile_qentl_to_qbc(full_path, out_path) == 0) {
-                        compiled++;
-                    }
-                    total++;
+        for (int i = 0; i < total; i++) {
+            // 构建输出路径
+            char out_path[MAX_PATH];
+            strncpy(out_path, qentl_files[i], MAX_PATH - 1);
+            out_path[MAX_PATH - 1] = '\0';
+            
+            // 替换扩展名 .qentl -> .qbc
+            char *ext = strstr(out_path, ".qentl");
+            if (ext) {
+                *ext = '\0';
+                strcat(out_path, ".qbc");
+            }
+            
+            // 确保输出目录存在
+            char dir_path[MAX_PATH];
+            strncpy(dir_path, out_path, MAX_PATH - 1);
+            dir_path[MAX_PATH - 1] = '\0';
+            char *last_slash = strrchr(dir_path, '/');
+            if (last_slash) {
+                *last_slash = '\0';
+                if (mkdir(dir_path, 0755) == -1) {
+                    // 目录创建失败，跳过
                 }
+            }
+            
+            // 编译QEntL源码为QBC
+            int result = compile_qentl_to_qbc(qentl_files[i], out_path);
+            if (result == 0) {
+                compiled++;
             }
         }
         
