@@ -24,6 +24,8 @@ import "QEntL/compiler/src/backend/bytecode/optimizer/bytecode_optimizer.qentl";
 import "QEntL/compiler/src/backend/linker/linker.qentl";
 import "QEntL/compiler/src/utils/source_file_manager.qentl";
 import "QEntL/compiler/src/diagnostic/error_reporter.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @enum CompilationMode

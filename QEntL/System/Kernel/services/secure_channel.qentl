@@ -13,6 +13,8 @@ import "../utils/crypto.qentl";
 import "../utils/quantum_key_distribution.qentl";
 import "./error_service.qentl";
 import "./quantum_network.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 通道类型

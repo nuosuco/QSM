@@ -15,6 +15,8 @@ import "QEntL/core/path.qentl";
 import "QEntL/core/system.qentl";
 import "QEntL/compiler/frontend/parser/dependency_extractor.qentl";
 import "QEntL/vm/src/core/os_interface/file_system.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @class FileInfo

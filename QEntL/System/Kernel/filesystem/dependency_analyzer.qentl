@@ -7,6 +7,8 @@
 
 import { 记录日志 } from "../utils/logger.qentl";
 import { 读取文件, 文件存在 } from "./file_operations.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 依赖分析器配置

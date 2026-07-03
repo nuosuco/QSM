@@ -1,3 +1,5 @@
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 // QSM量子纠缠模块 - 实质量子电路
 // 模拟贝尔态创建→GHZ纠缠→纠缠交换的完整流程
 // 30量子比特: q0-q5贝尔对 / q6-q11 GHZ态 / q12-q17 图态 / q18-q23 纠缠交换 / q24-q29 测量

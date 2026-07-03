@@ -17,6 +17,8 @@ quantum_program IOScheduler {
     // 导入依赖模块
     import DeviceFramework from "./device_framework.qentl";
     import DeviceRegistry from "./device_registry.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
     // I/O请求状态常量
     constexpr io_request_states = {

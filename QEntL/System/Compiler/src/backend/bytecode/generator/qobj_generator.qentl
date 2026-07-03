@@ -12,6 +12,8 @@ import "QEntL/core/map.qentl";
 import "QEntL/core/error.qentl";
 import "QEntL/compiler/backend/ir/ir_module.qentl";
 import "QEntL/compiler/backend/bytecode/generator/optimizer.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @class QObjHeader

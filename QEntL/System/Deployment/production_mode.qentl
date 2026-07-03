@@ -1,0 +1,20 @@
+// 量子逻辑三种部署 - 生产模式
+import "QEntL/System/Kernel/qvm.qentl"
+import "QEntL/System/Platform/platform_types.qentl"
+import "QEntL/System/Platform/formats/pe_format.qentl"
+import "QEntL/System/Platform/formats/macho_format.qentl"
+import "QEntL/System/Platform/formats/elf_format.qentl"
+import "QEntL/System/Platform/formats/harmony_format.qentl"
+
+def production_mode():
+    config = {
+        'mode': 'production',
+        'platforms': ['windows', 'macos', 'ios', 'android', 'harmony', 'linux'],
+        'hot_reload': false,
+        'debug': false,
+        'optimization': 3,
+        'trace': false
+    }
+    return config
+
+export production_mode

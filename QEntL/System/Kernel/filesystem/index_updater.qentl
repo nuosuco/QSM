@@ -6,6 +6,8 @@
 
 import { MultidimensionalIndex } from "./multidimensional_index.qentl";
 import { DistributedIndex } from "./distributed_index.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 quantum_module IndexUpdater {
     // 模块元数据

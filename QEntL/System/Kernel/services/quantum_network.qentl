@@ -13,6 +13,8 @@ import "../utils/quantum_entanglement.qentl";
 import "../utils/crypto.qentl";
 import "./error_service.qentl";
 import "./resource_service.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 网络节点类型

@@ -12,6 +12,8 @@ import { Logger, LogLevel } from "../../src/core/os_interface/logger.qentl";
 import { FileSystem } from "../../src/core/os_interface/file_system.qentl";
 import { Console } from "../../src/core/os_interface/console.qentl";
 import { Process } from "../../src/core/os_interface/process.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 量子状态可视化模式
 enum VisualizationMode {

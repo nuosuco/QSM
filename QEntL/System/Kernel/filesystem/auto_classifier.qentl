@@ -8,6 +8,8 @@ import "../utils/file_analyzer.qentl";
 import "../semantic/content_extractor.qentl";
 import "../database/category_db.qentl";
 import "../utils/logger.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 配置
 config ClassifierConfig {

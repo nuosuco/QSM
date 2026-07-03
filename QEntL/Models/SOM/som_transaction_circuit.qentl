@@ -1,3 +1,5 @@
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 // SOM平权经济模型 - 交易模块实质量子电路
 // 模拟量子交易: 发起→量子叠加确认→执行→账本记录
 // 30量子比特: q0-q5发送方 / q6-q11接收方 / q12-q17交易叠加 / q18-q23账本 / q24-q29测量

@@ -13,6 +13,8 @@ import "QEntL/compiler/frontend/parser/ast.qentl";
 import "QEntL/compiler/frontend/semantic/semantic_analyzer.qentl";
 import "QEntL/compiler/src/backend/ir/ir_node.qentl";
 import "QEntL/compiler/src/backend/ir/ir_module.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @class IRGenerator

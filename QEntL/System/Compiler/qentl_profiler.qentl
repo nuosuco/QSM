@@ -27,6 +27,8 @@ import "QEntL/compiler/src/frontend/lexer/lexer.qentl";
 import "QEntL/compiler/src/frontend/parser/parser.qentl";
 import "QEntL/compiler/src/backend/bytecode/bytecode_generator.qentl";
 import "QEntL/compiler/src/backend/ir/ir_generator.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // ==================== 性能指标类型 ====================
 

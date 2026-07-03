@@ -13,6 +13,8 @@ import "QEntL/core/set.qentl";
 import "QEntL/core/queue.qentl";
 import "QEntL/vm/src/core/os_interface/process.qentl";
 import "QEntL/compiler/src/backend/build/incremental_builder.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @enum BuildTaskState

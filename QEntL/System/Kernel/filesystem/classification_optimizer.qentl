@@ -8,6 +8,8 @@ import "../utils/logger.qentl";
 import "../utils/statistics.qentl";
 import "./auto_classifier.qentl";
 import "./behavior_learner.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 配置
 config OptimizerConfig {

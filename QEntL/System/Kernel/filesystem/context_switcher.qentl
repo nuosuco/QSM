@@ -8,6 +8,8 @@
 import { 记录日志 } from "../utils/logger.qentl";
 import { 分析情境 } from "./context_analyzer.qentl";
 import { 初始化预加载器, 预加载文件 } from "./predictive_loader.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 情境切换器配置

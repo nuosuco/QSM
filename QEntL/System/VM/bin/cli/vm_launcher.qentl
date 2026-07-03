@@ -20,6 +20,8 @@ import { VM } from "QEntL/vm/src/core/vm.qentl";
 import { VMConfig } from "QEntL/vm/src/core/vm_config.qentl";
 import { BytecodeLoader } from "QEntL/vm/src/core/bytecode_loader.qentl";
 import { DebugLevel } from "QEntL/vm/src/core/debug/debug_info.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @class VMLauncher

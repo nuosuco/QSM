@@ -17,6 +17,8 @@ import "QEntL/core/command_line.qentl";
 import "QEntL/core/timer.qentl";
 import "QEntL/compiler/src/utils/file_watcher.qentl";
 import "QEntL/compiler/src/compiler.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @class AutoCompiler

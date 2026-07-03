@@ -12,6 +12,8 @@ import "QEntL/vm/quantum_state.qentl";
 
 // 导入字节码定义
 import "QEntL/compiler/bytecode.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 操作数栈最大深度
 const MAX_STACK_SIZE = 1024;

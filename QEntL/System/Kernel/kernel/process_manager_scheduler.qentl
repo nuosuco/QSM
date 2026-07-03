@@ -16,6 +16,8 @@ quantum_program ProcessManagerScheduler {
 
     // 导入基础模块
     import ProcessManagerBase from "./process_manager_base.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
     state {
         // 继承基础模块状态

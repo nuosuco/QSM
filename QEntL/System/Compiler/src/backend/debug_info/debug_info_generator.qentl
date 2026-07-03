@@ -13,6 +13,8 @@
 
 import { FileSystem } from "../../../../vm/src/core/os_interface/file_system.qentl";
 import { Logger, LogLevel } from "../../../../vm/src/core/os_interface/logger.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 源码位置信息
 export class SourceLocation {

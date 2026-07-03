@@ -12,6 +12,8 @@ import "../utils/json.qentl";
 import "../utils/logger.qentl";
 import "../utils/path.qentl";
 import "./security_service.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 配置服务配置

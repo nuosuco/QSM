@@ -10,6 +10,8 @@ import { 获取行为模式 } from "./behavior_learner.qentl";
 import { 分析情境 } from "./context_analyzer.qentl";
 import { 获取关联项 } from "./relevance_engine.qentl";
 import { 获取语义关联 } from "../semantic/knowledge_network.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 推荐引擎配置

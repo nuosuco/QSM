@@ -6,6 +6,8 @@
 
 import { ViewRenderer } from "./view_renderer.qentl";
 import { ViewCache } from "./view_cache.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 quantum_module ViewComposer {
     // 模块元数据

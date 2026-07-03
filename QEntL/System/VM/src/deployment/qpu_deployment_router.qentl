@@ -19,6 +19,8 @@ import "QEntL/System/VM/src/deployment/qpu_runtime_detector.qentl";
 import "QEntL/System/VM/src/deployment/qpu_adapter_qvm.qentl";
 import "QEntL/System/VM/src/deployment/qpu_adapter_cloud.qentl";
 import "QEntL/System/VM/src/deployment/qpu_adapter_hardware.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // ==================== 适配器接口定义 ====================
 

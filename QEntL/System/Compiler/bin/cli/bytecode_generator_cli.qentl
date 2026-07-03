@@ -17,6 +17,8 @@ import "QEntL/compiler/src/backend/ir/ir_node.qentl";
 import "QEntL/compiler/src/frontend/lexer/lexer.qentl";
 import "QEntL/compiler/src/frontend/parser/parser.qentl";
 import "QEntL/compiler/src/backend/ir/ir_builder.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * @class BytecodeGeneratorCLI

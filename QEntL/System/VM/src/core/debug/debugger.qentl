@@ -11,6 +11,8 @@ import { Memory } from "../memory/memory.qentl";
 import { Logger, LogLevel } from "../os_interface/logger.qentl";
 import { FileSystem } from "../os_interface/file_system.qentl";
 import { Console } from "../os_interface/console.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 断点类型
 export enum BreakpointType {

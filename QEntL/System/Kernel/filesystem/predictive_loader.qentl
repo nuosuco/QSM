@@ -9,6 +9,8 @@ import { 记录日志 } from "../utils/logger.qentl";
 import { 分析相关性 } from "./file_relation_analyzer.qentl";
 import { 获取文件引用 } from "./dependency_analyzer.qentl";
 import { 获取行为模式 } from "./behavior_learner.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 预测加载器配置

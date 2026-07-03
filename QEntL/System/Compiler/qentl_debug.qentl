@@ -28,6 +28,8 @@ import "QEntL/compiler/src/frontend/parser/ast.qentl";
 import "QEntL/compiler/src/frontend/semantic/semantic_analyzer.qentl";
 import "QEntL/compiler/src/backend/ir/ir_generator.qentl";
 import "QEntL/compiler/src/backend/bytecode/bytecode_generator.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 import "QEntL/compiler/src/diagnostic/error_reporter.qentl";
 
 // ==================== 调试模式枚举 ====================

@@ -12,6 +12,8 @@ import "QEntL/core/array.qentl";
 import "QEntL/core/map.qentl";
 import "QEntL/compiler/src/backend/linker/linker.qentl";
 import "QEntL/vm/src/core/os_interface/logger.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 链接器重定位类型

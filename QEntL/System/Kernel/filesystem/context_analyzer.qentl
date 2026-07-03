@@ -8,6 +8,8 @@
 import { 记录日志 } from "../utils/logger.qentl";
 import { 文件已访问 } from "./predictive_loader.qentl";
 import { 获取文件引用 } from "./dependency_analyzer.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 上下文分析器配置

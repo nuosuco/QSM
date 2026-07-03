@@ -10,6 +10,8 @@ import "./context_analyzer.qentl";
 import "./auto_classifier.qentl";
 import "./semantic_analyzer.qentl";
 import "./semantic_extractor.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 配置
 config RelevanceConfig {

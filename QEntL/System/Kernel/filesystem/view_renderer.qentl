@@ -5,6 +5,8 @@
  */
 
 import { ViewEngine } from "./view_engine.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 quantum_module ViewRenderer {
     // 模块元数据

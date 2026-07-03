@@ -1,0 +1,20 @@
+// 量子逻辑三种部署 - 开发模式
+import "QEntL/System/Kernel/qvm.qentl"
+import "QEntL/System/Platform/platform_types.qentl"
+import "QEntL/System/Platform/formats/pe_format.qentl"
+import "QEntL/System/Platform/formats/macho_format.qentl"
+import "QEntL/System/Platform/formats/elf_format.qentl"
+import "QEntL/System/Platform/formats/harmony_format.qentl"
+
+def development_mode():
+    config = {
+        'mode': 'development',
+        'platforms': ['windows', 'macos', 'ios', 'android', 'harmony', 'linux'],
+        'hot_reload': true,
+        'debug': true,
+        'optimization': 0,
+        'trace': true
+    }
+    return config
+
+export development_mode

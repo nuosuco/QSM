@@ -8,6 +8,8 @@
 
 import { FileSystem } from "../os_interface/file_system.qentl";
 import { Logger, LogLevel } from "../os_interface/logger.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 // 调试器配置类
 export class DebugConfig {

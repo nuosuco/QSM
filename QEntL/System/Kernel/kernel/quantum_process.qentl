@@ -18,6 +18,8 @@ quantum_program QuantumProcessManager {
     import ProcessManagerBase from "./process_manager_base.qentl";
     import ProcessManagerCore from "./process_manager_core.qentl";
     import QuantumMemory from "./quantum_memory.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
     state {
         // 内核引用

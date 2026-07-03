@@ -12,6 +12,8 @@ import "QEntL/core/map.qentl";
 import "QEntL/compiler/src/backend/ir/ir_module.qentl";
 import "QEntL/compiler/src/backend/ir/ir_instruction.qentl";
 import "QEntL/vm/src/core/os_interface/logger.qentl";
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
 
 /**
  * 量子门类型
