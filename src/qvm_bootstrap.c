@@ -822,8 +822,9 @@ int main(int argc, char *argv[]) {
         
         // 解析QEntL源码并执行函数
         if (parse_qentl_functions(argv[2]) == 0) {
-            // 找到并执行入口函数（通常是"main"或第一个函数）
-            FuncDef *entry = find_func("main");
+            // 找到并执行入口函数（通常是"主程序"或第一个函数）
+            FuncDef *entry = find_func("主程序");
+            if (!entry) entry = find_func("main");
             if (!entry) entry = func_defs;
             
             if (entry) {
