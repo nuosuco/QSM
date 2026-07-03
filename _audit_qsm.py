@@ -125,9 +125,9 @@ for o in orphan_qbc:
 fb_stat = {"14": [], "72": [], "other": []}
 for qbc in qbc_all:
     fb = first_byte(qbc)
-    if fb == 14:
+    if fb == 0x14:
         fb_stat["14"].append(qbc)
-    elif fb == 72:
+    elif fb == 0x72:
         fb_stat["72"].append(qbc)
     else:
         fb_stat["other"].append((qbc, fb))
@@ -179,13 +179,13 @@ for qbc in qbc_all:
     comp = classify_dir(qbc)
     fb = qbc_fb_map.get(qbc)
     add_component(comp, qbc=1)
-    if fb == 14:
+    if fb == 0x14:
         add_component(comp, valid_qbc=1)
         if qbc in qvm_pass_set:
             add_component(comp, qvm_pass=1)
         else:
             add_component(comp, qvm_fail=1)
-    elif fb == 72:
+    elif fb == 0x72:
         add_component(comp, invalid_qbc=1)
 
 # sort and print
