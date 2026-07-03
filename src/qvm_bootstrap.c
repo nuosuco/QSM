@@ -460,10 +460,10 @@ static int execute_function_body(FuncDef *fd, int arg_count, char *args[]) {
                     
                     // 向后找函数名开始（遇到空格/非字母数字/非中文字符）
                     while (name_start > line && 
-                           (name_start[-1] >= 'a' && name_start[-1] <= 'z') ||
-                           (name_start[-1] >= 'A' && name_start[-1] <= 'Z') ||
-                           (name_start[-1] >= '0' && name_start[-1] <= '9') ||
-                           name_start[-1] >= 0x80) {  // 中文字符
+                           (((unsigned char)name_start[-1] >= 'a' && (unsigned char)name_start[-1] <= 'z') ||
+                            ((unsigned char)name_start[-1] >= 'A' && (unsigned char)name_start[-1] <= 'Z') ||
+                            ((unsigned char)name_start[-1] >= '0' && (unsigned char)name_start[-1] <= '9') ||
+                            ((unsigned char)name_start[-1] >= 0x80))) {  // 中文字符
                         name_start--;
                     }
                     
@@ -472,6 +472,8 @@ static int execute_function_body(FuncDef *fd, int arg_count, char *args[]) {
                         char func_name[MAX_PATH];
                         strncpy(func_name, name_start, name_len);
                         func_name[name_len] = '\0';
+                        
+                        printf("[QVM] 提取函数名: [%s] (len=%d)\n", func_name, name_len);
                         
                         FuncDef *called = find_func(func_name);
                         if (called) {
