@@ -1,105 +1,150 @@
 #!/usr/bin/env python3
-"""QVM 全量审计：只审计头部为 0x14 的有效量子电路 .qbc 文件。"""
-import subprocess, os, sys
+"""QVM全量审计脚本 - 扫描所有.qbc文件，过滤0x14有效电路，执行qvm_bootstrap审计"""
+import os
+import subprocess
+import re
+import sys
 
-ROOT = "/root/QSM"
-QVM = os.path.join(ROOT, "bin", "qvm_bootstrap")
-TIMEOUT = 30  # 单文件超时秒数
+QSM_ROOT = '/root/QSM'
+QVM_BIN = os.path.join(QSM_ROOT, 'bin/qvm_bootstrap')
+KEY_CIRCUITS = [
+    'QEntL/System/Kernel/neural/qns_training_circuit.qbc',
+    'QEntL/System/Kernel/neural/qns_backprop_circuit.qbc',
+    'QEntL/System/Kernel/filesystem/qdfs_quantum_circuit.qbc',
+    'QEntL/System/Kernel/grover_search_circuit.qbc',
+    'QEntL/Models/QSM/qsm_entanglement_circuit.qbc',
+    'QEntL/Models/SOM/som_transaction_circuit.qbc',
+    'QEntL/Models/WeQ/weq_learning_circuit.qbc',
+    'QEntL/Models/Ref/ref_monitoring_circuit.qbc',
+]
 
-# 1. 扫描所有 .qbc
+# Step 1: 收集所有.qbc文件（排除.git）
 qbc_files = []
-for dirpath, _, filenames in os.walk(ROOT):
-    for fn in filenames:
-        if fn.endswith(".qbc"):
-            qbc_files.append(os.path.join(dirpath, fn))
+for root, dirs, files in os.walk(QSM_ROOT):
+    if '.git' in root:
+        continue
+    for f in files:
+        if f.endswith('.qbc'):
+            qbc_files.append(os.path.join(root, f))
 
-qbc_files.sort()
-total = len(qbc_files)
+print(f"=== 扫描完成：共发现 {len(qbc_files)} 个 .qbc 文件 ===\n")
 
-# 2. 分类：0x14 / 0x72 / other
+# Step 2: 按首字节分类
 valid_0x14 = []
 invalid_0x72 = []
-other = []
+other_bytes = []
+byte_stats = {}
 
-for f in qbc_files:
+for fp in qbc_files:
     try:
-        with open(f, "rb") as fh:
-            first = fh.read(1)
-            if not first:
-                other.append((f, "empty"))
-                continue
-            b = first[0]
-            if b == 0x14:
-                valid_0x14.append(f)
-            elif b == 0x72:
-                invalid_0x72.append(f)
-            else:
-                other.append((f, f"0x{b:02x}"))
-    except Exception as e:
-        other.append((f, f"error:{e}"))
-
-print(f"=== 扫描结果 ===")
-print(f"总 .qbc 文件数: {total}")
-print(f"0x14 有效量子电路: {len(valid_0x14)}")
-print(f"0x72 无效文本(含 def/import): {len(invalid_0x72)}")
-print(f"其他头部: {len(other)}")
-if other:
-    for f, reason in other:
-        print(f"  {reason}: {f}")
-
-# 3. 对每个 0x14 文件执行 QVM
-print(f"\n=== QVM 执行 (0x14 文件, 共 {len(valid_0x14)}) ===")
-passed = []
-failed = []
-
-for i, f in enumerate(valid_0x14):
-    rel = os.path.relpath(f, ROOT)
-    try:
-        r = subprocess.run(
-            [QVM, f],
-            capture_output=True, timeout=TIMEOUT, cwd=ROOT
-        )
-        if r.returncode == 0:
-            passed.append(rel)
+        with open(fp, 'rb') as fh:
+            b = fh.read(1)
+        hex_val = b.hex()
+        byte_stats[hex_val] = byte_stats.get(hex_val, 0) + 1
+        if b == b'\x14':
+            valid_0x14.append(fp)
+        elif b == b'\x72':
+            invalid_0x72.append(fp)
         else:
-            failed.append((rel, r.returncode, r.stderr.decode("utf-8", errors="replace")[:200]))
-    except subprocess.TimeoutExpired:
-        failed.append((rel, "TIMEOUT", ""))
+            other_bytes.append((fp, hex_val))
     except Exception as e:
-        failed.append((rel, "ERROR", str(e)[:200]))
+        print(f"[ERROR] 读取失败: {fp} - {e}")
 
-    # 进度
-    if (i + 1) % 20 == 0 or (i + 1) == len(valid_0x14):
-        print(f"  [{i+1}/{len(valid_0x14)}] ...", flush=True)
+print("=== 首字节统计 ===")
+for hex_v in sorted(byte_stats.keys()):
+    print(f"  0x{hex_v}: {byte_stats[hex_v]} 个文件")
+print(f"\n有效电路 (0x14): {len(valid_0x14)} 个")
+print(f"无效电路 (0x72): {len(invalid_0x72)} 个")
+print(f"其他字节: {len(other_bytes)} 个")
 
-# 4. 汇总
-print(f"\n=== 最终统计 ===")
-print(f"0x14 文件数: {len(valid_0x14)}")
-print(f"PASS (exit 0): {len(passed)}")
-print(f"FAIL (exit !=0): {len(failed)}")
-print(f"0x72 文件数: {len(invalid_0x72)}")
+# Step 3: 对每个0x14文件执行qvm_bootstrap
+results = []  # (filepath, status, cycles, gates, error_msg)
+pattern = re.compile(r'执行完成:\s*(\d+)\s*周期,\s*(\d+)\s*门操作')
 
-if failed:
-    print(f"\n=== 失败文件列表 ({len(failed)}) ===")
-    for rel, code, err in failed:
-        err_short = err.replace("\n", " ").strip()[:120]
-        print(f"  [{code}] {rel}  |  {err_short}")
+print(f"\n=== 开始执行QVM审计 ({len(valid_0x14)} 个文件) ===\n")
 
-# 写结果文件
-result_path = os.path.join(ROOT, "qvm_audit_result.txt")
-with open(result_path, "w") as out:
-    out.write(f"QVM 全量审计报告\n")
-    out.write(f"{'='*60}\n")
-    out.write(f"总 .qbc 文件数: {total}\n")
-    out.write(f"0x14 有效量子电路: {len(valid_0x14)}\n")
-    out.write(f"PASS: {len(passed)}\n")
-    out.write(f"FAIL: {len(failed)}\n")
-    out.write(f"0x72 无效文本: {len(invalid_0x72)}\n")
-    out.write(f"其他头部: {len(other)}\n")
-    out.write(f"\n失败文件:\n")
-    for rel, code, err in failed:
-        out.write(f"  [{code}] {rel}\n")
-    out.write(f"\nPASS 文件:\n")
-    for rel in passed:
-        out.write(f"  {rel}\n")
-print(f"\n结果已写入: {result_path}")
+pass_count = 0
+fail_count = 0
+fail_list = []
+
+for i, fp in enumerate(valid_0x14, 1):
+    rel_path = os.path.relpath(fp, QSM_ROOT)
+    try:
+        proc = subprocess.run(
+            [QVM_BIN, fp],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=QSM_ROOT,
+        )
+        combined = proc.stdout + proc.stderr
+        m = pattern.search(combined)
+        if m:
+            cycles = int(m.group(1))
+            gates = int(m.group(2))
+            status = 'PASS'
+            pass_count += 1
+            results.append((rel_path, status, cycles, gates, ''))
+            # 标记关键电路
+            if fp in KEY_CIRCUITS or rel_path in KEY_CIRCUITS:
+                print(f"  [{i}/{len(valid_0x14)}] ⭐ KEY [{status}] {rel_path} -> {cycles}周期, {gates}门")
+            else:
+                print(f"  [{i}/{len(valid_0x14)}]     [{status}] {rel_path} -> {cycles}周期, {gates}门")
+        else:
+            status = 'FAIL'
+            fail_count += 1
+            fail_list.append(rel_path)
+            err = combined.strip()[-200:] if combined.strip() else '无输出'
+            results.append((rel_path, status, 0, 0, err))
+            print(f"  [{i}/{len(valid_0x14)}] ❌ [{status}] {rel_path} -> 无完成标记 (输出: {err[:100]})")
+    except subprocess.TimeoutExpired:
+        fail_count += 1
+        fail_list.append(rel_path)
+        results.append((rel_path, 'TIMEOUT', 0, 0, '超时30秒'))
+        print(f"  [{i}/{len(valid_0x14)}] ⏱️ [TIMEOUT] {rel_path} -> 超时30秒")
+    except Exception as e:
+        fail_count += 1
+        fail_list.append(rel_path)
+        results.append((rel_path, 'ERROR', 0, 0, str(e)))
+        print(f"  [{i}/{len(valid_0x14)}] 💥 [ERROR] {rel_path} -> {e}")
+
+# Step 4: 汇总报告
+print("\n" + "=" * 60)
+print("📊 QVM全量审计报告")
+print("=" * 60)
+print(f"  (a) 总有效0x14电路数: {len(valid_0x14)}")
+print(f"  (b) PASS数量: {pass_count}")
+print(f"  (c) FAIL数量: {fail_count}")
+if fail_list:
+    print(f"\n  ❌ 失败文件列表 ({len(fail_list)}):")
+    for f in fail_list:
+        print(f"    - {f}")
+
+# Step 5: 关键电路详细报告
+print("\n" + "=" * 60)
+print("⭐ 8个关键电路详细验证")
+print("=" * 60)
+for kc in KEY_CIRCUITS:
+    fp_full = os.path.join(QSM_ROOT, kc)
+    if os.path.exists(fp_full):
+        # 找结果
+        found = False
+        for r in results:
+            if r[0] == kc:
+                print(f"  ⭐ {kc}")
+                print(f"     状态: {r[1]}, 周期: {r[2]}, 门操作: {r[3]}")
+                found = True
+                break
+        if not found:
+            print(f"  ⭐ {kc} -> 未在审计结果中找到")
+    else:
+        print(f"  ❌ {kc} -> 文件不存在")
+
+# 检查是否有类似grover的文件
+print("\n=== 查找类似grover_search的电路 ===")
+for fp in valid_0x14:
+    rel = os.path.relpath(fp, QSM_ROOT)
+    if 'grover' in rel.lower():
+        print(f"  找到: {rel}")
+
+print("\n审计完成。")
