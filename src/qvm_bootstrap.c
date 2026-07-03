@@ -255,6 +255,330 @@ int qentl_ends_with(const char *str, const char *suffix) {
     return strcmp(str + str_len - suffix_len, suffix) == 0;
 }
 
+// ============================================================
+// QEntL源码编译器（供QCL引导器调用）
+// ============================================================
+
+// 行缓冲区结构
+typedef struct {
+    char *buffer;
+    int size;
+} LineBuf;
+
+static void linebuf_init(LineBuf *lb) {
+    lb->size = 1024;
+    lb->buffer = (char *)malloc(lb->size);
+    lb->buffer[0] = '\0';
+}
+
+static void linebuf_append(LineBuf *lb, const char *s) {
+    int need = strlen(s) + 1;
+    if (strlen(lb->buffer) + need >= lb->size) {
+        lb->size *= 2;
+        lb->buffer = (char *)realloc(lb->buffer, lb->size);
+    }
+    strcat(lb->buffer, s);
+}
+
+static char *linebuf_get(LineBuf *lb) {
+    return lb->buffer;
+}
+
+// 写入字节码
+static void write_opcode(uint8_t **out, int *pos, uint8_t op, ...) {
+    va_list args;
+    va_start(args, op);
+    (*out)[(*pos)++] = op;
+    int num = op;
+    switch(num) {
+        case OP_H: case OP_X: case OP_Y: case OP_Z:
+        case OP_T: case OP_S: case OP_RESET: {
+            int q = va_arg(args, int);
+            (*out)[(*pos)++] = q;
+            break;
+        }
+        case OP_CNOT: case OP_SWAP: case OP_MEASURE: {
+            int a = va_arg(args, int);
+            int b = va_arg(args, int);
+            (*out)[(*pos)++] = a;
+            (*out)[(*pos)++] = b;
+            break;
+        }
+        case OP_LOAD: case OP_STORE: {
+            int r = va_arg(args, int);
+            (*out)[(*pos)++] = r;
+            break;
+        }
+        case OP_JUMP: case OP_JZ: {
+            int target = va_arg(args, int);
+            (*out)[(*pos)++] = target;
+            break;
+        }
+        default:
+            // NOP, STOP, PRINT, EXIT, INIT, BARRIER - 可能需要参数
+            break;
+    }
+    va_end(args);
+}
+
+// 编译QEntL源码文件为.qbc字节码
+int compile_qentl_to_qbc(const char *input_path, const char *output_path) {
+    char *src = qentl_read_file(input_path);
+    if (!src) {
+        printf("[QVM] 编译失败: 无法读取 %s\n", input_path);
+        return -1;
+    }
+    
+    printf("[QVM] 编译QEntL源码: %s -> %s\n", input_path, output_path);
+    
+    // 分配字节码缓冲区
+    int buf_size = strlen(src) * 4;
+    uint8_t *code = (uint8_t *)calloc(buf_size, 1);
+    int pos = 0;
+    int line_num = 0;
+    
+    // 逐行编译
+    char *line_start = src;
+    char *p = src;
+    char temp[MAX_FILE_SIZE];
+    
+    while (*p) {
+        if (*p == '\n') {
+            *p = '\0';
+            char *line = line_start;
+            line_num++;
+            
+            // 跳过空行和注释
+            while (*line && (*line == ' ' || *line == '\t')) line++;
+            if (*line == '/' && *(line+1) == '/') {
+                // 单行注释
+                line_start = p + 1;
+                p++;
+                continue;
+            }
+            if (*line == '/' && *(line+1) == '*') {
+                // 多行注释开始
+                char *end = strstr(p, "*/");
+                if (end) {
+                    line_start = end + 2;
+                    p = end + 2;
+                    continue;
+                }
+            }
+            
+            // 编译量子指令
+            char trimmed[MAX_FILE_SIZE];
+            strncpy(trimmed, line, MAX_FILE_SIZE - 1);
+            trimmed[MAX_FILE_SIZE - 1] = '\0';
+            
+            // 去除首尾空格
+            char *t = trimmed;
+            while (*t && (*t == ' ' || *t == '\t')) t++;
+            char *end2 = t + strlen(t) - 1;
+            while (end2 > t && (*end2 == ' ' || *end2 == '\t')) {
+                *end2 = '\0';
+                end2--;
+            }
+            
+            // 跳过空行
+            if (*t == '\0') {
+                line_start = p + 1;
+                p++;
+                continue;
+            }
+            
+            // 跳过高级语法（def/import/var/class等）
+            if (strncmp(t, "def ", 4) == 0 || strncmp(t, "import ", 7) == 0 ||
+                strncmp(t, "var ", 4) == 0 || strncmp(t, "class ", 6) == 0 ||
+                strncmp(t, "const ", 6) == 0 || strncmp(t, "while ", 6) == 0 ||
+                strncmp(t, "if ", 3) == 0 || strncmp(t, "else", 4) == 0 ||
+                strncmp(t, "return ", 7) == 0 || strncmp(t, "break", 5) == 0 ||
+                strncmp(t, "continue", 8) == 0 || strncmp(t, "for ", 4) == 0 ||
+                t[0] == '/' || t[0] == '}') {
+                line_start = p + 1;
+                p++;
+                continue;
+            }
+            
+            // 编译量子指令
+            int parsed = 0;
+            
+            // init N
+            if (strncmp(t, "init ", 5) == 0) {
+                int n = atoi(t + 5);
+                write_opcode(&code, &pos, OP_INIT, n);
+                parsed = 1;
+            }
+            // H q
+            else if (strncmp(t, "H ", 2) == 0) {
+                int q = atoi(t + 2);
+                write_opcode(&code, &pos, OP_H, q);
+                parsed = 1;
+            }
+            // X q
+            else if (strncmp(t, "X ", 2) == 0) {
+                int q = atoi(t + 2);
+                write_opcode(&code, &pos, OP_X, q);
+                parsed = 1;
+            }
+            // Y q
+            else if (strncmp(t, "Y ", 2) == 0) {
+                int q = atoi(t + 2);
+                write_opcode(&code, &pos, OP_Y, q);
+                parsed = 1;
+            }
+            // Z q
+            else if (strncmp(t, "Z ", 2) == 0) {
+                int q = atoi(t + 2);
+                write_opcode(&code, &pos, OP_Z, q);
+                parsed = 1;
+            }
+            // T q
+            else if (strncmp(t, "T ", 2) == 0) {
+                int q = atoi(t + 2);
+                write_opcode(&code, &pos, OP_T, q);
+                parsed = 1;
+            }
+            // S q
+            else if (strncmp(t, "S ", 2) == 0) {
+                int q = atoi(t + 2);
+                write_opcode(&code, &pos, OP_S, q);
+                parsed = 1;
+            }
+            // CNOT c t
+            else if (strncmp(t, "CNOT ", 5) == 0) {
+                char *s = t + 5;
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int c = atoi(s);
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int t2 = atoi(s);
+                write_opcode(&code, &pos, OP_CNOT, c, t2);
+                parsed = 1;
+            }
+            // SWAP a b
+            else if (strncmp(t, "SWAP ", 5) == 0) {
+                char *s = t + 5;
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int a = atoi(s);
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int b = atoi(s);
+                write_opcode(&code, &pos, OP_SWAP, a, b);
+                parsed = 1;
+            }
+            // MEASURE q r
+            else if (strncmp(t, "MEASURE ", 8) == 0) {
+                char *s = t + 8;
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int q = atoi(s);
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int r = atoi(s);
+                write_opcode(&code, &pos, OP_MEASURE, q, r);
+                parsed = 1;
+            }
+            // PRINT r
+            else if (strncmp(t, "PRINT ", 6) == 0) {
+                char *s = t + 6;
+                while (*s && (*s == ' ' || *s == '\t')) s++;
+                int r = atoi(s);
+                write_opcode(&code, &pos, OP_PRINT, r);
+                parsed = 1;
+            }
+            // RESET q
+            else if (strncmp(t, "RESET ", 6) == 0) {
+                int q = atoi(t + 6);
+                write_opcode(&code, &pos, OP_RESET, q);
+                parsed = 1;
+            }
+            // BARRIER
+            else if (strncmp(t, "BARRIER", 7) == 0) {
+                write_opcode(&code, &pos, OP_BARRIER);
+                parsed = 1;
+            }
+            // STOP
+            else if (strncmp(t, "STOP", 4) == 0) {
+                write_opcode(&code, &pos, OP_STOP);
+                parsed = 1;
+            }
+            // EXIT
+            else if (strncmp(t, "EXIT", 4) == 0) {
+                write_opcode(&code, &pos, OP_EXIT);
+                parsed = 1;
+            }
+            
+            if (!parsed) {
+                printf("[QVM] 跳过无法编译的行: %s\n", t);
+            }
+            
+            line_start = p + 1;
+            p++;
+        } else {
+            p++;
+        }
+    }
+    
+    if (pos == 0) {
+        printf("[QVM] 编译失败: %s 无有效量子指令\n", input_path);
+        free(src);
+        free(code);
+        return -1;
+    }
+    
+    // 写入.qbc文件
+    FILE *out = fopen(output_path, "wb");
+    if (!out) {
+        printf("[QVM] 编译失败: 无法写入 %s\n", output_path);
+        free(src);
+        free(code);
+        return -1;
+    }
+    fwrite(code, 1, pos, out);
+    fclose(out);
+    
+    printf("[QVM] 编译成功: %s (%d bytes, %d instructions)\n", output_path, pos, line_num);
+    free(src);
+    free(code);
+    return 0;
+}
+
+// 扫描目录并编译所有QEntL文件
+int compile_qentl_directory(const char *dir_path, const char *output_dir) {
+    char entries[100][MAX_PATH];
+    char full_path[MAX_PATH];
+    char out_path[MAX_PATH];
+    int count = qentl_list_dir(dir_path, entries, 100);
+    
+    if (count < 0) return -1;
+    
+    int compiled = 0;
+    for (int i = 0; i < count; i++) {
+        qentl_path_join(full_path, dir_path, entries[i]);
+        
+        if (qentl_is_dir(full_path)) {
+            qentl_path_join(out_path, output_dir, entries[i]);
+            if (mkdir(out_path, 0755) == 0) {
+                int sub = compile_qentl_directory(full_path, out_path);
+                if (sub >= 0) compiled += sub;
+            }
+        } else if (qentl_ends_with(entries[i], ".qentl")) {
+            qentl_path_join(out_path, output_dir, entries[i]);
+            // 替换扩展名 .qentl -> .qbc
+            char *ext = strstr(out_path, ".qentl");
+            if (ext) {
+                *ext = '\0';
+                strcat(out_path, ".qbc");
+            }
+            if (compile_qentl_to_qbc(full_path, out_path) == 0) {
+                compiled++;
+            }
+        }
+    }
+    
+    return compiled;
+}
+
+// 包含va_list
+#include <stdarg.h>
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("[QVM] 用法: %s <字节码文件>\n", argv[0]);
