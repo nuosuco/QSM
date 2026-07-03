@@ -7,11 +7,15 @@
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define MAX_QUBITS 64
 #define MAX_REGISTERS 64
 #define MAX_MEM 256 * 1024 * 1024  /* 256MB for up to 22 qubits */
 #define MAX_CYCLES 10000
+#define MAX_PATH 1024
+#define MAX_FILE_SIZE 1024 * 1024  // 1MB max file read
 
 /* 操作码 — 与qcl_bootstrap.c编译器严格对齐 */
 enum {
@@ -155,6 +159,100 @@ static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
     }
 end_gate:
     free(tmp);
+}
+
+// ============================================================
+// QEntL文件操作函数（供QCL引导器调用）
+// ============================================================
+
+// 文件读取 — 读取完整文件内容到字符串
+char *qentl_read_file(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        printf("[QVM] 文件读取失败: %s\n", path);
+        return NULL;
+    }
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (size > MAX_FILE_SIZE) {
+        printf("[QVM] 文件过大: %s (%ld bytes)\n", path, size);
+        fclose(f);
+        return NULL;
+    }
+    char *content = (char *)malloc(size + 1);
+    if (!content) {
+        fclose(f);
+        return NULL;
+    }
+    fread(content, 1, size, f);
+    content[size] = '\0';
+    fclose(f);
+    printf("[QVM] 文件读取成功: %s (%ld bytes)\n", path, size);
+    return content;
+}
+
+// 文件写入 — 将字符串写入文件
+int qentl_write_file(const char *path, const char *content, int length) {
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        printf("[QVM] 文件写入失败: %s\n", path);
+        return -1;
+    }
+    fwrite(content, 1, length, f);
+    fclose(f);
+    printf("[QVM] 文件写入成功: %s (%d bytes)\n", path, length);
+    return 0;
+}
+
+// 目录扫描 — 列出目录下的所有文件/目录
+int qentl_list_dir(const char *path, char **entries, int max_entries) {
+    DIR *dir = opendir(path);
+    if (!dir) {
+        printf("[QVM] 目录扫描失败: %s\n", path);
+        return -1;
+    }
+    int count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL && count < max_entries) {
+        if (entry->d_name[0] == '.' && (entry->d_name[1] == '\0' || 
+            (entry->d_name[1] == '.' && entry->d_name[2] == '\0'))) {
+            continue; // 跳过.和..
+        }
+        strncpy(entries[count], entry->d_name, MAX_PATH - 1);
+        entries[count][MAX_PATH - 1] = '\0';
+        count++;
+    }
+    closedir(dir);
+    printf("[QVM] 目录扫描完成: %s (%d entries)\n", path, count);
+    return count;
+}
+
+// 路径连接 — 连接两个路径
+void qentl_path_join(char *dest, const char *dir, const char *file) {
+    strncpy(dest, dir, MAX_PATH - 1);
+    dest[MAX_PATH - 1] = '\0';
+    int len = strlen(dest);
+    if (len > 0 && dest[len - 1] != '/') {
+        dest[len] = '/';
+        dest[len + 1] = '\0';
+    }
+    strncat(dest, file, MAX_PATH - strlen(dest) - 1);
+}
+
+// 判断路径是否是目录
+int qentl_is_dir(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return S_ISDIR(st.st_mode);
+}
+
+// 判断字符串是否以后缀结尾
+int qentl_ends_with(const char *str, const char *suffix) {
+    int str_len = strlen(str);
+    int suffix_len = strlen(suffix);
+    if (suffix_len > str_len) return 0;
+    return strcmp(str + str_len - suffix_len, suffix) == 0;
 }
 
 int main(int argc, char *argv[]) {
