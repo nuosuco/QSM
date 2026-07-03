@@ -550,24 +550,54 @@ static int parse_qentl_functions(const char *path) {
                 continue;
             }
             
-            // 检测def函数定义
-            if (strncmp(line, "def ", 4) == 0) {
+            // 跳过缩进空格（检测函数定义前的缩进）
+            char *line_trimmed = line;
+            while (*line_trimmed && (*line_trimmed == ' ' || *line_trimmed == '\t')) line_trimmed++;
+            
+            // 检测def函数定义（英文语法）
+            if (strncmp(line_trimmed, "def ", 4) == 0) {
                 // 保存上一个函数（结束）
                 current_func = NULL;
                 if (in_function) {
                     printf("[QVM] 警告: 嵌套函数定义\n");
                 }
-                parse_def_func(line);
+                parse_def_func(line_trimmed);
                 in_function = 1;
-            } else if (in_function) {
-                // 追加函数体
-                append_to_function_body(line);
-            } else if (!in_function && line[0] != ' ' && line[0] != '\t' && line[0] != '/' && line[0] != '\0') {
-                // 检测到函数结束（缩进减少或新语句开始）
-                // 但只有当前函数体不为空时才算结束
-                if (current_func && current_func->body_len > 0) {
-                    // 继续检测，不关闭函数（允许多行语句）
+            }
+            // 检测"函数"定义（中文语法）- UTF-8中"函数"=6字节，+空格=7字节
+            else if (strncmp(line_trimmed, "函数 ", 7) == 0) {
+                // 保存上一个函数（结束）
+                current_func = NULL;
+                if (in_function) {
+                    printf("[QVM] 警告: 嵌套函数定义\n");
                 }
+                // 将"函数 "替换为"def "后解析
+                char line_copy[MAX_PATH];
+                strncpy(line_copy, "def ", 4);
+                strncat(line_copy, line_trimmed + 7, MAX_PATH - 5);  // 跳过"函数 " (7字节)
+                line_copy[MAX_PATH - 1] = '\0';
+                parse_def_func(line_copy);
+                in_function = 1;
+            }
+            // 检测函数体结束
+            else if (in_function && line[0] == '}') {
+                in_function = 0;
+            }
+            // 函数体内容（添加到当前函数）
+            else if (in_function && current_func) {
+                append_to_function_body(line);
+            }
+            // 检测量子模块定义（中文语法）
+            else if (strstr(line, "量子模块")) {
+                printf("[QVM] 检测到量子模块: %s\n", line);
+            }
+            // 检测类型定义（中文语法）
+            else if (strstr(line, "类型")) {
+                printf("[QVM] 检测到类型: %s\n", line);
+            }
+            // 检测导入语句（中文语法）
+            else if (strstr(line, "导入")) {
+                printf("[QVM] 检测到导入: %s\n", line);
             }
             
             line_start = p + 1;
