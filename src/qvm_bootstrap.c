@@ -261,7 +261,9 @@ typedef struct FuncDef {
     struct FuncDef *next;
 } FuncDef;
 
-static FuncDef *func_defs = NULL;
+// 全局指针：当前正在构建的函数定义
+static FuncDef *current_func = NULL;
+static FuncDef *func_defs = NULL;  // 函数定义链表头
 
 // 解析def函数定义
 static void parse_def_func(const char *line) {
@@ -308,17 +310,16 @@ static void parse_def_func(const char *line) {
     fd->body_len = 0;
     fd->next = func_defs;
     func_defs = fd;
+    current_func = fd;  // 设置当前函数指针
     
     printf("[QVM] 解析函数定义: %s(%d params)\n", name, param_count);
 }
 
 // 追加函数体到当前函数定义
 static void append_to_function_body(const char *line) {
-    if (!func_defs) return;
+    if (!current_func) return;
     
-    FuncDef *fd = func_defs;
-    // 找到最后一个函数定义（当前正在构建的）
-    while (fd->next) fd = fd->next;
+    FuncDef *fd = current_func;
     
     if (!fd->body) {
         fd->body = (char *)malloc(MAX_FILE_SIZE);
@@ -446,31 +447,39 @@ static int execute_function_body(FuncDef *fd, int arg_count, char *args[]) {
             else if (strstr(line, "(") && !strstr(line, "def ")) {
                 printf("[QVM] 函数调用: %s\n", line);
                 // 尝试查找并执行被调用的函数
-                char *func_name_start = line;
-                // 找到函数名（到(之前）
                 char *paren = strstr(line, "(");
                 if (paren) {
-                    char func_name[MAX_PATH];
-                    int len = paren - line;
-                    if (len > 0 && len < MAX_PATH) {
-                        strncpy(func_name, line, len);
-                        func_name[len] = '\0';
-                        // 去除空格
-                        char *trimmed = func_name;
-                        while (*trimmed && (*trimmed == ' ' || *trimmed == '\t')) trimmed++;
-                        len = strlen(trimmed);
-                        if (len > 0) {
-                            strncpy(func_name, trimmed, len);
-                            func_name[len] = '\0';
-                            
-                            FuncDef *called = find_func(func_name);
-                            if (called) {
-                                printf("[QVM] 执行函数调用: %s\n", func_name);
-                                int called_cycles = execute_function_body(called, 0, NULL);
-                                cycles += called_cycles;
-                            } else {
-                                printf("[QVM] 函数未找到: %s\n", func_name);
-                            }
+                    // 找到函数名：从(往前找
+                    char *name_end = paren;
+                    char *name_start = name_end;
+                    
+                    // 向前跳过空格
+                    while (name_start > line && (name_start[-1] == ' ' || name_start[-1] == '\t')) {
+                        name_start--;
+                    }
+                    
+                    // 向后找函数名开始（遇到空格/非字母数字/非中文字符）
+                    while (name_start > line && 
+                           (name_start[-1] >= 'a' && name_start[-1] <= 'z') ||
+                           (name_start[-1] >= 'A' && name_start[-1] <= 'Z') ||
+                           (name_start[-1] >= '0' && name_start[-1] <= '9') ||
+                           name_start[-1] >= 0x80) {  // 中文字符
+                        name_start--;
+                    }
+                    
+                    int name_len = name_end - name_start;
+                    if (name_len > 0 && name_len < MAX_PATH) {
+                        char func_name[MAX_PATH];
+                        strncpy(func_name, name_start, name_len);
+                        func_name[name_len] = '\0';
+                        
+                        FuncDef *called = find_func(func_name);
+                        if (called) {
+                            printf("[QVM] 执行函数调用: %s\n", func_name);
+                            int called_cycles = execute_function_body(called, 0, NULL);
+                            cycles += called_cycles;
+                        } else {
+                            printf("[QVM] 函数未找到: %s\n", func_name);
                         }
                     }
                 }
