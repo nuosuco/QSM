@@ -771,14 +771,16 @@ static int parse_def(Parser *P) {
 
 /* ==================== export 解析 ==================== */
 static int parse_export(Parser *P) {
-    consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+    consume(P); /* 消耗 "export"，cur 已推进到导出标识符 */
+    /* consume 后直接读 cur，不额外 lexer_next（避免跳过标识符） */
     while (P->lexer.cur.kind == TOK_IDENT) {
         const char *sname = P->lexer.cur.text;
         write_opcode(OP_EXPORT_SYM); write_string_ref(sname);
         consume(P);
         if (expect_tok(P, TOK_SEMI)) break;
-        if (expect_tok(P, TOK_COMMA)) {}
-        lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        if (expect_tok(P, TOK_COMMA)) {
+            /* 跳过逗号后的空白，cur 已推进到下一个标识符 */
+        }
     }
     P->high_level++; return 1;
 }
