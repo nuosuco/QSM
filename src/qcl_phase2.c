@@ -440,7 +440,7 @@ static int parse_quantum_instruction(Parser *P) {
 
 /* ==================== import / const / 类型 / def 解析 ==================== */
 static int parse_import(Parser *P) {
-    consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+    consume(P); /* import */
     /* 接受 import "模块名" 和 import <ident>（如 import stdlib） */
     const char *mod = NULL;
     if (P->lexer.cur.kind == TOK_STRING) {
@@ -481,7 +481,8 @@ static int parse_const(Parser *P) {
 }
 
 static int parse_type_def(Parser *P) {
-    consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+    consume(P); /* 类型 */
+    lexer_skip_ws(&P->lexer);
     if (P->lexer.cur.kind != TOK_IDENT) return 0;
     const char *name = P->lexer.cur.text;
     consume(P);
@@ -494,21 +495,36 @@ static int parse_type_def(Parser *P) {
     write_opcode(OP_TYPE_DEF);
     write_string_ref(name);
     int field_count = 0;
+    /* expect_tok(LBRACE) 已消费 {，lexer.cur 现在在第一个字段 */
     while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_RBRACE) {
-        lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
-        if (P->lexer.cur.kind == TOK_HASH) { consume(P); continue; }
+        if (P->lexer.cur.kind == TOK_HASH) {
+            /* 跳过 # 注释，前进到下一 token */
+            consume(P); continue;
+        }
         if (P->lexer.cur.kind == TOK_IDENT) {
             const char *fname = P->lexer.cur.text;
-            consume(P);
-            lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+            consume(P); /* 字段名 → cur 现在指向 = 或 : */
+            lexer_skip_ws(&P->lexer);
             if (P->lexer.cur.kind == TOK_HASH) continue;
             if (P->lexer.cur.kind == TOK_EQ) {
                 /* Name = value 枚举风格字段 */
-                consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
-                if (P->lexer.cur.kind == TOK_NUMBER) { consume(P); }
+                consume(P); /* 消费 "="，cur 现在指向值 */
+                int value = 0;
+                if (P->lexer.cur.kind == TOK_NUMBER) {
+                    value = parse_const_int(P->lexer.cur.text);
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_IDENT) {
+                    value = parse_const_int(P->lexer.cur.text);
+                    consume(P);
+                }
+                /* emit 字节码: OP_PUSH_CONST_INT + 值 + OP_EXPORT_SYM + 字段名字符串 */
+                write_opcode(OP_PUSH_CONST_INT);
+                write_u16((unsigned short)value);
+                write_opcode(OP_EXPORT_SYM);
+                write_string_ref(fname);
+                field_count++;
             } else if (P->lexer.cur.kind == TOK_COLON) {
-                consume(P);
-                lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+                consume(P); /* 消费 ":"，cur 现在指向类型名 */
                 if (P->lexer.cur.kind == TOK_IDENT) {
                     const char *ftype = P->lexer.cur.text;
                     write_high_byte(field_count);
@@ -522,7 +538,10 @@ static int parse_type_def(Parser *P) {
         } else if (P->lexer.cur.kind == TOK_IDENT && kw(&P->lexer.cur, "var")) {
             /* var 在类型体中出现时跳过 */
             consume(P);
-        } else break;
+        } else {
+            /* 无法识别的 token，向前推进避免死循环 */
+            consume(P);
+        }
     }
     write_u16((unsigned short)field_count);
     flush_highbuf();
@@ -709,15 +728,17 @@ static void parse_func_body(Parser *P) {
 
 /* ==================== def 函数解析（顶层） ==================== */
 static int parse_def(Parser *P) {
-    consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+    consume(P); /* def */
+    lexer_skip_ws(&P->lexer);
     if (P->lexer.cur.kind != TOK_IDENT) return 0;
     const char *fname = P->lexer.cur.text;
-    write_opcode(OP_FUNC_DEF); write_string_ref(fname);
-    consume(P);
-    lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+    write_opcode(OP_FUNC_DEF);
+    write_string_ref(fname);
+    consume(P); /* 函数名 */
+    lexer_skip_ws(&P->lexer);
     int param_count = 0;
     if (P->lexer.cur.kind == TOK_LPAR) {
-        consume(P);
+        consume(P); /* ( */
         while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_RPAR) {
             if (P->lexer.cur.kind == TOK_IDENT) {
                 write_high_byte(param_count);
@@ -725,17 +746,27 @@ static int parse_def(Parser *P) {
                 param_count++;
                 consume(P);
             } else consume(P);
-            if (expect_tok(P, TOK_COLON)) { lexer_skip_ws(&P->lexer); lexer_next(&P->lexer); if (P->lexer.cur.kind == TOK_IDENT) consume(P); }
+            if (expect_tok(P, TOK_COLON)) { lexer_skip_ws(&P->lexer); if (P->lexer.cur.kind == TOK_IDENT) consume(P); }
             if (expect_tok(P, TOK_COMMA)) {}
         }
-        expect_tok(P, TOK_RPAR);
+        expect_tok(P, TOK_RPAR); /* ) */
     }
+    /* 接受 def f() { ... } 和 def f() : { ... } 两种写法 */
+    lexer_skip_ws(&P->lexer);
+    if (expect_tok(P, TOK_COLON)) { lexer_skip_ws(&P->lexer); }
     write_u16((unsigned short)param_count);
     flush_highbuf();
-    expect_tok(P, TOK_COLON);
-    lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
-    if (P->lexer.cur.kind == TOK_LBRACE) parse_func_body(P);
-    else { skip_to_semi(P); write_opcode(OP_FUNC_END); }
+    if (P->lexer.cur.kind == TOK_LBRACE) {
+        write_high_opcode(BC_FUNC_BODY);
+        parse_func_body(P);
+        write_high_opcode(BC_FUNC_END);
+        flush_highbuf();
+    } else {
+        skip_to_semi(P);
+        write_high_opcode(BC_FUNC_BODY); write_high_opcode(BC_FUNC_END);
+        flush_highbuf();
+    }
+    write_opcode(OP_FUNC_END);
     P->high_level++; return 1;
 }
 

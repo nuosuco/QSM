@@ -1,6 +1,6 @@
 # QSM 项目记忆
 
-> 最后更新：2026-07-05 02:30
+> 最后更新：2026-07-05 13:00（基线审计v4）
 
 ---
 
@@ -18,9 +18,9 @@
 | 文件 | 行数 |
 |------|------|
 | `src/qcl_bootstrap.c` | **247** |
-| `src/qvm_bootstrap.c` | **242** |
+| `src/qvm_bootstrap.c` | **244** |
 | `QCL引导器.qentl` | **472** |
-| `src/qcl_phase2.c` | **902** |
+| `src/qcl_phase2.c` | **928** |
 
 ### 红线检测
 | 指标 | 值 | 说明 |
@@ -31,10 +31,10 @@
 | 类型 | 数量 |
 |------|------|
 | .qbc 总数 | **354** |
-| 有效量子字节码（首字节0x14） | **296** |
+| 有效量子字节码（首字节0x14） | **297** |
 | QCLF_MAGIC文本（0x46） | 52 |
 | 空壳（0x0c/OP_STOP） | 4 |
-| 其他（0x0b/0x01） | 2 |
+| 其他（0x0b/0x01） | 1 |
 
 ### .qentl 源码统计
 | 类型 | 数量 |
@@ -42,7 +42,7 @@
 | .qentl 总数 | **341** |
 | QCL模块 | 7 |
 | 四大模型（QSM/Ref/SOM/WeQ） | 40 |
-| 边界测试 .qbc | 8（在 `tests/qcl_phase2_boundary/`） |
+| 边界测试 .qbc | 16（在 `tests/qcl_phase2_boundary/`） |
 
 ### 四大模型
 | 模型 | 文件数 |
@@ -73,9 +73,10 @@
 - `src/qcl_phase2.c` 修复合并冲突（OP_SUB/OP_STOP/OP_PRINT去重）
 - 与 `qcl_bootstrap.c` 同步操作码定义
 - 重新编译 `bin/qcl_phase2`（ELF 64-bit LSB executable）
-- **有效0x14从30暴增至296** — qcl_phase2批量重新编译成功
-- 新增 `tests/qcl_phase2_boundary/` 边界测试（8个测试）
+- **有效0x14从30暴增至297** — qcl_phase2批量重新编译成功
+- 新增 `tests/qcl_phase2_boundary/` 边界测试（16个测试）
 - `src/qcl_phase2.c` 当前有未提交修改（OP_STOP=12, OP_ADD=16等）
+- CNOT回归通过：`bin/qcl_bootstrap test/cnot_r.qentl` → 9周期9门操作
 
 ### 红线规则
 - `qcl_bootstrap.c` 只能解释量子指令子集（init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP）
@@ -159,3 +160,4 @@ cd /root/QSM && bin/qcl_phase2 QEntL/
 | 2026-07-03 23:20 | 332 | 356 | 28 | 0 | 初始基线 |
 | 2026-07-05 00:26 | 332 | 358 | 30 | 0 | 基线审计v3 |
 | 2026-07-05 02:30 | **341** | **354** | **296** | **0** | qcl_phase2修复后重编译 |
+| 2026-07-05 13:00 | **341** | **354** | **297** | **0** | 基线审计v4（qvm_bootstrap+1行, phase2+26行, 0x14+1, 边界测试8→16） |
