@@ -1,6 +1,6 @@
 # QSM 项目记忆
 
-> 最后更新：2026-07-05 14:30（基线审计v6：qcl_phase2.c 928→959行, 引导器产物319→335字节, 函数16→17, 常量2→1, 导入3不变）
+> 最后更新：2026-07-05 23:30（基线审计v9：qcl_compiler_phase2 退化壳修复 14B→202B/函数0→12/导入0→5，qcl_phase2.c 959→958行修正，引导器 IMPORT 新opcode=100下实测4，整体完成度修正42-45%非100%）
 
 ---
 
@@ -20,7 +20,7 @@
 | `src/qcl_bootstrap.c` | **247** |
 | `src/qvm_bootstrap.c` | **244** |
 | `QCL引导器.qentl` | **472** |
-| `src/qcl_phase2.c` | **959** |
+| `src/qcl_phase2.c` | **958** |
 
 ### 红线检测
 | 指标 | 值 | 说明 |
@@ -79,6 +79,7 @@
 - CNOT回归通过：`bin/qcl_bootstrap test/cnot_r.qentl` → 27字节27条指令
 - **v6更新**：parse_type_def emit修复 + 三件套误用修复 + OP_FUNC_END闭合修复 → qcl_phase2.c 928→959行，引导器产物319→335字节
 - **⚠️ opcode重新映射**：`OP_IMPORT` 96→100，统计导入数时需用新值（导入仍为3，未退化）
+- **v9更新**：`qcl_compiler_phase2.qentl` 退化壳修复 — 24行占位符(14字节/函数=0) → 204行编译器(202字节/函数=12/导入=5)，阶段5核心编译器不再阻塞
 
 ### 红线规则
 - `qcl_bootstrap.c` 只能解释量子指令子集（init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP）
@@ -91,17 +92,20 @@
 - 首字节 0x0c = 空壳STOP占位（C解释器跳过）
 - 首字节 0x46 = QCLF_MAGIC文本头
 
-### 八阶段状态
+### 八阶段状态（2026-07-05 23:30 审计v9，整体完成度 42-45%）
+
+> ⚠️ 此前记忆将阶段3-8误标为全部 ✅ 完成，与实时状态严重不符（曾被误刷）。以下为实测修正值，以 qentl-fullstack skill v6.13.0 审计 v8 为准。
+
 | 阶段 | 状态 | 说明 |
 |------|------|------|
-| Stage 1 | ✅ 完成 | qcl_bootstrap.c 247行，红线0，可编译量子指令子集 |
-| Stage 2 | ✅ 完成 | QCL引导器 472行完整版，bin/qcl_bootstrap可用 |
-| Stage 3 | ✅ 完成 | QCL引导器.qbc 293字节，23周期23门，bin/qcl_phase2批量编译成功 |
-| Stage 4 | ✅ 完成 | QCL引导器.qbc可QVM执行 |
-| Stage 5 | ✅ 完成 | QCL编译器编译所有QEntL源码（24个有效量子电路） |
-| Stage 6 | ✅ 完成 | QDFS/QNS/四大模型运行 |
-| Stage 7 | ✅ 完成 | QNS训练彝文数据 |
-| Stage 8 | ✅ 完成 | 三种部署模式（开发/生产/专用） |
+| Stage 1 | ✅ 完成 | qcl_bootstrap.c 247行，红线0，CNOT回归通过（27字节27条指令） |
+| Stage 2 | ✅ 完成 | QCL引导器 472行，产物335字节，函数16，导入3 |
+| Stage 3 | 🟡 修复中 | QCL模块7文件均成功emit；**qcl_compiler_phase2 退化壳已修复（14B→202B，函数0→12，导入0→5）**；残留：parse_var/if/return 高级控制流未验证 |
+| Stage 4 | 🟡 阻塞 | qvm_bootstrap.c 244行已编译；**QVM.qbc=72字节仅为量子电路（非完整VM）→ 最大阻塞点** |
+| Stage 5 | 🔴 阻塞 | 需阶段4 QEntL环境形成；qcl_compiler_phase2 退化壳已修复 |
+| Stage 6 | 🔴 待开始 | 四大模型(29个)+System(197个).qentl 待编译 |
+| Stage 7 | 🔴 待开始 | 需阶段6完成 |
+| Stage 8 | 🔴 待开始 | 需阶段7完成 |
 
 ### QCL引导器系统结构
 - **QCL引导器.qentl**：472行（L21-L54量子指令34行 + L56-L472高级语法108行）
@@ -111,7 +115,7 @@
   - `qcl_parser.qentl`（618行，10+函数）
   - `qcl_parser_high.qentl`（1,258行，50+函数）
   - `qcl_bootstrap_phase2.qentl`（735行）
-  - `qcl_compiler_phase2.qentl`（24行）
+  - `qcl_compiler_phase2.qentl`（204行，12函数，202字节 — 2026-07-05 退化壳修复后）
   - `qcircuit`相关文件
 - **编译器源码**：`QEntL/System/Compiler`（53个.qentl，28,662行）
 - **QVM源码**：`QEntL/System/VM`（29个.qentl，15,110行）
@@ -164,3 +168,4 @@ cd /root/QSM && bin/qcl_phase2 QEntL/
 | 2026-07-05 02:30 | **341** | **354** | **296** | **0** | qcl_phase2修复后重编译 |
 | 2026-07-05 13:00 | **341** | **354** | **297** | **0** | 基线审计v4（qvm_bootstrap+1行, phase2+26行, 0x14+1, 边界测试8→16） |
 | 2026-07-05 14:30 | **341** | **354** | **297** | **0** | 基线审计v6（qcl_phase2 928→959行：parse_type_def emit修复+三件套误用修复+OP_FUNC_END闭合修复） |
+| 2026-07-05 23:30 | **341** | **354** | **297** | **0** | 基线审计v9（qcl_compiler_phase2退化壳修复14B→202B函数0→12导入0→5；qcl_phase2.c实测958行非959；引导器335B DEF=17/END=17/IMPORT=4；八阶段完成度修正42-45%非100%） |
