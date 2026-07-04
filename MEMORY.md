@@ -1,6 +1,6 @@
 # QSM 项目记忆
 
-> 最后更新：2026-07-05 13:00（基线审计v4）
+> 最后更新：2026-07-05 14:30（基线审计v6：qcl_phase2.c 928→959行, 引导器产物319→335字节, 函数16→17, 常量2→1, 导入3不变）
 
 ---
 
@@ -20,7 +20,7 @@
 | `src/qcl_bootstrap.c` | **247** |
 | `src/qvm_bootstrap.c` | **244** |
 | `QCL引导器.qentl` | **472** |
-| `src/qcl_phase2.c` | **928** |
+| `src/qcl_phase2.c` | **959** |
 
 ### 红线检测
 | 指标 | 值 | 说明 |
@@ -76,7 +76,9 @@
 - **有效0x14从30暴增至297** — qcl_phase2批量重新编译成功
 - 新增 `tests/qcl_phase2_boundary/` 边界测试（16个测试）
 - `src/qcl_phase2.c` 当前有未提交修改（OP_STOP=12, OP_ADD=16等）
-- CNOT回归通过：`bin/qcl_bootstrap test/cnot_r.qentl` → 9周期9门操作
+- CNOT回归通过：`bin/qcl_bootstrap test/cnot_r.qentl` → 27字节27条指令
+- **v6更新**：parse_type_def emit修复 + 三件套误用修复 + OP_FUNC_END闭合修复 → qcl_phase2.c 928→959行，引导器产物319→335字节
+- **⚠️ opcode重新映射**：`OP_IMPORT` 96→100，统计导入数时需用新值（导入仍为3，未退化）
 
 ### 红线规则
 - `qcl_bootstrap.c` 只能解释量子指令子集（init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP）
@@ -161,3 +163,4 @@ cd /root/QSM && bin/qcl_phase2 QEntL/
 | 2026-07-05 00:26 | 332 | 358 | 30 | 0 | 基线审计v3 |
 | 2026-07-05 02:30 | **341** | **354** | **296** | **0** | qcl_phase2修复后重编译 |
 | 2026-07-05 13:00 | **341** | **354** | **297** | **0** | 基线审计v4（qvm_bootstrap+1行, phase2+26行, 0x14+1, 边界测试8→16） |
+| 2026-07-05 14:30 | **341** | **354** | **297** | **0** | 基线审计v6（qcl_phase2 928→959行：parse_type_def emit修复+三件套误用修复+OP_FUNC_END闭合修复） |
