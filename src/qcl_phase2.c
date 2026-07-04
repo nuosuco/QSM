@@ -26,7 +26,6 @@
 #define MAX_STRING   1024
 #define MAX_IDENT    256
 
-/* ==================== 字节码操作码表 ==================== */
 typedef enum {
     BC_MAGIC     = 0x14,
     OP_NOP       = 0,
@@ -41,14 +40,14 @@ typedef enum {
     OP_STORE_REG = 9,
     OP_JUMP      = 10,
     OP_PRINT     = 11,
-    OP_ADD       = 13,
-    OP_SUB       = 30,
-    OP_DIV       = 14,
+    OP_ADD       = 16,
+    OP_SUB       = 13,
     OP_MUL       = 15,
+    OP_DIV       = 14,
     OP_EXIT      = 17,
     OP_BARRIER   = 18,
     OP_INIT_N    = 20,
-    OP_STOP      = 16,
+    OP_STOP      = 12,
     OP_T         = 35,
     OP_S         = 36,
     OP_Y         = 37,
@@ -114,7 +113,7 @@ static void write_string_ref(const char *s) {
     int len = (int)strlen(s);
     if (len == 0) return;
     int off = g_strpool_pos;
-    if (off + len >= MAX_FUNC_BODY) return;
+    if (off + len > MAX_FUNC_BODY) return;
     memcpy(g_strpool + off, s, len);
     g_strpool_pos += len;
     write_u16((unsigned short)off);
@@ -356,9 +355,7 @@ static int parse_const_int(const char *s) {
     while (*s) { if (*s >= '0' && *s <= '9') v = v * 10 + (*s - '0'); s++; }
     return v;
 }
-static int is_opcode_name(const char *s) {
-    return strncmp(s, "OP_", 3) == 0;
-}
+static int is_opcode_name_unused(const char *s) { (void)s; return 0; }
 
 /* 向前声明 */
 static int  L_peek_next_is_colon(Parser *P);
@@ -443,9 +440,18 @@ static int parse_quantum_instruction(Parser *P) {
 /* ==================== import / const / 类型 / def 解析 ==================== */
 static int parse_import(Parser *P) {
     consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
-    if (P->lexer.cur.kind != TOK_STRING) return 0;
-    const char *mod = P->lexer.cur.text;
-    consume(P); expect_tok(P, TOK_SEMI);
+    /* 接受 import "模块名" 和 import <ident>（如 import stdlib） */
+    const char *mod = NULL;
+    if (P->lexer.cur.kind == TOK_STRING) {
+        mod = P->lexer.cur.text;
+        consume(P);
+    } else if (P->lexer.cur.kind == TOK_IDENT) {
+        mod = P->lexer.cur.text;
+        consume(P);
+    } else {
+        return 0;
+    }
+    expect_tok(P, TOK_SEMI);
     write_opcode(OP_IMPORT); write_string_ref(mod);
     P->high_level++; return 1;
 }
@@ -478,12 +484,9 @@ static int parse_type_def(Parser *P) {
     if (P->lexer.cur.kind != TOK_IDENT) return 0;
     const char *name = P->lexer.cur.text;
     consume(P);
-    lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
-    if (P->lexer.cur.kind == TOK_LT && L_peek_next_is_colon(P)) {
-        consume(P); consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
-        if (P->lexer.cur.kind == TOK_IDENT) consume(P);
-    }
-    if (!expect_tok(P, TOK_EQ)) return 0;
+    /* 接受 类型 Name = { ... } 或 类型 Name { ... }（无 =） */
+    lexer_skip_ws(&P->lexer);
+    expect_tok(P, TOK_EQ);
     lexer_skip_ws(&P->lexer);
     if (!expect_tok(P, TOK_LBRACE)) return 0;
 
@@ -834,6 +837,10 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         if (P.lexer.cur.kind == TOK_EOF) break;
         Token cur = P.lexer.cur;
         fprintf(stderr, "[main] cur=%s kind=%d line=%d\n", cur.text, cur.kind, P.lexer.line);
+        /* 跳过 # 注释（单行）和 // 注释 */
+        if (cur.kind == TOK_HASH || L_is_double_slash(&P.lexer)) {
+            skip_to_semi(&P); continue;
+        }
         if (parse_quantum_instruction(&P)) { stats.quantum_lines++; continue; }
         if (kw(&cur, "import")) {
             if (parse_import(&P)) { stats.imports++; stats.high_level_lines++; continue; }
@@ -888,11 +895,17 @@ int main(int argc, char *argv[]) {
     const char *input  = argv[1];
     const char *output = (argc >= 3) ? argv[2] : NULL;
     if (!output) {
-        char tmp[4096];
-        strncpy(tmp, input, sizeof(tmp)-1); tmp[sizeof(tmp)-1] = '\0';
+        size_t nlen = strlen(input) + 8;
+        char *tmp = (char *)malloc(nlen);
+        if (!tmp) { fprintf(stderr, "[QCL2] 内存不足\\n"); return -1; }
+        strcpy(tmp, input);
         char *ext = strstr(tmp, ".qentl");
         if (ext) { *ext = '\0'; strcat(tmp, ".qbc"); }
         output = tmp;
+        /* 输出路径是栈分配的，用完释放 */
+        int rc = compile_file_stage2(input, output);
+        free(tmp);
+        return rc;
     }
     srand((unsigned int)time(NULL));
     return compile_file_stage2(input, output);

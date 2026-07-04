@@ -18,24 +18,26 @@ enum {
     OP_NOP = 0,
     OP_H = 1,
     OP_X = 2,
-    OP_Y = 37,   // 编译器OP_Y=37
     OP_Z = 3,
     OP_CNOT = 4,
     OP_MEASURE = 5,
     OP_RESET = 6,
     OP_SWAP = 7,
-    OP_LOAD = 8,
-    OP_STORE = 9,
+    OP_LOAD_REG = 8,    // 编译器OP_LOAD_REG=8
+    OP_STORE_REG = 9,   // 编译器OP_STORE_REG=9
     OP_JUMP = 10,
     OP_PRINT = 11,
     OP_STOP = 12,
-    OP_ADD = 13,
+    OP_SUB = 13,
+    OP_DIV = 14,
     OP_MUL = 15,
+    OP_ADD = 16,
     OP_EXIT = 17,
+    OP_BARRIER = 18,
+    OP_INIT_N = 20,     // 编译器OP_INIT_N=20
     OP_T = 35,
     OP_S = 36,
-    OP_BARRIER = 18,
-    OP_INIT = 20,   // 编译器OP_INIT_N=20, 0x14=20
+    OP_Y = 37,
 };
 
 typedef struct {
@@ -182,7 +184,7 @@ int main(int argc, char *argv[]) {
     printf("[QVM] 初始化量子虚拟机\n");
     while (pos < fsize) {
         uint8_t op = code[pos++];
-        if (op == OP_INIT) {
+        if (op == OP_INIT_N) {
             int n = code[pos++];
             qvm_reset(&vm, n);
             printf("[QVM] 初始化 %d 个量子比特\n", n);
@@ -196,7 +198,7 @@ int main(int argc, char *argv[]) {
             return 0;
         }
         switch (op) {
-        case OP_INIT: {
+        case OP_INIT_N: {
             int n = code[pos++];
             qvm_reset(&vm, n);
             printf("[QVM] 初始化 %d 个量子比特\n", n);
