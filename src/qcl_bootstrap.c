@@ -29,7 +29,7 @@ typedef enum {
     OP_LOAD_REG = 8,
     OP_STORE_REG = 9,
     OP_JUMP = 10,
-    OP_ADD = 12,
+    OP_ADD = 16,
     OP_SUB = 13,
     OP_MUL = 15,
     OP_DIV = 14,
