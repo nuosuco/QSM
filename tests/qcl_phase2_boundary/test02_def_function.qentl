@@ -1,0 +1,8 @@
+@qcl
+def bell_pair q0 q1
+    H q0
+    CNOT q0 q1
+end
+init q0 q1
+call bell_pair q0 q1
+STOP

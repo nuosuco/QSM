@@ -1,0 +1,10 @@
+@qcl
+var a = 5
+var b = 10
+if a > b then
+    H q0
+else
+    X q0
+end
+init q0
+STOP

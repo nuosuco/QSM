@@ -1,0 +1,7 @@
+@qcl
+init q0 q1 q2
+while n > 0 do
+    H q0
+    CNOT q0 q1
+end
+STOP
