@@ -41,14 +41,14 @@ typedef enum {
     OP_STORE_REG = 9,
     OP_JUMP      = 10,
     OP_PRINT     = 11,
-    OP_ADD       = 13,   // 与qvm_bootstrap.c对齐
-    OP_SUB       = 14,
+    OP_ADD       = 13,
+    OP_SUB       = 30,
     OP_DIV       = 14,
     OP_MUL       = 15,
     OP_EXIT      = 17,
     OP_BARRIER   = 18,
     OP_INIT_N    = 20,
-    OP_STOP      = 12,
+    OP_STOP      = 16,
     OP_T         = 35,
     OP_S         = 36,
     OP_Y         = 37,
@@ -109,12 +109,6 @@ static void write_u8(unsigned char v)  { write_byte(v); }
 static void write_u16(unsigned short v) {
     write_byte(v & 0xFF);
     write_byte((v >> 8) & 0xFF);
-}
-static void write_u32(unsigned int v) {
-    write_byte(v & 0xFF);
-    write_byte((v >> 8) & 0xFF);
-    write_byte((v >> 16) & 0xFF);
-    write_byte((v >> 24) & 0xFF);
 }
 static void write_string_ref(const char *s) {
     int len = (int)strlen(s);
