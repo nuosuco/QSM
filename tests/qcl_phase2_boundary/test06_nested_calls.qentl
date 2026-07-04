@@ -1,15 +1,16 @@
-@qcl
-def bell q0 q1
+def bell(q0, q1):
+{
     H q0
     CNOT q0 q1
-end
+}
 
-def swap q0 q1 q2
-    call bell q0 q1
-    call bell q1 q2
-end
+def swap(q0, q1, q2):
+{
+    call bell(q0, q1)
+    call bell(q1, q2)
+}
 
 init q0 q1 q2 q3
-call bell q0 q1
-call swap q1 q2 q3
+call bell(q0, q1)
+call swap(q1, q2, q3)
 STOP

@@ -41,7 +41,8 @@ typedef enum {
     OP_STORE_REG = 9,
     OP_JUMP      = 10,
     OP_PRINT     = 11,
-    OP_ADD       = 12,
+    OP_ADD       = 13,   // 与qvm_bootstrap.c对齐
+    OP_SUB       = 14,
     OP_DIV       = 14,
     OP_MUL       = 15,
     OP_EXIT      = 17,
