@@ -581,7 +581,6 @@ static int L_is_double_slash(Parser *P) {
 /* ==================== 函数体解析 ==================== */
 static void parse_func_body(Parser *P) {
     P->func_depth++;
-    write_opcode(OP_FUNC_DEF);
     int d = 1;
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
