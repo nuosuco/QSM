@@ -186,7 +186,7 @@ typedef struct {
 static void lexer_skip_ws(Lexer *L) {
     while (L->pos < L->len) {
         int ch = (unsigned char)L->src[L->pos];
-        if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
+        if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' || ch == '\f' || ch == '\v') {
             if (ch == '\n') { L->line++; L->col = 1; }
             L->pos++; L->col++;
         }
@@ -307,6 +307,7 @@ static void lexer_next(Lexer *L) {
         case '.': t->kind=TOK_DOT;    break;
         case ';': t->kind=TOK_SEMI;   break;
         case ':': t->kind=TOK_COLON;  break;
+        case '#': t->kind=TOK_HASH;   break;
         default:  t->kind=TOK_ERR;    break;
     }
     t->text[0] = (char)ch; t->text[1] = '\0';
@@ -495,10 +496,18 @@ static int parse_type_def(Parser *P) {
     int field_count = 0;
     while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_RBRACE) {
         lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        if (P->lexer.cur.kind == TOK_HASH) { consume(P); continue; }
         if (P->lexer.cur.kind == TOK_IDENT) {
             const char *fname = P->lexer.cur.text;
             consume(P);
-            if (expect_tok(P, TOK_COLON)) {
+            lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+            if (P->lexer.cur.kind == TOK_HASH) continue;
+            if (P->lexer.cur.kind == TOK_EQ) {
+                /* Name = value 枚举风格字段 */
+                consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+                if (P->lexer.cur.kind == TOK_NUMBER) { consume(P); }
+            } else if (P->lexer.cur.kind == TOK_COLON) {
+                consume(P);
                 lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
                 if (P->lexer.cur.kind == TOK_IDENT) {
                     const char *ftype = P->lexer.cur.text;
@@ -510,6 +519,9 @@ static int parse_type_def(Parser *P) {
                 }
             }
             expect_tok(P, TOK_COMMA);
+        } else if (P->lexer.cur.kind == TOK_IDENT && kw(&P->lexer.cur, "var")) {
+            /* var 在类型体中出现时跳过 */
+            consume(P);
         } else break;
     }
     write_u16((unsigned short)field_count);
@@ -838,8 +850,12 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         Token cur = P.lexer.cur;
         fprintf(stderr, "[main] cur=%s kind=%d line=%d\n", cur.text, cur.kind, P.lexer.line);
         /* 跳过 # 注释（单行）和 // 注释 */
-        if (cur.kind == TOK_HASH || L_is_double_slash(&P.lexer)) {
+        if (cur.kind == TOK_HASH) {
             skip_to_semi(&P); continue;
+        }
+        if (P.lexer.pos + 1 < P.lexer.len && P.lexer.src[P.lexer.pos] == '/' && P.lexer.src[P.lexer.pos+1] == '/') {
+            /* 注：lexer_next 已处理 // 注释，此行通常不会到达 */
+            consume(&P); continue;
         }
         if (parse_quantum_instruction(&P)) { stats.quantum_lines++; continue; }
         if (kw(&cur, "import")) {
