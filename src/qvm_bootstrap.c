@@ -118,11 +118,6 @@ static void qvm_reset(QVM *vm, int n) {
     vm->ops = 0;
 }
 
-static complex_t c_mul(complex_t a, complex_t b) {
-    return (complex_t){a.real * b.real - a.imag * b.imag,
-                       a.real * b.imag + a.imag * b.real};
-}
-
 /* 安全读取string_pool中的字符串，避免越界 */
 static char *read_string(char *buf, int bufsize, uint8_t *sp_data, int sp_len, int off, int len) {
     if (!buf || bufsize <= 0 || !sp_data || sp_len <= 0) return NULL;
@@ -209,17 +204,12 @@ static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
         }
         printf("[QVM] 测量 q%d -> r%d = %d [坍缩 prob0=%.4f prob1=%.4f]\n", op1, op2, result, prob0, prob1);
     } else if (opcode == OP_RESET) {
-        /* 真实 RESET：等同于测量+强制置|0>（已含在measure坍缩逻辑中） */
+        /* 真实 RESET：等同于测量+强制置|0> */
         if (op1 >= n) goto end_gate;
-        for (int s = 0; s < size; s++) {
-            if (((s >> op1) & 1) != 0) { vm->state[s].real = 0.0; vm->state[s].imag = 0.0; }
-        }
-        /* 重归一化 |0...0> 态 */
         double p = vm->state[0].real * vm->state[0].real + vm->state[0].imag * vm->state[0].imag;
         if (p > 0.0) {
             double inv = 1.0 / sqrt(p);
             for (int s = 0; s < size; s++) {
-                int pair = s ^ (1 << op1);
                 if (((s >> op1) & 1) == 0) { vm->state[s].real *= inv; vm->state[s].imag *= inv; }
                 else { vm->state[s].real = 0.0; vm->state[s].imag = 0.0; }
             }
@@ -331,7 +321,7 @@ int main(int argc, char *argv[]) {
         int max_search = (fsize > 5000) ? 5000 : fsize;
         for (int i = 2; i < max_search - 1; i++) {
             unsigned short spl = code[i] | (code[i + 1] << 8);
-            if (i + 2 + (int)spl == fsize && spl >= 0) {
+            if (i + 2 + (int)spl == fsize) {
                 code_len = i - 1;            /* 代码区长度 = sp_len 字段位置 - 魔数(1字节) */
                 sp_data = code + i + 2;      /* string_pool 起始 */
                 sp_len = fsize - (i + 2);    /* 实际 string_pool 长度 */
@@ -489,6 +479,7 @@ int main(int argc, char *argv[]) {
                    n ? n : "(unknown)", nargs, nest);
             func_nest_depth++;
             strncpy(last_func_name, name, sizeof(last_func_name) - 1);
+            last_func_name[sizeof(last_func_name) - 1] = '\0';
             high_count++;
             break;
         }
