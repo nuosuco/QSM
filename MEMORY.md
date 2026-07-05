@@ -101,7 +101,7 @@
 | 阶段3 | 🟡 **94%** | **qcl_lexer 561字节（TYPE_DEF=3）** ✅；**QCL引导器 DEF=17/END=17** ✅；**qcl_compiler_phase2 499字节（DEF=12/END=12）** ✅；**parse_compound_block 实现成功** ✅；**class语法已实现** ✅（L1122-1131）；**经典5平台6模块已编译** ✅；**量子3部署9模块已编译** ✅；**qcl_bootstrap_phase2 DEF/END 修复** ✅（bootstrap_phase2()缺}已落盘，3515B可编译产出）✅；**qcl_phase2.c=1394行(+434)** ✅；**残留：skip_brace_block 仍残留6处调用** ⚠️ |
 | 阶段4 | 🟡 **45%** | **qvm_bootstrap opcode扩展成功** ✅（32个case OP_处理，456行，commit bb55146）✅；**qcl_phase2 class 语法支持已实现** ✅；QVM.qbc=1016字节 ✅；**QDFS=32个.qbc ✅；QNS=15个.qbc ✅；经典5平台=6个.qbc ✅；量子3部署=9个.qbc ✅**（共95个.qbc已编译，四大模型40+QDFS32+QNS15+经典5平台8+量子3部署3+VM29=134+其他21=155？以实测为准）；**四大模型40个+VM29个.qentl 全部编译** ✅；**残留：29个VM源码 emit=1797字节，函数数=102（class语法已实现，函数体正常emit）** ⚠️；**QVM.qbc仍不含完整VM执行体** ⚠️ |
 | 阶段5 | 🔴 12% | **qcl_compiler_phase2 完整编译器验证通过** ✅（499字节，DEF=12/END=12配对完整）；QDFS文件已编译 ✅；**需阶段4 QEntL环境完全形成** |
-| 阶段6 | 🔴 **18%** | **QDFS=32 + QNS=15 + 经典5平台=6 + 量子3部署=9（实测约155个.qbc）** ✅；**四大模型40个.qbc已编译** ✅；**VM29个.qentl已编译** ✅；**残留：29个VM源码 emit 函数=0被skip_to_semi丢弃，System其余模块待编译** ⏳ |
+| 阶段6 | 🔴 **18%** | **QDFS=32 + QNS=15 + 经典5平台=6 + 量子3部署=9（实测约155个.qbc）** ✅；**四大模型40个.qbc已编译** ✅；**VM29个.qentl已编译** ✅；**残留：29个VM源码 emit 函数=102（class语法已实现），System其余模块待编译** ⏳ |
 | 阶段7 | 🔴 0% | 需阶段6完成 |
 | 阶段8 | 🔴 0% | 需阶段7完成 |
 
