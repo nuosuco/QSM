@@ -1344,8 +1344,12 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     P.lexer.line = 1; P.lexer.col = 1;
     lexer_next(&P.lexer);
 
-    /* 首字节 0x14 */
+    /* 首字节 0x14 + 3字节0x00 padding + code_len(LE16) 头部 */
+    /* 格式: [0x14 | 0x00 | 0x00 | 0x00 | code_len(LE16) | CODE | sp_len(LE16) | string_pool] */
     write_byte(BC_MAGIC);
+    write_byte(0x00);
+    write_byte(0x00);
+    write_byte(0x00);
 
     while (P.lexer.cur.kind != TOK_EOF) {
         /* 跳过空白（含换行） */

@@ -204,15 +204,15 @@ int compile_file_v2(const char *input_path, const char *output_path) {
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "用法: %s <input.qentl> [output.qbc]\\n", argv[0]);
-        fprintf(stderr, "\\nQCL引导编译器 v2 - 最小化C语言引导编译器\\n");
-        fprintf(stderr, "将QEntL源码编译为QVM可执行的.qbc字节码\\n");
-        fprintf(stderr, "\\n支持指令:\\n");
-        fprintf(stderr, "  量子门: init, H, X, Y, Z, T, S, CNOT, SWAP, MEASURE, RESET, BARRIER\\n");
-        fprintf(stderr, "  高级语法: 导入, 量子模块, 类型, 函数, 如果, 返回, new, .长度, 随机\\n");
-        fprintf(stderr, "  运算符: ===, !==, ==, !=, <, >, +, -, *, /\\n");
-        fprintf(stderr, "  控制流: 否则, 循环, 跳出, 继续\\n");
-        fprintf(stderr, "\\n注: 高级QEntL语法(类定义、函数体等)会被简化处理\\n");
+        fprintf(stderr, "用法: %s <input.qentl> [output.qbc]\n", argv[0]);
+        fprintf(stderr, "\nQCL引导编译器 v2 - 最小化C语言引导编译器\n");
+        fprintf(stderr, "将QEntL源码编译为QVM可执行的.qbc字节码\n");
+        fprintf(stderr, "\n支持指令:\n");
+        fprintf(stderr, "  量子门: init, H, X, Y, Z, T, S, CNOT, SWAP, MEASURE, RESET, BARRIER\n");
+        fprintf(stderr, "  (bootstrap仅支持量子指令子集；类/函数体等高级语法由qcl_phase2/QCL编译器处理)\n");
+        fprintf(stderr, "  运算符: ===, !==, ==, !=, <, >, +, -, *, /\n");
+        fprintf(stderr, "  控制流: 否则, 循环, 跳出, 继续\n");
+        fprintf(stderr, "\n注: 高级QEntL语法(类定义、函数体等)会被简化处理\n");
         return 1;
     }
     
@@ -223,16 +223,16 @@ int main(int argc, char *argv[]) {
         char tmp_qbc[512];
         snprintf(tmp_qbc, sizeof(tmp_qbc), "/tmp/qcl_exec_%d.qbc", getpid());
         
-        fprintf(stderr, "[QCL] 执行模式：编译 %s → %s\\n", input, tmp_qbc);
+        fprintf(stderr, "[QCL] 执行模式：编译 %s → %s\n", input, tmp_qbc);
         int ret = compile_file_v2(input, tmp_qbc);
         if (ret != 0) {
-            fprintf(stderr, "[QCL] 编译失败\\n");
+            fprintf(stderr, "[QCL] 编译失败\n");
             return ret;
         }
         
         char cmd[1024];
         snprintf(cmd, sizeof(cmd), "bin/qvm_bootstrap %s", tmp_qbc);
-        fprintf(stderr, "[QCL] 调用QVM执行 %s\\n", cmd);
+        fprintf(stderr, "[QCL] 调用QVM执行 %s\n", cmd);
         ret = system(cmd);
         
         // 清理临时文件
