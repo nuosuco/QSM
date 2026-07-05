@@ -386,8 +386,12 @@ static void parse_compound_block(Parser *P) {
                 }
             }
             if (expect_tok(P, TOK_COLON)) {}
-            if (P->lexer.cur.kind == TOK_LBRACE) parse_func_body(P);
-            else skip_to_semi(P);
+            if (P->lexer.cur.kind == TOK_LBRACE) {
+                write_high_opcode(BC_FUNC_BODY);
+                parse_func_body(P);
+                write_high_opcode(BC_FUNC_END);
+                flush_highbuf();
+            } else skip_to_semi(P);
             continue;
         }
         if (kw(&t, "import")) { if (parse_import(P)) continue; }
@@ -757,8 +761,12 @@ static void parse_class_body(Parser *P) {
             kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override")) {
             consume(P); continue;
         }
-        /* 跳过 this. 调用开头的 this */
-        if (kw(&t, "this")) { consume(P); continue; }
+        /* 跳过 this. 调用开头的 this（跟随跳过到分号） */
+        if (kw(&t, "this")) {
+            consume(P);
+            /* this.X = ...; 或 this.X(); — 跳整个语句 */
+            skip_to_semi(P); continue;
+        }
         /* 跳过 super( ... ) 调用 */
         if (kw(&t, "super")) { consume(P);
             if (P->lexer.cur.kind == TOK_LPAR) {
@@ -794,8 +802,13 @@ static void parse_class_body(Parser *P) {
             }
             if (expect_tok(P, TOK_COLON)) {}
             if (P->lexer.cur.kind == TOK_LBRACE) {
+                /* 方法体：包裹 BC_FUNC_BODY/BC_FUNC_END（与 parse_def 一致） */
+                flush_highbuf();
+                write_high_opcode(BC_FUNC_BODY);
                 parse_class_body(P);
-                write_high_opcode(OP_FUNC_END); /* 方法体闭合 */
+                write_high_opcode(BC_FUNC_END);
+                flush_highbuf();
+                write_high_opcode(OP_FUNC_END); /* 方法闭合 */
             } else {
                 skip_to_semi(P);
             }
@@ -1299,9 +1312,9 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         if (kw(&cur, "def") || kw(&cur, "函数")) {
             if (parse_def(&P)) { stats.functions++; stats.high_level_lines++; continue; }
         }
-        /* class / quantum_class / enum 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）
-           注意：此分支在 export 之前，以处理 "export class Foo { ... }" 语法 */
-        if (kw(&cur, "class") || kw(&cur, "quantum_class") || kw(&cur, "enum")) {
+        /* class / quantum_class / enum / interface 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）
+           注意：此分支在 export 之前，以处理 "export class Foo { ... }" 和 "export interface Foo { ... }" 语法 */
+        if (kw(&cur, "class") || kw(&cur, "quantum_class") || kw(&cur, "enum") || kw(&cur, "interface")) {
             consume(&P); /* 消耗 class / quantum_class，cur 推进到类名 */
             if (P.lexer.cur.kind == TOK_IDENT) {
                 write_opcode(OP_TYPE_DEF); write_string_ref(P.lexer.cur.text);

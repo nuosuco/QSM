@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
     fread(code, 1, fsize, f);
     fclose(f);
 
-    /* 解析QEntL字节码头: [0]=0x14魔数, [1:3]=代码长度(le16), [3:3+code_len]=代码区, [3+code_len:3+code_len+2]=string_pool长度, [3+code_len+2:]=string_pool */
+    /* 解析QEntL字节码头: [0]=0x14魔数, [1:3]=代码长度(le16), [3:3+code_len]=代码区, [3+code_len:3+code_len+2]=string_pool长度(声明值), [3+code_len+2:]=string_pool */
     int sp_len = 0;
     uint8_t *sp_data = NULL;
     int code_len = 0;
@@ -211,8 +211,10 @@ int main(int argc, char *argv[]) {
         code_len = code[1] | (code[2] << 8);
         if (3 + code_len + 2 <= fsize) {
             unsigned short spl = code[3 + code_len] | (code[3 + code_len + 1] << 8);
-            sp_len = spl;
             sp_data = code + 3 + code_len + 2;
+            /* 声明的spl可能因编译器g_strpool_pos溢出而错误，用实际可用空间 */
+            int actual = fsize - (3 + code_len + 2);
+            sp_len = (spl < actual) ? spl : actual;
         }
     }
 
@@ -280,22 +282,40 @@ int main(int argc, char *argv[]) {
         case OP_SWAP: { int a = code[pos++], b = code[pos++]; (void)a; (void)b; break; }
         /* ---------- 高级语法opcode（100+）: 为QEntL环境铺垫 ---------- */
         case OP_IMPORT: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int len = code[pos++] | ((s1 & 0xFF) << 8);
-                    printf("[QVM] 高级opcode: OP_IMPORT (skip %d B)\n", len + 2);
-                    high_count++;
-                }}
+            /* 格式: u16(string_pool_offset) + u16(length) */
+            if (pos + 3 <= fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int len = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                if (sp_data && off + len <= sp_len && off + len <= fsize - (3 + code_len + 2)) {
+                    char name[256] = {0};
+                    int safe_len = (len < 255) ? len : 255;
+                    memcpy(name, sp_data + off, safe_len);
+                    printf("[QVM] 高级opcode: OP_IMPORT(name=\"%s\")\n", name);
+                } else {
+                    printf("[QVM] 高级opcode: OP_IMPORT (off=%d, len=%d) [string_pool不可用]\n", off, len);
+                }
+                high_count++;
+            }
             break;
         }
         case OP_CONST_DEF: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int slen = code[pos++] | ((s1 & 0xFF) << 8);
-                    int sval = 0;
-                    if (pos < fsize) { sval = code[pos++]; }
-                    if (pos < fsize) { sval |= code[pos++] << 8; }
-                    printf("[QVM] 高级opcode: OP_CONST_DEF (name_skip=%d, value=%d)\n", slen, sval);
-                    high_count++;
-                }}
+            /* 格式: u16(string_pool_offset) + u16(length) + u16(value) */
+            if (pos + 4 <= fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int len = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                int sval = 0;
+                if (pos + 1 < fsize) { sval = code[pos] | (code[pos+1] << 8); pos += 2; }
+                char name[128] = {0};
+                if (sp_data && off + len <= sp_len && len < 127) {
+                    memcpy(name, sp_data + off, len); name[len] = 0;
+                    printf("[QVM] 高级opcode: OP_CONST_DEF(name=\"%s\", value=%d)\n", name, sval);
+                } else {
+                    printf("[QVM] 高级opcode: OP_CONST_DEF (off=%d, len=%d, value=%d)\n", off, len, sval);
+                }
+                high_count++;
+            }
             break;
         }
         case OP_FUNC_DEF: {
@@ -303,13 +323,14 @@ int main(int argc, char *argv[]) {
             char fn[128] = {0};
             int off = 0, flen = 0, nargs = 0;
             /* 字节码格式: u16(string_pool_offset) + u16(flen) + u8(nargs) */
-            if (pos < fsize) { off = code[pos++]; }
-            if (pos < fsize) { off |= code[pos++] << 8; }
-            if (pos < fsize) { flen = code[pos++]; }
-            if (pos < fsize) { flen |= code[pos++] << 8; }
+            if (pos + 4 <= fsize) {
+                off = code[pos] | (code[pos+1] << 8);
+                flen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+            }
             if (pos < fsize) nargs = code[pos++];
-            /* 读取 string pool 中的函数名（offset 为 string pool 内相对偏移） */
-            if (off + flen <= sp_len && flen > 0 && flen < 128) {
+            /* 读取 string pool 中的函数名 */
+            if (sp_data && off + flen <= sp_len && flen > 0 && flen < 128) {
                 memcpy(fn, sp_data + off, flen); fn[flen] = 0;
             }
             printf("[QVM] 高级opcode: OP_FUNC_DEF(%s, nargs=%d) depth=%d\n",
@@ -329,19 +350,35 @@ int main(int argc, char *argv[]) {
             break;
         }
         case OP_TYPE_DEF: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int tlen = code[pos++] | ((s1 & 0xFF) << 8);
-                    printf("[QVM] 高级opcode: OP_TYPE_DEF(name_skip=%d)\n", tlen);
-                    high_count++;
-                }}
+            if (pos + 3 <= fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int tlen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                char name[128] = {0};
+                if (sp_data && off + tlen <= sp_len && tlen < 127) {
+                    memcpy(name, sp_data + off, tlen); name[tlen] = 0;
+                    printf("[QVM] 高级opcode: OP_TYPE_DEF(name=\"%s\")\n", name);
+                } else {
+                    printf("[QVM] 高级opcode: OP_TYPE_DEF (off=%d, len=%d)\n", off, tlen);
+                }
+                high_count++;
+            }
             break;
         }
         case OP_VAR_DECL: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int vlen = code[pos++] | ((s1 & 0xFF) << 8);
-                    printf("[QVM] 高级opcode: OP_VAR_DECL(var_skip=%d)\n", vlen);
-                    high_count++;
-                }}
+            if (pos + 3 <= fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int vlen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                char name[128] = {0};
+                if (sp_data && off + vlen <= sp_len && vlen < 127) {
+                    memcpy(name, sp_data + off, vlen); name[vlen] = 0;
+                    printf("[QVM] 高级opcode: OP_VAR_DECL(var=\"%s\")\n", name);
+                } else {
+                    printf("[QVM] 高级opcode: OP_VAR_DECL (off=%d, len=%d)\n", off, vlen);
+                }
+                high_count++;
+            }
             break;
         }
         case OP_RETURN_STMT: {
@@ -377,21 +414,34 @@ int main(int argc, char *argv[]) {
             break;
         }
         case OP_ASSIGN: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int vlen = code[pos++] | ((s1 & 0xFF) << 8);
-                    printf("[QVM] 高级opcode: OP_ASSIGN(var_skip=%d)\n", vlen);
-                    high_count++;
-                }}
+            if (pos + 3 <= fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int vlen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                char name[128] = {0};
+                if (sp_data && off + vlen <= sp_len && vlen < 127) {
+                    memcpy(name, sp_data + off, vlen); name[vlen] = 0;
+                    printf("[QVM] 高级opcode: OP_ASSIGN(var=\"%s\")\n", name);
+                } else {
+                    printf("[QVM] 高级opcode: OP_ASSIGN (off=%d, len=%d)\n", off, vlen);
+                }
+                high_count++;
+            }
             break;
         }
         case OP_FUNC_CALL: {
             int off = 0, flen = 0, nargs = 0;
-            if (pos < fsize) { off = code[pos++]; }
-            if (pos < fsize) { off |= code[pos++] << 8; }
-            if (pos < fsize) { flen = code[pos++]; }
-            if (pos < fsize) { flen |= code[pos++] << 8; }
+            if (pos + 4 <= fsize) {
+                off = code[pos] | (code[pos+1] << 8);
+                flen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+            }
             if (pos < fsize) nargs = code[pos++];
-            printf("[QVM] 高级opcode: OP_FUNC_CALL(off=%d, flen=%d, nargs=%d)\n", off, flen, nargs);
+            char fn[128] = {0};
+            if (sp_data && off + flen <= sp_len && flen > 0 && flen < 128) {
+                memcpy(fn, sp_data + off, flen); fn[flen] = 0;
+            }
+            printf("[QVM] 高级opcode: OP_FUNC_CALL(%s, nargs=%d)\n", fn[0] ? fn : "(unknown)", nargs);
             high_count++;
             break;
         }
@@ -427,11 +477,19 @@ int main(int argc, char *argv[]) {
             break;
         }
         case OP_EXPORT_SYM: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int slen = code[pos++] | ((s1 & 0xFF) << 8);
-                    printf("[QVM] 高级opcode: OP_EXPORT_SYM(skip %d B)\n", slen + 2);
-                    high_count++;
-                }}
+            if (pos + 3 <= fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int slen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                char name[128] = {0};
+                if (sp_data && off + slen <= sp_len && slen < 127) {
+                    memcpy(name, sp_data + off, slen); name[slen] = 0;
+                    printf("[QVM] 高级opcode: OP_EXPORT_SYM(name=\"%s\")\n", name);
+                } else {
+                    printf("[QVM] 高级opcode: OP_EXPORT_SYM (off=%d, len=%d)\n", off, slen);
+                }
+                high_count++;
+            }
             break;
         }
         case BC_FUNC_BODY: {
