@@ -536,6 +536,7 @@ static int  parse_def(Parser *P);
 static int  parse_export(Parser *P);
 static void parse_func_body(Parser *P);
 static int  parse_top_statement(Parser *P);
+static void parse_class_body(Parser *P);
 
 /* ==================== 量子指令解析 ==================== */
 static int parse_quantum_instruction(Parser *P) {
@@ -743,6 +744,183 @@ static int L_is_double_slash(Parser *P) {
     return (sp + 1 < P->lexer.len && P->lexer.src[sp] == '/' && P->lexer.src[sp+1] == '/');
 }
 
+/* ==================== class 体解析（递归解析方法） ==================== */
+static void parse_class_body(Parser *P) {
+    int d = 1;
+    while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
+        Token t = P->lexer.cur;
+        if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
+        if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
+
+        /* 跳过修饰符：private / public / protected / static / virtual / override */
+        if (kw(&t, "private") || kw(&t, "public") || kw(&t, "protected") ||
+            kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override")) {
+            consume(P); continue;
+        }
+        /* 跳过 this. 调用开头的 this */
+        if (kw(&t, "this")) { consume(P); continue; }
+        /* 跳过 super( ... ) 调用 */
+        if (kw(&t, "super")) { consume(P);
+            if (P->lexer.cur.kind == TOK_LPAR) {
+                int pd = 1; consume(P);
+                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                    consume(P);
+                }
+            }
+            skip_to_semi(P); continue;
+        }
+        /* 方法定义：def / 函数 / constructor */
+        if (kw(&t, "def") || kw(&t, "函数") || kw(&t, "constructor")) {
+            consume(P); /* def/函数/constructor → cur 已推进到函数名 */
+            if (P->lexer.cur.kind == TOK_IDENT) {
+                write_high_opcode(OP_FUNC_DEF);
+                write_string_ref(P->lexer.cur.text);
+                consume(P); /* 函数名 */
+            } else {
+                /* constructor() 或 constructor(...) 紧跟 (，无名字 */
+                write_high_opcode(OP_FUNC_DEF);
+                write_string_ref("_constructor");
+            }
+            /* 跳过参数列表 ( ...) */
+            if (P->lexer.cur.kind == TOK_LPAR) {
+                int pd = 1; consume(P);
+                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                    consume(P);
+                }
+            }
+            if (expect_tok(P, TOK_COLON)) {}
+            if (P->lexer.cur.kind == TOK_LBRACE) parse_class_body(P);
+            else skip_to_semi(P);
+            continue;
+        }
+        /* var 字段声明 */
+        if (kw(&t, "var")) {
+            consume(P);
+            if (P->lexer.cur.kind == TOK_IDENT) {
+                write_high_opcode(OP_VAR_DECL);
+                write_string_ref(P->lexer.cur.text);
+                consume(P);
+            }
+            if (expect_tok(P, TOK_EQ)) {
+                if (P->lexer.cur.kind == TOK_NUMBER) {
+                    write_high_opcode(OP_PUSH_CONST_INT);
+                    write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_IDENT) {
+                    write_high_opcode(OP_PUSH_CONST_STR);
+                    write_string_ref(P->lexer.cur.text);
+                    consume(P);
+                }
+            }
+            skip_to_semi(P); continue;
+        }
+        /* import / const / 类型 / export 等顶层语法 */
+        if (kw(&t, "import")) { if (parse_import(P)) continue; }
+        if (kw(&t, "const"))  { if (parse_const(P))  continue; }
+        if (kw(&t, "类型"))   { if (parse_type_def(P)) continue; }
+        if (kw(&t, "export")) { if (parse_export(P)) continue; }
+
+        /* 控制流：if / return / while / break / continue */
+        if (kw(&t, "如果") || kw(&t, "if")) {
+            consume(P);
+            if (P->lexer.cur.kind == TOK_LPAR) {
+                int pd = 1; consume(P);
+                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                    consume(P);
+                }
+            }
+            write_high_opcode(OP_IF_STMT);
+            if (P->lexer.cur.kind == TOK_COLON) consume(P);
+            if (P->lexer.cur.kind == TOK_LBRACE) parse_class_body(P);
+            else skip_to_semi(P);
+            continue;
+        }
+        if (kw(&t, "返回") || kw(&t, "return")) {
+            consume(P);
+            if (P->lexer.cur.kind == TOK_SEMI) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(0); consume(P);
+            } else if (P->lexer.cur.kind == TOK_IDENT) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(1);
+                write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi(P);
+            } else if (P->lexer.cur.kind == TOK_NUMBER) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(2);
+                write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                consume(P); skip_to_semi(P);
+            } else if (P->lexer.cur.kind == TOK_STRING) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(3);
+                write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi(P);
+            } else skip_to_semi(P);
+            continue;
+        }
+        if (kw(&t, "循环") || kw(&t, "while")) {
+            consume(P);
+            if (P->lexer.cur.kind == TOK_LPAR) {
+                int pd = 1; consume(P);
+                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                    consume(P);
+                }
+            }
+            write_high_opcode(OP_WHILE_STMT);
+            if (P->lexer.cur.kind == TOK_COLON) consume(P);
+            if (P->lexer.cur.kind == TOK_LBRACE) parse_class_body(P);
+            else skip_to_semi(P);
+            continue;
+        }
+        if (kw(&t, "跳出") || kw(&t, "break") || kw(&t, "继续") || kw(&t, "continue")) {
+            consume(P); skip_to_semi(P); continue;
+        }
+        /* 注释 */
+        if (t.kind == TOK_HASH || (t.kind == TOK_SLASH && L_is_double_slash(P))) {
+            skip_to_semi(P); continue;
+        }
+        /* 普通标识符：可能是赋值、函数调用、或裸语句 */
+        if (t.kind == TOK_IDENT) {
+            const char *nm = P->lexer.cur.text;
+            consume(P);
+            if (P->lexer.cur.kind == TOK_LPAR) { /* 函数调用 */
+                int pd = 1; consume(P);
+                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                    consume(P);
+                }
+                write_high_opcode(OP_FUNC_CALL_STMT); write_string_ref(nm);
+                skip_to_semi(P); continue;
+            }
+            if (P->lexer.cur.kind == TOK_EQ) { /* 赋值 */
+                write_high_opcode(OP_ASSIGN_STMT); write_string_ref(nm);
+                consume(P);
+                if (P->lexer.cur.kind == TOK_NUMBER) {
+                    write_high_opcode(OP_PUSH_CONST_INT);
+                    write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_IDENT) {
+                    write_high_opcode(OP_PUSH_CONST_STR);
+                    write_string_ref(P->lexer.cur.text); consume(P);
+                }
+                skip_to_semi(P); continue;
+            }
+            skip_to_semi(P); continue;
+        }
+        /* 其他 token：分号、逗号、括号直接推进 */
+        if (t.kind == TOK_SEMI || t.kind == TOK_COMMA ||
+            t.kind == TOK_COLON || t.kind == TOK_LPAR || t.kind == TOK_RPAR) {
+            consume(P); continue;
+        }
+        /* 无法识别的 token：推进 */
+        consume(P);
+    }
+    flush_highbuf();
+}
+
 /* ==================== 函数体解析 ==================== */
 static void parse_func_body(Parser *P) {
     P->func_depth++;
@@ -771,6 +949,7 @@ static void parse_func_body(Parser *P) {
             if (expect_tok(P, TOK_COLON)) {}
             if (P->lexer.cur.kind == TOK_LBRACE) parse_func_body(P);
             else skip_to_semi(P);
+            write_high_opcode(OP_FUNC_END); /* 嵌套 def 必须闭合 OP_FUNC_END */
             continue;
         }
         if (kw(&t, "import")) { if (parse_import(P)) continue; }
@@ -1116,7 +1295,8 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         if (kw(&cur, "def") || kw(&cur, "函数")) {
             if (parse_def(&P)) { stats.functions++; stats.high_level_lines++; continue; }
         }
-        /* class / quantum_class / enum 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）*/
+        /* class / quantum_class / enum 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）
+           注意：此分支在 export 之前，以处理 "export class Foo { ... }" 语法 */
         if (kw(&cur, "class") || kw(&cur, "quantum_class") || kw(&cur, "enum")) {
             consume(&P); /* 消耗 class / quantum_class，cur 推进到类名 */
             if (P.lexer.cur.kind == TOK_IDENT) {
@@ -1124,7 +1304,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
                 consume(&P);
             }
             if (P.lexer.cur.kind == TOK_LBRACE) {
-                skip_brace_block(&P); /* 跳过整个 class { ... } */
+                parse_class_body(&P); /* 递归解析 class 体内的方法 */
             } else {
                 skip_to_semi(&P);
             }
@@ -1135,6 +1315,24 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         }
         if (kw(&cur, "export")) {
             if (parse_export(&P)) { stats.exports++; stats.high_level_lines++; continue; }
+        }
+        /* export class / export enum 的 class 关键字已消耗在 parse_export 中，
+           若 parse_export 失败且下一个 token 是 class/enum，作为类型定义处理 */
+        if (kw(&cur, "class") || kw(&cur, "quantum_class") || kw(&cur, "enum")) {
+            consume(&P); /* 消耗 class / quantum_class，cur 推进到类名 */
+            if (P.lexer.cur.kind == TOK_IDENT) {
+                write_opcode(OP_TYPE_DEF); write_string_ref(P.lexer.cur.text);
+                consume(&P);
+            }
+            if (P.lexer.cur.kind == TOK_LBRACE) {
+                parse_class_body(&P); /* 递归解析 class 体内的方法 */
+            } else {
+                skip_to_semi(&P);
+            }
+            write_opcode(OP_TYPE_END);
+            flush_highbuf();
+            stats.types++; stats.high_level_lines++;
+            continue;
         }
         if (kw(&cur, "var")) {
             parse_top_statement(&P); stats.high_level_lines++; continue;

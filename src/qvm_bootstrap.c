@@ -203,13 +203,26 @@ int main(int argc, char *argv[]) {
     fread(code, 1, fsize, f);
     fclose(f);
 
+    /* 解析QEntL字节码头: [0]=0x14魔数, [1:3]=string_pool长度(le16), [3:3+sp_len]=代码区 */
+    int sp_len = 0;
+    uint8_t *sp_data = NULL;
+    if (fsize > 3 && code[0] == 0x14) {
+        sp_len = code[1] | (code[2] << 8);
+        if (3 + sp_len <= fsize) {
+            sp_data = code + 3 + sp_len;
+        }
+    }
+
     QVM vm;
     vm.state = NULL;
     int pos = 0;
+    /* 对QEntL字节码（0x14格式），从代码区开始执行（跳过string_pool段） */
+    if (sp_data) pos = 3 + sp_len;
     int func_nest_depth = 0;   /* OP_FUNC_DEF/END 嵌套计数器 */
     char last_func_name[128] = {0};
     int high_count = 0;        /* 高级opcode处理计数 */
     printf("[QVM] 初始化量子虚拟机\n");
+    if (sp_data) printf("[QVM] 加载QEntL字节码: sp_len=%d, 代码区起始=%d\n", sp_len, pos);
     while (pos < fsize) {
         uint8_t op = code[pos++];
         if (op == OP_INIT_N) {
@@ -285,23 +298,22 @@ int main(int argc, char *argv[]) {
         case OP_FUNC_DEF: {
             int nest = func_nest_depth;
             char fn[128] = {0};
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int flen = code[pos++] | ((s1 & 0xFF) << 8);
-                    if (flen > 0 && flen < 128) {
-                        int read_n = (flen < fsize - pos) ? flen : (fsize - pos);
-                        memcpy(fn, code + pos, read_n);
-                        fn[read_n] = 0;
-                        pos += read_n;
-                    }}
-                /* 读取参数数量（1字节） */
-                int nargs = 0;
-                if (pos < fsize) nargs = code[pos++];
-                printf("[QVM] 高级opcode: OP_FUNC_DEF(%s, nargs=%d) depth=%d\n",
-                       fn[0] ? fn : "(unknown)", nargs, nest);
-                func_nest_depth++;
-                strncpy(last_func_name, fn, sizeof(last_func_name) - 1);
-                high_count++;
+            int off = 0, flen = 0, nargs = 0;
+            /* 字节码格式: u16(string_pool_offset) + u16(flen) + u8(nargs) */
+            if (pos < fsize) { off = code[pos++]; }
+            if (pos < fsize) { off |= code[pos++] << 8; }
+            if (pos < fsize) { flen = code[pos++]; }
+            if (pos < fsize) { flen |= code[pos++] << 8; }
+            if (pos < fsize) nargs = code[pos++];
+            /* 读取 string pool 中的函数名（offset 为 string pool 内相对偏移） */
+            if (off + flen <= sp_len && flen > 0 && flen < 128) {
+                memcpy(fn, sp_data + off, flen); fn[flen] = 0;
             }
+            printf("[QVM] 高级opcode: OP_FUNC_DEF(%s, nargs=%d) depth=%d\n",
+                   fn[0] ? fn : "(unknown)", nargs, nest);
+            func_nest_depth++;
+            strncpy(last_func_name, fn, sizeof(last_func_name) - 1);
+            high_count++;
             break;
         }
         case OP_FUNC_END: {
@@ -370,13 +382,14 @@ int main(int argc, char *argv[]) {
             break;
         }
         case OP_FUNC_CALL: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int flen = code[pos++] | ((s1 & 0xFF) << 8);
-                    if (pos < fsize) { int nargs = code[pos++];
-                        printf("[QVM] 高级opcode: OP_FUNC_CALL(func_skip=%d, nargs=%d)\n", flen, nargs);
-                        high_count++;
-                    }}
-            }
+            int off = 0, flen = 0, nargs = 0;
+            if (pos < fsize) { off = code[pos++]; }
+            if (pos < fsize) { off |= code[pos++] << 8; }
+            if (pos < fsize) { flen = code[pos++]; }
+            if (pos < fsize) { flen |= code[pos++] << 8; }
+            if (pos < fsize) nargs = code[pos++];
+            printf("[QVM] 高级opcode: OP_FUNC_CALL(off=%d, flen=%d, nargs=%d)\n", off, flen, nargs);
+            high_count++;
             break;
         }
         case OP_PUSH_CONST_INT: {
