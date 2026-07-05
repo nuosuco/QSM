@@ -14,27 +14,35 @@
 #define MAX_CYCLES 10000
 #define FUNC_DEF_NEST_MAX 16
 
-/* 高级语法操作码 — 与qcl_phase2.c对齐（100+） */
+/* 高级语法操作码 — 与qcl_phase2.c严格对齐（编译器最新枚举） */
 #define OP_IMPORT          100
 #define OP_CONST_DEF       101
 #define OP_FUNC_DEF        102
 #define OP_FUNC_END        103
 #define OP_TYPE_DEF        104
-#define OP_VAR_DECL        105
-#define OP_RETURN_STMT     106
+#define OP_TYPE_END        105
+#define OP_VAR_DECL        106
+#define OP_RETURN_STMT     107
 #define OP_IF_STMT         108
-#define OP_WHILE_STMT      109
-#define OP_ELSE_STMT       110
-#define OP_BREAK_STMT      111
-#define OP_CONTINUE_STMT   112
-#define OP_ASSIGN          113
-#define OP_FUNC_CALL       114
+#define OP_ELSE_STMT       109
+#define OP_WHILE_STMT      110
+#define OP_ASSIGN_STMT     111
+#define OP_FUNC_CALL_STMT  112
+#define OP_BREAK_STMT      113
+#define OP_CONTINUE_STMT   114
 #define OP_PUSH_CONST_INT  120
 #define OP_PUSH_CONST_STR  121
-#define OP_NEW_OBJECT      122
-#define OP_LENGTH          123
-#define OP_RANDOM          124
+#define OP_APPEND_BYTE     130
+#define OP_BYTECODE_LEN    131
 #define OP_EXPORT_SYM      140
+#define OP_MODULE_DEF      141
+/* 平台选择opcode — 经典5平台 */
+#define OP_LINUX           200
+#define OP_WINDOWS         201
+#define OP_IOS             202
+#define OP_ANDROID         203
+#define OP_HARMONY         204
+/* BC_FUNC_BODY/END 标记函数体字节码边界 */
 #define BC_FUNC_BODY       255
 #define BC_FUNC_END        254
 
@@ -107,6 +115,16 @@ static void qvm_reset(QVM *vm, int n) {
 static complex_t c_mul(complex_t a, complex_t b) {
     return (complex_t){a.real * b.real - a.imag * b.imag,
                        a.real * b.imag + a.imag * b.real};
+}
+
+/* 安全读取string_pool中的字符串，避免越界 */
+static char *read_string(char *buf, int bufsize, uint8_t *sp_data, int sp_len, int off, int len) {
+    if (!buf || bufsize <= 0 || !sp_data || sp_len <= 0) return NULL;
+    if (off < 0 || len <= 0 || off + len > sp_len) return NULL;
+    int safe = (len < bufsize - 1) ? len : (bufsize - 1);
+    memcpy(buf, sp_data + off, safe);
+    buf[safe] = '\0';
+    return buf;
 }
 
 static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
@@ -203,32 +221,44 @@ int main(int argc, char *argv[]) {
     fread(code, 1, fsize, f);
     fclose(f);
 
-    /* 解析QEntL字节码头: [0]=0x14魔数, [1:3]=代码长度(le16), [3:3+code_len]=代码区, [3+code_len:3+code_len+2]=string_pool长度(声明值), [3+code_len+2:]=string_pool */
     int sp_len = 0;
     uint8_t *sp_data = NULL;
     int code_len = 0;
+    char name[256] = {0};       /* string_pool 安全读取缓冲区 */
+    /* qcl_phase2 实际输出格式: [MAGIC(0x14) | CODE(g_bc_pos bytes) | sp_len(2B LE16) | string_pool]
+       通过搜索 sp_len 字段位置来确定代码区边界（sp_len 必须满足 offset+2+sp_len==fsize） */
     if (fsize > 3 && code[0] == 0x14) {
-        code_len = code[1] | (code[2] << 8);
-        if (3 + code_len + 2 <= fsize) {
-            unsigned short spl = code[3 + code_len] | (code[3 + code_len + 1] << 8);
-            sp_data = code + 3 + code_len + 2;
-            /* 声明的spl可能因编译器g_strpool_pos溢出而错误，用实际可用空间 */
-            int actual = fsize - (3 + code_len + 2);
-            sp_len = (spl < actual) ? spl : actual;
+        int found = 0;
+        /* 在魔数后、文件尾部之前搜索 sp_len 字段 */
+        int max_search = (fsize > 5000) ? 5000 : fsize;
+        for (int i = 2; i < max_search - 1; i++) {
+            unsigned short spl = code[i] | (code[i + 1] << 8);
+            if (i + 2 + (int)spl == fsize && spl >= 0) {
+                code_len = i - 1;            /* 代码区长度 = sp_len 字段位置 - 魔数(1字节) */
+                sp_data = code + i + 2;      /* string_pool 起始 */
+                sp_len = fsize - (i + 2);    /* 实际 string_pool 长度 */
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            /* 搜索失败：退化为纯字节码（无 string_pool） */
+            code_len = fsize - 1;
         }
     }
 
     QVM vm;
     vm.state = NULL;
-    int pos = 3;       /* 代码区始终从偏移3开始（跳过头部魔数+长度） */
+    int pos = 1;       /* 代码区从魔数后开始（跳过0x14魔数1字节） */
     int func_nest_depth = 0;   /* OP_FUNC_DEF/END 嵌套计数器 */
     char last_func_name[128] = {0};
     int high_count = 0;        /* 高级opcode处理计数 */
     printf("[QVM] 初始化量子虚拟机\n");
     int code_end;          /* 代码区结束位置 */
     if (sp_data) {
-        code_end = 3 + code_len;
-        printf("[QVM] 加载QEntL字节码: code_len=%d, sp_len=%d, 代码区起始=3, string_pool起始=%d\n", code_len, sp_len, 3+code_len+2);
+        code_end = 1 + code_len;   /* 代码区 = [1, 1+code_len) */
+        printf("[QVM] 加载QEntL字节码: code_len=%d, sp_len=%d, 代码区起始=1, string_pool起始=%d\n",
+               code_len, sp_len, 1+code_len+2);
     } else {
         code_end = fsize;          /* 无头部时执行整个文件 */
         pos = 0;
@@ -285,168 +315,136 @@ int main(int argc, char *argv[]) {
         case OP_S:  { int q = code[pos++]; (void)q; break; }
         case OP_RESET: { int q = code[pos++]; (void)q; break; }
         case OP_SWAP: { int a = code[pos++], b = code[pos++]; (void)a; (void)b; break; }
-        /* ---------- 高级语法opcode（100+）: 为QEntL环境铺垫 ---------- */
+        /* ---------- 高级语法opcode（100+）: 与qcl_phase2.c严格对齐 ---------- */
         case OP_IMPORT: {
-            /* 格式: u16(string_pool_offset) + u16(length) */
-            if (pos + 3 <= fsize) {
+            if (pos + 3 < fsize) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int len = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
-                if (sp_data && off >= 0 && len > 0 && off + len <= sp_len && off + len <= fsize - (3 + code_len + 2) && len < 255) {
-                    char name[256] = {0};
-                    int safe_len = (len < 255) ? len : 255;
-                    memcpy(name, sp_data + off, safe_len);
-                    printf("[QVM] 高级opcode: OP_IMPORT(name=\"%s\")\n", name);
-                } else {
-                    printf("[QVM] 高级opcode: OP_IMPORT (off=%d, len=%d) [string_pool不可用]\n", off, len);
-                }
+                char *n = read_string(name, sizeof(name), sp_data, sp_len, off, len);
+                printf("[QVM] OP_IMPORT(%s)\n", n ? n : "(invalid)");
                 high_count++;
             }
             break;
         }
         case OP_CONST_DEF: {
-            /* 格式: u16(string_pool_offset) + u16(length) + u16(value) */
-            if (pos + 4 <= fsize) {
+            if (pos + 4 < fsize) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int len = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
                 int sval = 0;
                 if (pos + 1 < fsize) { sval = code[pos] | (code[pos+1] << 8); pos += 2; }
-                char name[128] = {0};
-                if (sp_data && off + len <= sp_len && len < 127) {
-                    memcpy(name, sp_data + off, len); name[len] = 0;
-                    printf("[QVM] 高级opcode: OP_CONST_DEF(name=\"%s\", value=%d)\n", name, sval);
-                } else {
-                    printf("[QVM] 高级opcode: OP_CONST_DEF (off=%d, len=%d, value=%d)\n", off, len, sval);
-                }
+                char *n = read_string(name, sizeof(name), sp_data, sp_len, off, len);
+                printf("[QVM] OP_CONST_DEF(%s = %d)\n", n ? n : "(invalid)", sval);
                 high_count++;
             }
             break;
         }
         case OP_FUNC_DEF: {
             int nest = func_nest_depth;
-            char fn[128] = {0};
             int off = 0, flen = 0, nargs = 0;
-            /* 字节码格式: u16(string_pool_offset) + u16(flen) + u8(nargs) */
-            if (pos + 4 <= fsize) {
+            if (pos + 4 < fsize) {
                 off = code[pos] | (code[pos+1] << 8);
                 flen = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
             }
             if (pos < fsize) nargs = code[pos++];
-            /* 读取 string pool 中的函数名 */
-            if (sp_data && off + flen <= sp_len && flen > 0 && flen < 128) {
-                memcpy(fn, sp_data + off, flen); fn[flen] = 0;
-            }
-            printf("[QVM] 高级opcode: OP_FUNC_DEF(%s, nargs=%d) depth=%d\n",
-                   fn[0] ? fn : "(unknown)", nargs, nest);
+            char *n = read_string(name, sizeof(name), sp_data, sp_len, off, flen);
+            printf("[QVM] OP_FUNC_DEF(%s, nargs=%d) depth=%d\n",
+                   n ? n : "(unknown)", nargs, nest);
             func_nest_depth++;
-            strncpy(last_func_name, fn, sizeof(last_func_name) - 1);
+            strncpy(last_func_name, name, sizeof(last_func_name) - 1);
             high_count++;
             break;
         }
         case OP_FUNC_END: {
             func_nest_depth--;
-            printf("[QVM] 高级opcode: OP_FUNC_END(%s) depth=%d %s\n",
+            printf("[QVM] OP_FUNC_END(%s) depth=%d %s\n",
                    last_func_name[0] ? last_func_name : "(unknown)",
-                   func_nest_depth < 0 ? -1 : func_nest_depth,
-                   func_nest_depth < 0 ? "!!! 不匹配: FUNC_END 多余" : "");
+                   func_nest_depth, func_nest_depth < 0 ? "!!! 不匹配" : "");
             high_count++;
             break;
         }
         case OP_TYPE_DEF: {
-            if (pos + 3 <= fsize) {
+            if (pos + 3 < fsize) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int tlen = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
-                char name[128] = {0};
-                if (sp_data && off + tlen <= sp_len && tlen < 127) {
-                    memcpy(name, sp_data + off, tlen); name[tlen] = 0;
-                    printf("[QVM] 高级opcode: OP_TYPE_DEF(name=\"%s\")\n", name);
-                } else {
-                    printf("[QVM] 高级opcode: OP_TYPE_DEF (off=%d, len=%d)\n", off, tlen);
-                }
+                char *n = read_string(name, sizeof(name), sp_data, sp_len, off, tlen);
+                printf("[QVM] OP_TYPE_DEF(%s)\n", n ? n : "(invalid)");
                 high_count++;
             }
             break;
         }
+        case OP_TYPE_END: {
+            printf("[QVM] OP_TYPE_END\n");
+            high_count++;
+            break;
+        }
         case OP_VAR_DECL: {
-            if (pos + 3 <= fsize) {
+            if (pos + 3 < fsize) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int vlen = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
-                char name[128] = {0};
-                if (sp_data && off + vlen <= sp_len && vlen < 127) {
-                    memcpy(name, sp_data + off, vlen); name[vlen] = 0;
-                    printf("[QVM] 高级opcode: OP_VAR_DECL(var=\"%s\")\n", name);
-                } else {
-                    printf("[QVM] 高级opcode: OP_VAR_DECL (off=%d, len=%d)\n", off, vlen);
-                }
+                char *n = read_string(name, sizeof(name), sp_data, sp_len, off, vlen);
+                printf("[QVM] OP_VAR_DECL(%s)\n", n ? n : "(invalid)");
                 high_count++;
             }
             break;
         }
         case OP_RETURN_STMT: {
-            if (pos < fsize) { int rt = code[pos++];
-                printf("[QVM] 高级opcode: OP_RETURN_STMT(kind=%d)\n", rt);
-                high_count++;
-            }
-            break;
-        }
-        case OP_IF_STMT: {
-            printf("[QVM] 高级opcode: OP_IF_STMT (skip body)\n");
+            int rt = 0;
+            if (pos < fsize) rt = code[pos++];
+            printf("[QVM] OP_RETURN_STMT(kind=%d)\n", rt);
             high_count++;
             break;
         }
-        case OP_WHILE_STMT: {
-            printf("[QVM] 高级opcode: OP_WHILE_STMT (skip body)\n");
+        case OP_IF_STMT: {
+            printf("[QVM] OP_IF_STMT (条件跳过后置代码)\n");
             high_count++;
             break;
         }
         case OP_ELSE_STMT: {
-            printf("[QVM] 高级opcode: OP_ELSE_STMT (skip body)\n");
+            printf("[QVM] OP_ELSE_STMT\n");
             high_count++;
             break;
         }
-        case OP_BREAK_STMT: {
-            printf("[QVM] 高级opcode: OP_BREAK_STMT\n");
+        case OP_WHILE_STMT: {
+            printf("[QVM] OP_WHILE_STMT (循环体)\n");
             high_count++;
             break;
         }
-        case OP_CONTINUE_STMT: {
-            printf("[QVM] 高级opcode: OP_CONTINUE_STMT\n");
-            high_count++;
-            break;
-        }
-        case OP_ASSIGN: {
-            if (pos + 3 <= fsize) {
+        case OP_ASSIGN_STMT: {
+            if (pos + 3 < fsize) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int vlen = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
-                char name[128] = {0};
-                if (sp_data && off + vlen <= sp_len && vlen < 127) {
-                    memcpy(name, sp_data + off, vlen); name[vlen] = 0;
-                    printf("[QVM] 高级opcode: OP_ASSIGN(var=\"%s\")\n", name);
-                } else {
-                    printf("[QVM] 高级opcode: OP_ASSIGN (off=%d, len=%d)\n", off, vlen);
-                }
+                char *n = read_string(name, sizeof(name), sp_data, sp_len, off, vlen);
+                printf("[QVM] OP_ASSIGN_STMT(%s = ...)\n", n ? n : "(invalid)");
                 high_count++;
             }
             break;
         }
-        case OP_FUNC_CALL: {
+        case OP_FUNC_CALL_STMT: {
             int off = 0, flen = 0, nargs = 0;
-            if (pos + 4 <= fsize) {
+            if (pos + 4 < fsize) {
                 off = code[pos] | (code[pos+1] << 8);
                 flen = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
             }
             if (pos < fsize) nargs = code[pos++];
-            char fn[128] = {0};
-            if (sp_data && off + flen <= sp_len && flen > 0 && flen < 128) {
-                memcpy(fn, sp_data + off, flen); fn[flen] = 0;
-            }
-            printf("[QVM] 高级opcode: OP_FUNC_CALL(%s, nargs=%d)\n", fn[0] ? fn : "(unknown)", nargs);
+            char *n = read_string(name, sizeof(name), sp_data, sp_len, off, flen);
+            printf("[QVM] OP_FUNC_CALL_STMT(%s, nargs=%d)\n", n ? n : "(unknown)", nargs);
+            high_count++;
+            break;
+        }
+        case OP_BREAK_STMT: {
+            printf("[QVM] OP_BREAK_STMT\n");
+            high_count++;
+            break;
+        }
+        case OP_CONTINUE_STMT: {
+            printf("[QVM] OP_CONTINUE_STMT\n");
             high_count++;
             break;
         }
@@ -454,60 +452,97 @@ int main(int argc, char *argv[]) {
             int v = 0;
             if (pos < fsize) v = code[pos++];
             if (pos < fsize) v |= code[pos++] << 8;
-            printf("[QVM] 高级opcode: OP_PUSH_CONST_INT(%d)\n", v);
+            printf("[QVM] OP_PUSH_CONST_INT(%d)\n", v);
             high_count++;
             break;
         }
         case OP_PUSH_CONST_STR: {
-            if (pos < fsize) { int s1 = code[pos++];
-                if (pos < fsize) { int slen = code[pos++] | ((s1 & 0xFF) << 8);
-                    printf("[QVM] 高级opcode: OP_PUSH_CONST_STR(skip %d B)\n", slen + 2);
-                    high_count++;
-                }}
-            break;
-        }
-        case OP_NEW_OBJECT: {
-            printf("[QVM] 高级opcode: OP_NEW_OBJECT (skip)\n");
-            high_count++;
-            break;
-        }
-        case OP_LENGTH: {
-            printf("[QVM] 高级opcode: OP_LENGTH (skip)\n");
-            high_count++;
-            break;
-        }
-        case OP_RANDOM: {
-            printf("[QVM] 高级opcode: OP_RANDOM (skip)\n");
-            high_count++;
-            break;
-        }
-        case OP_EXPORT_SYM: {
-            if (pos + 3 <= fsize) {
-                int off = code[pos] | (code[pos+1] << 8);
-                int slen = code[pos+2] | (code[pos+3] << 8);
-                pos += 4;
-                char name[128] = {0};
-                if (sp_data && off + slen <= sp_len && slen < 127) {
-                    memcpy(name, sp_data + off, slen); name[slen] = 0;
-                    printf("[QVM] 高级opcode: OP_EXPORT_SYM(name=\"%s\")\n", name);
-                } else {
-                    printf("[QVM] 高级opcode: OP_EXPORT_SYM (off=%d, len=%d)\n", off, slen);
-                }
+            if (pos < fsize) {
+                uint16_t slen = 0;
+                if (pos < fsize) slen = code[pos++];
+                if (pos < fsize) slen |= (uint16_t)code[pos++] << 8;
+                if (pos + slen <= fsize) pos += slen;
+                printf("[QVM] OP_PUSH_CONST_STR(%d B)\n", slen);
                 high_count++;
             }
             break;
         }
+        case OP_APPEND_BYTE: {
+            int b = 0;
+            if (pos < fsize) b = code[pos++];
+            printf("[QVM] OP_APPEND_BYTE(%d)\n", b);
+            high_count++;
+            break;
+        }
+        case OP_BYTECODE_LEN: {
+            int bclen = 0;
+            if (pos + 1 < fsize) bclen = code[pos] | (code[pos+1] << 8);
+            if (pos + 1 < fsize) pos += 2;
+            printf("[QVM] OP_BYTECODE_LEN(%d)\n", bclen);
+            high_count++;
+            break;
+        }
+        case OP_EXPORT_SYM: {
+            if (pos + 3 < fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int slen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                char *n = read_string(name, sizeof(name), sp_data, sp_len, off, slen);
+                printf("[QVM] OP_EXPORT_SYM(%s)\n", n ? n : "(invalid)");
+                high_count++;
+            }
+            break;
+        }
+        case OP_MODULE_DEF: {
+            if (pos + 3 < fsize) {
+                int off = code[pos] | (code[pos+1] << 8);
+                int mlen = code[pos+2] | (code[pos+3] << 8);
+                pos += 4;
+                char *n = read_string(name, sizeof(name), sp_data, sp_len, off, mlen);
+                printf("[QVM] OP_MODULE_DEF(%s)\n", n ? n : "(invalid)");
+                high_count++;
+            }
+            break;
+        }
+        /* ---------- 平台选择opcode（200+） ---------- */
+        case OP_LINUX: {
+            printf("[QVM] OP_LINUX (平台: Linux ELF)\n");
+            high_count++;
+            break;
+        }
+        case OP_WINDOWS: {
+            printf("[QVM] OP_WINDOWS (平台: Windows PE)\n");
+            high_count++;
+            break;
+        }
+        case OP_IOS: {
+            printf("[QVM] OP_IOS (平台: iOS Mach-O)\n");
+            high_count++;
+            break;
+        }
+        case OP_ANDROID: {
+            printf("[QVM] OP_ANDROID (平台: Android ELF)\n");
+            high_count++;
+            break;
+        }
+        case OP_HARMONY: {
+            printf("[QVM] OP_HARMONY (平台: 鸿蒙 ELF/ARM)\n");
+            high_count++;
+            break;
+        }
         case BC_FUNC_BODY: {
-            printf("[QVM] 高级opcode: BC_FUNC_BODY (函数体开始)\n");
+            printf("[QVM] BC_FUNC_BODY (函数体开始)\n");
             high_count++;
             break;
         }
         case BC_FUNC_END: {
-            printf("[QVM] 高级opcode: BC_FUNC_END (函数体结束)\n");
+            printf("[QVM] BC_FUNC_END (函数体结束)\n");
             high_count++;
             break;
         }
-        default: break;
+        default:
+            printf("[QVM] 未知opcode: 0x%02x (pos=%d)\n", op, pos - 1);
+            break;
         }
     }
 
