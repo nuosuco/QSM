@@ -352,6 +352,19 @@ static void skip_brace_block(Parser *P) {
         consume(P);
     }
 }
+/* brace/parens-aware version of skip_to_semi: consumes until ';' or '}', treating {} as balanced */
+static void skip_to_semi_or_rbrace(Parser *P) {
+    int bd = 0;
+    while (P->lexer.cur.kind != TOK_EOF) {
+        if (P->lexer.cur.kind == TOK_LBRACE) bd++;
+        else if (P->lexer.cur.kind == TOK_RBRACE) {
+            if (bd > 0) bd--; else break;
+        } else if (P->lexer.cur.kind == TOK_SEMI && bd == 0) {
+            consume(P); return;
+        }
+        consume(P);
+    }
+}
 /* 向前声明：parse_compound_block 内部调用的后续定义的函数 */
 static int  parse_const_int(const char *s);
 static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close);
@@ -392,6 +405,7 @@ static void parse_compound_block(Parser *P) {
                 write_high_opcode(BC_FUNC_END);
                 flush_highbuf();
             } else skip_to_semi(P);
+            write_high_opcode(OP_FUNC_END); /* 嵌套 def 闭合 */
             continue;
         }
         if (kw(&t, "import")) { if (parse_import(P)) continue; }
@@ -764,8 +778,8 @@ static void parse_class_body(Parser *P) {
         /* 跳过 this. 调用开头的 this（跟随跳过到分号） */
         if (kw(&t, "this")) {
             consume(P);
-            /* this.X = ...; 或 this.X(); — 跳整个语句 */
-            skip_to_semi(P); continue;
+            /* this.X = ...; 或 this.X(); — 跳整个语句（brace-aware） */
+            skip_to_semi_or_rbrace(P); continue;
         }
         /* 跳过 super( ... ) 调用 */
         if (kw(&t, "super")) { consume(P);
@@ -777,42 +791,60 @@ static void parse_class_body(Parser *P) {
                     consume(P);
                 }
             }
-            skip_to_semi(P); continue;
+            skip_to_semi_or_rbrace(P); continue;
         }
-        /* 方法定义：def / 函数 / constructor */
-        if (kw(&t, "def") || kw(&t, "函数") || kw(&t, "constructor")) {
-            consume(P); /* def/函数/constructor → cur 已推进到函数名 */
-            if (P->lexer.cur.kind == TOK_IDENT) {
-                write_high_opcode(OP_FUNC_DEF);
-                write_string_ref(P->lexer.cur.text);
-                consume(P); /* 函数名 */
-            } else {
-                /* constructor() 或 constructor(...) 紧跟 (，无名字 */
-                write_high_opcode(OP_FUNC_DEF);
-                write_string_ref("_constructor");
+        /* 方法定义：def / 函数 / constructor / public function / private function / ... */
+        if (kw(&t, "def") || kw(&t, "函数") || kw(&t, "constructor") ||
+            kw(&t, "public") || kw(&t, "private") || kw(&t, "protected") ||
+            kw(&t, "function") || kw(&t, "readonly")) {
+            /* 跳过修饰符（public/private/protected/static/virtual/override/readonly/function），定位到 constructor/def */
+            while (kw(&t, "public") || kw(&t, "private") || kw(&t, "protected") ||
+                   kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override") ||
+                   kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "function") ||
+                   kw(&t, "external")) {
+                consume(P);
+                t = P->lexer.cur;
             }
-            /* 跳过参数列表 ( ...) */
-            if (P->lexer.cur.kind == TOK_LPAR) {
-                int pd = 1; consume(P);
-                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
-                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
-                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+            /* 此时 t 是 constructor / def / 函数，或意外 token */
+            if (kw(&t, "constructor") || kw(&t, "def") || kw(&t, "函数")) {
+                consume(P); /* constructor/def/函数 → cur 推进到函数名或 '(' */
+                if (P->lexer.cur.kind == TOK_IDENT) {
+                    /* 有名方法 */
+                    write_high_opcode(OP_FUNC_DEF);
+                    write_string_ref(P->lexer.cur.text);
                     consume(P);
+                } else {
+                    write_high_opcode(OP_FUNC_DEF);
+                    write_string_ref("_method");
                 }
+                /* 跳过参数列表 ( ...) */
+                if (P->lexer.cur.kind == TOK_LPAR) {
+                    int pd = 1; consume(P);
+                    while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                        if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                        else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                        consume(P);
+                    }
+                }
+                /* 跳过返回类型/默认值: colon + type + optional default */
+                if (P->lexer.cur.kind == TOK_COLON) consume(P);
+                if (P->lexer.cur.kind == TOK_IDENT) consume(P);
+                /* 处理 = 默认值 */
+                if (P->lexer.cur.kind == TOK_EQ) { skip_to_semi(P); continue; }
+                if (P->lexer.cur.kind == TOK_LBRACE) {
+                    flush_highbuf();
+                    write_high_opcode(BC_FUNC_BODY);
+                    parse_class_body(P);
+                    write_high_opcode(BC_FUNC_END);
+                    flush_highbuf();
+                    write_high_opcode(OP_FUNC_END);
+                } else {
+                    skip_to_semi(P);
+                }
+                continue;
             }
-            if (expect_tok(P, TOK_COLON)) {}
-            if (P->lexer.cur.kind == TOK_LBRACE) {
-                /* 方法体：包裹 BC_FUNC_BODY/BC_FUNC_END（与 parse_def 一致） */
-                flush_highbuf();
-                write_high_opcode(BC_FUNC_BODY);
-                parse_class_body(P);
-                write_high_opcode(BC_FUNC_END);
-                flush_highbuf();
-                write_high_opcode(OP_FUNC_END); /* 方法闭合 */
-            } else {
-                skip_to_semi(P);
-            }
-            continue;
+            /* 未识别为方法定义，跳过到分号 */
+            skip_to_semi(P); continue;
         }
         /* var 字段声明 */
         if (kw(&t, "var")) {
@@ -964,8 +996,12 @@ static void parse_func_body(Parser *P) {
                 }
             }
             if (expect_tok(P, TOK_COLON)) {}
-            if (P->lexer.cur.kind == TOK_LBRACE) parse_func_body(P);
-            else skip_to_semi(P);
+            if (P->lexer.cur.kind == TOK_LBRACE) {
+                write_high_opcode(BC_FUNC_BODY);
+                parse_func_body(P);
+                write_high_opcode(BC_FUNC_END);
+                flush_highbuf();
+            } else skip_to_semi(P);
             write_high_opcode(OP_FUNC_END); /* 嵌套 def 必须闭合 OP_FUNC_END */
             continue;
         }
@@ -1121,12 +1157,15 @@ static int parse_def(Parser *P) {
     write_u16((unsigned short)param_count);
     flush_highbuf();
     if (P->lexer.cur.kind == TOK_LBRACE) {
+        fprintf(stderr, "[BC_BODY] emitting BC_FUNC_BODY for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos + g_highbuf_pos);
         write_high_opcode(BC_FUNC_BODY);
         parse_func_body(P);
+        fprintf(stderr, "[BC_END ] emitting BC_FUNC_END for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos + g_highbuf_pos);
         write_high_opcode(BC_FUNC_END);
         flush_highbuf();
     } else {
         skip_to_semi(P);
+        fprintf(stderr, "[BC_BODY] emitting EMPTY BC_FUNC_BODY/BC_FUNC_END for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos + g_highbuf_pos);
         write_high_opcode(BC_FUNC_BODY); write_high_opcode(BC_FUNC_END);
         flush_highbuf();
     }
