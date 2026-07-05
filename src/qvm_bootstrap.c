@@ -292,7 +292,7 @@ int main(int argc, char *argv[]) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int len = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
-                if (sp_data && off + len <= sp_len && off + len <= fsize - (3 + code_len + 2)) {
+                if (sp_data && off >= 0 && len > 0 && off + len <= sp_len && off + len <= fsize - (3 + code_len + 2) && len < 255) {
                     char name[256] = {0};
                     int safe_len = (len < 255) ? len : 255;
                     memcpy(name, sp_data + off, safe_len);
