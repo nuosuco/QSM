@@ -793,8 +793,12 @@ static void parse_class_body(Parser *P) {
                 }
             }
             if (expect_tok(P, TOK_COLON)) {}
-            if (P->lexer.cur.kind == TOK_LBRACE) parse_class_body(P);
-            else skip_to_semi(P);
+            if (P->lexer.cur.kind == TOK_LBRACE) {
+                parse_class_body(P);
+                write_high_opcode(OP_FUNC_END); /* 方法体闭合 */
+            } else {
+                skip_to_semi(P);
+            }
             continue;
         }
         /* var 字段声明 */

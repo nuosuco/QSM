@@ -203,26 +203,29 @@ int main(int argc, char *argv[]) {
     fread(code, 1, fsize, f);
     fclose(f);
 
-    /* 解析QEntL字节码头: [0]=0x14魔数, [1:3]=string_pool长度(le16), [3:3+sp_len]=代码区 */
+    /* 解析QEntL字节码头: [0]=0x14魔数, [1:3]=代码长度(le16), [3:3+code_len]=代码区, [3+code_len:3+code_len+2]=string_pool长度, [3+code_len+2:]=string_pool */
     int sp_len = 0;
     uint8_t *sp_data = NULL;
+    int code_len = 0;
     if (fsize > 3 && code[0] == 0x14) {
-        sp_len = code[1] | (code[2] << 8);
-        if (3 + sp_len <= fsize) {
-            sp_data = code + 3 + sp_len;
+        code_len = code[1] | (code[2] << 8);
+        if (3 + code_len + 2 <= fsize) {
+            unsigned short spl = code[3 + code_len] | (code[3 + code_len + 1] << 8);
+            sp_len = spl;
+            sp_data = code + 3 + code_len + 2;
         }
     }
 
     QVM vm;
     vm.state = NULL;
     int pos = 0;
-    /* 对QEntL字节码（0x14格式），从代码区开始执行（跳过string_pool段） */
-    if (sp_data) pos = 3 + sp_len;
+    /* 对QEntL字节码（0x14格式），从代码区开始执行（跳过头部） */
+    if (sp_data) pos = 3 + code_len;
     int func_nest_depth = 0;   /* OP_FUNC_DEF/END 嵌套计数器 */
     char last_func_name[128] = {0};
     int high_count = 0;        /* 高级opcode处理计数 */
     printf("[QVM] 初始化量子虚拟机\n");
-    if (sp_data) printf("[QVM] 加载QEntL字节码: sp_len=%d, 代码区起始=%d\n", sp_len, pos);
+    if (sp_data) printf("[QVM] 加载QEntL字节码: code_len=%d, sp_len=%d, 代码区起始=%d\n", code_len, sp_len, pos);
     while (pos < fsize) {
         uint8_t op = code[pos++];
         if (op == OP_INIT_N) {
