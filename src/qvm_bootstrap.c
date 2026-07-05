@@ -13,6 +13,10 @@
 #define MAX_MEM 256 * 1024 * 1024  /* 256MB for up to 22 qubits */
 #define MAX_CYCLES 10000
 #define FUNC_DEF_NEST_MAX 16
+#define MAX_FUNCS 256
+#define MAX_VARIABLES 512
+#define CALL_STACK_MAX 128
+#define LOOP_STACK_MAX 64
 
 /* 高级语法操作码 — 与qcl_phase2.c严格对齐（编译器最新枚举） */
 #define OP_IMPORT          100
@@ -313,25 +317,39 @@ int main(int argc, char *argv[]) {
     uint8_t *sp_data = NULL;
     int code_len = 0;
     char name[256] = {0};       /* string_pool 安全读取缓冲区 */
-    /* qcl_phase2 实际输出格式: [MAGIC(0x14) | CODE(g_bc_pos bytes) | sp_len(2B LE16) | string_pool]
-       通过搜索 sp_len 字段位置来确定代码区边界（sp_len 必须满足 offset+2+sp_len==fsize） */
-    if (fsize > 3 && code[0] == 0x14) {
+    /* D-001 修复：显式文件头标记，替代脆弱的等式反推搜索
+       新格式: [0x14 | 0x00 | 0x00 | 0x00 | code_len(LE16) | CODE(code_len bytes) | sp_len(LE16) | string_pool]
+       标记 = "QVML"(0x14 0x00 0x00 0x00)，搜索范围覆盖整个 code 区(最多 fsize-4)，
+       并校验 code_len + header_size + sp_len == fsize，防止误判。 */
+    if (fsize >= 6) {
         int found = 0;
-        /* 在魔数后、文件尾部之前搜索 sp_len 字段 */
-        int max_search = (fsize > 5000) ? 5000 : fsize;
-        for (int i = 2; i < max_search - 1; i++) {
-            unsigned short spl = code[i] | (code[i + 1] << 8);
-            if (i + 2 + (int)spl == fsize) {
-                code_len = i - 1;            /* 代码区长度 = sp_len 字段位置 - 魔数(1字节) */
-                sp_data = code + i + 2;      /* string_pool 起始 */
-                sp_len = fsize - (i + 2);    /* 实际 string_pool 长度 */
-                found = 1;
-                break;
+        /* 在整个 code 区内搜索显式标记头 */
+        int max_search = (int)fsize - 4;  /* 需要至少 code_len(2B)+sp_len(2B) */
+        if (max_search < 4) max_search = (int)fsize;
+        for (int i = 0; i < max_search - 3; i++) {
+            /* 检测标记: 0x14 0x00 0x00 0x00 */
+            if (code[i] == 0x14 && code[i + 1] == 0x00 &&
+                code[i + 2] == 0x00 && code[i + 3] == 0x00) {
+                int hdr = i + 4;            /* code_len 字段起始 */
+                if (hdr + 2 > (int)fsize) break;
+                int c_len = code[hdr] | (code[hdr + 1] << 8);
+                int sp_hdr = hdr + 2 + c_len;  /* sp_len 字段起始 */
+                if (sp_hdr + 2 > (int)fsize) break;
+                int s_len = code[sp_hdr] | (code[sp_hdr + 1] << 8);
+                int sp_start = sp_hdr + 2;
+                /* 额外校验: code_len + header(6B) + sp_len == fsize */
+                if (sp_start + s_len == (int)fsize && c_len >= 0 && s_len >= 0) {
+                    code_len = c_len;
+                    sp_data = code + sp_start;
+                    sp_len = s_len;
+                    found = 1;
+                    break;
+                }
             }
         }
         if (!found) {
-            /* 搜索失败：退化为纯字节码（无 string_pool） */
-            code_len = fsize - 1;
+            /* 无显式标记：退化为纯字节码（无 string_pool） */
+            code_len = fsize;
         }
     }
 
