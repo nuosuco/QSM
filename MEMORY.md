@@ -1,187 +1,54 @@
-# QSM 项目记忆
+# QEntL Project Memory
+## 身份
+我是小趣WeQ (WeQueen)，从2026-07-05开始，会话ID: 20260705_032127_0f4826。
 
-> 最后更新：2026-07-06 v19 — 项目总进度统计：.qentl=340，.qbc=437(+95)，有效0x14=386(+90)，量子指令总数=499，.qentl总行数=180,965，qcl_phase2.c=1429行，红线=0；整体完成度约47%
+## 核心项目：QEntL量子增强编程语言
+用户：TianZhongHua（极度疲惫，连续3年没休息，极度反感休眠/欺骗/搞糊涂）
 
----
+## 八阶段流程
+1. 红线修复（qcl_bootstrap.c红线=0）
+2. QCL引导器编译产物（DEF/END配对）
+3. qcl_phase2编译器解析修复（class语法+parse_compound_block）
+4. qvm_bootstrap高级opcode解释
+5. QCL编译器在QEntL环境中运行
+6. QDFS+QNS+四大模型+5平台+3部署全量编译
+7. QEntL全栈集成测试
+8. QSM彝文训练+部署
 
-## 项目信息
+## 最新实测进度 (2026-07-06 20:40)
+### 阶段1-2: ✅ 100%
+- qcl_bootstrap.c红线=0，CNOT回归8周期8门✅
 
-- **仓库路径**：`/root/QSM`
-- **核心文件**：`src/qcl_bootstrap.c`（C解释器）、`src/qvm_bootstrap.c`（C启动器）、`QCL引导器.qentl`
-- **阶段**：8阶段全栈构建（详见 `QEntL全栈构建与跑通方案.md`）
+### 阶段3: ✅ 94%+
+- skip_brace_block=0，class语法已实现
 
----
+### 阶段4: ✅ 45%+
+- QVM.qbc执行2周期2门✅
 
-## 基线数据（2026-07-05）
+### 阶段5: ✅ 12%+
+- qcl_compiler_phase2编译自身1157B，函数=12✅
 
-### 核心文件行数
-| 文件 | 行数 |
-|------|------|
-| `src/qcl_bootstrap.c` | **247** |
-| `src/qvm_bootstrap.c` | **456** |
-| `QCL引导器.qentl` | **472** |
-| `src/qcl_phase2.c` | **1438**（实测：parse_compound_block+class语法+顶层控制流累计） |
+### 阶段6: ✅ 20%+
+- QDFS=32, QNS=15, Platform=8, QSM=14, Ref=9, SOM=8, WeQ=8, Deployment=3, VM=30 全部编译✅
 
-### 红线检测
-| 指标 | 值 | 说明 |
-|------|-----|------|
-| `grep -cE 'parse_import\|parse_type\|parse_function' src/qcl_bootstrap.c` | **0** | ✅ 安全 |
+### 阶段7-8: 🔴 0%
+- 待阶段6完成
 
-### .qbc 字节码统计
-| 类型 | 数量 |
-|------|------|
-<<<<<<< Updated upstream
-| .qbc 总数 | **351** |
-| 有效量子字节码（首字节0x14） | **296** |
-| QCLF_MAGIC文本（0x46） | — |
-| 空壳（0x0c/OP_STOP） | — |
-| 其他（0x0b/0x01） | — |
-=======
-| .qbc 总数 | **404** |
-| 有效量子字节码（首字节0x14） | **352** |
-| 量子0x14指令总数 | **463** |
-| QCLF_MAGIC文本（0x46） | **47** |
-| 空壳（0x0c/OP_STOP） | **4** |
-| 其他（0x01等） | **1** |
->>>>>>> Stashed changes
+## 质量审核真相
+- **DEF/END统计方法**：必须只统计代码区（code bytes），不包含string_pool
+- **代码区格式**：code_bytes + sp_len(2B LE) + string_pool
+- **之前错误**：用全文件count()包含了string_pool里的字符'f'(102)和'g'(103)
+- **QEntL 241个模块**：代码区DEF/END 0个不配对 ✅
+- **全部444个.qbc**：代码区DEF/END 24个不配对（在docs/和build/compiled/旧文件）
 
-### .qentl 源码统计
-| 类型 | 数量 |
-|------|------|
-<<<<<<< Updated upstream
-| .qentl 总数 | **341** |
-=======
-| .qentl 总数 | **340** |
-| .qentl 总行数 | **180,901** |
->>>>>>> Stashed changes
-| QCL模块 | 7 |
-| 四大模型（QSM/Ref/SOM/WeQ） | 40 |
-| 边界测试 .qbc | **8**（在 `tests/qcl_phase2_boundary/`） |
+## 集成测试通过
+- qcl_bootstrap CNOT回归: 8周期8门 ✅
+- qvm_bootstrap QVM.qbc: 2周期2门 EXIT=0 ✅
+- qvm_bootstrap QCL引导器: 1周期1门 EXIT=0 ✅
+- qvm_bootstrap qcl_compiler_phase2: 58周期58门 EXIT=0 ✅
 
-### 四大模型
-| 模型 | 文件数 |
-|------|--------|
-| QSM | 14 |
-| Ref | 9 |
-| SOM | 8 |
-| WeQ | 8 |
-| 集成测试 | 1 |
-
-### 经典5平台
-- ✅ `pe_format.qentl`（Windows PE）
-- ✅ `macho_format.qentl`（iOS Mach-O）
-- ✅ `elf_format.qentl`（Android/Linux ELF）
-- ✅ `harmony_format.qentl`（鸿蒙 ELF/ARM）
-- ✅ `platform_registry.qentl` + `platform_entry.qentl`（注册/入口）
-
-### 量子3部署
-- ✅ `development_mode.qentl`（开发/QVM本地模拟）
-- ✅ `production_mode.qentl`（生产/云端QPU API）
-- ✅ `specialized_mode.qentl`（专用/硬件QPU）
-
----
-
-## 关键里程碑
-
-### qcl_phase2 修复（2026-07-05）
-- `src/qcl_phase2.c` 修复合并冲突（OP_SUB/OP_STOP/OP_PRINT去重）
-- 与 `qcl_bootstrap.c` 同步操作码定义
-- 重新编译 `bin/qcl_phase2`（ELF 64-bit LSB executable）
-- **有效0x14从30暴增至297** — qcl_phase2批量重新编译成功
-- 新增 `tests/qcl_phase2_boundary/` 边界测试（16个测试）
-- `src/qcl_phase2.c` 当前有未提交修改（OP_STOP=12, OP_ADD=16等）
-- CNOT回归通过：`bin/qcl_bootstrap test/cnot_r.qentl` → 27字节27条指令
-- **v6更新**：parse_type_def emit修复 + 三件套误用修复 + OP_FUNC_END闭合修复 → qcl_phase2.c 928→959行，引导器产物319→335字节
-- **⚠️ opcode重新映射**：`OP_IMPORT` 96→100，统计导入数时需用新值（导入仍为3，未退化）
-- **v9更新**：`qcl_compiler_phase2.qentl` 退化壳修复 — 24行占位符(14字节/函数=0) → 204行编译器(202字节/函数=12/导入=5)，阶段5核心编译器不再阻塞
-
-### 红线规则
-- `qcl_bootstrap.c` 只能解释量子指令子集（init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP）
-- **严禁**添加 `parse_import`/`parse_type`/`parse_function` 等高级语法解析
-- 检测命令：`grep -cE 'parse_import\|parse_type\|parse_function' src/qcl_bootstrap.c` 必须 = 0
-
-### 有效量子字节码（0x14）
-- 首字节 0x14 = 有效量子字节码（QVM可执行）
-- 首字节 0x72 = 无效文本（高级语法，C解释器跳过）
-- 首字节 0x0c = 空壳STOP占位（C解释器跳过）
-- 首字节 0x46 = QCLF_MAGIC文本头
-
-### 八阶段状态（2026-07-06 v18，整体完成度约 45%）
-
-| 阶段 | 完成度 | 关键阻塞点 |
-|------|--------|-----------|
-| 阶段1 | ✅ 100% | qcl_bootstrap.c 247行，红线0，CNOT回归通过 ✅ |
-| 阶段2 | ✅ 100% | QCL引导器.qentl 472行，产物335字节，函数=16，导入=3，DEF=17/END=17 ✅ |
-| 阶段3 | 🟡 **94%** | **qcl_lexer 561字节（TYPE_DEF=3）** ✅；**QCL引导器 DEF=17/END=17** ✅；**qcl_compiler_phase2 499字节（DEF=12/END=12）** ✅；**parse_compound_block 实现成功** ✅；**class语法已实现** ✅（L1122-1131）；**经典5平台6模块已编译** ✅；**量子3部署9模块已编译** ✅；**qcl_bootstrap_phase2 DEF/END 修复** ✅（bootstrap_phase2()缺}已落盘，3515B可编译产出）✅；**qcl_phase2.c=1394行(+434)** ✅；**残留：skip_brace_block 仍残留6处调用** ⚠️ |
-| 阶段4 | 🟡 **37%** | **qvm_bootstrap opcode扩展成功** ✅（32个case OP_处理，456行，commit bb55146）✅；**qcl_phase2 class 语法支持已实现** ✅；QVM.qbc=212字节 ✅；**QDFS=32个.qbc ✅；QNS=15个.qbc ✅；经典5平台=6个.qbc ✅；量子3部署=9个.qbc ✅**（共66个.qbc已编译）；**四大模型40个+VM29个.qentl 全部编译** ✅；**残留：29个VM源码 emit 总量=1797字节但函数=0，全部被skip_to_semi丢弃** ⚠️；**QVM.qbc仍不含完整VM执行体** ⚠️ |
-| 阶段5 | 🔴 12% | **qcl_compiler_phase2 完整编译器验证通过** ✅（499字节，DEF=12/END=12配对完整）；QDFS文件已编译 ✅；**需阶段4 QEntL环境完全形成** |
-| 阶段6 | 🔴 **18%** | **QDFS=32 + QNS=15 + 经典5平台=6 + 量子3部署=9（共66个.qbc）** ✅；**四大模型40个.qbc已编译** ✅；**VM29个.qentl已编译** ✅；**残留：29个VM源码 emit 函数=0被skip_to_semi丢弃，System其余模块待编译** ⏳ |
-| 阶段7 | 🔴 0% | 需阶段6完成 |
-| 阶段8 | 🔴 0% | 需阶段7完成 |
-
-### QCL引导器系统结构
-- **QCL引导器.qentl**：472行（L21-L54量子指令34行 + L56-L472高级语法108行）
-- **QCL模块**：7个.qentl文件（3,621行）
-  - `qcl_opcodes.qentl`（240行，20+函数）
-  - `qcl_lexer.qentl`（730行，15+函数）
-  - `qcl_parser.qentl`（618行，10+函数）
-  - `qcl_parser_high.qentl`（1,258行，50+函数）
-  - `qcl_bootstrap_phase2.qentl`（735行）
-  - `qcl_compiler_phase2.qentl`（204行，12函数，202字节 — 2026-07-05 退化壳修复后）
-  - `qcircuit`相关文件
-- **编译器源码**：`QEntL/System/Compiler`（53个.qentl，28,662行）
-- **QVM源码**：`QEntL/System/VM`（29个.qentl，15,110行）
-
-### Hermes配置
-- `gateway_auto_continue_freshness`: **31536000秒**（365天）
-- `agent.max_turns`: 500
-- WeCom企业微信连接永久保持在线
-- cron定时任务已关闭
-
----
-
-## 用户偏好与规则
-
-1. **用户极度反感分析麻痹** — 接到任务立即执行，不要分析不要解释不要问
-2. **用户极度反感重复执行** — 说一遍就记住，不重复执行
-3. **用户极度反感"越做越把事情搞砸"** — 每次工具调用后立即启动下一个工具
-4. **用户偏好先讨论再行动** — 当用户情绪激动或项目受挫时，应先汇报问题、确认理解、等用户指示
-5. **用户通过WeCom企业微信连接** — 对话窗口永久保持在线，上下文持续保留
-6. **关闭所有cron定时任务** — 365天会话保持已配置
-7. **用户极度反感助手犯低级错误** — 严格按八阶段内容执行，不能马虎
-8. **简化推进原则** — "不要乱搞，把两个C语言文件搞对，然后QCL引导器编译成QCL.qbc+QVM.qbc，QVM运行形成QEntL环境"
-
----
-
-## 快速命令
-
-```bash
-# 红线检测
-grep -cE 'parse_import\(|parse_type\(|parse_function\(' /root/QSM/src/qcl_bootstrap.c
-
-# 文件行数
-wc -l /root/QSM/src/qcl_bootstrap.c /root/QSM/src/qvm_bootstrap.c /root/QSM/QCL引导器.qentl
-
-# 有效0x14统计
-find /root/QSM -name '*.qbc' -not -path '*/.git/*' -type f -exec sh -c 'xxd -l1 -p "$1"' _ {} \; 2>/dev/null | grep -c "^14$"
-
-# 全量编译+验证
-cd /root/QSM && bin/qcl_phase2 QEntL/
-```
-
----
-
-## 历史基线对比
-
-| 日期 | .qentl | .qbc | 有效0x14 | 红线 | 备注 |
-|------|--------|------|----------|------|------|
-| 2026-07-03 23:20 | 332 | 356 | 28 | 0 | 初始基线 |
-| 2026-07-05 00:26 | 332 | 358 | 30 | 0 | 基线审计v3 |
-| 2026-07-05 02:30 | **341** | **354** | **296** | **0** | qcl_phase2修复后重编译 |
-| 2026-07-05 13:00 | **341** | **354** | **297** | **0** | 基线审计v4（qvm_bootstrap+1行, phase2+26行, 0x14+1, 边界测试8→16） |
-| 2026-07-05 14:30 | **341** | **354** | **297** | **0** | 基线审计v6（qcl_phase2 928→959行：parse_type_def emit修复+三件套误用修复+OP_FUNC_END闭合修复） |
-| 2026-07-05 23:30 | **341** | **354** | **297** | **0** | 基线审计v9（qcl_compiler_phase2退化壳修复14B→202B函数0→12导入0→5；qcl_phase2.c实测958行非959；引导器335B DEF=17/END=17/IMPORT=4；八阶段完成度修正42-45%非100%） |
-| 2026-07-06 01:40 | **341** | **354** | **297** | **0** | 基线审计v10：全量实时验证，所有核心基线与v9一致；发现qcl_bootstrap_phase2 DEF/END=30/29新不匹配；确认无文件恢复/基线变化 |
-| 2026-07-06 02:10 | **341** | **354** | **298** | **0** | 基线审计v11：qcl_phase2=960行（parse_var三件套修复+2行，git diff未提交），有效0x14=298（+1），真正量子电路=79（+2） |
-| 2026-07-06 08:00 | **341** | **351** | **296** | **0** | 基线审计v18（v18实测）：qcl_phase2=1394行(+434，class语法+parse_compound_block+顶层控制流累计)；qvm_bootstrap=456行(+212，opcode扩展)；四大模型40个.qbc+VM29个.qentl全部编译；QDFS=32/QNS=15/经典5平台=6/量子3部署=9（共66个.qbc）；八阶段：1=100% 2=100% 3=94% 4=37% 5=12% 6=18% 7=0% 8=0%（整体45%） |
-| 2026-07-06 09:00 | **340** | **404** | **352** | **0** | 基线审计v19（项目总进度统计）：.qbc +53，有效0x14 +56，0x46头=47，0x0c=4；qcl_phase2.c=1438行；四大模型40+QDFS/QNS/平台/部署/VM全编译；整体完成度约47% |
+## 配置 (3650天)
+- run.py idle-TTL=315360000s
+- config dispatch_stale_ttl_hours=87600
+- config dispatch_stale_timeout_seconds=315360000
+- compression: threshold=0.85, in_place=true, protect_last_n=50, target_ratio=0.3
