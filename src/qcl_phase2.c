@@ -343,15 +343,6 @@ static void skip_to_semi(Parser *P) {
         consume(P);
     if (P->lexer.cur.kind == TOK_SEMI) consume(P);
 }
-static void skip_brace_block(Parser *P) {
-    int d = 1;
-    consume(P);
-    while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
-        if (P->lexer.cur.kind == TOK_LBRACE) d++;
-        else if (P->lexer.cur.kind == TOK_RBRACE) d--;
-        consume(P);
-    }
-}
 /* brace/parens-aware version of skip_to_semi: consumes until ';' or '}', treating {} as balanced */
 static void skip_to_semi_or_rbrace(Parser *P) {
     int bd = 0;
@@ -541,7 +532,6 @@ static int is_opcode_name_unused(const char *s) { (void)s; return 0; }
 
 /* 向前声明 */
 static int  L_peek_next_is_colon(Parser *P);
-static void skip_brace_block(Parser *P);
 static void parse_compound_block(Parser *P);
 static int  parse_const_int(const char *s);
 static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close);
@@ -1030,7 +1020,7 @@ static void parse_func_body(Parser *P) {
                     skip_brace_block_alt(P, TOK_LBRK, TOK_RBRK);
                 } else if (P->lexer.cur.kind == TOK_LBRACE) {
                     write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
-                    skip_brace_block(P);
+                    parse_compound_block(P);
                 } else if (P->lexer.cur.kind == TOK_IDENT) {
                     write_high_opcode(OP_PUSH_CONST_STR);
                     write_string_ref(P->lexer.cur.text);
@@ -1222,7 +1212,7 @@ static int parse_top_statement(Parser *P) {
                 skip_brace_block_alt(P, TOK_LBRK, TOK_RBRK);
             } else if (P->lexer.cur.kind == TOK_LBRACE) {
                 write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
-                skip_brace_block(P);
+                parse_compound_block(P);
             } else if (P->lexer.cur.kind == TOK_IDENT) {
                 write_high_opcode(OP_PUSH_CONST_STR);
                 write_string_ref(P->lexer.cur.text);
