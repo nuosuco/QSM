@@ -211,14 +211,14 @@ quantum_module ViewEngine {
             context.result = await this._renderTemplateWithContext(template, context);
             
             // 应用后处理
-            if (options器.post_processors) {
+            if (options?.post_processors) {
                 for (const processor of options.post_processors) {
                     context.result = await processor(context.result, context);
                 }
             }
             
             // 压缩输出
-            if (this.config.minify_output && !options器.skip_minify) {
+            if (this.config.minify_output && !options?.skip_minify) {
                 context.result = this._minifyOutput(context.result);
             }
             
@@ -377,7 +377,7 @@ quantum_module ViewEngine {
         const metadata = {};
         
         // 匹配 {{!-- @key: value --}} 语法
-        const metadataRegex = /\{\{!--\s*@(\w+):\s*(.+器)\s*--\}\}/g;
+        const metadataRegex = /\{\{!--\s*@(\w+):\s*(.+)\s*--\}\}/g;
         let match;
         
         while ((match = metadataRegex.exec(content)) !== null) {
@@ -476,9 +476,9 @@ quantum_module ViewEngine {
                 }
                 
                 // 处理条件 {{#if var}}...{{/if}}
-                const ifRegex = /\{\{#if\s+(\w+)\}\}([\s\S]*器)\{\{\/if\}\}/g;
+                const ifRegex = /\{\{#if\s+(\w+)\}\}([\s\S]*)\{\{\/if\}\}/g;
                 result = result.replace(ifRegex, (match, condition, content) => {
-                    return data[condition] 器 content : '';
+                    return data[condition] ? content : '';
                 });
                 
                 // 处理部分视图 {{> partial}}
@@ -564,7 +564,7 @@ quantum_module ViewEngine {
         let result = content;
         
         // 移除HTML注释
-        result = result.replace(/<!--[\s\S]*器-->/g, '');
+        result = result.replace(/<!--[\s\S]*-->/g, '');
         
         // 移除多余空白
         result = result.replace(/\s+/g, ' ');
@@ -582,7 +582,7 @@ quantum_module ViewEngine {
     _registerBuiltinHelpers: function() {
         // 条件判断
         this.registerHelper('if', function(condition, options) {
-            return condition 器 options.fn(this) : options.inverse(this);
+            return condition ? options.fn(this) : options.inverse(this);
         });
         
         // 循环

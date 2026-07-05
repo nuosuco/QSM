@@ -358,7 +358,6 @@ static void skip_to_semi_or_rbrace(Parser *P) {
 }
 /* 向前声明：parse_compound_block 内部调用的后续定义的函数 */
 static int  parse_const_int(const char *s);
-static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close);
 static void skip_to_semi_or_rpar(Parser *P);
 static int  parse_quantum_instruction(Parser *P);
 static int  parse_import(Parser *P);
@@ -419,7 +418,7 @@ static void parse_compound_block(Parser *P) {
                     consume(P);
                 } else if (P->lexer.cur.kind == TOK_LBRK) {
                     write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
-                    skip_brace_block_alt(P, TOK_LBRK, TOK_RBRK);
+                    parse_compound_block(P);
                 } else if (P->lexer.cur.kind == TOK_LBRACE) {
                     write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
                     parse_compound_block(P);
@@ -534,7 +533,6 @@ static int is_opcode_name_unused(const char *s) { (void)s; return 0; }
 static int  L_peek_next_is_colon(Parser *P);
 static void parse_compound_block(Parser *P);
 static int  parse_const_int(const char *s);
-static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close);
 static void skip_to_semi_or_rpar(Parser *P);
 static int  parse_quantum_instruction(Parser *P);
 static int  parse_import(Parser *P);
@@ -732,15 +730,6 @@ static int L_peek_next_is_colon(Parser *P) {
     return is_colon;
 }
 
-static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close) {
-    int d = 1;
-    consume(P);
-    while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
-        if (P->lexer.cur.kind == open) d++;
-        else if (P->lexer.cur.kind == close) d--;
-        consume(P);
-    }
-}
 static void skip_to_semi_or_rpar(Parser *P) {
     while (P->lexer.cur.kind != TOK_EOF &&
            P->lexer.cur.kind != TOK_SEMI &&
@@ -1017,7 +1006,7 @@ static void parse_func_body(Parser *P) {
                     consume(P);
                 } else if (P->lexer.cur.kind == TOK_LBRK) {
                     write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
-                    skip_brace_block_alt(P, TOK_LBRK, TOK_RBRK);
+                    parse_compound_block(P);
                 } else if (P->lexer.cur.kind == TOK_LBRACE) {
                     write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
                     parse_compound_block(P);
@@ -1209,7 +1198,7 @@ static int parse_top_statement(Parser *P) {
                 consume(P);
             } else if (P->lexer.cur.kind == TOK_LBRK) {
                 write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
-                skip_brace_block_alt(P, TOK_LBRK, TOK_RBRK);
+                parse_compound_block(P);
             } else if (P->lexer.cur.kind == TOK_LBRACE) {
                 write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
                 parse_compound_block(P);
