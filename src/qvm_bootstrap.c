@@ -88,14 +88,14 @@ static void qvm_reset(QVM *vm, int n) {
     // 内存安全检查: >20 qubits (2^20 * 16 = 16MB) 用简化模式
     if (n > 20 || size * sizeof(complex_t) > MAX_MEM * 2) {
         vm->state = NULL;
-        printf("[QVM] 量子比特数=%d，使用简化模拟模式（不展开完整态矢量）\\n", n);
+        printf("[QVM] 量子比特数=%d，使用简化模拟模式（不展开完整态矢量）\n", n);
     } else {
         vm->state = (complex_t *)calloc(size, sizeof(complex_t));
         if (vm->state) {
             vm->state[0].real = 1.0;
             vm->state[0].imag = 0.0;
         } else {
-            printf("[QVM] 警告: 内存不足，使用简化模拟模式\\n");
+            printf("[QVM] 警告: 内存不足，使用简化模拟模式\n");
         }
     }
     memset(vm->registers, 0, sizeof(vm->registers));

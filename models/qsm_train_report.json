@@ -1,0 +1,101 @@
+{
+  "epochs": 3,
+  "circuits": 73,
+  "total_cycles": 2289,
+  "total_gates": 2289,
+  "fails": 0,
+  "per_model": {
+    "QSM": {
+      "cycles": 1194,
+      "gates": 1194,
+      "files": 12
+    },
+    "Ref": {
+      "cycles": 792,
+      "gates": 792,
+      "files": 9
+    },
+    "SOM/WeQ": {
+      "cycles": 261,
+      "gates": 261,
+      "files": 14
+    },
+    "QNS": {
+      "cycles": 42,
+      "gates": 42,
+      "files": 15
+    }
+  },
+  "samples": [
+    {
+      "file": "qsm_consciousness.qbc",
+      "epoch": 1,
+      "cycles": 2,
+      "gates": 2,
+      "exit": 0
+    },
+    {
+      "file": "qsm_consciousness_circuit.qbc",
+      "epoch": 1,
+      "cycles": 7,
+      "gates": 7,
+      "exit": 0
+    },
+    {
+      "file": "qsm_construction_plan.qbc",
+      "epoch": 1,
+      "cycles": 1,
+      "gates": 1,
+      "exit": 0
+    },
+    {
+      "file": "qsm_core.qbc",
+      "epoch": 1,
+      "cycles": 0,
+      "gates": 0,
+      "exit": 0
+    },
+    {
+      "file": "qsm_entanglement.qbc",
+      "epoch": 1,
+      "cycles": 0,
+      "gates": 0,
+      "exit": 0
+    },
+    {
+      "file": "qsm_entanglement_circuit.qbc",
+      "epoch": 1,
+      "cycles": 5,
+      "gates": 5,
+      "exit": 0
+    },
+    {
+      "file": "qsm_entry.qbc",
+      "epoch": 1,
+      "cycles": 5,
+      "gates": 5,
+      "exit": 0
+    },
+    {
+      "file": "qsm_implementation.qbc",
+      "epoch": 1,
+      "cycles": 169,
+      "gates": 169,
+      "exit": 0
+    },
+    {
+      "file": "qsm_yi_training_circuit.qbc",
+      "epoch": 1,
+      "cycles": 5,
+      "gates": 5,
+      "exit": 0
+    },
+    {
+      "file": "ref_construction_plan.qbc",
+      "epoch": 1,
+      "cycles": 2,
+      "gates": 2,
+      "exit": 0
+    }
+  ]
+}
