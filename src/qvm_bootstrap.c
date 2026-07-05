@@ -12,6 +12,31 @@
 #define MAX_REGISTERS 64
 #define MAX_MEM 256 * 1024 * 1024  /* 256MB for up to 22 qubits */
 #define MAX_CYCLES 10000
+#define FUNC_DEF_NEST_MAX 16
+
+/* 高级语法操作码 — 与qcl_phase2.c对齐（100+） */
+#define OP_IMPORT          100
+#define OP_CONST_DEF       101
+#define OP_FUNC_DEF        102
+#define OP_FUNC_END        103
+#define OP_TYPE_DEF        104
+#define OP_VAR_DECL        105
+#define OP_RETURN_STMT     106
+#define OP_IF_STMT         108
+#define OP_WHILE_STMT      109
+#define OP_ELSE_STMT       110
+#define OP_BREAK_STMT      111
+#define OP_CONTINUE_STMT   112
+#define OP_ASSIGN          113
+#define OP_FUNC_CALL       114
+#define OP_PUSH_CONST_INT  120
+#define OP_PUSH_CONST_STR  121
+#define OP_NEW_OBJECT      122
+#define OP_LENGTH          123
+#define OP_RANDOM          124
+#define OP_EXPORT_SYM      140
+#define BC_FUNC_BODY       255
+#define BC_FUNC_END        254
 
 /* 操作码 — 与qcl_bootstrap.c编译器严格对齐 */
 enum {
@@ -181,6 +206,9 @@ int main(int argc, char *argv[]) {
     QVM vm;
     vm.state = NULL;
     int pos = 0;
+    int func_nest_depth = 0;   /* OP_FUNC_DEF/END 嵌套计数器 */
+    char last_func_name[128] = {0};
+    int high_count = 0;        /* 高级opcode处理计数 */
     printf("[QVM] 初始化量子虚拟机\n");
     while (pos < fsize) {
         uint8_t op = code[pos++];
@@ -234,9 +262,180 @@ int main(int argc, char *argv[]) {
         case OP_S:  { int q = code[pos++]; (void)q; break; }
         case OP_RESET: { int q = code[pos++]; (void)q; break; }
         case OP_SWAP: { int a = code[pos++], b = code[pos++]; (void)a; (void)b; break; }
+        /* ---------- 高级语法opcode（100+）: 为QEntL环境铺垫 ---------- */
+        case OP_IMPORT: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int len = code[pos++] | ((s1 & 0xFF) << 8);
+                    printf("[QVM] 高级opcode: OP_IMPORT (skip %d B)\n", len + 2);
+                    high_count++;
+                }}
+            break;
+        }
+        case OP_CONST_DEF: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int slen = code[pos++] | ((s1 & 0xFF) << 8);
+                    int sval = 0;
+                    if (pos < fsize) { sval = code[pos++]; }
+                    if (pos < fsize) { sval |= code[pos++] << 8; }
+                    printf("[QVM] 高级opcode: OP_CONST_DEF (name_skip=%d, value=%d)\n", slen, sval);
+                    high_count++;
+                }}
+            break;
+        }
+        case OP_FUNC_DEF: {
+            int nest = func_nest_depth;
+            char fn[128] = {0};
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int flen = code[pos++] | ((s1 & 0xFF) << 8);
+                    if (flen > 0 && flen < 128) {
+                        int read_n = (flen < fsize - pos) ? flen : (fsize - pos);
+                        memcpy(fn, code + pos, read_n);
+                        fn[read_n] = 0;
+                        pos += read_n;
+                    }}
+                /* 读取参数数量（1字节） */
+                int nargs = 0;
+                if (pos < fsize) nargs = code[pos++];
+                printf("[QVM] 高级opcode: OP_FUNC_DEF(%s, nargs=%d) depth=%d\n",
+                       fn[0] ? fn : "(unknown)", nargs, nest);
+                func_nest_depth++;
+                strncpy(last_func_name, fn, sizeof(last_func_name) - 1);
+                high_count++;
+            }
+            break;
+        }
+        case OP_FUNC_END: {
+            func_nest_depth--;
+            printf("[QVM] 高级opcode: OP_FUNC_END(%s) depth=%d %s\n",
+                   last_func_name[0] ? last_func_name : "(unknown)",
+                   func_nest_depth < 0 ? -1 : func_nest_depth,
+                   func_nest_depth < 0 ? "!!! 不匹配: FUNC_END 多余" : "");
+            high_count++;
+            break;
+        }
+        case OP_TYPE_DEF: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int tlen = code[pos++] | ((s1 & 0xFF) << 8);
+                    printf("[QVM] 高级opcode: OP_TYPE_DEF(name_skip=%d)\n", tlen);
+                    high_count++;
+                }}
+            break;
+        }
+        case OP_VAR_DECL: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int vlen = code[pos++] | ((s1 & 0xFF) << 8);
+                    printf("[QVM] 高级opcode: OP_VAR_DECL(var_skip=%d)\n", vlen);
+                    high_count++;
+                }}
+            break;
+        }
+        case OP_RETURN_STMT: {
+            if (pos < fsize) { int rt = code[pos++];
+                printf("[QVM] 高级opcode: OP_RETURN_STMT(kind=%d)\n", rt);
+                high_count++;
+            }
+            break;
+        }
+        case OP_IF_STMT: {
+            printf("[QVM] 高级opcode: OP_IF_STMT (skip body)\n");
+            high_count++;
+            break;
+        }
+        case OP_WHILE_STMT: {
+            printf("[QVM] 高级opcode: OP_WHILE_STMT (skip body)\n");
+            high_count++;
+            break;
+        }
+        case OP_ELSE_STMT: {
+            printf("[QVM] 高级opcode: OP_ELSE_STMT (skip body)\n");
+            high_count++;
+            break;
+        }
+        case OP_BREAK_STMT: {
+            printf("[QVM] 高级opcode: OP_BREAK_STMT\n");
+            high_count++;
+            break;
+        }
+        case OP_CONTINUE_STMT: {
+            printf("[QVM] 高级opcode: OP_CONTINUE_STMT\n");
+            high_count++;
+            break;
+        }
+        case OP_ASSIGN: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int vlen = code[pos++] | ((s1 & 0xFF) << 8);
+                    printf("[QVM] 高级opcode: OP_ASSIGN(var_skip=%d)\n", vlen);
+                    high_count++;
+                }}
+            break;
+        }
+        case OP_FUNC_CALL: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int flen = code[pos++] | ((s1 & 0xFF) << 8);
+                    if (pos < fsize) { int nargs = code[pos++];
+                        printf("[QVM] 高级opcode: OP_FUNC_CALL(func_skip=%d, nargs=%d)\n", flen, nargs);
+                        high_count++;
+                    }}
+            }
+            break;
+        }
+        case OP_PUSH_CONST_INT: {
+            int v = 0;
+            if (pos < fsize) v = code[pos++];
+            if (pos < fsize) v |= code[pos++] << 8;
+            printf("[QVM] 高级opcode: OP_PUSH_CONST_INT(%d)\n", v);
+            high_count++;
+            break;
+        }
+        case OP_PUSH_CONST_STR: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int slen = code[pos++] | ((s1 & 0xFF) << 8);
+                    printf("[QVM] 高级opcode: OP_PUSH_CONST_STR(skip %d B)\n", slen + 2);
+                    high_count++;
+                }}
+            break;
+        }
+        case OP_NEW_OBJECT: {
+            printf("[QVM] 高级opcode: OP_NEW_OBJECT (skip)\n");
+            high_count++;
+            break;
+        }
+        case OP_LENGTH: {
+            printf("[QVM] 高级opcode: OP_LENGTH (skip)\n");
+            high_count++;
+            break;
+        }
+        case OP_RANDOM: {
+            printf("[QVM] 高级opcode: OP_RANDOM (skip)\n");
+            high_count++;
+            break;
+        }
+        case OP_EXPORT_SYM: {
+            if (pos < fsize) { int s1 = code[pos++];
+                if (pos < fsize) { int slen = code[pos++] | ((s1 & 0xFF) << 8);
+                    printf("[QVM] 高级opcode: OP_EXPORT_SYM(skip %d B)\n", slen + 2);
+                    high_count++;
+                }}
+            break;
+        }
+        case BC_FUNC_BODY: {
+            printf("[QVM] 高级opcode: BC_FUNC_BODY (函数体开始)\n");
+            high_count++;
+            break;
+        }
+        case BC_FUNC_END: {
+            printf("[QVM] 高级opcode: BC_FUNC_END (函数体结束)\n");
+            high_count++;
+            break;
+        }
         default: break;
         }
     }
+
+    if (func_nest_depth != 0) {
+        printf("[QVM] 警告: FUNC_DEF/END 不匹配 (depth=%d, 应有0)\n", func_nest_depth);
+    }
+    printf("[QVM] 高级opcode处理总数: %d\n", high_count);
 
     printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
     free(code);

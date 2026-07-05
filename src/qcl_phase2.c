@@ -351,6 +351,160 @@ static void skip_brace_block(Parser *P) {
         consume(P);
     }
 }
+/* 递归解析 if/while/else 大括号内的语句块（var/return/if/while/assign/func_call/def 等） */
+static void parse_compound_block(Parser *P) {
+    if (P->lexer.cur.kind != TOK_LBRACE) return;
+    consume(P); /* 消耗 '{' */
+    int d = 1;
+    while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
+        Token t = P->lexer.cur;
+        if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
+        if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
+
+        if (kw(&t, "def")) {
+            consume(P);
+            if (P->lexer.cur.kind == TOK_IDENT) {
+                write_high_opcode(OP_FUNC_DEF);
+                write_string_ref(P->lexer.cur.text);
+                consume(P);
+            }
+            if (P->lexer.cur.kind == TOK_LPAR) {
+                int pd = 1; consume(P);
+                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                    consume(P);
+                }
+            }
+            if (expect_tok(P, TOK_COLON)) {}
+            if (P->lexer.cur.kind == TOK_LBRACE) parse_func_body(P);
+            else skip_to_semi(P);
+            continue;
+        }
+        if (kw(&t, "import")) { if (parse_import(P)) continue; }
+        if (kw(&t, "const"))  { if (parse_const(P))  continue; }
+        if (kw(&t, "var")) {
+            consume(P);
+            if (P->lexer.cur.kind == TOK_IDENT) {
+                write_high_opcode(OP_VAR_DECL);
+                write_string_ref(P->lexer.cur.text);
+                consume(P);
+            }
+            if (expect_tok(P, TOK_EQ)) {
+                if (P->lexer.cur.kind == TOK_NUMBER) {
+                    write_high_opcode(OP_PUSH_CONST_INT);
+                    write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_STRING) {
+                    write_high_opcode(OP_PUSH_CONST_STR);
+                    write_string_ref(P->lexer.cur.text);
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_LBRK) {
+                    write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
+                    skip_brace_block_alt(P, TOK_LBRK, TOK_RBRK);
+                } else if (P->lexer.cur.kind == TOK_LBRACE) {
+                    write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
+                    parse_compound_block(P);
+                } else if (P->lexer.cur.kind == TOK_IDENT) {
+                    write_high_opcode(OP_PUSH_CONST_STR);
+                    write_string_ref(P->lexer.cur.text);
+                    consume(P);
+                } else if (kw(&P->lexer.cur, "null")) {
+                    write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
+                    consume(P);
+                }
+            }
+            expect_tok(P, TOK_SEMI); P->high_level++; continue;
+        }
+        if (kw(&t, "返回") || kw(&t, "return")) {
+            consume(P);
+            if (P->lexer.cur.kind == TOK_SEMI) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(0);
+                consume(P);
+            } else if (P->lexer.cur.kind == TOK_IDENT) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(1);
+                write_string_ref(P->lexer.cur.text);
+                consume(P); expect_tok(P, TOK_SEMI);
+            } else if (P->lexer.cur.kind == TOK_NUMBER) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(2);
+                write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                consume(P); expect_tok(P, TOK_SEMI);
+            } else if (P->lexer.cur.kind == TOK_STRING) {
+                write_high_opcode(OP_RETURN_STMT); write_byte(3);
+                write_string_ref(P->lexer.cur.text);
+                consume(P); expect_tok(P, TOK_SEMI);
+            }
+            P->high_level++; continue;
+        }
+        if (kw(&t, "如果") || kw(&t, "if")) {
+            consume(P);
+            if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
+            if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_IF_STMT); parse_compound_block(P); }
+            if (kw(&P->lexer.cur, "否则") || kw(&P->lexer.cur, "else")) {
+                consume(P);
+                if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_ELSE_STMT); parse_compound_block(P); }
+            }
+            P->high_level++; continue;
+        }
+        if (kw(&t, "循环") || kw(&t, "while") || kw(&t, "当")) {
+            consume(P);
+            if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
+            if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_WHILE_STMT); parse_compound_block(P); }
+            P->high_level++; continue;
+        }
+        if (kw(&t, "跳出") || kw(&t, "break")) {
+            consume(P); expect_tok(P, TOK_SEMI);
+            write_high_opcode(OP_BREAK_STMT); P->high_level++; continue;
+        }
+        if (kw(&t, "继续") || kw(&t, "continue")) {
+            consume(P); expect_tok(P, TOK_SEMI);
+            write_high_opcode(OP_CONTINUE_STMT); P->high_level++; continue;
+        }
+        /* 顶层赋值 / 函数调用（标识符开头） */
+        if (t.kind == TOK_IDENT) {
+            const char *nm = t.text;
+            consume(P);
+            if (P->lexer.cur.kind == TOK_LPAR) { /* func_call */
+                write_high_opcode(OP_FUNC_CALL);
+                write_string_ref(nm);
+                int pd = 1; consume(P);
+                while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                    if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                    else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                    consume(P);
+                }
+                expect_tok(P, TOK_SEMI); P->high_level++; continue;
+            }
+            if (P->lexer.cur.kind == TOK_EQ) { /* assign */
+                write_high_opcode(OP_ASSIGN);
+                write_string_ref(nm);
+                consume(P); /* '=' */
+                if (P->lexer.cur.kind == TOK_NUMBER) {
+                    write_high_opcode(OP_PUSH_CONST_INT);
+                    write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_STRING) {
+                    write_high_opcode(OP_PUSH_CONST_STR);
+                    write_string_ref(P->lexer.cur.text);
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_IDENT) {
+                    write_high_opcode(OP_PUSH_CONST_STR);
+                    write_string_ref(P->lexer.cur.text);
+                    consume(P);
+                } else if (kw(&P->lexer.cur, "null")) {
+                    write_high_opcode(OP_PUSH_CONST_INT); write_u16(0);
+                    consume(P);
+                }
+                expect_tok(P, TOK_SEMI); P->high_level++; continue;
+            }
+            expect_tok(P, TOK_SEMI); continue;
+        }
+        /* 量子指令（STOP/H/X/CNOT 等） */
+        if (parse_quantum_instruction(P)) continue;
+        /* 兜底：跳过无法识别的单条语句 */
+        skip_to_semi(P);
+    }
+}
 static int parse_const_int(const char *s) {
     int v = 0;
     while (*s) { if (*s >= '0' && *s <= '9') v = v * 10 + (*s - '0'); s++; }
@@ -360,6 +514,8 @@ static int is_opcode_name_unused(const char *s) { (void)s; return 0; }
 
 /* 向前声明 */
 static int  L_peek_next_is_colon(Parser *P);
+static void skip_brace_block(Parser *P);
+static void parse_compound_block(Parser *P);
 static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close);
 static void skip_to_semi_or_rpar(Parser *P);
 static int  L_is_double_slash(Parser *P);
@@ -667,17 +823,17 @@ static void parse_func_body(Parser *P) {
             consume(P); /* "if" → cur 已推进到 "(" */
             /* consume 后直接读 cur，不额外 lexer_next（三件套误用修复） */
             if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
-            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_IF_STMT); skip_brace_block(P); }
+            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_IF_STMT); parse_compound_block(P); }
             if (kw(&P->lexer.cur, "否则") || kw(&P->lexer.cur, "else")) {
                 consume(P);
-                if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_ELSE_STMT); skip_brace_block(P); }
+                if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_ELSE_STMT); parse_compound_block(P); }
             }
             P->high_level++; continue;
         }
         if (kw(&t, "循环") || kw(&t, "while") || kw(&t, "当")) {
             consume(P);
             if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
-            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_WHILE_STMT); skip_brace_block(P); }
+            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_WHILE_STMT); parse_compound_block(P); }
             P->high_level++; continue;
         }
         if (kw(&t, "跳出") || kw(&t, "break")) {
@@ -838,10 +994,10 @@ static int parse_top_statement(Parser *P) {
     if (kw(&t, "如果") || kw(&t, "if")) {
         consume(P); /* "if" → cur 已推进到 "(" */
         if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
-        if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_IF_STMT); skip_brace_block(P); }
+        if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_IF_STMT); parse_compound_block(P); }
         if (kw(&P->lexer.cur, "否则") || kw(&P->lexer.cur, "else")) {
             consume(P);
-            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_ELSE_STMT); skip_brace_block(P); }
+            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_ELSE_STMT); parse_compound_block(P); }
         }
         flush_highbuf(); P->high_level++; return 1;
     }
@@ -868,7 +1024,7 @@ static int parse_top_statement(Parser *P) {
     if (kw(&t, "循环") || kw(&t, "while") || kw(&t, "当")) {
         consume(P);
         if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
-        if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_WHILE_STMT); skip_brace_block(P); }
+        if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_WHILE_STMT); parse_compound_block(P); }
         flush_highbuf(); P->high_level++; return 1;
     }
     if (kw(&t, "跳出") || kw(&t, "break")) {
