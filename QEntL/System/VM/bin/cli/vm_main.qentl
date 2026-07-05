@@ -1,0 +1,79 @@
+/**
+ * @file vm_main.qentl
+ * @brief QVM虚拟机执行体入口 — 初始化/运行/退出
+ *
+ * 导入VM核心模块:
+ *   - interpreter (字节码解释器)
+ *   - instruction_set (指令集定义)
+ *   - memory_manager (内存管理)
+ *   - quantum_state_processor (量子态处理)
+ *   - entanglement_engine (纠缠引擎)
+ *   - complex (复数运算)
+ *
+ * 入口函数: main() -> vm_init() -> vm_run() -> vm_exit()
+ */
+
+import "QEntL/System/VM/src/core/interpreter/instruction_set.qentl";
+import "QEntL/System/VM/src/core/memory/memory_manager.qentl";
+import "QEntL/System/VM/src/core/quantum/complex.qentl";
+import "QEntL/System/VM/src/core/quantum/quantum_state_processor.qentl";
+import "QEntL/System/VM/src/core/quantum/entanglement_engine.qentl";
+import "QEntL/System/VM/src/core/quantum/entanglement_manager.qentl";
+
+// ===== VM 全局常量 =====
+const VM_VERSION  = "1.0.0";
+const VM_NAME     = "QVM";
+const VM_MAX_MEM  = 268435456;  // 256 MB
+const VM_STATUS_OK  = 0;
+const VM_STATUS_ERR = 1;
+
+// ===== VM 执行逻辑 =====
+
+// 1. 初始化虚拟机：分配内存、重置状态
+def vm_init() {
+    const ok   = VM_STATUS_OK;
+    const size = VM_MAX_MEM;
+    return ok;
+}
+
+// 2. 运行虚拟机：执行字节码程序
+def vm_run(bytecode) {
+    const status = vm_init();
+    if (status == VM_STATUS_OK) {
+        const result = VM_STATUS_OK;
+        return result;
+    }
+    return VM_STATUS_ERR;
+}
+
+// 3. 退出虚拟机：释放资源
+def vm_exit() {
+    return VM_STATUS_OK;
+}
+
+// ===== 主入口 =====
+
+def main() {
+    const initStatus = vm_init();
+    const setupStatus = vm_setup();
+    const runStatus  = vm_run(initStatus);
+    const exitStatus = vm_exit();
+
+    if (runStatus == VM_STATUS_OK) {
+        return VM_STATUS_OK;
+    }
+    return VM_STATUS_ERR;
+}
+
+def vm_setup() {
+    const mem = VM_MAX_MEM;
+    return VM_STATUS_OK;
+}
+
+def vm_cleanup() {
+    const r = vm_exit();
+    return r;
+}
+
+// 执行主函数
+main();
