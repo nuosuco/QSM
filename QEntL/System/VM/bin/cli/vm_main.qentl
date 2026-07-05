@@ -1,109 +1,49 @@
-/**
- * @file vm_main.qentl
- * @brief QVM虚拟机执行体入口 — 初始化/运行/退出
- *
- * 导入VM核心模块:
- *   - instruction_set (指令集定义)
- *   - memory_manager (内存管理)
- *   - complex (复数运算)
- *   - quantum_state_processor (量子态处理)
- *   - entanglement_engine (纠缠引擎)
- *   - entanglement_manager (纠缠管理器)
- *
- * 入口函数: main() -> vm_init() -> vm_run() -> vm_exit()
- * 使用 DEF/END 配对语法，确保编译器正确统计函数数。
- */
+// QVM量子虚拟机主入口 - VM执行体
+import VM
+import quantum_state_processor
+import entanglement_engine
+import memory_manager
+import instruction_set
 
-import "QEntL/System/VM/src/core/interpreter/instruction_set.qentl";
-import "QEntL/System/VM/src/core/memory/memory_manager.qentl";
-import "QEntL/System/VM/src/core/quantum/complex.qentl";
-import "QEntL/System/VM/src/core/quantum/quantum_state_processor.qentl";
-import "QEntL/System/VM/src/core/quantum/entanglement_engine.qentl";
-import "QEntL/System/VM/src/core/quantum/entanglement_manager.qentl";
+def vm_init():
+    VM.vm_start()
+    memory_manager.init_memory()
+    instruction_set.load_opcodes()
+    return 0
 
-// ===== VM 全局常量 =====
-const VM_VERSION  = "1.0.0";
-const VM_NAME     = "QVM";
-const VM_MAX_MEM  = 268435456;  // 256 MB
-const VM_STATUS_OK  = 0;
-const VM_STATUS_ERR = 1;
+def vm_run():
+    quantum_state_processor.init_qubits()
+    entanglement_engine.enable_entanglement()
+    VM.vm_execute()
+    return 0
 
-// ===== VM 执行逻辑 =====
+def vm_exit():
+    VM.vm_stop()
+    memory_manager.release_memory()
+    return 0
 
-// 1. 初始化虚拟机：分配内存、重置状态
-def vm_init()
-    const ok   = VM_STATUS_OK;
-    const size = VM_MAX_MEM;
-    return ok;
-END
+def vm_setup():
+    vm_init()
+    return 0
 
-// 2. 运行虚拟机：执行字节码程序
-def vm_run(bytecode)
-    const status = vm_init();
-    if (status == VM_STATUS_OK) {
-        const result = VM_STATUS_OK;
-        return result;
-    }
-    return VM_STATUS_ERR;
-END
+def vm_cleanup():
+    vm_exit()
+    return 0
 
-// 3. 退出虚拟机：释放资源
-def vm_exit()
-    return VM_STATUS_OK;
-END
+def vm_version():
+    return "QVM 1.0"
 
-// 4. 设置虚拟机环境
-def vm_setup()
-    const mem = VM_MAX_MEM;
-    return VM_STATUS_OK;
-END
+def vm_name():
+    return "QEntL Quantum Virtual Machine"
 
-// 5. 清理虚拟机资源
-def vm_cleanup()
-    const r = vm_exit();
-    return r;
-END
+def vm_memory_limit():
+    return 1024 * 1024 * 1024  // 1GB
 
-// 6. 获取VM版本信息
-def vm_version()
-    return VM_VERSION;
-END
+def vm_health_check():
+    return 1  // healthy
 
-// 7. 获取VM名称
-def vm_name()
-    return VM_NAME;
-END
-
-// 8. 查询内存上限
-def vm_memory_limit()
-    return VM_MAX_MEM;
-END
-
-// 9. 状态检查
-def vm_health_check()
-    const n = vm_name();
-    const v = vm_version();
-    const m = vm_memory_limit();
-    return VM_STATUS_OK;
-END
-
-// 10. 启动入口
-def main()
-    const initStatus = vm_init();
-    const setupStatus = vm_setup();
-    const runStatus  = vm_run(initStatus);
-    const exitStatus = vm_exit();
-    const ver = vm_version();
-    const nm  = vm_name();
-    const lim = vm_memory_limit();
-    const hc  = vm_health_check();
-    const cl  = vm_cleanup();
-
-    if (runStatus == VM_STATUS_OK) {
-        return VM_STATUS_OK;
-    }
-    return VM_STATUS_ERR;
-END
-
-// 执行主函数
-main();
+def main():
+    vm_init()
+    vm_run()
+    vm_exit()
+    return 0

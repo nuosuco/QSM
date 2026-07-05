@@ -685,7 +685,6 @@ int main(int argc, char *argv[]) {
         printf("[QVM] 警告: FUNC_DEF/END 不匹配 (depth=%d, 应有0)\n", func_nest_depth);
     }
     printf("[QVM] 高级opcode处理总数: %d\n", high_count);
-
     printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
     free(code);
     return 0;

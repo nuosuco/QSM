@@ -1,0 +1,18 @@
+// 部署配置管理
+import deployment_types
+import qpu_runtime_detector
+
+def get_deployment_config():
+    config = {}
+    config.mode = select_deployment_mode("auto")
+    config.qpu_enabled = qpu_runtime_detector.check_qpu()
+    config.qvm_fallback = true
+    config.verbose = false
+    
+    return config
+    
+def apply_deployment_config(config):
+    // 应用部署配置
+    set_deployment_mode(config.mode)
+    set_qpu_enabled(config.qpu_enabled)
+    set_qvm_fallback(config.qvm_fallback)

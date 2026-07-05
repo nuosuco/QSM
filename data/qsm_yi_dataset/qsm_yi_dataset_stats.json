@@ -1,0 +1,337 @@
+{
+  "generated_at": "2026-07-06",
+  "source_files": 92,
+  "total_lines": 226952,
+  "valid_samples": 226935,
+  "parsed_errors": 0,
+  "yi_samples": 201696,
+  "yi_vocab_size": 4132,
+  "yi_samples_pct": 88.9,
+  "category_distribution": {
+    "merged": 103844,
+    "general": 65644,
+    "structured": 31356,
+    "dictionary": 12271,
+    "translation": 5012,
+    "culture": 2948,
+    "character": 1500,
+    "paragraph": 1486,
+    "sentence": 1153,
+    "grammar": 915,
+    "conversation": 379,
+    "tech": 218,
+    "daily_life": 131,
+    "science": 78
+  },
+  "top_yi_chars": [
+    {
+      "char": "󲊂",
+      "count": 434
+    },
+    {
+      "char": "󲠇",
+      "count": 189
+    },
+    {
+      "char": "󲞥",
+      "count": 179
+    },
+    {
+      "char": "󲞶",
+      "count": 176
+    },
+    {
+      "char": "󲯷",
+      "count": 176
+    },
+    {
+      "char": "󲡛",
+      "count": 175
+    },
+    {
+      "char": "󲢟",
+      "count": 175
+    },
+    {
+      "char": "󲵾",
+      "count": 175
+    },
+    {
+      "char": "󲝭",
+      "count": 175
+    },
+    {
+      "char": "󲞟",
+      "count": 175
+    },
+    {
+      "char": "󲞐",
+      "count": 173
+    },
+    {
+      "char": "󲠟",
+      "count": 173
+    },
+    {
+      "char": "󲺛",
+      "count": 171
+    },
+    {
+      "char": "󲜣",
+      "count": 170
+    },
+    {
+      "char": "󲝂",
+      "count": 169
+    },
+    {
+      "char": "󲠷",
+      "count": 169
+    },
+    {
+      "char": "󲣌",
+      "count": 169
+    },
+    {
+      "char": "󲝎",
+      "count": 169
+    },
+    {
+      "char": "󲞕",
+      "count": 167
+    },
+    {
+      "char": "󲣍",
+      "count": 167
+    },
+    {
+      "char": "󲟬",
+      "count": 167
+    },
+    {
+      "char": "󲜳",
+      "count": 167
+    },
+    {
+      "char": "󲝒",
+      "count": 167
+    },
+    {
+      "char": "󲞰",
+      "count": 167
+    },
+    {
+      "char": "󳖀",
+      "count": 166
+    },
+    {
+      "char": "󲟡",
+      "count": 165
+    },
+    {
+      "char": "󲹙",
+      "count": 165
+    },
+    {
+      "char": "󲡦",
+      "count": 165
+    },
+    {
+      "char": "󲩂",
+      "count": 164
+    },
+    {
+      "char": "󲧯",
+      "count": 164
+    },
+    {
+      "char": "󲢑",
+      "count": 163
+    },
+    {
+      "char": "󲣵",
+      "count": 163
+    },
+    {
+      "char": "󲟕",
+      "count": 163
+    },
+    {
+      "char": "󲝗",
+      "count": 162
+    },
+    {
+      "char": "󲜺",
+      "count": 161
+    },
+    {
+      "char": "󲢪",
+      "count": 161
+    },
+    {
+      "char": "󳘲",
+      "count": 161
+    },
+    {
+      "char": "󲝴",
+      "count": 161
+    },
+    {
+      "char": "󲝈",
+      "count": 161
+    },
+    {
+      "char": "󲠉",
+      "count": 160
+    },
+    {
+      "char": "󲢭",
+      "count": 160
+    },
+    {
+      "char": "󳌶",
+      "count": 160
+    },
+    {
+      "char": "󲰌",
+      "count": 160
+    },
+    {
+      "char": "󲞸",
+      "count": 160
+    },
+    {
+      "char": "󲟘",
+      "count": 159
+    },
+    {
+      "char": "󲬃",
+      "count": 159
+    },
+    {
+      "char": "󲢚",
+      "count": 159
+    },
+    {
+      "char": "󲱜",
+      "count": 159
+    },
+    {
+      "char": "󲜸",
+      "count": 159
+    },
+    {
+      "char": "󲜫",
+      "count": 159
+    }
+  ],
+  "output_files": [
+    {
+      "file": "qsm_yi_merged_messages.jsonl",
+      "size": "32.9MB",
+      "format": "messages"
+    },
+    {
+      "file": "qsm_yi_merged_input_output.jsonl",
+      "size": "20.3MB",
+      "format": "input/output"
+    },
+    {
+      "file": "QSM彝文数据集报告.html",
+      "size": "N/A",
+      "format": "report"
+    }
+  ],
+  "top_files": [
+    {
+      "file": "qsm_training_dataset.jsonl",
+      "samples": 52986,
+      "yi_chars": 101585,
+      "category": "general"
+    },
+    {
+      "file": "yi_4120_merged_for_gemma.jsonl",
+      "samples": 51899,
+      "yi_chars": 99009,
+      "category": "merged"
+    },
+    {
+      "file": "yi_gemma_training_merged.jsonl",
+      "samples": 51540,
+      "yi_chars": 98841,
+      "category": "merged"
+    },
+    {
+      "file": "yi_detailed_descriptions_v3.jsonl",
+      "samples": 12368,
+      "yi_chars": 21644,
+      "category": "structured"
+    },
+    {
+      "file": "yi_dense_training_v3.jsonl",
+      "samples": 10740,
+      "yi_chars": 46412,
+      "category": "structured"
+    },
+    {
+      "file": "yi_char_trilingual_v3.jsonl",
+      "samples": 7711,
+      "yi_chars": 7717,
+      "category": "dictionary"
+    },
+    {
+      "file": "yi_structured_v3.jsonl",
+      "samples": 6044,
+      "yi_chars": 7500,
+      "category": "structured"
+    },
+    {
+      "file": "yi_direct_translation_v3.jsonl",
+      "samples": 4735,
+      "yi_chars": 0,
+      "category": "translation"
+    },
+    {
+      "file": "滇川黔贵通用彝文三语对照表.jsonl",
+      "samples": 4120,
+      "yi_chars": 4124,
+      "category": "dictionary"
+    },
+    {
+      "file": "通用彝文彝汉对照训练表(2.0.4.22).jsonl",
+      "samples": 4120,
+      "yi_chars": 4122,
+      "category": "general"
+    },
+    {
+      "file": "通用彝文汉彝对照训练表(2.0.4.22).jsonl",
+      "samples": 4120,
+      "yi_chars": 4122,
+      "category": "general"
+    },
+    {
+      "file": "yi_extended_training_v3.jsonl",
+      "samples": 3439,
+      "yi_chars": 4656,
+      "category": "general"
+    },
+    {
+      "file": "yi_proverbs_dialogue_v3.jsonl",
+      "samples": 2040,
+      "yi_chars": 4394,
+      "category": "culture"
+    },
+    {
+      "file": "yi_dialog_expanded_v3.jsonl",
+      "samples": 2010,
+      "yi_chars": 3840,
+      "category": "structured"
+    },
+    {
+      "file": "yi_char_learning_v4.jsonl",
+      "samples": 1500,
+      "yi_chars": 2248,
+      "category": "character"
+    }
+  ]
+}
