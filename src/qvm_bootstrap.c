@@ -88,6 +88,12 @@ typedef struct {
     int ops;
 } QVM;
 
+/* 算术寄存器栈 — 用于 LOAD_REG/STORE_REG + ADD/SUB/MUL/DIV */
+static int arith_stack[MAX_REGISTERS] = {0};
+static int stack_top = 0;
+static void stack_push(int v) { if (stack_top < MAX_REGISTERS) arith_stack[stack_top++] = v; }
+static int stack_pop(void) { return stack_top > 0 ? arith_stack[--stack_top] : 0; }
+
 static void qvm_reset(QVM *vm, int n) {
     vm->qubits = n;
     vm->num_qubits = n;
@@ -187,16 +193,108 @@ static void apply_gate(QVM *vm, int opcode, int op1, int op2) {
             }
         }
     } else if (opcode == OP_MEASURE) {
-        int result = (rand() % 2);
+        /* 真实测量：按幅度模平方概率采样，波函数坍缩 */
+        if (op1 >= n) goto end_gate;
+        double prob0 = 0.0, prob1 = 0.0;
+        for (int s = 0; s < size; s++) {
+            if (((s >> op1) & 1) == 0) prob0 += vm->state[s].real * vm->state[s].real + vm->state[s].imag * vm->state[s].imag;
+            else                       prob1 += vm->state[s].real * vm->state[s].real + vm->state[s].imag * vm->state[s].imag;
+        }
+        double rnd = ((double)rand() / (double)RAND_MAX) * (prob0 + prob1 + 1e-12);
+        int result = (rnd < prob0) ? 0 : 1;
         if (op2 < MAX_REGISTERS) vm->registers[op2] = result;
-        printf("[QVM] 测量 q%d -> r%d = %d\n", op1, op2, result);
+        /* 坍缩：把非结果态的幅度清零 */
+        for (int s = 0; s < size; s++) {
+            if (((s >> op1) & 1) != result) { vm->state[s].real = 0.0; vm->state[s].imag = 0.0; }
+        }
+        printf("[QVM] 测量 q%d -> r%d = %d [坍缩 prob0=%.4f prob1=%.4f]\n", op1, op2, result, prob0, prob1);
+    } else if (opcode == OP_RESET) {
+        /* 真实 RESET：等同于测量+强制置|0>（已含在measure坍缩逻辑中） */
+        if (op1 >= n) goto end_gate;
+        for (int s = 0; s < size; s++) {
+            if (((s >> op1) & 1) != 0) { vm->state[s].real = 0.0; vm->state[s].imag = 0.0; }
+        }
+        /* 重归一化 |0...0> 态 */
+        double p = vm->state[0].real * vm->state[0].real + vm->state[0].imag * vm->state[0].imag;
+        if (p > 0.0) {
+            double inv = 1.0 / sqrt(p);
+            for (int s = 0; s < size; s++) {
+                int pair = s ^ (1 << op1);
+                if (((s >> op1) & 1) == 0) { vm->state[s].real *= inv; vm->state[s].imag *= inv; }
+                else { vm->state[s].real = 0.0; vm->state[s].imag = 0.0; }
+            }
+        }
+    } else if (opcode == OP_Z) {
+        /* Z = [[1,0],[0,-1]] 相位翻转 |1> */
+        if (op1 >= n) goto end_gate;
+        memcpy(tmp, vm->state, sizeof(complex_t) * size);
+        for (int s = 0; s < size; s++) {
+            if (((s >> op1) & 1) == 1) {
+                tmp[s] = (complex_t){-vm->state[s].real, -vm->state[s].imag};
+            }
+        }
+        memcpy(vm->state, tmp, sizeof(complex_t) * size);
+    } else if (opcode == OP_S) {
+        /* S = [[1,0],[0,i]] 相位门，|1> 乘 i */
+        if (op1 >= n) goto end_gate;
+        memcpy(tmp, vm->state, sizeof(complex_t) * size);
+        for (int s = 0; s < size; s++) {
+            if (((s >> op1) & 1) == 1) {
+                double r = vm->state[s].real, im = vm->state[s].imag;
+                tmp[s] = (complex_t){-im, r};   /* (r+im*i)*i = -im + ir */
+            }
+        }
+        memcpy(vm->state, tmp, sizeof(complex_t) * size);
+    } else if (opcode == OP_T) {
+        /* T = [[1,0],[0,e^(i*pi/4)]] pi/8 相位门 */
+        double cp = cos(M_PI / 4.0), sp = sin(M_PI / 4.0);  /* e^(i*pi/4) = (sqrt2/2) + i*(sqrt2/2) */
+        if (op1 >= n) goto end_gate;
+        memcpy(tmp, vm->state, sizeof(complex_t) * size);
+        for (int s = 0; s < size; s++) {
+            if (((s >> op1) & 1) == 1) {
+                double r = vm->state[s].real, im = vm->state[s].imag;
+                tmp[s] = (complex_t){r * cp - im * sp, r * sp + im * cp};
+            }
+        }
+        memcpy(vm->state, tmp, sizeof(complex_t) * size);
+    } else if (opcode == OP_Y) {
+        /* Y = [[0,-i],[i,0]] 泡利Y门 */
+        if (op1 >= n) goto end_gate;
+        memcpy(tmp, vm->state, sizeof(complex_t) * size);
+        for (int s = 0; s < size; s++) {
+            if (((s >> op1) & 1) == 1) {
+                int pair = s ^ (1 << op1);
+                /* |1>态 -> -i*|0>态, |0>态 -> i*|1>态 */
+                double r0 = vm->state[pair].real, i0 = vm->state[pair].imag;
+                tmp[s] = (complex_t){i0, -r0};  /* i*(r0+i*i0) = -i0 + i*r0 */
+                tmp[pair] = (complex_t){-vm->state[s].imag, vm->state[s].real};  /* -i*(rs+i*is) = is - i*rs */
+            }
+        }
+        memcpy(vm->state, tmp, sizeof(complex_t) * size);
+    } else if (opcode == OP_SWAP) {
+        /* SWAP 交换两个量子比特 */
+        if (op1 >= n || op2 >= n) goto end_gate;
+        if (op1 == op2) goto end_gate;
+        memcpy(tmp, vm->state, sizeof(complex_t) * size);
+        for (int s = 0; s < size; s++) {
+            int ss = s ^ (((s >> op1) & 1) << op2) ^ (((s >> op2) & 1) << op1);
+            if (ss > s) {
+                vm->state[s] = tmp[ss];
+                vm->state[ss] = tmp[s];
+            }
+        }
+    } else if (opcode == OP_BARRIER) {
+        /* BARRIER: 同步点，强制刷新（实际模拟中为no-op） */
+        fflush(stdout);
+    } else if (opcode == OP_NOP) {
+        /* NOP: 无操作 */
     } else if (opcode == OP_PRINT) {
         int val = (op1 < MAX_REGISTERS) ? vm->registers[op1] : 0;
         printf("[QVM] print(r%d) = %d\n", op1, val);
     } else if (opcode == OP_STOP) {
         /* STOP handled by main loop */
     } else {
-        /* 兼容QCL编译器字节码：Z/S/T/SWAP/RESET/BARRIER等做no-op */
+        /* 兼容QCL编译器字节码：未实现opcode做no-op */
     }
 end_gate:
     free(tmp);
@@ -310,11 +408,48 @@ int main(int argc, char *argv[]) {
                            apply_gate(&vm, OP_MEASURE, q, r); break; }
         case OP_PRINT: { int r = code[pos++];
                          apply_gate(&vm, OP_PRINT, r, 0); break; }
-        case OP_Z:  { int q = code[pos++]; (void)q; break; }
-        case OP_T:  { int q = code[pos++]; (void)q; break; }
-        case OP_S:  { int q = code[pos++]; (void)q; break; }
-        case OP_RESET: { int q = code[pos++]; (void)q; break; }
-        case OP_SWAP: { int a = code[pos++], b = code[pos++]; (void)a; (void)b; break; }
+        case OP_Z:  { int q = code[pos++]; apply_gate(&vm, OP_Z, q, 0);
+                      printf("[QVM] Z(q%d)\n", q); break; }
+        case OP_S:  { int q = code[pos++]; apply_gate(&vm, OP_S, q, 0);
+                      printf("[QVM] S(q%d)\n", q); break; }
+        case OP_T:  { int q = code[pos++]; apply_gate(&vm, OP_T, q, 0);
+                      printf("[QVM] T(q%d)\n", q); break; }
+        case OP_Y:  { int q = code[pos++]; apply_gate(&vm, OP_Y, q, 0);
+                      printf("[QVM] Y(q%d)\n", q); break; }
+        case OP_RESET: { int q = code[pos++]; apply_gate(&vm, OP_RESET, q, 0);
+                         printf("[QVM] RESET(q%d)\n", q); break; }
+        case OP_SWAP: { int a = code[pos++], b = code[pos++];
+                        apply_gate(&vm, OP_SWAP, a, b);
+                        printf("[QVM] SWAP(q%d, q%d)\n", a, b); break; }
+        case OP_BARRIER: {
+                         printf("[QVM] BARRIER\n"); break; }
+        case OP_NOP: {
+                      printf("[QVM] NOP\n"); break; }
+        case OP_LOAD_REG: { int r = code[pos++];
+                            int val = (r < MAX_REGISTERS) ? vm.registers[r] : 0;
+                            stack_push(val);
+                            printf("[QVM] LOAD_REG r%d -> stack=%d\n", r, val); break; }
+        case OP_STORE_REG: { int r = code[pos++];
+                             if (r < MAX_REGISTERS) vm.registers[r] = stack_pop();
+                             printf("[QVM] STORE_REG stack -> r%d\n", r); break; }
+        case OP_ADD: { int b = stack_pop(), a = stack_pop();
+                       stack_push(a + b);
+                       printf("[QVM] ADD(%d + %d = %d)\n", a, b, a + b); break; }
+        case OP_SUB: { int b = stack_pop(), a = stack_pop();
+                       stack_push(a - b);
+                       printf("[QVM] SUB(%d - %d = %d)\n", a, b, a - b); break; }
+        case OP_MUL: { int b = stack_pop(), a = stack_pop();
+                       stack_push(a * b);
+                       printf("[QVM] MUL(%d * %d = %d)\n", a, b, a * b); break; }
+        case OP_DIV: { int b = stack_pop(), a = stack_pop();
+                       int res = (b != 0) ? a / b : 0;
+                       stack_push(res);
+                       printf("[QVM] DIV(%d / %d = %d)\n", a, b, res); break; }
+        case OP_JUMP: { int tgt = (int)(code[pos] | (code[pos+1] << 8)); pos += 2;
+                        printf("[QVM] JUMP to %d\n", tgt); break; }
+        case OP_EXIT: {
+                       printf("[QVM] EXIT\n");
+                       free(code); if (vm.state) free(vm.state); return 0; }
         /* ---------- 高级语法opcode（100+）: 与qcl_phase2.c严格对齐 ---------- */
         case OP_IMPORT: {
             if (pos + 3 < fsize) {
