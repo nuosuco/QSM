@@ -220,15 +220,20 @@ int main(int argc, char *argv[]) {
 
     QVM vm;
     vm.state = NULL;
-    int pos = 0;
-    /* 对QEntL字节码（0x14格式），从代码区开始执行（跳过头部） */
-    if (sp_data) pos = 3 + code_len;
+    int pos = 3;       /* 代码区始终从偏移3开始（跳过头部魔数+长度） */
     int func_nest_depth = 0;   /* OP_FUNC_DEF/END 嵌套计数器 */
     char last_func_name[128] = {0};
     int high_count = 0;        /* 高级opcode处理计数 */
     printf("[QVM] 初始化量子虚拟机\n");
-    if (sp_data) printf("[QVM] 加载QEntL字节码: code_len=%d, sp_len=%d, 代码区起始=%d\n", code_len, sp_len, pos);
-    while (pos < fsize) {
+    int code_end;          /* 代码区结束位置 */
+    if (sp_data) {
+        code_end = 3 + code_len;
+        printf("[QVM] 加载QEntL字节码: code_len=%d, sp_len=%d, 代码区起始=3, string_pool起始=%d\n", code_len, sp_len, 3+code_len+2);
+    } else {
+        code_end = fsize;          /* 无头部时执行整个文件 */
+        pos = 0;
+    }
+    while (pos < code_end) {
         uint8_t op = code[pos++];
         if (op == OP_INIT_N) {
             int n = code[pos++];
