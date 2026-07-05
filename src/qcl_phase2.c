@@ -76,6 +76,8 @@ typedef enum {
     OP_APPEND_BYTE     = 130,
     OP_BYTECODE_LEN    = 131,
     OP_EXPORT_SYM      = 140,
+    OP_MODULE_DEF      = 141,
+    OP_MODULE_END      = 142,
     BC_FUNC_BODY       = 255,
     BC_FUNC_END        = 254,
 } Opcode;
@@ -541,6 +543,7 @@ static int  parse_type_def(Parser *P);
 static int  parse_def(Parser *P);
 static int  parse_export(Parser *P);
 static void parse_func_body(Parser *P);
+static int  parse_quantum_module(Parser *P);
 static int  parse_top_statement(Parser *P);
 static void parse_class_body(Parser *P);
 
@@ -612,7 +615,7 @@ static int parse_quantum_instruction(Parser *P) {
 
 /* ==================== import / const / 类型 / def 解析 ==================== */
 static int parse_import(Parser *P) {
-    consume(P); /* import */
+    consume(P); /* import / 导入 */
     /* 接受 import "模块名" 和 import <ident>（如 import stdlib） */
     const char *mod = NULL;
     if (P->lexer.cur.kind == TOK_STRING) {
@@ -623,6 +626,15 @@ static int parse_import(Parser *P) {
         consume(P);
     } else {
         return 0;
+    }
+    /* 处理 "作为 别名" 后缀（如：导入 "path" 作为 量子虚拟机） */
+    if (kw(&P->lexer.cur, "作为")) {
+        consume(P); /* 消耗 "作为" */
+        if (P->lexer.cur.kind == TOK_IDENT) {
+            const char *alias = P->lexer.cur.text;
+            consume(P);
+            (void)alias; /* 别名在 QVM 层用作导入表标识 */
+        }
     }
     expect_tok(P, TOK_SEMI);
     write_opcode(OP_IMPORT); write_string_ref(mod);
@@ -1179,6 +1191,8 @@ static int parse_top_statement(Parser *P) {
     if (t.kind == TOK_EOF) return 0;
     if (t.kind == TOK_HASH || (t.kind == TOK_SLASH && L_is_double_slash(P))) { skip_to_semi(P); return 1; }
     if (kw(&t, "import")) return parse_import(P);
+    if (kw(&t, "导入")) return parse_import(P);    /* 中文 import 等价 */
+    if (kw(&t, "量子模块")) return parse_quantum_module(P);
     if (kw(&t, "const"))  return parse_const(P);
     if (kw(&t, "类型"))   return parse_type_def(P);
     if (kw(&t, "def") || kw(&t, "函数")) return parse_def(P);
@@ -1264,6 +1278,38 @@ static int parse_top_statement(Parser *P) {
         write_high_opcode(OP_CONTINUE_STMT); P->high_level++; return 1;
     }
     skip_to_semi(P); return 1;
+}
+
+/* ==================== 量子模块 解析 ==================== */
+static int parse_quantum_module(Parser *P) {
+    consume(P); /* 消耗 "量子模块"，cur 已推进到模块名标识符 */
+    const char *mod_name = NULL;
+    if (P->lexer.cur.kind == TOK_IDENT) {
+        mod_name = P->lexer.cur.text;
+        consume(P);
+    }
+    write_opcode(OP_MODULE_DEF);
+    if (mod_name) {
+        write_string_ref(mod_name);
+    } else {
+        write_string_ref("");
+    }
+    if (P->lexer.cur.kind == TOK_LBRACE) {
+        consume(P); /* 消耗 '{' */
+        int depth = 1;
+        while (depth > 0 && P->lexer.cur.kind != TOK_EOF) {
+            Token tk = P->lexer.cur;
+            if (tk.kind == TOK_LBRACE) { depth++; consume(P); continue; }
+            if (tk.kind == TOK_RBRACE) { depth--; consume(P); continue; }
+            if (tk.kind == TOK_HASH || (tk.kind == TOK_SLASH && L_is_double_slash(P))) { skip_to_semi(P); continue; }
+            parse_top_statement(P); /* 递归解析模块内顶层语句 */
+        }
+    } else {
+        skip_to_semi(P);
+    }
+    write_opcode(OP_MODULE_END);
+    flush_highbuf();
+    P->high_level++; return 1;
 }
 
 /* ==================== 主编译函数 ==================== */
