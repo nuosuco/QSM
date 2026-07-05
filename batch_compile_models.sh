@@ -11,7 +11,7 @@ RESULTS=()
 for model in QSM Ref SOM WeQ; do
     srcdir="QEntL/Models/$model"
     if [ ! -d "$srcdir" ]; then
-        RESULTS+=(FAIL | $model | directory not found)
+        RESULTS+=("FAIL | $model | directory not found")
         FAIL=$((FAIL+1))
         continue
     fi
@@ -23,7 +23,7 @@ for model in QSM Ref SOM WeQ; do
 
         # Check compilation succeeded and .qbc exists
         if ! echo "$compile_output" | grep -q "编译完成" || [ ! -f "$out" ]; then
-            RESULTS+=(FAIL | $model/$name | compile failed)
+            RESULTS+=("FAIL | $model/$name | compile failed")
             FAIL=$((FAIL+1))
             continue
         fi
@@ -43,10 +43,10 @@ for model in QSM Ref SOM WeQ; do
         fi
 
         if [ "$first_byte" = "14" ]; then
-            RESULTS+=(OK   | $model/$name | ${sz}B | 0x14 | funcs=$func_count | $pair_ok)
+            RESULTS+=("OK   | $model/$name | ${sz}B | 0x14 | funcs=$func_count | $pair_ok")
             SUCCESS=$((SUCCESS+1))
         else
-            RESULTS+=(FAIL | $model/$name | ${sz}B | header=0x$first_byte (exp 0x14))
+            RESULTS+=("FAIL | $model/$name | ${sz}B | header=0x$first_byte (exp 0x14)")
             FAIL=$((FAIL+1))
         fi
     done

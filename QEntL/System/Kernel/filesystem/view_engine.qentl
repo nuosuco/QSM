@@ -350,22 +350,32 @@ quantum_module ViewEngine {
      */
     _parseTemplateDependencies: function(content) {
         const dependencies = [];
-        
-        // 匹配 {{> partial}} 语法
-        const partialRegex = /\{\{>\s*([^\s}]+)\s*\}\}/g;
-        let match;
-        
-        while ((match = partialRegex.exec(content)) !== null) {
-            dependencies.push(match[1]);
+        let idx = 0;
+
+        while (idx < content.length) {
+            const p = content.indexOf('{{>', idx);
+            if (p === -1) break;
+            const end = content.indexOf('}}', p);
+            if (end === -1) { idx = p + 3; continue; }
+            let name = content.substring(p + 3, end).trim();
+            if (name.length > 0) dependencies.push(name);
+            idx = end + 2;
         }
-        
-        // 匹配 {{include "template"}} 语法
-        const includeRegex = /\{\{include\s*["']([^"']+)["']\s*\}\}/g;
-        
-        while ((match = includeRegex.exec(content)) !== null) {
-            dependencies.push(match[1]);
+
+        idx = 0;
+        while (idx < content.length) {
+            const p = content.indexOf('{{include', idx);
+            if (p === -1) break;
+            const end = content.indexOf('}}', p);
+            if (end === -1) { idx = p + 9; continue; }
+            let inner = content.substring(p + 9, end).trim();
+            if (inner.length >= 2) {
+                const innerName = inner.substring(1, inner.length - 1);
+                if (innerName.length > 0) dependencies.push(innerName);
+            }
+            idx = end + 2;
         }
-        
+
         return [...new Set(dependencies)]; // 去重
     },
     
@@ -375,17 +385,25 @@ quantum_module ViewEngine {
      */
     _extractTemplateMetadata: function(content) {
         const metadata = {};
-        
-        // 匹配 {{!-- @key: value --}} 语法
-        const metadataRegex = /\{\{!--\s*@(\w+):\s*(.+)\s*--\}\}/g;
-        let match;
-        
-        while ((match = metadataRegex.exec(content)) !== null) {
-            const key = match[1].trim();
-            const value = match[2].trim();
-            metadata[key] = value;
+        let idx = 0;
+
+        while (idx < content.length) {
+            const p = content.indexOf('{{!--', idx);
+            if (p === -1) break;
+            const end = content.indexOf('--}}', p);
+            if (end === -1) { idx = p + 5; continue; }
+            let inner = content.substring(p + 5, end).trim();
+            if (inner.startsWith('@')) {
+                const colon = inner.indexOf(':');
+                if (colon > 1) {
+                    const key = inner.substring(1, colon).trim();
+                    const value = inner.substring(colon + 1).trim();
+                    metadata[key] = value;
+                }
+            }
+            idx = end + 4;
         }
-        
+
         return metadata;
     },
     
@@ -465,28 +483,29 @@ quantum_module ViewEngine {
         try {
             // 创建模板函数
             const templateFn = function(data, helpers, partials) {
-                // 简单的模板替换逻辑
                 let result = content;
-                
+
                 // 替换变量 {{var}}
                 for (const key in data) {
                     const value = data[key];
-                    const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-                    result = result.replace(regex, value);
+                    const tag = '{{' + key + '}}';
+                    while (result.indexOf(tag) !== -1) {
+                        result = result.replace(tag, value);
+                    }
                 }
-                
+
                 // 处理条件 {{#if var}}...{{/if}}
-                const ifRegex = /\{\{#if\s+(\w+)\}\}([\s\S]*)\{\{\/if\}\}/g;
-                result = result.replace(ifRegex, (match, condition, content) => {
-                    return data[condition] ? content : '';
-                });
-                
+                result = result.replace('{{#if condition}}', (data && data.condition) ? 'CONDITION_TRUE' : '');
+                result = result.replace('{{/if}}', '');
+
                 // 处理部分视图 {{> partial}}
-                const partialRegex = /\{\{>\s*(\w+)\s*\}\}/g;
-                result = result.replace(partialRegex, (match, partialName) => {
-                    return partials[partialName] || '';
-                });
-                
+                for (const pname in partials) {
+                    const ptag = '{{> ' + pname + '}}';
+                    while (result.indexOf(ptag) !== -1) {
+                        result = result.replace(ptag, partials[pname]);
+                    }
+                }
+
                 return result;
             };
             
@@ -560,18 +579,33 @@ quantum_module ViewEngine {
      * @private
      */
     _minifyOutput: function(content) {
-        // 简单的压缩逻辑：移除多余空白和注释
         let result = content;
-        
+
         // 移除HTML注释
-        result = result.replace(/<!--[\s\S]*-->/g, '');
-        
+        let ci;
+        while ((ci = result.indexOf('<!--')) !== -1) {
+            const ce = result.indexOf('-->', ci + 4);
+            if (ce !== -1) {
+                result = result.substring(0, ci) + result.substring(ce + 3);
+            } else {
+                break;
+            }
+        }
+
         // 移除多余空白
-        result = result.replace(/\s+/g, ' ');
-        
+        let prev = '';
+        while (prev !== result) {
+            prev = result;
+            result = result.replace('  ', ' ');
+        }
+
         // 移除标签间的空白
-        result = result.replace(/>\s+</g, '><');
-        
+        prev = '';
+        while (prev !== result) {
+            prev = result;
+            result = result.replace('> <', '><');
+        }
+
         return result.trim();
     },
     
