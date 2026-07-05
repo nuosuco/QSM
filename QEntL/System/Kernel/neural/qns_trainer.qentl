@@ -419,21 +419,47 @@ import "QEntL/System/Deployment/development_mode.qentl";
         学习率 = 状态.学习率
         动量系数 = 配置.动量系数
         
-        // 更新输出层
+        // 更新输出层 - CRITICAL-2修复：遍历完整batch/seq维度
+        输出梯度累积 = 初始化零矩阵(网络.输出层权重.长度, 网络.输出层权重.第一个().长度)
+        偏置梯度累积 = 初始化零向量(配置.词汇表大小)
+        样本总数 = 梯度.输出梯度.长度
+        对于 batch_idx 从 0 到 梯度.输出梯度.长度 - 1 {
+            对于 seq_idx 从 0 到 梯度.输出梯度.第一个().长度 - 1 {
+                对于 in_dim 从 0 到 网络.输出层权重.长度 - 1 {
+                    对于 out_dim 从 0 到 网络.输出层权重.第一个().长度 - 1 {
+                        输出梯度累积[in_dim][out_dim] += 梯度.输出梯度[batch_idx][seq_idx][out_dim]
+                    }
+                }
+                对于 out_dim 从 0 到 配置.词汇表大小 - 1 {
+                    偏置梯度累积[out_dim] += 梯度.输出梯度[batch_idx][seq_idx][out_dim]
+                }
+            }
+        }
         对于 in_dim 从 0 到 网络.输出层权重.长度 - 1 {
             对于 out_dim 从 0 到 网络.输出层权重.第一个().长度 - 1 {
-                网络.输出层权重[in_dim][out_dim] -= 学习率 * 梯度.输出梯度[0][0][out_dim]
+                网络.输出层权重[in_dim][out_dim] -= 学习率 * 输出梯度累积[in_dim][out_dim] / 样本总数
             }
         }
         对于 out_dim 从 0 到 配置.词汇表大小 - 1 {
-            网络.输出层偏置[out_dim] -= 学习率 * 梯度.输出梯度[0][0][out_dim]
+            网络.输出层偏置[out_dim] -= 学习率 * 偏置梯度累积[out_dim] / 样本总数
         }
         
-        // 更新隐藏层
+        // 更新隐藏层 - CRITICAL-1修复：使用真实隐藏梯度
         对于 layer_idx 从 0 到 网络.隐藏层权重.长度 - 1 {
+            梯度累积 = 初始化零矩阵(网络.隐藏层权重[layer_idx].长度, 网络.隐藏层权重[layer_idx].第一个().长度)
+            样本总数 = 梯度.隐藏梯度.长度
+            对于 batch_idx 从 0 到 梯度.隐藏梯度.长度 - 1 {
+                对于 seq_idx 从 0 到 梯度.隐藏梯度.第一个().长度 - 1 {
+                    对于 in_dim 从 0 到 网络.隐藏层权重[layer_idx].长度 - 1 {
+                        对于 out_dim 从 0 到 网络.隐藏层权重[layer_idx].第一个().长度 - 1 {
+                            梯度累积[in_dim][out_dim] += 梯度.隐藏梯度[batch_idx][seq_idx][in_dim]
+                        }
+                    }
+                }
+            }
             对于 in_dim 从 0 到 网络.隐藏层权重[layer_idx].长度 - 1 {
                 对于 out_dim 从 0 到 网络.隐藏层权重[layer_idx].第一个().长度 - 1 {
-                    网络.隐藏层权重[layer_idx][in_dim][out_dim] -= 学习率 * 0.01
+                    网络.隐藏层权重[layer_idx][in_dim][out_dim] -= 学习率 * 梯度累积[in_dim][out_dim] / 样本总数
                 }
             }
         }
