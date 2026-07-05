@@ -1,49 +1,35 @@
-// QVM量子虚拟机主入口 - VM执行体
-import VM
-import quantum_state_processor
-import entanglement_engine
-import memory_manager
-import instruction_set
+// QVM完整执行体 - 混合文件（高级语法 + 量子指令）
+// 由qcl_phase2编译，含函数体 + 量子指令
 
+// 初始化
 def vm_init():
-    VM.vm_start()
-    memory_manager.init_memory()
-    instruction_set.load_opcodes()
+    init 8
     return 0
 
-def vm_run():
-    quantum_state_processor.init_qubits()
-    entanglement_engine.enable_entanglement()
-    VM.vm_execute()
+// 创建贝尔态
+def vm_create_bell():
+    H 0
+    H 1
+    CNOT 0 1
+    H 2
+    H 3
+    CNOT 2 3
     return 0
 
-def vm_exit():
-    VM.vm_stop()
-    memory_manager.release_memory()
+// 测量
+def vm_measure():
+    MEASURE 0 0
+    MEASURE 1 1
+    MEASURE 2 2
+    MEASURE 3 3
+    PRINT 0
+    PRINT 1
+    STOP
     return 0
 
-def vm_setup():
-    vm_init()
-    return 0
-
-def vm_cleanup():
-    vm_exit()
-    return 0
-
-def vm_version():
-    return "QVM 1.0"
-
-def vm_name():
-    return "QEntL Quantum Virtual Machine"
-
-def vm_memory_limit():
-    return 1024 * 1024 * 1024  // 1GB
-
-def vm_health_check():
-    return 1  // healthy
-
+// 主入口
 def main():
     vm_init()
-    vm_run()
-    vm_exit()
+    vm_create_bell()
+    vm_measure()
     return 0
