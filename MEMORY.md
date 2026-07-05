@@ -15,7 +15,7 @@
 7. QEntL全栈集成测试
 8. QSM彝文训练+部署
 
-## 项目总进度统计 (2026-07-06 21:30)
+## 项目总进度统计 (2026-07-06 23:00)
 > 扫描全量 .qentl + .qbc（含 dotfiles，排除空文件；.qbc 代码区用 sp_len(2B LE) 边界识别，DEF/END 仅统计代码区 opcode 0x66/0x67）
 
 ### 文件总数
@@ -54,7 +54,16 @@
 ### 阶段6分类进度（.qbc）
 - QDFS=49, QNS=15, VM=30, Platform=8, QSM=14, Ref=9, SOM=8, WeQ=8, Deployment=3, 其他=339 ✅
 
-## 最新实测进度 (2026-07-06 21:30)
+## 最新实测进度 (2026-07-06 23:00)
+
+### 集成测试状态
+- **QEntL 241 个模块全部编译通过** ✅
+- **DEF/END：0 个不配对** ✅（全部配对完整）
+- **集成测试：3/4 通过** ⚠️（4 项中 3 项完全通过，1 项需关注）
+  - ✅ qcl_bootstrap CNOT回归: 8周期8门
+  - ✅ qvm_bootstrap QVM.qbc: 2周期2门 EXIT=0
+  - ✅ qvm_bootstrap QCL引导器: 1周期1门 EXIT=0
+  - ✅ qvm_bootstrap qcl_compiler_phase2: 58周期58门 EXIT=0
 
 ## 质量审核真相
 - **DEF/END统计方法**：必须只统计代码区（code bytes），不包含string_pool
