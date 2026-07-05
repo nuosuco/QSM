@@ -92,6 +92,50 @@ typedef struct {
     int ops;
 } QVM;
 
+/* ========== 高级语法执行引擎数据结构 ========== */
+
+/* 函数表：存储已解析的函数定义（名称、起始pos、参数数） */
+typedef struct {
+    char name[128];
+    int start_pos;
+    int end_pos;      /* OP_FUNC_END 的 pos */
+    int nargs;
+} FuncDef;
+static FuncDef func_table[MAX_FUNCS];
+static int func_count = 0;
+
+/* 变量表：变量名 -> 整数值 */
+typedef struct {
+    char name[128];
+    int value;
+} Variable;
+static Variable var_table[MAX_VARIABLES];
+static int var_count = 0;
+
+/* 函数调用栈：每层保存返回地址 */
+typedef struct {
+    int return_pos;       /* 函数返回后继续执行的位置 */
+    int nargs;            /* 本次调用实参个数（可选） */
+    int frame_base;       /* 局部变量栈基准（简化实现中不用） */
+} CallFrame;
+static CallFrame call_stack[CALL_STACK_MAX];
+static int call_depth = 0;
+static int return_value = 0;   /* 最近一次 return 的值 */
+static int in_return = 0;      /* 刚执行 return，需要弹出调用帧 */
+
+/* 循环栈：每层 while 循环保存循环体起始位置和条件值 */
+typedef struct {
+    int body_start;       /* while 循环体第一条指令的 pos */
+    int body_end;         /* while 循环体结束位置（下一指令） */
+    int condition;        /* 循环条件值（简化：非0继续） */
+} LoopFrame;
+static LoopFrame loop_stack[LOOP_STACK_MAX];
+static int loop_depth = 0;
+
+/* 字符串常量暂存区 */
+static char str_const_buf[4096];
+static int str_const_count = 0;
+
 /* 算术寄存器栈 — 用于 LOAD_REG/STORE_REG + ADD/SUB/MUL/DIV */
 static int arith_stack[MAX_REGISTERS] = {0};
 static int stack_top = 0;
