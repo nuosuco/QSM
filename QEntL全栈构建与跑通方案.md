@@ -6,30 +6,39 @@
 
 ---
 
-## 一、八阶段自举流程（总体架构）
+## 一、自举链（2026-07-06最终版，必须牢记！）
 
-```
-阶段1: C语言解释器（qcl_bootstrap.c）解释量子指令子集
-     ↓
-阶段2: 解释器启动QCL引导器（QEntL源码，数个.qentl文件）
-     ↓
-阶段3: QCL引导器编译QCL与QVM的QEntL源码（各数个.qentl文件）
-       → 生成 QCL 和 QVM 的 QBC（各数个.qbc文件）
-     ↓
-阶段4: C语言启动器（qvm_bootstrap.c）加载QVM（数个.qbc文件）运行
-       → QEntL环境形成
-     ↓
-阶段5: QCL编译器（数个.qbc文件）在QEntL环境中运行
-       → 编译所有QEntL源码
-     ↓
-阶段6: QDFS/QNS/四大模型（各数个.qbc文件）等全部在QEntL环境中运行
-       其中 QNS 以 QDFS 为基础，四大模型以 QNS 为基础
-     ↓
-阶段7: QNS（各数个.qbc文件）训练彝文等数据，模型测试成功
-       → 更新 web 桌面的量子助手的 API
-     ↓
-阶段8: QEntL 三种部署
-```
+1. **阶段1-2**: C语言解释器 `qcl_bootstrap.c` 启动 **QCL引导器**（7个QEntL源码文件，在QCL模块目录下，因为还没有qbc，只能用源码）
+2. **自举**: QCL引导器编译自己 → **QCL.qbc**，同时编译QVM源码 → **QVM.qbc**
+3. **阶段4**: C语言启动器 `qvm_bootstrap.c` 加载 **QVM.qbc**，QEntL环境形成
+4. **阶段5**: qbc版本的QCL在QVM上运行，以后所有QEntL源码都用它编译
+5. **阶段6**: qbc版本的QCL/QDFS/QNS等在QVM之上运行，**QNS必须以QDFS为基础**
+
+## 各系统文件数量（2026-07-06实测）
+
+| 系统 | 源码文件数 | 文件目录 |
+|------|----------|----------|
+| QCL模块（QCL引导器） | **7个** | `QCL模块/` |
+| QDFS | 32个 | `QEntL/System/Kernel/filesystem/` |
+| QNS | 15个 | `QEntL/System/Kernel/neural/` |
+| Platform | 8个 | `QEntL/System/Platform/` |
+| Deployment | 5个 | `QEntL/System/Deployment/` |
+| QSM | 14个 | `QEntL/Models/QSM/` |
+| Ref | 9个 | `QEntL/Models/Ref/` |
+| SOM | 8个 | `QEntL/Models/SOM/` |
+| WeQ | 8个 | `QEntL/Models/WeQ/` |
+
+**⚠️ 统计规则**：只统计源码文件（.qentl），不统计编译产物（.qbc）。所有系统的源码文件都在同一个文件目录下。
+
+## QCL引导器7个源码文件（在QCL模块目录下）
+
+1. qcl_bootstrap_phase2.qentl
+2. qcl_compiler_phase2.qentl
+3. qcl_lexer.qentl
+4. qcl_opcodes.qentl
+5. qcl_parser_high.qentl
+6. qcl_parser.qentl
+7. qcl_bootstrap_phase2_qcircuit.qentl
 
 ---
 
