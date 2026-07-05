@@ -116,7 +116,7 @@ static int var_count = 0;
 typedef struct {
     int return_pos;       /* 函数返回后继续执行的位置 */
     int nargs;            /* 本次调用实参个数（可选） */
-    int frame_base;       /* 局部变量栈基准（简化实现中不用） */
+    int ret_addr_value;   /* 函数返回值 */
 } CallFrame;
 static CallFrame call_stack[CALL_STACK_MAX];
 static int call_depth = 0;
@@ -752,13 +752,14 @@ int main(int argc, char *argv[]) {
         }
         case OP_RETURN_STMT: {
             int rt = 0;
+            int save_ret = 0;
             if (pos < fsize) rt = code[pos++];
             printf("[QVM] OP_RETURN_STMT(kind=%d)\n", rt);
             /* 从函数返回：弹出调用帧，跳到返回地址 */
             if (rt == 0 && call_depth > 0) {
                 /* return; 无返回值 */
                 CallFrame *cf = &call_stack[--call_depth];
-                int ret = cf->return_value;
+                int ret = cf->ret_addr_value;
                 return_value = ret;
                 printf("[QVM] return; -> 返回地址=%d, return_value=%d\n", cf->return_pos, ret);
                 pos = cf->return_pos;
@@ -798,7 +799,7 @@ int main(int argc, char *argv[]) {
                 char *vn = read_string(name, sizeof(name), sp_data, sp_len, off, vlen);
                 CallFrame *cf = &call_stack[--call_depth];
                 return_value = 0;
-                printf("[QVM] return "%s" -> 返回地址=%d\n", vn ? vn : "(null)", cf->return_pos);
+                printf("[QVM] return \"%s\" -> 返回地址=%d\n", vn ? vn : "(null)", cf->return_pos);
                 pos = cf->return_pos;
                 continue;
             } else if (call_depth <= 0) {
@@ -809,79 +810,138 @@ int main(int argc, char *argv[]) {
             break;
         }
         case OP_IF_STMT: {
-            printf("[QVM] OP_IF_STMT (条件分支: 取栈顶条件值)\n");
-            /* 取条件值：先从算术栈弹，若无值则取最后一个 PUSH_CONST_INT 的值 */
             int cond = 0;
             if (stack_top > 0) cond = stack_pop();
-            /* 扫描 IF body 的结束位置 */
             int if_end = find_if_else_end(code, code_end, pos);
-            /* 有 ELSE 时检查 */
             int has_else = (if_end < code_end && code[if_end] == OP_ELSE_STMT);
             int else_end = has_else ? find_if_else_end(code, code_end, if_end + 1) : if_end;
+            printf("[QVM] OP_IF_STMT cond=%d if_body=[%d,%d) else=%d else_end=%d\n",
+                   cond, pos, if_end, has_else, else_end);
             if (cond != 0) {
-                printf("[QVM] IF 条件为真，执行 IF body (pos %d -> %d)\n", pos, if_end);
-                /* 执行 IF body */
+                printf("[QVM] IF 真，执行 IF body [%d -> %d)\n", pos, if_end);
                 if (if_end < code_end) {
                     while (pos < if_end) {
-                        /* 内联执行 IF body 中的指令（简化：执行第一条 push_const 后跳） */
                         uint8_t bip = code[pos++];
                         if (bip == OP_PUSH_CONST_INT) {
                             if (pos + 1 < code_end) { int v = read_u16(code, pos); pos += 2;
-                                printf("[QVM] IF-body PUSH_CONST_INT(%d)\n", v); stack_push(v); }
-                        } else if (bip == OP_FUNC_CALL_STMT) {
-                            pos--; /* 回溯给主循环处理 */
-                            break;
+                                stack_push(v); }
+                        } else if (bip == OP_PUSH_CONST_STR) {
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int l = read_u16(code, pos+2); pos += 4;
+                                char *s = read_string(str_const_buf, sizeof(str_const_buf), sp_data, sp_len, o, l);
+                                (void)s;
+                            }
                         } else if (bip == OP_VAR_DECL) {
-                            int o = pos < code_end ? read_u16(code, pos) : 0;
-                            int vl = pos+2 < code_end ? read_u16(code, pos+2) : 0;
-                            pos += 4; char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl);
-                            if (vname) var_set(vname, 0);
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int vl = read_u16(code, pos+2); pos += 4;
+                                char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl);
+                                if (vname) var_set(vname, 0);
+                            }
                         } else if (bip == OP_ASSIGN_STMT) {
-                            int o = pos < code_end ? read_u16(code, pos) : 0;
-                            int vl = pos+2 < code_end ? read_u16(code, pos+2) : 0;
-                            pos += 4; char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl);
-                            int v = stack_top > 0 ? stack_pop() : 0;
-                            if (vname) var_set(vname, v);
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int vl = read_u16(code, pos+2); pos += 4;
+                                char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl);
+                                int v = stack_top > 0 ? stack_pop() : 0;
+                                if (vname) var_set(vname, v);
+                            }
+                        } else if (bip == OP_FUNC_CALL_STMT) {
+                            /* 内联执行函数调用 */
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int fl = read_u16(code, pos+2); pos += 4;
+                                int nargs = (pos < code_end) ? code[pos++] : 0;
+                                char *fn = read_string(name, sizeof(name), sp_data, sp_len, o, fl);
+                                if (fn && func_find(fn) >= 0) {
+                                    if (call_depth < CALL_STACK_MAX) {
+                                        CallFrame *cf = &call_stack[call_depth++];
+                                        cf->return_pos = pos; cf->nargs = nargs; cf->return_value = 0;
+                                        pos = func_table[func_find(fn)].start_pos;
+                                        /* 在 IF body 内继续循环执行 */
+                                        continue;
+                                    }
+                                }
+                            }
                         } else if (bip == OP_RETURN_STMT) {
-                            pos--; /* 回溯 */
+                            /* 内联处理 return */
+                            if (pos < code_end) { uint8_t rt = code[pos++]; (void)rt; }
+                            pos--; /* 回溯给主循环继续处理（主循环会跳回调用者） */
+                            break;
+                        } else if (bip == OP_IF_STMT || bip == OP_WHILE_STMT) {
+                            pos--; /* 回溯给主循环处理嵌套控制流 */
                             break;
                         } else if (bip == OP_STOP || bip == OP_EXIT) {
                             pos--; break;
+                        } else if (bip == OP_PRINT) {
+                            int r = (pos < code_end) ? code[pos++] : 0;
+                            int val = (r < MAX_REGISTERS) ? vm.registers[r] : 0;
+                            printf("[QVM] IF-body print(r%d) = %d\n", r, val);
+                        } else if (bip == OP_LOAD_REG) {
+                            int r = (pos < code_end) ? code[pos++] : 0;
+                            int val = (r < MAX_REGISTERS) ? vm.registers[r] : 0;
+                            stack_push(val);
+                        } else if (bip == OP_STORE_REG) {
+                            int r = (pos < code_end) ? code[pos++] : 0;
+                            if (r < MAX_REGISTERS) vm.registers[r] = stack_pop();
+                        } else if (bip == OP_ADD) {
+                            int b = stack_pop(), a = stack_pop(); stack_push(a + b);
+                        } else if (bip == OP_SUB) {
+                            int b = stack_pop(), a = stack_pop(); stack_push(a - b);
+                        } else if (bip == OP_MUL) {
+                            int b = stack_pop(), a = stack_pop(); stack_push(a * b);
+                        } else if (bip == OP_DIV) {
+                            int b = stack_pop(), a = stack_pop(); stack_push(b != 0 ? a / b : 0);
+                        } else if (bip == OP_JUMP) {
+                            if (pos + 1 < code_end) { int tgt = read_u16(code, pos); pos += 2; pos = tgt; }
                         } else {
-                            /* 未知指令，继续 */
-                            high_count++;
+                            printf("[QVM] IF-body 未知 opcode 0x%02x pos=%d\n", bip, pos-1);
                         }
                     }
                     pos = else_end;
                 }
             } else {
-                printf("[QVM] IF 条件为假，跳过 IF body (pos %d -> %d)\n", pos, if_end);
+                printf("[QVM] IF 假，跳过 IF body [%d -> %d)\n", pos, if_end);
                 if (has_else) {
-                    printf("[QVM] 执行 ELSE body (pos %d -> %d)\n", if_end+1, else_end);
+                    printf("[QVM] 执行 ELSE body [%d -> %d)\n", if_end+1, else_end);
                     pos = if_end + 1;
                     while (pos < else_end) {
                         uint8_t bip = code[pos++];
                         if (bip == OP_PUSH_CONST_INT) {
-                            if (pos + 1 < code_end) { int v = read_u16(code, pos); pos += 2;
-                                printf("[QVM] ELSE-body PUSH_CONST_INT(%d)\n", v); stack_push(v); }
-                        } else if (bip == OP_FUNC_CALL_STMT) {
-                            pos--; break;
+                            if (pos + 1 < code_end) { int v = read_u16(code, pos); pos += 2; stack_push(v); }
+                        } else if (bip == OP_PUSH_CONST_STR) {
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int l = read_u16(code, pos+2); pos += 4; (void)read_string(str_const_buf, sizeof(str_const_buf), sp_data, sp_len, o, l); }
                         } else if (bip == OP_VAR_DECL) {
-                            int o = pos < code_end ? read_u16(code, pos) : 0;
-                            int vl = pos+2 < code_end ? read_u16(code, pos+2) : 0;
-                            pos += 4; char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl);
-                            if (vname) var_set(vname, 0);
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int vl = read_u16(code, pos+2); pos += 4; char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl); if (vname) var_set(vname, 0); }
                         } else if (bip == OP_ASSIGN_STMT) {
-                            int o = pos < code_end ? read_u16(code, pos) : 0;
-                            int vl = pos+2 < code_end ? read_u16(code, pos+2) : 0;
-                            pos += 4; char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl);
-                            int v = stack_top > 0 ? stack_pop() : 0;
-                            if (vname) var_set(vname, v);
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int vl = read_u16(code, pos+2); pos += 4; char *vname = read_string(name, sizeof(name), sp_data, sp_len, o, vl); int v = stack_top > 0 ? stack_pop() : 0; if (vname) var_set(vname, v); }
+                        } else if (bip == OP_FUNC_CALL_STMT) {
+                            if (pos + 3 < code_end) { int o = read_u16(code, pos); int fl = read_u16(code, pos+2); pos += 4; int nargs = (pos < code_end) ? code[pos++] : 0;
+                                char *fn = read_string(name, sizeof(name), sp_data, sp_len, o, fl);
+                                if (fn && func_find(fn) >= 0) {
+                                    if (call_depth < CALL_STACK_MAX) {
+                                        CallFrame *cf = &call_stack[call_depth++];
+                                        cf->return_pos = pos; cf->nargs = nargs; cf->return_value = 0;
+                                        pos = func_table[func_find(fn)].start_pos;
+                                        continue;
+                                    }
+                                }
+                            }
                         } else if (bip == OP_RETURN_STMT) {
+                            if (pos < code_end) { uint8_t rt = code[pos++]; (void)rt; }
                             pos--; break;
-                        } else {
-                            high_count++;
-                        }
+                        } else if (bip == OP_IF_STMT || bip == OP_WHILE_STMT) {
+                            pos--; break;
+                        } else if (bip == OP_PRINT) {
+                            int r = (pos < code_end) ? code[pos++] : 0;
+                            int val = (r < MAX_REGISTERS) ? vm.registers[r] : 0;
+                            printf("[QVM] ELSE-body print(r%d) = %d\n", r, val);
+                        } else if (bip == OP_LOAD_REG) {
+                            int r = (pos < code_end) ? code[pos++] : 0; stack_push((r < MAX_REGISTERS) ? vm.registers[r] : 0);
+                        } else if (bip == OP_STORE_REG) {
+                            int r = (pos < code_end) ? code[pos++] : 0;
+                            if (r < MAX_REGISTERS) vm.registers[r] = stack_pop();
+                        } else if (bip == OP_ADD) { int b = stack_pop(), a = stack_pop(); stack_push(a + b); }
+                        else if (bip == OP_SUB) { int b = stack_pop(), a = stack_pop(); stack_push(a - b); }
+                        else if (bip == OP_MUL) { int b = stack_pop(), a = stack_pop(); stack_push(a * b); }
+                        else if (bip == OP_DIV) { int b = stack_pop(), a = stack_pop(); stack_push(b != 0 ? a / b : 0); }
+                        else if (bip == OP_JUMP) {
+                            if (pos + 1 < code_end) { int tgt = read_u16(code, pos); pos += 2; pos = tgt; }
+                        } else if (bip == OP_STOP || bip == OP_EXIT) { pos--; break; }
+                        else { printf("[QVM] ELSE-body 未知 opcode 0x%02x pos=%d\n", bip, pos-1); }
                     }
                     pos = else_end;
                 } else {
@@ -955,7 +1015,7 @@ int main(int argc, char *argv[]) {
                 CallFrame *cf = &call_stack[call_depth++];
                 cf->return_pos = pos;  /* 函数返回后继续执行的位置 */
                 cf->nargs = nargs;
-                cf->return_value = 0;
+                cf->ret_addr_value = 0;
                 int fidx = func_find(n);
                 int target = func_table[fidx].start_pos;
                 printf("[QVM] 跳转调用函数 '%s' (返回地址=%d, 目标=%d)\n", n, pos, target);
