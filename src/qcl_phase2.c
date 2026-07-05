@@ -112,12 +112,13 @@ static void write_u16(unsigned short v) {
 static void write_string_ref(const char *s) {
     int len = (int)strlen(s);
     if (len == 0) return;
+    /* 为每个字符串分配新的string pool偏移 */
     int off = g_strpool_pos;
     if (off + len > MAX_FUNC_BODY) return;
     memcpy(g_strpool + off, s, len);
     g_strpool_pos += len;
-    write_u16((unsigned short)off);
-    write_u16((unsigned short)len);
+    write_u16((unsigned short)off);  /* string_pool_offset */
+    write_u16((unsigned short)len);   /* length */
 }
 static void flush_highbuf(void) {
     if (g_highbuf_pos > 0 && g_bc_pos + g_highbuf_pos <= MAX_OPS) {
@@ -351,6 +352,14 @@ static void skip_brace_block(Parser *P) {
         consume(P);
     }
 }
+/* 向前声明：parse_compound_block 内部调用的后续定义的函数 */
+static int  parse_const_int(const char *s);
+static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close);
+static void skip_to_semi_or_rpar(Parser *P);
+static int  parse_quantum_instruction(Parser *P);
+static int  parse_import(Parser *P);
+static int  parse_const(Parser *P);
+static void parse_func_body(Parser *P);
 /* 递归解析 if/while/else 大括号内的语句块（var/return/if/while/assign/func_call/def 等） */
 static void parse_compound_block(Parser *P) {
     if (P->lexer.cur.kind != TOK_LBRACE) return;
@@ -465,7 +474,7 @@ static void parse_compound_block(Parser *P) {
             const char *nm = t.text;
             consume(P);
             if (P->lexer.cur.kind == TOK_LPAR) { /* func_call */
-                write_high_opcode(OP_FUNC_CALL);
+                write_high_opcode(OP_FUNC_CALL_STMT);
                 write_string_ref(nm);
                 int pd = 1; consume(P);
                 while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
@@ -476,7 +485,7 @@ static void parse_compound_block(Parser *P) {
                 expect_tok(P, TOK_SEMI); P->high_level++; continue;
             }
             if (P->lexer.cur.kind == TOK_EQ) { /* assign */
-                write_high_opcode(OP_ASSIGN);
+                write_high_opcode(OP_ASSIGN_STMT);
                 write_string_ref(nm);
                 consume(P); /* '=' */
                 if (P->lexer.cur.kind == TOK_NUMBER) {
@@ -516,9 +525,9 @@ static int is_opcode_name_unused(const char *s) { (void)s; return 0; }
 static int  L_peek_next_is_colon(Parser *P);
 static void skip_brace_block(Parser *P);
 static void parse_compound_block(Parser *P);
+static int  parse_const_int(const char *s);
 static void skip_brace_block_alt(Parser *P, TokenKind open, TokenKind close);
 static void skip_to_semi_or_rpar(Parser *P);
-static int  L_is_double_slash(Parser *P);
 static int  parse_quantum_instruction(Parser *P);
 static int  parse_import(Parser *P);
 static int  parse_const(Parser *P);
@@ -823,17 +832,17 @@ static void parse_func_body(Parser *P) {
             consume(P); /* "if" → cur 已推进到 "(" */
             /* consume 后直接读 cur，不额外 lexer_next（三件套误用修复） */
             if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
-            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_IF_STMT); parse_compound_block(P); }
+            if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_IF_STMT); parse_compound_block(P); }
             if (kw(&P->lexer.cur, "否则") || kw(&P->lexer.cur, "else")) {
                 consume(P);
-                if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_ELSE_STMT); parse_compound_block(P); }
+                if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_ELSE_STMT); parse_compound_block(P); }
             }
             P->high_level++; continue;
         }
         if (kw(&t, "循环") || kw(&t, "while") || kw(&t, "当")) {
             consume(P);
             if (expect_tok(P, TOK_LPAR)) { skip_to_semi_or_rpar(P); if (expect_tok(P, TOK_RPAR)) {} }
-            if (expect_tok(P, TOK_LBRACE)) { write_high_opcode(OP_WHILE_STMT); parse_compound_block(P); }
+            if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_WHILE_STMT); parse_compound_block(P); }
             P->high_level++; continue;
         }
         if (kw(&t, "跳出") || kw(&t, "break")) {
@@ -1107,6 +1116,23 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         if (kw(&cur, "def") || kw(&cur, "函数")) {
             if (parse_def(&P)) { stats.functions++; stats.high_level_lines++; continue; }
         }
+        /* class / quantum_class / enum 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）*/
+        if (kw(&cur, "class") || kw(&cur, "quantum_class") || kw(&cur, "enum")) {
+            consume(&P); /* 消耗 class / quantum_class，cur 推进到类名 */
+            if (P.lexer.cur.kind == TOK_IDENT) {
+                write_opcode(OP_TYPE_DEF); write_string_ref(P.lexer.cur.text);
+                consume(&P);
+            }
+            if (P.lexer.cur.kind == TOK_LBRACE) {
+                skip_brace_block(&P); /* 跳过整个 class { ... } */
+            } else {
+                skip_to_semi(&P);
+            }
+            write_opcode(OP_TYPE_END);
+            flush_highbuf();
+            stats.types++; stats.high_level_lines++;
+            continue;
+        }
         if (kw(&cur, "export")) {
             if (parse_export(&P)) { stats.exports++; stats.high_level_lines++; continue; }
         }
@@ -1123,10 +1149,15 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     FILE *fout = fopen(output_path, "wb");
     if (!fout) { fprintf(stderr, "[QCL2] 无法创建: %s\n", output_path); free(src); return -1; }
     fwrite(g_bytecode, 1, g_bc_pos, fout);
+    /* 追加 string pool 长度（u16）+ 内容，供 qvm_bootstrap 区分代码/字符串区 */
+    unsigned short sp_len = (unsigned short)g_strpool_pos;
+    fwrite(&sp_len, 2, 1, fout);
+    if (g_strpool_pos > 0) fwrite(g_strpool, 1, g_strpool_pos, fout);
     fclose(fout);
 
     stats.total_lines = stats.quantum_lines + stats.high_level_lines;
-    fprintf(stdout, "[QCL2] 编译完成: %d 字节, 首字节 0x%02X\n", g_bc_pos, g_bytecode[0]);
+    fprintf(stdout, "[QCL2] 编译完成: %d 字节(代码 %d + sp_len 2 + string_pool %d), 首字节 0x%02X\n",
+            g_bc_pos + 2 + (g_strpool_pos > 0 ? g_strpool_pos : 0), g_bc_pos, g_strpool_pos, g_bytecode[0]);
     fprintf(stdout, "[QCL2] 量子指令=%d 高级语法=%d 函数=%d 类型=%d 导入=%d 常量=%d 导出=%d\n",
             stats.quantum_lines, stats.high_level_lines, stats.functions,
             stats.types, stats.imports, stats.const_defs, stats.exports);
