@@ -809,7 +809,11 @@ static void parse_class_body(Parser *P) {
                 if (P->lexer.cur.kind == TOK_COLON) consume(P);
                 if (P->lexer.cur.kind == TOK_IDENT) consume(P);
                 /* 处理 = 默认值 */
-                if (P->lexer.cur.kind == TOK_EQ) { skip_to_semi(P); continue; }
+                if (P->lexer.cur.kind == TOK_EQ) {
+                    skip_to_semi(P);
+                    write_high_opcode(OP_FUNC_END); /* 无body方法也需闭合 */
+                    continue;
+                }
                 if (P->lexer.cur.kind == TOK_LBRACE) {
                     flush_highbuf();
                     write_high_opcode(BC_FUNC_BODY);
@@ -819,6 +823,7 @@ static void parse_class_body(Parser *P) {
                     write_high_opcode(OP_FUNC_END);
                 } else {
                     skip_to_semi(P);
+                    write_high_opcode(OP_FUNC_END); /* 无body方法也需闭合 */
                 }
                 continue;
             }

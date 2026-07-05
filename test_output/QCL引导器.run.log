@@ -1,42 +1,8 @@
-╔══════════════════════════════════════╗
-║    QEntL Quantum Virtual Machine     ║
-║    Version 1.0.0                       ║
-╚══════════════════════════════════════╝
-
-[QVM] 量子虚拟机初始化完成 (v1.0.0)
-[QVM] 量子比特: 0/64
-[QVM] 经典寄存器: 16个
-[QVM] 量子内存: 1024 KB
-[QVM] 开始执行字节码 (45 bytes)
-[QVM] 未知指令: 0x72
-[QVM] 经典指令: 0x0f (跳过)
-[QVM] LOAD_CONST(8224)
-[QVM] LOAD_CONST(34789)
-[QVM] 未知指令: 0xbd
-[QVM] 未知指令: 0xe6
-[QVM] 未知指令: 0x95
-[QVM] 未知指令: 0xb0
-[QVM] LOAD_CONST(24941)
-[QVM] 未知指令: 0x69
-[QVM] 未知指令: 0x6e
-[QVM] 未知指令: 0x72
-[QVM] 未知指令: 0x18
-[QVM] LOAD_CONST(8224)
-[QVM] LOAD_CONST(8224)
-[QVM] LOAD_CONST(59168)
-[QVM] 未知指令: 0xbc
-[QVM] 未知指令: 0x96
-[QVM] 未知指令: 0xe8
-[QVM] 未知指令: 0xaf
-[QVM] 未知指令: 0x91
-[QVM] 未知指令: 0xe5
-[QVM] 未知指令: 0x99
-[QVM] 未知指令: 0xa8
-[QVM] 未知指令: 0x2e
-[QVM] 未知指令: 0xe8
-[QVM] 未知指令: 0xbe
-[QVM] 未知指令: 0x93
-[QVM] 未知指令: 0xe5
-[QVM] 未知指令: 0x87
-[QVM] 未知指令: 0xba
-[QVM] 执行完成: 33 周期, 0 门操作
+[QVM] 初始化量子虚拟机
+[QVM] 加载QEntL字节码: code_len=20, sp_len=2232, 代码区起始=23
+[QVM] 高级opcode: OP_IMPORT(name="")
+[QVM] 高级opcode: OP_IMPORT(name="")
+[QVM] CNOT(q0, q106)
+[QVM] 高级opcode: OP_PUSH_CONST_STR(skip 8194 B)
+[QVM] 程序退出
+[QVM] 执行完成: 1 周期, 1 门操作
