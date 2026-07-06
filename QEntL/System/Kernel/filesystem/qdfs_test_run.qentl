@@ -4,17 +4,7 @@
 import "qdfs_core.qentl" 作为 QDFS
 
 def main():
-    // 1. 创建文件系统
-    var qdfs_config = {
-        最大文件数: 65536,
-        块大小: 4096,
-        量子加密启用: true
-    }
-    
-    // 2. 初始化文件系统
-    // 文件系统 = QDFS.创建文件系统(qdfs_config)
-    
-    // 3. 测试量子加密
+    // 1. QDFS文件系统量子加密测试
     init 4
     H 0
     H 1
