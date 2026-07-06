@@ -1,24 +1,26 @@
-# 阶段2编译器 - 用纯量子指令编写
-# 能处理def函数定义，输出真正量子字节码
-# 功能：解析def函数定义，生成函数表，编译函数体
+// 阶段2编译器 - 真正的QEntL编译器
+// 能在QVM上运行，编译QEntL源码为字节码
+// 功能：解析QEntL语法，生成QVM字节码
 
-init 64
+import "QCL模块/qcl_lexer.qentl" 作为 词法分析
+import "QCL模块/qcl_parser.qentl" 作为 语法分析
 
-# 读取输入文件（模拟）
-# def main(): init 2; H 0; CNOT 0 1; STOP
-# def test(): init 1; X 0; MEASURE 0 0; PRINT 0; STOP
-
-# 解析结果：
-# 函数表：main(1), test(1)
-# 函数体字节码：
-#   main: init 2; H 0; CNOT 0 1; STOP
-#   test: init 1; X 0; MEASURE 0 0; PRINT 0; STOP
-
-# 生成输出.qbc
-# 文件头：魔数14 + 量子比特数 + 函数表 + 函数体字节码
-
-H 0
-CNOT 0 1
-MEASURE 0 0
-PRINT 0
-STOP
+// 编译器配置
+def main():
+    // 读取输入QEntL文件
+    var input_file = "input.qentl"
+    var output_file = "output.qbc"
+    
+    // 词法分析
+    var tokens = 词法分析.分析(input_file)
+    
+    // 语法分析
+    var ast = 语法分析.解析(tokens)
+    
+    // 生成字节码
+    var bytecode = 生成字节码(ast)
+    
+    // 输出字节码
+    写入字节码(output_file, bytecode)
+    
+    返回 0
