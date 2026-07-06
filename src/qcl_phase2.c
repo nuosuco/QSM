@@ -264,7 +264,7 @@ static void lexer_next(Lexer *L) {
         int i = 0;
         while (L->pos < L->len) {
             int c = (unsigned char)L->src[L->pos];
-            if (c == '_' || c == '$' || isalnum(c) || c >= 0x80) {
+            if (c == '_' || c == '$' || c == '@' || isalnum(c) || c >= 0x80) {
                 if (i < MAX_STRING-1) t->text[i++] = L->src[L->pos];
                 L->pos++; L->col++;
             } else break;
@@ -275,6 +275,13 @@ static void lexer_next(Lexer *L) {
     if (L->pos + 1 < L->len) {
         int c1 = (unsigned char)L->src[L->pos];
         int c2 = (unsigned char)L->src[L->pos+1];
+        if (c1 == '/' && c2 != '/') {
+            /* 单斜杠 / 是除法运算符，必须匹配 TOK_SLASH。
+             * 与 c1=='/' && c2=='/' 分开，避免注释路径覆盖单斜杠。 */
+            t->kind = TOK_SLASH; L->pos++; L->col++;
+            t->text[0] = (char)c1; t->text[1] = '\0';
+            return;
+        }
         if (c1=='=' && c2=='=') { t->kind=TOK_EQ;     L->pos+=2; L->col+=2; return; }
         if (c1=='!' && c2=='=') { t->kind=TOK_NEQ;    L->pos+=2; L->col+=2; return; }
         if (c1=='<' && c2=='=') { t->kind=TOK_LTE;    L->pos+=2; L->col+=2; return; }
@@ -671,6 +678,11 @@ static int parse_const(Parser *P) {
     if (P->lexer.cur.kind != TOK_IDENT) return 0;
     const char *name = P->lexer.cur.text;
     consume(P); /* 名字 */
+    /* 接受 : 类型 注释（如 const MAX_SIZE: int = 100） */
+    if (P->lexer.cur.kind == TOK_COLON) {
+        consume(P); /* : */
+        if (P->lexer.cur.kind == TOK_IDENT) consume(P); /* 类型名 */
+    }
     if (P->lexer.cur.kind != TOK_EQ) return 0;
     consume(P); /* = */
     int value = 0;
@@ -679,10 +691,16 @@ static int parse_const(Parser *P) {
         value = parse_const_int(P->lexer.cur.text);
         consume(P);
     }
-    /* 跳到行尾（可能有行内注释） */
-    while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_SEMI &&
-           P->lexer.cur.kind != TOK_HASH)
-        consume(P);
+    /* 只消费到行尾的空白/注释，不消费后续语句（让主循环处理 def/import/类型 等） */
+    while (P->lexer.cur.kind == TOK_HASH) {
+        /* 跳过行内注释到换行 */
+        while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_SEMI &&
+               P->lexer.src[P->lexer.pos] != '\n' && P->lexer.pos < P->lexer.len) {
+            P->lexer.pos++; P->lexer.col++;
+        }
+        lexer_next(&P->lexer);
+    }
+    /* 可选消费分号（非强制，QEntL 风格不要求） */
     if (P->lexer.cur.kind == TOK_SEMI) consume(P);
 
     write_opcode(OP_CONST_DEF); write_string_ref(name); write_u16((unsigned short)value);
@@ -781,22 +799,85 @@ static int L_is_double_slash(Parser *P) {
 /* ==================== class 体解析（递归解析方法） ==================== */
 static void parse_class_body(Parser *P) {
     int d = 1;
+    int debug_iter = 0;
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
+        if (debug_iter++ % 1000 == 0) fprintf(stderr, "[CB] iter=%d d=%d pos=%d cur=%s\n", debug_iter, d, P->lexer.pos, t.text);
+        if (debug_iter > 5000000) { fprintf(stderr, "[CB] HANG guard, d=%d pos=%d cur=%s kind=%d\n", d, P->lexer.pos, t.text, t.kind); exit(1); }
         while (t.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
             P->lexer.pos++; P->lexer.col++;
             if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
-            lexer_next(&P->lexer); t = P->lexer.cur;
+            lexer_next(&P->lexer);
+            t = P->lexer.cur;
         }
         if (P->lexer.cur.kind == TOK_EOF) break;
         t = P->lexer.cur;
         if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
         if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
 
-        /* 跳过修饰符：private / public / protected / static / virtual / override */
+        /* 跳过修饰符：private / public / protected / static / virtual / override / abstract / readonly / function / external */
         if (kw(&t, "private") || kw(&t, "public") || kw(&t, "protected") ||
-            kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override")) {
-            consume(P); continue;
+            kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override") ||
+            kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "function") ||
+            kw(&t, "external")) {
+            /* 跳过连续修饰符，定位到下一个非修饰符 token */
+            while (kw(&t, "private") || kw(&t, "public") || kw(&t, "protected") ||
+                   kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override") ||
+                   kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "function") ||
+                   kw(&t, "external")) {
+                consume(P);
+                t = P->lexer.cur;
+            }
+        }
+        /* public/protected/private/static/abstract/readonly/function/external 后紧跟标识符，
+           很可能是方法声明 public foo() { ... }，当作方法体处理 */
+        if (kw(&t, "public") || kw(&t, "protected") || kw(&t, "private") ||
+            kw(&t, "static") || kw(&t, "abstract") || kw(&t, "readonly") ||
+            kw(&t, "function") || kw(&t, "external")) {
+            fprintf(stderr, "[DEBUG1] public branch, cur=%s pos=%d\n", P->lexer.cur.text, P->lexer.pos);
+            consume(P);
+            /* 跳过连续修饰符 */
+            while (kw(&P->lexer.cur, "public") || kw(&P->lexer.cur, "protected") ||
+                   kw(&P->lexer.cur, "private") || kw(&P->lexer.cur, "static") ||
+                   kw(&P->lexer.cur, "abstract") || kw(&P->lexer.cur, "readonly") ||
+                   kw(&P->lexer.cur, "function") || kw(&P->lexer.cur, "external")) {
+                consume(P);
+            }
+            fprintf(stderr, "[DEBUG2] after mods, cur=%s pos=%d kind=%d\n", P->lexer.cur.text, P->lexer.pos, P->lexer.cur.kind);
+            /* 如果接下来是标识符（方法名），当作方法定义处理 */
+            if (P->lexer.cur.kind == TOK_IDENT) {
+                const char *mname = P->lexer.cur.text;
+                fprintf(stderr, "[DEBUG3] method name=%s pos=%d\n", mname, P->lexer.pos);
+                /* emit 方法定义 */
+                write_high_opcode(OP_FUNC_DEF);
+                write_string_ref(mname);
+                consume(P); /* 方法名 → cur 推进到 ( 或 : */
+                /* 跳过参数列表 ( ... ) */
+                if (P->lexer.cur.kind == TOK_LPAR) {
+                    int pd = 1; consume(P);
+                    while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                        if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                        else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                        consume(P);
+                    }
+                }
+                /* 跳过返回类型 : Type */
+                if (P->lexer.cur.kind == TOK_COLON) { consume(P); if (P->lexer.cur.kind == TOK_IDENT) consume(P); }
+                /* 如果有 { ... } 方法体，解析之 */
+                if (P->lexer.cur.kind == TOK_LBRACE) {
+                    flush_highbuf();
+                    write_high_opcode(BC_FUNC_BODY);
+                    parse_func_body(P);
+                    write_high_opcode(BC_FUNC_END);
+                    flush_highbuf();
+                } else {
+                    skip_to_semi_or_rbrace(P);
+                }
+                write_high_opcode(OP_FUNC_END);
+                continue;
+            }
+            /* 否则跳过到分号 */
+            skip_to_semi_or_rbrace(P); continue;
         }
         /* 跳过 this. 调用开头的 this（跟随跳过到分号） */
         if (kw(&t, "this")) {
@@ -994,6 +1075,7 @@ static void parse_class_body(Parser *P) {
         }
         /* 无法识别的 token：推进 */
         consume(P);
+        if (P->lexer.cur.kind == TOK_EOF) break;
     }
     flush_highbuf();
 }
@@ -1002,8 +1084,10 @@ static void parse_class_body(Parser *P) {
 static void parse_func_body(Parser *P) {
     P->func_depth++;
     int d = 1;
+    int debug_iter = 0;
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
+        if (debug_iter++ % 1000 == 0) fprintf(stderr, "[FB] iter=%d d=%d pos=%d cur=%s\n", debug_iter, d, P->lexer.pos, t.text);
         while (t.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
             P->lexer.pos++; P->lexer.col++;
             if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
@@ -1336,12 +1420,14 @@ static int parse_quantum_module(Parser *P) {
     if (P->lexer.cur.kind == TOK_LBRACE) {
         consume(P); /* 消耗 '{' */
         int depth = 1;
+        int iter = 0;
         while (depth > 0 && P->lexer.cur.kind != TOK_EOF) {
+            if (iter++ > 5000000) { fprintf(stderr, "[QCL2] module parse HANG guard at pos=%d depth=%d\n", P->lexer.pos, depth); break; }
             Token tk = P->lexer.cur;
             if (tk.kind == TOK_LBRACE) { depth++; consume(P); continue; }
             if (tk.kind == TOK_RBRACE) { depth--; consume(P); continue; }
             if (tk.kind == TOK_HASH || (tk.kind == TOK_SLASH && L_is_double_slash(P))) { skip_to_semi_or_rbrace(P); continue; }
-            parse_top_statement(P); /* 递归解析模块内顶层语句 */
+            if (!parse_top_statement(P)) { consume(P); } /* 保底推进 */
         }
     } else {
         skip_to_semi_or_rbrace(P);
@@ -1376,7 +1462,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     memset(g_strpool, 0, sizeof(g_strpool));
 
     CompileStats stats = {0};
-
+    int iter = 0;
     Parser P;
     memset(&P, 0, sizeof(P));
     P.lexer.src = src; P.lexer.len = (int)nread;
@@ -1391,6 +1477,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         /* 跳过空白（含换行） */
         lexer_skip_ws(&P.lexer);
         if (P.lexer.cur.kind == TOK_EOF) break;
+        if (iter++ > 5000000) { fprintf(stderr, "[QCL2] main loop HANG guard at pos=%d\n", P.lexer.pos); break; }
         /* 快速跳过连续的未知字符（TS 语法符号 `as/typeof/void` 产生大量 TOK_ERR） */
         while (P.lexer.cur.kind == TOK_ERR) {
             P.lexer.pos++; P.lexer.col++;
