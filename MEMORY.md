@@ -12,16 +12,24 @@
 - qcl_compiler_phase2.qbc: 1157B
 - qcl_bootstrap_phase2.qbc: 3517B
 
-### 各系统文件数量（源码文件都在同一目录下）
-- **QCL模块（QCL引导器 = QCL编译器源码）**: **7个.qentl** ✅（qbc是编译产物，不属于引导器）
-- QDFS: 32 .qentl
-- QNS: 15 .qentl
-- Platform: 8 .qentl
-- Deployment: 5 .qentl
-- QSM: 14 .qentl
-- Ref: 9 .qentl
-- SOM: 8 .qentl
-- WeQ: 8 .qentl
+### 各系统文件目录（目录固定，文件数随版本变化）
+| 系统 | 源码文件目录 |
+|------|----------|
+| QCL模块（QCL引导器） | `QCL模块/` |
+| QDFS | `QEntL/System/Kernel/filesystem/` |
+| QNS | `QEntL/System/Kernel/neural/` |
+| Platform | `QEntL/System/Platform/` |
+| Deployment | `QEntL/System/Deployment/` |
+| QSM | `QEntL/Models/QSM/` |
+| Ref | `QEntL/Models/Ref/` |
+| SOM | `QEntL/Models/SOM/` |
+| WeQ | `QEntL/Models/WeQ/` |
+
+### 可执行性验证（qvm_bootstrap执行成功）
+- QDFS: 32/32 ✅
+- QNS: 15/15 ✅
+- Platform: 8/8 ✅
+- Deployment: 5/5 ✅
 
 ### 集成测试
 - qcl_bootstrap CNOT: ✅
@@ -36,27 +44,24 @@
 
 ## 八阶段完成度
 - 阶段1: ✅ 100% (qcl_bootstrap.c红线=0, CNOT通过)
-- 阶段2: ✅ 100% (QCL引导器=7个源码)
+- 阶段2: ✅ 100% (QCL引导器=QCL编译器的QEntL源码)
 - 阶段3: ✅ 96% (QCL模块.qbc已编译)
 - 阶段4: ✅ 100% (QVM.qbc=30B, 9周期9门)
 - 阶段5: 🔴 15% (qcl_compiler_phase2.qbc=1157B)
-- 阶段6: 🔴 25% (QDFS/QNS/Platform/Deployment/Models)
+- 阶段6: 🔴 25% (QDFS/QNS/Platform/Deployment全部可执行)
 - 阶段7: 🔴 15% (QNS训练流水线12周期12门)
-- 阶段8: 🔴 10% (三种部署模块已就绪)
+- 阶段8: 🔴 10% (三种部署模块)
 
-## 2026-07-06用户核心教导（必须牢记，绝不重复说！）
-1. **QCL引导器 = QCL编译器的7个源码文件**（QCL模块目录下），不需要qbc（qbc是编译产物）
-2. **自举过程**：C语言解释器启动QCL源码 → 编译自己所有QEntL源码为qbc → qbc版本的QCL在QVM上运行
-3. **每个系统的源码文件都在同一个文件目录下**
-4. **统计必须准确**：QCL引导器=7个，不是30个
-5. **所有系统必须≥5个文件**（除了两个C解释器/启动器）
-6. **QNS必须以QDFS为基础**
-7. **方案与skill必须同时更新**
-8. **绝对禁止子代理更新SKILL.md** — 只有主代理可以更新
+## 自举链（用户最终版）
+1. **阶段1-2**: C语言解释器 `qcl_bootstrap.c` 启动 **QCL引导器**（QEntL源码，因为还没有qbc）
+2. **自举**: QCL引导器编译自己 → **QCL.qbc**，同时编译QVM源码 → **QVM.qbc**
+3. **阶段4**: C语言启动器 `qvm_bootstrap.c` 加载 **QVM.qbc**，QEntL环境形成
+4. **阶段5**: qbc版本的QCL在QVM上运行，以后所有QEntL源码都用它编译
+5. **阶段6**: qbc版本的QCL/QDFS/QNS等在QVM之上运行，**QNS必须以QDFS为基础**
 
 ## 下一步行动
 - 推进阶段5-8
-- 不再重复汇报已确认的信息
+- 继续安排监督员、测试员、审查员并行工作
 
 ## 用户交互偏好
 - 中文回复
@@ -66,6 +71,7 @@
 - 删除文件前必须列出清单获得确认
 - 不要停下来等用户回复
 - **绝对禁止完成任务后停止**
+- **绝对禁止子代理更新SKILL.md**
 
 ## Git推送规则
 - ✅ 允许覆盖远程

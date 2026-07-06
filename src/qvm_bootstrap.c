@@ -540,6 +540,16 @@ int main(int argc, char *argv[]) {
 
     QVM vm;
     vm.state = NULL;
+    /* 初始化高级语法执行引擎数据结构 */
+    func_count = 0;
+    var_count = 0;
+    call_depth = 0;
+    loop_depth = 0;
+    return_value = 0;
+    memset(func_table, 0, sizeof(func_table));
+    memset(var_table, 0, sizeof(var_table));
+    memset(call_stack, 0, sizeof(call_stack));
+    memset(loop_stack, 0, sizeof(loop_stack));
     int pos = 1;       /* 代码区从魔数后开始（跳过0x14魔数1字节） */
     int func_nest_depth = 0;   /* OP_FUNC_DEF/END 嵌套计数器 */
     char last_func_name[128] = {0};
@@ -849,7 +859,7 @@ int main(int argc, char *argv[]) {
                                 if (fn && func_find(fn) >= 0) {
                                     if (call_depth < CALL_STACK_MAX) {
                                         CallFrame *cf = &call_stack[call_depth++];
-                                        cf->return_pos = pos; cf->nargs = nargs; cf->return_value = 0;
+                                        cf->return_pos = pos; cf->nargs = nargs; cf->ret_addr_value = 0;
                                         pos = func_table[func_find(fn)].start_pos;
                                         /* 在 IF body 内继续循环执行 */
                                         continue;
@@ -914,7 +924,7 @@ int main(int argc, char *argv[]) {
                                 if (fn && func_find(fn) >= 0) {
                                     if (call_depth < CALL_STACK_MAX) {
                                         CallFrame *cf = &call_stack[call_depth++];
-                                        cf->return_pos = pos; cf->nargs = nargs; cf->return_value = 0;
+                                        cf->return_pos = pos; cf->nargs = nargs; cf->ret_addr_value = 0;
                                         pos = func_table[func_find(fn)].start_pos;
                                         continue;
                                     }
