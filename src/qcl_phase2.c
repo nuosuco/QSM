@@ -352,12 +352,13 @@ static void skip_to_semi(Parser *P) {
     }
     if (P->lexer.cur.kind == TOK_SEMI) consume(P);
 }
-/* brace/parens-aware version of skip_to_semi: consumes until ';' or '}', treating {} as balanced */
+/* brace/parens-aware version of skip_to_semi: consumes until ';' or '}', treating {} as balanced
+   also handles ${} template literal brace pairs */
 static void skip_to_semi_or_rbrace(Parser *P) {
     int bd = 0;
     int safe = 0;
     while (P->lexer.cur.kind != TOK_EOF) {
-        if (safe++ > MAX_LINE_LEN*4) break; /* 防止无限循环 */
+        if (safe++ > MAX_LINE_LEN*10) break; /* 防止无限循环 */
         if (P->lexer.cur.kind == TOK_LBRACE) bd++;
         else if (P->lexer.cur.kind == TOK_RBRACE) {
             if (bd > 0) bd--; else break;
