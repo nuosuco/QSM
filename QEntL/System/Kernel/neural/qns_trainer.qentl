@@ -360,8 +360,10 @@ import "QEntL/System/Deployment/development_mode.qentl";
             }
         }
         
-        // 反向传播到隐藏层
-        隐藏梯度 = 输出梯度
+        // 反向传播到隐藏层 (从输出层反向到输入层)
+        // CRITICAL修复：梯度必须逐层传递，遵循链式法则
+        层梯度列表 = []
+        当前梯度 = 输出梯度
         对于 layer_idx 从 网络.隐藏层权重.长度 - 1 到 0 步长 -1 {
             权重 = 网络.隐藏层权重[layer_idx]
             相位 = 网络.量子相位[layer_idx + 1]
@@ -372,7 +374,7 @@ import "QEntL/System/Deployment/development_mode.qentl";
             对于 batch_idx 从 0 到 批次大小 - 1 {
                 样本梯度 = []
                 对于 seq_idx 从 0 到 序列长度 - 1 {
-                    梯度向量 = 隐藏梯度[batch_idx][seq_idx]
+                    梯度向量 = 当前梯度[batch_idx][seq_idx]  // 来自上一层（输出方向）的梯度
                     新梯度 = []
                     
                     对于 in_dim 从 0 到 输入维度 - 1 {
@@ -395,13 +397,21 @@ import "QEntL/System/Deployment/development_mode.qentl";
                 }
                 新隐藏梯度.推入(样本梯度)
             }
-            隐藏梯度 = 新隐藏梯度
+            层梯度列表.推入(新隐藏梯度)  // 保存该层梯度
+            当前梯度 = 新隐藏梯度        // 传递到下一层（更靠近输入层）
+        }
+        
+        // 层梯度列表[0] 是最靠近输出层的隐藏层梯度，层梯度列表[-1] 是最靠近嵌入层的梯度
+        // 反转使其与权重层索引对齐
+        隐藏梯度矩阵 = []
+        对于 i 从 层梯度列表.长度 - 1 到 0 步长 -1 {
+            隐藏梯度矩阵.推入(层梯度列表[i])
         }
         
         返回 {
             输出梯度: 输出梯度,
-            隐藏梯度: 隐藏梯度,
-            嵌入梯度: 隐藏梯度
+            隐藏梯度: 隐藏梯度矩阵,    // [layer_idx][batch][seq][dim]
+            嵌入梯度: 隐藏梯度矩阵.最后一个()
         }
     }
     
@@ -434,7 +444,11 @@ import "QEntL/System/Deployment/development_mode.qentl";
             对于 seq_idx 从 0 到 序列长度 - 1 {
                 // 输出梯度: do[out_dim]
                 对于 out_dim 从 0 到 配置.词汇表大小 - 1 {
-                    输出梯度累积[0][out_dim] += 梯度.输出梯度[batch_idx][seq_idx][out_dim]
+                    对于 in_dim 从 0 到 网络.输出层权重.长度 - 1 {
+                        对于 out_dim 从 0 到 网络.输出层权重.第一个().长度 - 1 {
+                            输出梯度累积[in_dim][out_dim] += 梯度.输出梯度[batch_idx][seq_idx][out_dim]
+                        }
+                    }
                     偏置梯度累积[out_dim] += 梯度.输出梯度[batch_idx][seq_idx][out_dim]
                 }
             }
@@ -460,7 +474,9 @@ import "QEntL/System/Deployment/development_mode.qentl";
             对于 batch_idx 从 0 到 批次大小 - 1 {
                 对于 seq_idx 从 0 到 序列长度 - 1 {
                     对于 in_dim 从 0 到 网络.隐藏层权重[layer_idx].长度 - 1 {
-                        梯度累积[in_dim][0] += 梯度.隐藏梯度[batch_idx][seq_idx][in_dim]
+                        对于 out_dim 从 0 到 网络.隐藏层权重[layer_idx].第一个().长度 - 1 {
+                            梯度累积[in_dim][out_dim] += 梯度.隐藏梯度[batch_idx][seq_idx][in_dim]
+                        }
                     }
                 }
             }

@@ -1433,8 +1433,16 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         consume(&P);
     }
 
+    flush_highbuf(); /* 确保 class body / def 内容全部写入代码区 */
     if (g_bc_pos <= 1 || g_bytecode[g_bc_pos - 1] != OP_STOP)
         write_opcode(OP_STOP);
+
+    /* 回填 code_len: QVM header格式 [0x14 | 0x00 0x00 0x00 | code_len(LE16) | CODE | sp_len(LE16) | sp] */
+    /* code_len 含头部自身(6B): 总代码字节数 - 0x14(1B) = g_bc_pos - 1 */
+    int code_len_val = g_bc_pos - 1;
+    if (code_len_val < 0) code_len_val = 0;
+    g_bytecode[4] = (unsigned char)(code_len_val & 0xFF);
+    g_bytecode[5] = (unsigned char)((code_len_val >> 8) & 0xFF);
 
     FILE *fout = fopen(output_path, "wb");
     if (!fout) { fprintf(stderr, "[QCL2] 无法创建: %s\n", output_path); free(src); return -1; }

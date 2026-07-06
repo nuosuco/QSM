@@ -1,4 +1,4 @@
-.PHONY: all clean test phase1 phase2 phase3 phase4 phase5 pipeline qnn_train deploy
+.PHONY: all clean test phase1 phase2 phase3 phase4 phase5 pipeline qnn_train deploy qcl_phase2 phase2_compile phase2_verify
 
 # Compiler flags
 CC = gcc
@@ -202,7 +202,7 @@ test-all: test test-qnn test-pipeline
 # ============================================================================
 
 clean:
-	rm -f $(BIN)/qvm_boot $(BIN)/qnn_runner $(BIN)/yi_pipeline $(BIN)/qentl_compiler
+	rm -f $(BIN)/qvm_boot $(BIN)/qnn_runner $(BIN)/yi_pipeline $(BIN)/qentl_compiler $(BIN)/qcl_phase2
 	rm -f $(BIN)/qdfs.o $(BIN)/libqdfs.a $(BIN)/qdfs_driver $(BIN)/qdfs_extended_test
 	rm -f $(EXAMPLES)/*.qbc
 	rm -f $(CURDIR)/data/training_batch.dat $(CURDIR)/data/training_batch.jsonl

@@ -6,31 +6,30 @@
 
 // ==================== Opcode 常量定义 ====================
 
-// 基础指令 (0 - 31) — 严格对齐 qvm_bootstrap.c enum
-const OP_INIT_N = 20;       // OP_INIT = 0x14
+// 基础指令 (0 - 31) — 严格对齐 qvm_bootstrap.c / qcl_bootstrap.c enum
 const OP_NOP = 0;
-const OP_H = 0x00;
-const OP_X = 0x01;
-const OP_Y = 0x02;
-const OP_Z = 0x03;
-const OP_CNOT = 0x04;
-const OP_S = 0x05;
-const OP_T = 0x06;
-const OP_SWAP = 0x07;
-const OP_RESET = 0x08;
-const OP_MEASURE = 0x09;
-const OP_BARRIER = 0x0A;
-const OP_PRINT = 0x0B;
-const OP_STOP = 0x0C;
-const OP_LOAD = 0x0D;
-const OP_STORE = 0x0E;
-const OP_ADD = 0x0F;
-const OP_MUL = 0x10;
-const OP_CALL = 0x11;
-const OP_RET = 0x12;
+const OP_H = 1;
+const OP_X = 2;
+const OP_Z = 3;
+const OP_CNOT = 4;
+const OP_MEASURE = 5;
+const OP_RESET = 6;
+const OP_SWAP = 7;
+const OP_LOAD_REG = 8;
+const OP_STORE_REG = 9;
+const OP_JUMP = 10;
+const OP_PRINT = 11;
+const OP_STOP = 12;
 const OP_SUB = 13;
 const OP_DIV = 14;
+const OP_MUL = 15;
+const OP_ADD = 16;
 const OP_EXIT = 17;
+const OP_BARRIER = 18;
+const OP_INIT_N = 20;
+const OP_T = 35;
+const OP_S = 36;
+const OP_Y = 37;
 
 // 变量与常数 (32 - 34)
 const OP_LOAD_CONST = 32;

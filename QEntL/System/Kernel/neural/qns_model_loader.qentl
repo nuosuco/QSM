@@ -236,7 +236,7 @@ import "QEntL/System/Deployment/development_mode.qentl";
         调制后嵌入 = []
         对于 i 从 0 到 嵌入向量.长度 - 1 {
             // 量子叠加态: 嵌入值 * cos(相位) + 偏置
-            调制值 = 嵌入向量[i] * Math.cos(相位) + 偏置[i]
+            调制值 = 嵌入向量[i] * 数学.cos(相位) + 偏置[i]
             调制后嵌入.推入(调制值)
         }
         
@@ -285,7 +285,7 @@ import "QEntL/System/Deployment/development_mode.qentl";
                     加权和 += 隐藏输出[k] * 权重[k][j]
                 }
                 // QNS量子激活: ReLU * cos(相位)
-                激活值 = 如果 (加权和 > 0) { 加权和 * Math.cos(相位[j % 相位.长度]) } 否则 { 0.0 }
+                激活值 = 如果 (加权和 > 0) { 加权和 * 数学.cos(相位[j % 相位.长度]) } 否则 { 0.0 }
                 新输出.推入(激活值)
             }
             隐藏输出 = 新输出
@@ -320,7 +320,7 @@ import "QEntL/System/Deployment/development_mode.qentl";
         
         // QNS量子干涉调制
         纠缠权重 = 模型参数.纠缠强度
-        量子干涉得分 = 最大概率 * (1.0 + 0.05 * Math.sin(纠缠权重 * token_id))
+        量子干涉得分 = 最大概率 * (1.0 + 0.05 * 数学.sin(纠缠权重 * token_id))
         
         返回 {
             输入token: token_id,

@@ -1,0 +1,18 @@
+class Foo {
+    var x: int
+    
+    constructor(x: int) {
+        this.x = x
+        return
+    }
+    
+    def bar() -> int {
+        return this.x
+    }
+}
+
+def main() {
+    var f = Foo(5)
+    var y = f.bar()
+    return
+}
