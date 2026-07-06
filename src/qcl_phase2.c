@@ -551,7 +551,7 @@ static void parse_class_body(Parser *P);
 static int parse_quantum_instruction(Parser *P) {
     Token t = P->lexer.cur;
     if (kw(&t, "init")) {
-        consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        consume(P); lexer_skip_ws(&P->lexer);
         int n = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { n = parse_const_int(P->lexer.cur.text); consume(P); }
         write_opcode(OP_INIT_N); write_u8(n & 0xFF); write_u8((n >> 8) & 0xFF);
@@ -559,7 +559,7 @@ static int parse_quantum_instruction(Parser *P) {
     }
     for (int i = 0; GATE_MAP[i].name; i++) {
         if (kw(&t, GATE_MAP[i].name)) {
-            consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+            consume(P); lexer_skip_ws(&P->lexer);
             int qid = 0;
             if (P->lexer.cur.kind == TOK_NUMBER) { qid = parse_const_int(P->lexer.cur.text); consume(P); }
             write_opcode(GATE_MAP[i].op); write_u8(qid);
@@ -567,7 +567,7 @@ static int parse_quantum_instruction(Parser *P) {
         }
     }
     if (kw(&t, "CNOT")) {
-        consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        consume(P); lexer_skip_ws(&P->lexer);
         int ctrl = 0, tgt = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { ctrl = parse_const_int(P->lexer.cur.text); consume(P); }
         lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
@@ -576,7 +576,7 @@ static int parse_quantum_instruction(Parser *P) {
         P->compiled++; return 1;
     }
     if (kw(&t, "MEASURE")) {
-        consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        consume(P); lexer_skip_ws(&P->lexer);
         int qid = 0, reg = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { qid = parse_const_int(P->lexer.cur.text); consume(P); }
         lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
@@ -585,7 +585,7 @@ static int parse_quantum_instruction(Parser *P) {
         P->compiled++; return 1;
     }
     if (kw(&t, "PRINT")) {
-        consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        consume(P); lexer_skip_ws(&P->lexer);
         int reg = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { reg = parse_const_int(P->lexer.cur.text); consume(P); }
         write_opcode(OP_PRINT); write_u8(reg);
@@ -594,7 +594,7 @@ static int parse_quantum_instruction(Parser *P) {
     if (kw(&t, "STOP")) { consume(P); write_opcode(OP_STOP); P->compiled++; return 1; }
     if (kw(&t, "EXIT")) { consume(P); write_opcode(OP_EXIT); P->compiled++; return 1; }
     if (kw(&t, "SWAP")) {
-        consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        consume(P); lexer_skip_ws(&P->lexer);
         int a = 0, b = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { a = parse_const_int(P->lexer.cur.text); consume(P); }
         lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
@@ -603,7 +603,7 @@ static int parse_quantum_instruction(Parser *P) {
         P->compiled++; return 1;
     }
     if (kw(&t, "RESET")) {
-        consume(P); lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        consume(P); lexer_skip_ws(&P->lexer);
         int qid = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { qid = parse_const_int(P->lexer.cur.text); consume(P); }
         write_opcode(OP_RESET); write_u8(qid);
@@ -1344,14 +1344,8 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     P.lexer.line = 1; P.lexer.col = 1;
     lexer_next(&P.lexer);
 
-    /* 首字节 0x14 + 3字节0x00 padding + code_len(LE16) 头部 */
-    /* 格式: [0x14 | 0x00 | 0x00 | 0x00 | code_len(LE16) | CODE | sp_len(LE16) | string_pool] */
-    /* code_len 占位（实际值在编译结束后回填） */
-    write_byte(BC_MAGIC);
-    write_byte(0x00);
-    write_byte(0x00);
-    write_byte(0x00);
-    write_byte(0x00); write_byte(0x00);  /* code_len 占位 */
+    /* 不写 magic 字节：QVM 兼容格式 [CODE | sp_len(LE16) | string_pool] */
+    /* 注：OP_INIT_N=0x14，不能同时作 magic，否则 QVM 误读 */
 
     while (P.lexer.cur.kind != TOK_EOF) {
         /* 跳过空白（含换行） */
@@ -1436,13 +1430,6 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     flush_highbuf(); /* 确保 class body / def 内容全部写入代码区 */
     if (g_bc_pos <= 1 || g_bytecode[g_bc_pos - 1] != OP_STOP)
         write_opcode(OP_STOP);
-
-    /* 回填 code_len: QVM header格式 [0x14 | 0x00 0x00 0x00 | code_len(LE16) | CODE | sp_len(LE16) | sp] */
-    /* code_len 含头部自身(6B): 总代码字节数 - 0x14(1B) = g_bc_pos - 1 */
-    int code_len_val = g_bc_pos - 1;
-    if (code_len_val < 0) code_len_val = 0;
-    g_bytecode[4] = (unsigned char)(code_len_val & 0xFF);
-    g_bytecode[5] = (unsigned char)((code_len_val >> 8) & 0xFF);
 
     FILE *fout = fopen(output_path, "wb");
     if (!fout) { fprintf(stderr, "[QCL2] 无法创建: %s\n", output_path); free(src); return -1; }
