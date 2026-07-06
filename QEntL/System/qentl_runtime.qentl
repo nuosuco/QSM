@@ -1,0 +1,22 @@
+// QEntL全栈运行时入口
+// 集成所有系统在QVM上运行
+import "Kernel/filesystem/qdfs_core.qentl" 作为 QDFS
+import "Kernel/neural/qns_training_pipeline.qentl" 作为 QNS训练
+import "Platform/platform_entry.qentl" 作为 Platform
+
+// 运行时启动
+def 启动QEntL运行时():
+    // 1. 初始化QDFS量子动态文件系统
+    var 文件系统 = QDFS.创建文件系统()
+    
+    // 2. 加载彝文数据到QDFS
+    var 数据路径 = "/root/QSM/data/qsm_yi_dataset/"
+    文件系统.扫描目录(数据路径)
+    
+    // 3. QNS从QDFS加载数据并训练
+    var 训练结果 = QNS训练.执行训练(数据路径)
+    
+    // 4. 保存训练结果到QDFS
+    文件系统.写入文件("训练结果.json", 训练结果)
+    
+    返回 训练结果
