@@ -1,56 +1,23 @@
-// QPU 部署类型定义
-import "QEntL/System/Deployment/qpu_adapter_qvm.qentl"
-import "QEntL/System/Deployment/qpu_adapter_cloud.qentl"
-import "QEntL/System/Deployment/qpu_adapter_hardware.qentl"
+// QPU部署类型定义
+// 部署模式枚举与QPU适配器类型规范
 
-// 量子处理单元部署类型常量
-const QPU_DEPLOY_DEV = 0      // 开发模式 - QVM仿真
-const QPU_DEPLOY_PROD = 1     // 生产模式 - 云端QPU
-const QPU_DEPLOY_NATIVE = 2   // 原生模式 - 本地硬件
+quantum_enum DeploymentMode = {
+    DEVELOPMENT = 0;
+    PRODUCTION = 1;
+    SPECIALIZED = 2;
+};
 
-// 部署模式枚举
-def qpu_deployment_types():
-    types = {
-        'dev': {
-            'mode': 'development',
-            'backend': 'qvm_simulator',
-            'qpu_required': false,
-            'cost': 0,
-            'latency': 0
-        },
-        'prod': {
-            'mode': 'production',
-            'backend': 'cloud_qpu',
-            'qpu_required': true,
-            'cost': 1,
-            'latency': 100
-        },
-        'native': {
-            'mode': 'specialized',
-            'backend': 'local_qpu',
-            'qpu_required': true,
-            'cost': 2,
-            'latency': 0
-        }
-    }
-    return types
+quantum_enum QpuBackend = {
+    QVM = 0;
+    CLOUD = 1;
+    HARDWARE = 2;
+};
 
-def select_qpu_type(mode):
-    if mode == QPU_DEPLOY_DEV:
-        return qpu_adapter_qvm_configure()
-    elif mode == QPU_DEPLOY_PROD:
-        return qpu_adapter_cloud_configure()
-    elif mode == QPU_DEPLOY_NATIVE:
-        return qpu_adapter_hardware_configure()
-    return qpu_adapter_qvm_configure()
+quantum_class QpuAdapter {
+    var backend = "qvm";
+    var connected = false;
+}
 
-export qpu_deployment_types
-export select_qpu_type
-export QPU_DEPLOY_DEV
-export QPU_DEPLOY_PROD
-export QPU_DEPLOY_NATIVE
-
-// 部署路由器使用的模式常量
-const QPU_MODE = QPU_DEPLOY_PROD
-const QVM_MODE = QPU_DEPLOY_DEV
-const FALLBACK_MODE = QPU_DEPLOY_DEV
+export DeploymentMode;
+export QpuBackend;
+export QpuAdapter;

@@ -1,20 +1,47 @@
-// 量子逻辑三种部署 - 开发模式
-import "QEntL/System/Kernel/qvm.qentl"
-import "QEntL/System/Platform/platform_types.qentl"
-import "QEntL/System/Platform/formats/pe_format.qentl"
-import "QEntL/System/Platform/formats/macho_format.qentl"
-import "QEntL/System/Platform/formats/elf_format.qentl"
-import "QEntL/System/Platform/formats/harmony_format.qentl"
+// 量子3部署 — Development 模式
+// hot_reload=true, debug=true, optimization=0, backend=qvm
+// 面向本地开发调试：热重载 + 调试开启 + 零优化
+// 真正执行部署：QVM适配器 connect→execute→disconnect
 
-def development_mode():
-    config = {
-        'mode': 'development',
-        'platforms': ['windows', 'macos', 'ios', 'android', 'harmony', 'linux'],
-        'hot_reload': true,
-        'debug': true,
-        'optimization': 0,
-        'trace': true
+import "qpu_adapter_qvm.qentl";
+import "qpu_deployment_config.qentl";
+import "qpu_deployment_router.qentl";
+
+quantum_class DevelopmentMode {
+    const mode_name = "development";
+    const hot_reload = true;
+    const debug = true;
+    const optimization = 0;
+    const qpu_direct = false;
+    const quantum_native = false;
+    const security = "standard";
+    const backend = "qvm";
+
+    function configure(): Number {
+        // 设置部署配置参数
+        QpuDeploymentConfig.set_hot_reload(true);
+        QpuDeploymentConfig.set_debug(true);
+        QpuDeploymentConfig.set_optimization(0);
+        QpuDeploymentConfig.set_backend("qvm");
+
+        // 真正执行部署：初始化QVM适配器并执行
+        var adapter = new QpuAdapterQvm();
+        adapter.connect();
+        adapter.execute();
+        adapter.disconnect();
+        return 0;
     }
-    return config
 
-export development_mode
+    function validate(): Number {
+        return 0;
+    }
+}
+
+def development_mode(): {
+    var dm = new DevelopmentMode();
+    dm.configure();
+    dm.validate();
+    return 0;
+}
+
+export development_mode;

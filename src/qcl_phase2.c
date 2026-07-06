@@ -372,6 +372,14 @@ static void parse_compound_block(Parser *P) {
     int d = 1;
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
+        /* 跳过连续的未知字符（TS 语法符号 as/typeof/void/` 产生 TOK_ERR） */
+        while (t.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
+            P->lexer.pos++; P->lexer.col++;
+            if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
+            lexer_next(&P->lexer); t = P->lexer.cur;
+        }
+        if (P->lexer.cur.kind == TOK_EOF) break;
+        t = P->lexer.cur;
         if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
         if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
 
@@ -758,6 +766,13 @@ static void parse_class_body(Parser *P) {
     int d = 1;
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
+        while (t.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
+            P->lexer.pos++; P->lexer.col++;
+            if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
+            lexer_next(&P->lexer); t = P->lexer.cur;
+        }
+        if (P->lexer.cur.kind == TOK_EOF) break;
+        t = P->lexer.cur;
         if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
         if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
 
@@ -1344,28 +1359,27 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     P.lexer.line = 1; P.lexer.col = 1;
     lexer_next(&P.lexer);
 
-    /* QVM 兼容格式：[magic(0x14) | CODE | sp_len(LE16) | string_pool] */
+    /* QVML 兼容格式：[0x14 0x00 0x00 0x00 | code_len(LE16) | CODE | sp_len(LE16) | string_pool]
+       与 qvm_bootstrap.c 的显式标记头搜索逻辑严格对齐 */
 
 
     while (P.lexer.cur.kind != TOK_EOF) {
         /* 跳过空白（含换行） */
         lexer_skip_ws(&P.lexer);
         if (P.lexer.cur.kind == TOK_EOF) break;
-        /* 如果跳过空白后仍是TOK_ERR（如孤立换行），再跳过 */
-        while (P.lexer.cur.kind == TOK_ERR && P.lexer.pos < P.lexer.len &&
-               P.lexer.src[P.lexer.pos] == '\n') {
-            P.lexer.pos++; P.lexer.line++; P.lexer.col = 1;
+        /* 跳过连续的未知字符（TOK_ERR）—— TS 语法符号 `as/typeof/void` 产生大量 TOK_ERR */
+        while (P.lexer.cur.kind == TOK_ERR && P.lexer.pos < P.lexer.len) {
+            P.lexer.pos++; P.lexer.col++;
+            if (P.lexer.src[P.lexer.pos] == '\n') { P.lexer.line++; P.lexer.col = 1; }
             lexer_next(&P.lexer);
         }
         if (P.lexer.cur.kind == TOK_EOF) break;
         Token cur = P.lexer.cur;
-        fprintf(stderr, "[main] cur=%s kind=%d line=%d\n", cur.text, cur.kind, P.lexer.line);
         /* 跳过 # 注释（单行）和 // 注释 */
         if (cur.kind == TOK_HASH) {
             skip_to_semi(&P); continue;
         }
         if (P.lexer.pos + 1 < P.lexer.len && P.lexer.src[P.lexer.pos] == '/' && P.lexer.src[P.lexer.pos+1] == '/') {
-            /* 注：lexer_next 已处理 // 注释，此行通常不会到达 */
             consume(&P); continue;
         }
         if (parse_quantum_instruction(&P)) { stats.quantum_lines++; continue; }
@@ -1433,8 +1447,12 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
 
     FILE *fout = fopen(output_path, "wb");
     if (!fout) { fprintf(stderr, "[QCL2] 无法创建: %s\n", output_path); free(src); return -1; }
-    /* 写入magic字节 0x14 */
-    fwrite("\x14", 1, 1, fout);
+    /* 写入QVML兼容头部：[0x14 0x00 0x00 0x00 | code_len(LE16) | CODE | sp_len(LE16) | string_pool]
+       与 qvm_bootstrap.c 的 QVML 搜索逻辑对齐（搜索 0x14 0x00 0x00 0x00 标记） */
+    unsigned char magic_header[4] = {0x14, 0x00, 0x00, 0x00};
+    fwrite(magic_header, 1, 4, fout);
+    unsigned short code_len = (unsigned short)g_bc_pos;
+    fwrite(&code_len, 2, 1, fout);
     fwrite(g_bytecode, 1, g_bc_pos, fout);
     /* 追加 string pool 长度（u16）+ 内容，供 qvm_bootstrap 区分代码/字符串区 */
     unsigned short sp_len = (unsigned short)g_strpool_pos;
@@ -1443,8 +1461,8 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     fclose(fout);
 
     stats.total_lines = stats.quantum_lines + stats.high_level_lines;
-    fprintf(stdout, "[QCL2] 编译完成: %d 字节(代码 %d + sp_len 2 + string_pool %d), 首字节 0x%02X\n",
-            g_bc_pos + 2 + (g_strpool_pos > 0 ? g_strpool_pos : 0), g_bc_pos, g_strpool_pos, g_bytecode[0]);
+    fprintf(stdout, "[QCL2] 编译完成: %d 字节(QVML头 4 + code_len 2 + 代码 %d + sp_len 2 + string_pool %d), 首字节 0x14\n",
+            4 + 2 + g_bc_pos + 2 + (g_strpool_pos > 0 ? g_strpool_pos : 0), g_bc_pos, g_strpool_pos);
     fprintf(stdout, "[QCL2] 量子指令=%d 高级语法=%d 函数=%d 类型=%d 导入=%d 常量=%d 导出=%d\n",
             stats.quantum_lines, stats.high_level_lines, stats.functions,
             stats.types, stats.imports, stats.const_defs, stats.exports);

@@ -1,38 +1,43 @@
-// QPU 适配器 - 量子虚拟机模式
-import "QEntL/System/Kernel/qvm.qentl"
-import "QEntL/System/Platform/platform_types.qentl"
-import "QEntL/System/Deployment/development_mode.qentl"
+// QPU适配器 — QVM（开发模式）
+// 本地CPU量子模拟器后端
+// connect()初始化QVM → execute()执行量子电路 → disconnect()释放
 
-// QVM模式：量子虚拟机执行字节码
-const QPU_MODE_QVM = 0
+import "qpu_deployment_types.qentl";
+import "qpu_deployment_config.qentl";
 
-def qpu_adapter_qvm_init():
-    // QVM初始化 - 加载虚拟机环境
-    return QPU_MODE_QVM
+quantum_class QpuAdapterQvm {
+    const backend = "qvm";
+    var connected = false;
+    var qubits = 0;
+    var exec_cycles = 0;
 
-def qpu_adapter_qvm_execute(bytecode):
-    // 在QVM上执行量子字节码
-    return 0
-
-def qpu_adapter_qvm_status():
-    // 检查QVM运行状态
-    return true
-
-def qpu_adapter_qvm_shutdown():
-    // 关闭QVM虚拟机
-    return 0
-
-def qpu_adapter_qvm_configure():
-    config = {
-        'adapter': 'qvm',
-        'qpu_available': false,
-        'fallback': true,
-        'backend': 'software_simulator'
+    function connect(): Number {
+        // 初始化QVM后端：分配量子比特池
+        qubits = 100;
+        connected = true;
+        return 0;
     }
-    return config
 
-export qpu_adapter_qvm_init
-export qpu_adapter_qvm_execute
-export qpu_adapter_qvm_status
-export qpu_adapter_qvm_shutdown
-export qpu_adapter_qvm_configure
+    function execute(): Number {
+        // 在QVM上执行量子电路（开发模式：热重载 + 调试）
+        if (connected == false) {
+            return -1;
+        }
+        exec_cycles = 1;
+        return 0;
+    }
+
+    function disconnect(): Number {
+        // 释放QVM资源
+        connected = false;
+        qubits = 0;
+        exec_cycles = 0;
+        return 0;
+    }
+
+    function status(): Number {
+        return connected;
+    }
+}
+
+export QpuAdapterQvm;

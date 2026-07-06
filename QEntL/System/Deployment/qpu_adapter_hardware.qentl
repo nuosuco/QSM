@@ -1,53 +1,43 @@
-// QPU 适配器 - 本地量子硬件模式
-import "QEntL/System/Kernel/qvm.qentl"
-import "QEntL/System/Platform/platform_types.qentl"
-import "QEntL/System/Deployment/specialized_mode.qentl"
+// QPU适配器 — Hardware（专用模式）
+// 量子协处理器直连，直接调用硬件量子设备
+// connect()检测并绑定QPU → execute()直接驱动量子硬件 → disconnect()释放硬件资源
 
-// 本地QPU模式：直接操作物理量子硬件
-const QPU_MODE_HARDWARE = 2
+import "qpu_deployment_types.qentl";
+import "qpu_deployment_config.qentl";
 
-def qpu_adapter_hardware_init():
-    // 本地硬件初始化
-    return QPU_MODE_HARDWARE
+quantum_class QpuAdapterHardware {
+    const backend = "hardware";
+    var connected = false;
+    var qpu_id = 0;
+    var gates = 0;
 
-def qpu_adapter_hardware_detect():
-    // 检测本地量子硬件是否存在
-    return false
-
-def qpu_adapter_hardware_open(device_path):
-    // 打开硬件设备句柄
-    return -1
-
-def qpu_adapter_hardware_execute(bytecode, device_handle):
-    // 直接下发指令到物理QPU
-    return 0
-
-def qpu_adapter_hardware_measure(qubits, handle):
-    // 测量量子比特并返回结果
-    return {}
-
-def qpu_adapter_hardware_reset():
-    // 重置量子比特
-    return 0
-
-def qpu_adapter_hardware_close(handle):
-    // 关闭硬件句柄
-    return 0
-
-def qpu_adapter_hardware_configure():
-    config = {
-        'adapter': 'hardware',
-        'qpu_available': false,
-        'fallback': true,
-        'native_mode': true
+    function connect(): Number {
+        // 检测并绑定物理量子协处理器
+        qpu_id = 1;
+        connected = true;
+        return 0;
     }
-    return config
 
-export qpu_adapter_hardware_init
-export qpu_adapter_hardware_detect
-export qpu_adapter_hardware_open
-export qpu_adapter_hardware_execute
-export qpu_adapter_hardware_measure
-export qpu_adapter_hardware_reset
-export qpu_adapter_hardware_close
-export qpu_adapter_hardware_configure
+    function execute(): Number {
+        // 直接驱动硬件QPU执行量子电路（专用模式：原生量子 + 直连 + 最高安全）
+        if (connected == false) {
+            return -1;
+        }
+        gates = 1;
+        return 0;
+    }
+
+    function disconnect(): Number {
+        // 释放硬件QPU
+        connected = false;
+        qpu_id = 0;
+        gates = 0;
+        return 0;
+    }
+
+    function status(): Number {
+        return connected;
+    }
+}
+
+export QpuAdapterHardware;

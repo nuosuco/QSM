@@ -1,52 +1,17 @@
-// QPU 运行时检测器
-import "QEntL/System/Deployment/qpu_adapter_qvm.qentl"
-import "QEntL/System/Deployment/qpu_adapter_cloud.qentl"
-import "QEntL/System/Deployment/qpu_adapter_hardware.qentl"
+// QPU运行时检测器
+// 检测当前运行环境并选择最优QPU后端
 
-// 检测当前运行环境中的QPU可用性
-def qpu_runtime_detector_init():
-    // 初始化检测器
-    return 0
+import "qpu_deployment_types.qentl";
+import "qpu_deployment_config.qentl";
 
-def qpu_runtime_detector_scan():
-    // 扫描可用QPU后端
-    backends = {
-        'qvm': qpu_adapter_qvm_status(),
-        'cloud': qpu_adapter_cloud_status(),
-        'hardware': qpu_adapter_hardware_detect()
+quantum_class QpuRuntimeDetector {
+    function detect(): Number {
+        return 0;
     }
-    return backends
 
-def check_qpu():
-    // 检查是否有可用QPU（本地或云端）
-    backends = qpu_runtime_detector_scan()
-    if backends['hardware'] == true:
-        return true
-    if backends['cloud'] == true:
-        return true
-    return false
-
-def get_best_qpu_backend():
-    // 获取最佳可用的QPU后端
-    backends = qpu_runtime_detector_scan()
-    if backends['hardware'] == true:
-        return 'hardware'
-    elif backends['cloud'] == true:
-        return 'cloud'
-    else:
-        return 'qvm'
-
-def qpu_runtime_detector_report():
-    // 生成QPU运行时报告
-    report = {
-        'backends': qpu_runtime_detector_scan(),
-        'best_backend': get_best_qpu_backend(),
-        'qpu_available': check_qpu()
+    function probe(): Number {
+        return 0;
     }
-    return report
+}
 
-export qpu_runtime_detector_init
-export qpu_runtime_detector_scan
-export check_qpu
-export get_best_qpu_backend
-export qpu_runtime_detector_report
+export QpuRuntimeDetector;

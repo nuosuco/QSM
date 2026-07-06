@@ -560,16 +560,16 @@ int main(int argc, char *argv[]) {
     memset(var_table, 0, sizeof(var_table));
     memset(call_stack, 0, sizeof(call_stack));
     memset(loop_stack, 0, sizeof(loop_stack));
-    int pos = 1;       /* 代码区从魔数后开始（跳过0x14魔数1字节） */
+    int pos = 6;       /* 代码区从 QVML 头后开始：跳过 [0x14 0x00 0x00 0x00 | code_len(2B)] 共 6 字节 */
     int func_nest_depth = 0;   /* OP_FUNC_DEF/END 嵌套计数器 */
     char last_func_name[128] = {0};
     int high_count = 0;        /* 高级opcode处理计数 */
     printf("[QVM] 初始化量子虚拟机\n");
     int code_end;          /* 代码区结束位置 */
     if (sp_data) {
-        code_end = 1 + code_len;   /* 代码区 = [1, 1+code_len) */
-        printf("[QVM] 加载QEntL字节码: code_len=%d, sp_len=%d, 代码区起始=1, string_pool起始=%d\n",
-               code_len, sp_len, 1+code_len+2);
+        code_end = 6 + code_len;   /* 代码区 = [6, 6+code_len)，QVML 头 4B + code_len 字段 2B */
+        printf("[QVM] 加载QEntL字节码: code_len=%d, sp_len=%d, 代码区起始=6, string_pool起始=%d\n",
+               code_len, sp_len, 6+code_len+2);
     } else {
         code_end = fsize;          /* 无头部时执行整个文件 */
         pos = 0;
@@ -684,9 +684,7 @@ int main(int argc, char *argv[]) {
                              printf("[QVM] STORE_REG stack -> r%d\n", r); break; }
         case OP_JUMP: { int tgt = (int)(code[pos] | (code[pos+1] << 8)); pos += 2;
                         if (pos + 1 >= code_end) goto end;
-                        int tgt = (int)(code[pos] | (code[pos+1] << 8)); pos += 2;
                         printf("[QVM] JUMP to %d\n", tgt); pos = tgt; break; }
-        case OP_EXIT: {
         case OP_SUB: { int b = stack_pop(), a = stack_pop();
                        stack_push(a - b);
                        printf("[QVM] SUB(%d - %d = %d)\n", a, b, a - b); break; }
@@ -697,8 +695,6 @@ int main(int argc, char *argv[]) {
                        int res = (b != 0) ? a / b : 0;
                        stack_push(res);
                        printf("[QVM] DIV(%d / %d = %d)\n", a, b, res); break; }
-        case OP_JUMP: { int tgt = (int)(code[pos] | (code[pos+1] << 8)); pos += 2;
-                        printf("[QVM] JUMP to %d\n", tgt); pos = tgt; break; }
         case OP_EXIT: {
                        printf("[QVM] EXIT\n");
                        free(code); if (vm.state) free(vm.state); return 0; }

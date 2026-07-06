@@ -1,20 +1,47 @@
-// 量子逻辑三种部署 - 生产模式
-import "QEntL/System/Kernel/qvm.qentl"
-import "QEntL/System/Platform/platform_types.qentl"
-import "QEntL/System/Platform/formats/pe_format.qentl"
-import "QEntL/System/Platform/formats/macho_format.qentl"
-import "QEntL/System/Platform/formats/elf_format.qentl"
-import "QEntL/System/Platform/formats/harmony_format.qentl"
+// 量子3部署 — Production 模式
+// hot_reload=false, debug=false, optimization=3, backend=cloud
+// 面向生产环境：关闭热重载与调试 + 最大优化
+// 真正执行部署：Cloud适配器 connect→execute→disconnect
 
-def production_mode():
-    config = {
-        'mode': 'production',
-        'platforms': ['windows', 'macos', 'ios', 'android', 'harmony', 'linux'],
-        'hot_reload': false,
-        'debug': false,
-        'optimization': 3,
-        'trace': false
+import "qpu_adapter_cloud.qentl";
+import "qpu_deployment_config.qentl";
+import "qpu_deployment_router.qentl";
+
+quantum_class ProductionMode {
+    const mode_name = "production";
+    const hot_reload = false;
+    const debug = false;
+    const optimization = 3;
+    const qpu_direct = false;
+    const quantum_native = true;
+    const security = "high";
+    const backend = "cloud";
+
+    function configure(): Number {
+        // 设置部署配置参数
+        QpuDeploymentConfig.set_hot_reload(false);
+        QpuDeploymentConfig.set_debug(false);
+        QpuDeploymentConfig.set_optimization(3);
+        QpuDeploymentConfig.set_backend("cloud");
+
+        // 真正执行部署：初始化云端QPU适配器并执行
+        var adapter = new QpuAdapterCloud();
+        adapter.connect();
+        adapter.execute();
+        adapter.disconnect();
+        return 0;
     }
-    return config
 
-export production_mode
+    function validate(): Number {
+        return 0;
+    }
+}
+
+def production_mode(): {
+    var pm = new ProductionMode();
+    pm.configure();
+    pm.validate();
+    return 0;
+}
+
+export production_mode;

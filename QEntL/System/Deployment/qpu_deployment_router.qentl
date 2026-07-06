@@ -1,0 +1,37 @@
+// QPU部署路由器
+// 根据部署名称选择对应的部署模式：development / production / specialized
+
+import "development_mode.qentl";
+import "production_mode.qentl";
+import "specialized_mode.qentl";
+import "qpu_deployment_config.qentl";
+import "qpu_deployment_types.qentl";
+
+quantum_class QpuDeploymentRouter {
+    function select(mode_name): Number {
+        if (mode_name == "development") {
+            development_mode();
+            return 0;
+        }
+        if (mode_name == "production") {
+            production_mode();
+            return 0;
+        }
+        if (mode_name == "specialized") {
+            specialized_mode();
+            return 0;
+        }
+        return -1;
+    }
+
+    function list_modes(): Number {
+        return 0;
+    }
+}
+
+def deployment_router(mode_name): {
+    var router = new QpuDeploymentRouter();
+    return router.select(mode_name);
+}
+
+export deployment_router;
