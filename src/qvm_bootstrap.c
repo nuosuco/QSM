@@ -587,35 +587,30 @@ int main(int argc, char *argv[]) {
     /* ================================================ */
 
     while (pos < code_end) {
-        /* 每 N 步检查一次上限（而非每次迭代），对快速电路几乎零开销 */
-        qvm_steps++;
-        if ((qvm_steps & (QVM_STEP_CHECK_INTERVAL - 1)) == 0) {
-            if (qvm_steps >= qvm_step_limit) {
-                fprintf(stderr, "[QVM] 错误: 执行步数达到上限 %lld (当前=%lld)，强制终止以防止死循环\\n", qvm_step_limit, qvm_steps);
-                fprintf(stderr, "[QVM] 提示: 可通过环境变量 QVM_MAX_STEPS 调高上限（默认 %d）\\n", QVM_DEFAULT_MAX_STEPS);
-                goto end;
+        /* 循环迭代检查：当 pos 到达活跃循环的 body_end 时，重新评估条件决定继续/退出 */
+        if (loop_depth > 0) {
+            LoopFrame *lf = &loop_stack[loop_depth - 1];
+            if (pos == lf->body_end) {
+                /* 重新计算 body_end（循环体内可能有新增指令） */
+                int cond = lf->condition;
+                if (stack_top > 0) cond = stack_pop();
+                printf("[QVM] WHILE 迭代: cond=%d, body=[%d,%d)\\n", cond, lf->body_start, lf->body_end);
+                if (cond != 0) {
+                    /* 条件为真，重新扫描 body_end 并跳回 */
+                    int new_end = find_while_body_end(code, code_end, lf->body_start);
+                    lf->body_end = new_end;
+                    lf->condition = cond;
+                    printf("[QVM] WHILE 条件为真，跳回 body_start=%d\\n", lf->body_start);
+                    pos = lf->body_start;
+                    continue;
+                } else {
+                    /* 条件为假，退出循环 */
+                    printf("[QVM] WHILE 条件为假，退出循环 pos=%d\\n", lf->body_end);
+                    loop_depth--;
+                    continue;
+                }
             }
         }
-
-        /* 看门狗：检测 pos 是否在窗口内重复出现（典型死循环/原地打转的特征） */
-        watchdog_pos[watchdog_idx] = pos;
-        watchdog_idx = (watchdog_idx + 1) % QVM_WATCHDOG_WINDOW;
-        if (watchdog_count < QVM_WATCHDOG_WINDOW) watchdog_count++;
-        watchdog_init = 1;
-
-        /* 统计当前窗口内该位置出现次数 */
-        if (watchdog_init) {
-            int dup = 0;
-            for (int i = 0; i < watchdog_count; i++) {
-                if (watchdog_pos[i] == pos) dup++;
-            }
-            if (dup >= watchdog_dup_threshold) {
-                fprintf(stderr, "[QVM] 看门狗: pos=%d 在窗口内重复 %d 次（≥%d），判定死循环，强制终止\\n",
-                        pos, dup, watchdog_dup_threshold);
-                goto end;
-            }
-        }
-
         uint8_t op = code[pos++];
         if (op == OP_INIT_N) {
             if (pos >= code_end) goto end;

@@ -882,7 +882,7 @@ static void parse_class_body(Parser *P) {
             }
             write_high_opcode(OP_IF_STMT);
             if (P->lexer.cur.kind == TOK_COLON) consume(P);
-            if (P->lexer.cur.kind == TOK_LBRACE) parse_class_body(P);
+            if (P->lexer.cur.kind == TOK_LBRACE) parse_compound_block(P);
             else skip_to_semi(P);
             continue;
         }
@@ -915,7 +915,7 @@ static void parse_class_body(Parser *P) {
             }
             write_high_opcode(OP_WHILE_STMT);
             if (P->lexer.cur.kind == TOK_COLON) consume(P);
-            if (P->lexer.cur.kind == TOK_LBRACE) parse_class_body(P);
+            if (P->lexer.cur.kind == TOK_LBRACE) parse_compound_block(P);
             else skip_to_semi(P);
             continue;
         }
