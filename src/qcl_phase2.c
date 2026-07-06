@@ -111,16 +111,25 @@ static void write_u16(unsigned short v) {
     write_byte(v & 0xFF);
     write_byte((v >> 8) & 0xFF);
 }
+static void write_string_ref_after(const char *s) {
+    /* 仅写字符串参数（offset + len），不 flush。用于紧接 OP_* 之后写入参数。
+       调用者必须先写 opcode（通过 write_opcode 或 write_high_opcode + flush_highbuf），
+       确保 opcode 在参数之前。 */
+    if (g_bc_pos < MAX_OPS) {
+        int len = (int)strlen(s);
+        if (len == 0) return;
+        int off = g_strpool_pos;
+        if (off + len > MAX_FUNC_BODY) return;
+        memcpy(g_strpool + off, s, len);
+        g_strpool_pos += len;
+        write_u16((unsigned short)off);
+        write_u16((unsigned short)len);
+    }
+}
+static void flush_highbuf(void);
 static void write_string_ref(const char *s) {
-    int len = (int)strlen(s);
-    if (len == 0) return;
-    /* 为每个字符串分配新的string pool偏移 */
-    int off = g_strpool_pos;
-    if (off + len > MAX_FUNC_BODY) return;
-    memcpy(g_strpool + off, s, len);
-    g_strpool_pos += len;
-    write_u16((unsigned short)off);  /* string_pool_offset */
-    write_u16((unsigned short)len);   /* length */
+    flush_highbuf(); /* 确保高字节码已写入代码区，再写字符串参数（避免参数错位被当成指令） */
+    write_string_ref_after(s);
 }
 static void flush_highbuf(void) {
     if (g_highbuf_pos > 0 && g_bc_pos + g_highbuf_pos <= MAX_OPS) {
