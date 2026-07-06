@@ -77,3 +77,19 @@
 - ✅ 允许覆盖远程
 - ❌ 绝对禁止拉取远程覆盖本地
 - ✅ 有新进展立即推送三个分支：master/main/dev
+
+## 最新状态 (2026-07-06)
+### QDFS在QEntL环境（QVM）里运行
+- 32个模块全部可在QVM上执行 ✅
+
+### QCL在QEntL环境（QVM）里运行
+- qcl_compiler_phase2.qbc在QVM上执行4周期4门 ✅
+- 但它不是真正的编译器，只是简单量子电路
+- 真正的编译器 = qcl_phase2.c（C语言），还在C层
+
+### 所有.qbc来源
+- qcl_phase2（C编译器）编译.qentl源码 → 生成.qbc
+- qvm_bootstrap（C解释器）在QVM上执行.qbc
+
+### 待完成
+- qcl_compiler_phase2真正自举（在QVM上运行并能编译其他.qentl）
