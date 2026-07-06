@@ -1344,8 +1344,8 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     P.lexer.line = 1; P.lexer.col = 1;
     lexer_next(&P.lexer);
 
-    /* 不写 magic 字节：QVM 兼容格式 [CODE | sp_len(LE16) | string_pool] */
-    /* 注：OP_INIT_N=0x14，不能同时作 magic，否则 QVM 误读 */
+    /* QVM 兼容格式：[magic(0x14) | CODE | sp_len(LE16) | string_pool] */
+
 
     while (P.lexer.cur.kind != TOK_EOF) {
         /* 跳过空白（含换行） */
@@ -1433,6 +1433,8 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
 
     FILE *fout = fopen(output_path, "wb");
     if (!fout) { fprintf(stderr, "[QCL2] 无法创建: %s\n", output_path); free(src); return -1; }
+    /* 写入magic字节 0x14 */
+    fwrite("\x14", 1, 1, fout);
     fwrite(g_bytecode, 1, g_bc_pos, fout);
     /* 追加 string pool 长度（u16）+ 内容，供 qvm_bootstrap 区分代码/字符串区 */
     unsigned short sp_len = (unsigned short)g_strpool_pos;
