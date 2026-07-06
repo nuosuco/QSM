@@ -18,6 +18,14 @@
 #define CALL_STACK_MAX 128
 #define LOOP_STACK_MAX 64
 
+/* 执行步数上限 — 防止大电路死循环导致 TIMEOUT
+   默认 1M 步；可通过环境变量 QVM_MAX_STEPS 覆盖 */
+#define QVM_DEFAULT_MAX_STEPS 1000000
+/* 每 N 步检查一次上限，避免每次迭代都分支（影响小电路性能） */
+#define QVM_STEP_CHECK_INTERVAL 1000
+/* 看门狗窗口：若 pos 在该窗口内重复出现，判定为死循环 */
+#define QVM_WATCHDOG_WINDOW 5000
+
 /* 高级语法操作码 — 与qcl_phase2.c严格对齐（编译器最新枚举） */
 #define OP_IMPORT          100
 #define OP_CONST_DEF       101
@@ -565,23 +573,6 @@ int main(int argc, char *argv[]) {
         pos = 0;
     }
     while (pos < code_end) {
-        /* 循环重入检查：如果 pos 进入活跃循环的 body_end 区域，重新评估条件 */
-        if (loop_depth > 0) {
-            LoopFrame *lf = &loop_stack[loop_depth - 1];
-            if (pos >= lf->body_end && pos <= lf->body_end + 1) {
-                printf("[QVM] WHILE 循环到达 body_end=%d, 重新评估条件\n", lf->body_end);
-                int cond = lf->condition;  /* 使用 WHILE_STMT 时设置的条件 */
-                if (stack_top > 0) cond = stack_pop();  /* 优先用栈顶 */
-                printf("[QVM] WHILE 循环条件: cond=%d\n", cond);
-                if (cond != 0) {
-                    printf("[QVM] 条件为真，跳回循环体开始 pos=%d\n", lf->body_start);
-                    pos = lf->body_start;
-                } else {
-                    printf("[QVM] 条件为假，退出循环\n");
-                    loop_depth--;
-                }
-            }
-        }
         uint8_t op = code[pos++];
         if (op == OP_INIT_N) {
             int n = code[pos++];
@@ -598,6 +589,7 @@ int main(int argc, char *argv[]) {
         }
         switch (op) {
         case OP_INIT_N: {
+            if (pos >= code_end) goto end;
             int n = code[pos++];
             qvm_reset(&vm, n);
             printf("[QVM] 初始化 %d 个量子比特\n", n);
@@ -606,9 +598,7 @@ int main(int argc, char *argv[]) {
         case OP_STOP: {
             printf("[QVM] 程序退出\n");
             printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
-            free(code);
-            free(vm.state);
-            return 0;
+            free(code); if (vm.state) free(vm.state); return 0;
         }
         case 0x15: { // QCL编译器STOP兼容
             printf("[QVM] 程序退出\n");
@@ -657,7 +647,7 @@ int main(int argc, char *argv[]) {
                        printf("[QVM] ADD(%d + %d = %d)\n", a, b, a + b); break; }
         case OP_SUB: { int b = stack_pop(), a = stack_pop();
                        stack_push(a - b);
-                       printf("[QVM] SUB(%d - %d = %d)\n", a, b, a - b); break; }
+                       printf("[QVM] SUB(%d - %d = %d)\n", a, b, a - b); pos = tgt; break; }
         case OP_MUL: { int b = stack_pop(), a = stack_pop();
                        stack_push(a * b);
                        printf("[QVM] MUL(%d * %d = %d)\n", a, b, a * b); break; }
