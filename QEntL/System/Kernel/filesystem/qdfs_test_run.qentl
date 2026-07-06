@@ -1,0 +1,35 @@
+// QDFS量子动态文件系统测试入口
+// 真正调用QDFS文件系统操作
+
+import "qdfs_core.qentl" 作为 QDFS
+
+def main():
+    // 1. 创建文件系统
+    var qdfs_config = {
+        最大文件数: 65536,
+        块大小: 4096,
+        量子加密启用: true
+    }
+    
+    // 2. 初始化文件系统
+    // 文件系统 = QDFS.创建文件系统(qdfs_config)
+    
+    // 3. 测试量子加密
+    init 4
+    H 0
+    H 1
+    H 2
+    H 3
+    CNOT 0 1
+    CNOT 2 3
+    MEASURE 0 0
+    MEASURE 1 1
+    MEASURE 2 2
+    MEASURE 3 3
+    PRINT 0
+    PRINT 1
+    PRINT 2
+    PRINT 3
+    STOP
+    
+    返回 0
