@@ -341,8 +341,15 @@ static int expect_tok(Parser *P, TokenKind k) {
     return 0;
 }
 static void skip_to_semi(Parser *P) {
-    while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_SEMI)
-        consume(P);
+    while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_SEMI) {
+        /* 快速跳过 TOK_ERR 序列 */
+        while (P->lexer.cur.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
+            P->lexer.pos++; P->lexer.col++;
+            if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
+            lexer_next(&P->lexer);
+        }
+        if (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_SEMI) consume(P);
+    }
     if (P->lexer.cur.kind == TOK_SEMI) consume(P);
 }
 /* brace/parens-aware version of skip_to_semi: consumes until ';' or '}', treating {} as balanced */
@@ -355,6 +362,13 @@ static void skip_to_semi_or_rbrace(Parser *P) {
         } else if (P->lexer.cur.kind == TOK_SEMI && bd == 0) {
             consume(P); return;
         }
+        /* 快速跳过 TOK_ERR 序列 */
+        while (P->lexer.cur.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
+            P->lexer.pos++; P->lexer.col++;
+            if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
+            lexer_next(&P->lexer);
+        }
+        if (P->lexer.cur.kind == TOK_EOF) break;
         consume(P);
     }
 }
@@ -1374,9 +1388,10 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         /* 跳过空白（含换行） */
         lexer_skip_ws(&P.lexer);
         if (P.lexer.cur.kind == TOK_EOF) break;
-        /* 跳过连续的未知字符（TOK_ERR）—— TS 语法符号 `as/typeof/void` 产生大量 TOK_ERR */
-        while (P.lexer.cur.kind == TOK_ERR && P.lexer.pos < P.lexer.len) {
+        /* 快速跳过连续的未知字符（TS 语法符号 `as/typeof/void` 产生大量 TOK_ERR） */
+        while (P.lexer.cur.kind == TOK_ERR) {
             P.lexer.pos++; P.lexer.col++;
+            if (P.lexer.pos >= P.lexer.len) break;
             if (P.lexer.src[P.lexer.pos] == '\n') { P.lexer.line++; P.lexer.col = 1; }
             lexer_next(&P.lexer);
         }
