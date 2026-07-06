@@ -987,6 +987,13 @@ static void parse_func_body(Parser *P) {
     int d = 1;
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
+        while (t.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
+            P->lexer.pos++; P->lexer.col++;
+            if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
+            lexer_next(&P->lexer); t = P->lexer.cur;
+        }
+        if (P->lexer.cur.kind == TOK_EOF) break;
+        t = P->lexer.cur;
         if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
         if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
 
