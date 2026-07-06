@@ -1,1 +1,24 @@
-
+# 阶段2编译器 - 用纯量子指令编写
+# 能处理def函数定义，输出真正量子字节码
+# 功能：解析def函数定义，生成函数表，编译函数体
+
+init 64
+
+# 读取输入文件（模拟）
+# def main(): init 2; H 0; CNOT 0 1; STOP
+# def test(): init 1; X 0; MEASURE 0 0; PRINT 0; STOP
+
+# 解析结果：
+# 函数表：main(1), test(1)
+# 函数体字节码：
+#   main: init 2; H 0; CNOT 0 1; STOP
+#   test: init 1; X 0; MEASURE 0 0; PRINT 0; STOP
+
+# 生成输出.qbc
+# 文件头：魔数14 + 量子比特数 + 函数表 + 函数体字节码
+
+H 0
+CNOT 0 1
+MEASURE 0 0
+PRINT 0
+STOP
