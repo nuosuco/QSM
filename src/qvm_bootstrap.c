@@ -1199,6 +1199,18 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    /* 自动调用main函数（如果存在）*/
+    for (int i = 0; i < func_count; i++) {
+        if (strcmp(func_table[i].name, "main") == 0) {
+            printf("[QVM] 自动调用main函数...\n");
+            int ret = call_function(code, fsize, "main", 0, NULL, 0);
+            if (ret < 0) {
+                printf("[QVM] 错误: 调用main函数失败 (返回=%d)\n", ret);
+            }
+            break;
+        }
+    }
+
 end:
     if (func_nest_depth != 0) {
         printf("[QVM] 警告: FUNC_DEF/END 不匹配 (depth=%d, 应有0)\n", func_nest_depth);
