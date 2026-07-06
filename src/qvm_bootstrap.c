@@ -760,6 +760,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         case OP_TYPE_DEF: {
+            /* OP_TYPE_DEF: 4-byte string params (offset(2B) + len(2B)), matches write_string_ref */
             if (pos + 3 < fsize) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int tlen = code[pos+2] | (code[pos+3] << 8);

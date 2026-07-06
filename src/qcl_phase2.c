@@ -378,6 +378,8 @@ static void skip_to_semi_or_rbrace(Parser *P) {
         if (P->lexer.cur.kind == TOK_LBRACE) bd++;
         else if (P->lexer.cur.kind == TOK_RBRACE) {
             if (bd > 0) bd--; else break;
+        } else if (P->lexer.cur.kind == TOK_RBRK && bd == 0) {
+            consume(P); return; /* 数据字面量数组闭合，停止跳过 */
         } else if (P->lexer.cur.kind == TOK_SEMI && bd == 0) {
             consume(P); return;
         }
@@ -1409,6 +1411,18 @@ static int parse_top_statement(Parser *P) {
         consume(P); expect_tok(P, TOK_SEMI);
         write_high_opcode(OP_CONTINUE_STMT); P->high_level++; return 1;
     }
+    /* 如果读到 ']' 或 '}', 表示数据字面量块已闭合（如 CYCLE_STEPS: [{...}]）。
+       不属于任何受支持语句，返回0让调用者决定是否继续。
+       在顶层 main loop 中：parse_top_statement 返回 0 → consume 跳过 ]/} → 下一轮匹配 quantum_class。
+       在 parse_func_body 中：返回 0 → consume 跳过 ]/} → 解析继续。
+       注意此检查放在 EOF 之后、skip_to_semi_or_rbrace 之前。 */
+    if (t.kind == TOK_RBRK || t.kind == TOK_RBRACE) { return 0; }
+    /* 裸标识符（如裸变量声明、注释中的标识符等）只消费当前token，不跳过整行。
+       这样在 # 注释后的裸标识符（如 QG-DOC-...）会被逐token跳过，直到遇到 quantum_class。 */
+    if (t.kind == TOK_IDENT) {
+        consume(P);
+        return 1;
+    }
     skip_to_semi_or_rbrace(P); return 1;
 }
 
@@ -1486,6 +1500,9 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         /* 跳过空白（含换行） */
         lexer_skip_ws(&P.lexer);
         if (P.lexer.cur.kind == TOK_EOF) break;
+        if (iter < 100 && P.lexer.cur.kind == TOK_IDENT) {
+            fprintf(stderr, "[DEBUG] token=%s pos=%d line=%d\n", P.lexer.cur.text, P.lexer.pos, P.lexer.line);
+        }
         if (iter++ > 5000000) { fprintf(stderr, "[QCL2] main loop HANG guard at pos=%d\n", P.lexer.pos); break; }
         /* 快速跳过连续的未知字符（TS 语法符号 `as/typeof/void` 产生大量 TOK_ERR） */
         while (P.lexer.cur.kind == TOK_ERR) {
@@ -1498,7 +1515,12 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         Token cur = P.lexer.cur;
         /* 跳过 # 注释（单行）和 // 注释 */
         if (cur.kind == TOK_HASH) {
-            skip_to_semi(&P); continue;
+            /* # 注释只到行尾，不跳过整个文件 */
+            while (P.lexer.cur.kind != TOK_EOF) {
+                consume(&P);
+                if (P.lexer.pos >= P.lexer.len || P.lexer.src[P.lexer.pos - 1] == '\n') break;
+            }
+            continue;
         }
         if (P.lexer.pos + 1 < P.lexer.len && P.lexer.src[P.lexer.pos] == '/' && P.lexer.src[P.lexer.pos+1] == '/') {
             consume(&P); continue;
