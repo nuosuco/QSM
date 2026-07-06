@@ -418,7 +418,7 @@ static void parse_compound_block(Parser *P) {
                 parse_func_body(P);
                 write_high_opcode(BC_FUNC_END);
                 flush_highbuf();
-            } else skip_to_semi(P);
+            } else skip_to_semi_or_rbrace(P);
             write_high_opcode(OP_FUNC_END); /* 嵌套 def 闭合 */
             continue;
         }
@@ -543,7 +543,7 @@ static void parse_compound_block(Parser *P) {
         /* 量子指令（STOP/H/X/CNOT 等） */
         if (parse_quantum_instruction(P)) continue;
         /* 兜底：跳过无法识别的单条语句 */
-        skip_to_semi(P);
+        skip_to_semi_or_rbrace(P);
     }
 }
 static int parse_const_int(const char *s) {
@@ -851,7 +851,7 @@ static void parse_class_body(Parser *P) {
                 if (P->lexer.cur.kind == TOK_IDENT) consume(P);
                 /* 处理 = 默认值 */
                 if (P->lexer.cur.kind == TOK_EQ) {
-                    skip_to_semi(P);
+                    skip_to_semi_or_rbrace(P);
                     write_high_opcode(OP_FUNC_END); /* 无body方法也需闭合 */
                     continue;
                 }
@@ -863,13 +863,13 @@ static void parse_class_body(Parser *P) {
                     flush_highbuf();
                     write_high_opcode(OP_FUNC_END);
                 } else {
-                    skip_to_semi(P);
+                    skip_to_semi_or_rbrace(P);
                     write_high_opcode(OP_FUNC_END); /* 无body方法也需闭合 */
                 }
                 continue;
             }
             /* 未识别为方法定义，跳过到分号 */
-            skip_to_semi(P); continue;
+            skip_to_semi_or_rbrace(P); continue;
         }
         /* var 字段声明 */
         if (kw(&t, "var")) {
@@ -890,7 +890,7 @@ static void parse_class_body(Parser *P) {
                     consume(P);
                 }
             }
-            skip_to_semi(P); continue;
+            skip_to_semi_or_rbrace(P); continue;
         }
         /* import / const / 类型 / export 等顶层语法 */
         if (kw(&t, "import")) { if (parse_import(P)) continue; }
@@ -912,7 +912,7 @@ static void parse_class_body(Parser *P) {
             write_high_opcode(OP_IF_STMT);
             if (P->lexer.cur.kind == TOK_COLON) consume(P);
             if (P->lexer.cur.kind == TOK_LBRACE) parse_compound_block(P);
-            else skip_to_semi(P);
+            else skip_to_semi_or_rbrace(P);
             continue;
         }
         if (kw(&t, "返回") || kw(&t, "return")) {
@@ -921,15 +921,15 @@ static void parse_class_body(Parser *P) {
                 write_high_opcode(OP_RETURN_STMT); write_byte(0); consume(P);
             } else if (P->lexer.cur.kind == TOK_IDENT) {
                 write_high_opcode(OP_RETURN_STMT); write_byte(1);
-                write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi(P);
+                write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi_or_rbrace(P);
             } else if (P->lexer.cur.kind == TOK_NUMBER) {
                 write_high_opcode(OP_RETURN_STMT); write_byte(2);
                 write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
-                consume(P); skip_to_semi(P);
+                consume(P); skip_to_semi_or_rbrace(P);
             } else if (P->lexer.cur.kind == TOK_STRING) {
                 write_high_opcode(OP_RETURN_STMT); write_byte(3);
-                write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi(P);
-            } else skip_to_semi(P);
+                write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi_or_rbrace(P);
+            } else skip_to_semi_or_rbrace(P);
             continue;
         }
         if (kw(&t, "循环") || kw(&t, "while")) {
@@ -945,15 +945,15 @@ static void parse_class_body(Parser *P) {
             write_high_opcode(OP_WHILE_STMT);
             if (P->lexer.cur.kind == TOK_COLON) consume(P);
             if (P->lexer.cur.kind == TOK_LBRACE) parse_compound_block(P);
-            else skip_to_semi(P);
+            else skip_to_semi_or_rbrace(P);
             continue;
         }
         if (kw(&t, "跳出") || kw(&t, "break") || kw(&t, "继续") || kw(&t, "continue")) {
-            consume(P); skip_to_semi(P); continue;
+            consume(P); skip_to_semi_or_rbrace(P); continue;
         }
         /* 注释 */
         if (t.kind == TOK_HASH || (t.kind == TOK_SLASH && L_is_double_slash(P))) {
-            skip_to_semi(P); continue;
+            skip_to_semi_or_rbrace(P); continue;
         }
         /* 普通标识符：可能是赋值、函数调用、或裸语句 */
         if (t.kind == TOK_IDENT) {
@@ -967,7 +967,7 @@ static void parse_class_body(Parser *P) {
                     consume(P);
                 }
                 write_high_opcode(OP_FUNC_CALL_STMT); write_string_ref(nm);
-                skip_to_semi(P); continue;
+                skip_to_semi_or_rbrace(P); continue;
             }
             if (P->lexer.cur.kind == TOK_EQ) { /* 赋值 */
                 write_high_opcode(OP_ASSIGN_STMT); write_string_ref(nm);
@@ -980,9 +980,9 @@ static void parse_class_body(Parser *P) {
                     write_high_opcode(OP_PUSH_CONST_STR);
                     write_string_ref(P->lexer.cur.text); consume(P);
                 }
-                skip_to_semi(P); continue;
+                skip_to_semi_or_rbrace(P); continue;
             }
-            skip_to_semi(P); continue;
+            skip_to_semi_or_rbrace(P); continue;
         }
         /* 其他 token：分号、逗号、括号直接推进 */
         if (t.kind == TOK_SEMI || t.kind == TOK_COMMA ||
@@ -1033,7 +1033,7 @@ static void parse_func_body(Parser *P) {
                 parse_func_body(P);
                 write_high_opcode(BC_FUNC_END);
                 flush_highbuf();
-            } else skip_to_semi(P);
+            } else skip_to_semi_or_rbrace(P);
             write_high_opcode(OP_FUNC_END); /* 嵌套 def 必须闭合 OP_FUNC_END */
             continue;
         }
@@ -1152,7 +1152,7 @@ static void parse_func_body(Parser *P) {
             }
             expect_tok(P, TOK_SEMI); continue;
         }
-        skip_to_semi(P); continue;
+        skip_to_semi_or_rbrace(P); continue;
     }
     flush_highbuf();
     P->func_depth--;
@@ -1196,7 +1196,7 @@ static int parse_def(Parser *P) {
         write_high_opcode(BC_FUNC_END);
         flush_highbuf();
     } else {
-        skip_to_semi(P);
+        skip_to_semi_or_rbrace(P);
         fprintf(stderr, "[BC_BODY] emitting EMPTY BC_FUNC_BODY/BC_FUNC_END for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos + g_highbuf_pos);
         write_high_opcode(BC_FUNC_BODY); write_high_opcode(BC_FUNC_END);
         flush_highbuf();
@@ -1225,7 +1225,7 @@ static int parse_export(Parser *P) {
 static int parse_top_statement(Parser *P) {
     Token t = P->lexer.cur;
     if (t.kind == TOK_EOF) return 0;
-    if (t.kind == TOK_HASH || (t.kind == TOK_SLASH && L_is_double_slash(P))) { skip_to_semi(P); return 1; }
+    if (t.kind == TOK_HASH || (t.kind == TOK_SLASH && L_is_double_slash(P))) { skip_to_semi_or_rbrace(P); return 1; }
     if (kw(&t, "import")) return parse_import(P);
     if (kw(&t, "导入")) return parse_import(P);    /* 中文 import 等价 */
     if (kw(&t, "量子模块")) return parse_quantum_module(P);
@@ -1313,7 +1313,7 @@ static int parse_top_statement(Parser *P) {
         consume(P); expect_tok(P, TOK_SEMI);
         write_high_opcode(OP_CONTINUE_STMT); P->high_level++; return 1;
     }
-    skip_to_semi(P); return 1;
+    skip_to_semi_or_rbrace(P); return 1;
 }
 
 /* ==================== 量子模块 解析 ==================== */
@@ -1337,11 +1337,11 @@ static int parse_quantum_module(Parser *P) {
             Token tk = P->lexer.cur;
             if (tk.kind == TOK_LBRACE) { depth++; consume(P); continue; }
             if (tk.kind == TOK_RBRACE) { depth--; consume(P); continue; }
-            if (tk.kind == TOK_HASH || (tk.kind == TOK_SLASH && L_is_double_slash(P))) { skip_to_semi(P); continue; }
+            if (tk.kind == TOK_HASH || (tk.kind == TOK_SLASH && L_is_double_slash(P))) { skip_to_semi_or_rbrace(P); continue; }
             parse_top_statement(P); /* 递归解析模块内顶层语句 */
         }
     } else {
-        skip_to_semi(P);
+        skip_to_semi_or_rbrace(P);
     }
     write_opcode(OP_MODULE_END);
     flush_highbuf();
