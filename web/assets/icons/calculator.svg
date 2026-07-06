@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Quantum Calculator -->
+  <defs>
+    <linearGradient id="calg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ecdc4"/>
+      <stop offset="100%" stop-color="#44bd32"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="28" fill="rgba(255,255,255,0.05)" stroke="url(#calg)" stroke-width="2"/>
+  <rect x="20" y="14" width="24" height="36" rx="3" fill="none" stroke="#4ecdc4" stroke-width="2"/>
+  <rect x="23" y="18" width="18" height="8" fill="rgba(78,205,196,0.3)"/>
+  <g fill="#4ecdc4">
+    <circle cx="25" cy="32" r="1.5"/>
+    <circle cx="32" cy="32" r="1.5"/>
+    <circle cx="39" cy="32" r="1.5"/>
+    <circle cx="25" cy="39" r="1.5"/>
+    <circle cx="32" cy="39" r="1.5"/>
+    <circle cx="39" cy="39" r="1.5"/>
+  </g>
+  <rect x="25" y="44" width="14" height="3" fill="#4ecdc4"/>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Monitor / Ref - Dashboard -->
+  <defs>
+    <linearGradient id="mng" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b6b"/>
+      <stop offset="100%" stop-color="#ee5a24"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="28" fill="rgba(255,255,255,0.05)" stroke="url(#mng)" stroke-width="2"/>
+  <rect x="16" y="18" width="32" height="22" rx="2" fill="rgba(0,0,0,0.3)" stroke="#ff6b6b" stroke-width="2"/>
+  <!-- bar chart -->
+  <g fill="#ff6b6b">
+    <rect x="20" y="32" width="4" height="6"/>
+    <rect x="26" y="28" width="4" height="10"/>
+    <rect x="32" y="24" width="4" height="14"/>
+    <rect x="38" y="30" width="4" height="8"/>
+  </g>
+  <line x1="20" y1="40" x2="44" y2="40" stroke="#ff6b6b" stroke-width="1"/>
+  <rect x="26" y="42" width="12" height="2" fill="#ff6b6b"/>
+  <rect x="22" y="44" width="20" height="1" fill="#ff6b6b" opacity="0.5"/>
+</svg>

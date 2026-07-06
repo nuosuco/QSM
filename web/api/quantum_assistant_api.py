@@ -39,6 +39,12 @@ QSM_ROOT = Path("/root/QSM")
 QENTL_COMPILER = QSM_ROOT / "qentl_compiler"
 QVM_DIR = QSM_ROOT / "qvm"
 WEB_DIR = QSM_ROOT / "web"
+_API_START_TIME = time.time()
+
+
+def _get_start_time():
+    """返回API启动时的Unix时间戳（用于计算uptime）"""
+    return _API_START_TIME
 
 
 class CompileRequest(BaseModel):
@@ -73,6 +79,43 @@ async def root():
         },
         "status": "running",
     }
+
+
+@app.get("/api/status")
+async def status():
+    """健康检查 / 系统状态端点"""
+    import platform
+    return {
+        "status": "healthy",
+        "service": "QEntL Web桌面量子助手API",
+        "version": "1.0.0",
+        "platform": "QVM量子虚拟机",
+        "uptime_seconds": int(time.time() - _get_start_time()),
+        "endpoints": {
+            "/": "API根路径",
+            "/api/status": "健康检查",
+            "/api/compile": "QEntL编译接口",
+            "/api/execute": "QVM执行接口",
+            "/api/test": "量子电路测试接口",
+            "/api/v21/status": "API状态（兼容前端调用）",
+        },
+        "system": {
+            "python": platform.python_version(),
+            "system": platform.system(),
+        },
+        "components": {
+            "compiler": "ready",
+            "qvm": "ready",
+            "qdfs": "ready",
+            "qns": "ready",
+        },
+    }
+
+
+@app.get("/api/v21/status")
+async def status_v21():
+    """兼容前端 v21 路径的API状态端点（/api/status 别名）"""
+    return await status()
 
 
 @app.post("/api/compile")
