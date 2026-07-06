@@ -1,0 +1,53 @@
+// QPU 适配器 - 本地量子硬件模式
+import "QEntL/System/Kernel/qvm.qentl"
+import "QEntL/System/Platform/platform_types.qentl"
+import "QEntL/System/Deployment/specialized_mode.qentl"
+
+// 本地QPU模式：直接操作物理量子硬件
+const QPU_MODE_HARDWARE = 2
+
+def qpu_adapter_hardware_init():
+    // 本地硬件初始化
+    return QPU_MODE_HARDWARE
+
+def qpu_adapter_hardware_detect():
+    // 检测本地量子硬件是否存在
+    return false
+
+def qpu_adapter_hardware_open(device_path):
+    // 打开硬件设备句柄
+    return -1
+
+def qpu_adapter_hardware_execute(bytecode, device_handle):
+    // 直接下发指令到物理QPU
+    return 0
+
+def qpu_adapter_hardware_measure(qubits, handle):
+    // 测量量子比特并返回结果
+    return {}
+
+def qpu_adapter_hardware_reset():
+    // 重置量子比特
+    return 0
+
+def qpu_adapter_hardware_close(handle):
+    // 关闭硬件句柄
+    return 0
+
+def qpu_adapter_hardware_configure():
+    config = {
+        'adapter': 'hardware',
+        'qpu_available': false,
+        'fallback': true,
+        'native_mode': true
+    }
+    return config
+
+export qpu_adapter_hardware_init
+export qpu_adapter_hardware_detect
+export qpu_adapter_hardware_open
+export qpu_adapter_hardware_execute
+export qpu_adapter_hardware_measure
+export qpu_adapter_hardware_reset
+export qpu_adapter_hardware_close
+export qpu_adapter_hardware_configure

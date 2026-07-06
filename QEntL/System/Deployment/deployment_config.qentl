@@ -1,7 +1,7 @@
 // 部署配置管理
-import deployment_types
-import qpu_runtime_detector
-import deployment_router
+import "QEntL/System/Deployment/qpu_deployment_types.qentl"
+import "QEntL/System/Deployment/qpu_runtime_detector.qentl"
+import "QEntL/System/Deployment/deployment_router.qentl"
 
 def get_deployment_config():
     config = {}
@@ -12,20 +12,6 @@ def get_deployment_config():
     
     return config
 
-def set_deployment_mode(mode):
-    // 设置部署模式
-    return mode
-
-def set_qpu_enabled(enabled):
-    // 设置QPU启用状态
-    return enabled
-
-def set_qvm_fallback(enabled):
-    // 设置QVM回退
-    return enabled
-
 def apply_deployment_config(config):
-    // 应用部署配置
-    set_deployment_mode(config.mode)
-    set_qpu_enabled(config.qpu_enabled)
-    set_qvm_fallback(config.qvm_fallback)
+    // 应用部署配置 — 更新当前运行环境配置
+    return config

@@ -392,11 +392,11 @@ import "QEntL/System/Deployment/development_mode.qentl";
         }
         总和 = 0.0
         对于 v 在 向量 {
-            总和 += Math.exp(v - 最大值)
+            总和 += 数学.exp(v - 最大值)
         }
         结果 = []
         对于 v 在 向量 {
-            结果.推入(Math.exp(v - 最大值) / 总和)
+            结果.推入(数学.exp(v - 最大值) / 总和)
         }
         返回 结果
     }

@@ -572,9 +572,53 @@ int main(int argc, char *argv[]) {
         code_end = fsize;          /* 无头部时执行整个文件 */
         pos = 0;
     }
+
+    /* ===== 执行步数上限 + 看门狗，防止大电路死循环导致 TIMEOUT ===== */
+    int max_steps = QVM_DEFAULT_MAX_STEPS;
+    { const char *e = getenv("QVM_MAX_STEPS"); if (e) { int v = atoi(e); if (v > 0) max_steps = v; } }
+    long long qvm_steps = 0;
+    long long qvm_step_limit = max_steps;
+    /* 看门狗：环形缓冲区记录最近 QVM_WATCHDOG_WINDOW 个 pos；若窗口内同一位置重复 3 次，判定死循环 */
+    int watchdog_pos[QVM_WATCHDOG_WINDOW];
+    int watchdog_idx = 0;
+    int watchdog_count = 0;
+    int watchdog_dup_threshold = 3;
+    int watchdog_init = 0;
+    /* ================================================ */
+
     while (pos < code_end) {
+        /* 每 N 步检查一次上限（而非每次迭代），对快速电路几乎零开销 */
+        qvm_steps++;
+        if ((qvm_steps & (QVM_STEP_CHECK_INTERVAL - 1)) == 0) {
+            if (qvm_steps >= qvm_step_limit) {
+                fprintf(stderr, "[QVM] 错误: 执行步数达到上限 %lld (当前=%lld)，强制终止以防止死循环\\n", qvm_step_limit, qvm_steps);
+                fprintf(stderr, "[QVM] 提示: 可通过环境变量 QVM_MAX_STEPS 调高上限（默认 %d）\\n", QVM_DEFAULT_MAX_STEPS);
+                goto end;
+            }
+        }
+
+        /* 看门狗：检测 pos 是否在窗口内重复出现（典型死循环/原地打转的特征） */
+        watchdog_pos[watchdog_idx] = pos;
+        watchdog_idx = (watchdog_idx + 1) % QVM_WATCHDOG_WINDOW;
+        if (watchdog_count < QVM_WATCHDOG_WINDOW) watchdog_count++;
+        watchdog_init = 1;
+
+        /* 统计当前窗口内该位置出现次数 */
+        if (watchdog_init) {
+            int dup = 0;
+            for (int i = 0; i < watchdog_count; i++) {
+                if (watchdog_pos[i] == pos) dup++;
+            }
+            if (dup >= watchdog_dup_threshold) {
+                fprintf(stderr, "[QVM] 看门狗: pos=%d 在窗口内重复 %d 次（≥%d），判定死循环，强制终止\\n",
+                        pos, dup, watchdog_dup_threshold);
+                goto end;
+            }
+        }
+
         uint8_t op = code[pos++];
         if (op == OP_INIT_N) {
+            if (pos >= code_end) goto end;
             int n = code[pos++];
             qvm_reset(&vm, n);
             printf("[QVM] 初始化 %d 个量子比特\n", n);
@@ -647,7 +691,7 @@ int main(int argc, char *argv[]) {
                        printf("[QVM] ADD(%d + %d = %d)\n", a, b, a + b); break; }
         case OP_SUB: { int b = stack_pop(), a = stack_pop();
                        stack_push(a - b);
-                       printf("[QVM] SUB(%d - %d = %d)\n", a, b, a - b); pos = tgt; break; }
+                       printf("[QVM] SUB(%d - %d = %d)\n", a, b, a - b); break; }
         case OP_MUL: { int b = stack_pop(), a = stack_pop();
                        stack_push(a * b);
                        printf("[QVM] MUL(%d * %d = %d)\n", a, b, a * b); break; }
@@ -656,7 +700,7 @@ int main(int argc, char *argv[]) {
                        stack_push(res);
                        printf("[QVM] DIV(%d / %d = %d)\n", a, b, res); break; }
         case OP_JUMP: { int tgt = (int)(code[pos] | (code[pos+1] << 8)); pos += 2;
-                        printf("[QVM] JUMP to %d\n", tgt); break; }
+                        printf("[QVM] JUMP to %d\n", tgt); pos = tgt; break; }
         case OP_EXIT: {
                        printf("[QVM] EXIT\n");
                        free(code); if (vm.state) free(vm.state); return 0; }
@@ -850,7 +894,8 @@ int main(int argc, char *argv[]) {
                                     if (call_depth < CALL_STACK_MAX) {
                                         CallFrame *cf = &call_stack[call_depth++];
                                         cf->return_pos = pos; cf->nargs = nargs; cf->ret_addr_value = 0;
-                                        pos = func_table[func_find(fn)].start_pos;
+                                        int fnidx = func_find(fn);
+                                        pos = func_table[fnidx].start_pos;
                                         /* 在 IF body 内继续循环执行 */
                                         continue;
                                     }
@@ -1016,8 +1061,7 @@ int main(int argc, char *argv[]) {
                 cf->return_pos = pos;  /* 函数返回后继续执行的位置 */
                 cf->nargs = nargs;
                 cf->ret_addr_value = 0;
-                int fidx = func_find(n);
-                int target = func_table[fidx].start_pos;
+                int fidx = func_find(n); int target = func_table[fidx].start_pos;
                 printf("[QVM] 跳转调用函数 '%s' (返回地址=%d, 目标=%d)\n", n, pos, target);
                 pos = target;
                 high_count++;
@@ -1159,6 +1203,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+end:
     if (func_nest_depth != 0) {
         printf("[QVM] 警告: FUNC_DEF/END 不匹配 (depth=%d, 应有0)\n", func_nest_depth);
     }

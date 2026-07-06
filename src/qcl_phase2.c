@@ -829,7 +829,7 @@ static void parse_class_body(Parser *P) {
                 if (P->lexer.cur.kind == TOK_LBRACE) {
                     flush_highbuf();
                     write_high_opcode(BC_FUNC_BODY);
-                    parse_class_body(P);
+                    parse_func_body(P); /* BUG FIX: 方法体应使用 parse_func_body，不是 parse_class_body */
                     write_high_opcode(BC_FUNC_END);
                     flush_highbuf();
                     write_high_opcode(OP_FUNC_END);
