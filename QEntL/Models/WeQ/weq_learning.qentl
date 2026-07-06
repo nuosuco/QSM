@@ -10,6 +10,9 @@ import "QEntL/System/Deployment/development_mode.qentl";
 导入 "weq_core.qentl" 作为 WeQ核心
 导入 "weq_social.qentl" 作为 WeQ社交网络
 
+// QSM集成: 学习模块使用QSM量子叠加态进行社交学习
+import "QEntL/Models/QSM/qsm_core.qentl";
+
 量子模块 WeQ学习 {
     
     类型 学习记录 {
