@@ -613,7 +613,7 @@ static int parse_quantum_instruction(Parser *P) {
         consume(P); lexer_skip_ws(&P->lexer);
         int ctrl = 0, tgt = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { ctrl = parse_const_int(P->lexer.cur.text); consume(P); }
-        lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        lexer_skip_ws(&P->lexer);
         if (P->lexer.cur.kind == TOK_NUMBER) { tgt = parse_const_int(P->lexer.cur.text); consume(P); }
         write_opcode(OP_CNOT); write_u8(ctrl); write_u8(tgt);
         P->compiled++; return 1;
@@ -622,7 +622,7 @@ static int parse_quantum_instruction(Parser *P) {
         consume(P); lexer_skip_ws(&P->lexer);
         int qid = 0, reg = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { qid = parse_const_int(P->lexer.cur.text); consume(P); }
-        lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        lexer_skip_ws(&P->lexer);
         if (P->lexer.cur.kind == TOK_NUMBER) { reg = parse_const_int(P->lexer.cur.text); consume(P); }
         write_opcode(OP_MEASURE); write_u8(qid); write_u8(reg);
         P->compiled++; return 1;
@@ -640,7 +640,7 @@ static int parse_quantum_instruction(Parser *P) {
         consume(P); lexer_skip_ws(&P->lexer);
         int a = 0, b = 0;
         if (P->lexer.cur.kind == TOK_NUMBER) { a = parse_const_int(P->lexer.cur.text); consume(P); }
-        lexer_skip_ws(&P->lexer); lexer_next(&P->lexer);
+        lexer_skip_ws(&P->lexer);
         if (P->lexer.cur.kind == TOK_NUMBER) { b = parse_const_int(P->lexer.cur.text); consume(P); }
         write_opcode(OP_SWAP); write_u8(a); write_u8(b);
         P->compiled++; return 1;
@@ -826,16 +826,14 @@ static void parse_class_body(Parser *P) {
         if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
         if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
 
-        /* 跳过修饰符：private / public / protected / static / virtual / override / abstract / readonly / function / external */
+        /* 跳过修饰符：private / public / protected / static / virtual / override / abstract / readonly / external */
         if (kw(&t, "private") || kw(&t, "public") || kw(&t, "protected") ||
             kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override") ||
-            kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "function") ||
-            kw(&t, "external")) {
+            kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "external")) {
             /* 跳过连续修饰符，定位到下一个非修饰符 token */
             while (kw(&t, "private") || kw(&t, "public") || kw(&t, "protected") ||
                    kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override") ||
-                   kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "function") ||
-                   kw(&t, "external")) {
+                   kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "external")) {
                 consume(P);
                 t = P->lexer.cur;
             }
@@ -1329,7 +1327,7 @@ static int parse_top_statement(Parser *P) {
     if (kw(&t, "量子模块")) return parse_quantum_module(P);
     if (kw(&t, "const"))  return parse_const(P);
     if (kw(&t, "类型"))   return parse_type_def(P);
-    if (kw(&t, "def") || kw(&t, "函数")) return parse_def(P);
+    if (kw(&t, "def") || kw(&t, "函数") || kw(&t, "function")) return parse_def(P);
     if (kw(&t, "export")) return parse_export(P);
     if (parse_quantum_instruction(P)) return 1;
     if (kw(&t, "var")) {
@@ -1535,7 +1533,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         if (kw(&cur, "类型")) {
             if (parse_type_def(&P)) { stats.types++; stats.high_level_lines++; continue; }
         }
-        if (kw(&cur, "def") || kw(&cur, "函数")) {
+        if (kw(&cur, "def") || kw(&cur, "函数") || kw(&cur, "function")) {
             if (parse_def(&P)) { stats.functions++; stats.high_level_lines++; continue; }
         }
         /* class / quantum_class / enum / interface 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）
