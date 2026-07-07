@@ -918,8 +918,8 @@ static void parse_class_body(Parser *P) {
                 consume(P);
                 t = P->lexer.cur;
             }
-            /* 此时 t 是 constructor / def / 函数，或意外 token */
-            if (kw(&t, "constructor") || kw(&t, "def") || kw(&t, "函数")) {
+            /* 此时 t 是 constructor / def / 函数 / function（方法名前的最后关键字），或意外 token */
+            if (kw(&t, "constructor") || kw(&t, "def") || kw(&t, "函数") || kw(&t, "function")) {
                 consume(P); /* constructor/def/函数 → cur 推进到函数名或 '(' */
                 if (P->lexer.cur.kind == TOK_IDENT) {
                     /* 有名方法 */
