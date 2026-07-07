@@ -82,6 +82,111 @@ typedef enum {
     BC_FUNC_END        = 254,
 } Opcode;
 
+/* ==================== 彝文Token→量子指令映射（QEntL全栈核心创新） ====================
+   用户核心哲学：一个彝文字符 = 文字(人可读) + Token(AI语义) + 指令(CPU/QPU可执行)
+   实现：编译器遇到PUA范围的彝文字符，直接emit量子操作码，不是存字符串池。
+   ───────────────────────────────────────────────────────────────────────────────── */
+#define YI_BASE     0xF2710
+#define YI_END      0xF370F  // 完整字典 U+F2700~U+F370F (4120字符)
+#define YI_TOK(n)   ((n) + YI_BASE)
+#define YI_IS(cp)   ((cp) >= YI_BASE && (cp) <= YI_END)
+
+/* forward declarations for Yi YiGate helpers */
+static void write_opcode(Opcode op);
+static void write_u8(unsigned char v);
+static void write_string_ref_after(const char *s);
+
+typedef struct {
+    unsigned int token_code;
+    Opcode op;
+    unsigned char gate_class;  // 0=single, 1=two-qubit
+} YiGateEntry;
+
+static const YiGateEntry YI_GATE_MAP[] = {
+    {YI_TOK(0x00), OP_H,     0}, // U+F2710 → H
+    {YI_TOK(0x01), OP_X,     0}, // U+F2711 → X
+    {YI_TOK(0x02), OP_Z,     0}, // U+F2712 → Z
+    {YI_TOK(0x03), OP_Y,     0}, // U+F2713 → Y
+    {YI_TOK(0x04), OP_T,     0}, // U+F2714 → T
+    {YI_TOK(0x05), OP_S,     0}, // U+F2715 → S
+    {YI_TOK(0x06), OP_RESET, 0}, // U+F2716 → RESET
+    {YI_TOK(0x07), OP_NOP,   0}, // U+F2717 → NOP
+    {YI_TOK(0x08), OP_BARRIER,0}, // U+F2718 → BARRIER
+    {YI_TOK(0x09), OP_STOP,  0}, // U+F2719 → STOP
+    {YI_TOK(0x0A), OP_EXIT,  0}, // U+F271A → EXIT
+    {YI_TOK(0x0B), OP_INIT_N,0}, // U+F271B → INIT_N
+    {YI_TOK(0x0C), OP_PRINT, 0}, // U+F271C → PRINT
+    {YI_TOK(0x0D), OP_MEASURE,0}, // U+F271D → MEASURE
+    {YI_TOK(0x0E), OP_SWAP,  0}, // U+F271E → SWAP
+    {YI_TOK(0x10), OP_CNOT,  1}, // U+F2720 → CNOT
+    {YI_TOK(0x11), OP_SWAP,  1}, // U+F2721 → SWAP(two-qubit)
+    {0, OP_NOP, 0}
+};
+
+/* 算法映射：超出静态表的字符 → 18种量子门 */
+static unsigned int yi_gate_opcode(unsigned int cp) {
+    static const unsigned char ops[18] = {
+        OP_H, OP_X, OP_Z, OP_Y, OP_T, OP_S,
+        OP_RESET, OP_NOP, OP_BARRIER, OP_STOP, OP_EXIT,
+        OP_INIT_N, OP_PRINT, OP_MEASURE, OP_SWAP, OP_CNOT,
+        OP_SWAP, OP_INIT_N
+    };
+    return ops[(cp - YI_BASE) % 18];
+}
+
+/* UTF-8解码 */
+static unsigned int utf8_decode(const char *p, int n, int *consumed) {
+    unsigned char c0 = (unsigned char)p[0];
+    if (c0 <= 0x7F) { *consumed = 1; return (unsigned int)c0; }
+    if ((c0 & 0xE0) == 0xC0) { *consumed = 2; return (((unsigned char)p[0] & 0x1F) << 6) | ((unsigned char)p[1] & 0x3F); }
+    if ((c0 & 0xF0) == 0xE0) { *consumed = 3; return (((unsigned char)p[0] & 0x0F) << 12) | (((unsigned char)p[1] & 0x3F) << 6) | ((unsigned char)p[2] & 0x3F); }
+    if ((c0 & 0xF8) == 0xF0) { *consumed = 4; return (((unsigned char)p[0] & 0x07) << 18) | (((unsigned char)p[1] & 0x3F) << 12) | (((unsigned char)p[2] & 0x3F) << 6) | ((unsigned char)p[3] & 0x3F); }
+    *consumed = 1; return ~0U;
+}
+
+/* emit彝文量子指令：优先查表，否则算法映射 */
+static int emit_yi_gate(unsigned int cp, int qubit_id) {
+    if (!YI_IS(cp)) return 0;
+    for (int i = 0; YI_GATE_MAP[i].token_code != 0; i++) {
+        if (YI_GATE_MAP[i].token_code == cp) {
+            write_opcode(YI_GATE_MAP[i].op);
+            if (YI_GATE_MAP[i].gate_class == 1) {
+                write_u8(qubit_id & 0xFF);
+                write_u8((qubit_id + 1) & 0xFF);
+            } else {
+                write_u8(qubit_id & 0xFF);
+            }
+            return 1;
+        }
+    }
+    write_opcode(yi_gate_opcode(cp));
+    write_u8(qubit_id & 0xFF);
+    return 1;
+}
+
+/* 扫描字符串，彝文字符→量子指令，非彝文→字符串池 */
+static int write_yi_instruction(const char *s) {
+    if (!s) return 0;
+    int len = (int)strlen(s);
+    int yi_count = 0, qi = 0;
+    int i = 0;
+    while (i < len) {
+        int consumed = 0;
+        unsigned int cp = utf8_decode(s + i, len - i, &consumed);
+        if (cp == ~0U) { consumed = 1; cp = (unsigned char)s[i]; }
+        if (emit_yi_gate(cp, qi)) { yi_count++; qi++; }
+        else {
+            char leftover[16];
+            int rem = len - i;
+            if (rem > 15) rem = 15;
+            memcpy(leftover, s + i, rem); leftover[rem] = '\0';
+            write_string_ref_after(leftover);
+        }
+        i += consumed;
+    }
+    return yi_count;
+}
+
 typedef struct {
     const char *name;
     Opcode     op;
@@ -128,8 +233,11 @@ static void write_string_ref_after(const char *s) {
 }
 static void flush_highbuf(void);
 static void write_string_ref(const char *s) {
-    flush_highbuf(); /* 确保高字节码已写入代码区，再写字符串参数（避免参数错位被当成指令） */
-    write_string_ref_after(s);
+    /* 彝文字符→量子指令；非彝文→字符串池 */
+    int yi_count = write_yi_instruction(s);
+    if (yi_count == 0) {
+        write_string_ref_after(s);
+    }
 }
 static void flush_highbuf(void) {
     if (g_highbuf_pos > 0 && g_bc_pos + g_highbuf_pos <= MAX_OPS) {
@@ -683,6 +791,20 @@ static int parse_quantum_instruction(Parser *P) {
         P->compiled++; return 1;
     }
     if (kw(&t, "BARRIER")) { consume(P); write_opcode(OP_BARRIER); P->compiled++; return 1; }
+    /* 彝文字符直接作为量子指令：U+F2710~U+F370F → emit_yi_gate */
+    if (t.kind == TOK_IDENT) {
+        int consumed = 0;
+        unsigned int cp = utf8_decode(t.text, (int)strlen(t.text), &consumed);
+        if (YI_IS(cp)) {
+            consume(P);
+            int qid = 0;
+            lexer_skip_ws(&P->lexer);
+            if (P->lexer.cur.kind == TOK_NUMBER) { qid = parse_const_int(P->lexer.cur.text); consume(P); }
+            emit_yi_gate(cp, qid);
+            P->compiled++;
+            return 1;
+        }
+    }
     return 0;
 }
 
