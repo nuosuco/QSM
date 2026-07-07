@@ -85,10 +85,15 @@ typedef enum {
 /* ==================== 彝文Token→量子指令映射（QEntL全栈核心创新） ====================
    用户核心哲学：一个彝文字符 = 文字(人可读) + Token(AI语义) + 指令(CPU/QPU可执行)
    实现：编译器遇到PUA范围的彝文字符，直接emit量子操作码，不是存字符串池。
+   范围：U+F2700..U+F370F (共 4120 字符)
+   覆盖策略：
+     - U+F2700..U+F270F (16字符): 算法映射兜底 (cp - YI_BASE) % 18
+     - U+F2710..U+F2721 (18字符): 静态表精确映射到 18 种量子门
+     - U+F2722..U+F370F (4086字符): 算法映射兜底 (cp - YI_BASE) % 18
    ───────────────────────────────────────────────────────────────────────────────── */
-#define YI_BASE     0xF2710
+#define YI_BASE     0xF2700
 #define YI_END      0xF370F  // 完整字典 U+F2700~U+F370F (4120字符)
-#define YI_TOK(n)   ((n) + YI_BASE)
+#define YI_TOK(n)   ((n) + YI_BASE + 0x10)   /* 静态表从 U+F2710 开始 */
 #define YI_IS(cp)   ((cp) >= YI_BASE && (cp) <= YI_END)
 
 /* forward declarations for Yi YiGate helpers */
@@ -117,7 +122,7 @@ static const YiGateEntry YI_GATE_MAP[] = {
     {YI_TOK(0x0B), OP_INIT_N,0}, // U+F271B → INIT_N
     {YI_TOK(0x0C), OP_PRINT, 0}, // U+F271C → PRINT
     {YI_TOK(0x0D), OP_MEASURE,0}, // U+F271D → MEASURE
-    {YI_TOK(0x0E), OP_SWAP,  0}, // U+F271E → SWAP
+    {YI_TOK(0x0E), OP_SWAP,  1}, // U+F271E → SWAP(two-qubit)
     {YI_TOK(0x10), OP_CNOT,  1}, // U+F2720 → CNOT
     {YI_TOK(0x11), OP_SWAP,  1}, // U+F2721 → SWAP(two-qubit)
     {0, OP_NOP, 0}
@@ -128,10 +133,16 @@ static unsigned int yi_gate_opcode(unsigned int cp) {
     static const unsigned char ops[18] = {
         OP_H, OP_X, OP_Z, OP_Y, OP_T, OP_S,
         OP_RESET, OP_NOP, OP_BARRIER, OP_STOP, OP_EXIT,
-        OP_INIT_N, OP_PRINT, OP_MEASURE, OP_SWAP, OP_CNOT,
+        OP_INIT_N, OP_PRINT, OP_MEASURE, OP_CNOT, OP_SWAP,
         OP_SWAP, OP_INIT_N
     };
     return ops[(cp - YI_BASE) % 18];
+}
+
+/* 判断算法映射的门是否为双量子比特门（需要ctrl+target两个operand） */
+static int yi_gate_is_twoqubit(unsigned int cp) {
+    unsigned int op = yi_gate_opcode(cp);
+    return (op == OP_CNOT || op == OP_SWAP);
 }
 
 /* UTF-8解码 */
@@ -159,8 +170,14 @@ static int emit_yi_gate(unsigned int cp, int qubit_id) {
             return 1;
         }
     }
+    /* 算法映射兜底：超出静态表的字符 → (cp - YI_BASE) % 18 → 18种量子门 */
     write_opcode(yi_gate_opcode(cp));
-    write_u8(qubit_id & 0xFF);
+    if (yi_gate_is_twoqubit(cp)) {
+        write_u8(qubit_id & 0xFF);
+        write_u8((qubit_id + 1) & 0xFF);
+    } else {
+        write_u8(qubit_id & 0xFF);
+    }
     return 1;
 }
 
