@@ -21,11 +21,11 @@ class YiFontInstaller {
  return 'unknown';
  }
  
- // 检测字体是否已安装
+ // 检测字体是否已加载（两种字体名都检查）
  async checkFontInstalled() {
  try {
- await document.fonts.load('48px YiTongyong');
- this.installed = document.fonts.check('48px YiTongyong');
+ await document.fonts.load('48px LSTY-Yi-Black');
+ this.installed = document.fonts.check('48px LSTY-Yi-Black') || document.fonts.check('48px YiTongyong');
  } catch (e) {
  this.installed = false;
  }
