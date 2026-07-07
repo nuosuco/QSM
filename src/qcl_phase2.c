@@ -1075,10 +1075,22 @@ static void parse_class_body(Parser *P) {
             if (P->lexer.cur.kind == TOK_IDENT) {
                 const char *mname = P->lexer.cur.text;
                 fprintf(stderr, "[DEBUG3] method name=%s pos=%d\n", mname, P->lexer.pos);
-                /* emit 方法定义 */
                 write_high_opcode(OP_FUNC_DEF);
                 write_string_ref(mname);
                 consume(P); /* 方法名 → cur 推进到 ( 或 : */
+                /* 跳过类型注解（字段声明的 : Type） */
+                if (P->lexer.cur.kind == TOK_COLON) {
+                    consume(P);
+                    lexer_skip_ws(&P->lexer);
+                    if (P->lexer.cur.kind == TOK_IDENT) consume(P); /* 跳过类型 */
+                    lexer_skip_ws(&P->lexer);
+                }
+                /* 如果是字段声明 (有 = 无 ())，跳过值到分号 */
+                if (P->lexer.cur.kind == TOK_EQ) {
+                    skip_to_semi_or_rbrace(P);
+                    write_high_opcode(OP_FUNC_END); /* 字段也需闭合 */
+                    continue;
+                }
                 /* 跳过参数列表 ( ... ) */
                 if (P->lexer.cur.kind == TOK_LPAR) {
                     int pd = 1; consume(P);
@@ -1190,6 +1202,11 @@ static void parse_class_body(Parser *P) {
                 write_string_ref(P->lexer.cur.text);
                 consume(P);
             }
+            /* 跳过类型注解 : Type */
+            if (expect_tok(P, TOK_COLON)) {
+                lexer_skip_ws(&P->lexer);
+                if (P->lexer.cur.kind == TOK_IDENT) consume(P);
+            }
             if (expect_tok(P, TOK_EQ)) {
                 if (P->lexer.cur.kind == TOK_NUMBER) {
                     write_high_opcode(OP_PUSH_CONST_INT);
@@ -1201,6 +1218,7 @@ static void parse_class_body(Parser *P) {
                     consume(P);
                 }
             }
+            /* 跳过剩余（如方法调用 init_entanglement_channels()）直到分号或 } */
             skip_to_semi_or_rbrace(P); continue;
         }
         /* import / const / 类型 / export 等顶层语法 */
@@ -1517,9 +1535,13 @@ static int parse_def(Parser *P) {
         }
         expect_tok(P, TOK_RPAR); /* ) */
     }
-    /* 接受 def f() { ... } 和 def f() : { ... } 两种写法 */
+    /* 接受 def f() { ... } 和 def f() : Type { ... } 两种写法 */
     lexer_skip_ws(&P->lexer);
-    if (expect_tok(P, TOK_COLON)) { lexer_skip_ws(&P->lexer); }
+    if (expect_tok(P, TOK_COLON)) {
+        lexer_skip_ws(&P->lexer);
+        if (P->lexer.cur.kind == TOK_IDENT) consume(P); /* 跳过返回类型标识符 */
+        lexer_skip_ws(&P->lexer);
+    }
     write_u16((unsigned short)param_count);
     flush_highbuf();
     if (P->lexer.cur.kind == TOK_LBRACE) {

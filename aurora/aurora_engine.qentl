@@ -511,7 +511,7 @@ struct CycleResult {
 // 入口点
 // ============================================================
 
-function main(): Integer {
+def main(): Integer {
   var engine = new AuroraEngine()
   
   if !engine.init() {
