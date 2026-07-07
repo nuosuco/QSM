@@ -1,0 +1,197 @@
+{
+  "meta": {
+    "title": "QSM 八阶段: 自举链端到端集成测试与性能基准",
+    "qcl_compiler": "/root/QSM/bin/qcl_bootstrap",
+    "qvm_vm": "/root/QSM/bin/qvm_bootstrap",
+    "n_perf_runs": 5,
+    "n_stability_runs": 20,
+    "total_ms": 607.5931420054985
+  },
+  "binary_info": {
+    "qcl_bootstrap": {
+      "size_bytes": 12984,
+      "kind": "dynamic"
+    },
+    "qvm_bootstrap": {
+      "size_bytes": 34376,
+      "kind": "dynamic"
+    },
+    "qcl_bootstrap_opt": {
+      "size_bytes": 678248,
+      "kind": "static"
+    },
+    "qvm_bootstrap_opt": {
+      "size_bytes": 698728,
+      "kind": "static"
+    }
+  },
+  "e2e_tests": {
+    "bell_state": {
+      "compiler_rc": 0,
+      "compiler_ms": 11.466953990748152,
+      "compiler_rss_kb": 14328,
+      "vm_rc": 0,
+      "vm_ms": 7.020359000307508,
+      "vm_rss_kb": 14328,
+      "total_ms": 18.48731299105566,
+      "bc_size": 19,
+      "pass": true,
+      "stdout_compiler": "[QCL] 编译: /root/QSM/test/bell_state.qentl\n[QCL] 输出: /tmp/bench_e2e_bell.qbc\n[QCL] 编译完成: 19 字节, 19 条指令",
+      "stdout_vm": "[QVM] 初始化量子虚拟机\n[QVM] 初始化 2 个量子比特\n[QVM] NOP\n[QVM] H(q0)\n[QVM] CNOT(q0, q1)\n[QVM] 测量 q0 -> r0 = 1 [坍缩 prob0=0.5000 prob1=0.5000]\n[QVM] 测量 q1 -> r1 = 1 [坍缩 prob0=0.0000 prob1=0.5000]\n[QVM] print(r0) = 1\n[QVM] print(r1) = 1\n[QVM] 程序退出\n[QVM] 执行完成: 6 周期, 6 门操作"
+    }
+  },
+  "performance": [
+    {
+      "n_instructions": 10,
+      "n_qubits": 4,
+      "bc_size": 40,
+      "compiler": {
+        "rc_all_pass": true,
+        "stats_ms": {
+          "n": 5,
+          "avg": 7.282126203062944,
+          "min": 4.630871000699699,
+          "max": 9.779897998669185,
+          "median": 7.312561006983742,
+          "stdev": 2.366748231561116
+        },
+        "rss_avg_kb": 14328
+      },
+      "executor": {
+        "rc_all_pass": true,
+        "stats_ms": {
+          "n": 5,
+          "avg": 3.1138414022279903,
+          "min": 1.502440994954668,
+          "max": 5.4506590095115826,
+          "median": 2.0869059953838587,
+          "stdev": 1.9052915566469526
+        },
+        "rss_avg_kb": 14328
+      },
+      "end_to_end_ms": {
+        "n": 5,
+        "avg": 10.395967605290934,
+        "min": 7.294031995115802,
+        "max": 14.682052002171986,
+        "median": 10.081530010211281,
+        "stdev": 2.763898270056445
+      },
+      "compiler_stdout_sample": "[QCL] 编译: /tmp/bench_10ops.qentl\n[QCL] 输出: /tmp/bench_10ops.qbc\n[QCL] 编译完成: 40 字节, 40 条指令"
+    },
+    {
+      "n_instructions": 100,
+      "n_qubits": 4,
+      "bc_size": 242,
+      "compiler": {
+        "rc_all_pass": true,
+        "stats_ms": {
+          "n": 5,
+          "avg": 5.743343799258582,
+          "min": 1.9055009906878695,
+          "max": 9.25930100493133,
+          "median": 6.629939001868479,
+          "stdev": 3.238207283615788
+        },
+        "rss_avg_kb": 14328
+      },
+      "executor": {
+        "rc_all_pass": true,
+        "stats_ms": {
+          "n": 5,
+          "avg": 4.388722399016842,
+          "min": 2.3656789999222383,
+          "max": 8.262595991254784,
+          "median": 4.361366998637095,
+          "stdev": 2.3981867016727354
+        },
+        "rss_avg_kb": 14328
+      },
+      "end_to_end_ms": {
+        "n": 5,
+        "avg": 10.132066198275425,
+        "min": 7.359829993220046,
+        "max": 11.67743801488541,
+        "median": 10.463660000823438,
+        "stdev": 1.6524991174875652
+      },
+      "compiler_stdout_sample": "[QCL] 编译: /tmp/bench_100ops.qentl\n[QCL] 输出: /tmp/bench_100ops.qbc\n[QCL] 编译完成: 242 字节, 242 条指令"
+    },
+    {
+      "n_instructions": 1000,
+      "n_qubits": 4,
+      "bc_size": 2268,
+      "compiler": {
+        "rc_all_pass": true,
+        "stats_ms": {
+          "n": 5,
+          "avg": 7.060479599749669,
+          "min": 4.378776997327805,
+          "max": 9.09942400176078,
+          "median": 7.243692991323769,
+          "stdev": 1.7682280864888495
+        },
+        "rss_avg_kb": 14430.4
+      },
+      "executor": {
+        "rc_all_pass": true,
+        "stats_ms": {
+          "n": 5,
+          "avg": 4.464126800303347,
+          "min": 2.0737070008181036,
+          "max": 5.98142399394419,
+          "median": 4.4271259976085275,
+          "stdev": 1.6182253691408843
+        },
+        "rss_avg_kb": 14456
+      },
+      "end_to_end_ms": {
+        "n": 5,
+        "avg": 11.524606400053017,
+        "min": 8.805902994936332,
+        "max": 15.029252012027428,
+        "median": 10.48516899754759,
+        "stdev": 2.536725693306446
+      },
+      "compiler_stdout_sample": "[QCL] 编译: /tmp/bench_1000ops.qentl\n[QCL] 输出: /tmp/bench_1000ops.qbc\n[QCL] 编译完成: 2268 字节, 2268 条指令"
+    }
+  ],
+  "stability": {
+    "bell_state": {
+      "n_runs": 20,
+      "bad_rc": 0,
+      "rss_mean_kb": 14456,
+      "rss_stdev_kb": 0.0,
+      "rss_trend_kb_per_run": 0,
+      "leak_detected": false,
+      "pass": true
+    },
+    "1000ops": {
+      "n_runs": 20,
+      "bad_rc": 0,
+      "rss_mean_kb": 14456,
+      "rss_stdev_kb": 0.0,
+      "rss_trend_kb_per_run": 0,
+      "leak_detected": false,
+      "pass": true
+    },
+    "overall_pass": true,
+    "opt_compare": {
+      "orig_compiler_ms": 3.05515099898912,
+      "orig_vm_ms": 2.0069579913979396,
+      "orig_total_ms": 5.06210899038706,
+      "orig_rss_kb": 14456,
+      "opt_compiler_ms": 15.207807999104261,
+      "opt_vm_ms": 4.151633998844773,
+      "opt_total_ms": 19.359441997949034,
+      "opt_rss_kb": 14456,
+      "speedup": 0.2614801083070135
+    }
+  },
+  "summary": {
+    "e2e_pass": true,
+    "perf_all_sizes_pass": true,
+    "stability_pass": true,
+    "overall_pass": true
+  }
+}

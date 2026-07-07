@@ -1,0 +1,61 @@
+{
+  "stage": 8,
+  "title": "QDFS文件系统与QNS训练管道集成验证",
+  "date": "2026-07-08",
+  "compiler": "bin/qcl_phase2",
+
+  "QDFS_36_files": {
+    "total_qentl": 36,
+    "total_qbc": 36,
+    "compile_pass": 36,
+    "compile_fail": 0,
+    "status": "36/36 PASS",
+    "files": [
+      "access_control", "auto_classifier", "behavior_learner", "classification_optimizer",
+      "context_analyzer", "context_switcher", "dependency_analyzer", "distributed_index",
+      "file_operations", "file_relation_analyzer", "grover_search_circuit", "index_updater",
+      "knowledge_network", "metadata_manager", "multidimensional_index", "predictive_loader",
+      "priority_manager", "qdfs_circuit", "qdfs_core", "qdfs_extended_v2",
+      "qdfs_quantum_circuit", "qdfs_real_fs", "qdfs_test", "qdfs_test_qcircuit", "qdfs_test_run",
+      "quantum_crypto", "recommendation_engine", "relevance_engine", "semantic_analyzer",
+      "semantic_extractor", "semantic_search", "transaction_manager",
+      "view_cache", "view_composer", "view_engine", "view_renderer"
+    ]
+  },
+
+  "QNS_QDFS_integration": {
+    "qns_qdfs_storage.qentl": { "compile": "PASS", "量子指令": 0, "注": "纯高级语法模块, 导入qdfs_core.qentl" },
+    "qns_qdfs_dataflow.qentl":  { "compile": "PASS", "量子指令": 43 },
+    "qns_qdfs_reverse_flow_circuit.qentl": { "compile": "PASS", "量子指令": 74 }
+  },
+
+  "QNS_training_pipeline": {
+    "qns_real_train.qentl":       { "compile": "PASS", "量子指令": 38 },
+    "qns_yi_train_circuit.qentl": { "compile": "PASS", "量子指令": 140 },
+    "full_train_pipeline.qentl":  { "compile": "PASS", "量子指令": 252 },
+    "multi_epoch_train.qentl":    { "compile": "PASS", "量子指令": 257 },
+    "qns_yi_infer_circuit.qentl": { "compile": "PASS", "量子指令": 56 },
+    "qns_yi_test_circuit.qentl":  { "compile": "PASS", "量子指令": 177 }
+  },
+
+  "training_data": {
+    "file": "data/yi_4120_merged_for_gemma.jsonl",
+    "total_lines": 51899,
+    "valid_json_samples": 51899,
+    "empty_input": 0,
+    "empty_output": 0,
+    "unique_yi_chars_ge_U+F0000": 4133,
+    "yi_coverage_of_4120": "100% (4133 unique Yi chars in U+F0000-U+FFFFD range per qns_qdfs_storage extractor)"
+  },
+
+  "integration_flow": {
+    "step1": "qns_qdfs_storage.qentl 导入 qdfs_core.qentl (量子文件系统)",
+    "step2": "初始化QNS存储 → 创建 qns_train/qns_test/qns_models/qns_index 目录",
+    "step3": "扫描QDFS上 yi_* / 通用 / 彝文 等 .jsonl 文件",
+    "step4": "量子加密读取 → 解析JSON → 提取彝文tokens (Unicode U+F0000-U+FFFFD)",
+    "step5": "按15%划分训练/测试集, 多维索引存储 (字符/类别/难度)",
+    "step6": "叠加态并行加载 → QNS训练电路(qns_yi_train_circuit)"
+  },
+
+  "overall": "全部通过"
+}

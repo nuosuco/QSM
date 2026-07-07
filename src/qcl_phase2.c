@@ -393,6 +393,36 @@ static void skip_to_semi_or_rbrace(Parser *P) {
         consume(P);
     }
 }
+static void skip_to_semi_newline_or_rbrace(Parser *P) {
+    /* 类似 skip_to_semi_or_rbrace，但在 brace-depth==0 时换行符也视为语句结束。
+       用于字段声明 / 无分号的类体成员。 */
+    int bd = 0;
+    while (P->lexer.cur.kind != TOK_EOF) {
+        if (P->lexer.cur.kind == TOK_LBRACE) bd++;
+        else if (P->lexer.cur.kind == TOK_RBRACE) {
+            if (bd > 0) bd--; else break;
+        } else if (P->lexer.cur.kind == TOK_SEMI && bd == 0) {
+            consume(P); return;
+        } else if (P->lexer.cur.kind == TOK_RBRK && bd == 0) {
+            consume(P); return;
+        } else if (P->lexer.cur.kind == TOK_EOF) {
+            break;
+        } else if (bd == 0) {
+            /* 当前字符不是分号/大括号 → 看下一字符是否是换行（语句边界） */
+            if (P->lexer.pos < P->lexer.len && P->lexer.src[P->lexer.pos] == '\n') {
+                return; /* 换行即语句结束，不消费（留给主循环继续） */
+            }
+        }
+        /* 快速跳过 TOK_ERR 序列 */
+        while (P->lexer.cur.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
+            P->lexer.pos++; P->lexer.col++;
+            if (P->lexer.src[P->lexer.pos] == '\n') { P->lexer.line++; P->lexer.col = 1; }
+            lexer_next(&P->lexer);
+        }
+        if (P->lexer.cur.kind == TOK_EOF) break;
+        consume(P);
+    }
+}
 /* 向前声明：parse_compound_block 内部调用的后续定义的函数 */
 static int  parse_const_int(const char *s);
 static void skip_to_semi_or_rpar(Parser *P);
@@ -814,6 +844,7 @@ static void parse_class_body(Parser *P) {
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
         if (debug_iter++ % 1000 == 0) fprintf(stderr, "[CB] iter=%d d=%d pos=%d cur=%s\n", debug_iter, d, P->lexer.pos, t.text);
+        else fprintf(stderr, "[CB] iter=%d d=%d pos=%d cur=%s kind=%d\n", debug_iter, d, P->lexer.pos, t.text, t.kind);
         if (debug_iter > 5000000) { fprintf(stderr, "[CB] HANG guard, d=%d pos=%d cur=%s kind=%d\n", d, P->lexer.pos, t.text, t.kind); exit(1); }
         while (t.kind == TOK_ERR && P->lexer.pos < P->lexer.len) {
             P->lexer.pos++; P->lexer.col++;
@@ -826,23 +857,71 @@ static void parse_class_body(Parser *P) {
         if (t.kind == TOK_LBRACE) { d++; consume(P); continue; }
         if (t.kind == TOK_RBRACE) { d--; consume(P); continue; }
 
-        /* 跳过修饰符：private / public / protected / static / virtual / override / abstract / readonly / external */
+        /* 修饰符 / 方法关键字入口：public/private/protected/static/virtual/override/abstract/readonly/external/function/def/函数/constructor
+           先吃掉所有连续修饰符/方法关键字，再根据结尾判断是方法定义还是字段声明。 */
         if (kw(&t, "private") || kw(&t, "public") || kw(&t, "protected") ||
             kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override") ||
-            kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "external")) {
-            /* 跳过连续修饰符，定位到下一个非修饰符 token */
+            kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "external") ||
+            kw(&t, "function") || kw(&t, "def") || kw(&t, "函数") || kw(&t, "constructor")) {
+            fprintf(stderr, "[CB] modifier/method entry pos=%d cur=%s\n", P->lexer.pos, t.text);
+            /* 判断结尾关键字（方法声明的标志） */
+            int method_kw = kw(&t, "def") || kw(&t, "函数") || kw(&t, "constructor") || kw(&t, "function");
             while (kw(&t, "private") || kw(&t, "public") || kw(&t, "protected") ||
                    kw(&t, "static") || kw(&t, "virtual") || kw(&t, "override") ||
                    kw(&t, "abstract") || kw(&t, "readonly") || kw(&t, "external")) {
                 consume(P);
                 t = P->lexer.cur;
+                method_kw = kw(&t, "def") || kw(&t, "函数") || kw(&t, "constructor") || kw(&t, "function");
             }
+            /* 若结尾是 def/函数/constructor/function，作为方法定义处理 */
+            if (method_kw) {
+                consume(P); /* constructor/def/函数 → cur 推进到函数名或 '(' */
+                if (P->lexer.cur.kind == TOK_IDENT) {
+                    write_high_opcode(OP_FUNC_DEF);
+                    write_string_ref(P->lexer.cur.text);
+                    consume(P);
+                } else {
+                    write_high_opcode(OP_FUNC_DEF);
+                    write_string_ref("_method");
+                }
+                /* 跳过参数列表 ( ...) */
+                if (P->lexer.cur.kind == TOK_LPAR) {
+                    int pd = 1; consume(P);
+                    while (pd > 0 && P->lexer.cur.kind != TOK_EOF) {
+                        if (P->lexer.cur.kind == TOK_LPAR) pd++;
+                        else if (P->lexer.cur.kind == TOK_RPAR) pd--;
+                        consume(P);
+                    }
+                }
+                if (P->lexer.cur.kind == TOK_COLON) consume(P);
+                if (P->lexer.cur.kind == TOK_IDENT) consume(P);
+                if (P->lexer.cur.kind == TOK_EQ) {
+                    skip_to_semi_or_rbrace(P);
+                    write_high_opcode(OP_FUNC_END);
+                    continue;
+                }
+                if (P->lexer.cur.kind == TOK_LBRACE) {
+                    flush_highbuf();
+                    write_high_opcode(BC_FUNC_BODY);
+                    parse_func_body(P);
+                    write_high_opcode(BC_FUNC_END);
+                    flush_highbuf();
+                    write_high_opcode(OP_FUNC_END);
+                } else {
+                    skip_to_semi_or_rbrace(P);
+                    write_high_opcode(OP_FUNC_END);
+                }
+                continue;
+            }
+            /* 结尾不是方法关键字 → 是字段声明，交给下面的 TOK_IDENT 分支 */
+            fprintf(stderr, "[CB] modifier-only -> field at pos=%d cur=%s\n", P->lexer.pos, P->lexer.cur.text);
+            continue;
         }
         /* public/protected/private/static/abstract/readonly/function/external 后紧跟标识符，
            很可能是方法声明 public foo() { ... }，当作方法体处理 */
-        if (kw(&t, "public") || kw(&t, "protected") || kw(&t, "private") ||
-            kw(&t, "static") || kw(&t, "abstract") || kw(&t, "readonly") ||
-            kw(&t, "function") || kw(&t, "external")) {
+        if (kw(&P->lexer.cur, "public") || kw(&P->lexer.cur, "protected") || kw(&P->lexer.cur, "private") ||
+            kw(&P->lexer.cur, "static") || kw(&P->lexer.cur, "abstract") || kw(&P->lexer.cur, "readonly") ||
+            kw(&P->lexer.cur, "function") || kw(&P->lexer.cur, "external")) {
             fprintf(stderr, "[DEBUG1] public branch, cur=%s pos=%d\n", P->lexer.cur.text, P->lexer.pos);
             consume(P);
             /* 跳过连续修饰符 */
@@ -1048,9 +1127,10 @@ static void parse_class_body(Parser *P) {
         if (t.kind == TOK_HASH || (t.kind == TOK_SLASH && L_is_double_slash(P))) {
             skip_to_semi_or_rbrace(P); continue;
         }
-        /* 普通标识符：可能是赋值、函数调用、或裸语句 */
+        /* 普通标识符：可能是赋值、函数调用、字段声明或裸语句 */
         if (t.kind == TOK_IDENT) {
             const char *nm = P->lexer.cur.text;
+            fprintf(stderr, "[CB] TOK_IDENT name=%s pos=%d next=%s\n", nm, P->lexer.pos, P->lexer.cur.text);
             consume(P);
             if (P->lexer.cur.kind == TOK_LPAR) { /* 函数调用 */
                 int pd = 1; consume(P);
@@ -1075,7 +1155,26 @@ static void parse_class_body(Parser *P) {
                 }
                 skip_to_semi_or_rbrace(P); continue;
             }
-            skip_to_semi_or_rbrace(P); continue;
+            /* 字段声明：name[: Type][= value]; */
+            fprintf(stderr, "[CB] field_decl %s next_pos=%d next=%s kind=%d\n", nm, P->lexer.pos, P->lexer.cur.text, P->lexer.cur.kind);
+            write_high_opcode(OP_VAR_DECL); write_string_ref(nm);
+            if (P->lexer.cur.kind == TOK_COLON) {
+                consume(P);
+                if (P->lexer.cur.kind == TOK_IDENT) consume(P);
+            }
+            if (P->lexer.cur.kind == TOK_EQ) {
+                consume(P);
+                if (P->lexer.cur.kind == TOK_NUMBER) {
+                    write_high_opcode(OP_PUSH_CONST_INT);
+                    write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_IDENT) {
+                    write_high_opcode(OP_PUSH_CONST_STR);
+                    write_string_ref(P->lexer.cur.text); consume(P);
+                }
+            }
+            /* 类体字段通常没有分号，用换行感知版跳过 */
+            skip_to_semi_newline_or_rbrace(P); continue;
         }
         /* 其他 token：分号、逗号、括号直接推进 */
         if (t.kind == TOK_SEMI || t.kind == TOK_COMMA ||
