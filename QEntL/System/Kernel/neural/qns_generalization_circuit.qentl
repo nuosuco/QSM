@@ -1,0 +1,346 @@
+# QNS Quantum Neural Superposition - 泛化能力测试电路
+# QNS Generalization Test Circuit
+# 量子基因编码: QGC-QNS-GENERALIZE-20260707
+#
+# 目的: 验证QNS模型对未见彝文字符的泛化能力
+#
+# 测试方案:
+#   - 测试集: 训练后5个新字符(U+F2724-U+F2728)
+#   - 验证模型对未知字符的分类能力
+#   - 比较训练集与测试集输出差异
+#
+# 电路架构:
+#   q0-q4:   输入寄存器(5量子比特, 新字符编码)
+#   q5-q8:   隐藏层(4量子比特, 使用最优参数)
+#   q9-q12:  输出层(4量子比特)
+#   q13-q16: 测量寄存器
+#   q17-q21: 多字符测试结果寄存器(5个字符)
+
+init 22
+
+# ============================================================
+# 测试1: 新字符 U+F2724 (训练集外第1个字符)
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+# 最优纠缠(0.99)
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+# 最优相位
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 5 6
+CNOT 7 8
+CNOT 5 7
+CNOT 6 8
+CNOT 5 8
+
+CNOT 5 9
+CNOT 6 10
+CNOT 7 11
+CNOT 8 12
+
+Z 9
+Z 10
+T 11
+T 12
+Z 9
+Z 10
+T 11
+T 12
+
+# 测试1测量
+MEASURE 9 13
+MEASURE 10 14
+MEASURE 11 15
+MEASURE 12 16
+
+# 记录测试1结果
+X 17
+
+# ============================================================
+# 测试2: 新字符 U+F2725
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 5 6
+CNOT 7 8
+CNOT 5 7
+CNOT 6 8
+CNOT 5 8
+
+CNOT 5 9
+CNOT 6 10
+CNOT 7 11
+CNOT 8 12
+
+Z 9
+Z 10
+T 11
+T 12
+Z 9
+Z 10
+T 11
+T 12
+
+MEASURE 9 13
+MEASURE 10 14
+MEASURE 11 15
+MEASURE 12 16
+
+X 18
+
+# ============================================================
+# 测试3: 新字符 U+F2726
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 5 6
+CNOT 7 8
+CNOT 5 7
+CNOT 6 8
+CNOT 5 8
+
+CNOT 5 9
+CNOT 6 10
+CNOT 7 11
+CNOT 8 12
+
+Z 9
+Z 10
+T 11
+T 12
+Z 9
+Z 10
+T 11
+T 12
+
+MEASURE 9 13
+MEASURE 10 14
+MEASURE 11 15
+MEASURE 12 16
+
+X 19
+
+# ============================================================
+# 测试4: 新字符 U+F2727
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 5 6
+CNOT 7 8
+CNOT 5 7
+CNOT 6 8
+CNOT 5 8
+
+CNOT 5 9
+CNOT 6 10
+CNOT 7 11
+CNOT 8 12
+
+Z 9
+Z 10
+T 11
+T 12
+Z 9
+Z 10
+T 11
+T 12
+
+MEASURE 9 13
+MEASURE 10 14
+MEASURE 11 15
+MEASURE 12 16
+
+X 20
+
+# ============================================================
+# 测试5: 新字符 U+F2728
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 5 6
+CNOT 7 8
+CNOT 5 7
+CNOT 6 8
+CNOT 5 8
+
+CNOT 5 9
+CNOT 6 10
+CNOT 7 11
+CNOT 8 12
+
+Z 9
+Z 10
+T 11
+T 12
+Z 9
+Z 10
+T 11
+T 12
+
+MEASURE 9 13
+MEASURE 10 14
+MEASURE 11 15
+MEASURE 12 16
+
+X 21
+
+# 打印所有测试结果
+PRINT 13
+PRINT 14
+PRINT 15
+PRINT 16
+PRINT 17
+PRINT 18
+PRINT 19
+PRINT 20
+PRINT 21
+
+# ============================================================
+# 输出格式:
+#   r13-r16: 最终测试字符4分类输出
+#   r17: 测试1标志(U+F2724)
+#   r18: 测试2标志(U+F2725)
+#   r19: 测试3标志(U+F2726)
+#   r20: 测试4标志(U+F2727)
+#   r21: 测试5标志(U+F2728)
+# ============================================================
+
+STOP

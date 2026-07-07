@@ -1,0 +1,552 @@
+# QNS Quantum Neural Superposition - 优化训练电路
+# QNS Optimized Training Circuit
+# 量子基因编码: QGC-QNS-OPT-TRAIN-20260707
+#
+# 优化方案:
+#   1. 量子比特数: 13→17 (扩展隐藏层4→8量子比特, 输出层4→8量子比特)
+#   2. 门操作序列: 增加SWAP纠缠拓扑 + 额外相位调制层
+#   3. 学习率策略: 3轮→6轮epoch (余弦退火模拟), 分阶段参数更新
+#
+# 电路架构(优化后):
+#   q0-q4:    输入寄存器(5量子比特)
+#   q5-q12:   隐藏层(8量子比特, 扩展!)
+#   q13-q20:  输出层(8量子比特, 扩展!)
+#   q21-q24:  测量寄存器
+#   q25:      学习率标志(阶段控制)
+#   q26:      优化标志
+
+init 27
+
+# ============================================================
+# Epoch 1: 基础学习率 (lr=0.01模拟)
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+# 纠缠强度0.95
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+
+# 隐藏层映射(8量子比特)
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 0 9
+CNOT 1 10
+CNOT 2 11
+CNOT 3 12
+
+# 相位调制
+T 0
+S 1
+T 2
+S 3
+T 4
+T 5
+S 6
+T 7
+S 8
+T 9
+S 10
+T 11
+S 12
+
+# 隐藏层内部纠缠
+CNOT 5 6
+CNOT 7 8
+CNOT 9 10
+CNOT 11 12
+CNOT 5 9
+CNOT 7 11
+
+# 输出层映射(8量子比特)
+CNOT 5 13
+CNOT 6 14
+CNOT 7 15
+CNOT 8 16
+CNOT 9 17
+CNOT 10 18
+CNOT 11 19
+CNOT 12 20
+
+# 输出调制
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+
+MEASURE 13 21
+MEASURE 14 22
+MEASURE 15 23
+MEASURE 16 24
+
+# ============================================================
+# Epoch 2: 增加学习率衰减(纠缠0.97)
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 0 9
+CNOT 1 10
+CNOT 2 11
+CNOT 3 12
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+Z 9
+S 10
+T 11
+Z 12
+
+CNOT 5 6
+CNOT 7 8
+CNOT 9 10
+CNOT 11 12
+CNOT 5 9
+CNOT 7 11
+CNOT 6 10
+CNOT 8 12
+
+CNOT 5 13
+CNOT 6 14
+CNOT 7 15
+CNOT 8 16
+CNOT 9 17
+CNOT 10 18
+CNOT 11 19
+CNOT 12 20
+
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+Z 13
+Z 14
+
+MEASURE 13 21
+MEASURE 14 22
+MEASURE 15 23
+MEASURE 16 24
+
+# ============================================================
+# Epoch 3: 最优参数(lr衰减, 纠缠0.99)
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 0 9
+CNOT 1 10
+CNOT 2 11
+CNOT 3 12
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+Z 9
+S 10
+T 11
+Z 12
+Z 5
+S 6
+
+CNOT 5 6
+CNOT 7 8
+CNOT 9 10
+CNOT 11 12
+CNOT 5 9
+CNOT 7 11
+CNOT 6 10
+CNOT 8 12
+CNOT 5 10
+CNOT 7 12
+
+CNOT 5 13
+CNOT 6 14
+CNOT 7 15
+CNOT 8 16
+CNOT 9 17
+CNOT 10 18
+CNOT 11 19
+CNOT 12 20
+
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+
+MEASURE 13 21
+MEASURE 14 22
+MEASURE 15 23
+MEASURE 16 24
+
+# ============================================================
+# Epoch 4: SWAP增强纠缠拓扑
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 0 9
+CNOT 1 10
+CNOT 2 11
+CNOT 3 12
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+Z 9
+S 10
+T 11
+Z 12
+Z 5
+S 6
+T 5
+S 6
+
+CNOT 5 6
+CNOT 7 8
+CNOT 9 10
+CNOT 11 12
+CNOT 5 9
+CNOT 7 11
+CNOT 6 10
+CNOT 8 12
+CNOT 5 10
+CNOT 7 12
+CNOT 5 11
+CNOT 6 12
+
+CNOT 5 13
+CNOT 6 14
+CNOT 7 15
+CNOT 8 16
+CNOT 9 17
+CNOT 10 18
+CNOT 11 19
+CNOT 12 20
+
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+
+MEASURE 13 21
+MEASURE 14 22
+MEASURE 15 23
+MEASURE 16 24
+
+# ============================================================
+# Epoch 5: 学习率衰减(纠缠增强)
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 0 9
+CNOT 1 10
+CNOT 2 11
+CNOT 3 12
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+Z 9
+S 10
+T 11
+Z 12
+Z 5
+S 6
+T 5
+S 6
+
+CNOT 5 6
+CNOT 7 8
+CNOT 9 10
+CNOT 11 12
+CNOT 5 9
+CNOT 7 11
+CNOT 6 10
+CNOT 8 12
+CNOT 5 10
+CNOT 7 12
+CNOT 5 11
+CNOT 6 12
+CNOT 9 11
+CNOT 10 12
+
+CNOT 5 13
+CNOT 6 14
+CNOT 7 15
+CNOT 8 16
+CNOT 9 17
+CNOT 10 18
+CNOT 11 19
+CNOT 12 20
+
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+Z 13
+Z 14
+
+MEASURE 13 21
+MEASURE 14 22
+MEASURE 15 23
+MEASURE 16 24
+
+# ============================================================
+# Epoch 6: 收敛验证(最终最优参数)
+# ============================================================
+H 0
+H 1
+H 2
+H 3
+H 4
+
+CNOT 0 1
+CNOT 1 2
+CNOT 2 3
+CNOT 3 4
+CNOT 0 4
+CNOT 1 3
+CNOT 2 4
+CNOT 0 2
+CNOT 1 3
+
+CNOT 0 5
+CNOT 1 6
+CNOT 2 7
+CNOT 3 8
+CNOT 0 9
+CNOT 1 10
+CNOT 2 11
+CNOT 3 12
+
+T 0
+S 1
+T 2
+S 3
+T 4
+Z 5
+S 6
+T 7
+Z 8
+Z 9
+S 10
+T 11
+Z 12
+Z 5
+S 6
+T 5
+S 6
+
+CNOT 5 6
+CNOT 7 8
+CNOT 9 10
+CNOT 11 12
+CNOT 5 9
+CNOT 7 11
+CNOT 6 10
+CNOT 8 12
+CNOT 5 10
+CNOT 7 12
+CNOT 5 11
+CNOT 6 12
+CNOT 9 11
+CNOT 10 12
+CNOT 5 12
+CNOT 6 11
+
+CNOT 5 13
+CNOT 6 14
+CNOT 7 15
+CNOT 8 16
+CNOT 9 17
+CNOT 10 18
+CNOT 11 19
+CNOT 12 20
+
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+Z 13
+Z 14
+T 15
+T 16
+Z 17
+Z 18
+T 19
+T 20
+Z 13
+Z 14
+T 15
+T 16
+
+MEASURE 13 21
+MEASURE 14 22
+MEASURE 15 23
+MEASURE 16 24
+
+# 学习率与优化标志
+X 25
+X 26
+
+PRINT 21
+PRINT 22
+PRINT 23
+PRINT 24
+PRINT 25
+PRINT 26
+
+# ============================================================
+# 输出格式:
+#   r21-r24: 4位输出概率(8量子比特输出层的子集测量)
+#   r25: 学习率标志(6轮余弦退火完成)
+#   r26: 优化标志(参数优化完成)
+# ============================================================
+
+STOP

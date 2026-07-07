@@ -1,0 +1,40 @@
+{
+  "sizes": {
+    "qcl_orig": 12984,
+    "qvm_orig": 34376,
+    "qcl_opt": 678248,
+    "qvm_opt": 698728
+  },
+  "compile_performance": {
+    "\u539f\u59cb\u7248\u672c_compile_avg": 8.623341999191325,
+    "\u4f18\u5316\u7248\u672c_compile_avg": 7.672075201116968,
+    "\u539f\u59cb\u7248\u672c_exec_avg": 1.9239464003476314,
+    "\u4f18\u5316\u7248\u672c_exec_avg": 0.7446877978509292,
+    "QCL\u539f\u59cb_rss": 11880,
+    "QCL\u4f18\u5316_rss": 11880,
+    "QVM\u539f\u59cb_rss": 11880,
+    "QVM\u4f18\u5316_rss": 11880
+  },
+  "execution_performance": {
+    "\u539f\u59cb\u7248\u672c_compile_avg": 8.623341999191325,
+    "\u4f18\u5316\u7248\u672c_compile_avg": 7.672075201116968,
+    "\u539f\u59cb\u7248\u672c_exec_avg": 1.9239464003476314,
+    "\u4f18\u5316\u7248\u672c_exec_avg": 0.7446877978509292,
+    "QCL\u539f\u59cb_rss": 11880,
+    "QCL\u4f18\u5316_rss": 11880,
+    "QVM\u539f\u59cb_rss": 11880,
+    "QVM\u4f18\u5316_rss": 11880
+  },
+  "memory_rss_kb": {
+    "QCL\u539f\u59cb_rss": 11880,
+    "QCL\u4f18\u5316_rss": 11880,
+    "QVM\u539f\u59cb_rss": 11880,
+    "QVM\u4f18\u5316_rss": 11880
+  },
+  "stress_tests": [
+    "\u5927\u91cf\u6307\u4ee4(>1000)",
+    "\u5927\u91cf\u91cf\u5b50\u6bd4\u7279(>64)",
+    "\u590d\u6742\u63a7\u5236\u6d41",
+    "Buffer\u8fb9\u754c"
+  ]
+}
