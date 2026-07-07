@@ -1,1 +1,450 @@
-
+// ============================================================================
+// qcl_parser_high.qentl
+// QCL 高级语法分析器模块
+// 处理高级语法：函数定义、类定义、模块初始化、配置、数组/对象字面量
+// 依赖: qcl_lexer.qentl, qcl_parser.qentl
+// ============================================================================
+
+import "QCL模块/qcl_lexer.qentl" 作为 词法分析
+import "QCL模块/qcl_parser.qentl" 作为 基础解析
+
+// ==================== 高级AST节点类型 ====================
+
+const AST_FUNC_DEF = 20;
+const AST_CLASS_DEF = 21;
+const AST_MODULE_INIT = 22;
+const AST_SET_CONFIG = 23;
+const AST_ARRAY_LITERAL = 24;
+const AST_OBJECT_LITERAL = 25;
+const AST_STRING_CONCAT = 26;
+const AST_LENGTH_CALL = 27;
+const AST_RANDOM_CALL = 28;
+const AST_NEW_OBJ = 29;
+const AST_DEF_PARAM = 30;
+const AST_RETURN_VAL = 31;
+const AST_LOAD_MEMBER = 32;
+const AST_STORE_MEMBER = 33;
+const AST_LOAD_LOCAL = 34;
+const AST_STORE_LOCAL = 35;
+const AST_RETURN_OBJ = 36;
+const AST_RETURN_EMPTY = 37;
+const AST_IF_STMT = 38;
+const AST_WHILE_STMT = 39;
+const AST_FUNC_CALL_STMT = 40;
+const AST_BARRIER_STMT = 41;
+
+// ==================== 高级解析器配置 ====================
+
+const MAX_FUNC_PARAMS = 64;
+const MAX_CLASS_MEMBERS = 256;
+const SUPPORT_RETURN_VAL = true;
+const SUPPORT_OBJECTS = true;
+
+// ==================== 高级解析器核心函数 ====================
+
+// 初始化高级解析器状态
+def 初始化高级解析器(tokens):
+    var index = 0
+    var 错误列表 = []
+    var 函数表 = {}
+    var 类表 = {}
+    var 变量作用域 = []
+    var 当前函数 = null
+    返回 {tokens, index, 错误列表, 函数表, 类表, 变量作用域, 当前函数}
+
+// 获取当前token
+def 当前token(状态):
+    var index = 状态.index
+    var tokens = 状态.tokens
+    IF index >= LENGTH(tokens):
+        返回 {类型=TK_EOF, 值=""}
+    返回 tokens[index]
+
+// 消费当前token
+def 消费(状态, 期望类型):
+    var tok = 当前token(状态)
+    IF 期望类型 != 0 且 tok.类型 != 期望类型:
+        状态.错误列表.push("高级解析: 期望 " + 期望类型 + " 但得到 " + tok.类型)
+    状态.index = 状态.index + 1
+    返回 tok
+
+// 匹配关键字
+def 匹配关键字(状态, 类型):
+    IF 当前token(状态).类型 == 类型:
+        状态.index = 状态.index + 1
+        返回 true
+    返回 false
+
+// 解析函数参数列表
+def 解析参数列表(状态):
+    消费(状态, TK_LPAREN)
+    var 参数 = []
+    WHILE 当前token(状态).类型 != TK_RPAREN:
+        IF 当前token(状态).类型 == TK_EOF:
+            BREAK
+        var 参数名 = 消费(状态, TK_IDENT).值
+        var 默认值 = null
+        IF 匹配关键字(状态, TK_EQ):
+            默认值 = 解析表达式(状态, 0)
+        参数.push({名字=参数名, 默认值=默认值})
+        IF 当前token(状态).类型 == TK_COMMA:
+            消费(状态, TK_COMMA)
+    消费(状态, TK_RPAREN)
+    返回 参数
+
+// 解析函数定义
+def 解析函数定义(状态, 函数名):
+    // 参数列表
+    var 参数 = 解析参数列表(状态)
+    // 函数体
+    var 函数体 = 解析代码块(状态)
+    // 保存函数信息
+    var 函数 = {
+        类型=AST_FUNC_DEF,
+        名字=函数名,
+        参数=参数,
+        体=函数体
+    }
+    IF 函数名 且 LENGTH(函数名) > 0:
+        状态.函数表[函数名] = 函数
+    返回 函数
+
+// 解析类定义
+def 解析类定义(状态, 类名):
+    var 成员 = []
+    消费(状态, TK_LBRACE)
+    WHILE 当前token(状态).类型 != TK_RBRACE:
+        IF 当前token(状态).类型 == TK_DEF:
+            var 方法名 = 消费(状态, TK_IDENT).值
+            var 方法 = 解析函数定义(状态, 方法名)
+            成员.push({类型="方法", 名字=方法名, 值=方法})
+        ELSE IF 当前token(状态).类型 == TK_VAR:
+            消费(状态, TK_VAR)
+            var 成员名 = 消费(状态, TK_IDENT).值
+            成员.push({类型="成员变量", 名字=成员名})
+        ELSE:
+            状态.错误列表.push("类中不支持的语句")
+            消费(状态, 0)
+    消费(状态, TK_RBRACE)
+    状态.类表[类名] = {名字=类名, 成员=成员}
+    返回 {类型=AST_CLASS_DEF, 名字=类名, 成员=成员}
+
+// 解析def语句入口
+def 解析def语句(状态):
+    消费(状态, TK_DEF)
+    var tok = 当前token(状态)
+    // 检查是否为函数定义: def 名字(
+    IF tok.类型 == TK_IDENT 且 预览(状态).类型 == TK_LPAREN:
+        var 函数名 = 消费(状态, TK_IDENT).值
+        返回 解析函数定义(状态, 函数名)
+    // 检查是否为类定义: def 名字 {
+    IF tok.类型 == TK_IDENT 且 预览(状态).类型 == TK_LBRACE:
+        var 类名 = 消费(状态, TK_IDENT).值
+        返回 解析类定义(状态, 类名)
+    // 无名字（匿名函数）
+    IF tok.类型 == TK_LPAREN:
+        返回 解析函数定义(状态, null)
+    // 其他情况使用基础解析
+    状态.错误列表.push("高级def语句: 不支持的语法")
+    消费(状态, 0)
+    返回 null
+
+// 解析模块初始化
+def 解析模块初始化(状态):
+    消费(状态, TK_INIT_MODULE)
+    var 模块名 = null
+    IF 当前token(状态).类型 == TK_STRING:
+        模块名 = 消费(状态, TK_STRING).值
+    var 配置 = 解析表达式(状态, 0)
+    返回 {类型=AST_MODULE_INIT, 模块名=模块名, 配置=配置}
+
+// 解析配置设置
+def 解析配置设置(状态):
+    消费(状态, TK_SET_CONFIG)
+    var 键 = 消费(状态, TK_STRING).值
+    var 值 = 解析表达式(状态, 0)
+    返回 {类型=AST_SET_CONFIG, 键=键, 值=值}
+
+// 解析数组字面量
+def 解析数组字面量(状态):
+    消费(状态, TK_LBRACKET)
+    var 元素 = []
+    WHILE 当前token(状态).类型 != TK_RBRACKET:
+        元素.push(解析表达式(状态, 0))
+        IF 当前token(状态).类型 == TK_COMMA:
+            消费(状态, TK_COMMA)
+    消费(状态, TK_RBRACKET)
+    返回 {类型=AST_ARRAY_LITERAL, 元素=元素}
+
+// 解析对象字面量
+def 解析对象字面量(状态):
+    消费(状态, TK_LBRACE)
+    var 属性 = []
+    WHILE 当前token(状态).类型 != TK_RBRACE:
+        IF 当前token(状态).类型 == TK_EOF:
+            BREAK
+        var 键 = 消费(状态, TK_IDENT).值
+        消费(状态, TK_COLON)
+        var 值 = 解析表达式(状态, 0)
+        属性.push({键=键, 值=值})
+        IF 当前token(状态).类型 == TK_COMMA:
+            消费(状态, TK_COMMA)
+    消费(状态, TK_RBRACE)
+    返回 {类型=AST_OBJECT_LITERAL, 属性=属性}
+
+// 解析成员访问
+def 解析成员访问(状态, 对象):
+    IF 当前token(状态).类型 == TK_DOT:
+        消费(状态, TK_DOT)
+        var 成员名 = 消费(状态, TK_IDENT).值
+        返回 {类型=AST_LOAD_MEMBER, 对象=对象, 成员=成员名}
+    IF 当前token(状态).类型 == TK_LBRACKET:
+        消费(状态, TK_LBRACKET)
+        var 索引 = 解析表达式(状态, 0)
+        消费(状态, TK_RBRACKET)
+        返回 {类型=AST_LOAD_MEMBER, 对象=对象, 索引=索引}
+    返回 对象
+
+// 解析长度调用
+def 解析长度调用(状态):
+    消费(状态, TK_LENGTH)
+    消费(状态, TK_LPAREN)
+    var 目标 = 解析表达式(状态, 0)
+    消费(状态, TK_RPAREN)
+    返回 {类型=AST_LENGTH_CALL, 目标=目标}
+
+// 解析随机数调用
+def 解析随机数调用(状态):
+    消费(状态, TK_RANDOM)
+    var 参数 = null
+    IF 匹配关键字(状态, TK_LPAREN):
+        参数 = 解析表达式(状态, 0)
+        消费(状态, TK_RPAREN)
+    返回 {类型=AST_RANDOM_CALL, 参数=参数}
+
+// 解析字符串拼接
+def 解析字符串拼接(状态, 左值):
+    var 右值 = 解析表达式(状态, 2)
+    返回 {类型=AST_STRING_CONCAT, 左=左值, 右=右值}
+
+// 解析表达式（高级版）
+def 解析表达式(状态, 最小优先级):
+    var tok = 当前token(状态)
+    // 特殊函数调用
+    IF tok.类型 == TK_LENGTH:
+        返回 解析长度调用(状态)
+    IF tok.类型 == TK_RANDOM:
+        返回 解析随机数调用(状态)
+    // 数组/对象字面量
+    IF tok.类型 == TK_LBRACKET:
+        返回 解析数组字面量(状态)
+    IF tok.类型 == TK_LBRACE:
+        返回 解析对象字面量(状态)
+    // 新对象创建
+    IF tok.类型 == TK_NEW:
+        消费(状态, TK_NEW)
+        var 类名 = 消费(状态, TK_IDENT).值
+        var 参数 = []
+        IF 匹配关键字(状态, TK_LPAREN):
+            WHILE 当前token(状态).类型 != TK_RPAREN:
+                参数.push(解析表达式(状态, 0))
+            消费(状态, TK_RPAREN)
+        返回 {类型=AST_NEW_OBJ, 类名=类名, 参数=参数}
+    // 使用基础解析获取主值
+    var 主值 = 基础解析.解析主值(状态)
+    // 检查成员访问
+    主值 = 解析成员访问(状态, 主值)
+    // 字符串拼接
+    IF 当前token(状态).类型 == TK_STRING_CONCAT:
+        返回 解析字符串拼接(状态, 主值)
+    // 二元运算符
+    WHILE true:
+        var opTok = 当前token(状态)
+        var 优先级 = 运算符优先级(opTok.类型)
+        IF 优先级 < 最小优先级:
+            返回 主值
+        消费(状态, opTok.类型)
+        var 右值 = 解析表达式(状态, 优先级 + 1)
+        主值 = {类型=AST_BINARY, 操作符=opTok.值, 左=主值, 右=右值}
+    返回 主值
+
+// 预览下一个token
+def 预览(状态):
+    var index = 状态.index + 1
+    var tokens = 状态.tokens
+    IF index >= LENGTH(tokens):
+        返回 {类型=TK_EOF, 值=""}
+    返回 tokens[index]
+
+// 解析返回值语句
+def 解析返回值(状态, 类型):
+    消费(状态, 类型)
+    var 值 = null
+    IF 当前token(状态).类型 != TK_SEMI:
+        值 = 解析表达式(状态, 0)
+    IF 类型 == TK_RETURN_OBJ:
+        返回 {类型=AST_RETURN_OBJ, 值=值}
+    IF 类型 == TK_RETURN_EMPTY:
+        返回 {类型=AST_RETURN_EMPTY, 值=值}
+    返回 {类型=AST_RETURN_VAL, 值=值}
+
+// 解析屏障语句
+def 解析屏障(状态):
+    消费(状态, TK_BARRIER)
+    返回 {类型=AST_BARRIER_STMT}
+
+// 解析局部变量加载/存储
+def 解析局部变量(状态, 加载):
+    var 操作 = 加载 ? AST_LOAD_LOCAL : AST_STORE_LOCAL
+    var 名字 = 消费(状态, TK_IDENT).值
+    状态.变量作用域.push(名字)
+    IF 加载:
+        返回 {类型=AST_LOAD_LOCAL, 名字=名字}
+    var 值 = 解析表达式(状态, 0)
+    返回 {类型=AST_STORE_LOCAL, 名字=名字, 值=值}
+
+// 解析函数调用语句
+def 解析函数调用语句(状态, 函数名):
+    消费(状态, TK_FUNC_CALL)
+    var 参数 = []
+    WHILE 当前token(状态).类型 != TK_RPAREN:
+        参数.push(解析表达式(状态, 0))
+    消费(状态, TK_RPAREN)
+    返回 {类型=AST_FUNC_CALL_STMT, 函数=函数名, 参数=参数}
+
+// 解析代码块
+def 解析代码块(状态):
+    消费(状态, TK_LBRACE)
+    var 语句列表 = []
+    WHILE 当前token(状态).类型 != TK_RBRACE:
+        IF 当前token(状态).类型 == TK_EOF:
+            BREAK
+        var stmt = 解析高级语句(状态)
+        IF stmt:
+            语句列表.push(stmt)
+    消费(状态, TK_RBRACE)
+    返回 {类型=AST_BLOCK, 语句=语句列表}
+
+// 解析高级语句
+def 解析高级语句(状态):
+    var tok = 当前token(状态)
+    IF tok.类型 == TK_SEMI:
+        消费(状态, TK_SEMI)
+        返回 null
+    // 高级def语句（函数/类定义）
+    IF tok.类型 == TK_DEF:
+        返回 解析def语句(状态)
+    // 基础语句
+    IF tok.类型 == TK_VAR:
+        返回 基础解析.解析变量声明(状态)
+    IF tok.类型 == TK_IF:
+        返回 基础解析.解析if语句(状态)
+    IF tok.类型 == TK_WHILE:
+        返回 基础解析.解析while循环(状态)
+    IF tok.类型 == TK_IMPORT:
+        返回 基础解析.解析导入(状态)
+    IF tok.类型 == TK_RETURN:
+        返回 基础解析.解析返回(状态)
+    // 高级返回变体
+    IF tok.类型 == TK_RETURN_VAL:
+        返回 解析返回值(状态, TK_RETURN_VAL)
+    IF tok.类型 == TK_RETURN_OBJ:
+        返回 解析返回值(状态, TK_RETURN_OBJ)
+    IF tok.类型 == TK_RETURN_EMPTY:
+        返回 解析返回值(状态, TK_RETURN_EMPTY)
+    // 高级控制流
+    IF tok.类型 == TK_BREAK:
+        返回 {类型=AST_QINSTR, 指令=TK_BREAK}
+    IF tok.类型 == TK_CONTINUE:
+        返回 {类型=AST_QINSTR, 指令=TK_CONTINUE}
+    // 高级指令
+    IF tok.类型 == TK_INIT_MODULE:
+        返回 解析模块初始化(状态)
+    IF tok.类型 == TK_SET_CONFIG:
+        返回 解析配置设置(状态)
+    IF tok.类型 == TK_BARRIER:
+        返回 解析屏障(状态)
+    IF tok.类型 == TK_FUNC_CALL:
+        返回 解析函数调用语句(状态, tok.值)
+    // 表达式语句
+    var expr = 解析表达式(状态, 0)
+    IF 当前token(状态).类型 == TK_SEMI:
+        消费(状态, TK_SEMI)
+    返回 expr
+
+// 解析完整高级程序
+def 解析高级程序(状态):
+    var 语句列表 = []
+    WHILE 当前token(状态).类型 != TK_EOF:
+        IF 当前token(状态).类型 == TK_SEMI:
+            消费(状态, TK_SEMI)
+            继续
+        var stmt = 解析高级语句(状态)
+        IF stmt:
+            语句列表.push(stmt)
+    返回 {
+        类型=AST_PROGRAM,
+        语句=语句列表,
+        函数表=状态.函数表,
+        类表=状态.类表,
+        错误=状态.错误列表
+    }
+
+// 运算符优先级（与基础解析器一致）
+def 运算符优先级(类型):
+    IF 类型 == TK_PLUS:    返回 1
+    IF 类型 == TK_MINUS:   返回 1
+    IF 类型 == TK_STAR:    返回 2
+    IF 类型 == TK_SLASH:   返回 2
+    IF 类型 == TK_EQ_EQ:   返回 0
+    IF 类型 == TK_NEQ:     返回 0
+    IF 类型 == TK_LT:      返回 0
+    IF 类型 == TK_GT:      返回 0
+    IF 类型 == TK_LE:      返回 0
+    IF 类型 == TK_GE:      返回 0
+    IF 类型 == TK_AND:     返回 -1
+    IF 类型 == TK_OR:      返回 -2
+    IF 类型 == TK_STRING_CONCAT: 返回 3
+    返回 0
+
+// 对外接口：解析高级语法
+def 解析高级(tokens):
+    var 状态 = 初始化高级解析器(tokens)
+    返回 解析高级程序(状态)
+
+// 对外接口：从文件解析
+def 从文件解析高级(文件路径):
+    var tokens = 词法分析.分析(文件路径)
+    返回 解析高级(tokens)
+
+// ==================== 高级语法分析量子电路 ====================
+
+init 5
+
+// 量子叠加态：五个高级解析阶段
+H 0      // 函数解析
+H 1      // 类解析
+H 2      // 模块初始化
+H 3      // 表达式高级扩展
+H 4      // 类型检查
+
+// 各阶段纠缠
+CNOT 0 1    // 函数-类纠缠
+CNOT 1 2    // 类-模块纠缠
+CNOT 0 3    // 函数-表达式纠缠
+CNOT 3 4    // 表达式-类型检查纠缠
+
+// 测量高级解析状态
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+
+// 输出高级解析结果
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+
+STOP

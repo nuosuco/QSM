@@ -549,6 +549,8 @@ static void skip_to_semi_newline_or_rbrace(Parser *P) {
     }
 }
 /* 向前声明：parse_compound_block 内部调用的后续定义的函数 */
+static int  parse_struct(Parser *P);   /* struct Name { field: Type; ... } */
+static int  parse_type_def(Parser *P); /* 类型 Name { ... } 或 = { ... } */
 static int  parse_const_int(const char *s);
 static void skip_to_semi_or_rpar(Parser *P);
 static int  parse_quantum_instruction(Parser *P);
@@ -738,6 +740,7 @@ static int  parse_quantum_instruction(Parser *P);
 static int  parse_import(Parser *P);
 static int  parse_const(Parser *P);
 static int  parse_type_def(Parser *P);
+static int  parse_struct(Parser *P);
 static int  parse_def(Parser *P);
 static int  parse_export(Parser *P);
 static void parse_func_body(Parser *P);
@@ -887,6 +890,77 @@ static int parse_const(Parser *P) {
     P->high_level++; return 1;
 }
 
+/* ==================== struct 解析 ====================
+ * struct Name { field: Type; field: Type; }
+ * 复用 OP_TYPE_DEF 字节码，与"类型"关键字等价，便于 QVM 统一处理。 */
+static int parse_struct(Parser *P) {
+    consume(P); /* 消耗 "struct"，cur 已推进到结构体名标识符 */
+    lexer_skip_ws(&P->lexer);
+    if (P->lexer.cur.kind != TOK_IDENT) return 0;
+    const char *name = P->lexer.cur.text;
+    consume(P);
+    lexer_skip_ws(&P->lexer);
+    /* struct 语法不需要 "="，直接到 "{" */
+    if (!expect_tok(P, TOK_LBRACE)) return 0;
+
+    write_opcode(OP_TYPE_DEF);
+    write_string_ref(name);
+    int field_count = 0;
+    /* expect_tok(LBRACE) 已消费 {，lexer.cur 现在在第一个字段 */
+    while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_RBRACE) {
+        if (P->lexer.cur.kind == TOK_HASH) {
+            consume(P); continue;
+        }
+        if (P->lexer.cur.kind == TOK_IDENT) {
+            const char *fname = P->lexer.cur.text;
+            consume(P);
+            lexer_skip_ws(&P->lexer);
+            if (P->lexer.cur.kind == TOK_HASH) continue;
+            if (P->lexer.cur.kind == TOK_COLON) {
+                consume(P); /* 消费 ":"，cur 现在指向类型名 */
+                if (P->lexer.cur.kind == TOK_IDENT) {
+                    const char *ftype = P->lexer.cur.text;
+                    write_high_byte(field_count);
+                    write_string_ref(fname);
+                    write_string_ref(ftype);
+                    field_count++;
+                    consume(P);
+                }
+            } else if (P->lexer.cur.kind == TOK_EQ) {
+                /* Name = value 枚举风格字段也接受 */
+                consume(P);
+                int value = 0;
+                if (P->lexer.cur.kind == TOK_NUMBER) {
+                    value = parse_const_int(P->lexer.cur.text);
+                    consume(P);
+                } else if (P->lexer.cur.kind == TOK_IDENT) {
+                    value = parse_const_int(P->lexer.cur.text);
+                    consume(P);
+                }
+                write_opcode(OP_PUSH_CONST_INT);
+                write_u16((unsigned short)value);
+                write_opcode(OP_EXPORT_SYM);
+                write_string_ref(fname);
+                field_count++;
+            }
+            expect_tok(P, TOK_COMMA);
+            expect_tok(P, TOK_SEMI); /* struct 字段用分号分隔（可选消费） */
+        } else if (P->lexer.cur.kind == TOK_SEMI || P->lexer.cur.kind == TOK_COMMA) {
+            consume(P);
+        } else {
+            consume(P);
+        }
+    }
+    write_u16((unsigned short)field_count);
+    flush_highbuf();
+    expect_tok(P, TOK_RBRACE);
+    /* struct 声明末尾分号可选 */
+    lexer_skip_ws(&P->lexer);
+    if (P->lexer.cur.kind == TOK_SEMI) { consume(P); }
+    P->high_level++; return 1;
+}
+
+/* ==================== 类型定义解析 ==================== */
 static int parse_type_def(Parser *P) {
     consume(P); /* 类型 */
     lexer_skip_ws(&P->lexer);
@@ -980,8 +1054,10 @@ static int L_is_double_slash(Parser *P) {
 static void parse_class_body(Parser *P) {
     int d = 1;
     int debug_iter = 0;
+    fprintf(stderr, "[CB] enter d=1 pos=%d cur=%s line=%d\n", P->lexer.pos, P->lexer.cur.text, P->lexer.line);
     while (d > 0 && P->lexer.cur.kind != TOK_EOF) {
         Token t = P->lexer.cur;
+        if (t.kind == TOK_RBRACE) { fprintf(stderr, "[CB] } at pos=%d d:%d->%d line=%d\n", P->lexer.pos, d, d-1, P->lexer.line); }
         if (debug_iter++ % 1000 == 0) fprintf(stderr, "[CB] iter=%d d=%d pos=%d cur=%s\n", debug_iter, d, P->lexer.pos, t.text);
         else fprintf(stderr, "[CB] iter=%d d=%d pos=%d cur=%s kind=%d\n", debug_iter, d, P->lexer.pos, t.text, t.kind);
         if (debug_iter > 5000000) { fprintf(stderr, "[CB] HANG guard, d=%d pos=%d cur=%s kind=%d\n", d, P->lexer.pos, t.text, t.kind); exit(1); }
@@ -1225,6 +1301,7 @@ static void parse_class_body(Parser *P) {
         if (kw(&t, "import")) { if (parse_import(P)) continue; }
         if (kw(&t, "const"))  { if (parse_const(P))  continue; }
         if (kw(&t, "类型"))   { if (parse_type_def(P)) continue; }
+        if (kw(&t, "struct")) { if (parse_struct(P))   continue; }
         if (kw(&t, "export")) { if (parse_export(P)) continue; }
 
         /* 控制流：if / return / while / break / continue */
@@ -1587,6 +1664,7 @@ static int parse_top_statement(Parser *P) {
     if (kw(&t, "量子模块")) return parse_quantum_module(P);
     if (kw(&t, "const"))  return parse_const(P);
     if (kw(&t, "类型"))   return parse_type_def(P);
+    if (kw(&t, "struct")) return parse_struct(P);
     if (kw(&t, "def") || kw(&t, "函数") || kw(&t, "function")) return parse_def(P);
     if (kw(&t, "export")) return parse_export(P);
     if (parse_quantum_instruction(P)) return 1;
@@ -1793,7 +1871,11 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         if (kw(&cur, "类型")) {
             if (parse_type_def(&P)) { stats.types++; stats.high_level_lines++; continue; }
         }
+        if (kw(&cur, "struct")) {
+            if (parse_struct(&P)) { stats.types++; stats.high_level_lines++; continue; }
+        }
         if (kw(&cur, "def") || kw(&cur, "函数") || kw(&cur, "function")) {
+            fprintf(stderr, "[TDEBUG] def at line=%d pos=%d cur=%s\n", P.lexer.line, P.lexer.pos, cur.text);
             if (parse_def(&P)) { stats.functions++; stats.high_level_lines++; continue; }
         }
         /* class / quantum_class / enum / interface 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）
@@ -1805,6 +1887,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
                 consume(&P);
             }
             if (P.lexer.cur.kind == TOK_LBRACE) {
+                consume(&P); /* 消耗类的 {，parse_class_body 从 d=1 开始计数 */
                 parse_class_body(&P); /* 递归解析 class 体内的方法 */
             } else {
                 skip_to_semi(&P);
@@ -1826,6 +1909,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
                 consume(&P);
             }
             if (P.lexer.cur.kind == TOK_LBRACE) {
+                consume(&P);
                 parse_class_body(&P); /* 递归解析 class 体内的方法 */
             } else {
                 skip_to_semi(&P);
