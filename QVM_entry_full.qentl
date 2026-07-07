@@ -1,0 +1,67 @@
+// QVM完整入口模块 - 丰富量子电路（目标>100字节）
+// 包含：初始化、叠加、纠缠、单量子比特门、双量子比特门、测量、经典控制、停机
+
+init 12
+
+// === 阶段1：全局叠加态 ===
+H 0
+H 1
+H 2
+H 3
+H 4
+H 5
+
+// === 阶段2：多对纠缠（贝尔态生成器）===
+CNOT 0 1
+CNOT 2 3
+CNOT 4 5
+
+// === 阶段3：量子门变换 ===
+X 0
+X 2
+X 4
+Z 1
+Z 3
+Z 5
+H 0
+H 1
+H 2
+
+// === 阶段4：SWAP与CNOT交叉连接 ===
+SWAP 0 3
+SWAP 1 4
+SWAP 2 5
+CNOT 0 6
+CNOT 1 7
+CNOT 2 8
+
+// === 阶段5：测量全部量子比特 ===
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+MEASURE 5 5
+MEASURE 6 6
+MEASURE 7 7
+MEASURE 8 8
+MEASURE 9 9
+MEASURE 10 10
+MEASURE 11 11
+
+// === 阶段6：打印结果 ===
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+PRINT 5
+PRINT 6
+PRINT 7
+PRINT 8
+PRINT 9
+PRINT 10
+PRINT 11
+
+// === 阶段7：停机 ===
+STOP

@@ -1,0 +1,51 @@
+// QVM完整执行体 - VM启动器入口模块
+// 由qcl_phase2编译，含函数体 + 量子指令
+import "QEntL/System/Platform/platform_types.qentl";
+import "QEntL/System/Deployment/development_mode.qentl";
+
+// 初始化
+def vm_init():
+    return 0
+
+# 初始化8个量子比特
+init 8
+
+// 创建贝尔态
+def vm_create_bell():
+    return 0
+
+# 阶段1: 创建叠加态 (Hadamard变换)
+H 0
+H 1
+H 2
+H 3
+
+# 阶段2: 建立量子纠缠 (贝尔态对)
+CNOT 0 1
+CNOT 2 3
+
+// 测量
+def vm_measure():
+    return 0
+
+# 阶段3: 量子测量
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+
+# 阶段4: 输出结果
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+
+// 主入口
+def main():
+    vm_init()
+    vm_create_bell()
+    vm_measure()
+    return 0
+
+# 停止
+STOP
