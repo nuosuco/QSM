@@ -1,0 +1,376 @@
+// ============================================================================
+// vm_gate.qentl — 量子门操作库
+// 职责：所有量子门的具体实现（单量子比特门 / 双量子比特门 / 多量子比特门）
+// 依赖：vm_memory.qentl（访问量子态）
+// ============================================================================
+
+import "QEntL/System/VM/src/vm_memory.qentl" 作为 VM_MEMORY;
+
+// ==================== 数学常数 ====================
+
+const PI           = 3.141592653589793238;
+const PI_HALF      = 1.570796326794896619;   // π/2
+const PI_QUARTER   = 0.785398163397448309;   // π/4
+const SQRT_HALF    = 0.707106781186547524;   // 1/√2
+const SQRT_HALF_NEG= -0.707106781186547524;
+
+// ==================== 门分类常量 ====================
+
+const GATE_SINGLE   = 1;    // 单量子比特门
+const GATE_DUAL     = 2;    // 双量子比特门
+const GATE_MULTI    = 3;    // 多量子比特门
+const GATE_MEASURE  = 4;    // 测量类操作
+
+// ==================== 门元数据表 ====================
+
+// 单量子比特门矩阵（2×2 复数，存储为 [a,b;c,d]）
+// 矩阵 M 作用： [a  b] [α] = [a·α + b·β]
+//              [c  d] [β]   [c·α + d·β]
+
+const MATRIX_ID   = [1.0, 0.0, 0.0, 1.0];          // I 门（恒等）
+const MATRIX_X    = [0.0, 1.0, 1.0, 0.0];          // Pauli-X（比特翻转）
+const MATRIX_Y    = [0.0, -1.0, 1.0, 0.0];         // Pauli-Y
+const MATRIX_Z    = [1.0, 0.0, 0.0, -1.0];         // Pauli-Z（相位翻转）
+const MATRIX_H    = [SQRT_HALF,  SQRT_HALF,
+                     SQRT_HALF, -SQRT_HALF];        // Hadamard
+const MATRIX_S    = [1.0, 0.0, 0.0, 0.0];          // S 门（简化版，实际为相位 i）
+const MATRIX_SDG  = [1.0, 0.0, 0.0, 0.0];          // S†
+const MATRIX_T    = [1.0, 0.0, 0.0, 0.0];          // T 门（π/8 旋转）
+const MATRIX_TDG  = [1.0, 0.0, 0.0, 0.0];          // T†
+const MATRIX_NOP  = [1.0, 0.0, 0.0, 1.0];          // NOP
+
+// 门信息结构
+def 创建门信息(名称, 矩阵, 类别, 描述):
+    返回 {
+        名称 = 名称,
+        矩阵 = 矩阵,
+        类别 = 类别,
+        描述 = 描述,
+        量子比特数 = 1  // 默认单量子比特
+    }
+
+// 门注册表（供 vm_debug 查询）
+const 门注册表 = {
+    "I":   创建门信息("I",   MATRIX_ID,  GATE_SINGLE, "恒等门：不改变量子态"),
+    "X":   创建门信息("X",   MATRIX_X,   GATE_SINGLE, "Pauli-X：比特翻转 |0⟩↔|1⟩"),
+    "Y":   创建门信息("Y",   MATRIX_Y,   GATE_SINGLE, "Pauli-Y：绕 Y 轴旋转 π"),
+    "Z":   创建门信息("Z",   MATRIX_Z,   GATE_SINGLE, "Pauli-Z：相位翻转，|1⟩→−|1⟩"),
+    "H":   创建门信息("H",   MATRIX_H,   GATE_SINGLE, "Hadamard：创建叠加态"),
+    "S":   创建门信息("S",   MATRIX_S,   GATE_SINGLE, "S 门：π/2 相位旋转"),
+    "SDG": 创建门信息("SDG", MATRIX_SDG, GATE_SINGLE, "S† 门：S 门逆操作"),
+    "T":   创建门信息("T",   MATRIX_T,   GATE_SINGLE, "T 门：π/8 相位旋转"),
+    "TDG": 创建门信息("TDG", MATRIX_TDG, GATE_SINGLE, "T† 门：T 门逆操作"),
+    "CNOT":创建门信息("CNOT",[0,0,0,0],   GATE_DUAL,   "受控非门：控制位 |1⟩ 时翻转目标位"),
+    "CZ":  创建门信息("CZ",  [0,0,0,0],   GATE_DUAL,   "受控 Z 门"),
+    "SWAP":创建门信息("SWAP",[0,0,0,0],   GATE_DUAL,   "交换两个量子比特状态"),
+    "TOFFOLI":创建门信息("TOFFOLI",[0,0,0,0], GATE_MULTI, "三量子比特受控非门"),
+    "CSWAP":创建门信息("CSWAP",[0,0,0,0],  GATE_MULTI, "受控交换门 (Fredkin)")
+};
+
+// ==================== 辅助计算函数 ====================
+
+// 应用 2×2 矩阵到量子态振幅
+def 应用矩阵(α, β, m00, m01, m10, m11):
+    var 新α = m00 * α + m01 * β
+    var 新β = m10 * α + m11 * β
+    返回 {新α, 新β}
+
+// 归一化振幅（确保 |α|² + |β|² = 1）
+def 归一化(α, β):
+    var 模方 = α * α + β * β
+    IF 模方 <= 0:
+        返回 {α=1.0, β=0.0}
+    var 模 = 开方(模方)
+    返回 {α = α / 模, β = β / 模}
+
+// 安全开方
+def 开方(v):
+    IF v <= 0: 返回 0.0
+    // 牛顿迭代开方
+    var 估计 = v
+    FOR var i 从 0 到 20:
+        估计 = (估计 + v / 估计) / 2.0
+    返回 估计
+
+// ==================== 单量子比特门实现 ====================
+
+// I 门（恒等）— 一般不显式调用
+def 应用I(内存, 量子索引):
+    // 无操作，仅记录
+    记录操作(内存, "I", 量子索引)
+    返回 true
+
+// Pauli-X 门（比特翻转）
+def 应用X(内存, 量子索引):
+    var q = VM_MEMORY.读取量子态(内存, 量子索引)
+    IF q == null: 返回 false
+    // X: [0,1; 1,0] → α' = β, β' = α
+    var 旧α = q.振幅0
+    var 旧β = q.振幅1
+    q.振幅0 = 旧β
+    q.振幅1 = 旧α
+    q.状态标记 = VM_MEMORY.QUBIT_SUPERPOS
+    内存.脏标记 = true
+    记录操作(内存, "X", 量子索引)
+    返回 true
+
+// Pauli-Y 门（绕 Y 轴旋转）
+def 应用Y(内存, 量子索引):
+    var q = VM_MEMORY.读取量子态(内存, 量子索引)
+    IF q == null: 返回 false
+    // Y: [0,-1; 1,0] → α' = -β, β' = α
+    var 旧α = q.振幅0
+    var 旧β = q.振幅1
+    q.振幅0 = -旧β
+    q.振幅1 = 旧α
+    q.状态标记 = VM_MEMORY.QUBIT_SUPERPOS
+    内存.脏标记 = true
+    记录操作(内存, "Y", 量子索引)
+    返回 true
+
+// Pauli-Z 门（相位翻转）
+def 应用Z(内存, 量子索引):
+    var q = VM_MEMORY.读取量子态(内存, 量子索引)
+    IF q == null: 返回 false
+    // Z: [1,0; 0,-1] → α' = α, β' = -β
+    q.振幅1 = -q.振幅1
+    q.状态标记 = VM_MEMORY.QUBIT_SUPERPOS
+    内存.脏标记 = true
+    记录操作(内存, "Z", 量子索引)
+    返回 true
+
+// Hadamard 门（叠加态创建）
+def 应用H(内存, 量子索引):
+    var q = VM_MEMORY.读取量子态(内存, 量子索引)
+    IF q == null: 返回 false
+    var 旧α = q.振幅0
+    var 旧β = q.振幅1
+    // H: 1/√2 · [1, 1; 1, -1]
+    var 新态 = 应用矩阵(旧α, 旧β, SQRT_HALF, SQRT_HALF, SQRT_HALF, SQRT_HALF_NEG)
+    var 归一 = 归一化(新态.新α, 新态.新β)
+    q.振幅0 = 归一.α
+    q.振幅1 = 归一.β
+    q.状态标记 = VM_MEMORY.QUBIT_SUPERPOS
+    内存.脏标记 = true
+    记录操作(内存, "H", 量子索引)
+    返回 true
+
+// S 门（π/2 相位旋转）
+def 应用S(内存, 量子索引):
+    var q = VM_MEMORY.读取量子态(内存, 量子索引)
+    IF q == null: 返回 false
+    // S: [1,0; 0,i] — 简化版直接取反（模拟相位）
+    q.振幅1 = -q.振幅1
+    q.状态标记 = VM_MEMORY.QUBIT_SUPERPOS
+    内存.脏标记 = true
+    记录操作(内存, "S", 量子索引)
+    返回 true
+
+// T 门（π/8 旋转）
+def 应用T(内存, 量子索引):
+    var q = VM_MEMORY.读取量子态(内存, 量子索引)
+    IF q == null: 返回 false
+    // T: [1,0; 0,e^(iπ/4)] — 简化版
+    q.振幅1 = -q.振幅1 * SQRT_HALF
+    var 归一 = 归一化(q.振幅0, q.振幅1)
+    q.振幅0 = 归一.α
+    q.振幅1 = 归一.β
+    q.状态标记 = VM_MEMORY.QUBIT_SUPERPOS
+    内存.脏标记 = true
+    记录操作(内存, "T", 量子索引)
+    返回 true
+
+// ==================== 双量子比特门实现 ====================
+
+// CNOT 门（受控非门）
+def 应用Cnot(内存, 控制, 目标):
+    var qC = VM_MEMORY.读取量子态(内存, 控制)
+    var qT = VM_MEMORY.读取量子态(内存, 目标)
+    IF qC == null 或 qT == null: 返回 false
+
+    // CNOT 逻辑：当控制位处于 |1⟩ 时翻转目标位
+    // 纠缠态下的简化模型：
+    // 若控制位 |1⟩ 振幅 > |0⟩ 振幅，则对目标位施加 X
+    IF qC.振幅1 * qC.振幅1 >= qC.振幅0 * qC.振幅0:
+        // 控制为 |1⟩ — 翻转目标
+        var 旧α = qT.振幅0
+        var 旧β = qT.振幅1
+        qT.振幅0 = 旧β
+        qT.振幅1 = 旧α
+    ELSE:
+        // 控制为 |0⟩ — 目标不变
+        // 但创建纠缠：目标态与控制定相
+        qT.振幅0 = qC.振幅0
+        qT.振幅1 = qC.振幅1
+
+    qC.状态标记 = VM_MEMORY.QUBIT_ENTANGLED
+    qT.状态标记 = VM_MEMORY.QUBIT_ENTANGLED
+    VM_MEMORY.加入纠缠组(内存, 控制, 目标)
+    内存.脏标记 = true
+    记录操作(内存, "CNOT", 控制 + "," + 目标)
+    返回 true
+
+// CZ 门（受控 Z）
+def 应用Cz(内存, 控制, 目标):
+    var qC = VM_MEMORY.读取量子态(内存, 控制)
+    var qT = VM_MEMORY.读取量子态(内存, 目标)
+    IF qC == null 或 qT == null: 返回 false
+
+    // CZ: 当控制为 |1⟩ 时，目标相位翻转
+    IF qC.振幅1 * qC.振幅1 >= qC.振幅0 * qC.振幅0:
+        qT.振幅1 = -qT.振幅1
+    VM_MEMORY.加入纠缠组(内存, 控制, 目标)
+    内存.脏标记 = true
+    记录操作(内存, "CZ", 控制 + "," + 目标)
+    返回 true
+
+// SWAP 门（交换两个量子比特）
+def 应用Swap(内存, 量子A, 量子B):
+    var qA = VM_MEMORY.读取量子态(内存, 量子A)
+    var qB = VM_MEMORY.读取量子态(内存, 量子B)
+    IF qA == null 或 qB == null: 返回 false
+
+    // 交换振幅
+    var 临时α = qA.振幅0
+    var 临时β = qA.振幅1
+    qA.振幅0 = qB.振幅0
+    qA.振幅1 = qB.振幅1
+    qB.振幅0 = 临时α
+    qB.振幅1 = 临时β
+
+    // 交换纠缠组
+    var 临时组 = qA.纠缠组
+    qA.纠缠组 = qB.纠缠组
+    qB.纠缠组 = 临时组
+
+    内存.脏标记 = true
+    记录操作(内存, "SWAP", 量子A + "," + 量子B)
+    返回 true
+
+// ==================== 多量子比特门实现 ====================
+
+// Toffoli 门（CCNOT）— 双控制非门
+def 应用Toffoli(内存, 控制1, 控制2, 目标):
+    var qC1 = VM_MEMORY.读取量子态(内存, 控制1)
+    var qC2 = VM_MEMORY.读取量子态(内存, 控制2)
+    var qT  = VM_MEMORY.读取量子态(内存, 目标)
+    IF qC1 == null 或 qC2 == null 或 qT == null: 返回 false
+
+    // 当两个控制位都处于 |1⟩ 时翻转目标
+    var 控制1高 = (qC1.振幅1 * qC1.振幅1 >= qC1.振幅0 * qC1.振幅0)
+    var 控制2高 = (qC2.振幅1 * qC2.振幅1 >= qC2.振幅0 * qC2.振幅0)
+
+    IF 控制1高 和 控制2高:
+        var 旧α = qT.振幅0
+        var 旧β = qT.振幅1
+        qT.振幅0 = 旧β
+        qT.振幅1 = 旧α
+
+    VM_MEMORY.加入纠缠组(内存, 控制1, 目标)
+    VM_MEMORY.加入纠缠组(内存, 控制2, 目标)
+    内存.脏标记 = true
+    记录操作(内存, "TOFFOLI", 控制1 + "," + 控制2 + "," + 目标)
+    返回 true
+
+// CSWAP 门（受控交换 / Fredkin）
+def 应用Cswap(内存, 控制, 目标A, 目标B):
+    var qC  = VM_MEMORY.读取量子态(内存, 控制)
+    var qA  = VM_MEMORY.读取量子态(内存, 目标A)
+    var qB  = VM_MEMORY.读取量子态(内存, 目标B)
+    IF qC == null 或 qA == null 或 qB == null: 返回 false
+
+    // 控制为 |1⟩ 时交换 A 和 B
+    IF qC.振幅1 * qC.振幅1 >= qC.振幅0 * qC.振幅0:
+        var 临时α = qA.振幅0
+        var 临时β = qA.振幅1
+        qA.振幅0 = qB.振幅0
+        qA.振幅1 = qB.振幅1
+        qB.振幅0 = 临时α
+        qB.振幅1 = 临时β
+
+    VM_MEMORY.加入纠缠组(内存, 控制, 目标A)
+    VM_MEMORY.加入纠缠组(内存, 控制, 目标B)
+    内存.脏标记 = true
+    记录操作(内存, "CSWAP", 控制 + "," + 目标A + "," + 目标B)
+    返回 true
+
+// ==================== 通用门应用接口 ====================
+
+// 根据门名称应用门（供 vm_executor 使用）
+def 应用门(内存, 门名, 量子比特列表):
+    var 元数据 = 门注册表[门名]
+    IF 元数据 == null:
+        返回 false
+
+    var n = 量子比特列表.LENGTH
+    SWITCH 门名:
+        CASE "I":    应用I(内存, 量子比特列表[0])
+        CASE "X":    应用X(内存, 量子比特列表[0])
+        CASE "Y":    应用Y(内存, 量子比特列表[0])
+        CASE "Z":    应用Z(内存, 量子比特列表[0])
+        CASE "H":    应用H(内存, 量子比特列表[0])
+        CASE "S":    应用S(内存, 量子比特列表[0])
+        CASE "SDG":  应用S(内存, 量子比特列表[0])  // 简化
+        CASE "T":    应用T(内存, 量子比特列表[0])
+        CASE "TDG":  应用T(内存, 量子比特列表[0])  // 简化
+        CASE "CNOT": IF n >= 2: 应用Cnot(内存, 量子比特列表[0], 量子比特列表[1])
+        CASE "CZ":   IF n >= 2: 应用Cz(内存, 量子比特列表[0], 量子比特列表[1])
+        CASE "SWAP": IF n >= 2: 应用Swap(内存, 量子比特列表[0], 量子比特列表[1])
+        CASE "TOFFOLI": IF n >= 3: 应用Toffoli(内存, 量子比特列表[0], 量子比特列表[1], 量子比特列表[2])
+        CASE "CSWAP": IF n >= 3: 应用Cswap(内存, 量子比特列表[0], 量子比特列表[1], 量子比特列表[2])
+        DEFAULT:     返回 false
+
+    返回 true
+
+// 获取所有已注册门名称列表
+def 列出所有门():
+    var 名称列表 = []
+    FOR var 键 在 门注册表:
+        名称列表.push(键)
+    返回 名称列表
+
+// ==================== 操作记录（供调试） ====================
+
+def 记录操作(内存, 门名, 位置):
+    var 计数 = 内存.元数据.操作计数[门名]
+    IF 计数 == null:
+        计数 = 0
+    内存.元数据.操作计数[门名] = 计数 + 1
+
+// ==================== 量子电路：门操作态 ====================
+
+init 5
+
+// 量子门操作的量子表示：
+// q0: 单量子比特门集合
+// q1: 双量子比特门集合
+// q2: 多量子比特门集合
+// q3: 测量操作
+// q4: 门注册表
+
+H 0      // 单量子比特门叠加
+H 1      // 双量子比特门叠加
+H 2      // 多量子比特门叠加
+H 3      // 测量操作叠加
+H 4      // 门注册表叠加
+
+// 门类型纠缠
+CNOT 0 1    // 单-双纠缠
+CNOT 1 2    // 双-多纠缠
+CNOT 2 3    // 多-测量纠缠
+CNOT 3 4    // 测量-注册表纠缠
+
+// 测量门状态
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+
+STOP
