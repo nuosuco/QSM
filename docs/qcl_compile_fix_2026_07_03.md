@@ -58,9 +58,9 @@ qcl_bootstrap_phase2的核心逻辑（L161-387 parse_quantum_gate函数）是纯
 将qcl_bootstrap_phase2.qentl的核心算法（parse_quantum_gate/parse_func_def/compile_source）移植为C代码 → 编译为独立C程序 → 输出真正的量子字节码。这是唯一能打破鸡生蛋循环的方法。
 
 ### 已实施的修复
-1. **创建纯量子电路提取版**：`QCL模块/qcl_bootstrap_phase2_qcircuit.qentl`
+1. **创建纯量子电路提取版**：`QCL引导器/qcl_bootstrap_phase2_qcircuit.qentl`
    - 从原文件抽象出量子电路逻辑，重写为纯量子指令（12行）
-   - 编译输出：`QCL模块/qcl_bootstrap_phase2_qcircuit.qbc`（29字节，0x14头）
+   - 编译输出：`QCL引导器/qcl_bootstrap_phase2_qcircuit.qbc`（29字节，0x14头）
    - QVM执行：10周期/10门 ✅
    - **注：这是电路部分的可执行版本，但丢失了编译器逻辑（def解析等）**
 
@@ -71,17 +71,17 @@ qcl_bootstrap_phase2的核心逻辑（L161-387 parse_quantum_gate函数）是纯
 ### 可QVM执行（0x14头）
 | 组件 | 路径 | 大小 | 周期/门 |
 |------|------|------|---------|
-| qcl_compiler_phase2 | QCL模块/qcl_compiler_phase2.qbc | 14字节 | 4/4 ✅ |
-| qcl_bootstrap_phase2_电路版 | QCL模块/qcl_bootstrap_phase2_qcircuit.qbc | 29字节 | 10/10 ✅ (新创建) |
+| qcl_compiler_phase2 | QCL引导器/qcl_compiler_phase2.qbc | 14字节 | 4/4 ✅ |
+| qcl_bootstrap_phase2_电路版 | QCL引导器/qcl_bootstrap_phase2_qcircuit.qbc | 29字节 | 10/10 ✅ (新创建) |
 
 ### 不可QVM执行（0x72头，文本）
 | 组件 | 路径 | 大小 | 原因 |
 |------|------|------|------|
-| qcl_opcodes | QCL模块/qcl_opcodes.qbc | 94字节 | 含def函数 |
-| qcl_lexer | QCL模块/qcl_lexer.qbc | 29字节 | 含def函数 |
-| qcl_parser | QCL模块/qcl_parser.qbc | 44字节 | 含def函数 |
-| qcl_parser_high | QCL模块/qcl_parser_high.qbc | 285字节 | 含def函数 |
-| qcl_bootstrap_phase2 | QCL模块/qcl_bootstrap_phase2.qbc | 271字节 | 含def函数 |
+| qcl_opcodes | QCL引导器/qcl_opcodes.qbc | 94字节 | 含def函数 |
+| qcl_lexer | QCL引导器/qcl_lexer.qbc | 29字节 | 含def函数 |
+| qcl_parser | QCL引导器/qcl_parser.qbc | 44字节 | 含def函数 |
+| qcl_parser_high | QCL引导器/qcl_parser_high.qbc | 285字节 | 含def函数 |
+| qcl_bootstrap_phase2 | QCL引导器/qcl_bootstrap_phase2.qbc | 271字节 | 含def函数 |
 
 ### 系统级可执行组件
 | 组件 | 状态 |

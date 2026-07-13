@@ -10,12 +10,12 @@
 
 | 模块 | 路径 | 行数 | 函数数 | const/类型 | 导出数 |
 |------|------|------|--------|-----------|--------|
-| qcl_opcodes | QCL模块/qcl_opcodes.qentl | 184 | 12 | 68 | 79 |
-| qcl_lexer | QCL模块/qcl_lexer.qentl | 623 | 9 | 4个类型(TokenKind/Token/Lexer/TokenStream) | 5 |
-| qcl_parser | QCL模块/qcl_parser.qentl | 341 | 13 | 0 | 12 |
-| qcl_parser_high | QCL模块/qcl_parser_high.qentl | 721 | 31 | 0 | 36 |
-| qcl_bootstrap_phase2 | QCL模块/qcl_bootstrap_phase2.qentl | 735 | 25 | 94 | 2 |
-| qcl_compiler_phase2 | QCL模块/qcl_compiler_phase2.qentl | 24 | 0 | 0 | 0 |
+| qcl_opcodes | QCL引导器/qcl_opcodes.qentl | 184 | 12 | 68 | 79 |
+| qcl_lexer | QCL引导器/qcl_lexer.qentl | 623 | 9 | 4个类型(TokenKind/Token/Lexer/TokenStream) | 5 |
+| qcl_parser | QCL引导器/qcl_parser.qentl | 341 | 13 | 0 | 12 |
+| qcl_parser_high | QCL引导器/qcl_parser_high.qentl | 721 | 31 | 0 | 36 |
+| qcl_bootstrap_phase2 | QCL引导器/qcl_bootstrap_phase2.qentl | 735 | 25 | 94 | 2 |
+| qcl_compiler_phase2 | QCL引导器/qcl_compiler_phase2.qentl | 24 | 0 | 0 | 0 |
 | **总计** | | **2,628** | **90** | **66** | **134** |
 
 ### 与Skill声称行数对比
@@ -158,7 +158,7 @@ qcl_compiler_phase2.qentl  ← 纯量子电路占位
 
 ---
 
-## 五、与QCL引导器.qentl兼容性验证
+## 五、与QCL入口.qentl兼容性验证
 
 ### 兼容性分析
 

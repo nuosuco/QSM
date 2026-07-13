@@ -15,7 +15,7 @@
 ### 各系统文件目录（目录固定，文件数随版本变化）
 | 系统 | 源码文件目录 |
 |------|----------|
-| QCL模块（QCL引导器） | `QCL模块/` |
+| QCL模块（QCL引导器） | `QCL引导器/` |
 | QDFS | `QEntL/System/Kernel/filesystem/` |
 | QNS | `QEntL/System/Kernel/neural/` |
 | Platform | `QEntL/System/Platform/` |

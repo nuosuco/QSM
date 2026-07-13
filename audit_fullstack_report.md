@@ -20,7 +20,7 @@
 - 功能: 解释量子指令子集
 
 ### Stage 2 — 解释器启动QCL引导器 ⬜
-- `QCL引导器.qentl`: ✅ **472行**, 完整版本已恢复
+- `QCL入口.qentl`: ✅ **472行**, 完整版本已恢复
 - `QCL引导器_simple.qentl`: ✅ 存在(简化版)
 - `QCL引导器.qbc`: ✅ 存在
 
@@ -28,7 +28,7 @@
 - `build/compiled/`: ✅ **24个.qbc文件**
   - QCL模块: QCL_bootstrap.qbc, QCL.qbc, qcl_bootstrap_phase2.qbc, qcl_lexer.qbc, qcl_opcodes.qbc, qcl_parser.qbc, qcl_parser_high.qbc, qcl_compiler_phase2.qbc, QCL_phase2_qcircuit.qbc
   - QVM模块: QVM.qbc, qvm_interpreter.qbc, qvm_entanglement_engine.qbc, qvm_memory_manager.qbc, qvm_quantum_state_processor.qbc, qvm_instruction_set.qbc, qvm_complex.qbc, qvm_random.qbc + 各phase2版本
-- `QCL模块/`: ✅ 7个.qentl + 7个.qbc
+- `QCL引导器/`: ✅ 7个.qentl + 7个.qbc
 
 ### Stage 4 — C启动器加载QVM运行
 - `src/qvm_bootstrap.c`: ✅ C source
@@ -126,7 +126,7 @@
 
 ## 5. QCL引导器 .qentl 行数
 
-**文件:** `QCL引导器.qentl`
+**文件:** `QCL入口.qentl`
 **行数:** **472行** ✅
 **状态:** 完整版本已恢复
 

@@ -1,9 +1,9 @@
-// QVM入口模块（平坦量子指令，绕过def函数体空壳问题）
-// 由 qcl_phase2 直接编译为字节码，每行量子指令生成一个opcode
-
-init 8
+// QVM入口模块 - 8量子比特贝尔态电路
+// 链接基础模块
+import "QVM.qentl"
 
 // 叠加态初始化
+init 8
 H 0
 H 1
 H 2

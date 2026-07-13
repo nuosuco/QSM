@@ -163,7 +163,7 @@ def execute(bytecodeFile): {
    - 重新编译：`gcc -std=c11 -O2 -o bin/qvm_bootstrap src/qvm_bootstrap.c -lm`
 
 2. **用 qcl_phase2 编译 QCL 模块集** 形成 `QCL.qbc`（QCL引导器+lexer+parser）
-   - 这些文件（QCL引导器.qentl 等）已能正常 emit（函数=16, 导入=3）
+   - 这些文件（QCL入口.qentl 等）已能正常 emit（函数=16, 导入=3）
 
 3. **合并生成完整 QVM.qbc**：
    - 将 QCL 模块的 .qbc + 必要的基础模块 .qbc 合并

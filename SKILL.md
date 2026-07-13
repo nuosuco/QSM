@@ -322,7 +322,7 @@ ls -la QEntL/System/Kernel/neural/qns_training_pipeline.qentl
 阶段1（一次性引导）:
 qcl_bootstrap.c (C语言启动器)
      ↓
-启动 QCL引导器.qentl (QEntL源码构建)
+启动 QCL入口.qentl (QEntL源码构建)
      ↓
 编译出 QCL.qbc 和 QVM.qbc
 
@@ -345,7 +345,7 @@ QCL编译所有QEntL源码 → 新.qbc
 |------|---------|------|
 | **qvm_bootstrap.c** | C语言启动器（纯加载器） | 只负责加载QVM.qbc，不含业务逻辑 |
 | **qcl_bootstrap.c** | C语言启动器（纯加载器） | 只负责启动QCL引导器，不含业务逻辑 |
-| **QCL引导器.qentl** | QEntL源码构建 | 用C语言启动器启动，编译出QCL.qbc和QVM.qbc |
+| **QCL入口.qentl** | QEntL源码构建 | 用C语言启动器启动，编译出QCL.qbc和QVM.qbc |
 | **QVM** | .qbc字节码 | QVM的业务逻辑全部在.qbc中 |
 | **QCL** | .qbc字节码 | QCL的业务逻辑全部在.qbc中 |
 
@@ -353,7 +353,7 @@ QCL编译所有QEntL源码 → 新.qbc
 
 | 阶段 | 说明 | 输出 |
 |------|------|------|
-| **阶段1：一次性引导** | qcl_bootstrap.c 启动 QCL引导器.qentl | QCL.qbc + QVM.qbc |
+| **阶段1：一次性引导** | qcl_bootstrap.c 启动 QCL入口.qentl | QCL.qbc + QVM.qbc |
 | **阶段2：运行环境** | qvm_bootstrap.c 启动 QVM.qbc | QEntL环境形成 |
 | **阶段3：QCL运行** | QCL.qbc 直接在QEntL环境中运行 | 不需要C语言启动器 |
 
@@ -392,12 +392,12 @@ C语言引导编译器（qcl_bootstrap_v2.c）只能编译量子指令子集（i
 
 | 模块 | 路径 | 行数 | 状态 |
 |------|------|------|------|
-| Opcode常量表 | QCL模块/qcl_opcodes.qentl | 150 | ✅ 已验证（68个opcodes与C源码完全一致） |
-| 词法分析 | QCL模块/qcl_lexer.qentl | 623 | ✅ 已验证（70个token类型） |
-| 量子指令解析 | QCL模块/qcl_parser.qentl | 341 | ✅ 已验证（13个函数，12个导出） |
-| 高级语法解析 | QCL模块/qcl_parser_high.qentl | 721 | ✅ 已验证（41个导出） |
+| Opcode常量表 | QCL引导器/qcl_opcodes.qentl | 150 | ✅ 已验证（68个opcodes与C源码完全一致） |
+| 词法分析 | QCL引导器/qcl_lexer.qentl | 623 | ✅ 已验证（70个token类型） |
+| 量子指令解析 | QCL引导器/qcl_parser.qentl | 341 | ✅ 已验证（13个函数，12个导出） |
+| 高级语法解析 | QCL引导器/qcl_parser_high.qentl | 721 | ✅ 已验证（41个导出） |
 
-**QCL引导器.qentl状态：** 当前仅39行占位伪代码，需要填充实际实现（`新建编译器()`、`扫描QEntL目录()`等函数尚未实现）。
+**QCL入口.qentl状态：** 当前仅39行占位伪代码，需要填充实际实现（`新建编译器()`、`扫描QEntL目录()`等函数尚未实现）。
 
 ### 架构流程
 
@@ -416,7 +416,7 @@ QEntL源码 → QCL编译器(在QVM上运行)
 **正确架构流程：**
 
 ```
-qcl_bootstrap.c (C语言解释器) → 启动并执行 QCL引导器.qentl (QEntL源码)
+qcl_bootstrap.c (C语言解释器) → 启动并执行 QCL入口.qentl (QEntL源码)
      ↓
 QCL引导器执行：
   1. 编译 QVM源码 → QVM.qbc
@@ -442,7 +442,7 @@ QCL编译所有QEntL源码 → 新.qbc
 
 | 阶段 | 启动方式 | 说明 | 输出 |
 |------|---------|------|------|
-| **阶段1** | qcl_bootstrap执行QCL引导器.qentl | QCL引导器是QCL编译器的QEntL源码，由解释器启动 | QVM.qbc + QCL编译器（qbc） |
+| **阶段1** | qcl_bootstrap执行QCL入口.qentl | QCL引导器是QCL编译器的QEntL源码，由解释器启动 | QVM.qbc + QCL编译器（qbc） |
 | **阶段2** | qvm_bootstrap加载QVM.qbc | QVM运行就构建了QEntL环境 | QEntL环境形成 |
 | **阶段3** | QCL编译器（qbc）在QEntL环境中运行 | 不再需要C语言启动器 | 编译所有QEntL源码 |
 
@@ -545,7 +545,7 @@ QCL编译所有QEntL源码 → 新.qbc
 阶段1（一次性引导）:
 qcl_bootstrap.c (C语言启动器)
      ↓
-启动 QCL引导器.qentl (QEntL源码构建)
+启动 QCL入口.qentl (QEntL源码构建)
      ↓
 编译出 QCL.qbc 和 QVM.qbc
 
@@ -904,7 +904,7 @@ bin/qvm_bootstrap QEntL/Models/Ref/ref_core.qbc
 阶段1（一次性引导）:
 qcl_bootstrap.c (C语言启动器)
      ↓
-启动 QCL引导器.qentl (QEntL源码构建)
+启动 QCL入口.qentl (QEntL源码构建)
      ↓
 编译出 QCL.qbc 和 QVM.qbc
 
@@ -927,7 +927,7 @@ QCL编译所有QEntL源码 → 新.qbc
 |------|---------|------|
 | **qvm_bootstrap.c** | C语言启动器（纯加载器） | 只负责加载QVM.qbc，不含业务逻辑 |
 | **qcl_bootstrap.c** | C语言启动器（纯加载器） | 只负责启动QCL引导器，不含业务逻辑 |
-| **QCL引导器.qentl** | QEntL源码构建 | 用C语言启动器启动，编译出QCL.qbc和QVM.qbc |
+| **QCL入口.qentl** | QEntL源码构建 | 用C语言启动器启动，编译出QCL.qbc和QVM.qbc |
 | **QVM** | .qbc字节码 | QVM的业务逻辑全部在.qbc中 |
 | **QCL** | .qbc字节码 | QCL的业务逻辑全部在.qbc中 |
 
@@ -935,7 +935,7 @@ QCL编译所有QEntL源码 → 新.qbc
 
 | 阶段 | 说明 | 输出 |
 |------|------|------|
-| **阶段1：一次性引导** | qcl_bootstrap.c 启动 QCL引导器.qentl | QCL.qbc + QVM.qbc |
+| **阶段1：一次性引导** | qcl_bootstrap.c 启动 QCL入口.qentl | QCL.qbc + QVM.qbc |
 | **阶段2：运行环境** | qvm_bootstrap.c 启动 QVM.qbc | QEntL环境形成 |
 | **阶段3：QCL运行** | QCL.qbc 直接在QEntL环境中运行 | 不需要C语言启动器 |
 
@@ -974,12 +974,12 @@ C语言引导编译器（qcl_bootstrap_v2.c）只能编译量子指令子集（i
 
 | 模块 | 路径 | 行数 | 状态 |
 |------|------|------|------|
-| Opcode常量表 | QCL模块/qcl_opcodes.qentl | 150 | ✅ 已验证（68个opcodes与C源码完全一致） |
-| 词法分析 | QCL模块/qcl_lexer.qentl | 623 | ✅ 已验证（70个token类型） |
-| 量子指令解析 | QCL模块/qcl_parser.qentl | 341 | ✅ 已验证（13个函数，12个导出） |
-| 高级语法解析 | QCL模块/qcl_parser_high.qentl | 721 | ✅ 已验证（41个导出） |
+| Opcode常量表 | QCL引导器/qcl_opcodes.qentl | 150 | ✅ 已验证（68个opcodes与C源码完全一致） |
+| 词法分析 | QCL引导器/qcl_lexer.qentl | 623 | ✅ 已验证（70个token类型） |
+| 量子指令解析 | QCL引导器/qcl_parser.qentl | 341 | ✅ 已验证（13个函数，12个导出） |
+| 高级语法解析 | QCL引导器/qcl_parser_high.qentl | 721 | ✅ 已验证（41个导出） |
 
-**QCL引导器.qentl状态：** 当前仅39行占位伪代码，需要填充实际实现（`新建编译器()`、`扫描QEntL目录()`等函数尚未实现）。
+**QCL入口.qentl状态：** 当前仅39行占位伪代码，需要填充实际实现（`新建编译器()`、`扫描QEntL目录()`等函数尚未实现）。
 
 ### 架构流程
 
@@ -998,7 +998,7 @@ QEntL源码 → QCL编译器(在QVM上运行)
 **正确架构流程：**
 
 ```
-qcl_bootstrap.c (C语言解释器) → 启动并执行 QCL引导器.qentl (QEntL源码)
+qcl_bootstrap.c (C语言解释器) → 启动并执行 QCL入口.qentl (QEntL源码)
      ↓
 QCL引导器执行：
   1. 编译 QVM源码 → QVM.qbc
@@ -1024,7 +1024,7 @@ QCL编译所有QEntL源码 → 新.qbc
 
 | 阶段 | 启动方式 | 说明 | 输出 |
 |------|---------|------|------|
-| **阶段1** | qcl_bootstrap执行QCL引导器.qentl | QCL引导器是QCL编译器的QEntL源码，由解释器启动 | QVM.qbc + QCL编译器（qbc） |
+| **阶段1** | qcl_bootstrap执行QCL入口.qentl | QCL引导器是QCL编译器的QEntL源码，由解释器启动 | QVM.qbc + QCL编译器（qbc） |
 | **阶段2** | qvm_bootstrap加载QVM.qbc | QVM运行就构建了QEntL环境 | QEntL环境形成 |
 | **阶段3** | QCL编译器（qbc）在QEntL环境中运行 | 不再需要C语言启动器 | 编译所有QEntL源码 |
 
@@ -1127,7 +1127,7 @@ QCL编译所有QEntL源码 → 新.qbc
 阶段1（一次性引导）:
 qcl_bootstrap.c (C语言启动器)
      ↓
-启动 QCL引导器.qentl (QEntL源码构建)
+启动 QCL入口.qentl (QEntL源码构建)
      ↓
 编译出 QCL.qbc 和 QVM.qbc
 

@@ -71,6 +71,7 @@ typedef enum {
     OP_FUNC_CALL_STMT  = 112,
     OP_BREAK_STMT      = 113,
     OP_CONTINUE_STMT   = 114,
+    OP_WHILE_END       = 115,
     OP_PUSH_CONST_INT  = 120,
     OP_PUSH_CONST_STR  = 121,
     OP_APPEND_BYTE     = 130,
@@ -187,19 +188,35 @@ static int write_yi_instruction(const char *s) {
     int len = (int)strlen(s);
     int yi_count = 0, qi = 0;
     int i = 0;
+    int non_yi_start = -1;  /* 连续非彝文字符段的起始位置 */
     while (i < len) {
         int consumed = 0;
         unsigned int cp = utf8_decode(s + i, len - i, &consumed);
         if (cp == ~0U) { consumed = 1; cp = (unsigned char)s[i]; }
-        if (emit_yi_gate(cp, qi)) { yi_count++; qi++; }
-        else {
-            char leftover[16];
-            int rem = len - i;
-            if (rem > 15) rem = 15;
-            memcpy(leftover, s + i, rem); leftover[rem] = '\0';
-            write_string_ref_after(leftover);
+        if (emit_yi_gate(cp, qi)) {
+            /* 遇到彝文字符：先把之前累积的非彝文段写入池 */
+            if (non_yi_start >= 0) {
+                char leftover[256];
+                int rem = i - non_yi_start;
+                if (rem > 255) rem = 255;
+                memcpy(leftover, s + non_yi_start, rem); leftover[rem] = '\0';
+                write_string_ref_after(leftover);
+                non_yi_start = -1;
+            }
+            yi_count++; qi++;
+        } else {
+            /* 非彝文字符：记录连续段起始位置（如果还没开始） */
+            if (non_yi_start < 0) non_yi_start = i;
         }
         i += consumed;
+    }
+    /* 处理末尾的连续非彝文段 */
+    if (non_yi_start >= 0) {
+        char leftover[256];
+        int rem = len - non_yi_start;
+        if (rem > 255) rem = 255;
+        memcpy(leftover, s + non_yi_start, rem); leftover[rem] = '\0';
+        write_string_ref_after(leftover);
     }
     return yi_count;
 }
@@ -218,8 +235,6 @@ static const GateMapEntry GATE_MAP[] = {
 /* ==================== 全局缓冲区 ==================== */
 static unsigned char g_bytecode[MAX_OPS];
 static int           g_bc_pos = 0;
-static unsigned char g_highbuf[MAX_FUNC_BODY];
-static int           g_highbuf_pos = 0;
 static char g_strpool[MAX_FUNC_BODY];
 static int  g_strpool_pos = 0;
 
@@ -250,21 +265,32 @@ static void write_string_ref_after(const char *s) {
 }
 static void flush_highbuf(void);
 static void write_string_ref(const char *s) {
-    /* 彝文字符→量子指令；非彝文→字符串池 */
-    int yi_count = write_yi_instruction(s);
-    if (yi_count == 0) {
+    /* 快速判断是否含彝文字符：有→走write_yi_instruction（已包含写池），无→直接写完整串 */
+    int has_yi = 0;
+    if (s) {
+        int len = (int)strlen(s);
+        for (int i = 0; i < len; ) {
+            int consumed = 0;
+            unsigned int cp = utf8_decode(s + i, len - i, &consumed);
+            if (cp == ~0U) { consumed = 1; cp = (unsigned char)s[i]; }
+            if (YI_IS(cp)) { has_yi = 1; break; }
+            i += consumed;
+        }
+    }
+    if (has_yi) {
+        /* 含彝文：write_yi_instruction处理完整串（彝文作量子指令，非彝文写池） */
+        write_yi_instruction(s);
+    } else {
+        /* 纯非彝文：直接写池，不经过yi检测（避免双写bug） */
         write_string_ref_after(s);
     }
 }
 static void flush_highbuf(void) {
-    if (g_highbuf_pos > 0 && g_bc_pos + g_highbuf_pos <= MAX_OPS) {
-        memcpy(g_bytecode + g_bc_pos, g_highbuf, g_highbuf_pos);
-        g_bc_pos += g_highbuf_pos;
-    }
-    g_highbuf_pos = 0;
+    /* g_highbuf 已移除，所有写入直接进入 g_bytecode，无需 flush */
+    (void)0;
 }
 static void write_high_byte(unsigned char b) {
-    if (g_highbuf_pos < MAX_FUNC_BODY) g_highbuf[g_highbuf_pos++] = b;
+    write_byte(b);
 }
 static void write_high_opcode(Opcode op) { write_high_byte((unsigned char)op); }
 
@@ -638,18 +664,18 @@ static void parse_compound_block(Parser *P) {
         if (kw(&t, "返回") || kw(&t, "return")) {
             consume(P);
             if (P->lexer.cur.kind == TOK_SEMI) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(0);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(0);
                 consume(P);
             } else if (P->lexer.cur.kind == TOK_IDENT) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(1);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(1);
                 write_string_ref(P->lexer.cur.text);
                 consume(P); expect_tok(P, TOK_SEMI);
             } else if (P->lexer.cur.kind == TOK_NUMBER) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(2);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(2);
                 write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
                 consume(P); expect_tok(P, TOK_SEMI);
             } else if (P->lexer.cur.kind == TOK_STRING) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(3);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(3);
                 write_string_ref(P->lexer.cur.text);
                 consume(P); expect_tok(P, TOK_SEMI);
             }
@@ -830,16 +856,28 @@ static int parse_quantum_instruction(Parser *P) {
 
 /* ==================== import / const / 类型 / def 解析 ==================== */
 static int parse_import(Parser *P) {
-    consume(P); /* import / 导入 */
+    Token prev = consume(P); /* import / 导入 */
     /* 接受 import "模块名" 和 import <ident>（如 import stdlib） */
+    char mod_buf[512];
+    mod_buf[0] = '\0';
     const char *mod = NULL;
     if (P->lexer.cur.kind == TOK_STRING) {
         mod = P->lexer.cur.text;
+        strncpy(mod_buf, mod ? mod : "", sizeof(mod_buf) - 1);
+        mod_buf[sizeof(mod_buf) - 1] = '\0';
+        mod = mod_buf;
+        fprintf(stderr, "[debug_import] TOK_STRING: mod=[%s] prev=[%s]\n", mod, prev.text);
         consume(P);
     } else if (P->lexer.cur.kind == TOK_IDENT) {
         mod = P->lexer.cur.text;
+        strncpy(mod_buf, mod ? mod : "", sizeof(mod_buf) - 1);
+        mod_buf[sizeof(mod_buf) - 1] = '\0';
+        mod = mod_buf;
+        fprintf(stderr, "[debug_import] TOK_IDENT: mod=[%s] prev=[%s]\n", mod, prev.text);
         consume(P);
     } else {
+        fprintf(stderr, "[debug_import] TOK_OTHER: kind=%d prev=[%s] cur=[%.20s]\n",
+                P->lexer.cur.kind, prev.text, P->lexer.src + P->lexer.pos);
         return 0;
     }
     /* 处理 "作为 别名" 后缀（如：导入 "path" 作为 量子虚拟机） */
@@ -859,7 +897,10 @@ static int parse_import(Parser *P) {
 static int parse_const(Parser *P) {
     consume(P); /* const */
     if (P->lexer.cur.kind != TOK_IDENT) return 0;
-    const char *name = P->lexer.cur.text;
+    char name_buf[MAX_STRING];
+    strncpy(name_buf, P->lexer.cur.text, sizeof(name_buf) - 1);
+    name_buf[sizeof(name_buf) - 1] = '\0';
+    const char *name = name_buf;
     consume(P); /* 名字 */
     /* 接受 : 类型 注释（如 const MAX_SIZE: int = 100） */
     if (P->lexer.cur.kind == TOK_COLON) {
@@ -897,7 +938,10 @@ static int parse_struct(Parser *P) {
     consume(P); /* 消耗 "struct"，cur 已推进到结构体名标识符 */
     lexer_skip_ws(&P->lexer);
     if (P->lexer.cur.kind != TOK_IDENT) return 0;
-    const char *name = P->lexer.cur.text;
+    char name_buf[MAX_STRING];
+    strncpy(name_buf, P->lexer.cur.text, sizeof(name_buf) - 1);
+    name_buf[sizeof(name_buf) - 1] = '\0';
+    const char *name = name_buf;
     consume(P);
     lexer_skip_ws(&P->lexer);
     /* struct 语法不需要 "="，直接到 "{" */
@@ -912,14 +956,20 @@ static int parse_struct(Parser *P) {
             consume(P); continue;
         }
         if (P->lexer.cur.kind == TOK_IDENT) {
-            const char *fname = P->lexer.cur.text;
+            char fname_buf[MAX_STRING];
+            strncpy(fname_buf, P->lexer.cur.text, sizeof(fname_buf) - 1);
+            fname_buf[sizeof(fname_buf) - 1] = '\0';
+            const char *fname = fname_buf;
             consume(P);
             lexer_skip_ws(&P->lexer);
             if (P->lexer.cur.kind == TOK_HASH) continue;
             if (P->lexer.cur.kind == TOK_COLON) {
                 consume(P); /* 消费 ":"，cur 现在指向类型名 */
                 if (P->lexer.cur.kind == TOK_IDENT) {
-                    const char *ftype = P->lexer.cur.text;
+                    char ftype_buf[MAX_STRING];
+                    strncpy(ftype_buf, P->lexer.cur.text, sizeof(ftype_buf) - 1);
+                    ftype_buf[sizeof(ftype_buf) - 1] = '\0';
+                    const char *ftype = ftype_buf;
                     write_high_byte(field_count);
                     write_string_ref(fname);
                     write_string_ref(ftype);
@@ -965,7 +1015,10 @@ static int parse_type_def(Parser *P) {
     consume(P); /* 类型 */
     lexer_skip_ws(&P->lexer);
     if (P->lexer.cur.kind != TOK_IDENT) return 0;
-    const char *name = P->lexer.cur.text;
+    char name_buf[MAX_STRING];
+    strncpy(name_buf, P->lexer.cur.text, sizeof(name_buf) - 1);
+    name_buf[sizeof(name_buf) - 1] = '\0';
+    const char *name = name_buf;
     consume(P);
     /* 接受 类型 Name = { ... } 或 类型 Name { ... }（无 =） */
     lexer_skip_ws(&P->lexer);
@@ -983,7 +1036,10 @@ static int parse_type_def(Parser *P) {
             consume(P); continue;
         }
         if (P->lexer.cur.kind == TOK_IDENT) {
-            const char *fname = P->lexer.cur.text;
+            char fname_buf[MAX_STRING];
+            strncpy(fname_buf, P->lexer.cur.text, sizeof(fname_buf) - 1);
+            fname_buf[sizeof(fname_buf) - 1] = '\0';
+            const char *fname = fname_buf;
             consume(P); /* 字段名 → cur 现在指向 = 或 : */
             lexer_skip_ws(&P->lexer);
             if (P->lexer.cur.kind == TOK_HASH) continue;
@@ -1007,7 +1063,10 @@ static int parse_type_def(Parser *P) {
             } else if (P->lexer.cur.kind == TOK_COLON) {
                 consume(P); /* 消费 ":"，cur 现在指向类型名 */
                 if (P->lexer.cur.kind == TOK_IDENT) {
-                    const char *ftype = P->lexer.cur.text;
+                    char ftype_buf[MAX_STRING];
+                    strncpy(ftype_buf, P->lexer.cur.text, sizeof(ftype_buf) - 1);
+                    ftype_buf[sizeof(ftype_buf) - 1] = '\0';
+                    const char *ftype = ftype_buf;
                     write_high_byte(field_count);
                     write_string_ref(fname);
                     write_string_ref(ftype);
@@ -1324,16 +1383,16 @@ static void parse_class_body(Parser *P) {
         if (kw(&t, "返回") || kw(&t, "return")) {
             consume(P);
             if (P->lexer.cur.kind == TOK_SEMI) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(0); consume(P);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(0); consume(P);
             } else if (P->lexer.cur.kind == TOK_IDENT) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(1);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(1);
                 write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi_or_rbrace(P);
             } else if (P->lexer.cur.kind == TOK_NUMBER) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(2);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(2);
                 write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
                 consume(P); skip_to_semi_or_rbrace(P);
             } else if (P->lexer.cur.kind == TOK_STRING) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(3);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(3);
                 write_string_ref(P->lexer.cur.text); consume(P); skip_to_semi_or_rbrace(P);
             } else skip_to_semi_or_rbrace(P);
             continue;
@@ -1363,8 +1422,10 @@ static void parse_class_body(Parser *P) {
         }
         /* 普通标识符：可能是赋值、函数调用、字段声明或裸语句 */
         if (t.kind == TOK_IDENT) {
-            const char *nm = P->lexer.cur.text;
-            fprintf(stderr, "[CB] TOK_IDENT name=%s pos=%d next=%s\n", nm, P->lexer.pos, P->lexer.cur.text);
+            char nm_buf[MAX_STRING];
+            strncpy(nm_buf, t.text, sizeof(nm_buf) - 1);
+            nm_buf[sizeof(nm_buf) - 1] = '\0';
+            const char *nm = nm_buf;
             consume(P);
             if (P->lexer.cur.kind == TOK_LPAR) { /* 函数调用 */
                 int pd = 1; consume(P);
@@ -1504,18 +1565,18 @@ static void parse_func_body(Parser *P) {
             consume(P); /* "return" → cur 已推进到值/分号 */
             /* consume 后直接读 cur，不额外 lexer_next（三件套误用修复） */
             if (P->lexer.cur.kind == TOK_SEMI) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(0);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(0);
                 consume(P);
             } else if (P->lexer.cur.kind == TOK_IDENT) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(1);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(1);
                 write_string_ref(P->lexer.cur.text);
                 consume(P); expect_tok(P, TOK_SEMI);
             } else if (P->lexer.cur.kind == TOK_NUMBER) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(2);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(2);
                 write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
                 consume(P); expect_tok(P, TOK_SEMI);
             } else if (P->lexer.cur.kind == TOK_STRING) {
-                write_high_opcode(OP_RETURN_STMT); write_byte(3);
+                write_high_opcode(OP_RETURN_STMT); write_high_byte(3);
                 write_string_ref(P->lexer.cur.text);
                 consume(P); expect_tok(P, TOK_SEMI);
             }
@@ -1613,28 +1674,236 @@ static int parse_def(Parser *P) {
         expect_tok(P, TOK_RPAR); /* ) */
     }
     /* 接受 def f() { ... } 和 def f() : Type { ... } 两种写法 */
+    /* 保存冒号后的起始位置（在 lexer_skip_ws 消耗空白前），用于缩进体解析器搜索函数体起始行 */
+    int colon_pos = P->lexer.pos;
     lexer_skip_ws(&P->lexer);
     if (expect_tok(P, TOK_COLON)) {
         lexer_skip_ws(&P->lexer);
-        if (P->lexer.cur.kind == TOK_IDENT) consume(P); /* 跳过返回类型标识符 */
-        lexer_skip_ws(&P->lexer);
+        /* 尝试跳过返回类型标识符，但仅当后面紧跟 {（花括号体）时才合法
+           对于缩进体，第一个标识符属于函数体，不能消耗 */
+        int has_return_type = 0;
+        if (P->lexer.cur.kind == TOK_IDENT) {
+            /* 保存当前pos，用于后续是return type还是body的判定 */
+            int before_return_type_pos = P->lexer.pos;
+            int before_return_type_cur_line = P->lexer.line;
+            consume(P); /* 消耗标识符，检查是否花括号体 */
+            lexer_skip_ws(&P->lexer);
+            if (P->lexer.cur.kind == TOK_LBRACE) {
+                has_return_type = 1; /* 正确消耗了返回类型 */
+            } else {
+                /* 不是返回类型——是函数体第一个语句！回退 lexer 位置 */
+                /* 通过重置 pos 和 cur 来"回滚" */
+                P->lexer.pos = before_return_type_pos;
+                /* 重新读取前一个token（即标识符本身）*/
+                lexer_next(&P->lexer);
+            }
+        }
+        if (!has_return_type) {
+            lexer_skip_ws(&P->lexer);
+        }
     }
     write_u16((unsigned short)param_count);
     flush_highbuf();
     if (P->lexer.cur.kind == TOK_LBRACE) {
-        fprintf(stderr, "[BC_BODY] emitting BC_FUNC_BODY for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos + g_highbuf_pos);
+        fprintf(stderr, "[BC_BODY] emitting BC_FUNC_BODY for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos);
         write_high_opcode(BC_FUNC_BODY);
         parse_func_body(P);
-        fprintf(stderr, "[BC_END ] emitting BC_FUNC_END for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos + g_highbuf_pos);
+        fprintf(stderr, "[BC_END ] emitting BC_FUNC_END for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos);
         write_high_opcode(BC_FUNC_END);
         flush_highbuf();
     } else {
-        skip_to_semi_or_rbrace(P);
-        fprintf(stderr, "[BC_BODY] emitting EMPTY BC_FUNC_BODY/BC_FUNC_END for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos + g_highbuf_pos);
-        write_high_opcode(BC_FUNC_BODY); write_high_opcode(BC_FUNC_END);
-        flush_highbuf();
+        /* 缩进体解析：函数体使用冒号+缩进（无花括号） */
+        int saved_lexer_pos = colon_pos;
+        int body_indent = -1;
+        /* 向后搜索第一个非空行的缩进 */
+        int sp = saved_lexer_pos;
+        while (sp < P->lexer.len) {
+            if (P->lexer.src[sp] == '\n') {
+                sp++;
+                int indent = 0;
+                while (sp < P->lexer.len && (P->lexer.src[sp] == ' ' || P->lexer.src[sp] == '\t')) { indent++; sp++; }
+                if (sp < P->lexer.len && P->lexer.src[sp] != '\n' && P->lexer.src[sp] != '\r'
+                    && P->lexer.src[sp] != '#' && !(P->lexer.src[sp] == '/' && sp+1 < P->lexer.len && P->lexer.src[sp+1] == '/')) {
+                    body_indent = indent; break; }
+            } else { sp++; }
+        }
+        if (body_indent >= 0) {
+            fprintf(stderr, "[BC_BODY] indented body for function at line %d indent=%d\n", P->lexer.line, body_indent);
+            write_high_opcode(BC_FUNC_BODY);
+            /* 重置词法分析器到第一个函数体行的起始位置 */
+            int body_start = saved_lexer_pos;
+            /* 向前推进到第一个缩进行 */
+            while (body_start < P->lexer.len) {
+                if (P->lexer.src[body_start] == '\n') { body_start++; break; }
+                body_start++;
+            }
+            fprintf(stderr, "[BC_BODY] func body start pos=%d line=%d\n", body_start, P->lexer.line);
+            P->lexer.pos = body_start; P->lexer.col = body_indent + 1;
+            lexer_next(&P->lexer);
+            fprintf(stderr, "[BC_BODY] first cur=%s kind=%d pos=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos);
+            /* 逐行解析缩进体中的语句 */
+            while (P->lexer.cur.kind != TOK_EOF) {
+                /* 检查当前行的缩进是否 <= body_indent（函数体结束）*/
+                /* 回溯到当前行首位置，测量缩进 */
+                int lp = P->lexer.pos;
+                /* 从当前token位置向前回溯找行首 */
+                int found_newline = 0;
+                while (lp > 0) {
+                    if (P->lexer.src[lp-1] == '\n') { found_newline = 1; break; }
+                    lp--;
+                }
+                int line_indent = 0;
+                if (found_newline) {
+                    while (lp < P->lexer.len && (P->lexer.src[lp] == ' ' || P->lexer.src[lp] == '\t')) { line_indent++; lp++; }
+                }
+                /* 空行/注释行保持缩进状态 */
+                if (P->lexer.cur.kind == TOK_EOF) break;
+                if (line_indent < body_indent && P->lexer.cur.kind != TOK_ERR) {
+                    fprintf(stderr, "[BC_BODY] indent break: line_indent=%d < body_indent=%d cur=%s\n", line_indent, body_indent, P->lexer.cur.text);
+                    /* 缩进已回退，函数体结束 */
+                    break;
+                }
+                Token ct = P->lexer.cur;
+                if (ct.kind == TOK_ERR) { consume(P); continue; }
+                /* 在缩进体中，} 不会作为结构闭合出现（花括号体由 parse_compound_block 处理）。
+                   此处出现的 } 要么是对象字面量（如 返回 {a, b}），要么是字符串内的字符（如 \"缺少结束 }\"）。
+                   直接消耗即可 */
+                if (ct.kind == TOK_RBRACE) { consume(P); continue; }
+                if (kw(&ct, "def")) {
+                    consume(P);
+                    if (P->lexer.cur.kind == TOK_IDENT) {
+                        write_high_opcode(OP_FUNC_DEF); write_string_ref(P->lexer.cur.text); consume(P);
+                    }
+                    if (P->lexer.cur.kind == TOK_LPAR) { int pd=1; consume(P);
+                        while (pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) pd++; else if (P->lexer.cur.kind==TOK_RPAR) pd--; consume(P); } }
+                    if (expect_tok(P, TOK_COLON)) {}
+                    if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(BC_FUNC_BODY); parse_func_body(P); write_high_opcode(BC_FUNC_END); flush_highbuf(); }
+                    else skip_to_semi_or_rbrace(P);
+                    write_high_opcode(OP_FUNC_END); continue;
+                }
+                if (kw(&ct, "import")) { if (parse_import(P)) continue; }
+                if (kw(&ct, "const")) { if (parse_const(P)) continue; }
+                if (kw(&ct, "var")) {
+                    consume(P);
+                    char vn_buf[MAX_STRING] = "";
+                    if (P->lexer.cur.kind == TOK_IDENT) { strncpy(vn_buf, P->lexer.cur.text, sizeof(vn_buf)-1); write_high_opcode(OP_VAR_DECL); write_string_ref(P->lexer.cur.text); consume(P); }
+                    if (expect_tok(P, TOK_EQ)) {
+                        if (P->lexer.cur.kind == TOK_NUMBER) { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
+                        else if (P->lexer.cur.kind == TOK_STRING) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                        else if (P->lexer.cur.kind == TOK_LBRK) { write_high_opcode(OP_PUSH_CONST_INT); write_u16(0); parse_compound_block(P); }
+                        else if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_PUSH_CONST_INT); write_u16(0); parse_compound_block(P); }
+                        else if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                        /* 将栈上的初始值赋给变量 */
+                        if (vn_buf[0]) { write_high_opcode(OP_ASSIGN_STMT); write_string_ref(vn_buf); }
+                    }
+                    expect_tok(P, TOK_SEMI); P->high_level++; continue;
+                }
+                if (kw(&ct, "返回") || kw(&ct, "return")) {
+                    consume(P);
+                    if (P->lexer.cur.kind == TOK_SEMI) { write_high_opcode(OP_RETURN_STMT); write_high_byte(0); consume(P); P->high_level++; continue; }
+                    if (P->lexer.cur.kind == TOK_NUMBER) { write_high_opcode(OP_RETURN_STMT); write_high_byte(1); write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
+                    if (P->lexer.cur.kind == TOK_STRING) { write_high_opcode(OP_RETURN_STMT); write_high_byte(2); write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
+                    if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_RETURN_STMT); write_high_byte(3); write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
+                    if (P->lexer.cur.kind == TOK_LBRK || P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_RETURN_STMT); write_high_byte(4); int r_depth = 1; int r_open = P->lexer.cur.kind; int r_close = (r_open == TOK_LBRACE) ? TOK_RBRACE : TOK_RBRK; consume(P); while (r_depth > 0 && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == r_open) r_depth++; else if (P->lexer.cur.kind == r_close) { r_depth--; if (r_depth <= 0) { consume(P); break; } } consume(P); } P->high_level++; continue; }
+                    write_high_opcode(OP_RETURN_STMT); write_high_byte(0); expect_tok(P, TOK_SEMI); P->high_level++; continue;
+                }
+                if (kw(&ct, "if") || kw(&ct, "如果")) {
+                    consume(P);
+                    if (P->lexer.cur.kind == TOK_LPAR) consume(P);
+                    if (P->lexer.cur.kind == TOK_IDENT) { /* condition is an expression on stack */
+                        /* parse condition (simplified: push int or string) */
+                        if (P->lexer.cur.text[0] >= '0' && P->lexer.cur.text[0] <= '9') { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
+                        else { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                    }
+                    if (P->lexer.cur.kind == TOK_RPAR) consume(P);
+                    if (expect_tok(P, TOK_COLON)) {}
+                    if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_IF_STMT); parse_compound_block(P); }
+                    else { /* single-statement then-body */ write_high_opcode(OP_IF_STMT); skip_to_semi_or_rbrace(P); }
+                    P->high_level++; continue;
+                }
+                if (kw(&ct, "else") || kw(&ct, "否则")) {
+                    consume(P);
+                    if (expect_tok(P, TOK_COLON)) {}
+                    if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_ELSE_STMT); parse_compound_block(P); }
+                    else { write_high_opcode(OP_ELSE_STMT); skip_to_semi_or_rbrace(P); }
+                    P->high_level++; continue;
+                }
+                if (kw(&ct, "while") || kw(&ct, "循环")) {
+                    consume(P);
+                    if (P->lexer.cur.kind == TOK_LPAR) consume(P);
+                    if (P->lexer.cur.kind == TOK_IDENT) {
+                        if (P->lexer.cur.text[0] >= '0' && P->lexer.cur.text[0] <= '9') { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
+                        else { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                    } else if (P->lexer.cur.kind == TOK_NUMBER) {
+                        write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P);
+                    }
+                    if (P->lexer.cur.kind == TOK_RPAR) consume(P);
+                    if (expect_tok(P, TOK_COLON)) {}
+                    if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_WHILE_STMT); parse_compound_block(P); write_high_opcode(OP_WHILE_END); }
+                    else { write_high_opcode(OP_WHILE_STMT); /* 缩进体由外层循环处理，不消耗 */ }
+                    P->high_level++; continue;
+                }
+                if (kw(&ct, "break") || kw(&ct, "跳出")) { write_high_opcode(OP_BREAK_STMT); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
+                if (kw(&ct, "continue") || kw(&ct, "继续")) { write_high_opcode(OP_CONTINUE_STMT); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
+                /* 函数调用和高阶赋值 */
+                if (ct.kind == TOK_IDENT) {
+                    char id_buf[MAX_STRING];
+                    strncpy(id_buf, ct.text, sizeof(id_buf) - 1);
+                    id_buf[sizeof(id_buf) - 1] = '\0';
+                    const char *id = id_buf;
+                    consume(P);
+                    if (P->lexer.cur.kind == TOK_LPAR) {
+                        write_high_opcode(OP_FUNC_CALL_STMT);
+                        write_string_ref(id);
+                        consume(P); int nargs=0;
+                        while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_RPAR) {
+                            if (P->lexer.cur.kind == TOK_COMMA) nargs++;
+                            else if (P->lexer.cur.kind == TOK_IDENT || P->lexer.cur.kind == TOK_NUMBER || P->lexer.cur.kind == TOK_STRING) nargs++;
+                            consume(P);
+                        }
+                        if (P->lexer.cur.kind == TOK_RPAR) consume(P);
+                        write_high_byte((unsigned char)nargs);
+                        expect_tok(P, TOK_SEMI);
+                        P->high_level++; continue;
+                    }
+                    /* 赋值语句 */
+                    if (P->lexer.cur.kind == TOK_EQ) {
+                        write_high_opcode(OP_ASSIGN_STMT);
+                        write_string_ref(id);
+                        consume(P);
+                        if (P->lexer.cur.kind == TOK_NUMBER) { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
+                        else if (P->lexer.cur.kind == TOK_STRING) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                        else if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P);
+                                                    /* 支持 X = X - N 递减模式 */
+                                                    if (P->lexer.cur.kind == TOK_MINUS) {
+                                                        consume(P);
+                                                        if (P->lexer.cur.kind == TOK_NUMBER) {
+                                                            write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
+                                                            consume(P);
+                                                            write_high_opcode(OP_SUB);
+                                                        }
+                                                    }
+                                                }
+                                                expect_tok(P, TOK_SEMI);
+                                                P->high_level++; continue;
+                                            }
+                                            skip_to_semi_or_rbrace(P); continue;
+                                        }
+                                        skip_to_semi_or_rbrace(P); continue;
+                                    }
+                                    fprintf(stderr, "[BC_BODY] after while: cur=%s kind=%d pos=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos, P->lexer.line);
+            flush_highbuf();
+            write_high_opcode(BC_FUNC_END);
+            flush_highbuf();
+        } else {
+            skip_to_semi_or_rbrace(P);
+            fprintf(stderr, "[BC_BODY] emitting EMPTY BC_FUNC_BODY/BC_FUNC_END for function at line %d (pos=%d)\n", P->lexer.line, g_bc_pos);
+            write_high_opcode(BC_FUNC_BODY); write_high_opcode(BC_FUNC_END);
+            flush_highbuf();
+        }
     }
     write_opcode(OP_FUNC_END);
+    fprintf(stderr, "[parse_def] after func end: cur=%s kind=%d pos=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos, P->lexer.line);
     P->high_level++; return 1;
 }
 
@@ -1716,18 +1985,18 @@ static int parse_top_statement(Parser *P) {
     if (kw(&t, "返回") || kw(&t, "return")) {
         consume(P); /* "return" → cur 已推进到值/分号 */
         if (P->lexer.cur.kind == TOK_SEMI) {
-            write_high_opcode(OP_RETURN_STMT); write_byte(0);
+            write_high_opcode(OP_RETURN_STMT); write_high_byte(0);
             consume(P);
         } else if (P->lexer.cur.kind == TOK_IDENT) {
-            write_high_opcode(OP_RETURN_STMT); write_byte(1);
+            write_high_opcode(OP_RETURN_STMT); write_high_byte(1);
             write_string_ref(P->lexer.cur.text);
             consume(P); expect_tok(P, TOK_SEMI);
         } else if (P->lexer.cur.kind == TOK_NUMBER) {
-            write_high_opcode(OP_RETURN_STMT); write_byte(2);
+            write_high_opcode(OP_RETURN_STMT); write_high_byte(2);
             write_u16((unsigned short)parse_const_int(P->lexer.cur.text));
             consume(P); expect_tok(P, TOK_SEMI);
         } else if (P->lexer.cur.kind == TOK_STRING) {
-            write_high_opcode(OP_RETURN_STMT); write_byte(3);
+            write_high_opcode(OP_RETURN_STMT); write_high_byte(3);
             write_string_ref(P->lexer.cur.text);
             consume(P); expect_tok(P, TOK_SEMI);
         }
@@ -1815,9 +2084,8 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
     fprintf(stdout, "[QCL2] 编译: %s\n", input_path);
     fprintf(stdout, "[QCL2] 输出: %s\n", output_path);
 
-    g_bc_pos = 0; g_highbuf_pos = 0; g_strpool_pos = 0;
+    g_bc_pos = 0; g_strpool_pos = 0;
     memset(g_bytecode, 0, sizeof(g_bytecode));
-    memset(g_highbuf, 0, sizeof(g_highbuf));
     memset(g_strpool, 0, sizeof(g_strpool));
 
     CompileStats stats = {0};

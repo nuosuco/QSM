@@ -73,17 +73,17 @@
 
 | 模块 | 路径 | 大小 |
 |------|------|------|
-| qcl_bootstrap_phase2.qbc | QCL模块/ | 3,508 字节 |
-| qcl_bootstrap_phase2_qcircuit.qbc | QCL模块/ | 37 字节 |
-| qcl_compiler_circuit.qbc | QCL模块/ | 49 字节 |
-| qcl_compiler_phase2.qbc | QCL模块/ | 42 字节 |
-| qcl_compiler_phase2_fixed.qbc | QCL模块/ | 1,157 字节 |
-| qcl_lexer.qbc | QCL模块/ | 9 字节 |
-| qcl_opcodes.qbc | QCL模块/ | 3,381 字节 |
-| qcl_opcodes_test.qbc | QCL模块/ | 674 字节 |
-| qcl_parser.qbc | QCL模块/ | 9 字节 |
-| qcl_parser_high.qbc | QCL模块/ | 9 字节 |
-| qcl_real_compiler.qbc | QCL模块/ | 49 字节 |
+| qcl_bootstrap_phase2.qbc | QCL引导器/ | 3,508 字节 |
+| qcl_bootstrap_phase2_qcircuit.qbc | QCL引导器/ | 37 字节 |
+| qcl_compiler_circuit.qbc | QCL引导器/ | 49 字节 |
+| qcl_compiler_phase2.qbc | QCL引导器/ | 42 字节 |
+| qcl_compiler_phase2_fixed.qbc | QCL引导器/ | 1,157 字节 |
+| qcl_lexer.qbc | QCL引导器/ | 9 字节 |
+| qcl_opcodes.qbc | QCL引导器/ | 3,381 字节 |
+| qcl_opcodes_test.qbc | QCL引导器/ | 674 字节 |
+| qcl_parser.qbc | QCL引导器/ | 9 字节 |
+| qcl_parser_high.qbc | QCL引导器/ | 9 字节 |
+| qcl_real_compiler.qbc | QCL引导器/ | 49 字节 |
 
 ### 3.4 QEntL模型统计
 
@@ -191,7 +191,7 @@ Total -> quantum gates  : 2288 chars -> 100.0%
 
 ### 优先级1 (立即)
 
-1. **修复QCL.qbc** - 从QCL引导器.qentl或QCL模块源文件重新编译生成QCL.qbc
+1. **修复QCL.qbc** - 从QCL入口.qentl或QCL模块源文件重新编译生成QCL.qbc
 2. **修正编译脚本** - test_full_stack.sh中引用的bin/qvm_boot应为bin/qvm_bootstrap，修复382个超时文件
 
 ### 优先级2 (近期)

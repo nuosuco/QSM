@@ -1,6 +1,6 @@
 # QCL引导器自举流程（2026-07-03 最终确认）
 
-> **核心原则**: `qcl_bootstrap.c` 是C语言**解释器**（不是编译器），只解释量子指令子集。真正编译QEntL高级语法的是**QCL引导器.qentl**（QEntL源码）。
+> **核心原则**: `qcl_bootstrap.c` 是C语言**解释器**（不是编译器），只解释量子指令子集。真正编译QEntL高级语法的是**QCL入口.qentl**（QEntL源码）。
 
 ---
 
@@ -10,7 +10,7 @@
 |------|------|
 | `qcl_bootstrap.c` | **C语言解释器** — 解释执行QEntL量子电路，启动QCL引导器 |
 | `qcl_bootstrap.c` | **不是编译器** — 只解释量子指令子集，不编译高级语法 |
-| `QCL引导器.qentl` | **QEntL构建的QCL编译器** — 真正的编译器，由解释器启动 |
+| `QCL入口.qentl` | **QEntL构建的QCL编译器** — 真正的编译器，由解释器启动 |
 | QVM | **运行环境** — 构建QEntL环境 |
 
 ---
@@ -20,7 +20,7 @@
 ```
 阶段1: C语言解释器（qcl_bootstrap.c）解释量子指令子集
      ↓
-阶段2: 解释器启动QCL引导器.qentl（QEntL源码）
+阶段2: 解释器启动QCL入口.qentl（QEntL源码）
      ↓
 阶段3: QCL引导器编译QEntL源码 → 生成QCL.qbc和QVM.qbc
      ↓
@@ -48,16 +48,16 @@ gcc -std=c11 -O2 -o bin/qcl_bootstrap src/qcl_bootstrap.c -lm
 # 不支持: def/类型/函数/模块/导入等高级语法
 ```
 
-### 阶段2: 启动QCL引导器.qentl
+### 阶段2: 启动QCL入口.qentl
 
 ```bash
-# qcl_bootstrap解释并启动QCL引导器.qentl
-bin/qcl_bootstrap QCL引导器.qentl
+# qcl_bootstrap解释并启动QCL入口.qentl
+bin/qcl_bootstrap QCL入口.qentl
 # 或
-bin/qcl_bootstrap QCL引导器.qentl QCL引导器.qbc
+bin/qcl_bootstrap QCL入口.qentl QCL引导器.qbc
 ```
 
-**注意**: QCL引导器.qentl 当前只有39行占位代码，需要实现！
+**注意**: QCL入口.qentl 当前只有39行占位代码，需要实现！
 
 ### 阶段3: QCL引导器编译QEntL源码
 
@@ -117,7 +117,7 @@ bin/qvm_bootstrap Ref.qbc
 
 ## 关键问题
 
-**QCL引导器.qentl 当前状态**: 39行占位伪代码，未实现！
+**QCL入口.qentl 当前状态**: 39行占位伪代码，未实现！
 
 需要实现：
 ```
@@ -143,6 +143,6 @@ bin/qvm_bootstrap Ref.qbc
 ## 相关文件
 
 - SKILL.md: `/root/.hermes/skills/qentl-fullstack/SKILL.md`
-- QCL引导器源码: `QCL引导器.qentl`
+- QCL引导器源码: `QCL入口.qentl`
 - C语言解释器: `src/qcl_bootstrap.c`
 - C语言启动器: `src/qvm_bootstrap.c`

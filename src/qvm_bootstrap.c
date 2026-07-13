@@ -4,11 +4,12 @@
  * ⚠️ 只作为启动器，真正计算由QEntL全栈执行
  */
 #include <stdio.h>
-
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <stdint.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define MAX_QUBITS 64
 #define MAX_REGISTERS 64
@@ -44,6 +45,7 @@
 #define OP_FUNC_CALL_STMT  112
 #define OP_BREAK_STMT      113
 #define OP_CONTINUE_STMT   114
+#define OP_WHILE_END       115
 #define OP_PUSH_CONST_INT  120
 #define OP_PUSH_CONST_STR  121
 #define OP_APPEND_BYTE     130
@@ -122,6 +124,37 @@ typedef struct {
 static Variable var_table[MAX_VARIABLES];
 static int var_count = 0;
 
+/* ── 字符串变量表 ── */
+static char str_var_data[MAX_VARIABLES][65536];
+static int str_var_len[MAX_VARIABLES];
+static char str_var_names[MAX_VARIABLES][128];
+static int str_var_count = 0;
+static int str_var_find(const char *name) {
+    for (int i = 0; i < str_var_count; i++)
+        if (strcmp(str_var_names[i], name) == 0) return i;
+    return -1;
+}
+static void str_var_set(const char *name, const char *val, int len) {
+    int idx = str_var_find(name);
+    if (idx < 0) {
+        if (str_var_count >= MAX_VARIABLES) return;
+        idx = str_var_count++;
+        strncpy(str_var_names[idx], name, 127);
+        str_var_names[idx][127] = '\0';
+    }
+    if (len < 0) len = val ? (int)strlen(val) : 0;
+    if (len > 65535) len = 65535;
+    if (val) { memcpy(str_var_data[idx], val, len); }
+    str_var_len[idx] = len;
+    str_var_data[idx][len] = '\0';
+}
+static const char *str_var_get(const char *name, int *out_len) {
+    int idx = str_var_find(name);
+    if (idx < 0) { if (out_len) *out_len = 0; return ""; }
+    if (out_len) *out_len = str_var_len[idx];
+    return str_var_data[idx];
+}
+
 /* 函数调用栈：每层保存返回地址 */
 typedef struct {
     int return_pos;       /* 函数返回后继续执行的位置 */
@@ -145,6 +178,127 @@ static int loop_depth = 0;
 /* 字符串常量暂存区 */
 static char str_const_buf[4096];
 static int str_const_count = 0;
+
+/* ========== import链接栈：支持多文件递归链接成系统 ========== */
+static int g_is_inline = 1;  /* 内联模式：字符串在字节码流中 */
+#define IMPORT_STACK_MAX 64
+static uint8_t *import_code_stack[IMPORT_STACK_MAX];
+static int import_pos_stack[IMPORT_STACK_MAX];
+static int import_fsize_stack[IMPORT_STACK_MAX];
+static int import_sp_len_stack[IMPORT_STACK_MAX];
+static int import_func_nest_stack[IMPORT_STACK_MAX];
+static int import_sp_off_stack[IMPORT_STACK_MAX];
+static int import_depth = 0;
+
+/* import搜索目录 */
+static const char *import_search_dirs[] = {
+    "build/compiled_qcl/",
+    "build/compiled_qvm/",
+    "build/compiled_new/",
+    "build/",
+    "",
+    NULL,
+};
+
+/* ── 内建函数系统 ── */
+#define BUILTIN_STR_BUF 65536
+static char builtin_str_buf[BUILTIN_STR_BUF];
+static int builtin_str_len = 0;
+
+/* 前向声明 */
+static char *read_string(char *buf, int bufsize, uint8_t *sp_data, int sp_len, int off, int len);
+
+/* 从字符串池读取字符串 */
+static char *builtin_read_str(char *buf, int bufsize, uint8_t *sp_data, int sp_len, int pos, uint8_t *code, int fsize) {
+    int off = 0, slen = 0;
+    if (pos + 3 < fsize) {
+        off = code[pos] | (code[pos+1] << 8);
+        slen = code[pos+2] | (code[pos+3] << 8);
+    }
+    return read_string(buf, bufsize, sp_data, sp_len, off, slen);
+}
+
+/* 内建函数 dispatch：在函数名不匹配 func_table 时调用 */
+static int builtin_dispatch(const char *fn, int nargs, uint8_t *code, int pos, int fsize, uint8_t *sp_data, int sp_len) {
+    int ret = 0;
+    builtin_str_len = 0; builtin_str_buf[0] = '\0';
+
+    if (strcmp(fn, "文件读取") == 0 || strcmp(fn, "file_read") == 0 || strcmp(fn, "read_file") == 0) {
+        char path[1024];
+        builtin_read_str(path, sizeof(path), sp_data, sp_len, pos - 4, code, fsize);
+        FILE *f = fopen(path, "rb");
+        if (!f) { printf("[builtin] 文件读取(%s) 失败\n", path); return 0; }
+        int n = fread(builtin_str_buf, 1, BUILTIN_STR_BUF-1, f);
+        fclose(f);
+        builtin_str_buf[n] = '\0';
+        builtin_str_len = n;
+        printf("[builtin] 文件读取(%s) = %d 字节\n", path, n);
+        ret = n;
+    } else if (strcmp(fn, "get_directory_entries") == 0) {
+        char dirpath[1024];
+        builtin_read_str(dirpath, sizeof(dirpath), sp_data, sp_len, pos - 4, code, fsize);
+        DIR *d = opendir(dirpath);
+        if (!d) { printf("[builtin] get_directory_entries(%s) 失败\n", dirpath); return 0; }
+        int count = 0; builtin_str_len = 0;
+        struct dirent *entry;
+        while ((entry = readdir(d)) != NULL) {
+            if (entry->d_name[0] == '.') continue;
+            int nlen = (int)strlen(entry->d_name);
+            if (builtin_str_len + nlen + 2 < BUILTIN_STR_BUF) {
+                if (builtin_str_len > 0) builtin_str_buf[builtin_str_len++] = '\n';
+                memcpy(builtin_str_buf + builtin_str_len, entry->d_name, nlen);
+                builtin_str_len += nlen;
+            } count++;
+        }
+        closedir(d);
+        builtin_str_buf[builtin_str_len] = '\0';
+        printf("[builtin] get_directory_entries(%s) = %d 项\n", dirpath, count);
+        ret = count;
+    } else if (strcmp(fn, "is_directory") == 0) {
+        char dirpath[1024];
+        builtin_read_str(dirpath, sizeof(dirpath), sp_data, sp_len, pos - 4, code, fsize);
+        struct stat st;
+        ret = (stat(dirpath, &st) == 0 && S_ISDIR(st.st_mode)) ? 1 : 0;
+        printf("[builtin] is_directory(%s) = %s\n", dirpath, ret ? "true" : "false");
+    } else if (strcmp(fn, "ends_with") == 0) {
+        char str_val[4096], suf_val[4096];
+        builtin_read_str(str_val, sizeof(str_val), sp_data, sp_len, pos - 9, code, fsize);
+        builtin_read_str(suf_val, sizeof(suf_val), sp_data, sp_len, pos - 5, code, fsize);
+        int sl = (int)strlen(str_val), sufl = (int)strlen(suf_val);
+        ret = (sl >= sufl && memcmp(str_val + sl - sufl, suf_val, sufl) == 0) ? 1 : 0;
+        printf("[builtin] ends_with(\"%s\", \"%s\") = %d\n", str_val, suf_val, ret);
+    } else if (strcmp(fn, "len") == 0 || strcmp(fn, "length") == 0) {
+        char str_val[4096];
+        builtin_read_str(str_val, sizeof(str_val), sp_data, sp_len, pos - 4, code, fsize);
+        ret = (int)strlen(str_val);
+    } else if (strcmp(fn, "print") == 0 || strcmp(fn, "打印") == 0) {
+        /* print: 弹出 nargs 个参数，拼接输出，返回 0 */
+        builtin_str_len = 0;
+        for (int pi = 0; pi < nargs && pi < 10; pi++) {
+            int soff = pos - 4 - pi * 4;
+            if (soff < 0) soff = pos - 4;
+            char pbuf[4096];
+            builtin_read_str(pbuf, sizeof(pbuf), sp_data, sp_len, soff, code, fsize);
+            if (pi > 0) {
+                if (builtin_str_len + 1 < BUILTIN_STR_BUF) {
+                    builtin_str_buf[builtin_str_len++] = ' ';
+                    builtin_str_buf[builtin_str_len] = '\0';
+                }
+            }
+            int slen = (int)strlen(pbuf);
+            if (builtin_str_len + slen < BUILTIN_STR_BUF) {
+                memcpy(builtin_str_buf + builtin_str_len, pbuf, slen);
+                builtin_str_len += slen;
+            }
+        }
+        printf("[builtin] print(%s)\n", builtin_str_buf);
+        ret = 0;
+    } else {
+        printf("[builtin] 未知内建: %s\n", fn);
+        return 0;
+    }
+    return ret;
+}
 
 /* 算术寄存器栈 — 用于 LOAD_REG/STORE_REG + ADD/SUB/MUL/DIV */
 static int arith_stack[MAX_REGISTERS] = {0};
@@ -282,28 +436,96 @@ static int find_if_else_end(const uint8_t *code, int code_end, int pos) {
     return pos;
 }
 
-/* 前向扫描：定位 WHILE body 结束位置（下一条同层级指令） */
+/* 前向扫描：定位 WHILE body 结束位置（OP_WHILE_END标记） */
 static int find_while_body_end(const uint8_t *code, int code_end, int pos) {
     int depth = 0;
     while (pos < code_end) {
         uint8_t op = code[pos];
-        if (op == OP_IF_STMT || op == OP_WHILE_STMT || op == OP_FUNC_DEF || op == OP_FUNC_END) {
+        if (op == OP_IF_STMT || op == OP_WHILE_STMT || op == OP_FUNC_DEF) {
             depth++;
             pos++;
-        } else if (op == OP_BREAK_STMT && depth == 0) {
-            /* break 是 body 内的一部分，跳过 */
+        } else if (op == OP_WHILE_END && depth == 0) {
+            return pos;  /* 找到while体结束标记 */
+        } else if (op == OP_WHILE_END && depth > 0) {
+            depth--;
             pos++;
-        } else if ((op == OP_RETURN_STMT || op == OP_IF_STMT || op == OP_WHILE_STMT ||
-                    op == OP_FUNC_DEF || op == OP_FUNC_CALL_STMT || op == OP_ASSIGN_STMT ||
-                    op == OP_VAR_DECL || op == OP_STOP || op == OP_EXIT || op == OP_ELSE_STMT) && depth == 0) {
-            /* 同层级的下一条语句 — while body 结束 */
-            return pos;
+        } else if (op == OP_FUNC_END && depth == 0) {
+            return pos;  /* 函数体结束也是while体边界 */
         } else if (op == OP_FUNC_END && depth > 0) {
             depth--;
             pos++;
         } else {
             pos++;
         }
+    }
+    return pos;
+}
+
+/* ========== import链加载 + 路径解析 ========== */
+
+/* 读取.qbc文件，按import路径搜索 */
+static uint8_t *load_import_qbc(const char *src_path, int *out_size) {
+    char path[512];
+    int sl = (int)strlen(src_path);
+    /* 提取basename */
+    const char *base = src_path;
+    for (int i = sl - 1; i >= 0; i--) {
+        if (src_path[i] == '/' || src_path[i] == '\\') {
+            base = src_path + i + 1;
+            break;
+        }
+    }
+    int bl = (int)strlen(base);
+    /* 替换 .qentl → .qbc */
+    if (bl > 6 && strcmp(base + bl - 6, ".qentl") == 0) {
+        snprintf(path, sizeof(path), "%.*s.qbc", bl - 6, base);
+    } else {
+        snprintf(path, sizeof(path), "%s.qbc", base);
+    }
+    /* 搜索目录 */
+    for (int d = 0; import_search_dirs[d]; d++) {
+        char full[1024];
+        snprintf(full, sizeof(full), "%s%s", import_search_dirs[d], path);
+        FILE *f = fopen(full, "rb");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long fsz = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            if (fsz <= 0) { fclose(f); continue; }
+            uint8_t *buf = (uint8_t *)malloc(fsz);
+            if (!buf) { fclose(f); continue; }
+            fread(buf, 1, fsz, f);
+            fclose(f);
+            *out_size = (int)fsz;
+            printf("[QVM] import: 加载 '%s' (%ld bytes) → %s\n", src_path, fsz, full);
+            return buf;
+        }
+    }
+    printf("[QVM] import: 未找到 '%s' (搜索: %s)\n", src_path, path);
+    return NULL;
+}
+
+/* 跳过带内联字符串的opcode，返回下一条指令的pos */
+static int skip_string_opcode(const uint8_t *code, int code_end, int pos) {
+    if (pos >= code_end) return pos;
+    uint8_t op = code[pos++];
+    if (op == OP_IMPORT || op == OP_CONST_DEF || op == OP_FUNC_DEF || op == OP_FUNC_CALL_STMT ||
+        op == OP_VAR_DECL || op == OP_ASSIGN_STMT ||
+        op == OP_EXPORT_SYM || op == OP_MODULE_DEF ||
+        op == OP_TYPE_DEF || op == OP_PUSH_CONST_STR) {
+        if (pos + 3 >= code_end) return code_end;
+        /* int off = */ (void)(code[pos] | (code[pos+1] << 8));
+        int len = code[pos+2] | (code[pos+3] << 8);
+        pos += 4;
+        if (op == OP_CONST_DEF) { pos += 2; } /* cval */
+        pos += len; /* 字符串内容 */
+        if (op == OP_FUNC_DEF || op == OP_FUNC_CALL_STMT) {
+            if (pos < code_end) pos++;
+        }
+    } else if (op == OP_PUSH_CONST_INT) {
+        pos += 2;
+    } else if (op == OP_APPEND_BYTE) {
+        pos += 1;
     }
     return pos;
 }
@@ -550,6 +772,8 @@ int main(int argc, char *argv[]) {
 
     QVM vm;
     vm.state = NULL;
+    vm.cycles = 0;
+    vm.ops = 0;
     /* 初始化高级语法执行引擎数据结构 */
     func_count = 0;
     var_count = 0;
@@ -583,7 +807,68 @@ int main(int argc, char *argv[]) {
     /* 看门狗：环形缓冲区记录最近 QVM_WATCHDOG_WINDOW 个 pos；若窗口内同一位置重复 3 次，判定死循环 */
     /* watchdog vars removed — unused */
     /* ================================================ */
-
+    /* ================================================ */
+    /* 预扫描已禁用：其跳过逻辑与字节码结构不匹配 */
+#if 0
+    {
+        int scan_pos = 6;
+        while (scan_pos < code_end) {
+            uint8_t op = code[scan_pos++];
+            if (op == OP_FUNC_DEF) {
+                printf("[QVM] 预扫描: OP_FUNC_DEF at %d\n", scan_pos-1);
+                if (scan_pos + 3 < code_end) {
+                    int off = code[scan_pos] | (code[scan_pos+1] << 8);
+                    int flen = code[scan_pos+2] | (code[scan_pos+3] << 8);
+                    scan_pos += 4;
+                    char *n = read_string(name, sizeof(name), sp_data, sp_len, off, flen);
+                    int pc = 0;
+                    while (scan_pos < code_end) {
+                        if (code[scan_pos] == BC_FUNC_BODY) break;
+                        if (scan_pos + 4 < code_end) {
+                            scan_pos += 5;
+                        } else break;
+                    }
+                    if (scan_pos < code_end && code[scan_pos] == BC_FUNC_BODY) scan_pos++;
+                    if (func_count < MAX_FUNCS && n) {
+                        strncpy(func_table[func_count].name, n, sizeof(func_table[func_count].name) - 1);
+                        func_table[func_count].name[sizeof(func_table[func_count].name) - 1] = '\0';
+                        func_table[func_count].start_pos = scan_pos;
+                        func_table[func_count].nargs = pc;
+                        func_count++;
+                    }
+                    int depth = 1;
+                    while (scan_pos < code_end && depth > 0) {
+                        uint8_t b = code[scan_pos++];
+                        if (b == BC_FUNC_BODY) depth++;
+                        else if (b == BC_FUNC_END) depth--;
+                    }
+                }
+            } else if (op == OP_IMPORT) {
+                scan_pos += 4;
+            } else if (op == OP_CONST_DEF) {
+                scan_pos += 6;
+            } else if (op == OP_VAR_DECL || op == OP_TYPE_DEF) {
+                scan_pos += 4;
+            } else if (op == OP_PUSH_CONST_STR) {
+                scan_pos += 4;
+            } else if (op == OP_PUSH_CONST_INT) {
+                scan_pos += 2;
+            } else if (op == OP_PRINT || op == OP_LOAD_REG || op == OP_STORE_REG) {
+                scan_pos += 1;
+            } else if (op == OP_JUMP) {
+                scan_pos += 2;
+            } else if (op >= 100 && op <= 130) {
+                /* skip */
+            } else if (op >= 14 && op <= 19 && scan_pos < code_end) {
+                scan_pos++;
+            } else if (op >= 0 && op <= 7 && scan_pos < code_end) {
+                /* skip */
+            }
+        }
+    }
+#endif
+    /* ================================================ */
+restart_loop:
     while (pos < code_end) {
         /* 循环迭代检查：当 pos 到达活跃循环的 body_end 时，重新评估条件决定继续/退出 */
         if (loop_depth > 0) {
@@ -617,13 +902,32 @@ int main(int argc, char *argv[]) {
             printf("[QVM] 初始化 %d 个量子比特\n", n);
             continue;
         }
-        if (op == OP_STOP) {
-            printf("[QVM] 程序退出\n");
-            printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
-            free(code);
-            free(vm.state);
-            return 0;
+        switch (op) {
+        /* 当在函数定义体内时（func_nest_depth>0），跳过所有非函数定义/结束/函数体标记的opcode */
+        case OP_FUNC_DEF: { if (func_nest_depth > 0) { func_nest_depth++; high_count++; break; } } goto _func_def_continue;
+        case OP_FUNC_END: {
+            func_nest_depth--;
+            /* 函数返回：当不在函数定义上下文且存在挂起调用时，恢复调用栈 */
+            if (call_depth > 0 && func_nest_depth < 0) {
+                CallFrame *cf = &call_stack[--call_depth];
+                printf("[QVM] 函数返回: 跳回 pos=%d (call_depth=%d)\n", cf->return_pos, call_depth);
+                pos = cf->return_pos;
+                high_count++;
+                continue;  /* 从返回地址继续执行 */
+            }
+            high_count++; break;
         }
+        case BC_FUNC_BODY: { high_count++; break; }
+        case BC_FUNC_END: { high_count++; break; }
+        default:
+            if (func_nest_depth > 0) {
+                /* 在函数体内，跳过非特殊opcode */
+                break;
+            }
+            goto _process_opcode;
+        }
+        continue;
+    _process_opcode:
         switch (op) {
         case OP_INIT_N: {
             if (pos >= code_end) goto end;
@@ -633,16 +937,18 @@ int main(int argc, char *argv[]) {
             continue;
         }
         case OP_STOP: {
-            printf("[QVM] 程序退出\n");
-            printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
-            free(code); if (vm.state) free(vm.state); return 0;
+            if (import_depth > 0) {
+                goto end;
+            }
+            /* 顶层 STOP：不退出，继续执行后续字节码（函数定义等在STOP之后） */
+            printf("[QVM] OP_STOP (顶层，跳过)\n");
+            high_count++;
+            break;
         }
         case 0x15: { // QCL编译器STOP兼容
-            printf("[QVM] 程序退出\n");
-            printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
-            free(code);
-            if (vm.state) free(vm.state);
-            return 0;
+            printf("[QVM] OP 0x15 (顶层，跳过)\n");
+            high_count++;
+            break;
         }
         case OP_H:  { int q = code[pos++]; apply_gate(&vm, OP_H, q, 0);
                       printf("[QVM] H(q%d)\n", q); break; }
@@ -696,16 +1002,57 @@ int main(int argc, char *argv[]) {
                        stack_push(res);
                        printf("[QVM] DIV(%d / %d = %d)\n", a, b, res); break; }
         case OP_EXIT: {
-                       printf("[QVM] EXIT\n");
-                       free(code); if (vm.state) free(vm.state); return 0; }
+                       printf("[QVM] OP_EXIT\n");
+                       // 不立即return，设置标记让while循环正常退出
+                       goto end; }
         /* ---------- 高级语法opcode（100+）: 与qcl_phase2.c严格对齐 ---------- */
         case OP_IMPORT: {
-            if (pos + 3 < fsize) {
+            if (pos + 3 < code_end) {
                 int off = code[pos] | (code[pos+1] << 8);
                 int len = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
+                /* QVML格式：字符串在字符串池(sp_data)中，off+len指向池中位置 */
+                int parent_pos = pos;  /* 下一指令在父模块中的位置 */
                 char *n = read_string(name, sizeof(name), sp_data, sp_len, off, len);
-                printf("[QVM] OP_IMPORT(%s)\n", n ? n : "(invalid)");
+                if (!n) n = "";
+                printf("[QVM] OP_IMPORT(%s)\n", n);
+                /* 尝试加载import模块 */
+                if (n[0] && import_depth < IMPORT_STACK_MAX) {
+                    int imported_size = 0;
+                    uint8_t *imported = load_import_qbc(n, &imported_size);
+                    if (imported && imported_size > 0) {
+                        /* 保存父模块上下文 */
+                        import_code_stack[import_depth] = code;
+                        import_pos_stack[import_depth] = parent_pos;
+                        import_fsize_stack[import_depth] = fsize;
+                        import_sp_len_stack[import_depth] = sp_len;
+                        import_sp_off_stack[import_depth] = (int)(sp_data - code);
+                        import_func_nest_stack[import_depth] = func_nest_depth;
+                        printf("[QVM] import: 保存父模块 pos=%d (off+len后), sp_off=%d, depth=%d\n", parent_pos, (int)(sp_data - code), import_depth);
+                        import_depth++;
+                        func_nest_depth = 0;
+                        /* 切换到imported模块 */
+                        code = imported;
+                        fsize = imported_size;
+                        pos = 0;
+                        sp_data = imported;
+                        sp_len = imported_size;
+                        code_end = imported_size;
+                        /* 扫描QVML头 */
+                        if (imported_size >= 6 && imported[0] == 0x14) {
+                            int c_len = imported[4] | (imported[5] << 8);
+                            pos = 6;
+                            code_end = c_len + 6;
+                            if (c_len + 6 <= imported_size) {
+                                sp_data = imported + c_len + 8;
+                                sp_len = imported_size - (c_len + 8);
+                                printf("[QVM] import: 模块代码区=%d字节, sp=%d字节\n", c_len, sp_len);
+                            }
+                        }
+                        printf("[QVM] import: 链接执行 '%s' (%d bytes)\n", n, imported_size);
+                        continue;  /* 从新模块开始执行 */
+                    }
+                }
                 high_count++;
             }
             break;
@@ -723,29 +1070,56 @@ int main(int argc, char *argv[]) {
             }
             break;
         }
+_func_def_continue:
         case OP_FUNC_DEF: {
             int nest = func_nest_depth;
-            int off = 0, flen = 0, nargs = 0;
-            if (pos + 4 < fsize) {
+            int off = 0, flen = 0;
+            if (pos + 3 < fsize) {
                 off = code[pos] | (code[pos+1] << 8);
                 flen = code[pos+2] | (code[pos+3] << 8);
                 pos += 4;
             }
-            if (pos < fsize) nargs = code[pos++];
             char *n = read_string(name, sizeof(name), sp_data, sp_len, off, flen);
-            printf("[QVM] OP_FUNC_DEF(%s, nargs=%d) depth=%d\n",
-                   n ? n : "(unknown)", nargs, nest);
+            printf("[QVM] OP_FUNC_DEF(%s, body=%d) depth=%d\n",
+                   n ? n : "(unknown)", pos, nest);
+            fflush(stdout);
+            /* 跳过参数条目：编译器格式为 [param_idx(1B) | param_name_ref(4B)] × N，然后 param_count(2B)，然后 BC_FUNC_BODY(1B) */
+            int param_count = 0;
+            /* 先扫描找到 BC_FUNC_BODY 位置 */
+            int body_mark_pos = pos;
+            while (body_mark_pos < fsize && body_mark_pos < code_end) {
+                if (code[body_mark_pos] == BC_FUNC_BODY) break;
+                body_mark_pos++;
+            }
+            /* param_count 在 BC_FUNC_BODY 前的2字节 */
+            if (body_mark_pos >= 2 && body_mark_pos < fsize) {
+                param_count = code[body_mark_pos-2] | (code[body_mark_pos-1] << 8);
+                if (param_count > 20) param_count = 20; /* 安全上限 */
+            }
+            /* 精确跳过所有参数条目 + param_count(2B) + BC_FUNC_BODY(1B) */
+            pos = body_mark_pos + 1;
             /* 只在顶层（depth==0）注册函数，嵌套 def 只是语法标记 */
             if (nest == 0) {
                 if (func_count < MAX_FUNCS) {
                     strncpy(func_table[func_count].name, name, sizeof(func_table[func_count].name) - 1);
                     func_table[func_count].name[sizeof(func_table[func_count].name) - 1] = '\0';
                     func_table[func_count].start_pos = pos;  /* 函数体从下一条指令开始 */
-                    func_table[func_count].nargs = nargs;
+                    func_table[func_count].nargs = param_count;
                     func_count++;
                 }
             }
             func_nest_depth++;
+            /* 主动跳过函数体：扫描到匹配的 BC_FUNC_END（但不消费它），或直到 code_end */
+            {
+                int skip_depth = 1;
+                while (pos < code_end && skip_depth > 0) {
+                    uint8_t bip = code[pos];
+                    if (bip == BC_FUNC_BODY) { skip_depth++; pos++; }
+                    else if (bip == BC_FUNC_END) { skip_depth--; if (skip_depth > 0) pos++; }
+                    else pos++;
+                }
+                /* pos 停留在 BC_FUNC_END，主循环将处理 BC_FUNC_END → OP_FUNC_END → 函数返回 */
+            }
             strncpy(last_func_name, name, sizeof(last_func_name) - 1);
             last_func_name[sizeof(last_func_name) - 1] = '\0';
             high_count++;
@@ -753,9 +1127,17 @@ int main(int argc, char *argv[]) {
         }
         case OP_FUNC_END: {
             func_nest_depth--;
-            printf("[QVM] OP_FUNC_END(%s) depth=%d %s\n",
+            printf("[QVM] OP_FUNC_END(%s) depth=%d%s\n",
                    last_func_name[0] ? last_func_name : "(unknown)",
-                   func_nest_depth, func_nest_depth < 0 ? "!!! 不匹配" : "");
+                   func_nest_depth, func_nest_depth < 0 ? " !!! 不匹配" : "");
+            /* 函数返回：恢复调用栈，跳回调用点 */
+            if (call_depth > 0) {
+                CallFrame *cf = &call_stack[--call_depth];
+                printf("[QVM] 函数返回: 跳回 pos=%d (call_depth=%d)\n", cf->return_pos, call_depth);
+                pos = cf->return_pos;
+                high_count++;
+                continue;  /* 从返回地址继续执行 */
+            }
             high_count++;
             break;
         }
@@ -793,6 +1175,12 @@ int main(int argc, char *argv[]) {
             int rt = 0;
             if (pos < fsize) rt = code[pos++];
             printf("[QVM] OP_RETURN_STMT(kind=%d)\n", rt);
+            if (call_depth <= 0) {
+                /* 顶层 return：跳过，继续执行后续字节码（函数定义等） */
+                printf("[QVM] 顶层 return，跳过\n");
+                high_count++;
+                break;
+            }
             /* 从函数返回：弹出调用帧，跳到返回地址 */
             if (rt == 0 && call_depth > 0) {
                 /* return; 无返回值 */
@@ -843,7 +1231,7 @@ int main(int argc, char *argv[]) {
             } else if (call_depth <= 0) {
                 /* 在顶层 return = 退出程序 */
                 printf("[QVM] 顶层 return，退出程序\n");
-                free(code); if (vm.state) free(vm.state); return 0;
+                goto end;
             }
             break;
         }
@@ -1063,6 +1451,15 @@ int main(int argc, char *argv[]) {
                 pos = target;
                 high_count++;
                 continue;  /* 立即从目标位置继续执行 */
+            } else if (n && n[0]) {
+                /* 尝试内建函数调用 */
+                int bval = builtin_dispatch(n, nargs, code, pos, fsize, sp_data, sp_len);
+                printf("[QVM] 内建 '%s' 返回 %d\n", n, bval);
+                stack_push(bval);
+                if (builtin_str_len > 0) {
+                    str_var_set("__last_result", builtin_str_buf, builtin_str_len);
+                }
+                high_count++;
             } else {
                 printf("[QVM] 警告: 函数 '%s' 未定义，跳过调用\n", n ? n : "(null)");
                 high_count++;
@@ -1117,6 +1514,10 @@ int main(int argc, char *argv[]) {
             }
             char *s = read_string(str_const_buf, sizeof(str_const_buf), sp_data, sp_len, off, slen);
             printf("[QVM] OP_PUSH_CONST_STR(%s)\n", s ? s : "(null)");
+            /* 推变量值到栈（用于条件判断和赋值） */
+            int val = (s && s[0]) ? var_get(s) : 1;
+            stack_push(val);
+            printf("[QVM] OP_PUSH_CONST_STR -> stack=%d\n", val);
             high_count++;
             break;
         }
@@ -1195,29 +1596,112 @@ int main(int argc, char *argv[]) {
             break;
         }
         default:
-            printf("[QVM] 未知opcode: 0x%02x (pos=%d)\n", op, pos - 1);
+            /* 未知opcode：跳过1字节（可能是保留扩展），防止无限循环 */
+            printf("[QVM] 未知opcode: 0x%02x (pos=%d)，跳过\n", op, pos - 1);
+            high_count++;
             break;
         }
     }
-
-    /* 自动调用main函数（如果存在）*/
-    for (int i = 0; i < func_count; i++) {
-        if (strcmp(func_table[i].name, "main") == 0) {
-            printf("[QVM] 自动调用main函数...\n");
-            int ret = call_function(code, fsize, "main", 0, NULL, 0);
-            if (ret < 0) {
-                printf("[QVM] 错误: 调用main函数失败 (返回=%d)\n", ret);
-            }
-            break;
-        }
-    }
-
+    /* ========== import栈管理：模块执行完毕后的父模块恢复 ========== */
+    /* 注意：此代码必须放在while循环之后（end标签处），
+       因为OP_STOP的goto end跳过while内代码直接到end处执行 */
 end:
+    if (import_depth > 0) {
+        /* 当前模块执行完毕，恢复到父模块 */
+        import_depth--;
+        printf("[QVM] import: 模块执行完毕，返回父模块 (depth=%d)\n", import_depth);
+        uint8_t *parent_code = import_code_stack[import_depth];
+        int parent_pos = import_pos_stack[import_depth];
+        int parent_fsize = import_fsize_stack[import_depth];
+        int parent_sp_len = import_sp_len_stack[import_depth];
+        int parent_sp_off = import_sp_off_stack[import_depth];
+        func_nest_depth = import_func_nest_stack[import_depth];
+        free(code);  /* 释放当前模块 */
+        code = parent_code;
+        fsize = parent_fsize;
+        pos = parent_pos;
+        sp_data = parent_code + parent_sp_off;
+        sp_len = parent_sp_len;
+        code_end = parent_fsize;  /* 对于有QVML头的父模块，这可能不对，但仅作fallback */
+        if (parent_fsize >= 6 && parent_code[0] == 0x14) {
+            int c_len = parent_code[4] | (parent_code[5] << 8);
+            code_end = c_len + 6;
+        }
+        printf("[QVM] import: 父模块 pos=%d, code_end=%d\n", pos, code_end);
+        goto restart_loop;  /* 继续在父模块中执行 */
+    }
+
+    /* 自动调用main函数（如果存在，且尚未调用）*/
+    static int auto_called_main = 0;
+    int auto_called = 0;
+    if (!auto_called_main) {
+        for (int i = 0; i < func_count; i++) {
+            if (strcmp(func_table[i].name, "main") == 0) {
+                printf("[QVM] 自动调用main函数...\n");
+                pos = func_table[i].start_pos;
+                auto_called = 1;
+                auto_called_main = 1;
+                goto restart_loop;
+            }
+        }
+        /* 尝试调用主程序 */
+        if (!auto_called) {
+            for (int i = 0; i < func_count; i++) {
+                if (strcmp(func_table[i].name, "主程序") == 0) {
+                    printf("[QVM] 自动调用主程序...\n");
+                    pos = func_table[i].start_pos;
+                    auto_called = 1;
+                    auto_called_main = 1;
+                    goto restart_loop;
+                }
+            }
+        }
+        /* 回退：直接从字符串池查找函数名并调用 */
+        if (!auto_called) {
+            for (int i = 0; i < func_count; i++) {
+                char *n = func_table[i].name;
+                if (n[0] != '\0') {
+                    /* 检查是否包含目标关键词 */
+                    if (strstr(n, "编译器编译") || strstr(n, "主程序")) {
+                        printf("[QVM] 回退调用函数 #%d: %s (start_pos=%d)\n", i, n, func_table[i].start_pos);
+                        pos = func_table[i].start_pos;
+                        auto_called = 1;
+                        auto_called_main = 1;
+                        goto restart_loop;
+                    }
+                }
+            }
+        }
+        /* 终极回退：直接扫描代码段查找编译器编译和主程序的 OP_FUNC_DEF */
+        if (!auto_called) {
+            for (int i = 0; i < func_count; i++) {
+                char *n = func_table[i].name;
+                if (n[0] != '\0') {
+                    /* 检查名称中是否包含目标关键词（容错模糊匹配） */
+                    if (strstr(n, "编译器") || strstr(n, "主程")) {
+                        printf("[QVM] 回退调用函数 #%d: '%s' (start_pos=%d)\n", i, n, func_table[i].start_pos);
+                        pos = func_table[i].start_pos;
+                        auto_called = 1;
+                        auto_called_main = 1;
+                        goto restart_loop;
+                    }
+                }
+            }
+        }
+    }
+    /* 如果 auto-call 已完成，退出 */
+    if (auto_called_main) {
+        printf("[QVM] 主程序执行完毕，退出\n");
+        free(code);
+        if (vm.state) free(vm.state);
+        return 0;
+    }
+
     if (func_nest_depth != 0) {
         printf("[QVM] 警告: FUNC_DEF/END 不匹配 (depth=%d, 应有0)\n", func_nest_depth);
     }
     printf("[QVM] 高级opcode处理总数: %d\n", high_count);
-    printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, vm.ops);
+    printf("[QVM] 执行完成: %d 周期, %d 门操作\n", vm.cycles, high_count);
     free(code);
     return 0;
 }
