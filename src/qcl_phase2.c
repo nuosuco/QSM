@@ -1743,6 +1743,7 @@ static int parse_def(Parser *P) {
             fprintf(stderr, "[BC_BODY] first cur=%s kind=%d pos=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos);
             /* 逐行解析缩进体中的语句 */
             while (P->lexer.cur.kind != TOK_EOF) {
+                fprintf(stderr, "[LOOP_TOP] line=%d cur=%s kind=%d pos=%d body_indent=%d\n", P->lexer.line, P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos, body_indent);
                 /* 检查当前行的缩进是否 <= body_indent（函数体结束）*/
                 /* 回溯到当前行首位置，测量缩进 */
                 int lp = P->lexer.pos;
@@ -1756,14 +1757,16 @@ static int parse_def(Parser *P) {
                 if (found_newline) {
                     while (lp < P->lexer.len && (P->lexer.src[lp] == ' ' || P->lexer.src[lp] == '\t')) { line_indent++; lp++; }
                 }
+                fprintf(stderr, "[INDENT_CHECK] line=%d indent=%d body=%d cur=%s kind=%d pos=%d\n", P->lexer.line, line_indent, body_indent, P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos);
                 /* 空行/注释行保持缩进状态 */
                 if (P->lexer.cur.kind == TOK_EOF) break;
                 if (line_indent < body_indent && P->lexer.cur.kind != TOK_ERR) {
-                    fprintf(stderr, "[BC_BODY] indent break: line_indent=%d < body_indent=%d cur=%s\n", line_indent, body_indent, P->lexer.cur.text);
+                    fprintf(stderr, "[INDENT_BREAK] line=%d indent=%d body=%d cur=%s kind=%d\n", P->lexer.line, line_indent, body_indent, P->lexer.cur.text, P->lexer.cur.kind);
                     /* 缩进已回退，函数体结束 */
                     break;
                 }
                 Token ct = P->lexer.cur;
+                fprintf(stderr, "[PROCESS] line=%d cur=%s kind=%d pos=%d\n", P->lexer.line, ct.text, ct.kind, P->lexer.pos);
                 if (ct.kind == TOK_ERR) { consume(P); continue; }
                 /* 在缩进体中，} 不会作为结构闭合出现（花括号体由 parse_compound_block 处理）。
                    此处出现的 } 要么是对象字面量（如 返回 {a, b}），要么是字符串内的字符（如 \"缺少结束 }\"）。
@@ -1778,7 +1781,7 @@ static int parse_def(Parser *P) {
                         while (pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) pd++; else if (P->lexer.cur.kind==TOK_RPAR) pd--; consume(P); } }
                     if (expect_tok(P, TOK_COLON)) {}
                     if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(BC_FUNC_BODY); parse_func_body(P); write_high_opcode(BC_FUNC_END); flush_highbuf(); }
-                    else skip_to_semi_or_rbrace(P);
+                    else { /* 缩进体由外层循环处理 */ }
                     write_high_opcode(OP_FUNC_END); continue;
                 }
                 if (kw(&ct, "import")) { if (parse_import(P)) continue; }
@@ -1792,7 +1795,12 @@ static int parse_def(Parser *P) {
                         else if (P->lexer.cur.kind == TOK_STRING) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
                         else if (P->lexer.cur.kind == TOK_LBRK) { write_high_opcode(OP_PUSH_CONST_INT); write_u16(0); parse_compound_block(P); }
                         else if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_PUSH_CONST_INT); write_u16(0); parse_compound_block(P); }
-                        else if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                        else if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P);
+                            /* 函数调用(...)续写 */
+                            if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } }
+                        }
+                        /* 消耗同行剩余表达式标记（运算符续写） */
+                        { int _sl = P->lexer.line; while (P->lexer.line == _sl && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } } else consume(P); } }
                         /* 将栈上的初始值赋给变量 */
                         if (vn_buf[0]) { write_high_opcode(OP_ASSIGN_STMT); write_string_ref(vn_buf); }
                     }
@@ -1803,37 +1811,48 @@ static int parse_def(Parser *P) {
                     if (P->lexer.cur.kind == TOK_SEMI) { write_high_opcode(OP_RETURN_STMT); write_high_byte(0); consume(P); P->high_level++; continue; }
                     if (P->lexer.cur.kind == TOK_NUMBER) { write_high_opcode(OP_RETURN_STMT); write_high_byte(1); write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
                     if (P->lexer.cur.kind == TOK_STRING) { write_high_opcode(OP_RETURN_STMT); write_high_byte(2); write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
-                    if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_RETURN_STMT); write_high_byte(3); write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
+                    if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_RETURN_STMT); write_high_byte(3); write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P);
+                            /* 函数调用(...)续写 */
+                            if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } }
+                            expect_tok(P, TOK_SEMI); P->high_level++; continue; }
                     if (P->lexer.cur.kind == TOK_LBRK || P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_RETURN_STMT); write_high_byte(4); int r_depth = 1; int r_open = P->lexer.cur.kind; int r_close = (r_open == TOK_LBRACE) ? TOK_RBRACE : TOK_RBRK; consume(P); while (r_depth > 0 && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == r_open) r_depth++; else if (P->lexer.cur.kind == r_close) { r_depth--; if (r_depth <= 0) { consume(P); break; } } consume(P); } P->high_level++; continue; }
                     write_high_opcode(OP_RETURN_STMT); write_high_byte(0); expect_tok(P, TOK_SEMI); P->high_level++; continue;
                 }
                 if (kw(&ct, "if") || kw(&ct, "如果")) {
                     consume(P);
+                    /* 跳过TOK_ERR（如!取反）*/
+                    while (P->lexer.cur.kind == TOK_ERR) consume(P);
                     if (P->lexer.cur.kind == TOK_LPAR) consume(P);
                     if (P->lexer.cur.kind == TOK_IDENT) { /* condition is an expression on stack */
                         /* parse condition (simplified: push int or string) */
                         if (P->lexer.cur.text[0] >= '0' && P->lexer.cur.text[0] <= '9') { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
                         else { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                        /* 消耗剩余条件token直到冒号 */
+                        while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_COLON) consume(P);
                     }
                     if (P->lexer.cur.kind == TOK_RPAR) consume(P);
                     if (expect_tok(P, TOK_COLON)) {}
                     if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_IF_STMT); parse_compound_block(P); }
-                    else { /* single-statement then-body */ write_high_opcode(OP_IF_STMT); skip_to_semi_or_rbrace(P); }
+                    else { write_high_opcode(OP_IF_STMT); /* 缩进体由外层循环处理 */ }
                     P->high_level++; continue;
                 }
                 if (kw(&ct, "else") || kw(&ct, "否则")) {
                     consume(P);
                     if (expect_tok(P, TOK_COLON)) {}
                     if (P->lexer.cur.kind == TOK_LBRACE) { write_high_opcode(OP_ELSE_STMT); parse_compound_block(P); }
-                    else { write_high_opcode(OP_ELSE_STMT); skip_to_semi_or_rbrace(P); }
+                    else { write_high_opcode(OP_ELSE_STMT); /* 缩进体由外层循环处理 */ }
                     P->high_level++; continue;
                 }
                 if (kw(&ct, "while") || kw(&ct, "循环")) {
                     consume(P);
+                    /* 跳过TOK_ERR（如!取反）*/
+                    while (P->lexer.cur.kind == TOK_ERR) consume(P);
                     if (P->lexer.cur.kind == TOK_LPAR) consume(P);
                     if (P->lexer.cur.kind == TOK_IDENT) {
                         if (P->lexer.cur.text[0] >= '0' && P->lexer.cur.text[0] <= '9') { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
                         else { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                        /* 消耗剩余条件token直到冒号 */
+                        while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_COLON) consume(P);
                     } else if (P->lexer.cur.kind == TOK_NUMBER) {
                         write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P);
                     }
@@ -1846,6 +1865,7 @@ static int parse_def(Parser *P) {
                 if (kw(&ct, "break") || kw(&ct, "跳出")) { write_high_opcode(OP_BREAK_STMT); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
                 if (kw(&ct, "continue") || kw(&ct, "继续")) { write_high_opcode(OP_CONTINUE_STMT); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
                 /* 函数调用和高阶赋值 */
+                fprintf(stderr, "[CHECK_IDENT] ct.kind=%d ct.text=%s line=%d\n", ct.kind, ct.text, P->lexer.line);
                 if (ct.kind == TOK_IDENT) {
                     char id_buf[MAX_STRING];
                     strncpy(id_buf, ct.text, sizeof(id_buf) - 1);
@@ -1865,6 +1885,50 @@ static int parse_def(Parser *P) {
                         write_high_byte((unsigned char)nargs);
                         expect_tok(P, TOK_SEMI);
                         P->high_level++; continue;
+                    }
+                    /* 数组索引访问 [...] */
+                    if (P->lexer.cur.kind == TOK_LBRK) {
+                        int _od = 1; consume(P);
+                        while (_od > 0 && P->lexer.cur.kind != TOK_EOF) {
+                            if (P->lexer.cur.kind == TOK_LBRK) _od++;
+                            else if (P->lexer.cur.kind == TOK_RBRK) { _od--; if (_od <= 0) { consume(P); break; } }
+                            consume(P);
+                        }
+                        /* 数组索引后的赋值操作 */
+                        if (P->lexer.cur.kind == TOK_EQ) {
+                            fprintf(stderr, "[ARRAY_EQ] enter at line=%d cur=%s kind=%d\n", P->lexer.line, P->lexer.cur.text, P->lexer.cur.kind);
+                            write_high_opcode(OP_ASSIGN_STMT);
+                            write_string_ref(id);
+                            consume(P);
+                            if (P->lexer.cur.kind == TOK_NUMBER) { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
+                            else if (P->lexer.cur.kind == TOK_STRING) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
+                            else if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); fprintf(stderr, "[ARRAY_EQ] consume ident=%s at line=%d\n", P->lexer.cur.text, P->lexer.line); consume(P); fprintf(stderr, "[ARRAY_EQ] after ident consume: cur=%s kind=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.line); }
+                            /* 消耗同行剩余表达式标记（运算符+函数调用续写） */
+                            { int _sl = P->lexer.line; while (P->lexer.line == _sl && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } } else consume(P); } }
+                            fprintf(stderr, "[ARRAY_EQ] continue: cur=%s kind=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.line);
+                            P->high_level++; continue;
+                        }
+                        P->high_level++; continue;
+                    }
+                    /* 方法调用 .identifier(...) */
+                    if (P->lexer.cur.kind == TOK_DOT) {
+                        consume(P); /* consume . */
+                        if (P->lexer.cur.kind == TOK_IDENT) {
+                            write_high_opcode(OP_FUNC_CALL_STMT);
+                            write_string_ref(P->lexer.cur.text);
+                            consume(P);
+                            if (P->lexer.cur.kind == TOK_LPAR) {
+                                consume(P); int nargs=0;
+                                while (P->lexer.cur.kind != TOK_EOF && P->lexer.cur.kind != TOK_RPAR) {
+                                    if (P->lexer.cur.kind == TOK_COMMA) nargs++;
+                                    else if (P->lexer.cur.kind == TOK_IDENT || P->lexer.cur.kind == TOK_NUMBER || P->lexer.cur.kind == TOK_STRING) nargs++;
+                                    consume(P);
+                                }
+                                if (P->lexer.cur.kind == TOK_RPAR) consume(P);
+                                write_high_byte((unsigned char)nargs);
+                            }
+                        }
+                        expect_tok(P, TOK_SEMI); P->high_level++; continue;
                     }
                     /* 赋值语句 */
                     if (P->lexer.cur.kind == TOK_EQ) {
@@ -1887,10 +1951,13 @@ static int parse_def(Parser *P) {
                                                 expect_tok(P, TOK_SEMI);
                                                 P->high_level++; continue;
                                             }
-                                            skip_to_semi_or_rbrace(P); continue;
+                                            /* 消耗同行剩余标记（缩进体语句无分号结尾） */
+                                            { int _sl = P->lexer.line; while (P->lexer.line == _sl && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } } else consume(P); } } continue;
                                         }
-                                        skip_to_semi_or_rbrace(P); continue;
+                                        /* 消耗同行剩余标记 */
+                                        { int _sl = P->lexer.line; while (P->lexer.line == _sl && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } } else consume(P); } } continue;
                                     }
+                                    fprintf(stderr, "[BC_BODY] after IDENT handler: cur=%s kind=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.line);
                                     fprintf(stderr, "[BC_BODY] after while: cur=%s kind=%d pos=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos, P->lexer.line);
             flush_highbuf();
             write_high_opcode(BC_FUNC_END);
