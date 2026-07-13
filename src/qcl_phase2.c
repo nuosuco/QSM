@@ -866,17 +866,17 @@ static int parse_import(Parser *P) {
         strncpy(mod_buf, mod ? mod : "", sizeof(mod_buf) - 1);
         mod_buf[sizeof(mod_buf) - 1] = '\0';
         mod = mod_buf;
-        fprintf(stderr, "[debug_import] TOK_STRING: mod=[%s] prev=[%s]\n", mod, prev.text);
+        
         consume(P);
     } else if (P->lexer.cur.kind == TOK_IDENT) {
         mod = P->lexer.cur.text;
         strncpy(mod_buf, mod ? mod : "", sizeof(mod_buf) - 1);
         mod_buf[sizeof(mod_buf) - 1] = '\0';
         mod = mod_buf;
-        fprintf(stderr, "[debug_import] TOK_IDENT: mod=[%s] prev=[%s]\n", mod, prev.text);
+        
         consume(P);
     } else {
-        fprintf(stderr, "[debug_import] TOK_OTHER: kind=%d prev=[%s] cur=[%.20s]\n",
+        
                 P->lexer.cur.kind, prev.text, P->lexer.src + P->lexer.pos);
         return 0;
     }
@@ -1743,7 +1743,7 @@ static int parse_def(Parser *P) {
             fprintf(stderr, "[BC_BODY] first cur=%s kind=%d pos=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos);
             /* 逐行解析缩进体中的语句 */
             while (P->lexer.cur.kind != TOK_EOF) {
-                fprintf(stderr, "[LOOP_TOP] line=%d cur=%s kind=%d pos=%d body_indent=%d\n", P->lexer.line, P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos, body_indent);
+                
                 /* 检查当前行的缩进是否 <= body_indent（函数体结束）*/
                 /* 回溯到当前行首位置，测量缩进 */
                 int lp = P->lexer.pos;
@@ -1757,16 +1757,16 @@ static int parse_def(Parser *P) {
                 if (found_newline) {
                     while (lp < P->lexer.len && (P->lexer.src[lp] == ' ' || P->lexer.src[lp] == '\t')) { line_indent++; lp++; }
                 }
-                fprintf(stderr, "[INDENT_CHECK] line=%d indent=%d body=%d cur=%s kind=%d pos=%d\n", P->lexer.line, line_indent, body_indent, P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos);
+                
                 /* 空行/注释行保持缩进状态 */
                 if (P->lexer.cur.kind == TOK_EOF) break;
                 if (line_indent < body_indent && P->lexer.cur.kind != TOK_ERR) {
-                    fprintf(stderr, "[INDENT_BREAK] line=%d indent=%d body=%d cur=%s kind=%d\n", P->lexer.line, line_indent, body_indent, P->lexer.cur.text, P->lexer.cur.kind);
+                    
                     /* 缩进已回退，函数体结束 */
                     break;
                 }
                 Token ct = P->lexer.cur;
-                fprintf(stderr, "[PROCESS] line=%d cur=%s kind=%d pos=%d\n", P->lexer.line, ct.text, ct.kind, P->lexer.pos);
+                
                 if (ct.kind == TOK_ERR) { consume(P); continue; }
                 /* 在缩进体中，} 不会作为结构闭合出现（花括号体由 parse_compound_block 处理）。
                    此处出现的 } 要么是对象字面量（如 返回 {a, b}），要么是字符串内的字符（如 \"缺少结束 }\"）。
@@ -1865,7 +1865,7 @@ static int parse_def(Parser *P) {
                 if (kw(&ct, "break") || kw(&ct, "跳出")) { write_high_opcode(OP_BREAK_STMT); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
                 if (kw(&ct, "continue") || kw(&ct, "继续")) { write_high_opcode(OP_CONTINUE_STMT); consume(P); expect_tok(P, TOK_SEMI); P->high_level++; continue; }
                 /* 函数调用和高阶赋值 */
-                fprintf(stderr, "[CHECK_IDENT] ct.kind=%d ct.text=%s line=%d\n", ct.kind, ct.text, P->lexer.line);
+                
                 if (ct.kind == TOK_IDENT) {
                     char id_buf[MAX_STRING];
                     strncpy(id_buf, ct.text, sizeof(id_buf) - 1);
@@ -1896,16 +1896,15 @@ static int parse_def(Parser *P) {
                         }
                         /* 数组索引后的赋值操作 */
                         if (P->lexer.cur.kind == TOK_EQ) {
-                            fprintf(stderr, "[ARRAY_EQ] enter at line=%d cur=%s kind=%d\n", P->lexer.line, P->lexer.cur.text, P->lexer.cur.kind);
+                            
                             write_high_opcode(OP_ASSIGN_STMT);
                             write_string_ref(id);
                             consume(P);
                             if (P->lexer.cur.kind == TOK_NUMBER) { write_high_opcode(OP_PUSH_CONST_INT); write_u16((unsigned short)parse_const_int(P->lexer.cur.text)); consume(P); }
                             else if (P->lexer.cur.kind == TOK_STRING) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
-                            else if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); fprintf(stderr, "[ARRAY_EQ] consume ident=%s at line=%d\n", P->lexer.cur.text, P->lexer.line); consume(P); fprintf(stderr, "[ARRAY_EQ] after ident consume: cur=%s kind=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.line); }
+                            else if (P->lexer.cur.kind == TOK_IDENT) { write_high_opcode(OP_PUSH_CONST_STR); write_string_ref(P->lexer.cur.text); consume(P); }
                             /* 消耗同行剩余表达式标记（运算符+函数调用续写） */
                             { int _sl = P->lexer.line; while (P->lexer.line == _sl && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } } else consume(P); } }
-                            fprintf(stderr, "[ARRAY_EQ] continue: cur=%s kind=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.line);
                             P->high_level++; continue;
                         }
                         P->high_level++; continue;
@@ -1957,8 +1956,8 @@ static int parse_def(Parser *P) {
                                         /* 消耗同行剩余标记 */
                                         { int _sl = P->lexer.line; while (P->lexer.line == _sl && P->lexer.cur.kind != TOK_EOF) { if (P->lexer.cur.kind == TOK_LPAR) { int _pd=1; consume(P); while (_pd>0 && P->lexer.cur.kind!=TOK_EOF) { if (P->lexer.cur.kind==TOK_LPAR) _pd++; else if (P->lexer.cur.kind==TOK_RPAR) _pd--; consume(P); } } else consume(P); } } continue;
                                     }
-                                    fprintf(stderr, "[BC_BODY] after IDENT handler: cur=%s kind=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.line);
-                                    fprintf(stderr, "[BC_BODY] after while: cur=%s kind=%d pos=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos, P->lexer.line);
+                                    
+                                    
             flush_highbuf();
             write_high_opcode(BC_FUNC_END);
             flush_highbuf();
@@ -1970,7 +1969,7 @@ static int parse_def(Parser *P) {
         }
     }
     write_opcode(OP_FUNC_END);
-    fprintf(stderr, "[parse_def] after func end: cur=%s kind=%d pos=%d line=%d\n", P->lexer.cur.text, P->lexer.cur.kind, P->lexer.pos, P->lexer.line);
+    
     P->high_level++; return 1;
 }
 
@@ -2172,7 +2171,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
         lexer_skip_ws(&P.lexer);
         if (P.lexer.cur.kind == TOK_EOF) break;
         if (iter < 100 && P.lexer.cur.kind == TOK_IDENT) {
-            fprintf(stderr, "[DEBUG] token=%s pos=%d line=%d\n", P.lexer.cur.text, P.lexer.pos, P.lexer.line);
+            
         }
         if (iter++ > 5000000) { fprintf(stderr, "[QCL2] main loop HANG guard at pos=%d\n", P.lexer.pos); break; }
         /* 快速跳过连续的未知字符（TS 语法符号 `as/typeof/void` 产生大量 TOK_ERR） */
@@ -2210,7 +2209,7 @@ static int compile_file_stage2(const char *input_path, const char *output_path) 
             if (parse_struct(&P)) { stats.types++; stats.high_level_lines++; continue; }
         }
         if (kw(&cur, "def") || kw(&cur, "函数") || kw(&cur, "function")) {
-            fprintf(stderr, "[TDEBUG] def at line=%d pos=%d cur=%s\n", P.lexer.line, P.lexer.pos, cur.text);
+            
             if (parse_def(&P)) { stats.functions++; stats.high_level_lines++; continue; }
         }
         /* class / quantum_class / enum / interface 类型定义（跳过整个体，emit OP_TYPE_DEF + 类型名 + OP_TYPE_END）
