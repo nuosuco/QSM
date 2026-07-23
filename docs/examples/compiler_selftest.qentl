@@ -1,0 +1,12 @@
+# QEntL 编译器自检程序
+# 验证编译器能正确处理所有支持的指令
+# 这是一个"元编程"测试：用 QEntL 编写 QEntL 编译器
+
+# 测试 1: 基本量子门
+init 2
+H 0
+CNOT 0 1
+MEASURE 0 0
+MEASURE 1 1
+PRINT 0
+STOP

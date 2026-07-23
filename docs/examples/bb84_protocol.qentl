@@ -1,0 +1,43 @@
+# 量子密钥分发 (BB84 协议简化版)
+# Alice 和 Bob 通过量子通道共享密钥
+# 模拟 BB84 协议的量子传输阶段
+
+init 4
+
+# Alice 制备量子比特 (随机选择基)
+# 基1 (Rectilinear): |0> 或 |1>
+# 基2 (Diagonal): |+> 或 |->
+
+# Alice 选择基1, 发送 |1>
+X 0
+
+# Bob 选择基1 (正确基)
+# 测量后应得到 |1>
+MEASURE 0 0
+
+# Alice 选择基2, 发送 |+>
+H 1
+
+# Bob 选择基2 (正确基)
+MEASURE 1 1
+
+# Alice 选择基1, 发送 |0>
+# (初始就是 |0>, 不需要额外操作)
+
+# Bob 选择基1
+MEASURE 2 2
+
+# 纠缠密钥分发: Alice 和 Bob 共享 EPR 对
+H 2
+CNOT 2 3
+
+# Bob 测量他的部分
+MEASURE 3 3
+
+# 打印结果
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+
+STOP

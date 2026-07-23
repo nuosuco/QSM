@@ -1,0 +1,37 @@
+# 量子随机数生成器
+# 利用量子叠加态的本质随机性生成真随机数
+# 每个 H 门产生 50/50 的随机比特
+
+init 8
+
+# 创建 8 个量子比特的叠加态
+H 0
+H 1
+H 2
+H 3
+H 4
+H 5
+H 6
+H 7
+
+# 测量所有量子比特
+MEASURE 0 0
+MEASURE 1 1
+MEASURE 2 2
+MEASURE 3 3
+MEASURE 4 4
+MEASURE 5 5
+MEASURE 6 6
+MEASURE 7 7
+
+# 打印结果 (8-bit 随机数)
+PRINT 0
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+PRINT 5
+PRINT 6
+PRINT 7
+
+STOP

@@ -1,0 +1,94 @@
+# QCL.skill — 量子编译器
+
+**量子基因编码**: QGC-SKILL-QCL-20260723
+**纠缠信道**: QEC-SKILL-QCL-COMPILER
+**性质**: 永久核心skill，不可删除
+
+---
+
+## 一、编译器现状
+
+### 有效编译器
+- **qcl_self2.qentl** (1979行) — 唯一真正的QEntL编译器
+  - 能编译：def/var/const/if/else/while/算术/比较/递归/import/struct/printf(单参数)
+  - 不能编译：str_*内置函数(79处)、数组索引表达式(416处)、多参数printf
+
+### C启动器（不是编译器）
+- **src/qcl_bootstrap.c** — 只认量子指令(init/H/X/CNOT/MEASURE/PRINT/STOP)
+- 红线：不在此文件中添加任何新功能
+
+## 二、字节码格式
+
+```
+QBC格式: [magic 4字节 | code_len LE16 | CODE | sp_len LE16 | string_pool]
+```
+
+## 三、Opcode表（关键）
+
+| Opcode | 值 | 说明 |
+|--------|-----|------|
+| OP_PUSH_INT | 1 | 压入整数常量 |
+| OP_PUSH_VAR | 2 | 压入变量值 |
+| OP_STORE_VAR | 3 | 存储到变量 |
+| OP_ADD | 10 | 加法 |
+| OP_SUB | 11 | 减法 |
+| OP_MUL | 12 | 乘法 |
+| OP_DIV | 13 | 除法 |
+| OP_MOD | 14 | 取模 |
+| OP_EQ | 20 | 等于 |
+| OP_NEQ | 24 | 不等于 |
+| OP_LT | 25 | 小于 |
+| OP_GT | 26 | 大于 |
+| OP_JMP | 30 | 无条件跳转 |
+| OP_JMP_IF_FALSE | 31 | 条件跳转 |
+| OP_CALL | 40 | 函数调用 |
+| OP_RET | 41 | 返回 |
+| OP_PRINTF | 50 | 打印 |
+| OP_FUNC_CALL_STMT | 112 | 函数调用语句 |
+| OP_STRUCT_NEW | 60 | 创建结构体 |
+| OP_FIELD_GET | 61 | 获取字段 |
+| OP_FIELD_SET | 62 | 设置字段 |
+
+## 四、自举瓶颈（阶段2）
+
+### 4a. str_*内置函数（79处调用）
+需要实现：
+- str_len(s) → 字符串长度
+- str_char_at(s, i) → 第i个字符ASCII码
+- str_substring(s, start, len) → 子串
+- str_concat(a, b) → 拼接
+- str_eq(a, b) → 相等比较
+- str_index_of(s, sub) → 查找子串
+- str_from_char(c) → ASCII转字符
+- str_to_int(s) → 字符串转整数
+- int_to_str(n) → 整数转字符串
+
+### 4b. 数组索引表达式（416处）
+当前：arr[i] = val 能编译（赋值目标）
+缺失：var x = arr[i]（表达式中的索引）
+需要：表达式解析器识别 IDENT [ expr ]，生成 OP_PUSH_VAR + OP_INDEX_GET
+
+### 4c. 多参数printf
+当前只支持 printf("%d", x)
+需要支持 printf("%d + %d = %d", a, b, c)
+
+## 五、已知Bug修复记录
+
+- TOK_EQEQ=16与TOK_LPAR=16冲突 → 已修复
+- FUNC_DEF start_pos在参数VAR_DECL前 → 已修复
+- Builtin栈泄漏(stack_top-=nargs) → 已修复
+- import buffer生命周期 → 已修复
+- FUNC_DEF break在goto双switch下跳出while → 改continue
+- PUSH_CONST_STR推垃圾int stack → 删除
+- 递归: CallFrame加变量快照CALL保存RETURN恢复
+- return表达式: return_active标志防拆语句
+
+## 六、验证命令
+
+```bash
+# 编译测试
+cd /root/QSM
+gcc -std=c11 -O2 -o bin/qcl_bootstrap src/qcl_bootstrap.c -lm
+bin/qcl_bootstrap --compile qcl_self2.qentl build/qcl_self2.qbc
+wc -c build/qcl_self2.qbc  # 应>1000字节，不是1字节STOP
+```
