@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>SOM 松麦 - 智能养生平台</title>
+    <meta name="description" content="小麦SOM - 中医辨证养生，有机食品推荐">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">松</div>
+                    <div class="logo-text">
+                        <h1>SOM 松麦</h1>
+                        <p>智能养生平台</p>
+                    </div>
+                </div>
+                <nav class="nav">
+                    <button class="nav-btn active" data-tab="chat">小麦SOM</button>
+                    <button class="nav-btn" data-tab="products">有机好物</button>
+                    <button class="nav-btn" data-tab="yangshenggu">养生谷</button>
+                    <button class="nav-btn" data-tab="profile">我</button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main">
+            <!-- 对话页面 -->
+            <div class="tab-content active" id="chat-tab">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message assistant">
+                            <div class="message-avatar">麦</div>
+                            <div class="message-content">
+                                <div class="message-text">
+                                    你好，我是小麦SOM，你的养生助手。<br><br>
+                                    告诉我你最近的身体状况，比如：<br>
+                                    • 失眠、疲劳、上火<br>
+                                    • 口干、胃口不好<br>
+                                    • 手脚冰凉、湿气重<br><br>
+                                    我会帮你辨证分析，推荐适合的养生方案和有机好物。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <textarea 
+                            class="chat-input" 
+                            id="chat-input" 
+                            placeholder="描述你的身体状况..."
+                            rows="2"
+                        ></textarea>
+                        <button class="send-btn" id="send-btn">发送</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 商品页面 -->
+            <div class="tab-content" id="products-tab">
+                <div class="products-container">
+                    <div class="search-box">
+                        <input type="text" id="product-search" placeholder="搜索有机食材，如：枸杞、红枣、山药...">
+                        <button id="search-btn">搜索</button>
+                    </div>
+                    <div class="platform-filter">
+                        <button class="filter-btn active" data-platform="taobao">淘宝</button>
+                        <button class="filter-btn" data-platform="jd">京东</button>
+                        <button class="filter-btn" data-platform="all">全部</button>
+                    </div>
+                    <!-- 排序按钮 -->
+                    <div class="sort-filter">
+                        <button class="sort-btn active" data-sort="default">综合</button>
+                        <button class="sort-btn" data-sort="price_asc">价格最低</button>
+                        <button class="sort-btn" data-sort="price_desc">价格最高</button>
+                        <button class="sort-btn" data-sort="sales">销量最高</button>
+                        <button class="sort-btn" data-sort="credit">评价最高</button>
+                    </div>
+                    <!-- 分类目录 -->
+                    <div class="category-nav" id="category-nav">
+                        <div class="category-loading">加载分类...</div>
+                    </div>
+                    <div class="products-grid" id="products-grid">
+                        <div class="empty-state">
+                            <p>选择分类或搜索有机食材</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 养生谷页面（暂时放养生知识） -->
+            <div class="tab-content" id="yangshenggu-tab">
+                <div class="knowledge-container">
+                    <div class="knowledge-section">
+                        <h2>九种体质</h2>
+                        <div class="tizhi-grid" id="tizhi-grid"></div>
+                    </div>
+                    <div class="knowledge-section">
+                        <h2>药食同源</h2>
+                        <div class="yaoshi-list" id="yaoshi-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 个人中心页面 -->
+            <div class="tab-content" id="profile-tab">
+                <div class="profile-container">
+                    <div class="profile-card">
+                        <div class="profile-avatar">松</div>
+                        <div class="profile-info">
+                            <h3 id="profile-name">养生用户</h3>
+                            <p id="profile-tizhi">体质：未检测</p>
+                            <p id="profile-points">积分：0</p>
+                            <p id="profile-checkin">签到：今天未签到</p>
+                        </div>
+                    </div>
+                    <div class="profile-section">
+                        <h3>📋 我的体质记录</h3>
+                        <div class="profile-history" id="profile-history">
+                            <p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>
+                        </div>
+                    </div>
+                    <div class="profile-section">
+                        <h3>📊 我的数据</h3>
+                        <div class="profile-stats">
+                            <div class="stat-item">
+                                <span class="stat-num" id="stat-chats">0</span>
+                                <span class="stat-label">对话次数</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-num" id="stat-checkins">0</span>
+                                <span class="stat-label">签到天数</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-num" id="stat-products">0</span>
+                                <span class="stat-label">浏览商品</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="footer">
+            <p>SOM 松麦 · 中医辨证 · 有机养生</p>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
