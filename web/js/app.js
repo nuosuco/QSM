@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initProductSearch();
     loadCategories();
     initProfile();
+    loadTizhiKnowledge();
+    loadYaoshiKnowledge();
 });
 
 // ========== 导航切换 ==========
@@ -520,7 +522,15 @@ function loadProfile() {
     
     const today = new Date().toISOString().split('T')[0];
     const checkedInToday = data.checkins && data.checkins.indexOf(today) >= 0;
-    document.getElementById('profile-checkin').textContent = checkedInToday ? '✅ 今天已签到' : '签到：今天未签到';
+    const checkinEl = document.getElementById('profile-checkin');
+    checkinEl.textContent = checkedInToday ? '✅ 今天已签到' : '📅 签到：今天未签到';
+    if (!checkedInToday) {
+        checkinEl.style.cursor = 'pointer';
+        checkinEl.onclick = doCheckin;
+    } else {
+        checkinEl.style.cursor = 'default';
+        checkinEl.onclick = null;
+    }
     
     document.getElementById('stat-chats').textContent = (data.chats || []).length;
     document.getElementById('stat-checkins').textContent = (data.checkins || []).length;
@@ -580,6 +590,78 @@ function saveProductBrowse(keyword, count) {
     if (!data.productBrowses) data.productBrowses = 0;
     data.productBrowses += count;
     saveUserData(data);
+}
+
+// ========== 签到功能 ==========
+
+function doCheckin() {
+    const data = getUserData();
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (data.checkins && data.checkins.indexOf(today) >= 0) {
+        return;
+    }
+    
+    if (!data.checkins) data.checkins = [];
+    data.checkins.push(today);
+    
+    // 签到奖励积分
+    if (!data.points) data.points = 0;
+    data.points += 10;
+    
+    saveUserData(data);
+    
+    // 更新显示
+    const checkinEl = document.getElementById('profile-checkin');
+    checkinEl.textContent = '✅ 今天已签到';
+    checkinEl.style.cursor = 'default';
+    checkinEl.onclick = null;
+    
+    document.getElementById('profile-points').textContent = '积分：' + data.points;
+    document.getElementById('stat-checkins').textContent = data.checkins.length;
+    
+    alert('🎉 签到成功！获得10积分');
+}
+
+// ========== 养生谷知识库加载 ==========
+
+async function loadTizhiKnowledge() {
+    try {
+        const response = await fetch(`${API_BASE}/api/knowledge/tizhi`);
+        const data = await response.json();
+        const grid = document.getElementById('tizhi-grid');
+        if (data && data.length > 0) {
+            grid.innerHTML = data.map(t => `
+                <div class="tizhi-card">
+                    <h3>${escapeHtml(t.name || '')}</h3>
+                    <p><strong>特征：</strong>${escapeHtml(t.features || '')}</p>
+                    <p><strong>调养：</strong>${escapeHtml(t.diet || '')}</p>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        console.error('加载体质知识失败:', e);
+    }
+}
+
+async function loadYaoshiKnowledge() {
+    try {
+        const response = await fetch(`${API_BASE}/api/knowledge/yaoshi`);
+        const data = await response.json();
+        const list = document.getElementById('yaoshi-list');
+        if (data && data.length > 0) {
+            list.innerHTML = data.map(y => `
+                <div class="yaoshi-item">
+                    <h4>${escapeHtml(y.name || '')}</h4>
+                    <p><strong>性味：</strong>${escapeHtml(y.xingwei || '')}</p>
+                    <p><strong>功效：</strong>${escapeHtml(y.gongxiao || '')}</p>
+                    <p><strong>禁忌：</strong>${escapeHtml(y.jinji || '')}</p>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        console.error('加载药食同源知识失败:', e);
+    }
 }
 
 // ========== 商品详情弹窗 ==========
@@ -644,91 +726,6 @@ function showDetail(product) {
 
 function closeDetail() {
     document.getElementById('product-detail-overlay').style.display = 'none';
-    currentDetailProduct = null;
-}
-
-function switchDetailImage(el, imgUrl) {
-    document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('detail-main-image').innerHTML = 
-        `<img src="${imgUrl}" alt="商品图片">`;
-}
-
-function goToBuy() {
-    if (currentDetailProduct) {
-        let url = currentDetailProduct.url || '#';
-        if (url && url !== '#') {
-            window.open(url, '_blank');
-        }
-    }
-}
-
-// 点击遮罩层关闭
-document.addEventListener('click', function(e) {
-    const overlay = document.getElementById('product-detail-overlay');
-    if (e.target === overlay) {
-        closeDetail();
-    }
-});
-
-// ========== 商品详情弹窗 ==========
-let currentDetailProduct = null;
-
-function showDetail(product) {
-    currentDetailProduct = product;
-    
-    // 主图
-    let mainImage = product.image || '';
-    if (product.images && product.images.length > 0) {
-        mainImage = product.images[0];
-    }
-    document.getElementById('detail-main-image').innerHTML = 
-        `<img src="${mainImage}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">`;
-    
-    // 缩略图
-    let thumbnails = '';
-    const images = product.images || [mainImage];
-    images.forEach((img, i) => {
-        thumbnails += `<img src="${img}" class="detail-thumb${i === 0 ? ' active' : ''}" onclick="switchDetailImage(this, '${img}')" onerror="this.style.display='none'">`;
-    });
-    document.getElementById('detail-thumbnails').innerHTML = thumbnails;
-    
-    // 标题
-    document.getElementById('detail-title').textContent = product.title;
-    
-    // 价格
-    document.getElementById('detail-price').innerHTML = `<span class="price-symbol">¥</span>${product.price}`;
-    
-    // 店铺
-    let shopHtml = '';
-    if (product.shop_name) {
-        shopHtml += `<span>🏪 ${escapeHtml(product.shop_name)}</span>`;
-    }
-    if (product.brand) {
-        shopHtml += `<span>🏷️ ${escapeHtml(product.brand)}</span>`;
-    }
-    document.getElementById('detail-shop').innerHTML = shopHtml;
-    
-    // 购买按钮
-    const buyBtn = document.getElementById('detail-buy-btn');
-    const platform = product.platform || 'taobao';
-    const platformName = platform === 'taobao' ? '淘宝' : '京东';
-    buyBtn.textContent = `去${platformName}购买`;
-    buyBtn.onclick = function() {
-        let url = product.url || '#';
-        if (url && url !== '#') {
-            window.open(url, '_blank');
-        }
-    };
-    
-    // 显示弹窗
-    document.getElementById('product-detail-overlay').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-}
-
-function closeDetail() {
-    document.getElementById('product-detail-overlay').style.display = 'none';
-    document.body.style.overflow = '';
     currentDetailProduct = null;
 }
 
