@@ -1070,3 +1070,38 @@ body {
     background: #e74c3c;
 }
 
+
+/* ========== 商品详情弹窗 ========== */
+.detail-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6); z-index: 1000;
+    justify-content: center; align-items: center; padding: 20px;
+}
+.detail-modal {
+    background: #fff; border-radius: 16px; max-width: 500px; width: 100%;
+    max-height: 90vh; overflow-y: auto; position: relative;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+}
+.detail-close {
+    position: fixed; top: 24px; right: 24px;
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.5); color: #fff; font-size: 22px;
+    cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center;
+}
+.detail-img-wrap { width: 100%; background: #f8f9fa; }
+.detail-img-wrap img { width: 100%; display: block; }
+.detail-body { padding: 20px; }
+.detail-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; line-height: 1.5; }
+.detail-price { font-size: 28px; color: #e74c3c; font-weight: 700; margin-bottom: 12px; }
+.detail-price .sym { font-size: 18px; }
+.detail-shop { font-size: 13px; color: #888; margin-bottom: 20px; }
+.detail-buy {
+    width: 100%; padding: 14px; background: linear-gradient(135deg, #7bc49f, #5aae82);
+    color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
+}
+.detail-buy:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(123,196,159,0.4); }
+@media (max-width: 500px) {
+    .detail-overlay { padding: 0; align-items: flex-end; }
+    .detail-modal { max-height: 85vh; border-radius: 16px 16px 0 0; }
+    .detail-close { top: 12px; right: 12px; }
+}

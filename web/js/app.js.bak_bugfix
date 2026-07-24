@@ -1,4 +1,4 @@
-// SOM 松麦 - 前端逻辑
+// SOM 松麦 - 前端逻辑 v2
 
 // API地址：同域部署时用相对路径，跨域时修改此处
 const API_BASE = '';
@@ -9,9 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initChat();
     initProductSearch();
-    loadCategories();
+    initYangshengGu();
     initProfile();
-    initKnowledge();
+    initCheckin();
+    loadDailyTip();
+    loadCategories();
 });
 
 // ========== 导航切换 ==========
@@ -66,7 +68,7 @@ async function sendMessage() {
     const loadingId = appendMessage('<div class="loading"></div>', 'assistant', true);
     
     try {
-        const response = await fetch(API_BASE + '/api/chat', {
+        const response = await fetch(`${API_BASE}/api/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -80,28 +82,39 @@ async function sendMessage() {
         const data = await response.json();
         
         // 移除加载状态
-        var loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
+        document.getElementById(loadingId).remove();
         
         // 显示AI回复
-        var replyText = data.reply;
+        let replyText = data.reply;
+        
+        // 如果有推荐食材，添加到回复中
+        if (data.recommendations && data.recommendations.length > 0) {
+            let recHtml = '<div class="rec-list">';
+            data.recommendations.forEach(rec => {
+                recHtml += `<div class="rec-item">
+                    <strong>${esc(rec.name)}</strong>
+                    ${rec.xingwei ? '· ' + esc(rec.xingwei) : ''}
+                </div>`;
+            });
+            recHtml += '</div>';
+            appendMessage(recHtml, 'assistant');
+        }
         
         // 如果有推荐商品，添加到回复中
         if (data.products && data.products.length > 0) {
             replyText += '\n\n为你找到以下有机好物：';
-            data.products.slice(0, 3).forEach(function(product, index) {
-                replyText += '\n' + (index + 1) + '. ' + product.title + ' - ¥' + product.price;
+            data.products.slice(0, 6).forEach((product, index) => {
+                replyText += `\n${index + 1}. ${product.title} - ¥${product.price}`;
             });
+        } else if (data.zhengxing || data.tizhi) {
+            // 保存辨证结果到用户数据
+            saveTizhiRecord(data.tizhi, message);
         }
         
         appendMessage(replyText, 'assistant');
         
-        // 保存对话记录
-        saveChatRecord(message, data.reply, data.tizhi);
-        
     } catch (error) {
-        var loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
+        document.getElementById(loadingId).remove();
         appendMessage('抱歉，网络出现问题，请稍后重试。', 'assistant');
         console.error('发送消息失败:', error);
     } finally {
@@ -156,13 +169,22 @@ function getSessionId() {
     return sessionId;
 }
 
+// ========== 工具函数 =========
+
+function esc(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
+
 // ========== 商品搜索 ==========
 
 let currentPlatform = 'taobao';
 let currentCategory = null;
 let currentPage = 1;
 let currentKeyword = '';
-let currentSort = 'default'; // default, price_asc, price_desc, sales, credit
+let currentSort = 'default';
 let isLoading = false;
 let hasMore = true;
 
@@ -223,7 +245,6 @@ function initProductSearch() {
         const windowHeight = window.innerHeight;
         const documentHeight = document.documentElement.scrollHeight;
         
-        // 距离底部200px时触发加载
         if (scrollTop + windowHeight >= documentHeight - 200) {
             loadMoreProducts();
         }
@@ -235,9 +256,8 @@ async function loadCategories() {
         const response = await fetch(`${API_BASE}/api/products/categories`);
         const data = await response.json();
         displayCategories(data.categories);
-        // 页面加载时自动显示"全部"分类的商品
         if (data.categories.length > 0) {
-            const defaultCategory = data.categories[0]; // "全部"分类
+            const defaultCategory = data.categories[0];
             searchByCategory(defaultCategory.keyword, defaultCategory.name);
         }
     } catch (error) {
@@ -259,8 +279,6 @@ function displayCategories(categories) {
 
 function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
-    // 用分类名称作为搜索框显示，但实际搜索用后端关键词
-    // 取关键词的第一个词作为搜索关键词，避免太长
     currentKeyword = keyword.split(' ')[0];
     currentPage = 1;
     hasMore = true;
@@ -272,7 +290,6 @@ function setSort(sortType) {
     currentPage = 1;
     hasMore = true;
     
-    // 更新排序按钮状态
     const sortBtns = document.querySelectorAll('.sort-btn');
     sortBtns.forEach(btn => {
         btn.classList.remove('active');
@@ -281,7 +298,6 @@ function setSort(sortType) {
         }
     });
     
-    // 重新搜索
     if (currentCategory) {
         searchByCategory(currentCategory);
     } else if (currentKeyword) {
@@ -311,9 +327,9 @@ async function searchProducts(clear = false) {
             if (clear) {
                 productsGrid.innerHTML = '';
             }
+            window._allProducts = data.items;
             displayProducts(data.items, !clear);
             
-            // 判断是否还有更多
             if (data.items.length < 20) {
                 hasMore = false;
             }
@@ -353,34 +369,23 @@ async function loadMoreProducts() {
     }
 }
 
-// 商品数据存储（用于详情弹窗）
-var _productList = [];
-
 function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
     
-    // 保存商品数据到全局数组，用索引引用
-    if (!append) {
-        _productList = [];
-    }
-    var startIdx = _productList.length;
-    products.forEach(function(p) { _productList.push(p); });
-    
-    var productHtml = products.map(function(product, i) {
-        var idx = startIdx + i;
-        var title = escapeHtml(product.title);
-        var shop = escapeHtml(product.shop_name || '');
-        var platformLabel = product.platform === 'taobao' ? '淘宝' : '京东';
-        var img = product.image || '';
+    const productHtml = products.map(product => {
+        let appUrl = product.app_url || '';
+        let webUrl = product.url || '#';
         
-        return '<div class="product-card" onclick="showDetailByIndex(' + idx + ')">' +
-            '<img class="product-image" src="' + img + '" alt="' + title + '" onerror="this.onerror=null;this.parentElement.innerHTML+=\'<div class=\\"img-placeholder\\">暂无图片</div>\\';this.style.display=\'none\\'">' +
-            '<div class="product-info">' +
-                '<div class="product-title">' + title + '</div>' +
-                '<div class="product-price">¥' + product.price + '</div>' +
-                '<div class="product-shop">' + shop + ' · ' + platformLabel + '</div>' +
-            '</div>' +
-        '</div>';
+        return `
+        <div class="product-card" data-product='${encodeURIComponent(JSON.stringify(product))}' onclick="showDetail(this)">>
+            <img class="product-image" src="${product.image}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+            <div class="product-info">
+                <div class="product-title">${escapeHtml(product.title)}</div>
+                <div class="product-price">¥${product.price}</div>
+                <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+            </div>
+        </div>
+        `;
     }).join('');
     
     if (append) {
@@ -390,17 +395,9 @@ function displayProducts(products, append = false) {
     }
 }
 
-function showDetailByIndex(index) {
-    var item = _productList[index];
-    if (!item) return;
-    showDetail(item);
-}
-
 function openProduct(appUrl, webUrl, platform) {
     if (platform === 'taobao' && appUrl) {
-        // 先尝试打开淘宝APP
         window.location.href = appUrl;
-        // 2.5秒后如果页面还可见（APP没安装），回退到网页版
         setTimeout(() => {
             if (!document.hidden) {
                 window.open(webUrl, '_blank');
@@ -411,19 +408,57 @@ function openProduct(appUrl, webUrl, platform) {
     }
 }
 
-// ========== 个人中心 ==========
+// ========== 养生谷 =========
 
-function initProfile() {
-    loadProfile();
-    
-    // 签到按钮事件
-    var checkinBtn = document.getElementById('profile-checkin-btn');
-    if (checkinBtn) {
-        checkinBtn.addEventListener('click', function() {
-            doCheckin();
-        });
+async function initYangshengGu() {
+    await Promise.all([
+        loadTizhi(),
+        loadYaoshi()
+    ]);
+    await loadDailyTip();
+}
+
+async function loadTizhi() {
+    try {
+        const res = await fetch(`${API_BASE}/api/knowledge/tizhi`);
+        const data = await res.json();
+        const grid = document.getElementById('tizhi-grid');
+        if (!grid || !data.items) return;
+        
+        grid.innerHTML = data.items.map(t => `
+            <div class="tizhi-card">
+                <h3>${esc(t.name)}</h3>
+                <p>💡 ${esc(t.desc)}</p>
+                <p style="margin-top:8px;color:var(--primary-color)">🍵 调养：${esc(t.diet || t.yangsheng || '')}</p>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.error('加载体质数据失败', e);
     }
 }
+
+async function loadYaoshi() {
+    try {
+        const res = await fetch(`${API_BASE}/api/knowledge/yaoshi`);
+        const data = await res.json();
+        const list = document.getElementById('yaoshi-list');
+        if (!list || !data.items) return;
+        
+        list.innerHTML = data.items.map(y => `
+            <div class="yaoshi-item">
+                <h4>${esc(y.name)}</h4>
+                <p><strong>性味：</strong>${esc(y.xingwei)}</p>
+                <p><strong>归经：</strong>${esc(y.guijing)}</p>
+                <p><strong>功效：</strong>${esc(y.gongxiao)}</p>
+                <p style="color:#e74c3c;font-size:11px"><strong>⚠️ 禁忌：</strong>${esc(y.jinji)}</p>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.error('加载药食同源数据失败', e);
+    }
+}
+
+// ========== 个人中心 ==========
 
 function getUserId() {
     let uid = localStorage.getItem('som_user_id');
@@ -456,6 +491,10 @@ function getUserData() {
 function saveUserData(data) {
     const key = 'som_user_data_' + getUserId();
     localStorage.setItem(key, JSON.stringify(data));
+}
+
+function initProfile() {
+    loadProfile();
 }
 
 function loadProfile() {
@@ -529,98 +568,106 @@ function saveProductBrowse(keyword, count) {
     saveUserData(data);
 }
 
-// ========== 签到功能 ==========
-
-function doCheckin() {
-    var data = getUserData();
-    var today = new Date().toISOString().split('T')[0];
-    
-    if (data.checkins && data.checkins.indexOf(today) >= 0) {
-        showToast('今天已经签到过了哦~');
-        return;
+function initCheckin() {
+    const userId = getUserId();
+    const statusBtn = document.getElementById('checkin-btn');
+    if (statusBtn) {
+        statusBtn.addEventListener('click', doCheckin);
     }
-    
-    if (!data.checkins) data.checkins = [];
-    data.checkins.push(today);
-    data.points = (data.points || 0) + 10;
-    saveUserData(data);
-    
-    loadProfile();
-    showToast('签到成功！获得10积分 ✨');
+    refreshCheckinUI();
 }
 
-// ========== Toast提示 ==========
-
-function showToast(msg) {
-    var toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-    setTimeout(function() { toast.classList.add('show'); }, 10);
-    setTimeout(function() {
-        toast.classList.remove('show');
-        setTimeout(function() { toast.remove(); }, 300);
-    }, 2000);
-}
-
-// ========== 养生谷知识库加载 ==========
-
-function initKnowledge() {
-    loadTizhiKnowledge();
-    loadYaoshiKnowledge();
-}
-
-async function loadTizhiKnowledge() {
-    var grid = document.getElementById('tizhi-grid');
-    if (!grid) return;
-    grid.innerHTML = '<div class="empty-state"><div class="loading"></div><p>加载中...</p></div>';
-    
+async function refreshCheckinUI() {
+    const userId = getUserId();
     try {
-        var resp = await fetch(API_BASE + '/api/knowledge/tizhi');
-        var data = await resp.json();
-        var items = data.items || [];
-        if (items.length === 0) {
-            grid.innerHTML = '<div class="empty-state"><p>暂无数据</p></div>';
-            return;
+        const res = await fetch(`${API_BASE}/api/checkin/status?user_id=${userId}`);
+        const data = await res.json();
+        const checkinText = document.getElementById('profile-checkin-status');
+        const checkinBtn = document.getElementById('checkin-btn');
+        if (checkinText) {
+            checkinText.textContent = data.checked_in_today ? '✅ 今日已签到' : '今天还未签到';
         }
-        var html = items.map(function(t) {
-            return '<div class="tizhi-card">' +
-                '<h3>' + escapeHtml(t.name) + '</h3>' +
-                '<p>' + escapeHtml(t.desc || '') + '</p>' +
-                '<p class="tizhi-diet"><strong>调养：</strong>' + escapeHtml(t.diet || t.yangsheng || '') + '</p>' +
-            '</div>';
-        }).join('');
-        grid.innerHTML = html;
-    } catch (e) {
-        grid.innerHTML = '<div class="empty-state"><p>加载失败</p></div>';
-        console.error('加载体质知识失败:', e);
+        if (checkinBtn) {
+            checkinBtn.textContent = data.checked_in_today ? '✅ 已签到' : '去签到';
+            checkinBtn.disabled = data.checked_in_today;
+        }
+    } catch(e) {
+        console.error('获取签到状态失败', e);
     }
 }
 
-async function loadYaoshiKnowledge() {
-    var list = document.getElementById('yaoshi-list');
-    if (!list) return;
-    list.innerHTML = '<div class="empty-state"><div class="loading"></div><p>加载中...</p></div>';
+async function doCheckin() {
+    const userId = getUserId();
+    const btn = document.getElementById('checkin-btn');
+    if (btn) btn.disabled = true;
     
     try {
-        var resp = await fetch(API_BASE + '/api/knowledge/yaoshi');
-        var data = await resp.json();
-        var items = data.items || [];
-        if (items.length === 0) {
-            list.innerHTML = '<div class="empty-state"><p>暂无数据</p></div>';
-            return;
+        const res = await fetch(`${API_BASE}/api/checkin/do`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+        const data = await res.json();
+        
+        const dataObj = getUserData();
+        dataObj.points = data.total_points || (dataObj.points || 0) + (data.success ? 10 : 0);
+        saveUserData(dataObj);
+        loadProfile();
+        
+        await refreshCheckinUI();
+        
+        alert(data.message || '签到成功！');
+    } catch(e) {
+        alert('签到失败，请稍后重试');
+        if (btn) btn.disabled = false;
+    }
+}
+
+// ========== 每日养生建议 ==========
+
+async function loadDailyTip() {
+    try {
+        const res = await fetch(`${API_BASE}/api/daily-tip`);
+        const tip = await res.json();
+        
+        // 顶部每日建议卡片
+        const tipEl = document.getElementById('daily-tip');
+        if (tipEl && tip.title) {
+            tipEl.innerHTML = `
+                <div class="daily-tip-card">
+                    <div class="daily-tip-header">${tip.emoji} ${esc(tip.title)}</div>
+                    <div class="daily-tip-content">${esc(tip.content)}</div>
+                </div>
+            `;
         }
-        var html = items.map(function(y) {
-            return '<div class="yaoshi-item">' +
-                '<h4>' + escapeHtml(y.name) + '</h4>' +
-                '<p>性味：' + escapeHtml(y.xingwei || '') + ' | 归经：' + escapeHtml(y.guijing || '') + '</p>' +
-                '<p>功效：' + escapeHtml(y.gongxiao || '') + '</p>' +
-                (y.jinji ? '<p style="color:#e74c3c;font-size:12px">⚠ ' + escapeHtml(y.jinji) + '</p>' : '') +
-            '</div>';
-        }).join('');
-        list.innerHTML = html;
-    } catch (e) {
-        list.innerHTML = '<div class="empty-state"><p>加载失败</p></div>';
-        console.error('加载药食同源知识失败:', e);
+        
+        // 养生谷页面内每日建议
+        const tipContentEl = document.getElementById('daily-tip-content');
+        if (tipContentEl && tip.title) {
+            tipContentEl.innerHTML = `
+                <div class="daily-tip-card">
+                    <div class="daily-tip-header">${tip.emoji} ${esc(tip.title)}</div>
+                    <div class="daily-tip-content">${esc(tip.content)}</div>
+                </div>
+            `;
+        }
+    } catch(e) {
+        console.error('加载每日建议失败', e);
+    }
+}
+
+// ========== 保存辨证记录 =========
+
+function saveTizhiRecord(tizhi, msg) {
+    const data = getUserData();
+    if (tizhi && tizhi !== '未检测') {
+        if (!data.tizhiRecords) data.tizhiRecords = [];
+        data.tizhiRecords.push({
+            date: new Date().toISOString().split('T')[0],
+            tizhi: tizhi,
+            desc: (msg || '').substring(0, 50)
+        });
+        data.tizhi = tizhi;
+        saveUserData(data);
     }
 }

@@ -327,6 +327,7 @@ async function searchProducts(clear = false) {
             if (clear) {
                 productsGrid.innerHTML = '';
             }
+            window._allProducts = data.items;
             displayProducts(data.items, !clear);
             
             if (data.items.length < 20) {
@@ -376,7 +377,7 @@ function displayProducts(products, append = false) {
         let webUrl = product.url || '#';
         
         return `
-        <div class="product-card" onclick="openProduct('${appUrl}', '${webUrl}', '${product.platform}')">
+        <div class="product-card" data-product="${encodeURIComponent(JSON.stringify(product))}" onclick="showDetail(this)">
             <img class="product-image" src="${product.image}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
             <div class="product-info">
                 <div class="product-title">${escapeHtml(product.title)}</div>
