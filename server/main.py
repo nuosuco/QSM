@@ -5,7 +5,10 @@ SOM 松麦 - 后端服务入口
 import json
 import os
 import sys
+import sqlite3
+import time as time_module
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
 # 确保服务脚本可从任意目录启动
 _server_dir = Path(__file__).resolve().parent
@@ -118,11 +121,31 @@ async def chat(request: ChatRequest):
             items = shop.search(rec["name"], platform="taobao", page_size=3)
             for item in items:
                 item_key = item.get('item_id', '') or item.get('title', '')
-                if item_key not in seen_ids:
+                if item_key and item_key not in seen_ids:
                     seen_ids.add(item_key)
                     products.append(item)
             if len(products) >= 6:
                 break
+
+    # 3. 保存对话历史到数据库
+    try:
+        conn = get_user_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO chat_history (user_id, session_id, user_message, assistant_reply, tizhi, zhengxing)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            request.user_id or 'anonymous',
+            request.session_id or 'default',
+            request.message[:500],
+            result["reply"][:2000],
+            result.get('tizhi', ''),
+            result.get('zhengxing', ''),
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"保存对话历史失败: {e}")
 
     return ChatResponse(
         reply=result["reply"],
@@ -211,63 +234,358 @@ class CheckinResponse(BaseModel):
     total_points: int = 0
     message: str = ""
 
-# 本地签到记录（生产环境应使用数据库）
-_checkin_records = {}  # user_id -> {last_date, total_points, streak}
+# ========== 数据库初始化 ==========
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+os.makedirs(DATA_DIR, exist_ok=True)
+USER_DB_PATH = os.path.join(DATA_DIR, 'user_data.db')
+
+def init_user_db():
+    """初始化用户数据库"""
+    conn = sqlite3.connect(USER_DB_PATH)
+    cursor = conn.cursor()
+    
+    # 签到记录表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS checkin_records (
+            user_id TEXT PRIMARY KEY,
+            last_date TEXT,
+            total_points INTEGER DEFAULT 0,
+            streak INTEGER DEFAULT 0
+        )
+    ''')
+    
+    # 对话历史表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            session_id TEXT,
+            user_message TEXT,
+            assistant_reply TEXT,
+            tizhi TEXT,
+            zhengxing TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # 搜索历史表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS search_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            keyword TEXT NOT NULL,
+            platform TEXT DEFAULT 'taobao',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # 商品收藏表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS product_favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            title TEXT,
+            price TEXT,
+            image TEXT,
+            url TEXT,
+            platform TEXT,
+            shop_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, item_id)
+        )
+    ''')
+    
+    # 创建索引
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_history(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_search_user ON search_history(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_fav_user ON product_favorites(user_id)')
+    
+    conn.commit()
+    conn.close()
+
+init_user_db()
+
+def get_user_db():
+    """获取用户数据库连接"""
+    conn = sqlite3.connect(USER_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def get_beijing_now():
+    """获取当前北京时间"""
+    utc_now = datetime.now(timezone.utc)
+    beijing_tz = timezone(timedelta(hours=8))
+    return utc_now.astimezone(beijing_tz)
+
+# ========== 签到接口 ==========
 
 @app.get("/api/checkin/status")
 async def checkin_status(user_id: str):
-    """获取签到状态"""
-    from datetime import datetime, timezone, timedelta
-    beijing_tz = timezone(timedelta(hours=8))
-    today = datetime.now(beijing_tz).strftime('%Y-%m-%d')
+    """获取签到状态（数据库持久化）"""
+    now = get_beijing_now()
+    today = now.strftime('%Y-%m-%d')
     
-    record = _checkin_records.get(user_id, {})
-    checked_in_today = record.get('last_date') == today
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM checkin_records WHERE user_id = ?', (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        checked_in_today = row['last_date'] == today
+        return {
+            "checked_in_today": checked_in_today,
+            "total_points": row['total_points'],
+            "streak": row['streak'],
+            "today": today
+        }
     
     return {
-        "checked_in_today": checked_in_today,
-        "total_points": record.get('total_points', 0),
-        "streak": record.get('streak', 0),
+        "checked_in_today": False,
+        "total_points": 0,
+        "streak": 0,
         "today": today
     }
 
 @app.post("/api/checkin/do")
 async def do_checkin(request: CheckinRequest):
-    """执行签到"""
-    from datetime import datetime, timezone, timedelta
-    beijing_tz = timezone(timedelta(hours=8))
-    now = datetime.now(beijing_tz)
+    """执行签到（数据库持久化）"""
+    now = get_beijing_now()
     today = now.strftime('%Y-%m-%d')
     yesterday = (now - timedelta(days=1)).strftime('%Y-%m-%d')
     
-    record = _checkin_records.get(request.user_id, {
-        'last_date': '',
-        'total_points': 0,
-        'streak': 0
-    })
+    conn = get_user_db()
+    cursor = conn.cursor()
     
-    if record.get('last_date') == today:
+    cursor.execute('SELECT * FROM checkin_records WHERE user_id = ?', (request.user_id,))
+    row = cursor.fetchone()
+    
+    if row and row['last_date'] == today:
+        conn.close()
         return CheckinResponse(
             success=False,
             message="今天已经签到过了"
         )
     
-    # 计算连续签到
-    if record.get('last_date') == yesterday:
-        record['streak'] = record.get('streak', 0) + 1
+    if row:
+        last_date = row['last_date']
+        total_points = row['total_points']
+        streak = row['streak']
+        
+        if last_date == yesterday:
+            streak += 1
+        else:
+            streak = 1
+        
+        total_points += 10
+        
+        cursor.execute('''
+            UPDATE checkin_records 
+            SET last_date = ?, total_points = ?, streak = ?
+            WHERE user_id = ?
+        ''', (today, total_points, streak, request.user_id))
     else:
-        record['streak'] = 1
+        total_points = 10
+        streak = 1
+        cursor.execute('''
+            INSERT INTO checkin_records (user_id, last_date, total_points, streak)
+            VALUES (?, ?, ?, ?)
+        ''', (request.user_id, today, total_points, streak))
     
-    record['last_date'] = today
-    record['total_points'] = record.get('total_points', 0) + 10
-    _checkin_records[request.user_id] = record
+    conn.commit()
+    conn.close()
     
     return CheckinResponse(
         success=True,
         points=10,
-        total_points=record['total_points'],
-        message=f"签到成功！连续签到{record['streak']}天，获得10积分"
+        total_points=total_points,
+        message=f"签到成功！连续签到{streak}天，获得10积分"
     )
+
+# ========== 对话历史接口 ==========
+
+@app.get("/api/chat/history")
+async def get_chat_history(user_id: str, limit: int = 20):
+    """获取对话历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM chat_history 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT ?
+    ''', (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "total": len(rows),
+        "history": [dict(r) for r in rows]
+    }
+
+@app.get("/api/chat/history/session")
+async def get_session_history(session_id: str):
+    """获取特定会话的对话历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM chat_history 
+        WHERE session_id = ? 
+        ORDER BY created_at ASC
+    ''', (session_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "total": len(rows),
+        "history": [dict(r) for r in rows]
+    }
+
+class ClearHistoryRequest(BaseModel):
+    user_id: str
+
+@app.post("/api/chat/history/clear")
+async def clear_chat_history(request: ClearHistoryRequest):
+    """清空对话历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM chat_history WHERE user_id = ?', (request.user_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return {"success": True, "deleted": affected}
+
+# ========== 搜索历史接口 ==========
+
+@app.get("/api/search/history")
+async def get_search_history(user_id: str, limit: int = 20):
+    """获取搜索历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT DISTINCT keyword, platform, MAX(created_at) as last_searched
+        FROM search_history 
+        WHERE user_id = ? 
+        GROUP BY keyword
+        ORDER BY last_searched DESC 
+        LIMIT ?
+    ''', (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "total": len(rows),
+        "history": [dict(r) for r in rows]
+    }
+
+class SearchAddRequest(BaseModel):
+    user_id: str
+    keyword: str
+    platform: str = "taobao"
+
+@app.post("/api/search/history/add")
+async def add_search_history(request: SearchAddRequest):
+    """添加搜索历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO search_history (user_id, keyword, platform)
+            VALUES (?, ?, ?)
+        ''', (request.user_id, request.keyword, request.platform))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"success": True}
+
+@app.post("/api/search/history/clear")
+async def clear_search_history(request: ClearHistoryRequest):
+    """清空搜索历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM search_history WHERE user_id = ?', (request.user_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return {"success": True, "deleted": affected}
+
+# ========== 商品收藏接口 ==========
+
+@app.get("/api/favorites")
+async def get_favorites(user_id: str, limit: int = 50):
+    """获取收藏商品列表"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM product_favorites
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+    ''', (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "total": len(rows),
+        "favorites": [dict(r) for r in rows]
+    }
+
+@app.post("/api/favorites/add")
+async def add_favorite(request: dict):
+    """添加商品收藏"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT OR IGNORE INTO product_favorites 
+            (user_id, item_id, title, price, image, url, platform, shop_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            request.get('user_id'),
+            request.get('item_id'),
+            request.get('title'),
+            request.get('price'),
+            request.get('image'),
+            request.get('url'),
+            request.get('platform'),
+            request.get('shop_name'),
+        ))
+        conn.commit()
+        added = cursor.rowcount > 0
+    except Exception as e:
+        conn.close()
+        return {"success": False, "error": str(e)}
+    conn.close()
+    return {"success": True, "added": added}
+
+@app.post("/api/favorites/remove")
+async def remove_favorite(user_id: str, item_id: str):
+    """移除收藏商品"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        DELETE FROM product_favorites
+        WHERE user_id = ? AND item_id = ?
+    ''', (user_id, item_id))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return {"success": True, "deleted": affected}
+
+@app.get("/api/favorites/check")
+async def check_favorite(user_id: str, item_id: str):
+    """检查是否已收藏"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT 1 FROM product_favorites
+        WHERE user_id = ? AND item_id = ?
+    ''', (user_id, item_id))
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return {"favorited": exists}
 
 # ========== 缓存统计接口 ==========
 

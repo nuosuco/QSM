@@ -1,4 +1,4 @@
-// SOM 松麦 - 前端逻辑 v2 (迭代6)
+// SOM 松麦 - 前端逻辑 v3 (迭代7：搜索历史+收藏+对话持久化)
 
 const API_BASE = '';
 
@@ -60,7 +60,6 @@ function initChat() {
     if (firstNavBtn) {
         const clickEvent = new MouseEvent('click', { bubbles: true });
         firstNavBtn.dispatchEvent(clickEvent);
-        // 手动调用一次每日建议
         loadDailyTip();
     }
 }
@@ -85,16 +84,14 @@ async function sendMessage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message: message,
-                session_id: getSessionId()
+                session_id: getSessionId(),
+                user_id: getUserId()
             })
         });
 
         const data = await response.json();
         document.getElementById(loadingId).remove();
-
-        // 显示结构化回复 + 推荐卡片
         displayChatResult(data);
-
     } catch (error) {
         document.getElementById(loadingId).remove();
         appendMessage('抱歉，网络出现问题，请稍后重试。', 'assistant');
@@ -145,7 +142,7 @@ function getSessionId() {
 function displayChatResult(data) {
     const messagesContainer = document.getElementById('chat-messages');
 
-    // 1. 文字回复（保留原始格式）
+    // 1. 文字回复
     const replyText = data.reply || '没有获取到回复，请重试。';
     appendMessage(replyText, 'assistant');
 
@@ -207,6 +204,9 @@ function initProductSearch() {
         currentKeyword = searchInput.value.trim();
         currentPage = 1;
         hasMore = true;
+        if (currentKeyword) {
+            addSearchHistory(currentKeyword, currentPlatform);
+        }
         searchProducts(true);
     });
 
@@ -215,8 +215,39 @@ function initProductSearch() {
             currentKeyword = searchInput.value.trim();
             currentPage = 1;
             hasMore = true;
+            if (currentKeyword) {
+                addSearchHistory(currentKeyword, currentPlatform);
+            }
             searchProducts(true);
         }
+    });
+
+    // 搜索框聚焦时显示搜索历史
+    searchInput.addEventListener('focus', () => {
+        showSearchHistory();
+    });
+
+    // 点击其他地方关闭搜索历史
+    document.addEventListener('click', (e) => {
+        const historyEl = document.getElementById('search-history-dropdown');
+        if (historyEl && !e.target.closest('.search-box')) {
+            historyEl.remove();
+        }
+    });
+
+    // 搜索框输入时实时搜索（防抖500ms，输入2字以上触发）
+    let searchDebounceTimer;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            const val = searchInput.value.trim();
+            if (val.length >= 2 && val !== currentKeyword) {
+                currentKeyword = val;
+                currentPage = 1;
+                hasMore = true;
+                searchProducts(true);
+            }
+        }, 500);
     });
 
     filterBtns.forEach(btn => {
@@ -251,6 +282,76 @@ function initProductSearch() {
         }
     });
 }
+
+// ========== 搜索历史 ==========
+
+async function addSearchHistory(keyword, platform) {
+    try {
+        await fetch(`${API_BASE}/api/search/history/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: getUserId(), keyword, platform })
+        }).catch(() => {});
+    } catch(e) { /* ignore */ }
+}
+
+async function showSearchHistory() {
+    // 移除旧的
+    const old = document.getElementById('search-history-dropdown');
+    if (old) old.remove();
+
+    const searchBox = document.querySelector('.search-box');
+    if (!searchBox) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/search/history?user_id=${encodeURIComponent(getUserId())}&limit=10`);
+        const data = await res.json();
+        if (!data.history || data.history.length === 0) return;
+
+        const dropdown = document.createElement('div');
+        dropdown.id = 'search-history-dropdown';
+        dropdown.className = 'search-history-dropdown';
+        dropdown.innerHTML = `
+            <div class="search-history-header">
+                <span>搜索历史</span>
+                <button class="clear-history-btn" onclick="clearSearchHistory(event)">清空</button>
+            </div>
+            ${data.history.map(h => `
+                <div class="search-history-item" onclick="useSearchHistory('${escapeHtml(h.keyword)}')">
+                    <span class="history-keyword">${escapeHtml(h.keyword)}</span>
+                    <span class="history-platform">${h.platform === 'taobao' ? '淘宝' : '京东'}</span>
+                </div>
+            `).join('')}
+        `;
+        searchBox.appendChild(dropdown);
+    } catch(e) { /* ignore */ }
+}
+
+function useSearchHistory(keyword) {
+    const input = document.getElementById('product-search');
+    if (input) {
+        input.value = keyword;
+        currentKeyword = keyword;
+        currentPage = 1;
+        hasMore = true;
+        searchProducts(true);
+    }
+    const dropdown = document.getElementById('search-history-dropdown');
+    if (dropdown) dropdown.remove();
+}
+
+function clearSearchHistory(e) {
+    if (e) e.stopPropagation();
+    fetch(`${API_BASE}/api/search/history/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: getUserId() })
+    }).catch(() => {});
+    const dropdown = document.getElementById('search-history-dropdown');
+    if (dropdown) dropdown.remove();
+}
+
+// ========== 分类加载 ==========
 
 async function loadCategories() {
     try {
@@ -349,8 +450,10 @@ function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
     const productHtml = products.map(product => {
         const webUrl = product.url || '#';
+        const itemId = product.item_id || '';
         return `
-        <div class="product-card" data-id="${product.item_id || ''}" data-url="${webUrl}" data-platform="${product.platform || ''}">
+        <div class="product-card" data-id="${escapeHtml(itemId)}" data-url="${webUrl}" data-platform="${product.platform || ''}">
+            <button class="fav-btn" onclick="event.stopPropagation(); toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${escapeHtml(product.price || '')}', '${escapeHtml(product.image || '')}', '${escapeHtml(webUrl)}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')" title="收藏">♡</button>
             <img class="product-image" src="${product.image || ''}" alt="${escapeHtml(product.title || '')}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
             <div class="product-info">
                 <div class="product-title">${escapeHtml(product.title || '')}</div>
@@ -367,37 +470,62 @@ function displayProducts(products, append = false) {
         productsGrid.innerHTML = productHtml;
     }
 
-    // 给每个商品卡片绑定点击事件
+    // 绑定点击事件
     productsGrid.querySelectorAll('.product-card[data-id]').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('.fav-btn')) return;
             showProductDetail({
-                item_id: card.dataset.id,
-                title: card.querySelector('.product-title').textContent,
-                price: card.querySelector('.product-price').textContent.replace('¥', ''),
-                image: card.querySelector('.product-image').src,
-                url: card.dataset.url,
-                platform: card.dataset.platform,
-                shop_name: card.querySelector('.product-shop')?.textContent?.split('·')[0]?.trim() || ''
+                item_id: this.dataset.id,
+                title: this.querySelector('.product-title').textContent,
+                price: this.querySelector('.product-price').textContent.replace('¥', ''),
+                image: this.querySelector('.product-image').src,
+                url: this.dataset.url,
+                platform: this.dataset.platform,
+                shop_name: this.querySelector('.product-shop')?.textContent?.split('·')[0]?.trim() || ''
             });
         });
     });
 }
 
 function openProduct(webUrl, platform) {
-    // 直接打开推广链接（佣金追踪）
     if (webUrl && webUrl !== '#') {
         window.open(webUrl, '_blank');
     }
 }
 
+// ========== 商品收藏 ==========
+
+async function toggleFavorite(btn, itemId, title, price, image, url, platform, shopName) {
+    if (!itemId) return;
+    
+    const isFav = btn.textContent === '♥' || btn.classList.contains('favorited');
+    const uid = getUserId();
+    
+    try {
+        let res, data;
+        if (isFav) {
+            res = await fetch(`${API_BASE}/api/favorites/remove?user_id=${encodeURIComponent(uid)}&item_id=${encodeURIComponent(itemId)}`, { method: 'POST' });
+            data = await res.json();
+            if (data.success) { btn.textContent = '♡'; btn.classList.remove('favorited'); showToast('已取消收藏'); }
+        } else {
+            res = await fetch(`${API_BASE}/api/favorites/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: uid, item_id: itemId, title: title, price: price, image: image, url: url, platform: platform, shop_name: shopName })
+            });
+            data = await res.json();
+            if (data.success) { btn.textContent = '♥'; btn.classList.add('favorited'); showToast('收藏成功'); }
+        }
+    } catch(e) { console.error('收藏操作失败:', e); }
+}
+
 // ========== 商品详情弹窗 ==========
 
 function showProductDetail(product) {
-    // 移除已有弹窗
     closeProductDetail();
 
     const overlay = document.createElement('div');
-    overlay.className = 'detail-overlay';
+    overlay.className = 'detail-overlay show';
     overlay.onclick = (e) => { if (e.target === overlay) closeProductDetail(); };
 
     const imgSrc = product.image || '';
@@ -417,7 +545,10 @@ function showProductDetail(product) {
                 <div class="detail-price"><span class="sym">¥</span>${product.price || '0'}</div>
                 <div class="detail-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
                 ${product.commission_rate ? `<div class="modal-commission">佣金比例：${product.commission_rate}%</div>` : ''}
-                <button class="detail-buy" onclick="openProduct('${product.url}', '${product.platform}')">立即购买 →</button>
+                <div class="detail-actions">
+                    <button class="detail-buy" onclick="openProduct('${product.url}', '${product.platform}')">立即购买 →</button>
+                    <button class="detail-fav" onclick="toggleFavorite(this, '${product.item_id || ''}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${imgSrc}', '${product.url || ''}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
+                </div>
             </div>
         </div>
     `;
@@ -425,7 +556,6 @@ function showProductDetail(product) {
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-    // 记录浏览
     saveProductBrowse(product.title || '', 1);
 }
 
@@ -441,12 +571,8 @@ async function initYangshengGu() {
     const tizhiGrid = document.getElementById('tizhi-grid');
     const yaoshiList = document.getElementById('yaoshi-list');
 
-    if (tizhiGrid) {
-        tizhiGrid.innerHTML = '<div class="knowledge-loading">加载中...</div>';
-    }
-    if (yaoshiList) {
-        yaoshiList.innerHTML = '<div class="knowledge-loading">加载中...</div>';
-    }
+    if (tizhiGrid) tizhiGrid.innerHTML = '<div class="knowledge-loading">加载中...</div>';
+    if (yaoshiList) yaoshiList.innerHTML = '<div class="knowledge-loading">加载中...</div>';
 
     try {
         const [tizhiRes, yaoshiRes] = await Promise.all([
@@ -459,7 +585,6 @@ async function initYangshengGu() {
 
         renderTizhiCards(tizhiData.items || []);
         renderYaoshiCards(yaoshiData.items || []);
-
     } catch (error) {
         console.error('加载养生谷数据失败:', error);
         if (tizhiGrid) tizhiGrid.innerHTML = '<div class="knowledge-empty">加载失败，请刷新重试</div>';
@@ -472,7 +597,7 @@ function renderTizhiCards(items) {
     if (!tizhiGrid) return;
 
     tizhiGrid.innerHTML = items.map(t => `
-        <div class="knowledge-card tizhi-card" onclick="showTizhiDetail('${t.name}')">
+        <div class="knowledge-card tizhi-card">
             <div class="knowledge-card-title">${t.name}</div>
             <div class="knowledge-card-desc">${t.desc || ''}</div>
             <div class="knowledge-card-diet">💊 ${t.diet || ''}</div>
@@ -485,40 +610,13 @@ function renderYaoshiCards(items) {
     if (!yaoshiList) return;
 
     yaoshiList.innerHTML = items.map(y => `
-        <div class="knowledge-card yaoshi-card" onclick="showYaoshiDetail('${y.name}')">
+        <div class="knowledge-card yaoshi-card">
             <div class="knowledge-card-title">${y.name}</div>
             <div class="knowledge-card-meta">性味：${y.xingwei || '—'} · 归经：${y.guijing || '—'}</div>
             <div class="knowledge-card-desc">${y.gongxiao || ''}</div>
             <div class="knowledge-card-jinji">⚠️ ${y.jinji || '无特殊禁忌'}</div>
         </div>
     `).join('');
-}
-
-function showTizhiDetail(name) {
-    const tips = document.getElementById('daily-tip-area');
-    if (!tips) return;
-
-    tips.innerHTML = `
-        <div class="detail-popup" id="detail-popup">
-            <button class="detail-close" onclick="this.parentElement.parentElement.remove()" style="position:relative;float:right;margin-left:8px">✕</button>
-            <h3 style="color:var(--primary-color);margin-bottom:12px">${name}</h3>
-            <p>体质说明已在养生谷列表中展示，点击上方卡片即可查看详情。</p>
-        </div>
-    `;
-}
-
-function showYaoshiDetail(name) {
-    // 简单提示，实际可展开更详细视图
-    const tips = document.getElementById('daily-tip-area');
-    if (!tips) return;
-
-    tips.innerHTML = `
-        <div class="detail-popup" id="detail-popup">
-            <button class="detail-close" onclick="this.parentElement.parentElement.remove()" style="position:relative;float:right;margin-left:8px">✕</button>
-            <h3 style="color:var(--primary-color);margin-bottom:12px">${name} 详细信息</h3>
-            <p>药食同源详细信息可在养生谷列表查看。后续版本会增加详情页弹窗。</p>
-        </div>
-    `;
 }
 
 // ========== 每日养生建议 ==========
@@ -549,6 +647,7 @@ async function loadDailyTip() {
 function initProfile() {
     loadProfile();
     bindCheckin();
+    loadFavorites();
 }
 
 function getUserId() {
@@ -594,7 +693,7 @@ async function loadProfile() {
             updateProfileFromBackend(checkin);
         }
     } catch(e) {
-        console.log('后端签到状态获取失败，使用本地数据');
+        console.log('后端签到状态获取失败');
     }
 
     const data = getUserData();
@@ -643,11 +742,11 @@ async function bindCheckin() {
             if (result.success) {
                 checkinBtn.textContent = `✅ 已连续签到${result.streak || 1}天`;
                 checkinBtn.disabled = true;
-                alert(result.message);
+                showToast(result.message);
             } else {
                 checkinBtn.textContent = '今天已签到';
                 checkinBtn.disabled = true;
-                alert(result.message);
+                showToast(result.message);
             }
         } catch (error) {
             checkinBtn.textContent = '签到失败';
@@ -669,7 +768,7 @@ function loadTizhiRecords(data) {
     }
 
     let html = '';
-    const maxShow = Math.min(records.length, 5);
+    const maxShow = Math.min(records.length, 10);
     for (let i = records.length - maxShow; i < records.length; i++) {
         const r = records[i];
         html += '<div class="history-item">';
@@ -709,4 +808,47 @@ function saveProductBrowse(keyword, count) {
     if (!data.productBrowses) data.productBrowses = 0;
     data.productBrowses += count;
     saveUserData(data);
+}
+
+// ========== 收藏列表 ==========
+
+async function loadFavorites() {
+    try {
+        const res = await fetch(`${API_BASE}/api/favorites?user_id=${encodeURIComponent(getUserId())}&limit=10`);
+        const data = await res.json();
+        const favList = document.getElementById('favorites-list');
+        if (!favList) return;
+
+        if (!data.favorites || data.favorites.length === 0) {
+            favList.innerHTML = '<p class="empty-hint">暂无收藏商品</p>';
+            return;
+        }
+
+        favList.innerHTML = data.favorites.map(f => `
+            <div class="history-item">
+                <span class="history-date">${escapeHtml(f.title || '').substring(0, 20)}</span>
+                <span class="history-tizhi">¥${f.price || '0'}</span>
+                <span class="history-desc">${f.platform === 'taobao' ? '淘宝' : '京东'}</span>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.log('加载收藏列表失败:', e);
+    }
+}
+
+// ========== Toast 提示 ==========
+
+function showToast(msg) {
+    const existing = document.querySelector('.toast-msg');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-msg';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 2500);
 }

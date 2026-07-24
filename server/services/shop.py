@@ -188,53 +188,59 @@ class ShopService:
         1. 优先从数据库缓存查询
         2. 缓存未命中或不足时，再调淘宝API实时搜索
         3. 长关键词拆成短组合并行搜索，提高召回率
+        4. 全链路去重：以item_id为唯一标识，实时结果覆盖缓存
         """
-        # 先尝试从缓存查询
-        cache_items = self.search_from_cache(keyword=keyword, page=page, page_size=page_size)
-        if len(cache_items) >= page_size:
-            return cache_items
-        
-        # 缓存不足，实时搜索
         # 强制追加有机认证关键词
         search_keyword = self._ensure_organic(keyword)
 
-        items = list(cache_items)  # 缓存结果作为基础
+        # 使用集合去重，以item_id+title[:20]为唯一标识
         seen_ids = set()
-        for item in cache_items:
-            item_id = item.get('item_id', '') or item.get('title', '')
-            if item_id:
-                seen_ids.add(item_id)
+        items = []
 
-        if platform in ("taobao", "all"):
-            # 把长关键词拆成2-3个词的短组合，分别搜索再合并
-            sub_keywords = self._split_keywords(search_keyword)
-            # 并行搜索所有子关键词，每个搜1页，然后合并去重
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-                # 提交所有搜索任务
-                future_to_kw = {executor.submit(self._search_taobao, sub_kw, 1, page_size, sort): sub_kw for sub_kw in sub_keywords}
-                for future in concurrent.futures.as_completed(future_to_kw):
-                    sub_items = future.result()
-                    if not sub_items:
-                        continue
-                    for item in sub_items:
-                        item_id = item.get('item_id', '') or item.get('title', '')
-                        if item_id and item_id not in seen_ids and not self._is_excluded(item):
-                            seen_ids.add(item_id)
-                            items.append(item)
-                            if len(items) >= page_size * 2:
-                                # 已经够了，取消剩余任务
-                                for f in future_to_kw:
-                                    f.cancel()
-                                break
-                    if len(items) >= page_size * 2:
-                        break
-        if platform in ("jd", "all"):
-            for page_num in range(1, 2):  # 每个子关键词搜1页，提高速度
-                for item in self._search_jd(search_keyword, page_num, page_size):
-                    if not self._is_excluded(item):
-                        items.append(item)
-        return items
+        def _add_unique(item_list):
+            """添加唯一商品，返回新增数量"""
+            added = 0
+            for item in item_list:
+                item_id = item.get('item_id', '') or ''
+                title = item.get('title', '') or ''
+                if not item_id and not title:
+                    continue
+                # 使用 item_id + 标题前20字作为去重key
+                dedup_key = f"{item_id}:{title[:20]}" if item_id else title[:30]
+                
+                if dedup_key not in seen_ids and not self._is_excluded(item):
+                    seen_ids.add(dedup_key)
+                    items.append(item)
+                    added += 1
+            return added
+
+        # 1. 先从缓存查询
+        cache_items = self.search_from_cache(keyword=keyword, page=1, page_size=page_size * 2)
+        _add_unique(cache_items)
+
+        # 2. 缓存不够时，实时搜索
+        if len(items) < page_size:
+            if platform in ("taobao", "all"):
+                sub_keywords = self._split_keywords(search_keyword)
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                    future_to_kw = {
+                        executor.submit(self._search_taobao, sub_kw, 1, page_size, sort): sub_kw 
+                        for sub_kw in sub_keywords[:3]  # 限制并发数，避免超时
+                    }
+                    for future in concurrent.futures.as_completed(future_to_kw):
+                        sub_items = future.result()
+                        if sub_items:
+                            _add_unique(sub_items)
+                        if len(items) >= page_size * 2:
+                            break
+
+            if platform in ("jd", "all"):
+                jd_items = self._search_jd(search_keyword, 1, page_size)
+                _add_unique(jd_items)
+
+        # 3. 截断到page_size
+        return items[:page_size]
 
     def _is_excluded(self, item: dict) -> bool:
         """检查商品是否应该被排除（书籍、化工、玩具等无关品类）"""
