@@ -167,23 +167,49 @@ class ShopService:
             {'name': name, 'keyword': info['keyword'], 'icon': info['icon'], 'desc': info['desc']}
             for name, info in CATEGORY_MAP.items()
         ]
+    
+    def get_category_keyword(self, category_name: str) -> str:
+        """根据分类名获取搜索关键词"""
+        if category_name in CATEGORY_MAP:
+            return CATEGORY_MAP[category_name]['keyword']
+        # 尝试匹配部分名称
+        for name, info in CATEGORY_MAP.items():
+            if category_name in name or name in category_name:
+                return info['keyword']
+        return category_name
 
     def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
         """
         搜索商品 - 自动追加"有机"关键词，只返回有机认证产品
         platform: taobao / jd / all
         sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
+        
+        优化策略：
+        1. 优先从数据库缓存查询
+        2. 缓存未命中或不足时，再调淘宝API实时搜索
+        3. 长关键词拆成短组合并行搜索，提高召回率
         """
+        # 先尝试从缓存查询
+        cache_items = self.search_from_cache(keyword=keyword, page=page, page_size=page_size)
+        if len(cache_items) >= page_size:
+            return cache_items
+        
+        # 缓存不足，实时搜索
         # 强制追加有机认证关键词
         search_keyword = self._ensure_organic(keyword)
 
-        items = []
+        items = list(cache_items)  # 缓存结果作为基础
+        seen_ids = set()
+        for item in cache_items:
+            item_id = item.get('item_id', '') or item.get('title', '')
+            if item_id:
+                seen_ids.add(item_id)
+
         if platform in ("taobao", "all"):
             # 把长关键词拆成2-3个词的短组合，分别搜索再合并
             sub_keywords = self._split_keywords(search_keyword)
             # 并行搜索所有子关键词，每个搜1页，然后合并去重
             import concurrent.futures
-            seen_ids = set()
             with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
                 # 提交所有搜索任务
                 future_to_kw = {executor.submit(self._search_taobao, sub_kw, 1, page_size, sort): sub_kw for sub_kw in sub_keywords}
@@ -193,15 +219,15 @@ class ShopService:
                         continue
                     for item in sub_items:
                         item_id = item.get('item_id', '') or item.get('title', '')
-                        if item_id not in seen_ids and not self._is_excluded(item):
+                        if item_id and item_id not in seen_ids and not self._is_excluded(item):
                             seen_ids.add(item_id)
                             items.append(item)
-                            if len(items) >= page_size * 10:
+                            if len(items) >= page_size * 2:
                                 # 已经够了，取消剩余任务
                                 for f in future_to_kw:
                                     f.cancel()
                                 break
-                    if len(items) >= page_size * 10:
+                    if len(items) >= page_size * 2:
                         break
         if platform in ("jd", "all"):
             for page_num in range(1, 2):  # 每个子关键词搜1页，提高速度

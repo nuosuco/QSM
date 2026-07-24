@@ -94,6 +94,27 @@
                 </div>
             </div>
 
+            <!-- 商品详情弹窗 -->
+            <div class="product-detail-overlay" id="product-detail-overlay" style="display:none">
+                <div class="product-detail-modal">
+                    <button class="detail-close" onclick="closeDetail()">✕</button>
+                    <div class="detail-content">
+                        <div class="detail-images">
+                            <div class="detail-main-image" id="detail-main-image"></div>
+                            <div class="detail-thumbnails" id="detail-thumbnails"></div>
+                        </div>
+                        <div class="detail-info">
+                            <h2 class="detail-title" id="detail-title"></h2>
+                            <div class="detail-price" id="detail-price"></div>
+                            <div class="detail-shop" id="detail-shop"></div>
+                            <div class="detail-params" id="detail-params"></div>
+                            <div class="detail-desc" id="detail-desc"></div>
+                            <button class="detail-buy-btn" id="detail-buy-btn" onclick="goToBuy()">去淘宝购买</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 养生谷页面（暂时放养生知识） -->
             <div class="tab-content" id="yangshenggu-tab">
                 <div class="knowledge-container">

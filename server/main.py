@@ -151,12 +151,18 @@ async def search_products(
     """
     from services.shop import ShopService
     shop = ShopService()
+    
+    # 如果是分类名，先转成搜索关键词
+    search_kw = shop.get_category_keyword(keyword) if keyword else ''
+    if not search_kw and keyword:
+        search_kw = keyword
+    
     # 优先从数据库缓存查
-    items = shop.search_from_cache(keyword=keyword, page=page, page_size=page_size)
-    if not items:
-        # 缓存没有，调淘宝API实时搜索
-        items = shop.search(keyword, platform=platform, page=page, page_size=page_size, sort=sort)
-    return {"keyword": keyword, "platform": platform, "total": len(items), "items": items}
+    items = shop.search_from_cache(keyword=search_kw, page=page, page_size=page_size)
+    if len(items) < page_size:
+        # 缓存不足，调淘宝API实时搜索
+        items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
+    return {"keyword": keyword, "search_keyword": search_kw, "platform": platform, "total": len(items), "items": items}
 
 # ========== 知识库接口 ==========
 

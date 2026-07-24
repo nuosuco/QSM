@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initChat();
     initProductSearch();
     loadCategories();
-    loadKnowledge();
+    initProfile();
 });
 
 // ========== 导航切换 ==========
@@ -253,11 +253,11 @@ function displayCategories(categories) {
 
 function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
-    currentKeyword = categoryName || keyword;
+    // 用分类名作为搜索关键词（后端会根据分类名映射到关键词）
+    // 这样前端不需要传完整关键词，更简洁
+    currentKeyword = categoryName;
     currentPage = 1;
     hasMore = true;
-    const searchInput = document.getElementById('product-search');
-    searchInput.value = currentKeyword;
     searchProducts(true);
 }
 
@@ -351,17 +351,56 @@ function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
     
     const productHtml = products.map(product => {
-        // 淘宝商品：优先使用APP deeplink，网页版使用推广链接
         let appUrl = product.app_url || '';
         let webUrl = product.url || '#';
         
+        // 多张图片：如果有images数组，取第一张；否则用单张image
+        let mainImage = product.image || '';
+        if (product.images && product.images.length > 0) {
+            mainImage = product.images[0];
+        }
+        
+        // 佣金率显示
+        let commissionText = '';
+        if (product.commission_rate) {
+            let rate = parseFloat(product.commission_rate);
+            if (rate > 100) {
+                commissionText = (rate / 100).toFixed(1) + '%';
+            } else if (rate > 0) {
+                commissionText = rate + '%';
+            }
+        }
+        
+        // 平台标签
+        let platformBadge = '';
+        if (product.platform === 'taobao') {
+            platformBadge = '<span class="platform-badge taobao">淘宝</span>';
+        } else if (product.platform === 'jd') {
+            platformBadge = '<span class="platform-badge jd">京东</span>';
+        }
+        
+        // 安全转义商品标题用于弹窗
+        const safeTitle = escapeHtml(product.title);
+        const safePrice = product.price || '';
+        const safeShop = escapeHtml(product.shop_name || '');
+        const safeBrand = escapeHtml(product.brand || '');
+        
         return `
-        <div class="product-card" onclick="openProduct('${appUrl}', '${webUrl}', '${product.platform}')">
-            <img class="product-image" src="${product.image}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+        <div class="product-card" onclick="showProductDetail('${safeTitle.replace(/'/g, "\\'")}', '${safePrice}', '${mainImage}', '${webUrl}', '${appUrl}', '${product.platform}', '${commissionText}', '${safeShop.replace(/'/g, "\\'")}')">
+            <div class="product-image-wrapper">
+                <img class="product-image" src="${mainImage}" alt="${safeTitle}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'img-placeholder\'><span>暂无图片</span></div>'">
+                ${product.images && product.images.length > 1 ? '<div class="image-count">共' + product.images.length + '张</div>' : ''}
+            </div>
             <div class="product-info">
-                <div class="product-title">${escapeHtml(product.title)}</div>
-                <div class="product-price">¥${product.price}</div>
-                <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+                <div class="product-title">${safeTitle}</div>
+                <div class="product-price">
+                    <span>¥${safePrice}</span>
+                    ${commissionText ? '<span class="commission-badge">' + commissionText + '</span>' : ''}
+                </div>
+                <div class="product-meta">
+                    ${platformBadge}
+                    <span class="product-shop">${safeShop}</span>
+                </div>
             </div>
         </div>
         `;
@@ -373,6 +412,50 @@ function displayProducts(products, append = false) {
         productsGrid.innerHTML = productHtml;
     }
 }
+
+// ========== 商品详情弹窗 ==========
+
+function showProductDetail(title, price, image, webUrl, appUrl, platform, commissionText, shopName) {
+    // 移除已有弹窗
+    const existing = document.getElementById('product-detail-modal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'product-detail-modal';
+    modal.className = 'modal-overlay';
+    modal.onclick = function(e) { if (e.target === this) this.remove(); };
+    
+    let platformLabel = platform === 'taobao' ? '淘宝' : platform === 'jd' ? '京东' : platform;
+    
+    modal.innerHTML = `
+        <div class="modal-content product-detail-modal">
+            <button class="modal-close" onclick="document.getElementById('product-detail-modal').remove()">×</button>
+            <div class="detail-image-wrapper">
+                <img src="${image}" alt="${title}" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'img-placeholder big\'><span>暂无图片</span></div>'">
+            </div>
+            <div class="detail-info">
+                <h3 class="detail-title">${title}</h3>
+                <div class="detail-price">
+                    <span class="price-symbol">¥</span>
+                    <span class="price-value">${price}</span>
+                </div>
+                <div class="detail-meta">
+                    <span class="platform-badge ${platform}">${platformLabel}</span>
+                    ${commissionText ? '<span class="commission-badge big">佣金 ' + commissionText + '</span>' : ''}
+                    ${shopName ? '<span class="detail-shop">🏪 ' + shopName + '</span>' : ''}
+                </div>
+                <div class="detail-actions">
+                    <button class="buy-btn" onclick="openProduct('${appUrl}', '${webUrl}', '${platform}')">
+                        ${platform === 'taobao' ? '🛒 去淘宝购买' : '🛒 去京东购买'}
+                    </button>
+                </div>
+                <p class="detail-note">💡 通过本链接购买，您将支持SOM松麦的发展</p>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+
 
 function openProduct(appUrl, webUrl, platform) {
     if (platform === 'taobao' && appUrl) {
@@ -389,47 +472,201 @@ function openProduct(appUrl, webUrl, platform) {
     }
 }
 
-// ========== 知识库 ==========
+// ========== 个人中心 ==========
 
-async function loadKnowledge() {
-    try {
-        // 加载体质分类
-        const tizhiResponse = await fetch(`${API_BASE}/api/knowledge/tizhi`);
-        const tizhiData = await tizhiResponse.json();
-        displayTizhi(tizhiData.items);
-        
-        // 加载药食同源
-        const yaoshiResponse = await fetch(`${API_BASE}/api/knowledge/yaoshi`);
-        const yaoshiData = await yaoshiResponse.json();
-        displayYaoshi(yaoshiData.items);
-        
-    } catch (error) {
-        console.error('加载知识库失败:', error);
+function initProfile() {
+    loadProfile();
+}
+
+function getUserId() {
+    let uid = localStorage.getItem('som_user_id');
+    if (!uid) {
+        uid = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('som_user_id', uid);
+    }
+    return uid;
+}
+
+function getUserData() {
+    const key = 'som_user_data_' + getUserId();
+    const dataStr = localStorage.getItem(key);
+    let data;
+    if (dataStr) {
+        try { data = JSON.parse(dataStr); } catch(e) { data = {}; }
+    } else {
+        data = {};
+    }
+    if (!data.name) data.name = '养生用户';
+    if (!data.tizhi) data.tizhi = '未检测';
+    if (!data.points) data.points = 0;
+    if (!data.chats) data.chats = [];
+    if (!data.checkins) data.checkins = [];
+    if (!data.productBrowses) data.productBrowses = 0;
+    if (!data.tizhiRecords) data.tizhiRecords = [];
+    return data;
+}
+
+function saveUserData(data) {
+    const key = 'som_user_data_' + getUserId();
+    localStorage.setItem(key, JSON.stringify(data));
+}
+
+function loadProfile() {
+    const data = getUserData();
+    
+    document.getElementById('profile-name').textContent = data.name;
+    document.getElementById('profile-tizhi').textContent = '体质：' + (data.tizhi || '未检测');
+    document.getElementById('profile-points').textContent = '积分：' + (data.points || 0);
+    
+    const today = new Date().toISOString().split('T')[0];
+    const checkedInToday = data.checkins && data.checkins.indexOf(today) >= 0;
+    document.getElementById('profile-checkin').textContent = checkedInToday ? '✅ 今天已签到' : '签到：今天未签到';
+    
+    document.getElementById('stat-chats').textContent = (data.chats || []).length;
+    document.getElementById('stat-checkins').textContent = (data.checkins || []).length;
+    document.getElementById('stat-products').textContent = data.productBrowses || 0;
+    
+    loadTizhiRecords(data);
+}
+
+function loadTizhiRecords(data) {
+    const history = document.getElementById('profile-history');
+    if (!history) return;
+    
+    const records = data.tizhiRecords || [];
+    if (records.length === 0) {
+        history.innerHTML = '<p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>';
+        return;
+    }
+    
+    let html = '';
+    const maxShow = Math.min(records.length, 5);
+    for (let i = records.length - maxShow; i < records.length; i++) {
+        const r = records[i];
+        html += '<div class="history-item">';
+        html += '  <span class="history-date">' + escapeHtml(r.date || '') + '</span>';
+        html += '  <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span>';
+        html += '  <span class="history-desc">' + escapeHtml(r.desc || '') + '</span>';
+        html += '</div>';
+    }
+    history.innerHTML = html;
+}
+
+function saveChatRecord(message, reply, tizhi) {
+    const data = getUserData();
+    if (!data.chats) data.chats = [];
+    
+    data.chats.push({
+        date: new Date().toISOString(),
+        message: message.substring(0, 100),
+        tizhi: tizhi || ''
+    });
+    
+    if (tizhi && tizhi !== '未检测') {
+        if (!data.tizhiRecords) data.tizhiRecords = [];
+        data.tizhiRecords.push({
+            date: new Date().toISOString().split('T')[0],
+            tizhi: tizhi,
+            desc: message.substring(0, 50)
+        });
+        data.tizhi = tizhi;
+    }
+    
+    saveUserData(data);
+}
+
+function saveProductBrowse(keyword, count) {
+    const data = getUserData();
+    if (!data.productBrowses) data.productBrowses = 0;
+    data.productBrowses += count;
+    saveUserData(data);
+}
+
+// ========== 商品详情弹窗 ==========
+let currentDetailProduct = null;
+
+function showDetail(product) {
+    currentDetailProduct = product;
+    
+    // 主图
+    let mainImage = product.image || '';
+    if (product.images && product.images.length > 0) {
+        mainImage = product.images[0];
+    }
+    document.getElementById('detail-main-image').innerHTML = 
+        `<img src="${mainImage}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">`;
+    
+    // 缩略图
+    let thumbnails = '';
+    const images = product.images || [mainImage];
+    images.forEach((img, i) => {
+        thumbnails += `<img src="${img}" class="detail-thumb${i === 0 ? ' active' : ''}" onclick="switchDetailImage(this, '${img}')" onerror="this.style.display='none'">`;
+    });
+    document.getElementById('detail-thumbnails').innerHTML = thumbnails;
+    
+    // 标题
+    document.getElementById('detail-title').textContent = product.title;
+    
+    // 价格
+    document.getElementById('detail-price').innerHTML = `<span class="price-symbol">¥</span>${product.price}`;
+    
+    // 店铺
+    let shopHtml = '';
+    if (product.shop_name) {
+        shopHtml += `<span>🏪 ${escapeHtml(product.shop_name)}</span>`;
+    }
+    if (product.brand) {
+        shopHtml += `<span>🏷️ ${escapeHtml(product.brand)}</span>`;
+    }
+    document.getElementById('detail-shop').innerHTML = shopHtml;
+    
+    // 参数（从数据库取）
+    document.getElementById('detail-params').innerHTML = '<div class="detail-section-title">商品参数</div><div class="detail-params-list"><span>暂无详细参数</span></div>';
+    
+    // 描述
+    document.getElementById('detail-desc').innerHTML = '<div class="detail-section-title">商品描述</div><p>点击下方按钮查看淘宝详情</p>';
+    
+    // 购买按钮
+    const buyBtn = document.getElementById('detail-buy-btn');
+    const platform = product.platform || 'taobao';
+    const platformName = platform === 'taobao' ? '淘宝' : '京东';
+    buyBtn.textContent = `去${platformName}购买`;
+    buyBtn.onclick = function() {
+        let url = product.url || '#';
+        if (url && url !== '#') {
+            window.open(url, '_blank');
+        }
+    };
+    
+    // 显示弹窗
+    document.getElementById('product-detail-overlay').style.display = 'flex';
+}
+
+function closeDetail() {
+    document.getElementById('product-detail-overlay').style.display = 'none';
+    currentDetailProduct = null;
+}
+
+function switchDetailImage(el, imgUrl) {
+    document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('detail-main-image').innerHTML = 
+        `<img src="${imgUrl}" alt="商品图片">`;
+}
+
+function goToBuy() {
+    if (currentDetailProduct) {
+        let url = currentDetailProduct.url || '#';
+        if (url && url !== '#') {
+            window.open(url, '_blank');
+        }
     }
 }
 
-function displayTizhi(tizhiList) {
-    const tizhiGrid = document.getElementById('tizhi-grid');
-    
-    tizhiGrid.innerHTML = tizhiList.map(tizhi => `
-        <div class="tizhi-card">
-            <h3>${tizhi.name}</h3>
-            <p><strong>特征：</strong>${tizhi.desc}</p>
-            <p><strong>养生：</strong>${tizhi.yangsheng}</p>
-        </div>
-    `).join('');
-}
-
-function displayYaoshi(yaoshiItems) {
-    const yaoshiList = document.getElementById('yaoshi-list');
-    
-    yaoshiList.innerHTML = Object.entries(yaoshiItems).map(([name, info]) => `
-        <div class="yaoshi-item">
-            <h4>${name}</h4>
-            <p><strong>性味：</strong>${info.xingwei}</p>
-            <p><strong>归经：</strong>${info.guijing}</p>
-            <p><strong>功效：</strong>${info.gongxiao}</p>
-            <p><strong>禁忌：</strong>${info.jinji}</p>
-        </div>
-    `).join('');
-}
+// 点击遮罩层关闭
+document.addEventListener('click', function(e) {
+    const overlay = document.getElementById('product-detail-overlay');
+    if (e.target === overlay) {
+        closeDetail();
+    }
+});

@@ -253,9 +253,9 @@ function displayCategories(categories) {
 
 function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
-    // 用分类名称作为搜索框显示，但实际搜索用后端关键词
-    // 取关键词的第一个词作为搜索关键词，避免太长
-    currentKeyword = keyword;
+    // 用分类名作为搜索关键词（后端会根据分类名映射到关键词）
+    // 这样前端不需要传完整关键词，更简洁
+    currentKeyword = categoryName;
     currentPage = 1;
     hasMore = true;
     searchProducts(true);
@@ -365,23 +365,41 @@ function displayProducts(products, append = false) {
         if (product.commission_rate) {
             let rate = parseFloat(product.commission_rate);
             if (rate > 100) {
-                commissionText = '佣金' + (rate / 100).toFixed(1) + '%';
-            } else {
-                commissionText = '佣金' + rate + '%';
+                commissionText = (rate / 100).toFixed(1) + '%';
+            } else if (rate > 0) {
+                commissionText = rate + '%';
             }
         }
         
+        // 平台标签
+        let platformBadge = '';
+        if (product.platform === 'taobao') {
+            platformBadge = '<span class="platform-badge taobao">淘宝</span>';
+        } else if (product.platform === 'jd') {
+            platformBadge = '<span class="platform-badge jd">京东</span>';
+        }
+        
+        // 安全转义商品标题用于弹窗
+        const safeTitle = escapeHtml(product.title);
+        const safePrice = product.price || '';
+        const safeShop = escapeHtml(product.shop_name || '');
+        const safeBrand = escapeHtml(product.brand || '');
+        
         return `
-        <div class="product-card" onclick="openProduct('', '${webUrl}', '${product.platform}')">
+        <div class="product-card" onclick="showProductDetail('${safeTitle.replace(/'/g, "\\'")}', '${safePrice}', '${mainImage}', '${webUrl}', '${appUrl}', '${product.platform}', '${commissionText}', '${safeShop.replace(/'/g, "\\'")}')">
             <div class="product-image-wrapper">
-                <img class="product-image" src="${mainImage}" alt="${escapeHtml(product.title)}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+                <img class="product-image" src="${mainImage}" alt="${safeTitle}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'img-placeholder\'><span>暂无图片</span></div>'">
                 ${product.images && product.images.length > 1 ? '<div class="image-count">共' + product.images.length + '张</div>' : ''}
             </div>
             <div class="product-info">
-                <div class="product-title">${escapeHtml(product.title)}</div>
-                <div class="product-price">¥${product.price}</div>
+                <div class="product-title">${safeTitle}</div>
+                <div class="product-price">
+                    <span>¥${safePrice}</span>
+                    ${commissionText ? '<span class="commission-badge">' + commissionText + '</span>' : ''}
+                </div>
                 <div class="product-meta">
-                    <span class="product-shop">${escapeHtml(product.shop_name || '')}</span>
+                    ${platformBadge}
+                    <span class="product-shop">${safeShop}</span>
                 </div>
             </div>
         </div>
@@ -394,6 +412,50 @@ function displayProducts(products, append = false) {
         productsGrid.innerHTML = productHtml;
     }
 }
+
+// ========== 商品详情弹窗 ==========
+
+function showProductDetail(title, price, image, webUrl, appUrl, platform, commissionText, shopName) {
+    // 移除已有弹窗
+    const existing = document.getElementById('product-detail-modal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'product-detail-modal';
+    modal.className = 'modal-overlay';
+    modal.onclick = function(e) { if (e.target === this) this.remove(); };
+    
+    let platformLabel = platform === 'taobao' ? '淘宝' : platform === 'jd' ? '京东' : platform;
+    
+    modal.innerHTML = `
+        <div class="modal-content product-detail-modal">
+            <button class="modal-close" onclick="document.getElementById('product-detail-modal').remove()">×</button>
+            <div class="detail-image-wrapper">
+                <img src="${image}" alt="${title}" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'img-placeholder big\'><span>暂无图片</span></div>'">
+            </div>
+            <div class="detail-info">
+                <h3 class="detail-title">${title}</h3>
+                <div class="detail-price">
+                    <span class="price-symbol">¥</span>
+                    <span class="price-value">${price}</span>
+                </div>
+                <div class="detail-meta">
+                    <span class="platform-badge ${platform}">${platformLabel}</span>
+                    ${commissionText ? '<span class="commission-badge big">佣金 ' + commissionText + '</span>' : ''}
+                    ${shopName ? '<span class="detail-shop">🏪 ' + shopName + '</span>' : ''}
+                </div>
+                <div class="detail-actions">
+                    <button class="buy-btn" onclick="openProduct('${appUrl}', '${webUrl}', '${platform}')">
+                        ${platform === 'taobao' ? '🛒 去淘宝购买' : '🛒 去京东购买'}
+                    </button>
+                </div>
+                <p class="detail-note">💡 通过本链接购买，您将支持SOM松麦的发展</p>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+
 
 function openProduct(appUrl, webUrl, platform) {
     if (platform === 'taobao' && appUrl) {
@@ -519,3 +581,177 @@ function saveProductBrowse(keyword, count) {
     data.productBrowses += count;
     saveUserData(data);
 }
+
+// ========== 商品详情弹窗 ==========
+let currentDetailProduct = null;
+
+function showDetail(product) {
+    currentDetailProduct = product;
+    
+    // 主图
+    let mainImage = product.image || '';
+    if (product.images && product.images.length > 0) {
+        mainImage = product.images[0];
+    }
+    document.getElementById('detail-main-image').innerHTML = 
+        `<img src="${mainImage}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">`;
+    
+    // 缩略图
+    let thumbnails = '';
+    const images = product.images || [mainImage];
+    images.forEach((img, i) => {
+        thumbnails += `<img src="${img}" class="detail-thumb${i === 0 ? ' active' : ''}" onclick="switchDetailImage(this, '${img}')" onerror="this.style.display='none'">`;
+    });
+    document.getElementById('detail-thumbnails').innerHTML = thumbnails;
+    
+    // 标题
+    document.getElementById('detail-title').textContent = product.title;
+    
+    // 价格
+    document.getElementById('detail-price').innerHTML = `<span class="price-symbol">¥</span>${product.price}`;
+    
+    // 店铺
+    let shopHtml = '';
+    if (product.shop_name) {
+        shopHtml += `<span>🏪 ${escapeHtml(product.shop_name)}</span>`;
+    }
+    if (product.brand) {
+        shopHtml += `<span>🏷️ ${escapeHtml(product.brand)}</span>`;
+    }
+    document.getElementById('detail-shop').innerHTML = shopHtml;
+    
+    // 参数（从数据库取）
+    document.getElementById('detail-params').innerHTML = '<div class="detail-section-title">商品参数</div><div class="detail-params-list"><span>暂无详细参数</span></div>';
+    
+    // 描述
+    document.getElementById('detail-desc').innerHTML = '<div class="detail-section-title">商品描述</div><p>点击下方按钮查看淘宝详情</p>';
+    
+    // 购买按钮
+    const buyBtn = document.getElementById('detail-buy-btn');
+    const platform = product.platform || 'taobao';
+    const platformName = platform === 'taobao' ? '淘宝' : '京东';
+    buyBtn.textContent = `去${platformName}购买`;
+    buyBtn.onclick = function() {
+        let url = product.url || '#';
+        if (url && url !== '#') {
+            window.open(url, '_blank');
+        }
+    };
+    
+    // 显示弹窗
+    document.getElementById('product-detail-overlay').style.display = 'flex';
+}
+
+function closeDetail() {
+    document.getElementById('product-detail-overlay').style.display = 'none';
+    currentDetailProduct = null;
+}
+
+function switchDetailImage(el, imgUrl) {
+    document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('detail-main-image').innerHTML = 
+        `<img src="${imgUrl}" alt="商品图片">`;
+}
+
+function goToBuy() {
+    if (currentDetailProduct) {
+        let url = currentDetailProduct.url || '#';
+        if (url && url !== '#') {
+            window.open(url, '_blank');
+        }
+    }
+}
+
+// 点击遮罩层关闭
+document.addEventListener('click', function(e) {
+    const overlay = document.getElementById('product-detail-overlay');
+    if (e.target === overlay) {
+        closeDetail();
+    }
+});
+
+// ========== 商品详情弹窗 ==========
+let currentDetailProduct = null;
+
+function showDetail(product) {
+    currentDetailProduct = product;
+    
+    // 主图
+    let mainImage = product.image || '';
+    if (product.images && product.images.length > 0) {
+        mainImage = product.images[0];
+    }
+    document.getElementById('detail-main-image').innerHTML = 
+        `<img src="${mainImage}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">`;
+    
+    // 缩略图
+    let thumbnails = '';
+    const images = product.images || [mainImage];
+    images.forEach((img, i) => {
+        thumbnails += `<img src="${img}" class="detail-thumb${i === 0 ? ' active' : ''}" onclick="switchDetailImage(this, '${img}')" onerror="this.style.display='none'">`;
+    });
+    document.getElementById('detail-thumbnails').innerHTML = thumbnails;
+    
+    // 标题
+    document.getElementById('detail-title').textContent = product.title;
+    
+    // 价格
+    document.getElementById('detail-price').innerHTML = `<span class="price-symbol">¥</span>${product.price}`;
+    
+    // 店铺
+    let shopHtml = '';
+    if (product.shop_name) {
+        shopHtml += `<span>🏪 ${escapeHtml(product.shop_name)}</span>`;
+    }
+    if (product.brand) {
+        shopHtml += `<span>🏷️ ${escapeHtml(product.brand)}</span>`;
+    }
+    document.getElementById('detail-shop').innerHTML = shopHtml;
+    
+    // 购买按钮
+    const buyBtn = document.getElementById('detail-buy-btn');
+    const platform = product.platform || 'taobao';
+    const platformName = platform === 'taobao' ? '淘宝' : '京东';
+    buyBtn.textContent = `去${platformName}购买`;
+    buyBtn.onclick = function() {
+        let url = product.url || '#';
+        if (url && url !== '#') {
+            window.open(url, '_blank');
+        }
+    };
+    
+    // 显示弹窗
+    document.getElementById('product-detail-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDetail() {
+    document.getElementById('product-detail-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    currentDetailProduct = null;
+}
+
+function switchDetailImage(el, imgUrl) {
+    document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('detail-main-image').innerHTML = 
+        `<img src="${imgUrl}" alt="商品图片">`;
+}
+
+function goToBuy() {
+    if (currentDetailProduct) {
+        let url = currentDetailProduct.url || '#';
+        if (url && url !== '#') {
+            window.open(url, '_blank');
+        }
+    }
+}
+
+// 点击遮罩层关闭
+document.addEventListener('click', function(e) {
+    const overlay = document.getElementById('product-detail-overlay');
+    if (e.target === overlay) {
+        closeDetail();
+    }
+});
