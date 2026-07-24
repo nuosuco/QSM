@@ -8,7 +8,6 @@
     <title>SOM 松麦 - 智能养生平台</title>
     <meta name="description" content="小麦SOM - 中医辨证养生，有机食品推荐">
     <link rel="stylesheet" href="css/style.css">
-    <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <div class="app">
@@ -35,6 +34,7 @@
         <main class="main">
             <!-- 对话页面 -->
             <div class="tab-content active" id="chat-tab">
+                <div class="daily-tip-area" id="daily-tip-area"></div>
                 <div class="chat-container">
                     <div class="chat-messages" id="chat-messages">
                         <div class="message assistant">
@@ -95,39 +95,16 @@
                 </div>
             </div>
 
-            <!-- 商品详情弹窗 -->
-            <div class="detail-overlay" id="detail-overlay" style="display:none">
-                <div class="detail-modal">
-                    <button class="detail-close" onclick="closeDetail()">&times;</button>
-                    <div class="detail-images" id="detail-images"></div>
-                    <div class="detail-body">
-                        <div class="detail-title" id="detail-title"></div>
-                        <div class="detail-price" id="detail-price"></div>
-                        <div class="detail-shop" id="detail-shop"></div>
-                        <button class="detail-buy" id="detail-buy">去淘宝购买</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 养生谷页面 -->
+            <!-- 养生谷页面（暂时放养生知识） -->
             <div class="tab-content" id="yangshenggu-tab">
-                <div id="daily-tip"></div>
                 <div class="knowledge-container">
                     <div class="knowledge-section">
-                        <h2>🌿 今日养生建议</h2>
-                        <div id="daily-tip-content"></div>
-                    </div>
-                    <div class="knowledge-section">
                         <h2>九种体质</h2>
-                        <div class="tizhi-grid" id="tizhi-grid">
-                            <div class="empty-state"><div class="loading"></div><p>加载体质数据...</p></div>
-                        </div>
+                        <div class="tizhi-grid" id="tizhi-grid"></div>
                     </div>
                     <div class="knowledge-section">
-                        <h2>药食同源食材库</h2>
-                        <div class="yaoshi-list" id="yaoshi-list">
-                            <div class="empty-state"><div class="loading"></div><p>加载药食同源数据...</p></div>
-                        </div>
+                        <h2>药食同源</h2>
+                        <div class="yaoshi-list" id="yaoshi-list"></div>
                     </div>
                 </div>
             </div>
@@ -141,8 +118,8 @@
                             <h3 id="profile-name">养生用户</h3>
                             <p id="profile-tizhi">体质：未检测</p>
                             <p id="profile-points">积分：0</p>
-                            <p id="profile-checkin-status" style="color:white;background:rgba(255,255,255,0.15);border-radius:8px;padding:4px 12px;display:inline-block;margin-top:8px;">今天还未签到</p>
-                            <button id="checkin-btn" class="checkin-action-btn" onclick="doCheckin()">去签到</button>
+                            <p id="profile-checkin">签到：今天未签到</p>
+                    <button class="checkin-action-btn" id="checkin-btn">每日签到</button>
                         </div>
                     </div>
                     <div class="profile-section">
@@ -178,52 +155,9 @@
         </footer>
     </div>
 
+    <!-- 商品详情弹窗容器 -->
+    <div class="detail-overlay" id="product-detail-overlay"></div>
+
     <script src="js/app.js"></script>
-<!-- 商品详情弹窗 -->
-<script>
-var currentDetailItem = null;
-
-function showDetail(el) {
-    var raw = el.getAttribute("data-product");
-    if (!raw) return;
-    
-    var item = JSON.parse(decodeURIComponent(raw));
-    currentDetailItem = item;
-    
-    var imgs = item.images || [];
-    if (imgs.length === 0 && item.image) imgs = [item.image];
-    
-    var html = "";
-    for (var i = 0; i < imgs.length; i++) {
-        html += "<div class="detail-img-wrap"><img src="" + imgs[i] + "" alt="" referrerpolicy="no-referrer" style="width:100%;display:block"></div>";
-    }
-    document.getElementById("detail-images").innerHTML = html;
-    
-    document.getElementById("detail-title").textContent = item.title;
-    document.getElementById("detail-price").innerHTML = '<span class="sym">¥</span>' + item.price;
-    document.getElementById("detail-shop").textContent = item.shop_name || '';
-    
-    var platform = item.platform || 'taobao';
-    var btnText = platform === 'taobao' ? '去淘宝购买' : '去京东购买';
-    var buyBtn = document.getElementById('detail-buy');
-    buyBtn.textContent = btnText;
-    buyBtn.onclick = function() {
-        if (item.url) window.open(item.url, '_blank');
-    };
-    
-    document.getElementById('detail-overlay').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-}
-
-function closeDetail() {
-    document.getElementById('detail-overlay').style.display = 'none';
-    document.body.style.overflow = '';
-    currentDetailItem = null;
-}
-
-document.addEventListener('click', function(e) {
-    if (e.target.id === 'detail-overlay') closeDetail();
-});
-</script>
 </body>
 </html>

@@ -300,8 +300,9 @@ def update_crawl_status(keyword: str, platform: str, page_crawled: int, total_pa
 def get_crawl_queue() -> List[dict]:
     """获取待爬取的分类队列"""
     # 从shop.py读取分类
-    import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'server'))
+    _server_dir = os.path.join(os.path.dirname(__file__))
+    if _server_dir not in __import__('sys').path:
+        __import__('sys').path.insert(0, _server_dir)
     from services.shop import ShopService
     
     # 获取分类列表
