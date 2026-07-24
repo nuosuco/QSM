@@ -179,19 +179,36 @@ class KnowledgeService:
     """知识库查询服务"""
 
     def get_yaoshi_list(self) -> dict:
-        """获取药食同源食材库"""
+        """获取药食同源食材库（返回列表格式，方便前端展示）"""
+        items = []
+        for name, info in YAOSHI_TONGYUAN.items():
+            items.append({
+                "name": name,
+                "xingwei": info.get("xingwei", ""),
+                "guijing": info.get("guijing", ""),
+                "gongxiao": info.get("gongxiao", ""),
+                "jinji": info.get("jinji", ""),
+            })
         return {
-            "total": len(YAOSHI_TONGYUAN),
+            "total": len(items),
             "source": "国家卫健委药食同源目录",
-            "items": YAOSHI_TONGYUAN
+            "items": items
         }
 
     def get_tizhi_list(self) -> dict:
         """获取九种体质分类"""
+        enhanced_list = []
+        for t in TIZHI_LIST:
+            enhanced_list.append({
+                "name": t.get("name", ""),
+                "desc": t.get("desc", ""),
+                "features": t.get("desc", ""),
+                "diet": t.get("yangsheng", ""),
+            })
         return {
-            "total": len(TIZHI_LIST),
+            "total": len(enhanced_list),
             "source": "中医体质分类与判定（中华中医药学会标准）",
-            "items": TIZHI_LIST
+            "items": enhanced_list
         }
 
     def get_shiliao(self, zhengxing: Optional[str] = None) -> dict:
