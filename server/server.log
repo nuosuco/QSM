@@ -1,1 +1,13 @@
-nohup: failed to run command 'python3': No such file or directory
+INFO:     Started server process [3408835]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:44642 - "GET /api/knowledge/tizhi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44646 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46492 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46506 - "GET /api/knowledge/tizhi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46512 - "GET /api/products/search?keyword=%E8%B1%86%E7%97%95&platform=all&page_size=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38880 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38886 - "GET /api/knowledge/yaoshi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38898 - "GET /api/products/search?keyword=%E5%9C%B0%E7%B1%B3&platform=all&page_size=3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38910 - "GET / HTTP/1.1" 200 OK

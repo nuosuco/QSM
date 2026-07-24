@@ -1,31 +1,47 @@
 """
-SOM 松麦 - 辨证引擎
-基于RAG知识库的中医辨证分析
+SOM 松麦 - 辨证引擎 v2
+基于规则+RAG的中医辨证分析（升级：模糊匹配+症状权重+综合分析）
 """
 import json
 import os
-from typing import Optional
+import re
+from typing import Optional, List, Tuple
 
 KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shared", "knowledge")
 
-# 症状→证型 映射规则
+# ========== 症状→证型 映射规则 v2 ==========
 SYMPTOM_RULES = {
-    "失眠": {"zhengxing": "心肾不交/肝郁化火", "tizhi": "阴虚质/气郁质", "foods": ["酸枣仁", "百合", "莲子"]},
-    "口干": {"zhengxing": "阴虚火旺", "tizhi": "阴虚质", "foods": ["麦冬", "百合", "银耳"]},
-    "上火": {"zhengxing": "实热/虚火", "tizhi": "湿热质/阴虚质", "foods": ["菊花", "金银花", "绿豆"]},
-    "疲劳": {"zhengxing": "气虚", "tizhi": "气虚质", "foods": ["黄芪", "党参", "山药"]},
-    "胃口不好": {"zhengxing": "脾胃虚弱", "tizhi": "气虚质/痰湿质", "foods": ["山药", "茯苓", "陈皮"]},
-    "手脚冰凉": {"zhengxing": "阳虚", "tizhi": "阳虚质", "foods": ["生姜", "红枣", "桂圆"]},
-    "便秘": {"zhengxing": "肠燥/气滞", "tizhi": "阴虚质/气郁质", "foods": ["蜂蜜", "黑芝麻", "火麻仁"]},
-    "湿气重": {"zhengxing": "脾虚湿盛", "tizhi": "痰湿质/湿热质", "foods": ["薏米", "赤小豆", "茯苓"]},
-    "眼睛干涩": {"zhengxing": "肝血不足", "tizhi": "阴虚质/血虚", "foods": ["枸杞", "菊花", "桑葚"]},
-    "头晕": {"zhengxing": "气血不足/肝阳上亢", "tizhi": "气虚质/阴虚质", "foods": ["天麻", "枸杞", "红枣"]},
-    "咳嗽": {"zhengxing": "肺燥/风寒", "tizhi": "阴虚质/气虚质", "foods": ["川贝", "梨", "百合"]},
-    "痛经": {"zhengxing": "寒凝血瘀", "tizhi": "血瘀质/阳虚质", "foods": ["红糖", "生姜", "当归"]},
-    "掉头发": {"zhengxing": "肾精不足/血虚", "tizhi": "阴虚质/血虚", "foods": ["黑芝麻", "何首乌", "核桃"]},
-    "长痘": {"zhengxing": "湿热/肺热", "tizhi": "湿热质", "foods": ["金银花", "蒲公英", "绿豆"]},
-    "肥胖": {"zhengxing": "脾虚痰湿", "tizhi": "痰湿质", "foods": ["荷叶", "山楂", "薏米"]},
-    "焦虑": {"zhengxing": "肝郁气滞", "tizhi": "气郁质", "foods": ["玫瑰花", "合欢花", "佛手"]},
+    # 核心症状列表，每个症状有多个别名/说法
+    "失眠": {"aliases": ["睡不着", "入睡困难", "睡不好", "失眠多梦", "夜间醒", "半夜醒来", "睡眠差", "多梦", "睡不着觉"], "zhengxing": ["心肾不交", "肝郁化火", "心脾两虚"], "tizhi": ["阴虚质", "气郁质"], "foods": ["酸枣仁", "百合", "莲子"], "weight": 0.9},
+    "口干": {"aliases": ["口渴", "口干舌燥", "喝水不解渴", "口燥"], "zhengxing": ["阴虚火旺", "胃热"], "tizhi": ["阴虚质"], "foods": ["麦冬", "百合", "银耳"], "weight": 0.7},
+    "上火": {"aliases": ["上火发炎", "冒痘", "喉咙痛", "牙龈肿", "口臭", "口舌生疮"], "zhengxing": ["实热", "虚火", "肺热"], "tizhi": ["湿热质", "阴虚质"], "foods": ["菊花", "金银花", "绿豆"], "weight": 0.8},
+    "疲劳": {"aliases": ["疲倦", "乏力", "没精神", "总是困", "容易累", "精神不好", "嗜睡", "倦怠"], "zhengxing": ["气虚", "脾虚湿盛"], "tizhi": ["气虚质", "痰湿质"], "foods": ["黄芪", "党参", "山药"], "weight": 0.8},
+    "胃口不好": {"aliases": ["食欲差", "吃不下", "不想吃饭", "厌食", "腹胀", "胃胀", "消化不良", "没胃口"], "zhengxing": ["脾胃虚弱", "肝郁气滞", "脾虚湿盛"], "tizhi": ["气虚质", "痰湿质", "气郁质"], "foods": ["山药", "茯苓", "陈皮"], "weight": 0.8},
+    "手脚冰凉": {"aliases": ["怕冷", "畏寒", "寒凉", "冷手冷脚", "冬天手脚凉", "体温偏低"], "zhengxing": ["阳虚", "寒凝血瘀"], "tizhi": ["阳虚质"], "foods": ["生姜", "红枣", "桂圆"], "weight": 0.9},
+    "便秘": {"aliases": ["大便干", "排便困难", "拉不出来", "干燥", "肠道不畅"], "zhengxing": ["肠燥", "气滞", "气血不足"], "tizhi": ["阴虚质", "气郁质"], "foods": ["蜂蜜", "黑芝麻", "火麻仁"], "weight": 0.7},
+    "湿气重": {"aliases": ["身体沉重", "水肿", "大便黏腻", "舌苔厚", "头面部油", "出油多", "湿气大", "体内湿重"], "zhengxing": ["脾虚湿盛", "湿热"], "tizhi": ["痰湿质", "湿热质"], "foods": ["薏米", "赤小豆", "茯苓"], "weight": 0.9},
+    "眼睛干涩": {"aliases": ["眼干", "眼睛干", "眼涩", "眼睛疲劳", "视物模糊", "眼疲劳"], "zhengxing": ["肝血不足", "肝肾阴虚"], "tizhi": ["阴虚质"], "foods": ["枸杞", "菊花", "桑葚"], "weight": 0.7},
+    "头晕": {"aliases": ["眩晕", "头昏", "头部发晕", "天旋地转", "站立时晕"], "zhengxing": ["气血不足", "肝阳上亢", "痰湿中阻"], "tizhi": ["气虚质", "阴虚质", "痰湿质"], "foods": ["天麻", "枸杞", "红枣"], "weight": 0.7},
+    "咳嗽": {"aliases": ["干咳", "有痰咳嗽", "反复咳嗽", "嗓子痒", "气管不舒服"], "zhengxing": ["肺燥", "风寒", "肺热"], "tizhi": ["阴虚质", "气虚质"], "foods": ["川贝", "梨", "百合"], "weight": 0.7},
+    "痛经": {"aliases": ["月经痛", "来姨妈疼", "经期腹痛", "经前肚子疼", "小腹冷痛"], "zhengxing": ["寒凝血瘀", "气滞血瘀"], "tizhi": ["血瘀质", "阳虚质"], "foods": ["红糖", "生姜", "当归"], "weight": 0.9},
+    "掉头发": {"aliases": ["脱发", "头发掉", "发量少", "掉发严重", "头发稀疏"], "zhengxing": ["肾精不足", "血虚", "湿热"], "tizhi": ["阴虚质", "血虚", "湿热质"], "foods": ["黑芝麻", "何首乌", "核桃"], "weight": 0.8},
+    "长痘": {"aliases": ["长粉刺", "脸上起痘", "青春痘", "痤疮", "满脸痘痘", "皮肤不好"], "zhengxing": ["湿热", "肺热", "内分泌失调"], "tizhi": ["湿热质"], "foods": ["金银花", "蒲公英", "绿豆"], "weight": 0.7},
+    "肥胖": {"aliases": ["体重超标", "偏胖", "肚子大", "腰粗", "怎么都不瘦", "虚胖"], "zhengxing": ["脾虚痰湿", "湿热"], "tizhi": ["痰湿质", "湿热质"], "foods": ["荷叶", "山楂", "薏米"], "weight": 0.8},
+    "焦虑": {"aliases": ["紧张", "心情不好", "压力大", "烦躁", "爱生气", "情绪低落", "想太多", "心慌", "闷闷不乐"], "zhengxing": ["肝郁气滞", "心肾不交", "心脾两虚"], "tizhi": ["气郁质", "阴虚质"], "foods": ["玫瑰花", "合欢花", "佛手"], "weight": 0.9},
+    "胃疼": {"aliases": ["胃痛", "胃酸", "烧心", "反酸", "胃不舒服"], "zhengxing": ["脾胃虚弱", "肝胃不和", "胃热"], "tizhi": ["气虚质", "气郁质"], "foods": ["山药", "陈皮", "茯苓"], "weight": 0.8},
+    "腰酸背痛": {"aliases": ["腰疼", "腰酸痛", "背部疼痛", "浑身酸", "肌肉酸痛"], "zhengxing": ["肾虚", "寒湿阻络", "气血不足"], "tizhi": ["阳虚质", "气虚质"], "foods": ["杜仲", "核桃", "枸杞"], "weight": 0.7},
+    "容易感冒": {"aliases": ["抵抗力差", "经常生病", "免疫力低", "感冒频繁"], "zhengxing": ["肺气虚弱", "气虚"], "tizhi": ["气虚质", "特禀质"], "foods": ["黄芪", "山药", "白术"], "weight": 0.7},
+    "皮肤过敏": {"aliases": ["过敏", "起疹子", "荨麻疹", "皮肤痒", "湿疹"], "zhengxing": ["特禀", "湿热", "风热"], "tizhi": ["特禀质", "湿热质"], "foods": ["白鲜皮", "防风", "甘草"], "weight": 0.7},
+}
+
+# 补充症状（非标准术语）
+SYNONYM_MAP = {
+    "没力气": "疲劳", "没精神": "疲劳", "困": "疲劳",
+    "不想吃东西": "胃口不好", "肚子胀": "胃口不好",
+    "懒": "疲劳", "累": "疲劳",
+    "热": "上火",
+    "胃不舒服": "胃疼", "拉肚子": "湿气重",
+    "睡不好": "失眠", "做梦多": "失眠",
 }
 
 # 药食同源食材库（国家卫健委目录）
@@ -69,9 +85,42 @@ TIZHI_LIST = [
     {"name": "特禀质", "desc": "过敏体质，容易哮喘、荨麻疹", "yangsheng": "益气固表，避免过敏原"},
 ]
 
+# 食疗方案库 v2
+SHILIAO_DB = {
+    "心肾不交": {"name": "安神养心粥", "recipe": "酸枣仁15g、百合10g、莲子15g、粳米100g", "method": "酸枣仁先煎20分钟取汁，加入百合、莲子、粳米同煮至粥成"},
+    "肝郁化火": {"name": "玫瑰菊花茶", "recipe": "玫瑰花5朵、菊花10g、枸杞10g", "method": "沸水冲泡，代茶频饮"},
+    "心脾两虚": {"name": "黄芪党参粥", "recipe": "黄芪20g、党参15g、山药20g、桂圆肉10g、粳米100g", "method": "药材先煮取汁，加入粳米和桂圆煮粥"},
+    "阴虚火旺": {"name": "百合银耳羹", "recipe": "百合20g、银耳15g、麦冬10g、冰糖适量", "method": "银耳泡发后与百合、麦冬同炖至粘稠，加冰糖调味"},
+    "实热": {"name": "金银花绿豆汤", "recipe": "金银花15g、绿豆100g、冰糖适量", "method": "绿豆浸泡2小时后煮至开花，加金银花再煮10分钟"},
+    "虚火": {"name": "麦冬枸杞茶", "recipe": "麦冬15g、枸杞10g、菊花5g", "method": "沸水冲泡，焖10分钟后代茶饮"},
+    "胃热": {"name": "竹蔗茅根水", "recipe": "竹蔗2根、茅根30g、马蹄5个", "method": "所有材料洗净切段，加水煮沸30分钟"},
+    "气虚": {"name": "黄芪党参鸡汤", "recipe": "黄芪30g、党参20g、山药30g、乌鸡半只、红枣5枚", "method": "药材洗净，乌鸡焯水，同入砂锅加水慢炖2小时，调味食用"},
+    "脾虚湿盛": {"name": "薏米赤小豆粥", "recipe": "薏米50g、赤小豆50g、茯苓15g、粳米50g", "method": "薏米、赤小豆提前浸泡4小时，与茯苓同煮至烂熟"},
+    "脾胃虚弱": {"name": "山药茯苓粥", "recipe": "山药50g、茯苓15g、陈皮6g、粳米100g", "method": "茯苓先煎取汁，加入山药、粳米煮粥，陈皮切丝后入"},
+    "肝胃不和": {"name": "陈皮生姜水", "recipe": "陈皮6g、生姜5片、红枣3枚", "method": "所有材料加水煮15分钟，趁热饮用"},
+    "阳虚": {"name": "姜枣桂圆茶", "recipe": "生姜3片、红枣6枚、桂圆肉15g、红糖适量", "method": "红枣去核，与生姜、桂圆同煮20分钟，加红糖调味"},
+    "寒凝血瘀": {"name": "红糖姜枣茶", "recipe": "红糖30g、生姜5片、红枣8枚、山楂10g", "method": "红枣去核，与生姜、山楂同煮15分钟，加红糖"},
+    "肠燥": {"name": "蜂蜜黑芝麻糊", "recipe": "黑芝麻30g、蜂蜜2勺、糯米粉20g", "method": "黑芝麻炒香磨碎，糯米粉炒熟，混合后加蜂蜜调糊食用"},
+    "气滞": {"name": "陈皮玫瑰花茶", "recipe": "陈皮6g、玫瑰花5朵、佛手片5g", "method": "沸水冲泡，焖5分钟后代茶饮"},
+    "气血不足": {"name": "天麻红枣炖蛋", "recipe": "天麻10g、红枣5枚、鸡蛋1个、枸杞10g", "method": "天麻先煎30分钟取汁，打入鸡蛋，加红枣、枸杞再煮10分钟"},
+    "肝阳上亢": {"name": "天麻钩藤茶", "recipe": "天麻10g、菊花10g、枸杞15g", "method": "天麻切片先煎20分钟，加入菊花、枸杞焖泡"},
+    "肝血不足": {"name": "枸杞菊花决明茶", "recipe": "枸杞15g、菊花10g、决明子10g", "method": "决明子微炒后与枸杞、菊花同泡，代茶饮"},
+    "肝肾阴虚": {"name": "桑葚枸杞茶", "recipe": "桑葚15g、枸杞10g、菊花5g", "method": "沸水冲泡，焖10分钟"},
+    "痰湿中阻": {"name": "陈皮薏米茶", "recipe": "陈皮10g、薏米20g、茯苓10g", "method": "薏米提前浸泡，与陈皮、茯苓同煮30分钟"},
+    "肺燥": {"name": "川贝雪梨盅", "recipe": "川贝母6g、雪梨1个、冰糖适量", "method": "雪梨去核，纳入川贝粉和冰糖，隔水蒸1小时"},
+    "风寒": {"name": "生姜葱白红糖水", "recipe": "生姜5片、葱白3段、红糖30g", "method": "生姜、葱白加水煮沸5分钟，加红糖溶化后趁热饮用"},
+    "肺热": {"name": "金银花杏仁茶", "recipe": "金银花10g、杏仁10g、枇杷叶10g", "method": "药材洗净加水煮沸，转小火煮15分钟，代茶饮"},
+    "肾虚": {"name": "黑豆核桃浆", "recipe": "黑豆30g、核桃仁20g、黑芝麻10g", "method": "所有材料浸泡后打成浆，煮沸饮用"},
+    "湿热": {"name": "蒲公英绿豆汤", "recipe": "蒲公英15g、绿豆100g、薏米30g", "method": "绿豆、薏米浸泡后煮至半熟，加蒲公英再煮15分钟"},
+    "内分泌失调": {"name": "玫瑰柚子茶", "recipe": "玫瑰花5朵、柚子皮10g、蜂蜜适量", "method": "沸水冲泡，放温后加蜂蜜"},
+    "特禀": {"name": "玉屏风饮", "recipe": "黄芪20g、白术10g、防风10g", "method": "加水煮沸，小火煮20分钟，分两次饮用"},
+    "风热": {"name": "薄荷银花饮", "recipe": "薄荷3g、金银花10g、甘草5g", "method": "金银花、甘草先煮10分钟，关火后加入薄荷焖5分钟"},
+    "肺气虚弱": {"name": "黄芪山药饮", "recipe": "黄芪20g、山药30g、党参15g", "method": "材料洗净加水煮30分钟，代茶饮"},
+}
+
 
 class BianzhengEngine:
-    """辨证引擎 - 基于规则+RAG的中医辨证"""
+    """辨证引擎 v2 - 基于模糊匹配+权重分析的中医辨证"""
 
     def analyze(self, message: str) -> dict:
         """
@@ -79,70 +128,182 @@ class BianzhengEngine:
         """
         msg = message.strip()
         if not msg:
-            return {"reply": "请描述一下你的身体状况，比如最近有什么不舒服？", "recommendations": []}
+            return self._empty_response("请描述一下你的身体状况，比如最近有什么不舒服？")
 
-        # 1. 匹配症状
-        matched = self._match_symptoms(msg)
+        # 输入标准化
+        msg_lower = msg.lower()
+
+        # 1. 模糊匹配症状
+        matched = self._match_symptoms_smart(msg_lower)
 
         if not matched:
-            return {
-                "reply": f"你说的\u201c{msg}\u201d，我不太确定对应什么症状。可以换个说法吗？比如：失眠、疲劳、上火、口干、胃口不好等。",
-                "recommendations": []
-            }
+            return self._no_match_response(msg, matched)
 
-        # 2. 综合辨证
-        zhengxing_list = list(set(m["zhengxing"] for m in matched))
-        tizhi_list_found = list(set(m["tizhi"] for m in matched))
-        foods = []
+        # 2. 综合辨证 - 按证型和体质计分
+        zhengxing_scores = {}
+        tizhi_scores = {}
+        all_foods = []
+
         for m in matched:
-            for f in m["foods"]:
-                if f not in foods:
-                    foods.append(f)
+            food_weight = m["weight"] * m["rule"]["weight"]
 
-        # 3. 获取食材详情
+            # 证型评分
+            for z, freq in enumerate(m["rule"]["zhengxing"]):
+                if freq not in zhengxing_scores:
+                    zhengxing_scores[freq] = {"score": 0, "sources": []}
+                zhengxing_scores[freq]["score"] += food_weight / (z + 1)  # 排名越前分数越高
+                zhengxing_scores[freq]["sources"].append(m["symptom"])
+
+            # 体质评分
+            for t, freq in enumerate(m["rule"]["tizhi"]):
+                if t not in tizhi_scores:
+                    tizhi_scores[freq] = {"score": 0, "sources": []}
+                tizhi_scores[freq]["score"] += food_weight / (t + 1)
+                tizhi_scores[freq]["sources"].append(m["symptom"])
+
+            # 收集食材
+            for f in m["rule"]["foods"]:
+                if f not in all_foods:
+                    all_foods.append(f)
+
+        # 3. 排序取Top结果
+        top_zhengxing = sorted(zhengxing_scores.items(), key=lambda x: x[1]["score"], reverse=True)[:3]
+        top_tizhi = sorted(tizhi_scores.items(), key=lambda x: x[1]["score"], reverse=True)[:3]
+
+        zhengxing_str = "、".join(z[0] for z in top_zhengxing)
+        tizhi_str = "、".join(t[0] for t in top_tizhi)
+        foods = all_foods[:6]
+
+        # 4. 获取食材详情
         recommendations = []
-        for food in foods[:5]:
+        for food in foods:
             info = YAOSHI_TONGYUAN.get(food, {})
-            recommendations.append({
+            rec = {
                 "name": food,
                 "xingwei": info.get("xingwei", ""),
                 "gongxiao": info.get("gongxiao", ""),
                 "jinji": info.get("jinji", ""),
-            })
+            }
+            # 从辨证结果中找食疗方
+            for zheng in top_zhengxing:
+                shiliao = SHILIAO_DB.get(zheng[0])
+                if shiliao and food in shiliao.get("recipe", ""):
+                    rec["shiliao"] = shiliao
+                    break
+            recommendations.append(rec)
 
-        # 4. 生成回复
+        # 5. 生成回复
         symptoms_str = "、".join(m["symptom"] for m in matched)
-        zhengxing_str = "、".join(zhengxing_list)
-        tizhi_str = "、".join(tizhi_list_found)
-        foods_str = "、".join(foods[:5])
-
-        reply = (
-            f"根据你的描述（{symptoms_str}），从中医角度看，可能属于**{zhengxing_str}**的情况，"
-            f"体质偏向**{tizhi_str}**。\n\n"
-            f"建议你可以适当食用以下药食同源的食材：{foods_str}。\n\n"
-            f"我帮你找了一些有机认证的相关产品，你可以看看。"
-            f"不过要提醒你，这些是养生建议，如果症状严重还是要去看医生哦。"
-        )
+        reply = self._build_reply(msg, symptoms_str, zhengxing_str, tizhi_str, foods, recommendations, matched)
 
         return {
             "reply": reply,
             "tizhi": tizhi_str,
             "zhengxing": zhengxing_str,
             "recommendations": recommendations,
+            "confidence": self._calc_confidence(matched),
+            "matched_symptoms": [m["symptom"] for m in matched],
         }
 
-    def _match_symptoms(self, msg: str) -> list:
-        """匹配用户描述中的症状"""
+    def _build_reply(self, msg, symptoms_str, zhengxing_str, tizhi_str, foods, recommendations, matched):
+        """构建友好的辨证回复"""
+        # 提取食疗方案
+        food_dishes = []
+        seen_recipe = set()
+        for rec in recommendations:
+            shiliao = rec.get("shiliao")
+            if shiliao and shiliao["name"] not in seen_recipe:
+                food_dishes.append(shiliao)
+                seen_recipe.add(shiliao["name"])
+
+        parts = [f"根据你的描述（{symptoms_str}），我从中医角度帮你分析一下：\n\n"]
+        parts.append(f"📋 **辨证方向：** {zhengxing_str}\n")
+        parts.append(f"🩺 **体质偏向：** {tizhi_str}\n\n")
+
+        if food_dishes:
+            dish = food_dishes[0]
+            parts.append(f"🍲 **今日推荐食疗：{dish['name']}**\n")
+            parts.append(f"   配方：{dish['recipe']}\n")
+            parts.append(f"   做法：{dish['method']}\n")
+            parts.append(f"   功效：{dish.get('gongxiao', '养生调理')}\n\n")
+
+        parts.append(f"💊 **建议食用的药食同源食材：** {', '.join(foods)}\n\n")
+        parts.append("⚠️ 提醒：以上为养生建议，不是医疗诊断。如果症状严重或持续，请及时就医。")
+
+        return "".join(parts)
+
+    def _match_symptoms_smart(self, msg: str) -> list:
+        """智能匹配症状：支持别名、同义词、模糊匹配"""
         matched = []
-        for symptom, rule in SYMPTOM_RULES.items():
-            if symptom in msg:
-                matched.append({"symptom": symptom, **rule})
+
+        # 1. 先检查直接别名/同义词映射
+        checked = set()
+
+        for keyword, rule_data in SYMPTOM_RULES.items():
+            if keyword in checked:
+                continue
+
+            aliases = rule_data.get("aliases", [])
+
+            # 直接匹配关键词
+            if keyword in msg:
+                matched.append({"symptom": keyword, "rule": rule_data, "weight": rule_data["weight"]})
+                checked.add(keyword)
+                continue
+
+            # 匹配别名
+            for alias in aliases:
+                if alias in msg:
+                    matched.append({"symptom": keyword, "rule": rule_data, "weight": rule_data["weight"]})
+                    checked.add(keyword)
+                    break
+
+        # 2. 检查同义词映射
+        for syn, target in SYNONYM_MAP.items():
+            if syn in msg and target not in checked:
+                # target 应该在 SYMPTOM_RULES 中有定义
+                if target in SYMPTOM_RULES:
+                    matched.append({
+                        "symptom": target,
+                        "rule": SYMPTOM_RULES[target],
+                        "weight": SYMPTOM_RULES[target]["weight"],
+                    })
+                    checked.add(target)
+
+        # 3. 按权重降序排列
+        matched.sort(key=lambda x: x["weight"], reverse=True)
+
         return matched
 
+    def _no_match_response(self, msg: str, matched: list) -> dict:
+        """未匹配到症状时的友好回复"""
+        suggestions = ["失眠", "疲劳", "上火", "口干", "胃口不好", "手脚冰凉", "湿气重", "焦虑", "头痛", "掉头发"]
+        return {
+            "reply": (
+                f"你说的\"{msg}\"，我不太确定对应什么症状。\n\n"
+                f"可以试试这些说法：\n• {', '.join(suggestions[:6])}\n\n"
+                f"也可以多说一点细节，比如：什么时候开始的？持续多久了？有什么诱因？"
+            ),
+            "recommendations": [],
+            "confidence": 0.0,
+        }
+
+    def _empty_response(self, text: str) -> dict:
+        return {
+            "reply": text,
+            "recommendations": [],
+            "confidence": 0.0,
+        }
+
+    def _calc_confidence(self, matched: list) -> float:
+        """计算辨证置信度"""
+        if not matched:
+            return 0.0
+        total_weight = sum(m["weight"] for m in matched)
+        return min(total_weight / (len(matched) * 0.9), 1.0)
+
     def get_yaoshi_info(self, name: str) -> Optional[dict]:
-        """获取食材信息"""
         return YAOSHI_TONGYUAN.get(name)
 
     def get_tizhi_list(self) -> list:
-        """获取体质列表"""
         return TIZHI_LIST

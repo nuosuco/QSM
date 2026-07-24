@@ -8,6 +8,7 @@
     <title>SOM 松麦 - 智能养生平台</title>
     <meta name="description" content="小麦SOM - 中医辨证养生，有机食品推荐">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <div class="app">
@@ -94,19 +95,24 @@
                 </div>
             </div>
 
-            <!-- 养生谷页面（暂时放养生知识） -->
+            <!-- 养生谷页面 -->
             <div class="tab-content" id="yangshenggu-tab">
+                <div id="daily-tip"></div>
                 <div class="knowledge-container">
+                    <div class="knowledge-section">
+                        <h2>🌿 今日养生建议</h2>
+                        <div id="daily-tip-content"></div>
+                    </div>
                     <div class="knowledge-section">
                         <h2>九种体质</h2>
                         <div class="tizhi-grid" id="tizhi-grid">
-                            <div class="empty-state"><div class="loading"></div><p>加载中...</p></div>
+                            <div class="empty-state"><div class="loading"></div><p>加载体质数据...</p></div>
                         </div>
                     </div>
                     <div class="knowledge-section">
-                        <h2>药食同源</h2>
+                        <h2>药食同源食材库</h2>
                         <div class="yaoshi-list" id="yaoshi-list">
-                            <div class="empty-state"><div class="loading"></div><p>加载中...</p></div>
+                            <div class="empty-state"><div class="loading"></div><p>加载药食同源数据...</p></div>
                         </div>
                     </div>
                 </div>
@@ -121,13 +127,12 @@
                             <h3 id="profile-name">养生用户</h3>
                             <p id="profile-tizhi">体质：未检测</p>
                             <p id="profile-points">积分：0</p>
-                            <p id="profile-checkin">今天未签到</p>
-                            <button class="checkin-btn" id="profile-checkin-btn">今日签到 +10积分</button>
+                            <p id="profile-checkin-status" style="color:white;background:rgba(255,255,255,0.15);border-radius:8px;padding:4px 12px;display:inline-block;margin-top:8px;">今天还未签到</p>
+                            <button id="checkin-btn" class="checkin-action-btn" onclick="doCheckin()">去签到</button>
                         </div>
                     </div>
                     <div class="profile-section">
                         <h3>📋 我的体质记录</h3>
-                        <p class="profile-hint">和小麦SOM对话后，体质记录会自动保存在这里</p>
                         <div class="profile-history" id="profile-history">
                             <p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>
                         </div>

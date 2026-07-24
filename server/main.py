@@ -4,6 +4,17 @@ SOM 松麦 - 后端服务入口
 """
 import json
 import os
+import sys
+from pathlib import Path
+
+# 确保服务脚本可从任意目录启动
+_server_dir = Path(__file__).resolve().parent
+if str(_server_dir) not in sys.path:
+    sys.path.insert(0, str(_server_dir))
+_parent = str(_server_dir.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -89,13 +100,6 @@ async def health_check():
 async def chat(request: ChatRequest):
     """
     小麦SOM核心对话接口
-    用户描述症状 → AI辨证 → 推荐养生方案 → 推荐商品
-    
-    这个接口被以下端调用：
-    - 网页版 som.top
-    - 微信小程序
-    - AI购物助手
-    - 未来Skill / 腾讯AI搜索
     """
     from services.bianzheng import BianzhengEngine
     from services.shop import ShopService
@@ -109,9 +113,16 @@ async def chat(request: ChatRequest):
     # 2. 根据辨证结果搜索商品
     products = []
     if result.get("recommendations"):
+        seen_ids = set()
         for rec in result["recommendations"][:3]:
             items = shop.search(rec["name"], platform="taobao", page_size=3)
-            products.extend(items)
+            for item in items:
+                item_key = item.get('item_id', '') or item.get('title', '')
+                if item_key not in seen_ids:
+                    seen_ids.add(item_key)
+                    products.append(item)
+            if len(products) >= 6:
+                break
 
     return ChatResponse(
         reply=result["reply"],
@@ -266,6 +277,72 @@ async def cache_stats():
     from services.shop import ShopService
     shop = ShopService()
     return shop.get_cache_stats()
+
+# ========== 每日养生建议接口 ==========
+
+@app.get("/api/daily-tip")
+async def daily_tip():
+    """获取每日养生建议"""
+    import random
+    from datetime import datetime, timezone, timedelta
+    beijing_tz = timezone(timedelta(hours=8))
+    today = datetime.now(beijing_tz).strftime('%Y-%m-%d')
+    
+    tips = [
+        {
+            "title": "今日养生：早睡早起",
+            "content": "子时（23:00-1:00）是胆经当令，最好提前入睡。睡前可用温水泡脚15分钟，助眠安神。",
+            "tip_type": "作息",
+            "emoji": "🌙"
+        },
+        {
+            "title": "今日养生：喝杯枸杞红枣茶",
+            "content": "枸杞滋补肝肾，红枣补中益气。取枸杞10g、红枣3枚，沸水冲泡，代茶饮。",
+            "tip_type": "食疗",
+            "emoji": "🍵"
+        },
+        {
+            "title": "今日养生：健脾祛湿",
+            "content": "湿气重的人适合喝薏米赤小豆汤。薏米50g、赤小豆50g，提前浸泡4小时后煮粥。",
+            "tip_type": "食疗",
+            "emoji": "🥣"
+        },
+        {
+            "title": "今日养生：穴位按摩",
+            "content": "按揉足三里穴（膝盖外膝眼下四横指），每次3-5分钟，可健脾和胃、补中益气。",
+            "tip_type": "穴位",
+            "emoji": "💆"
+        },
+        {
+            "title": "今日养生：情绪调节",
+            "content": "肝郁则百病生。建议做深呼吸练习：吸气4秒、屏息4秒、呼气6秒，重复10次。",
+            "tip_type": "情志",
+            "emoji": "🧘"
+        },
+        {
+            "title": "今日养生：适量运动",
+            "content": "春捂秋冻，适度运动最养人。推荐八段锦或太极，晨起练习30分钟，气血通畅。",
+            "tip_type": "运动",
+            "emoji": "🏃"
+        },
+        {
+            "title": "今日养生：滋阴润燥",
+            "content": "常感口干咽燥？试试百合银耳羹：百合20g、银耳15g，炖煮至粘稠，加冰糖调味。",
+            "tip_type": "食疗",
+            "emoji": "🍯"
+        },
+        {
+            "title": "今日养生：补肾固精",
+            "content": "黑芝麻核桃糊：黑芝麻30g、核桃仁20g、黑米30g，炒香磨碎冲糊食用，补肾乌发。",
+            "tip_type": "食疗",
+            "emoji": "🫘"
+        },
+    ]
+    # 用日期作为种子，保证同一天返回相同建议
+    seed = sum(ord(c) for c in today)
+    random.seed(seed)
+    tip = random.choice(tips)
+    return {"date": today, **tip}
 
 # ========== 启动 ==========
 

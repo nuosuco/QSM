@@ -302,10 +302,10 @@ def get_crawl_queue() -> List[dict]:
     # 从shop.py读取分类
     import sys
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'server'))
-    from services.shop import ProductService
+    from services.shop import ShopService
     
     # 获取分类列表
-    shop = ProductService()
+    shop = ShopService()
     categories = shop.get_categories()
     
     conn = get_db()
