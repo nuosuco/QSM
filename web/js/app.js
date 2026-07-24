@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initProductSearch();
     loadCategories();
     initProfile();
+    // 迭代4：恢复养生谷页面知识库数据加载
     loadTizhiKnowledge();
     loadYaoshiKnowledge();
 });
@@ -95,6 +96,9 @@ async function sendMessage() {
         }
         
         appendMessage(replyText, 'assistant');
+        
+        // 记录到个人中心
+        saveChatRecord(message, replyText, data.tizhi || '');
         
     } catch (error) {
         document.getElementById(loadingId).remove();
@@ -246,18 +250,18 @@ function displayCategories(categories) {
     const categoryNav = document.getElementById('category-nav');
     
     categoryNav.innerHTML = categories.map(cat => `
-        <div class="category-item" onclick="searchByCategory('${cat.keyword}', '${cat.name}')">
+        <div class="category-item" onclick="searchByCategory('${escapeHtml(cat.keyword)}', '${escapeHtml(cat.name)}')">
             <div class="category-icon">${cat.icon}</div>
-            <div class="category-name">${cat.name}</div>
+            <div class="category-name">${escapeHtml(cat.name)}</div>
         </div>
     `).join('');
 }
 
 function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
-    // 用分类名作为搜索关键词（后端会根据分类名映射到关键词）
-    // 这样前端不需要传完整关键词，更简洁
-    currentKeyword = categoryName;
+    // 用分类名称作为搜索框显示，但实际搜索用后端关键词
+    // 取关键词的第一个词作为搜索关键词，避免太长
+    currentKeyword = keyword.split(' ')[0];
     currentPage = 1;
     hasMore = true;
     searchProducts(true);
@@ -309,6 +313,9 @@ async function searchProducts(clear = false) {
             }
             displayProducts(data.items, !clear);
             
+            // 记录浏览商品数
+            saveProductBrowse(currentKeyword, data.items.length);
+            
             // 判断是否还有更多
             if (data.items.length < 20) {
                 hasMore = false;
@@ -353,9 +360,6 @@ function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
     
     const productHtml = products.map(product => {
-        let appUrl = product.app_url || '';
-        let webUrl = product.url || '#';
-        
         // 多张图片：如果有images数组，取第一张；否则用单张image
         let mainImage = product.image || '';
         if (product.images && product.images.length > 0) {
@@ -381,6 +385,10 @@ function displayProducts(products, append = false) {
             platformBadge = '<span class="platform-badge jd">京东</span>';
         }
         
+        // 淘宝商品：优先使用APP deeplink，网页版使用推广链接
+        let appUrl = product.app_url || '';
+        let webUrl = product.url || '#';
+        
         // 安全转义商品标题用于弹窗
         const safeTitle = escapeHtml(product.title);
         const safePrice = product.price || '';
@@ -390,7 +398,7 @@ function displayProducts(products, append = false) {
         return `
         <div class="product-card" onclick="showProductDetail('${safeTitle.replace(/'/g, "\\'")}', '${safePrice}', '${mainImage}', '${webUrl}', '${appUrl}', '${product.platform}', '${commissionText}', '${safeShop.replace(/'/g, "\\'")}')">
             <div class="product-image-wrapper">
-                <img class="product-image" src="${mainImage}" alt="${safeTitle}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'img-placeholder\'><span>暂无图片</span></div>'">
+                <img class="product-image" src="${mainImage}" alt="${safeTitle}" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'img-placeholder\\'><span>暂无图片</span></div>'">
                 ${product.images && product.images.length > 1 ? '<div class="image-count">共' + product.images.length + '张</div>' : ''}
             </div>
             <div class="product-info">
@@ -425,39 +433,48 @@ function showProductDetail(title, price, image, webUrl, appUrl, platform, commis
     const modal = document.createElement('div');
     modal.id = 'product-detail-modal';
     modal.className = 'modal-overlay';
-    modal.onclick = function(e) { if (e.target === this) this.remove(); };
-    
-    let platformLabel = platform === 'taobao' ? '淘宝' : platform === 'jd' ? '京东' : platform;
-    
     modal.innerHTML = `
-        <div class="modal-content product-detail-modal">
-            <button class="modal-close" onclick="document.getElementById('product-detail-modal').remove()">×</button>
-            <div class="detail-image-wrapper">
-                <img src="${image}" alt="${title}" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\'img-placeholder big\'><span>暂无图片</span></div>'">
-            </div>
-            <div class="detail-info">
-                <h3 class="detail-title">${title}</h3>
-                <div class="detail-price">
-                    <span class="price-symbol">¥</span>
-                    <span class="price-value">${price}</span>
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeProductDetail()">×</button>
+            <div class="modal-body">
+                <div class="modal-image-wrapper">
+                    <img class="modal-image" src="${image}" alt="${title}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
                 </div>
-                <div class="detail-meta">
-                    <span class="platform-badge ${platform}">${platformLabel}</span>
-                    ${commissionText ? '<span class="commission-badge big">佣金 ' + commissionText + '</span>' : ''}
-                    ${shopName ? '<span class="detail-shop">🏪 ' + shopName + '</span>' : ''}
+                <div class="modal-info">
+                    <h3 class="modal-title">${title}</h3>
+                    <div class="modal-price">¥${price}</div>
+                    <div class="modal-meta">
+                        ${platform === 'taobao' ? '<span class="platform-badge taobao">淘宝</span>' : '<span class="platform-badge jd">京东</span>'}
+                        <span class="modal-shop">${shopName}</span>
+                        ${commissionText ? '<span class="commission-badge">佣金 ' + commissionText + '</span>' : ''}
+                    </div>
+                    <div class="modal-actions">
+                        <button class="modal-btn btn-primary" onclick="openProduct('${appUrl}', '${webUrl}', '${platform}')">去购买</button>
+                        <button class="modal-btn btn-secondary" onclick="closeProductDetail()">关闭</button>
+                    </div>
                 </div>
-                <div class="detail-actions">
-                    <button class="buy-btn" onclick="openProduct('${appUrl}', '${webUrl}', '${platform}')">
-                        ${platform === 'taobao' ? '🛒 去淘宝购买' : '🛒 去京东购买'}
-                    </button>
-                </div>
-                <p class="detail-note">💡 通过本链接购买，您将支持SOM松麦的发展</p>
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
+    
+    // 点击背景关闭
+    modal.addEventListener('click', closeProductDetail);
+    
+    // 动画效果
+    requestAnimationFrame(() => {
+        modal.classList.add('active');
+    });
+}
 
+function closeProductDetail() {
+    const modal = document.getElementById('product-detail-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        setTimeout(() => modal.remove(), 300);
+    }
+}
 
 function openProduct(appUrl, webUrl, platform) {
     if (platform === 'taobao' && appUrl) {
@@ -472,12 +489,76 @@ function openProduct(appUrl, webUrl, platform) {
     } else {
         window.open(webUrl, '_blank');
     }
+    closeProductDetail();
+}
+
+// ========== 养生谷 ==========
+
+async function loadTizhiKnowledge() {
+    const tizhiGrid = document.getElementById('tizhi-grid');
+    if (!tizhiGrid) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/knowledge/tizhi`);
+        const data = await response.json();
+        
+        const items = data.items || [];
+        if (items.length === 0) {
+            tizhiGrid.innerHTML = '<p class="empty-hint">暂无数据</p>';
+            return;
+        }
+        
+        tizhiGrid.innerHTML = items.map(t => `
+            <div class="tizhi-card">
+                <h3>${escapeHtml(t.name)}</h3>
+                <p>${escapeHtml(t.features || t.desc || '')}</p>
+                <p class="tizhi-diet"><strong>调养建议：</strong>${escapeHtml(t.diet || '')}</p>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('加载体质数据失败:', error);
+        tizhiGrid.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
+    }
+}
+
+async function loadYaoshiKnowledge() {
+    const yaoshiList = document.getElementById('yaoshi-list');
+    if (!yaoshiList) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/knowledge/yaoshi`);
+        const data = await response.json();
+        
+        const items = data.items || [];
+        if (items.length === 0) {
+            yaoshiList.innerHTML = '<p class="empty-hint">暂无数据</p>';
+            return;
+        }
+        
+        yaoshiList.innerHTML = items.map(y => `
+            <div class="yaoshi-item">
+                <h4>${escapeHtml(y.name)}</h4>
+                <p><strong>性味：</strong>${escapeHtml(y.xingwei || '')}</p>
+                <p><strong>归经：</strong>${escapeHtml(y.guijing || '')}</p>
+                <p><strong>功效：</strong>${escapeHtml(y.gongxiao || '')}</p>
+                <p><strong>禁忌：</strong>${escapeHtml(y.jinji || '')}</p>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('加载药食同源数据失败:', error);
+        yaoshiList.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
+    }
 }
 
 // ========== 个人中心 ==========
 
 function initProfile() {
     loadProfile();
+    // 签到按钮
+    const checkinBtn = document.getElementById('profile-checkin-btn');
+    if (checkinBtn) {
+        checkinBtn.addEventListener('click', doCheckin);
+    }
 }
 
 function getUserId() {
@@ -522,14 +603,16 @@ function loadProfile() {
     
     const today = new Date().toISOString().split('T')[0];
     const checkedInToday = data.checkins && data.checkins.indexOf(today) >= 0;
-    const checkinEl = document.getElementById('profile-checkin');
-    checkinEl.textContent = checkedInToday ? '✅ 今天已签到' : '📅 签到：今天未签到';
-    if (!checkedInToday) {
-        checkinEl.style.cursor = 'pointer';
-        checkinEl.onclick = doCheckin;
-    } else {
-        checkinEl.style.cursor = 'default';
-        checkinEl.onclick = null;
+    
+    const checkinBtn = document.getElementById('profile-checkin-btn');
+    const checkinStatus = document.getElementById('profile-checkin');
+    if (checkinStatus) {
+        checkinStatus.textContent = checkedInToday ? '✅ 今天已签到' : '今天未签到';
+    }
+    if (checkinBtn) {
+        checkinBtn.textContent = checkedInToday ? '已签到' : '今日签到 +10积分';
+        checkinBtn.disabled = checkedInToday;
+        checkinBtn.className = checkedInToday ? 'checkin-btn done' : 'checkin-btn';
     }
     
     document.getElementById('stat-chats').textContent = (data.chats || []).length;
@@ -537,6 +620,24 @@ function loadProfile() {
     document.getElementById('stat-products').textContent = data.productBrowses || 0;
     
     loadTizhiRecords(data);
+}
+
+function doCheckin() {
+    const data = getUserData();
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (data.checkins && data.checkins.indexOf(today) >= 0) {
+        showToast('今天已经签到过了！');
+        return;
+    }
+    
+    if (!data.checkins) data.checkins = [];
+    data.checkins.push(today);
+    data.points = (data.points || 0) + 10;
+    saveUserData(data);
+    
+    loadProfile();
+    showToast('签到成功！获得10积分 🎉');
 }
 
 function loadTizhiRecords(data) {
@@ -592,163 +693,20 @@ function saveProductBrowse(keyword, count) {
     saveUserData(data);
 }
 
-// ========== 签到功能 ==========
+// ========== Toast提示 ==========
 
-function doCheckin() {
-    const data = getUserData();
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (data.checkins && data.checkins.indexOf(today) >= 0) {
-        return;
+function showToast(message) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
     }
-    
-    if (!data.checkins) data.checkins = [];
-    data.checkins.push(today);
-    
-    // 签到奖励积分
-    if (!data.points) data.points = 0;
-    data.points += 10;
-    
-    saveUserData(data);
-    
-    // 更新显示
-    const checkinEl = document.getElementById('profile-checkin');
-    checkinEl.textContent = '✅ 今天已签到';
-    checkinEl.style.cursor = 'default';
-    checkinEl.onclick = null;
-    
-    document.getElementById('profile-points').textContent = '积分：' + data.points;
-    document.getElementById('stat-checkins').textContent = data.checkins.length;
-    
-    alert('🎉 签到成功！获得10积分');
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2500);
 }
-
-// ========== 养生谷知识库加载 ==========
-
-async function loadTizhiKnowledge() {
-    try {
-        const response = await fetch(`${API_BASE}/api/knowledge/tizhi`);
-        const data = await response.json();
-        const grid = document.getElementById('tizhi-grid');
-        if (data && data.length > 0) {
-            grid.innerHTML = data.map(t => `
-                <div class="tizhi-card">
-                    <h3>${escapeHtml(t.name || '')}</h3>
-                    <p><strong>特征：</strong>${escapeHtml(t.features || '')}</p>
-                    <p><strong>调养：</strong>${escapeHtml(t.diet || '')}</p>
-                </div>
-            `).join('');
-        }
-    } catch (e) {
-        console.error('加载体质知识失败:', e);
-    }
-}
-
-async function loadYaoshiKnowledge() {
-    try {
-        const response = await fetch(`${API_BASE}/api/knowledge/yaoshi`);
-        const data = await response.json();
-        const list = document.getElementById('yaoshi-list');
-        if (data && data.length > 0) {
-            list.innerHTML = data.map(y => `
-                <div class="yaoshi-item">
-                    <h4>${escapeHtml(y.name || '')}</h4>
-                    <p><strong>性味：</strong>${escapeHtml(y.xingwei || '')}</p>
-                    <p><strong>功效：</strong>${escapeHtml(y.gongxiao || '')}</p>
-                    <p><strong>禁忌：</strong>${escapeHtml(y.jinji || '')}</p>
-                </div>
-            `).join('');
-        }
-    } catch (e) {
-        console.error('加载药食同源知识失败:', e);
-    }
-}
-
-// ========== 商品详情弹窗 ==========
-let currentDetailProduct = null;
-
-function showDetail(product) {
-    currentDetailProduct = product;
-    
-    // 主图
-    let mainImage = product.image || '';
-    if (product.images && product.images.length > 0) {
-        mainImage = product.images[0];
-    }
-    document.getElementById('detail-main-image').innerHTML = 
-        `<img src="${mainImage}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">`;
-    
-    // 缩略图
-    let thumbnails = '';
-    const images = product.images || [mainImage];
-    images.forEach((img, i) => {
-        thumbnails += `<img src="${img}" class="detail-thumb${i === 0 ? ' active' : ''}" onclick="switchDetailImage(this, '${img}')" onerror="this.style.display='none'">`;
-    });
-    document.getElementById('detail-thumbnails').innerHTML = thumbnails;
-    
-    // 标题
-    document.getElementById('detail-title').textContent = product.title;
-    
-    // 价格
-    document.getElementById('detail-price').innerHTML = `<span class="price-symbol">¥</span>${product.price}`;
-    
-    // 店铺
-    let shopHtml = '';
-    if (product.shop_name) {
-        shopHtml += `<span>🏪 ${escapeHtml(product.shop_name)}</span>`;
-    }
-    if (product.brand) {
-        shopHtml += `<span>🏷️ ${escapeHtml(product.brand)}</span>`;
-    }
-    document.getElementById('detail-shop').innerHTML = shopHtml;
-    
-    // 参数（从数据库取）
-    document.getElementById('detail-params').innerHTML = '<div class="detail-section-title">商品参数</div><div class="detail-params-list"><span>暂无详细参数</span></div>';
-    
-    // 描述
-    document.getElementById('detail-desc').innerHTML = '<div class="detail-section-title">商品描述</div><p>点击下方按钮查看淘宝详情</p>';
-    
-    // 购买按钮
-    const buyBtn = document.getElementById('detail-buy-btn');
-    const platform = product.platform || 'taobao';
-    const platformName = platform === 'taobao' ? '淘宝' : '京东';
-    buyBtn.textContent = `去${platformName}购买`;
-    buyBtn.onclick = function() {
-        let url = product.url || '#';
-        if (url && url !== '#') {
-            window.open(url, '_blank');
-        }
-    };
-    
-    // 显示弹窗
-    document.getElementById('product-detail-overlay').style.display = 'flex';
-}
-
-function closeDetail() {
-    document.getElementById('product-detail-overlay').style.display = 'none';
-    currentDetailProduct = null;
-}
-
-function switchDetailImage(el, imgUrl) {
-    document.querySelectorAll('.detail-thumb').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('detail-main-image').innerHTML = 
-        `<img src="${imgUrl}" alt="商品图片">`;
-}
-
-function goToBuy() {
-    if (currentDetailProduct) {
-        let url = currentDetailProduct.url || '#';
-        if (url && url !== '#') {
-            window.open(url, '_blank');
-        }
-    }
-}
-
-// 点击遮罩层关闭
-document.addEventListener('click', function(e) {
-    const overlay = document.getElementById('product-detail-overlay');
-    if (e.target === overlay) {
-        closeDetail();
-    }
-});

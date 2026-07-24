@@ -187,6 +187,86 @@ async def get_shiliao(zhengxing: Optional[str] = None):
     ks = KnowledgeService()
     return ks.get_shiliao(zhengxing)
 
+# ========== 签到接口 ==========
+
+class CheckinRequest(BaseModel):
+    """签到请求"""
+    user_id: str
+
+class CheckinResponse(BaseModel):
+    """签到响应"""
+    success: bool
+    points: int = 0
+    total_points: int = 0
+    message: str = ""
+
+# 本地签到记录（生产环境应使用数据库）
+_checkin_records = {}  # user_id -> {last_date, total_points, streak}
+
+@app.get("/api/checkin/status")
+async def checkin_status(user_id: str):
+    """获取签到状态"""
+    from datetime import datetime, timezone, timedelta
+    beijing_tz = timezone(timedelta(hours=8))
+    today = datetime.now(beijing_tz).strftime('%Y-%m-%d')
+    
+    record = _checkin_records.get(user_id, {})
+    checked_in_today = record.get('last_date') == today
+    
+    return {
+        "checked_in_today": checked_in_today,
+        "total_points": record.get('total_points', 0),
+        "streak": record.get('streak', 0),
+        "today": today
+    }
+
+@app.post("/api/checkin/do")
+async def do_checkin(request: CheckinRequest):
+    """执行签到"""
+    from datetime import datetime, timezone, timedelta
+    beijing_tz = timezone(timedelta(hours=8))
+    now = datetime.now(beijing_tz)
+    today = now.strftime('%Y-%m-%d')
+    yesterday = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    record = _checkin_records.get(request.user_id, {
+        'last_date': '',
+        'total_points': 0,
+        'streak': 0
+    })
+    
+    if record.get('last_date') == today:
+        return CheckinResponse(
+            success=False,
+            message="今天已经签到过了"
+        )
+    
+    # 计算连续签到
+    if record.get('last_date') == yesterday:
+        record['streak'] = record.get('streak', 0) + 1
+    else:
+        record['streak'] = 1
+    
+    record['last_date'] = today
+    record['total_points'] = record.get('total_points', 0) + 10
+    _checkin_records[request.user_id] = record
+    
+    return CheckinResponse(
+        success=True,
+        points=10,
+        total_points=record['total_points'],
+        message=f"签到成功！连续签到{record['streak']}天，获得10积分"
+    )
+
+# ========== 缓存统计接口 ==========
+
+@app.get("/api/cache/stats")
+async def cache_stats():
+    """获取商品缓存统计"""
+    from services.shop import ShopService
+    shop = ShopService()
+    return shop.get_cache_stats()
+
 # ========== 启动 ==========
 
 if __name__ == "__main__":
