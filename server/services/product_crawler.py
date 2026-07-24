@@ -11,7 +11,10 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None  # 可选依赖，没有时跳过详情爬取
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
@@ -300,7 +303,7 @@ def update_crawl_status(keyword: str, platform: str, page_crawled: int, total_pa
 def get_crawl_queue() -> List[dict]:
     """获取待爬取的分类队列"""
     # 从shop.py读取分类
-    _server_dir = os.path.join(os.path.dirname(__file__))
+    _server_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)))
     if _server_dir not in __import__('sys').path:
         __import__('sys').path.insert(0, _server_dir)
     from services.shop import ShopService

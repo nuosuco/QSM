@@ -113,19 +113,28 @@ async def chat(request: ChatRequest):
     # 1. 辨证分析
     result = engine.analyze(request.message)
 
-    # 2. 根据辨证结果搜索商品
+    # 2. 根据辨证结果搜索商品（带超时保护，最长5秒）
     products = []
     if result.get("recommendations"):
         seen_ids = set()
-        for rec in result["recommendations"][:3]:
-            items = shop.search(rec["name"], platform="taobao", page_size=3)
-            for item in items:
-                item_key = item.get('item_id', '') or item.get('title', '')
-                if item_key and item_key not in seen_ids:
-                    seen_ids.add(item_key)
-                    products.append(item)
-            if len(products) >= 6:
-                break
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            future_map = {
+                executor.submit(shop.search, rec["name"], "taobao", 1, 3): rec["name"]
+                for rec in result["recommendations"][:3]
+            }
+            for future in concurrent.futures.as_completed(future_map, timeout=5):
+                try:
+                    items = future.result()
+                    for item in items:
+                        item_key = item.get('item_id', '') or item.get('title', '')
+                        if item_key and item_key not in seen_ids:
+                            seen_ids.add(item_key)
+                            products.append(item)
+                except Exception:
+                    pass
+                if len(products) >= 6:
+                    break
 
     # 3. 保存对话历史到数据库
     try:
@@ -446,6 +455,60 @@ async def get_session_history(session_id: str):
 class ClearHistoryRequest(BaseModel):
     user_id: str
 
+class SearchAddRequest(BaseModel):
+    user_id: str
+    keyword: str
+    platform: str = "taobao"
+
+class FavoriteAddRequest(BaseModel):
+    user_id: str
+    item_id: str
+    title: str = ""
+    price: str = ""
+    image: str = ""
+    url: str = ""
+    platform: str = ""
+    shop_name: str = ""
+
+# ========== 对话历史接口 ==========
+
+@app.get("/api/chat/history")
+async def get_chat_history(user_id: str, limit: int = 20):
+    """获取对话历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM chat_history 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT ?
+    ''', (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "total": len(rows),
+        "history": [dict(r) for r in rows]
+    }
+
+@app.get("/api/chat/history/session")
+async def get_session_history(session_id: str):
+    """获取特定会话的对话历史"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM chat_history 
+        WHERE session_id = ? 
+        ORDER BY created_at ASC
+    ''', (session_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "total": len(rows),
+        "history": [dict(r) for r in rows]
+    }
+
 @app.post("/api/chat/history/clear")
 async def clear_chat_history(request: ClearHistoryRequest):
     """清空对话历史"""
@@ -479,11 +542,6 @@ async def get_search_history(user_id: str, limit: int = 20):
         "total": len(rows),
         "history": [dict(r) for r in rows]
     }
-
-class SearchAddRequest(BaseModel):
-    user_id: str
-    keyword: str
-    platform: str = "taobao"
 
 @app.post("/api/search/history/add")
 async def add_search_history(request: SearchAddRequest):
@@ -533,7 +591,7 @@ async def get_favorites(user_id: str, limit: int = 50):
     }
 
 @app.post("/api/favorites/add")
-async def add_favorite(request: dict):
+async def add_favorite(request: FavoriteAddRequest):
     """添加商品收藏"""
     conn = get_user_db()
     cursor = conn.cursor()
@@ -543,14 +601,14 @@ async def add_favorite(request: dict):
             (user_id, item_id, title, price, image, url, platform, shop_name)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            request.get('user_id'),
-            request.get('item_id'),
-            request.get('title'),
-            request.get('price'),
-            request.get('image'),
-            request.get('url'),
-            request.get('platform'),
-            request.get('shop_name'),
+            request.user_id,
+            request.item_id,
+            request.title,
+            request.price,
+            request.image,
+            request.url,
+            request.platform,
+            request.shop_name,
         ))
         conn.commit()
         added = cursor.rowcount > 0
@@ -562,7 +620,7 @@ async def add_favorite(request: dict):
 
 @app.post("/api/favorites/remove")
 async def remove_favorite(user_id: str, item_id: str):
-    """移除收藏商品"""
+    """移除收藏商品（支持query参数和body两种方式）"""
     conn = get_user_db()
     cursor = conn.cursor()
     cursor.execute('''

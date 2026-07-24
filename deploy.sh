@@ -7,15 +7,18 @@ set -e
 echo "=== SOM 松麦 部署开始 ==="
 
 # 1. 检查 Python
-if ! command -v python3 &> /dev/null; then
-    echo "安装 Python3..."
-    apt-get update && apt-get install -y python3 python3-pip
+PYTHON_BIN=$(which python3.11 2>/dev/null || which python3 2>/dev/null || echo "python3")
+
+if ! command -v $PYTHON_BIN &> /dev/null; then
+    echo "安装 Python3.11..."
+    apt-get update && apt-get install -y python3.11 python3.11-pip
+    PYTHON_BIN="python3.11"
 fi
 
 # 2. 安装 Python 依赖
 echo "安装 Python 依赖..."
 cd /data/SOM/server
-pip3 install -r requirements.txt
+$PYTHON_BIN -m pip install -r requirements.txt
 
 # 3. 安装 Nginx
 if ! command -v nginx &> /dev/null; then
