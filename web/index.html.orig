@@ -24,8 +24,7 @@
                 <nav class="nav">
                     <button class="nav-btn active" data-tab="chat">小麦SOM</button>
                     <button class="nav-btn" data-tab="products">有机好物</button>
-                    <button class="nav-btn" data-tab="yangshenggu">养生谷</button>
-                    <button class="nav-btn" data-tab="profile">我</button>
+                    <button class="nav-btn" data-tab="knowledge">养生知识</button>
                 </nav>
             </div>
         </header>
@@ -94,8 +93,8 @@
                 </div>
             </div>
 
-            <!-- 养生谷页面（暂时放养生知识） -->
-            <div class="tab-content" id="yangshenggu-tab">
+            <!-- 知识页面 -->
+            <div class="tab-content" id="knowledge-tab">
                 <div class="knowledge-container">
                     <div class="knowledge-section">
                         <h2>九种体质</h2>
@@ -104,44 +103,6 @@
                     <div class="knowledge-section">
                         <h2>药食同源</h2>
                         <div class="yaoshi-list" id="yaoshi-list"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 个人中心页面 -->
-            <div class="tab-content" id="profile-tab">
-                <div class="profile-container">
-                    <div class="profile-card">
-                        <div class="profile-avatar">松</div>
-                        <div class="profile-info">
-                            <h3 id="profile-name">养生用户</h3>
-                            <p id="profile-tizhi">体质：未检测</p>
-                            <p id="profile-points">积分：0</p>
-                            <p id="profile-checkin">签到：今天未签到</p>
-                        </div>
-                    </div>
-                    <div class="profile-section">
-                        <h3>📋 我的体质记录</h3>
-                        <div class="profile-history" id="profile-history">
-                            <p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>
-                        </div>
-                    </div>
-                    <div class="profile-section">
-                        <h3>📊 我的数据</h3>
-                        <div class="profile-stats">
-                            <div class="stat-item">
-                                <span class="stat-num" id="stat-chats">0</span>
-                                <span class="stat-label">对话次数</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-num" id="stat-checkins">0</span>
-                                <span class="stat-label">签到天数</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-num" id="stat-products">0</span>
-                                <span class="stat-label">浏览商品</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>

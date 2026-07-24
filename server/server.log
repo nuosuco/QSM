@@ -1,0 +1,22 @@
+INFO:     Started server process [3223367]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56544 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56554 - "GET /api/products/search?keyword=%E9%A3%9F%E5%93%81%20%E5%85%BB%E7%94%9F%20%E9%A3%9F%E6%9D%90%20%E6%BB%8B%E8%A1%A5%E5%93%81%20%E8%8D%AF%E8%86%B3%20%E6%AF%8D%E5%A9%B4%20%E5%8E%9F%E7%94%9F%E6%80%81%20%E9%87%8E%E7%94%9F%20%E6%97%A5%E7%94%A8%E5%93%81%20%E5%AE%B6%E5%B1%85%20%E7%BB%BF%E6%A4%8D%20%E5%81%A5%E8%BA%AB%20%E4%BF%9D%E5%81%A5%20%E6%A3%89%E5%93%81%20%E7%BE%8E%E5%A6%86&platform=taobao&page=1&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/categories HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E9%A3%9F%E5%93%81&platform=taobao&page=1&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E9%A3%9F%E5%93%81&platform=taobao&page=2&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E9%A3%9F%E5%93%81&platform=taobao&page=3&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E4%BA%94%E8%B0%B7%E6%9D%82%E7%B2%AE&platform=taobao&page=1&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E4%BA%94%E8%B0%B7%E6%9D%82%E7%B2%AE&platform=taobao&page=2&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E4%BA%94%E8%B0%B7%E6%9D%82%E7%B2%AE&platform=taobao&page=3&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E5%8C%BB%E7%94%A8&platform=taobao&page=1&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E8%89%BE%E8%8D%89&platform=taobao&page=1&page_size=20 HTTP/1.1" 200 OK
+淘宝搜索异常: HTTPSConnectionPool(host='eco.taobao.com', port=443): Read timed out. (read timeout=10)
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E8%89%BE%E8%8D%89&platform=taobao&page=2&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/categories HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=&platform=taobao&page=1&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E9%A3%9F%E5%93%81&platform=taobao&page=2&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E8%8C%AF%E8%8B%93&platform=taobao&page=1&page_size=20 HTTP/1.1" 200 OK
+INFO:     182.141.233.242:0 - "GET /api/products/search?keyword=%E8%8C%AF%E8%8B%93&platform=taobao&page=2&page_size=20 HTTP/1.1" 200 OK

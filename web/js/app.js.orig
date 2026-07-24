@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initChat();
     initProductSearch();
     loadCategories();
-    initProfile();
+    loadKnowledge();
 });
 
 // ========== 导航切换 ==========
@@ -253,11 +253,11 @@ function displayCategories(categories) {
 
 function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
-    // 用分类名称作为搜索框显示，但实际搜索用后端关键词
-    // 取关键词的第一个词作为搜索关键词，避免太长
-    currentKeyword = keyword.split(' ')[0];
+    currentKeyword = categoryName || keyword;
     currentPage = 1;
     hasMore = true;
+    const searchInput = document.getElementById('product-search');
+    searchInput.value = currentKeyword;
     searchProducts(true);
 }
 
@@ -389,112 +389,47 @@ function openProduct(appUrl, webUrl, platform) {
     }
 }
 
-// ========== 个人中心 ==========
+// ========== 知识库 ==========
 
-function initProfile() {
-    loadProfile();
-}
-
-function getUserId() {
-    let uid = localStorage.getItem('som_user_id');
-    if (!uid) {
-        uid = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('som_user_id', uid);
+async function loadKnowledge() {
+    try {
+        // 加载体质分类
+        const tizhiResponse = await fetch(`${API_BASE}/api/knowledge/tizhi`);
+        const tizhiData = await tizhiResponse.json();
+        displayTizhi(tizhiData.items);
+        
+        // 加载药食同源
+        const yaoshiResponse = await fetch(`${API_BASE}/api/knowledge/yaoshi`);
+        const yaoshiData = await yaoshiResponse.json();
+        displayYaoshi(yaoshiData.items);
+        
+    } catch (error) {
+        console.error('加载知识库失败:', error);
     }
-    return uid;
 }
 
-function getUserData() {
-    const key = 'som_user_data_' + getUserId();
-    const dataStr = localStorage.getItem(key);
-    let data;
-    if (dataStr) {
-        try { data = JSON.parse(dataStr); } catch(e) { data = {}; }
-    } else {
-        data = {};
-    }
-    if (!data.name) data.name = '养生用户';
-    if (!data.tizhi) data.tizhi = '未检测';
-    if (!data.points) data.points = 0;
-    if (!data.chats) data.chats = [];
-    if (!data.checkins) data.checkins = [];
-    if (!data.productBrowses) data.productBrowses = 0;
-    if (!data.tizhiRecords) data.tizhiRecords = [];
-    return data;
+function displayTizhi(tizhiList) {
+    const tizhiGrid = document.getElementById('tizhi-grid');
+    
+    tizhiGrid.innerHTML = tizhiList.map(tizhi => `
+        <div class="tizhi-card">
+            <h3>${tizhi.name}</h3>
+            <p><strong>特征：</strong>${tizhi.desc}</p>
+            <p><strong>养生：</strong>${tizhi.yangsheng}</p>
+        </div>
+    `).join('');
 }
 
-function saveUserData(data) {
-    const key = 'som_user_data_' + getUserId();
-    localStorage.setItem(key, JSON.stringify(data));
-}
-
-function loadProfile() {
-    const data = getUserData();
+function displayYaoshi(yaoshiItems) {
+    const yaoshiList = document.getElementById('yaoshi-list');
     
-    document.getElementById('profile-name').textContent = data.name;
-    document.getElementById('profile-tizhi').textContent = '体质：' + (data.tizhi || '未检测');
-    document.getElementById('profile-points').textContent = '积分：' + (data.points || 0);
-    
-    const today = new Date().toISOString().split('T')[0];
-    const checkedInToday = data.checkins && data.checkins.indexOf(today) >= 0;
-    document.getElementById('profile-checkin').textContent = checkedInToday ? '✅ 今天已签到' : '签到：今天未签到';
-    
-    document.getElementById('stat-chats').textContent = (data.chats || []).length;
-    document.getElementById('stat-checkins').textContent = (data.checkins || []).length;
-    document.getElementById('stat-products').textContent = data.productBrowses || 0;
-    
-    loadTizhiRecords(data);
-}
-
-function loadTizhiRecords(data) {
-    const history = document.getElementById('profile-history');
-    if (!history) return;
-    
-    const records = data.tizhiRecords || [];
-    if (records.length === 0) {
-        history.innerHTML = '<p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>';
-        return;
-    }
-    
-    let html = '';
-    const maxShow = Math.min(records.length, 5);
-    for (let i = records.length - maxShow; i < records.length; i++) {
-        const r = records[i];
-        html += '<div class="history-item">';
-        html += '  <span class="history-date">' + escapeHtml(r.date || '') + '</span>';
-        html += '  <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span>';
-        html += '  <span class="history-desc">' + escapeHtml(r.desc || '') + '</span>';
-        html += '</div>';
-    }
-    history.innerHTML = html;
-}
-
-function saveChatRecord(message, reply, tizhi) {
-    const data = getUserData();
-    if (!data.chats) data.chats = [];
-    
-    data.chats.push({
-        date: new Date().toISOString(),
-        message: message.substring(0, 100),
-        tizhi: tizhi || ''
-    });
-    
-    if (tizhi && tizhi !== '未检测') {
-        if (!data.tizhiRecords) data.tizhiRecords = [];
-        data.tizhiRecords.push({
-            date: new Date().toISOString().split('T')[0],
-            tizhi: tizhi,
-            desc: message.substring(0, 50)
-        });
-        data.tizhi = tizhi;
-    }
-    
-    saveUserData(data);
-}
-
-function saveProductBrowse(keyword, count) {
-    const data = getUserData();
-    if (!data.productBrowses) data.productBrowses = 0;
-    data.productBrowses += count;
-    saveUserData(data);
+    yaoshiList.innerHTML = Object.entries(yaoshiItems).map(([name, info]) => `
+        <div class="yaoshi-item">
+            <h4>${name}</h4>
+            <p><strong>性味：</strong>${info.xingwei}</p>
+            <p><strong>归经：</strong>${info.guijing}</p>
+            <p><strong>功效：</strong>${info.gongxiao}</p>
+            <p><strong>禁忌：</strong>${info.jinji}</p>
+        </div>
+    `).join('');
 }
