@@ -170,38 +170,164 @@ class ShopService:
 
     def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
         """
-        搜索商品 - 自动追加"有机"关键词，只返回有机认证产品
+        搜索商品 - 用食材名+有机精确搜索，不拆词，搜到够为止
         platform: taobao / jd / all
         sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
         """
-        # 强制追加有机认证关键词
-        search_keyword = self._ensure_organic(keyword)
+        if not keyword or not keyword.strip():
+            return []
+        
+        # 直接使用食材名+有机搜索，不拆词，搜到够为止
+        search_keyword = f"{keyword.strip()} 有机"
 
         items = []
         if platform in ("taobao", "all"):
-            # 把长关键词拆成2-3个词的短组合，分别搜索再合并
-            sub_keywords = self._split_keywords(search_keyword)
             seen_ids = set()
-            for sub_kw in sub_keywords:
-                # 每个子关键词搜3页，覆盖更多商品
-                for page_num in range(1, 4):
-                    sub_items = self._search_taobao(sub_kw, page_num, page_size, sort)
-                    if not sub_items:
-                        break  # 这一页没结果了，跳过
-                    for item in sub_items:
-                        item_id = item.get('item_id', '') or item.get('title', '')
-                        if item_id not in seen_ids and not self._is_excluded(item):
-                            seen_ids.add(item_id)
-                            items.append(item)
-                # 如果已经收集够多了，就不再继续
-                if len(items) >= page_size * 10:
+            page_num = 1
+            while len(items) < page_size:
+                sub_items = self._search_taobao(search_keyword, page_num, page_size, sort)
+                if not sub_items:
                     break
+                for item in sub_items:
+                    title = item.get('title', '')
+                    # 标题必须包含食材名，确保搜到的是相关商品
+                    if keyword.strip() not in title:
+                        continue
+                    item_id = item.get('item_id', '') or item.get('title', '')
+                    if item_id not in seen_ids and not self._is_excluded(item):
+                        seen_ids.add(item_id)
+                        items.append(item)
+                    if len(items) >= page_size:
+                        break
+                page_num += 1
         if platform in ("jd", "all"):
-            for page_num in range(1, 4):
-                for item in self._search_jd(search_keyword, page_num, page_size):
+            page_num = 1
+            while len(items) < page_size:
+                sub_items = self._search_jd(search_keyword, page_num, page_size)
+                if not sub_items:
+                    break
+                for item in sub_items:
+                    title = item.get('title', '')
+                    if keyword.strip() not in title:
+                        continue
                     if not self._is_excluded(item):
                         items.append(item)
+                    if len(items) >= page_size:
+                        break
+                page_num += 1
         return items
+
+    def get_category_keyword(self, keyword: str) -> str:
+        """根据搜索词匹配分类关键词"""
+        if not keyword:
+            return ''
+        keyword_lower = keyword.lower()
+        for cat_name, info in CATEGORY_MAP.items():
+            kw = info['keyword']
+            for part in kw.split():
+                if part and part in keyword_lower:
+                    return kw
+        return keyword
+
+    def search_from_cache(self, keyword: str, page: int = 1, page_size: int = 10) -> List[dict]:
+        """从SQLite缓存数据库搜索商品"""
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
+        if not os.path.exists(db_path):
+            return []
+        
+        # 过滤空关键词和纯空白
+        if not keyword or not keyword.strip():
+            return []
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # 用多个关键词组合匹配
+            search_parts = [p.strip() for p in keyword.split() if p.strip()][:5]
+            if not search_parts:
+                conn.close()
+                return []
+            
+            conditions = []
+            params = []
+            or_groups = []
+            for part in search_parts:
+                or_groups.append(f'(title LIKE ? OR click_url LIKE ? OR desc_text LIKE ?)')
+                params.extend([f'%{part}%', f'%{part}%', f'%{part}%'])
+            where = ' OR '.join(or_groups)
+            
+            sql = f'''
+                SELECT item_id, platform, title, price, main_image as image,
+                       shop_name, brand, commission_rate, click_url as url,
+                       images, sales
+                FROM product_cache
+                WHERE {where}
+                ORDER BY updated_at DESC
+                LIMIT ? OFFSET ?
+            '''
+            
+            cursor.execute(sql, params + [page_size * 2, (page - 1) * page_size])
+            rows = cursor.fetchall()
+            conn.close()
+            
+            items = []
+            seen_ids = set()
+            for row in rows:
+                r = dict(row)
+                rid = r.get('item_id', '')
+                if rid not in seen_ids and not self._is_excluded(r):
+                    seen_ids.add(rid)
+                    items.append({
+                        'item_id': rid,
+                        'title': r.get('title', ''),
+                        'price': r.get('price', ''),
+                        'image': r.get('main_image', '') or r.get('images', '').strip('[]"') if isinstance(r.get('images'), str) else (r.get('images') or [])[0] if isinstance(r.get('images'), list) else '',
+                        'url': r.get('click_url', ''),
+                        'platform': r.get('platform', 'taobao'),
+                        'commission_rate': r.get('commission_rate', ''),
+                        'shop_name': r.get('shop_name', ''),
+                        'brand': r.get('brand', ''),
+                        'sales': r.get('sales', ''),
+                    })
+                if len(items) >= page_size * 3:
+                    break
+            return items[:page_size * 2]
+        except Exception as e:
+            print(f"缓存搜索异常: {e}")
+            return []
+
+    def get_cache_stats(self) -> dict:
+        """获取缓存统计信息"""
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
+        if not os.path.exists(db_path):
+            return {'total': 0, 'error': 'cache db not found'}
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM product_cache')
+            total = cursor.fetchone()[0]
+            cursor.execute("SELECT platform, COUNT(*) as cnt FROM product_cache GROUP BY platform")
+            platforms = {}
+            for row in cursor.fetchall():
+                platforms[row[0]] = row[1]
+            cursor.execute('SELECT MAX(updated_at) FROM product_cache')
+            latest = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(DISTINCT category) FROM product_cache WHERE category != ''")
+            categories = cursor.fetchone()[0]
+            conn.close()
+            return {
+                'total': total,
+                'platforms': platforms,
+                'latest_update': latest,
+                'categories': categories,
+            }
+        except Exception as e:
+            return {'total': 0, 'error': str(e)}
 
     def _is_excluded(self, item: dict) -> bool:
         """检查商品是否应该被排除（书籍、化工、玩具等无关品类）"""
@@ -298,20 +424,11 @@ class ShopService:
                                 # 将 https://s.click.taobao.com/... 转为 taobao:// 协议
                                 app_url = click_url.replace('https://', 'taobao://', 1)
                             
-                            # 提取 small_images（商品详情图，最多4张）
-                            si = basic.get('small_images', {})
-                            images = []
-                            if isinstance(si, dict):
-                                images = si.get('string', [])
-                            elif isinstance(si, list):
-                                images = si
-                            
                             items.append({
                                 'item_id': item.get('item_id', ''),
                                 'title': basic.get('short_title', '') or basic.get('title', ''),
                                 'price': price_info.get('zk_final_price', '') or price_info.get('reserve_price', ''),
                                 'image': basic.get('pict_url', ''),
-                                'images': images,  # 多张商品图
                                 'url': click_url,  # 网页版推广链接（带佣金）
                                 'app_url': app_url,  # APP deeplink（优先，带佣金追踪）
                                 'platform': 'taobao',
