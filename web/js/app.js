@@ -378,6 +378,112 @@ function openProduct(webUrl, platform) {
     window.open(webUrl, '_blank');
 }
 
+// ========== 商品详情弹窗 ==========
+
+function showProductDetail(product) {
+    closeProductDetail();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'detail-overlay show';
+    overlay.onclick = (e) => { if (e.target === overlay) closeProductDetail(); };
+
+    const imgSrc = product.image || '';
+    const itemId = product.item_id || '';
+    const fullImages = (product.images || []).map(img =>
+        `<div class="detail-thumb" onclick="window.open('${img}','_blank')"><img src="${img}" onerror="this.style.display='none'"></div>`
+    ).join('');
+
+    // 生成淘宝详情页URL（使用click_url或直接构造）
+    const detailUrl = product.url || '';
+
+    overlay.innerHTML = `
+        <button class="detail-close" onclick="closeProductDetail()">✕</button>
+        <div class="detail-modal detail-modal-full">
+            <div class="detail-tabs">
+                <button class="detail-tab active" onclick="switchDetailTab(this, 'info')">商品信息</button>
+                <button class="detail-tab" onclick="switchDetailTab(this, 'detail')">淘宝详情</button>
+            </div>
+            <div class="detail-tab-content" id="detail-tab-info">
+                <div class="detail-img-wrap">
+                    <img src="${imgSrc}" alt="${escapeHtml(product.title || '')}" onclick="window.open('${imgSrc}','_blank')" style="cursor:pointer" onerror="this.parentElement.innerHTML='<div style=\'height:200px;display:flex;align-items:center;justify-content:center;color:#aaa\'>暂无图片</div>'">
+                </div>
+                ${fullImages ? `<div class="detail-thumbs">${fullImages}</div>` : ''}
+                <div class="detail-body">
+                    <div class="detail-title">${escapeHtml(product.title || '')}</div>
+                    <div class="detail-price"><span class="sym">¥</span>${product.price || '0'}</div>
+                    <div class="detail-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+                    ${product.brand ? `<div class="detail-brand">品牌：${escapeHtml(product.brand)}</div>` : ''}
+                    ${product.commission_rate ? `<div class="modal-commission">佣金比例：${product.commission_rate}%</div>` : ''}
+                    ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
+                    <div class="detail-actions">
+                        <button class="detail-buy" onclick="openProduct('${product.url || '#'}', '${product.platform}')">立即购买 →</button>
+                        <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${imgSrc}', '${product.url || ''}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
+                    </div>
+                </div>
+            </div>
+            <div class="detail-tab-content" id="detail-tab-detail" style="display:none">
+                <div class="detail-iframe-wrap">
+                    <iframe src="${detailUrl}" 
+                        class="detail-iframe" 
+                        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                        loading="lazy"
+                        onerror="this.parentElement.innerHTML='<div class=\'detail-iframe-error\'>无法加载详情页，<a href=\'${detailUrl}\' target=\'_blank\'>点击这里在新窗口查看</a></div>'">
+                    </iframe>
+                    <div class="detail-iframe-placeholder">
+                        <div class="detail-iframe-loading">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    // iframe加载完成后隐藏loading
+    setTimeout(() => {
+        const iframe = overlay.querySelector('.detail-iframe');
+        const placeholder = overlay.querySelector('.detail-iframe-placeholder');
+        if (iframe && placeholder) {
+            iframe.addEventListener('load', () => {
+                placeholder.style.display = 'none';
+            });
+            setTimeout(() => {
+                if (placeholder) placeholder.style.display = 'none';
+            }, 5000);
+        }
+    }, 100);
+
+    // 异步检查收藏状态
+    if (itemId) {
+        fetch(`${API_BASE}/api/favorites/check?user_id=${encodeURIComponent(getUserId())}&item_id=${encodeURIComponent(itemId)}`)
+            .then(r => r.json())
+            .then(data => {
+                const favBtn = document.getElementById('detail-fav-btn');
+                if (favBtn && data.favorited) {
+                    favBtn.textContent = '♥ 已收藏';
+                    favBtn.classList.add('favorited');
+                }
+            })
+            .catch(() => {});
+    }
+
+    saveProductBrowse(product.title || '', 1);
+}
+
+function switchDetailTab(btn, tabName) {
+    document.querySelectorAll('.detail-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.detail-tab-content').forEach(c => c.style.display = 'none');
+    document.getElementById('detail-tab-' + tabName).style.display = '';
+}
+
+function closeProductDetail() {
+    const existing = document.querySelector('.detail-overlay');
+    if (existing) existing.remove();
+    document.body.style.overflow = '';
+}
+
 // ========== 个人中心 ==========
 
 function initProfile() {
