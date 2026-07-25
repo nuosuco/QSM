@@ -177,44 +177,45 @@ class ShopService:
         if not keyword or not keyword.strip():
             return []
         
-        # 把多关键词拆成单个词（如 "食品 养生 食材" → ["食品", "养生", "食材"]）
+        # 把多关键词拆成单个词
         keywords = [k.strip() for k in keyword.split() if k.strip()]
         if not keywords:
             return []
         
-        seen_ids = set()
+        seen_titles = set()
         items = []
         
         def search_single_keyword(single_kw: str) -> list:
-            """搜索单个关键词，搜到够 page_size 个为止"""
+            """搜索单个关键词，搜多页直到找够为止"""
             search_kw = f"{single_kw} 有机"
             result = []
-            local_seen = set()
+            local_titles = set()
             page_num = 1
-            while len(result) < page_size:
+            while len(result) < page_size * 2:
                 sub_items = self._search_taobao(search_kw, page_num, page_size, sort)
                 if not sub_items:
                     break
                 for item in sub_items:
-                    item_id = item.get('item_id', '') or item.get('title', '')
-                    if item_id not in local_seen and not self._is_excluded(item):
-                        local_seen.add(item_id)
+                    title = item.get('title', '')
+                    if title and title not in local_titles and not self._is_excluded(item):
+                        local_titles.add(title)
                         result.append(item)
-                    if len(result) >= page_size:
+                    if len(result) >= page_size * 2:
                         break
                 page_num += 1
-            return result
+            # 截断到 page_size（给前端的总数）
+            return result[:page_size]
         
         # 所有关键词并行搜索
         import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(keywords)) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(keywords), 15)) as executor:
             future_map = {executor.submit(search_single_keyword, kw): kw for kw in keywords}
             for future in concurrent.futures.as_completed(future_map, timeout=10):
                 try:
                     for item in future.result():
-                        item_id = item.get('item_id', '') or item.get('title', '')
-                        if item_id not in seen_ids:
-                            seen_ids.add(item_id)
+                        title = item.get('title', '')
+                        if title and title not in seen_titles:
+                            seen_titles.add(title)
                             items.append(item)
                 except Exception:
                     pass
