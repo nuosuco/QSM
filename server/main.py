@@ -617,6 +617,52 @@ async def get_dashboard():
     ss = StatsService()
     return ss.get_dashboard()
 
+# ========== 缓存预热管理接口 ==========
+
+@app.get("/api/cache/warmup/status")
+async def get_warmup_status():
+    """获取缓存预热状态"""
+    import sqlite3
+    db_path = os.path.join(DATA_DIR, 'product_cache.db')
+    if not os.path.exists(db_path):
+        return {"status": "no_cache", "total": 0, "keywords": []}
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM product_cache')
+        total = cursor.fetchone()[0]
+        cursor.execute('SELECT * FROM crawl_status ORDER BY last_crawled DESC')
+        rows = cursor.fetchall()
+        conn.close()
+        keywords = []
+        for row in rows:
+            keywords.append({
+                "keyword": row[0],
+                "platform": row[1],
+                "page_crawled": row[2],
+                "items_found": row[3],
+                "last_crawled": row[4],
+                "status": row[5],
+            })
+        return {"status": "ok", "total": total, "keywords": keywords}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.get("/api/cache/warmup/trigger")
+async def trigger_warmup():
+    """触发缓存预热（异步）"""
+    import subprocess
+    script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts', 'cache_warmup.py')
+    try:
+        subprocess.Popen(
+            ['python3.11', script_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return {"success": True, "message": "缓存预热已触发"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/stats/users")
 async def get_user_stats():
     """用户统计"""
