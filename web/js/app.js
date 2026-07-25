@@ -116,14 +116,8 @@ async function sendMessage() {
             }
             
             chatContainer.appendChild(productsDiv);
-            // 滚到回复文字底部，让用户看到提问和文字，商品卡片在下方可自行上滑
-            if (chatMsgDiv) {
-                const anchorTop = chatMsgDiv.getBoundingClientRect().bottom;
-                const containerBottom = chatContainer.getBoundingClientRect().bottom;
-                if (anchorTop > containerBottom) {
-                    chatContainer.scrollTop += anchorTop - containerBottom + 10;
-                }
-            }
+            // 滚到回复文字顶部，让用户看到自己的提问和完整回答
+            chatContainer.scrollTop = chatMsgDiv.offsetTop;
             return;
         }
         
