@@ -222,15 +222,14 @@ class ShopService:
         return items[:page_size]
 
     def get_category_keyword(self, keyword: str) -> str:
-        """根据搜索词匹配分类关键词"""
+        """根据分类名返回对应的关键词列表"""
         if not keyword:
             return ''
-        keyword_lower = keyword.lower()
+        # 直接按分类名匹配
         for cat_name, info in CATEGORY_MAP.items():
-            kw = info['keyword']
-            for part in kw.split():
-                if part and part in keyword_lower:
-                    return kw
+            if cat_name == keyword.strip():
+                return info['keyword']
+        # 没匹配到分类名，返回原词（用户自定义搜索）
         return keyword
 
     def search_from_cache(self, keyword: str, page: int = 1, page_size: int = 10) -> List[dict]:
