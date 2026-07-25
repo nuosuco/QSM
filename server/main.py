@@ -494,6 +494,28 @@ async def remove_favorite(request: FavoriteRemoveRequest):
     conn.close()
     return {"success": True, "deleted": affected}
 
+@app.post("/api/favorites/batch-check")
+async def batch_check_favorites(user_ids: dict = None):
+    """批量检查商品是否已收藏（POST请求）"""
+    # 支持 query 参数格式: ?user_id=xxx&item_ids=id1,id2,id3
+    pass
+
+@app.get("/api/favorites/batch-check")
+async def batch_check_favorites_get(user_id: str, item_ids: str = ""):
+    """批量检查商品是否已收藏"""
+    if not item_ids:
+        return {"favorites": {}}
+    ids_list = [x.strip() for x in item_ids.split(",") if x.strip()]
+    conn = get_user_db()
+    cursor = conn.cursor()
+    favorites = {}
+    for item_id in ids_list:
+        cursor.execute('SELECT 1 FROM product_favorites WHERE user_id = ? AND item_id = ?',
+                       (user_id, item_id))
+        favorites[item_id] = cursor.fetchone() is not None
+    conn.close()
+    return {"favorites": favorites}
+
 @app.get("/api/favorites/check")
 async def check_favorite(user_id: str, item_id: str):
     conn = get_user_db()

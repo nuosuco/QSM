@@ -446,42 +446,62 @@ async function loadMoreProducts() {
     if (indicator) indicator.remove();
 }
 
+async function checkFavoritesStatus(products) {
+    // 批量检查商品收藏状态
+    const itemIds = products.map(p => p.item_id || '').filter(id => id).join(',');
+    if (!itemIds) return {};
+    try {
+        const res = await fetch(`${API_BASE}/api/favorites/batch-check?user_id=${encodeURIComponent(getUserId())}&item_ids=${encodeURIComponent(itemIds)}`);
+        const data = await res.json();
+        return data.favorites || {};
+    } catch(e) {
+        return {};
+    }
+}
+
 function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
-    const productHtml = products.map(product => {
-        const webUrl = product.url || '#';
-        const itemId = product.item_id || '';
-        return `
-        <div class="product-card" data-id="${escapeHtml(itemId)}" data-url="${webUrl}" data-platform="${product.platform || ''}">
-            <button class="fav-btn" onclick="event.stopPropagation(); toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${escapeHtml(product.price || '')}', '${escapeHtml(product.image || '')}', '${escapeHtml(webUrl)}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')" title="收藏">♡</button>
-            <img class="product-image" src="${product.image || ''}" alt="${escapeHtml(product.title || '')}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
-            <div class="product-info">
-                <div class="product-title">${escapeHtml(product.title || '')}</div>
-                <div class="product-price">¥${product.price || ''}</div>
-                <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+    
+    // 异步检查收藏状态后渲染
+    checkFavoritesStatus(products).then(favStatus => {
+        const productHtml = products.map(product => {
+            const webUrl = product.url || '#';
+            const itemId = product.item_id || '';
+            const isFav = favStatus[itemId] || false;
+            const favIcon = isFav ? '♥' : '♡';
+            const favClass = isFav ? 'fav-btn favorited' : 'fav-btn';
+            return `
+            <div class="product-card" data-id="${escapeHtml(itemId)}" data-url="${webUrl}" data-platform="${product.platform || ''}">
+                <button class="${favClass}" onclick="event.stopPropagation(); toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${escapeHtml(product.price || '')}', '${escapeHtml(product.image || '')}', '${escapeHtml(webUrl)}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')" title="收藏">${favIcon}</button>
+                <img class="product-image" src="${product.image || ''}" alt="${escapeHtml(product.title || '')}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+                <div class="product-info">
+                    <div class="product-title">${escapeHtml(product.title || '')}</div>
+                    <div class="product-price">¥${product.price || ''}</div>
+                    <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+                </div>
             </div>
-        </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
 
-    if (append) {
-        productsGrid.insertAdjacentHTML('beforeend', productHtml);
-    } else {
-        productsGrid.innerHTML = productHtml;
-    }
+        if (append) {
+            productsGrid.insertAdjacentHTML('beforeend', productHtml);
+        } else {
+            productsGrid.innerHTML = productHtml;
+        }
 
-    // 绑定点击事件
-    productsGrid.querySelectorAll('.product-card[data-id]').forEach(card => {
-        card.addEventListener('click', function(e) {
-            if (e.target.closest('.fav-btn')) return;
-            showProductDetail({
-                item_id: this.dataset.id,
-                title: this.querySelector('.product-title').textContent,
-                price: this.querySelector('.product-price').textContent.replace('¥', ''),
-                image: this.querySelector('.product-image').src,
-                url: this.dataset.url,
-                platform: this.dataset.platform,
-                shop_name: this.querySelector('.product-shop')?.textContent?.split('·')[0]?.trim() || ''
+        // 绑定点击事件
+        productsGrid.querySelectorAll('.product-card[data-id]').forEach(card => {
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('.fav-btn')) return;
+                showProductDetail({
+                    item_id: this.dataset.id,
+                    title: this.querySelector('.product-title').textContent,
+                    price: this.querySelector('.product-price').textContent.replace('¥', ''),
+                    image: this.querySelector('.product-image').src,
+                    url: this.dataset.url,
+                    platform: this.dataset.platform,
+                    shop_name: this.querySelector('.product-shop')?.textContent?.split('·')[0]?.trim() || ''
+                });
             });
         });
     });
@@ -504,7 +524,7 @@ async function toggleFavorite(btn, itemId, title, price, image, url, platform, s
     try {
         let res, data;
         if (isFav) {
-            res = await fetch(`${API_BASE}/api/favorites/remove?user_id=${encodeURIComponent(uid)}&item_id=${encodeURIComponent(itemId)}`, { method: 'POST' });
+            res = await fetch(`${API_BASE}/api/favorites/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: uid, item_id: itemId }) });
             data = await res.json();
             if (data.success) { btn.textContent = '♡'; btn.classList.remove('favorited'); showToast('已取消收藏'); }
         } else {
@@ -529,6 +549,7 @@ function showProductDetail(product) {
     overlay.onclick = (e) => { if (e.target === overlay) closeProductDetail(); };
 
     const imgSrc = product.image || '';
+    const itemId = product.item_id || '';
     const fullImages = (product.images || []).map(img =>
         `<div class="detail-thumb" onclick="window.open('${img}','_blank')"><img src="${img}" onerror="this.style.display='none'"></div>`
     ).join('');
@@ -537,7 +558,7 @@ function showProductDetail(product) {
         <button class="detail-close" onclick="closeProductDetail()">✕</button>
         <div class="detail-modal">
             <div class="detail-img-wrap">
-                <img src="${imgSrc}" alt="${escapeHtml(product.title || '')}" onerror="this.parentElement.innerHTML='<div style=\\'height:200px;display:flex;align-items:center;justify-content:center;color:#aaa\\'>暂无图片</div>'">
+                <img src="${imgSrc}" alt="${escapeHtml(product.title || '')}" onerror="this.parentElement.innerHTML='<div style=\'height:200px;display:flex;align-items:center;justify-content:center;color:#aaa\'>暂无图片</div>'">
             </div>
             ${fullImages ? `<div class="detail-thumbs">${fullImages}</div>` : ''}
             <div class="detail-body">
@@ -547,7 +568,7 @@ function showProductDetail(product) {
                 ${product.commission_rate ? `<div class="modal-commission">佣金比例：${product.commission_rate}%</div>` : ''}
                 <div class="detail-actions">
                     <button class="detail-buy" onclick="openProduct('${product.url}', '${product.platform}')">立即购买 →</button>
-                    <button class="detail-fav" onclick="toggleFavorite(this, '${product.item_id || ''}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${imgSrc}', '${product.url || ''}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
+                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${imgSrc}', '${product.url || ''}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
         </div>
@@ -555,6 +576,20 @@ function showProductDetail(product) {
 
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
+
+    // 异步检查收藏状态，初始化收藏按钮图标
+    if (itemId) {
+        fetch(`${API_BASE}/api/favorites/check?user_id=${encodeURIComponent(getUserId())}&item_id=${encodeURIComponent(itemId)}`)
+            .then(r => r.json())
+            .then(data => {
+                const favBtn = document.getElementById('detail-fav-btn');
+                if (favBtn && data.favorited) {
+                    favBtn.textContent = '♥ 已收藏';
+                    favBtn.classList.add('favorited');
+                }
+            })
+            .catch(() => {});
+    }
 
     saveProductBrowse(product.title || '', 1);
 }
