@@ -97,10 +97,7 @@ async function sendMessage() {
             productsGrid.className = 'products-grid chat-products-grid';
             productsDiv.appendChild(productsGrid);
             
-            // 每种药膳食材推荐3个商品
-            const perIngredient = 3;
-            const totalProducts = Math.min(data.products.length, perIngredient * 3);
-            for (let i = 0; i < totalProducts; i++) {
+            for (let i = 0; i < data.products.length; i++) {
                 const product = data.products[i];
                 _productIndex++;
                 _productCache[_productIndex] = product;
@@ -116,7 +113,7 @@ async function sendMessage() {
                     </div>
                 `;
                 productsGrid.appendChild(card);
-            });
+            }
             
             chatContainer.appendChild(productsDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
