@@ -110,7 +110,7 @@ async def chat(request: ChatRequest):
     products = []
     if result.get("recommendations"):
         for rec in result["recommendations"][:3]:
-            items = shop.search(rec["name"], platform="taobao", page_size=3)
+            items = shop.search(rec["name"], platform="taobao", page_size=6)
             products.extend(items)
 
     return ChatResponse(
