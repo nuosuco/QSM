@@ -392,8 +392,25 @@ document.addEventListener('click', (e) => {
 });
 
 function openProduct(webUrl, platform) {
-    // 直接在新窗口打开推广链接
-    window.open(webUrl, '_blank');
+    // 手机跳APP，电脑跳淘宝详情页
+    var isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+        // 手机端：尝试唤起淘宝APP
+        if (platform === 'taobao' && webUrl) {
+            // 淘宝APP协议
+            var appUrl = 'taobao://' + webUrl.replace(/^https?:\/\//, '');
+            window.location.href = appUrl;
+            // 2秒后如果没跳转成功，fallback到浏览器
+            setTimeout(function() {
+                window.open(webUrl, '_blank');
+            }, 2000);
+        } else {
+            window.open(webUrl, '_blank');
+        }
+    } else {
+        // 电脑端：直接打开淘宝详情页
+        window.open(webUrl, '_blank');
+    }
 }
 
 // ========== 商品详情弹窗 ==========
@@ -407,50 +424,64 @@ function showProductDetail(product) {
 
     const imgSrc = product.image || '';
     const itemId = product.item_id || '';
-    const fullImages = (product.images || []).map(img =>
-        `<div class="detail-thumb" onclick="window.open('${img}','_blank')"><img src="${img}" onerror="this.style.display='none'"></div>`
-    ).join('');
-
-    // 生成淘宝详情页URL（使用click_url或直接构造）
     const detailUrl = product.url || '';
-
-    // 所有图片用于轮播
     const allImgs = [imgSrc, ...(product.images || [])].filter(Boolean);
+    var currentImgIdx = 0;
 
     overlay.innerHTML = `
         <button class="detail-close" onclick="closeProductDetail()">✕</button>
         <div class="detail-modal detail-modal-full">
             <div class="detail-img-wrap">
-                <img src="${imgSrc}" alt="${escapeHtml(product.title || '')}" onclick="window.open('${imgSrc}','_blank')" style="cursor:pointer" onerror="this.parentElement.innerHTML='<div style=\'height:200px;display:flex;align-items:center;justify-content:center;color:#aaa\'>暂无图片</div>'">
+                <button class="detail-arrow detail-arrow-left" data-arrow="prev">‹</button>
+                <img id="detail-main-img" src="${escapeHtml(imgSrc)}" alt="${escapeHtml(product.title || '')}" onclick="window.open('${escapeHtml(imgSrc)}','_blank')" style="cursor:pointer" onerror="this.parentElement.innerHTML+='<div class=\'detail-no-img\'>暂无图片</div>'">
+                <button class="detail-arrow detail-arrow-right" data-arrow="next">›</button>
+                <div class="detail-img-counter"><span id="detail-img-cur">1</span>/<span id="detail-img-total">${allImgs.length}</span></div>
             </div>
-            ${fullImages ? `<div class="detail-thumbs">${fullImages}</div>` : ''}
+            ${allImgs.length > 1 ? `<div class="detail-thumbs" id="detail-thumbs">${allImgs.map(function(img, i) {
+                return '<div class="detail-thumb' + (i === 0 ? ' active' : '') + '" data-thumb-idx="' + i + '"><img src="' + escapeHtml(img) + '" onerror="this.style.display=\'none\'"></div>';
+            }).join('')}</div>` : ''}
             <div class="detail-body">
                 <div class="detail-title">${escapeHtml(product.title || '')}</div>
                 <div class="detail-price"><span class="sym">¥</span>${product.price || '0'}</div>
                 <div class="detail-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
                 ${product.brand ? `<div class="detail-brand">品牌：${escapeHtml(product.brand)}</div>` : ''}
-                ${product.commission_rate ? `<div class="modal-commission">佣金比例：${product.commission_rate}%</div>` : ''}
                 ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
                 <div class="detail-actions">
-                    <button class="detail-buy" onclick="openProduct('${product.url || '#'}', '${product.platform}')">立即购买 →</button>
-                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${imgSrc}', '${product.url || ''}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
+                    <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}')">点击购买</button>
+                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${escapeHtml(imgSrc)}', '${escapeHtml(product.url || '')}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
             <div class="detail-detail-section">
                 <div class="detail-detail-title">— 商品详情 —</div>
-                <div class="detail-detail-gallery">
-                    ${allImgs.map((img, i) => `
-                        <div class="detail-detail-img">
-                            <img src="${img}" onclick="window.open('${img}','_blank')" style="cursor:pointer" onerror="this.style.display='none'">
-                        </div>
-                    `).join('')}
-                </div>
                 <div class="detail-detail-footer">
-                    <a href="${detailUrl}" target="_blank" class="detail-detail-btn">前往淘宝查看完整详情 →</a>
+                    <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
                 </div>
             </div>
         </div>
     `;
+
+    // 轮播逻辑
+    var mainImg = overlay.querySelector('#detail-main-img');
+    var curSpan = overlay.querySelector('#detail-img-cur');
+
+    function switchImg(idx) {
+        if (idx < 0) idx = allImgs.length - 1;
+        if (idx >= allImgs.length) idx = 0;
+        currentImgIdx = idx;
+        if (mainImg) mainImg.src = allImgs[idx];
+        if (curSpan) curSpan.textContent = idx + 1;
+        overlay.querySelectorAll('.detail-thumb').forEach(function(t) {
+            t.classList.toggle('active', parseInt(t.getAttribute('data-thumb-idx')) === idx);
+        });
+    }
+
+    overlay.addEventListener('click', function(e) {
+        var arrow = e.target.getAttribute('data-arrow');
+        if (arrow === 'prev') { switchImg(currentImgIdx - 1); e.stopPropagation(); }
+        else if (arrow === 'next') { switchImg(currentImgIdx + 1); e.stopPropagation(); }
+        var thumbIdx = e.target.getAttribute('data-thumb-idx');
+        if (thumbIdx !== null) { switchImg(parseInt(thumbIdx)); e.stopPropagation(); }
+    });
 
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
@@ -482,6 +513,43 @@ function closeProductDetail() {
     if (existing) existing.remove();
     document.body.style.overflow = '';
 }
+
+// ========== 收藏功能 ==========
+
+globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, platform, shopName) {
+    if (!itemId) return;
+    var userId = getUserId();
+    var isFav = btn.classList.contains('favorited');
+    
+    if (isFav) {
+        fetch(API_BASE + '/api/favorites/remove', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId, item_id: itemId})
+        }).then(function() {
+            btn.classList.remove('favorited');
+            btn.textContent = '♡ 收藏';
+        }).catch(function() {});
+    } else {
+        fetch(API_BASE + '/api/favorites/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_id: userId,
+                item_id: itemId,
+                title: title || '',
+                price: price || '',
+                image: image || '',
+                url: url || '',
+                platform: platform || 'taobao',
+                shop_name: shopName || ''
+            })
+        }).then(function() {
+            btn.classList.add('favorited');
+            btn.textContent = '♥ 已收藏';
+        }).catch(function() {});
+    }
+};
 
 // ========== 个人中心 ==========
 
