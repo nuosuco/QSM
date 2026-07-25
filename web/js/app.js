@@ -460,6 +460,7 @@ function showProductDetail(product) {
                 </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
+                    ${detailUrl ? '<a href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener" class="detail-full-page-link" style="display:block;text-align:center;margin-top:10px;font-size:13px;color:#888;text-decoration:none;">查看完整页面 →</a>' : ''}
                 </div>
             </div>
         </div>
