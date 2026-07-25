@@ -167,80 +167,41 @@ class ShopService:
             {'name': name, 'keyword': info['keyword'], 'icon': info['icon'], 'desc': info['desc']}
             for name, info in CATEGORY_MAP.items()
         ]
-    
-    def get_category_keyword(self, category_name: str) -> str:
-        """根据分类名获取搜索关键词"""
-        if category_name in CATEGORY_MAP:
-            return CATEGORY_MAP[category_name]['keyword']
-        # 尝试匹配部分名称
-        for name, info in CATEGORY_MAP.items():
-            if category_name in name or name in category_name:
-                return info['keyword']
-        return category_name
 
     def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
         """
         搜索商品 - 自动追加"有机"关键词，只返回有机认证产品
         platform: taobao / jd / all
         sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
-        
-        优化策略：
-        1. 优先从数据库缓存查询
-        2. 缓存未命中或不足时，再调淘宝API实时搜索
-        3. 长关键词拆成短组合并行搜索，提高召回率
-        4. 全链路去重：以item_id为唯一标识，实时结果覆盖缓存
         """
         # 强制追加有机认证关键词
         search_keyword = self._ensure_organic(keyword)
 
-        # 使用集合去重，以item_id+title[:20]为唯一标识
-        seen_ids = set()
         items = []
-
-        def _add_unique(item_list):
-            """添加唯一商品，返回新增数量"""
-            added = 0
-            for item in item_list:
-                item_id = item.get('item_id', '') or ''
-                title = item.get('title', '') or ''
-                if not item_id and not title:
-                    continue
-                # 使用 item_id + 标题前20字作为去重key
-                dedup_key = f"{item_id}:{title[:20]}" if item_id else title[:30]
-                
-                if dedup_key not in seen_ids and not self._is_excluded(item):
-                    seen_ids.add(dedup_key)
-                    items.append(item)
-                    added += 1
-            return added
-
-        # 1. 先从缓存查询
-        cache_items = self.search_from_cache(keyword=keyword, page=1, page_size=page_size * 2)
-        _add_unique(cache_items)
-
-        # 2. 缓存不够时，实时搜索
-        if len(items) < page_size:
-            if platform in ("taobao", "all"):
-                sub_keywords = self._split_keywords(search_keyword)
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                    future_to_kw = {
-                        executor.submit(self._search_taobao, sub_kw, 1, page_size, sort): sub_kw 
-                        for sub_kw in sub_keywords[:3]  # 限制并发数，避免超时
-                    }
-                    for future in concurrent.futures.as_completed(future_to_kw):
-                        sub_items = future.result()
-                        if sub_items:
-                            _add_unique(sub_items)
-                        if len(items) >= page_size * 2:
-                            break
-
-            if platform in ("jd", "all"):
-                jd_items = self._search_jd(search_keyword, 1, page_size)
-                _add_unique(jd_items)
-
-        # 3. 截断到page_size
-        return items[:page_size]
+        if platform in ("taobao", "all"):
+            # 把长关键词拆成2-3个词的短组合，分别搜索再合并
+            sub_keywords = self._split_keywords(search_keyword)
+            seen_ids = set()
+            for sub_kw in sub_keywords:
+                # 每个子关键词搜3页，覆盖更多商品
+                for page_num in range(1, 4):
+                    sub_items = self._search_taobao(sub_kw, page_num, page_size, sort)
+                    if not sub_items:
+                        break  # 这一页没结果了，跳过
+                    for item in sub_items:
+                        item_id = item.get('item_id', '') or item.get('title', '')
+                        if item_id not in seen_ids and not self._is_excluded(item):
+                            seen_ids.add(item_id)
+                            items.append(item)
+                # 如果已经收集够多了，就不再继续
+                if len(items) >= page_size * 10:
+                    break
+        if platform in ("jd", "all"):
+            for page_num in range(1, 4):
+                for item in self._search_jd(search_keyword, page_num, page_size):
+                    if not self._is_excluded(item):
+                        items.append(item)
+        return items
 
     def _is_excluded(self, item: dict) -> bool:
         """检查商品是否应该被排除（书籍、化工、玩具等无关品类）"""
@@ -419,79 +380,3 @@ class ShopService:
         except Exception as e:
             print(f"京东搜索异常: {e}")
         return []
-
-    def search_from_cache(self, keyword: str = '', page: int = 1, page_size: int = 20) -> List[dict]:
-        """从数据库缓存查询商品（优先）"""
-        import sqlite3, json, os
-        
-        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
-        if not os.path.exists(db_path):
-            return []
-        
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        if keyword:
-            cursor.execute('''
-                SELECT * FROM product_cache 
-                WHERE title LIKE ? OR shop_name LIKE ?
-                ORDER BY updated_at DESC
-                LIMIT ? OFFSET ?
-            ''', (f'%{keyword}%', f'%{keyword}%', page_size, (page - 1) * page_size))
-        else:
-            cursor.execute('''
-                SELECT * FROM product_cache 
-                ORDER BY updated_at DESC
-                LIMIT ? OFFSET ?
-            ''', (page_size, (page - 1) * page_size))
-        
-        rows = cursor.fetchall()
-        items = []
-        for row in rows:
-            item = dict(row)
-            images = []
-            if item.get('images'):
-                try:
-                    images = json.loads(item['images'])
-                except:
-                    images = [item['main_image']] if item['main_image'] else []
-            if not images and item.get('main_image'):
-                images = [item['main_image']]
-            
-            items.append({
-                'item_id': item['item_id'],
-                'title': item['title'],
-                'price': item['price'],
-                'image': item['main_image'] or (images[0] if images else ''),
-                'images': images[:5],
-                'url': item['click_url'] or '',
-                'platform': item['platform'],
-                'commission_rate': item['commission_rate'] or '',
-                'shop_name': item['shop_name'] or '',
-                'brand': item['brand'] or '',
-                'sales': item['sales'] or '',
-                'from_cache': True,
-            })
-        
-        conn.close()
-        return items
-    
-    def get_cache_stats(self) -> dict:
-        """获取缓存统计"""
-        import sqlite3, os
-        
-        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
-        if not os.path.exists(db_path):
-            return {'total': 0, 'platforms': {}}
-        
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM product_cache')
-        total = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT platform, COUNT(*) FROM product_cache GROUP BY platform')
-        platforms = {row[0]: row[1] for row in cursor.fetchall()}
-        
-        conn.close()
-        return {'total': total, 'platforms': platforms}
