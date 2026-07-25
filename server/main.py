@@ -1,241 +1,45 @@
-"""
-SOM 松麦 - 后端服务入口
-小麦SOM = Qwen3.5 2B + RAG知识库
-"""
-import json
-import os
-import sys
-import sqlite3
-import time as time_module
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
-
-# 确保服务脚本可从任意目录启动
-_server_dir = Path(__file__).resolve().parent
-if str(_server_dir) not in sys.path:
-    sys.path.insert(0, str(_server_dir))
-_parent = str(_server_dir.parent)
-if _parent not in sys.path:
-    sys.path.insert(0, _parent)
-
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import Optional, List
-
-# 加载配置
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-with open(CONFIG_PATH, "r") as f:
-    CONFIG = json.load(f)
-
-app = FastAPI(
-    title="SOM 松麦 API",
-    description="小麦SOM - 中医辨证 + 有机食品推荐",
-    version="1.1.1"
-)
-
-# CORS - 允许网页版、小程序调用
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ========== 数据模型（所有模型集中定义，避免引用顺序问题） ==========
-
-class ChatRequest(BaseModel):
-    """对话请求 - 小麦SOM问诊"""
-    message: str
-    session_id: Optional[str] = None
-    user_id: Optional[str] = None
-
-class ChatResponse(BaseModel):
-    """对话响应"""
-    reply: str
-    tizhi: Optional[str] = None
-    zhengxing: Optional[str] = None
-    recommendations: List[dict] = []
-    products: List[dict] = []
-    session_id: str
-
-class CheckinRequest(BaseModel):
-    """签到请求"""
-    user_id: str
-
-class CheckinResponse(BaseModel):
-    """签到响应"""
-    success: bool
-    points: int = 0
-    total_points: int = 0
-    message: str = ""
-
-class ClearHistoryRequest(BaseModel):
-    user_id: str
-
-class SearchAddRequest(BaseModel):
-    user_id: str
-    keyword: str
-    platform: str = "taobao"
-
-class FavoriteAddRequest(BaseModel):
-    user_id: str
-    item_id: str
-    title: str = ""
-    price: str = ""
-    image: str = ""
-    url: str = ""
-    platform: str = ""
-    shop_name: str = ""
-
-class FavoriteRemoveRequest(BaseModel):
-    user_id: str
-    item_id: str
-
-class FeedbackRequest(BaseModel):
-    """用户反馈请求"""
-    user_id: str
-    content: str
-    feedback_type: str = "suggestion"
-    contact: str = ""
-    page_url: str = ""
-    user_agent: str = ""
-
-# ========== 静态文件托管（网页版前端） ==========
-
-WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
-if os.path.isdir(WEB_DIR):
-    app.mount("/css", StaticFiles(directory=os.path.join(WEB_DIR, "css")), name="css")
-    app.mount("/js", StaticFiles(directory=os.path.join(WEB_DIR, "js")), name="js")
-    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
-
-    @app.get("/")
-    async def serve_web():
-        from fastapi.responses import FileResponse
-        return FileResponse(os.path.join(WEB_DIR, "index.html"))
-
-# ========== 数据库初始化 ==========
-
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
-os.makedirs(DATA_DIR, exist_ok=True)
-USER_DB_PATH = os.path.join(DATA_DIR, 'user_data.db')
-
-def init_user_db():
-    conn = sqlite3.connect(USER_DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS checkin_records (
-            user_id TEXT PRIMARY KEY,
-            last_date TEXT,
-            total_points INTEGER DEFAULT 0,
-            streak INTEGER DEFAULT 0
-        )
-    ''')
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            session_id TEXT,
-            user_message TEXT,
-            assistant_reply TEXT,
-            tizhi TEXT,
-            zhengxing TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS search_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            keyword TEXT NOT NULL,
-            platform TEXT DEFAULT 'taobao',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS product_favorites (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            item_id TEXT NOT NULL,
-            title TEXT,
-            price TEXT,
-            image TEXT,
-            url TEXT,
-            platform TEXT,
-            shop_name TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, item_id)
-        )
-    ''')
-
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_history(user_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_search_user ON search_history(user_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_fav_user ON product_favorites(user_id)')
-
-    conn.commit()
-    conn.close()
-
-init_user_db()
-
-def get_user_db():
-    conn = sqlite3.connect(USER_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def get_beijing_now():
-    utc_now = datetime.now(timezone.utc)
-    beijing_tz = timezone(timedelta(hours=8))
-    return utc_now.astimezone(beijing_tz)
-
-# ========== API 路由 ==========
-
-@app.get("/api/health")
-async def health_check():
-    return {"status": "ok", "service": "SOM松麦后端", "version": "1.1.1"}
-
-# ========== 小麦SOM 对话接口 ==========
-
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    from services.bianzheng import BianzhengEngine
-    from services.shop import ShopService
-
-    engine = BianzhengEngine()
-    shop = ShopService()
-
-    result = engine.analyze(request.message)
-
-    products = []
-    import re
-    # 从配方文字中提取食材名（如“配方：酸枣仁15g、百合10g、莲子15g”）
-    recipe_ingredients = re.findall(r'配方[：:](.+?)(?:\n|—|：|：\s)', result.get("reply", ""), re.DOTALL)
-    ingredient_names = []
-    if recipe_ingredients:
-        text = recipe_ingredients[0]
-        names = re.findall(r'([\u4e00-\u9fa5]{2,4})(?:\d+)g|[\u4e00-\u9fa5]{2,5}(?:仁|肉|子|叶|根|皮|粉|酱|蜜|枣|莲|米|粥)', text)
-        seen_n = set()
-        for n in names:
-            if len(n) >= 2 and n not in seen_n:
-                seen_n.add(n)
-                ingredient_names.append(n)
-    else:
-        # fallback: 用建议食用食材
-        ingredient_names = [r["name"] for r in result.get("recommendations", [])]
-
-    seen_titles = set()
-    if ingredient_names:
+        def search_ingredient(ing: str) -> list:
+            """搜索单个食材，不限页数，搜够不同品牌2款就停"""
+            result = []
+            local_titles = set()
+            local_brands = set()
+            page_num = 1
+            while len(result) < 2:
+                try:
+                    sub_items = _shop._search_taobao(f"{ing} 有机", page_num, 2, "")
+                except Exception:
+                    sub_items = []
+                if not sub_items:
+                    page_num += 1
+                    if page_num > 5:
+                        break
+                    continue
+                for item in sub_items:
+                    title = item.get('title', '')
+                    brand = item.get('shop_name', '') or ''
+                    # 只保留标题里有"有机"的商品
+                        continue
+                    if title and title not in local_titles and not _shop._is_excluded(item):
+                        if ing.lower() in title.lower():
+                            local_titles.add(title)
+                            if brand not in local_brands:
+                                local_brands.add(brand)
+                                result.append(item)
+                            elif len(result) < 2:
+                                result.append(item)
+                page_num += 1
+            return result
+        
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             future_map = {
-                executor.submit(shop.search, ing, "taobao", 1, 2): ing
+                executor.submit(search_ingredient, ing): ing
                 for ing in ingredient_names
             }
-            for future in concurrent.futures.as_completed(future_map, timeout=10):
+            # 不用超时机制，全部等所有结果回来
+            concurrent.futures.wait(future_map, timeout=None)
+            print(f"[小麦助手] 搜索完成，products: {len(products)}个")
+            for future in future_map:
                 try:
                     items = future.result()
                     for item in items:
