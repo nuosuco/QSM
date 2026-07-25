@@ -298,11 +298,20 @@ class ShopService:
                                 # 将 https://s.click.taobao.com/... 转为 taobao:// 协议
                                 app_url = click_url.replace('https://', 'taobao://', 1)
                             
+                            # 提取 small_images（商品详情图，最多4张）
+                            si = basic.get('small_images', {})
+                            images = []
+                            if isinstance(si, dict):
+                                images = si.get('string', [])
+                            elif isinstance(si, list):
+                                images = si
+                            
                             items.append({
                                 'item_id': item.get('item_id', ''),
                                 'title': basic.get('short_title', '') or basic.get('title', ''),
                                 'price': price_info.get('zk_final_price', '') or price_info.get('reserve_price', ''),
                                 'image': basic.get('pict_url', ''),
+                                'images': images,  # 多张商品图
                                 'url': click_url,  # 网页版推广链接（带佣金）
                                 'app_url': app_url,  # APP deeplink（优先，带佣金追踪）
                                 'platform': 'taobao',
