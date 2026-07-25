@@ -184,7 +184,7 @@ class ShopService:
         if platform in ("taobao", "all"):
             seen_ids = set()
             page_num = 1
-            while len(items) < page_size:
+            while len(items) < page_size and page_num <= 5:
                 sub_items = self._search_taobao(search_keyword, page_num, page_size, sort)
                 if not sub_items:
                     break
@@ -202,7 +202,7 @@ class ShopService:
                 page_num += 1
         if platform in ("jd", "all"):
             page_num = 1
-            while len(items) < page_size:
+            while len(items) < page_size and page_num <= 5:
                 sub_items = self._search_jd(search_keyword, page_num, page_size)
                 if not sub_items:
                     break

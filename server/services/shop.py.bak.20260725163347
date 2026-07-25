@@ -170,51 +170,34 @@ class ShopService:
 
     def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
         """
-        搜索商品 - 用食材名+有机精确搜索，不拆词，搜到够为止
+        搜索商品 - 用食材名+有机精确搜索，不拆词，只搜1页
         platform: taobao / jd / all
         sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
         """
         if not keyword or not keyword.strip():
             return []
         
-        # 直接使用食材名+有机搜索，不拆词，搜到够为止
+        # 直接使用食材名+有机搜索，不拆词
         search_keyword = f"{keyword.strip()} 有机"
 
         items = []
         if platform in ("taobao", "all"):
             seen_ids = set()
-            page_num = 1
-            while len(items) < page_size:
-                sub_items = self._search_taobao(search_keyword, page_num, page_size, sort)
-                if not sub_items:
-                    break
+            sub_items = self._search_taobao(search_keyword, 1, page_size, sort)
+            if sub_items:
                 for item in sub_items:
-                    title = item.get('title', '')
-                    # 标题必须包含食材名，确保搜到的是相关商品
-                    if keyword.strip() not in title:
-                        continue
                     item_id = item.get('item_id', '') or item.get('title', '')
                     if item_id not in seen_ids and not self._is_excluded(item):
                         seen_ids.add(item_id)
                         items.append(item)
                     if len(items) >= page_size:
                         break
-                page_num += 1
         if platform in ("jd", "all"):
-            page_num = 1
-            while len(items) < page_size:
-                sub_items = self._search_jd(search_keyword, page_num, page_size)
-                if not sub_items:
+            for item in self._search_jd(search_keyword, 1, page_size):
+                if not self._is_excluded(item):
+                    items.append(item)
+                if len(items) >= page_size:
                     break
-                for item in sub_items:
-                    title = item.get('title', '')
-                    if keyword.strip() not in title:
-                        continue
-                    if not self._is_excluded(item):
-                        items.append(item)
-                    if len(items) >= page_size:
-                        break
-                page_num += 1
         return items
 
     def get_category_keyword(self, keyword: str) -> str:
