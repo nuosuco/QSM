@@ -351,12 +351,11 @@ function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
     
     const productHtml = products.map(product => {
-        // 淘宝商品：优先使用APP deeplink，网页版使用推广链接
-        let appUrl = product.app_url || '';
-        let webUrl = product.url || '#';
+        // 构造完整的商品对象，点击卡片时传给详情弹窗
+        const productJson = JSON.stringify(product).replace(/"/g, '&quot;');
         
         return `
-        <div class="product-card" onclick="openProduct('${appUrl}', '${webUrl}', '${product.platform}')">
+        <div class="product-card" onclick="showProductDetail(${productJson})">
             <img class="product-image" src="${product.image}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
             <div class="product-info">
                 <div class="product-title">${escapeHtml(product.title)}</div>
@@ -374,19 +373,9 @@ function displayProducts(products, append = false) {
     }
 }
 
-function openProduct(appUrl, webUrl, platform) {
-    if (platform === 'taobao' && appUrl) {
-        // 先尝试打开淘宝APP
-        window.location.href = appUrl;
-        // 2.5秒后如果页面还可见（APP没安装），回退到网页版
-        setTimeout(() => {
-            if (!document.hidden) {
-                window.open(webUrl, '_blank');
-            }
-        }, 2500);
-    } else {
-        window.open(webUrl, '_blank');
-    }
+function openProduct(webUrl, platform) {
+    // 直接在新窗口打开推广链接
+    window.open(webUrl, '_blank');
 }
 
 // ========== 个人中心 ==========
