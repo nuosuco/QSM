@@ -414,12 +414,15 @@ function showProductDetail(product) {
     // 生成淘宝详情页URL（使用click_url或直接构造）
     const detailUrl = product.url || '';
 
+    // 所有图片用于轮播
+    const allImgs = [imgSrc, ...(product.images || [])].filter(Boolean);
+
     overlay.innerHTML = `
         <button class="detail-close" onclick="closeProductDetail()">✕</button>
         <div class="detail-modal detail-modal-full">
             <div class="detail-tabs">
                 <button class="detail-tab active" onclick="switchDetailTab(this, 'info')">商品信息</button>
-                <button class="detail-tab" onclick="switchDetailTab(this, 'detail')">淘宝详情</button>
+                <button class="detail-tab" onclick="switchDetailTab(this, 'detail')">商品详情</button>
             </div>
             <div class="detail-tab-content" id="detail-tab-info">
                 <div class="detail-img-wrap">
@@ -440,15 +443,17 @@ function showProductDetail(product) {
                 </div>
             </div>
             <div class="detail-tab-content" id="detail-tab-detail" style="display:none">
-                <div class="detail-iframe-wrap">
-                    <iframe src="${detailUrl}" 
-                        class="detail-iframe" 
-                        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                        loading="lazy"
-                        onerror="this.parentElement.innerHTML='<div class=\'detail-iframe-error\'>无法加载详情页，<a href=\'${detailUrl}\' target=\'_blank\'>点击这里在新窗口查看</a></div>'">
-                    </iframe>
-                    <div class="detail-iframe-placeholder">
-                        <div class="detail-iframe-loading">加载中...</div>
+                <div class="detail-detail-wrap">
+                    <div class="detail-detail-gallery">
+                        ${allImgs.map((img, i) => `
+                            <div class="detail-detail-img">
+                                <img src="${img}" onclick="window.open('${img}','_blank')" style="cursor:pointer" onerror="this.style.display='none'">
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="detail-detail-footer">
+                        <p>以上为商品展示图，查看完整商品详情</p>
+                        <a href="${detailUrl}" target="_blank" class="detail-detail-btn">前往淘宝查看 →</a>
                     </div>
                 </div>
             </div>
@@ -458,19 +463,10 @@ function showProductDetail(product) {
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-    // iframe加载完成后隐藏loading
-    setTimeout(() => {
-        const iframe = overlay.querySelector('.detail-iframe');
-        const placeholder = overlay.querySelector('.detail-iframe-placeholder');
-        if (iframe && placeholder) {
-            iframe.addEventListener('load', () => {
-                placeholder.style.display = 'none';
-            });
-            setTimeout(() => {
-                if (placeholder) placeholder.style.display = 'none';
-            }, 5000);
-        }
-    }, 100);
+    // 弹窗动画：延迟添加slide-up类
+    requestAnimationFrame(() => {
+        overlay.classList.add('slide-up');
+    });
 
     // 异步检查收藏状态
     if (itemId) {
