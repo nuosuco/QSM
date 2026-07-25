@@ -203,6 +203,107 @@ class ShopService:
                         items.append(item)
         return items
 
+    def get_category_keyword(self, keyword: str) -> str:
+        """根据搜索词匹配分类关键词"""
+        if not keyword:
+            return ''
+        keyword_lower = keyword.lower()
+        for cat_name, info in CATEGORY_MAP.items():
+            kw = info['keyword']
+            for part in kw.split():
+                if part and part in keyword_lower:
+                    return kw
+        return keyword
+
+    def search_from_cache(self, keyword: str, page: int = 1, page_size: int = 10) -> List[dict]:
+        """从SQLite缓存数据库搜索商品"""
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
+        if not os.path.exists(db_path):
+            return []
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # 用多个关键词组合匹配
+            search_parts = keyword.split()[:5]
+            conditions = []
+            params = []
+            for part in search_parts:
+                conditions.append('(title LIKE ? OR click_url LIKE ? OR desc_text LIKE ?)')
+                params.extend([f'%{part}%', f'%{part}%', f'%{part}%'])
+            where = ' AND '.join(conditions)
+            
+            cursor.execute(f'''
+                SELECT item_id, platform, title, price, main_image as image,
+                       shop_name, brand, commission_rate, click_url as url,
+                       images, sales
+                FROM product_cache
+                WHERE {where}
+                ORDER BY updated_at DESC
+                LIMIT ? OFFSET ?
+            ''', params + [page_size * 2, (page - 1) * page_size])
+            rows = cursor.fetchall()
+            conn.close()
+            
+            items = []
+            seen_ids = set()
+            for row in rows:
+                r = dict(row)
+                rid = r.get('item_id', '')
+                if rid not in seen_ids and not self._is_excluded(r):
+                    seen_ids.add(rid)
+                    items.append({
+                        'item_id': rid,
+                        'title': r.get('title', ''),
+                        'price': r.get('price', ''),
+                        'image': r.get('main_image', '') or r.get('images', '').strip('[]"') if isinstance(r.get('images'), str) else (r.get('images') or [])[0] if isinstance(r.get('images'), list) else '',
+                        'url': r.get('click_url', ''),
+                        'platform': r.get('platform', 'taobao'),
+                        'commission_rate': r.get('commission_rate', ''),
+                        'shop_name': r.get('shop_name', ''),
+                        'brand': r.get('brand', ''),
+                        'sales': r.get('sales', ''),
+                    })
+                if len(items) >= page_size * 3:
+                    break
+            return items[:page_size * 2]
+        except Exception as e:
+            print(f"缓存搜索异常: {e}")
+            return []
+
+    def get_cache_stats(self) -> dict:
+        """获取缓存统计信息"""
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
+        if not os.path.exists(db_path):
+            return {'total': 0, 'error': 'cache db not found'}
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM product_cache')
+            total = cursor.fetchone()[0]
+            cursor.execute("SELECT platform, COUNT(*) as cnt FROM product_cache GROUP BY platform")
+            platforms = {}
+            for row in cursor.fetchall():
+                platforms[row[0]] = row[1]
+            cursor.execute('SELECT MAX(updated_at) FROM product_cache')
+            latest = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(DISTINCT category) FROM product_cache WHERE category != ''")
+            categories = cursor.fetchone()[0]
+            conn.close()
+            return {
+                'total': total,
+                'platforms': platforms,
+                'latest_update': latest,
+                'categories': categories,
+            }
+        except Exception as e:
+            return {'total': 0, 'error': str(e)}
+
     def _is_excluded(self, item: dict) -> bool:
         """检查商品是否应该被排除（书籍、化工、玩具等无关品类）"""
         title = (item.get('title', '') or '').lower()

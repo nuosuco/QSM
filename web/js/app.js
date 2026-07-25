@@ -3,7 +3,63 @@
 // API地址：同域部署时用相对路径，跨域时修改此处
 const API_BASE = '';
 
-// ========== 初始化 ==========
+// ========== 每日养生小贴士 ==========
+
+async function loadDailyTip() {
+    try {
+        const response = await fetch(`${API_BASE}/api/daily-tip`);
+        const data = await response.json();
+        const area = document.getElementById('daily-tip-area');
+        if (area && data.content) {
+            area.innerHTML = `
+                <div class="daily-tip-card">
+                    <div class="daily-tip-emoji">${data.emoji || '🌿'}</div>
+                    <div class="daily-tip-title">${data.title || '今日养生'}</div>
+                    <div class="daily-tip-content">${escapeHtml(data.content)}</div>
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.error('加载每日养生贴士失败:', e);
+    }
+}
+
+// ========== 清理对话历史 ==========
+
+async function clearChatHistory() {
+    if (!confirm('确定要清空所有对话记录吗？')) return;
+    try {
+        await fetch(`${API_BASE}/api/chat/history/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: getUserId() })
+        });
+        localStorage.removeItem('som_user_data_' + getUserId());
+        const messagesContainer = document.getElementById('chat-messages');
+        messagesContainer.innerHTML = '';
+        alert('对话记录已清空');
+    } catch (e) {
+        console.error('清空对话失败:', e);
+    }
+}
+
+// ========== 清理搜索历史 ==========
+
+async function clearSearchHistory() {
+    if (!confirm('确定要清空所有搜索记录吗？')) return;
+    try {
+        await fetch(`${API_BASE}/api/search/history/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: getUserId() })
+        });
+        alert('搜索记录已清空');
+    } catch (e) {
+        console.error('清空搜索历史失败:', e);
+    }
+}
+
+// ========== 初始化（补充每日养生贴士） ==========
 
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
@@ -11,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initProductSearch();
     loadCategories();
     initProfile();
+    loadDailyTip();  // 新增：加载每日养生贴士
 });
 
 // ========== 导航切换 ==========

@@ -32,7 +32,7 @@ with open(CONFIG_PATH, "r") as f:
 app = FastAPI(
     title="SOM 松麦 API",
     description="小麦SOM - 中医辨证 + 有机食品推荐",
-    version="1.1.0"
+    version="1.1.1"
 )
 
 # CORS - 允许网页版、小程序调用
@@ -196,7 +196,7 @@ def get_beijing_now():
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "SOM松麦后端", "version": "1.1.0"}
+    return {"status": "ok", "service": "SOM松麦后端", "version": "1.1.1"}
 
 # ========== 小麦SOM 对话接口 ==========
 
