@@ -319,7 +319,7 @@ function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
     // 用分类名称作为搜索框显示，但实际搜索用后端关键词
     // 取关键词的第一个词作为搜索关键词，避免太长
-    currentKeyword = keyword.split(' ')[0];
+    currentKeyword = keyword;
     currentPage = 1;
     hasMore = true;
     searchProducts(true);

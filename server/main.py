@@ -298,17 +298,14 @@ async def search_products(
     if not search_kw and keyword:
         search_kw = keyword
 
-    items = shop.search_from_cache(keyword=search_kw, page=page, page_size=page_size)
-    from_cache = len(items)
-    if len(items) < page_size:
-        items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
+    items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
 
     return {
         "keyword": keyword,
         "search_keyword": search_kw,
         "platform": platform,
         "total": len(items),
-        "from_cache": from_cache,
+        "from_cache": 0,
         "items": items
     }
 
