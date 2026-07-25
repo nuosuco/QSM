@@ -97,7 +97,11 @@ async function sendMessage() {
             productsGrid.className = 'products-grid chat-products-grid';
             productsDiv.appendChild(productsGrid);
             
-            data.products.slice(0, 3).forEach((product) => {
+            // 每种药膳食材推荐3个商品
+            const perIngredient = 3;
+            const totalProducts = Math.min(data.products.length, perIngredient * 3);
+            for (let i = 0; i < totalProducts; i++) {
+                const product = data.products[i];
                 _productIndex++;
                 _productCache[_productIndex] = product;
                 const card = document.createElement('div');
