@@ -84,12 +84,39 @@ async function sendMessage() {
         // 显示AI回复
         let replyText = data.reply;
         
-        // 如果有推荐商品，添加到回复中
+        // 如果有推荐商品，显示为可点击的商品卡片
         if (data.products && data.products.length > 0) {
-            replyText += '\n\n为你找到以下有机好物：';
-            data.products.slice(0, 3).forEach((product, index) => {
-                replyText += `\n${index + 1}. ${product.title} - ¥${product.price}`;
+            const chatMsgDiv = appendMessage(replyText, 'assistant');
+            const chatContainer = document.getElementById('chat-messages');
+            
+            // 在回复消息后面插入商品卡片区域
+            const productsDiv = document.createElement('div');
+            productsDiv.className = 'chat-products';
+            productsDiv.innerHTML = '<div class="chat-products-title">🛒 为你推荐以下有机好物：</div>';
+            const productsGrid = document.createElement('div');
+            productsGrid.className = 'products-grid chat-products-grid';
+            productsDiv.appendChild(productsGrid);
+            
+            data.products.slice(0, 3).forEach((product) => {
+                _productIndex++;
+                _productCache[_productIndex] = product;
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.setAttribute('data-product-idx', _productIndex);
+                card.innerHTML = `
+                    <img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+                    <div class="product-info">
+                        <div class="product-title">${escapeHtml(product.title)}</div>
+                        <div class="product-price">¥${product.price}</div>
+                        <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+                    </div>
+                `;
+                productsGrid.appendChild(card);
             });
+            
+            chatContainer.appendChild(productsDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return;
         }
         
         appendMessage(replyText, 'assistant');
@@ -460,7 +487,7 @@ function showProductDetail(product) {
                 </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
-                    ${detailUrl ? '<a href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener" class="detail-full-page-link" style="display:block;text-align:center;margin-top:10px;font-size:13px;color:#888;text-decoration:none;">查看完整页面 →</a>' : ''}
+                    ${detailUrl ? '<a href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:10px;font-size:13px;color:#888;text-decoration:none;">查看完整页面 →</a>' : ''}
                 </div>
             </div>
         </div>

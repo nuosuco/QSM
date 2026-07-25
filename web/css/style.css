@@ -459,6 +459,37 @@ body {
     color: var(--text-secondary);
 }
 
+/* 聊天中推荐商品 */
+.chat-products {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+}
+
+.chat-products-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.chat-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.chat-products-grid .product-card {
+    border-radius: 10px;
+}
+
+.chat-products-grid .product-image {
+    height: 150px;
+    object-fit: cover;
+}
+
 /* 知识界面 */
 .knowledge-container {
     display: flex;
