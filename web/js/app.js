@@ -115,9 +115,44 @@ async function sendMessage() {
                 productsGrid.appendChild(card);
             }
             
+            // 给小麦回答框添加收藏按钮
+            const chatMsg = document.getElementById(chatMsgDiv);
+            if (chatMsg) {
+                const favBtn = document.createElement('button');
+                favBtn.className = 'fav-chat-btn';
+                favBtn.innerHTML = '♡ 收藏';
+                favBtn.onclick = function() {
+                    const isFav = this.innerHTML.includes('♥');
+                    if (isFav) {
+                        this.innerHTML = '♡ 收藏';
+                        this.classList.remove('favorited');
+                    } else {
+                        this.innerHTML = '♥ 已收藏';
+                        this.classList.add('favorited');
+                        // 收藏内容：用户问题+小麦回答+推荐商品
+                        const userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
+                        const favData = {
+                            type: 'chat_with_products',
+                            userMessage: userMsg ? userMsg.querySelector('.message-text').textContent : '',
+                            assistantReply: replyText,
+                            products: data.products,
+                            time: new Date().toISOString()
+                        };
+                        let favs = JSON.parse(localStorage.getItem('som_favorites') || '[]');
+                        favs.push(favData);
+                        localStorage.setItem('som_favorites', JSON.stringify(favs));
+                    }
+                };
+                chatMsg.querySelector('.message-content').appendChild(favBtn);
+            }
+            
             chatContainer.appendChild(productsDiv);
-            // 滚到回复文字顶部，让用户看到自己的提问和完整回答
-            chatContainer.scrollTop = chatMsgDiv.offsetTop;
+            // 滚到用户输入内容的底部，让用户看到自己问的+小麦回答
+            const lastUserMsg = document.querySelector('#chat-messages .message.user:last-of-type');
+            if (lastUserMsg) {
+                lastUserMsg.scrollIntoView({ block: 'start', behavior: 'auto' });
+            }
+            
             return;
         }
         
@@ -489,7 +524,7 @@ function showProductDetail(product) {
                 </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
-                    ${detailUrl ? '<a href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:10px;font-size:13px;color:#888;text-decoration:none;">查看完整页面 →</a>' : ''}
+                    
                 </div>
             </div>
         </div>

@@ -186,25 +186,26 @@ class ShopService:
         items = []
         
         def search_single_keyword(single_kw: str) -> list:
-            """搜索单个关键词，搜多页直到找够为止"""
+            """搜索单个关键词，搜到够 page_size 个为止"""
             search_kw = f"{single_kw} 有机"
             result = []
             local_titles = set()
             page_num = 1
-            while len(result) < page_size * 2:
+            while len(result) < page_size:
                 sub_items = self._search_taobao(search_kw, page_num, page_size, sort)
                 if not sub_items:
                     break
                 for item in sub_items:
                     title = item.get('title', '')
                     if title and title not in local_titles and not self._is_excluded(item):
-                        local_titles.add(title)
-                        result.append(item)
-                    if len(result) >= page_size * 2:
+                        # 标题必须包含搜索词（排除无关商品）
+                        if single_kw.lower() in title.lower():
+                            local_titles.add(title)
+                            result.append(item)
+                    if len(result) >= page_size:
                         break
                 page_num += 1
-            # 截断到 page_size（给前端的总数）
-            return result[:page_size]
+            return result
         
         # 所有关键词并行搜索
         import concurrent.futures

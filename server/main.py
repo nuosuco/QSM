@@ -227,7 +227,7 @@ async def chat(request: ChatRequest):
         # fallback: 用建议食用食材
         ingredient_names = [r["name"] for r in result.get("recommendations", [])]
 
-    seen_ids = set()
+    seen_titles = set()
     if ingredient_names:
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -239,9 +239,9 @@ async def chat(request: ChatRequest):
                 try:
                     items = future.result()
                     for item in items:
-                        item_key = item.get('item_id', '') or item.get('title', '')
-                        if item_key and item_key not in seen_ids:
-                            seen_ids.add(item_key)
+                        title = item.get('title', '')
+                        if title and title not in seen_titles:
+                            seen_titles.add(title)
                             products.append(item)
                 except Exception:
                     pass
