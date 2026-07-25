@@ -347,16 +347,21 @@ async function loadMoreProducts() {
     }
 }
 
+// 商品数据缓存，用ID索引
+let _productCache = {};
+let _productIndex = 0;
+
 function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
     
     const productHtml = products.map(product => {
-        // 构造完整的商品对象，点击卡片时传给详情弹窗
-        const productJson = JSON.stringify(product).replace(/"/g, '&quot;');
+        // 用唯一索引存数据，避免JSON.stringify嵌入HTML导致特殊字符炸掉
+        _productIndex++;
+        _productCache[_productIndex] = product;
         
         return `
-        <div class="product-card" onclick="showProductDetail(${productJson})">
-            <img class="product-image" src="${product.image}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+        <div class="product-card" data-product-idx="${_productIndex}">
+            <img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
             <div class="product-info">
                 <div class="product-title">${escapeHtml(product.title)}</div>
                 <div class="product-price">¥${product.price}</div>
@@ -372,6 +377,19 @@ function displayProducts(products, append = false) {
         productsGrid.innerHTML = productHtml;
     }
 }
+
+// 事件委托：商品卡片点击
+document.addEventListener('click', (e) => {
+    const card = e.target.closest('.product-card');
+    if (card) {
+        const idx = parseInt(card.dataset.productIdx);
+        const product = _productCache[idx];
+        if (product) {
+            showProductDetail(product);
+        }
+        return;
+    }
+});
 
 function openProduct(webUrl, platform) {
     // 直接在新窗口打开推广链接
