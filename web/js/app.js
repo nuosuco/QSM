@@ -453,6 +453,11 @@ function showProductDetail(product) {
             </div>
             <div class="detail-detail-section">
                 <div class="detail-detail-title">— 商品详情 —</div>
+                <div class="detail-detail-gallery">
+                    ${allImgs.map(function(img, i) {
+                        return '<div class="detail-detail-img"><img src="' + escapeHtml(img) + '" onclick="window.open(\'' + escapeHtml(img) + '\',\'_blank\')" style="cursor:pointer" onerror="this.style.display=\'none\'"></div>';
+                    }).join('')}
+                </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
                 </div>
@@ -482,6 +487,33 @@ function showProductDetail(product) {
         var thumbIdx = e.target.getAttribute('data-thumb-idx');
         if (thumbIdx !== null) { switchImg(parseInt(thumbIdx)); e.stopPropagation(); }
     });
+
+    // 自动轮播（3秒切换）
+    var autoTimer = null;
+    function startAutoSlide() {
+        if (allImgs.length <= 1) return;
+        stopAutoSlide();
+        autoTimer = setInterval(function() {
+            switchImg(currentImgIdx + 1);
+        }, 3000);
+    }
+    function stopAutoSlide() {
+        if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    }
+    // 鼠标悬停暂停，移开恢复
+    overlay.addEventListener('mouseenter', stopAutoSlide);
+    overlay.addEventListener('mouseleave', startAutoSlide);
+    // 触摸时暂停，松手后恢复
+    overlay.addEventListener('touchstart', stopAutoSlide);
+    overlay.addEventListener('touchend', startAutoSlide);
+    // 手动点击箭头/缩略图时，重置定时器
+    var origSwitch = switchImg;
+    switchImg = function(idx) {
+        origSwitch(idx);
+        stopAutoSlide();
+        startAutoSlide();
+    };
+    startAutoSlide();
 
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
