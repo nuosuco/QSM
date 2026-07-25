@@ -170,52 +170,56 @@ class ShopService:
 
     def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
         """
-        搜索商品 - 用食材名+有机精确搜索，不拆词，搜到够为止
+        搜索商品 - 多关键词拆成单个词并行搜索，合并去重
         platform: taobao / jd / all
         sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
         """
         if not keyword or not keyword.strip():
             return []
         
-        # 直接使用食材名+有机搜索，不拆词，搜到够为止
-        search_keyword = f"{keyword.strip()} 有机"
-
+        # 把多关键词拆成单个词（如 "食品 养生 食材" → ["食品", "养生", "食材"]）
+        keywords = [k.strip() for k in keyword.split() if k.strip()]
+        if not keywords:
+            return []
+        
+        seen_ids = set()
         items = []
-        if platform in ("taobao", "all"):
-            seen_ids = set()
+        
+        def search_single_keyword(single_kw: str) -> list:
+            """搜索单个关键词，搜到够 page_size 个为止"""
+            search_kw = f"{single_kw} 有机"
+            result = []
+            local_seen = set()
             page_num = 1
-            while len(items) < page_size:
-                sub_items = self._search_taobao(search_keyword, page_num, page_size, sort)
+            while len(result) < page_size:
+                sub_items = self._search_taobao(search_kw, page_num, page_size, sort)
                 if not sub_items:
                     break
                 for item in sub_items:
-                    title = item.get('title', '')
-                    # 标题必须包含食材名，确保搜到的是相关商品
-                    if keyword.strip() not in title:
-                        continue
                     item_id = item.get('item_id', '') or item.get('title', '')
-                    if item_id not in seen_ids and not self._is_excluded(item):
-                        seen_ids.add(item_id)
-                        items.append(item)
-                    if len(items) >= page_size:
+                    if item_id not in local_seen and not self._is_excluded(item):
+                        local_seen.add(item_id)
+                        result.append(item)
+                    if len(result) >= page_size:
                         break
                 page_num += 1
-        if platform in ("jd", "all"):
-            page_num = 1
-            while len(items) < page_size:
-                sub_items = self._search_jd(search_keyword, page_num, page_size)
-                if not sub_items:
-                    break
-                for item in sub_items:
-                    title = item.get('title', '')
-                    if keyword.strip() not in title:
-                        continue
-                    if not self._is_excluded(item):
-                        items.append(item)
-                    if len(items) >= page_size:
-                        break
-                page_num += 1
-        return items
+            return result
+        
+        # 所有关键词并行搜索
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(keywords)) as executor:
+            future_map = {executor.submit(search_single_keyword, kw): kw for kw in keywords}
+            for future in concurrent.futures.as_completed(future_map, timeout=10):
+                try:
+                    for item in future.result():
+                        item_id = item.get('item_id', '') or item.get('title', '')
+                        if item_id not in seen_ids:
+                            seen_ids.add(item_id)
+                            items.append(item)
+                except Exception:
+                    pass
+        
+        return items[:page_size]
 
     def get_category_keyword(self, keyword: str) -> str:
         """根据搜索词匹配分类关键词"""
