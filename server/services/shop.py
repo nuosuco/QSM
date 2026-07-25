@@ -219,7 +219,7 @@ class ShopService:
                 except Exception:
                     pass
         
-        return items[:page_size]
+        return items
 
     def get_category_keyword(self, keyword: str) -> str:
         """根据分类名返回对应的关键词列表"""
@@ -427,11 +427,23 @@ class ShopService:
                                 # 将 https://s.click.taobao.com/... 转为 taobao:// 协议
                                 app_url = click_url.replace('https://', 'taobao://', 1)
                             
+                            # 提取主图和副图
+                            main_image = basic.get('pict_url', '')
+                            small_images_raw = basic.get('small_images', {})
+                            if isinstance(small_images_raw, dict):
+                                small_imgs = [u for u in small_images_raw.get('string', []) if u]
+                            elif isinstance(small_images_raw, list):
+                                small_imgs = [u for u in small_images_raw if u]
+                            else:
+                                small_imgs = []
+                            all_images = [main_image] + [img for img in small_imgs if img and img != main_image]
+                            
                             items.append({
                                 'item_id': item.get('item_id', ''),
                                 'title': basic.get('short_title', '') or basic.get('title', ''),
                                 'price': price_info.get('zk_final_price', '') or price_info.get('reserve_price', ''),
-                                'image': basic.get('pict_url', ''),
+                                'image': main_image,
+                                'images': all_images[:5],
                                 'url': click_url,  # 网页版推广链接（带佣金）
                                 'app_url': app_url,  # APP deeplink（优先，带佣金追踪）
                                 'platform': 'taobao',
