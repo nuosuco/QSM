@@ -939,32 +939,13 @@ body {
     background: #e74c3c; color: #fff;
 }
 
-/* ===== 详情弹窗标签页 ===== */
-.detail-tabs {
-    display: flex; border-bottom: 1px solid #eee; position: sticky; top: 0;
-    background: #fff; z-index: 5; border-radius: 16px 16px 0 0;
+/* ===== 商品详情区域（在商品信息下方） ===== */
+.detail-detail-section {
+    padding: 0 16px 16px;
 }
-.detail-tab {
-    flex: 1; padding: 14px 16px; border: none; background: none;
-    font-size: 14px; font-weight: 500; color: #888; cursor: pointer;
-    transition: color 0.2s, border-color 0.2s;
-    border-bottom: 2px solid transparent;
-}
-.detail-tab.active {
-    color: #5aae82; border-bottom-color: #5aae82;
-}
-.detail-tab:hover {
-    color: #5aae82;
-}
-
-/* ===== 详情弹窗标签页内容 ===== */
-.detail-tab-content {
-    min-height: 300px;
-}
-
-/* ===== 商品详情标签页（图片展示+跳转） ===== */
-.detail-detail-wrap {
-    padding: 16px;
+.detail-detail-title {
+    text-align: center; font-size: 14px; color: #aaa; padding: 12px 0;
+    letter-spacing: 2px;
 }
 .detail-detail-gallery {
     display: flex; flex-direction: column; gap: 12px;
@@ -978,9 +959,6 @@ body {
 }
 .detail-detail-footer {
     text-align: center; padding: 20px 0;
-}
-.detail-detail-footer p {
-    font-size: 13px; color: #888; margin: 0 0 12px 0;
 }
 .detail-detail-btn {
     display: inline-block; padding: 12px 32px;

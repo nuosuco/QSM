@@ -420,41 +420,33 @@ function showProductDetail(product) {
     overlay.innerHTML = `
         <button class="detail-close" onclick="closeProductDetail()">✕</button>
         <div class="detail-modal detail-modal-full">
-            <div class="detail-tabs">
-                <button class="detail-tab active" onclick="switchDetailTab(this, 'info')">商品信息</button>
-                <button class="detail-tab" onclick="switchDetailTab(this, 'detail')">商品详情</button>
+            <div class="detail-img-wrap">
+                <img src="${imgSrc}" alt="${escapeHtml(product.title || '')}" onclick="window.open('${imgSrc}','_blank')" style="cursor:pointer" onerror="this.parentElement.innerHTML='<div style=\'height:200px;display:flex;align-items:center;justify-content:center;color:#aaa\'>暂无图片</div>'">
             </div>
-            <div class="detail-tab-content" id="detail-tab-info">
-                <div class="detail-img-wrap">
-                    <img src="${imgSrc}" alt="${escapeHtml(product.title || '')}" onclick="window.open('${imgSrc}','_blank')" style="cursor:pointer" onerror="this.parentElement.innerHTML='<div style=\'height:200px;display:flex;align-items:center;justify-content:center;color:#aaa\'>暂无图片</div>'">
-                </div>
-                ${fullImages ? `<div class="detail-thumbs">${fullImages}</div>` : ''}
-                <div class="detail-body">
-                    <div class="detail-title">${escapeHtml(product.title || '')}</div>
-                    <div class="detail-price"><span class="sym">¥</span>${product.price || '0'}</div>
-                    <div class="detail-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
-                    ${product.brand ? `<div class="detail-brand">品牌：${escapeHtml(product.brand)}</div>` : ''}
-                    ${product.commission_rate ? `<div class="modal-commission">佣金比例：${product.commission_rate}%</div>` : ''}
-                    ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
-                    <div class="detail-actions">
-                        <button class="detail-buy" onclick="openProduct('${product.url || '#'}', '${product.platform}')">立即购买 →</button>
-                        <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${imgSrc}', '${product.url || ''}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
-                    </div>
+            ${fullImages ? `<div class="detail-thumbs">${fullImages}</div>` : ''}
+            <div class="detail-body">
+                <div class="detail-title">${escapeHtml(product.title || '')}</div>
+                <div class="detail-price"><span class="sym">¥</span>${product.price || '0'}</div>
+                <div class="detail-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+                ${product.brand ? `<div class="detail-brand">品牌：${escapeHtml(product.brand)}</div>` : ''}
+                ${product.commission_rate ? `<div class="modal-commission">佣金比例：${product.commission_rate}%</div>` : ''}
+                ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
+                <div class="detail-actions">
+                    <button class="detail-buy" onclick="openProduct('${product.url || '#'}', '${product.platform}')">立即购买 →</button>
+                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${imgSrc}', '${product.url || ''}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
-            <div class="detail-tab-content" id="detail-tab-detail" style="display:none">
-                <div class="detail-detail-wrap">
-                    <div class="detail-detail-gallery">
-                        ${allImgs.map((img, i) => `
-                            <div class="detail-detail-img">
-                                <img src="${img}" onclick="window.open('${img}','_blank')" style="cursor:pointer" onerror="this.style.display='none'">
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="detail-detail-footer">
-                        <p>以上为商品展示图，查看完整商品详情</p>
-                        <a href="${detailUrl}" target="_blank" class="detail-detail-btn">前往淘宝查看 →</a>
-                    </div>
+            <div class="detail-detail-section">
+                <div class="detail-detail-title">— 商品详情 —</div>
+                <div class="detail-detail-gallery">
+                    ${allImgs.map((img, i) => `
+                        <div class="detail-detail-img">
+                            <img src="${img}" onclick="window.open('${img}','_blank')" style="cursor:pointer" onerror="this.style.display='none'">
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="detail-detail-footer">
+                    <a href="${detailUrl}" target="_blank" class="detail-detail-btn">前往淘宝查看完整详情 →</a>
                 </div>
             </div>
         </div>
@@ -483,13 +475,6 @@ function showProductDetail(product) {
     }
 
     saveProductBrowse(product.title || '', 1);
-}
-
-function switchDetailTab(btn, tabName) {
-    document.querySelectorAll('.detail-tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.detail-tab-content').forEach(c => c.style.display = 'none');
-    document.getElementById('detail-tab-' + tabName).style.display = '';
 }
 
 function closeProductDetail() {
