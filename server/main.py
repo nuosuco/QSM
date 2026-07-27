@@ -353,6 +353,15 @@ async def search_products(
         "items": items
     }
 
+# ========== 淘口令接口 ==========
+
+@app.get("/api/products/tpwd")
+async def create_tpwd(url: str, text: str = ""):
+    from services.shop import ShopService
+    shop = ShopService()
+    result = shop.create_tpwd(url, text)
+    return result
+
 # ========== 知识库接口 ==========
 
 @app.get("/api/knowledge/yaoshi")

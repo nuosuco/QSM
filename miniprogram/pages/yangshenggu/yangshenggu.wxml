@@ -1,0 +1,36 @@
+<!-- 对应 index.html #yangshenggu-tab -->
+<view class="knowledge-container">
+  <!-- 九种体质（对应 .knowledge-section h2=九种体质） -->
+  <view class="knowledge-section">
+    <view class="section-title">九种体质</view>
+    <view class="tizhi-grid">
+      <view class="tizhi-card" wx:for="{{tizhiList}}" wx:key="index">
+        <view class="tizhi-name">{{item.name}}</view>
+        <view class="tizhi-desc">{{item.desc}}</view>
+      </view>
+    </view>
+    <view class="empty-state" wx:if="{{tizhiList.length === 0 && !loading}}">
+      <text>暂无数据</text>
+    </view>
+  </view>
+
+  <!-- 药食同源（对应 .knowledge-section h2=药食同源） -->
+  <view class="knowledge-section">
+    <view class="section-title">药食同源</view>
+    <view class="yaoshi-list">
+      <view class="yaoshi-item" wx:for="{{yaoshiList}}" wx:key="index">
+        <view class="yaoshi-name">{{item.name}}</view>
+        <view class="yaoshi-desc">{{item.desc}}</view>
+      </view>
+    </view>
+    <view class="empty-state" wx:if="{{yaoshiList.length === 0 && !loading}}">
+      <text>暂无数据</text>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading-more" wx:if="{{loading}}">
+    <text class="loading"></text>
+    <text>加载中...</text>
+  </view>
+</view>

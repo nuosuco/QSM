@@ -1,0 +1,75 @@
+/* 对应 style.css 中 .knowledge-container 到 .yaoshi-item p 部分 */
+.knowledge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  padding: 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+}
+
+.knowledge-section {
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.08);
+  padding: 32rpx;
+}
+
+.section-title {
+  font-size: 36rpx;
+  color: #4a9d6e;
+  margin-bottom: 24rpx;
+  font-weight: bold;
+}
+
+/* 九种体质（对应 .tizhi-grid / .tizhi-card） */
+.tizhi-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.tizhi-card {
+  padding: 24rpx;
+  background: #f5f7f6;
+  border-radius: 24rpx;
+  border-left: 8rpx solid #4a9d6e;
+}
+
+.tizhi-name {
+  font-size: 32rpx;
+  color: #4a9d6e;
+  margin-bottom: 12rpx;
+  font-weight: 500;
+}
+
+.tizhi-desc {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  line-height: 1.5;
+}
+
+/* 药食同源（对应 .yaoshi-list / .yaoshi-item） */
+.yaoshi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.yaoshi-item {
+  padding: 24rpx;
+  background: #f5f7f6;
+  border-radius: 24rpx;
+}
+
+.yaoshi-name {
+  font-size: 30rpx;
+  color: #4a9d6e;
+  margin-bottom: 8rpx;
+  font-weight: 500;
+}
+
+.yaoshi-desc {
+  font-size: 24rpx;
+  color: #7f8c8d;
+  line-height: 1.5;
+}
