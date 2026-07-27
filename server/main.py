@@ -102,6 +102,34 @@ class FeedbackRequest(BaseModel):
     page_url: str = ""
     user_agent: str = ""
 
+# ===== 用户系统 / 体质评测 模型 =====
+
+class UserRegisterRequest(BaseModel):
+    """匿名用户注册/识别"""
+    user_id: str
+
+class UserLoginRequest(BaseModel):
+    """手机号登录（带匿名ID合并）"""
+    phone: str
+    anonymous_user_id: Optional[str] = None
+
+class UserProfileUpdateRequest(BaseModel):
+    user_id: str
+    nickname: Optional[str] = None
+    avatar: Optional[str] = None
+
+class TizhiSaveRequest(BaseModel):
+    """保存体质评测记录"""
+    user_id: str
+    tizhi: str
+    zhengxing: Optional[str] = None
+    symptoms: Optional[str] = None
+    advice: Optional[str] = None
+    source: str = "chat"
+
+class TokenVerifyRequest(BaseModel):
+    token: str
+
 # ========== 静态文件托管（网页版前端） ==========
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
@@ -754,6 +782,76 @@ async def get_checkin_stats():
     from services.stats import StatsService
     ss = StatsService()
     return ss.get_checkin_stats()
+
+# ========== 用户系统 API ==========
+
+@app.post("/api/user/register")
+async def user_register(request: UserRegisterRequest):
+    """匿名用户注册/识别（不用登录即可用）"""
+    from services.user_system import get_or_create_anonymous
+    user = get_or_create_anonymous(request.user_id)
+    return {"success": True, "user": user}
+
+@app.get("/api/user/profile")
+async def user_profile(user_id: str):
+    """获取用户信息"""
+    from services.user_system import get_user, get_latest_tizhi
+    user = get_user(user_id)
+    if not user:
+        return {"success": False, "error": "user not found"}
+    user["latest_tizhi"] = get_latest_tizhi(user_id)
+    return {"success": True, "user": user}
+
+@app.post("/api/user/login")
+async def user_login(request: UserLoginRequest):
+    """手机号登录，合并匿名数据"""
+    from services.user_system import login_by_phone
+    if not request.phone or len(request.phone) < 6:
+        raise HTTPException(status_code=400, detail="手机号格式不正确")
+    result = login_by_phone(request.phone, anonymous_user_id=request.anonymous_user_id)
+    return {"success": True, **result}
+
+@app.post("/api/user/token/verify")
+async def user_token_verify(request: TokenVerifyRequest):
+    """校验登录 token"""
+    from services.user_system import verify_token, get_user
+    user_id = verify_token(request.token)
+    if not user_id:
+        return {"success": False, "valid": False}
+    return {"success": True, "valid": True, "user": get_user(user_id)}
+
+@app.post("/api/user/profile/update")
+async def user_profile_update(request: UserProfileUpdateRequest):
+    """更新昵称/头像"""
+    from services.user_system import update_profile
+    user = update_profile(request.user_id, nickname=request.nickname, avatar=request.avatar)
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return {"success": True, "user": user}
+
+# ========== 体质评测 API ==========
+
+@app.post("/api/tizhi/save")
+async def tizhi_save(request: TizhiSaveRequest):
+    """保存一条体质评测记录"""
+    from services.user_system import add_tizhi_record
+    record = add_tizhi_record(
+        request.user_id, request.tizhi, zhengxing=request.zhengxing,
+        symptoms=request.symptoms, advice=request.advice, source=request.source,
+    )
+    return {"success": True, "record": record}
+
+@app.get("/api/tizhi/records")
+async def tizhi_records(user_id: str, limit: int = 50):
+    """体质评测历史"""
+    from services.user_system import get_tizhi_records
+    return {"success": True, "records": get_tizhi_records(user_id, limit=limit)}
+
+@app.get("/api/tizhi/latest")
+async def tizhi_latest(user_id: str):
+    """最新一次体质结果"""
+    from services.user_system import get_latest_tizhi
+    return {"success": True, "record": get_latest_tizhi(user_id)}
 
 # ========== 启动 ==========
 
