@@ -187,7 +187,7 @@ class ShopService:
         
         def search_single_keyword(single_kw: str) -> list:
             """搜索单个关键词，只搜一页"""
-            search_kw = self._ensure_organic(single_kw)
+            search_kw = f"{single_kw} 有机"
             result = []
             local_titles = set()
             sub_items = self._search_taobao(search_kw, 1, page_size, sort)
@@ -195,9 +195,7 @@ class ShopService:
                 for item in sub_items:
                     title = item.get('title', '')
                     if title and title not in local_titles and not self._is_excluded(item):
-                        # 放宽匹配：标题包含关键词任一字即可（淘宝标题常省略"有机"）
-                        kw_chars = [c for c in single_kw if c.strip()]
-                        if any(c in title for c in kw_chars):
+                        if single_kw.lower() in title.lower():
                             local_titles.add(title)
                             result.append(item)
                         if len(result) >= page_size:
