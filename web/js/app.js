@@ -84,6 +84,9 @@ async function sendMessage() {
         // 显示AI回复
         let replyText = data.reply;
         
+        // 保存对话记录 + 同步体质到后端
+        saveChatRecord(message, replyText, data.tizhi || '');
+        
         // 如果有推荐商品，显示为可点击的商品卡片
         if (data.products && data.products.length > 0) {
             const chatMsgDiv = appendMessage(replyText, 'assistant');
@@ -319,7 +322,7 @@ function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
     // 用分类名称作为搜索框显示，但实际搜索用后端关键词
     // 取关键词的第一个词作为搜索关键词，避免太长
-    currentKeyword = keyword.split(' ')[0];
+    currentKeyword = keyword;
     currentPage = 1;
     hasMore = true;
     searchProducts(true);
@@ -524,7 +527,7 @@ function showProductDetail(product) {
                 </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
-                    ${detailUrl ? '<a href="' + escapeHtml(detailUrl) + '" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:10px;font-size:13px;color:#888;text-decoration:none;">查看完整页面 →</a>' : ''}
+                    
                 </div>
             </div>
         </div>
@@ -659,8 +662,23 @@ function getUserId() {
     if (!uid) {
         uid = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('som_user_id', uid);
+        // 首次生成时，向后端注册匿名用户
+        registerUserToBackend(uid);
     }
     return uid;
+}
+
+// 向后端注册用户（匿名，无需登录）
+async function registerUserToBackend(uid) {
+    try {
+        await fetch(`${API_BASE}/api/user/register`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: uid })
+        });
+    } catch (e) {
+        console.error('后端用户注册失败:', e);
+    }
 }
 
 function getUserData() {
@@ -702,7 +720,32 @@ function loadProfile() {
     document.getElementById('stat-checkins').textContent = (data.checkins || []).length;
     document.getElementById('stat-products').textContent = data.productBrowses || 0;
     
-    loadTizhiRecords(data);
+    // 优先从后端加载体质记录，失败则用本地
+    loadTizhiRecordsFromBackend().catch(() => loadTizhiRecords(data));
+}
+
+// 从后端加载体质记录
+async function loadTizhiRecordsFromBackend() {
+    const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=5`);
+    const result = await resp.json();
+    const history = document.getElementById('profile-history');
+    if (!history) return;
+    
+    const records = result.records || [];
+    if (records.length === 0) {
+        history.innerHTML = '<p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>';
+        return;
+    }
+    
+    let html = '';
+    for (const r of records) {
+        html += '<div class="history-item">';
+        html += '  <span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span>';
+        html += '  <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span>';
+        html += '  <span class="history-desc">' + escapeHtml((r.symptoms || '').substring(0, 30)) + '</span>';
+        html += '</div>';
+    }
+    history.innerHTML = html;
 }
 
 function loadTizhiRecords(data) {
@@ -746,9 +789,29 @@ function saveChatRecord(message, reply, tizhi) {
             desc: message.substring(0, 50)
         });
         data.tizhi = tizhi;
+        // 同步体质记录到后端
+        saveTizhiToBackend(tizhi, message);
     }
     
     saveUserData(data);
+}
+
+// 同步体质评测结果到后端
+async function saveTizhiToBackend(tizhi, symptoms) {
+    try {
+        await fetch(`${API_BASE}/api/tizhi/save`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_id: getUserId(),
+                tizhi: tizhi,
+                symptoms: (symptoms || '').substring(0, 200),
+                source: 'web_chat'
+            })
+        });
+    } catch (e) {
+        console.error('体质记录同步失败:', e);
+    }
 }
 
 function saveProductBrowse(keyword, count) {
