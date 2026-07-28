@@ -27,6 +27,33 @@
             <text wx:if="{{msg.loading}}" class="loading"></text>
             <text wx:else>{{msg.text}}</text>
           </view>
+
+          <!-- 辨证结果卡片 -->
+          <view class="bianzheng-card" wx:if="{{msg.hasBianzheng}}">
+            <view class="bianzheng-title">📋 辨证分析</view>
+            <view class="bianzheng-row" wx:if="{{msg.zhengxing}}">
+              <text class="bianzheng-label">证型：</text>
+              <text class="bianzheng-value">{{msg.zhengxing}}</text>
+            </view>
+            <view class="bianzheng-row" wx:if="{{msg.tizhi}}">
+              <text class="bianzheng-label">体质偏向：</text>
+              <text class="bianzheng-value">{{msg.tizhi}}</text>
+            </view>
+          </view>
+
+          <!-- 药食同源推荐 -->
+          <view class="recommend-card" wx:if="{{msg.recommendations && msg.recommendations.length > 0}}">
+            <view class="recommend-title">💊 推荐药食同源食材</view>
+            <view class="recommend-item" wx:for="{{msg.recommendations}}" wx:for-item="rec" wx:key="name">
+              <view class="recommend-name">{{rec.name}}</view>
+              <view class="recommend-detail">性味：{{rec.xingwei}} ｜ 功效：{{rec.gongxiao}}</view>
+              <view class="recommend-detail warn" wx:if="{{rec.jinji}}">⚠️ {{rec.jinji}}</view>
+              <view class="recommend-shiliao" wx:if="{{rec.shiliao}}">
+                <text class="shiliao-name">🍲 {{rec.shiliao.name}}</text>
+                <text class="shiliao-recipe">{{rec.shiliao.recipe}}</text>
+              </view>
+            </view>
+          </view>
           <!-- 收藏按钮（对应 fav-chat-btn） -->
           <view class="fav-chat-btn {{msg.favorited ? 'favorited' : ''}}" wx:if="{{msg.showFav}}" bindtap="toggleChatFav" data-idx="{{msgIdx}}">
             {{msg.favorited ? '♥ 已收藏' : '♡ 收藏'}}

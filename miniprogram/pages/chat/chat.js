@@ -56,14 +56,21 @@ Page({
 
       const replyText = data.reply || '';
       const products = data.products || [];
+      const tizhi = data.tizhi || '';
+      const zhengxing = data.zhengxing || '';
+      const recommendations = data.recommendations || [];
 
-      // 显示AI回复（对应 appendMessage(replyText, 'assistant')）
+      // 显示AI回复 + 辨证结果卡片
       const assistantMsg = {
         id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
         type: 'assistant',
         text: replyText,
+        tizhi: tizhi,
+        zhengxing: zhengxing,
+        recommendations: recommendations,
+        hasBianzheng: !!(tizhi || zhengxing),
         products: products,
-        showFav: products.length > 0,
+        showFav: products.length > 0 || recommendations.length > 0,
         favorited: false
       };
 

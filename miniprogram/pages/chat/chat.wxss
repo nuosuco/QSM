@@ -155,3 +155,101 @@ page {
 .chat-products-grid .product-image {
   height: 300rpx;
 }
+
+/* 辨证结果卡片 */
+.bianzheng-card {
+  margin-top: 16rpx;
+  padding: 20rpx 24rpx;
+  background: linear-gradient(135deg, #f0f7f3, #e8f5ee);
+  border-radius: 16rpx;
+  border-left: 6rpx solid #4a9d6e;
+}
+
+.bianzheng-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #2d6a4f;
+  margin-bottom: 12rpx;
+}
+
+.bianzheng-row {
+  display: flex;
+  margin-bottom: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.bianzheng-label {
+  color: #666;
+  flex-shrink: 0;
+}
+
+.bianzheng-value {
+  color: #2d6a4f;
+  font-weight: 500;
+}
+
+/* 药食同源推荐卡片 */
+.recommend-card {
+  margin-top: 16rpx;
+  padding: 20rpx 24rpx;
+  background: #fffdf5;
+  border-radius: 16rpx;
+  border: 2rpx solid #f0e6c8;
+}
+
+.recommend-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #b8860b;
+  margin-bottom: 16rpx;
+}
+
+.recommend-item {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0e6c8;
+}
+
+.recommend-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.recommend-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6rpx;
+}
+
+.recommend-detail {
+  font-size: 22rpx;
+  color: #888;
+  line-height: 1.5;
+  margin-bottom: 4rpx;
+}
+
+.recommend-detail.warn {
+  color: #e67e22;
+}
+
+.recommend-shiliao {
+  margin-top: 8rpx;
+  padding: 12rpx 16rpx;
+  background: #f9f6ee;
+  border-radius: 12rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.shiliao-name {
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #4a9d6e;
+}
+
+.shiliao-recipe {
+  font-size: 22rpx;
+  color: #999;
+}
