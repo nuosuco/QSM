@@ -7,7 +7,7 @@ import os
 import re
 from typing import Optional, List, Tuple
 
-KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shared", "knowledge")
+KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "shared", "knowledge")
 
 # ========== 加载知识库数据（优先JSON文件，fallback内联数据） ==========
 
