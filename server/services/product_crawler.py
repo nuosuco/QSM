@@ -140,6 +140,10 @@ def search_taobao(keyword: str, page: int = 1, page_size: int = 40) -> List[dict
                         if not images and basic.get('pict_url'):
                             images = [basic.get('pict_url', '')]
                         
+                        # 多图过滤：只采集至少2张图片的商品，单图不要
+                        if len(images) < 2:
+                            continue
+                        
                         items.append({
                             'item_id': item.get('item_id', ''),
                             'title': basic.get('short_title', '') or basic.get('title', ''),
