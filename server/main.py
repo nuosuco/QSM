@@ -21,6 +21,7 @@ if _parent not in sys.path:
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from services.api_auth import APIAuthMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 
@@ -42,6 +43,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# API 鉴权 + 限流（som.skill 开放平台）
+app.add_middleware(APIAuthMiddleware)
 
 # ========== 数据模型（所有模型集中定义，避免引用顺序问题） ==========
 
@@ -779,6 +783,28 @@ async def chat_vision(request: VisionChatRequest):
         "provider": result.get("provider"),
         "model": result.get("model"),
     }
+
+# ========== som.skill API 管理 ==========
+
+@app.get("/api/skill/status")
+async def skill_status():
+    """som.skill 开放平台状态"""
+    from services.api_auth import get_auth_status
+    return get_auth_status()
+
+@app.post("/api/skill/register-key")
+async def skill_register_key(name: str = Query(...), rate_limit: int = Query(60)):
+    """注册新的 API Key（内部调用）"""
+    from services.api_auth import register_api_key
+    key = register_api_key(name, rate_limit)
+    return {"success": True, "api_key": key, "name": name, "rate_limit": rate_limit}
+
+@app.post("/api/skill/revoke-key")
+async def skill_revoke_key(api_key: str = Query(...)):
+    """撤销 API Key（内部调用）"""
+    from services.api_auth import revoke_api_key
+    success = revoke_api_key(api_key)
+    return {"success": success}
 
 # ========== 节气养生 API ==========
 
