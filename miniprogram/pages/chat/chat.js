@@ -8,23 +8,86 @@ Page({
     inputValue: '',
     sending: false,
     scrollToId: '',
-    msgCounter: 0
+    msgCounter: 0,
+    pendingImage: '' // 待发送的图片临时路径
   },
 
   onInput(e) {
     this.setData({ inputValue: e.detail.value });
   },
 
-  // 对应 sendMessage()
-  sendMessage() {
-    const message = this.data.inputValue.trim();
-    if (!message || this.data.sending) return;
+  // 拍照/从相册选图（对应网页版 upload-btn）
+  chooseImage() {
+    if (this.data.sending) return;
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'], // 压缩，减小base64体积
+      camera: 'back',
+      success: (res) => {
+        const tempPath = res.tempFiles[0].tempFilePath;
+        this.setData({ pendingImage: tempPath });
+      },
+      fail: (err) => {
+        if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
+          wx.showToast({ title: '选择图片失败', icon: 'none' });
+        }
+      }
+    });
+  },
 
-    // 显示用户消息（对应 appendMessage(message, 'user')）
+  // 清除待发送图片（对应网页版 preview-remove）
+  clearPendingImage() {
+    this.setData({ pendingImage: '' });
+  },
+
+  // 点击预览大图
+  previewPendingImage() {
+    if (!this.data.pendingImage) return;
+    wx.previewImage({ urls: [this.data.pendingImage] });
+  },
+
+  // 点击消息中的图片预览
+  previewMsgImage(e) {
+    const src = e.currentTarget.dataset.src;
+    if (!src) return;
+    wx.previewImage({ urls: [src] });
+  },
+
+  // 把图片文件转成 base64 data URI
+  imageToBase64(filePath) {
+    return new Promise((resolve, reject) => {
+      const fs = wx.getFileSystemManager();
+      fs.readFile({
+        filePath: filePath,
+        encoding: 'base64',
+        success: (res) => {
+          // 根据扩展名判断MIME
+          let mime = 'image/jpeg';
+          const lower = filePath.toLowerCase();
+          if (lower.endsWith('.png')) mime = 'image/png';
+          else if (lower.endsWith('.gif')) mime = 'image/gif';
+          else if (lower.endsWith('.webp')) mime = 'image/webp';
+          resolve('data:' + mime + ';base64,' + res.data);
+        },
+        fail: reject
+      });
+    });
+  },
+
+  // 对应 sendMessage()
+  async sendMessage() {
+    const message = this.data.inputValue.trim();
+    const hasImage = !!this.data.pendingImage;
+    if ((!message && !hasImage) || this.data.sending) return;
+
+    // 显示用户消息（带图片）
     const userMsg = {
       id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
       type: 'user',
-      text: message
+      text: message || (hasImage ? '📷 [舌苔照片]' : ''),
+      image: hasImage ? this.data.pendingImage : ''
     };
 
     // 显示加载状态（对应 appendMessage('<div class="loading"></div>', 'assistant', true)）
@@ -35,22 +98,41 @@ Page({
       loading: true
     };
 
+    const imagePath = this.data.pendingImage;
+
     this.setData({
       messages: [...this.data.messages, userMsg, loadingMsg],
       inputValue: '',
+      pendingImage: '',
       sending: true,
       scrollToId: 'msg-' + loadingMsg.id
     });
 
-    // 调用 /api/chat（对应 fetch(`${API_BASE}/api/chat`, ...)）
-    request('/api/chat', {
-      method: 'POST',
-      data: {
-        message: message,
-        session_id: app.globalData.sessionId,
-        user_id: app.globalData.userId
+    try {
+      let data;
+      if (hasImage) {
+        // 图片辨证：转base64 → 调 /api/chat/vision
+        const base64Uri = await this.imageToBase64(imagePath);
+        data = await request('/api/chat/vision', {
+          method: 'POST',
+          data: {
+            message: message || '请观察这张舌头照片，从中医角度分析舌色、舌苔、舌形，给出体质倾向和食养建议。',
+            image_url: base64Uri,
+            user_id: app.globalData.userId
+          }
+        });
+      } else {
+        // 普通对话：调 /api/chat
+        data = await request('/api/chat', {
+          method: 'POST',
+          data: {
+            message: message,
+            session_id: app.globalData.sessionId,
+            user_id: app.globalData.userId
+          }
+        });
       }
-    }).then(data => {
+
       // 移除加载状态（对应 document.getElementById(loadingId).remove()）
       let msgs = this.data.messages.filter(m => !m.loading);
 
@@ -84,12 +166,12 @@ Page({
 
       // 保存对话记录（对应 saveChatRecord）
       try {
-        this.saveChatRecord(message, replyText, data.tizhi || '');
+        this.saveChatRecord(message || '[图片辨证]', replyText, data.tizhi || '');
       } catch (e) {
         console.error('保存对话记录失败:', e);
       }
 
-    }).catch(err => {
+    } catch (err) {
       // 对应 catch 中的错误处理（只在请求真正失败时显示）
       let msgs = this.data.messages.filter(m => !m.loading);
       // 如果已经有AI回复了（说明请求成功但后续处理出错），不再追加错误消息
@@ -98,12 +180,12 @@ Page({
         msgs.push({
           id: 'msg-err-' + Date.now(),
           type: 'assistant',
-          text: '抱歉，网络出现问题，请稍后重试。'
+          text: hasImage ? '抱歉，图片分析失败。请确保图片清晰、光线充足，或直接用文字描述身体状况。' : '抱歉，网络出现问题，请稍后重试。'
         });
       }
       this.setData({ messages: msgs, sending: false });
       console.error('发送消息失败:', err);
-    });
+    }
   },
 
   // 对应 toggleChatFav（收藏对话+推荐商品）

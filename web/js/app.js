@@ -43,6 +43,9 @@ function initNavigation() {
 function initChat() {
     const sendBtn = document.getElementById('send-btn');
     const chatInput = document.getElementById('chat-input');
+    const uploadBtn = document.getElementById('upload-btn');
+    const imageInput = document.getElementById('image-input');
+    const previewRemove = document.getElementById('preview-remove');
     
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keydown', (e) => {
@@ -51,35 +54,89 @@ function initChat() {
             sendMessage();
         }
     });
+    
+    // 图片上传/拍照
+    uploadBtn.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', handleImageSelect);
+    previewRemove.addEventListener('click', clearImagePreview);
+}
+
+// 当前选中的图片 base64
+let pendingImageBase64 = null;
+
+function handleImageSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // 限制大小 5MB
+    if (file.size > 5 * 1024 * 1024) {
+        alert('图片太大了，请选择5MB以内的图片');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        pendingImageBase64 = ev.target.result; // data:image/xxx;base64,...
+        document.getElementById('preview-img').src = pendingImageBase64;
+        document.getElementById('image-preview').style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+    // 重置 input，允许重复选同一文件
+    e.target.value = '';
+}
+
+function clearImagePreview() {
+    pendingImageBase64 = null;
+    document.getElementById('image-preview').style.display = 'none';
+    document.getElementById('preview-img').src = '';
 }
 
 async function sendMessage() {
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
     const message = input.value.trim();
+    const hasImage = !!pendingImageBase64;
     
-    if (!message) return;
+    if (!message && !hasImage) return;
     
-    // 显示用户消息
-    appendMessage(message, 'user');
+    // 显示用户消息（带图片预览）
+    const displayMsg = hasImage
+        ? (message ? message + '<br><img src="' + pendingImageBase64 + '" style="max-width:160px;max-height:120px;border-radius:8px;margin-top:6px;">' : '📷 [舌苔照片]')
+        : message;
+    appendMessage(displayMsg, 'user', true);
+    
+    const imageToSend = pendingImageBase64;
     input.value = '';
+    clearImagePreview();
     sendBtn.disabled = true;
     
     // 显示加载状态
     const loadingId = appendMessage('<div class="loading"></div>', 'assistant', true);
     
     try {
-        const response = await fetch(`${API_BASE}/api/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                message: message,
-                session_id: getSessionId(),
-                user_id: getUserId()
-            })
-        });
+        let response;
+        if (hasImage) {
+            // 图片辨证：走 vision 接口（base64 data URI）
+            response = await fetch(`${API_BASE}/api/chat/vision`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: message || '请观察这张舌头照片，从中医角度分析舌色、舌苔、舌形，给出体质倾向和食养建议。',
+                    image_url: imageToSend,
+                    user_id: getUserId()
+                })
+            });
+        } else {
+            response = await fetch(`${API_BASE}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: getSessionId(),
+                    user_id: getUserId()
+                })
+            });
+        }
         
         const data = await response.json();
         
@@ -88,6 +145,13 @@ async function sendMessage() {
         
         // 显示AI回复
         let replyText = data.reply;
+        
+        // 图片辨证：直接显示回复，不走商品推荐分支
+        if (hasImage) {
+            appendMessage(replyText, 'assistant');
+            sendBtn.disabled = false;
+            return;
+        }
         
         // 保存对话记录 + 同步体质到后端
         saveChatRecord(message, replyText, data.tizhi || '');

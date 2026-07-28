@@ -22,7 +22,10 @@
       <view class="message {{msg.type}}" id="msg-{{msg.id}}">
         <view class="message-avatar">{{msg.type === 'user' ? '你' : '麦'}}</view>
         <view class="message-content">
-          <view class="message-text" wx:if="{{msg.type === 'user'}}">{{msg.text}}</view>
+          <view class="message-text" wx:if="{{msg.type === 'user'}}">
+            <text>{{msg.text}}</text>
+            <image wx:if="{{msg.image}}" class="msg-user-image" src="{{msg.image}}" mode="aspectFill" bindtap="previewMsgImage" data-src="{{msg.image}}"></image>
+          </view>
           <view class="message-text" wx:else>
             <text wx:if="{{msg.loading}}" class="loading"></text>
             <text wx:else>{{msg.text}}</text>
@@ -81,7 +84,15 @@
 
   <!-- 输入区域（对应 chat-input-area） -->
   <view class="chat-input-area">
-    <textarea class="chat-input" value="{{inputValue}}" placeholder="描述你的身体状况..." auto-height maxlength="500" bindinput="onInput" bindconfirm="sendMessage" confirm-type="send" />
-    <button class="send-btn" bindtap="sendMessage" disabled="{{sending}}">发送</button>
+    <!-- 图片预览 -->
+    <view class="image-preview" wx:if="{{pendingImage}}">
+      <image class="preview-img" src="{{pendingImage}}" mode="aspectFill" bindtap="previewPendingImage"></image>
+      <view class="preview-remove" bindtap="clearPendingImage">✕</view>
+    </view>
+    <view class="chat-input-row">
+      <button class="upload-btn" bindtap="chooseImage" disabled="{{sending}}">📷</button>
+      <textarea class="chat-input" value="{{inputValue}}" placeholder="描述身体状况，或📷拍舌苔..." auto-height maxlength="500" bindinput="onInput" bindconfirm="sendMessage" confirm-type="send" />
+      <button class="send-btn" bindtap="sendMessage" disabled="{{sending}}">发送</button>
+    </view>
   </view>
 </view>

@@ -51,13 +51,21 @@
                         </div>
                     </div>
                     <div class="chat-input-area">
-                        <textarea 
-                            class="chat-input" 
-                            id="chat-input" 
-                            placeholder="描述你的身体状况..."
-                            rows="2"
-                        ></textarea>
-                        <button class="send-btn" id="send-btn">发送</button>
+                        <div class="chat-input-row">
+                            <button class="upload-btn" id="upload-btn" title="拍照/上传舌苔照片">📷</button>
+                            <textarea 
+                                class="chat-input" 
+                                id="chat-input" 
+                                placeholder="描述身体状况，或📷拍舌苔照片..."
+                                rows="2"
+                            ></textarea>
+                            <button class="send-btn" id="send-btn">发送</button>
+                        </div>
+                        <div class="image-preview" id="image-preview" style="display:none;">
+                            <img id="preview-img" src="" alt="预览">
+                            <button class="preview-remove" id="preview-remove">✕</button>
+                        </div>
+                        <input type="file" id="image-input" accept="image/*" capture="environment" style="display:none;">
                     </div>
                 </div>
             </div>
