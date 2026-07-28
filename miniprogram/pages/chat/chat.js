@@ -47,7 +47,8 @@ Page({
       method: 'POST',
       data: {
         message: message,
-        session_id: app.globalData.sessionId
+        session_id: app.globalData.sessionId,
+        user_id: app.globalData.userId
       }
     }).then(data => {
       // 移除加载状态（对应 document.getElementById(loadingId).remove()）
@@ -174,8 +175,25 @@ Page({
         desc: message.substring(0, 50)
       });
       data.tizhi = tizhi;
+      // 同步体质记录到后端
+      this.saveTizhiToBackend(tizhi, message);
     }
 
     wx.setStorageSync(key, data);
+  },
+
+  // 同步体质评测结果到后端
+  saveTizhiToBackend(tizhi, symptoms) {
+    request('/api/tizhi/save', {
+      method: 'POST',
+      data: {
+        user_id: app.globalData.userId,
+        tizhi: tizhi,
+        symptoms: (symptoms || '').substring(0, 200),
+        source: 'miniprogram_chat'
+      }
+    }).catch(err => {
+      console.error('体质记录同步失败:', err);
+    });
   }
 });
