@@ -34,7 +34,6 @@
         <main class="main">
             <!-- 对话页面 -->
             <div class="tab-content active" id="chat-tab">
-                <div class="daily-tip-area" id="daily-tip-area"></div>
                 <div class="chat-container">
                     <div class="chat-messages" id="chat-messages">
                         <div class="message assistant">
@@ -95,13 +94,29 @@
                 </div>
             </div>
 
-            <!-- 养生谷页面（暂时放养生知识） -->
+            <!-- 养生谷页面 -->
             <div class="tab-content" id="yangshenggu-tab">
                 <div class="knowledge-container">
+                    <!-- 节气养生 -->
+                    <div class="knowledge-section">
+                        <h2>🌿 节气养生</h2>
+                        <div class="jieqi-card" id="jieqi-card">
+                            <div class="jieqi-loading">加载中...</div>
+                        </div>
+                    </div>
+                    <!-- 护眼训练 -->
+                    <div class="knowledge-section">
+                        <h2>👁️ 护眼训练</h2>
+                        <div class="eye-exercise" id="eye-exercise">
+                            <div class="jieqi-loading">加载中...</div>
+                        </div>
+                    </div>
+                    <!-- 九种体质 -->
                     <div class="knowledge-section">
                         <h2>九种体质</h2>
                         <div class="tizhi-grid" id="tizhi-grid"></div>
                     </div>
+                    <!-- 药食同源 -->
                     <div class="knowledge-section">
                         <h2>药食同源</h2>
                         <div class="yaoshi-list" id="yaoshi-list"></div>
@@ -119,7 +134,6 @@
                             <p id="profile-tizhi">体质：未检测</p>
                             <p id="profile-points">积分：0</p>
                             <p id="profile-checkin">签到：今天未签到</p>
-                    <button class="checkin-action-btn" id="checkin-btn">每日签到</button>
                         </div>
                     </div>
                     <div class="profile-section">
@@ -145,12 +159,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="profile-section">
-                        <h3>❤️ 我的收藏</h3>
-                        <div id="favorites-list">
-                            <p class="empty-hint">暂无收藏商品</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </main>
@@ -160,9 +168,6 @@
             <p>SOM 松麦 · 中医辨证 · 有机养生</p>
         </footer>
     </div>
-
-    <!-- 商品详情弹窗容器 -->
-    <div class="detail-overlay" id="product-detail-overlay"></div>
 
     <script src="js/app.js"></script>
 </body>

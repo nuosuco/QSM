@@ -780,6 +780,57 @@ async def chat_vision(request: VisionChatRequest):
         "model": result.get("model"),
     }
 
+# ========== 节气养生 API ==========
+
+@app.get("/api/jieqi/current")
+async def jieqi_current():
+    """获取当前节气养生建议"""
+    from services.jieqi import get_jieqi_advice
+    return get_jieqi_advice()
+
+@app.get("/api/jieqi/all")
+async def jieqi_all():
+    """获取全部二十四节气列表"""
+    from services.jieqi import get_all_jieqi
+    return {"jieqi_list": get_all_jieqi()}
+
+# ========== 护眼训练 API ==========
+
+@app.get("/api/eye-exercise")
+async def eye_exercise():
+    """护眼训练方案"""
+    return {
+        "exercises": [
+            {
+                "name": "远近交替",
+                "duration": "3分钟",
+                "steps": "看远处5秒→看近处5秒，交替进行",
+                "benefit": "锻炼睫状肌，缓解视疲劳"
+            },
+            {
+                "name": "眼球转动",
+                "duration": "2分钟",
+                "steps": "上下左右各转5圈，顺时针逆时针各5圈",
+                "benefit": "促进眼部血液循环"
+            },
+            {
+                "name": "热敷双眼",
+                "duration": "5分钟",
+                "steps": "搓热双手掌心，轻敷双眼，重复3次",
+                "benefit": "缓解干涩，放松眼肌"
+            },
+            {
+                "name": "20-20-20法则",
+                "duration": "随时",
+                "steps": "每用眼20分钟，看20英尺（6米）外，持续20秒",
+                "benefit": "国际公认的护眼法则"
+            }
+        ],
+        "foods": ["枸杞", "菊花", "决明子", "桑葚", "蓝莓", "胡萝卜"],
+        "tea": "枸杞菊花茶、决明子茶",
+        "tips": "中医认为肝开窍于目，养眼先养肝。少熬夜，多食绿色蔬菜。"
+    }
+
 # ========== 用户系统 API ==========
 
 @app.post("/api/user/register")

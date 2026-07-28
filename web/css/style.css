@@ -459,6 +459,37 @@ body {
     color: var(--text-secondary);
 }
 
+/* 聊天中推荐商品 */
+.chat-products {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+}
+
+.chat-products-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.chat-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.chat-products-grid .product-card {
+    border-radius: 10px;
+}
+
+.chat-products-grid .product-image {
+    height: 150px;
+    object-fit: cover;
+}
+
 /* 知识界面 */
 .knowledge-container {
     display: flex;
@@ -837,36 +868,179 @@ body {
 
 /* ========== 养生谷 ========== */
 
-.yangshenggu-container {
+.knowledge-container {
     padding: 16px;
+    max-width: 800px;
+    margin: 0 auto;
 }
 
-.yangshenggu-modules {
+.knowledge-section {
+    margin-bottom: 24px;
+}
+
+.knowledge-section h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: var(--primary-color);
+}
+
+/* 节气养生卡片 */
+.jieqi-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+
+.jieqi-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.jieqi-name {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.jieqi-season {
+    background: var(--secondary-color);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+}
+
+.jieqi-next {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: auto;
+}
+
+.jieqi-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+.jieqi-yangsheng {
+    font-size: 15px;
+    line-height: 1.7;
+    margin-bottom: 14px;
+    padding: 12px;
+    background: #f0f7f3;
+    border-radius: 8px;
+    border-left: 3px solid var(--primary-color);
+}
+
+.jieqi-foods {
+    margin-bottom: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.jieqi-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.jieqi-food-tag {
+    background: #e8f5e9;
+    color: #2e7d32;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+}
+
+.jieqi-tea, .jieqi-avoid {
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.jieqi-avoid {
+    color: #e65100;
+}
+
+.jieqi-loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+}
+
+/* 护眼训练 */
+.eye-exercise-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.eye-exercise-item {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+}
+
+.eye-exercise-name {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.eye-exercise-duration {
+    font-size: 12px;
+    color: var(--primary-color);
+    background: #e8f5e9;
+    padding: 2px 8px;
+    border-radius: 8px;
+    margin-left: 6px;
+}
+
+.eye-exercise-steps {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    line-height: 1.5;
+}
+
+.eye-exercise-benefit {
+    font-size: 13px;
+    color: var(--primary-color);
+}
+
+.eye-foods, .eye-tea, .eye-tips {
+    font-size: 14px;
+    margin-bottom: 8px;
+    padding: 10px 14px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+}
+
+.eye-tips {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* 体质网格 */
+.tizhi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+/* 药食同源列表 */
+.yaoshi-list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-}
-
-.module-banner {
-    background: linear-gradient(135deg, #4a8c6f, #6cb488);
-    border-radius: 16px;
-    padding: 40px 24px;
-    text-align: center;
-    color: white;
-    box-shadow: 0 4px 15px rgba(74, 140, 111, 0.3);
-}
-
-.module-banner h3 {
-    margin: 0 0 12px 0;
-    font-size: 24px;
-    color: white;
-}
-
-.module-banner p {
-    margin: 0;
-    font-size: 15px;
-    opacity: 0.9;
-    color: white;
+    gap: 10px;
 }
 
 /* ========== 商品详情弹窗 ========== */
@@ -894,15 +1068,34 @@ body {
     transition: background 0.2s;
 }
 .detail-close:hover { background: rgba(0,0,0,0.7); }
-.detail-img-wrap { width: 100%; background: #f8f9fa; }
+.detail-img-wrap { width: 100%; background: #f8f9fa; position: relative; }
 .detail-img-wrap img { width: 100%; display: block; }
+.detail-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.45); color: #fff; font-size: 26px; line-height: 1;
+    cursor: pointer; z-index: 5; display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s; padding: 0;
+}
+.detail-arrow:hover { background: rgba(0,0,0,0.7); }
+.detail-arrow-left { left: 10px; }
+.detail-arrow-right { right: 10px; }
+.detail-img-counter {
+    position: absolute; bottom: 10px; right: 10px;
+    background: rgba(0,0,0,0.5); color: #fff; font-size: 12px;
+    padding: 3px 10px; border-radius: 10px; z-index: 5;
+}
+.detail-no-img {
+    height: 200px; display: flex; align-items: center; justify-content: center; color: #aaa;
+}
 .detail-thumbs {
     display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto;
 }
 .detail-thumb {
     flex: 0 0 auto; width: 60px; height: 60px; border-radius: 8px; overflow: hidden;
-    cursor: pointer; border: 1px solid #eee;
+    cursor: pointer; border: 2px solid #eee; transition: border-color 0.2s;
 }
+.detail-thumb.active { border-color: #7bc49f; }
 .detail-thumb img {
     width: 100%; height: 100%; object-fit: cover;
 }
@@ -911,7 +1104,7 @@ body {
 .detail-price { font-size: 28px; color: #e74c3c; font-weight: 700; margin-bottom: 12px; }
 .detail-price .sym { font-size: 18px; }
 .detail-shop { font-size: 13px; color: #888; margin-bottom: 20px; }
-.detail-brand, .modal-commission, .modal-sales {
+.detail-brand, .modal-sales {
     font-size: 13px; color: #888; margin-bottom: 6px;
 }
 .detail-actions {
@@ -924,11 +1117,11 @@ body {
     flex: 0 0 auto; padding: 14px 20px;
 }
 .detail-buy {
-    width: 100%; padding: 14px; background: linear-gradient(135deg, #7bc49f, #5aae82);
+    width: 100%; padding: 14px; background: linear-gradient(135deg, #ff6b35, #e85d2c);
     color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.detail-buy:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(123,196,159,0.4); }
+.detail-buy:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(232,93,44,0.4); }
 .detail-fav {
     padding: 14px 20px; border: 2px solid #e74c3c; border-radius: 12px;
     background: #fff; color: #e74c3c; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -962,12 +1155,12 @@ body {
 }
 .detail-detail-btn {
     display: inline-block; padding: 12px 32px;
-    background: linear-gradient(135deg, #7bc49f, #5aae82);
-    color: #fff; border-radius: 24px; font-size: 15px; font-weight: 600;
-    text-decoration: none; transition: transform 0.2s, box-shadow 0.2s;
+    background: linear-gradient(135deg, #ff6b35, #e85d2c);
+    color: #fff; border: none; border-radius: 24px; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
 }
 .detail-detail-btn:hover {
-    transform: translateY(-1px); box-shadow: 0 4px 15px rgba(123,196,159,0.4);
+    transform: translateY(-1px); box-shadow: 0 4px 15px rgba(232,93,44,0.4);
 }
 
 /* ===== 弹窗底部滑入动画 ===== */

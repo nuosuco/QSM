@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initProductSearch();
     loadCategories();
     initProfile();
+    loadJieqi();
+    loadEyeExercise();
 });
 
 // ========== 导航切换 ==========
@@ -819,4 +821,60 @@ function saveProductBrowse(keyword, count) {
     if (!data.productBrowses) data.productBrowses = 0;
     data.productBrowses += count;
     saveUserData(data);
+}
+
+// ========== 节气养生 ==========
+
+async function loadJieqi() {
+    const card = document.getElementById('jieqi-card');
+    if (!card) return;
+    try {
+        const resp = await fetch(`${API_BASE}/api/jieqi/current`);
+        const data = await resp.json();
+        card.innerHTML = `
+            <div class="jieqi-header">
+                <span class="jieqi-name">${escapeHtml(data.jieqi)}</span>
+                <span class="jieqi-season">${escapeHtml(data.season)}季</span>
+                <span class="jieqi-next">下一节气：${escapeHtml(data.next_jieqi)} ${escapeHtml(data.next_date)}</span>
+            </div>
+            <div class="jieqi-desc">${escapeHtml(data.desc)}</div>
+            <div class="jieqi-yangsheng">${escapeHtml(data.yangsheng)}</div>
+            <div class="jieqi-foods">
+                <span class="jieqi-label">🥬 当季食材：</span>
+                ${data.foods.map(f => `<span class="jieqi-food-tag">${escapeHtml(f)}</span>`).join('')}
+            </div>
+            <div class="jieqi-tea">🍵 推荐茶饮：${escapeHtml(data.tea)}</div>
+            <div class="jieqi-avoid">⚠️ 注意：${escapeHtml(data.avoid)}</div>
+        `;
+    } catch (e) {
+        card.innerHTML = '<div class="jieqi-loading">加载失败，请刷新重试</div>';
+    }
+}
+
+// ========== 护眼训练 ==========
+
+async function loadEyeExercise() {
+    const container = document.getElementById('eye-exercise');
+    if (!container) return;
+    try {
+        const resp = await fetch(`${API_BASE}/api/eye-exercise`);
+        const data = await resp.json();
+        let html = '<div class="eye-exercise-list">';
+        for (const ex of data.exercises) {
+            html += `
+                <div class="eye-exercise-item">
+                    <div class="eye-exercise-name">${escapeHtml(ex.name)} <span class="eye-exercise-duration">${escapeHtml(ex.duration)}</span></div>
+                    <div class="eye-exercise-steps">${escapeHtml(ex.steps)}</div>
+                    <div class="eye-exercise-benefit">${escapeHtml(ex.benefit)}</div>
+                </div>
+            `;
+        }
+        html += '</div>';
+        html += `<div class="eye-foods">🥕 护眼食材：${data.foods.map(f => escapeHtml(f)).join('、')}</div>`;
+        html += `<div class="eye-tea">🍵 护眼茶饮：${escapeHtml(data.tea)}</div>`;
+        html += `<div class="eye-tips">💡 ${escapeHtml(data.tips)}</div>`;
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<div class="jieqi-loading">加载失败，请刷新重试</div>';
+    }
 }
