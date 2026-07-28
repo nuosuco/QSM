@@ -68,19 +68,32 @@ function handleImageSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
     
-    // 限制大小 5MB
-    if (file.size > 5 * 1024 * 1024) {
-        alert('图片太大了，请选择5MB以内的图片');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-        pendingImageBase64 = ev.target.result; // data:image/xxx;base64,...
+    // 自动压缩：canvas 缩放到最大 1280px 宽，JPEG 0.8 质量
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = function() {
+        URL.revokeObjectURL(objectUrl);
+        const maxW = 1280;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW) {
+            h = Math.round(h * maxW / w);
+            w = maxW;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        pendingImageBase64 = canvas.toDataURL('image/jpeg', 0.8);
         document.getElementById('preview-img').src = pendingImageBase64;
         document.getElementById('image-preview').style.display = 'inline-block';
     };
-    reader.readAsDataURL(file);
+    img.onerror = function() {
+        URL.revokeObjectURL(objectUrl);
+        alert('图片加载失败，请重新选择');
+    };
+    img.src = objectUrl;
     // 重置 input，允许重复选同一文件
     e.target.value = '';
 }
