@@ -133,10 +133,11 @@ def _search_products_from_reply(reply: str, recommendations: list) -> list:
             for item in items:
                 title = item.get('title', '')
                 brand = item.get('shop_name', '') or ''
-                if '有机' not in title:
-                    continue
+                # 放宽匹配：搜索词已带"有机"前缀，淘宝返回的结果相关性有保障
+                # 不再强制标题含"有机"或完整包含食材名（淘宝标题常省略）
                 if title and title not in local_titles and not shop._is_excluded(item):
-                    if ing.lower() in title.lower():
+                    kw_chars = [c for c in ing if c.strip()]
+                    if any(c in title for c in kw_chars):
                         local_titles.add(title)
                         if brand not in local_brands or len(result) < 2:
                             local_brands.add(brand)

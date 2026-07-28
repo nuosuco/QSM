@@ -63,6 +63,8 @@ class ChatResponse(BaseModel):
     recommendations: List[dict] = []
     products: List[dict] = []
     session_id: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
 
 class CheckinRequest(BaseModel):
     """签到请求"""
@@ -265,7 +267,9 @@ async def chat(request: ChatRequest):
         zhengxing=result.get("zhengxing"),
         recommendations=result.get("recommendations", []),
         products=products,
-        session_id=request.session_id or "default"
+        session_id=request.session_id or "default",
+        provider=result.get("provider"),
+        model=result.get("model")
     )
 
 # ========== 商品搜索接口 ==========

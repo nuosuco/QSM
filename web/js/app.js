@@ -76,7 +76,8 @@ async function sendMessage() {
             },
             body: JSON.stringify({
                 message: message,
-                session_id: getSessionId()
+                session_id: getSessionId(),
+                user_id: getUserId()
             })
         });
         
@@ -463,23 +464,9 @@ document.addEventListener('click', (e) => {
 });
 
 function openProduct(webUrl, platform) {
-    // 手机跳APP，电脑跳淘宝详情页
-    var isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) {
-        // 手机端：尝试唤起淘宝APP
-        if (platform === 'taobao' && webUrl) {
-            // 淘宝APP协议
-            var appUrl = 'taobao://' + webUrl.replace(/^https?:\/\//, '');
-            window.location.href = appUrl;
-            // 2秒后如果没跳转成功，fallback到浏览器
-            setTimeout(function() {
-                window.open(webUrl, '_blank');
-            }, 2000);
-        } else {
-            window.open(webUrl, '_blank');
-        }
-    } else {
-        // 电脑端：直接打开淘宝详情页
+    // 直接用 click_url（s.click.taobao.com）跳转，淘宝联盟链接会自动处理APP唤起
+    // 不要用 taobao:// 协议，电脑浏览器不识别，手机端 click_url 本身就能唤起APP
+    if (webUrl) {
         window.open(webUrl, '_blank');
     }
 }
