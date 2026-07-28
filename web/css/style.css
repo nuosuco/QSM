@@ -1032,8 +1032,38 @@ body {
 /* 体质网格 */
 .tizhi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 12px;
+}
+
+.tizhi-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    border-left: 3px solid var(--primary-color);
+}
+
+.tizhi-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 6px;
+}
+
+.tizhi-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.tizhi-diet {
+    font-size: 13px;
+    color: var(--text-primary);
+    background: #f0f7f3;
+    padding: 6px 10px;
+    border-radius: 6px;
 }
 
 /* 药食同源列表 */
@@ -1041,6 +1071,46 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.yaoshi-item {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+}
+
+.yaoshi-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.yaoshi-info {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.yaoshi-xingwei, .yaoshi-guijing {
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: #f5f5f5;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.yaoshi-gongxiao {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.yaoshi-jinji {
+    font-size: 13px;
+    color: #e65100;
 }
 
 /* ========== 商品详情弹窗 ========== */

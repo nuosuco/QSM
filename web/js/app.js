@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initProfile();
     loadJieqi();
     loadEyeExercise();
+    loadTizhiGrid();
+    loadYaoshiList();
 });
 
 // ========== 导航切换 ==========
@@ -821,6 +823,50 @@ function saveProductBrowse(keyword, count) {
     if (!data.productBrowses) data.productBrowses = 0;
     data.productBrowses += count;
     saveUserData(data);
+}
+
+// ========== 养生谷：体质 + 药食同源 ==========
+
+async function loadTizhiGrid() {
+    const grid = document.getElementById('tizhi-grid');
+    if (!grid) return;
+    try {
+        const resp = await fetch(`${API_BASE}/api/knowledge/tizhi`);
+        const data = await resp.json();
+        const items = data.items || [];
+        grid.innerHTML = items.map(t => `
+            <div class="tizhi-card">
+                <div class="tizhi-name">${escapeHtml(t.name)}</div>
+                <div class="tizhi-desc">${escapeHtml(t.desc || t.features || '')}</div>
+                <div class="tizhi-diet">调养：${escapeHtml(t.diet || t.yangsheng || '')}</div>
+            </div>
+        `).join('');
+    } catch (e) {
+        grid.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
+    }
+}
+
+async function loadYaoshiList() {
+    const list = document.getElementById('yaoshi-list');
+    if (!list) return;
+    try {
+        const resp = await fetch(`${API_BASE}/api/knowledge/yaoshi`);
+        const data = await resp.json();
+        const items = data.items || [];
+        list.innerHTML = items.map(y => `
+            <div class="yaoshi-item">
+                <div class="yaoshi-name">${escapeHtml(y.name)}</div>
+                <div class="yaoshi-info">
+                    <span class="yaoshi-xingwei">性味：${escapeHtml(y.xingwei || '')}</span>
+                    <span class="yaoshi-guijing">归经：${escapeHtml(y.guijing || '')}</span>
+                </div>
+                <div class="yaoshi-gongxiao">功效：${escapeHtml(y.gongxiao || '')}</div>
+                ${y.jinji ? `<div class="yaoshi-jinji">⚠️ ${escapeHtml(y.jinji)}</div>` : ''}
+            </div>
+        `).join('');
+    } catch (e) {
+        list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
+    }
 }
 
 // ========== 节气养生 ==========
