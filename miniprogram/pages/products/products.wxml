@@ -1,37 +1,28 @@
-<!-- 对应 index.html #products-tab -->
+<!-- 有机好物 - 审核版：隐藏商品展示，只留搜索框 -->
+<!-- 商品功能完整保留，用户主动搜索后才显示结果 -->
 <view class="products-container">
-  <!-- 搜索框（对应 .search-box） -->
+  <!-- 搜索框（核心功能，保留） -->
   <view class="search-box">
     <input type="text" value="{{keyword}}" placeholder="搜索有机食材，如：枸杞、红枣、山药..." bindinput="onSearchInput" bindconfirm="doSearch" confirm-type="search" />
     <button bindtap="doSearch">搜索</button>
   </view>
 
-  <!-- 平台筛选（对应 .platform-filter） -->
-  <view class="platform-filter">
-    <view class="filter-btn {{currentPlatform === 'taobao' ? 'active' : ''}}" bindtap="switchPlatform" data-platform="taobao">淘宝</view>
-    <view class="filter-btn {{currentPlatform === 'jd' ? 'active' : ''}}" bindtap="switchPlatform" data-platform="jd">京东</view>
-    <view class="filter-btn {{currentPlatform === 'all' ? 'active' : ''}}" bindtap="switchPlatform" data-platform="all">全部</view>
+  <!-- 搜索提示（未搜索时显示） -->
+  <view class="search-hint" wx:if="{{!hasSearched && !loading}}">
+    <view class="hint-icon">🌿</view>
+    <view class="hint-title">有机食材搜索</view>
+    <view class="hint-desc">输入食材名称，为您查找有机认证好物</view>
+    <view class="hint-tags">
+      <text class="hint-tag" bindtap="quickSearch" data-kw="枸杞">枸杞</text>
+      <text class="hint-tag" bindtap="quickSearch" data-kw="红枣">红枣</text>
+      <text class="hint-tag" bindtap="quickSearch" data-kw="山药">山药</text>
+      <text class="hint-tag" bindtap="quickSearch" data-kw="薏米">薏米</text>
+      <text class="hint-tag" bindtap="quickSearch" data-kw="茯苓">茯苓</text>
+      <text class="hint-tag" bindtap="quickSearch" data-kw="百合">百合</text>
+    </view>
   </view>
 
-  <!-- 排序按钮（对应 .sort-filter） -->
-  <scroll-view class="sort-filter" scroll-x>
-    <view class="sort-btn {{currentSort === 'default' ? 'active' : ''}}" bindtap="switchSort" data-sort="default">综合</view>
-    <view class="sort-btn {{currentSort === 'price_asc' ? 'active' : ''}}" bindtap="switchSort" data-sort="price_asc">价格最低</view>
-    <view class="sort-btn {{currentSort === 'price_desc' ? 'active' : ''}}" bindtap="switchSort" data-sort="price_desc">价格最高</view>
-    <view class="sort-btn {{currentSort === 'sales' ? 'active' : ''}}" bindtap="switchSort" data-sort="sales">销量最高</view>
-    <view class="sort-btn {{currentSort === 'credit' ? 'active' : ''}}" bindtap="switchSort" data-sort="credit">评价最高</view>
-  </scroll-view>
-
-  <!-- 分类导航（对应 .category-nav） -->
-  <scroll-view class="category-nav" scroll-x>
-    <view wx:if="{{categories.length === 0}}" class="category-loading">加载分类...</view>
-    <view class="category-item {{currentCategory === item.keyword ? 'active' : ''}}" wx:for="{{categories}}" wx:key="keyword" bindtap="searchByCategory" data-keyword="{{item.keyword}}" data-name="{{item.name}}">
-      <view class="category-icon">{{item.icon}}</view>
-      <view class="category-name">{{item.name}}</view>
-    </view>
-  </scroll-view>
-
-  <!-- 商品网格（对应 .products-grid） -->
+  <!-- 商品网格（搜索后才显示） -->
   <view class="products-grid" wx:if="{{products.length > 0}}">
     <view class="product-card" wx:for="{{products}}" wx:key="index" bindtap="openProductDetail" data-index="{{index}}">
       <image class="product-image" src="{{item.image}}" mode="aspectFill"></image>
@@ -43,9 +34,9 @@
     </view>
   </view>
 
-  <!-- 空状态（对应 .empty-state） -->
-  <view class="empty-state" wx:if="{{!loading && products.length === 0}}">
-    <text>选择分类或搜索有机食材</text>
+  <!-- 搜索无结果 -->
+  <view class="empty-state" wx:if="{{hasSearched && !loading && products.length === 0}}">
+    <text>未找到相关食材，换个关键词试试</text>
   </view>
 
   <!-- 加载中 -->
@@ -54,7 +45,7 @@
     <text>搜索中...</text>
   </view>
 
-  <!-- 加载更多（对应无限滚动） -->
+  <!-- 加载更多 -->
   <view class="loading-more" wx:if="{{!loading && products.length > 0 && hasMore}}" bindtap="loadMore">
     <text>点击加载更多</text>
   </view>

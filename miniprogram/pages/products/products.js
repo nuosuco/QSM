@@ -13,34 +13,29 @@ Page({
     hasMore: true,
     categories: [],
     products: [],
-    loading: false
+    loading: false,
+    hasSearched: false  // 是否已执行过搜索（控制空状态显示）
   },
 
   onLoad() {
-    this.loadCategories();
+    // 审核版：不自动加载分类和商品，只留搜索框
+    // this.loadCategories();  // 已注释
   },
 
-  // 对应 loadCategories()
+  // 对应 loadCategories()（审核版：不自动调用）
   loadCategories() {
     request('/api/products/categories').then(data => {
       const categories = data.categories || [];
       this.setData({ categories });
-      // 页面加载时自动显示"全部"分类的商品（对应 defaultCategory）
-      if (categories.length > 0) {
-        const defaultCategory = categories[0];
-        this.searchByCategory({
-          currentTarget: {
-            dataset: { keyword: defaultCategory.keyword, name: defaultCategory.name }
-          }
-        });
-      }
+      // 审核版：不自动显示"全部"分类的商品
+      // if (categories.length > 0) { ... }  // 已注释
     }).catch(err => {
       console.error('加载分类失败:', err);
       this.setData({ categories: [] });
     });
   },
 
-  // 对应 searchByCategory(keyword, categoryName)
+  // 对应 searchByCategory(keyword, categoryName)（审核版：不自动调用）
   searchByCategory(e) {
     const keyword = e.currentTarget.dataset.keyword;
     this.setData({
@@ -48,8 +43,14 @@ Page({
       currentPage: 1,
       hasMore: true
     });
-    // 搜索用分类关键词，但不显示在搜索框里
     this.searchProducts(true, keyword);
+  },
+
+  // 快捷搜索标签
+  quickSearch(e) {
+    const kw = e.currentTarget.dataset.kw;
+    this.setData({ keyword: kw });
+    this.doSearch();
   },
 
   // 对应 searchInput 事件
@@ -62,7 +63,8 @@ Page({
     this.setData({
       currentCategory: '',
       currentPage: 1,
-      hasMore: true
+      hasMore: true,
+      hasSearched: true
     });
     this.searchProducts(true);
   },
