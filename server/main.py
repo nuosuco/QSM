@@ -230,93 +230,11 @@ async def health_check():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    from services.bianzheng import BianzhengEngine
-    from services.shop import ShopService
+    from services.chat_engine import chat_with_llm
 
-    engine = BianzhengEngine()
-    shop = ShopService()
+    result = chat_with_llm(request.message)
 
-    result = engine.analyze(request.message)
-
-    products = []
-    import re
-    # 从配方文字中提取食材名（如“配方：酸枣仁15g、百合10g、莲子15g”）
-    recipe_ingredients = re.findall(r'配方[：:](.+?)(?:\n|—|：|：\s)', result.get("reply", ""), re.DOTALL)
-    ingredient_names = []
-    if recipe_ingredients:
-        text = recipe_ingredients[0]
-        # 去掉数字和单位，保留纯中文食材名
-        parts = re.split(r'[、,，;；]', text)
-        for part in parts:
-            part = part.strip()
-            name = re.sub(r'[\d.]+(?:[gG克毫升mlML枚粒只条根片块个半只碗勺杯袋包瓶盒罐]*)', '', part).strip()
-            name = re.sub(r'(半只|少许|适量|若干|少量|各)$', '', name).strip()
-            if name and len(name) >= 2 and len(name) <= 6:
-                if name not in ingredient_names:
-                    ingredient_names.append(name)
-    else:
-        # fallback: 用建议食用食材
-        ingredient_names = [r["name"] for r in result.get("recommendations", [])]
-
-    print(f"[小麦助手] 食材名: {ingredient_names}")
-    seen_titles = set()
-    if ingredient_names:
-        # 小麦助手：每个食材独立搜10页，每页2个，与商城搜索逻辑分开
-        from services.shop import ShopService
-        _shop = ShopService()
-        
-        def search_ingredient(ing: str) -> list:
-            """搜索单个食材，不限页数，搜够不同品牌2款就停"""
-            result = []
-            local_titles = set()
-            local_brands = set()
-            page_num = 1
-            while len(result) < 2:
-                try:
-                    sub_items = _shop._search_taobao(f"{ing} 有机", page_num, 2, "")
-                except Exception:
-                    sub_items = []
-                if not sub_items:
-                    page_num += 1
-                    if page_num > 5:
-                        break
-                    continue
-                for item in sub_items:
-                    title = item.get('title', '')
-                    brand = item.get('shop_name', '') or ''
-                    # 只保留标题里有"有机"的商品
-                    if '有机' not in title:
-                        continue
-                    if title and title not in local_titles and not _shop._is_excluded(item):
-                        if ing.lower() in title.lower():
-                            local_titles.add(title)
-                            if brand not in local_brands:
-                                local_brands.add(brand)
-                                result.append(item)
-                            elif len(result) < 2:
-                                result.append(item)
-                page_num += 1
-            return result
-        
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            future_map = {
-                executor.submit(search_ingredient, ing): ing
-                for ing in ingredient_names
-            }
-            # 不用超时机制，全部等所有结果回来
-            concurrent.futures.wait(future_map, timeout=None)
-            print(f"[小麦助手] 搜索完成，products: {len(products)}个")
-            for future in future_map:
-                try:
-                    items = future.result()
-                    for item in items:
-                        title = item.get('title', '')
-                        if title and title not in seen_titles:
-                            seen_titles.add(title)
-                            products.append(item)
-                except Exception:
-                    pass
+    products = result.get("products", [])
 
     try:
         conn = get_user_db()
@@ -782,6 +700,85 @@ async def get_checkin_stats():
     from services.stats import StatsService
     ss = StatsService()
     return ss.get_checkin_stats()
+
+# ========== LLM 状态监控 ==========
+
+@app.get("/api/llm/status")
+async def llm_status():
+    """LLM 服务商状态（不暴露密钥）"""
+    from services import llm_router
+    return llm_router.get_status()
+
+# ========== 图片辨证接口（看舌苔） ==========
+
+class VisionChatRequest(BaseModel):
+    """图片辨证请求"""
+    message: str = "请观察这张舌头照片，从中医角度分析舌色、舌苔、舌形，给出体质倾向和食养建议。"
+    image_url: str
+    user_id: Optional[str] = None
+
+@app.post("/api/chat/vision")
+async def chat_vision(request: VisionChatRequest):
+    """图片理解辨证（看舌苔、看食材等）"""
+    from services import llm_router, rag
+
+    system_prompt = """你是小麦SOM，一位经验丰富的中医养生顾问，擅长舌诊。
+请观察用户发来的图片，从以下角度分析：
+1. 舌色（淡红/淡白/红/紫暗）
+2. 舌苔（薄白/白腻/黄腻/少苔）
+3. 舌形（胖大/瘦薄/齿痕/裂纹）
+4. 综合判断可能的体质倾向
+5. 给出2-3条食养建议（用药食同源食材）
+
+注意：
+- 用通俗易懂的语言，不堆砌术语
+- 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医
+- 如果图片不是舌头或看不清，礼貌说明并建议重新拍摄"""
+
+    # RAG 上下文（基于用户消息）
+    context = rag.build_context(request.message, max_chars=1500)
+    if context:
+        system_prompt += f"\n\n【参考知识】\n{context}"
+
+    result = llm_router.vision(
+        request.message,
+        request.image_url,
+        system_prompt=system_prompt,
+        temperature=0.5,
+    )
+
+    if not result.get("success"):
+        return {
+            "success": False,
+            "error": result.get("error", "图片分析失败"),
+            "reply": "抱歉，我暂时无法分析这张图片。请确保图片清晰、光线充足，或者直接用文字描述你的身体状况，我一样可以帮你分析。"
+        }
+
+    # 保存对话记录
+    try:
+        conn = get_user_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO chat_history (user_id, session_id, user_message, assistant_reply, tizhi, zhengxing)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            request.user_id or 'anonymous',
+            'vision',
+            f'[图片辨证] {request.message[:200]}',
+            result["content"][:2000],
+            '', '',
+        ))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "reply": result["content"],
+        "provider": result.get("provider"),
+        "model": result.get("model"),
+    }
 
 # ========== 用户系统 API ==========
 
