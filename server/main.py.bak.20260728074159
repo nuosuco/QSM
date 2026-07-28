@@ -211,25 +211,84 @@ async def chat(request: ChatRequest):
     result = engine.analyze(request.message)
 
     products = []
-    if result.get("recommendations"):
-        seen_ids = set()
+    import re
+    # 从配方文字中提取食材名（如“配方：酸枣仁15g、百合10g、莲子15g”）
+    recipe_ingredients = re.findall(r'配方[：:](.+?)(?:\n|—|：|：\s)', result.get("reply", ""), re.DOTALL)
+    ingredient_names = []
+    if recipe_ingredients:
+        text = recipe_ingredients[0]
+        # 去掉数字和单位，保留纯中文食材名
+        parts = re.split(r'[、,，;；]', text)
+        for part in parts:
+            part = part.strip()
+            name = re.sub(r'[\d.]+(?:[gG克毫升mlML枚粒只条根片块个半只碗勺杯袋包瓶盒罐]*)', '', part).strip()
+            name = re.sub(r'(半只|少许|适量|若干|少量|各)$', '', name).strip()
+            if name and len(name) >= 2 and len(name) <= 6:
+                if name not in ingredient_names:
+                    ingredient_names.append(name)
+    else:
+        # fallback: 用建议食用食材
+        ingredient_names = [r["name"] for r in result.get("recommendations", [])]
+
+    print(f"[小麦助手] 食材名: {ingredient_names}")
+    seen_titles = set()
+    if ingredient_names:
+        # 小麦助手：每个食材独立搜10页，每页2个，与商城搜索逻辑分开
+        from services.shop import ShopService
+        _shop = ShopService()
+        
+        def search_ingredient(ing: str) -> list:
+            """搜索单个食材，不限页数，搜够不同品牌2款就停"""
+            result = []
+            local_titles = set()
+            local_brands = set()
+            page_num = 1
+            while len(result) < 2:
+                try:
+                    sub_items = _shop._search_taobao(f"{ing} 有机", page_num, 2, "")
+                except Exception:
+                    sub_items = []
+                if not sub_items:
+                    page_num += 1
+                    if page_num > 5:
+                        break
+                    continue
+                for item in sub_items:
+                    title = item.get('title', '')
+                    brand = item.get('shop_name', '') or ''
+                    # 只保留标题里有"有机"的商品
+                    if '有机' not in title:
+                        continue
+                    if title and title not in local_titles and not _shop._is_excluded(item):
+                        if ing.lower() in title.lower():
+                            local_titles.add(title)
+                            if brand not in local_brands:
+                                local_brands.add(brand)
+                                result.append(item)
+                            elif len(result) < 2:
+                                result.append(item)
+                page_num += 1
+            return result
+        
         import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             future_map = {
-                executor.submit(shop.search, rec["name"], "taobao", 1, 6): rec["name"]
-                for rec in result["recommendations"]
+                executor.submit(search_ingredient, ing): ing
+                for ing in ingredient_names
             }
-            for future in concurrent.futures.as_completed(future_map, timeout=5):
+            # 不用超时机制，全部等所有结果回来
+            concurrent.futures.wait(future_map, timeout=None)
+            print(f"[小麦助手] 搜索完成，products: {len(products)}个")
+            for future in future_map:
                 try:
                     items = future.result()
                     for item in items:
-                        item_key = item.get('item_id', '') or item.get('title', '')
-                        if item_key and item_key not in seen_ids:
-                            seen_ids.add(item_key)
+                        title = item.get('title', '')
+                        if title and title not in seen_titles:
+                            seen_titles.add(title)
                             products.append(item)
                 except Exception:
                     pass
-                # 不再限制总商品数，让所有食材的商品都显示
 
     try:
         conn = get_user_db()
@@ -283,19 +342,25 @@ async def search_products(
     if not search_kw and keyword:
         search_kw = keyword
 
-    items = shop.search_from_cache(keyword=search_kw, page=page, page_size=page_size)
-    from_cache = len(items)
-    if len(items) < page_size:
-        items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
+    items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
 
     return {
         "keyword": keyword,
         "search_keyword": search_kw,
         "platform": platform,
         "total": len(items),
-        "from_cache": from_cache,
+        "from_cache": 0,
         "items": items
     }
+
+# ========== 淘口令接口 ==========
+
+@app.get("/api/products/tpwd")
+async def create_tpwd(url: str, text: str = ""):
+    from services.shop import ShopService
+    shop = ShopService()
+    result = shop.create_tpwd(url, text)
+    return result
 
 # ========== 知识库接口 ==========
 

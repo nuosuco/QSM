@@ -42,53 +42,53 @@ EXCLUDE_KEYWORDS = [
 # 搜索时自动追加'有机 原生态 野生'前缀
 CATEGORY_MAP = {
     '全部': {
-        'keyword': '食品 养生 食材 滋补品 药膳 母婴 原生态 野生 日用品 家居 绿植 健身 保健 棉品 美妆',
+        'keyword': '食品 养生 食材 滋补品 药膳 母婴 日用品 家居 绿植 健身 保健 棉品 美妆',
         'icon': '🌿',
         'desc': '所有有机认证、环保认证产品',
     },
     # ====== 食品粮油 ======
     '谷物杂粮': {
-        'keyword': '五谷杂粮 大米 小米 燕麦 藜麦 原生态 野生',
+        'keyword': '五谷杂粮 大米 小米 燕麦 藜麦',
         'icon': '🌾',
         'desc': '有机五谷杂粮、米面粮油',
     },
     '滋补养生': {
-        'keyword': '滋补 枸杞 红枣 黄芪 党参 人参 原生态 野生',
+        'keyword': '滋补 枸杞 红枣 黄芪 党参 人参',
         'icon': '🫖',
         'desc': '枸杞、红枣、黄芪、党参等滋补品',
     },
     '药膳食材': {
-        'keyword': '药膳 药食同源 黄芪 党参 山药 莲子 茯苓 原生态 野生',
+        'keyword': '药膳 药食同源 黄芪 党参 山药 莲子 茯苓',
         'icon': '🍲',
         'desc': '药膳食材、药食同源目录食材',
     },
     '茶饮酒水': {
-        'keyword': '茶 养生茶 花茶 红茶 绿茶 药酒 果酒 原生态 野生',
+        'keyword': '茶 养生茶 花茶 红茶 绿茶 药酒 果酒',
         'icon': '🍵',
         'desc': '有机茶、养生茶、药酒、果酒',
     },
     '坚果干果': {
-        'keyword': '坚果 核桃 杏仁 腰果 干果 果脯 原生态 野生',
+        'keyword': '坚果 核桃 杏仁 腰果 干果 果脯',
         'icon': '🥜',
         'desc': '有机坚果、干果、果脯',
     },
     '菌菇干货': {
-        'keyword': '菌菇 香菇 木耳 银耳 干货 山珍 原生态 野生',
+        'keyword': '菌菇 香菇 木耳 银耳 干货 山珍',
         'icon': '🍄',
         'desc': '有机菌菇、木耳、银耳等山珍干货',
     },
     '调味佐料': {
-        'keyword': '调味品 酱油 醋 橄榄油 调料 蜂蜜 原生态 野生',
+        'keyword': '调味品 酱油 醋 橄榄油 调料 蜂蜜',
         'icon': '🧂',
         'desc': '有机调味品、蜂蜜、橄榄油等',
     },
     '新鲜果蔬': {
-        'keyword': '蔬菜 水果 新鲜 时令 原生态 野生',
+        'keyword': '蔬菜 水果 新鲜 时令',
         'icon': '🥬',
         'desc': '有机认证新鲜蔬果',
     },
     '母婴食品': {
-        'keyword': '母婴 婴儿食品 奶粉 辅食 原生态 野生',
+        'keyword': '母婴 婴儿食品 奶粉 辅食',
         'icon': '🍼',
         'desc': '有机婴幼儿食品、奶粉',
     },
@@ -99,55 +99,55 @@ CATEGORY_MAP = {
         'desc': '有机棉、丝、麻等天然面料服装家纺',
     },
     '日化洗护': {
-        'keyword': '洗发水 沐浴露 护肤品 化妆品 手工皂 环保 原生态 野生',
+        'keyword': '洗发水 沐浴露 护肤品 化妆品 手工皂 环保',
         'icon': '🧴',
         'desc': '有机/环保认证日化洗护用品',
     },
     '美妆护肤': {
-        'keyword': '护肤品 化妆品 面膜 精油 纯露 口红 原生态 野生',
+        'keyword': '护肤品 化妆品 面膜 精油 纯露 口红',
         'icon': '💄',
         'desc': '有机/天然成分美妆护肤品',
     },
     # ====== 家居生活 ======
     '家居日用': {
-        'keyword': '家居 日用 收纳 竹制品 藤编 环保 原生态 野生',
+        'keyword': '家居 日用 收纳 竹制品 藤编 环保',
         'icon': '🏠',
         'desc': '环保家居用品、竹木藤编制品',
     },
     '绿植盆栽': {
-        'keyword': '绿植 盆栽 花卉 多肉 盆景 园艺 原生态 野生',
+        'keyword': '绿植 盆栽 花卉 多肉 盆景 园艺',
         'icon': '🪴',
         'desc': '绿植盆栽、花卉园艺、盆景',
     },
     '环保餐具': {
-        'keyword': '餐具 厨具 水杯 竹纤维 麦秸秆 环保 原生态',
+        'keyword': '餐具 厨具 水杯 竹纤维 麦秸秆 环保',
         'icon': '🍽️',
         'desc': '环保餐具、竹纤维/麦秸秆制品',
     },
     # ====== 健康养生 ======
     '保健器械': {
-        'keyword': '保健品 艾灸 刮痧 拔罐 按摩 理疗 原生态 野生',
+        'keyword': '保健品 艾灸 刮痧 拔罐 按摩 理疗',
         'icon': '💊',
         'desc': '有机保健品、艾灸刮痧等中医器具',
     },
     '健身运动': {
-        'keyword': '健身 瑜伽 太极 运动 器材 跳绳 原生态',
+        'keyword': '健身 瑜伽 太极 运动 器材 跳绳',
         'icon': '🏋️',
         'desc': '环保健身器材、瑜伽用品、太极用品',
     },
     '户外出行': {
-        'keyword': '户外 露营 徒步 登山 环保 水杯 原生态 野生',
+        'keyword': '户外 露营 徒步 登山 环保 水杯',
         'icon': '🥾',
         'desc': '环保户外用品、露营装备',
     },
     # ====== 医疗健康 ======
     '医用环保': {
-        'keyword': '医用 棉签 口罩 纱布 消毒 环保 原生态',
+        'keyword': '医用 棉签 口罩 纱布 消毒 环保',
         'icon': '🏥',
         'desc': '有机棉医用耗材、环保医疗用品',
     },
     '中医养生': {
-        'keyword': '艾草 足浴 泡脚 养生壶 经络 穴位 原生态 野生',
+        'keyword': '艾草 足浴 泡脚 养生壶 经络 穴位',
         'icon': '🧘',
         'desc': '中医养生用品、艾草足浴、经络调理',
     },
@@ -170,43 +170,63 @@ class ShopService:
 
     def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
         """
-        搜索商品 - 用食材名+有机精确搜索，不拆词，只搜1页
+        搜索商品 - 多关键词拆成单个词并行搜索，合并去重
         platform: taobao / jd / all
         sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
         """
         if not keyword or not keyword.strip():
             return []
         
-        # 直接使用食材名+有机搜索，不拆词
-        search_keyword = f"{keyword.strip()} 有机"
-
+        # 把多关键词拆成单个词
+        keywords = [k.strip() for k in keyword.split() if k.strip()]
+        if not keywords:
+            return []
+        
+        seen_titles = set()
         items = []
-        if platform in ("taobao", "all"):
-            seen_ids = set()
-            # 只搜1页，不拆词，确保搜到的是食材本身的有机商品
-            sub_items = self._search_taobao(search_keyword, 1, page_size, sort)
+        
+        def search_single_keyword(single_kw: str) -> list:
+            """搜索单个关键词，只搜一页"""
+            search_kw = f"{single_kw} 有机"
+            result = []
+            local_titles = set()
+            sub_items = self._search_taobao(search_kw, 1, page_size, sort)
             if sub_items:
                 for item in sub_items:
-                    item_id = item.get('item_id', '') or item.get('title', '')
-                    if item_id not in seen_ids and not self._is_excluded(item):
-                        seen_ids.add(item_id)
-                        items.append(item)
-        if platform in ("jd", "all"):
-            for item in self._search_jd(search_keyword, 1, page_size):
-                if not self._is_excluded(item):
-                    items.append(item)
+                    title = item.get('title', '')
+                    if title and title not in local_titles and not self._is_excluded(item):
+                        if single_kw.lower() in title.lower():
+                            local_titles.add(title)
+                            result.append(item)
+                        if len(result) >= page_size:
+                            break
+            return result
+        
+        # 所有关键词并行搜索
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(keywords), 15)) as executor:
+            future_map = {executor.submit(search_single_keyword, kw): kw for kw in keywords}
+            for future in concurrent.futures.as_completed(future_map, timeout=15):
+                try:
+                    for item in future.result():
+                        title = item.get('title', '')
+                        if title and title not in seen_titles:
+                            seen_titles.add(title)
+                            items.append(item)
+                except Exception:
+                    pass
+        
         return items
 
     def get_category_keyword(self, keyword: str) -> str:
-        """根据搜索词匹配分类关键词"""
+        """根据分类名返回对应的关键词列表"""
         if not keyword:
             return ''
-        keyword_lower = keyword.lower()
+        # 直接按分类名匹配
         for cat_name, info in CATEGORY_MAP.items():
-            kw = info['keyword']
-            for part in kw.split():
-                if part and part in keyword_lower:
-                    return kw
+            if cat_name == keyword.strip():
+                return info['keyword']
+        # 没匹配到分类名，返回原词（用户自定义搜索）
         return keyword
 
     def search_from_cache(self, keyword: str, page: int = 1, page_size: int = 10) -> List[dict]:
@@ -404,11 +424,23 @@ class ShopService:
                                 # 将 https://s.click.taobao.com/... 转为 taobao:// 协议
                                 app_url = click_url.replace('https://', 'taobao://', 1)
                             
+                            # 提取主图和副图
+                            main_image = basic.get('pict_url', '')
+                            small_images_raw = basic.get('small_images', {})
+                            if isinstance(small_images_raw, dict):
+                                small_imgs = [u for u in small_images_raw.get('string', []) if u]
+                            elif isinstance(small_images_raw, list):
+                                small_imgs = [u for u in small_images_raw if u]
+                            else:
+                                small_imgs = []
+                            all_images = [main_image] + [img for img in small_imgs if img and img != main_image]
+                            
                             items.append({
                                 'item_id': item.get('item_id', ''),
                                 'title': basic.get('short_title', '') or basic.get('title', ''),
                                 'price': price_info.get('zk_final_price', '') or price_info.get('reserve_price', ''),
-                                'image': basic.get('pict_url', ''),
+                                'image': main_image,
+                                'images': all_images[:5],
                                 'url': click_url,  # 网页版推广链接（带佣金）
                                 'app_url': app_url,  # APP deeplink（优先，带佣金追踪）
                                 'platform': 'taobao',
