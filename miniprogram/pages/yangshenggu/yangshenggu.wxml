@@ -1,31 +1,67 @@
-<!-- 对应 index.html #yangshenggu-tab -->
+<!-- 养生谷：节气养生 + 护眼训练 + 九种体质 + 药食同源 -->
 <view class="knowledge-container">
-  <!-- 九种体质（对应 .knowledge-section h2=九种体质） -->
+  <!-- 节气养生 -->
+  <view class="knowledge-section">
+    <view class="section-title">🌿 节气养生</view>
+    <view class="jieqi-card" wx:if="{{jieqi}}">
+      <view class="jieqi-header">
+        <text class="jieqi-name">{{jieqi.jieqi}}</text>
+        <text class="jieqi-season">{{jieqi.season}}季</text>
+        <text class="jieqi-next">下一：{{jieqi.next_jieqi}} {{jieqi.next_date}}</text>
+      </view>
+      <view class="jieqi-desc">{{jieqi.desc}}</view>
+      <view class="jieqi-yangsheng">{{jieqi.yangsheng}}</view>
+      <view class="jieqi-foods">
+        <text class="jieqi-label">🥬 当季食材：</text>
+        <text class="jieqi-food-tag" wx:for="{{jieqi.foods}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="jieqi-tea">🍵 推荐茶饮：{{jieqi.tea}}</view>
+      <view class="jieqi-avoid">⚠️ 注意：{{jieqi.avoid}}</view>
+    </view>
+    <view class="empty-state" wx:if="{{!jieqi && !loading}}"><text>加载失败</text></view>
+  </view>
+
+  <!-- 护眼训练 -->
+  <view class="knowledge-section">
+    <view class="section-title">👁️ 护眼训练</view>
+    <view class="eye-list" wx:if="{{eyeExercises.length > 0}}">
+      <view class="eye-item" wx:for="{{eyeExercises}}" wx:key="index">
+        <view class="eye-name">{{item.name}} <text class="eye-duration">{{item.duration}}</text></view>
+        <view class="eye-steps">{{item.steps}}</view>
+        <view class="eye-benefit">{{item.benefit}}</view>
+      </view>
+    </view>
+    <view class="eye-tips" wx:if="{{eyeTips}}">💡 {{eyeTips}}</view>
+  </view>
+
+  <!-- 九种体质 -->
   <view class="knowledge-section">
     <view class="section-title">九种体质</view>
     <view class="tizhi-grid">
       <view class="tizhi-card" wx:for="{{tizhiList}}" wx:key="index">
         <view class="tizhi-name">{{item.name}}</view>
         <view class="tizhi-desc">{{item.desc}}</view>
+        <view class="tizhi-diet" wx:if="{{item.diet}}">调养：{{item.diet}}</view>
       </view>
     </view>
-    <view class="empty-state" wx:if="{{tizhiList.length === 0 && !loading}}">
-      <text>暂无数据</text>
-    </view>
+    <view class="empty-state" wx:if="{{tizhiList.length === 0 && !loading}}"><text>暂无数据</text></view>
   </view>
 
-  <!-- 药食同源（对应 .knowledge-section h2=药食同源） -->
+  <!-- 药食同源 -->
   <view class="knowledge-section">
     <view class="section-title">药食同源</view>
     <view class="yaoshi-list">
       <view class="yaoshi-item" wx:for="{{yaoshiList}}" wx:key="index">
         <view class="yaoshi-name">{{item.name}}</view>
-        <view class="yaoshi-desc">{{item.desc}}</view>
+        <view class="yaoshi-info">
+          <text class="yaoshi-tag">性味：{{item.xingwei}}</text>
+          <text class="yaoshi-tag">归经：{{item.guijing}}</text>
+        </view>
+        <view class="yaoshi-gongxiao">功效：{{item.gongxiao}}</view>
+        <view class="yaoshi-jinji" wx:if="{{item.jinji}}">⚠️ {{item.jinji}}</view>
       </view>
     </view>
-    <view class="empty-state" wx:if="{{yaoshiList.length === 0 && !loading}}">
-      <text>暂无数据</text>
-    </view>
+    <view class="empty-state" wx:if="{{yaoshiList.length === 0 && !loading}}"><text>暂无数据</text></view>
   </view>
 
   <!-- 加载中 -->

@@ -1,34 +1,35 @@
-// 对应养生谷页面：从后端 /api/knowledge/tizhi 和 /api/knowledge/yaoshi 加载
+// 养生谷：节气养生 + 护眼训练 + 九种体质 + 药食同源
 const { request } = require('../../utils/api');
 
 Page({
   data: {
+    jieqi: null,
+    eyeExercises: [],
+    eyeTips: '',
     tizhiList: [],
     yaoshiList: [],
     loading: true
   },
 
   onLoad() {
-    this.loadKnowledge();
+    this.loadAll();
   },
 
-  loadKnowledge() {
+  loadAll() {
     this.setData({ loading: true });
 
-    // 并行加载（对应网页版同时请求两个API）
     Promise.all([
-      request('/api/knowledge/tizhi').catch(err => {
-        console.error('加载体质失败:', err);
-        return { items: [] };
-      }),
-      request('/api/knowledge/yaoshi').catch(err => {
-        console.error('加载药食同源失败:', err);
-        return { items: [] };
-      })
-    ]).then(([tizhiData, yaoshiData]) => {
+      request('/api/jieqi/current').catch(() => null),
+      request('/api/eye-exercise').catch(() => null),
+      request('/api/knowledge/tizhi').catch(() => ({ items: [] })),
+      request('/api/knowledge/yaoshi').catch(() => ({ items: [] }))
+    ]).then(([jieqi, eye, tizhiData, yaoshiData]) => {
       this.setData({
-        tizhiList: tizhiData.items || tizhiData.list || [],
-        yaoshiList: yaoshiData.items || yaoshiData.list || [],
+        jieqi: jieqi,
+        eyeExercises: (eye && eye.exercises) || [],
+        eyeTips: (eye && eye.tips) || '',
+        tizhiList: (tizhiData && tizhiData.items) || [],
+        yaoshiList: (yaoshiData && yaoshiData.items) || [],
         loading: false
       });
     });

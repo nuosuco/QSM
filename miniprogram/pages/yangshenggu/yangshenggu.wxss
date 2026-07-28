@@ -1,4 +1,4 @@
-/* 对应 style.css 中 .knowledge-container 到 .yaoshi-item p 部分 */
+/* 养生谷：节气 + 护眼 + 体质 + 药食同源 */
 .knowledge-container {
   display: flex;
   flex-direction: column;
@@ -21,7 +21,138 @@
   font-weight: bold;
 }
 
-/* 九种体质（对应 .tizhi-grid / .tizhi-card） */
+/* 节气养生 */
+.jieqi-card {
+  padding: 24rpx;
+  background: #f0f7f3;
+  border-radius: 16rpx;
+  border-left: 8rpx solid #4a9d6e;
+}
+
+.jieqi-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+  flex-wrap: wrap;
+}
+
+.jieqi-name {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #4a9d6e;
+}
+
+.jieqi-season {
+  background: #7bc49f;
+  color: #fff;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+}
+
+.jieqi-next {
+  font-size: 24rpx;
+  color: #7f8c8d;
+  margin-left: auto;
+}
+
+.jieqi-desc {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  margin-bottom: 16rpx;
+}
+
+.jieqi-yangsheng {
+  font-size: 28rpx;
+  line-height: 1.7;
+  margin-bottom: 20rpx;
+  padding: 16rpx;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
+.jieqi-foods {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10rpx;
+  margin-bottom: 16rpx;
+}
+
+.jieqi-label {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.jieqi-food-tag {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+}
+
+.jieqi-tea, .jieqi-avoid {
+  font-size: 26rpx;
+  margin-bottom: 10rpx;
+}
+
+.jieqi-avoid {
+  color: #e65100;
+}
+
+/* 护眼训练 */
+.eye-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.eye-item {
+  padding: 24rpx;
+  background: #f5f7f6;
+  border-radius: 16rpx;
+}
+
+.eye-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.eye-duration {
+  font-size: 22rpx;
+  color: #4a9d6e;
+  background: #e8f5e9;
+  padding: 4rpx 12rpx;
+  border-radius: 12rpx;
+  margin-left: 12rpx;
+}
+
+.eye-steps {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  margin-bottom: 8rpx;
+  line-height: 1.5;
+}
+
+.eye-benefit {
+  font-size: 24rpx;
+  color: #4a9d6e;
+}
+
+.eye-tips {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  padding: 16rpx;
+  background: #f5f7f6;
+  border-radius: 12rpx;
+  font-style: italic;
+}
+
+/* 九种体质 */
 .tizhi-grid {
   display: flex;
   flex-direction: column;
@@ -46,9 +177,18 @@
   font-size: 26rpx;
   color: #7f8c8d;
   line-height: 1.5;
+  margin-bottom: 8rpx;
 }
 
-/* 药食同源（对应 .yaoshi-list / .yaoshi-item） */
+.tizhi-diet {
+  font-size: 24rpx;
+  color: #2c3e50;
+  background: #f0f7f3;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+/* 药食同源 */
 .yaoshi-list {
   display: flex;
   flex-direction: column;
@@ -68,8 +208,46 @@
   font-weight: 500;
 }
 
-.yaoshi-desc {
-  font-size: 24rpx;
+.yaoshi-info {
+  display: flex;
+  gap: 16rpx;
+  flex-wrap: wrap;
+  margin-bottom: 8rpx;
+}
+
+.yaoshi-tag {
+  font-size: 22rpx;
   color: #7f8c8d;
-  line-height: 1.5;
+  background: #eee;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.yaoshi-gongxiao {
+  font-size: 26rpx;
+  color: #2c3e50;
+  margin-bottom: 6rpx;
+}
+
+.yaoshi-jinji {
+  font-size: 24rpx;
+  color: #e65100;
+}
+
+/* 通用 */
+.empty-state {
+  text-align: center;
+  padding: 40rpx;
+  color: #7f8c8d;
+  font-size: 26rpx;
+}
+
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 32rpx;
+  color: #7f8c8d;
+  font-size: 26rpx;
 }
