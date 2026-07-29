@@ -1,5 +1,14 @@
-<!-- 养生谷：节气养生 + 护眼训练 + 九种体质 + 药食同源 -->
+<!-- 养生谷：健康测评 + 节气养生 + 护眼训练 + 九种体质 + 药食同源 -->
 <view class="knowledge-container">
+  <!-- 健康测评入口 -->
+  <view class="test-banner" bindtap="goTizhiTest">
+    <view class="test-banner-left">
+      <view class="test-banner-title">🔍 测测你的健康</view>
+      <view class="test-banner-desc">体质测评 + 三高/痛风/风湿症状自评</view>
+    </view>
+    <view class="test-banner-btn">3分钟 →</view>
+  </view>
+
   <!-- 节气养生 -->
   <view class="knowledge-section">
     <view class="section-title">🌿 节气养生</view>

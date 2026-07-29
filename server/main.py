@@ -1040,6 +1040,67 @@ async def tizhi_latest(user_id: str):
     from services.user_system import get_latest_tizhi
     return {"success": True, "record": get_latest_tizhi(user_id)}
 
+
+# ========== 健康测评 API ==========
+
+@app.post("/api/tizhi-test/save")
+async def tizhi_test_save(data: dict):
+    """保存健康测评结果"""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(__file__), "data", "user_data.db")
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS tizhi_test (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        mode TEXT,
+        result_key TEXT,
+        result_name TEXT,
+        score INTEGER,
+        answers TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    import json as _json
+    c.execute("INSERT INTO tizhi_test (user_id, mode, result_key, result_name, score, answers) VALUES (?,?,?,?,?,?)",
+        (data.get("user_id",""), data.get("mode",""), data.get("result_key",""),
+         data.get("result_name",""), data.get("score",0), _json.dumps(data.get("answers",[]))))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/api/tizhi-test/count")
+async def tizhi_test_count():
+    """测评总人数"""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(__file__), "data", "user_data.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM tizhi_test")
+        count = c.fetchone()[0]
+        conn.close()
+        return {"count": count}
+    except:
+        return {"count": 0}
+
+@app.get("/api/tizhi-test/latest")
+async def tizhi_test_latest(user_id: str):
+    """用户最新测评结果（小麦对话时读取）"""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(__file__), "data", "user_data.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM tizhi_test WHERE user_id=? ORDER BY created_at DESC LIMIT 1", (user_id,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            return {"success": True, "record": dict(row)}
+        return {"success": True, "record": None}
+    except:
+        return {"success": True, "record": None}
+
 # ========== 启动 ==========
 
 if __name__ == "__main__":

@@ -12,6 +12,16 @@ Page({
     pendingImage: '' // 待发送的图片临时路径
   },
 
+  onShow() {
+    // 从体质测评页跳过来时，自动发送测评结果给小麦
+    const hint = wx.getStorageSync('som_tizhi_hint');
+    if (hint) {
+      wx.removeStorageSync('som_tizhi_hint');
+      this.setData({ inputValue: hint });
+      setTimeout(() => this.sendMessage(), 300);
+    }
+  },
+
   onInput(e) {
     this.setData({ inputValue: e.detail.value });
   },

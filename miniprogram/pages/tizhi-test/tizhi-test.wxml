@@ -1,0 +1,57 @@
+<!-- 体质测评：10道题 → 判定体质 → 分享图裂变 -->
+<view class="test-container">
+  <!-- 开始页 -->
+  <view class="start-page" wx:if="{{phase === 'start'}}">
+    <view class="start-icon">🌿</view>
+    <view class="start-title">测测你的体质</view>
+    <view class="start-desc">中医九种体质，10道题，3分钟\n了解自己的身体，才能对症养生</view>
+    <button class="start-btn" bindtap="startTest">开始测评</button>
+    <view class="start-tip">已有 {{testCount || 1286}} 人完成测评</view>
+  </view>
+
+  <!-- 答题页 -->
+  <view class="quiz-page" wx:if="{{phase === 'quiz'}}">
+    <view class="progress-bar">
+      <view class="progress-fill" style="width: {{(currentIndex + 1) / questions.length * 100}}%"></view>
+    </view>
+    <view class="progress-text">{{currentIndex + 1}} / {{questions.length}}</view>
+
+    <view class="question-card">
+      <view class="question-text">{{questions[currentIndex].q}}</view>
+      <view class="options">
+        <view class="option {{selectedAnswer === idx ? 'selected' : ''}}"
+              wx:for="{{questions[currentIndex].options}}" wx:for-index="idx" wx:key="idx"
+              bindtap="selectAnswer" data-idx="{{idx}}">
+          {{item}}
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 结果页 -->
+  <view class="result-page" wx:if="{{phase === 'result'}}">
+    <view class="result-card">
+      <view class="result-badge">{{result.emoji}}</view>
+      <view class="result-title">你是【{{result.name}}】</view>
+      <view class="result-symptoms">
+        <text class="symptom-tag" wx:for="{{result.symptoms}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="result-desc">{{result.desc}}</view>
+      <view class="result-advice">
+        <view class="advice-title">🌾 小麦建议</view>
+        <view class="advice-diet">食疗：{{result.diet}}</view>
+        <view class="advice-avoid">忌口：{{result.avoid}}</view>
+        <view class="advice-life">起居：{{result.life}}</view>
+      </view>
+    </view>
+
+    <!-- 分享图 canvas -->
+    <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
+
+    <view class="result-actions">
+      <button class="share-btn" bindtap="saveShareImage">📷 保存分享图</button>
+      <button class="ask-btn" bindtap="goAskXiaomai">💬 问小麦怎么调理</button>
+    </view>
+    <view class="result-tip">分享给朋友，一起养生 💚</view>
+  </view>
+</view>

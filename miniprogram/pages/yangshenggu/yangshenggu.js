@@ -15,6 +15,10 @@ Page({
     this.loadAll();
   },
 
+  goTizhiTest() {
+    wx.navigateTo({ url: '/pages/tizhi-test/tizhi-test' });
+  },
+
   loadAll() {
     this.setData({ loading: true });
 
