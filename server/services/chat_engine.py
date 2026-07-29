@@ -233,15 +233,15 @@ def _extract_ingredients_from_reply(reply: str) -> list:
     skip_words = {'水', '盐', '调味', '给你', '每周', '每天', '每次', '每日', '连吃', '连服', '煮水', '煮粥', '代茶饮', '方子', '食谱', '食材', '分钟', '小时'}
 
     # 1. 匹配所有 "食材名+用量" 的模式，兼容多种 LLM 输出格式：
-    #    黄芪15g / 黄芪：15g / 黄芪（15g）/ 乌鸡半只 / 红枣5枚 / 黄芪15-20g
+    #    黄芪15g / 黄芪：15g / 黄芪（15g）/ 乌鸡半只 / 红枣5枚 / 黄芪15-20g / 冰糖适量
     import re
     dosage_pattern = (
         r"([一-龥]{2,6})"          # 食材名（2-6个汉字）
         r"\s*[：:]?\s*"            # 可选冒号（中英文）
         r"[（(]?\s*"               # 可选左括号
-        r"(?:\d+(?:[-~]\d+)?|半)"  # 数字（可带范围如15-20）或"半"
+        r"(?:\d+(?:[-~]\d+)?|半|适量|少许)"  # 数字（可带范围）/半/适量/少许
         r"\s*"
-        r"[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两]"  # 单位
+        r"[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两]?"  # 单位（适量/少许时可省略）
     )
     matches = re.findall(dosage_pattern, reply)
     for m in matches:
@@ -309,8 +309,10 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
         result = []
         local_brands = set()
         is_amb = ing in AMBIGUOUS
-        # 搜索词：始终带"有机"，中药材类加消歧后缀
-        queries = [f"{ing} 有机", f"有机 {ing} 中药材"] if is_amb else [f"{ing} 有机", f"有机 {ing}"]
+        # 搜索词：始终带"有机"，多种组合提高命中率
+        queries = [f"{ing} 有机", f"有机 {ing}", f"有机{ing}"]
+        if is_amb:
+            queries.append(f"有机 {ing} 中药材")
         for q in queries:
             if len(result) >= 2:
                 break
