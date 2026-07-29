@@ -122,14 +122,7 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
     if not ingredient_names:
         ingredient_names = [r.get("name", "") for r in recommendations if r.get("name")]
 
-    # 方法4：从回复中匹配常见食材
-    if not ingredient_names:
-        common_foods = ['枸杞', '红枣', '山药', '薏米', '茯苓', '百合', '莲子', '黄芪',
-                        '当归', '陈皮', '山楂', '菊花', '决明子', '酸枣仁', '桂圆', '黑芝麻',
-                        '赤小豆', '银耳', '核桃', '黑豆', '黑米', '燕麦', '小米', '党参', '麦冬']
-        for food in common_foods:
-            if food in reply and food not in ingredient_names:
-                ingredient_names.append(food)
+    # 不再从回复中额外匹配食材（用户要求：严格只推食谱内的，不加食谱外的）
 
     if not ingredient_names:
         return []
@@ -140,10 +133,13 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
     seen_titles = set()
 
     def search_one(ing: str) -> list:
+        """搜索单个食材，严格只返回2个不同品牌的商品"""
         result = []
         local_titles = set()
         local_brands = set()
         for page in range(1, 6):
+            if len(result) >= 2:
+                break
             try:
                 items = shop._search_taobao(f"{ing} 有机", page, 2, "")
             except Exception:
@@ -151,18 +147,23 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
             if not items:
                 continue
             for item in items:
+                if len(result) >= 2:
+                    break
                 title = item.get('title', '')
                 brand = item.get('shop_name', '') or ''
                 if '有机' not in title:
                     continue
+                # 严格匹配：食材名必须出现在标题前半段
+                # 防止“麦冬…黄芪党参泡水”这种只是顺带提及的商品混进来
+                half = max(len(title) // 2, 10)
+                if ing.lower() not in title.lower()[:half]:
+                    continue
                 if title and title not in local_titles and not shop._is_excluded(item):
-                    if ing.lower() in title.lower():
+                    # 必须是不同品牌，同品牌只要一个
+                    if brand not in local_brands:
                         local_titles.add(title)
-                        if brand not in local_brands or len(result) < 2:
-                            local_brands.add(brand)
-                            result.append(item)
-            if len(result) >= 2:
-                break
+                        local_brands.add(brand)
+                        result.append(item)
         return result
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
