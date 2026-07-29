@@ -229,7 +229,8 @@ def _extract_ingredients_from_reply(reply: str) -> list:
     ingredient_names = []
     seen = set()
     # 仅过滤明显不是食材的词，排骨、猪骨就是食材！
-    skip_words = {'粳米', '冰糖', '红糖', '水', '盐', '调味', '给你', '每周', '每天', '每次', '每日', '连吃', '连服', '煮水', '煮粥', '代茶饮', '方子', '食谱', '食材', '分钟', '小时'}
+    # 只过滤明显不是食材的词（冰糖、红糖是食材，不过滤！）
+    skip_words = {'水', '盐', '调味', '给你', '每周', '每天', '每次', '每日', '连吃', '连服', '煮水', '煮粥', '代茶饮', '方子', '食谱', '食材', '分钟', '小时'}
 
     # 1. 匹配所有 "食材名+用量" 的模式，兼容多种 LLM 输出格式：
     #    黄芪15g / 黄芪：15g / 黄芪（15g）/ 乌鸡半只 / 红枣5枚 / 黄芪15-20g
@@ -296,14 +297,20 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
     # 易混淆药材：裸搜会搜出日用品（防风帽/有机玻璃），加"中药材"消歧
     AMBIGUOUS = {'防风', '白术', '当归', '熟地', '生地', '川芎', '白芍', '红花', '麻黄', '桂枝', '柴胡', '黄芩', '半夏', '附子'}
 
+    # 加工制品排除词：松麦只推原材料食材，不推加工饮品/保健品
+    PROCESSED_EXCLUDE = ['原浆', '口服液', '饮料', '饮品', '冲剂', '胶囊', '片剂', '丸剂', '糖浆',
+                         '精华液', '面膜', '护肤', '注射', '颗粒剂', '含片', '泡腾片', '软糖',
+                         '代餐', '奶昔', '果汁', '酵素', '益生菌粉',
+                         '膏方', '养生膏', '桑椹膏', '秋梨膏', '阿胶膏', '固元膏']
+
     def search_one(ing: str) -> list:
-        """搜索单个食材，严格只返回2个不同品牌的商品。
-        分级搜索：有机 → 中药材 → 裸搜，保证中药材类也能搜到。"""
+        """搜索单个食材，严格只返回2个不同品牌的有机认证商品。
+        铁律：标题必须含"有机"，必须是原材料食材，不推加工制品。"""
         result = []
         local_brands = set()
         is_amb = ing in AMBIGUOUS
-        # 搜索词梯度：优先有机，中药材类加消歧后缀
-        queries = [f"{ing} 有机", f"{ing} 中药材", ing] if is_amb else [f"{ing} 有机", ing]
+        # 搜索词：始终带"有机"，中药材类加消歧后缀
+        queries = [f"{ing} 有机", f"有机 {ing} 中药材"] if is_amb else [f"{ing} 有机", f"有机 {ing}"]
         for q in queries:
             if len(result) >= 2:
                 break
@@ -321,8 +328,23 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
                         break
                     title = item.get('title', '')
                     brand = item.get('shop_name', '') or ''
-                    # 标题必须包含完整食材关键词（不限制位置）
+                    # 铁律1：标题必须含"有机"（松麦只卖有机认证）
+                    if '有机' not in title:
+                        continue
+                    # 铁律2：食材必须是商品主体，不能只是搭配提及
+                    # 如"有机玉竹...搭沙参麦冬百合煲汤"，百合只是搭配，商品是玉竹
                     if ing.lower() not in title.lower():
+                        continue
+                    # 检查食材是否出现在"搭/送/赠"之前（之后的是搭配推荐，不是商品本身）
+                    main_part = title
+                    for sep in ['搭', '送', '赠']:
+                        idx = title.find(sep)
+                        if 0 < idx < len(main_part):
+                            main_part = title[:idx]
+                    if ing.lower() not in main_part.lower():
+                        continue
+                    # 铁律3：排除加工制品（原浆/口服液/饮品等不是食材）
+                    if any(w in title for w in PROCESSED_EXCLUDE):
                         continue
                     # 易混淆药材：排除日用品（帽/玻璃/挡风/针织等）
                     if is_amb and any(w in title for w in ['帽', '玻璃', '挡风', '针织', '婴', '童', '罩', '板', '衣', '杯', '睡袋', '包巾', '安抚', 't恤', 'T恤', '服饰', '母婴']):
