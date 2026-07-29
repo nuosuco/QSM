@@ -231,19 +231,29 @@ def _extract_ingredients_from_reply(reply: str) -> list:
     # 仅过滤明显不是食材的词，排骨、猪骨就是食材！
     skip_words = {'粳米', '冰糖', '红糖', '水', '盐', '调味', '给你', '每周', '每天', '每次', '每日', '连吃', '连服', '煮水', '煮粥', '代茶饮', '方子', '食谱', '食材', '分钟', '小时'}
 
-    # 1. 匹配所有 "食材名+数字+单位" 的模式（如 茯苓15g、淮山15g...）
+    # 1. 匹配所有 "食材名+用量" 的模式，兼容多种 LLM 输出格式：
+    #    黄芪15g / 黄芪：15g / 黄芪（15g）/ 乌鸡半只 / 红枣5枚 / 黄芪15-20g
     import re
-    matches = re.findall(r"([一-龥]{2,6})\s*\d+\s*[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两]", reply)
+    dosage_pattern = (
+        r"([一-龥]{2,6})"          # 食材名（2-6个汉字）
+        r"\s*[：:]?\s*"            # 可选冒号（中英文）
+        r"[（(]?\s*"               # 可选左括号
+        r"(?:\d+(?:[-~]\d+)?|半)"  # 数字（可带范围如15-20）或"半"
+        r"\s*"
+        r"[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两]"  # 单位
+    )
+    matches = re.findall(dosage_pattern, reply)
     for m in matches:
         m = m.strip()
         if m not in seen and m not in skip_words and 2 <= len(m) <= 6:
             seen.add(m)
             ingredient_names.append(m)
 
-    # 2. 提取肉类食材（不要过滤排骨/猪骨！它们就是需要推荐的食材）
-    meat_patterns = re.findall(r"加排骨|加猪骨|排骨|猪骨", reply)
-    for m in meat_patterns:
-        m_clean = m.replace('加', '').strip()
+    # 2. 提取肉类/禽类食材（排骨、猪骨、乌鸡、瘦肉等，它们就是需要推荐的食材）
+    meat_pattern = r"(?:加)?(排骨|猪骨|乌鸡|鸡肉|瘦肉|羊肉|牛肉|鸭肉|鸽子|鲫鱼|鲈鱼|猪蹄)"
+    meat_matches = re.findall(meat_pattern, reply)
+    for m in meat_matches:
+        m_clean = m.strip()
         if m_clean not in seen and 2 <= len(m_clean) <= 6:
             seen.add(m_clean)
             ingredient_names.append(m_clean)
