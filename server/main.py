@@ -264,7 +264,25 @@ async def health_check():
 async def chat(request: ChatRequest):
     from services.chat_engine import chat_with_llm
 
-    result = chat_with_llm(request.message)
+    # 加载当前会话的历史对话（传给LLM，让小麦记住上下文）
+    history = []
+    if request.session_id:
+        try:
+            conn = get_user_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT user_message, assistant_reply FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
+                (request.session_id,)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            for row in reversed(rows):  # 时间正序
+                history.append({"role": "user", "content": row["user_message"]})
+                history.append({"role": "assistant", "content": row["assistant_reply"]})
+        except Exception as e:
+            print(f"加载会话历史失败: {e}")
+
+    result = chat_with_llm(request.message, history=history, user_id=request.user_id)
 
     products = result.get("products", [])
 
@@ -797,7 +815,7 @@ async def chat_vision(request: VisionChatRequest):
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             request.user_id or 'anonymous',
-            'vision',
+            request.session_id or 'vision',
             f'[图片辨证] {request.message[:200]}',
             result["content"][:2000],
             '', '',
