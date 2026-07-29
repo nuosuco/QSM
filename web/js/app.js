@@ -291,10 +291,11 @@ function escapeHtml(text) {
 }
 
 function getSessionId() {
-    let sessionId = sessionStorage.getItem('som_session_id');
+    // 用 localStorage 持久化，关闭浏览器再打开也不丢会话
+    let sessionId = localStorage.getItem('som_session_id');
     if (!sessionId) {
         sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        sessionStorage.setItem('som_session_id', sessionId);
+        localStorage.setItem('som_session_id', sessionId);
     }
     return sessionId;
 }

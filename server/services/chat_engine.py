@@ -11,32 +11,50 @@ from typing import Optional
 from services import llm_router, rag
 from services.bianzheng import BianzhengEngine
 
-SYSTEM_PROMPT = """你是小麦SOM，一位温暖、专业、有耐心的中医养生顾问。你是用户终生的健康生活伴侣。
+SYSTEM_PROMPT = """你是小麦，松麦平台的中医养生顾问。你不是客服，不是搜索引擎，你是用户相识多年的老朋友、终生的健康生活伴侣。
 
-你的职责：
-1. 认真倾听用户的身体描述，用通俗语言分析可能的体质倾向
-2. 基于药食同源知识，给出实用的食养建议（配方+用法）
-3. 语气温和亲切，像老朋友聊天，不说教、不吓唬人
-4. 每次回复结尾加一句：以上为养生文化参考，身体不适请及时就医
+【你的性格】
+- 温暖但不啰嗦，专业但不说教，关心人但不吓唬人
+- 像老朋友聊天一样自然，该开玩笑开玩笑，该认真认真
+- 你记得用户之前跟你说过的每一件事，主动关心他/她的变化
 
-【商品推荐机制（你必须知道）】
-- 系统会自动在你回复下方展示有机商品卡片（带图片、价格、购买链接）
-- 你不需要说"不能发链接"，商品卡片会自动出现
-- 当你给出食谱建议时，自然地提一句："对应的有机食材我帮你找好了，就在下面哦～"
-- 用户问"哪里买""链接""推荐"时，告诉他："就在下方推荐里，点击就能购买～"
+【你的职责】
+1. 倾听用户身体描述，用通俗语言分析体质倾向
+2. 基于药食同源知识，给出实用的食养建议（配方+用法+用量）
+3. 结合当前节气，给出时令养生提醒
+4. 关注用户情绪和心情，身心一起调
+5. 发现严重症状时，第一时间建议就医，再给辅助食养参考
+
+【商品推荐——你必须主动做！】
+- 当你给出食谱/药膳建议后，必须自然地说："这几样食材我帮你找了有机的，就在下面，点击就能买～"
+- 用户说"推荐""哪里买""链接""帮我找"时，你必须回应并引导看下方商品卡片
+- 系统会在你回复下方自动展示有机商品卡片（带图片、价格、购买链接）
+- 你不需要说"不能发链接""我无法推荐"这种话！商品卡片会自动出现！
 - 不要编造具体商品名或价格，商品由系统自动匹配
+- 推荐要自然，像朋友说"对了，这个我买过，给你个链接"的感觉
 
-重要规则：
+【主动关怀——松麦的灵魂】
+- 如果系统提供了用户的健康档案和历史对话，你必须像老朋友一样主动关心：
+  "上次你说睡眠不好，最近好点了吗？"
+  "你之前提到容易疲倦，这个节气要注意..."
+- 结合当前节气主动提醒：今天该吃什么、该怎样锻炼、心情怎样调节
+- 用户每天状况不同，你要根据变化推断身体趋势，给出针对性建议
+- 不是被动等用户问，而是主动关心，像真正的老朋友
+
+【规则】
 - 不做医疗诊断，不说"你得了XX病"
-- 不用"治疗""治愈""根治"等医疗用语，用"调养""食养""参考"
-- 配方必须来自药食同源目录，不推荐药材
-- 如果用户描述严重症状，优先建议就医，再给辅助食养参考
+- 不用"治疗""治愈""根治"，用"调养""食养""参考"
+- 配方必须来自药食同源目录
 - 回复控制在300字以内，简洁有用
-- 记住用户之前说过的身体状况，像老朋友一样关心他/她"""
+- 每次回复结尾加一句：以上为养生文化参考，身体不适请及时就医"""
 
 
 def _build_user_profile_context(user_id: str) -> str:
-    """构建用户终身档案：历史对话 + 体质记录，让小麦“认识”老用户"""
+    """构建用户终身档案：历史对话 + 体质记录，让小麦"认识"老用户
+    
+    松麦核心优势：不管小麦经历多少次新会话，它都认识这个用户，
+    好像已经相识几年了一样。
+    """
     if not user_id or user_id == 'anonymous':
         return ""
     try:
@@ -48,41 +66,69 @@ def _build_user_profile_context(user_id: str) -> str:
         conn.row_factory = sqlite3.Row
         parts = []
 
-        # 体质记录（最近3条）
+        # 体质记录（最近5条，追踪变化趋势）
         try:
             rows = conn.execute(
-                "SELECT tizhi, zhengxing, symptoms, created_at FROM tizhi_records WHERE user_id=? ORDER BY created_at DESC LIMIT 3",
+                "SELECT tizhi, zhengxing, symptoms, advice, created_at FROM tizhi_records WHERE user_id=? ORDER BY created_at DESC LIMIT 5",
                 (user_id,)
             ).fetchall()
             if rows:
                 tizhi_lines = []
                 for r in rows:
                     line = f"{r['created_at'][:10]} 体质:{r['tizhi'] or '未定'}"
+                    if r['zhengxing']:
+                        line += f" 证型:{r['zhengxing']}"
                     if r['symptoms']:
-                        line += f" 症状:{r['symptoms'][:40]}"
+                        line += f" 症状:{r['symptoms'][:50]}"
                     tizhi_lines.append(line)
-                parts.append("【用户体质档案】\n" + "\n".join(tizhi_lines))
+                parts.append("【用户体质档案（注意变化趋势）】\n" + "\n".join(tizhi_lines))
         except Exception:
             pass
 
-        # 历史对话（最近10条，跨会话）
+        # 历史对话（最近30条，跨会话，让小麦真正"认识"用户）
         try:
             rows = conn.execute(
-                "SELECT user_message, assistant_reply, created_at FROM chat_history WHERE user_id=? ORDER BY created_at DESC LIMIT 10",
+                "SELECT user_message, assistant_reply, created_at FROM chat_history WHERE user_id=? ORDER BY created_at DESC LIMIT 30",
                 (user_id,)
             ).fetchall()
             if rows:
                 hist_lines = []
                 for r in reversed(rows):  # 时间正序
-                    hist_lines.append(f"[{r['created_at'][:16]}] 用户:{(r['user_message'] or '')[:60]}")
-                    hist_lines.append(f"    小麦:{(r['assistant_reply'] or '')[:80]}")
-                parts.append("【历史对话记录（你和这位用户之前的交流）】\n" + "\n".join(hist_lines))
+                    hist_lines.append(f"[{r['created_at'][:16]}] 用户:{(r['user_message'] or '')[:80]}")
+                    hist_lines.append(f"    小麦:{(r['assistant_reply'] or '')[:100]}")
+                parts.append("【历史对话记录（你和这位用户之前的所有交流，跨会话）】\n" + "\n".join(hist_lines))
         except Exception:
             pass
 
         conn.close()
         if parts:
-            return "\n\n".join(parts) + "\n\n【重要】你认识这位用户，请像老朋友一样关心他/她，记住他/她之前的身体状况，主动跟进关心。"
+            return ("\n\n".join(parts) +
+                    "\n\n【重要！松麦的核心优势】你认识这位用户，你们已经相识很久了。"
+                    "请像老朋友一样主动关心他/她：\n"
+                    "- 主动提起之前的话题：\"上次你说XX，最近好点了吗？\"\n"
+                    "- 根据体质变化趋势给出针对性建议\n"
+                    "- 结合今天的节气提醒注意事项\n"
+                    "- 不要每次都像第一次见面，你们是老朋友！")
+    except Exception:
+        pass
+    return ""
+
+
+def _build_jieqi_context() -> str:
+    """获取当前节气信息，注入对话上下文，让小麦主动结合节气关怀用户"""
+    try:
+        from services.jieqi import get_jieqi_advice
+        advice = get_jieqi_advice()
+        if advice and advice.get('name'):
+            lines = [
+                f"【当前节气：{advice['name']}】",
+                f"养生要点：{advice.get('yangsheng', '')}",
+                f"宜食：{', '.join(advice.get('foods', [])[:6])}",
+                f"宜饮：{advice.get('tea', '')}",
+                f"忌：{advice.get('avoid', '')}",
+                "请在回复中自然融入节气养生提醒（不要生硬罗列），像朋友随口提醒一样。",
+            ]
+            return "\n".join(lines)
     except Exception:
         pass
     return ""
@@ -105,6 +151,11 @@ def chat_with_llm(user_message: str, history: list = None, user_id: str = None) 
     profile_ctx = _build_user_profile_context(user_id)
     if profile_ctx:
         system += f"\n\n{profile_ctx}"
+
+    # 当前节气信息（让小麦主动结合节气关怀用户）
+    jieqi_ctx = _build_jieqi_context()
+    if jieqi_ctx:
+        system += f"\n\n{jieqi_ctx}"
 
     # 3. 调用 LLM 生成回复
     llm_result = llm_router.chat(
