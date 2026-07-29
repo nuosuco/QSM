@@ -161,7 +161,8 @@ async function sendMessage() {
         
         // 图片辨证：直接显示回复，不走商品推荐分支
         if (hasImage) {
-            appendMessage(replyText, 'assistant');
+            appendMessage(replyText, 'assistant', false, false);
+            scrollToLastUserMessage();
             sendBtn.disabled = false;
             return;
         }
@@ -171,7 +172,8 @@ async function sendMessage() {
         
         // 如果有推荐商品，显示为可点击的商品卡片
         if (data.products && data.products.length > 0) {
-            const chatMsgDiv = appendMessage(replyText, 'assistant');
+            // 不自动滚底！等商品全部渲染完后一次性定位
+            const chatMsgDiv = appendMessage(replyText, 'assistant', false, false);
             const chatContainer = document.getElementById('chat-messages');
             
             // 在回复消息后面插入商品卡片区域
@@ -232,16 +234,14 @@ async function sendMessage() {
             }
             
             chatContainer.appendChild(productsDiv);
-            // 滚到用户输入内容的底部，让用户看到自己问的+小麦回答
-            const lastUserMsg = document.querySelector('#chat-messages .message.user:last-of-type');
-            if (lastUserMsg) {
-                lastUserMsg.scrollIntoView({ block: 'start', behavior: 'auto' });
-            }
+            scrollToLastUserMessage();
             
             return;
         }
         
-        appendMessage(replyText, 'assistant');
+        // 无商品：也不跳底，定位到用户消息
+        appendMessage(replyText, 'assistant', false, false);
+        scrollToLastUserMessage();
         
     } catch (error) {
         document.getElementById(loadingId).remove();
@@ -252,7 +252,20 @@ async function sendMessage() {
     }
 }
 
-function appendMessage(text, type, isHtml = false) {
+// 滚动定位：把最后一条用户消息放到聊天区顶部
+// 用户能看到：自己的输入 + 小麦回答，往下滑才看到商品/更多内容
+function scrollToLastUserMessage() {
+    const chatContainer = document.getElementById('chat-messages');
+    const allUserMsgs = chatContainer.querySelectorAll('.message.user');
+    const lastUserMsg = allUserMsgs[allUserMsgs.length - 1];
+    if (lastUserMsg) {
+        // 用 offsetTop 定位：用户消息在容器中的偏移量
+        // 容器顶部留10px边距，用户能看到自己输入 + 小麦回答
+        chatContainer.scrollTop = lastUserMsg.offsetTop - 10;
+    }
+}
+
+function appendMessage(text, type, isHtml = false, autoScroll = true) {
     const messagesContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
@@ -279,7 +292,9 @@ function appendMessage(text, type, isHtml = false) {
     }
     
     messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (autoScroll) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
     
     return messageId;
 }

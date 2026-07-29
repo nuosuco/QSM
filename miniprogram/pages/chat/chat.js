@@ -161,7 +161,8 @@ Page({
       this.setData({
         messages: msgs,
         sending: false,
-        scrollToId: 'msg-' + assistantMsg.id
+        // 定位到用户消息（和网页版一致）：看到自己输入+小麦回答，下滑看商品
+        scrollToId: 'msg-' + userMsg.id
       });
 
       // 保存对话记录（对应 saveChatRecord）
