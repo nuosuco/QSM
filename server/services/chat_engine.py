@@ -25,13 +25,13 @@ SYSTEM_PROMPT = """你是小麦，松麦平台的中医养生顾问。你不是�
 4. 关注用户情绪和心情，身心一起调
 5. 发现严重症状时，第一时间建议就医，再给辅助食养参考
 
-【商品推荐——你必须主动做！】
-- 当你给出食谱/药膳建议后，必须自然地说："这几样食材我帮你找了有机的，就在下面，点击就能买～"
-- 用户说"推荐""哪里买""链接""帮我找"时，你必须回应并引导看下方商品卡片
-- 系统会在你回复下方自动展示有机商品卡片（带图片、价格、购买链接）
-- 你不需要说"不能发链接""我无法推荐"这种话！商品卡片会自动出现！
-- 不要编造具体商品名或价格，商品由系统自动匹配
-- 推荐要自然，像朋友说"对了，这个我买过，给你个链接"的感觉
+【商品推荐——只在出示食谱时做】
+- 你不需要在回复中主动说"下方推荐""就在下面""帮你找了"这类话！
+- 系统会自动判断：如果你给了食谱，系统会在你回复下方自动展示有机商品卡片，并自动追加引导语
+- 如果没给食谱（普通聊天、情绪关怀、问答），系统不会展示商品，你也绝对不要提商品
+- 用户主动问"链接""哪里买""推荐"时，你可以说"我帮你找找看"
+- 不要编造具体商品名或价格，商品由系统按食谱食材自动匹配
+- 总之：你只管给好食谱，商品的事交给系统，你不用操心
 
 【主动关怀——松麦的灵魂】
 - 如果系统提供了用户的健康档案和历史对话，你必须像老朋友一样主动关心：
@@ -134,6 +134,24 @@ def _build_jieqi_context() -> str:
     return ""
 
 
+def _reply_has_recipe(reply: str) -> bool:
+    """检测回复中是否包含药膳食谱（有食材+用量才算）"""
+    # 明确的配方/食谱标记
+    if re.search(r'(配方|食谱|药膳方|食疗方|食养方|推荐方|参考方)[：:]', reply):
+        return True
+    # 食材+用量模式（如 "酸枣仁15g" "百合10克" "玫瑰花3朵"），至少2个才算食谱
+    dosage_matches = re.findall(r'[\u4e00-\u9fa5]{2,6}\s*\d+\s*[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐]', reply)
+    if len(dosage_matches) >= 2:
+        return True
+    return False
+
+
+def _user_asks_for_products(user_message: str) -> bool:
+    """检测用户是否主动要求商品/链接/推荐"""
+    keywords = ['链接', '推荐', '哪里买', '帮我找', '购买', '下单', '商品', '在哪买', '怎么买']
+    return any(kw in user_message for kw in keywords)
+
+
 def chat_with_llm(user_message: str, history: list = None, user_id: str = None) -> dict:
     """
     新版对话：LLM + RAG + 辨证引擎 + 用户终身档案
@@ -180,11 +198,16 @@ def chat_with_llm(user_message: str, history: list = None, user_id: str = None) 
     zhengxing = bz_result.get("zhengxing")
     recommendations = bz_result.get("recommendations", [])
 
-    # 5. 从回复中提取食材名，搜索商品（传入证型+用户消息+历史）
-    products = _search_products_from_reply(
-        reply, recommendations, zhengxing=zhengxing,
-        user_message=user_message, history=history
-    )
+    # 5. 只有出示药膳食谱时才搜索商品（或用户主动要求链接/推荐）
+    has_recipe = _reply_has_recipe(reply)
+    user_wants = _user_asks_for_products(user_message)
+    if has_recipe or user_wants:
+        products = _search_products_from_reply(
+            reply, recommendations, zhengxing=zhengxing,
+            user_message=user_message, history=history
+        )
+    else:
+        products = []
 
     # 6. 有商品时，在回复末尾追加推荐引导语（LLM已说过就不重复）
     if products and '下方推荐' not in reply and '就在下面' not in reply and '点击即可购买' not in reply:
@@ -320,7 +343,7 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
         return result
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {executor.submit(search_one, ing): ing for ing in ingredient_names[:6]}
+        futures = {executor.submit(search_one, ing): ing for ing in ingredient_names}
         concurrent.futures.wait(futures, timeout=15)
         for future in futures:
             try:
