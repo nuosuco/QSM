@@ -34,17 +34,33 @@ def init_user_system():
     conn = _conn()
     c = conn.cursor()
 
-    # 用户主表
+    # 用户主表（统一账号：phone / email / wechat_openid 三合一）
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
             phone TEXT UNIQUE,
+            email TEXT UNIQUE,
+            wechat_openid TEXT UNIQUE,
             nickname TEXT DEFAULT '养生用户',
             avatar TEXT,
             is_anonymous INTEGER DEFAULT 1,
             points INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 验证码表（短信/邮箱通用）
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS verify_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            target TEXT NOT NULL,
+            code TEXT NOT NULL,
+            channel TEXT NOT NULL DEFAULT 'sms',
+            purpose TEXT NOT NULL DEFAULT 'login',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            used INTEGER DEFAULT 0
         )
     ''')
 
@@ -75,6 +91,16 @@ def init_user_system():
     c.execute('CREATE INDEX IF NOT EXISTS idx_token_user ON auth_tokens(user_id)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_tizhi_user ON tizhi_records(user_id)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_users_openid ON users(wechat_openid)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_codes_target ON verify_codes(target)')
+
+    # 迁移：已有数据库加新字段（幂等）
+    existing_cols = [row[1] for row in c.execute('PRAGMA table_info(users)').fetchall()]
+    if 'email' not in existing_cols:
+        c.execute('ALTER TABLE users ADD COLUMN email TEXT UNIQUE')
+    if 'wechat_openid' not in existing_cols:
+        c.execute('ALTER TABLE users ADD COLUMN wechat_openid TEXT UNIQUE')
 
     conn.commit()
     conn.close()

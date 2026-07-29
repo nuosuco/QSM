@@ -719,9 +719,153 @@ globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, plat
     }
 };
 
+// ========== 统一认证（全球手机号 + 邮箱） ==========
+
+let _codeCooldown = 0;
+
+function switchLoginChannel(channel) {
+    document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.login-tab[data-channel="${channel}"]`).classList.add('active');
+    document.getElementById('login-form-sms').style.display = channel === 'sms' ? 'flex' : 'none';
+    document.getElementById('login-form-email').style.display = channel === 'email' ? 'flex' : 'none';
+    hideLoginError();
+}
+
+function showLoginError(msg) {
+    const el = document.getElementById('login-error');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+function hideLoginError() {
+    document.getElementById('login-error').style.display = 'none';
+}
+
+async function sendLoginCode(channel) {
+    hideLoginError();
+    let target, countryCode = '+86';
+    if (channel === 'sms') {
+        target = document.getElementById('sms-phone').value.trim();
+        countryCode = document.getElementById('country-code').value;
+        if (!target) { showLoginError('请输入手机号'); return; }
+    } else {
+        target = document.getElementById('email-addr').value.trim();
+        if (!target || !target.includes('@')) { showLoginError('请输入有效邮箱'); return; }
+    }
+
+    const btnId = channel === 'sms' ? 'sms-code-btn' : 'email-code-btn';
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/send-code`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ target, channel, country_code: countryCode })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            // 倒计时 60 秒
+            _codeCooldown = 60;
+            const timer = setInterval(() => {
+                _codeCooldown--;
+                if (_codeCooldown <= 0) {
+                    clearInterval(timer);
+                    btn.disabled = false;
+                    btn.textContent = '获取验证码';
+                } else {
+                    btn.textContent = `${_codeCooldown}s`;
+                }
+            }, 1000);
+            btn.textContent = '60s';
+        } else {
+            showLoginError(data.error || '发送失败');
+            btn.disabled = false;
+        }
+    } catch (e) {
+        showLoginError('网络错误，请重试');
+        btn.disabled = false;
+    }
+}
+
+async function doLogin(channel) {
+    hideLoginError();
+    let target, code, countryCode = '+86';
+    if (channel === 'sms') {
+        target = document.getElementById('sms-phone').value.trim();
+        code = document.getElementById('sms-code').value.trim();
+        countryCode = document.getElementById('country-code').value;
+        if (!target) { showLoginError('请输入手机号'); return; }
+        if (!code) { showLoginError('请输入验证码'); return; }
+    } else {
+        target = document.getElementById('email-addr').value.trim();
+        code = document.getElementById('email-code').value.trim();
+        if (!target) { showLoginError('请输入邮箱'); return; }
+        if (!code) { showLoginError('请输入验证码'); return; }
+    }
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                target, code, channel,
+                country_code: countryCode,
+                anonymous_user_id: getUserId()
+            })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            // 保存登录态
+            localStorage.setItem('som_auth_token', data.token);
+            localStorage.setItem('som_auth_user', JSON.stringify(data.user));
+            // 更新 user_id 为正式账号
+            if (data.user && data.user.user_id) {
+                localStorage.setItem('som_user_id', data.user.user_id);
+            }
+            updateLoginUI();
+            loadProfile();
+        } else {
+            showLoginError(data.error || '登录失败');
+        }
+    } catch (e) {
+        showLoginError('网络错误，请重试');
+    }
+}
+
+function doLogout() {
+    localStorage.removeItem('som_auth_token');
+    localStorage.removeItem('som_auth_user');
+    updateLoginUI();
+}
+
+function isLoggedIn() {
+    return !!localStorage.getItem('som_auth_token');
+}
+
+function updateLoginUI() {
+    const loginSection = document.getElementById('login-section');
+    const profileCard = document.getElementById('profile-card');
+    if (isLoggedIn()) {
+        loginSection.style.display = 'none';
+        profileCard.style.display = 'flex';
+        // 显示昵称
+        try {
+            const user = JSON.parse(localStorage.getItem('som_auth_user') || '{}');
+            if (user.nickname) {
+                document.getElementById('profile-name').textContent = user.nickname;
+            }
+        } catch(e) {}
+    } else {
+        loginSection.style.display = 'block';
+        profileCard.style.display = 'none';
+    }
+}
+
 // ========== 个人中心 ==========
 
 function initProfile() {
+    updateLoginUI();
     loadProfile();
 }
 

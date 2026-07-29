@@ -119,6 +119,32 @@ class UserLoginRequest(BaseModel):
     phone: str
     anonymous_user_id: Optional[str] = None
 
+class SendCodeRequest(BaseModel):
+    """发送验证码（短信/邮箱）"""
+    target: str  # 手机号或邮箱
+    channel: str = "sms"  # sms | email
+    country_code: str = "+86"  # 国家码，默认中国
+
+class VerifyCodeLoginRequest(BaseModel):
+    """验证码登录"""
+    target: str  # 手机号或邮箱
+    code: str
+    channel: str = "sms"  # sms | email
+    country_code: str = "+86"
+    anonymous_user_id: Optional[str] = None
+
+class WechatLoginRequest(BaseModel):
+    """微信小程序登录"""
+    code: str  # wx.login() 返回的 code
+    anonymous_user_id: Optional[str] = None
+
+class BindPhoneRequest(BaseModel):
+    """微信用户绑定手机号"""
+    user_id: str
+    phone: str
+    code: str  # 短信验证码
+    country_code: str = "+86"
+
 class UserProfileUpdateRequest(BaseModel):
     user_id: str
     nickname: Optional[str] = None
@@ -906,6 +932,71 @@ async def user_profile_update(request: UserProfileUpdateRequest):
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return {"success": True, "user": user}
+
+# ========== 统一认证 API（全球手机号 + 邮箱 + 微信） ==========
+
+@app.get("/api/auth/status")
+async def auth_status():
+    """查询各登录方式的配置状态"""
+    from services import auth_service
+    return auth_service.get_auth_status()
+
+@app.post("/api/auth/send-code")
+async def auth_send_code(request: SendCodeRequest):
+    """发送验证码（短信或邮箱）"""
+    from services import auth_service
+    target = (request.target or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="请输入手机号或邮箱")
+
+    if request.channel == "email":
+        # 简单邮箱格式校验
+        if "@" not in target or "." not in target.split("@")[-1]:
+            raise HTTPException(status_code=400, detail="邮箱格式不正确")
+        return auth_service.send_email_code(target)
+    else:
+        # 手机号：简单长度校验
+        digits = target.replace("+", "").replace("-", "").replace(" ", "")
+        if len(digits) < 6 or len(digits) > 15:
+            raise HTTPException(status_code=400, detail="手机号格式不正确")
+        return auth_service.send_sms_code(target, request.country_code)
+
+@app.post("/api/auth/login")
+async def auth_login(request: VerifyCodeLoginRequest):
+    """验证码登录（手机号/邮箱统一）"""
+    from services import auth_service
+    target = (request.target or "").strip()
+
+    # 手机号统一为 E.164
+    if request.channel == "sms":
+        target = auth_service.normalize_phone(target, request.country_code)
+
+    # 校验验证码
+    check = auth_service.verify_code(target, request.code)
+    if not check.get("success"):
+        return {"success": False, "error": check.get("error", "验证码错误")}
+
+    # 登录/注册
+    result = auth_service.login_or_register(
+        target, request.channel, anonymous_user_id=request.anonymous_user_id
+    )
+    return {"success": True, **result}
+
+@app.post("/api/auth/wechat-login")
+async def auth_wechat_login(request: WechatLoginRequest):
+    """微信小程序登录"""
+    from services import auth_service
+    return auth_service.wechat_login(request.code, anonymous_user_id=request.anonymous_user_id)
+
+@app.post("/api/auth/bind-phone")
+async def auth_bind_phone(request: BindPhoneRequest):
+    """微信用户绑定手机号（需短信验证码）"""
+    from services import auth_service
+    e164 = auth_service.normalize_phone(request.phone, request.country_code)
+    check = auth_service.verify_code(e164, request.code)
+    if not check.get("success"):
+        return {"success": False, "error": check.get("error", "验证码错误")}
+    return auth_service.bind_phone_to_wechat(request.user_id, e164)
 
 # ========== 体质评测 API ==========
 
