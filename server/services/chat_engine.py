@@ -297,6 +297,25 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
     # 易混淆药材：裸搜会搜出日用品（防风帽/有机玻璃），加"中药材"消歧
     AMBIGUOUS = {'防风', '白术', '当归', '熟地', '生地', '川芎', '白芍', '红花', '麻黄', '桂枝', '柴胡', '黄芩', '半夏', '附子'}
 
+    # 食材别名表：标题里不一定出现原词（如"大米"商品标题常写"有机米/五常大米/稻花香"）
+    # 匹配标题时，原词或任一别名命中即算匹配；搜索词也用别名扩展提高命中率
+    INGREDIENT_ALIASES = {
+        '大米': ['米', '稻花香', '粳米', '五常大米', '东北大米', '珍珠米', '胚芽米'],
+        '老鸭': ['鸭', '老鸭', '麻鸭'],
+        '乌鸡': ['乌鸡', '乌骨鸡'],
+        '排骨': ['排骨', '肋排', '猪排骨'],
+        '瘦肉': ['瘦肉', '猪瘦肉', '里脊'],
+        '生姜': ['生姜', '姜', '老姜', '嫩姜'],
+        '薏米': ['薏米', '薏仁', '薏苡仁'],
+        '山药': ['山药', '淮山', '铁棍山药'],
+        '绿豆': ['绿豆'],
+        '莲藕': ['莲藕', '藕', '莲菜'],
+        '苦瓜': ['苦瓜'],
+        '陈皮': ['陈皮', '新会陈皮'],
+        '茯苓': ['茯苓', '云苓'],
+        '冰糖': ['冰糖', '黄冰糖', '老冰糖', '多晶冰糖'],
+    }
+
     # 加工制品排除词：松麦只推原材料食材，不推加工饮品/保健品
     PROCESSED_EXCLUDE = ['原浆', '口服液', '饮料', '饮品', '冲剂', '胶囊', '片剂', '丸剂', '糖浆',
                          '精华液', '面膜', '护肤', '注射', '颗粒剂', '含片', '泡腾片', '软糖',
@@ -309,10 +328,22 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
         result = []
         local_brands = set()
         is_amb = ing in AMBIGUOUS
-        # 搜索词：始终带"有机"，多种组合提高命中率
+        aliases = INGREDIENT_ALIASES.get(ing, [])
+        # 搜索词：始终带"有机"，原词+别名扩展提高命中率
         queries = [f"{ing} 有机", f"有机 {ing}", f"有机{ing}"]
+        for al in aliases[:3]:
+            if al != ing:
+                queries.append(f"有机 {al}")
         if is_amb:
             queries.append(f"有机 {ing} 中药材")
+
+        def _title_match(title: str) -> bool:
+            """标题是否命中该食材（原词或任一别名）"""
+            tl = title.lower()
+            if ing.lower() in tl:
+                return True
+            return any(al.lower() in tl for al in aliases)
+
         for q in queries:
             if len(result) >= 2:
                 break
@@ -335,7 +366,7 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
                         continue
                     # 铁律2：食材必须是商品主体，不能只是搭配提及
                     # 如"有机玉竹...搭沙参麦冬百合煲汤"，百合只是搭配，商品是玉竹
-                    if ing.lower() not in title.lower():
+                    if not _title_match(title):
                         continue
                     # 检查食材是否出现在"搭/送/赠"之前（之后的是搭配推荐，不是商品本身）
                     main_part = title
@@ -343,7 +374,7 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
                         idx = title.find(sep)
                         if 0 < idx < len(main_part):
                             main_part = title[:idx]
-                    if ing.lower() not in main_part.lower():
+                    if not _title_match(main_part):
                         continue
                     # 铁律3：排除加工制品（原浆/口服液/饮品等不是食材）
                     if any(w in title for w in PROCESSED_EXCLUDE):
