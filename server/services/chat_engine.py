@@ -64,8 +64,8 @@ def chat_with_llm(user_message: str, history: list = None) -> dict:
     zhengxing = bz_result.get("zhengxing")
     recommendations = bz_result.get("recommendations", [])
 
-    # 5. 从回复中提取食材名，搜索商品
-    products = _search_products_from_reply(reply, recommendations)
+    # 5. 从回复中提取食材名，搜索商品（传入证型用于查食疗方）
+    products = _search_products_from_reply(reply, recommendations, zhengxing=zhengxing)
 
     return {
         "reply": reply,
@@ -78,15 +78,16 @@ def chat_with_llm(user_message: str, history: list = None) -> dict:
     }
 
 
-def _search_products_from_reply(reply: str, recommendations: list) -> list:
+def _search_products_from_reply(reply: str, recommendations: list, zhengxing: str = None) -> list:
     """从回复文本中提取食材名，并行搜索商品"""
     from services.shop import ShopService
+    from services.bianzheng import SHILIAO_DB
     import concurrent.futures
 
     # 提取食材名
     ingredient_names = []
 
-    # 方法1：从配方文字提取
+    # 方法1：从配方文字提取（LLM 回复带"配方："格式时）
     recipe_match = re.findall(r'配方[：:](.+?)(?:\n|—|：|。)', reply, re.DOTALL)
     if recipe_match:
         text = recipe_match[0]
@@ -98,15 +99,34 @@ def _search_products_from_reply(reply: str, recommendations: list) -> list:
             if name and 2 <= len(name) <= 6 and name not in ingredient_names:
                 ingredient_names.append(name)
 
-    # 方法2：从推荐列表提取
+    # 方法2：从食疗方数据库提取（按证型查 SHILIAO_DB，恢复原版5食材逻辑）
+    if not ingredient_names and zhengxing:
+        # zhengxing 可能是 "气虚、脾虚湿盛" 这种多证型
+        for zheng in zhengxing.split('、'):
+            zheng = zheng.strip()
+            shiliao = SHILIAO_DB.get(zheng)
+            if shiliao and shiliao.get('recipe'):
+                parts = re.split(r'[、,，;；]', shiliao['recipe'])
+                for part in parts:
+                    part = part.strip()
+                    name = re.sub(r'[\d.]+(?:[gG克毫升mlML枚粒只条根片块个半只碗勺杯袋包瓶盒罐]*)', '', part).strip()
+                    name = re.sub(r'(半只|少许|适量|若干|少量|各)$', '', name).strip()
+                    # 过滤掉非食材（粳米、冰糖、红糖等主食/调料）
+                    skip = ['粳米', '冰糖', '红糖', '水', '盐', '调味']
+                    if name and 2 <= len(name) <= 6 and name not in ingredient_names and name not in skip:
+                        ingredient_names.append(name)
+                if ingredient_names:
+                    break  # 用一个证型的食疗方就够了
+
+    # 方法3：从推荐列表提取
     if not ingredient_names:
         ingredient_names = [r.get("name", "") for r in recommendations if r.get("name")]
 
-    # 方法3：从回复中匹配常见食材
+    # 方法4：从回复中匹配常见食材
     if not ingredient_names:
         common_foods = ['枸杞', '红枣', '山药', '薏米', '茯苓', '百合', '莲子', '黄芪',
                         '当归', '陈皮', '山楂', '菊花', '决明子', '酸枣仁', '桂圆', '黑芝麻',
-                        '赤小豆', '银耳', '核桃', '黑豆', '黑米', '燕麦', '小米']
+                        '赤小豆', '银耳', '核桃', '黑豆', '黑米', '燕麦', '小米', '党参', '麦冬']
         for food in common_foods:
             if food in reply and food not in ingredient_names:
                 ingredient_names.append(food)
