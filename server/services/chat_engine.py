@@ -140,7 +140,7 @@ def _reply_has_recipe(reply: str) -> bool:
     if re.search(r'(配方|食谱|药膳方|食疗方|食养方|推荐方|参考方)[：:]', reply):
         return True
     # 食材+用量模式（如 "酸枣仁15g" "百合10克" "玫瑰花3朵"），至少2个才算食谱
-    dosage_matches = re.findall(r'[\u4e00-\u9fa5]{2,6}\s*\d+\s*[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐]', reply)
+    dosage_matches = re.findall(r'[\u4e00-\u9fa5]{2,6}\s*\d+\s*[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两]', reply)
     if len(dosage_matches) >= 2:
         return True
     return False
@@ -224,136 +224,117 @@ def chat_with_llm(user_message: str, history: list = None, user_id: str = None) 
     }
 
 
+def _extract_ingredients_from_reply(reply: str) -> list:
+    """从回复中提取所有食材（包括多食谱和肉类），按出现顺序返回，不过滤排骨/猪骨"""
+    ingredient_names = []
+    seen = set()
+    # 仅过滤明显不是食材的词，排骨、猪骨就是食材！
+    skip_words = {'粳米', '冰糖', '红糖', '水', '盐', '调味', '给你', '每周', '每天', '每次', '每日', '连吃', '连服', '煮水', '煮粥', '代茶饮', '方子', '食谱', '食材', '分钟', '小时'}
+
+    # 1. 匹配所有 "食材名+数字+单位" 的模式（如 茯苓15g、淮山15g...）
+    import re
+    matches = re.findall(r"([一-龥]{2,6})\s*\d+\s*[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两]", reply)
+    for m in matches:
+        m = m.strip()
+        if m not in seen and m not in skip_words and 2 <= len(m) <= 6:
+            seen.add(m)
+            ingredient_names.append(m)
+
+    # 2. 提取肉类食材（不要过滤排骨/猪骨！它们就是需要推荐的食材）
+    meat_patterns = re.findall(r"加排骨|加猪骨|排骨|猪骨", reply)
+    for m in meat_patterns:
+        m_clean = m.replace('加', '').strip()
+        if m_clean not in seen and 2 <= len(m_clean) <= 6:
+            seen.add(m_clean)
+            ingredient_names.append(m_clean)
+
+    return ingredient_names
+
+
 def _search_products_from_reply(reply: str, recommendations: list, zhengxing: str = None,
                                user_message: str = "", history: list = None) -> list:
-    """从回复文本中提取食材名，并行搜索商品"""
+    """从回复文本中提取食材名，按食谱顺序每个食材推荐2款不同品牌商品"""
     from services.shop import ShopService
-    from services.bianzheng import SHILIAO_DB
     import concurrent.futures
 
-    # 提取食材名
-    ingredient_names = []
+    # 1. 从回复中按食谱顺序提取所有食材
+    ingredient_names = _extract_ingredients_from_reply(reply)
 
-    # 方法1：从配方文字提取（LLM 回复带"配方："格式时）
-    recipe_match = re.findall(r'配方[：:](.+?)(?:\n|—|：|。)', reply, re.DOTALL)
-    if recipe_match:
-        text = recipe_match[0]
-        parts = re.split(r'[、,，;；]', text)
-        for part in parts:
-            part = part.strip()
-            name = re.sub(r'[\d.]+(?:[gG克毫升mlML枚粒只条根片块个半只碗勺杯袋包瓶盒罐]*)', '', part).strip()
-            name = re.sub(r'(半只|少许|适量|若干|少量|各)$', '', name).strip()
-            if name and 2 <= len(name) <= 6 and name not in ingredient_names:
+    # 2. 如果回复没提取到，从推荐列表取
+    if not ingredient_names and recommendations:
+        for r in recommendations:
+            name = r.get("name", "")
+            if name and name not in ingredient_names:
                 ingredient_names.append(name)
 
-    # 方法2：从食疗方数据库提取（按证型查 SHILIAO_DB，恢复原版5食材逻辑）
-    if not ingredient_names and zhengxing:
-        # zhengxing 可能是 "气虚、脾虚湿盛" 这种多证型
-        for zheng in zhengxing.split('、'):
-            zheng = zheng.strip()
-            shiliao = SHILIAO_DB.get(zheng)
-            if shiliao and shiliao.get('recipe'):
-                parts = re.split(r'[、,，;；]', shiliao['recipe'])
-                for part in parts:
-                    part = part.strip()
-                    name = re.sub(r'[\d.]+(?:[gG克毫升mlML枚粒只条根片块个半只碗勺杯袋包瓶盒罐]*)', '', part).strip()
-                    name = re.sub(r'(半只|少许|适量|若干|少量|各)$', '', name).strip()
-                    # 过滤掉非食材（粳米、冰糖、红糖等主食/调料）
-                    skip = ['粳米', '冰糖', '红糖', '水', '盐', '调味']
-                    if name and 2 <= len(name) <= 6 and name not in ingredient_names and name not in skip:
-                        ingredient_names.append(name)
-                if ingredient_names:
-                    break  # 用一个证型的食疗方就够了
-
-    # 方法3：从推荐列表提取
-    if not ingredient_names:
-        ingredient_names = [r.get("name", "") for r in recommendations if r.get("name")]
-
-    # 方法4：当前消息无匹配时，从历史对话中提取食材（用户追问"链接""推荐"时）
+    # 3. 如果还没提取到，从历史对话中提取（用户追问"链接""推荐"时）
     if not ingredient_names and history:
-        # 从历史 assistant 回复中提取配方
         for msg in reversed(history):
             if msg.get("role") == "assistant":
-                content = msg.get("content", "")
-                # 先试配方匹配
-                hist_recipe = re.findall(r'配方[：:](.+?)(?:\n|—|：|。)', content, re.DOTALL)
-                if hist_recipe:
-                    parts = re.split(r'[、,，;；]', hist_recipe[0])
-                    for part in parts:
-                        part = part.strip()
-                        name = re.sub(r'[\d.]+(?:[gG克毫升mlML枚粒只条根片块个半只碗勺杯袋包瓶盒罐]*)', '', part).strip()
-                        name = re.sub(r'(半只|少许|适量|若干|少量|各)$', '', name).strip()
-                        if name and 2 <= len(name) <= 6 and name not in ingredient_names:
-                            ingredient_names.append(name)
-                if ingredient_names:
+                hist_names = _extract_ingredients_from_reply(msg.get("content", ""))
+                if hist_names:
+                    ingredient_names = hist_names
                     break
-                # 再试常见食材匹配
-                common_foods = ['枸杞', '红枣', '山药', '薏米', '茯苓', '百合', '莲子', '黄芪',
-                                '当归', '陈皮', '山楂', '菊花', '决明子', '酸枣仁', '桂圆', '黑芝麻',
-                                '赤小豆', '银耳', '核桃', '黑豆', '黑米', '燕麦', '小米', '党参', '麦冬',
-                                '乌鸡', '生姜']
-                for food in common_foods:
-                    if food in content and food not in ingredient_names:
-                        ingredient_names.append(food)
-                if ingredient_names:
-                    break
-
-    # 不再从回复中额外匹配食材（用户要求：严格只推食谱内的，不加食谱外的）
 
     if not ingredient_names:
         return []
 
-    # 并行搜索
+    # 4. 并行搜索：严格按食谱顺序，每个食材2款不同品牌
     shop = ShopService()
     products = []
-    seen_titles = set()
+
+    # 易混淆药材：裸搜会搜出日用品（防风帽/有机玻璃），加"中药材"消歧
+    AMBIGUOUS = {'防风', '白术', '当归', '熟地', '生地', '川芎', '白芍', '红花', '麻黄', '桂枝', '柴胡', '黄芩', '半夏', '附子'}
 
     def search_one(ing: str) -> list:
-        """搜索单个食材，严格只返回2个不同品牌的商品"""
+        """搜索单个食材，严格只返回2个不同品牌的商品。
+        分级搜索：有机 → 中药材 → 裸搜，保证中药材类也能搜到。"""
         result = []
-        local_titles = set()
         local_brands = set()
-        for page in range(1, 6):
+        is_amb = ing in AMBIGUOUS
+        # 搜索词梯度：优先有机，中药材类加消歧后缀
+        queries = [f"{ing} 有机", f"{ing} 中药材", ing] if is_amb else [f"{ing} 有机", ing]
+        for q in queries:
             if len(result) >= 2:
                 break
-            try:
-                items = shop._search_taobao(f"{ing} 有机", page, 2, "")
-            except Exception:
-                items = []
-            if not items:
-                continue
-            for item in items:
+            for page in range(1, 4):
                 if len(result) >= 2:
                     break
-                title = item.get('title', '')
-                brand = item.get('shop_name', '') or ''
-                if '有机' not in title:
+                try:
+                    items = shop._search_taobao(q, page, 10, "")
+                except Exception:
+                    items = []
+                if not items:
                     continue
-                # 严格匹配：食材名必须出现在标题前半段
-                # 防止“麦冬…黄芪党参泡水”这种只是顺带提及的商品混进来
-                half = max(len(title) // 2, 10)
-                if ing.lower() not in title.lower()[:half]:
-                    continue
-                if title and title not in local_titles and not shop._is_excluded(item):
-                    # 必须是不同品牌，同品牌只要一个
-                    if brand not in local_brands:
-                        local_titles.add(title)
-                        local_brands.add(brand)
-                        result.append(item)
+                for item in items:
+                    if len(result) >= 2:
+                        break
+                    title = item.get('title', '')
+                    brand = item.get('shop_name', '') or ''
+                    # 标题必须包含完整食材关键词（不限制位置）
+                    if ing.lower() not in title.lower():
+                        continue
+                    # 易混淆药材：排除日用品（帽/玻璃/挡风/针织等）
+                    if is_amb and any(w in title for w in ['帽', '玻璃', '挡风', '针织', '婴', '童', '罩', '板', '衣', '杯', '睡袋', '包巾', '安抚', 't恤', 'T恤', '服饰', '母婴']):
+                        continue
+                    if title and not shop._is_excluded(item):
+                        if brand not in local_brands:
+                            local_brands.add(brand)
+                            result.append(item)
         return result
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {executor.submit(search_one, ing): ing for ing in ingredient_names}
-        concurrent.futures.wait(futures, timeout=15)
-        for future in futures:
-            try:
-                items = future.result()
-                for item in items:
-                    title = item.get('title', '')
-                    if title and title not in seen_titles:
-                        seen_titles.add(title)
-                        products.append(item)
-            except Exception:
-                pass
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        future_map = {executor.submit(search_one, ing): ing for ing in ingredient_names}
+        concurrent.futures.wait(future_map, timeout=20)
+        # 按原食材顺序收集结果
+        for ing in ingredient_names:
+            for future in future_map:
+                if future_map[future] == ing:
+                    try:
+                        items = future.result()
+                        products.extend(items)
+                    except Exception:
+                        pass
+                    break
 
     return products
