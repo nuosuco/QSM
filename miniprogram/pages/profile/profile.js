@@ -6,6 +6,7 @@ Page({
   data: {
     isLoggedIn: false,
     loginChannel: 'sms',
+    wechatLoading: false,
     phone: '',
     smsCode: '',
     email: '',
@@ -58,6 +59,44 @@ Page({
   },
 
   // ========== 登录相关 ==========
+
+  async wechatLogin() {
+    this.setData({ wechatLoading: true, loginError: '' });
+    try {
+      // 1. wx.login 获取临时 code
+      const loginRes = await new Promise((resolve, reject) => {
+        wx.login({ success: resolve, fail: reject });
+      });
+      if (!loginRes.code) {
+        this.setData({ loginError: '微信登录失败，请重试' });
+        return;
+      }
+      // 2. 发 code 给后端换 token
+      const data = await request('/api/auth/wechat-login', {
+        method: 'POST',
+        data: {
+          code: loginRes.code,
+          anonymous_user_id: app.globalData.userId
+        }
+      });
+      if (data.success) {
+        wx.setStorageSync('som_auth_token', data.token);
+        wx.setStorageSync('som_auth_user', data.user);
+        if (data.user && data.user.user_id) {
+          app.globalData.userId = data.user.user_id;
+        }
+        this.setData({ isLoggedIn: true, loginError: '' });
+        this.loadProfile();
+        wx.showToast({ title: '登录成功', icon: 'success' });
+      } else {
+        this.setData({ loginError: data.error || '微信登录失败' });
+      }
+    } catch (e) {
+      this.setData({ loginError: '网络错误，请重试' });
+    } finally {
+      this.setData({ wechatLoading: false });
+    }
+  },
 
   switchChannel(e) {
     this.setData({ loginChannel: e.currentTarget.dataset.ch, loginError: '' });

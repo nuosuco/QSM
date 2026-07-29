@@ -229,6 +229,40 @@
   border-color: #ddd;
 }
 
+.wechat-login-btn {
+  width: 100%;
+  padding: 24rpx;
+  background: #07c160;
+  color: #fff;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.wechat-login-btn::after {
+  border: none;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 24rpx 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1rpx;
+  background: rgba(255,255,255,0.2);
+}
+
+.divider-text {
+  padding: 0 20rpx;
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.5);
+}
+
 .login-btn {
   width: 100%;
   padding: 24rpx;

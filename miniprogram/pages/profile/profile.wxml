@@ -5,6 +5,16 @@
     <view class="login-title">🌿 登录 / 注册</view>
     <view class="login-hint">登录后数据云端同步，换设备不丢失</view>
 
+    <!-- 微信一键登录（最方便） -->
+    <button class="wechat-login-btn" bindtap="wechatLogin" loading="{{wechatLoading}}">
+      <text>💚 微信一键登录</text>
+    </button>
+    <view class="login-divider">
+      <view class="divider-line"></view>
+      <text class="divider-text">或用以下方式</text>
+      <view class="divider-line"></view>
+    </view>
+
     <!-- 登录方式切换 -->
     <view class="login-tabs">
       <view class="login-tab {{loginChannel === 'sms' ? 'active' : ''}}" bindtap="switchChannel" data-ch="sms">📱 手机号</view>
