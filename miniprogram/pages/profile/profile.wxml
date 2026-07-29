@@ -1,7 +1,48 @@
 <!-- 对应 index.html #profile-tab -->
 <view class="profile-container">
-  <!-- 用户信息卡片（对应 .profile-card） -->
-  <view class="profile-card">
+  <!-- 登录区域（未登录时显示） -->
+  <view class="login-card" wx:if="{{!isLoggedIn}}">
+    <view class="login-title">🌿 登录 / 注册</view>
+    <view class="login-hint">登录后数据云端同步，换设备不丢失</view>
+
+    <!-- 登录方式切换 -->
+    <view class="login-tabs">
+      <view class="login-tab {{loginChannel === 'sms' ? 'active' : ''}}" bindtap="switchChannel" data-ch="sms">📱 手机号</view>
+      <view class="login-tab {{loginChannel === 'email' ? 'active' : ''}}" bindtap="switchChannel" data-ch="email">✉️ 邮箱</view>
+    </view>
+
+    <!-- 手机号登录 -->
+    <view wx:if="{{loginChannel === 'sms'}}">
+      <view class="login-row">
+        <picker class="country-picker" mode="selector" range="{{countryList}}" range-key="label" value="{{countryIdx}}" bindchange="onCountryChange">
+          <view class="country-label">{{countryList[countryIdx].label}}</view>
+        </picker>
+        <input class="login-input" type="number" placeholder="手机号" value="{{phone}}" bindinput="onPhoneInput" maxlength="15" />
+      </view>
+      <view class="login-row">
+        <input class="login-input" type="number" placeholder="验证码" value="{{smsCode}}" bindinput="onSmsCodeInput" maxlength="6" />
+        <button class="code-btn" bindtap="sendCode" disabled="{{codeCooldown > 0}}">{{codeCooldown > 0 ? codeCooldown + 's' : '获取验证码'}}</button>
+      </view>
+      <button class="login-btn" bindtap="doLogin">登录 / 注册</button>
+    </view>
+
+    <!-- 邮箱登录 -->
+    <view wx:if="{{loginChannel === 'email'}}">
+      <view class="login-row">
+        <input class="login-input" type="text" placeholder="邮箱地址" value="{{email}}" bindinput="onEmailInput" />
+      </view>
+      <view class="login-row">
+        <input class="login-input" type="number" placeholder="验证码" value="{{emailCode}}" bindinput="onEmailCodeInput" maxlength="6" />
+        <button class="code-btn" bindtap="sendCode" disabled="{{codeCooldown > 0}}">{{codeCooldown > 0 ? codeCooldown + 's' : '获取验证码'}}</button>
+      </view>
+      <button class="login-btn" bindtap="doLogin">登录 / 注册</button>
+    </view>
+
+    <view class="login-error" wx:if="{{loginError}}">{{loginError}}</view>
+  </view>
+
+  <!-- 用户信息卡片（登录后显示） -->
+  <view class="profile-card" wx:if="{{isLoggedIn}}">
     <view class="profile-avatar">松</view>
     <view class="profile-info">
       <view class="profile-name">{{userData.name}}</view>
@@ -9,6 +50,7 @@
       <view class="profile-points">积分：{{userData.points}}</view>
       <view class="profile-checkin">{{checkedInToday ? '✅ 今天已签到' : '签到：今天未签到'}}</view>
     </view>
+    <view class="logout-btn" bindtap="doLogout">退出</view>
   </view>
 
   <!-- 体质记录（对应 .profile-section h3=📋 我的体质记录） -->

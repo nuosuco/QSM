@@ -138,3 +138,126 @@
   padding: 40rpx 0;
   font-size: 28rpx;
 }
+/* ========== 登录区域 ========== */
+.login-card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.05);
+}
+
+.login-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 8rpx;
+}
+
+.login-hint {
+  font-size: 24rpx;
+  color: #95a5a6;
+  margin-bottom: 28rpx;
+}
+
+.login-tabs {
+  display: flex;
+  border: 2rpx solid #e0e6e3;
+  border-radius: 16rpx;
+  overflow: hidden;
+  margin-bottom: 28rpx;
+}
+
+.login-tab {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  font-size: 28rpx;
+  color: #666;
+  background: #f8f9fa;
+}
+
+.login-tab.active {
+  background: #4a9d6e;
+  color: #fff;
+  font-weight: 500;
+}
+
+.login-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+  align-items: center;
+}
+
+.country-picker {
+  flex-shrink: 0;
+}
+
+.country-label {
+  padding: 18rpx 20rpx;
+  border: 2rpx solid #e0e6e3;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.login-input {
+  flex: 1;
+  padding: 18rpx 24rpx;
+  border: 2rpx solid #e0e6e3;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}
+
+.code-btn {
+  flex-shrink: 0;
+  padding: 18rpx 24rpx;
+  background: #f0f7f3;
+  color: #4a9d6e;
+  border: 2rpx solid #4a9d6e;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.code-btn[disabled] {
+  background: #eee;
+  color: #999;
+  border-color: #ddd;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 24rpx;
+  background: #4a9d6e;
+  color: #fff;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  margin-top: 8rpx;
+}
+
+.login-btn::after {
+  border: none;
+}
+
+.login-error {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #e74c3c;
+  text-align: center;
+}
+
+.logout-btn {
+  margin-left: auto;
+  padding: 10rpx 28rpx;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 2rpx solid rgba(255,255,255,0.5);
+  border-radius: 12rpx;
+  font-size: 24rpx;
+}
