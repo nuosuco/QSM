@@ -19,7 +19,7 @@
 
     <!-- 消息列表（对应 appendMessage 动态生成的 DOM） -->
     <block wx:for="{{messages}}" wx:for-index="msgIdx" wx:for-item="msg" wx:key="id">
-      <view class="message {{msg.type}}" id="msg-{{msg.id}}">
+      <view class="message {{msg.type}}" id="{{msg.id}}">
         <view class="message-avatar">{{msg.type === 'user' ? '你' : '麦'}}</view>
         <view class="message-content">
           <view class="message-text" wx:if="{{msg.type === 'user'}}">
