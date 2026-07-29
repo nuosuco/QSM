@@ -1,6 +1,6 @@
 <!-- 对应 index.html #chat-tab -->
 <view class="chat-container">
-  <scroll-view class="chat-messages" scroll-y scroll-top="{{scrollTopValue}}">
+  <scroll-view class="chat-messages" scroll-y scroll-into-view="{{scrollToId}}" scroll-with-animation="{{false}}">
    <view class="chat-messages-inner">
     <!-- 初始欢迎消息（对应 index.html 中的 assistant message） -->
     <view class="message assistant" wx:if="{{messages.length === 0}}">

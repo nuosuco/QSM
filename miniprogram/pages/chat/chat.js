@@ -7,7 +7,7 @@ Page({
     messages: [],
     inputValue: '',
     sending: false,
-    scrollTopValue: 0,
+    scrollToId: '',
     msgCounter: 0,
     pendingImage: '' // 待发送的图片临时路径
   },
@@ -104,10 +104,9 @@ Page({
       messages: [...this.data.messages, userMsg, loadingMsg],
       inputValue: '',
       pendingImage: '',
-      sending: true
-    }, () => {
-      // 显示用户消息后先滚到底部（让用户看到自己发的内容+加载动画）
-      this.scrollToBottom();
+      sending: true,
+      // 先定位到用户消息（无动画），让用户看到自己发的内容
+      scrollToId: userMsg.id
     });
 
     try {
@@ -162,10 +161,9 @@ Page({
 
       this.setData({
         messages: msgs,
-        sending: false
-      }, () => {
-        // 定位到用户消息（和网页版一致）：看到自己输入+小麦回答，下滑看商品
-        this.scrollToLastUserMessage();
+        sending: false,
+        // 定位到用户消息（无动画）：看到自己输入+小麦回答，下滑看商品
+        scrollToId: userMsg.id
       });
 
       // 保存对话记录（对应 saveChatRecord）
@@ -240,28 +238,6 @@ Page({
   // 图片加载失败（对应 onerror）
   onImgError(e) {
     // 小程序 image 组件不支持 onerror 替换，用默认占位
-  },
-
-  // 滚动到底部（显示用户消息+加载动画）
-  scrollToBottom() {
-    this.setData({ scrollTopValue: 999999 });
-  },
-
-  // 定位到最后一条用户消息（和网页版 offsetTop 逻辑一致）
-  scrollToLastUserMessage() {
-    const query = wx.createSelectorQuery().in(this);
-    query.selectAll('.message.user').boundingClientRect();
-    query.select('.chat-messages').boundingClientRect();
-    query.exec((res) => {
-      if (!res || !res[0] || res[0].length === 0) return;
-      const userMsgs = res[0];
-      const container = res[1];
-      const lastUserMsg = userMsgs[userMsgs.length - 1];
-      if (!lastUserMsg || !container) return;
-      // 计算用户消息相对于容器的偏移量
-      const offset = lastUserMsg.top - container.top + (this.data.scrollTopValue || 0);
-      this.setData({ scrollTopValue: Math.max(0, offset - 10) });
-    });
   },
 
   // 对应 saveChatRecord
