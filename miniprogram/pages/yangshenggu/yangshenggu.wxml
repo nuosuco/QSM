@@ -9,6 +9,16 @@
     <view class="test-banner-btn">3分钟 →</view>
   </view>
 
+  <!-- 快捷操作栏 -->
+  <view class="quick-actions">
+    <button class="quick-btn" bindtap="goAskXiaomai">💬 问小麦</button>
+    <button class="quick-btn" open-type="share">📤 分享养生谷</button>
+    <button class="quick-btn" bindtap="shareYangshengImage">🖼️ 分享海报</button>
+  </view>
+
+  <!-- 分享海报 canvas（隐藏） -->
+  <canvas type="2d" id="ygShareCanvas" class="yg-share-canvas"></canvas>
+
   <!-- 节气养生 -->
   <view class="knowledge-section">
     <view class="section-title">🌿 节气养生</view>

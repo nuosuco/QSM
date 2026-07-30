@@ -45,8 +45,9 @@
       <view class="scan-result-text">{{scanResult}}</view>
     </view>
     <view class="result-actions">
-      <button class="share-btn" bindtap="saveShareImage">📷 保存分享图</button>
-      <button class="ask-btn" bindtap="goAskXiaomai">💬 问小麦怎么调理</button>
+      <button class="share-btn" bindtap="shareToFriend" open-type="share">📤 转发好友</button>
+      <button class="share-btn" bindtap="saveShareImage">📷 保存相册</button>
+      <button class="ask-btn" bindtap="goAskXiaomai">💬 问小麦</button>
     </view>
     <view class="result-tip">分享给朋友，一起养生 💚</view>
   </view>
@@ -91,8 +92,9 @@
     <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
 
     <view class="result-actions">
-      <button class="share-btn" bindtap="saveShareImage">📷 保存分享图</button>
-      <button class="ask-btn" bindtap="goAskXiaomai">💬 问小麦怎么调理</button>
+      <button class="share-btn" bindtap="shareToFriend" open-type="share">📤 转发好友</button>
+      <button class="share-btn" bindtap="saveShareImage">📷 保存相册</button>
+      <button class="ask-btn" bindtap="goAskXiaomai">💬 问小麦</button>
     </view>
     <view class="result-tip">分享给朋友，一起养生 💚</view>
   </view>

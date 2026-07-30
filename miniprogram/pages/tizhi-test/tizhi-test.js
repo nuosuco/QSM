@@ -84,6 +84,7 @@ Page({
     // AI拍照扫描
     scanPart: '',
     scanImagePath: '',
+    scanImagePaths: [],
     scanResult: ''
   },
 
@@ -98,19 +99,24 @@ Page({
     }).catch(() => {});
   },
 
-  // AI拍照扫描
+  // AI拍照扫描（支持多图）
   scanPhoto(e) {
     const part = e.currentTarget.dataset.part || '舌头';
     wx.chooseMedia({
-      count: 1,
+      count: 9,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       sizeType: ['compressed'],
       camera: 'back',
       success: (res) => {
-        const tempPath = res.tempFiles[0].tempFilePath;
-        this.setData({ scanPart: part, scanImagePath: tempPath, phase: 'scanning' });
-        this.analyzePhoto(tempPath, part);
+        const tempPaths = res.tempFiles.map(f => f.tempFilePath);
+        this.setData({ 
+          scanPart: part, 
+          scanImagePath: tempPaths[0],
+          scanImagePaths: tempPaths,
+          phase: 'scanning' 
+        });
+        this.analyzePhotos(tempPaths, part);
       },
       fail: (err) => {
         if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
@@ -120,15 +126,17 @@ Page({
     });
   },
 
-  async analyzePhoto(filePath, part) {
+  async analyzePhotos(filePaths, part) {
     try {
-      // 转base64
-      const base64Uri = await this.imageToBase64(filePath);
+      // 转base64（多图）
+      const base64Promises = filePaths.map(fp => this.imageToBase64(fp));
+      const base64Uris = await Promise.all(base64Promises);
+      
       const prompts = {
-        '舌头': '请从中医角度分析这张舌头照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
-        '面色': '请从中医角度分析这张面色照片：面色、光泽、唇色等，判断气血状况和体质倾向，给出食疗建议。',
-        '皮肤': '请从中医角度分析这张皮肤照片：肤色、皮疹、干燥程度等，判断可能的体质问题和调理方向，给出食疗建议。',
-        '患处': '请从中医角度分析这张照片中的症状表现，判断可能的健康问题，给出食疗调理建议。'
+        '舌头': '请从中医角度分析这些舌头照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
+        '面色': '请从中医角度分析这些面色照片：面色、光泽、唇色等，判断气血状况和体质倾向，给出食疗建议。',
+        '皮肤': '请从中医角度分析这些皮肤照片：肤色、皮疹、干燥程度等，判断可能的体质问题和调理方向，给出食疗建议。',
+        '患处': '请从中医角度分析这些照片中的症状表现，判断可能的健康问题，给出食疗调理建议。'
       };
       const prompt = prompts[part] || prompts['患处'];
 
@@ -136,7 +144,7 @@ Page({
         method: 'POST',
         data: {
           message: prompt,
-          image_url: base64Uri,
+          images: base64Uris,
           user_id: getApp().globalData.userId || ''
         }
       });
@@ -414,6 +422,48 @@ Page({
       },
       fail: () => wx.showToast({ title: '生成失败', icon: 'none' })
     });
+  },
+
+  // M4: 直接转发分享图给微信好友
+  shareToFriend() {
+    if (!this._canvas) {
+      wx.showToast({ title: '图片生成中...', icon: 'none' });
+      return;
+    }
+    wx.canvasToTempFilePath({
+      canvas: this._canvas,
+      success: (res) => {
+        wx.shareFileMessage({
+          filePath: res.tempFilePath,
+          fileName: 'health-report.png',
+          success: () => {},
+          fail: (err) => {
+            // 用户取消不提示
+            if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
+              wx.showToast({ title: '分享失败，请重试', icon: 'none' });
+            }
+          }
+        });
+      },
+      fail: () => wx.showToast({ title: '生成失败', icon: 'none' })
+    });
+  },
+
+  // 分享小程序卡片给好友
+  onShareAppMessage() {
+    const { mode, result, scanPart } = this.data;
+    let title = '🌿 测测你的健康体质，3分钟出结果';
+    let path = '/pages/tizhi-test/tizhi-test';
+    if (mode === 'tizhi' && result) {
+      title = `我是【${result.name}】${result.emoji}，你是什么体质？来测测！`;
+      path = '/pages/tizhi-test/tizhi-test?mode=tizhi';
+    } else if (mode === 'symptom' && result) {
+      title = `我的健康自测：${result.name}${result.emoji}，你也来测测吧`;
+      path = '/pages/tizhi-test/tizhi-test?mode=symptom';
+    } else if (mode === 'scan') {
+      title = `我用AI拍了${scanPart}，中医分析太准了！`;
+    }
+    return { title, path };
   },
 
   goAskXiaomai() {
