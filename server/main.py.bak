@@ -812,28 +812,6 @@ async def chat_vision(request: VisionChatRequest):
 - 用通俗易懂的语言
 - 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医"""
 
-    # 加载会话历史（让小麦记住之前的对话上下文，包括之前的拍照扫描结果）
-    history_context = ""
-    if request.session_id:
-        try:
-            conn = get_user_db()
-            cursor = conn.cursor()
-            cursor.execute(
-                'SELECT user_message, assistant_reply FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
-                (request.session_id,)
-            )
-            rows = cursor.fetchall()
-            conn.close()
-            if rows:
-                history_lines = []
-                for row in reversed(rows):
-                    history_lines.append(f"用户: {row['user_message'][:300]}")
-                    history_lines.append(f"小麦: {row['assistant_reply'][:500]}")
-                history_context = "\n".join(history_lines)
-                system_prompt += f"\n\n【之前的对话记录】\n{history_context}\n\n请结合以上对话历史，特别是之前的拍照扫描/辨证结果，来回答用户当前的问题。"
-        except Exception as e:
-            print(f"vision加载会话历史失败: {e}")
-
     # RAG 上下文
     context = rag.build_context(request.message, max_chars=1500)
     if context:
@@ -872,24 +850,9 @@ async def chat_vision(request: VisionChatRequest):
     except Exception:
         pass
 
-    # 从回复中提取食材，搜索有机商品推荐
-    products = []
-    try:
-        from services.chat_engine import _search_products_from_reply
-        products = _search_products_from_reply(result["content"], [], "", request.message or "")
-    except Exception as e:
-        print(f"vision商品搜索失败: {e}")
-
-    # 如果有商品推荐，在回复末尾追加引导语
-    reply_text = result["content"]
-    if products and '下方推荐' not in reply_text and '就在下面' not in reply_text:
-        reply_text += '\n\n🛒 上面提到的食材，我在下方帮你找了有机认证的，点击即可购买～'
-
     return {
         "success": True,
-        "reply": reply_text,
-        "products": products,
-        "recommendations": [],
+        "reply": result["content"],
         "provider": result.get("provider"),
         "model": result.get("model"),
     }

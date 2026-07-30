@@ -43,7 +43,7 @@ Page({
       const guideMsg = {
         id: 'msg-guide-' + Date.now(),
         type: 'assistant',
-        text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤/患处）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
+        text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
         showGuide: true
       };
       this.setData({ messages: [guideMsg] });
@@ -55,7 +55,7 @@ Page({
     const guideMsg = {
       id: 'msg-guide-' + Date.now(),
       type: 'assistant',
-      text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤/患处）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
+      text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
       showGuide: true
     };
     this.setData({

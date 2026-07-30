@@ -52,17 +52,20 @@
                     </div>
                     <div class="chat-input-area">
                         <div class="chat-input-row">
-                            <button class="upload-btn" id="upload-btn" title="拍照/上传照片（可多张）">📷</button>
+                            <button class="upload-btn" id="upload-btn" title="拍照/上传舌苔照片">📷</button>
                             <textarea 
                                 class="chat-input" 
                                 id="chat-input" 
-                                placeholder="描述身体状况，或📷拍舌苔/面色/皮肤照片..."
+                                placeholder="描述身体状况，或📷拍舌苔照片..."
                                 rows="2"
                             ></textarea>
                             <button class="send-btn" id="send-btn">发送</button>
                         </div>
-                        <div class="image-preview-list" id="image-preview-list" style="display:none;"></div>
-                        <input type="file" id="image-input" accept="image/*" multiple style="display:none;">
+                        <div class="image-preview" id="image-preview" style="display:none;">
+                            <img id="preview-img" src="" alt="预览">
+                            <button class="preview-remove" id="preview-remove">✕</button>
+                        </div>
+                        <input type="file" id="image-input" accept="image/*" style="display:none;">
                     </div>
                 </div>
             </div>
@@ -102,14 +105,6 @@
             <!-- 养生谷页面 -->
             <div class="tab-content" id="yangshenggu-tab">
                 <div class="knowledge-container">
-                    <!-- 健康测评入口 -->
-                    <div class="test-banner" id="test-banner" onclick="switchToHealthTest('yangshenggu')">
-                        <div class="test-banner-left">
-                            <div class="test-banner-title">🔍 测测你的健康</div>
-                            <div class="test-banner-desc">AI拍照扫描 + 体质测评 + 症状自评</div>
-                        </div>
-                        <div class="test-banner-btn">3分钟 →</div>
-                    </div>
                     <!-- 节气养生 -->
                     <div class="knowledge-section">
                         <h2>🌿 节气养生</h2>
@@ -134,16 +129,6 @@
                         <h2>药食同源</h2>
                         <div class="yaoshi-list" id="yaoshi-list"></div>
                     </div>
-                </div>
-            </div>
-
-            <!-- 健康测评页面（从养生谷/小麦入口进入） -->
-            <div class="tab-content" id="health-test-tab">
-                <div class="knowledge-container">
-                    <div class="test-back-bar">
-                        <button class="test-back-nav" onclick="goBackFromTest()">← 返回养生谷</button>
-                    </div>
-                    <div id="test-container"></div>
                 </div>
             </div>
 

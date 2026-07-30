@@ -92,7 +92,7 @@ async function checkNewUserGuide() {
                 </div>
                 <div class="guide-actions">
                     <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描（舌头/面色/皮肤/患处）</button>
-                    <button class="guide-btn test" onclick="switchToHealthTest('chat')">📝 3分钟健康测评</button>
+                    <button class="guide-btn test" onclick="switchToHealthTest()">📝 3分钟健康测评</button>
                 </div>
             `;
         }
@@ -105,9 +105,7 @@ function showGuideScan() {
 }
 
 // 跳转到健康测评页（养生谷banner / 小麦引导按钮 / 快捷问题共用）
-function switchToHealthTest(from) {
-    // 记录来源：'chat' 或 'yangshenggu'，决定返回按钮文案
-    _healthTestFrom = from || 'yangshenggu';
+function switchToHealthTest() {
     const navBtns = document.querySelectorAll('.nav-btn');
     const tabContents = document.querySelectorAll('.tab-content');
     navBtns.forEach(b => b.classList.remove('active'));
@@ -116,27 +114,19 @@ function switchToHealthTest(from) {
     if (healthTab) {
         healthTab.classList.add('active');
         renderHealthTestPage();
-        // 更新返回按钮文案
-        const backBtn = document.querySelector('.test-back-nav');
-        if (backBtn) {
-            backBtn.textContent = _healthTestFrom === 'chat' ? '← 返回小麦' : '← 返回养生谷';
-        }
     }
 }
 
-let _healthTestFrom = 'yangshenggu';
-
-// 从健康测评页返回（根据来源决定回哪里）
+// 从健康测评页返回养生谷
 function goBackFromTest() {
     const navBtns = document.querySelectorAll('.nav-btn');
     const tabContents = document.querySelectorAll('.tab-content');
     navBtns.forEach(b => b.classList.remove('active'));
     tabContents.forEach(c => c.classList.remove('active'));
-    const targetTab = _healthTestFrom === 'chat' ? 'chat' : 'yangshenggu';
-    const tab = document.getElementById(targetTab + '-tab');
-    const btn = document.querySelector('.nav-btn[data-tab="' + targetTab + '"]');
-    if (tab) tab.classList.add('active');
-    if (btn) btn.classList.add('active');
+    const ysgTab = document.getElementById('yangshenggu-tab');
+    const ysgBtn = document.querySelector('.nav-btn[data-tab="yangshenggu"]');
+    if (ysgTab) ysgTab.classList.add('active');
+    if (ysgBtn) ysgBtn.classList.add('active');
 }
 
 // 当前选中的图片 base64 列表（支持多张）
@@ -407,7 +397,7 @@ function appendFollowUpSuggestions(afterImage) {
             }
             // 测评类：跳养生谷测评
             if (text.indexOf('体质测评') >= 0) {
-                switchToHealthTest('chat');
+                switchToHealthTest();
                 return;
             }
             // 其他：填入输入框并发送

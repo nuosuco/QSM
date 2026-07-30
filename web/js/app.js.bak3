@@ -71,12 +71,30 @@ function initChat() {
     setTimeout(checkNewUserGuide, 500);
 }
 
-// 每次进入都显示体质评测引导（拍照+测评入口常驻，不限新用户）
+// 新用户第一次进来，引导做测评
 async function checkNewUserGuide() {
     if (_guidedNewUser) return;
     _guidedNewUser = true;
     
-    // 替换欢迎消息为引导版本（每次刷新/打开都显示，确保体质评测入口随时可见）
+    const data = getUserData();
+    const hasHistory = data.chats && data.chats.length > 0;
+    if (hasHistory) return;
+    
+    // 先查后端有没有测评记录
+    try {
+        const resp = await fetch(`${API_BASE}/api/tizhi-test/latest?user_id=${encodeURIComponent(getUserId())}`);
+        const result = await resp.json();
+        if (result && result.record) {
+            // 有记录，自动出方案
+            const r = result.record;
+            const input = document.getElementById('chat-input');
+            input.value = `我之前做过${r.mode === 'tizhi' ? '体质测评' : '症状自评'}，结果是【${r.result_name}】，请给我食疗调理方案`;
+            setTimeout(() => sendMessage(), 300);
+            return;
+        }
+    } catch(e) {}
+    
+    // 新用户，替换欢迎消息为引导版本
     const chatMessages = document.getElementById('chat-messages');
     const welcome = chatMessages.querySelector('.message.assistant');
     if (welcome) {
@@ -86,13 +104,13 @@ async function checkNewUserGuide() {
                 <div class="message-text">
                     你好呀！我是小麦 🌾<br><br>
                     想知道自己是什么体质、该吃什么养生吗？<br><br>
-                    📷 拍个照（舌头/面色/皮肤/患处）<br>
+                    📷 拍个照（舌头/面色/皮肤）<br>
                     📝 或做3分钟测评<br><br>
                     我帮你辨证，给你食疗方案！
                 </div>
                 <div class="guide-actions">
-                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描（舌头/面色/皮肤/患处）</button>
-                    <button class="guide-btn test" onclick="switchToHealthTest('chat')">📝 3分钟健康测评</button>
+                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描（舌头/面色/皮肤）</button>
+                    <button class="guide-btn test" onclick="switchToHealthTest()">📝 3分钟健康测评</button>
                 </div>
             `;
         }
@@ -104,39 +122,10 @@ function showGuideScan() {
     document.getElementById('image-input').click();
 }
 
-// 跳转到健康测评页（养生谷banner / 小麦引导按钮 / 快捷问题共用）
-function switchToHealthTest(from) {
-    // 记录来源：'chat' 或 'yangshenggu'，决定返回按钮文案
-    _healthTestFrom = from || 'yangshenggu';
-    const navBtns = document.querySelectorAll('.nav-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    navBtns.forEach(b => b.classList.remove('active'));
-    tabContents.forEach(c => c.classList.remove('active'));
-    const healthTab = document.getElementById('health-test-tab');
-    if (healthTab) {
-        healthTab.classList.add('active');
-        renderHealthTestPage();
-        // 更新返回按钮文案
-        const backBtn = document.querySelector('.test-back-nav');
-        if (backBtn) {
-            backBtn.textContent = _healthTestFrom === 'chat' ? '← 返回小麦' : '← 返回养生谷';
-        }
-    }
-}
-
-let _healthTestFrom = 'yangshenggu';
-
-// 从健康测评页返回（根据来源决定回哪里）
-function goBackFromTest() {
-    const navBtns = document.querySelectorAll('.nav-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    navBtns.forEach(b => b.classList.remove('active'));
-    tabContents.forEach(c => c.classList.remove('active'));
-    const targetTab = _healthTestFrom === 'chat' ? 'chat' : 'yangshenggu';
-    const tab = document.getElementById(targetTab + '-tab');
-    const btn = document.querySelector('.nav-btn[data-tab="' + targetTab + '"]');
-    if (tab) tab.classList.add('active');
-    if (btn) btn.classList.add('active');
+// 引导按钮：跳转到健康测评页
+function switchToHealthTest() {
+    const healthBtn = document.querySelector('.nav-btn[data-tab="health-test"]');
+    if (healthBtn) healthBtn.click();
 }
 
 // 当前选中的图片 base64 列表（支持多张）
@@ -217,14 +206,11 @@ async function sendMessage() {
     
     try {
         let response;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45秒超时
         if (hasImage) {
             // 图片辨证：走 vision 接口（支持多图）
             response = await fetch(`${API_BASE}/api/chat/vision`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                signal: controller.signal,
                 body: JSON.stringify({
                     message: message || '请综合观察这些照片（舌头/面色/皮肤/患处），从中医角度分析，给出体质倾向和食养建议。',
                     images: imagesToSend,
@@ -236,7 +222,6 @@ async function sendMessage() {
             response = await fetch(`${API_BASE}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                signal: controller.signal,
                 body: JSON.stringify({
                     message: message,
                     session_id: getSessionId(),
@@ -244,7 +229,6 @@ async function sendMessage() {
                 })
             });
         }
-        clearTimeout(timeoutId);
         
         const data = await response.json();
         
@@ -344,30 +328,7 @@ async function sendMessage() {
         
     } catch (error) {
         document.getElementById(loadingId).remove();
-        let errMsg = '抱歉，出了点问题：';
-        if (error.name === 'AbortError' || (error.message && error.message.includes('aborted'))) {
-            errMsg += 'AI 思考超时（超过30秒），请重试。';
-        } else if (error instanceof TypeError && error.message.includes('fetch')) {
-            errMsg += '网络连接失败，请检查网络后重试。';
-        } else {
-            errMsg += (error.message || '未知错误') + '，请重试。';
-        }
-        const errId = appendMessage(errMsg, 'assistant', false, false);
-        // 添加重试按钮
-        const errDiv = document.getElementById(errId);
-        if (errDiv) {
-            const retryBtn = document.createElement('button');
-            retryBtn.className = 'msg-action-btn';
-            retryBtn.innerHTML = '🔄 重试';
-            retryBtn.style.cssText = 'margin:8px 0 0 48px;padding:6px 16px;border:1px solid #7bc49f;border-radius:16px;background:#f0f7f2;color:#3a7d5c;font-size:14px;cursor:pointer;';
-            retryBtn.onclick = function() {
-                errDiv.remove();
-                input.value = message;
-                if (imagesToSend.length) { pendingImages = imagesToSend; }
-                sendMessage();
-            };
-            errDiv.querySelector('.message-content').appendChild(retryBtn);
-        }
+        appendMessage('抱歉，网络出现问题，请稍后重试。', 'assistant');
         console.error('发送消息失败:', error);
     } finally {
         sendBtn.disabled = false;
@@ -407,7 +368,7 @@ function appendFollowUpSuggestions(afterImage) {
             }
             // 测评类：跳养生谷测评
             if (text.indexOf('体质测评') >= 0) {
-                switchToHealthTest('chat');
+                switchToHealthTest();
                 return;
             }
             // 其他：填入输入框并发送

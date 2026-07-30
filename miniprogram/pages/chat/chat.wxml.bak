@@ -36,7 +36,7 @@
 
           <!-- 新用户引导按钮 -->
           <view class="guide-actions" wx:if="{{msg.showGuide}}">
-            <view class="guide-btn photo" bindtap="goPhotoScan">📷 拍照扫描（舌头/面色/皮肤/患处）</view>
+            <view class="guide-btn photo" bindtap="goPhotoScan">📷 拍照扫描（舌头/面色/皮肤）</view>
             <view class="guide-btn test" bindtap="goTizhiTest">📝 3分钟健康测评</view>
           </view>
 
