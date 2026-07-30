@@ -11,8 +11,8 @@ async function upload() {
 
   const uploadResult = await ci.upload({
     project,
-    version: '1.0.7',
-    desc: '健康测评闭环：AI拍照扫描+体质答题+症状自评+分享图裂变+小麦对话对接+vision会话历史+商品推荐',
+    version: '1.0.8',
+    desc: 'M1多图拍照+M2养生谷分享/问小麦+M4转发好友+M3小麦商品推荐+W5横幅压矮',
     setting: {
       es6: true,
       es7: true,
