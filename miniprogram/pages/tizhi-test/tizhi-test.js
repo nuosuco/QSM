@@ -73,14 +73,18 @@ const SYMPTOM_RESULTS = {
 
 Page({
   data: {
-    phase: 'start',       // start | quiz | result
+    phase: 'start',       // start | quiz | result | scanning | scan-result
     mode: '',             // tizhi | symptom
     questions: [],
     currentIndex: 0,
     selectedAnswer: -1,
     answers: [],
     result: null,
-    testCount: 0
+    testCount: 0,
+    // AI拍照扫描
+    scanPart: '',
+    scanImagePath: '',
+    scanResult: ''
   },
 
   onLoad(options) {
@@ -92,6 +96,91 @@ Page({
     request('/api/tizhi-test/count').then(res => {
       if (res && res.count) this.setData({ testCount: res.count });
     }).catch(() => {});
+  },
+
+  // AI拍照扫描
+  scanPhoto(e) {
+    const part = e.currentTarget.dataset.part || '舌头';
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      camera: 'back',
+      success: (res) => {
+        const tempPath = res.tempFiles[0].tempFilePath;
+        this.setData({ scanPart: part, scanImagePath: tempPath, phase: 'scanning' });
+        this.analyzePhoto(tempPath, part);
+      },
+      fail: (err) => {
+        if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
+          wx.showToast({ title: '选择图片失败', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  async analyzePhoto(filePath, part) {
+    try {
+      // 转base64
+      const base64Uri = await this.imageToBase64(filePath);
+      const prompts = {
+        '舌头': '请从中医角度分析这张舌头照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
+        '面色': '请从中医角度分析这张面色照片：面色、光泽、唇色等，判断气血状况和体质倾向，给出食疗建议。',
+        '皮肤': '请从中医角度分析这张皮肤照片：肤色、皮疹、干燥程度等，判断可能的体质问题和调理方向，给出食疗建议。',
+        '患处': '请从中医角度分析这张照片中的症状表现，判断可能的健康问题，给出食疗调理建议。'
+      };
+      const prompt = prompts[part] || prompts['患处'];
+
+      const data = await request('/api/chat/vision', {
+        method: 'POST',
+        data: {
+          message: prompt,
+          image_url: base64Uri,
+          user_id: getApp().globalData.userId || ''
+        }
+      });
+
+      const result = data.reply || '分析完成，建议咨询小麦获取详细方案。';
+      this.setData({ phase: 'scan-result', scanResult: result });
+
+      // 保存扫描记录
+      request('/api/tizhi-test/save', {
+        method: 'POST',
+        data: {
+          user_id: getApp().globalData.userId || '',
+          mode: 'scan',
+          result_key: part,
+          result_name: 'AI拍照扫描-' + part,
+          score: 0,
+          answers: [result.substring(0, 500)]
+        }
+      }).catch(() => {});
+
+    } catch (err) {
+      console.error('AI分析失败:', err);
+      this.setData({ phase: 'start' });
+      wx.showToast({ title: 'AI分析失败，请重试或改用答题测评', icon: 'none', duration: 2500 });
+    }
+  },
+
+  imageToBase64(filePath) {
+    return new Promise((resolve, reject) => {
+      const fs = wx.getFileSystemManager();
+      fs.readFile({
+        filePath: filePath,
+        encoding: 'base64',
+        success: (res) => {
+          let mime = 'image/jpeg';
+          const lower = filePath.toLowerCase();
+          if (lower.endsWith('.png')) mime = 'image/png';
+          else if (lower.endsWith('.gif')) mime = 'image/gif';
+          else if (lower.endsWith('.webp')) mime = 'image/webp';
+          resolve('data:' + mime + ';base64,' + res.data);
+        },
+        fail: reject
+      });
+    });
   },
 
   startTest() {
@@ -328,11 +417,16 @@ Page({
   },
 
   goAskXiaomai() {
-    const { result, mode } = this.data;
-    // 跳到小麦对话页，带上体质/症状信息
-    const hint = mode === 'tizhi'
-      ? `我刚做了体质测评，结果是【${result.name}】，请给我食疗调理方案`
-      : `我刚做了症状自评，倾向【${result.name}】，请给我食疗调理方案`;
+    const { result, mode, scanPart, scanResult } = this.data;
+    let hint;
+    if (mode === 'scan') {
+      // AI拍照扫描结果
+      hint = `我刚用AI拍照扫描了${scanPart}，分析结果：${(scanResult || '').substring(0, 200)}，请给我食疗调理方案`;
+    } else if (mode === 'tizhi') {
+      hint = `我刚做了体质测评，结果是【${result.name}】，请给我食疗调理方案`;
+    } else {
+      hint = `我刚做了症状自评，倾向【${result.name}】，请给我食疗调理方案`;
+    }
     wx.setStorageSync('som_tizhi_hint', hint);
     wx.switchTab({ url: '/pages/chat/chat' });
   }

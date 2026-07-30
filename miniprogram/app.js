@@ -5,7 +5,7 @@ App({
     userId: '',
     sessionId: ''
   },
-  onLaunch() {
+  onLaunch(options) {
     // 获取/生成用户ID（对应网页版 getUserId）
     let uid = wx.getStorageSync('som_user_id');
     if (!uid) {
@@ -21,5 +21,14 @@ App({
       wx.setStorageSync('som_session_id', sid);
     }
     this.globalData.sessionId = sid;
+
+    // 处理分享图小程序码扫码进入（scene=tizhi_qixu 等）
+    if (options && options.scene) {
+      const scene = decodeURIComponent(options.scene);
+      // scene格式: tizhi_qixu / symptom_tongfeng 等
+      if (scene.startsWith('tizhi_') || scene.startsWith('symptom_')) {
+        this.globalData.pendingScene = scene;
+      }
+    }
   }
 })
