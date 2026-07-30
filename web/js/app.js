@@ -122,10 +122,29 @@ function showGuideScan() {
     document.getElementById('image-input').click();
 }
 
-// 引导按钮：跳转到健康测评页
+// 跳转到健康测评页（养生谷banner / 小麦引导按钮 / 快捷问题共用）
 function switchToHealthTest() {
-    const healthBtn = document.querySelector('.nav-btn[data-tab="health-test"]');
-    if (healthBtn) healthBtn.click();
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    navBtns.forEach(b => b.classList.remove('active'));
+    tabContents.forEach(c => c.classList.remove('active'));
+    const healthTab = document.getElementById('health-test-tab');
+    if (healthTab) {
+        healthTab.classList.add('active');
+        renderHealthTestPage();
+    }
+}
+
+// 从健康测评页返回养生谷
+function goBackFromTest() {
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    navBtns.forEach(b => b.classList.remove('active'));
+    tabContents.forEach(c => c.classList.remove('active'));
+    const ysgTab = document.getElementById('yangshenggu-tab');
+    const ysgBtn = document.querySelector('.nav-btn[data-tab="yangshenggu"]');
+    if (ysgTab) ysgTab.classList.add('active');
+    if (ysgBtn) ysgBtn.classList.add('active');
 }
 
 // 当前选中的图片 base64 列表（支持多张）

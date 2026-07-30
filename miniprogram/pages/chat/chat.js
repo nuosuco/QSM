@@ -67,6 +67,23 @@ Page({
     }
   },
 
+  // 下拉刷新：重新检查体质测评记录
+  onPullDownRefresh() {
+    request('/api/tizhi-test/latest?user_id=' + encodeURIComponent(app.globalData.userId))
+      .then(res => {
+        if (res && res.record) {
+          wx.showToast({ title: '最近测评：' + res.record.result_name, icon: 'none' });
+        } else {
+          wx.showToast({ title: '暂无测评记录', icon: 'none' });
+        }
+        wx.stopPullDownRefresh();
+      })
+      .catch(() => {
+        wx.showToast({ title: '刷新失败', icon: 'none' });
+        wx.stopPullDownRefresh();
+      });
+  },
+
   // 引导按钮：去测评
   goTizhiTest() {
     wx.navigateTo({ url: '/pages/tizhi-test/tizhi-test' });
