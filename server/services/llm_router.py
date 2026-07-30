@@ -134,25 +134,32 @@ def chat(user_message: str, system_prompt: str = "", history: list = None,
     return {"success": False, "content": "", "error": " | ".join(errors)}
 
 
-def vision(user_message: str, image_url: str, system_prompt: str = "",
+def vision(user_message: str, image_url, system_prompt: str = "",
            temperature: float = 0.7) -> dict:
     """
-    图片理解（看舌苔、看食材等），需要支持 image 输入的服务商。
-    image_url: 图片URL或base64 data URI
+    图片理解（看舌苔、面色、皮肤、患处等），需要支持 image 输入的服务商。
+    image_url: 单张图片URL/base64，或多张图片的列表（兼容旧版）
     """
     cfg = _load_config()
     timeout = cfg.get("timeout_seconds", 30)
     cooldown = cfg.get("cooldown_seconds", 3600)
 
+    # 兼容单图(str)和多图(list)
+    if isinstance(image_url, str):
+        image_list = [image_url]
+    else:
+        image_list = list(image_url or [])
+    if not image_list:
+        return {"success": False, "content": "", "error": "no image provided"}
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
 
-    # OpenAI vision 格式
-    user_content = [
-        {"type": "text", "text": user_message},
-        {"type": "image_url", "image_url": {"url": image_url}},
-    ]
+    # OpenAI vision 格式：一段文字 + 多张图片
+    user_content = [{"type": "text", "text": user_message}]
+    for url in image_list:
+        user_content.append({"type": "image_url", "image_url": {"url": url}})
     messages.append({"role": "user", "content": user_content})
 
     providers = _get_providers_for("vision")

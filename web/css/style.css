@@ -1939,3 +1939,17 @@ body {
     font-size: 14px;
   }
 }
+
+/* 测评分享按钮 */
+.test-share-btn {
+  flex: 1;
+  padding: 14px;
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.test-share-btn:hover { opacity: 0.9; }

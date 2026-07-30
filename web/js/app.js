@@ -54,7 +54,6 @@ function initChat() {
     const chatInput = document.getElementById('chat-input');
     const uploadBtn = document.getElementById('upload-btn');
     const imageInput = document.getElementById('image-input');
-    const previewRemove = document.getElementById('preview-remove');
     
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keydown', (e) => {
@@ -64,10 +63,9 @@ function initChat() {
         }
     });
     
-    // 图片上传/拍照
+    // 图片上传/拍照（支持多张）
     uploadBtn.addEventListener('click', () => imageInput.click());
     imageInput.addEventListener('change', handleImageSelect);
-    previewRemove.addEventListener('click', clearImagePreview);
     
     // 新用户引导：检查是否第一次进来
     setTimeout(checkNewUserGuide, 500);
@@ -130,64 +128,75 @@ function switchToHealthTest() {
     if (healthBtn) healthBtn.click();
 }
 
-// 当前选中的图片 base64
-let pendingImageBase64 = null;
+// 当前选中的图片 base64 列表（支持多张）
+let pendingImages = [];
 
 function handleImageSelect(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    // 自动压缩：canvas 缩放到最大 1280px 宽，JPEG 0.8 质量
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = function() {
-        URL.revokeObjectURL(objectUrl);
-        const maxW = 1280;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxW) {
-            h = Math.round(h * maxW / w);
-            w = maxW;
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        pendingImageBase64 = canvas.toDataURL('image/jpeg', 0.8);
-        document.getElementById('preview-img').src = pendingImageBase64;
-        document.getElementById('image-preview').style.display = 'inline-block';
-    };
-    img.onerror = function() {
-        URL.revokeObjectURL(objectUrl);
-        alert('图片加载失败，请重新选择');
-    };
-    img.src = objectUrl;
-    // 重置 input，允许重复选同一文件
+    const files = Array.from(e.target.files || []);
+    // 重置 input，允许重复选同一文件 / 取消后再拍
     e.target.value = '';
+    if (files.length === 0) return; // 用户取消，不做任何事，可再次点击拍照
+
+    files.forEach(file => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = function() {
+            URL.revokeObjectURL(objectUrl);
+            const maxW = 1280;
+            let w = img.width, h = img.height;
+            if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            pendingImages.push(canvas.toDataURL('image/jpeg', 0.8));
+            renderImagePreviews();
+        };
+        img.onerror = function() { URL.revokeObjectURL(objectUrl); };
+        img.src = objectUrl;
+    });
+}
+
+function renderImagePreviews() {
+    const list = document.getElementById('image-preview-list');
+    if (!list) return;
+    if (pendingImages.length === 0) { list.style.display = 'none'; list.innerHTML = ''; return; }
+    list.style.display = 'flex';
+    list.innerHTML = pendingImages.map((src, i) =>
+        '<div class="preview-item">' +
+          '<img src="' + src + '" alt="预览">' +
+          '<button class="preview-remove" onclick="removePreviewImage(' + i + ')">✕</button>' +
+        '</div>'
+    ).join('') +
+    '<button class="preview-add" onclick="document.getElementById(\'image-input\').click()">＋</button>';
+}
+
+function removePreviewImage(idx) {
+    pendingImages.splice(idx, 1);
+    renderImagePreviews();
 }
 
 function clearImagePreview() {
-    pendingImageBase64 = null;
-    document.getElementById('image-preview').style.display = 'none';
-    document.getElementById('preview-img').src = '';
+    pendingImages = [];
+    renderImagePreviews();
 }
 
 async function sendMessage() {
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
     const message = input.value.trim();
-    const hasImage = !!pendingImageBase64;
+    const hasImage = pendingImages.length > 0;
     
     if (!message && !hasImage) return;
     
     // 显示用户消息（带图片预览）
-    const displayMsg = hasImage
-        ? (message ? message + '<br><img src="' + pendingImageBase64 + '" style="max-width:160px;max-height:120px;border-radius:8px;margin-top:6px;">' : '📷 [舌苔照片]')
-        : message;
+    let displayMsg = message;
+    if (hasImage) {
+        const imgsHtml = pendingImages.map(src => '<img src="' + src + '" style="max-width:120px;max-height:90px;border-radius:8px;margin:4px 4px 0 0;">').join('');
+        displayMsg = (message ? message + '<br>' : '📷 ') + imgsHtml;
+    }
     appendMessage(displayMsg, 'user', true);
     
-    const imageToSend = pendingImageBase64;
+    const imagesToSend = pendingImages.slice();
     input.value = '';
     clearImagePreview();
     sendBtn.disabled = true;
@@ -198,14 +207,15 @@ async function sendMessage() {
     try {
         let response;
         if (hasImage) {
-            // 图片辨证：走 vision 接口（base64 data URI）
+            // 图片辨证：走 vision 接口（支持多图）
             response = await fetch(`${API_BASE}/api/chat/vision`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: message || '请观察这张舌头照片，从中医角度分析舌色、舌苔、舌形，给出体质倾向和食养建议。',
-                    image_url: imageToSend,
-                    user_id: getUserId()
+                    message: message || '请综合观察这些照片（舌头/面色/皮肤/患处），从中医角度分析，给出体质倾向和食养建议。',
+                    images: imagesToSend,
+                    user_id: getUserId(),
+                    session_id: getSessionId()
                 })
             });
         } else {
@@ -228,9 +238,12 @@ async function sendMessage() {
         // 显示AI回复
         let replyText = data.reply;
         
-        // 图片辨证：直接显示回复，不走商品推荐分支
+        // 图片辨证：显示回复 + 多轮引导（3个建议问题）+ 收藏分享
         if (hasImage) {
-            appendMessage(replyText, 'assistant', false, false);
+            const msgId = appendMessage(replyText, 'assistant', false, false);
+            appendFollowUpSuggestions(hasImage);
+            appendMessageActions(msgId, replyText);
+            saveChatRecord('[图片辨证x' + imagesToSend.length + '] ' + message, replyText, '');
             scrollToLastUserMessage();
             sendBtn.disabled = false;
             return;
@@ -308,8 +321,9 @@ async function sendMessage() {
             return;
         }
         
-        // 无商品：也不跳底，定位到用户消息
-        appendMessage(replyText, 'assistant', false, false);
+        // 无商品：定位到用户消息 + 收藏分享
+        const plainMsgId = appendMessage(replyText, 'assistant', false, false);
+        appendMessageActions(plainMsgId, replyText);
         scrollToLastUserMessage();
         
     } catch (error) {
@@ -319,6 +333,169 @@ async function sendMessage() {
     } finally {
         sendBtn.disabled = false;
     }
+}
+
+// ========== 多轮引导：小麦回复末尾留 3 个建议问题 ==========
+// 用户点一个就自动提交给小麦，引导继续拍照/补充症状，最终多维辩证
+function appendFollowUpSuggestions(afterImage) {
+    const container = document.getElementById('chat-messages');
+    // 根据是否刚拍过照，给不同的引导问题
+    const suggestions = afterImage
+        ? [
+            '📷 再拍一张其他部位（面色/皮肤/患处）',
+            '📝 我说说最近的身体症状',
+            '🌾 直接给我药膳食疗方案'
+          ]
+        : [
+            '📷 我拍个舌苔/面色照片给你看',
+            '📝 帮我做个3分钟体质测评',
+            '🌾 推荐适合我的有机食材'
+          ];
+
+    const wrap = document.createElement('div');
+    wrap.className = 'followup-suggestions';
+    wrap.innerHTML = '<div class="followup-title">你可以继续：</div>' +
+        suggestions.map(s => '<button class="followup-chip">' + s + '</button>').join('');
+    container.appendChild(wrap);
+
+    wrap.querySelectorAll('.followup-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const text = chip.textContent.trim();
+            // 拍照类：直接唤起图片选择
+            if (text.indexOf('📷') === 0) {
+                document.getElementById('image-input').click();
+                return;
+            }
+            // 测评类：跳养生谷测评
+            if (text.indexOf('体质测评') >= 0) {
+                switchToHealthTest();
+                return;
+            }
+            // 其他：填入输入框并发送
+            const input = document.getElementById('chat-input');
+            input.value = text.replace(/^[\u{1F300}-\u{1FAFF}\u2600-\u27BF]\s*/u, '');
+            sendMessage();
+        });
+    });
+}
+
+// ========== 收藏 + 图片分享（裂变） ==========
+// 给小麦的每条回复加「收藏」和「生成分享图」按钮
+function appendMessageActions(msgId, replyText) {
+    const chatMsg = document.getElementById(msgId);
+    if (!chatMsg) return;
+    const content = chatMsg.querySelector('.message-content');
+    if (!content) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'msg-action-bar';
+
+    const favBtn = document.createElement('button');
+    favBtn.className = 'msg-action-btn';
+    favBtn.innerHTML = '♡ 收藏';
+    favBtn.onclick = function() {
+        const isFav = this.classList.contains('favorited');
+        if (isFav) {
+            this.innerHTML = '♡ 收藏';
+            this.classList.remove('favorited');
+        } else {
+            this.innerHTML = '♥ 已收藏';
+            this.classList.add('favorited');
+            const userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
+            const favData = {
+                type: 'chat',
+                userMessage: userMsg ? userMsg.querySelector('.message-text').textContent : '',
+                assistantReply: replyText,
+                time: new Date().toISOString()
+            };
+            let favs = JSON.parse(localStorage.getItem('som_favorites') || '[]');
+            favs.push(favData);
+            localStorage.setItem('som_favorites', JSON.stringify(favs));
+        }
+    };
+
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'msg-action-btn';
+    shareBtn.innerHTML = '🖼️ 分享图';
+    shareBtn.onclick = function() { generateShareImage(replyText); };
+
+    bar.appendChild(favBtn);
+    bar.appendChild(shareBtn);
+    content.appendChild(bar);
+}
+
+// 用 canvas 把小麦回答画成分享卡片图，长按可保存/转发
+function generateShareImage(text) {
+    const W = 750, padding = 50, lineHeight = 40, fontSize = 28;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // 先算文字换行，确定高度
+    ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
+    const maxTextW = W - padding * 2;
+    const rawLines = String(text).split('\n');
+    const lines = [];
+    rawLines.forEach(raw => {
+        if (raw.trim() === '') { lines.push(''); return; }
+        let cur = '';
+        for (const ch of raw) {
+            if (ctx.measureText(cur + ch).width > maxTextW) {
+                lines.push(cur); cur = ch;
+            } else cur += ch;
+        }
+        if (cur) lines.push(cur);
+    });
+
+    const headerH = 130, footerH = 110;
+    const bodyH = lines.length * lineHeight + 40;
+    const H = headerH + bodyH + footerH;
+    canvas.width = W; canvas.height = H;
+
+    // 背景
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#f0f7f2'); grad.addColorStop(1, '#e3f0e8');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+    // 头部
+    ctx.fillStyle = '#3a7d5c';
+    ctx.font = 'bold 40px "PingFang SC", sans-serif';
+    ctx.fillText('🌾 小麦SOM · 养生辨证', padding, 75);
+    ctx.fillStyle = '#7ba892'; ctx.font = '24px sans-serif';
+    ctx.fillText('中医辨证 · 有机养生', padding, 110);
+
+    // 正文
+    ctx.fillStyle = '#2d3b33'; ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
+    let y = headerH + 30;
+    lines.forEach(l => { ctx.fillText(l, padding, y); y += lineHeight; });
+
+    // 底部
+    ctx.fillStyle = '#3a7d5c'; ctx.font = 'bold 26px sans-serif';
+    ctx.fillText('扫码体验 SOM 松麦 · 你的养生助手', padding, H - 55);
+    ctx.fillStyle = '#9bb8a8'; ctx.font = '22px sans-serif';
+    ctx.fillText('som.top · 以上为养生文化参考，不构成医疗诊断', padding, H - 22);
+
+    // 弹出预览，用户可长按保存
+    const dataUrl = canvas.toDataURL('image/png');
+    showSharePreview(dataUrl);
+}
+
+function showSharePreview(dataUrl) {
+    let mask = document.getElementById('share-preview-mask');
+    if (mask) mask.remove();
+    mask = document.createElement('div');
+    mask.id = 'share-preview-mask';
+    mask.className = 'share-preview-mask';
+    mask.innerHTML =
+        '<div class="share-preview-box">' +
+          '<img src="' + dataUrl + '" alt="分享图">' +
+          '<div class="share-preview-tip">长按图片保存，转发给朋友 💚</div>' +
+          '<div class="share-preview-btns">' +
+            '<a class="share-dl-btn" href="' + dataUrl + '" download="xiaomai-share.png">⬇️ 保存图片</a>' +
+            '<button class="share-close-btn" onclick="document.getElementById(\'share-preview-mask\').remove()">关闭</button>' +
+          '</div>' +
+        '</div>';
+    mask.addEventListener('click', (e) => { if (e.target === mask) mask.remove(); });
+    document.body.appendChild(mask);
 }
 
 // 滚动定位：把最后一条用户消息放到聊天区顶部
@@ -1460,6 +1637,7 @@ function renderScanResult(container, part, result) {
       '</div>' +
       '<div class="test-result-actions">' +
         '<button class="test-ask-btn" onclick="goAskXiaomaiScan()">💬 问小麦怎么调理</button>' +
+        '<button class="test-share-btn" onclick="shareScanResult()">🖼️ 生成分享图</button>' +
         '<button class="test-back-btn" onclick="renderHealthTestPage()">🔄 重新测评</button>' +
       '</div>' +
       '<div class="test-result-tip">分享给朋友，一起养生 💚</div>' +
@@ -1640,6 +1818,7 @@ function renderQuizResult(container, result, mode) {
       '</div>' +
       '<div class="test-result-actions">' +
         '<button class="test-ask-btn" onclick="goAskXiaomaiResult()">💬 问小麦怎么调理</button>' +
+        '<button class="test-share-btn" onclick="shareQuizResult()">🖼️ 生成分享图</button>' +
         '<button class="test-back-btn" onclick="renderHealthTestPage()">🔄 重新测评</button>' +
       '</div>' +
       '<div class="test-result-tip">分享给朋友，一起养生 💚</div>' +
@@ -1662,4 +1841,122 @@ function goAskXiaomaiResult() {
       sendMessage();
     }
   }, 500);
+}
+
+// ========== 测评结果分享图（问题5） ==========
+function generateTestShareImage(result, mode) {
+  var W = 750, padding = 50;
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d');
+  var H = 1040;
+  canvas.width = W; canvas.height = H;
+
+  // 背景渐变
+  var grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#f0f7f2'); grad.addColorStop(1, '#e3f0e8');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+  // 顶部绿条
+  ctx.fillStyle = '#4a9d6e'; ctx.fillRect(0, 0, W, 12);
+
+  // 标题
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#2c3e50'; ctx.font = 'bold 40px "PingFang SC", sans-serif';
+  ctx.fillText('🌿 我的健康自测报告', W / 2, 80);
+
+  // 体质/症状名
+  ctx.fillStyle = '#4a9d6e'; ctx.font = 'bold 52px "PingFang SC", sans-serif';
+  ctx.fillText((result.emoji || '🌿') + ' ' + result.name, W / 2, 160);
+
+  // 症状标签
+  ctx.font = '26px "PingFang SC", sans-serif'; ctx.fillStyle = '#666';
+  ctx.fillText(result.symptoms.join(' · '), W / 2, 210);
+
+  // 描述
+  ctx.fillStyle = '#555'; ctx.font = '24px "PingFang SC", sans-serif';
+  wrapCanvasText(ctx, result.desc, W / 2, 260, W - 100, 36);
+
+  // 小麦建议白框
+  var boxY = 330, boxH = 340;
+  ctx.fillStyle = '#ffffff';
+  roundRectPath(ctx, 40, boxY, W - 80, boxH, 20); ctx.fill();
+  ctx.strokeStyle = '#4a9d6e'; ctx.lineWidth = 2;
+  roundRectPath(ctx, 40, boxY, W - 80, boxH, 20); ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#4a9d6e'; ctx.font = 'bold 30px "PingFang SC", sans-serif';
+  ctx.fillText('🌾 小麦建议', 70, boxY + 50);
+
+  ctx.fillStyle = '#333'; ctx.font = '26px "PingFang SC", sans-serif';
+  wrapCanvasTextLeft(ctx, '✅ 食疗：' + result.diet, 70, boxY + 100, W - 140, 38);
+  wrapCanvasTextLeft(ctx, '❌ 忌口：' + result.avoid, 70, boxY + 190, W - 140, 38);
+  wrapCanvasTextLeft(ctx, '🏠 起居：' + result.life, 70, boxY + 280, W - 140, 38);
+
+  if (result.secondary) {
+    ctx.fillStyle = '#999'; ctx.font = '22px "PingFang SC", sans-serif';
+    ctx.fillText('兼夹倾向：' + result.secondary, 70, boxY + boxH - 15);
+  }
+
+  // 底部引导
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#4a9d6e'; ctx.font = 'bold 28px "PingFang SC", sans-serif';
+  ctx.fillText('扫码问小麦，对症食疗 →', W / 2, 740);
+
+  ctx.fillStyle = '#999'; ctx.font = '22px "PingFang SC", sans-serif';
+  ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, 790);
+  ctx.fillText('som.top · 养生文化参考，不构成医疗诊断', W / 2, 830);
+
+  // 小程序码占位
+  ctx.fillStyle = '#ddd'; ctx.fillRect(W / 2 - 60, 860, 120, 120);
+  ctx.fillStyle = '#999'; ctx.font = '20px sans-serif';
+  ctx.fillText('[小程序码]', W / 2, 930);
+
+  var dataUrl = canvas.toDataURL('image/png');
+  showSharePreview(dataUrl);
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+  var line = '';
+  for (var i = 0; i < text.length; i++) {
+    var testLine = line + text[i];
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      ctx.fillText(line, x, y); line = text[i]; y += lineHeight;
+    } else { line = testLine; }
+  }
+  ctx.fillText(line, x, y);
+}
+
+function wrapCanvasTextLeft(ctx, text, x, y, maxWidth, lineHeight) {
+  var line = '';
+  for (var i = 0; i < text.length; i++) {
+    var testLine = line + text[i];
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      ctx.fillText(line, x, y); line = text[i]; y += lineHeight;
+    } else { line = testLine; }
+  }
+  ctx.fillText(line, x, y);
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// 测评结果分享按钮处理
+function shareQuizResult() {
+  var result = _healthTestState.result;
+  var mode = _healthTestState.mode;
+  if (result) generateTestShareImage(result, mode);
+}
+
+function shareScanResult() {
+  var part = _healthTestState.scanPart || '舌头';
+  var scanText = _healthTestState.scanResult || '';
+  // 扫描结果用通用分享图
+  generateShareImage('📷 AI拍照扫描：' + part + '\n\n' + scanText.substring(0, 600));
 }

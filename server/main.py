@@ -764,37 +764,62 @@ async def llm_status():
 # ========== 图片辨证接口（看舌苔） ==========
 
 class VisionChatRequest(BaseModel):
-    """图片辨证请求"""
-    message: str = "请观察这张舌头照片，从中医角度分析舌色、舌苔、舌形，给出体质倾向和食养建议。"
-    image_url: str
+    """图片辨证请求（支持多张图片）"""
+    message: str = "请观察这些照片，从中医角度分析舌色、舌苔、舌形、面色、皮肤等，给出体质倾向和食养建议。"
+    image_url: Optional[str] = None  # 兼容旧版单图
+    images: Optional[List[str]] = None  # 新版多图
     user_id: Optional[str] = None
+    session_id: Optional[str] = None
 
 @app.post("/api/chat/vision")
 async def chat_vision(request: VisionChatRequest):
-    """图片理解辨证（看舌苔、看食材等）"""
+    """图片理解辨证（支持多张图片：舌头/面色/皮肤/患处）"""
     from services import llm_router, rag
 
-    system_prompt = """你是小麦SOM，一位经验丰富的中医养生顾问，擅长舌诊。
+    # 兼容旧版单图 + 新版多图
+    image_list = request.images or []
+    if request.image_url and request.image_url not in image_list:
+        image_list.insert(0, request.image_url)
+    if not image_list:
+        return {"success": False, "error": "no_image", "reply": "请上传至少一张照片哦～"}
+
+    # 根据图片数量调整提示词
+    if len(image_list) == 1:
+        system_prompt = """你是小麦SOM，一位经验丰富的中医养生顾问，擅长舌诊、面诊、皮肤望诊。
 请观察用户发来的图片，从以下角度分析：
-1. 舌色（淡红/淡白/红/紫暗）
-2. 舌苔（薄白/白腻/黄腻/少苔）
-3. 舌形（胖大/瘦薄/齿痕/裂纹）
+1. 舌色（淡红/淡白/红/紫暗）、舌苔（薄白/白腻/黄腻/少苔）、舌形（胖大/瘦薄/齿痕/裂纹）
+2. 或面色（红润/萎黄/苍白/晦暗）、光泽、唇色
+3. 或皮肤（肤色、皮疹、干燥、湿疹等）
 4. 综合判断可能的体质倾向
 5. 给出2-3条食养建议（用药食同源食材）
 
 注意：
 - 用通俗易懂的语言，不堆砌术语
 - 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医
-- 如果图片不是舌头或看不清，礼貌说明并建议重新拍摄"""
+- 如果图片看不清，礼貌说明并建议重新拍摄"""
+    else:
+        system_prompt = f"""你是小麦SOM，一位经验丰富的中医养生顾问，擅长多维度望诊。
+用户发来了{len(image_list)}张照片（可能包含舌头、面色、皮肤、患处等不同部位）。
+请综合所有照片进行多维度分析：
+1. 逐一分析每张照片的特征（舌色/舌苔/面色/皮肤/患处等）
+2. 综合多张照片的信息，交叉验证，给出更准确的体质判断
+3. 给出综合辨证结论（主证+兼证）
+4. 给出药膳食疗方案（具体食材+做法）
+5. 推荐3-5种适合的有机食材
 
-    # RAG 上下文（基于用户消息）
+注意：
+- 多维度综合分析比单张照片更准确，请充分利用多张图的信息
+- 用通俗易懂的语言
+- 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医"""
+
+    # RAG 上下文
     context = rag.build_context(request.message, max_chars=1500)
     if context:
         system_prompt += f"\n\n【参考知识】\n{context}"
 
     result = llm_router.vision(
         request.message,
-        request.image_url,
+        image_list,
         system_prompt=system_prompt,
         temperature=0.5,
     )
@@ -803,7 +828,7 @@ async def chat_vision(request: VisionChatRequest):
         return {
             "success": False,
             "error": result.get("error", "图片分析失败"),
-            "reply": "抱歉，我暂时无法分析这张图片。请确保图片清晰、光线充足，或者直接用文字描述你的身体状况，我一样可以帮你分析。"
+            "reply": "抱歉，我暂时无法分析这些图片。请确保图片清晰、光线充足，或者直接用文字描述你的身体状况，我一样可以帮你分析。"
         }
 
     # 保存对话记录
@@ -816,7 +841,7 @@ async def chat_vision(request: VisionChatRequest):
         ''', (
             request.user_id or 'anonymous',
             request.session_id or 'vision',
-            f'[图片辨证] {request.message[:200]}',
+            f'[图片辨证x{len(image_list)}] {request.message[:200]}',
             result["content"][:2000],
             '', '',
         ))
