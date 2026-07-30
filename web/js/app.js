@@ -80,20 +80,7 @@ async function checkNewUserGuide() {
     const hasHistory = data.chats && data.chats.length > 0;
     if (hasHistory) return;
     
-    // 先查后端有没有测评记录
-    try {
-        const resp = await fetch(`${API_BASE}/api/tizhi-test/latest?user_id=${encodeURIComponent(getUserId())}`);
-        const result = await resp.json();
-        if (result && result.record) {
-            // 有记录，自动出方案
-            const r = result.record;
-            const modeLabel = r.mode === 'tizhi' ? '体质测评' : r.mode === 'scan' ? 'AI拍照扫描' : '症状自评';
-            const input = document.getElementById('chat-input');
-            input.value = `我之前做过${modeLabel}，结果是【${r.result_name}】，请给我食疗调理方案`;
-            setTimeout(() => sendMessage(), 300);
-            return;
-        }
-    } catch(e) {}
+    // 不再自动发送消息，只显示引导（用户主动点击才发送）
     
     // 新用户，替换欢迎消息为引导版本
     const chatMessages = document.getElementById('chat-messages');
@@ -226,11 +213,14 @@ async function sendMessage() {
     
     try {
         let response;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45秒超时
         if (hasImage) {
             // 图片辨证：走 vision 接口（支持多图）
             response = await fetch(`${API_BASE}/api/chat/vision`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
                     message: message || '请综合观察这些照片（舌头/面色/皮肤/患处），从中医角度分析，给出体质倾向和食养建议。',
                     images: imagesToSend,
@@ -242,6 +232,7 @@ async function sendMessage() {
             response = await fetch(`${API_BASE}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
                     message: message,
                     session_id: getSessionId(),
@@ -249,6 +240,7 @@ async function sendMessage() {
                 })
             });
         }
+        clearTimeout(timeoutId);
         
         const data = await response.json();
         
@@ -348,7 +340,30 @@ async function sendMessage() {
         
     } catch (error) {
         document.getElementById(loadingId).remove();
-        appendMessage('抱歉，网络出现问题，请稍后重试。', 'assistant');
+        let errMsg = '抱歉，出了点问题：';
+        if (error.name === 'AbortError' || (error.message && error.message.includes('aborted'))) {
+            errMsg += 'AI 思考超时（超过30秒），请重试。';
+        } else if (error instanceof TypeError && error.message.includes('fetch')) {
+            errMsg += '网络连接失败，请检查网络后重试。';
+        } else {
+            errMsg += (error.message || '未知错误') + '，请重试。';
+        }
+        const errId = appendMessage(errMsg, 'assistant', false, false);
+        // 添加重试按钮
+        const errDiv = document.getElementById(errId);
+        if (errDiv) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'msg-action-btn';
+            retryBtn.innerHTML = '🔄 重试';
+            retryBtn.style.cssText = 'margin:8px 0 0 48px;padding:6px 16px;border:1px solid #7bc49f;border-radius:16px;background:#f0f7f2;color:#3a7d5c;font-size:14px;cursor:pointer;';
+            retryBtn.onclick = function() {
+                errDiv.remove();
+                input.value = message;
+                if (imagesToSend.length) { pendingImages = imagesToSend; }
+                sendMessage();
+            };
+            errDiv.querySelector('.message-content').appendChild(retryBtn);
+        }
         console.error('发送消息失败:', error);
     } finally {
         sendBtn.disabled = false;
