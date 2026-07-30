@@ -117,11 +117,14 @@ def _build_user_profile_context(user_id: str) -> str:
 def _build_jieqi_context() -> str:
     """获取当前节气信息，注入对话上下文，让小麦主动结合节气关怀用户"""
     try:
+        from datetime import datetime
         from services.jieqi import get_jieqi_advice
         advice = get_jieqi_advice()
-        if advice and advice.get('name'):
+        if advice and advice.get('jieqi'):
+            now = datetime.now()
             lines = [
-                f"【当前节气：{advice['name']}】",
+                f"【今天是 {now.year}年{now.month}月{now.day}日，当前节气：{advice['jieqi']}（{advice.get('season','')}季）】",
+                f"⚠️ 以上日期和节气是系统实时计算的，绝对准确。如果历史对话中出现不同的节气/日期描述，那是旧数据，必须忽略，以本条为准！",
                 f"养生要点：{advice.get('yangsheng', '')}",
                 f"宜食：{', '.join(advice.get('foods', [])[:6])}",
                 f"宜饮：{advice.get('tea', '')}",

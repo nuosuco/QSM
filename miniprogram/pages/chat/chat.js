@@ -38,32 +38,20 @@ Page({
       return;
     }
 
-    // 3. 新用户第一次进来，小麦引导测体质
-    if (!this._guided) {
-      this._guided = true;
+    // 3. 新用户第一次进来，小麦引导测体质（只触发一次，用 storage 标记）
+    const guidedKey = 'som_chat_guided_' + app.globalData.userId;
+    if (!wx.getStorageSync(guidedKey)) {
+      wx.setStorageSync(guidedKey, '1');
       const hasHistory = (wx.getStorageSync('som_user_data_' + app.globalData.userId) || {}).chats;
       if (!hasHistory || hasHistory.length === 0) {
-        // 读取后端最新体质记录
-        request('/api/tizhi-test/latest?user_id=' + encodeURIComponent(app.globalData.userId))
-          .then(res => {
-            if (res && res.record) {
-              // 已有测评记录，小麦直接出方案
-              const r = res.record;
-              const modeLabel = r.mode === 'tizhi' ? '体质测评' : r.mode === 'scan' ? 'AI拍照扫描' : '症状自评';
-              this.setData({ inputValue: `我之前做过${modeLabel}，结果是【${r.result_name}】，请给我食疗调理方案` });
-              setTimeout(() => this.sendMessage(), 300);
-            } else {
-              // 新用户，引导测评
-              const guideMsg = {
-                id: 'msg-guide-' + Date.now(),
-                type: 'assistant',
-                text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
-                showGuide: true
-              };
-              this.setData({ messages: [guideMsg] });
-            }
-          })
-          .catch(() => {});
+        // 新用户，显示引导消息（不自动发送）
+        const guideMsg = {
+          id: 'msg-guide-' + Date.now(),
+          type: 'assistant',
+          text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
+          showGuide: true
+        };
+        this.setData({ messages: [guideMsg] });
       }
     }
   },
