@@ -71,18 +71,12 @@ function initChat() {
     setTimeout(checkNewUserGuide, 500);
 }
 
-// 新用户第一次进来，引导做测评
+// 每次进入都显示体质评测引导（拍照+测评入口常驻，不限新用户）
 async function checkNewUserGuide() {
     if (_guidedNewUser) return;
     _guidedNewUser = true;
     
-    const data = getUserData();
-    const hasHistory = data.chats && data.chats.length > 0;
-    if (hasHistory) return;
-    
-    // 不再自动发送消息，只显示引导（用户主动点击才发送）
-    
-    // 新用户，替换欢迎消息为引导版本
+    // 替换欢迎消息为引导版本（每次刷新/打开都显示，确保体质评测入口随时可见）
     const chatMessages = document.getElementById('chat-messages');
     const welcome = chatMessages.querySelector('.message.assistant');
     if (welcome) {

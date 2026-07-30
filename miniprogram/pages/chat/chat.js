@@ -38,39 +38,35 @@ Page({
       return;
     }
 
-    // 3. 新用户第一次进来，小麦引导测体质（只触发一次，用 storage 标记）
-    const guidedKey = 'som_chat_guided_' + app.globalData.userId;
-    if (!wx.getStorageSync(guidedKey)) {
-      wx.setStorageSync(guidedKey, '1');
-      const hasHistory = (wx.getStorageSync('som_user_data_' + app.globalData.userId) || {}).chats;
-      if (!hasHistory || hasHistory.length === 0) {
-        // 新用户，显示引导消息（不自动发送）
-        const guideMsg = {
-          id: 'msg-guide-' + Date.now(),
-          type: 'assistant',
-          text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
-          showGuide: true
-        };
-        this.setData({ messages: [guideMsg] });
-      }
+    // 3. 每次进入，如果没有对话记录，显示体质评测引导（不限新用户，每次刷新/打开都有）
+    if (this.data.messages.length === 0) {
+      const guideMsg = {
+        id: 'msg-guide-' + Date.now(),
+        type: 'assistant',
+        text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
+        showGuide: true
+      };
+      this.setData({ messages: [guideMsg] });
     }
   },
 
-  // 下拉刷新：重新检查体质测评记录
+  // 下拉刷新：清空对话，回到引导首页（体质评测入口）
   onPullDownRefresh() {
-    request('/api/tizhi-test/latest?user_id=' + encodeURIComponent(app.globalData.userId))
-      .then(res => {
-        if (res && res.record) {
-          wx.showToast({ title: '最近测评：' + res.record.result_name, icon: 'none' });
-        } else {
-          wx.showToast({ title: '暂无测评记录', icon: 'none' });
-        }
-        wx.stopPullDownRefresh();
-      })
-      .catch(() => {
-        wx.showToast({ title: '刷新失败', icon: 'none' });
-        wx.stopPullDownRefresh();
-      });
+    const guideMsg = {
+      id: 'msg-guide-' + Date.now(),
+      type: 'assistant',
+      text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
+      showGuide: true
+    };
+    this.setData({
+      messages: [guideMsg],
+      sending: false,
+      inputValue: '',
+      pendingImage: '',
+      pendingImages: []
+    });
+    wx.showToast({ title: '已刷新', icon: 'success', duration: 1000 });
+    wx.stopPullDownRefresh();
   },
 
   // 引导按钮：去测评
@@ -209,7 +205,8 @@ Page({
               : '请观察这张照片，从中医角度分析舌色、舌苔、舌形或面色、皮肤，给出体质倾向和食养建议。'),
             images: base64List,
             image_url: base64List[0],
-            user_id: app.globalData.userId
+            user_id: app.globalData.userId,
+            session_id: app.globalData.sessionId
           }
         });
       } else {
