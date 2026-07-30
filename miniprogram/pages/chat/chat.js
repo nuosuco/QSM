@@ -9,7 +9,8 @@ Page({
     sending: false,
     scrollToId: '',
     msgCounter: 0,
-    pendingImage: '' // 待发送的图片临时路径
+    pendingImage: '', // 兼容旧字段
+    pendingImages: [] // 待发送的多张图片临时路径
   },
 
   onShow() {
@@ -80,18 +81,23 @@ Page({
     this.setData({ inputValue: e.detail.value });
   },
 
-  // 拍照/从相册选图（对应网页版 upload-btn）
+  // 拍照/从相册选图（支持多张，最多4张）
   chooseImage() {
     if (this.data.sending) return;
+    const already = this.data.pendingImages.length;
+    const remain = Math.max(1, 4 - already);
     wx.chooseMedia({
-      count: 1,
+      count: remain,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       sizeType: ['compressed'], // 压缩，减小base64体积
       camera: 'back',
       success: (res) => {
-        const tempPath = res.tempFiles[0].tempFilePath;
-        this.setData({ pendingImage: tempPath });
+        const paths = (res.tempFiles || []).map(f => f.tempFilePath);
+        this.setData({
+          pendingImages: [...this.data.pendingImages, ...paths].slice(0, 4),
+          pendingImage: paths[0] || ''
+        });
       },
       fail: (err) => {
         if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
@@ -101,15 +107,25 @@ Page({
     });
   },
 
-  // 清除待发送图片（对应网页版 preview-remove）
-  clearPendingImage() {
-    this.setData({ pendingImage: '' });
+  // 清除某张待发送图片
+  removePendingImage(e) {
+    const idx = e.currentTarget.dataset.idx;
+    const arr = this.data.pendingImages.slice();
+    arr.splice(idx, 1);
+    this.setData({ pendingImages: arr, pendingImage: arr[0] || '' });
   },
 
-  // 点击预览大图
-  previewPendingImage() {
-    if (!this.data.pendingImage) return;
-    wx.previewImage({ urls: [this.data.pendingImage] });
+  // 清除待发送图片（兼容旧版）
+  clearPendingImage() {
+    this.setData({ pendingImage: '', pendingImages: [] });
+  },
+
+  // 点击预览大图（支持多图滑动）
+  previewPendingImage(e) {
+    const urls = this.data.pendingImages;
+    if (!urls.length) return;
+    const current = e && e.currentTarget && e.currentTarget.dataset.src ? e.currentTarget.dataset.src : urls[0];
+    wx.previewImage({ urls: urls, current: current });
   },
 
   // 点击消息中的图片预览
@@ -143,15 +159,17 @@ Page({
   // 对应 sendMessage()
   async sendMessage() {
     const message = this.data.inputValue.trim();
-    const hasImage = !!this.data.pendingImage;
+    const imagePaths = this.data.pendingImages.slice();
+    const hasImage = imagePaths.length > 0;
     if ((!message && !hasImage) || this.data.sending) return;
 
-    // 显示用户消息（带图片）
+    // 显示用户消息（带多张图片）
     const userMsg = {
       id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
       type: 'user',
-      text: message || (hasImage ? '📷 [舌苔照片]' : ''),
-      image: hasImage ? this.data.pendingImage : ''
+      text: message || (hasImage ? '📷 [' + imagePaths.length + '张照片]' : ''),
+      images: imagePaths,
+      image: imagePaths[0] || ''
     };
 
     // 显示加载状态（对应 appendMessage('<div class="loading"></div>', 'assistant', true)）
@@ -162,12 +180,11 @@ Page({
       loading: true
     };
 
-    const imagePath = this.data.pendingImage;
-
     this.setData({
       messages: [...this.data.messages, userMsg, loadingMsg],
       inputValue: '',
       pendingImage: '',
+      pendingImages: [],
       sending: true,
       // 先定位到用户消息（无动画），让用户看到自己发的内容
       scrollToId: userMsg.id
@@ -176,13 +193,16 @@ Page({
     try {
       let data;
       if (hasImage) {
-        // 图片辨证：转base64 → 调 /api/chat/vision
-        const base64Uri = await this.imageToBase64(imagePath);
+        // 多图辨证：全部转base64 → 调 /api/chat/vision（images数组）
+        const base64List = await Promise.all(imagePaths.map(p => this.imageToBase64(p)));
         data = await request('/api/chat/vision', {
           method: 'POST',
           data: {
-            message: message || '请观察这张舌头照片，从中医角度分析舌色、舌苔、舌形，给出体质倾向和食养建议。',
-            image_url: base64Uri,
+            message: message || (base64List.length > 1
+              ? '请综合观察这' + base64List.length + '张照片（舌头/面色/皮肤/患处），多维度交叉分析，给出综合辨证和食疗建议。'
+              : '请观察这张照片，从中医角度分析舌色、舌苔、舌形或面色、皮肤，给出体质倾向和食养建议。'),
+            images: base64List,
+            image_url: base64List[0],
             user_id: app.globalData.userId
           }
         });

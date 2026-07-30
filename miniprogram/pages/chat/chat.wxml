@@ -24,7 +24,10 @@
         <view class="message-content">
           <view class="message-text" wx:if="{{msg.type === 'user'}}">
             <text>{{msg.text}}</text>
-            <image wx:if="{{msg.image}}" class="msg-user-image" src="{{msg.image}}" mode="aspectFill" bindtap="previewMsgImage" data-src="{{msg.image}}"></image>
+            <view class="msg-user-images" wx:if="{{msg.images && msg.images.length > 0}}">
+              <image wx:for="{{msg.images}}" wx:for-item="imgSrc" wx:key="*this" class="msg-user-image" src="{{imgSrc}}" mode="aspectFill" bindtap="previewMsgImage" data-src="{{imgSrc}}"></image>
+            </view>
+            <image wx:elif="{{msg.image}}" class="msg-user-image" src="{{msg.image}}" mode="aspectFill" bindtap="previewMsgImage" data-src="{{msg.image}}"></image>
           </view>
           <view class="message-text" wx:else>
             <text wx:if="{{msg.loading}}" class="loading"></text>
@@ -90,10 +93,13 @@
 
   <!-- 输入区域（对应 chat-input-area） -->
   <view class="chat-input-area">
-    <!-- 图片预览 -->
-    <view class="image-preview" wx:if="{{pendingImage}}">
-      <image class="preview-img" src="{{pendingImage}}" mode="aspectFill" bindtap="previewPendingImage"></image>
-      <view class="preview-remove" bindtap="clearPendingImage">✕</view>
+    <!-- 图片预览（多张） -->
+    <view class="image-preview-list" wx:if="{{pendingImages.length > 0}}">
+      <view class="preview-item" wx:for="{{pendingImages}}" wx:key="*this">
+        <image class="preview-img" src="{{item}}" mode="aspectFill" bindtap="previewPendingImage" data-src="{{item}}"></image>
+        <view class="preview-remove" bindtap="removePendingImage" data-idx="{{index}}">✕</view>
+      </view>
+      <view class="preview-add" wx:if="{{pendingImages.length < 4}}" bindtap="chooseImage">＋</view>
     </view>
     <view class="chat-input-row">
       <button class="upload-btn" bindtap="chooseImage" disabled="{{sending}}">📷</button>
