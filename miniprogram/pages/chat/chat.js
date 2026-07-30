@@ -49,7 +49,8 @@ Page({
             if (res && res.record) {
               // 已有测评记录，小麦直接出方案
               const r = res.record;
-              this.setData({ inputValue: `我之前做过${r.mode === 'tizhi' ? '体质测评' : '症状自评'}，结果是【${r.result_name}】，请给我食疗调理方案` });
+              const modeLabel = r.mode === 'tizhi' ? '体质测评' : r.mode === 'scan' ? 'AI拍照扫描' : '症状自评';
+              this.setData({ inputValue: `我之前做过${modeLabel}，结果是【${r.result_name}】，请给我食疗调理方案` });
               setTimeout(() => this.sendMessage(), 300);
             } else {
               // 新用户，引导测评

@@ -87,8 +87,9 @@ async function checkNewUserGuide() {
         if (result && result.record) {
             // 有记录，自动出方案
             const r = result.record;
+            const modeLabel = r.mode === 'tizhi' ? '体质测评' : r.mode === 'scan' ? 'AI拍照扫描' : '症状自评';
             const input = document.getElementById('chat-input');
-            input.value = `我之前做过${r.mode === 'tizhi' ? '体质测评' : '症状自评'}，结果是【${r.result_name}】，请给我食疗调理方案`;
+            input.value = `我之前做过${modeLabel}，结果是【${r.result_name}】，请给我食疗调理方案`;
             setTimeout(() => sendMessage(), 300);
             return;
         }
