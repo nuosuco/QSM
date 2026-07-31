@@ -345,14 +345,17 @@ async function sendMessage() {
                 productsGrid.appendChild(card);
             }
             
-            // 给小麦回答框添加收藏按钮
+            // 给小麦回答框添加收藏+分享图按钮
             const chatMsg = document.getElementById(chatMsgDiv);
             if (chatMsg) {
+                const bar = document.createElement('div');
+                bar.className = 'msg-action-bar';
+
                 const favBtn = document.createElement('button');
-                favBtn.className = 'fav-chat-btn';
+                favBtn.className = 'msg-action-btn';
                 favBtn.innerHTML = '♡ 收藏';
                 favBtn.onclick = function() {
-                    const isFav = this.innerHTML.includes('♥');
+                    const isFav = this.classList.contains('favorited');
                     if (isFav) {
                         this.innerHTML = '♡ 收藏';
                         this.classList.remove('favorited');
@@ -373,10 +376,19 @@ async function sendMessage() {
                         localStorage.setItem('som_favorites', JSON.stringify(favs));
                     }
                 };
-                chatMsg.querySelector('.message-content').appendChild(favBtn);
+
+                const shareBtn = document.createElement('button');
+                shareBtn.className = 'msg-action-btn';
+                shareBtn.innerHTML = '🖼️ 分享图';
+                shareBtn.onclick = function() { generateShareImage(replyText); };
+
+                bar.appendChild(favBtn);
+                bar.appendChild(shareBtn);
+                chatMsg.querySelector('.message-content').appendChild(bar);
             }
             
             chatContainer.appendChild(productsDiv);
+            appendFollowUpSuggestions(false);
             scrollToLastUserMessage();
             
             return;
