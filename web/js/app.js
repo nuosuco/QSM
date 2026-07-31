@@ -1763,7 +1763,7 @@ function renderScanResult(container, part, result) {
 }
 
 function goAskXiaomaiScan() {
-  var hint = '我刚用AI拍照扫描了' + _healthTestState.scanPart + '，分析结果：' + (_healthTestState.scanResult || '').substring(0, 200) + '，请给我食疗调理方案';
+  var hint = '我刚用AI拍照扫描了' + _healthTestState.scanPart + '，分析结果：' + (_healthTestState.scanResult || '') + '\n请给我食疗调理方案';
   localStorage.setItem('som_tizhi_hint', hint);
   var chatBtn = document.querySelector('.nav-btn[data-tab="chat"]');
   if (chatBtn) chatBtn.click();
@@ -1946,9 +1946,24 @@ function renderQuizResult(container, result, mode) {
 function goAskXiaomaiResult() {
   var result = _healthTestState.result;
   var mode = _healthTestState.mode;
-  var hint = mode === 'tizhi'
-    ? '我刚做了体质测评，结果是【' + result.name + '】，请给我食疗调理方案'
-    : '我刚做了症状自评，倾向【' + result.name + '】，请给我食疗调理方案';
+  var hint;
+  if (mode === 'tizhi') {
+    hint = '我刚做了体质测评，结果是【' + result.name + '】\n'
+      + '体质特征：' + result.desc + '\n'
+      + '食疗建议：' + result.diet + '\n'
+      + '忌口：' + result.avoid + '\n'
+      + '起居建议：' + result.life
+      + (result.secondary ? '\n兼夹倾向：' + result.secondary : '')
+      + '\n请给我详细的食疗调理方案';
+  } else {
+    hint = '我刚做了症状自评，倾向【' + result.name + '】\n'
+      + '症状表现：' + result.desc + '\n'
+      + '食疗建议：' + result.diet + '\n'
+      + '忌口：' + result.avoid + '\n'
+      + '起居建议：' + result.life
+      + (result.secondary ? '\n兼夹倾向：' + result.secondary : '')
+      + '\n请给我详细的食疗调理方案';
+  }
   localStorage.setItem('som_tizhi_hint', hint);
   var chatBtn = document.querySelector('.nav-btn[data-tab="chat"]');
   if (chatBtn) chatBtn.click();

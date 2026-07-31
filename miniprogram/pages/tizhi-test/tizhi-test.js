@@ -488,12 +488,12 @@ Page({
     const { result, mode, scanPart, scanResult } = this.data;
     let hint;
     if (mode === 'scan') {
-      // AI拍照扫描结果
-      hint = `我刚用AI拍照扫描了${scanPart}，分析结果：${(scanResult || '').substring(0, 200)}，请给我食疗调理方案`;
+      // AI拍照扫描结果（不截断，完整发送）
+      hint = `我刚用AI拍照扫描了${scanPart}，分析结果：${scanResult || ''}\n请给我食疗调理方案`;
     } else if (mode === 'tizhi') {
-      hint = `我刚做了体质测评，结果是【${result.name}】，请给我食疗调理方案`;
+      hint = `我刚做了体质测评，结果是【${result.name}】\n体质特征：${result.desc}\n食疗建议：${result.diet}\n忌口：${result.avoid}\n起居建议：${result.life}${result.secondary ? '\n兼夹倾向：' + result.secondary : ''}\n请给我详细的食疗调理方案`;
     } else {
-      hint = `我刚做了症状自评，倾向【${result.name}】，请给我食疗调理方案`;
+      hint = `我刚做了症状自评，倾向【${result.name}】\n症状表现：${result.desc}\n食疗建议：${result.diet}\n忌口：${result.avoid}\n起居建议：${result.life}${result.secondary ? '\n兼夹倾向：' + result.secondary : ''}\n请给我详细的食疗调理方案`;
     }
     wx.setStorageSync('som_tizhi_hint', hint);
     wx.switchTab({ url: '/pages/chat/chat' });
