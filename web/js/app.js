@@ -100,12 +100,15 @@ async function checkNewUserGuide() {
         if (msgDiv) {
             msgDiv.innerHTML = `
                 <div class="message-text">
-                    你好呀，我是小麦 🌾<br>
-                    说说你的身体状况（失眠、疲劳、上火…），或拍张舌苔照，我来帮你辨证养生！
+                    你好呀！我是小麦 🌾<br><br>
+                    想知道自己是什么体质、该吃什么养生吗？<br><br>
+                    📷 拍个照（舌苔/面色/皮肤/患处）<br>
+                    📝 或做3分钟测评<br><br>
+                    我帮你辨证，给你食疗方案！
                 </div>
                 <div class="guide-actions">
-                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照辨证</button>
-                    <button class="guide-btn test" onclick="switchToHealthTest('chat')">📝 3分钟测评</button>
+                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描（舌苔/面色/皮肤/患处）</button>
+                    <button class="guide-btn test" onclick="switchToHealthTest('chat')">📝 3分钟健康测评</button>
                 </div>
             `;
         }
