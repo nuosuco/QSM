@@ -793,7 +793,7 @@ def _base64_to_url(data_uri: str) -> str:
 
 @app.post("/api/chat/vision")
 async def chat_vision(request: VisionChatRequest):
-    """图片理解辨证（支持多张图片：舌头/面色/皮肤/患处）"""
+    """图片理解辨证（支持多张图片：舌苔/面色/皮肤/患处）"""
     from services import llm_router, rag
 
     # 兼容旧版单图 + 新版多图
@@ -822,7 +822,7 @@ async def chat_vision(request: VisionChatRequest):
 - 如果图片看不清，礼貌说明并建议重新拍摄"""
     else:
         system_prompt = f"""你是小麦SOM，一位经验丰富的中医养生顾问，擅长多维度望诊。
-用户发来了{len(image_list)}张照片（可能包含舌头、面色、皮肤、患处等不同部位）。
+用户发来了{len(image_list)}张照片（可能包含舌苔、面色、皮肤、患处等不同部位）。
 请综合所有照片进行多维度分析：
 1. 逐一分析每张照片的特征（舌色/舌苔/面色/皮肤/患处等）
 2. 综合多张照片的信息，交叉验证，给出更准确的体质判断

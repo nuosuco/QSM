@@ -43,7 +43,7 @@ Page({
       const guideMsg = {
         id: 'msg-guide-' + Date.now(),
         type: 'assistant',
-        text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤/患处）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
+        text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌苔/面色/皮肤/患处）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
         showGuide: true
       };
       this.setData({ messages: [guideMsg] });
@@ -55,7 +55,7 @@ Page({
     const guideMsg = {
       id: 'msg-guide-' + Date.now(),
       type: 'assistant',
-      text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌头/面色/皮肤/患处）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
+      text: '你好呀！我是小麦 🌾\n\n想知道自己是什么体质、该吃什么养生吗？\n\n📷 拍个照（舌苔/面色/皮肤/患处）\n📝 或做3分钟测评\n\n我帮你辨证，给你食疗方案！',
       showGuide: true
     };
     this.setData({
@@ -201,7 +201,7 @@ Page({
           method: 'POST',
           data: {
             message: message || (base64List.length > 1
-              ? '请综合观察这' + base64List.length + '张照片（舌头/面色/皮肤/患处），多维度交叉分析，给出综合辨证和食疗建议。'
+              ? '请综合观察这' + base64List.length + '张照片（舌苔/面色/皮肤/患处），多维度交叉分析，给出综合辨证和食疗建议。'
               : '请观察这张照片，从中医角度分析舌色、舌苔、舌形或面色、皮肤，给出体质倾向和食养建议。'),
             images: base64List,
             image_url: base64List[0],
@@ -223,6 +223,20 @@ Page({
 
       // 移除加载状态（对应 document.getElementById(loadingId).remove()）
       let msgs = this.data.messages.filter(m => !m.loading);
+
+      // 后端返回 success:false（如 LLM 全部失败），视为失败，显示重试按钮
+      if (data && data.success === false) {
+        msgs.push({
+          id: 'msg-err-' + Date.now(),
+          type: 'assistant',
+          text: data.reply || (hasImage ? '抱歉，图片分析失败。请确保图片清晰、光线充足，或直接用文字描述身体状况。' : '抱歉，服务暂时不可用，请稍后重试。'),
+          showRetry: true,
+          retryMessage: message,
+          retryImages: imagePaths
+        });
+        this.setData({ messages: msgs, sending: false });
+        return;
+      }
 
       const replyText = data.reply || '';
       const products = data.products || [];
@@ -340,6 +354,149 @@ Page({
       favs.push(favData);
       wx.setStorageSync('som_favorites', favs);
     }
+  },
+
+  // 分享图（对应网页版 generateShareImage）
+  onShareChatImage(e) {
+    const idx = e.currentTarget.dataset.idx;
+    const msg = this.data.messages[idx];
+    if (!msg || !msg.text) return;
+
+    wx.showLoading({ title: '生成分享图...' });
+
+    const query = wx.createSelectorQuery();
+    query.select('#chatShareCanvas').fields({ node: true, size: true }).exec((res) => {
+      if (!res || !res[0] || !res[0].node) {
+        wx.hideLoading();
+        wx.showToast({ title: '生成失败', icon: 'none' });
+        return;
+      }
+      const canvas = res[0].node;
+      const ctx = canvas.getContext('2d');
+      const dpr = wx.getWindowInfo().pixelRatio || 2;
+      const W = 375;
+
+      // 先算文字换行，确定高度
+      const fontSize = 14, lineHeight = 22, padding = 30;
+      const maxTextW = W - padding * 2;
+      ctx.font = fontSize + 'px sans-serif';
+      const rawLines = String(msg.text).split('\n');
+      let lines = [];
+      rawLines.forEach(raw => {
+        let line = '';
+        for (let i = 0; i < raw.length; i++) {
+          const testLine = line + raw[i];
+          if (ctx.measureText(testLine).width > maxTextW && line) {
+            lines.push(line);
+            line = raw[i];
+          } else {
+            line = testLine;
+          }
+        }
+        lines.push(line);
+      });
+      // 最多显示30行，超出截断
+      if (lines.length > 30) {
+        lines = lines.slice(0, 30);
+        lines.push('……（内容较长，扫码问小麦获取完整分析）');
+      }
+
+      const textH = lines.length * lineHeight;
+      const H = 120 + textH + 80; // 头部 + 文字 + 底部
+
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      ctx.scale(dpr, dpr);
+
+      // 背景
+      ctx.fillStyle = '#f0f7f0';
+      ctx.fillRect(0, 0, W, H);
+
+      // 顶部绿色条
+      ctx.fillStyle = '#4a9d6e';
+      ctx.fillRect(0, 0, W, 6);
+
+      // 标题
+      ctx.fillStyle = '#2c3e50';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🌿 小麦SOM · 中医养生分析', W / 2, 40);
+
+      // 分割线
+      ctx.strokeStyle = '#d4e8d4';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding, 55);
+      ctx.lineTo(W - padding, 55);
+      ctx.stroke();
+
+      // 正文
+      ctx.fillStyle = '#333';
+      ctx.font = fontSize + 'px sans-serif';
+      ctx.textAlign = 'left';
+      let y = 80;
+      lines.forEach(line => {
+        ctx.fillText(line, padding, y);
+        y += lineHeight;
+      });
+
+      // 底部引导
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#4a9d6e';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('扫码问小麦，获取你的养生方案 →', W / 2, H - 45);
+
+      ctx.fillStyle = '#999';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, H - 22);
+
+      this._shareCanvas = canvas;
+      wx.hideLoading();
+
+      // 弹出操作菜单
+      wx.showActionSheet({
+        itemList: ['💾 保存到相册', '📤 分享给朋友'],
+        success: (res) => {
+          if (res.tapIndex === 0) this._saveShareImage();
+          else if (res.tapIndex === 1) this._shareToFriend();
+        }
+      });
+    });
+  },
+
+  _saveShareImage() {
+    if (!this._shareCanvas) return;
+    wx.canvasToTempFilePath({
+      canvas: this._shareCanvas,
+      success: (res) => {
+        wx.saveImageToPhotosAlbum({
+          filePath: res.tempFilePath,
+          success: () => wx.showToast({ title: '已保存到相册', icon: 'success' }),
+          fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
+        });
+      },
+      fail: () => wx.showToast({ title: '生成失败', icon: 'none' })
+    });
+  },
+
+  _shareToFriend() {
+    if (!this._shareCanvas) return;
+    wx.canvasToTempFilePath({
+      canvas: this._shareCanvas,
+      success: (res) => {
+        wx.shareFileMessage({
+          filePath: res.tempFilePath,
+          fileName: 'som-analysis.png',
+          success: () => {},
+          fail: (err) => {
+            if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
+              wx.showToast({ title: '分享失败', icon: 'none' });
+            }
+          }
+        });
+      },
+      fail: () => wx.showToast({ title: '生成失败', icon: 'none' })
+    });
   },
 
   // 引导提问点击处理

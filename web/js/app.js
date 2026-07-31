@@ -102,12 +102,12 @@ async function checkNewUserGuide() {
                 <div class="message-text">
                     你好呀！我是小麦 🌾<br><br>
                     想知道自己是什么体质、该吃什么养生吗？<br><br>
-                    📷 拍个照（舌头/面色/皮肤/患处）<br>
+                    📷 拍个照（舌苔/面色/皮肤/患处）<br>
                     📝 或做3分钟测评<br><br>
                     我帮你辨证，给你食疗方案！
                 </div>
                 <div class="guide-actions">
-                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描（舌头/面色/皮肤/患处）</button>
+                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描（舌苔/面色/皮肤/患处）</button>
                     <button class="guide-btn test" onclick="switchToHealthTest('chat')">📝 3分钟健康测评</button>
                 </div>
             `;
@@ -243,7 +243,7 @@ async function sendMessage() {
                 headers: { 'Content-Type': 'application/json' },
                 signal: controller.signal,
                 body: JSON.stringify({
-                    message: message || '请综合观察这些照片（舌头/面色/皮肤/患处），从中医角度分析，给出体质倾向和食养建议。',
+                    message: message || '请综合观察这些照片（舌苔/面色/皮肤/患处），从中医角度分析，给出体质倾向和食养建议。',
                     images: imagesToSend,
                     user_id: getUserId(),
                     session_id: getSessionId()
@@ -1622,9 +1622,9 @@ function renderHealthTestStart(container) {
       '<div class="test-start-desc">AI拍照看一眼，或答题3分钟<br>了解自己的身体，才能对症养生</div>' +
       '<div class="test-scan-section">' +
         '<div class="test-scan-title">📷 AI拍照扫描（最快）</div>' +
-        '<div class="test-scan-desc">拍舌头、面色、皮肤、患处，AI帮你分析</div>' +
+        '<div class="test-scan-desc">拍舌苔、面色、皮肤、患处，AI帮你分析</div>' +
         '<div class="test-scan-btns">' +
-          '<button class="test-scan-btn" onclick="startHealthScan(\'舌头\')">👅 拍舌头</button>' +
+          '<button class="test-scan-btn" onclick="startHealthScan(\'舌苔\')">👅 拍舌苔</button>' +
           '<button class="test-scan-btn" onclick="startHealthScan(\'面色\')">😊 拍面色</button>' +
           '<button class="test-scan-btn" onclick="startHealthScan(\'皮肤\')">🖐️ 拍皮肤</button>' +
           '<button class="test-scan-btn" onclick="startHealthScan(\'患处\')">📍 拍患处</button>' +
@@ -1708,7 +1708,7 @@ async function analyzeHealthPhotos(files, part) {
     var base64Uris = await Promise.all(base64Promises);
 
     var prompts = {
-      '舌头': '请从中医角度分析这些舌头照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
+      '舌苔': '请从中医角度分析这些舌苔照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
       '面色': '请从中医角度分析这些面色照片：面色、光泽、唇色等，判断气血状况和体质倾向，给出食疗建议。',
       '皮肤': '请从中医角度分析这些皮肤照片：肤色、皮疹、干燥程度等，判断可能的体质问题和调理方向，给出食疗建议。',
       '患处': '请从中医角度分析这些照片中的症状表现，判断可能的健康问题，给出食疗调理建议。'
@@ -2085,7 +2085,7 @@ function shareQuizResult() {
 }
 
 function shareScanResult() {
-  var part = _healthTestState.scanPart || '舌头';
+  var part = _healthTestState.scanPart || '舌苔';
   var scanText = _healthTestState.scanResult || '';
   // 扫描结果用通用分享图
   generateShareImage('📷 AI拍照扫描：' + part + '\n\n' + scanText.substring(0, 600));

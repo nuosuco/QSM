@@ -163,10 +163,17 @@ page {
   background: #bdc3c7;
 }
 
+/* 操作按钮栏：收藏 + 分享图 + 重试（对应网页版 .msg-action-bar） */
+.msg-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
 /* 收藏按钮（对应 .fav-chat-btn） */
 .fav-chat-btn {
   display: inline-block;
-  margin-top: 16rpx;
   padding: 8rpx 24rpx;
   border: 2rpx solid #e74c3c;
   border-radius: 24rpx;
@@ -178,6 +185,30 @@ page {
 .fav-chat-btn.favorited {
   background: #e74c3c;
   color: #fff;
+}
+
+/* 分享图按钮（对应网页版 shareBtn） */
+.share-chat-btn {
+  display: inline-block;
+  padding: 8rpx 24rpx;
+  border: 2rpx solid #4a9d6e;
+  border-radius: 24rpx;
+  background: #fff;
+  color: #4a9d6e;
+  font-size: 24rpx;
+}
+
+.share-chat-btn:active {
+  background: #e8f5e9;
+}
+
+/* 分享图 canvas（隐藏） */
+.share-canvas {
+  position: fixed;
+  left: -9999rpx;
+  top: -9999rpx;
+  width: 375px;
+  height: 600px;
 }
 
 /* 聊天中推荐商品（对应 .chat-products） */

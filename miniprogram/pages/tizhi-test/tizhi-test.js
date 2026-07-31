@@ -101,7 +101,7 @@ Page({
 
   // AI拍照扫描（支持多图、连续拍照）
   scanPhoto(e) {
-    const part = e.currentTarget.dataset.part || '舌头';
+    const part = e.currentTarget.dataset.part || '舌苔';
     wx.chooseMedia({
       count: 9,
       mediaType: ['image'],
@@ -139,7 +139,7 @@ Page({
       const base64Uris = await Promise.all(base64Promises);
       
       const prompts = {
-        '舌头': '请从中医角度分析这些舌头照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
+        '舌苔': '请从中医角度分析这些舌苔照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
         '面色': '请从中医角度分析这些面色照片：面色、光泽、唇色等，判断气血状况和体质倾向，给出食疗建议。',
         '皮肤': '请从中医角度分析这些皮肤照片：肤色、皮疹、干燥程度等，判断可能的体质问题和调理方向，给出食疗建议。',
         '患处': '请从中医角度分析这些照片中的症状表现，判断可能的健康问题，给出食疗调理建议。'

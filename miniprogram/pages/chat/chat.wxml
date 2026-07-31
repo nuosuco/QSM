@@ -36,7 +36,7 @@
 
           <!-- 新用户引导按钮 -->
           <view class="guide-actions" wx:if="{{msg.showGuide}}">
-            <view class="guide-btn photo" bindtap="goPhotoScan">📷 拍照扫描（舌头/面色/皮肤/患处）</view>
+            <view class="guide-btn photo" bindtap="goPhotoScan">📷 拍照扫描（舌苔/面色/皮肤/患处）</view>
             <view class="guide-btn test" bindtap="goTizhiTest">📝 3分钟健康测评</view>
           </view>
 
@@ -66,19 +66,15 @@
               </view>
             </view>
           </view>
-          <!-- 收藏按钮（对应 fav-chat-btn） -->
-          <view class="fav-chat-btn {{msg.favorited ? 'favorited' : ''}}" wx:if="{{msg.showFav}}" bindtap="toggleChatFav" data-idx="{{msgIdx}}">
-            {{msg.favorited ? '♥ 已收藏' : '♡ 收藏'}}
+          <!-- 操作按钮栏：收藏 + 分享图（对应网页版 msg-action-bar） -->
+          <view class="msg-action-bar" wx:if="{{msg.showFav || msg.showRetry}}">
+            <view class="fav-chat-btn {{msg.favorited ? 'favorited' : ''}}" wx:if="{{msg.showFav}}" bindtap="toggleChatFav" data-idx="{{msgIdx}}">
+              {{msg.favorited ? '♥ 已收藏' : '♡ 收藏'}}
+            </view>
+            <view class="share-chat-btn" wx:if="{{msg.showFav}}" bindtap="onShareChatImage" data-idx="{{msgIdx}}">🖼️ 分享图</view>
+            <view class="retry-btn" wx:if="{{msg.showRetry}}" bindtap="onRetry" data-idx="{{msgIdx}}">🔄 重试</view>
           </view>
 
-          <!-- 重试按钮（对应网页版 retryBtn） -->
-          <view class="retry-btn" wx:if="{{msg.showRetry}}" bindtap="onRetry" data-idx="{{msgIdx}}">🔄 重试</view>
-
-          <!-- 三个引导提问（对应网页版 appendFollowUpSuggestions） -->
-          <view class="followup-suggestions" wx:if="{{msg.showFollowup}}">
-            <view class="followup-title">你可以继续：</view>
-            <view class="followup-chip" wx:for="{{msg.followupChips}}" wx:for-item="chip" wx:key="*this" data-chip="{{chip}}" bindtap="onFollowupChip">{{chip}}</view>
-          </view>
         </view>
       </view>
 
@@ -96,9 +92,18 @@
           </view>
         </view>
       </view>
+
+      <!-- 三个引导提问（放在商品推荐之后，与网页版一致） -->
+      <view class="followup-suggestions" wx:if="{{msg.showFollowup}}">
+        <view class="followup-title">你可以继续：</view>
+        <view class="followup-chip" wx:for="{{msg.followupChips}}" wx:for-item="chip" wx:key="*this" data-chip="{{chip}}" bindtap="onFollowupChip">{{chip}}</view>
+      </view>
     </block>
    </view>
   </scroll-view>
+
+  <!-- 分享图 canvas（隐藏，对应网页版 generateShareImage） -->
+  <canvas type="2d" id="chatShareCanvas" class="share-canvas"></canvas>
 
   <!-- 输入区域（对应 chat-input-area） -->
   <view class="chat-input-area">

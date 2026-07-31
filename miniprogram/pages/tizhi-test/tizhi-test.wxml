@@ -9,9 +9,9 @@
     <!-- AI拍照扫描（最强裂变钩子） -->
     <view class="scan-section">
       <view class="scan-title">📷 AI拍照扫描（最快）</view>
-      <view class="scan-desc">拍舌头、面色、皮肤、患处，AI帮你分析</view>
+      <view class="scan-desc">拍舌苔、面色、皮肤、患处，AI帮你分析</view>
       <view class="scan-btns">
-        <view class="scan-btn" bindtap="scanPhoto" data-part="舌头">👅 拍舌头</view>
+        <view class="scan-btn" bindtap="scanPhoto" data-part="舌苔">👅 拍舌苔</view>
         <view class="scan-btn" bindtap="scanPhoto" data-part="面色">😊 拍面色</view>
         <view class="scan-btn" bindtap="scanPhoto" data-part="皮肤">🖐️ 拍皮肤</view>
         <view class="scan-btn" bindtap="scanPhoto" data-part="患处">📍 拍患处</view>
