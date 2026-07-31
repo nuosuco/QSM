@@ -7,6 +7,8 @@ import os
 import sys
 import sqlite3
 import time as time_module
+import base64
+import uuid
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -771,6 +773,24 @@ class VisionChatRequest(BaseModel):
     user_id: Optional[str] = None
     session_id: Optional[str] = None
 
+def _base64_to_url(data_uri: str) -> str:
+    """将 base64 data URI 存为文件，返回可公网访问的 URL"""
+    uploads_dir = os.path.join(WEB_DIR, "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    # 解析 data:image/jpeg;base64,xxxxx
+    header, _, b64data = data_uri.partition(",")
+    ext = "jpg"
+    if "png" in header:
+        ext = "png"
+    elif "webp" in header:
+        ext = "webp"
+    filename = f"{uuid.uuid4().hex[:12]}.{ext}"
+    filepath = os.path.join(uploads_dir, filename)
+    with open(filepath, "wb") as f:
+        f.write(base64.b64decode(b64data))
+    return f"https://som.top/uploads/{filename}"
+
+
 @app.post("/api/chat/vision")
 async def chat_vision(request: VisionChatRequest):
     """图片理解辨证（支持多张图片：舌头/面色/皮肤/患处）"""
@@ -782,6 +802,19 @@ async def chat_vision(request: VisionChatRequest):
         image_list.insert(0, request.image_url)
     if not image_list:
         return {"success": False, "error": "no_image", "reply": "请上传至少一张照片哦～"}
+
+    # base64 data URI → 存文件转公网URL（模型API需要可下载的URL）
+    converted = []
+    for img in image_list:
+        if isinstance(img, str) and img.startswith("data:"):
+            try:
+                converted.append(_base64_to_url(img))
+            except Exception as e:
+                print(f"base64转文件失败: {e}")
+                return {"success": False, "error": "image_save_failed", "reply": "图片保存失败，请重新拍照试试～"}
+        else:
+            converted.append(img)
+    image_list = converted
 
     # 根据图片数量调整提示词
     if len(image_list) == 1:
