@@ -316,7 +316,7 @@ Page({
       const canvas = res[0].node;
       const ctx = canvas.getContext('2d');
       const dpr = wx.getWindowInfo().pixelRatio || 2;
-      const W = 375, H = 520;
+      const W = 375, H = 570;
       canvas.width = W * dpr;
       canvas.height = H * dpr;
       ctx.scale(dpr, dpr);
@@ -386,16 +386,24 @@ Page({
 
       ctx.fillStyle = '#999';
       ctx.font = '11px sans-serif';
-      ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, 470);
+      ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, 462);
 
-      // 小程序码占位（需要后端 wxacode API 生成后替换）
-      ctx.fillStyle = '#ddd';
-      ctx.fillRect(W / 2 - 35, 480, 70, 30);
-      ctx.fillStyle = '#999';
+      ctx.fillStyle = '#bbb';
       ctx.font = '10px sans-serif';
-      ctx.fillText('[小程序码]', W / 2, 500);
+      ctx.fillText('som.top 养生文化参考 不构成医疗诊断', W / 2, 480);
 
-      this._canvas = canvas;
+      // 小程序码
+      const qrImg = canvas.createImage();
+      qrImg.src = '/images/qrcode.jpg';
+      qrImg.onload = () => {
+        const qrSize = 70;
+        ctx.drawImage(qrImg, W / 2 - qrSize / 2, 492, qrSize, qrSize);
+        this._canvas = canvas;
+      };
+      qrImg.onerror = () => {
+        // 二维码加载失败也要能继续
+        this._canvas = canvas;
+      };
     });
   },
 
@@ -456,9 +464,13 @@ Page({
           fileName: 'health-report.png',
           success: () => {},
           fail: (err) => {
-            // 用户取消不提示
+            // 用户取消不提示；未认证降级为保存到相册
             if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
-              wx.showToast({ title: '分享失败，请重试', icon: 'none' });
+              wx.saveImageToPhotosAlbum({
+                filePath: res.tempFilePath,
+                success: () => wx.showToast({ title: '已保存到相册，可分享给朋友', icon: 'none', duration: 2500 }),
+                fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
+              });
             }
           }
         });

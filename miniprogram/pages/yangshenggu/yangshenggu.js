@@ -51,7 +51,7 @@ Page({
       const canvas = res[0].node;
       const ctx = canvas.getContext('2d');
       const dpr = wx.getWindowInfo().pixelRatio || 2;
-      const W = 375, H = 400;
+      const W = 375, H = 480;
       canvas.width = W * dpr;
       canvas.height = H * dpr;
       ctx.scale(dpr, dpr);
@@ -99,28 +99,38 @@ Page({
       ctx.textAlign = 'center';
       ctx.fillStyle = '#4a9d6e';
       ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('扫码进入，免费测评 →', W / 2, 370);
+      ctx.fillText('扫码进入，免费测评 →', W / 2, 355);
 
       ctx.fillStyle = '#999';
       ctx.font = '11px sans-serif';
-      ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, 392);
+      ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, 375);
 
-      // 导出并分享
-      wx.canvasToTempFilePath({
-        canvas,
-        success: (tmpRes) => {
-          wx.shareFileMessage({
-            filePath: tmpRes.tempFilePath,
-            fileName: 'yangshenggu.png',
-            fail: (err) => {
-              if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
-                wx.showToast({ title: '分享失败', icon: 'none' });
-              }
-            }
-          });
-        },
-        fail: () => wx.showToast({ title: '生成失败', icon: 'none' })
-      });
+      ctx.fillStyle = '#bbb';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('som.top 养生文化参考 不构成医疗诊断', W / 2, 393);
+
+      // 小程序码 + 导出
+      const qrImg = canvas.createImage();
+      qrImg.src = '/images/qrcode.jpg';
+      const doExport = () => {
+        wx.canvasToTempFilePath({
+          canvas,
+          success: (tmpRes) => {
+            wx.saveImageToPhotosAlbum({
+              filePath: tmpRes.tempFilePath,
+              success: () => wx.showToast({ title: '已保存到相册，可分享给朋友', icon: 'none', duration: 2500 }),
+              fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
+            });
+          },
+          fail: () => wx.showToast({ title: '生成失败', icon: 'none' })
+        });
+      };
+      qrImg.onload = () => {
+        const qrSize = 70;
+        ctx.drawImage(qrImg, W / 2 - qrSize / 2, 403, qrSize, qrSize);
+        doExport();
+      };
+      qrImg.onerror = () => doExport();
     });
   },
 

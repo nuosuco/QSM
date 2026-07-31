@@ -402,7 +402,7 @@ Page({
       }
 
       const textH = lines.length * lineHeight;
-      const H = 120 + textH + 80; // 头部 + 文字 + 底部
+      const H = 120 + textH + 170; // 头部 + 文字 + 底部（含免责声明+小程序码）
 
       canvas.width = W * dpr;
       canvas.height = H * dpr;
@@ -444,23 +444,47 @@ Page({
       ctx.textAlign = 'center';
       ctx.fillStyle = '#4a9d6e';
       ctx.font = 'bold 13px sans-serif';
-      ctx.fillText('扫码问小麦，获取你的养生方案 →', W / 2, H - 45);
+      ctx.fillText('扫码问小麦，获取你的养生方案 →', W / 2, H - 130);
 
       ctx.fillStyle = '#999';
       ctx.font = '11px sans-serif';
-      ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, H - 22);
+      ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, H - 108);
 
-      this._shareCanvas = canvas;
-      wx.hideLoading();
+      ctx.fillStyle = '#bbb';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('som.top 养生文化参考 不构成医疗诊断', W / 2, H - 90);
 
-      // 弹出操作菜单
-      wx.showActionSheet({
-        itemList: ['💾 保存到相册', '📤 分享给朋友'],
-        success: (res) => {
-          if (res.tapIndex === 0) this._saveShareImage();
-          else if (res.tapIndex === 1) this._shareToFriend();
-        }
-      });
+      // 小程序码
+      const qrImg = canvas.createImage();
+      qrImg.src = '/images/qrcode.jpg';
+      qrImg.onload = () => {
+        const qrSize = 70;
+        ctx.drawImage(qrImg, W / 2 - qrSize / 2, H - 80, qrSize, qrSize);
+
+        this._shareCanvas = canvas;
+        wx.hideLoading();
+
+        // 弹出操作菜单
+        wx.showActionSheet({
+          itemList: ['💾 保存到相册', '📤 分享给朋友'],
+          success: (res) => {
+            if (res.tapIndex === 0) this._saveShareImage();
+            else if (res.tapIndex === 1) this._shareToFriend();
+          }
+        });
+      };
+      qrImg.onerror = () => {
+        // 二维码加载失败也要能继续
+        this._shareCanvas = canvas;
+        wx.hideLoading();
+        wx.showActionSheet({
+          itemList: ['💾 保存到相册', '📤 分享给朋友'],
+          success: (res) => {
+            if (res.tapIndex === 0) this._saveShareImage();
+            else if (res.tapIndex === 1) this._shareToFriend();
+          }
+        });
+      };
     });
   },
 
@@ -490,7 +514,12 @@ Page({
           success: () => {},
           fail: (err) => {
             if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
-              wx.showToast({ title: '分享失败', icon: 'none' });
+              // 未认证小程序无法直接分享文件，降级为保存到相册
+              wx.saveImageToPhotosAlbum({
+                filePath: res.tempFilePath,
+                success: () => wx.showToast({ title: '已保存到相册，可分享给朋友', icon: 'none', duration: 2500 }),
+                fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
+              });
             }
           }
         });

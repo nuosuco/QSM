@@ -542,7 +542,7 @@ function generateShareImage(text) {
         if (cur) lines.push(cur);
     });
 
-    const headerH = 130, footerH = 110;
+    const headerH = 130, footerH = 240;
     const bodyH = lines.length * lineHeight + 40;
     const H = headerH + bodyH + footerH;
     canvas.width = W; canvas.height = H;
@@ -565,14 +565,24 @@ function generateShareImage(text) {
     lines.forEach(l => { ctx.fillText(l, padding, y); y += lineHeight; });
 
     // 底部
+    ctx.textAlign = 'center';
     ctx.fillStyle = '#3a7d5c'; ctx.font = 'bold 26px sans-serif';
-    ctx.fillText('扫码体验 SOM 松麦 · 你的养生助手', padding, H - 55);
+    ctx.fillText('扫码体验 SOM 松麦 · 你的养生助手', W / 2, H - 195);
     ctx.fillStyle = '#9bb8a8'; ctx.font = '22px sans-serif';
-    ctx.fillText('som.top · 以上为养生文化参考，不构成医疗诊断', padding, H - 22);
+    ctx.fillText('som.top · 以上为养生文化参考，不构成医疗诊断', W / 2, H - 160);
 
-    // 弹出预览，用户可长按保存
-    const dataUrl = canvas.toDataURL('image/png');
-    showSharePreview(dataUrl);
+    // 小程序码
+    const qrImg = new Image();
+    qrImg.onload = () => {
+        const qrSize = 130;
+        ctx.drawImage(qrImg, W / 2 - qrSize / 2, H - 145, qrSize, qrSize);
+        showSharePreview(canvas.toDataURL('image/png'));
+    };
+    qrImg.onerror = () => {
+        // 二维码加载失败也要能分享
+        showSharePreview(canvas.toDataURL('image/png'));
+    };
+    qrImg.src = '/public/qrcode.jpg';
 }
 
 function showSharePreview(dataUrl) {
@@ -2051,13 +2061,17 @@ function generateTestShareImage(result, mode) {
   ctx.fillText('松麦SOM · 中医养生 · 有机生活', W / 2, 790);
   ctx.fillText('som.top · 养生文化参考，不构成医疗诊断', W / 2, 830);
 
-  // 小程序码占位
-  ctx.fillStyle = '#ddd'; ctx.fillRect(W / 2 - 60, 860, 120, 120);
-  ctx.fillStyle = '#999'; ctx.font = '20px sans-serif';
-  ctx.fillText('[小程序码]', W / 2, 930);
-
-  var dataUrl = canvas.toDataURL('image/png');
-  showSharePreview(dataUrl);
+  // 小程序码
+  var qrImg = new Image();
+  qrImg.onload = function() {
+    var qrSize = 130;
+    ctx.drawImage(qrImg, W / 2 - qrSize / 2, 860, qrSize, qrSize);
+    showSharePreview(canvas.toDataURL('image/png'));
+  };
+  qrImg.onerror = function() {
+    showSharePreview(canvas.toDataURL('image/png'));
+  };
+  qrImg.src = '/public/qrcode.jpg';
 }
 
 function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
