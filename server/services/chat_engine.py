@@ -325,6 +325,13 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
                          '代餐', '奶昔', '果汁', '酵素', '益生菌粉',
                          '膏方', '养生膏', '桑椹膏', '秋梨膏', '阿胶膏', '固元膏']
 
+    # 全局非食材排除："有机玻璃/有机板/有机盒"等日用品，标题带"有机"但不是食材
+    # 对所有食材搜索生效（不只易混淆药材）
+    NON_FOOD_EXCLUDE = ['玻璃', '亚克力', '压克力', '卡槽', '插槽', '插纸', '展示架', '展示盒',
+                        '收纳盒', '收纳箱', '置物架', '相框', '画框', '标牌', '广告牌',
+                        '板材', '片材', '管材', '型材', '零件', '配件', '模具',
+                        '玩具', '文具', '办公', '家具', '灯具', '窗帘', '地毯']
+
     def search_one(ing: str) -> list:
         """搜索单个食材，严格只返回2个不同品牌的有机认证商品。
         铁律：标题必须含"有机"，必须是原材料食材，不推加工制品。"""
@@ -382,8 +389,11 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
                     # 铁律3：排除加工制品（原浆/口服液/饮品等不是食材）
                     if any(w in title for w in PROCESSED_EXCLUDE):
                         continue
-                    # 易混淆药材：排除日用品（帽/玻璃/挡风/针织等）
-                    if is_amb and any(w in title for w in ['帽', '玻璃', '挡风', '针织', '婴', '童', '罩', '板', '衣', '杯', '睡袋', '包巾', '安抚', 't恤', 'T恤', '服饰', '母婴']):
+                    # 铁律4：全局排除非食材日用品（有机玻璃/亚克力/卡槽等）
+                    if any(w in title for w in NON_FOOD_EXCLUDE):
+                        continue
+                    # 易混淆药材：额外排除日用品（帽/挡风/针织等）
+                    if is_amb and any(w in title for w in ['帽', '挡风', '针织', '婴', '童', '罩', '衣', '杯', '睡袋', '包巾', '安抚', 't恤', 'T恤', '服饰', '母婴']):
                         continue
                     if title and not shop._is_excluded(item):
                         if brand not in local_brands:
