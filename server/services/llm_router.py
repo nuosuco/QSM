@@ -6,11 +6,19 @@ SOM LLM API 路由层
 - 全部兼容 OpenAI 格式
 - 冷却机制：额度耗尽的服务商短期内跳过
 """
+import base64
+import io
 import json
 import os
 import time
 import requests
 from typing import Optional, List
+
+try:
+    from PIL import Image
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "llm_providers.json")
 
@@ -155,6 +163,29 @@ def chat(user_message: str, system_prompt: str = "", history: list = None,
     return {"success": False, "content": "", "error": " | ".join(errors)}
 
 
+def _compress_base64_image(data_uri: str, max_size: int = 512, quality: int = 75) -> str:
+    """压缩 base64 图片：缩到 max_size px 宽，JPEG quality，减小上传体积避免超时"""
+    if not HAS_PILLOW or not data_uri.startswith("data:"):
+        return data_uri
+    try:
+        header, _, b64data = data_uri.partition(",")
+        img_bytes = base64.b64decode(b64data)
+        img = Image.open(io.BytesIO(img_bytes))
+        # 转 RGB（RGBA/P 模式不能直接存 JPEG）
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        w, h = img.size
+        if w > max_size:
+            new_h = int(h * max_size / w)
+            img = img.resize((max_size, new_h), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        compressed_b64 = base64.b64encode(buf.getvalue()).decode()
+        return f"data:image/jpeg;base64,{compressed_b64}"
+    except Exception:
+        return data_uri  # 压缩失败就用原图
+
+
 def vision(user_message: str, image_url, system_prompt: str = "",
            temperature: float = 0.7) -> dict:
     """
@@ -163,11 +194,11 @@ def vision(user_message: str, image_url, system_prompt: str = "",
 
     图片格式策略（2026-07-31 实测确认）：
     - base64 data URI 直接传给所有服务商（sensenova + agnes 均实测支持）
-    - 无需转存公网 URL，省去磁盘IO和nginx依赖，链路更短更快
+    - 发送前先压缩（512px宽，JPEG 75%），避免大图上传超时
     """
     cfg = _load_config()
     # vision 处理图片较慢，用更宽松的超时（不用 chat 的 15s 短超时）
-    timeout = cfg.get("vision_timeout_seconds", 45)
+    timeout = cfg.get("vision_timeout_seconds", 90)
     connect_timeout = cfg.get("connect_timeout", 5)
     cooldown = cfg.get("cooldown_seconds", 3600)
     timeout_cooldown = cfg.get("timeout_cooldown_seconds", 300)
@@ -179,6 +210,9 @@ def vision(user_message: str, image_url, system_prompt: str = "",
         image_list = list(image_url or [])
     if not image_list:
         return {"success": False, "content": "", "error": "no image provided"}
+
+    # 压缩所有 base64 图片，减小上传体积避免写入超时
+    image_list = [_compress_base64_image(img) for img in image_list]
 
     def _build_messages(images):
         msgs = []

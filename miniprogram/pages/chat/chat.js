@@ -199,6 +199,7 @@ Page({
         const base64List = await Promise.all(imagePaths.map(p => this.imageToBase64(p)));
         data = await request('/api/chat/vision', {
           method: 'POST',
+          timeout: 90000, // vision 分析慢：LLM 45s + 商品搜索 10s + 余量
           data: {
             message: message || (base64List.length > 1
               ? '请综合观察这' + base64List.length + '张照片（舌苔/面色/皮肤/患处），多维度交叉分析，给出综合辨证和食疗建议。'
@@ -514,12 +515,7 @@ Page({
           success: () => {},
           fail: (err) => {
             if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
-              // 未认证小程序无法直接分享文件，降级为保存到相册
-              wx.saveImageToPhotosAlbum({
-                filePath: res.tempFilePath,
-                success: () => wx.showToast({ title: '已保存到相册，可分享给朋友', icon: 'none', duration: 2500 }),
-                fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
-              });
+              wx.showToast({ title: '分享失败', icon: 'none' });
             }
           }
         });
