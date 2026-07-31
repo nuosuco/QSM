@@ -235,7 +235,7 @@ async function sendMessage() {
     try {
         let response;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 90000); // 90秒超时（LLM 45s + 商品搜索 10s + 余量）
         if (hasImage) {
             // 图片辨证：走 vision 接口（支持多图）
             response = await fetch(`${API_BASE}/api/chat/vision`, {
@@ -391,7 +391,7 @@ async function sendMessage() {
         document.getElementById(loadingId).remove();
         let errMsg = '抱歉，出了点问题：';
         if (error.name === 'AbortError' || (error.message && error.message.includes('aborted'))) {
-            errMsg += 'AI 思考超时（超过30秒），请重试。';
+            errMsg += 'AI 思考超时，请重试。';
         } else if (error instanceof TypeError && error.message.includes('fetch')) {
             errMsg += '网络连接失败，请检查网络后重试。';
         } else {
