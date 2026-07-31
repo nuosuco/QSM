@@ -1619,19 +1619,7 @@ function renderHealthTestStart(container) {
     '<div class="test-page">' +
       '<div class="test-start-icon">🌿</div>' +
       '<div class="test-start-title">测测你的健康</div>' +
-      '<div class="test-start-desc">AI拍照看一眼，或答题3分钟<br>了解自己的身体，才能对症养生</div>' +
-      '<div class="test-scan-section">' +
-        '<div class="test-scan-title">📷 AI拍照扫描（最快）</div>' +
-        '<div class="test-scan-desc">拍舌苔、面色、皮肤、患处，AI帮你分析</div>' +
-        '<div class="test-scan-btns">' +
-          '<button class="test-scan-btn" onclick="startHealthScan(\'舌苔\')">👅 拍舌苔</button>' +
-          '<button class="test-scan-btn" onclick="startHealthScan(\'面色\')">😊 拍面色</button>' +
-          '<button class="test-scan-btn" onclick="startHealthScan(\'皮肤\')">🖐️ 拍皮肤</button>' +
-          '<button class="test-scan-btn" onclick="startHealthScan(\'患处\')">📍 拍患处</button>' +
-        '</div>' +
-        '<div class="test-scan-tip">哪里有症状拍哪里，拍照后AI自动分析</div>' +
-      '</div>' +
-      '<div class="test-or-divider"><span>或者</span></div>' +
+      '<div class="test-start-desc">答题3分钟<br>了解自己的身体，才能对症养生</div>' +
       '<button class="test-start-btn" onclick="startHealthQuiz(\'tizhi\')">📝 体质测评（九种体质）</button>' +
       '<button class="test-start-btn symptom" onclick="startHealthQuiz(\'symptom\')">⚠️ 症状自评（三高/痛风/风湿等）</button>' +
       '<div class="test-start-tip">已有 ' + count + ' 人完成测评</div>' +
