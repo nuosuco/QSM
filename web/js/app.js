@@ -100,10 +100,10 @@ async function checkNewUserGuide() {
         if (msgDiv) {
             msgDiv.innerHTML = `
                 <div class="message-text">
-                    你好呀！我是小麦 🌾<br><br>
-                    想知道自己是什么体质、该吃什么养生吗？<br><br>
+                    你好呀！我是小麦 🌾<br>
+                    想知道自己是什么体质、该吃什么养生吗？<br>
                     📷 拍个照（舌苔/面色/皮肤/患处）<br>
-                    📝 或做3分钟测评<br><br>
+                    📝 或做3分钟测评<br>
                     我帮你辨证，给你食疗方案！
                 </div>
                 <div class="guide-actions">
