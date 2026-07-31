@@ -464,13 +464,9 @@ Page({
           fileName: 'health-report.png',
           success: () => {},
           fail: (err) => {
-            // 用户取消不提示；未认证降级为保存到相册
+            // 用户取消不提示
             if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
-              wx.saveImageToPhotosAlbum({
-                filePath: res.tempFilePath,
-                success: () => wx.showToast({ title: '已保存到相册，可分享给朋友', icon: 'none', duration: 2500 }),
-                fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
-              });
+              wx.showToast({ title: '小程序未认证，暂不支持分享', icon: 'none' });
             }
           }
         });

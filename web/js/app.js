@@ -229,8 +229,17 @@ async function sendMessage() {
     clearImagePreview();
     sendBtn.disabled = true;
     
-    // 显示加载状态
+    // 显示加载状态（带超时倒计时提示）
     const loadingId = appendMessage('<div class="loading"></div>', 'assistant', true);
+    
+    // 如果30秒还没返回，更新loading提示告知用户还在处理
+    let slowTimer = setTimeout(() => {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) {
+            const textEl = loadingEl.querySelector('.message-text');
+            if (textEl) textEl.innerHTML = '<div class="loading"></div><div style="color:#999;font-size:13px;margin-top:8px">正在分析图片，请稍候…可能需要30-60秒</div>';
+        }
+    }, 30000);
     
     try {
         let response;
@@ -262,11 +271,13 @@ async function sendMessage() {
             });
         }
         clearTimeout(timeoutId);
+        clearTimeout(slowTimer);
         
         const data = await response.json();
         
         // 移除加载状态
-        document.getElementById(loadingId).remove();
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
         
         // 显示AI回复
         let replyText = data.reply;
@@ -435,18 +446,12 @@ async function sendMessage() {
 // 用户点一个就自动提交给小麦，引导继续拍照/补充症状，最终多维辩证
 function appendFollowUpSuggestions(afterImage) {
     const container = document.getElementById('chat-messages');
-    // 根据是否刚拍过照，给不同的引导问题
-    const suggestions = afterImage
-        ? [
-            '📷 再拍一张其他部位（面色/皮肤/患处）',
-            '📝 我说说最近的身体症状',
-            '🌾 直接给我药膳食疗方案'
-          ]
-        : [
-            '📷 我拍个舌苔/面色照片给你看',
-            '📝 帮我做个3分钟体质测评',
-            '🌾 推荐适合我的有机食材'
-          ];
+    // 统一末尾引导问题（无论是否拍过照，同一套）
+    const suggestions = [
+        '📷 再拍一张其他部位（面色/皮肤/患处）',
+        '📝 帮我再做个3分钟体质评测',
+        '🌾 给我推荐药膳食疗方案'
+    ];
 
     const wrap = document.createElement('div');
     wrap.className = 'followup-suggestions';
@@ -619,12 +624,15 @@ async function nativeShareImage() {
                 files: [file]
             });
         } else {
-            // 不支持文件分享，提示长按保存
-            alert('当前浏览器不支持直接分享图片，请长按图片保存后分享～');
+            // 当前浏览器/APP不支持 Web Share API 文件分享，提示长按保存
+            const tip = document.querySelector('#share-preview-mask .share-preview-tip');
+            if (tip) tip.textContent = '当前环境不支持直接分享，请长按图片保存后，再去微信/QQ手动分享 💚';
         }
     } catch (e) {
+        // 用户取消分享（AbortError）不提示
         if (e.name !== 'AbortError') {
-            alert('分享失败，请长按图片保存后手动分享');
+            const tip = document.querySelector('#share-preview-mask .share-preview-tip');
+            if (tip) tip.textContent = '分享失败，请长按图片保存后手动分享到微信/QQ 💚';
         }
     }
 }

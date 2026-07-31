@@ -175,12 +175,30 @@ def _compress_base64_image(data_uri: str, max_size: int = 512, quality: int = 75
         if img.mode not in ("RGB", "L"):
             img = img.convert("RGB")
         w, h = img.size
+        # 如果图片分辨率很高（> 1024px），先缩到 512px 宽
         if w > max_size:
             new_h = int(h * max_size / w)
             img = img.resize((max_size, new_h), Image.LANCZOS)
+        # 进一步压缩质量，大图用更低质量
+        actual_quality = quality
         buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=quality, optimize=True)
-        compressed_b64 = base64.b64encode(buf.getvalue()).decode()
+        img.save(buf, format="JPEG", quality=actual_quality, optimize=True)
+        compressed = buf.getvalue()
+        # 如果压缩后仍然 > 500KB，降质量到 50% 再压缩一次
+        if len(compressed) > 500 * 1024:
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=50, optimize=True)
+            compressed = buf.getvalue()
+        # 如果还是 > 1MB，降质量到 30% 并缩到 320px
+        if len(compressed) > 1024 * 1024:
+            w2, h2 = img.size
+            if w2 > 320:
+                new_h2 = int(h2 * 320 / w2)
+                img = img.resize((320, new_h2), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=30, optimize=True)
+            compressed = buf.getvalue()
+        compressed_b64 = base64.b64encode(compressed).decode()
         return f"data:image/jpeg;base64,{compressed_b64}"
     except Exception:
         return data_uri  # 压缩失败就用原图

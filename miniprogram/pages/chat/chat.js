@@ -245,11 +245,13 @@ Page({
       const zhengxing = data.zhengxing || '';
       const recommendations = data.recommendations || [];
 
-      // 判断是否显示引导提问（图片辨证后或对话后）
+      // 判断是否显示引导提问（统一一套，无论是否拍过照）
       const showFollowup = true;
-      const followupChips = hasImage
-        ? ['📷 再拍一张其他部位（面色/皮肤/患处）', '📝 我说说最近的身体症状', '🌾 直接给我药膳食疗方案']
-        : ['📷 我拍个舌苔/面色照片给你看', '📝 帮我做个3分钟体质测评', '🌾 推荐适合我的有机食材'];
+      const followupChips = [
+        '📷 再拍一张其他部位（面色/皮肤/患处）',
+        '📝 帮我再做个3分钟体质评测',
+        '🌾 给我推荐药膳食疗方案'
+      ];
 
       // 显示AI回复 + 辨证结果卡片 + 引导提问 + 商品推荐
       const assistantMsg = {
@@ -515,7 +517,7 @@ Page({
           success: () => {},
           fail: (err) => {
             if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
-              wx.showToast({ title: '分享失败', icon: 'none' });
+              wx.showToast({ title: '小程序未认证，暂不支持分享', icon: 'none' });
             }
           }
         });
