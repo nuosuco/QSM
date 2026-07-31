@@ -536,8 +536,8 @@ Page({
       this.chooseImage();
       return;
     }
-    // 测评类：跳体质测评页
-    if (chip.indexOf('体质测评') >= 0) {
+    // 测评类：跳体质测评页（兼容"评测"和"测评"两种写法）
+    if (chip.indexOf('体质评') >= 0) {
       wx.navigateTo({ url: '/pages/tizhi-test/tizhi-test' });
       return;
     }

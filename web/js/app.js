@@ -107,7 +107,7 @@ async function checkNewUserGuide() {
                     我帮你辨证，给你食疗方案！
                 </div>
                 <div class="guide-actions">
-                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描（舌苔/面色/皮肤/患处）</button>
+                    <button class="guide-btn photo" onclick="showGuideScan()">📷 拍照扫描<br><span class="guide-btn-sub">（舌苔/面色/皮肤/患处）</span></button>
                     <button class="guide-btn test" onclick="switchToHealthTest('chat')">📝 3分钟健康测评</button>
                 </div>
             `;
@@ -467,8 +467,8 @@ function appendFollowUpSuggestions(afterImage) {
                 document.getElementById('image-input').click();
                 return;
             }
-            // 测评类：跳养生谷测评
-            if (text.indexOf('体质测评') >= 0) {
+            // 测评类：跳养生谷测评（兼容"评测"和"测评"两种写法）
+            if (text.indexOf('体质评') >= 0) {
                 switchToHealthTest('chat');
                 return;
             }
