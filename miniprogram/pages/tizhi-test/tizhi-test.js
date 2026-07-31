@@ -99,7 +99,7 @@ Page({
     }).catch(() => {});
   },
 
-  // AI拍照扫描（支持多图）
+  // AI拍照扫描（支持多图、连续拍照）
   scanPhoto(e) {
     const part = e.currentTarget.dataset.part || '舌头';
     wx.chooseMedia({
@@ -119,11 +119,17 @@ Page({
         this.analyzePhotos(tempPaths, part);
       },
       fail: (err) => {
+        // 取消后不报错，让用户能继续选择
         if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
           wx.showToast({ title: '选择图片失败', icon: 'none' });
         }
       }
     });
+  },
+
+  // 继续拍照（从结果页回到拍照页，可以再拍）
+  continueScan() {
+    this.setData({ phase: 'start' });
   },
 
   async analyzePhotos(filePaths, part) {
@@ -150,7 +156,19 @@ Page({
       });
 
       const result = data.reply || '分析完成，建议咨询小麦获取详细方案。';
-      this.setData({ phase: 'scan-result', scanResult: result });
+      // 拍照扫描结果也生成分享图
+      setTimeout(function() {
+        this.drawShareImage({
+          emoji: "u{1F4F7}",
+          name: "AI拍照扫描",
+          symptoms: [part],
+          desc: (result || "").substring(0, 80) + "...",
+          diet: "建议咨询小麦获取详细食疗方案",
+          avoid: "根据分析结果个性化调整",
+          life: "规律作息，适量运动"
+        });
+      }.bind(this), 500);
+      this.setData({ phase: 'scan-result', scanResult: result, mode: 'scan' });
 
       // 保存扫描记录
       request('/api/tizhi-test/save', {

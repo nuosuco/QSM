@@ -70,6 +70,12 @@
           <view class="fav-chat-btn {{msg.favorited ? 'favorited' : ''}}" wx:if="{{msg.showFav}}" bindtap="toggleChatFav" data-idx="{{msgIdx}}">
             {{msg.favorited ? '♥ 已收藏' : '♡ 收藏'}}
           </view>
+
+          <!-- 三个引导提问（对应网页版 appendFollowUpSuggestions） -->
+          <view class="followup-suggestions" wx:if="{{msg.showFollowup}}">
+            <view class="followup-title">你可以继续：</view>
+            <view class="followup-chip" wx:for="{{msg.followupChips}}" wx:for-item="chip" wx:key="*this" data-chip="{{chip}}" bindtap="onFollowupChip">{{chip}}</view>
+          </view>
         </view>
       </view>
 

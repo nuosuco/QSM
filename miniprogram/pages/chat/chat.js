@@ -230,7 +230,13 @@ Page({
       const zhengxing = data.zhengxing || '';
       const recommendations = data.recommendations || [];
 
-      // 显示AI回复 + 辨证结果卡片
+      // 判断是否显示引导提问（图片辨证后或对话后）
+      const showFollowup = true;
+      const followupChips = hasImage
+        ? ['📷 再拍一张其他部位（面色/皮肤/患处）', '📝 我说说最近的身体症状', '🌾 直接给我药膳食疗方案']
+        : ['📷 我拍个舌苔/面色照片给你看', '📝 帮我做个3分钟体质测评', '🌾 推荐适合我的有机食材'];
+
+      // 显示AI回复 + 辨证结果卡片 + 引导提问 + 商品推荐
       const assistantMsg = {
         id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
         type: 'assistant',
@@ -241,7 +247,10 @@ Page({
         hasBianzheng: !!(tizhi || zhengxing),
         products: products,
         showFav: products.length > 0 || recommendations.length > 0,
-        favorited: false
+        favorited: false,
+        showFollowup: showFollowup,
+        followupChips: followupChips,
+        hasImage: hasImage
       };
 
       msgs.push(assistantMsg);
@@ -311,8 +320,28 @@ Page({
     }
   },
 
+  // 引导提问点击处理
+  onFollowupChip(e) {
+    const chip = e.currentTarget.dataset.chip;
+    if (!chip) return;
+
+    // 拍照类：直接唤起图片选择
+    if (chip.indexOf('📷') === 0) {
+      this.chooseImage();
+      return;
+    }
+    // 测评类：跳体质测评页
+    if (chip.indexOf('体质测评') >= 0) {
+      wx.navigateTo({ url: '/pages/tizhi-test/tizhi-test' });
+      return;
+    }
+    // 其他：填入输入框并发送
+    this.setData({ inputValue: chip.replace(/^[\u{1F300}-\u{1FAFF}\u2600-\u27BF}]\s*/u, '') });
+    this.sendMessage();
+  },
+
   // 对应 openProduct → showProductDetail
-  openProductDetail(e) {
+  openProductDetail(e)
     const { msgIdx, prodIdx } = e.currentTarget.dataset;
     const msg = this.data.messages[msgIdx];
     if (!msg || !msg.products) return;

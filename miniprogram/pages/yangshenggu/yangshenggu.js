@@ -19,9 +19,16 @@ Page({
     wx.navigateTo({ url: '/pages/tizhi-test/tizhi-test' });
   },
 
-  // M2: 问小麦入口
-  goAskXiaomai() {
-    wx.setStorageSync('som_tizhi_hint', '我想了解养生知识，请根据我的体质推荐食疗方案');
+  // M2: 问小麦入口（跳转聊天页，带养生知识提示）
+  goAskXiaomai(e) {
+    let hint = '我想了解养生知识，请根据我的体质推荐食疗方案';
+    if (e && e.currentTarget && e.currentTarget.dataset) {
+      const part = e.currentTarget.dataset.part;
+      if (part) {
+        hint = '我看到养生谷的' + part + '内容，想进一步了解，请给我食疗调理方案';
+      }
+    }
+    wx.setStorageSync('som_tizhi_hint', hint);
     wx.switchTab({ url: '/pages/chat/chat' });
   },
 

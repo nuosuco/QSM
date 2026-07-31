@@ -63,9 +63,25 @@ function initChat() {
         }
     });
     
-    // 图片上传/拍照（支持多张）
-    uploadBtn.addEventListener('click', () => imageInput.click());
+    // 图片上传/拍照（支持多张，连续拍）
+    uploadBtn.addEventListener('click', () => {
+        imageInput.value = ''; // 重置，确保取消后能再次拍照
+        // 移除 capture 属性，让系统文件选择器支持多选
+        imageInput.removeAttribute('capture');
+        imageInput.setAttribute('multiple', 'multiple');
+        imageInput.click();
+    });
     imageInput.addEventListener('change', handleImageSelect);
+    
+    // 连拍按钮：预览区底部有"＋继续拍"按钮，点击直接打开拍照
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.preview-add')) {
+            imageInput.value = '';
+            imageInput.removeAttribute('capture');
+            imageInput.setAttribute('multiple', 'multiple');
+            imageInput.click();
+        }
+    });
     
     // 新用户引导：检查是否第一次进来
     setTimeout(checkNewUserGuide, 500);
@@ -178,7 +194,8 @@ function renderImagePreviews() {
           '<button class="preview-remove" onclick="removePreviewImage(' + i + ')">✕</button>' +
         '</div>'
     ).join('') +
-    '<button class="preview-add" onclick="document.getElementById(\'image-input\').click()">＋</button>';
+    '<button class="preview-add">＋</button>' +
+    '<div class="preview-hint">已选' + pendingImages.length + '张，点发送一起分析</div>';
 }
 
 function removePreviewImage(idx) {
@@ -202,7 +219,7 @@ async function sendMessage() {
     // 显示用户消息（带图片预览）
     let displayMsg = message;
     if (hasImage) {
-        const imgsHtml = pendingImages.map(src => '<img src="' + src + '" style="max-width:120px;max-height:90px;border-radius:8px;margin:4px 4px 0 0;">').join('');
+        const imgsHtml = pendingImages.map(src => '<img src="' + src + '" style="width:60px;height:60px;border-radius:6px;object-fit:cover;margin:2px 2px 0 0;">').join('');
         displayMsg = (message ? message + '<br>' : '📷 ') + imgsHtml;
     }
     appendMessage(displayMsg, 'user', true);
@@ -254,9 +271,37 @@ async function sendMessage() {
         // 显示AI回复
         let replyText = data.reply;
         
-        // 图片辨证：显示回复 + 多轮引导（3个建议问题）+ 收藏分享
+        // 图片辨证：显示回复 + 商品推荐 + 多轮引导（3个建议问题）+ 收藏分享
         if (hasImage) {
             const msgId = appendMessage(replyText, 'assistant', false, false);
+            // 渲染商品推荐（和小麦对话一样的逻辑）
+            if (data.products && data.products.length > 0) {
+                const chatContainer = document.getElementById('chat-messages');
+                const productsDiv = document.createElement('div');
+                productsDiv.className = 'chat-products';
+                productsDiv.innerHTML = '<div class="chat-products-title">🛒 为你推荐以下有机好物：</div>';
+                const productsGrid = document.createElement('div');
+                productsGrid.className = 'products-grid chat-products-grid';
+                productsDiv.appendChild(productsGrid);
+                for (let i = 0; i < data.products.length; i++) {
+                    const product = data.products[i];
+                    _productIndex++;
+                    _productCache[_productIndex] = product;
+                    const card = document.createElement('div');
+                    card.className = 'product-card';
+                    card.setAttribute('data-product-idx', _productIndex);
+                    card.innerHTML = `
+                        <img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+                        <div class="product-info">
+                            <div class="product-title">${escapeHtml(product.title)}</div>
+                            <div class="product-price">¥${product.price}</div>
+                            <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+                        </div>
+                    `;
+                    productsGrid.appendChild(card);
+                }
+                chatContainer.appendChild(productsDiv);
+            }
             appendFollowUpSuggestions(hasImage);
             appendMessageActions(msgId, replyText);
             saveChatRecord('[图片辨证x' + imagesToSend.length + '] ' + message, replyText, '');
@@ -527,14 +572,39 @@ function showSharePreview(dataUrl) {
     mask.innerHTML =
         '<div class="share-preview-box">' +
           '<img src="' + dataUrl + '" alt="分享图">' +
-          '<div class="share-preview-tip">长按图片保存，转发给朋友 💚</div>' +
+          '<div class="share-preview-tip">长按图片保存，或点击下方按钮分享 💚</div>' +
           '<div class="share-preview-btns">' +
+            '<button class="share-native-btn" onclick="nativeShareImage()">📤 分享给朋友</button>' +
             '<a class="share-dl-btn" href="' + dataUrl + '" download="xiaomai-share.png">⬇️ 保存图片</a>' +
             '<button class="share-close-btn" onclick="document.getElementById(\'share-preview-mask\').remove()">关闭</button>' +
           '</div>' +
         '</div>';
     mask.addEventListener('click', (e) => { if (e.target === mask) mask.remove(); });
     document.body.appendChild(mask);
+}
+
+// 调用系统原生分享（手机浏览器支持）
+async function nativeShareImage() {
+    const img = document.querySelector('#share-preview-mask img');
+    if (!img) return;
+    try {
+        const blob = await (await fetch(img.src)).blob();
+        const file = new File([blob], 'xiaomai-share.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                title: '小麦SOM · 养生辨证',
+                text: '我用小麦SOM做了中医养生辨证，结果超准！',
+                files: [file]
+            });
+        } else {
+            // 不支持文件分享，提示长按保存
+            alert('当前浏览器不支持直接分享图片，请长按图片保存后分享～');
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            alert('分享失败，请长按图片保存后手动分享');
+        }
+    }
 }
 
 // 滚动定位：把最后一条用户消息放到聊天区顶部
@@ -1568,7 +1638,7 @@ function renderHealthTestStart(container) {
     '</div>';
 }
 
-// AI拍照扫描
+// AI拍照扫描（支持多张 + 取消后可重拍）
 function startHealthScan(part) {
   var container = document.getElementById('test-container');
   if (!container) return;
@@ -1579,54 +1649,60 @@ function startHealthScan(part) {
   container.innerHTML =
     '<div class="test-page">' +
       '<div class="test-scan-preview">' +
-        '<div class="test-scan-placeholder">📷 请选择 ' + part + ' 照片</div>' +
+        '<div class="test-scan-placeholder">📷 请选择 ' + part + ' 照片（可多张）</div>' +
       '</div>' +
       '<div class="test-scan-status">' +
         '<div class="loading"></div>' +
         '<div>选择图片后AI自动分析...</div>' +
       '</div>' +
-      '<input type="file" id="scan-image-input" accept="image/*" style="display:none;">' +
+      '<button class="test-back-btn" onclick="renderHealthTestPage()" style="margin-top:12px;">← 取消，返回</button>' +
+      '<input type="file" id="scan-image-input" accept="image/*" multiple style="display:none;">' +
     '</div>';
 
   setTimeout(function() {
     var input = document.getElementById('scan-image-input');
     if (input) {
       input.onchange = function(e) {
-        var file = e.target.files[0];
-        if (!file) {
+        var files = Array.from(e.target.files || []);
+        if (files.length === 0) {
           renderHealthTestStart(container);
           return;
         }
-        analyzeHealthPhoto(file, part);
+        analyzeHealthPhotos(files, part);
       };
       input.click();
     }
   }, 100);
 }
 
-async function analyzeHealthPhoto(file, part) {
+async function analyzeHealthPhotos(files, part) {
   var container = document.getElementById('test-container');
   if (!container) return;
 
+  // 显示所有图片预览
+  var previewHtml = files.map(function(f) {
+    return '<img class="test-scan-image" src="' + URL.createObjectURL(f) + '" style="max-width:45%;max-height:120px;border-radius:12px;margin:4px;">';
+  }).join('');
+
   container.innerHTML =
     '<div class="test-page">' +
-      '<div class="test-scan-preview">' +
-        '<img class="test-scan-image" src="' + URL.createObjectURL(file) + '" style="max-width:100%;max-height:200px;border-radius:12px;">' +
-      '</div>' +
+      '<div class="test-scan-preview" style="flex-wrap:wrap;">' + previewHtml + '</div>' +
       '<div class="test-scan-status">' +
         '<div class="loading"></div>' +
-        '<div>AI正在分析你的' + part + '...</div>' +
+        '<div>AI正在分析你的' + part + '（' + files.length + '张）...</div>' +
       '</div>' +
     '</div>';
 
   try {
-    var base64Uri = await imageFileToBase64(file);
+    // 所有图片转base64
+    var base64Promises = files.map(function(f) { return imageFileToBase64(f); });
+    var base64Uris = await Promise.all(base64Promises);
 
     var prompts = {
-      '舌头': '请从中医角度分析这张舌头照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
-      '面色': '请从中医角度分析这张面色照片：面色、光泽、唇色等，判断气血状况和体质倾向，给出食疗建议。',
-      '皮肤': '请从中医角度分析这张皮肤照片：肤色、皮疹、干燥程度等，判断可能的体质问题和调理方向，给出食疗建议。',
-      '患处': '请从中医角度分析这张照片中的症状表现，判断可能的健康问题，给出食疗调理建议。'
+      '舌头': '请从中医角度分析这些舌头照片：舌色、舌苔、舌形、齿痕等，判断体质倾向和可能的健康问题，给出食疗建议。',
+      '面色': '请从中医角度分析这些面色照片：面色、光泽、唇色等，判断气血状况和体质倾向，给出食疗建议。',
+      '皮肤': '请从中医角度分析这些皮肤照片：肤色、皮疹、干燥程度等，判断可能的体质问题和调理方向，给出食疗建议。',
+      '患处': '请从中医角度分析这些照片中的症状表现，判断可能的健康问题，给出食疗调理建议。'
     };
     var prompt = prompts[part] || prompts['患处'];
 
@@ -1635,7 +1711,7 @@ async function analyzeHealthPhoto(file, part) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: prompt,
-        image_url: base64Uri,
+        images: base64Uris,
         user_id: getUserId()
       })
     });
@@ -1662,7 +1738,12 @@ async function analyzeHealthPhoto(file, part) {
 
   } catch (err) {
     console.error('AI分析失败:', err);
-    renderHealthTestStart(container);
+    container.innerHTML =
+      '<div class="test-page">' +
+        '<div class="test-scan-status" style="color:#e74c3c;">⚠️ AI分析失败，请重试</div>' +
+        '<button class="test-scan-btn" onclick="startHealthScan(\'' + part + '\')" style="width:100%;margin-top:12px;">🔄 重新拍照</button>' +
+        '<button class="test-back-btn" onclick="renderHealthTestPage()" style="width:100%;margin-top:8px;">← 返回首页</button>' +
+      '</div>';
   }
 }
 
