@@ -884,6 +884,9 @@ async def chat_vision(request: VisionChatRequest):
     reply_text = result["content"]
     if products and '下方推荐' not in reply_text and '就在下面' not in reply_text:
         reply_text += '\n\n🛒 上面提到的食材，我在下方帮你找了有机认证的，点击即可购买～'
+    elif not products:
+        # 淘宝API搜索失败时不追加推荐引导语，避免用户看到"推荐了"但实际没商品
+        pass
 
     return {
         "success": True,

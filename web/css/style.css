@@ -1534,7 +1534,7 @@ body {
 .test-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 16px 12px;
+  padding: 10px 12px;
 }
 
 .test-loading {
@@ -1547,17 +1547,17 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
 /* 开始页 */
 .test-start-icon {
-  font-size: 48px;
-  margin-top: 20px;
+  font-size: 32px;
+  margin-top: 6px;
 }
 
 .test-start-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: bold;
   color: var(--primary-color);
 }
@@ -1691,9 +1691,9 @@ body {
 }
 
 .test-scan-image {
-  max-width: 45%;
-  max-height: 100px;
-  border-radius: 12px;
+  max-width: 30%;
+  max-height: 70px;
+  border-radius: 8px;
   object-fit: contain;
 }
 
@@ -1719,14 +1719,15 @@ body {
 .test-scan-result-text {
   font-size: 14px;
   color: var(--text-primary);
-  line-height: 1.8;
+  line-height: 1.7;
   text-align: left;
-  padding: 12px;
+  padding: 10px 12px;
   background: var(--bg-color);
   border-radius: 8px;
-  max-height: 180px;
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* 答题页 */
@@ -1811,20 +1812,20 @@ body {
   background: var(--card-bg);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 20px 16px;
+  padding: 16px 14px;
   text-align: center;
 }
 
 .test-result-badge {
-  font-size: 28px;
-  margin-bottom: 6px;
+  font-size: 24px;
+  margin-bottom: 4px;
 }
 
 .test-result-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
   color: var(--primary-color);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .test-result-symptoms {
@@ -1854,14 +1855,14 @@ body {
   text-align: left;
   background: var(--bg-color);
   border-radius: 10px;
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .test-advice-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: bold;
   color: var(--primary-color);
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .test-advice-diet,
@@ -1869,7 +1870,7 @@ body {
 .test-advice-life {
   font-size: 13px;
   color: var(--text-primary);
-  line-height: 1.8;
+  line-height: 1.6;
   padding-left: 4px;
 }
 
@@ -1885,17 +1886,17 @@ body {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .test-ask-btn {
   width: 100%;
-  padding: 14px;
+  padding: 12px;
   background: var(--primary-color);
   color: white;
   border: none;
   border-radius: 12px;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -1907,12 +1908,12 @@ body {
 
 .test-back-btn {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   background: var(--card-bg);
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -1926,7 +1927,7 @@ body {
   font-size: 12px;
   color: var(--text-secondary);
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 /* 新用户引导按钮 */

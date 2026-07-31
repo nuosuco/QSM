@@ -1665,7 +1665,16 @@ function startHealthScan(part) {
       input.onchange = function(e) {
         var files = Array.from(e.target.files || []);
         if (files.length === 0) {
-          renderHealthTestStart(container);
+          // 取消后显示继续拍照按钮，不自动返回首页
+          container.innerHTML =
+            '<div class="test-page">' +
+              '<div class="test-scan-preview">' +
+                '<div class="test-scan-placeholder">📷 请选择 ' + part + ' 照片（可多张）</div>' +
+              '</div>' +
+              '<button class="test-scan-btn" onclick="startHealthScan(\'' + part + '\')" style="width:100%;margin-top:16px;">📷 重新拍照</button>' +
+              '<button class="test-back-btn" onclick="renderHealthTestPage()" style="width:100%;margin-top:8px;">← 返回首页</button>' +
+              '<input type="file" id="scan-image-input" accept="image/*" multiple style="display:none;">' +
+            '</div>';
           return;
         }
         analyzeHealthPhotos(files, part);
@@ -1756,6 +1765,7 @@ function renderScanResult(container, part, result) {
         '<div class="test-scan-result-text">' + escapeHtml(result).replace(/\n/g, '<br>') + '</div>' +
       '</div>' +
       '<div class="test-result-actions">' +
+        '<button class="test-scan-btn" onclick="startHealthScan(\'' + part + '\')" style="width:100%;">📷 继续拍照</button>' +
         '<button class="test-ask-btn" onclick="goAskXiaomaiScan()">💬 问小麦怎么调理</button>' +
         '<button class="test-share-btn" onclick="shareScanResult()">🖼️ 生成分享图</button>' +
         '<button class="test-back-btn" onclick="renderHealthTestPage()">🔄 重新测评</button>' +

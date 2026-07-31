@@ -310,6 +310,40 @@ page {
   font-size: 22rpx;
   color: #999;
 }
+/* 三个引导提问（对应网页版 .followup-suggestions） */
+.followup-suggestions {
+  margin-top: 20rpx;
+  padding: 20rpx 24rpx;
+  background: #f8faf9;
+  border-radius: 16rpx;
+  border: 2rpx solid #e0e6e3;
+}
+.followup-title {
+  font-size: 24rpx;
+  color: #888;
+  margin-bottom: 14rpx;
+}
+.followup-chip {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 12rpx;
+  padding: 18rpx 24rpx;
+  background: #fff;
+  border: 2rpx solid #7bc49f;
+  border-radius: 20rpx;
+  color: #3a7d5c;
+  font-size: 26rpx;
+  line-height: 1.4;
+  text-align: left;
+}
+.followup-chip:last-child {
+  margin-bottom: 0;
+}
+.followup-chip:active {
+  background: #f0f7f3;
+}
+
 /* 新用户引导按钮 */
 .guide-actions { margin-top: 20rpx; display: flex; flex-direction: column; gap: 16rpx; }
 .guide-btn { padding: 22rpx 30rpx; border-radius: 16rpx; font-size: 28rpx; font-weight: bold; text-align: center; }

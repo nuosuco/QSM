@@ -336,12 +336,12 @@ Page({
       return;
     }
     // 其他：填入输入框并发送
-    this.setData({ inputValue: chip.replace(/^[\u{1F300}-\u{1FAFF}\u2600-\u27BF}]\s*/u, '') });
+    this.setData({ inputValue: chip.replace(/^[\u{1F300}-\u{1FAFF}\u2600-\u27BF]\s*/u, '') });
     this.sendMessage();
   },
 
   // 对应 openProduct → showProductDetail
-  openProductDetail(e)
+  openProductDetail(e) {
     const { msgIdx, prodIdx } = e.currentTarget.dataset;
     const msg = this.data.messages[msgIdx];
     if (!msg || !msg.products) return;
