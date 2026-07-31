@@ -88,8 +88,12 @@ def _call_openai(base_url: str, api_key: str, model: str, messages: list,
         if resp.status_code != 200:
             return {"success": False, "error": resp.text[:200], "status_code": resp.status_code}
         data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        # 空回复视为失败，继续降级到下一个服务商
+        message = data["choices"][0]["message"]
+        content = message.get("content") or ""
+        # 推理模型（如 sensenova）把分析结果放在 reasoning/reasoning_content 字段，
+        # content 可能为空 —— 此时回退到 reasoning，不能误判为失败
+        if not content.strip():
+            content = message.get("reasoning") or message.get("reasoning_content") or ""
         if not content or not content.strip():
             return {"success": False, "error": "empty_response", "status_code": 200}
         return {"success": True, "content": content}
@@ -156,9 +160,14 @@ def vision(user_message: str, image_url, system_prompt: str = "",
     """
     图片理解（看舌苔、面色、皮肤、患处等），需要支持 image 输入的服务商。
     image_url: 单张图片URL/base64，或多张图片的列表（兼容旧版）
+
+    图片格式策略：
+    - base64 data URI 直接传给服务商（sensenova 实测支持，无需下载，最稳定）
+    - 若服务商不支持 base64（如 agnes），自动转存为公网 URL 再传
     """
     cfg = _load_config()
-    timeout = cfg.get("timeout_seconds", 15)
+    # vision 处理图片较慢，用更宽松的超时（不用 chat 的 15s 短超时）
+    timeout = cfg.get("vision_timeout_seconds", 45)
     connect_timeout = cfg.get("connect_timeout", 5)
     cooldown = cfg.get("cooldown_seconds", 3600)
     timeout_cooldown = cfg.get("timeout_cooldown_seconds", 300)
@@ -171,15 +180,33 @@ def vision(user_message: str, image_url, system_prompt: str = "",
     if not image_list:
         return {"success": False, "content": "", "error": "no image provided"}
 
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
+    has_base64 = any(isinstance(u, str) and u.startswith("data:") for u in image_list)
 
-    # OpenAI vision 格式：一段文字 + 多张图片
-    user_content = [{"type": "text", "text": user_message}]
-    for url in image_list:
-        user_content.append({"type": "image_url", "image_url": {"url": url}})
-    messages.append({"role": "user", "content": user_content})
+    # 预生成 URL 版本（仅在有 base64 时，供不支持 base64 的服务商用）
+    url_list = None
+    if has_base64:
+        try:
+            from main import _base64_to_url
+            url_list = [
+                _base64_to_url(u) if (isinstance(u, str) and u.startswith("data:")) else u
+                for u in image_list
+            ]
+        except Exception as e:
+            print(f"vision: base64转URL失败，将仅用base64尝试: {e}")
+            url_list = None
+
+    def _build_messages(images):
+        msgs = []
+        if system_prompt:
+            msgs.append({"role": "system", "content": system_prompt})
+        user_content = [{"type": "text", "text": user_message}]
+        for u in images:
+            user_content.append({"type": "image_url", "image_url": {"url": u}})
+        msgs.append({"role": "user", "content": user_content})
+        return msgs
+
+    # 不支持 base64 的服务商（实测 agnes 会忽略 base64 图片）
+    NO_BASE64_PROVIDERS = {"agnes"}
 
     providers = _get_providers_for("vision")
     errors = []
@@ -188,6 +215,15 @@ def vision(user_message: str, image_url, system_prompt: str = "",
         name = p["name"]
         if _is_cooled_down(name):
             continue
+        # 选择该服务商用的图片格式
+        if has_base64 and name in NO_BASE64_PROVIDERS:
+            if url_list is None:
+                errors.append(f"{name}: skipped (no base64 support, url unavailable)")
+                continue
+            images = url_list
+        else:
+            images = image_list  # base64 或原始URL直接用
+        messages = _build_messages(images)
         model = p["models"]["vision"]
         api_key = _get_api_key(p)
         result = _call_openai(p["base_url"], api_key, model, messages,

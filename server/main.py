@@ -803,18 +803,8 @@ async def chat_vision(request: VisionChatRequest):
     if not image_list:
         return {"success": False, "error": "no_image", "reply": "请上传至少一张照片哦～"}
 
-    # base64 data URI → 存文件转公网URL（模型API需要可下载的URL）
-    converted = []
-    for img in image_list:
-        if isinstance(img, str) and img.startswith("data:"):
-            try:
-                converted.append(_base64_to_url(img))
-            except Exception as e:
-                print(f"base64转文件失败: {e}")
-                return {"success": False, "error": "image_save_failed", "reply": "图片保存失败，请重新拍照试试～"}
-        else:
-            converted.append(img)
-    image_list = converted
+    # 图片格式由 llm_router 按服务商自动处理：
+    # sensenova 直接收 base64（无需下载，最稳），agnes 自动转公网URL
 
     # 根据图片数量调整提示词
     if len(image_list) == 1:
