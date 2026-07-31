@@ -8,7 +8,7 @@ function request(url, options = {}) {
       method: options.method || 'GET',
       data: options.data || {},
       header: options.header || { 'Content-Type': 'application/json' },
-      timeout: options.timeout || 30000,
+      timeout: options.timeout || 45000,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data);

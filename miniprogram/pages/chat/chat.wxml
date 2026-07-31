@@ -71,6 +71,9 @@
             {{msg.favorited ? '♥ 已收藏' : '♡ 收藏'}}
           </view>
 
+          <!-- 重试按钮（对应网页版 retryBtn） -->
+          <view class="retry-btn" wx:if="{{msg.showRetry}}" bindtap="onRetry" data-idx="{{msgIdx}}">🔄 重试</view>
+
           <!-- 三个引导提问（对应网页版 appendFollowUpSuggestions） -->
           <view class="followup-suggestions" wx:if="{{msg.showFollowup}}">
             <view class="followup-title">你可以继续：</view>

@@ -310,6 +310,19 @@ page {
   font-size: 22rpx;
   color: #999;
 }
+/* 重试按钮（对应网页版 .msg-action-btn retry） */
+.retry-btn {
+  display: inline-block;
+  margin: 16rpx 0 0 8rpx;
+  padding: 12rpx 32rpx;
+  border: 2rpx solid #7bc49f;
+  border-radius: 32rpx;
+  background: #f0f7f2;
+  color: #3a7d5c;
+  font-size: 28rpx;
+}
+.retry-btn:active { background: #dcefe4; }
+
 /* 三个引导提问（对应网页版 .followup-suggestions） */
 .followup-suggestions {
   margin-top: 20rpx;

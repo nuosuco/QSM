@@ -65,8 +65,11 @@ def _get_providers_for(capability: str) -> list:
 
 
 def _call_openai(base_url: str, api_key: str, model: str, messages: list,
-                 timeout: int = 30, temperature: float = 0.7) -> dict:
-    """调用 OpenAI 兼容接口，返回 {success, content, error, status_code}"""
+                 timeout: int = 15, temperature: float = 0.7,
+                 connect_timeout: int = 5) -> dict:
+    """调用 OpenAI 兼容接口，返回 {success, content, error, status_code}
+    timeout: 读取超时（秒），connect_timeout: 连接超时（秒）
+    """
     url = f"{base_url}/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -78,14 +81,22 @@ def _call_openai(base_url: str, api_key: str, model: str, messages: list,
         "temperature": temperature,
     }
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        resp = requests.post(url, headers=headers, json=payload,
+                             timeout=(connect_timeout, timeout))
         if resp.status_code == 429 or resp.status_code == 402:
             return {"success": False, "error": "quota_exceeded", "status_code": resp.status_code}
         if resp.status_code != 200:
             return {"success": False, "error": resp.text[:200], "status_code": resp.status_code}
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
+        # 空回复视为失败，继续降级到下一个服务商
+        if not content or not content.strip():
+            return {"success": False, "error": "empty_response", "status_code": 200}
         return {"success": True, "content": content}
+    except requests.exceptions.ConnectTimeout:
+        return {"success": False, "error": "connect_timeout", "status_code": 0}
+    except requests.exceptions.ReadTimeout:
+        return {"success": False, "error": "read_timeout", "status_code": 0}
     except requests.exceptions.Timeout:
         return {"success": False, "error": "timeout", "status_code": 0}
     except Exception as e:
@@ -99,8 +110,10 @@ def chat(user_message: str, system_prompt: str = "", history: list = None,
     返回 {success, content, provider, model, error}
     """
     cfg = _load_config()
-    timeout = cfg.get("timeout_seconds", 30)
+    timeout = cfg.get("timeout_seconds", 15)
+    connect_timeout = cfg.get("connect_timeout", 5)
     cooldown = cfg.get("cooldown_seconds", 3600)
+    timeout_cooldown = cfg.get("timeout_cooldown_seconds", 300)
 
     messages = []
     if system_prompt:
@@ -118,7 +131,8 @@ def chat(user_message: str, system_prompt: str = "", history: list = None,
             continue
         model = p["models"]["chat"]
         api_key = _get_api_key(p)
-        result = _call_openai(p["base_url"], api_key, model, messages, timeout, temperature)
+        result = _call_openai(p["base_url"], api_key, model, messages,
+                              timeout, temperature, connect_timeout)
         if result["success"]:
             return {
                 "success": True,
@@ -126,9 +140,12 @@ def chat(user_message: str, system_prompt: str = "", history: list = None,
                 "provider": name,
                 "model": model,
             }
-        # 额度耗尽 → 冷却
+        # 额度耗尽 → 长冷却
         if result.get("status_code") in (429, 402):
             _set_cooldown(name, cooldown)
+        # 超时/连接失败 → 短冷却（避免每次请求都白等）
+        elif result["error"] in ("timeout", "connect_timeout", "read_timeout"):
+            _set_cooldown(name, timeout_cooldown)
         errors.append(f"{name}: {result['error']}")
 
     return {"success": False, "content": "", "error": " | ".join(errors)}
@@ -141,8 +158,10 @@ def vision(user_message: str, image_url, system_prompt: str = "",
     image_url: 单张图片URL/base64，或多张图片的列表（兼容旧版）
     """
     cfg = _load_config()
-    timeout = cfg.get("timeout_seconds", 30)
+    timeout = cfg.get("timeout_seconds", 15)
+    connect_timeout = cfg.get("connect_timeout", 5)
     cooldown = cfg.get("cooldown_seconds", 3600)
+    timeout_cooldown = cfg.get("timeout_cooldown_seconds", 300)
 
     # 兼容单图(str)和多图(list)
     if isinstance(image_url, str):
@@ -171,7 +190,8 @@ def vision(user_message: str, image_url, system_prompt: str = "",
             continue
         model = p["models"]["vision"]
         api_key = _get_api_key(p)
-        result = _call_openai(p["base_url"], api_key, model, messages, timeout, temperature)
+        result = _call_openai(p["base_url"], api_key, model, messages,
+                              timeout, temperature, connect_timeout)
         if result["success"]:
             return {
                 "success": True,
@@ -181,6 +201,8 @@ def vision(user_message: str, image_url, system_prompt: str = "",
             }
         if result.get("status_code") in (429, 402):
             _set_cooldown(name, cooldown)
+        elif result["error"] in ("timeout", "connect_timeout", "read_timeout"):
+            _set_cooldown(name, timeout_cooldown)
         errors.append(f"{name}: {result['error']}")
 
     return {"success": False, "content": "", "error": " | ".join(errors)}

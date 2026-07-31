@@ -12,7 +12,7 @@ const path = require('path');
 
   const uploadResult = await ci.upload({
     project,
-    version: '1.0.10',
+    version: '1.0.11',
     desc: '小程序三引导提问样式+正则修复+后端推荐引导语优化',
     setting: {
       es6: true,

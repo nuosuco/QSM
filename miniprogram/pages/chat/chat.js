@@ -278,12 +278,34 @@ Page({
         msgs.push({
           id: 'msg-err-' + Date.now(),
           type: 'assistant',
-          text: hasImage ? '抱歉，图片分析失败。请确保图片清晰、光线充足，或直接用文字描述身体状况。' : '抱歉，网络出现问题，请稍后重试。'
+          text: hasImage ? '抱歉，图片分析失败。请确保图片清晰、光线充足，或直接用文字描述身体状况。' : '抱歉，网络出现问题，请稍后重试。',
+          showRetry: true,
+          retryMessage: message,
+          retryImages: imagePaths
         });
       }
       this.setData({ messages: msgs, sending: false });
       console.error('发送消息失败:', err);
     }
+  },
+
+  // 重试按钮（对应网页版 retryBtn.onclick）
+  onRetry(e) {
+    const idx = e.currentTarget.dataset.idx;
+    const msg = this.data.messages[idx];
+    if (!msg || !msg.showRetry) return;
+
+    // 移除错误消息
+    const msgs = this.data.messages.filter((m, i) => i !== idx);
+    this.setData({
+      messages: msgs,
+      inputValue: msg.retryMessage || '',
+      pendingImages: msg.retryImages || [],
+      pendingImage: (msg.retryImages && msg.retryImages[0]) || ''
+    });
+
+    // 重新发送
+    setTimeout(() => this.sendMessage(), 200);
   },
 
   // 对应 toggleChatFav（收藏对话+推荐商品）
