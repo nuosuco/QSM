@@ -911,6 +911,9 @@ async def chat_vision(request: VisionChatRequest):
         # 淘宝API搜索失败时不追加推荐引导语，避免用户看到"推荐了"但实际没商品
         pass
 
+    # 末尾追加AI生成提示（小程序审核要求）
+    reply_text += '\n\n_以上内容由人工智能生成，仅供参考。_'
+
     return {
         "success": True,
         "reply": reply_text,

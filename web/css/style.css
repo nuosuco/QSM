@@ -1287,7 +1287,7 @@ body {
     display: flex; gap: 8px; margin-top: 16px;
 }
 .detail-actions .detail-buy {
-    flex: 2;
+    flex: 1;
 }
 .detail-actions .detail-fav {
     flex: 0 0 auto; padding: 14px 20px;
@@ -2120,12 +2120,16 @@ body {
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   flex: 0 0 auto;
-  white-space: nowrap;
 }
 .detail-qr-btn {
-  flex: 0 0 60px;
-  font-size: 22px;
-  line-height: 1;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: normal;
+  word-break: break-all;
+}
+.detail-detail-qr-btn {
+  white-space: nowrap;
 }
 .detail-qr-btn:hover, .detail-detail-qr-btn:hover {
   transform: translateY(-1px);

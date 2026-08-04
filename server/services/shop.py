@@ -544,8 +544,9 @@ class ShopService:
     # ========== 京东联盟 ==========
 
     def _sign_jd(self, params: dict) -> str:
-        """京东联盟MD5签名"""
-        sorted_params = sorted(params.items())
+        """京东联盟MD5签名（排除sign和sign_method参数）"""
+        filtered = {k: v for k, v in params.items() if k not in ('sign', 'sign_method')}
+        sorted_params = sorted(filtered.items())
         sign_str = self.jd_config["app_secret"] + ''.join(f"{k}{v}" for k, v in sorted_params) + self.jd_config["app_secret"]
         return hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
 
@@ -570,6 +571,7 @@ class ShopService:
                     'keyword': keyword,
                     'pageSize': page_size,
                     'pageIndex': page,
+                    'pid': self.jd_config.get('pid', ''),
                 }
             }, separators=(',', ':'))
         }

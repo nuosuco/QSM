@@ -216,6 +216,9 @@ def chat_with_llm(user_message: str, history: list = None, user_id: str = None) 
     if products and '下方推荐' not in reply and '就在下面' not in reply and '点击即可购买' not in reply:
         reply += "\n\n🛒 我帮你找到了对应的有机食材，就在下方推荐里，点击即可购买～"
 
+    # 7. 末尾追加AI生成提示（小程序审核要求）
+    reply += "\n\n_以上内容由人工智能生成，仅供参考。_".replace("\n\n", "\n\n")
+
     return {
         "reply": reply,
         "tizhi": tizhi,

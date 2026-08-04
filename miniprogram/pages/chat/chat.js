@@ -225,8 +225,8 @@ Page({
       // 移除加载状态（对应 document.getElementById(loadingId).remove()）
       let msgs = this.data.messages.filter(m => !m.loading);
 
-      // 后端返回 success:false（如 LLM 全部失败），视为失败，显示重试按钮
-      if (data && data.success === false) {
+      // 后端返回失败或回复为空，视为失败，显示重试按钮
+      if (data && (data.success === false || !data.reply)) {
         msgs.push({
           id: 'msg-err-' + Date.now(),
           type: 'assistant',
