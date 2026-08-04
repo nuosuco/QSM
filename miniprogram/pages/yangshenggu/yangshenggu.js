@@ -15,6 +15,11 @@ Page({
     this.loadAll();
   },
 
+  // 搜索框跳转到有机好物页（审核版：不在此页展示商品，只做跳转入口）
+  goSearch() {
+    wx.navigateTo({ url: '/pages/products/products' });
+  },
+
   goTizhiTest() {
     wx.navigateTo({ url: '/pages/tizhi-test/tizhi-test' });
   },

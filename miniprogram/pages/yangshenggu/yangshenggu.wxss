@@ -252,6 +252,30 @@
   font-size: 26rpx;
 }
 
+/* 搜索框（审核版：只做搜索入口，跳转到商品页） */
+.yg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: #f5f7f6;
+  border-radius: 48rpx;
+  padding: 20rpx 28rpx;
+  margin-bottom: 16rpx;
+  border: 2rpx solid #e8eee9;
+}
+.yg-search-icon {
+  font-size: 28rpx;
+  flex-shrink: 0;
+}
+.yg-search-placeholder {
+  font-size: 26rpx;
+  color: #999;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 健康测评入口横幅（紧凑版） */
 .test-banner {
   display: flex;

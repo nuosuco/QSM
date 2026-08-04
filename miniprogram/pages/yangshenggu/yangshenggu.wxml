@@ -1,5 +1,11 @@
 <!-- 养生谷：健康测评 + 节气养生 + 护眼训练 + 九种体质 + 药食同源 -->
 <view class="knowledge-container">
+  <!-- 搜索框（隐藏商品功能，只留搜索入口） -->
+  <view class="yg-search-bar" bindtap="goSearch">
+    <text class="yg-search-icon">🔍</text>
+    <text class="yg-search-placeholder">搜有机食材，如：枸杞、红枣、山药...</text>
+  </view>
+
   <!-- 健康测评入口 -->
   <view class="test-banner" bindtap="goTizhiTest">
     <view class="test-banner-left">
