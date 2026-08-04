@@ -1128,7 +1128,7 @@ function showProductDetail(product) {
                 ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
                 <div class="detail-actions">
                     <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}')">点击购买</button>
-                    <button class="detail-qr-btn" onclick="showQRCode('${escapeHtml(product.url || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 扫码</button>
+                    <button class="detail-qr-btn" onclick="showQRCode('${escapeHtml(product.url || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${escapeHtml(imgSrc)}', '${escapeHtml(product.url || '')}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
@@ -1141,7 +1141,7 @@ function showProductDetail(product) {
                 </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
-                    <button class="detail-detail-qr-btn" onclick="showQRCode('${escapeHtml(detailUrl || '#')}', '${escapeHtml(product.title || '')}')">📱 扫码</button>
+                    <button class="detail-detail-qr-btn" onclick="showQRCode('${escapeHtml(detailUrl || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                 </div>
             </div>
         </div>
