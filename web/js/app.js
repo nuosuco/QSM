@@ -942,11 +942,72 @@ document.addEventListener('click', (e) => {
 });
 
 function openProduct(webUrl, platform) {
-    // 直接用 click_url（s.click.taobao.com）跳转，淘宝联盟链接会自动处理APP唤起
-    // 不要用 taobao:// 协议，电脑浏览器不识别，手机端 click_url 本身就能唤起APP
-    if (webUrl) {
-        window.open(webUrl, '_blank');
+    // 淘口令方案：微信服务号内无法直接跳转APP，生成淘口令让用户复制后打开淘宝
+    // 京东等其他平台：直接复制链接
+    if (!webUrl) return;
+    
+    if (platform === 'taobao' || !platform) {
+        // 调用后端生成淘口令
+        var tpwdUrl = '/api/products/tpwd?url=' + encodeURIComponent(webUrl) + '&text=' + encodeURIComponent('');
+        fetch(tpwdUrl)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var tpwd = data.model || data.tpwd || '';
+                if (tpwd) {
+                    copyToClipboard(tpwd, '淘口令已复制，打开淘宝APP即可查看');
+                } else {
+                    copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
+                }
+            })
+            .catch(function() {
+                copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
+            });
+    } else {
+        // 京东等平台：直接复制链接
+        copyToClipboard(webUrl, '链接已复制，打开' + (platform === 'jd' ? '京东' : 'APP') + '即可查看');
     }
+}
+
+// 复制到剪贴板
+function copyToClipboard(text, toast) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            showToast(toast || '已复制');
+        }).catch(function() {
+            fallbackCopy(text, toast);
+        });
+    } else {
+        fallbackCopy(text, toast);
+    }
+}
+
+function fallbackCopy(text, toast) {
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showToast(toast || '已复制');
+    } catch(e) {
+        // 兜底：跳转链接
+        window.open(text, '_blank');
+    }
+    document.body.removeChild(textarea);
+}
+
+// Toast 提示
+function showToast(msg) {
+    var el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:12px 24px;border-radius:8px;font-size:14px;z-index:99999;max-width:80%;text-align:center;transition:opacity 0.3s;';
+    document.body.appendChild(el);
+    setTimeout(function() {
+        el.style.opacity = '0';
+        setTimeout(function() { el.remove(); }, 300);
+    }, 2500);
 }
 
 // ========== 商品详情弹窗 ==========
