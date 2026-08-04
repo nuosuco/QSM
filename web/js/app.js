@@ -942,26 +942,32 @@ document.addEventListener('click', (e) => {
 });
 
 function openProduct(webUrl, platform) {
-    // 淘口令方案：微信服务号内无法直接跳转APP，生成淘口令让用户复制后打开淘宝
-    // 京东等其他平台：直接复制链接
     if (!webUrl) return;
     
+    // 判断是否电脑浏览器（电脑浏览器直接跳转淘宝商品页，手机端走淘口令）
+    var isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
     if (platform === 'taobao' || !platform) {
-        // 调用后端生成淘口令
-        var tpwdUrl = '/api/products/tpwd?url=' + encodeURIComponent(webUrl) + '&text=' + encodeURIComponent('');
-        fetch(tpwdUrl)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                var tpwd = data.model || data.tpwd || '';
-                if (tpwd) {
-                    copyToClipboard(tpwd, '淘口令已复制，打开淘宝APP即可查看');
-                } else {
+        if (isMobile) {
+            // 手机端：走淘口令方案
+            var tpwdUrl = '/api/products/tpwd?url=' + encodeURIComponent(webUrl) + '&text=' + encodeURIComponent('');
+            fetch(tpwdUrl)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var tpwd = data.model || data.tpwd || '';
+                    if (tpwd) {
+                        copyToClipboard(tpwd, '淘口令已复制，打开淘宝APP即可查看');
+                    } else {
+                        copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
+                    }
+                })
+                .catch(function() {
                     copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
-                }
-            })
-            .catch(function() {
-                copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
-            });
+                });
+        } else {
+            // 电脑端：直接跳转淘宝商品详情页
+            window.open(webUrl, '_blank');
+        }
     } else {
         // 京东等平台：直接复制链接
         copyToClipboard(webUrl, '链接已复制，打开' + (platform === 'jd' ? '京东' : 'APP') + '即可查看');
@@ -1036,7 +1042,7 @@ function showQRCode(url, title) {
     
     var hint = document.createElement('p');
     hint.className = 'qr-hint';
-    hint.innerHTML = '<span class="qr-hint-icon">📱</span> 打开手机淘宝扫一扫，扫码即可查看商品';
+    hint.innerHTML = '<span class="qr-hint-icon">📱</span> 用手机淘宝APP扫描购买';
     modal.appendChild(hint);
     
     var container = document.createElement('div');
@@ -1122,7 +1128,7 @@ function showProductDetail(product) {
                 ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
                 <div class="detail-actions">
                     <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}')">点击购买</button>
-                    <button class="detail-qr-btn" onclick="showQRCode('${escapeHtml(product.url || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱</button>
+                    <button class="detail-qr-btn" onclick="showQRCode('${escapeHtml(product.url || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 扫码</button>
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${escapeHtml(imgSrc)}', '${escapeHtml(product.url || '')}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
