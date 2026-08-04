@@ -1036,7 +1036,7 @@ function showQRCode(url, title) {
     
     var hint = document.createElement('p');
     hint.className = 'qr-hint';
-    hint.textContent = '打开手机淘宝扫一扫，扫码即可查看商品';
+    hint.innerHTML = '<span class="qr-hint-icon">📱</span> 打开手机淘宝扫一扫，扫码即可查看商品';
     modal.appendChild(hint);
     
     var container = document.createElement('div');
@@ -1069,16 +1069,20 @@ function showQRCode(url, title) {
         var c = document.getElementById('qr-code-container');
         if (c && typeof QRCode !== 'undefined') {
             c.innerHTML = '';
-            new QRCode(c, {
-                text: url,
-                width: 200,
-                height: 200,
-                colorDark: '#000000',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H
-            });
+            try {
+                new QRCode(c, {
+                    text: url,
+                    width: 200,
+                    height: 200,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.L  // 低纠错，长链接也能容下
+                });
+            } catch(e) {
+                c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
+            }
         } else if (c) {
-            c.innerHTML = '<p style="color:#999;padding:40px;text-align:center;">二维码加载失败，请使用复制链接</p>';
+            c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码加载失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
         }
     }, 100);
 }
