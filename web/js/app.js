@@ -1076,11 +1076,8 @@ function showQRCode(url, title) {
         if (c && typeof QRCode !== 'undefined') {
             c.innerHTML = '';
             try {
-                // 先创建一个临时隐藏的 div 让 qrcodejs 挂载
-                var tmpDiv = document.createElement('div');
-                tmpDiv.style.display = 'none';
-                document.body.appendChild(tmpDiv);
-                var qr = new QRCode(tmpDiv, {
+                // 直接让 qrcodejs 渲染到容器中（它自动选择 canvas/svg/table）
+                var qr = new QRCode(c, {
                     text: url,
                     width: 200,
                     height: 200,
@@ -1088,17 +1085,10 @@ function showQRCode(url, title) {
                     colorLight: '#ffffff',
                     correctLevel: QRCode.CorrectLevel.L
                 });
-                // 从 qr 的 canvas 转成 data URL
-                var canvas = tmpDiv.querySelector('canvas');
-                if (canvas) {
-                    var dataUrl = canvas.toDataURL('image/png');
-                    var img = document.createElement('img');
-                    img.src = dataUrl;
-                    img.alt = '二维码';
-                    img.style.width = '200px';
-                    img.style.height = '200px';
-                    c.appendChild(img);
-                    // 加一个保存按钮
+                // 加一个保存按钮（用 canvas 转 dataURL 下载）
+                var qrCanvas = c.querySelector('canvas');
+                if (qrCanvas) {
+                    var dataUrl = qrCanvas.toDataURL('image/png');
                     var saveBtn = document.createElement('a');
                     saveBtn.href = dataUrl;
                     saveBtn.download = 'qrcode.png';
@@ -1113,11 +1103,7 @@ function showQRCode(url, title) {
                         document.body.removeChild(link);
                     };
                     c.appendChild(saveBtn);
-                } else {
-                    c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
                 }
-                // 清理临时 div
-                document.body.removeChild(tmpDiv);
             } catch(e) {
                 c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
             }
