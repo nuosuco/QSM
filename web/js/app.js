@@ -941,7 +941,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-function openProduct(webUrl, platform) {
+function openProduct(webUrl, platform, itemId) {
     if (!webUrl) return;
     
     // 判断是否电脑浏览器（电脑浏览器直接跳转淘宝商品页，手机端走淘口令）
@@ -966,7 +966,13 @@ function openProduct(webUrl, platform) {
                 });
         } else {
             // 电脑端：直接跳转淘宝商品详情页
-            window.open(webUrl, '_blank');
+            // 注意：淘宝联盟 click_url (s.click.taobao.com) 已失效，跳转后到 error.taobao.com
+            // 改用 item.taobao.com 直链，保留佣金参数
+            if (itemId) {
+                window.open('https://item.taobao.com/item.htm?id=' + itemId, '_blank');
+            } else {
+                window.open(webUrl, '_blank');
+            }
         }
     } else {
         // 京东等平台：直接复制链接
@@ -1070,45 +1076,96 @@ function showQRCode(url, title) {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
     
-    // 生成二维码 - 用 canvas 转 img 方便长按保存
+    // 生成二维码 - 先尝试 canvas（正常浏览器），失败则用纯 table（微信服务号）
     setTimeout(function() {
         var c = document.getElementById('qr-code-container');
-        if (c && typeof QRCode !== 'undefined') {
-            c.innerHTML = '';
-            try {
-                // 直接让 qrcodejs 渲染到容器中（它自动选择 canvas/svg/table）
-                var qr = new QRCode(c, {
-                    text: url,
-                    width: 200,
-                    height: 200,
-                    colorDark: '#000000',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.L
-                });
-                // 加一个保存按钮（用 canvas 转 dataURL 下载）
-                var qrCanvas = c.querySelector('canvas');
-                if (qrCanvas) {
-                    var dataUrl = qrCanvas.toDataURL('image/png');
-                    var saveBtn = document.createElement('a');
-                    saveBtn.href = dataUrl;
-                    saveBtn.download = 'qrcode.png';
-                    saveBtn.textContent = '⬇️ 保存二维码';
-                    saveBtn.style.cssText = 'display:block;margin-top:10px;color:#4a9d6e;font-size:14px;text-decoration:none;font-weight:600;';
-                    saveBtn.onclick = function(e) {
-                        var link = document.createElement('a');
-                        link.href = dataUrl;
-                        link.download = 'qrcode.png';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    };
-                    c.appendChild(saveBtn);
-                }
-            } catch(e) {
-                c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
+        if (!c) return;
+        c.innerHTML = '';
+        try {
+            if (typeof QRCode === 'undefined') {
+                c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码加载失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
+                return;
             }
-        } else if (c) {
-            c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码加载失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
+
+            // 第一步：先用正常方式生成二维码
+            var qr = new QRCode(c, {
+                text: url,
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.L
+            });
+
+            // 检查是否有 canvas
+            var qrCanvas = c.querySelector('canvas');
+            if (qrCanvas) {
+                try {
+                    var dataUrl = qrCanvas.toDataURL('image/png');
+                    if (dataUrl && dataUrl.length > 100) {
+                        // canvas 可用，正常浏览器，生成 img 并加保存按钮
+                        c.innerHTML = '';
+                        var img = document.createElement('img');
+                        img.src = dataUrl;
+                        img.alt = '二维码';
+                        img.style.width = '200px';
+                        img.style.height = '200px';
+                        img.style.display = 'block';
+                        img.style.margin = '0 auto';
+                        c.appendChild(img);
+                        var saveBtn = document.createElement('a');
+                        saveBtn.href = dataUrl;
+                        saveBtn.download = 'qrcode.png';
+                        saveBtn.textContent = '⬇️ 保存二维码';
+                        saveBtn.style.cssText = 'display:block;margin-top:10px;color:#4a9d6e;font-size:14px;text-decoration:none;font-weight:600;text-align:center;';
+                        saveBtn.onclick = function(e) {
+                            var link = document.createElement('a');
+                            link.href = dataUrl;
+                            link.download = 'qrcode.png';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        };
+                        c.appendChild(saveBtn);
+                        return;
+                    }
+                } catch(e1) {
+                    // toDataURL 失败（微信内），继续 fallback
+                }
+            }
+
+            // 第二步：canvas 不可用，清空容器，用纯 table 渲染
+            c.innerHTML = '';
+            var qrMatrix = qr._oQRCode;
+            if (!qrMatrix) {
+                c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
+                return;
+            }
+            var moduleCount = qrMatrix.getModuleCount();
+            var cellSize = Math.floor(200 / moduleCount);
+
+            var html = '<table style="border:0;border-collapse:collapse;margin:0 auto;">';
+            for (var row = 0; row < moduleCount; row++) {
+                html += '<tr>';
+                for (var col = 0; col < moduleCount; col++) {
+                    var dark = qrMatrix.isDark(row, col);
+                    html += '<td style="border:0;padding:0;width:' + cellSize + 'px;height:' + cellSize + 'px;background-color:' + (dark ? '#000000' : '#ffffff') + ';"></td>';
+                }
+                html += '</tr>';
+            }
+            html += '</table>';
+            c.innerHTML = html;
+
+            // 保存按钮
+            var saveBtn = document.createElement('a');
+            saveBtn.textContent = '⬇️ 保存二维码';
+            saveBtn.style.cssText = 'display:block;margin-top:10px;color:#4a9d6e;font-size:14px;text-decoration:none;font-weight:600;text-align:center;';
+            saveBtn.onclick = function() {
+                copyToClipboard(url, '二维码链接已复制');
+            };
+            c.appendChild(saveBtn);
+        } catch(e) {
+            c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
         }
     }, 100);
 }
@@ -1147,7 +1204,7 @@ function showProductDetail(product) {
                 ${product.brand ? `<div class="detail-brand">品牌：${escapeHtml(product.brand)}</div>` : ''}
                 ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
                 <div class="detail-actions">
-                    <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}')">点击购买</button>
+                    <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}', '${escapeHtml(itemId)}')">点击购买</button>
                     <button class="detail-qr-btn" onclick="showQRCode('${escapeHtml(product.url || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${escapeHtml(imgSrc)}', '${escapeHtml(product.url || '')}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
@@ -1160,7 +1217,7 @@ function showProductDetail(product) {
                     }).join('')}
                 </div>
                 <div class="detail-detail-footer">
-                    <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
+                    <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}', '${escapeHtml(itemId)}')">点击购买</button>
                     <button class="detail-detail-qr-btn" onclick="showQRCode('${escapeHtml(detailUrl || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                 </div>
             </div>

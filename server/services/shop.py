@@ -233,15 +233,19 @@ class ShopService:
         items = []
         
         def search_single_keyword(single_kw: str) -> list:
-            """搜索单个关键词，只搜一页"""
+            """搜索单个关键词，搜多页直到凑够数量"""
             search_kw = f"{single_kw} 有机"
             result = []
             local_titles = set()
             # 别名：标题里不一定出现原词（如搜"生姜"，标题写"小黄姜/姜粉"）
             aliases = SEARCH_ALIASES.get(single_kw, [])
             match_words = [single_kw.lower()] + [a.lower() for a in aliases]
-            sub_items = self._search_taobao(search_kw, 1, page_size, sort)
-            if sub_items:
+            page_no = 1
+            max_pages = 5  # 每个关键词最多搜5页
+            while len(result) < page_size and page_no <= max_pages:
+                sub_items = self._search_taobao(search_kw, page_no, page_size, sort)
+                if not sub_items:
+                    break
                 for item in sub_items:
                     title = item.get('title', '')
                     if title and title not in local_titles and not self._is_excluded(item):
@@ -251,6 +255,7 @@ class ShopService:
                             result.append(item)
                         if len(result) >= page_size:
                             break
+                page_no += 1
             return result
         
         # 所有关键词并行搜索
