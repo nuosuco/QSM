@@ -1070,20 +1070,66 @@ function showQRCode(url, title) {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
     
-    // 生成二维码
+    // 生成二维码 - 用 canvas 转 img 方便长按保存
     setTimeout(function() {
         var c = document.getElementById('qr-code-container');
         if (c && typeof QRCode !== 'undefined') {
             c.innerHTML = '';
             try {
-                new QRCode(c, {
+                // 先在内存中创建一个 canvas 生成二维码
+                var qr = new QRCode(null, {
                     text: url,
                     width: 200,
                     height: 200,
                     colorDark: '#000000',
                     colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.L  // 低纠错，长链接也能容下
+                    correctLevel: QRCode.CorrectLevel.L
                 });
+                // 从 qr 对象获取模块数据，自己画到 canvas 上
+                var qrCode = qr._oQRCode;
+                if (qrCode) {
+                    var moduleCount = qrCode.getModuleCount();
+                    var cellSize = 200 / moduleCount;
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 200;
+                    canvas.height = 200;
+                    var ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, 200, 200);
+                    ctx.fillStyle = '#000000';
+                    for (var r = 0; r < moduleCount; r++) {
+                        for (var col = 0; col < moduleCount; col++) {
+                            if (qrCode.isDark(r, col)) {
+                                ctx.fillRect(col * cellSize, r * cellSize, cellSize, cellSize);
+                            }
+                        }
+                    }
+                    var dataUrl = canvas.toDataURL('image/png');
+                    var img = document.createElement('img');
+                    img.src = dataUrl;
+                    img.alt = '二维码';
+                    img.style.width = '200px';
+                    img.style.height = '200px';
+                    c.appendChild(img);
+                    // 加一个保存按钮
+                    var saveBtn = document.createElement('a');
+                    saveBtn.href = dataUrl;
+                    saveBtn.download = 'qrcode.png';
+                    saveBtn.textContent = '⬇️ 保存二维码';
+                    saveBtn.style.cssText = 'display:block;margin-top:10px;color:#4a9d6e;font-size:14px;text-decoration:none;font-weight:600;';
+                    saveBtn.onclick = function(e) {
+                        // 如果 download 属性不生效（微信内），尝试复制
+                        var link = document.createElement('a');
+                        link.href = dataUrl;
+                        link.download = 'qrcode.png';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    };
+                    c.appendChild(saveBtn);
+                } else {
+                    c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
+                }
             } catch(e) {
                 c.innerHTML = '<p style="color:#e85d2c;padding:40px;text-align:center;font-size:14px;">📱 二维码生成失败，请点击下方「复制链接」<br>然后在手机淘宝中粘贴打开</p>';
             }
