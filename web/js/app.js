@@ -992,7 +992,6 @@ function fallbackCopy(text, toast) {
         document.execCommand('copy');
         showToast(toast || '已复制');
     } catch(e) {
-        // 兜底：跳转链接
         window.open(text, '_blank');
     }
     document.body.removeChild(textarea);
@@ -1008,6 +1007,80 @@ function showToast(msg) {
         el.style.opacity = '0';
         setTimeout(function() { el.remove(); }, 300);
     }, 2500);
+}
+
+// ========== 二维码弹窗 ==========
+function showQRCode(url, title) {
+    if (!url || url === '#') return;
+    
+    var existing = document.getElementById('qr-overlay');
+    if (existing) existing.remove();
+    
+    var overlay = document.createElement('div');
+    overlay.id = 'qr-overlay';
+    overlay.className = 'detail-overlay show';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    
+    var modal = document.createElement('div');
+    modal.className = 'qr-modal';
+    
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'qr-close';
+    closeBtn.textContent = '\u2715';
+    closeBtn.onclick = function() { overlay.remove(); };
+    modal.appendChild(closeBtn);
+    
+    var h3 = document.createElement('h3');
+    h3.textContent = '手机扫码购买';
+    modal.appendChild(h3);
+    
+    var hint = document.createElement('p');
+    hint.className = 'qr-hint';
+    hint.textContent = '打开手机淘宝扫一扫，扫码即可查看商品';
+    modal.appendChild(hint);
+    
+    var container = document.createElement('div');
+    container.id = 'qr-code-container';
+    container.className = 'qr-code-container';
+    modal.appendChild(container);
+    
+    var titleDiv = document.createElement('div');
+    titleDiv.className = 'qr-title';
+    titleDiv.textContent = title || '';
+    modal.appendChild(titleDiv);
+    
+    var footer = document.createElement('div');
+    footer.className = 'qr-footer';
+    var copyBtn = document.createElement('button');
+    copyBtn.className = 'detail-buy';
+    copyBtn.textContent = '复制链接';
+    copyBtn.onclick = function() {
+        copyToClipboard(url, '链接已复制');
+        overlay.remove();
+    };
+    footer.appendChild(copyBtn);
+    modal.appendChild(footer);
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    // 生成二维码
+    setTimeout(function() {
+        var c = document.getElementById('qr-code-container');
+        if (c && typeof QRCode !== 'undefined') {
+            c.innerHTML = '';
+            new QRCode(c, {
+                text: url,
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        } else if (c) {
+            c.innerHTML = '<p style="color:#999;padding:40px;text-align:center;">二维码加载失败，请使用复制链接</p>';
+        }
+    }, 100);
 }
 
 // ========== 商品详情弹窗 ==========
@@ -1045,6 +1118,7 @@ function showProductDetail(product) {
                 ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
                 <div class="detail-actions">
                     <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}')">点击购买</button>
+                    <button class="detail-qr-btn" onclick="showQRCode('${escapeHtml(product.url || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱</button>
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${escapeHtml(imgSrc)}', '${escapeHtml(product.url || '')}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
@@ -1057,7 +1131,7 @@ function showProductDetail(product) {
                 </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}')">点击购买</button>
-                    
+                    <button class="detail-detail-qr-btn" onclick="showQRCode('${escapeHtml(detailUrl || '#')}', '${escapeHtml(product.title || '')}')">📱 扫码</button>
                 </div>
             </div>
         </div>

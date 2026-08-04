@@ -2107,6 +2107,81 @@ body {
   background: none;
   border: 1px solid #ddd;
   border-radius: 10px;
+}
+
+/* ========== 二维码弹窗 ========== */
+.detail-qr-btn, .detail-detail-qr-btn {
+  background: var(--accent, #e85d2c);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.detail-qr-btn:hover, .detail-detail-qr-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(232,93,44,0.4);
+}
+.qr-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 30px;
+  max-width: 320px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+.qr-modal h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #333;
+}
+.qr-modal .qr-hint {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: #999;
+}
+.qr-modal .qr-code-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+.qr-modal .qr-code-container img {
+  display: block;
+}
+.qr-modal .qr-title {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 15px;
+  word-break: break-all;
+  max-height: 40px;
+  overflow: hidden;
+}
+.qr-modal .qr-footer {
+  display: flex;
+  justify-content: center;
+}
+.qr-modal .qr-footer .detail-buy {
+  min-width: 120px;
+}
+.qr-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #999;
+  cursor: pointer;
+  padding: 5px;
+  line-height: 1;
+}
+.qr-close:hover {
+  color: #333;
+}
   font-size: 14px;
   color: #999;
   cursor: pointer;
