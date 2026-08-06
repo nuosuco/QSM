@@ -18,6 +18,17 @@ var g_code_len = 0
 var g_pool_off = 0
 var g_pool_len = 0
 var g_main_start = 0
+# 预解码字节码: 加载时一次性把code段转成int数组, fetch变纯数组访问
+var g_code[65535]
+
+# 快速字节码读取(走预解码数组)
+def byte_at(p):
+    return g_code[p]
+end
+
+def u16_at(p):
+    return g_code[p] + g_code[p + 1] * 256
+end
 
 # ---- 值栈: 4096深 ----
 var st_type[4096]
@@ -74,15 +85,8 @@ var pop4_s = ""
 var g_cmp_r = 0
 
 # ================================================================
-# 字节码访问
+# 字节码访问 — 已移至顶部走预解码数组g_code[]
 # ================================================================
-def byte_at(p):
-    return ord(str_char_at(g_raw, 6 + p))
-end
-
-def u16_at(p):
-    return byte_at(p) + byte_at(p + 1) * 256
-end
 
 def pool_str(off):
     if (off < 0): return "" end
@@ -630,6 +634,12 @@ def load_qbc():
     if (6 + g_code_len + 2 > g_raw_len):
         printf("[QVM-Q] QBC截断\n")
         return 0
+    end
+    # 预解码: 一次性把code段转成int数组, 后续fetch走数组
+    var di = 0
+    while (di < g_code_len):
+        g_code[di] = ord(str_char_at(g_raw, 6 + di))
+        di = di + 1
     end
     var pp = 6 + g_code_len
     g_pool_len = ord(str_char_at(g_raw, pp)) + ord(str_char_at(g_raw, pp + 1)) * 256

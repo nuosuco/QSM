@@ -1,0 +1,46 @@
+# ================================================================
+# examples/bench.qentl — QEntL性能基准测试
+# 测量: 整数循环 + 斐波那契 + 字符串拼接 + 函数调用
+# ================================================================
+
+# 1. 整数累加循环
+var sum = 0
+var i = 0
+while (i < 10000):
+    sum = sum + i
+    i = i + 1
+end
+printf("sum10k=%d\n", sum)
+
+# 2. 斐波那契(迭代)
+var a = 0
+var b = 1
+var k = 0
+while (k < 30):
+    var t = a + b
+    a = b
+    b = t
+    k = k + 1
+end
+printf("fib30=%d\n", b)
+
+# 3. 字符串拼接
+var s = ""
+var j = 0
+while (j < 1000):
+    s = str_concat(s, "a")
+    j = j + 1
+end
+printf("strlen=%d\n", str_len(s))
+
+# 4. 函数调用开销
+def add2(x, y):
+    return x + y
+end
+var acc = 0
+var m = 0
+while (m < 5000):
+    acc = add2(acc, 1)
+    m = m + 1
+end
+printf("calls=%d\n", acc)
