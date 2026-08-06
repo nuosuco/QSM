@@ -1412,6 +1412,48 @@ async function doPasswordLogin() {
     }
 }
 
+// 注册弹窗
+function showRegisterModal() {
+    document.getElementById('register-modal').style.display = 'flex';
+}
+function hideRegisterModal() {
+    document.getElementById('register-modal').style.display = 'none';
+    document.getElementById('register-account').value = '';
+    document.getElementById('register-nickname').value = '';
+    document.getElementById('register-password').value = '';
+    document.getElementById('register-confirm-password').value = '';
+}
+
+async function registerAccount() {
+    const account = document.getElementById('register-account').value.trim();
+    const nickname = document.getElementById('register-nickname').value.trim();
+    const password = document.getElementById('register-password').value;
+    const confirmPassword = document.getElementById('register-confirm-password').value;
+    
+    if (!account) { alert('请输入账号'); return; }
+    if (!password) { alert('请输入密码'); return; }
+    if (password.length < 6) { alert('密码至少6位'); return; }
+    if (password !== confirmPassword) { alert('两次密码不一致'); return; }
+    
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/register`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ account, password, nickname: nickname || account })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            hideRegisterModal();
+            alert('注册成功！请登录');
+            showLoginError = () => {}; // 屏蔽错误
+        } else {
+            alert(data.error || '注册失败');
+        }
+    } catch (e) {
+        alert('网络错误，请重试');
+    }
+}
+
 // 忘记密码
 function showForgotPassword() {
     document.getElementById('forgot-password-modal').style.display = 'flex';

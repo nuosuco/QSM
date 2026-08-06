@@ -180,8 +180,21 @@
                                 <div class="login-row">
                                     <input type="password" class="login-input" id="password-input" placeholder="密码">
                                 </div>
-                                <button class="login-btn" onclick="doPasswordLogin()">登录 / 注册</button>
+                                <button class="login-btn" onclick="doPasswordLogin()">登录</button>
+                                <p class="login-link" onclick="showRegisterModal()">没有账号？立即注册</p>
                                 <p class="login-link" onclick="showForgotPassword()">忘记密码？</p>
+                            </div>
+                            <!-- 注册弹窗 -->
+                            <div class="forgot-password-modal" id="register-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>注册新账号</h4>
+                                    <input type="text" class="login-input" id="register-account" placeholder="账号（邮箱或自定义）">
+                                    <input type="text" class="login-input" id="register-nickname" placeholder="昵称（可选）">
+                                    <input type="password" class="login-input" id="register-password" placeholder="密码">
+                                    <input type="password" class="login-input" id="register-confirm-password" placeholder="确认密码">
+                                    <button class="login-btn" onclick="registerAccount()">注册</button>
+                                    <button class="login-btn secondary" onclick="hideRegisterModal()">取消</button>
+                                </div>
                             </div>
                             <!-- 忘记密码弹窗 -->
                             <div class="forgot-password-modal" id="forgot-password-modal" style="display:none;">
