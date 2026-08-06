@@ -18,6 +18,9 @@ var g_code_len = 0
 var g_pool_off = 0
 var g_pool_len = 0
 var g_main_start = 0
+# 函数名缓存: 连续调用同一函数直接命中
+var g_last_fname = ""
+var g_last_fi = -1
 # 预解码字节码: 加载时一次性把code段转成int数组, fetch变纯数组访问
 var g_code[65535]
 
@@ -790,7 +793,14 @@ def vm_run():
         if (op == 18):
             fname = pool_str(u16_at(pc + 1))
             nargs = byte_at(pc + 3)
-            fi = find_func(fname)
+            # 函数名缓存: 连续调用同一函数(热循环)直接命中, 免重复扫描
+            if (str_eq(fname, g_last_fname)):
+                fi = g_last_fi
+            else:
+                fi = find_func(fname)
+                g_last_fname = fname
+                g_last_fi = fi
+            end
             if (fi < 0):
                 printf("[QVM-Q] 未定义函数: %s\n", fname)
                 running = 0
@@ -800,14 +810,7 @@ def vm_run():
                     running = 0
                 else:
                     base = fp * 64
-                    k = 0
-                    while (k < 64):
-                        loc_type[base + k] = 0
-                        loc_int[base + k] = 0
-                        loc_str[base + k] = ""
-                        loc_arr[base + k] = 0
-                        k = k + 1
-                    end
+                    # 惰性清零: QCL强制var初始化, 参数总是覆盖写入, 无需每次清64槽
                     k = nargs - 1
                     while (k >= 0):
                         do_pop1()
