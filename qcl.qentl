@@ -662,6 +662,10 @@ def is_builtin(nm):
     if (str_eq(nm, "apply_cx")): return 1 end
     if (str_eq(nm, "apply_ccx")): return 1 end
     if (str_eq(nm, "apply_ccz")): return 1 end
+    if (str_eq(nm, "apply_phase")): return 1 end
+    if (str_eq(nm, "apply_iphase")): return 1 end
+    if (str_eq(nm, "apply_cphase")): return 1 end
+    if (str_eq(nm, "apply_icphase")): return 1 end
     if (str_eq(nm, "measure")): return 1 end
     return 0
 end
@@ -985,10 +989,18 @@ def parse_statement():
                         if (str_eq(ident_nm, "ccx") or str_eq(ident_nm, "ccz")):
                             parse_quantum_ccx(ident_ns, ident_nl)
                         else:
-                            if (str_eq(ident_nm, "measure")):
-                                parse_quantum_measure(ident_ns, ident_nl)
+                            if (str_eq(ident_nm, "phase") or str_eq(ident_nm, "iphase")):
+                                parse_quantum_phase(ident_ns, ident_nl)
                             else:
-                                parse_ident_stmt()
+                                if (str_eq(ident_nm, "cphase") or str_eq(ident_nm, "icphase")):
+                                    parse_quantum_cphase(ident_ns, ident_nl)
+                                else:
+                                    if (str_eq(ident_nm, "measure")):
+                                        parse_quantum_measure(ident_ns, ident_nl)
+                                    else:
+                                        parse_ident_stmt()
+                                    end
+                                end
                             end
                         end
                     end
@@ -1168,6 +1180,93 @@ def parse_quantum_ccx(ns, nl):
     emit_u16(t_idx)
     emit_byte(OP_BUILTIN)
     emit_u16(pool_add_string(bname3))
+    emit_byte(4)
+    emit_byte(OP_POP)
+end
+
+# phase q[0], k / iphase q[0], k — 单量子位相位门 π/2^k
+def parse_quantum_phase(ns, nl):
+    advance()
+    var reg_ns = g_tok_start[g_parse_pos]
+    var reg_nl = g_tok_len[g_parse_pos]
+    advance()
+    expect(T_LBRACKET, "phase缺[")
+    var idx = 0
+    if (cur_type() == T_NUMBER):
+        idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    expect(T_RBRACKET, "phase缺]")
+    if (cur_type() == T_COMMA):
+        advance()
+    end
+    var kval = 1
+    if (cur_type() == T_NUMBER):
+        kval = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    var gate_nm4 = str_substring(g_src, ns, nl)
+    var bname4 = "apply_phase"
+    if (str_eq(gate_nm4, "iphase")): bname4 = "apply_iphase" end
+    emit_byte(OP_LOAD_VAR)
+    emit_u16(sym_resolve(reg_ns, reg_nl))
+    emit_byte(OP_PUSH_INT)
+    emit_u16(idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(kval)
+    emit_byte(OP_BUILTIN)
+    emit_u16(pool_add_string(bname4))
+    emit_byte(3)
+    emit_byte(OP_POP)
+end
+
+# cphase q[c], q[t], k / icphase q[c], q[t], k — 受控相位门
+def parse_quantum_cphase(ns, nl):
+    advance()
+    var c_ns = g_tok_start[g_parse_pos]
+    var c_nl = g_tok_len[g_parse_pos]
+    advance()
+    expect(T_LBRACKET, "cphase缺[")
+    var c_idx = 0
+    if (cur_type() == T_NUMBER):
+        c_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    expect(T_RBRACKET, "cphase缺]")
+    if (cur_type() == T_COMMA):
+        advance()
+    end
+    var t_ns = g_tok_start[g_parse_pos]
+    var t_nl = g_tok_len[g_parse_pos]
+    advance()
+    expect(T_LBRACKET, "cphase缺[")
+    var t_idx = 0
+    if (cur_type() == T_NUMBER):
+        t_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    expect(T_RBRACKET, "cphase缺]")
+    if (cur_type() == T_COMMA):
+        advance()
+    end
+    var kval2 = 1
+    if (cur_type() == T_NUMBER):
+        kval2 = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    var gate_nm5 = str_substring(g_src, ns, nl)
+    var bname5 = "apply_cphase"
+    if (str_eq(gate_nm5, "icphase")): bname5 = "apply_icphase" end
+    emit_byte(OP_LOAD_VAR)
+    emit_u16(sym_resolve(c_ns, c_nl))
+    emit_byte(OP_PUSH_INT)
+    emit_u16(c_idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(t_idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(kval2)
+    emit_byte(OP_BUILTIN)
+    emit_u16(pool_add_string(bname5))
     emit_byte(4)
     emit_byte(OP_POP)
 end

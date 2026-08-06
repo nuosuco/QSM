@@ -760,6 +760,55 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
         }
         return mk_int(-1);
     }
+    /* ---- QFT/Shor所需: 相位门 phase/cphase (±π/2^k) ---- */
+    if (strcmp(name, "apply_phase") == 0 || strcmp(name, "apply_iphase") == 0) {
+        if (nargs >= 3 && args[0].type == V_INT && args[1].type == V_INT && args[2].type == V_INT) {
+            int id = (int)args[0].i, q = (int)args[1].i, k = (int)args[2].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || q < 0 || q >= qregs[id].n || k < 0 || k > 30)
+                return mk_int(-1);
+            int sz = 1 << qregs[id].n;
+            double *s = qregs[id].state;
+            double ang = M_PI / ldexp(1.0, k);  /* π/2^k */
+            if (name[6] == 'i') ang = -ang;     /* iphase: 逆相位 ('i'在索引6) */
+            double cs = cos(ang), sn = sin(ang);
+            int qbit = 1 << q;
+            for (int i = 0; i < sz; i++) {
+                if (i & qbit) {
+                    double r = s[2 * i], im = s[2 * i + 1];
+                    s[2 * i] = r * cs - im * sn;
+                    s[2 * i + 1] = r * sn + im * cs;
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "apply_cphase") == 0 || strcmp(name, "apply_icphase") == 0) {
+        if (nargs >= 4 && args[0].type == V_INT && args[1].type == V_INT &&
+            args[2].type == V_INT && args[3].type == V_INT) {
+            int id = (int)args[0].i, c = (int)args[1].i, t = (int)args[2].i, k = (int)args[3].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || k < 0 || k > 30)
+                return mk_int(-1);
+            int n = qregs[id].n;
+            if (c < 0 || c >= n || t < 0 || t >= n || c == t)
+                return mk_int(-1);
+            int sz = 1 << n;
+            double *s = qregs[id].state;
+            double ang = M_PI / ldexp(1.0, k);
+            if (name[6] == 'i') ang = -ang;     /* icphase: 'i'在索引6 */
+            double cs = cos(ang), sn = sin(ang);
+            int cb = 1 << c, tb = 1 << t;
+            for (int i = 0; i < sz; i++) {
+                if ((i & cb) && (i & tb)) {
+                    double r = s[2 * i], im = s[2 * i + 1];
+                    s[2 * i] = r * cs - im * sn;
+                    s[2 * i + 1] = r * sn + im * cs;
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
     if (strcmp(name, "measure") == 0) {
         if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
             int id = (int)args[0].i, q = (int)args[1].i;
@@ -1286,7 +1335,8 @@ static int is_builtin_name(Comp *c, long start, long len) {
         "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown",
         "exec",
         "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx",
-        "apply_x", "apply_z", "apply_cz", "apply_ccx", "apply_ccz", "measure"
+        "apply_x", "apply_z", "apply_cz", "apply_ccx", "apply_ccz",
+        "apply_phase", "apply_iphase", "apply_cphase", "apply_icphase", "measure"
     };
     for (int k = 0; k < (int)(sizeof(names) / sizeof(names[0])); k++)
         if (kw_match(c->src + start, len, names[k])) return 1;

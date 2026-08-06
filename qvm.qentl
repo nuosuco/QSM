@@ -604,6 +604,26 @@ def do_builtin(bname, nargs):
         push_int(apply_ccx(pop1_i, pop2_i, pop3_i, pop4_i))
         return
     end
+    if (str_eq(bname, "apply_phase")):
+        do_pop3()
+        push_int(apply_phase(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_iphase")):
+        do_pop3()
+        push_int(apply_iphase(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_cphase")):
+        do_pop4()
+        push_int(apply_cphase(pop1_i, pop2_i, pop3_i, pop4_i))
+        return
+    end
+    if (str_eq(bname, "apply_icphase")):
+        do_pop4()
+        push_int(apply_icphase(pop1_i, pop2_i, pop3_i, pop4_i))
+        return
+    end
     if (str_eq(bname, "apply_ccz")):
         do_pop4()
         push_int(apply_ccz(pop1_i, pop2_i, pop3_i, pop4_i))
