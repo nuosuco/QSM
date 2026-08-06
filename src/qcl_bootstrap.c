@@ -709,6 +709,57 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
         }
         return mk_int(-1);
     }
+    /* ---- 3量子位Grover所需: CCX(Toffoli)/CCZ双控制门 ---- */
+    if (strcmp(name, "apply_ccx") == 0) {
+        if (nargs >= 4 && args[0].type == V_INT && args[1].type == V_INT &&
+            args[2].type == V_INT && args[3].type == V_INT) {
+            int id = (int)args[0].i, c1 = (int)args[1].i, c2 = (int)args[2].i, t = (int)args[3].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state)
+                return mk_int(-1);
+            int n = qregs[id].n;
+            if (c1 < 0 || c1 >= n || c2 < 0 || c2 >= n || t < 0 || t >= n ||
+                c1 == c2 || c1 == t || c2 == t)
+                return mk_int(-1);
+            int sz = 1 << n;
+            double *s = qregs[id].state;
+            int b1 = 1 << c1, b2 = 1 << c2, tb = 1 << t;
+            for (int i = 0; i < sz; i++) {
+                if ((i & b1) && (i & b2)) {
+                    int j = i ^ tb;
+                    if (j > i) {
+                        double r = s[2 * i], im = s[2 * i + 1];
+                        s[2 * i] = s[2 * j]; s[2 * i + 1] = s[2 * j + 1];
+                        s[2 * j] = r; s[2 * j + 1] = im;
+                    }
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "apply_ccz") == 0) {
+        if (nargs >= 4 && args[0].type == V_INT && args[1].type == V_INT &&
+            args[2].type == V_INT && args[3].type == V_INT) {
+            int id = (int)args[0].i, c1 = (int)args[1].i, c2 = (int)args[2].i, c3 = (int)args[3].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state)
+                return mk_int(-1);
+            int n = qregs[id].n;
+            if (c1 < 0 || c1 >= n || c2 < 0 || c2 >= n || c3 < 0 || c3 >= n ||
+                c1 == c2 || c1 == c3 || c2 == c3)
+                return mk_int(-1);
+            int sz = 1 << n;
+            double *s = qregs[id].state;
+            int b1 = 1 << c1, b2 = 1 << c2, b3 = 1 << c3;
+            for (int i = 0; i < sz; i++) {
+                if ((i & b1) && (i & b2) && (i & b3)) {
+                    s[2 * i] = -s[2 * i];
+                    s[2 * i + 1] = -s[2 * i + 1];
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
     if (strcmp(name, "measure") == 0) {
         if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
             int id = (int)args[0].i, q = (int)args[1].i;
@@ -1234,9 +1285,10 @@ static int is_builtin_name(Comp *c, long start, long len) {
         "file_list", "mkdir", "rand_int", "ord", "chr",
         "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown",
         "exec",
-        "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx", "measure"
+        "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx",
+        "apply_x", "apply_z", "apply_cz", "apply_ccx", "apply_ccz", "measure"
     };
-    for (int k = 0; k < 29; k++)
+    for (int k = 0; k < (int)(sizeof(names) / sizeof(names[0])); k++)
         if (kw_match(c->src + start, len, names[k])) return 1;
     return 0;
 }
