@@ -490,6 +490,55 @@ def bind_phone_to_wechat(user_id: str, phone: str) -> dict:
     return {"success": True, "message": "手机号绑定成功"}
 
 
+def bind_account_to_user(user_id: str, account: str, account_type: str = "email") -> dict:
+    """绑定账号到用户（邮箱/自定义账号）"""
+    from services import user_system
+    conn = user_system._conn()
+    
+    # 检查账号是否已被其他用户占用
+    existing = conn.execute("SELECT user_id FROM users WHERE account = ? AND user_id != ?", (account, user_id)).fetchone()
+    if existing:
+        conn.close()
+        return {"success": False, "error": "该账号已被其他用户占用"}
+    
+    conn.execute("UPDATE users SET account = ? WHERE user_id = ?", (account, user_id))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "账号绑定成功"}
+
+
+def bind_password_to_user(user_id: str, password: str) -> dict:
+    """绑定密码到用户"""
+    from services import user_system
+    from services.user_system import hash_password
+    conn = user_system._conn()
+    
+    password_hash = hash_password(password)
+    conn.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", (password_hash, user_id))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "密码设置成功"}
+
+
+def unbind_account(user_id: str, account_type: str = "email") -> dict:
+    """解绑账号"""
+    from services import user_system
+    conn = user_system._conn()
+    
+    if account_type == "email":
+        conn.execute("UPDATE users SET account = NULL WHERE user_id = ?", (user_id,))
+    elif account_type == "phone":
+        conn.execute("UPDATE users SET phone = NULL WHERE user_id = ?", (user_id,))
+    elif account_type == "wechat":
+        conn.execute("UPDATE users SET wechat_openid = NULL WHERE user_id = ?", (user_id,))
+    elif account_type == "password":
+        conn.execute("UPDATE users SET password_hash = NULL WHERE user_id = ?", (user_id,))
+    
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "解绑成功"}
+
+
 # ---------- 状态查询 ----------
 
 def get_auth_status() -> dict:

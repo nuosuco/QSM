@@ -1194,6 +1194,39 @@ async def auth_bind_phone(request: BindPhoneRequest):
         return {"success": False, "error": check.get("error", "验证码错误")}
     return auth_service.bind_phone_to_wechat(request.user_id, e164)
 
+@app.post("/api/auth/bind-account")
+async def auth_bind_account(request: dict):
+    """绑定账号到用户（邮箱/自定义账号）"""
+    from services import auth_service
+    user_id = request.get("user_id")
+    account = request.get("account")
+    account_type = request.get("account_type", "email")
+    if not user_id or not account:
+        return {"success": False, "error": "缺少参数"}
+    return auth_service.bind_account_to_user(user_id, account, account_type)
+
+@app.post("/api/auth/bind-password")
+async def auth_bind_password(request: dict):
+    """绑定密码到用户"""
+    from services import auth_service
+    user_id = request.get("user_id")
+    password = request.get("password")
+    if not user_id or not password:
+        return {"success": False, "error": "缺少参数"}
+    if len(password) < 6:
+        return {"success": False, "error": "密码至少6位"}
+    return auth_service.bind_password_to_user(user_id, password)
+
+@app.post("/api/auth/unbind-account")
+async def auth_unbind_account(request: dict):
+    """解绑账号"""
+    from services import auth_service
+    user_id = request.get("user_id")
+    account_type = request.get("account_type", "email")
+    if not user_id:
+        return {"success": False, "error": "缺少user_id"}
+    return auth_service.unbind_account(user_id, account_type)
+
 # ========== 体质评测 API ==========
 
 @app.post("/api/tizhi/save")
