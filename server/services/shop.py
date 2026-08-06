@@ -231,67 +231,6 @@ class ShopService:
         
         seen_titles = set()
         items = []
-<<<<<<< HEAD
-
-        def _add_unique(item_list):
-            """添加唯一商品，返回新增数量"""
-            added = 0
-            for item in item_list:
-                item_id = item.get('item_id', '') or ''
-                title = item.get('title', '') or ''
-                if not item_id and not title:
-                    continue
-                # 使用 item_id + 标题前20字作为去重key
-                dedup_key = f"{item_id}:{title[:20]}" if item_id else title[:30]
-                
-                if dedup_key not in seen_ids and not self._is_excluded(item):
-                    seen_ids.add(dedup_key)
-                    items.append(item)
-                    added += 1
-            return added
-
-        # 1. 先从缓存查询
-        cache_items = self.search_from_cache(keyword=keyword, page=1, page_size=page_size * 2)
-        _add_unique(cache_items)
-
-        # 2. 缓存不够时，实时搜索
-        if len(items) < page_size:
-            if platform in ("taobao", "all"):
-                sub_keywords = self._split_keywords(search_keyword)
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                    # 每个关键词并行搜5页，取更多候选合并去重
-                    def search_single_page(sub_kw: str) -> list:
-                        result = []
-                        for p in range(1, 6):
-                            items_page = self._search_taobao(sub_kw, p, page_size, sort)
-                            if not items_page:
-                                break
-                            for item in items_page:
-                                item_id = item.get('item_id', '') or ''
-                                title = item.get('title', '') or ''
-                                if not item_id and not title:
-                                    continue
-                                dedup_key = f"{item_id}:{title[:20]}" if item_id else title[:30]
-                                if dedup_key not in seen_ids and not self._is_excluded(item):
-                                    seen_ids.add(dedup_key)
-                                    result.append(item)
-                            if len(result) >= page_size * 3:
-                                break
-                        return result
-
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                        future_to_kw = {
-                            executor.submit(search_single_page, sub_kw): sub_kw
-                            for sub_kw in sub_keywords[:3]
-                        }
-                        for future in concurrent.futures.as_completed(future_to_kw):
-                            sub_items = future.result()
-                            if sub_items:
-                                items.extend(sub_items)
-                            if len(items) >= page_size * 2:
-                                break
-=======
         
         def search_single_keyword(single_kw: str) -> list:
             """搜索单个关键词，搜多页直到凑够数量"""
@@ -334,7 +273,6 @@ class ShopService:
                     pass
         
         return items
->>>>>>> iter10-restored
 
     def get_category_keyword(self, keyword: str) -> str:
         """根据分类名返回对应的关键词列表"""
