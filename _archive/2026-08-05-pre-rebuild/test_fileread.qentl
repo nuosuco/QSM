@@ -1,0 +1,9 @@
+def main():
+    var src = file_read("input.qentl")
+    printf("Read: %d bytes\n", str_len(src))
+    if str_len(src) > 0:
+        printf("First 50: %s\n", str_sub(src, 0, 50))
+    else:
+        printf("ERROR: empty string!\n")
+    end
+end

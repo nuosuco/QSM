@@ -1,0 +1,15 @@
+# Test if/while/control flow
+def factorial(n):
+    var result = 1
+    var i = 1
+    while (i < n):
+        i = i + 1
+        result = result * i
+    end
+    return result
+end
+
+def main():
+    var f = factorial(5)
+    printf("5! = %d\n", f)
+end

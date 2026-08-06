@@ -1,0 +1,14 @@
+var i = 0
+while (i < 10):
+    if (i == 3): break end
+    i = i + 1
+end
+printf("i=%d\n", i)
+var j = 0
+var s = ""
+while (j < str_len("hello")):
+    s = str_concat(s, str_char_at("hello", j))
+    if (str_eq(str_char_at("hello", j), "l")): break end
+    j = j + 1
+end
+printf("s=[%s]\n", s)

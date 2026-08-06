@@ -1,0 +1,13 @@
+printf("p0=[%s]\n", str_char_at("abc", 0))
+printf("p1=[%s]\n", str_char_at("abc", 1))
+var s = str_concat("x", str_from_char(0))
+printf("len_with_zero=%d\n", str_len(s))
+printf("chr0len=%d\n", str_len(chr(0)))
+printf("chr65=[%s]\n", chr(65))
+var z = str_char_at(s, 1)
+printf("zero_char_len=%d ord=%d\n", str_len(z), ord(z))
+if (str_eq(z, "")):
+    printf("zero_eq_empty=YES\n")
+else:
+    printf("zero_eq_empty=NO\n")
+end

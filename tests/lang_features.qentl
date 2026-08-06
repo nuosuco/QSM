@@ -1,0 +1,30 @@
+# 测试1：字符串数组
+var sa[4]
+sa[0] = "hello"
+sa[1] = "world"
+printf("sa0=%s sa1=%s\n", sa[0], sa[1])
+
+# 测试2：局部数组
+def f_with_local_arr():
+    var la[3]
+    la[0] = 10
+    la[1] = 20
+    la[2] = la[0] + la[1]
+    return la[2]
+end
+printf("local_arr=%d\n", f_with_local_arr())
+
+# 测试3：数组存字符串+取回
+def str_arr_test():
+    var arr[2]
+    arr[0] = "abc"
+    arr[1] = str_concat(arr[0], "def")
+    return str_len(arr[1])
+end
+printf("str_arr_len=%d\n", str_arr_test())
+
+# 测试4：and/or
+var t = 1
+if (t == 1 and str_len("x") == 1):
+    printf("and-ok\n")
+end

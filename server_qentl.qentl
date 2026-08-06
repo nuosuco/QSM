@@ -1,0 +1,203 @@
+# ================================================================
+# QEntL HTTP服务器 — 纯QEntL实现（QEntL全栈Web的心脏）
+# 依赖原语: tcp_listen/accept/recv/send/close（C种子系统接口层）
+# 用法: QVM执行此程序，nginx反代到本端口，qsm.som.top访问
+# ================================================================
+
+# ---- HTTP请求解析 ----
+# 从请求行提取方法: "GET /path HTTP/1.1" -> "GET"
+def http_method(req):
+    var i = 0
+    while (i < str_len(req)):
+        if (str_eq(str_char_at(req, i), " ")):
+            return str_substring(req, 0, i)
+        end
+        i = i + 1
+    end
+    return ""
+end
+
+# 从请求行提取路径: "GET /path HTTP/1.1" -> "/path"
+def http_path(req):
+    var i = 0
+    var start = -1
+    while (i < str_len(req)):
+        var ch = str_char_at(req, i)
+        if (str_eq(ch, " ") and start < 0):
+            start = i + 1
+        else:
+            if (str_eq(ch, " ") and start >= 0):
+                return str_substring(req, start, i - start)
+            end
+        end
+        i = i + 1
+    end
+    return "/"
+end
+
+# ---- 响应构造 ----
+def http_response(status, ctype, body):
+    var head = str_concat("HTTP/1.1 ", status)
+    head = str_concat(head, "\r\nContent-Type: ")
+    head = str_concat(head, ctype)
+    head = str_concat(head, "\r\nContent-Length: ")
+    head = str_concat(head, int_to_str(str_len(body)))
+    head = str_concat(head, "\r\nConnection: close\r\nServer: QEntL/1.0\r\n\r\n")
+    return str_concat(head, body)
+end
+
+# 取POST请求体（\r\n\r\n之后的部分）
+def http_body(req):
+    var i = str_index_of(req, "\r\n\r\n")
+    if (i < 0):
+        return ""
+    end
+    return str_substring(req, i + 4, str_len(req) - i - 4)
+end
+
+# 16进制字符转数值
+def hex_val(ch):
+    var d = ord(ch)
+    if (d >= 48 and d <= 57):
+        return d - 48
+    end
+    if (d >= 65 and d <= 70):
+        return d - 55
+    end
+    if (d >= 97 and d <= 102):
+        return d - 87
+    end
+    return 0
+end
+
+# URL解码: %XX转义 + '+'转空格
+def url_decode(s):
+    var out = ""
+    var i = 0
+    var n = str_len(s)
+    while (i < n):
+        var ch = str_char_at(s, i)
+        if (str_eq(ch, "%") and i + 2 < n):
+            var c = hex_val(str_char_at(s, i + 1)) * 16 + hex_val(str_char_at(s, i + 2))
+            out = str_concat(out, chr(c))
+            i = i + 3
+        else:
+            if (str_eq(ch, "+")):
+                out = str_concat(out, " ")
+            else:
+                out = str_concat(out, ch)
+            end
+            i = i + 1
+        end
+    end
+    return out
+end
+
+# HTML转义（用户输出嵌入<pre>防XSS）
+def html_escape(s):
+    var out = ""
+    var i = 0
+    var n = str_len(s)
+    while (i < n):
+        var ch = str_char_at(s, i)
+        if (str_eq(ch, "&")):
+            out = str_concat(out, "&amp;")
+        else:
+            if (str_eq(ch, "<")):
+                out = str_concat(out, "&lt;")
+            else:
+                if (str_eq(ch, ">")):
+                    out = str_concat(out, "&gt;")
+                else:
+                    out = str_concat(out, ch)
+                end
+            end
+        end
+        i = i + 1
+    end
+    return out
+end
+
+# ---- IDE页面 ----
+def ide_page():
+    var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>QEntL在线IDE</title>\n<style>\nbody { font-family: monospace; background: #0a0e17; color: #e0e6ed; margin: 0; }\n.wrap { max-width: 900px; margin: 0 auto; padding: 20px; }\nh1 { color: #4fc3f7; }\ntextarea { width: 100%%; height: 220px; background: #111827; color: #7ee787; border: 1px solid #374151; border-radius: 6px; padding: 12px; font-size: 14px; }\nbutton { background: #4fc3f7; color: #000; border: 0; padding: 10px 24px; border-radius: 6px; font-size: 15px; cursor: pointer; margin-top: 10px; }\npre { background: #111827; border: 1px solid #374151; border-radius: 6px; padding: 12px; min-height: 80px; white-space: pre-wrap; }\n.tip { color: #6b7280; font-size: 12px; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n<h1>&#9889; QEntL在线IDE</h1>\n<p class=\"tip\">纯QEntL全栈：QCL编译 + QVM沙箱执行，无第三方依赖</p>\n<textarea id=\"code\">printf(\"Hello from QEntL!\\n\")\nqreg q[2]\nh q[0]\ncx q[0], q[1]\nvar m0 = measure q[0]\nvar m1 = measure q[1]\nprintf(\"Bell: %%d %%d\\n\", m0, m1)\n</textarea>\n<button onclick=\"run()\">&#9654; 运行</button>\n<pre id=\"out\">输出...</pre>\n</div>\n<script>\nfunction run() {\n  var out = document.getElementById(\"out\");\n  out.textContent = \"编译运行中...\";\n  var xhr = new XMLHttpRequest();\n  xhr.open(\"POST\", \"/api/run\", true);\n  xhr.setRequestHeader(\"Content-Type\", \"application/x-www-form-urlencoded\");\n  xhr.onload = function() { out.textContent = xhr.responseText; };\n  xhr.onerror = function() { out.textContent = \"请求失败\"; };\n  xhr.send(\"code=\" + encodeURIComponent(document.getElementById(\"code\").value));\n}\n</script>\n</body>\n</html>\n"
+    return html
+end
+
+# ---- 运行用户代码（QCL全量编译+沙箱执行） ----
+def run_code(code):
+    var n = str_len(code)
+    if (n == 0):
+        return "代码为空"
+    end
+    if (n > 16000):
+        return "代码太长（上限16KB）"
+    end
+    var w = file_write_bytes("/root/QSM/input.qentl", code)
+    if (w < 0):
+        return "写入失败"
+    end
+    var comp = exec("cd /root/QSM && timeout 20 bin/qcl_bootstrap run build/qcl.qbc 2>&1")
+    var res = ""
+    if (str_index_of(comp, "错误") >= 0):
+        res = str_concat(res, "[编译错误]\n")
+        res = str_concat(res, comp)
+    else:
+        var run_out = exec("cd /root/QSM && timeout 15 bin/qcl_bootstrap run --sandbox output.qbc 2>&1")
+        res = str_concat(res, "[运行输出]\n")
+        res = str_concat(res, run_out)
+    end
+    return res
+end
+
+# ---- 路由 ----
+def route(path, req):
+    if (str_eq(path, "/ide")):
+        return http_response("200 OK", "text/html; charset=utf-8", ide_page())
+    end
+    if (str_eq(path, "/api/run")):
+        var body = http_body(req)
+        var code = ""
+        var idx = str_index_of(body, "code=")
+        if (idx >= 0):
+            code = url_decode(str_substring(body, idx + 5, str_len(body) - idx - 5))
+        end
+        var out = run_code(code)
+        return http_response("200 OK", "text/plain; charset=utf-8", out)
+    end
+    if (str_eq(path, "/")):
+        var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>QSM - QEntL量子计算</title>\n<style>\nbody { font-family: sans-serif; background: #0a0e17; color: #e0e6ed; margin: 0; }\n.wrap { max-width: 800px; margin: 0 auto; padding: 60px 20px; }\nh1 { color: #4fc3f7; }\n.badge { display: inline-block; background: #1a2332; border: 1px solid #4fc3f7; border-radius: 6px; padding: 4px 12px; margin: 4px; font-size: 13px; color: #81d4fa; }\n.card { background: #111827; border-radius: 10px; padding: 24px; margin-top: 24px; border: 1px solid #1f2937; }\ncode { color: #7ee787; }\na { color: #4fc3f7; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n<h1>&#9883; QSM — QEntL全栈量子计算平台</h1>\n<div class=\"badge\">纯QEntL实现</div>\n<div class=\"badge\">自举编译器</div>\n<div class=\"badge\">QVM虚拟机</div>\n<div class=\"badge\">量子电路编译</div>\n<div class=\"card\">\n<h2>全栈架构</h2>\n<p>本页由 <code>QEntL HTTP服务器</code> 直接提供服务 —— 没有Python、没有Node.js、没有第三方框架。</p>\n<p><code>C种子 → QCL编译器(QEntL写) → QVM虚拟机(QEntL写) → 标准库(QEntL写) → HTTP服务器(QEntL写)</code></p>\n</div>\n<div class=\"card\">\n<h2>&#9889; <a href=\"/ide\">在线IDE — 浏览器里写QEntL</a></h2>\n<p>在线编写、编译、沙箱执行QEntL程序，含量子电路示例。</p>\n</div>\n<div class=\"card\">\n<h2>访问接口</h2>\n<p><code>GET /</code> — 本页 | <code>GET /ide</code> — 在线IDE | <code>POST /api/run</code> — 运行代码 | <code>GET /api/status</code> — 状态</p>\n</div>\n</div>\n</body>\n</html>\n"
+        return http_response("200 OK", "text/html; charset=utf-8", html)
+    end
+    if (str_eq(path, "/api/status")):
+        var body = str_concat("{\"server\":\"QEntL/1.0\",\"vm\":\"QVM\",\"compiler\":\"QCL\",", "\"bootstrap\":\"self-hosted\",\"ide\":\"online\",\"status\":\"running\"}")
+        return http_response("200 OK", "application/json", body)
+    end
+    if (str_eq(path, "/api/stack")):
+        var body = "{\"layers\":[\"C种子(量子编译+系统接口)\",\"QCL编译器(QEntL)\",\"QVM虚拟机(QEntL)\",\"标准库lib/*.qentl\",\"HTTP服务器(纯QEntL)\"],\"third_party\":\"zero\"}"
+        return http_response("200 OK", "application/json", body)
+    end
+    return http_response("404 Not Found", "text/plain", "404 - QEntL Server")
+end
+
+# ---- 主循环 ----
+var PORT = 9802
+var srv = tcp_listen(PORT)
+if (srv < 0):
+    printf("[http] 端口%d监听失败\n", PORT)
+else:
+    printf("[http] QEntL HTTP服务器启动于端口%d\n", PORT)
+    while (1 == 1):
+        var conn = tcp_accept(srv)
+        if (conn >= 0):
+            var req = tcp_recv(conn, 8192)
+            var m = http_method(req)
+            var p = http_path(req)
+            var resp = route(p, req)
+            var n = tcp_send(conn, resp)
+            printf("[http] %s %s -> %d字节\n", m, p, n)
+            tcp_shutdown(conn)
+            tcp_close(conn)
+        end
+    end
+end

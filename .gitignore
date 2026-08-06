@@ -1,30 +1,19 @@
-# 只排除超大文件（>100MB）
-data/*.pdf
-data/《通用彝文字典》.pdf
-data/《通用彝文字典》_上册.pdf
-data/《通用彝文字典》_下册.pdf
-data/滇川黔桂彝文字典*.pdf
+# QEntL全栈QSM — 构建产物与缓存不入库
+# 源码(.qentl/.c)入库，产物不入库
 
-# 日志文件（如果太大）
-models/*.log
+# 构建产物
+build/
+output.qbc
+target.qbc
+input.qentl
 
-# 临时文件
-*.tmp
-*.swp
-*~
-tmp/
-.tmp/
+# Python缓存
+__pycache__/
+*.pyc
 
-# Git内部
-.git.broken/
-.git.backup/
-.git.old/
+# 日志
+*.log
+server/server.log
 
-# IDE
-.idea/
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-audit_results/
+# 临时
+/tmp/*

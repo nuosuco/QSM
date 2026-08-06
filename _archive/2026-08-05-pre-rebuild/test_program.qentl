@@ -1,0 +1,16 @@
+# Test program for QCL compiler
+# This tests basic compilation features
+
+def test_add(a, b):
+    return a + b
+end
+
+def test_greet(name):
+    printf("Hello, %s!\n", name)
+end
+
+def main():
+    var x = test_add(10, 20)
+    printf("10 + 20 = %d\n", x)
+    test_greet("QCL")
+end

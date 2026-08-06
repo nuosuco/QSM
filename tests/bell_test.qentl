@@ -1,0 +1,29 @@
+# 量子Bell态测试：H|0⟩ + CNOT → 纠缠态
+var reg = qreg_create(2)
+printf("寄存器创建: id=%d\n", reg)
+apply_h(reg, 0)
+apply_cx(reg, 0, 1)
+var m0 = measure(reg, 0)
+var m1 = measure(reg, 1)
+printf("Bell态测量: qubit0=%d qubit1=%d\n", m0, m1)
+# 多次测量验证纠缠
+var count00 = 0
+var count11 = 0
+var count01 = 0
+var count10 = 0
+var i = 0
+while (i < 100):
+    var r = qreg_create(2)
+    apply_h(r, 0)
+    apply_cx(r, 0, 1)
+    var b0 = measure(r, 0)
+    var b1 = measure(r, 1)
+    if (b0 == 0 and b1 == 0): count00 = count00 + 1 end
+    if (b0 == 1 and b1 == 1): count11 = count11 + 1 end
+    if (b0 == 0 and b1 == 1): count01 = count01 + 1 end
+    if (b0 == 1 and b1 == 0): count10 = count10 + 1 end
+    qreg_free(r)
+    i = i + 1
+end
+printf("Bell态纠缠验证(100次): 00=%d 11=%d 01=%d 10=%d\n", count00, count11, count01, count10)
+printf("纠缠率=%d%%\n", (count00 + count11))

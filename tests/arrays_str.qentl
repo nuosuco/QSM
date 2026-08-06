@@ -1,0 +1,17 @@
+# tests/arrays_str.qentl — 数组 + 字符串操作
+var arr[8]
+var i = 0
+while (i < 8):
+    arr[i] = i * i
+    i = i + 1
+end
+printf("arr[5]=%d arr[7]=%d len=%d\n", arr[5], arr[7], len(arr))
+
+var s = "Hello, "
+s = str_concat(s, "QSM!")
+printf("s=%s len=%d\n", s, str_len(s))
+printf("char@0=%s\n", str_char_at(s, 0))
+printf("sub(7,10)=%s\n", str_substring(s, 7, 3))
+printf("eq=%d idx=%d\n", str_eq(s, "Hello, QSM!"), str_index_of(s, "QSM"))
+printf("chr65=%s\n", str_from_char(65))
+printf("int=%d str=%s\n", str_to_int("12345"), int_to_str(678))

@@ -1,0 +1,55 @@
+# Self-hosting QEntL Compiler v2
+# Uses only simple control flow (no nested if-else, no compound conditions)
+
+def main():
+    var input_file = "input.qentl"
+    var output_file = "output.qbc"
+    var src = file_read(input_file)
+    var slen = str_len(src)
+    if slen == 0:
+        printf("Error: empty input\n")
+        return
+    end
+    printf("Input: %d bytes\n", slen)
+    
+    # Minimal tokenizer - single char tokens only
+    var tokens[1024]
+    var types[1024]
+    var tcount = 0
+    var i = 0
+    while i < slen:
+        var c = str_sub(src, i, i + 1)
+        var ci = str_char_at(src, i)
+        # Single char tokens
+        tokens[tcount] = c
+        types[tcount] = "char"
+        tcount = tcount + 1
+        i = i + 1
+    end
+    printf("Tokens: %d\n", tcount)
+    
+    # Generate bytecode from tokens
+    # Simple format: just output each token as a byte
+    var out_str = ""
+    var j = 0
+    while j < tcount:
+        var cc = str_char_at(tokens[j], 0)
+        var ci = 0
+        if (cc >= "a") and (cc <= "z"):
+            ci = 1
+        end
+        if (cc >= "0") and (cc <= "9"):
+            ci = 2
+        end
+        if (cc == " ") or (cc == "\n") or (cc == "\t"):
+            ci = 3
+        end
+        if ci == 0:
+            ci = 4
+        end
+        out_str = out_str + chr(ci)
+        j = j + 1
+    end
+    file_write_bytes(output_file, out_str)
+    printf("Output: %d bytes\n", str_len(out_str))
+end
