@@ -7,6 +7,8 @@ import os
 import sys
 import sqlite3
 import time as time_module
+import base64
+import uuid
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -21,6 +23,7 @@ if _parent not in sys.path:
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from services.api_auth import APIAuthMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 
@@ -32,7 +35,7 @@ with open(CONFIG_PATH, "r") as f:
 app = FastAPI(
     title="SOM 松麦 API",
     description="小麦SOM - 中医辨证 + 有机食品推荐",
-    version="1.1.0"
+    version="1.1.1"
 )
 
 # CORS - 允许网页版、小程序调用
@@ -42,6 +45,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# API 鉴权 + 限流（som.skill 开放平台）
+app.add_middleware(APIAuthMiddleware)
 
 # ========== 数据模型（所有模型集中定义，避免引用顺序问题） ==========
 
@@ -59,6 +65,8 @@ class ChatResponse(BaseModel):
     recommendations: List[dict] = []
     products: List[dict] = []
     session_id: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
 
 class CheckinRequest(BaseModel):
     """签到请求"""
@@ -101,6 +109,60 @@ class FeedbackRequest(BaseModel):
     contact: str = ""
     page_url: str = ""
     user_agent: str = ""
+
+# ===== 用户系统 / 体质评测 模型 =====
+
+class UserRegisterRequest(BaseModel):
+    """匿名用户注册/识别"""
+    user_id: str
+
+class UserLoginRequest(BaseModel):
+    """手机号登录（带匿名ID合并）"""
+    phone: str
+    anonymous_user_id: Optional[str] = None
+
+class SendCodeRequest(BaseModel):
+    """发送验证码（短信/邮箱）"""
+    target: str  # 手机号或邮箱
+    channel: str = "sms"  # sms | email
+    country_code: str = "+86"  # 国家码，默认中国
+
+class VerifyCodeLoginRequest(BaseModel):
+    """验证码登录"""
+    target: str  # 手机号或邮箱
+    code: str
+    channel: str = "sms"  # sms | email
+    country_code: str = "+86"
+    anonymous_user_id: Optional[str] = None
+
+class WechatLoginRequest(BaseModel):
+    """微信小程序登录"""
+    code: str  # wx.login() 返回的 code
+    anonymous_user_id: Optional[str] = None
+
+class BindPhoneRequest(BaseModel):
+    """微信用户绑定手机号"""
+    user_id: str
+    phone: str
+    code: str  # 短信验证码
+    country_code: str = "+86"
+
+class UserProfileUpdateRequest(BaseModel):
+    user_id: str
+    nickname: Optional[str] = None
+    avatar: Optional[str] = None
+
+class TizhiSaveRequest(BaseModel):
+    """保存体质评测记录"""
+    user_id: str
+    tizhi: str
+    zhengxing: Optional[str] = None
+    symptoms: Optional[str] = None
+    advice: Optional[str] = None
+    source: str = "chat"
+
+class TokenVerifyRequest(BaseModel):
+    token: str
 
 # ========== 静态文件托管（网页版前端） ==========
 
@@ -196,41 +258,35 @@ def get_beijing_now():
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "SOM松麦后端", "version": "1.1.0"}
+    return {"status": "ok", "service": "SOM松麦后端", "version": "1.1.1"}
 
 # ========== 小麦SOM 对话接口 ==========
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    from services.bianzheng import BianzhengEngine
-    from services.shop import ShopService
+    from services.chat_engine import chat_with_llm
 
-    engine = BianzhengEngine()
-    shop = ShopService()
+    # 加载当前会话的历史对话（传给LLM，让小麦记住上下文）
+    history = []
+    if request.session_id:
+        try:
+            conn = get_user_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT user_message, assistant_reply FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
+                (request.session_id,)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            for row in reversed(rows):  # 时间正序
+                history.append({"role": "user", "content": row["user_message"]})
+                history.append({"role": "assistant", "content": row["assistant_reply"]})
+        except Exception as e:
+            print(f"加载会话历史失败: {e}")
 
-    result = engine.analyze(request.message)
+    result = chat_with_llm(request.message, history=history, user_id=request.user_id)
 
-    products = []
-    if result.get("recommendations"):
-        seen_ids = set()
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            future_map = {
-                executor.submit(shop.search, rec["name"], "taobao", 1, 3): rec["name"]
-                for rec in result["recommendations"][:3]
-            }
-            for future in concurrent.futures.as_completed(future_map, timeout=5):
-                try:
-                    items = future.result()
-                    for item in items:
-                        item_key = item.get('item_id', '') or item.get('title', '')
-                        if item_key and item_key not in seen_ids:
-                            seen_ids.add(item_key)
-                            products.append(item)
-                except Exception:
-                    pass
-                if len(products) >= 6:
-                    break
+    products = result.get("products", [])
 
     try:
         conn = get_user_db()
@@ -257,7 +313,9 @@ async def chat(request: ChatRequest):
         zhengxing=result.get("zhengxing"),
         recommendations=result.get("recommendations", []),
         products=products,
-        session_id=request.session_id or "default"
+        session_id=request.session_id or "default",
+        provider=result.get("provider"),
+        model=result.get("model")
     )
 
 # ========== 商品搜索接口 ==========
@@ -284,19 +342,25 @@ async def search_products(
     if not search_kw and keyword:
         search_kw = keyword
 
-    items = shop.search_from_cache(keyword=search_kw, page=page, page_size=page_size)
-    from_cache = len(items)
-    if len(items) < page_size:
-        items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
+    items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
 
     return {
         "keyword": keyword,
         "search_keyword": search_kw,
         "platform": platform,
         "total": len(items),
-        "from_cache": from_cache,
+        "from_cache": 0,
         "items": items
     }
+
+# ========== 淘口令接口 ==========
+
+@app.get("/api/products/tpwd")
+async def create_tpwd(url: str, text: str = ""):
+    from services.shop import ShopService
+    shop = ShopService()
+    result = shop.create_tpwd(url, text)
+    return result
 
 # ========== 知识库接口 ==========
 
@@ -617,6 +681,52 @@ async def get_dashboard():
     ss = StatsService()
     return ss.get_dashboard()
 
+# ========== 缓存预热管理接口 ==========
+
+@app.get("/api/cache/warmup/status")
+async def get_warmup_status():
+    """获取缓存预热状态"""
+    import sqlite3
+    db_path = os.path.join(DATA_DIR, 'product_cache.db')
+    if not os.path.exists(db_path):
+        return {"status": "no_cache", "total": 0, "keywords": []}
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM product_cache')
+        total = cursor.fetchone()[0]
+        cursor.execute('SELECT * FROM crawl_status ORDER BY last_crawled DESC')
+        rows = cursor.fetchall()
+        conn.close()
+        keywords = []
+        for row in rows:
+            keywords.append({
+                "keyword": row[0],
+                "platform": row[1],
+                "page_crawled": row[2],
+                "items_found": row[3],
+                "last_crawled": row[4],
+                "status": row[5],
+            })
+        return {"status": "ok", "total": total, "keywords": keywords}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.get("/api/cache/warmup/trigger")
+async def trigger_warmup():
+    """触发缓存预热（异步）"""
+    import subprocess
+    script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts', 'cache_warmup.py')
+    try:
+        subprocess.Popen(
+            ['python3.11', script_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return {"success": True, "message": "缓存预热已触发"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/stats/users")
 async def get_user_stats():
     """用户统计"""
@@ -644,6 +754,443 @@ async def get_checkin_stats():
     from services.stats import StatsService
     ss = StatsService()
     return ss.get_checkin_stats()
+
+# ========== LLM 状态监控 ==========
+
+@app.get("/api/llm/status")
+async def llm_status():
+    """LLM 服务商状态（不暴露密钥）"""
+    from services import llm_router
+    return llm_router.get_status()
+
+# ========== 图片辨证接口（看舌苔） ==========
+
+class VisionChatRequest(BaseModel):
+    """图片辨证请求（支持多张图片）"""
+    message: str = "请观察这些照片，从中医角度分析舌色、舌苔、舌形、面色、皮肤等，给出体质倾向和食养建议。"
+    image_url: Optional[str] = None  # 兼容旧版单图
+    images: Optional[List[str]] = None  # 新版多图
+    user_id: Optional[str] = None
+    session_id: Optional[str] = None
+
+def _base64_to_url(data_uri: str) -> str:
+    """将 base64 data URI 存为文件，返回可公网访问的 URL"""
+    uploads_dir = os.path.join(WEB_DIR, "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    # 解析 data:image/jpeg;base64,xxxxx
+    header, _, b64data = data_uri.partition(",")
+    ext = "jpg"
+    if "png" in header:
+        ext = "png"
+    elif "webp" in header:
+        ext = "webp"
+    filename = f"{uuid.uuid4().hex[:12]}.{ext}"
+    filepath = os.path.join(uploads_dir, filename)
+    with open(filepath, "wb") as f:
+        f.write(base64.b64decode(b64data))
+    return f"https://som.top/uploads/{filename}"
+
+
+@app.post("/api/chat/vision")
+async def chat_vision(request: VisionChatRequest):
+    """图片理解辨证（支持多张图片：舌苔/面色/皮肤/患处）"""
+    from services import llm_router, rag
+
+    # 兼容旧版单图 + 新版多图
+    image_list = request.images or []
+    if request.image_url and request.image_url not in image_list:
+        image_list.insert(0, request.image_url)
+    if not image_list:
+        return {"success": False, "error": "no_image", "reply": "请上传至少一张照片哦～"}
+
+    # 图片格式由 llm_router 按服务商自动处理：
+    # sensenova 直接收 base64（无需下载，最稳），agnes 自动转公网URL
+
+    # 根据图片数量调整提示词
+    if len(image_list) == 1:
+        system_prompt = """你是小麦SOM，一位经验丰富的中医养生顾问，擅长舌诊、面诊、皮肤望诊。
+请观察用户发来的图片，从以下角度分析：
+1. 舌色（淡红/淡白/红/紫暗）、舌苔（薄白/白腻/黄腻/少苔）、舌形（胖大/瘦薄/齿痕/裂纹）
+2. 或面色（红润/萎黄/苍白/晦暗）、光泽、唇色
+3. 或皮肤（肤色、皮疹、干燥、湿疹等）
+4. 综合判断可能的体质倾向
+5. 给出2-3条食养建议（用药食同源食材）
+
+注意：
+- 用通俗易懂的语言，不堆砌术语
+- 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医
+- 如果图片看不清，礼貌说明并建议重新拍摄"""
+    else:
+        system_prompt = f"""你是小麦SOM，一位经验丰富的中医养生顾问，擅长多维度望诊。
+用户发来了{len(image_list)}张照片（可能包含舌苔、面色、皮肤、患处等不同部位）。
+请综合所有照片进行多维度分析：
+1. 逐一分析每张照片的特征（舌色/舌苔/面色/皮肤/患处等）
+2. 综合多张照片的信息，交叉验证，给出更准确的体质判断
+3. 给出综合辨证结论（主证+兼证）
+4. 给出药膳食疗方案（具体食材+做法）
+5. 推荐3-5种适合的有机食材
+
+注意：
+- 多维度综合分析比单张照片更准确，请充分利用多张图的信息
+- 用通俗易懂的语言
+- 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医"""
+
+    # 加载会话历史（让小麦记住之前的对话上下文，包括之前的拍照扫描结果）
+    history_context = ""
+    if request.session_id:
+        try:
+            conn = get_user_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT user_message, assistant_reply FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
+                (request.session_id,)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            if rows:
+                history_lines = []
+                for row in reversed(rows):
+                    history_lines.append(f"用户: {row['user_message'][:300]}")
+                    history_lines.append(f"小麦: {row['assistant_reply'][:500]}")
+                history_context = "\n".join(history_lines)
+                system_prompt += f"\n\n【之前的对话记录】\n{history_context}\n\n请结合以上对话历史，特别是之前的拍照扫描/辨证结果，来回答用户当前的问题。"
+        except Exception as e:
+            print(f"vision加载会话历史失败: {e}")
+
+    # RAG 上下文
+    context = rag.build_context(request.message, max_chars=1500)
+    if context:
+        system_prompt += f"\n\n【参考知识】\n{context}"
+
+    result = llm_router.vision(
+        request.message,
+        image_list,
+        system_prompt=system_prompt,
+        temperature=0.5,
+    )
+
+    if not result.get("success"):
+        return {
+            "success": False,
+            "error": result.get("error", "图片分析失败"),
+            "reply": "抱歉，我暂时无法分析这些图片。请确保图片清晰、光线充足，或者直接用文字描述你的身体状况，我一样可以帮你分析。"
+        }
+
+    # 保存对话记录
+    try:
+        conn = get_user_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO chat_history (user_id, session_id, user_message, assistant_reply, tizhi, zhengxing)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            request.user_id or 'anonymous',
+            request.session_id or 'vision',
+            f'[图片辨证x{len(image_list)}] {request.message[:200]}',
+            result["content"][:2000],
+            '', '',
+        ))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    # 从回复中提取食材，搜索有机商品推荐
+    products = []
+    try:
+        from services.chat_engine import _search_products_from_reply
+        products = _search_products_from_reply(result["content"], [], "", request.message or "")
+    except Exception as e:
+        print(f"vision商品搜索失败: {e}")
+
+    # 如果有商品推荐，在回复末尾追加引导语
+    reply_text = result["content"]
+    if products and '下方推荐' not in reply_text and '就在下面' not in reply_text:
+        reply_text += '\n\n🛒 上面提到的食材，我在下方帮你找了有机认证的，点击即可购买～'
+    elif not products:
+        # 淘宝API搜索失败时不追加推荐引导语，避免用户看到"推荐了"但实际没商品
+        pass
+
+    # 末尾追加AI生成提示（小程序审核要求）
+    reply_text += '\n\n_以上内容由人工智能生成，仅供参考。_'
+
+    return {
+        "success": True,
+        "reply": reply_text,
+        "products": products,
+        "recommendations": [],
+        "provider": result.get("provider"),
+        "model": result.get("model"),
+    }
+
+# ========== som.skill API 管理 ==========
+
+@app.get("/api/skill/status")
+async def skill_status():
+    """som.skill 开放平台状态"""
+    from services.api_auth import get_auth_status
+    return get_auth_status()
+
+@app.post("/api/skill/register-key")
+async def skill_register_key(name: str = Query(...), rate_limit: int = Query(60)):
+    """注册新的 API Key（内部调用）"""
+    from services.api_auth import register_api_key
+    key = register_api_key(name, rate_limit)
+    return {"success": True, "api_key": key, "name": name, "rate_limit": rate_limit}
+
+@app.post("/api/skill/revoke-key")
+async def skill_revoke_key(api_key: str = Query(...)):
+    """撤销 API Key（内部调用）"""
+    from services.api_auth import revoke_api_key
+    success = revoke_api_key(api_key)
+    return {"success": success}
+
+# ========== 节气养生 API ==========
+
+@app.get("/api/jieqi/current")
+async def jieqi_current():
+    """获取当前节气养生建议"""
+    from services.jieqi import get_jieqi_advice
+    return get_jieqi_advice()
+
+@app.get("/api/jieqi/all")
+async def jieqi_all():
+    """获取全部二十四节气列表"""
+    from services.jieqi import get_all_jieqi
+    return {"jieqi_list": get_all_jieqi()}
+
+# ========== 护眼训练 API ==========
+
+@app.get("/api/eye-exercise")
+async def eye_exercise():
+    """护眼训练方案"""
+    return {
+        "exercises": [
+            {
+                "name": "远近交替",
+                "duration": "3分钟",
+                "steps": "看远处5秒→看近处5秒，交替进行",
+                "benefit": "锻炼睫状肌，缓解视疲劳"
+            },
+            {
+                "name": "眼球转动",
+                "duration": "2分钟",
+                "steps": "上下左右各转5圈，顺时针逆时针各5圈",
+                "benefit": "促进眼部血液循环"
+            },
+            {
+                "name": "热敷双眼",
+                "duration": "5分钟",
+                "steps": "搓热双手掌心，轻敷双眼，重复3次",
+                "benefit": "缓解干涩，放松眼肌"
+            },
+            {
+                "name": "20-20-20法则",
+                "duration": "随时",
+                "steps": "每用眼20分钟，看20英尺（6米）外，持续20秒",
+                "benefit": "国际公认的护眼法则"
+            }
+        ],
+        "foods": ["枸杞", "菊花", "决明子", "桑葚", "蓝莓", "胡萝卜"],
+        "tea": "枸杞菊花茶、决明子茶",
+        "tips": "中医认为肝开窍于目，养眼先养肝。少熬夜，多食绿色蔬菜。"
+    }
+
+# ========== 用户系统 API ==========
+
+@app.post("/api/user/register")
+async def user_register(request: UserRegisterRequest):
+    """匿名用户注册/识别（不用登录即可用）"""
+    from services.user_system import get_or_create_anonymous
+    user = get_or_create_anonymous(request.user_id)
+    return {"success": True, "user": user}
+
+@app.get("/api/user/profile")
+async def user_profile(user_id: str):
+    """获取用户信息"""
+    from services.user_system import get_user, get_latest_tizhi
+    user = get_user(user_id)
+    if not user:
+        return {"success": False, "error": "user not found"}
+    user["latest_tizhi"] = get_latest_tizhi(user_id)
+    return {"success": True, "user": user}
+
+@app.post("/api/user/login")
+async def user_login(request: UserLoginRequest):
+    """手机号登录，合并匿名数据"""
+    from services.user_system import login_by_phone
+    if not request.phone or len(request.phone) < 6:
+        raise HTTPException(status_code=400, detail="手机号格式不正确")
+    result = login_by_phone(request.phone, anonymous_user_id=request.anonymous_user_id)
+    return {"success": True, **result}
+
+@app.post("/api/user/token/verify")
+async def user_token_verify(request: TokenVerifyRequest):
+    """校验登录 token"""
+    from services.user_system import verify_token, get_user
+    user_id = verify_token(request.token)
+    if not user_id:
+        return {"success": False, "valid": False}
+    return {"success": True, "valid": True, "user": get_user(user_id)}
+
+@app.post("/api/user/profile/update")
+async def user_profile_update(request: UserProfileUpdateRequest):
+    """更新昵称/头像"""
+    from services.user_system import update_profile
+    user = update_profile(request.user_id, nickname=request.nickname, avatar=request.avatar)
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return {"success": True, "user": user}
+
+# ========== 统一认证 API（全球手机号 + 邮箱 + 微信） ==========
+
+@app.get("/api/auth/status")
+async def auth_status():
+    """查询各登录方式的配置状态"""
+    from services import auth_service
+    return auth_service.get_auth_status()
+
+@app.post("/api/auth/send-code")
+async def auth_send_code(request: SendCodeRequest):
+    """发送验证码（短信或邮箱）"""
+    from services import auth_service
+    target = (request.target or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="请输入手机号或邮箱")
+
+    if request.channel == "email":
+        # 简单邮箱格式校验
+        if "@" not in target or "." not in target.split("@")[-1]:
+            raise HTTPException(status_code=400, detail="邮箱格式不正确")
+        return auth_service.send_email_code(target)
+    else:
+        # 手机号：简单长度校验
+        digits = target.replace("+", "").replace("-", "").replace(" ", "")
+        if len(digits) < 6 or len(digits) > 15:
+            raise HTTPException(status_code=400, detail="手机号格式不正确")
+        return auth_service.send_sms_code(target, request.country_code)
+
+@app.post("/api/auth/login")
+async def auth_login(request: VerifyCodeLoginRequest):
+    """验证码登录（手机号/邮箱统一）"""
+    from services import auth_service
+    target = (request.target or "").strip()
+
+    # 手机号统一为 E.164
+    if request.channel == "sms":
+        target = auth_service.normalize_phone(target, request.country_code)
+
+    # 校验验证码
+    check = auth_service.verify_code(target, request.code)
+    if not check.get("success"):
+        return {"success": False, "error": check.get("error", "验证码错误")}
+
+    # 登录/注册
+    result = auth_service.login_or_register(
+        target, request.channel, anonymous_user_id=request.anonymous_user_id
+    )
+    return {"success": True, **result}
+
+@app.post("/api/auth/wechat-login")
+async def auth_wechat_login(request: WechatLoginRequest):
+    """微信小程序登录"""
+    from services import auth_service
+    return auth_service.wechat_login(request.code, anonymous_user_id=request.anonymous_user_id)
+
+@app.post("/api/auth/bind-phone")
+async def auth_bind_phone(request: BindPhoneRequest):
+    """微信用户绑定手机号（需短信验证码）"""
+    from services import auth_service
+    e164 = auth_service.normalize_phone(request.phone, request.country_code)
+    check = auth_service.verify_code(e164, request.code)
+    if not check.get("success"):
+        return {"success": False, "error": check.get("error", "验证码错误")}
+    return auth_service.bind_phone_to_wechat(request.user_id, e164)
+
+# ========== 体质评测 API ==========
+
+@app.post("/api/tizhi/save")
+async def tizhi_save(request: TizhiSaveRequest):
+    """保存一条体质评测记录"""
+    from services.user_system import add_tizhi_record
+    record = add_tizhi_record(
+        request.user_id, request.tizhi, zhengxing=request.zhengxing,
+        symptoms=request.symptoms, advice=request.advice, source=request.source,
+    )
+    return {"success": True, "record": record}
+
+@app.get("/api/tizhi/records")
+async def tizhi_records(user_id: str, limit: int = 50):
+    """体质评测历史"""
+    from services.user_system import get_tizhi_records
+    return {"success": True, "records": get_tizhi_records(user_id, limit=limit)}
+
+@app.get("/api/tizhi/latest")
+async def tizhi_latest(user_id: str):
+    """最新一次体质结果"""
+    from services.user_system import get_latest_tizhi
+    return {"success": True, "record": get_latest_tizhi(user_id)}
+
+
+# ========== 健康测评 API ==========
+
+@app.post("/api/tizhi-test/save")
+async def tizhi_test_save(data: dict):
+    """保存健康测评结果"""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(__file__), "data", "user_data.db")
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS tizhi_test (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        mode TEXT,
+        result_key TEXT,
+        result_name TEXT,
+        score INTEGER,
+        answers TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    import json as _json
+    c.execute("INSERT INTO tizhi_test (user_id, mode, result_key, result_name, score, answers) VALUES (?,?,?,?,?,?)",
+        (data.get("user_id",""), data.get("mode",""), data.get("result_key",""),
+         data.get("result_name",""), data.get("score",0), _json.dumps(data.get("answers",[]))))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/api/tizhi-test/count")
+async def tizhi_test_count():
+    """测评总人数"""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(__file__), "data", "user_data.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM tizhi_test")
+        count = c.fetchone()[0]
+        conn.close()
+        return {"count": count}
+    except:
+        return {"count": 0}
+
+@app.get("/api/tizhi-test/latest")
+async def tizhi_test_latest(user_id: str):
+    """用户最新测评结果（小麦对话时读取）"""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(__file__), "data", "user_data.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM tizhi_test WHERE user_id=? ORDER BY created_at DESC LIMIT 1", (user_id,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            return {"success": True, "record": dict(row)}
+        return {"success": True, "record": None}
+    except:
+        return {"success": True, "record": None}
 
 # ========== 启动 ==========
 

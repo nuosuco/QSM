@@ -7,7 +7,20 @@ import os
 import re
 from typing import Optional, List, Tuple
 
-KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "shared", "knowledge")
+KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "shared", "knowledge")
+
+# ========== 加载知识库数据（优先JSON文件，fallback内联数据） ==========
+
+def _load_json(filename, default=None):
+    """从shared/knowledge加载JSON，失败时返回默认值"""
+    path = os.path.join(KNOWLEDGE_DIR, filename)
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[警告] 加载 {filename} 失败: {e}")
+    return default if default is not None else {}
 
 # ========== 症状→证型 映射规则 v2 ==========
 SYMPTOM_RULES = {
@@ -82,6 +95,11 @@ YAOSHI_TONGYUAN = {
     "核桃": {"xingwei": "甘，温", "guijing": "肾、肺、大肠经", "gongxiao": "补肾温肺，润肠通便", "jinji": "痰热咳嗽者慎用"},
 }
 
+# 优先从JSON加载药食同源数据（扩展版含更多食材）
+_json_yaoshi = _load_json('yaoshi_tongyuan.json', {})
+if _json_yaoshi:
+    YAOSHI_TONGYUAN = _json_yaoshi
+
 # 体质分类
 TIZHI_LIST = [
     {"name": "平和质", "desc": "体态适中，面色润泽，精力充沛", "yangsheng": "饮食有节，起居有常"},
@@ -94,6 +112,11 @@ TIZHI_LIST = [
     {"name": "气郁质", "desc": "情绪低落，多愁善感，容易紧张", "yangsheng": "疏肝解郁，多吃玫瑰花、佛手"},
     {"name": "特禀质", "desc": "过敏体质，容易哮喘、荨麻疹", "yangsheng": "益气固表，避免过敏原"},
 ]
+
+# 优先从JSON加载体质分类
+_json_tizhi = _load_json('tizhi.json', [])
+if _json_tizhi:
+    TIZHI_LIST = _json_tizhi
 
 # 食疗方案库 v2
 SHILIAO_DB = {
@@ -136,6 +159,11 @@ SHILIAO_DB = {
     "心气不足": {"name": "龙眼枣仁茶", "recipe": "桂圆肉15g、酸枣仁10g、红枣5枚", "method": "酸枣仁先煎20分钟，加入桂圆、红枣再煮10分钟", "gongxiao": "补心气，安心神", "jijie": "适合心悸气短、失眠者"},
     "痰湿蒙窍": {"name": "石菖蒲陈皮茶", "recipe": "石菖蒲6g、陈皮6g、茯苓10g", "method": "药材洗净，加水煮15分钟，代茶饮", "gongxiao": "化痰开窍，醒神益智", "jijie": "适合头重昏沉、健忘者"},
 }
+
+# 优先从JSON加载食疗方案
+_json_shiliao = _load_json('shiliao.json', {})
+if _json_shiliao:
+    SHILIAO_DB = _json_shiliao
 
 
 class BianzhengEngine:
