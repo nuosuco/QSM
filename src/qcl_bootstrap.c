@@ -24,6 +24,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 /* ================================================================
  * 通用工具
@@ -249,7 +252,9 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
     /* 沙箱拦截: 文件系统/进程/网络原语一律拒绝，防止IDE用户代码逃逸 */
     if (g_sandbox) {
         if (strcmp(name, "file_read") == 0 || strcmp(name, "file_write_bytes") == 0 ||
-            strcmp(name, "file_exists") == 0 || strcmp(name, "exec") == 0 ||
+            strcmp(name, "file_exists") == 0 || strcmp(name, "file_delete") == 0 ||
+            strcmp(name, "file_list") == 0 || strcmp(name, "mkdir") == 0 ||
+            strcmp(name, "exec") == 0 ||
             strncmp(name, "tcp_", 4) == 0) {
             printf("[sandbox] 原语 %s 被禁用\n", name);
             return mk_int(-1);
@@ -367,6 +372,62 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
             path[n] = '\0';
             FILE *f = fopen(path, "rb");
             if (f) { fclose(f); return mk_int(1); }
+        }
+        return mk_int(0);
+    }
+    /* ---- QDFS所需文件系统原语 ---- */
+    if (strcmp(name, "mkdir") == 0) {
+        if (nargs >= 1 && args[0].type == V_STR) {
+            char path[4096];
+            long long n = args[0].len < 4095 ? args[0].len : 4095;
+            memcpy(path, args[0].s, n);
+            path[n] = '\0';
+            if (mkdir(path, 0755) == 0) return mk_int(1);
+            if (errno == EEXIST) return mk_int(1);  /* 已存在算成功 */
+        }
+        return mk_int(0);
+    }
+    if (strcmp(name, "file_delete") == 0) {
+        if (nargs >= 1 && args[0].type == V_STR) {
+            char path[4096];
+            long long n = args[0].len < 4095 ? args[0].len : 4095;
+            memcpy(path, args[0].s, n);
+            path[n] = '\0';
+            if (remove(path) == 0) return mk_int(1);
+        }
+        return mk_int(0);
+    }
+    if (strcmp(name, "file_list") == 0) {
+        /* 列出目录内容，\n分隔，目录名加/后缀 */
+        if (nargs >= 1 && args[0].type == V_STR) {
+            char path[4096];
+            long long n = args[0].len < 4095 ? args[0].len : 4095;
+            memcpy(path, args[0].s, n);
+            path[n] = '\0';
+            DIR *d = opendir(path);
+            if (!d) return mk_str_copy("", 0);
+            char buf[65536];
+            long long pos = 0;
+            struct dirent *e;
+            while ((e = readdir(d)) != NULL && pos < 60000) {
+                if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+                int isdir = (e->d_type == DT_DIR);
+                long long ln = (long long)strlen(e->d_name);
+                if (pos + ln + 3 > 65000) break;
+                memcpy(buf + pos, e->d_name, ln);
+                pos += ln;
+                if (isdir) buf[pos++] = '/';
+                buf[pos++] = '\n';
+            }
+            closedir(d);
+            return mk_str_copy(buf, pos);
+        }
+        return mk_str_copy("", 0);
+    }
+    if (strcmp(name, "rand_int") == 0) {
+        /* rand_int(n): [0, n) 随机整数；n<=0返回0 */
+        if (nargs >= 1 && args[0].type == V_INT && args[0].i > 0) {
+            return mk_int(rand() % args[0].i);
         }
         return mk_int(0);
     }
@@ -1109,7 +1170,8 @@ static int is_builtin_name(Comp *c, long start, long len) {
     static const char *names[] = {
         "printf", "str_len", "str_char_at", "str_substring", "str_concat",
         "str_eq", "str_index_of", "str_from_char", "str_to_int", "int_to_str",
-        "len", "file_read", "file_write_bytes", "file_exists", "ord", "chr",
+        "len", "file_read", "file_write_bytes", "file_exists", "file_delete",
+        "file_list", "mkdir", "rand_int", "ord", "chr",
         "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown",
         "exec",
         "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx", "measure"

@@ -478,6 +478,26 @@ def do_builtin(bname, nargs):
         push_int(file_exists(pop1_s))
         return
     end
+    if (str_eq(bname, "file_delete")):
+        do_pop1()
+        push_int(file_delete(pop1_s))
+        return
+    end
+    if (str_eq(bname, "file_list")):
+        do_pop1()
+        push_str(file_list(pop1_s))
+        return
+    end
+    if (str_eq(bname, "mkdir")):
+        do_pop1()
+        push_int(mkdir(pop1_s))
+        return
+    end
+    if (str_eq(bname, "rand_int")):
+        do_pop1()
+        push_int(rand_int(pop1_i))
+        return
+    end
     if (str_eq(bname, "exec")):
         do_pop1()
         push_str(exec(pop1_s))
