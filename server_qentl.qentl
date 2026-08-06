@@ -169,6 +169,10 @@ def route(path, req):
         var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>QSM - QEntL量子计算</title>\n<style>\nbody { font-family: sans-serif; background: #0a0e17; color: #e0e6ed; margin: 0; }\n.wrap { max-width: 800px; margin: 0 auto; padding: 60px 20px; }\nh1 { color: #4fc3f7; }\n.badge { display: inline-block; background: #1a2332; border: 1px solid #4fc3f7; border-radius: 6px; padding: 4px 12px; margin: 4px; font-size: 13px; color: #81d4fa; }\n.card { background: #111827; border-radius: 10px; padding: 24px; margin-top: 24px; border: 1px solid #1f2937; }\ncode { color: #7ee787; }\na { color: #4fc3f7; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n<h1>&#9883; QSM — QEntL全栈量子计算平台</h1>\n<div class=\"badge\">纯QEntL实现</div>\n<div class=\"badge\">自举编译器</div>\n<div class=\"badge\">QVM虚拟机</div>\n<div class=\"badge\">量子电路编译</div>\n<div class=\"card\">\n<h2>全栈架构</h2>\n<p>本页由 <code>QEntL HTTP服务器</code> 直接提供服务 —— 没有Python、没有Node.js、没有第三方框架。</p>\n<p><code>C种子 → QCL编译器(QEntL写) → QVM虚拟机(QEntL写) → 标准库(QEntL写) → HTTP服务器(QEntL写)</code></p>\n</div>\n<div class=\"card\">\n<h2>&#9889; <a href=\"/ide\">在线IDE — 浏览器里写QEntL</a></h2>\n<p>在线编写、编译、沙箱执行QEntL程序，含量子电路示例。</p>\n</div>\n<div class=\"card\">\n<h2>访问接口</h2>\n<p><code>GET /</code> — 本页 | <code>GET /ide</code> — 在线IDE | <code>POST /api/run</code> — 运行代码 | <code>GET /api/status</code> — 状态</p>\n</div>\n</div>\n</body>\n</html>\n"
         return http_response("200 OK", "text/html; charset=utf-8", html)
     end
+    if (str_eq(path, "/api/grover")):
+        var out = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/grover.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out)
+    end
     if (str_eq(path, "/api/qdfs")):
         var out = exec("cd /root/QSM && timeout 20 bin/qcl_bootstrap run build/qdfs_demo.qbc 2>&1")
         return http_response("200 OK", "text/plain; charset=utf-8", out)

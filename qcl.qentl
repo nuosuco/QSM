@@ -974,10 +974,10 @@ def parse_statement():
                 var ident_ns = g_tok_start[g_parse_pos]
                 var ident_nl = g_tok_len[g_parse_pos]
                 var ident_nm = str_substring(g_src, ident_ns, ident_nl)
-                if (str_eq(ident_nm, "h") or str_eq(ident_nm, "t")):
+                if (str_eq(ident_nm, "h") or str_eq(ident_nm, "t") or str_eq(ident_nm, "x") or str_eq(ident_nm, "z")):
                     parse_quantum_gate_1arg(ident_ns, ident_nl)
                 else:
-                    if (str_eq(ident_nm, "cx")):
+                    if (str_eq(ident_nm, "cx") or str_eq(ident_nm, "cz")):
                         parse_quantum_cx(ident_ns, ident_nl)
                     else:
                         if (str_eq(ident_nm, "measure")):
@@ -1062,6 +1062,8 @@ def parse_quantum_gate_1arg(ns, nl):
     emit_byte(OP_BUILTIN)
     var bname = "apply_h"
     if (str_eq(gate_nm, "t")): bname = "apply_t" end
+    if (str_eq(gate_nm, "x")): bname = "apply_x" end
+    if (str_eq(gate_nm, "z")): bname = "apply_z" end
     emit_u16(pool_add_string(bname))
     emit_byte(2)
     emit_byte(OP_POP)
@@ -1093,6 +1095,9 @@ def parse_quantum_cx(ns, nl):
         advance()
     end
     expect(T_RBRACKET, "cx缺]")
+    var gate_nm2 = str_substring(g_src, ns, nl)
+    var bname2 = "apply_cx"
+    if (str_eq(gate_nm2, "cz")): bname2 = "apply_cz" end
     emit_byte(OP_LOAD_VAR)
     emit_u16(sym_resolve(ctrl_ns, ctrl_nl))
     emit_byte(OP_PUSH_INT)
@@ -1100,7 +1105,7 @@ def parse_quantum_cx(ns, nl):
     emit_byte(OP_PUSH_INT)
     emit_u16(tgt_idx)
     emit_byte(OP_BUILTIN)
-    emit_u16(pool_add_string("apply_cx"))
+    emit_u16(pool_add_string(bname2))
     emit_byte(3)
     emit_byte(OP_POP)
 end

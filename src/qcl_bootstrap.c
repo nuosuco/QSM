@@ -649,6 +649,66 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
         }
         return mk_int(-1);
     }
+    /* ---- Grover所需: X/Z/CZ门 ---- */
+    if (strcmp(name, "apply_x") == 0) {
+        if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
+            int id = (int)args[0].i, q = (int)args[1].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || q < 0 || q >= qregs[id].n)
+                return mk_int(-1);
+            int n = qregs[id].n, sz = 1 << n;
+            double *s = qregs[id].state;
+            int step = 1 << q;
+            for (int i = 0; i < sz; i += (step << 1)) {
+                for (int j = 0; j < step; j++) {
+                    int a = i + j, b = a + step;
+                    double r = s[2 * a], im = s[2 * a + 1];
+                    s[2 * a] = s[2 * b]; s[2 * a + 1] = s[2 * b + 1];
+                    s[2 * b] = r; s[2 * b + 1] = im;
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "apply_z") == 0) {
+        if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
+            int id = (int)args[0].i, q = (int)args[1].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || q < 0 || q >= qregs[id].n)
+                return mk_int(-1);
+            int sz = 1 << qregs[id].n;
+            double *s = qregs[id].state;
+            int qbit = 1 << q;
+            for (int i = 0; i < sz; i++) {
+                if (i & qbit) {
+                    s[2 * i] = -s[2 * i];
+                    s[2 * i + 1] = -s[2 * i + 1];
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "apply_cz") == 0) {
+        if (nargs >= 3 && args[0].type == V_INT && args[1].type == V_INT && args[2].type == V_INT) {
+            int id = (int)args[0].i, c = (int)args[1].i, t = (int)args[2].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state)
+                return mk_int(-1);
+            int n = qregs[id].n;
+            if (c < 0 || c >= n || t < 0 || t >= n || c == t)
+                return mk_int(-1);
+            int sz = 1 << n;
+            double *s = qregs[id].state;
+            int cb = 1 << c, tb = 1 << t;
+            for (int i = 0; i < sz; i++) {
+                if ((i & cb) && (i & tb)) {
+                    s[2 * i] = -s[2 * i];
+                    s[2 * i + 1] = -s[2 * i + 1];
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
     if (strcmp(name, "measure") == 0) {
         if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
             int id = (int)args[0].i, q = (int)args[1].i;
