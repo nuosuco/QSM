@@ -244,7 +244,17 @@ typedef struct {
 } QReg;
 static QReg qregs[QREG_MAX];
 static int qreg_count = 0;
+static int g_sandbox = 0;  /* 沙箱模式: 在线IDE执行用户代码时禁用系统原语 */
 static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
+    /* 沙箱拦截: 文件系统/进程/网络原语一律拒绝，防止IDE用户代码逃逸 */
+    if (g_sandbox) {
+        if (strcmp(name, "file_read") == 0 || strcmp(name, "file_write_bytes") == 0 ||
+            strcmp(name, "file_exists") == 0 || strcmp(name, "exec") == 0 ||
+            strncmp(name, "tcp_", 4) == 0) {
+            printf("[sandbox] 原语 %s 被禁用\n", name);
+            return mk_int(-1);
+        }
+    }
     if (strcmp(name, "printf") == 0) { bi_printf(args, nargs); return mk_int(0); }
     if (strcmp(name, "str_len") == 0) {
         return mk_int(nargs >= 1 && args[0].type == V_STR ? args[0].len : 0);
@@ -1723,6 +1733,11 @@ int main(int argc, char *argv[]) {
     }
     if (strcmp(argv[1], "run") == 0) {
         if (argc < 3) { usage(argv[0]); return 1; }
+        /* run --sandbox file.qbc : 沙箱模式，禁用文件/exec/tcp原语 */
+        if (argc >= 4 && strcmp(argv[2], "--sandbox") == 0) {
+            g_sandbox = 1;
+            return run_qbc(argv[3]);
+        }
         return run_qbc(argv[2]);
     }
     if (strcmp(argv[1], "qcompile") == 0) {

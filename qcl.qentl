@@ -642,6 +642,7 @@ def is_builtin(nm):
     if (str_eq(nm, "file_read")): return 1 end
     if (str_eq(nm, "file_write_bytes")): return 1 end
     if (str_eq(nm, "file_exists")): return 1 end
+    if (str_eq(nm, "exec")): return 1 end
     if (str_eq(nm, "ord")): return 1 end
     if (str_eq(nm, "chr")): return 1 end
     if (str_eq(nm, "tcp_listen")): return 1 end

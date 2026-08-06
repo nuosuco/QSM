@@ -478,6 +478,11 @@ def do_builtin(bname, nargs):
         push_int(file_exists(pop1_s))
         return
     end
+    if (str_eq(bname, "exec")):
+        do_pop1()
+        push_str(exec(pop1_s))
+        return
+    end
     if (str_eq(bname, "ord")):
         do_pop1()
         push_int(ord(pop1_s))
