@@ -944,12 +944,14 @@ document.addEventListener('click', (e) => {
 function openProduct(webUrl, platform, itemId) {
     if (!webUrl) return;
     
-    // 判断是否电脑浏览器（电脑浏览器直接跳转淘宝商品页，手机端走淘口令）
+    // 判断是否在微信内
+    var isWeixin = /MicroMessenger/i.test(navigator.userAgent);
+    // 判断是否手机浏览器
     var isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (platform === 'taobao' || !platform) {
-        if (isMobile) {
-            // 手机端：走淘口令方案
+        if (isWeixin) {
+            // 微信内（服务号/小程序）：走淘口令方案
             var tpwdUrl = '/api/products/tpwd?url=' + encodeURIComponent(webUrl) + '&text=' + encodeURIComponent('');
             fetch(tpwdUrl)
                 .then(function(r) { return r.json(); })
@@ -964,6 +966,25 @@ function openProduct(webUrl, platform, itemId) {
                 .catch(function() {
                     copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
                 });
+        } else if (isMobile) {
+            // 手机浏览器：直接跳转淘宝APP
+            // 尝试用 taobao:// 协议直接唤起淘宝APP
+            try {
+                var taobaoUrl = 'taobao://';
+                var startTime = Date.now();
+                window.location.href = taobaoUrl;
+                // 如果3秒内没有跳转成功，fallback到浏览器
+                setTimeout(function() {
+                    if (Date.now() - startTime < 3000) {
+                        // 成功跳转了，不处理
+                    } else {
+                        // 失败，尝试直接打开淘宝网页版
+                        window.open('https://m.taobao.com', '_blank');
+                    }
+                }, 3000);
+            } catch(e) {
+                window.open('https://m.taobao.com', '_blank');
+            }
         } else {
             // 电脑端：直接跳转淘宝商品详情页
             // 注意：淘宝联盟 click_url (s.click.taobao.com) 已失效，跳转后到 error.taobao.com
