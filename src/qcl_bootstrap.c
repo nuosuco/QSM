@@ -19,6 +19,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -232,7 +233,17 @@ static void bi_printf(Value *args, int nargs) {
     }
     fflush(stdout);
 }
-
+static int stack_buf[VM_STACK_MAX];  /* 备用 */
+/* ---- 量子寄存器（状态向量模拟）---- */
+#define QREG_MAX 16
+#define QREG_MAX_QUBITS 20
+typedef struct {
+    int id;
+    int n;
+    double *state;  /* 2*2^n doubles: [real, imag, real, imag, ...] */
+} QReg;
+static QReg qregs[QREG_MAX];
+static int qreg_count = 0;
 static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
     if (strcmp(name, "printf") == 0) { bi_printf(args, nargs); return mk_int(0); }
     if (strcmp(name, "str_len") == 0) {
@@ -422,6 +433,144 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
         if (nargs >= 1 && args[0].type == V_INT) {
             shutdown((int)args[0].i, SHUT_WR);
             return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    /* ---- 量子寄存器 + 门操作 ---- */
+    if (strcmp(name, "qreg_create") == 0) {
+        if (nargs >= 1 && args[0].type == V_INT) {
+            int n = (int)args[0].i;
+            if (n < 1 || n > QREG_MAX_QUBITS) return mk_int(-1);
+            int id = -1;
+            for (int k = 0; k < QREG_MAX; k++) {
+                if (!qregs[k].state) { id = k; break; }
+            }
+            if (id < 0) return mk_int(-1);
+            int sz = 1 << n;
+            double *s = (double *)malloc(2 * sz * sizeof(double));
+            if (!s) return mk_int(-1);
+            s[0] = 1.0; s[1] = 0.0;
+            for (int k = 2; k < 2 * sz; k++) s[k] = 0.0;
+            qregs[id].id = id;
+            qregs[id].n = n;
+            qregs[id].state = s;
+            if (id >= qreg_count) qreg_count = id + 1;
+            return mk_int(id);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "qreg_free") == 0) {
+        if (nargs >= 1 && args[0].type == V_INT) {
+            int id = (int)args[0].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state)
+                return mk_int(-1);
+            free(qregs[id].state);
+            qregs[id].state = NULL;
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "apply_h") == 0) {
+        if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
+            int id = (int)args[0].i, q = (int)args[1].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || q < 0 || q >= qregs[id].n)
+                return mk_int(-1);
+            int n = qregs[id].n, sz = 1 << n;
+            double *s = qregs[id].state;
+            int step = 1 << q;
+            double inv_sqrt2 = 1.0 / sqrt(2.0);
+            for (int i = 0; i < sz; i += (step << 1)) {
+                for (int j = 0; j < step; j++) {
+                    int a = i + j, b = a + step;
+                    double ra = s[2 * a], ia = s[2 * a + 1];
+                    double rb = s[2 * b], ib = s[2 * b + 1];
+                    s[2 * a] = (ra + rb) * inv_sqrt2;
+                    s[2 * a + 1] = (ia + ib) * inv_sqrt2;
+                    s[2 * b] = (ra - rb) * inv_sqrt2;
+                    s[2 * b + 1] = (ia - ib) * inv_sqrt2;
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "apply_t") == 0) {
+        if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
+            int id = (int)args[0].i, q = (int)args[1].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || q < 0 || q >= qregs[id].n)
+                return mk_int(-1);
+            int n = qregs[id].n, sz = 1 << n;
+            double *s = qregs[id].state;
+            double cos_pi4 = cos(M_PI / 4.0), sin_pi4 = sin(M_PI / 4.0);
+            int step = 1 << q;
+            for (int i = 0; i < sz; i += (step << 1)) {
+                for (int j = step; j < (step << 1); j++) {
+                    int idx = i + j;
+                    double r = s[2 * idx], im = s[2 * idx + 1];
+                    s[2 * idx] = r * cos_pi4 - im * sin_pi4;
+                    s[2 * idx + 1] = r * sin_pi4 + im * cos_pi4;
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "apply_cx") == 0) {
+        if (nargs >= 3 && args[0].type == V_INT && args[1].type == V_INT && args[2].type == V_INT) {
+            int id = (int)args[0].i, c = (int)args[1].i, t = (int)args[2].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state)
+                return mk_int(-1);
+            int n = qregs[id].n;
+            if (c < 0 || c >= n || t < 0 || t >= n || c == t)
+                return mk_int(-1);
+            int sz = 1 << n;
+            double *s = qregs[id].state;
+            int cbit = 1 << c, tbit = 1 << t;
+            for (int i = 0; i < sz; i++) {
+                if (i & cbit) {
+                    int j = i ^ tbit;
+                    if (j > i) {
+                        double r = s[2 * i], im = s[2 * i + 1];
+                        s[2 * i] = s[2 * j]; s[2 * i + 1] = s[2 * j + 1];
+                        s[2 * j] = r; s[2 * j + 1] = im;
+                    }
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "measure") == 0) {
+        if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
+            int id = (int)args[0].i, q = (int)args[1].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || q < 0 || q >= qregs[id].n)
+                return mk_int(-1);
+            int n = qregs[id].n, sz = 1 << n;
+            double *s = qregs[id].state;
+            double prob0 = 0.0;
+            int step = 1 << q;
+            for (int i = 0; i < sz; i += (step << 1)) {
+                for (int j = 0; j < step; j++) {
+                    int idx = i + j;
+                    prob0 += s[2 * idx] * s[2 * idx] + s[2 * idx + 1] * s[2 * idx + 1];
+                }
+            }
+            int result = (rand() / (double)RAND_MAX) >= prob0 ? 1 : 0;
+            double norm = 0.0;
+            for (int i = 0; i < sz; i++) {
+                int in_basis = ((i >> q) & 1) == result;
+                if (!in_basis) { s[2 * i] = 0.0; s[2 * i + 1] = 0.0; }
+                else { norm += s[2 * i] * s[2 * i] + s[2 * i + 1] * s[2 * i + 1]; }
+            }
+            if (norm > 0) {
+                double inv = 1.0 / sqrt(norm);
+                for (int i = 0; i < sz; i++) {
+                    if (((i >> q) & 1) == result) {
+                        s[2 * i] *= inv; s[2 * i + 1] *= inv;
+                    }
+                }
+            }
+            return mk_int(result);
         }
         return mk_int(-1);
     }
@@ -912,9 +1061,10 @@ static int is_builtin_name(Comp *c, long start, long len) {
         "printf", "str_len", "str_char_at", "str_substring", "str_concat",
         "str_eq", "str_index_of", "str_from_char", "str_to_int", "int_to_str",
         "len", "file_read", "file_write_bytes", "file_exists", "ord", "chr",
-        "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown"
+        "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown",
+        "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx", "measure"
     };
-    for (int k = 0; k < 22; k++)
+    for (int k = 0; k < 28; k++)
         if (kw_match(c->src + start, len, names[k])) return 1;
     return 0;
 }

@@ -648,6 +648,12 @@ def is_builtin(nm):
     if (str_eq(nm, "tcp_send")): return 1 end
     if (str_eq(nm, "tcp_close")): return 1 end
     if (str_eq(nm, "tcp_shutdown")): return 1 end
+    if (str_eq(nm, "qreg_create")): return 1 end
+    if (str_eq(nm, "qreg_free")): return 1 end
+    if (str_eq(nm, "apply_h")): return 1 end
+    if (str_eq(nm, "apply_t")): return 1 end
+    if (str_eq(nm, "apply_cx")): return 1 end
+    if (str_eq(nm, "measure")): return 1 end
     return 0
 end
 

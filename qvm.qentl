@@ -67,6 +67,8 @@ var pop2_t = 0
 var pop2_i = 0
 var pop2_s = ""
 var pop2_a = 0
+var pop3_i = 0
+var pop3_s = ""
 var g_cmp_r = 0
 
 # ================================================================
@@ -127,6 +129,13 @@ def do_pop2():
     pop2_s = pop1_s
     pop2_a = pop1_a
     do_pop1()
+end
+
+def do_pop3():
+    do_pop1()
+    pop3_i = pop1_i
+    pop3_s = pop1_s
+    do_pop2()
 end
 
 # ================================================================
@@ -507,6 +516,36 @@ def do_builtin(bname, nargs):
     if (str_eq(bname, "tcp_shutdown")):
         do_pop1()
         push_int(tcp_shutdown(pop1_i))
+        return
+    end
+    if (str_eq(bname, "qreg_create")):
+        do_pop1()
+        push_int(qreg_create(pop1_i))
+        return
+    end
+    if (str_eq(bname, "qreg_free")):
+        do_pop1()
+        push_int(qreg_free(pop1_i))
+        return
+    end
+    if (str_eq(bname, "apply_h")):
+        do_pop2()
+        push_int(apply_h(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "apply_t")):
+        do_pop2()
+        push_int(apply_t(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "apply_cx")):
+        do_pop3()
+        push_int(apply_cx(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "measure")):
+        do_pop2()
+        push_int(measure(pop1_i, pop2_i))
         return
     end
     printf("[QVM-Q] 未知内置函数: %s\n", bname)
