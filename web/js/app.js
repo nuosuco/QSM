@@ -1412,6 +1412,94 @@ async function doPasswordLogin() {
     }
 }
 
+// 账号绑定弹窗
+function showBindAccountModal(type) {
+    document.getElementById('bind-account-modal').style.display = 'flex';
+    document.getElementById('bind-account-input').value = '';
+}
+function hideBindAccountModal() {
+    document.getElementById('bind-account-modal').style.display = 'none';
+}
+
+async function doBindAccount() {
+    const account = document.getElementById('bind-account-input').value.trim();
+    if (!account) { alert('请输入账号'); return; }
+    const userId = getUserId();
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/bind-account`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, account, account_type: 'email' })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            hideBindAccountModal();
+            alert('绑定成功！');
+            loadUserAccount();
+        } else {
+            alert(data.error || '绑定失败');
+        }
+    } catch (e) {
+        alert('网络错误');
+    }
+}
+
+function showBindPasswordModal() {
+    document.getElementById('bind-password-modal').style.display = 'flex';
+    document.getElementById('bind-password-input').value = '';
+    document.getElementById('bind-password-confirm').value = '';
+}
+function hideBindPasswordModal() {
+    document.getElementById('bind-password-modal').style.display = 'none';
+}
+
+async function doBindPassword() {
+    const password = document.getElementById('bind-password-input').value;
+    const confirm = document.getElementById('bind-password-confirm').value;
+    if (!password) { alert('请输入密码'); return; }
+    if (password.length < 6) { alert('密码至少6位'); return; }
+    if (password !== confirm) { alert('两次密码不一致'); return; }
+    const userId = getUserId();
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/bind-password`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, password })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            hideBindPasswordModal();
+            alert('密码设置成功！');
+            loadUserAccount();
+        } else {
+            alert(data.error || '设置失败');
+        }
+    } catch (e) {
+        alert('网络错误');
+    }
+}
+
+async function loadUserAccount() {
+    const userId = getUserId();
+    const token = localStorage.getItem('som_auth_token');
+    if (!token) return;
+    try {
+        const resp = await fetch(`${API_BASE}/api/user/profile?user_id=${userId}`, {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        const data = await resp.json();
+        if (data.success && data.user) {
+            const user = data.user;
+            if (user.account) {
+                document.getElementById('binding-email').textContent = user.account;
+            }
+            if (user.password_hash) {
+                document.getElementById('binding-password').textContent = '已设置';
+            }
+        }
+    } catch (e) {}
+}
+
 // 注册弹窗
 function showRegisterModal() {
     document.getElementById('register-modal').style.display = 'flex';
@@ -1640,6 +1728,7 @@ function updateLoginUI() {
 function initProfile() {
     updateLoginUI();
     loadProfile();
+    loadUserAccount();
 }
 
 function getUserId() {

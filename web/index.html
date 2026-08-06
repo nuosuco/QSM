@@ -184,6 +184,25 @@
                                 <p class="login-link" onclick="showRegisterModal()">没有账号？立即注册</p>
                                 <p class="login-link" onclick="showForgotPassword()">忘记密码？</p>
                             </div>
+                            <!-- 绑定账号弹窗 -->
+                            <div class="forgot-password-modal" id="bind-account-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>绑定账号</h4>
+                                    <input type="text" class="login-input" id="bind-account-input" placeholder="输入邮箱或账号">
+                                    <button class="login-btn" onclick="doBindAccount()">确认绑定</button>
+                                    <button class="login-btn secondary" onclick="hideBindAccountModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 设置密码弹窗 -->
+                            <div class="forgot-password-modal" id="bind-password-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>设置密码</h4>
+                                    <input type="password" class="login-input" id="bind-password-input" placeholder="输入密码（至少6位）">
+                                    <input type="password" class="login-input" id="bind-password-confirm" placeholder="确认密码">
+                                    <button class="login-btn" onclick="doBindPassword()">确认设置</button>
+                                    <button class="login-btn secondary" onclick="hideBindPasswordModal()">取消</button>
+                                </div>
+                            </div>
                             <!-- 注册弹窗 -->
                             <div class="forgot-password-modal" id="register-modal" style="display:none;">
                                 <div class="forgot-password-content">
@@ -231,6 +250,26 @@
                             <p id="profile-checkin">签到：今天未签到</p>
                         </div>
                         <button class="logout-btn" onclick="doLogout()">退出</button>
+                    </div>
+                    <div class="profile-section">
+                        <h3>🔐 账号绑定</h3>
+                        <div class="account-binding">
+                            <div class="binding-item">
+                                <span class="binding-label">📧 邮箱账号</span>
+                                <span class="binding-value" id="binding-email">未绑定</span>
+                                <button class="binding-btn" onclick="showBindAccountModal('email')">绑定</button>
+                            </div>
+                            <div class="binding-item">
+                                <span class="binding-label">🔑 密码</span>
+                                <span class="binding-value" id="binding-password">未设置</span>
+                                <button class="binding-btn" onclick="showBindPasswordModal()">设置</button>
+                            </div>
+                            <div class="binding-item">
+                                <span class="binding-label">💬 微信</span>
+                                <span class="binding-value" id="binding-wechat">未绑定</span>
+                                <button class="binding-btn" onclick="alert('微信登录请在登录页面操作')">绑定</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="profile-section">
                         <h3>📋 我的体质记录</h3>

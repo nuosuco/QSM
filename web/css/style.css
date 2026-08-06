@@ -2300,3 +2300,40 @@ body {
 .forgot-password-content .login-btn.secondary {
     background: #999;
 }
+
+/* 账号绑定 */
+.account-binding {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.binding-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+}
+.binding-label {
+    font-size: 14px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+.binding-value {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+.binding-btn {
+    padding: 6px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.binding-btn:hover {
+    background: var(--secondary-color);
+}
