@@ -41,6 +41,8 @@ def init_user_system():
             phone TEXT UNIQUE,
             email TEXT UNIQUE,
             wechat_openid TEXT UNIQUE,
+            password_hash TEXT,
+            account TEXT UNIQUE,
             nickname TEXT DEFAULT '养生用户',
             avatar TEXT,
             is_anonymous INTEGER DEFAULT 1,
@@ -58,6 +60,17 @@ def init_user_system():
             code TEXT NOT NULL,
             channel TEXT NOT NULL DEFAULT 'sms',
             purpose TEXT NOT NULL DEFAULT 'login',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            used INTEGER DEFAULT 0
+        )
+    ''')
+
+    # 密码重置token表
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            token TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             expires_at TIMESTAMP NOT NULL,
             used INTEGER DEFAULT 0
@@ -273,3 +286,107 @@ def get_latest_tizhi(user_id: str):
 
 
 init_user_system()
+
+# ========== 密码相关函数 ==========
+
+import hashlib
+import secrets
+
+def hash_password(password: str) -> str:
+    """密码哈希"""
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+    return f"{salt}${password_hash}"
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """验证密码"""
+    if not password_hash or '$' not in password_hash:
+        return False
+    parts = password_hash.split('$')
+    if len(parts) != 2:
+        return False
+    salt, stored_hash = parts
+    computed_hash = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+    return computed_hash == stored_hash
+
+def generate_reset_token(user_id: str) -> str:
+    """生成密码重置token"""
+    token = secrets.token_urlsafe(32)
+    from datetime import datetime, timezone, timedelta
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    conn = _conn()
+    conn.execute(
+        "INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
+        (token, user_id, expires_at.isoformat())
+    )
+    conn.commit()
+    conn.close()
+    return token
+
+def verify_reset_token(token: str) -> dict:
+    """验证密码重置token"""
+    from datetime import datetime, timezone
+    conn = _conn()
+    row = conn.execute(
+        "SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > ?",
+        (token, datetime.now(timezone.utc).isoformat())
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def reset_password(user_id: str, new_password: str) -> bool:
+    """重置密码"""
+    new_hash = hash_password(new_password)
+    conn = _conn()
+    conn.execute("UPDATE users SET password_hash = ? WHERE user_id = ?", (new_hash, user_id))
+    conn.execute("UPDATE password_reset_tokens SET used = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def register_with_password(account: str, password: str, nickname: str = None) -> dict:
+    """用账号+密码注册"""
+    import secrets as secrets_mod
+    conn = _conn()
+    
+    # 检查账号是否已存在
+    existing = conn.execute("SELECT user_id FROM users WHERE account = ?", (account,)).fetchone()
+    if existing:
+        conn.close()
+        return {"success": False, "error": "账号已存在"}
+    
+    user_id = "u_" + secrets_mod.token_hex(12)
+    password_hash = hash_password(password)
+    now = _now_beijing().isoformat()
+    
+    conn.execute(
+        "INSERT INTO users (user_id, account, password_hash, nickname, is_anonymous, created_at, last_active) VALUES (?, ?, ?, ?, 0, ?, ?)",
+        (user_id, account, password_hash, nickname or account, now, now)
+    )
+    conn.commit()
+    conn.close()
+    
+    return {"success": True, "user_id": user_id}
+
+def login_with_password(account: str, password: str) -> dict:
+    """用账号+密码登录"""
+    conn = _conn()
+    row = conn.execute("SELECT * FROM users WHERE account = ?", (account,)).fetchone()
+    conn.close()
+    
+    if not row:
+        return {"success": False, "error": "账号不存在"}
+    
+    if not row["password_hash"]:
+        return {"success": False, "error": "该账号未设置密码，请使用其他方式登录"}
+    
+    if not verify_password(password, row["password_hash"]):
+        return {"success": False, "error": "密码错误"}
+    
+    # 生成token
+    token = _issue_token(conn, row["user_id"])
+    
+    user = dict(row)
+    user.pop("password_hash", None)
+    
+    return {"success": True, "user": user, "token": token}

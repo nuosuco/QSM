@@ -135,6 +135,26 @@ class VerifyCodeLoginRequest(BaseModel):
     country_code: str = "+86"
     anonymous_user_id: Optional[str] = None
 
+class RegisterRequest(BaseModel):
+    """账号密码注册"""
+    account: str
+    password: str
+    nickname: Optional[str] = None
+
+class PasswordLoginRequest(BaseModel):
+    """账号密码登录"""
+    account: str
+    password: str
+
+class ForgotPasswordRequest(BaseModel):
+    """忘记密码"""
+    account: str
+
+class ResetPasswordRequest(BaseModel):
+    """重置密码"""
+    token: str
+    new_password: str
+
 class WechatLoginRequest(BaseModel):
     """微信小程序登录"""
     code: str  # wx.login() 返回的 code
@@ -1096,6 +1116,51 @@ async def auth_wechat_login(request: WechatLoginRequest):
     """微信小程序登录"""
     from services import auth_service
     return auth_service.wechat_login(request.code, anonymous_user_id=request.anonymous_user_id)
+
+@app.post("/api/auth/register")
+async def auth_register(request: RegisterRequest):
+    """账号密码注册"""
+    from services.user_system import register_with_password
+    return register_with_password(request.account, request.password, request.nickname)
+
+@app.post("/api/auth/login/password")
+async def auth_login_password(request: PasswordLoginRequest):
+    """账号密码登录"""
+    from services.user_system import login_with_password
+    return login_with_password(request.account, request.password)
+
+@app.get("/api/auth/check-account")
+async def auth_check_account(account: str):
+    """检查账号是否已存在"""
+    from services.user_system import _conn
+    conn = _conn()
+    user = conn.execute("SELECT user_id FROM users WHERE account = ?", (account,)).fetchone()
+    conn.close()
+    return {"exists": bool(user)}
+
+@app.post("/api/auth/forgot-password")
+async def auth_forgot_password(request: ForgotPasswordRequest):
+    """忘记密码 - 发送重置token"""
+    from services.user_system import generate_reset_token, _conn
+    conn = _conn()
+    user = conn.execute("SELECT user_id, email FROM users WHERE account = ?", (request.account,)).fetchone()
+    conn.close()
+    if not user:
+        # 安全考虑，不提示账号不存在
+        return {"success": True, "message": "如果账号存在，已发送重置邮件"}
+    token = generate_reset_token(user["user_id"])
+    # 简化处理，直接返回token（实际应该发邮件）
+    return {"success": True, "message": "重置token已生成", "token": token}
+
+@app.post("/api/auth/reset-password")
+async def auth_reset_password(request: ResetPasswordRequest):
+    """重置密码"""
+    from services.user_system import verify_reset_token, reset_password
+    token_data = verify_reset_token(request.token)
+    if not token_data:
+        return {"success": False, "error": "无效或已过期的重置链接"}
+    reset_password(token_data["user_id"], request.new_password)
+    return {"success": True, "message": "密码重置成功"}
 
 @app.get("/wechat-callback")
 async def wechat_oauth_callback(code: str = None, state: str = None):
