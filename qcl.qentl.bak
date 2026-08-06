@@ -43,7 +43,6 @@ var T_COLON = 30
 var T_COMMA = 31
 var T_EOF = 32
 var T_BREAK = 33
-var T_QREG = 34
 
 # Opcode（QBC1规格）
 var OP_PUSH_INT = 1
@@ -347,7 +346,6 @@ def lex_run():
                 if (str_eq(word, "and")):    tt = T_LAND end
                 if (str_eq(word, "or")):     tt = T_LOR end
                 if (str_eq(word, "break")):  tt = T_BREAK end
-                if (str_eq(word, "qreg")):   tt = T_QREG end
                 tok_push(tt, i_start, pos - i_start)
                 handled = 1
             end
@@ -962,283 +960,62 @@ def parse_statement():
     if (t == T_VAR):
         parse_var_decl()
     else:
-        if (t == T_QREG):
-            parse_qreg_decl()
+        if (t == T_IF):
+            parse_if()
         else:
-            if (t == T_IDENT):
-                var ident_ns = g_tok_start[g_parse_pos]
-                var ident_nl = g_tok_len[g_parse_pos]
-                var ident_nm = str_substring(g_src, ident_ns, ident_nl)
-                if (str_eq(ident_nm, "h") or str_eq(ident_nm, "t")):
-                    parse_quantum_gate_1arg(ident_ns, ident_nl)
-                else:
-                    if (str_eq(ident_nm, "cx")):
-                        parse_quantum_cx(ident_ns, ident_nl)
-                    else:
-                        if (str_eq(ident_nm, "measure")):
-                            parse_quantum_measure(ident_ns, ident_nl)
-                        else:
-                            parse_ident_stmt()
-                        end
-                    end
-                end
+            if (t == T_WHILE):
+                parse_while()
             else:
-                if (t == T_IF):
-                    parse_if()
+                if (t == T_BREAK):
+                    parse_break()
                 else:
-                    if (t == T_WHILE):
-                        parse_while()
+                    if (t == T_RETURN):
+                        parse_return()
                     else:
-                        if (t == T_BREAK):
-                            parse_break()
+                        if (t == T_IDENT):
+                            parse_ident_stmt()
                         else:
-                            if (t == T_RETURN):
-                                parse_return()
-                            else:
-                                parse_expr()
-                                emit_byte(OP_POP)
-                            end
+                            parse_expr()
+                            emit_byte(OP_POP)
                         end
                     end
                 end
             end
         end
     end
-end
-
-
-
-# qreg q[N]
-def parse_qreg_decl():
-    advance()
-    var ns = g_tok_start[g_parse_pos]
-    var nl = g_tok_len[g_parse_pos]
-    advance()
-    expect(T_LBRACKET, "qreg缺[")
-    var size = 0
-    if (cur_type() == T_NUMBER):
-        size = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-        advance()
-    end
-    expect(T_RBRACKET, "qreg缺]")
-    emit_byte(OP_PUSH_INT)
-    emit_u16(size)
-    emit_byte(OP_BUILTIN)
-    emit_u16(pool_add_string("qreg_create"))
-    emit_byte(1)
-    var slot = 0
-    if (g_in_func == 1):
-        slot = sym_add_local(ns, nl)
-    else:
-        slot = sym_add_global(ns, nl)
-    end
-    emit_byte(OP_STORE_VAR)
-    emit_u16(slot)
-end
-
-# h q[0]
-def parse_quantum_gate_1arg(ns, nl):
-    var gate_nm = str_substring(g_src, ns, nl)
-    advance()
-    var reg_ns = g_tok_start[g_parse_pos]
-    var reg_nl = g_tok_len[g_parse_pos]
-    advance()
-    expect(T_LBRACKET, "量子门缺[")
-    var idx = 0
-    if (cur_type() == T_NUMBER):
-        idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-        advance()
-    end
-    expect(T_RBRACKET, "量子门缺]")
-    emit_byte(OP_LOAD_VAR)
-    emit_u16(sym_resolve(reg_ns, reg_nl))
-    emit_byte(OP_PUSH_INT)
-    emit_u16(idx)
-    emit_byte(OP_BUILTIN)
-    var bname = "apply_h"
-    if (str_eq(gate_nm, "t")): bname = "apply_t" end
-    emit_u16(pool_add_string(bname))
-    emit_byte(2)
-    emit_byte(OP_POP)
-end
-
-# cx q[0], q[1]
-def parse_quantum_cx(ns, nl):
-    advance()
-    var ctrl_ns = g_tok_start[g_parse_pos]
-    var ctrl_nl = g_tok_len[g_parse_pos]
-    advance()
-    expect(T_LBRACKET, "cx缺[")
-    var ctrl_idx = 0
-    if (cur_type() == T_NUMBER):
-        ctrl_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-        advance()
-    end
-    expect(T_RBRACKET, "cx缺]")
-    if (cur_type() == T_COMMA):
-        advance()
-    end
-    var tgt_ns = g_tok_start[g_parse_pos]
-    var tgt_nl = g_tok_len[g_parse_pos]
-    advance()
-    expect(T_LBRACKET, "cx缺[")
-    var tgt_idx = 0
-    if (cur_type() == T_NUMBER):
-        tgt_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-        advance()
-    end
-    expect(T_RBRACKET, "cx缺]")
-    emit_byte(OP_LOAD_VAR)
-    emit_u16(sym_resolve(ctrl_ns, ctrl_nl))
-    emit_byte(OP_PUSH_INT)
-    emit_u16(ctrl_idx)
-    emit_byte(OP_PUSH_INT)
-    emit_u16(tgt_idx)
-    emit_byte(OP_BUILTIN)
-    emit_u16(pool_add_string("apply_cx"))
-    emit_byte(3)
-    emit_byte(OP_POP)
-end
-
-# measure q[0]
-def parse_quantum_measure(ns, nl):
-    # ns/nl already consumed the gate name, current token is register name
-    var reg_ns = g_tok_start[g_parse_pos]
-    var reg_nl = g_tok_len[g_parse_pos]
-    advance()
-    expect(T_LBRACKET, "measure缺[")
-    var idx = 0
-    if (cur_type() == T_NUMBER):
-        idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-        advance()
-    end
-    expect(T_RBRACKET, "measure缺]")
-    emit_byte(OP_LOAD_VAR)
-    emit_u16(sym_resolve(reg_ns, reg_nl))
-    emit_byte(OP_PUSH_INT)
-    emit_u16(idx)
-    emit_byte(OP_BUILTIN)
-    emit_u16(pool_add_string("measure"))
-    emit_byte(2)
-    emit_byte(OP_POP)
 end
 
 def parse_var_decl():
-    advance()  # consume 'var'
+    advance()
     var ns = g_tok_start[g_parse_pos]
     var nl = g_tok_len[g_parse_pos]
-    advance()  # consume name
-    expect(T_ASSIGN, "var缺=")
-    # 检查是否是量子门赋值: var m0 = measure q[0]
-    var cur_t = cur_type()
-    if (cur_t == T_IDENT):
-        var gate_ns = g_tok_start[g_parse_pos]
-        var gate_nl = g_tok_len[g_parse_pos]
-        var gate_nm = str_substring(g_src, gate_ns, gate_nl)
-        if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")):
-            advance()  # consume gate name
-            # 发射量子门代码（不POP，让结果留在栈上供STORE_VAR）
-            if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t")):
-                # 发射 apply_h/register, index
-                emit_byte(OP_LOAD_VAR)
-                emit_u16(sym_resolve(gate_ns, gate_nl))
-                # 跳过register name token
-                advance()
-                expect(T_LBRACKET, "量子门缺[")
-                var idx = 0
-                if (cur_type() == T_NUMBER):
-                    idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-                    advance()
-                end
-                expect(T_RBRACKET, "量子门缺]")
-                emit_byte(OP_PUSH_INT)
-                emit_u16(idx)
-                emit_byte(OP_BUILTIN)
-                var bname = "apply_h"
-                if (str_eq(gate_nm, "t")): bname = "apply_t" end
-                emit_u16(pool_add_string(bname))
-                emit_byte(2)
-                # 不POP，让结果留在栈上
-            else:
-                if (str_eq(gate_nm, "cx")):
-                    # 发射 apply_cx/register, ctrl_idx, tgt_idx
-                    advance()  # 跳过cx
-                    var ctrl_ns = g_tok_start[g_parse_pos]
-                    var ctrl_nl = g_tok_len[g_parse_pos]
-                    advance()
-                    expect(T_LBRACKET, "cx缺[")
-                    var ctrl_idx = 0
-                    if (cur_type() == T_NUMBER):
-                        ctrl_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-                        advance()
-                    end
-                    expect(T_RBRACKET, "cx缺]")
-                    if (cur_type() == T_COMMA):
-                        advance()
-                    end
-                    var tgt_ns = g_tok_start[g_parse_pos]
-                    var tgt_nl = g_tok_len[g_parse_pos]
-                    advance()
-                    expect(T_LBRACKET, "cx缺[")
-                    var tgt_idx = 0
-                    if (cur_type() == T_NUMBER):
-                        tgt_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-                        advance()
-                    end
-                    expect(T_RBRACKET, "cx缺]")
-                    emit_byte(OP_LOAD_VAR)
-                    emit_u16(sym_resolve(ctrl_ns, ctrl_nl))
-                    emit_byte(OP_PUSH_INT)
-                    emit_u16(ctrl_idx)
-                    emit_byte(OP_PUSH_INT)
-                    emit_u16(tgt_idx)
-                    emit_byte(OP_BUILTIN)
-                    emit_u16(pool_add_string("apply_cx"))
-                    emit_byte(3)
-                    # 不POP
-                else:
-                    # measure q[0]
-                    var reg_ns = g_tok_start[g_parse_pos]
-                    var reg_nl = g_tok_len[g_parse_pos]
-                    advance()
-                    expect(T_LBRACKET, "measure缺[")
-                    var idx = 0
-                    if (cur_type() == T_NUMBER):
-                        idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
-                        advance()
-                    end
-                    expect(T_RBRACKET, "measure缺]")
-                    emit_byte(OP_LOAD_VAR)
-                    emit_u16(sym_resolve(reg_ns, reg_nl))
-                    emit_byte(OP_PUSH_INT)
-                    emit_u16(idx)
-                    emit_byte(OP_BUILTIN)
-                    emit_u16(pool_add_string("measure"))
-                    emit_byte(2)
-                    # 不POP，让结果留在栈上
-                end
-            end
-            var slot = 0
-            if (g_in_func == 1):
-                slot = sym_add_local(ns, nl)
-            else:
-                slot = sym_add_global(ns, nl)
-            end
-            emit_byte(OP_STORE_VAR)
-            emit_u16(slot)
-            return
+    advance()
+    if (cur_type() == T_LBRACKET):
+        advance()
+        parse_expr()
+        expect(T_RBRACKET, "数组声明缺]")
+        var slot = 0
+        if (g_in_func == 1):
+            slot = sym_add_local(ns, nl)
+        else:
+            slot = sym_add_global(ns, nl)
         end
-    end
-    # 普通赋值
-    parse_expr()
-    var slot = 0
-    if (g_in_func == 1):
-        slot = sym_add_local(ns, nl)
+        emit_byte(OP_ARRAY_NEW)
+        emit_u16(0)
+        emit_byte(OP_STORE_VAR)
+        emit_u16(slot)
     else:
-        slot = sym_add_global(ns, nl)
+        expect(T_ASSIGN, "var缺=")
+        parse_expr()
+        var slot = 0
+        if (g_in_func == 1):
+            slot = sym_add_local(ns, nl)
+        else:
+            slot = sym_add_global(ns, nl)
+        end
+        emit_byte(OP_STORE_VAR)
+        emit_u16(slot)
     end
-    emit_byte(OP_STORE_VAR)
-    emit_u16(slot)
 end
 
 def parse_if():

@@ -436,6 +436,27 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
         }
         return mk_int(-1);
     }
+    /* ---- exec(cmd) : 执行shell命令，返回输出 ---- */
+    if (strcmp(name, "exec") == 0) {
+        if (nargs >= 1 && args[0].type == V_STR) {
+            char cmd[4096];
+            long long n = args[0].len < 4095 ? args[0].len : 4095;
+            memcpy(cmd, args[0].s, n); cmd[n] = '\0';
+            FILE *fp = popen(cmd, "r");
+            if (!fp) { Value r; r.type = V_STR; r.s = strdup(""); r.len = 0; return r; }
+            char buf[65536]; buf[0] = '\0';
+            long total = 0;
+            while (fgets(buf + total, 65536 - (int)total, fp)) {
+                total = strlen(buf);
+                if (total >= 65535) break;
+            }
+            pclose(fp);
+            Value r;
+            r.type = V_STR; r.s = strdup(buf); r.len = total;
+            return r;
+        }
+        { Value r; r.type = V_STR; r.s = strdup(""); r.len = 0; return r; }
+    }
     /* ---- 量子寄存器 + 门操作 ---- */
     if (strcmp(name, "qreg_create") == 0) {
         if (nargs >= 1 && args[0].type == V_INT) {
@@ -833,7 +854,7 @@ vm_done:
 enum {
     TK_EOF = 0, TK_IDENT, TK_NUMBER, TK_STRING,
     TK_DEF, TK_VAR, TK_IF, TK_ELSE, TK_WHILE, TK_RETURN, TK_END,
-    TK_AND, TK_OR, TK_BREAK,
+    TK_AND, TK_OR, TK_BREAK, TK_QREG,
     TK_PLUS, TK_MINUS, TK_MUL, TK_DIV, TK_MOD,
     TK_EQ, TK_NEQ, TK_LT, TK_GT, TK_LE, TK_GE, TK_NOT, TK_ASSIGN,
     TK_LPAREN, TK_RPAREN, TK_LBRACKET, TK_RBRACKET, TK_COLON, TK_COMMA
@@ -971,6 +992,7 @@ static void lex_run(Comp *c) {
             else if (kw_match(w, L, "and")) t = TK_AND;
             else if (kw_match(w, L, "or")) t = TK_OR;
             else if (kw_match(w, L, "break")) t = TK_BREAK;
+            else if (kw_match(w, L, "qreg")) t = TK_QREG;
             add_tok(c, t, s, L);
             continue;
         }
@@ -1062,9 +1084,10 @@ static int is_builtin_name(Comp *c, long start, long len) {
         "str_eq", "str_index_of", "str_from_char", "str_to_int", "int_to_str",
         "len", "file_read", "file_write_bytes", "file_exists", "ord", "chr",
         "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown",
+        "exec",
         "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx", "measure"
     };
-    for (int k = 0; k < 28; k++)
+    for (int k = 0; k < 29; k++)
         if (kw_match(c->src + start, len, names[k])) return 1;
     return 0;
 }
