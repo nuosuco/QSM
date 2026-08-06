@@ -1373,9 +1373,30 @@ let _codeCooldown = 0;
 function switchLoginChannel(channel) {
     document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
     document.querySelector(`.login-tab[data-channel="${channel}"]`).classList.add('active');
+    // 微信和手机号共用同一表单（手机号表单现在隐藏）
     document.getElementById('login-form-sms').style.display = channel === 'sms' ? 'flex' : 'none';
+    document.getElementById('login-form-wechat').style.display = channel === 'wechat' ? 'flex' : 'none';
     document.getElementById('login-form-email').style.display = channel === 'email' ? 'flex' : 'none';
     hideLoginError();
+}
+
+// 微信服务号登录
+function wechatLogin() {
+    // 微信服务号OAuth2.0授权
+    var redirectUrl = encodeURIComponent(window.location.origin + '/wechat-callback');
+    var appId = 'YOUR_APPID'; // 待中华提供
+    var state = 'som_wechat_login';
+    
+    // 跳转到微信授权页
+    var authUrl = 'https://open.weixin.qq.com/connect/oauth2/authorize' +
+        '?appid=' + appId +
+        '&redirect_uri=' + redirectUrl +
+        '&response_type=code' +
+        '&scope=snsapi_base' +
+        '&state=' + state +
+        '#wechat_redirect';
+    
+    window.location.href = authUrl;
 }
 
 function showLoginError(msg) {

@@ -354,6 +354,88 @@ def wechat_login(code: str, anonymous_user_id: str = None) -> dict:
     except Exception as e:
         return {"success": False, "error": f"微信接口异常: {str(e)[:100]}"}
 
+
+def wechat_web_login(code: str) -> dict:
+    """
+    微信服务号OAuth2.0网页授权：code → 换access_token → 换openid → 登录/注册
+    """
+    import requests as http_requests
+
+    cfg = _load_auth_config()
+    wx_cfg = cfg["wechat"]
+
+    if not wx_cfg.get("enabled"):
+        return {"success": False, "error": "微信服务号登录未配置"}
+
+    # 用 code 换 access_token
+    try:
+        resp = http_requests.get(
+            "https://api.weixin.qq.com/sns/oauth2/access_token",
+            params={
+                "appid": wx_cfg["appid"],
+                "secret": wx_cfg["secret"],
+                "code": code,
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        if "openid" not in data:
+            return {"success": False, "error": f"微信授权失败: {data.get('errmsg', '未知错误')}"}
+        openid = data["openid"]
+        access_token = data.get("access_token")
+        refresh_token = data.get("refresh_token")
+    except Exception as e:
+        return {"success": False, "error": f"微信接口异常: {str(e)[:100]}"}
+
+    # 获取用户信息（可选，需要snsapi_userinfo权限）
+    nickname = "微信用户"
+    try:
+        user_resp = http_requests.get(
+            "https://api.weixin.qq.com/sns/userinfo",
+            params={
+                "access_token": access_token,
+                "openid": openid,
+                "lang": "zh_CN",
+            },
+            timeout=10,
+        )
+        user_data = user_resp.json()
+        if "nickname" in user_data:
+            nickname = user_data["nickname"]
+    except Exception:
+        pass
+
+    # 查找/创建用户
+    from services import user_system
+    conn = user_system._conn()
+    now = user_system._now_beijing().isoformat()
+
+    row = conn.execute("SELECT * FROM users WHERE wechat_openid = ?", (openid,)).fetchone()
+
+    if row:
+        user_id = row["user_id"]
+        conn.execute("UPDATE users SET is_anonymous = 0, last_active = ? WHERE user_id = ?", (now, user_id))
+    else:
+        user_id = "u_" + secrets.token_hex(12)
+        conn.execute(
+            "INSERT INTO users (user_id, wechat_openid, nickname, is_anonymous, created_at, last_active) VALUES (?, ?, ?, 0, ?, ?)",
+            (user_id, openid, nickname, now, now),
+        )
+
+    conn.commit()
+    conn.close()
+
+    token = user_system._issue_token(conn, user_id) if conn else None
+    user = dict(conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()) if conn else None
+    
+    if user:
+        user.pop("phone", None)
+        user.pop("email", None)
+        user.pop("wechat_openid", None)
+
+    return {"success": True, "user": user, "token": token}
+
     # 查找/创建用户
     from services import user_system
 

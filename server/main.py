@@ -1097,6 +1097,28 @@ async def auth_wechat_login(request: WechatLoginRequest):
     from services import auth_service
     return auth_service.wechat_login(request.code, anonymous_user_id=request.anonymous_user_id)
 
+@app.get("/wechat-callback")
+async def wechat_oauth_callback(code: str = None, state: str = None):
+    """微信服务号OAuth2.0回调"""
+    if not code:
+        return HTMLResponse("<script>window.location.href='/';alert('微信授权失败');</script>")
+    
+    from services import auth_service
+    result = auth_service.wechat_web_login(code)
+    
+    if result.get('success'):
+        # 设置cookie
+        response = HTMLResponse(f"""
+            <script>
+                localStorage.setItem('som_auth_token', '{result['token']}');
+                localStorage.setItem('som_auth_user', JSON.stringify({json.dumps(result['user'])}));
+                window.location.href='/';
+            </script>
+        """)
+        return response
+    else:
+        return HTMLResponse(f"<script>window.location.href='/';alert('{result.get('error', '登录失败')}');</script>")
+
 @app.post("/api/auth/bind-phone")
 async def auth_bind_phone(request: BindPhoneRequest):
     """微信用户绑定手机号（需短信验证码）"""
