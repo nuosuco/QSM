@@ -1,0 +1,29 @@
+{
+  "sms": {
+    "enabled": false,
+    "provider": "aliyun",
+    "access_key_id": "",
+    "access_key_secret": "",
+    "sign_name": "",
+    "template_code": "",
+    "region": "cn-hangzhou"
+  },
+  "email": {
+    "enabled": false,
+    "smtp_host": "",
+    "smtp_port": 465,
+    "smtp_user": "",
+    "smtp_pass": "",
+    "from_name": "SOM松麦",
+    "use_ssl": true
+  },
+  "wechat": {
+    "enabled": false,
+    "appid": "",
+    "secret": ""
+  },
+  "code_length": 6,
+  "code_expire_minutes": 5,
+  "code_cooldown_seconds": 60,
+  "max_attempts_per_hour": 10
+}
