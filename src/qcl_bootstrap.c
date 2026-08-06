@@ -396,13 +396,30 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
             if (max <= 0 || max > 1048576) max = 8192;
             char *buf = (char *)malloc(max);
             long long total = 0;
+            long long header_end = -1;      /* 头结束位置（含\r\n\r\n） */
+            long long content_len = 0;       /* 从Content-Length解析 */
+            int got_header = 0;
             /* 读取直到拿满请求头（空行）或缓冲区满或超时/关闭 */
             while (total < max) {
                 long long rd = recv((int)args[0].i, buf + total, max - total, 0);
                 if (rd <= 0) break;
                 total += rd;
                 /* HTTP请求头结束检测：\r\n\r\n */
-                if (total >= 4 && memmem(buf, total, "\r\n\r\n", 4)) break;
+                if (!got_header && total >= 4) {
+                    char *hdr = (char *)memmem(buf, total, "\r\n\r\n", 4);
+                    if (hdr) {
+                        got_header = 1;
+                        header_end = (hdr - buf) + 4;
+                        /* 解析Content-Length（大小写不敏感） */
+                        char *cl = (char *)memmem(buf, header_end, "\r\ncontent-length:", 17);
+                        if (!cl) cl = (char *)memmem(buf, header_end, "\r\nContent-Length:", 17);
+                        if (cl) content_len = atoll(cl + 17);
+                        if (content_len < 0) content_len = 0;
+                        if (content_len > max - header_end) content_len = max - header_end;
+                    }
+                }
+                /* 拿齐头+体即完成 */
+                if (got_header && total >= header_end + content_len) break;
             }
             Value r = mk_str_copy(buf, total);
             free(buf);
