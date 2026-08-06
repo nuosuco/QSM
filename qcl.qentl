@@ -692,7 +692,7 @@ def process_string_lit(idx):
         end
         i = i + 1
     end
-    tok_set(1, result, str_len(result))
+    return pool_add_string(result)
 end
 
 def tok_num(idx):
