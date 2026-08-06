@@ -2264,3 +2264,39 @@ body {
   color: #999;
   cursor: pointer;
 }
+
+/* 密码登录样式 */
+.login-link {
+    text-align: center;
+    color: #4a9d6e;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 12px;
+}
+.login-link:hover { text-decoration: underline; }
+.forgot-password-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.forgot-password-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 320px;
+}
+.forgot-password-content h4 {
+    margin: 0 0 16px;
+    text-align: center;
+}
+.forgot-password-content .login-btn {
+    margin-top: 12px;
+}
+.forgot-password-content .login-btn.secondary {
+    background: #999;
+}

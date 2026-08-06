@@ -1373,11 +1373,74 @@ let _codeCooldown = 0;
 function switchLoginChannel(channel) {
     document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
     document.querySelector(`.login-tab[data-channel="${channel}"]`).classList.add('active');
-    // 微信和手机号共用同一表单（手机号表单现在隐藏）
     document.getElementById('login-form-sms').style.display = channel === 'sms' ? 'flex' : 'none';
     document.getElementById('login-form-wechat').style.display = channel === 'wechat' ? 'flex' : 'none';
+    document.getElementById('login-form-password').style.display = channel === 'password' ? 'flex' : 'none';
     document.getElementById('login-form-email').style.display = channel === 'email' ? 'flex' : 'none';
     hideLoginError();
+}
+
+// 密码登录
+async function doPasswordLogin() {
+    hideLoginError();
+    const account = document.getElementById('password-account').value.trim();
+    const password = document.getElementById('password-input').value;
+    
+    if (!account) { showLoginError('请输入账号'); return; }
+    if (!password) { showLoginError('请输入密码'); return; }
+    
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/login/password`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ account, password })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            localStorage.setItem('som_auth_token', data.token);
+            localStorage.setItem('som_auth_user', JSON.stringify(data.user));
+            if (data.user && data.user.user_id) {
+                localStorage.setItem('som_user_id', data.user.user_id);
+            }
+            updateLoginUI();
+            loadProfile();
+        } else {
+            showLoginError(data.error || '登录失败');
+        }
+    } catch (e) {
+        showLoginError('网络错误，请重试');
+    }
+}
+
+// 忘记密码
+function showForgotPassword() {
+    document.getElementById('forgot-password-modal').style.display = 'flex';
+}
+
+function hideForgotPassword() {
+    document.getElementById('forgot-password-modal').style.display = 'none';
+}
+
+async function sendForgotPassword() {
+    const account = document.getElementById('forgot-account').value.trim();
+    if (!account) { alert('请输入账号'); return; }
+    
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ account, base_url: window.location.origin })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            alert('重置链接已发送，请检查邮箱');
+            hideForgotPassword();
+        } else {
+            alert(data.error || '发送失败');
+        }
+    } catch (e) {
+        alert('网络错误');
+    }
 }
 
 // 微信服务号登录
