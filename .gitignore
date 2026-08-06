@@ -1,0 +1,19 @@
+# QEntL全栈QSM — 构建产物与缓存不入库
+# 源码(.qentl/.c)入库，产物不入库
+
+# 构建产物
+build/
+output.qbc
+target.qbc
+input.qentl
+
+# Python缓存
+__pycache__/
+*.pyc
+
+# 日志
+*.log
+server/server.log
+
+# 临时
+/tmp/*

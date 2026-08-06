@@ -1,0 +1,9 @@
+# Simple test program for QCL compiler
+def test_add(a, b):
+    return a + b
+end
+
+def main():
+    var result = test_add(10, 20)
+    printf("result=%d\n", result)
+end

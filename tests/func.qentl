@@ -1,0 +1,25 @@
+# tests/func.qentl — 函数/递归/全局变量
+var g_count = 0
+
+def add(a, b):
+    return a + b
+end
+
+def fib(n):
+    if (n < 2):
+        return n
+    end
+    return fib(n - 1) + fib(n - 2)
+end
+
+def bump():
+    g_count = g_count + 1
+    return g_count
+end
+
+printf("add(3,4)=%d\n", add(3, 4))
+printf("fib(10)=%d\n", fib(10))
+bump()
+bump()
+bump()
+printf("g_count=%d\n", g_count)

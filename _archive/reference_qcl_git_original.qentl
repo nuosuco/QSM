@@ -1,0 +1,1383 @@
+# qcl.qentl - QEntL Compiler written in QEntL (self-hosting)
+# Reads .qentl source, outputs .qbc bytecode in QBC1 format
+# QBC1: [4B]'QBC1' [2B]code_len_LE16 [code] [2B]pool_len_LE16 [pool]
+# Code layout: JMP main_start | FUNC_DEFs... | main_start: stmts | HALT
+
+# ================================================================
+# Token type constants
+# ================================================================
+var T_IDENT    = 1
+var T_NUMBER   = 2
+var T_STRING   = 3
+var T_DEF      = 4
+var T_VAR      = 5
+var T_IF       = 6
+var T_ELSE     = 7
+var T_WHILE    = 8
+var T_RETURN   = 9
+var T_END      = 10
+var T_LAND     = 11
+var T_LOR      = 12
+var T_PLUS     = 13
+var T_MINUS    = 14
+var T_MUL      = 15
+var T_DIV      = 16
+var T_MOD      = 17
+var T_EQ       = 18
+var T_NEQ      = 19
+var T_LT       = 20
+var T_GT       = 21
+var T_LE       = 22
+var T_GE       = 23
+var T_NOT      = 24
+var T_ASSIGN   = 25
+var T_LPAREN   = 26
+var T_RPAREN   = 27
+var T_LBRACKET = 28
+var T_RBRACKET = 29
+var T_COLON    = 30
+var T_COMMA    = 31
+var T_EOF      = 32
+
+# ================================================================
+# Opcode constants
+# ================================================================
+var OP_PUSH_INT  = 1
+var OP_PUSH_STR  = 2
+var OP_LOAD_VAR  = 3
+var OP_STORE_VAR = 4
+var OP_ADD       = 5
+var OP_SUB       = 6
+var OP_MUL       = 7
+var OP_DIV       = 8
+var OP_MOD       = 9
+var OP_EQ        = 10
+var OP_NEQ       = 11
+var OP_LT        = 12
+var OP_GT        = 13
+var OP_LE        = 14
+var OP_GE        = 15
+var OP_JMP       = 16
+var OP_JMP_FALSE = 17
+var OP_CALL      = 18
+var OP_RET       = 19
+var OP_HALT      = 20
+var OP_BUILTIN   = 21
+var OP_ARRAY_NEW = 22
+var OP_ARRAY_GET = 23
+var OP_ARRAY_SET = 24
+var OP_POP       = 25
+var OP_NEG       = 26
+var OP_NOT       = 27
+var OP_AND       = 28
+var OP_OR        = 29
+var OP_FUNC_DEF  = 30
+var OP_FUNC_END  = 31
+
+# ================================================================
+# Global state
+# ================================================================
+var g_input_file  = "input.qentl"
+var g_output_file = "output.qbc"
+var g_src         = ""
+var g_src_len     = 0
+
+# Token storage (parallel arrays)
+var tok_type[16384]
+var tok_start[16384]
+var tok_len[16384]
+var tok_count  = 0
+var parse_pos  = 0
+
+# Code buffer (integer array for backpatching)
+var g_code[65535]
+var g_code_len = 0
+var g_main_jmp_patch = 0
+
+# String pool (built as string, null-separated)
+var g_pool_str = ""
+var g_pool_len = 0
+
+# Symbol table (current scope)
+var g_sym_start[2048]
+var g_sym_len[2048]
+var g_sym_slot[2048]
+var g_sym_count  = 0
+var g_next_slot  = 0
+
+# Error counter
+var g_errors = 0
+var g_abort = 0
+
+# ================================================================
+# Character classification
+# ================================================================
+def is_space(ch):
+    if (str_eq(ch, " ")): return 1 end
+    if (str_eq(ch, "\t")): return 1 end
+    if (str_eq(ch, "\n")): return 1 end
+    if (str_eq(ch, "\r")): return 1 end
+    return 0
+end
+
+def is_digit(ch):
+    if (str_eq(ch, "0")): return 1 end
+    if (str_eq(ch, "1")): return 1 end
+    if (str_eq(ch, "2")): return 1 end
+    if (str_eq(ch, "3")): return 1 end
+    if (str_eq(ch, "4")): return 1 end
+    if (str_eq(ch, "5")): return 1 end
+    if (str_eq(ch, "6")): return 1 end
+    if (str_eq(ch, "7")): return 1 end
+    if (str_eq(ch, "8")): return 1 end
+    if (str_eq(ch, "9")): return 1 end
+    return 0
+end
+
+# Identifier char: anything that is NOT a known delimiter/operator/whitespace.
+# This naturally includes letters, digits, underscore, and UTF-8 bytes >= 0x80.
+def is_ident_char(ch):
+    if (str_eq(ch, " ")): return 0 end
+    if (str_eq(ch, "\t")): return 0 end
+    if (str_eq(ch, "\n")): return 0 end
+    if (str_eq(ch, "\r")): return 0 end
+    if (str_eq(ch, "(")): return 0 end
+    if (str_eq(ch, ")")): return 0 end
+    if (str_eq(ch, "[")): return 0 end
+    if (str_eq(ch, "]")): return 0 end
+    if (str_eq(ch, ":")): return 0 end
+    if (str_eq(ch, ",")): return 0 end
+    if (str_eq(ch, "+")): return 0 end
+    if (str_eq(ch, "-")): return 0 end
+    if (str_eq(ch, "*")): return 0 end
+    if (str_eq(ch, "/")): return 0 end
+    if (str_eq(ch, "%")): return 0 end
+    if (str_eq(ch, "=")): return 0 end
+    if (str_eq(ch, "!")): return 0 end
+    if (str_eq(ch, "<")): return 0 end
+    if (str_eq(ch, ">")): return 0 end
+    if (str_eq(ch, "&")): return 0 end
+    if (str_eq(ch, "|")): return 0 end
+    if (str_eq(ch, "\"")): return 0 end
+    if (str_eq(ch, "#")): return 0 end
+    if (str_eq(ch, "'")): return 0 end
+    if (str_eq(ch, ";")): return 0 end
+    if (str_eq(ch, ".")): return 0 end
+    return 1
+end
+
+def is_ident_start(ch):
+    if (is_digit(ch)): return 0 end
+    return is_ident_char(ch)
+end
+
+# ================================================================
+# Token access helpers
+# ================================================================
+def cur_type():
+    if (parse_pos < tok_count):
+        return tok_type[parse_pos]
+    end
+    return T_EOF
+end
+
+def cur_text():
+    if (parse_pos < tok_count):
+        return str_substring(g_src, tok_start[parse_pos], tok_len[parse_pos])
+    end
+    return ""
+end
+
+def advance():
+    if (parse_pos < tok_count):
+        parse_pos = parse_pos + 1
+    end
+end
+
+def expect(ttype):
+    if (g_abort == 1): return end
+    if (cur_type() != ttype):
+        printf("qcl: error: expected token %d got %d at tok %d\n", ttype, cur_type(), parse_pos)
+        g_errors = g_errors + 1
+        g_abort = 1
+    end
+    advance()
+end
+
+def tok_to_int(idx):
+    var s = str_substring(g_src, tok_start[idx], tok_len[idx])
+    return str_to_int(s)
+end
+
+# ================================================================
+# Lexer
+# ================================================================
+def lex_run():
+    var pos = 0
+    var slen = str_len(g_src)
+    tok_count = 0
+
+    while (pos < slen):
+        var ch = str_char_at(g_src, pos)
+        var handled = 0
+
+        # --- whitespace ---
+        if (is_space(ch)):
+            pos = pos + 1
+            handled = 1
+        end
+
+        # --- comment: # to end of line ---
+        if (handled == 0):
+            if (str_eq(ch, "#")):
+                var in_cmt = 1
+                while (pos < slen and in_cmt == 1):
+                    pos = pos + 1
+                    if (pos < slen):
+                        var cc = str_char_at(g_src, pos)
+                        if (str_eq(cc, "\n")):
+                            in_cmt = 0
+                            pos = pos + 1
+                        end
+                    end
+                end
+                handled = 1
+            end
+        end
+
+        # --- string literal "..." with escapes ---
+        if (handled == 0):
+            if (str_eq(ch, "\"")):
+                var s_start = pos
+                pos = pos + 1
+                var in_str = 1
+                while (pos < slen and in_str == 1):
+                    var sc = str_char_at(g_src, pos)
+                    if (str_eq(sc, "\\")):
+                        pos = pos + 2
+                    else:
+                        if (str_eq(sc, "\"")):
+                            in_str = 0
+                            pos = pos + 1
+                        else:
+                            pos = pos + 1
+                        end
+                    end
+                end
+                tok_type[tok_count] = T_STRING
+                tok_start[tok_count] = s_start
+                tok_len[tok_count] = pos - s_start
+                tok_count = tok_count + 1
+                handled = 1
+            end
+        end
+
+        # --- number ---
+        if (handled == 0):
+            if (is_digit(ch)):
+                var n_start = pos
+                var reading = 1
+                while (pos < slen and reading == 1):
+                    var dc = str_char_at(g_src, pos)
+                    if (is_digit(dc)):
+                        pos = pos + 1
+                    else:
+                        reading = 0
+                    end
+                end
+                tok_type[tok_count] = T_NUMBER
+                tok_start[tok_count] = n_start
+                tok_len[tok_count] = pos - n_start
+                tok_count = tok_count + 1
+                handled = 1
+            end
+        end
+
+        # --- identifier / keyword ---
+        if (handled == 0):
+            if (is_ident_start(ch)):
+                var i_start = pos
+                var reading = 1
+                while (pos < slen and reading == 1):
+                    var ic = str_char_at(g_src, pos)
+                    if (is_ident_char(ic)):
+                        pos = pos + 1
+                    else:
+                        reading = 0
+                    end
+                end
+                var word = str_substring(g_src, i_start, pos - i_start)
+                var tt = T_IDENT
+                if (str_eq(word, "def")):    tt = T_DEF end
+                if (str_eq(word, "var")):    tt = T_VAR end
+                if (str_eq(word, "if")):     tt = T_IF end
+                if (str_eq(word, "else")):   tt = T_ELSE end
+                if (str_eq(word, "while")):  tt = T_WHILE end
+                if (str_eq(word, "return")): tt = T_RETURN end
+                if (str_eq(word, "end")):    tt = T_END end
+                if (str_eq(word, "and")):    tt = T_LAND end
+                if (str_eq(word, "or")):     tt = T_LOR end
+                tok_type[tok_count] = tt
+                tok_start[tok_count] = i_start
+                tok_len[tok_count] = pos - i_start
+                tok_count = tok_count + 1
+                handled = 1
+            end
+        end
+
+        # --- two-char operators: == != <= >= && || ---
+        if (handled == 0):
+            if (str_eq(ch, "=")):
+                if (pos + 1 < slen):
+                    var nx = str_char_at(g_src, pos + 1)
+                    if (str_eq(nx, "=")):
+                        tok_type[tok_count] = T_EQ
+                        tok_start[tok_count] = pos
+                        tok_len[tok_count] = 2
+                        tok_count = tok_count + 1
+                        pos = pos + 2
+                        handled = 1
+                    end
+                end
+                if (handled == 0):
+                    tok_type[tok_count] = T_ASSIGN
+                    tok_start[tok_count] = pos
+                    tok_len[tok_count] = 1
+                    tok_count = tok_count + 1
+                    pos = pos + 1
+                    handled = 1
+                end
+            end
+        end
+
+        if (handled == 0):
+            if (str_eq(ch, "!")):
+                if (pos + 1 < slen):
+                    var nx = str_char_at(g_src, pos + 1)
+                    if (str_eq(nx, "=")):
+                        tok_type[tok_count] = T_NEQ
+                        tok_start[tok_count] = pos
+                        tok_len[tok_count] = 2
+                        tok_count = tok_count + 1
+                        pos = pos + 2
+                        handled = 1
+                    end
+                end
+                if (handled == 0):
+                    tok_type[tok_count] = T_NOT
+                    tok_start[tok_count] = pos
+                    tok_len[tok_count] = 1
+                    tok_count = tok_count + 1
+                    pos = pos + 1
+                    handled = 1
+                end
+            end
+        end
+
+        if (handled == 0):
+            if (str_eq(ch, "<")):
+                if (pos + 1 < slen):
+                    var nx = str_char_at(g_src, pos + 1)
+                    if (str_eq(nx, "=")):
+                        tok_type[tok_count] = T_LE
+                        tok_start[tok_count] = pos
+                        tok_len[tok_count] = 2
+                        tok_count = tok_count + 1
+                        pos = pos + 2
+                        handled = 1
+                    end
+                end
+                if (handled == 0):
+                    tok_type[tok_count] = T_LT
+                    tok_start[tok_count] = pos
+                    tok_len[tok_count] = 1
+                    tok_count = tok_count + 1
+                    pos = pos + 1
+                    handled = 1
+                end
+            end
+        end
+
+        if (handled == 0):
+            if (str_eq(ch, ">")):
+                if (pos + 1 < slen):
+                    var nx = str_char_at(g_src, pos + 1)
+                    if (str_eq(nx, "=")):
+                        tok_type[tok_count] = T_GE
+                        tok_start[tok_count] = pos
+                        tok_len[tok_count] = 2
+                        tok_count = tok_count + 1
+                        pos = pos + 2
+                        handled = 1
+                    end
+                end
+                if (handled == 0):
+                    tok_type[tok_count] = T_GT
+                    tok_start[tok_count] = pos
+                    tok_len[tok_count] = 1
+                    tok_count = tok_count + 1
+                    pos = pos + 1
+                    handled = 1
+                end
+            end
+        end
+
+        if (handled == 0):
+            if (str_eq(ch, "&")):
+                if (pos + 1 < slen):
+                    var nx = str_char_at(g_src, pos + 1)
+                    if (str_eq(nx, "&")):
+                        tok_type[tok_count] = T_LAND
+                        tok_start[tok_count] = pos
+                        tok_len[tok_count] = 2
+                        tok_count = tok_count + 1
+                        pos = pos + 2
+                        handled = 1
+                    end
+                end
+                if (handled == 0):
+                    pos = pos + 1
+                    handled = 1
+                end
+            end
+        end
+
+        if (handled == 0):
+            if (str_eq(ch, "|")):
+                if (pos + 1 < slen):
+                    var nx = str_char_at(g_src, pos + 1)
+                    if (str_eq(nx, "|")):
+                        tok_type[tok_count] = T_LOR
+                        tok_start[tok_count] = pos
+                        tok_len[tok_count] = 2
+                        tok_count = tok_count + 1
+                        pos = pos + 2
+                        handled = 1
+                    end
+                end
+                if (handled == 0):
+                    pos = pos + 1
+                    handled = 1
+                end
+            end
+        end
+
+        # --- single-char operators / delimiters ---
+        if (handled == 0):
+            if (str_eq(ch, "+")):
+                tok_type[tok_count] = T_PLUS
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, "-")):
+                tok_type[tok_count] = T_MINUS
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, "*")):
+                tok_type[tok_count] = T_MUL
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, "/")):
+                tok_type[tok_count] = T_DIV
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, "%")):
+                tok_type[tok_count] = T_MOD
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, "(")):
+                tok_type[tok_count] = T_LPAREN
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, ")")):
+                tok_type[tok_count] = T_RPAREN
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, "[")):
+                tok_type[tok_count] = T_LBRACKET
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, "]")):
+                tok_type[tok_count] = T_RBRACKET
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, ":")):
+                tok_type[tok_count] = T_COLON
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            if (str_eq(ch, ",")):
+                tok_type[tok_count] = T_COMMA
+                tok_start[tok_count] = pos
+                tok_len[tok_count] = 1
+                tok_count = tok_count + 1
+                pos = pos + 1
+                handled = 1
+            end
+        end
+
+        # --- unknown byte: report and skip ---
+        if (handled == 0):
+            printf("qcl: error: unexpected character '%s' at byte %d\n", ch, pos)
+            g_errors = g_errors + 1
+            pos = pos + 1
+        end
+    end
+
+    # EOF sentinel
+    tok_type[tok_count] = T_EOF
+    tok_start[tok_count] = slen
+    tok_len[tok_count] = 0
+    tok_count = tok_count + 1
+end
+
+# ================================================================
+# Symbol table (flat per-scope; reset between function / main)
+# ================================================================
+def sym_reset():
+    g_sym_count = 0
+    g_next_slot = 0
+end
+
+def sym_lookup(s_start, s_len):
+    var i = g_sym_count - 1
+    while (i >= 0):
+        if (g_sym_len[i] == s_len):
+            var a = str_substring(g_src, g_sym_start[i], s_len)
+            var b = str_substring(g_src, s_start, s_len)
+            if (str_eq(a, b)):
+                return g_sym_slot[i]
+            end
+        end
+        i = i - 1
+    end
+    return 0 - 1
+end
+
+def sym_add(s_start, s_len):
+    var slot = g_next_slot
+    g_sym_start[g_sym_count] = s_start
+    g_sym_len[g_sym_count]   = s_len
+    g_sym_slot[g_sym_count]  = slot
+    g_sym_count = g_sym_count + 1
+    g_next_slot = g_next_slot + 1
+    return slot
+end
+
+def sym_add_direct(s_start, s_len, slot):
+    g_sym_start[g_sym_count] = s_start
+    g_sym_len[g_sym_count]   = s_len
+    g_sym_slot[g_sym_count]  = slot
+    g_sym_count = g_sym_count + 1
+    if (slot >= g_next_slot):
+        g_next_slot = slot + 1
+    end
+end
+
+# ================================================================
+# String pool (null-separated, built as a QEntL string)
+# ================================================================
+def pool_add_substr(s_start, s_len):
+    var offset = g_pool_len
+    var sub = str_substring(g_src, s_start, s_len)
+    g_pool_str = str_concat(g_pool_str, sub)
+    g_pool_str = str_concat(g_pool_str, str_from_char(0))
+    g_pool_len = g_pool_len + str_len(sub) + 1
+    return offset
+end
+
+def pool_add_string(s):
+    var offset = g_pool_len
+    if (str_len(s) == 0):
+        return offset
+    end
+    if (g_pool_len > 0):
+        g_pool_str = str_concat(g_pool_str, str_from_char(0))
+    end
+    g_pool_str = str_concat(g_pool_str, s)
+    g_pool_len = offset + str_len(s)
+    return offset
+end
+
+# ================================================================
+# Code emission helpers
+# ================================================================
+def emit_byte(b):
+    g_code[g_code_len] = b
+    g_code_len = g_code_len + 1
+end
+
+def emit_u16(v):
+    g_code[g_code_len] = v % 256
+    g_code_len = g_code_len + 1
+    g_code[g_code_len] = v / 256
+    g_code_len = g_code_len + 1
+end
+
+def patch_u16(at, val):
+    g_code[at] = val % 256
+    g_code[at + 1] = val / 256
+end
+
+# ================================================================
+# Builtin detection
+# ================================================================
+def is_builtin_name(s_start, s_len):
+    var nm = str_substring(g_src, s_start, s_len)
+    if (str_eq(nm, "printf")):          return 1 end
+    if (str_eq(nm, "str_len")):         return 1 end
+    if (str_eq(nm, "str_char_at")):     return 1 end
+    if (str_eq(nm, "str_substring")):   return 1 end
+    if (str_eq(nm, "str_concat")):      return 1 end
+    if (str_eq(nm, "str_eq")):          return 1 end
+    if (str_eq(nm, "str_index_of")):    return 1 end
+    if (str_eq(nm, "str_from_char")):   return 1 end
+    if (str_eq(nm, "str_to_int")):      return 1 end
+    if (str_eq(nm, "int_to_str")):      return 1 end
+    if (str_eq(nm, "len")):             return 1 end
+    if (str_eq(nm, "file_read")):       return 1 end
+    if (str_eq(nm, "file_write_bytes")): return 1 end
+    if (str_eq(nm, "file_exists")):     return 1 end
+    return 0
+end
+
+# ================================================================
+# String-literal processing (strip quotes, expand escapes)
+# Returns pool offset of the processed string.
+# ================================================================
+def process_string_lit(idx):
+    var raw_start = tok_start[idx] + 1
+    var raw_len   = tok_len[idx] - 2
+    var result = ""
+    var i = 0
+    while (i < raw_len):
+        var ch = str_char_at(g_src, raw_start + i)
+        if (str_eq(ch, "\\")):
+            i = i + 1
+            if (i < raw_len):
+                var esc = str_char_at(g_src, raw_start + i)
+                if (str_eq(esc, "n")):
+                    result = str_concat(result, "\n")
+                else:
+                    if (str_eq(esc, "t")):
+                        result = str_concat(result, "\t")
+                    else:
+                        if (str_eq(esc, "\\")):
+                            result = str_concat(result, "\\")
+                        else:
+                            if (str_eq(esc, "\"")):
+                                result = str_concat(result, "\"")
+                            else:
+                                result = str_concat(result, "\\")
+                                result = str_concat(result, esc)
+                            end
+                        end
+                    end
+                end
+            end
+        else:
+            result = str_concat(result, ch)
+        end
+        i = i + 1
+    end
+    return pool_add_string(result)
+end
+
+# ================================================================
+# Expression parser (precedence climbing, emits code directly)
+# ================================================================
+def parse_expr():
+    parse_or_expr()
+end
+
+def parse_or_expr():
+    parse_and_expr()
+    while (cur_type() == T_LOR):
+        advance()
+        parse_and_expr()
+        emit_byte(OP_OR)
+    end
+end
+
+def parse_and_expr():
+    parse_eq_expr()
+    while (cur_type() == T_LAND):
+        advance()
+        parse_eq_expr()
+        emit_byte(OP_AND)
+    end
+end
+
+def parse_eq_expr():
+    parse_cmp_expr()
+    var done = 0
+    while (done == 0):
+        if (cur_type() == T_EQ):
+            advance()
+            parse_cmp_expr()
+            emit_byte(OP_EQ)
+        else:
+            if (cur_type() == T_NEQ):
+                advance()
+                parse_cmp_expr()
+                emit_byte(OP_NEQ)
+            else:
+                done = 1
+            end
+        end
+    end
+end
+
+def parse_cmp_expr():
+    parse_add_expr()
+    var done = 0
+    while (done == 0):
+        if (cur_type() == T_LT):
+            advance()
+            parse_add_expr()
+            emit_byte(OP_LT)
+        else:
+            if (cur_type() == T_GT):
+                advance()
+                parse_add_expr()
+                emit_byte(OP_GT)
+            else:
+                if (cur_type() == T_LE):
+                    advance()
+                    parse_add_expr()
+                    emit_byte(OP_LE)
+                else:
+                    if (cur_type() == T_GE):
+                        advance()
+                        parse_add_expr()
+                        emit_byte(OP_GE)
+                    else:
+                        done = 1
+                    end
+                end
+            end
+        end
+    end
+end
+
+def parse_add_expr():
+    parse_mul_expr()
+    var done = 0
+    while (done == 0):
+        if (cur_type() == T_PLUS):
+            advance()
+            parse_mul_expr()
+            emit_byte(OP_ADD)
+        else:
+            if (cur_type() == T_MINUS):
+                advance()
+                parse_mul_expr()
+                emit_byte(OP_SUB)
+            else:
+                done = 1
+            end
+        end
+    end
+end
+
+def parse_mul_expr():
+    parse_unary()
+    var done = 0
+    while (done == 0):
+        if (cur_type() == T_MUL):
+            advance()
+            parse_unary()
+            emit_byte(OP_MUL)
+        else:
+            if (cur_type() == T_DIV):
+                advance()
+                parse_unary()
+                emit_byte(OP_DIV)
+            else:
+                if (cur_type() == T_MOD):
+                    advance()
+                    parse_unary()
+                    emit_byte(OP_MOD)
+                else:
+                    done = 1
+                end
+            end
+        end
+    end
+end
+
+def parse_unary():
+    if (cur_type() == T_MINUS):
+        advance()
+        parse_unary()
+        emit_byte(OP_NEG)
+    else:
+        if (cur_type() == T_NOT):
+            advance()
+            parse_unary()
+            emit_byte(OP_NOT)
+        else:
+            parse_primary()
+        end
+    end
+end
+
+def parse_primary():
+    var t = cur_type()
+
+    if (t == T_NUMBER):
+        var val = tok_to_int(parse_pos)
+        emit_byte(OP_PUSH_INT)
+        emit_u16(val)
+        advance()
+    else:
+        if (t == T_STRING):
+            var pid = process_string_lit(parse_pos)
+            emit_byte(OP_PUSH_STR)
+            emit_u16(pid)
+            advance()
+        else:
+            if (t == T_IDENT):
+                var ns = tok_start[parse_pos]
+                var nl = tok_len[parse_pos]
+                advance()
+
+                if (cur_type() == T_LPAREN):
+                    # function / builtin call
+                    parse_call(ns, nl)
+                else:
+                    if (cur_type() == T_LBRACKET):
+                        # array read: arr[i]
+                        advance()
+                        parse_expr()
+                        expect(T_RBRACKET)
+                        var slot = sym_lookup(ns, nl)
+                        if (slot < 0):
+                            printf("qcl: error: undefined array var\n")
+                            g_errors = g_errors + 1
+                            slot = 0
+                        end
+                        emit_byte(OP_ARRAY_GET)
+                        emit_u16(slot)
+                    else:
+                        # variable load
+                        var slot = sym_lookup(ns, nl)
+                        if (slot < 0):
+                            printf("qcl: error: undefined var\n")
+                            g_errors = g_errors + 1
+                            slot = 0
+                        end
+                        emit_byte(OP_LOAD_VAR)
+                        emit_u16(slot)
+                    end
+                end
+            else:
+                if (t == T_LPAREN):
+                    advance()
+                    parse_expr()
+                    expect(T_RPAREN)
+                else:
+                    printf("qcl: error: unexpected token %d in expr\n", t)
+                    g_errors = g_errors + 1
+                    g_abort = 1
+                    advance()
+                end
+            end
+        end
+    end
+end
+
+# Function / builtin call: name already consumed, current token is '('
+def parse_call(ns, nl):
+    advance()  # skip '('
+    var nargs = 0
+    if (cur_type() != T_RPAREN):
+        parse_expr()
+        nargs = 1
+        while (cur_type() == T_COMMA):
+            advance()
+            parse_expr()
+            nargs = nargs + 1
+        end
+    end
+    expect(T_RPAREN)
+
+    var pid = pool_add_substr(ns, nl)
+    if (is_builtin_name(ns, nl)):
+        emit_byte(OP_BUILTIN)
+        emit_u16(pid)
+        emit_byte(nargs)
+    else:
+        emit_byte(OP_CALL)
+        emit_u16(pid)
+        emit_byte(nargs)
+    end
+end
+
+# ================================================================
+# Statement parser
+# ================================================================
+def parse_statement():
+    var t = cur_type()
+
+    if (t == T_VAR):
+        parse_var_decl()
+    else:
+        if (t == T_IF):
+            parse_if()
+        else:
+            if (t == T_WHILE):
+                parse_while()
+            else:
+                if (t == T_RETURN):
+                    parse_return()
+                else:
+                    if (t == T_IDENT):
+                        parse_ident_stmt()
+                    else:
+                        # expression statement (e.g. bare function call)
+                        parse_expr()
+                        emit_byte(OP_POP)
+                    end
+                end
+            end
+        end
+    end
+end
+
+# var x = expr  |  var arr[N]
+def parse_var_decl():
+    advance()  # skip 'var'
+    var ns = tok_start[parse_pos]
+    var nl = tok_len[parse_pos]
+    advance()  # skip name
+
+    if (cur_type() == T_LBRACKET):
+        # var arr[expr]
+        advance()  # skip '['
+        parse_expr()
+        expect(T_RBRACKET)
+        var slot = sym_add(ns, nl)
+        emit_byte(OP_ARRAY_NEW)
+        emit_u16(0)   # 0 => pop size from stack
+        emit_byte(OP_STORE_VAR)
+        emit_u16(slot)
+    else:
+        # var x = expr
+        expect(T_ASSIGN)
+        parse_expr()
+        var slot = sym_add(ns, nl)
+        emit_byte(OP_STORE_VAR)
+        emit_u16(slot)
+    end
+end
+
+# if (cond): block [else: block] end
+def parse_if():
+    advance()  # skip 'if'
+    expect(T_LPAREN)
+    parse_expr()
+    expect(T_RPAREN)
+    expect(T_COLON)
+
+    emit_byte(OP_JMP_FALSE)
+    var else_patch = g_code_len
+    emit_u16(0)
+
+    parse_block()
+
+    if (cur_type() == T_ELSE):
+        advance()  # skip 'else'
+        expect(T_COLON)
+
+        emit_byte(OP_JMP)
+        var end_patch = g_code_len
+        emit_u16(0)
+
+        patch_u16(else_patch, g_code_len)
+        parse_block()
+        patch_u16(end_patch, g_code_len)
+    else:
+        patch_u16(else_patch, g_code_len)
+    end
+
+    expect(T_END)
+end
+
+# while (cond): block end
+def parse_while():
+    advance()  # skip 'while'
+    expect(T_LPAREN)
+    var loop_top = g_code_len
+    parse_expr()
+    expect(T_RPAREN)
+    expect(T_COLON)
+
+    emit_byte(OP_JMP_FALSE)
+    var end_patch = g_code_len
+    emit_u16(0)
+
+    parse_block()
+
+    emit_byte(OP_JMP)
+    emit_u16(loop_top)
+
+    patch_u16(end_patch, g_code_len)
+    expect(T_END)
+end
+
+# return expr
+def parse_return():
+    advance()  # skip 'return'
+    var t = cur_type()
+    if (t == T_END):
+        emit_byte(OP_PUSH_INT)
+        emit_u16(0)
+    else:
+        if (t == T_ELSE):
+            emit_byte(OP_PUSH_INT)
+            emit_u16(0)
+        else:
+            if (t == T_EOF):
+                emit_byte(OP_PUSH_INT)
+                emit_u16(0)
+            else:
+                parse_expr()
+            end
+        end
+    end
+    emit_byte(OP_RET)
+end
+
+# Identifier-led statement:
+#   x = expr | arr[i] = expr | f(args) | arr[i] (expr-stmt)
+def parse_ident_stmt():
+    var ns = tok_start[parse_pos]
+    var nl = tok_len[parse_pos]
+    advance()  # skip ident
+
+    if (cur_type() == T_ASSIGN):
+        # x = expr
+        advance()
+        parse_expr()
+        var slot = sym_lookup(ns, nl)
+        if (slot < 0):
+            slot = sym_add(ns, nl)
+        end
+        emit_byte(OP_STORE_VAR)
+        emit_u16(slot)
+    else:
+        if (cur_type() == T_LBRACKET):
+            # arr[i] = expr  OR  arr[i] as expr-stmt
+            advance()  # skip '['
+            parse_expr()
+            expect(T_RBRACKET)
+            if (cur_type() == T_ASSIGN):
+                advance()
+                parse_expr()
+                var slot = sym_lookup(ns, nl)
+                if (slot < 0):
+                    printf("qcl: error: undefined array var in assign\n")
+                    g_errors = g_errors + 1
+                    slot = 0
+                end
+                emit_byte(OP_ARRAY_SET)
+                emit_u16(slot)
+            else:
+                var slot = sym_lookup(ns, nl)
+                if (slot < 0):
+                    printf("qcl: error: undefined array var\n")
+                    g_errors = g_errors + 1
+                    slot = 0
+                end
+                emit_byte(OP_ARRAY_GET)
+                emit_u16(slot)
+                emit_byte(OP_POP)
+            end
+        else:
+            if (cur_type() == T_LPAREN):
+                # function call as statement
+                parse_call(ns, nl)
+                emit_byte(OP_POP)
+            else:
+                # bare variable reference as statement (rare)
+                var slot = sym_lookup(ns, nl)
+                if (slot < 0):
+                    slot = sym_add(ns, nl)
+                end
+                emit_byte(OP_LOAD_VAR)
+                emit_u16(slot)
+                emit_byte(OP_POP)
+            end
+        end
+    end
+end
+
+# Parse a block of statements until 'end', 'else', or EOF
+def parse_block():
+    while (cur_type() != T_END and cur_type() != T_ELSE and cur_type() != T_EOF):
+        parse_statement()
+    end
+end
+
+# ================================================================
+# Function definition parser
+# ================================================================
+def parse_func_def():
+    advance()  # skip 'def'
+
+    var fname_s = tok_start[parse_pos]
+    var fname_l = tok_len[parse_pos]
+    advance()  # skip function name
+
+    expect(T_LPAREN)
+
+    # Collect parameter names
+    var nparams = 0
+    var p_s[64]
+    var p_l[64]
+    if (cur_type() != T_RPAREN):
+        p_s[0] = tok_start[parse_pos]
+        p_l[0] = tok_len[parse_pos]
+        nparams = 1
+        advance()
+        while (cur_type() == T_COMMA):
+            advance()
+            p_s[nparams] = tok_start[parse_pos]
+            p_l[nparams] = tok_len[parse_pos]
+            nparams = nparams + 1
+            advance()
+        end
+    end
+    expect(T_RPAREN)
+    expect(T_COLON)
+
+    # Add names to string pool
+    var fname_pid = pool_add_substr(fname_s, fname_l)
+    var pids[64]
+    var i = 0
+    while (i < nparams):
+        pids[i] = pool_add_substr(p_s[i], p_l[i])
+        i = i + 1
+    end
+
+    # Emit FUNC_DEF header: opcode, name_id, nparams, [param_ids...]
+    emit_byte(OP_FUNC_DEF)
+    emit_u16(fname_pid)
+    emit_byte(nparams)
+    i = 0
+    while (i < nparams):
+        emit_u16(pids[i])
+        i = i + 1
+    end
+
+    # Fresh local scope; params occupy slots 0..nparams-1
+    sym_reset()
+    i = 0
+    while (i < nparams):
+        sym_add_direct(p_s[i], p_l[i], i)
+        i = i + 1
+    end
+
+    # Body
+    parse_block()
+
+    # Implicit return 0
+    emit_byte(OP_PUSH_INT)
+    emit_u16(0)
+    emit_byte(OP_RET)
+    emit_byte(OP_FUNC_END)
+
+    expect(T_END)
+end
+
+# ================================================================
+# Top-level program parser
+# ================================================================
+def parse_program():
+    # Phase 1: all function definitions (must precede main code)
+    while (cur_type() == T_DEF):
+        parse_func_def()
+    end
+
+    # Phase 2: backpatch initial JMP → main_start
+    patch_u16(g_main_jmp_patch, g_code_len)
+
+    # Phase 3: main code (fresh global scope)
+    sym_reset()
+    var done = 0
+    while (done == 0):
+        if (g_errors > 0):
+            done = 1
+        else:
+            var t = cur_type()
+            if (t == T_EOF):
+                done = 1
+            else:
+                if (t == T_DEF):
+                    printf("qcl: error: def after main code started\n")
+                    g_errors = g_errors + 1
+                    advance()
+                else:
+                    if (t == T_END):
+                        printf("qcl: error: stray end\n")
+                        g_errors = g_errors + 1
+                        advance()
+                    else:
+                        if (t == T_ELSE):
+                            printf("qcl: error: stray else\n")
+                            g_errors = g_errors + 1
+                            advance()
+                        else:
+                            parse_statement()
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    # Phase 4: HALT
+    if (g_errors == 0):
+        emit_byte(OP_HALT)
+    else:
+        printf("qcl: error count=%d, aborting output\n", g_errors)
+    end
+end
+
+# ================================================================
+# Output writer – builds QBC1 binary as a string, writes to file
+# ================================================================
+# Convert an integer to a single character byte
+def _emit_byte_char(val):
+    var b = val % 256
+    return str_from_char(b)
+end
+
+def write_output():
+    var out = "QBC1"
+
+    # code_len LE16
+    out = str_concat(out, _emit_byte_char(g_code_len))
+    out = str_concat(out, str_from_char(g_code_len / 256))
+
+    # code bytes – emit in chunks of 64 to reduce heap pressure
+    var chunk = ""
+    var chunk_size = 0
+    var max_chunk = 64
+    var i = 0
+    while (i < g_code_len):
+        var byte_char = str_from_char(g_code[i])
+        out = str_concat(out, byte_char)
+        i = i + 1
+    end
+
+    # pool_len LE16
+    out = str_concat(out, _emit_byte_char(g_pool_len))
+    out = str_concat(out, str_from_char(g_pool_len / 256))
+
+    # pool (already a string with null separators)
+    out = str_concat(out, g_pool_str)
+
+    file_write_bytes(g_output_file, out)
+end
+
+# ================================================================
+# Main entry point
+# ================================================================
+printf("qcl: QEntL compiler (self-hosting)\n")
+
+# Read source
+g_src = file_read(g_input_file)
+g_src_len = str_len(g_src)
+
+if (g_src_len == 0):
+    printf("qcl: error: cannot read %s\n", g_input_file)
+else:
+    # Initialise state
+    g_code_len = 0
+    g_pool_len = 0
+    g_pool_str = ""
+    g_errors   = 0
+    tok_count  = 0
+    parse_pos  = 0
+
+    # Emit initial JMP (placeholder – backpatched in parse_program)
+    emit_byte(OP_JMP)
+    g_main_jmp_patch = g_code_len
+    emit_u16(0)
+
+    # Lex → Parse+Codegen
+    lex_run()
+    parse_program()
+
+    if (g_errors > 0):
+        printf("qcl: %d error(s), output may be invalid\n", g_errors)
+    end
+
+    # Write .qbc
+    if (g_errors == 0):
+        write_output()
+        printf("qcl: %s -> %s  code=%d pool=%d total=%d\n", g_input_file, g_output_file, g_code_len, g_pool_len, g_code_len + g_pool_len + 8)
+    else:
+        printf("qcl: %d error(s), no output written\n", g_errors)
+    end
+end

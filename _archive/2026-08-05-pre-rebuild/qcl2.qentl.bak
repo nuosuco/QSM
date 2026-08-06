@@ -1,0 +1,440 @@
+# Self-hosting QEntL Compiler - Minimal Version
+# Only compiles main function body
+
+def main():
+    var input_file = "input.qentl"
+    var output_file = "output.qbc"
+    
+    # Read source
+    var src = file_read(input_file)
+    if str_len(src) == 0:
+        printf("Error: cannot read input file %s\n", input_file)
+        return
+    end
+    
+    # Tokenize
+    var tokens[4096]
+    var types[4096]
+    var tcount = 0
+    var i = 0
+    var slen = str_len(src)
+    while i < slen:
+        var c = str_sub(src, i, i + 1)
+        if c == " " or c == "\t" or c == "\n" or c == "\r":
+            i = i + 1
+        elif c == "#":
+            while i < slen and str_sub(src, i, i + 1) != "\n":
+                i = i + 1
+            end
+        elif c == '"':
+            var s = ""
+            i = i + 1
+            while i < slen:
+                var cc = str_sub(src, i, i + 1)
+                if cc == "\\":
+                    i = i + 1
+                    if i < slen:
+                        var esc = str_sub(src, i, i + 1)
+                        if esc == "n": s = s + "\n"
+                        elif esc == "t": s = s + "\t"
+                        elif esc == "\\": s = s + "\\"
+                        elif esc == '"': s = s + '"'
+                        else: s = s + esc
+                        end
+                    end
+                    i = i + 1
+                elif cc == '"':
+                    i = i + 1
+                    break
+                else:
+                    s = s + cc
+                    i = i + 1
+                end
+            end
+            tokens[tcount] = s
+            types[tcount] = "str"
+            tcount = tcount + 1
+        elif c >= "0" and c <= "9":
+            var n = ""
+            while i < slen and str_sub(src, i, i + 1) >= "0" and str_sub(src, i, i + 1) <= "9":
+                n = n + str_sub(src, i, i + 1)
+                i = i + 1
+            end
+            tokens[tcount] = n
+            types[tcount] = "num"
+            tcount = tcount + 1
+        elif (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c == "_":
+            var w = ""
+            while i < slen and ((str_sub(src, i, i + 1) >= "a" and str_sub(src, i, i + 1) <= "z") or (str_sub(src, i, i + 1) >= "A" and str_sub(src, i, i + 1) <= "Z") or (str_sub(src, i, i + 1) >= "0" and str_sub(src, i, i + 1) <= "9") or str_sub(src, i, i + 1) == "_"):
+                w = w + str_sub(src, i, i + 1)
+                i = i + 1
+            end
+            tokens[tcount] = w
+            types[tcount] = "id"
+            tcount = tcount + 1
+        elif c == ":" or c == "," or c == "(" or c == ")" or c == "[" or c == "]":
+            tokens[tcount] = c
+            types[tcount] = "op"
+            tcount = tcount + 1
+            i = i + 1
+        elif c == "<" and i + 1 < slen and str_sub(src, i + 1, i + 2) == "=":
+            tokens[tcount] = "<="
+            types[tcount] = "op"
+            tcount = tcount + 1
+            i = i + 2
+        elif c == ">" and i + 1 < slen and str_sub(src, i + 1, i + 2) == "=":
+            tokens[tcount] = ">="
+            types[tcount] = "op"
+            tcount = tcount + 1
+            i = i + 2
+        elif c == "!" and i + 1 < slen and str_sub(src, i + 1, i + 2) == "=":
+            tokens[tcount] = "!="
+            types[tcount] = "op"
+            tcount = tcount + 1
+            i = i + 2
+        elif c == "=" and i + 1 < slen and str_sub(src, i + 1, i + 2) == "=":
+            tokens[tcount] = "=="
+            types[tcount] = "op"
+            tcount = tcount + 1
+            i = i + 2
+        else:
+            i = i + 1
+        end
+    end
+    tokens[tcount] = "eof"
+    types[tcount] = "eof"
+    tcount = tcount + 1
+    
+    # Find main function and compile its body
+    var tpos = 0
+    var g_bc_len = 0
+    var g_sp_len = 0
+    var g_sp[1024]
+    
+    # Find main
+    while tpos < tcount and tokens[tpos] != "def":
+        tpos = tpos + 1
+    end
+    
+    if tpos < tcount:
+        tpos = tpos + 1  # skip "def"
+        # Get function name
+        var fname = tokens[tpos]
+        tpos = tpos + 1
+        if fname == "main":
+            # Skip params
+            if tokens[tpos] == "(":
+                tpos = tpos + 1
+                while tpos < tcount and tokens[tpos] != ")":
+                    tpos = tpos + 1
+                end
+                if tpos < tcount:
+                    tpos = tpos + 1  # skip ")"
+                end
+            end
+            # Skip ":"
+            if tokens[tpos] == ":":
+                tpos = tpos + 1
+            end
+            
+            # Compile main body
+            var bc[16384]
+            var bc_len = 0
+            var sp[1024]
+            var sp_len = 0
+            
+            # Helper: add string to pool
+            def add_string(s):
+                var j = 0
+                while j < sp_len:
+                    if sp[j] == s:
+                        return j
+                    end
+                    j = j + 1
+                end
+                if sp_len < 1024:
+                    sp[sp_len] = s
+                    sp_len = sp_len + 1
+                end
+                return sp_len - 1
+            end
+            
+            # Helper: emit bytecode
+            def bc_b(v):
+                bc[bc_len] = v
+                bc_len = bc_len + 1
+            end
+            
+            def bc_u16(v):
+                bc[bc_len] = v & 255
+                bc_len = bc_len + 1
+                bc[bc_len] = (v >> 8) & 255
+                bc_len = bc_len + 1
+            end
+            
+            # Helper: parse expression
+            def parse_expr():
+                var tk = tokens[tpos]
+                var tt = types[tpos]
+                if tt == "eof" or tk == ":" or tk == "," or tk == ")":
+                    return
+                end
+                tpos = tpos + 1
+                
+                if tt == "num":
+                    var n = to_int(tk)
+                    bc_b(120)
+                    bc_u16(n)
+                elif tt == "str":
+                    var sidx = add_string(tk)
+                    bc_b(121)
+                    bc_u16(sidx)
+                elif tt == "id":
+                    if tokens[tpos] == "(":
+                        tpos = tpos + 1
+                        var sidx = add_string(tk)
+                        var ac = 0
+                        while tpos < tcount and tokens[tpos] != ")":
+                            parse_expr()
+                            ac = ac + 1
+                            if tokens[tpos] == ",":
+                                tpos = tpos + 1
+                            end
+                        end
+                        if tpos < tcount:
+                            tpos = tpos + 1
+                        end
+                        bc_b(112)
+                        bc_u16(sidx)
+                        bc_b(ac)
+                    else:
+                        var sidx = add_string(tk)
+                        bc_b(34)
+                        bc_u16(sidx)
+                    end
+                elif tt == "op":
+                    if tk == "(":
+                        parse_expr()
+                        if tokens[tpos] == ")":
+                            tpos = tpos + 1
+                        end
+                    elif tk == "-":
+                        parse_expr()
+                        bc_b(17)
+                    elif tk == "!":
+                        parse_expr()
+                        bc_b(13)
+                    else:
+                        var op = tk
+                        parse_expr()
+                        if op == "+": bc_b(16)
+                        elif op == "-": bc_b(17)
+                        elif op == "*": bc_b(15)
+                        elif op == "/": bc_b(18)
+                        elif op == "%": bc_b(19)
+                        elif op == "<": bc_b(165)
+                        elif op == ">": bc_b(166)
+                        elif op == "<=": bc_b(167)
+                        elif op == ">=": bc_b(168)
+                        elif op == "==": bc_b(169)
+                        elif op == "!=": bc_b(170)
+                        elif op == "and": bc_b(171)
+                        elif op == "or": bc_b(172)
+                        end
+                    end
+                end
+                
+                # Infix operator
+                if tpos < tcount and types[tpos] == "op":
+                    var op2 = tokens[tpos]
+                    if op2 == "+" or op2 == "-" or op2 == "*" or op2 == "/" or op2 == "%" or op2 == "<" or op2 == ">" or op2 == "<=" or op2 == ">=" or op2 == "==" or op2 == "!=" or op2 == "and" or op2 == "or":
+                        tpos = tpos + 1
+                        parse_expr()
+                        if op2 == "+": bc_b(16)
+                        elif op2 == "-": bc_b(17)
+                        elif op2 == "*": bc_b(15)
+                        elif op2 == "/": bc_b(18)
+                        elif op2 == "%": bc_b(19)
+                        elif op2 == "<": bc_b(165)
+                        elif op2 == ">": bc_b(166)
+                        elif op2 == "<=": bc_b(167)
+                        elif op2 == ">=": bc_b(168)
+                        elif op2 == "==": bc_b(169)
+                        elif op2 == "!=": bc_b(170)
+                        elif op2 == "and": bc_b(171)
+                        elif op2 == "or": bc_b(172)
+                        end
+                    end
+                end
+            end
+            
+            # Compile main body statements
+            while tpos < tcount:
+                var stmt = tokens[tpos]
+                var st = types[tpos]
+                
+                if stmt == "var" and st == "id":
+                    tpos = tpos + 1  # var
+                    var vname = tokens[tpos]
+                    tpos = tpos + 1
+                    # Skip array size
+                    if tokens[tpos] == "[":
+                        tpos = tpos + 1
+                        while tpos < tcount and tokens[tpos] != "]":
+                            tpos = tpos + 1
+                        end
+                        if tpos < tcount:
+                            tpos = tpos + 1
+                        end
+                    end
+                    if tokens[tpos] == "=":
+                        tpos = tpos + 1
+                        parse_expr()
+                    end
+                    var sidx = add_string(vname)
+                    bc_b(33)
+                    bc_u16(sidx)
+                    
+                elif stmt == "if":
+                    var if_pos = bc_len
+                    bc_b(108)
+                    bc_u16(0)
+                    tpos = tpos + 1  # skip "if"
+                    parse_expr()
+                    if tokens[tpos] == ":":
+                        tpos = tpos + 1
+                    end
+                    # Save for later
+                    bc[if_pos + 1] = 0
+                    bc[if_pos + 2] = 0
+                    
+                elif stmt == "else":
+                    tpos = tpos + 1
+                    if tokens[tpos] == ":":
+                        tpos = tpos + 1
+                    end
+                    bc_b(109)
+                    
+                elif stmt == "while":
+                    tpos = tpos + 1
+                    parse_expr()
+                    if tokens[tpos] == ":":
+                        tpos = tpos + 1
+                    end
+                    bc_b(110)
+                    bc_u16(0)
+                    
+                elif stmt == "return":
+                    tpos = tpos + 1
+                    parse_expr()
+                    bc_b(14)
+                    
+                elif stmt == "end":
+                    bc_b(111)
+                    tpos = tpos + 1
+                    
+                elif st == "id" and tokens[tpos] == "(":
+                    # Function call
+                    var fname = tokens[tpos]
+                    tpos = tpos + 1  # skip (
+                    var sidx = add_string(fname)
+                    var ac = 0
+                    while tpos < tcount and tokens[tpos] != ")":
+                        parse_expr()
+                        ac = ac + 1
+                        if tokens[tpos] == ",":
+                            tpos = tpos + 1
+                        end
+                    end
+                    if tpos < tcount:
+                        tpos = tpos + 1  # skip )
+                    end
+                    bc_b(112)
+                    bc_u16(sidx)
+                    bc_b(ac)
+                    
+                elif st == "id" and tokens[tpos] == "=":
+                    var vname = tokens[tpos]
+                    tpos = tpos + 1  # id
+                    tpos = tpos + 1  # =
+                    parse_expr()
+                    var sidx = add_string(vname)
+                    bc_b(33)
+                    bc_u16(sidx)
+                    
+                else:
+                    tpos = tpos + 1
+                end
+                
+                if bc_len >= 16384:
+                    break
+                end
+            end
+            
+            # Build output file
+            var buf[32768]
+            var buf_len = 0
+            buf[buf_len] = 20
+            buf_len = buf_len + 1
+            buf[buf_len] = 0
+            buf_len = buf_len + 1
+            buf[buf_len] = 0
+            buf_len = buf_len + 1
+            buf[buf_len] = 0
+            buf_len = buf_len + 1
+            # Code length
+            buf[buf_len] = bc_len & 255
+            buf_len = buf_len + 1
+            buf[buf_len] = (bc_len >> 8) & 255
+            buf_len = buf_len + 1
+            # Copy bytecode
+            var j = 0
+            while j < bc_len:
+                buf[buf_len] = bc[j]
+                buf_len = buf_len + 1
+                j = j + 1
+            end
+            # String pool size
+            var pool_size = 0
+            j = 0
+            while j < sp_len:
+                pool_size = pool_size + str_len(sp[j]) + 1
+                j = j + 1
+            end
+            buf[buf_len] = pool_size & 255
+            buf_len = buf_len + 1
+            buf[buf_len] = (pool_size >> 8) & 255
+            buf_len = buf_len + 1
+            # String pool data
+            j = 0
+            while j < sp_len:
+                var s = sp[j]
+                var k = 0
+                var sl = str_len(s)
+                while k < sl:
+                    buf[buf_len] = ord(str_sub(s, k, k + 1))
+                    buf_len = buf_len + 1
+                    k = k + 1
+                end
+                buf[buf_len] = 0
+                buf_len = buf_len + 1
+                j = j + 1
+            end
+            
+            # Write output
+            var out_str = ""
+            j = 0
+            while j < buf_len:
+                out_str = out_str + chr(buf[j])
+                j = j + 1
+            end
+            file_write_bytes(output_file, out_str)
+            printf("Compiled %d bytes of code, %d strings\n", bc_len, sp_len)
+            printf("Output written to %s: %d bytes\n", output_file, buf_len)
+        else:
+            printf("Error: no main function found\n")
+        end
+    else:
+        printf("Error: no def found\n")
+    end
+end

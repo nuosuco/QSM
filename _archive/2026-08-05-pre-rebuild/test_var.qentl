@@ -1,0 +1,9 @@
+def test():
+    var x = 10
+    return x
+end
+
+def main():
+    var result = test()
+    printf("result: %d\n", result)
+end

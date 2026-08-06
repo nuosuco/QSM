@@ -1,0 +1,12 @@
+def test():
+    var x = 10
+    if x == 0:
+        printf("x is zero\n")
+    end
+    return x
+end
+
+def main():
+    var result = test()
+    printf("result: %d\n", result)
+end
