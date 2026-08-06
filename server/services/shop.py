@@ -224,16 +224,37 @@ class ShopService:
                 sub_keywords = self._split_keywords(search_keyword)
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                    future_to_kw = {
-                        executor.submit(self._search_taobao, sub_kw, 1, page_size, sort): sub_kw 
-                        for sub_kw in sub_keywords[:3]  # 限制并发数，避免超时
-                    }
-                    for future in concurrent.futures.as_completed(future_to_kw):
-                        sub_items = future.result()
-                        if sub_items:
-                            _add_unique(sub_items)
-                        if len(items) >= page_size * 2:
-                            break
+                    # 每个关键词并行搜5页，取更多候选合并去重
+                    def search_single_page(sub_kw: str) -> list:
+                        result = []
+                        for p in range(1, 6):
+                            items_page = self._search_taobao(sub_kw, p, page_size, sort)
+                            if not items_page:
+                                break
+                            for item in items_page:
+                                item_id = item.get('item_id', '') or ''
+                                title = item.get('title', '') or ''
+                                if not item_id and not title:
+                                    continue
+                                dedup_key = f"{item_id}:{title[:20]}" if item_id else title[:30]
+                                if dedup_key not in seen_ids and not self._is_excluded(item):
+                                    seen_ids.add(dedup_key)
+                                    result.append(item)
+                            if len(result) >= page_size * 3:
+                                break
+                        return result
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                        future_to_kw = {
+                            executor.submit(search_single_page, sub_kw): sub_kw
+                            for sub_kw in sub_keywords[:3]
+                        }
+                        for future in concurrent.futures.as_completed(future_to_kw):
+                            sub_items = future.result()
+                            if sub_items:
+                                items.extend(sub_items)
+                            if len(items) >= page_size * 2:
+                                break
 
             if platform in ("jd", "all"):
                 jd_items = self._search_jd(search_keyword, 1, page_size)
