@@ -967,23 +967,26 @@ function openProduct(webUrl, platform, itemId) {
                     copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
                 });
         } else if (isMobile) {
-            // 手机浏览器：直接跳转淘宝APP
-            // 尝试用 taobao:// 协议直接唤起淘宝APP
-            try {
-                var taobaoUrl = 'taobao://';
-                var startTime = Date.now();
-                window.location.href = taobaoUrl;
-                // 如果3秒内没有跳转成功，fallback到浏览器
-                setTimeout(function() {
-                    if (Date.now() - startTime < 3000) {
-                        // 成功跳转了，不处理
-                    } else {
-                        // 失败，尝试直接打开淘宝网页版
-                        window.open('https://m.taobao.com', '_blank');
-                    }
-                }, 3000);
-            } catch(e) {
-                window.open('https://m.taobao.com', '_blank');
+            // 手机浏览器：尝试用app_url直接跳转淘宝APP
+            // app_url格式: taobao://item/detail?itemId=xxx
+            if (appUrl && appUrl !== '#') {
+                try {
+                    var startTime = Date.now();
+                    window.location.href = appUrl;
+                    setTimeout(function() {
+                        if (Date.now() - startTime < 3000) {
+                            // 成功跳转了
+                        } else {
+                            // 失败，fallback到web版
+                            window.open(webUrl, '_blank');
+                        }
+                    }, 3000);
+                } catch(e) {
+                    window.open(webUrl, '_blank');
+                }
+            } else {
+                // 没有app_url，用web链接
+                window.open(webUrl, '_blank');
             }
         } else {
             // 电脑端：直接跳转淘宝商品详情页
