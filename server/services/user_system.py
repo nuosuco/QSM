@@ -369,18 +369,29 @@ def register_with_password(account: str, password: str, nickname: str = None) ->
     return {"success": True, "user_id": user_id}
 
 def login_with_password(account: str, password: str) -> dict:
-    """用账号+密码登录"""
+    """用账号+密码登录（自动注册新用户）"""
     conn = _conn()
     row = conn.execute("SELECT * FROM users WHERE account = ?", (account,)).fetchone()
-    conn.close()
     
     if not row:
+        # 自动注册新用户
+        user_id = f"user_pw_{int(time.time())}"
+        password_hash = hash_password(password)
+        conn.execute("INSERT INTO users (user_id, account, password_hash, nickname, created_at, is_anonymous) VALUES (?, ?, ?, ?, ?, ?)",
+                    (user_id, account, password_hash, account, int(time.time()), 0))
+        conn.commit()
+        row = conn.execute("SELECT * FROM users WHERE account = ?", (account,)).fetchone()
+    
+    if not row:
+        conn.close()
         return {"success": False, "error": "账号不存在"}
     
     if not row["password_hash"]:
+        conn.close()
         return {"success": False, "error": "该账号未设置密码，请使用其他方式登录"}
     
     if not verify_password(password, row["password_hash"]):
+        conn.close()
         return {"success": False, "error": "密码错误"}
     
     # 生成token
@@ -388,5 +399,6 @@ def login_with_password(account: str, password: str) -> dict:
     
     user = dict(row)
     user.pop("password_hash", None)
+    conn.close()
     
     return {"success": True, "user": user, "token": token}
