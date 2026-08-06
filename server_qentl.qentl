@@ -1,0 +1,86 @@
+# ================================================================
+# QEntL HTTP服务器 — 纯QEntL实现（QEntL全栈Web的心脏）
+# 依赖原语: tcp_listen/accept/recv/send/close（C种子系统接口层）
+# 用法: QVM执行此程序，nginx反代到本端口，qsm.som.top访问
+# ================================================================
+
+# ---- HTTP请求解析 ----
+# 从请求行提取方法: "GET /path HTTP/1.1" -> "GET"
+def http_method(req):
+    var i = 0
+    while (i < str_len(req)):
+        if (str_eq(str_char_at(req, i), " ")):
+            return str_substring(req, 0, i)
+        end
+        i = i + 1
+    end
+    return ""
+end
+
+# 从请求行提取路径: "GET /path HTTP/1.1" -> "/path"
+def http_path(req):
+    var i = 0
+    var start = -1
+    while (i < str_len(req)):
+        var ch = str_char_at(req, i)
+        if (str_eq(ch, " ") and start < 0):
+            start = i + 1
+        else:
+            if (str_eq(ch, " ") and start >= 0):
+                return str_substring(req, start, i - start)
+            end
+        end
+        i = i + 1
+    end
+    return "/"
+end
+
+# ---- 响应构造 ----
+def http_response(status, ctype, body):
+    var head = str_concat("HTTP/1.1 ", status)
+    head = str_concat(head, "\r\nContent-Type: ")
+    head = str_concat(head, ctype)
+    head = str_concat(head, "\r\nContent-Length: ")
+    head = str_concat(head, int_to_str(str_len(body)))
+    head = str_concat(head, "\r\nConnection: close\r\nServer: QEntL/1.0\r\n\r\n")
+    return str_concat(head, body)
+end
+
+# ---- 路由 ----
+def route(path):
+    if (str_eq(path, "/")):
+        var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>QSM - QEntL量子计算</title>\n<style>\nbody { font-family: sans-serif; background: #0a0e17; color: #e0e6ed; margin: 0; }\n.wrap { max-width: 800px; margin: 0 auto; padding: 60px 20px; }\nh1 { color: #4fc3f7; }\n.badge { display: inline-block; background: #1a2332; border: 1px solid #4fc3f7; border-radius: 6px; padding: 4px 12px; margin: 4px; font-size: 13px; color: #81d4fa; }\n.card { background: #111827; border-radius: 10px; padding: 24px; margin-top: 24px; border: 1px solid #1f2937; }\ncode { color: #7ee787; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n<h1>⚛ QSM — QEntL全栈量子计算平台</h1>\n<div class=\"badge\">纯QEntL实现</div>\n<div class=\"badge\">自举编译器</div>\n<div class=\"badge\">QVM虚拟机</div>\n<div class=\"badge\">量子电路编译</div>\n<div class=\"card\">\n<h2>全栈架构</h2>\n<p>本页由 <code>QEntL HTTP服务器</code> 直接提供服务 —— 没有Python、没有Node.js、没有第三方框架。</p>\n<p><code>C种子 → QCL编译器(QEntL写) → QVM虚拟机(QEntL写) → 标准库(QEntL写) → HTTP服务器(QEntL写)</code></p>\n</div>\n<div class=\"card\">\n<h2>访问接口</h2>\n<p><code>GET /</code> — 本页 | <code>GET /api/status</code> — 系统状态 | <code>GET /api/stack</code> — 全栈信息</p>\n</div>\n</div>\n</body>\n</html>\n"
+        return http_response("200 OK", "text/html; charset=utf-8", html)
+    end
+    if (str_eq(path, "/api/status")):
+        var body = str_concat("{\"server\":\"QEntL/1.0\",\"vm\":\"QVM\",\"compiler\":\"QCL\",", "\"bootstrap\":\"self-hosted\",\"status\":\"running\"}")
+        return http_response("200 OK", "application/json", body)
+    end
+    if (str_eq(path, "/api/stack")):
+        var body = "{\"layers\":[\"C种子(量子编译+系统接口)\",\"QCL编译器(1313行QEntL)\",\"QVM虚拟机(800行QEntL)\",\"标准库lib/*.qentl\",\"HTTP服务器(纯QEntL)\"],\"third_party\":\"zero\"}"
+        return http_response("200 OK", "application/json", body)
+    end
+    return http_response("404 Not Found", "text/plain", "404 - QEntL Server")
+end
+
+# ---- 主循环 ----
+var PORT = 9802
+var srv = tcp_listen(PORT)
+if (srv < 0):
+    printf("[http] 端口%d监听失败\n", PORT)
+else:
+    printf("[http] QEntL HTTP服务器启动于端口%d\n", PORT)
+    while (1 == 1):
+        var conn = tcp_accept(srv)
+        if (conn >= 0):
+            var req = tcp_recv(conn, 8192)
+            var m = http_method(req)
+            var p = http_path(req)
+            var resp = route(p)
+            var n = tcp_send(conn, resp)
+            printf("[http] %s %s -> %d字节\n", m, p, n)
+            tcp_shutdown(conn)
+            tcp_close(conn)
+        end
+    end
+end

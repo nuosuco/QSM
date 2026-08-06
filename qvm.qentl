@@ -479,6 +479,36 @@ def do_builtin(bname, nargs):
         push_str(chr(pop1_i))
         return
     end
+    if (str_eq(bname, "tcp_listen")):
+        do_pop1()
+        push_int(tcp_listen(pop1_i))
+        return
+    end
+    if (str_eq(bname, "tcp_accept")):
+        do_pop1()
+        push_int(tcp_accept(pop1_i))
+        return
+    end
+    if (str_eq(bname, "tcp_recv")):
+        do_pop2()
+        push_str(tcp_recv(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "tcp_send")):
+        do_pop2()
+        push_int(tcp_send(pop1_i, pop2_s))
+        return
+    end
+    if (str_eq(bname, "tcp_close")):
+        do_pop1()
+        push_int(tcp_close(pop1_i))
+        return
+    end
+    if (str_eq(bname, "tcp_shutdown")):
+        do_pop1()
+        push_int(tcp_shutdown(pop1_i))
+        return
+    end
     printf("[QVM-Q] 未知内置函数: %s\n", bname)
     sp = sp - nargs
     push_int(0)

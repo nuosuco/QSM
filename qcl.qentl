@@ -276,10 +276,15 @@ def lex_run():
                 var s_start = pos
                 pos = pos + 1
                 var in_str = 1
+                var first_escape = -1
                 while (pos < n and in_str == 1):
                     var sc = str_char_at(g_src, pos)
                     if (str_eq(sc, "\\")):
-                        pos = pos + 2
+                        # 记录第一个转义位置，用于process_string_lit
+                        if (first_escape < 0):
+                            first_escape = pos - s_start
+                        end
+                        pos = pos + 2  # 跳过转义序列（如\r, \n等）
                     else:
                         if (str_eq(sc, "\"")):
                             in_str = 0
@@ -289,7 +294,13 @@ def lex_run():
                         end
                     end
                 end
-                tok_push(T_STRING, s_start, pos - s_start)
+                # 如果有转义，标记为需要处理的字符串
+                if (first_escape >= 0):
+                    # 记录原始字符串，让process_string_lit处理
+                    tok_push(T_STRING, s_start, pos - s_start)
+                else:
+                    tok_push(T_STRING, s_start, pos - s_start)
+                end
                 handled = 1
             end
         end
@@ -631,6 +642,12 @@ def is_builtin(nm):
     if (str_eq(nm, "file_exists")): return 1 end
     if (str_eq(nm, "ord")): return 1 end
     if (str_eq(nm, "chr")): return 1 end
+    if (str_eq(nm, "tcp_listen")): return 1 end
+    if (str_eq(nm, "tcp_accept")): return 1 end
+    if (str_eq(nm, "tcp_recv")): return 1 end
+    if (str_eq(nm, "tcp_send")): return 1 end
+    if (str_eq(nm, "tcp_close")): return 1 end
+    if (str_eq(nm, "tcp_shutdown")): return 1 end
     return 0
 end
 
@@ -646,20 +663,25 @@ def process_string_lit(idx):
             i = i + 1
             if (i < raw_len):
                 var esc = str_char_at(g_src, raw_start + i)
+                # 比较单个字符，不是转义序列字符串
                 if (str_eq(esc, "n")):
                     result = str_concat(result, "\n")
                 else:
-                    if (str_eq(esc, "t")):
-                        result = str_concat(result, "\t")
+                    if (str_eq(esc, "r")):
+                        result = str_concat(result, "\r")
                     else:
-                        if (str_eq(esc, "\\")):
-                            result = str_concat(result, "\\")
+                        if (str_eq(esc, "t")):
+                            result = str_concat(result, "\t")
                         else:
-                            if (str_eq(esc, "\"")):
-                                result = str_concat(result, "\"")
-                            else:
+                            if (str_eq(esc, "\\")):
                                 result = str_concat(result, "\\")
-                                result = str_concat(result, esc)
+                            else:
+                                if (str_eq(esc, "\"")):
+                                    result = str_concat(result, "\"")
+                                else:
+                                    result = str_concat(result, "\\")
+                                    result = str_concat(result, esc)
+                                end
                             end
                         end
                     end
@@ -670,7 +692,7 @@ def process_string_lit(idx):
         end
         i = i + 1
     end
-    return pool_add_string(result)
+    tok_set(1, result, str_len(result))
 end
 
 def tok_num(idx):

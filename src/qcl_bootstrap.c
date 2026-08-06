@@ -13,11 +13,16 @@
  * 代码布局: JMP main_start | FUNC_DEF块... | main_start: 语句... | HALT
  * 变量编码: operand < 0x8000 = 帧内局部slot; >= 0x8000 = 全局slot(op & 0x7FFF)
  */
+#define _GNU_SOURCE  /* memmem */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
 /* ================================================================
  * 通用工具
@@ -343,6 +348,82 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
             if (f) { fclose(f); return mk_int(1); }
         }
         return mk_int(0);
+    }
+    /* ---- TCP socket原语（操作系统接口层，QEntL网络能力基础） ---- */
+    if (strcmp(name, "tcp_listen") == 0) {
+        if (nargs >= 1 && args[0].type == V_INT) {
+            int fd = socket(AF_INET, SOCK_STREAM, 0);
+            if (fd < 0) return mk_int(-1);
+            int yes = 1;
+            setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+            struct sockaddr_in addr;
+            memset(&addr, 0, sizeof(addr));
+            addr.sin_family = AF_INET;
+            addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            addr.sin_port = htons((unsigned short)args[0].i);
+            if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) { close(fd); return mk_int(-1); }
+            if (listen(fd, 64) < 0) { close(fd); return mk_int(-1); }
+            return mk_int(fd);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "tcp_accept") == 0) {
+        if (nargs >= 1 && args[0].type == V_INT) {
+            int c = accept((int)args[0].i, NULL, NULL);
+            if (c >= 0) {
+                /* 接收超时10秒，防止恶意客户端挂死QVM */
+                struct timeval tv = {10, 0};
+                setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+            }
+            return mk_int(c);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "tcp_recv") == 0) {
+        if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
+            long long max = args[1].i;
+            if (max <= 0 || max > 1048576) max = 8192;
+            char *buf = (char *)malloc(max);
+            long long total = 0;
+            /* 读取直到拿满请求头（空行）或缓冲区满或超时/关闭 */
+            while (total < max) {
+                long long rd = recv((int)args[0].i, buf + total, max - total, 0);
+                if (rd <= 0) break;
+                total += rd;
+                /* HTTP请求头结束检测：\r\n\r\n */
+                if (total >= 4 && memmem(buf, total, "\r\n\r\n", 4)) break;
+            }
+            Value r = mk_str_copy(buf, total);
+            free(buf);
+            return r;
+        }
+        return mk_str_copy("", 0);
+    }
+    if (strcmp(name, "tcp_send") == 0) {
+        if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_STR) {
+            long long sent = 0;
+            while (sent < args[1].len) {
+                long long w = send((int)args[0].i, args[1].s + sent, args[1].len - sent, MSG_NOSIGNAL);
+                if (w <= 0) break;
+                sent += w;
+            }
+            return mk_int(sent);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "tcp_close") == 0) {
+        if (nargs >= 1 && args[0].type == V_INT) {
+            close((int)args[0].i);
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    if (strcmp(name, "tcp_shutdown") == 0) {
+        if (nargs >= 1 && args[0].type == V_INT) {
+            shutdown((int)args[0].i, SHUT_WR);
+            return mk_int(0);
+        }
+        return mk_int(-1);
     }
     fprintf(stderr, "[QVM] 未知内置函数: %s\n", name);
     exit(1);
@@ -830,9 +911,10 @@ static int is_builtin_name(Comp *c, long start, long len) {
     static const char *names[] = {
         "printf", "str_len", "str_char_at", "str_substring", "str_concat",
         "str_eq", "str_index_of", "str_from_char", "str_to_int", "int_to_str",
-        "len", "file_read", "file_write_bytes", "file_exists", "ord", "chr"
+        "len", "file_read", "file_write_bytes", "file_exists", "ord", "chr",
+        "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown"
     };
-    for (int k = 0; k < 16; k++)
+    for (int k = 0; k < 22; k++)
         if (kw_match(c->src + start, len, names[k])) return 1;
     return 0;
 }
@@ -850,6 +932,7 @@ static int process_string_lit(Comp *c, int tokidx) {
             k++;
             char e = c->src[raw_start + k];
             if (e == 'n') tmp[o++] = '\n';
+            else if (e == 'r') tmp[o++] = '\r';
             else if (e == 't') tmp[o++] = '\t';
             else if (e == '\\') tmp[o++] = '\\';
             else if (e == '"') tmp[o++] = '"';
