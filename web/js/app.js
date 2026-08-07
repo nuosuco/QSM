@@ -1576,8 +1576,8 @@ async function sendForgotPassword() {
 // 微信服务号登录
 function wechatLogin() {
     // 微信服务号OAuth2.0授权
+    var appId = 'wx82287ef5c8de2fd2';
     var redirectUrl = encodeURIComponent(window.location.origin + '/wechat-callback');
-    var appId = 'YOUR_APPID'; // 待中华提供
     var state = 'som_wechat_login';
     
     // 跳转到微信授权页
