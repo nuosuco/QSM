@@ -1,36 +1,40 @@
 # ================================================================
-# examples/qclustering.qentl — 量子聚类分析
-# 使用量子叠加态进行模式聚类
+# examples/qclustering.qentl — 量子聚类演示
+# 使用贝尔态展示量子纠缠在聚类中的应用
 # ================================================================
 
-qreg q[6]
+qreg q[4]
 
-# 初始化
+# 创建两个贝尔纠缠对
+# 第一对: q[0]-q[1]
 h q[0]
-h q[1]
-h q[2]
-h q[3]
-h q[4]
-h q[5]
-
-# 创建纠缠对
 cx q[0], q[1]
+
+# 第二对: q[2]-q[3]
+h q[2]
 cx q[2], q[3]
-cx q[4], q[5]
 
-# 测量聚类结果
-var cluster0 = measure q[0]
-var cluster1 = measure q[1]
-var cluster2 = measure q[2]
-var cluster3 = measure q[3]
-var cluster4 = measure q[4]
-var cluster5 = measure q[5]
+# 测量所有量子位
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var m3 = measure q[3]
 
-printf("量子聚类: %d %d | %d %d | %d %d\n", cluster0, cluster1, cluster2, cluster3, cluster4, cluster5)
+printf("量子聚类: %d %d | %d %d\n", m0, m1, m2, m3)
 
-# 验证纠缠一致性
-if (cluster0 == cluster1 and cluster2 == cluster3 and cluster4 == cluster5):
-    printf("量子聚类验证: 通过\n")
+# 验证纠缠: 每对的两个量子位应该相同 (00 或 11)
+var pair1_match = 0
+var pair2_match = 0
+if (m0 == m1):
+    pair1_match = 1
+end
+if (m2 == m3):
+    pair2_match = 1
+end
+var total_match = pair1_match + pair2_match
+printf("纠缠对1匹配: %d, 纠缠对2匹配: %d\n", pair1_match, pair2_match)
+if (total_match == 2):
+    printf("量子聚类验证: 通过 (两对纠缠对都显示完美关联)\n")
 else:
     printf("量子聚类验证: 失败\n")
 end
