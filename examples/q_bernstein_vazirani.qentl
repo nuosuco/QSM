@@ -1,0 +1,26 @@
+# ================================================================
+# examples/q Bernstein-Vazirani.qentl — BV算法
+# 寻找隐藏字符串
+# ================================================================
+qreg q[4]
+# 初始化
+h q[0]
+h q[1]
+h q[2]
+x q[3]
+h q[3]
+# 预言机（隐藏字符串0110）
+cx q[0], q[3]
+cx q[1], q[3]
+# 测量
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var m3 = measure q[3]
+printf("BV算法: %d %d %d %d\n", m0, m1, m2, m3)
+if (m0 == 0 and m1 == 1 and m2 == 1 and m3 == 0):
+    printf("隐藏字符串: 0110\n")
+    printf("BV算法验证: 通过\n")
+else:
+    printf("BV算法验证: 失败\n")
+end
