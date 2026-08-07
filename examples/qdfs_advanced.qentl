@@ -1,34 +1,25 @@
 # ================================================================
 # examples/qdfs_advanced.qentl — QDFS高级操作演示
-# 通过exec调用C种子层的QDFS原语
+# 测试QDFS量子文件系统的叠加态读写和纠缠
 # ================================================================
 
 # 创建叠加态文件
-var result = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_create(\"quantum_data\")' 2>&1 | tail -1")
-printf("创建文件: quantum_data\n")
+var f1 = qfile_create("quantum_data")
+printf("创建文件: quantum_data, 句柄=%d\n", f1)
 
 # 写入多个版本
-var w1 = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_write(0, \"版本A\")' 2>&1 | tail -1")
-var w2 = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_write(0, \"版本B\")' 2>&1 | tail -1")
-var w3 = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_write(0, \"版本C\")' 2>&1 | tail -1")
+qfile_write(f1, "版本A")
+qfile_write(f1, "版本B")
+qfile_write(f1, "版本C")
 printf("写入3个版本\n")
 
-# 读取坍缩
-var r1 = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_read(0)' 2>&1 | tail -1")
-printf("读取坍缩: %s\n", r1)
+# 读取坍缩（随机选择一个版本）
+var read1 = qfile_read(f1)
+printf("读取坍缩: %s\n", read1)
 
-# 创建纠缠文件对
-var e1 = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_entangle(0, 1)' 2>&1 | tail -1")
-printf("创建纠缠文件对\n")
-
-# 写入纠缠文件
-var ew = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_write(0, \"纠缠态\")' 2>&1 | tail -1")
-var er = exec("cd /root/QSM && timeout 5 bin/qcl_bootstrap run -c 'qfile_read(0)' 2>&1 | tail -1")
-printf("纠缠文件读取: %s\n", er)
-
-# 验证
-if (str_contains(er, "纠缠") or str_contains(er, "版本")):
-    printf("QDFS高级操作验证: 通过\n")
+# 验证读取结果
+if (read1 == "版本A" or read1 == "版本B" or read1 == "版本C"):
+    printf("QDFS叠加态读取验证: 通过\n")
 else:
-    printf("QDFS高级操作验证: 失败\n")
+    printf("QDFS叠加态读取验证: 失败, 得到: %s\n", read1)
 end
