@@ -663,6 +663,7 @@ def is_builtin(nm):
     if (str_eq(nm, "apply_ccx")): return 1 end
     if (str_eq(nm, "apply_ccz")): return 1 end
     if (str_eq(nm, "apply_cccz")): return 1 end
+    if (str_eq(nm, "apply_ccccz")): return 1 end
     if (str_eq(nm, "apply_phase")): return 1 end
     if (str_eq(nm, "apply_iphase")): return 1 end
     if (str_eq(nm, "apply_cphase")): return 1 end
@@ -993,7 +994,10 @@ def parse_statement():
                             if (str_eq(ident_nm, "cccz")):
                                 parse_quantum_cccz(ident_ns, ident_nl)
                             else:
-                                if (str_eq(ident_nm, "phase") or str_eq(ident_nm, "iphase")):
+                                if (str_eq(ident_nm, "ccccz")):
+                                    parse_quantum_ccccz(ident_ns, ident_nl)
+                                else:
+                                    if (str_eq(ident_nm, "phase") or str_eq(ident_nm, "iphase")):
                                 parse_quantum_phase(ident_ns, ident_nl)
                             else:
                                 if (str_eq(ident_nm, "cphase") or str_eq(ident_nm, "icphase")):
@@ -1004,13 +1008,14 @@ def parse_statement():
                                     else:
                                         parse_ident_stmt()
                                     end
-                                end
+                                                            end
+                                                        end
+                                                    end
                                                 end
                                             end
                                         end
-                                    end
-                                end
-                                            else:
+                                        end
+                                        else:
                                                 if (t == T_IF):
                     parse_if()
                 else:
@@ -1233,6 +1238,56 @@ def parse_quantum_cccz(ns, nl):
     emit_byte(OP_BUILTIN)
     emit_u16(pool_add_string("apply_cccz"))
     emit_byte(5)
+    emit_byte(OP_POP)
+end
+
+# ccccz q[a], q[b], q[c], q[d], q[e] — 四控制Z门 (5量子位)
+def parse_quantum_ccccz(ns, nl):
+    advance()
+    var c1_ns = g_tok_start[g_parse_pos]
+    var c1_nl = g_tok_len[g_parse_pos]
+    advance()
+    expect(T_LBRACKET, "ccccz缺[")
+    var c1_idx = 0
+    if (cur_type() == T_NUMBER):
+        c1_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    expect(T_RBRACKET, "ccccz缺]")
+    var i = 0
+    while (i < 4):
+        if (cur_type() == T_COMMA): advance() end
+        var r_ns = g_tok_start[g_parse_pos]
+        var r_nl = g_tok_len[g_parse_pos]
+        advance()
+        expect(T_LBRACKET, "ccccz缺[")
+        var r_idx = 0
+        if (cur_type() == T_NUMBER):
+            r_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+            advance()
+        end
+        expect(T_RBRACKET, "ccccz缺]")
+        if (i == 0): c2_ns = r_ns; c2_nl = r_nl; c2_idx = r_idx end
+        if (i == 1): c3_ns = r_ns; c3_nl = r_nl; c3_idx = r_idx end
+        if (i == 2): c4_ns = r_ns; c4_nl = r_nl; c4_idx = r_idx end
+        if (i == 3): t_ns = r_ns; t_nl = r_nl; t_idx = r_idx end
+        i = i + 1
+    end
+    emit_byte(OP_LOAD_VAR)
+    emit_u16(sym_resolve(c1_ns, c1_nl))
+    emit_byte(OP_PUSH_INT)
+    emit_u16(c1_idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(c2_idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(c3_idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(c4_idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(t_idx)
+    emit_byte(OP_BUILTIN)
+    emit_u16(pool_add_string("apply_ccccz"))
+    emit_byte(6)
     emit_byte(OP_POP)
 end
 

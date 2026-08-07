@@ -87,6 +87,8 @@ var pop4_i = 0
 var pop4_s = ""
 var pop5_i = 0
 var pop5_s = ""
+var pop6_i = 0
+var pop6_s = ""
 var g_cmp_r = 0
 
 # ================================================================
@@ -154,6 +156,13 @@ def do_pop4():
     pop4_i = pop1_i
     pop4_s = pop1_s
     do_pop3()
+end
+
+def do_pop6():
+    do_pop1()
+    pop6_i = pop1_i
+    pop6_s = pop1_s
+    do_pop5()
 end
 
 def do_pop5():
@@ -636,6 +645,11 @@ def do_builtin(bname, nargs):
     if (str_eq(bname, "apply_ccz")):
         do_pop4()
         push_int(apply_ccz(pop1_i, pop2_i, pop3_i, pop4_i))
+        return
+    end
+    if (str_eq(bname, "apply_ccccz")):
+        do_pop6()
+        push_int(apply_ccccz(pop1_i, pop2_i, pop3_i, pop4_i, pop5_i, pop6_i))
         return
     end
     if (str_eq(bname, "apply_cccz")):

@@ -809,7 +809,30 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
         }
         return mk_int(-1);
     }
-    /* ---- 4量子位Grover所需: CCCZ(三控制Z) ---- */
+    /* ---- 5量子位Grover所需: CCCCZ(四控制Z) ---- */
+    if (strcmp(name, "apply_ccccz") == 0) {
+        if (nargs >= 6 && args[0].type == V_INT && args[1].type == V_INT &&
+            args[2].type == V_INT && args[3].type == V_INT && args[4].type == V_INT && args[5].type == V_INT) {
+            int id = (int)args[0].i;
+            int c1 = (int)args[1].i, c2 = (int)args[2].i;
+            int c3 = (int)args[3].i, c4 = (int)args[4].i, t = (int)args[5].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state)
+                return mk_int(-1);
+            int n = qregs[id].n;
+            int b1 = 1 << c1, b2 = 1 << c2, b3 = 1 << c3, b4 = 1 << c4, bt = 1 << t;
+            int sz = 1 << n;
+            double *s = qregs[id].state;
+            for (int i = 0; i < sz; i++) {
+                if ((i & b1) && (i & b2) && (i & b3) && (i & b4) && (i & bt)) {
+                    s[2 * i] = -s[2 * i];
+                    s[2 * i + 1] = -s[2 * i + 1];
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    /* ---- CCCZ(三控制Z) ---- */
     if (strcmp(name, "apply_cccz") == 0) {
         if (nargs >= 5 && args[0].type == V_INT && args[1].type == V_INT &&
             args[2].type == V_INT && args[3].type == V_INT && args[4].type == V_INT) {
@@ -1361,7 +1384,7 @@ static int is_builtin_name(Comp *c, long start, long len) {
         "exec",
         "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx",
         "apply_x", "apply_z", "apply_cz", "apply_ccx", "apply_ccz",
-        "apply_phase", "apply_iphase", "apply_cphase", "apply_icphase", "apply_cccz", "measure"
+        "apply_phase", "apply_iphase", "apply_cphase", "apply_icphase", "apply_cccz", "apply_ccccz", "measure"
     };
     for (int k = 0; k < (int)(sizeof(names) / sizeof(names[0])); k++)
         if (kw_match(c->src + start, len, names[k])) return 1;
