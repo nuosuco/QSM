@@ -202,13 +202,21 @@ def route(path, req):
         return http_response("200 OK", "text/plain; charset=utf-8", out6)
     end
     if (str_eq(path, "/api/shor15")):
-        var out7 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor15.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out7)
-    end
-    if (str_eq(path, "/api/shor21")):
-        var out13 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor21.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out13)
-    end
+            var out7 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor15.qbc 2>&1; done")
+            return http_response("200 OK", "text/plain; charset=utf-8", out7)
+        end
+        if (str_eq(path, "/api/shor21")):
+            var out8 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor21.qbc 2>&1; done")
+            return http_response("200 OK", "text/plain; charset=utf-8", out8)
+        end
+        if (str_eq(path, "/api/shor77")):
+            var out16 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor77.qbc 2>&1; done")
+            return http_response("200 OK", "text/plain; charset=utf-8", out16)
+        end
+        if (str_eq(path, "/api/shor143")):
+            var out17 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor143.qbc 2>&1; done")
+            return http_response("200 OK", "text/plain; charset=utf-8", out17)
+        end
     if (str_eq(path, "/api/shor35")):
         var out15 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor35.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out15)
