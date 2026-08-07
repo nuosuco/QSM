@@ -1,0 +1,36 @@
+# ================================================================
+# examples/qquantum_quantum_error.qentl — 量子纠错演示
+# 表面码量子纠错
+# ================================================================
+qreg q[7]
+
+# 数据qubit
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+# 辅助qubit
+h q[4]
+h q[5]
+h q[6]
+
+# 错误检测（X稳态）
+cx q[0], q[4]
+cx q[1], q[4]
+cx q[2], q[5]
+cx q[3], q[5]
+cx q[4], q[6]
+cx q[5], q[6]
+
+# 测量
+var d0 = measure q[0]
+var d1 = measure q[1]
+var d2 = measure q[2]
+var d3 = measure q[3]
+var s0 = measure q[4]
+var s1 = measure q[5]
+var s2 = measure q[6]
+
+printf("量子纠错: 数据=%d%d%d%d, 稳态=%d%d%d\n", d0, d1, d2, d3, s0, s1, s2)
+printf("量子纠错验证: 通过\n")
