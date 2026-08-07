@@ -185,6 +185,10 @@ def route(path, req):
         var out10 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/teleport.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out10)
     end
+    if (str_eq(path, "/api/dj")):
+        var out11 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/dj.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out11)
+    end
     if (str_eq(path, "/api/pea")):
         var out4 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/pea.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out4)
