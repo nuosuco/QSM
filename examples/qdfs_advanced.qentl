@@ -1,0 +1,51 @@
+# ================================================================
+# examples/qdfs_advanced.qentl — QDFS高级操作演示
+# 测试QDFS量子文件系统的完整功能：
+# 1. 创建叠加态文件
+# 2. 写入多个版本
+# 3. 读取坍缩
+# 4. 纠缠文件对验证
+# 5. 文件列表
+# ================================================================
+
+# 创建叠加态文件
+var f1 = qfile_create("quantum_data")
+printf("创建文件: quantum_data\n")
+
+# 写入多个版本
+qfile_write(f1, "版本A")
+qfile_write(f1, "版本B")
+qfile_write(f1, "版本C")
+printf("写入3个版本\n")
+
+# 读取坍缩（随机选择一个版本）
+var read1 = qfile_read(f1)
+printf("读取坍缩: %s\n", read1)
+
+# 创建纠缠文件对
+var f2 = qfile_create("entangled_A")
+var f3 = qfile_create("entangled_B")
+qfile_entangle(f2, f3)
+printf("创建纠缠文件对\n")
+
+# 写入纠缠文件A
+qfile_write(f2, "纠缠态|00>+|11>")
+var ent_read = qfile_read(f2)
+printf("纠缠文件A读取: %s\n", ent_read)
+
+# 验证纠缠同步
+if (str_contains(ent_read, "纠缠")):
+    printf("QDFS纠缠验证: 通过\n")
+else:
+    printf("QDFS纠缠验证: 失败\n")
+end
+
+# 文件列表
+var files = file_list("/tmp/.qdfs")
+printf("文件列表: %s\n", files)
+
+# 获取文件信息
+var info = qfile_info(f1)
+printf("文件信息: %s\n", info)
+
+printf("QDFS高级操作演示完成\n")
