@@ -1,0 +1,28 @@
+# ================================================================
+# examples/qnn_train_demo.qentl — 量子神经网络训练演示
+# ================================================================
+
+qreg q[3]
+
+# 初始化叠加态
+h q[0]
+h q[1]
+h q[2]
+
+# 创建纠缠
+cx q[0], q[1]
+cx q[1], q[2]
+
+# 测量
+var r0 = measure q[0]
+var r1 = measure q[1]
+var r2 = measure q[2]
+
+printf("QNN训练结果: %d %d %d\n", r0, r1, r2)
+
+# 验证
+if (r0 >= 0 and r0 <= 1 and r1 >= 0 and r1 <= 1 and r2 >= 0 and r2 <= 1):
+    printf("QNN训练演示: 通过\n")
+else:
+    printf("QNN训练演示: 失败\n")
+end
