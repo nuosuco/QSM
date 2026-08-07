@@ -120,7 +120,32 @@ end
 
 # ---- IDE页面 ----
 def ide_page():
-    var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>QEntL在线IDE</title>\n<style>\nbody { font-family: monospace; background: #0a0e17; color: #e0e6ed; margin: 0; }\n.wrap { max-width: 900px; margin: 0 auto; padding: 20px; }\nh1 { color: #4fc3f7; }\ntextarea { width: 100%%; height: 220px; background: #111827; color: #7ee787; border: 1px solid #374151; border-radius: 6px; padding: 12px; font-size: 14px; }\nbutton { background: #4fc3f7; color: #000; border: 0; padding: 10px 24px; border-radius: 6px; font-size: 15px; cursor: pointer; margin-top: 10px; }\npre { background: #111827; border: 1px solid #374151; border-radius: 6px; padding: 12px; min-height: 80px; white-space: pre-wrap; }\n.tip { color: #6b7280; font-size: 12px; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n<h1>&#9889; QEntL在线IDE</h1>\n<p class=\"tip\">纯QEntL全栈：QCL编译 + QVM沙箱执行，无第三方依赖</p>\n<textarea id=\"code\">printf(\"Hello from QEntL!\\n\")\nqreg q[2]\nh q[0]\ncx q[0], q[1]\nvar m0 = measure q[0]\nvar m1 = measure q[1]\nprintf(\"Bell: %%d %%d\\n\", m0, m1)\n</textarea>\n<button onclick=\"run()\">&#9654; 运行</button>\n<pre id=\"out\">输出...</pre>\n</div>\n<script>\nfunction run() {\n  var out = document.getElementById(\"out\");\n  out.textContent = \"编译运行中...\";\n  var xhr = new XMLHttpRequest();\n  xhr.open(\"POST\", \"/api/run\", true);\n  xhr.setRequestHeader(\"Content-Type\", \"application/x-www-form-urlencoded\");\n  xhr.onload = function() { out.textContent = xhr.responseText; };\n  xhr.onerror = function() { out.textContent = \"请求失败\"; };\n  xhr.send(\"code=\" + encodeURIComponent(document.getElementById(\"code\").value));\n}\n</script>\n</body>\n</html>\n"
+    var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>QEntL在线IDE</title>\n<style>\nbody { font-family: monospace; background: #0a0e17; color: #e0e6ed; margin: 0; }\n.wrap { max-width: 900px; margin: 0 auto; padding: 20px; }\nh1 { color: #4fc3f7; }\ntextarea { width: 100%%; height: 220px; background: #111827; color: #7ee787; border: 1px solid #374151; border-radius: 6px; padding: 12px; font-size: 14px; }\nbutton { background: #4fc3f7; color: #000; border: 0; padding: 10px 24px; border-radius: 6px; font-size: 15px; cursor: pointer; margin-top: 10px; }\npre { background: #111827; border: 1px solid #374151; border-radius: 6px; padding: 12px; min-height: 80px; white-space: pre-wrap; }\n.tip { color: #6b7280; font-size: 12px; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n<h1>&#9889; QEntL在线IDE</h1>\n<p class=\"tip\">纯QEntL全栈：QCL编译 + QVM沙箱执行，无第三方依赖</p>
+<textarea id=\"code\">printf(\"Hello from QEntL!\\n\")
+qreg q[2]
+h q[0]
+cx q[0], q[1]
+var m0 = measure q[0]
+var m1 = measure q[1]
+printf(\"Bell: %%d %%d\\n\", m0, m1)
+</textarea>
+<button onclick=\"run()\">&#9654; 运行</button>
+<pre id=\"out\">输出...</pre>
+</div>
+<script>
+function run() {
+  var out = document.getElementById(\"out\");
+  out.textContent = \"编译运行中...\";
+  var xhr = new XMLHttpRequest();
+  xhr.open(\"POST\", \"/api/run\", true);
+  xhr.setRequestHeader(\"Content-Type\", \"application/x-www-form-urlencoded\");
+  xhr.onload = function() { out.textContent = xhr.responseText; };
+  xhr.onerror = function() { out.textContent = \"请求失败\"; };
+  xhr.send(\"code=\" + encodeURIComponent(document.getElementById(\"code\").value));
+}
+</script>
+</body>
+</html>\n"
     return html
 end
 
@@ -182,16 +207,16 @@ def route(path, req):
         return http_response("200 OK", "text/plain; charset=utf-8", out9)
     end
     if (str_eq(path, "/api/grover5")):
-        var out12 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/grover5.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out12)
-    end
-    if (str_eq(path, "/api/teleport")):
-        var out10 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/teleport.qbc 2>&1; done")
+        var out10 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/grover5.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out10)
     end
-    if (str_eq(path, "/api/dj")):
-        var out11 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/dj.qbc 2>&1; done")
+    if (str_eq(path, "/api/teleport")):
+        var out11 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/teleport.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out11)
+    end
+    if (str_eq(path, "/api/dj")):
+        var out12 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/dj.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out12)
     end
     if (str_eq(path, "/api/pea")):
         var out4 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/pea.qbc 2>&1; done")
@@ -202,55 +227,43 @@ def route(path, req):
         return http_response("200 OK", "text/plain; charset=utf-8", out6)
     end
     if (str_eq(path, "/api/shor15")):
-            var out7 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor15.qbc 2>&1; done")
-            return http_response("200 OK", "text/plain; charset=utf-8", out7)
-        end
-        if (str_eq(path, "/api/shor21")):
-            var out8 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor21.qbc 2>&1; done")
-            return http_response("200 OK", "text/plain; charset=utf-8", out8)
-        end
-        if (str_eq(path, "/api/shor77")):
-            var out16 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor77.qbc 2>&1; done")
-            return http_response("200 OK", "text/plain; charset=utf-8", out16)
-        end
-        if (str_eq(path, "/api/shor143")):
-            var out17 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor143.qbc 2>&1; done")
-            return http_response("200 OK", "text/plain; charset=utf-8", out17)
-        end
+        var out7 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor15.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out7)
+    end
+    if (str_eq(path, "/api/shor21")):
+        var out8 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor21.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out8)
+    end
     if (str_eq(path, "/api/shor35")):
-        var out15 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor35.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out15)
+        var out13 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor35.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out13)
     end
     if (str_eq(path, "/api/shor77")):
-        var out16 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor77.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out16)
+        var out14 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor77.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out14)
     end
     if (str_eq(path, "/api/shor143")):
-        var out17 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor143.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out17)
-    end
-    if (str_eq(path, "/api/shor_qft")):
-        var out18 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor_qft.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out18)
-    end
-    if (str_eq(path, "/api/bench")):
-        var out14 = exec("cd /root/QSM && for i in 1 2 3; do time bin/qcl_bootstrap run build/bench.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out14)
+        var out15 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor143.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out15)
     end
     if (str_eq(path, "/api/qft")):
         var out5 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qft.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out5)
     end
     if (str_eq(path, "/api/qft6")):
-        var out8 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 15 bin/qcl_bootstrap run build/qft6.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out8)
+        var out16 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 15 bin/qcl_bootstrap run build/qft6.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out16)
     end
     if (str_eq(path, "/api/qdfs")):
         var out = exec("cd /root/QSM && timeout 20 bin/qcl_bootstrap run build/qdfs_demo.qbc 2>&1")
         return http_response("200 OK", "text/plain; charset=utf-8", out)
     end
+    if (str_eq(path, "/api/bench")):
+        var out14 = exec("cd /root/QSM && for i in 1 2 3; do time bin/qcl_bootstrap run build/bench.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out14)
+    end
     if (str_eq(path, "/api/status")):
-        var body = str_concat("{\"server\":\"QEntL/1.0\",\"vm\":\"QVM\",\"compiler\":\"QCL\",", "\"bootstrap\":\"self-hosted\",\"ide\":\"online\",\"status\":\"running\"}")
+        var body = "{\"server\":\"QEntL/1.0\",\"vm\":\"QVM\",\"compiler\":\"QCL\",\"bootstrap\":\"self-hosted\",\"ide\":\"online\",\"status\":\"running\"}"
         return http_response("200 OK", "application/json", body)
     end
     if (str_eq(path, "/api/stack")):
