@@ -1,6 +1,7 @@
-# QEntL 全栈量子计算平台 v0.0.4
+# QEntL 全栈量子计算平台 v0.0.5
 
 > 纯QEntL实现，零第三方依赖，自举编译器，在线IDE，HTTP服务器全栈完成。
+> 运行于 https://qsm.som.top (QOS平台)
 
 ## 🏗️ 全栈架构
 
@@ -24,6 +25,7 @@ HTTP服务器 (server_qentl.qentl → server.qbc)
 - ✅ 自举编译：C种子编译QCL，QCL编译一切
 - ✅ 在线IDE：浏览器写代码，云端编译运行
 - ✅ HTTP API：18个端点，公网可访问
+- ✅ 22个量子算法示例，全部验证通过
 
 ---
 
@@ -45,16 +47,17 @@ bin/qcl_bootstrap compile qcl.qentl build/qcl.qbc
 bin/qcl_bootstrap compile qvm.qentl build/qvm.qbc
 ```
 
-### 4. 编译算法示例
+### 4. 编译HTTP服务器
 ```bash
-bin/qcl_bootstrap compile examples/grover.qentl build/grover.qbc
-bin/qcl_bootstrap run build/grover.qbc
+bin/qcl_bootstrap compile server_qentl.qentl build/server.qbc
+bin/qcl_bootstrap run build/server.qbc
+# 访问: https://qsm.som.top
 ```
 
-### 5. 启动HTTP服务器
+### 5. 运行算法示例
 ```bash
-bin/qcl_bootstrap run build/server.qbc
-# 访问: https://qsm.som.top/ide
+bin/qcl_bootstrap run build/grover4.qbc
+bin/qcl_bootstrap run build/shor15.qbc
 ```
 
 ---
@@ -81,28 +84,56 @@ bin/qcl_bootstrap run build/server.qbc
 
 ---
 
-## 🧪 算法示例 (21个)
+## 🧪 算法示例 (22个)
 
-### 基础算法
+### 量子搜索
 | 文件 | 说明 | 验证 |
 |------|------|------|
-| `bell.qentl` | Bell态纠缠 | ✅ 100% |
-| `grover.qentl` | Grover搜索2量子位 | ✅ 20/20 |
-| `grover3.qentl` | Grover搜索3量子位 | ✅ 20/20 |
-| `grover4.qentl` | Grover搜索4量子位 | ✅ 20/20 |
-| `grover5.qentl` | Grover搜索5量子位 | ✅ 20/20 |
+| `grover.qentl` | Grover 2量子位 | ✅ 20/20 |
+| `grover3.qentl` | Grover 3量子位 | ✅ 20/20 |
+| `grover4.qentl` | Grover 4量子位 | ✅ 20/20 |
+| `grover5.qentl` | Grover 5量子位 (CCCCZ) | ✅ 20/20 |
+| `grover_opt.qentl` | Grover 3次最优迭代 | ✅ 20/20 |
+
+### 量子傅里叶变换
+| 文件 | 说明 | 验证 |
+|------|------|------|
 | `qft.qentl` | QFT 3量子位往返 | ✅ 5/5 |
 | `qft6.qentl` | QFT 6量子位往返 | ✅ 5/5 |
+
+### 量子估计
+| 文件 | 说明 | 验证 |
+|------|------|------|
 | `pea.qentl` | 相位估计(T门) | ✅ 5/5 |
-| `shor.qentl` | Shor算法基础 | ✅ 5/5 |
-| `shor15.qentl` | Shor分解N=15 | ✅ 5/5 |
-| `shor21.qentl` | Shor分解N=21 | ✅ 5/5 |
-| `shor35.qentl` | Shor分解N=35 | ✅ 5/5 |
-| `shor77.qentl` | Shor分解N=77 | ✅ 5/5 |
-| `shor143.qentl` | Shor分解N=143 | ✅ 5/5 |
+
+### Shor因子分解
+| 文件 | 说明 | 验证 |
+|------|------|------|
+| `shor.qentl` | Shor周期查找 | ✅ 5/5 |
+| `shor15.qentl` | N=15=3×5 | ✅ 5/5 |
+| `shor21.qentl` | N=21=3×7 | ✅ 5/5 |
+| `shor35.qentl` | N=35=5×7 | ✅ 5/5 |
+| `shor77.qentl` | N=77=7×11 | ✅ 5/5 |
+| `shor143.qentl` | N=143=11×13 | ✅ 5/5 |
+| `shor_qft.qentl` | QFT周期查找版 | ✅ 5/5 |
+
+### 量子协议
+| 文件 | 说明 | 验证 |
+|------|------|------|
 | `teleport.qentl` | 量子隐形传态 | ✅ 10/10 |
+| `bb84.qentl` | BB84量子密钥分发 | ✅ 10/10 |
 | `deutschjozsa.qentl` | Deutsch-Jozsa算法 | ✅ 10/10 |
-| `qwalk.qentl` | 量子随机行走 | ✅ 通过 |
+| `qwalk.qentl` | 量子随机行走K3 | ✅ 通过 |
+
+### 量子演示
+| 文件 | 说明 | 验证 |
+|------|------|------|
+| `superposition.qentl` | 叠加态测量 | ✅ 通过 |
+| `ghz.qentl` | GHZ纠缠态 | ✅ 通过 |
+| `bell_pair.qentl` | 双Bell态对 | ✅ 通过 |
+| `qclustering.qentl` | 量子聚类 | ✅ 通过 |
+| `qoptimization.qentl` | 量子优化 | ✅ 20/20 |
+| `qnn_demo.qentl` | 量子神经网络 | ✅ 通过 |
 
 ### QDFS文件系统
 | 文件 | 说明 | 验证 |
@@ -113,7 +144,7 @@ bin/qcl_bootstrap run build/server.qbc
 ### 性能基准
 | 文件 | 说明 | 性能 |
 |------|------|------|
-| `bench.qentl` | 500次H+CNOT循环 | ~7ms |
+| `bench.qentl` | 500次H+CNOT循环 | ~6ms |
 
 ---
 
@@ -130,6 +161,7 @@ bin/qcl_bootstrap run build/server.qbc
 | `/api/grover3` | GET | Grover 3量子位 |
 | `/api/grover4` | GET | Grover 4量子位 |
 | `/api/grover5` | GET | Grover 5量子位 |
+| `/api/grover_opt` | GET | Grover优化版 |
 | `/api/qft` | GET | QFT 3量子位 |
 | `/api/qft6` | GET | QFT 6量子位 |
 | `/api/pea` | GET | 相位估计 |
@@ -152,10 +184,10 @@ bin/qcl_bootstrap run build/server.qbc
 
 | 指标 | 数值 |
 |------|------|
-| QVM基准 (500次H+CNOT) | ~7ms |
+| QVM基准 (500次H+CNOT) | ~6ms |
 | 初始QVM (10M迭代) | 1.77s → 优化后 0.92s (48%提升) |
 | 编译器自举时间 | <1s |
-| 算法验证通过率 | 100% |
+| 算法验证通过率 | 100% (25/25) |
 
 ---
 
@@ -163,42 +195,19 @@ bin/qcl_bootstrap run build/server.qbc
 
 ```
 /root/QSM/
-├── src/
-│   └── qcl_bootstrap.c    # C种子：量子编译+系统接口
+├── src/qcl_bootstrap.c    # C种子：量子编译+系统接口
 ├── qcl.qentl              # QCL编译器源码
 ├── qvm.qentl              # QVM虚拟机源码
 ├── server_qentl.qentl     # HTTP服务器源码
 ├── lib/
 │   ├── core.qentl         # 核心库
 │   ├── io.qentl           # IO库
-│   └── qdfs.qentl         # 量子文件系统
-├── examples/
-│   ├── bell.qentl         # Bell态
-│   ├── grover.qentl       # Grover 2量子位
-│   ├── grover3.qentl      # Grover 3量子位
-│   ├── grover4.qentl      # Grover 4量子位
-│   ├── grover5.qentl      # Grover 5量子位
-│   ├── qft.qentl          # QFT 3量子位
-│   ├── qft6.qentl         # QFT 6量子位
-│   ├── pea.qentl          # 相位估计
-│   ├── shor.qentl         # Shor基础
-│   ├── shor15.qentl       # Shor N=15
-│   ├── shor21.qentl       # Shor N=21
-│   ├── shor35.qentl       # Shor N=35
-│   ├── shor77.qentl       # Shor N=77
-│   ├── shor143.qentl      # Shor N=143
-│   ├── teleport.qentl     # 隐形传态
-│   ├── deutschjozsa.qentl # Deutsch-Jozsa
-│   ├── qwalk.qentl        # 量子行走
-│   ├── qdfs_demo.qentl    # QDFS演示
-│   ├── qdfs_advanced.qentl # QDFS高级
-│   └── bench.qentl        # 性能基准
-├── build/
-│   ├── qcl.qbc            # QCL编译器字节码
-│   ├── qvm.qbc            # QVM虚拟机字节码
-│   └── server.qbc         # HTTP服务器字节码
-└── bin/
-    └── qcl_bootstrap      # C种子可执行文件
+│   ├── qdfs.qentl         # 量子文件系统
+│   └── qnn.qentl          # 量子神经网络
+├── examples/              # 22个算法示例
+├── build/                 # 编译产物
+├── bin/qcl_bootstrap      # C种子可执行文件
+└── docs/                  # 开发文档
 ```
 
 ---
@@ -211,7 +220,7 @@ bin/qcl_bootstrap run build/server.qbc
 4. **HTTP服务器** - 纯QEntL实现，nginx反代公网访问
 5. **QDFS** - 量子叠加态文件系统，支持纠缠文件对
 6. **沙箱模式** - `--sandbox`参数禁用危险操作
-7. **完整算法库** - 17个量子算法示例，全部验证通过
+7. **完整算法库** - 22个量子算法示例，全部验证通过
 
 ---
 
@@ -222,23 +231,22 @@ bin/qcl_bootstrap run build/server.qbc
 - `master` - 备份分支（同步dev）
 - `som` - SOM独立项目（账号系统）
 
-**注意**: QSM项目三分支内容完全一致。
-
 ---
 
 ## 🔮 后续规划
 
-1. **QVM性能优化** - JIT编译、 SIMD并行
-2. **更大规模Shor** - N=2048+ (需要更多量子位)
-3. **QDFS增强** - 更多文件系统原语
-4. **IDE功能扩展** - 代码高亮、调试器
-5. **错误校正** - 表面码、Shor码
-6. **量子机器学习** - QNN、QSVM
+1. **QNS量子神经网络** - 彝文4120字三语训练框架
+2. **四大模型** - QSM(主)/SOM(经济)/WeQ(社交)/Ref(自反省)
+3. **三种部署** - 终端QOS / 虚拟机 / Web QOS (qsm.som.top)
+4. **QVM性能优化** - JIT编译、SIMD并行
+5. **IDE功能扩展** - 代码高亮、调试器
+6. **量子机器学习** - QNN、QSVM、Q聚类
 
 ---
 
 ## 📅 版本历史
 
+- **v0.0.5** (2026-08-07): QNN/QSV/量子聚类/量子优化、BB84、GHZ、Bell态对、22个算法示例、25/25验证通过
 - **v0.0.4** (2026-08-07): QDFS完成、Shor分解N=15/21/35/77/143、Grover 2-5量子位、QFT 3/6量子位、隐形传态、Deutsch-Jozsa、量子行走、18个API端点
 - **v0.0.3**: QFT、PEA、Shor基础、HTTP服务器
 - **v0.0.2**: Grover、QDFS基础、IDE
