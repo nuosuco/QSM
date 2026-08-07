@@ -1,28 +1,22 @@
 # ================================================================
 # examples/qdfs_advanced.qentl — QDFS高级操作演示
-# 测试QDFS量子文件系统的完整功能：
-# 1. 创建叠加态文件
-# 2. 写入多个版本
-# 3. 读取坍缩
-# 4. 纠缠文件对验证
-# 5. 文件列表
+# 测试QDFS量子文件系统的完整功能
 # ================================================================
 
-# 初始化QDFS
-qdfs_init()
+# 初始化QDFS，使用/tmp/qdfs作为根目录
+qdfs_init("/tmp/qdfs")
 
 # 创建叠加态文件
-var f1 = qfile_create("quantum_data")
-printf("创建叠加态文件: quantum_data, 句柄=%d\n", f1)
+var f1 = qdfs_write("quantum_data", "版本A")
+printf("创建叠加态文件: quantum_data\n")
 
-# 写入多个版本
-qfile_write(f1, "版本A")
-qfile_write(f1, "版本B")
-qfile_write(f1, "版本C")
+# 写入多个版本到叠加态文件
+qdfs_write("quantum_data", "版本B")
+qdfs_write("quantum_data", "版本C")
 printf("写入3个版本\n")
 
 # 读取坍缩（随机选择一个版本）
-var read1 = qfile_read(f1)
+var read1 = qdfs_read("quantum_data")
 printf("读取坍缩: %s\n", read1)
 
 # 验证读取结果
@@ -33,18 +27,15 @@ else:
 end
 
 # 创建纠缠文件对
-var f2 = qfile_create("entangled_A")
-var f3 = qfile_create("entangled_B")
-qfile_entangle(f2, f3)
+qdfs_entangle("entangled_A", "entangled_B", "纠缠态0", "纠缠态1")
 printf("创建纠缠文件对: entangled_A ↔ entangled_B\n")
 
-# 写入纠缠文件A
-qfile_write(f2, "纠缠态|00>+|11>")
-var ent_read = qfile_read(f2)
+# 读取纠缠文件A
+var ent_read = qdfs_read("entangled_A")
 printf("纠缠文件A读取: %s\n", ent_read)
 
 # 读取纠缠文件B（应与A同步）
-var ent_b = qfile_read(f3)
+var ent_b = qdfs_read("entangled_B")
 printf("纠缠文件B读取: %s\n", ent_b)
 
 # 验证纠缠同步
@@ -55,11 +46,13 @@ else:
 end
 
 # 文件列表
-var files = file_list("/tmp/.qdfs")
-printf("文件列表: %s\n", files)
+printf("文件列表:\n%s", qdfs_ls())
 
 # 获取文件信息
-var info = qfile_info(f1)
-printf("文件信息: %s\n", info)
+var info1 = qdfs_info("quantum_data")
+printf("%s\n", info1)
+
+var info2 = qdfs_info("entangled_A")
+printf("%s\n", info2)
 
 printf("QDFS高级操作演示完成\n")
