@@ -1,0 +1,74 @@
+# ================================================================
+# lib/fixed.qentl — QEntL定点数运算库 (scale=1000, 3位小数)
+# 浮点能力边界②的解决方案: 定点数方案
+#
+# 设计原理:
+#   QVM只有整数运算(long long)。定点数把 3.14 表示为 3140
+#   编译器词法器已支持 3.14 字面量 → 自动转为 3140
+#   本库提供定点数的乘除/格式化(因为乘除需要缩放)
+#
+# 核心约定:
+#   scale = 1000 (3位小数)
+#   fx_add(a,b) = a + b        (加法直接加)
+#   fx_sub(a,b) = a - b        (减法直接减)
+#   fx_mul(a,b) = a*b/1000     (乘法需除scale)
+#   fx_div(a,b) = a*1000/b     (除法需乘scale)
+#   fx_int(n)   = n * 1000     (整数转定点)
+#   fx_trunc(a) = a / 1000     (取整数部分)
+#   fx_to_str(a) = "3.140"     (定点转可读字符串)
+# ================================================================
+
+var FIXED_SCALE = 1000
+
+def fx_add(a, b):
+    return a + b
+end
+
+def fx_sub(a, b):
+    return a - b
+end
+
+def fx_mul(a, b):
+    return a * b / FIXED_SCALE
+end
+
+def fx_div(a, b):
+    if (b == 0):
+        printf("fixed: 除零错误\n")
+        return 0
+    end
+    return a * FIXED_SCALE / b
+end
+
+def fx_int(n):
+    return n * FIXED_SCALE
+end
+
+def fx_trunc(a):
+    return a / FIXED_SCALE
+end
+
+def fx_from_parts(ip, frac3):
+    return ip * FIXED_SCALE + frac3
+end
+
+# 定点转可读字符串: 3140 -> "3.140"
+def fx_to_str(a):
+    var neg = 0
+    if (a < 0):
+        neg = 1
+        a = 0 - a
+    end
+    var ip = a / FIXED_SCALE
+    var frac = a % FIXED_SCALE
+    var fs = int_to_str(frac)
+    # 补齐到3位
+    while (str_len(fs) < 3):
+        fs = str_concat("0", fs)
+    end
+    var s = str_concat(int_to_str(ip), str_concat(".", fs))
+    if (neg == 1):
+        s = str_concat("-", s)
+    end
+    return s
+end

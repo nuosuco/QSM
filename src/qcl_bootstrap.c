@@ -1269,6 +1269,11 @@ static void lex_run(Comp *c) {
         if (ch >= '0' && ch <= '9') {
             long s = pos;
             while (pos < n && c->src[pos] >= '0' && c->src[pos] <= '9') pos++;
+            /* 浮点字面量: 3.14 → 继续读小数点和小数位 */
+            if (pos + 1 < n && c->src[pos] == '.' && c->src[pos+1] >= '0' && c->src[pos+1] <= '9') {
+                pos++;
+                while (pos < n && c->src[pos] >= '0' && c->src[pos] <= '9') pos++;
+            }
             add_tok(c, TK_NUMBER, s, pos - s);
             continue;
         }
@@ -1469,9 +1474,21 @@ static void parse_primary(Comp *c) {
     int t = cur(c);
     if (t == TK_NUMBER) {
         long L; char *txt = tok_text(c, c->pos, &L);
-        long long v = atoll(txt);
+        long long v;
+        char *dot = strchr(txt, '.');
+        if (dot) {
+            /* 定点字面量: 3.14 -> 3141 (scale=1000, 保留3位小数) */
+            *dot = '\0';
+            long long ip = atoll(txt);
+            long long frac = 0; int nd = 0;
+            for (char *p = dot + 1; *p && nd < 3; p++, nd++) frac = frac * 10 + (*p - '0');
+            while (nd < 3) { frac *= 10; nd++; }
+            v = ip * 1000 + frac;
+        } else {
+            v = atoll(txt);
+        }
         free(txt);
-        if (v < 0 || v > 65535) { comp_error(c, "整数字面量超出u16范围"); }
+        if (v < 0 || v > 65535) { comp_error(c, "字面量超出u16范围"); }
         emit_b(c, 0x01); emit_u16(c, (int)v);
         advance(c);
     } else if (t == TK_STRING) {

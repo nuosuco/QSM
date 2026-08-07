@@ -1,0 +1,90 @@
+# ================================================================
+# float_full_test.qentl — 浮点(定点)完整能力测试
+# 内联 lib/fixed.qentl 验证乘除+格式化
+# ================================================================
+var FIXED_SCALE = 1000
+
+def fx_add(a, b):
+    return a + b
+end
+
+def fx_sub(a, b):
+    return a - b
+end
+
+def fx_mul(a, b):
+    return a * b / FIXED_SCALE
+end
+
+def fx_div(a, b):
+    if (b == 0):
+        printf("fixed: 除零错误\n")
+        return 0
+    end
+    return a * FIXED_SCALE / b
+end
+
+def fx_int(n):
+    return n * FIXED_SCALE
+end
+
+def fx_trunc(a):
+    return a / FIXED_SCALE
+end
+
+def fx_to_str(a):
+    var neg = 0
+    if (a < 0):
+        neg = 1
+        a = 0 - a
+    end
+    var ip = a / FIXED_SCALE
+    var frac = a % FIXED_SCALE
+    var fs = int_to_str(frac)
+    while (str_len(fs) < 3):
+        fs = str_concat("0", fs)
+    end
+    var s = str_concat(int_to_str(ip), str_concat(".", fs))
+    if (neg == 1):
+        s = str_concat("-", s)
+    end
+    return s
+end
+
+# ---- 测试开始 ----
+var pi = 3.14
+var e = 2.718
+
+printf("=== 浮点运算测试 (scale=1000) ===\n")
+printf("pi = %s\n", fx_to_str(pi))
+printf("e  = %s\n", fx_to_str(e))
+
+var sum = fx_add(pi, e)
+printf("pi + e = %s\n", fx_to_str(sum))
+
+var diff = fx_sub(pi, e)
+printf("pi - e = %s\n", fx_to_str(diff))
+
+var prod = fx_mul(pi, e)
+printf("pi * e = %s (期望8.534)\n", fx_to_str(prod))
+
+var quot = fx_div(pi, e)
+printf("pi / e = %s (期望1.155)\n", fx_to_str(quot))
+
+var half = 0.5
+var sq = fx_mul(half, half)
+printf("0.5 * 0.5 = %s (期望0.250)\n", fx_to_str(sq))
+
+var n = fx_int(42)
+printf("int 42 转定点 = %s\n", fx_to_str(n))
+
+# 验证: pi*e 定点值
+var ok = 1
+if (prod != 8534): ok = 0 end
+if (quot != 1155): ok = 0 end
+if (sq != 250): ok = 0 end
+if (ok == 1):
+    printf("浮点完整能力测试: 通过\n")
+else:
+    printf("浮点完整能力测试: 失败\n")
+end
