@@ -1,6 +1,6 @@
 # examples/grover_opt.qentl — Grover搜索优化版
-# 最优迭代次数: R ≈ π/4 × √N
-# 对于N=16 (4量子位), R ≈ π/4 × 4 ≈ 3次迭代
+# 最优迭代次数: R ≈ π/4 × √N ≈ 3次
+# 搜索目标 |1011> (q0=1, q1=1, q2=0, q3=1)
 qreg q[4]
 h q[0]
 h q[1]
@@ -9,12 +9,10 @@ h q[3]
 var iter = 0
 while (iter < 3):
     # 预言机: 标记|1011>
-    x q[1]
-    x q[3]
+    x q[2]
     cccz q[0], q[1], q[2], q[3]
-    x q[1]
-    x q[3]
-    # 扩散算子
+    x q[2]
+    # 扩散算子: 2|0000><0000|-I
     h q[0]
     h q[1]
     h q[2]
@@ -39,7 +37,7 @@ var m1 = measure q[1]
 var m2 = measure q[2]
 var m3 = measure q[3]
 printf("Grover优化结果: %d%d%d%d\n", m0, m1, m2, m3)
-if (m0 == 1 and m1 == 0 and m2 == 1 and m3 == 1):
+if (m0 == 1 and m1 == 1 and m2 == 0 and m3 == 1):
     printf("命中目标|1011>, 迭代次数: 3 (最优)\n")
 else:
     printf("未命中\n")
