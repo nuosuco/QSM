@@ -1008,15 +1008,15 @@ def parse_statement():
                                     else:
                                         parse_ident_stmt()
                                     end
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                        end
-                                        else:
-                                                if (t == T_IF):
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    else:
+        if (t == T_IF):
                     parse_if()
                 else:
                     if (t == T_WHILE):
