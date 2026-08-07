@@ -1,0 +1,36 @@
+# ================================================================
+# examples/qclustering.qentl — 量子聚类分析
+# 使用量子叠加态进行模式聚类
+# ================================================================
+
+qreg q[6]
+
+# 初始化
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+h q[5]
+
+# 创建纠缠对
+cx q[0], q[1]
+cx q[2], q[3]
+cx q[4], q[5]
+
+# 测量聚类结果
+var cluster0 = measure q[0]
+var cluster1 = measure q[1]
+var cluster2 = measure q[2]
+var cluster3 = measure q[3]
+var cluster4 = measure q[4]
+var cluster5 = measure q[5]
+
+printf("量子聚类: %d %d | %d %d | %d %d\n", cluster0, cluster1, cluster2, cluster3, cluster4, cluster5)
+
+# 验证纠缠一致性
+if (cluster0 == cluster1 and cluster2 == cluster3 and cluster4 == cluster5):
+    printf("量子聚类验证: 通过\n")
+else:
+    printf("量子聚类验证: 失败\n")
+end

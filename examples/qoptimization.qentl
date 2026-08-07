@@ -1,0 +1,58 @@
+# ================================================================
+# examples/qoptimization.qentl — 量子优化算法
+# 使用量子叠加态搜索最优解
+# ================================================================
+
+qreg q[4]
+
+# 初始化叠加态
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+# Grover迭代优化
+var iter = 0
+while (iter < 3):
+    # 标记最优解 |1010>
+    x q[0]
+    x q[2]
+    ccccz q[0], q[1], q[2], q[3]
+    x q[0]
+    x q[2]
+    
+    # 扩散算子
+    h q[0]
+    h q[1]
+    h q[2]
+    h q[3]
+    x q[0]
+    x q[1]
+    x q[2]
+    x q[3]
+    ccccz q[0], q[1], q[2], q[3]
+    x q[0]
+    x q[1]
+    x q[2]
+    x q[3]
+    h q[0]
+    h q[1]
+    h q[2]
+    h q[3]
+    
+    iter = iter + 1
+end
+
+# 测量结果
+var r0 = measure q[0]
+var r1 = measure q[1]
+var r2 = measure q[2]
+var r3 = measure q[3]
+
+printf("量子优化结果: %d%d%d%d\n", r0, r1, r2, r3)
+
+if (r0 == 1 and r1 == 0 and r2 == 1 and r3 == 0):
+    printf("量子优化验证: 通过\n")
+else:
+    printf("量子优化验证: 失败\n")
+end
