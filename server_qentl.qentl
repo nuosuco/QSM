@@ -222,9 +222,49 @@ def route(path, req):
         var out12 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/dj.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out12)
     end
-    if (str_eq(path, "/api/pea")):
-        var out4 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/pea.qbc 2>&1; done")
-        return http_response("200 OK", "text/plain; charset=utf-8", out4)
+    if (str_eq(path, "/api/qdfs")):
+        var out = exec("cd /root/QSM && timeout 20 bin/qcl_bootstrap run build/qdfs_demo.qbc 2>&1")
+        return http_response("200 OK", "text/plain; charset=utf-8", out)
+    end
+    if (str_eq(path, "/api/grover_opt")):
+        var out19 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/grover_opt.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out19)
+    end
+    if (str_eq(path, "/api/qnn")):
+        var out20 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qnn_demo.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out20)
+    end
+    if (str_eq(path, "/api/qsvm")):
+        var out21 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qsvm.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out21)
+    end
+    if (str_eq(path, "/api/qclustering")):
+        var out22 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qclustering.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out22)
+    end
+    if (str_eq(path, "/api/qoptimization")):
+        var out23 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qoptimization.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out23)
+    end
+    if (str_eq(path, "/api/qft_qnn")):
+        var out24 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qft_qnn.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out24)
+    end
+    if (str_eq(path, "/api/qkernel")):
+        var out25 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qkernel.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out25)
+    end
+    if (str_eq(path, "/api/qrbm")):
+        var out26 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qrbm.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out26)
+    end
+    if (str_eq(path, "/api/qml_qsvm")):
+        var out27 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qml_qsvm.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out27)
+    end
+    if (str_eq(path, "/api/qml_variational")):
+        var out28 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qml_variational.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out28)
     end
     if (str_eq(path, "/api/shor")):
         var out6 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/shor.qbc 2>&1; done")
@@ -271,7 +311,7 @@ def route(path, req):
         return http_response("200 OK", "application/json", body)
     end
     if (str_eq(path, "/api/stack")):
-        var body = "{\"layers\":[\"C种子(量子编译+系统接口)\",\"QCL编译器(QEntL)\",\"QVM虚拟机(QEntL)\",\"标准库lib/*.qentl\",\"HTTP服务器(纯QEntL)\"],\"third_party\":\"zero\"}"
+        var body = "{\"layers\":[\"C种子(量子编译+系统接口)\",\"QCL编译器(QEntL)\",\"QVM虚拟机(QEntL)\",\"标准库lib/*.qentl\",\"HTTP服务器(纯QEntL)\"],\"third_party\":\"zero\",\"quantum_gates\":15,\"algorithms\":31,\"api_endpoints\":30}"
         return http_response("200 OK", "application/json", body)
     end
     return http_response("404 Not Found", "text/plain", "404 - QEntL Server")
