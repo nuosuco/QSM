@@ -306,12 +306,52 @@ def route(path, req):
         var out14 = exec("cd /root/QSM && for i in 1 2 3; do time bin/qcl_bootstrap run build/bench.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out14)
     end
+    if (str_eq(path, "/api/qml_qrbm_deep")):
+        var out29 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qrbm_deep.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out29)
+    end
+    if (str_eq(path, "/api/qml_qautoencoder")):
+        var out30 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qml_qautoencoder.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out30)
+    end
+    if (str_eq(path, "/api/qml_qgan")):
+        var out31 = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/qml_qgan.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out31)
+    end
+    if (str_eq(path, "/api/qsave")):
+        var out32 = exec("cd /root/QSM && for i in 1 2 3; do timeout 10 bin/qcl_bootstrap run build/qsm_main_enhanced.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out32)
+    end
+    if (str_eq(path, "/api/qsm_main")):
+        var out33 = exec("cd /root/QSM && for i in 1 2 3; do timeout 10 bin/qcl_bootstrap run build/qsm_main_enhanced.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out33)
+    end
+    if (str_eq(path, "/api/qsm_economy")):
+        var out34 = exec("cd /root/QSM && for i in 1 2 3; do timeout 10 bin/qcl_bootstrap run build/qsm_economy_enhanced.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out34)
+    end
+    if (str_eq(path, "/api/weq_social")):
+        var out35 = exec("cd /root/QSM && for i in 1 2 3; do timeout 10 bin/qcl_bootstrap run build/weq_social_enhanced.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out35)
+    end
+    if (str_eq(path, "/api/ref_self")):
+        var out36 = exec("cd /root/QSM && for i in 1 2 3; do timeout 10 bin/qcl_bootstrap run build/ref_self_enhanced.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out36)
+    end
+    if (str_eq(path, "/api/qns")):
+        var out37 = exec("cd /root/QSM && for i in 1 2 3; do timeout 10 bin/qcl_bootstrap run build/qns_framework_demo.qbc 2>&1; done")
+        return http_response("200 OK", "text/plain; charset=utf-8", out37)
+    end
+    if (str_eq(path, "/api/yi")):
+        var out38 = exec("cd /root/QSM && timeout 10 bin/qcl_bootstrap run build/yi_demo.qbc 2>&1")
+        return http_response("200 OK", "text/plain; charset=utf-8", out38)
+    end
     if (str_eq(path, "/api/status")):
-        var body = "{\"server\":\"QEntL/1.0\",\"vm\":\"QVM\",\"compiler\":\"QCL\",\"bootstrap\":\"self-hosted\",\"ide\":\"online\",\"status\":\"running\"}"
+        var body = "{\"server\":\"QEntL/1.0\",\"vm\":\"QVM\",\"compiler\":\"QCL\",\"bootstrap\":\"self-hosted\",\"ide\":\"online\",\"status\":\"running\",\"models\":[\"QSM\",\"SOM\",\"WeQ\",\"Ref\"],\"qns\":\"ready\",\"yi_data\":\"ready\"}"
         return http_response("200 OK", "application/json", body)
     end
     if (str_eq(path, "/api/stack")):
-        var body = "{\"layers\":[\"C种子(量子编译+系统接口)\",\"QCL编译器(QEntL)\",\"QVM虚拟机(QEntL)\",\"标准库lib/*.qentl\",\"HTTP服务器(纯QEntL)\"],\"third_party\":\"zero\",\"quantum_gates\":15,\"algorithms\":31,\"api_endpoints\":30}"
+        var body = "{\"layers\":[\"C种子(量子编译+系统接口)\",\"QCL编译器(QEntL)\",\"QVM虚拟机(QEntL)\",\"标准库lib/*.qentl\",\"HTTP服务器(纯QEntL)\"],\"third_party\":\"zero\",\"quantum_gates\":15,\"algorithms\":64,\"api_endpoints\":40,\"models\":[\"QSM\",\"SOM\",\"WeQ\",\"Ref\"],\"qns\":true,\"yi_data\":true}"
         return http_response("200 OK", "application/json", body)
     end
     return http_response("404 Not Found", "text/plain", "404 - QEntL Server")
