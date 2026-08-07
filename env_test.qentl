@@ -1,0 +1,43 @@
+# ================================================================
+# env_test.qentl — QEntL环境动态创建测试
+# 证明QEntL环境能现场编译+运行全新程序
+# ================================================================
+
+def factorial(n):
+    if (n <= 1):
+        return 1
+    end
+    return n * factorial(n - 1)
+end
+
+def is_even(x):
+    if (x % 2 == 0):
+        return 1
+    else:
+        return 0
+    end
+end
+
+var total = 0
+var i = 1
+while (i <= 5):
+    total = total + factorial(i)
+    i = i + 1
+end
+
+printf("=== QEntL环境动态测试 ===\n")
+printf("阶乘累加 1!+2!+3!+4!+5! = %d\n", total)
+printf("递归函数: factorial(6) = %d\n", factorial(6))
+printf("条件判断: is_even(42) = %d\n", is_even(42))
+printf("循环控制: 完成\n")
+
+qreg q[2]
+h q[0]
+cx q[0], q[1]
+var m0 = measure q[0]
+var m1 = measure q[1]
+printf("量子Bell态测量: %d%d\n", m0, m1)
+if (m0 == m1):
+    printf("Bell态纠缠正确: m0==m1\n")
+end
+printf("QEntL环境测试: 通过\n")

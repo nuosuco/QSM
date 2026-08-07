@@ -1316,6 +1316,7 @@ static void lex_run(Comp *c) {
         if (ch == ']') { add_tok(c, TK_RBRACKET, pos, 1); pos++; continue; }
         if (ch == ':') { add_tok(c, TK_COLON, pos, 1); pos++; continue; }
         if (ch == ',') { add_tok(c, TK_COMMA, pos, 1); pos++; continue; }
+        if (ch == ';') { pos++; continue; }  /* 语句分隔符，跳过 */
         fprintf(stderr, "[QCL-C] 词法错误: 未识别字符 0x%02X 位于字节 %ld\n", (unsigned char)ch, pos);
         pos++;
     }

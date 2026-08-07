@@ -217,6 +217,14 @@ def advance():
     end
 end
 
+# ---- token访问：窥探下一个token类型（不移动位置）----
+def peek_type():
+    if (g_parse_pos + 1 < g_tok_count):
+        return g_tok_type[g_parse_pos + 1]
+    end
+    return T_EOF
+end
+
 def expect(tt, msg):
     if (g_abort == 1): return end
     if (cur_type() != tt):
@@ -268,6 +276,13 @@ def lex_run():
                         end
                     end
                 end
+                handled = 1
+            end
+        end
+        if (handled == 0):
+            # --- semicolon: 语句分隔符，跳过（支持一行多语句）---
+            if (str_eq(ch, ";")):
+                pos = pos + 1
                 handled = 1
             end
         end
@@ -982,7 +997,7 @@ def parse_statement():
                 var ident_ns = g_tok_start[g_parse_pos]
                 var ident_nl = g_tok_len[g_parse_pos]
                 var ident_nm = str_substring(g_src, ident_ns, ident_nl)
-                if (str_eq(ident_nm, "h") or str_eq(ident_nm, "t") or str_eq(ident_nm, "x") or str_eq(ident_nm, "z")):
+                if ((str_eq(ident_nm, "h") or str_eq(ident_nm, "t") or str_eq(ident_nm, "x") or str_eq(ident_nm, "z")) and peek_type() != T_ASSIGN):
                     parse_quantum_gate_1arg(ident_ns, ident_nl)
                 else:
                     if (str_eq(ident_nm, "cx") or str_eq(ident_nm, "cz")):

@@ -1,0 +1,6 @@
+var a = 1; var b = 2
+printf("a=%d b=%d\n", a, b)
+qreg q[2]; h q[0]; cx q[0], q[1]
+var m0 = measure q[0]; var m1 = measure q[1]
+printf("Bell态: %d%d\n", m0, m1)
+printf("测试2: 通过\n")
