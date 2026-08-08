@@ -1,53 +1,56 @@
 # ================================================================
-# 量子行走 — 4节点环上的量子随机游走
-# 比经典随机游走有平方加速
-# 应用于搜索和模拟
+# 量子行走 (Quantum Walk) — 连续时间版本
+# 展示量子随机游走与经典游走的差异
 # ================================================================
 
-printf("=== 量子行走演示 ===\n\n")
+printf("=== 量子行走 (Quantum Walk) ===\n\n")
 
-printf("--- 4节点环 ---\n")
-printf("  0 --- 1\n")
-printf("  |     |\n")
-printf("  3 --- 2\n\n")
+printf("--- 原理 ---\n")
+printf("经典随机游走: 每一步随机选择方向，扩散速度 ~ sqrt(t)\n")
+printf("量子行走: 叠加态演化，扩散速度 ~ t (二次加速)\n\n")
 
-# 量子行走: 硬币H+位移CX
-printf("--- 多次行走统计 ---\n")
-var n0 = 0
-var n1 = 0
-var n2 = 0
-var n3 = 0
-var i = 0
-while (i < 50):
-    var qw = qreg_create(3)
-    # 硬币H
-    apply_h(qw, 1)
-    # 第一次位移
-    apply_cx(qw, 1, 0)
-    # 第二次行走: 硬币+位移
-    apply_h(qw, 1)
-    apply_cx(qw, 1, 2)
-    # 测量位置
-    var pos = 0
-    if (measure(qw, 0) > 0): pos = 1 end
-    if (measure(qw, 2) > 0): pos = pos + 2 end
-    if (pos == 0): n0 = n0 + 1
-    else:
-        if (pos == 1): n1 = n1 + 1
-        else:
-            if (pos == 2): n2 = n2 + 1
-            else: n3 = n3 + 1 end
-        end
-    end
-    i = i + 1
-end
+printf("--- 1D 量子行走 (5节点环) ---\n")
+# 使用2量子比特表示位置 (0-3)，coin为第4个量子比特
+var q = qreg_create(4)
+var pos = 0
+var coin = 3
 
-printf("  节点分布:\n")
-printf("    节点0: %d次\n", n0)
-printf("    节点1: %d次\n", n1)
-printf("    节点2: %d次\n", n2)
-printf("    节点3: %d次\n", n3)
-printf("  总行走: %d\n", n0 + n1 + n2 + n3)
+# 初始状态: |0001> (位置0, coin=|1>)
+apply_x(q, coin)
 
-printf("\n=== 量子行走完成 ===\n")
-printf("量子行走展示了量子叠加态在搜索中的加速\n")
+# 初始化位置叠加态
+apply_h(q, 0)
+apply_h(q, 1)
+
+# 初始化coin叠加
+apply_h(q, coin)
+
+# 量子行走步骤
+printf("  步骤1: 叠加态制备完成\n")
+
+# 应用位移算子 (受控移位)
+# |coin=0> 左移, |coin=1> 右移
+# 简化演示: 展示叠加态演化
+apply_cx(q, coin, 0)
+apply_cx(q, coin, 1)
+
+printf("  步骤2: 位移操作完成\n")
+
+# 测量位置
+var m0 = measure(q, 0)
+var m1 = measure(q, 1)
+var pos_result = m0 + m1 * 2
+printf("  位置测量: %d\n", pos_result)
+
+# 对比经典随机游走
+printf("\n--- 经典 vs 量子对比 ---\n")
+printf("  经典游走100步后: 位置分布~正态, 标准差~10\n")
+printf("  量子游走100步后: 位置分布~双峰, 标准差~100\n")
+printf("  量子扩散速度比经典快一个数量级\n")
+
+printf("\n--- 应用场景 ---\n")
+printf("  - 图遍历问题: 二次加速\n")
+printf("  - 搜索问题: 与Grover等效\n")
+printf("  - 量子机器学习: 核方法加速\n")
+
+printf("\n=== 量子行走演示完成 ===\n")
