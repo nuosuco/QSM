@@ -1,0 +1,55 @@
+# ================================================================
+# 量子随机数生成器 (QRNG) — 真随机数
+# 利用量子测量坍缩的随机性
+# 无法预测, 非伪随机
+# ================================================================
+
+printf("=== 量子随机数生成器 ===\n\n")
+
+printf("--- 原理 ---\n")
+printf("H|0> = |0>+|1>, 测量坍缩到0或1\n")
+printf("概率各50%, 量子真随机\n")
+printf("不同于伪随机数生成器(PRNG)的确定性算法\n\n")
+
+# 生成单比特随机数
+printf("--- 单比特随机数 ---\n")
+var q = qreg_create(1)
+apply_h(q, 0)
+var r = measure(q, 0)
+if (r == 0): r = 1 else: r = 0 end
+printf("  随机比特: %d\n", r)
+
+# 生成8比特随机数
+printf("\n--- 8比特随机数 ---\n")
+var rand_val = 0
+var b = 0
+while (b < 8):
+    var qb = qreg_create(1)
+    apply_h(qb, 0)
+    var bit = measure(qb, 0)
+    if (bit == 0): bit = 1 else: bit = 0 end
+    rand_val = rand_val + bit * 2^b
+    b = b + 1
+end
+printf("  随机数(8比特): %d\n", rand_val)
+printf("  范围: 0-255\n")
+
+# 随机性验证
+printf("\n--- 随机性抽样 ---\n")
+var zeros = 0
+var ones = 0
+# 限制循环次数避免QREG_MAX溢出
+var i = 0
+while (i < 10):
+    var qs = qreg_create(1)
+    apply_h(qs, 0)
+    var s = measure(qs, 0)
+    if (s == 0): zeros = zeros + 1 else: ones = ones + 1 end
+    i = i + 1
+end
+printf("  10次抽样: 0=%d, 1=%d\n", zeros, ones)
+printf("  (QREG_MAX=16限制, 每次创建新qreg; 更多抽样qreg会耗尽)\n")
+
+printf("\n=== QRNG完成 ===\n")
+printf("量子随机数生成器: 真随机, 不可预测\n")
+printf("应用: 密码学/蒙特卡洛模拟/博彩\n")
