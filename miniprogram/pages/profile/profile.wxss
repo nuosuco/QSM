@@ -1,0 +1,297 @@
+/* 对应 style.css 中 .profile-container 到 .empty-hint 部分 */
+.profile-container {
+  padding: 32rpx;
+  max-width: 100%;
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+}
+
+/* 用户卡片（对应 .profile-card） */
+.profile-card {
+  background: linear-gradient(135deg, #4a8c6f, #6cb488);
+  border-radius: 32rpx;
+  padding: 48rpx;
+  display: flex;
+  align-items: center;
+  gap: 40rpx;
+  color: white;
+  margin-bottom: 32rpx;
+  box-shadow: 0 8rpx 30rpx rgba(74, 140, 111, 0.3);
+}
+
+.profile-avatar {
+  width: 144rpx;
+  height: 144rpx;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64rpx;
+  font-weight: bold;
+  border: 6rpx solid rgba(255,255,255,0.5);
+  flex-shrink: 0;
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-name {
+  margin: 0 0 16rpx 0;
+  font-size: 40rpx;
+  color: white;
+  font-weight: bold;
+}
+
+.profile-tizhi,
+.profile-points,
+.profile-checkin {
+  margin: 8rpx 0;
+  font-size: 28rpx;
+  opacity: 0.9;
+  color: white;
+}
+
+/* 区块（对应 .profile-section） */
+.profile-section {
+  background: white;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 32rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+}
+
+.section-title {
+  margin: 0 0 24rpx 0;
+  font-size: 32rpx;
+  color: #2c3e50;
+  font-weight: bold;
+}
+
+/* 统计数据（对应 .profile-stats） */
+.profile-stats {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-num {
+  font-size: 56rpx;
+  font-weight: bold;
+  color: #4a9d6e;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #7f8c8d;
+  margin-top: 8rpx;
+}
+
+/* 体质记录（对应 .profile-history / .history-item） */
+.profile-history {
+  max-height: 600rpx;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #f0f0f0;
+  gap: 24rpx;
+  font-size: 26rpx;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-date {
+  color: #7f8c8d;
+  flex-shrink: 0;
+  font-size: 24rpx;
+}
+
+.history-tizhi {
+  color: #4a9d6e;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.history-desc {
+  color: #7f8c8d;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.empty-hint {
+  color: #7f8c8d;
+  text-align: center;
+  padding: 40rpx 0;
+  font-size: 28rpx;
+}
+/* ========== 登录区域 ========== */
+.login-card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.05);
+}
+
+.login-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 8rpx;
+}
+
+.login-hint {
+  font-size: 24rpx;
+  color: #95a5a6;
+  margin-bottom: 28rpx;
+}
+
+.login-tabs {
+  display: flex;
+  border: 2rpx solid #e0e6e3;
+  border-radius: 16rpx;
+  overflow: hidden;
+  margin-bottom: 28rpx;
+}
+
+.login-tab {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  font-size: 28rpx;
+  color: #666;
+  background: #f8f9fa;
+}
+
+.login-tab.active {
+  background: #4a9d6e;
+  color: #fff;
+  font-weight: 500;
+}
+
+.login-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+  align-items: center;
+}
+
+.country-picker {
+  flex-shrink: 0;
+}
+
+.country-label {
+  padding: 18rpx 20rpx;
+  border: 2rpx solid #e0e6e3;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.login-input {
+  flex: 1;
+  padding: 18rpx 24rpx;
+  border: 2rpx solid #e0e6e3;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}
+
+.code-btn {
+  flex-shrink: 0;
+  padding: 18rpx 24rpx;
+  background: #f0f7f3;
+  color: #4a9d6e;
+  border: 2rpx solid #4a9d6e;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.code-btn[disabled] {
+  background: #eee;
+  color: #999;
+  border-color: #ddd;
+}
+
+.wechat-login-btn {
+  width: 100%;
+  padding: 24rpx;
+  background: #07c160;
+  color: #fff;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.wechat-login-btn::after {
+  border: none;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 24rpx 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1rpx;
+  background: rgba(255,255,255,0.2);
+}
+
+.divider-text {
+  padding: 0 20rpx;
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.5);
+}
+
+.login-btn {
+  width: 100%;
+  padding: 24rpx;
+  background: #4a9d6e;
+  color: #fff;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  margin-top: 8rpx;
+}
+
+.login-btn::after {
+  border: none;
+}
+
+.login-error {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #e74c3c;
+  text-align: center;
+}
+
+.logout-btn {
+  margin-left: auto;
+  padding: 10rpx 28rpx;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 2rpx solid rgba(255,255,255,0.5);
+  border-radius: 12rpx;
+  font-size: 24rpx;
+}

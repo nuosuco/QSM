@@ -1,0 +1,615 @@
+"""
+SOM 松麦 - 商品服务
+对接淘宝联盟 + 京东联盟API
+只推荐有机认证、药食同源、健康环保认证产品
+"""
+import hashlib
+import json
+import os
+import time
+from typing import List, Optional
+
+import requests
+
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
+with open(CONFIG_PATH, "r") as f:
+    CONFIG = json.load(f)
+
+# 有机认证关键词（搜索时自动追加，确保只返回有机产品）
+ORGANIC_KEYWORDS = ['有机', '有机认证', '有机食品']
+
+# 排除关键词：搜索结果中出现这些词的商品将被过滤掉
+# 排除顺序：书籍 > 化工 > 玩具 > 电子 > 其他
+EXCLUDE_KEYWORDS = [
+    # 书籍文具
+    '书', '书籍', '教材', '课本', '图书', '文具', '笔记本', '笔', '本子',
+    # 化工化学
+    '化工', '化学', '试剂', '肥料', '农药', '化肥', '工业', '原料',
+    # 玩具娱乐
+    '玩具', '模型', '手办', '乐高', '积木', '游戏', '桌游', '卡牌',
+    # 电子产品
+    '手机', '电脑', '平板', '耳机', '充电器', '数据线', '电子', '数码', '电器',
+    # 汽车配件
+    '汽车', '轮胎', '机油', '车', '配件', '改装',
+    # 宠物用品
+    '猫粮', '狗粮', '宠物', '猫砂',
+    # 其他无关
+    '塑料', '包装', '纸箱', '胶带',
+    # 机械/五金/仪器
+    '机械', '设备', '机器', '电机', '五金', '工具', '仪器', '仪表', '阀', '泵',
+    # 小米相关的电子产品（小米作为食材是谷物，但淘宝会搜出手机/电视/手表）
+    '小米手机', '小米电视', '小米手表', '小米手环', '小米平板', '小米耳机', '小米充电', '小米数据线',
+    # 有机玻璃/有机板等非食材（标题含"有机"但不是食材）
+    '有机玻璃', '亚克力', '压克力', '有机板', '有机盒', '有机片',
+    # 工业/机械类（标题含"有机"但不是食材）
+    '粉碎机', '研磨机', '搅拌机', '打粉机', '切片机', '烘干机', '包装机', '封口机',
+    '反应器', '反应釜', '反应罐', '储罐', '容器', '塔器', '输送', '振动筛',
+    '颗粒机', '制粒机', '粉体', '粉料', '不锈钢',
+    '培养土', '花盆', '花架', '花肥', '营养土', '园艺', '农具', '种子',
+    # 日用品/家居（标题含"有机"但不是食材）
+    '有机棉', '有机肥', '收纳', '置物', '展示', '相框', '画框', '工艺品', '装饰',
+    # 塑料/玻璃/板材类（标题含"有机"但不是食材，如有机玻璃/有机板/有机片）
+    '玻璃', '片材', '管材', '型材', '有机硅', '有机涂料', '有机色',
+    # 服饰/鞋帽（标题含"有机"但不是食材）
+    '服装', '衣服', '鞋', '袜', '帽子', '围巾', '毛巾', '床单', '被套', '枕套',
+    # 化妆品/洗护（标题含"有机"但不是食材）
+    '洗发水', '沐浴露', '护肤品', '化妆品', '精油', '香薰', '口红', '唇膏', '粉底',
+]
+
+# 加工制品排除关键词（用于 chat_engine 的 _search_products_from_reply）
+# 松麦只推原材料食材，不推加工饮品/保健品/化妆品
+PROCESSED_EXCLUDE_KEYWORDS = [
+    '原浆', '口服液', '饮料', '饮品', '冲剂', '胶囊', '片剂', '丸剂', '糖浆',
+    '精华液', '面膜', '护肤', '注射', '颗粒剂', '含片', '泡腾片', '软糖',
+    '代餐', '奶昔', '果汁', '酵素', '益生菌粉',
+    '膏方', '养生膏', '桑椹膏', '秋梨膏', '阿胶膏', '固元膏',
+]
+
+# 分类目录：全品类有机认证 + 环保认证产品
+# 每个分类对应淘宝/京东搜索关键词
+# 搜索时自动追加'有机 原生态 野生'前缀
+CATEGORY_MAP = {
+    '全部': {
+        'keyword': '食品 养生 食材 滋补品 药膳 母婴 日用品 家居 绿植 健身 保健 棉品 美妆',
+        'icon': '🌿',
+        'desc': '所有有机认证、环保认证产品',
+    },
+    # ====== 食品粮油 ======
+    '谷物杂粮': {
+        'keyword': '五谷杂粮 大米 小米 燕麦 藜麦',
+        'icon': '🌾',
+        'desc': '有机五谷杂粮、米面粮油',
+    },
+    '滋补养生': {
+        'keyword': '滋补 枸杞 红枣 黄芪 党参 人参',
+        'icon': '🫖',
+        'desc': '枸杞、红枣、黄芪、党参等滋补品',
+    },
+    '药膳食材': {
+        'keyword': '药膳 药食同源 黄芪 党参 山药 莲子 茯苓',
+        'icon': '🍲',
+        'desc': '药膳食材、药食同源目录食材',
+    },
+    '茶饮酒水': {
+        'keyword': '茶 养生茶 花茶 红茶 绿茶 药酒 果酒',
+        'icon': '🍵',
+        'desc': '有机茶、养生茶、药酒、果酒',
+    },
+    '坚果干果': {
+        'keyword': '坚果 核桃 杏仁 腰果 干果 果脯',
+        'icon': '🥜',
+        'desc': '有机坚果、干果、果脯',
+    },
+    '菌菇干货': {
+        'keyword': '菌菇 香菇 木耳 银耳 干货 山珍',
+        'icon': '🍄',
+        'desc': '有机菌菇、木耳、银耳等山珍干货',
+    },
+    '调味佐料': {
+        'keyword': '调味品 酱油 醋 橄榄油 调料 蜂蜜',
+        'icon': '🧂',
+        'desc': '有机调味品、蜂蜜、橄榄油等',
+    },
+    '新鲜果蔬': {
+        'keyword': '蔬菜 水果 新鲜 时令',
+        'icon': '🥬',
+        'desc': '有机认证新鲜蔬果',
+    },
+    '母婴食品': {
+        'keyword': '母婴 婴儿食品 奶粉 辅食',
+        'icon': '🍼',
+        'desc': '有机婴幼儿食品、奶粉',
+    },
+    # ====== 日用品 ======
+    '棉品面料': {
+        'keyword': '棉 丝 麻 竹纤维 面料 衣服 内衣 毛巾 床品',
+        'icon': '👕',
+        'desc': '有机棉、丝、麻等天然面料服装家纺',
+    },
+    '日化洗护': {
+        'keyword': '洗发水 沐浴露 护肤品 化妆品 手工皂 环保',
+        'icon': '🧴',
+        'desc': '有机/环保认证日化洗护用品',
+    },
+    '美妆护肤': {
+        'keyword': '护肤品 化妆品 面膜 精油 纯露 口红',
+        'icon': '💄',
+        'desc': '有机/天然成分美妆护肤品',
+    },
+    # ====== 家居生活 ======
+    '家居日用': {
+        'keyword': '家居 日用 收纳 竹制品 藤编 环保',
+        'icon': '🏠',
+        'desc': '环保家居用品、竹木藤编制品',
+    },
+    '绿植盆栽': {
+        'keyword': '绿植 盆栽 花卉 多肉 盆景 园艺',
+        'icon': '🪴',
+        'desc': '绿植盆栽、花卉园艺、盆景',
+    },
+    '环保餐具': {
+        'keyword': '餐具 厨具 水杯 竹纤维 麦秸秆 环保',
+        'icon': '🍽️',
+        'desc': '环保餐具、竹纤维/麦秸秆制品',
+    },
+    # ====== 健康养生 ======
+    '保健器械': {
+        'keyword': '保健品 艾灸 刮痧 拔罐 按摩 理疗',
+        'icon': '💊',
+        'desc': '有机保健品、艾灸刮痧等中医器具',
+    },
+    '健身运动': {
+        'keyword': '健身 瑜伽 太极 运动 器材 跳绳',
+        'icon': '🏋️',
+        'desc': '环保健身器材、瑜伽用品、太极用品',
+    },
+    '户外出行': {
+        'keyword': '户外 露营 徒步 登山 环保 水杯',
+        'icon': '🥾',
+        'desc': '环保户外用品、露营装备',
+    },
+    # ====== 医疗健康 ======
+    '医用环保': {
+        'keyword': '医用 棉签 口罩 纱布 消毒 环保',
+        'icon': '🏥',
+        'desc': '有机棉医用耗材、环保医疗用品',
+    },
+    '中医养生': {
+        'keyword': '艾草 足浴 泡脚 养生壶 经络 穴位',
+        'icon': '🧘',
+        'desc': '中医养生用品、艾草足浴、经络调理',
+    },
+}
+
+
+# 搜索别名表：用户搜的词 vs 淘宝商品标题常用词
+# 匹配标题时，原词或任一别名命中即算匹配（不改搜索逻辑，只扩展匹配）
+SEARCH_ALIASES = {
+    '生姜': ['姜', '小黄姜', '老姜', '嫩姜', '姜粉', '姜片', '姜干'],
+    '大米': ['米', '稻花香', '粳米', '五常大米', '东北大米', '珍珠米', '胚芽米'],
+    '薏米': ['薏仁', '薏苡仁'],
+    '山药': ['淮山', '铁棍山药'],
+    '莲藕': ['藕', '莲菜'],
+    '老鸭': ['鸭', '麻鸭'],
+    '乌鸡': ['乌骨鸡'],
+    '排骨': ['肋排', '猪排骨'],
+    '瘦肉': ['猪瘦肉', '里脊'],
+    '绿豆': ['绿豆'],
+    '陈皮': ['新会陈皮'],
+    '茯苓': ['云苓'],
+    '冰糖': ['黄冰糖', '老冰糖', '多晶冰糖'],
+}
+
+
+class ShopService:
+    """商品搜索与推荐服务 - 只推荐有机认证产品"""
+
+    def __init__(self):
+        self.tb_config = CONFIG["taobao"]
+        self.jd_config = CONFIG["jd"]
+
+    def get_categories(self) -> List[dict]:
+        """获取分类目录"""
+        return [
+            {'name': name, 'keyword': info['keyword'], 'icon': info['icon'], 'desc': info['desc']}
+            for name, info in CATEGORY_MAP.items()
+        ]
+
+    def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
+        """
+        搜索商品 - 多关键词拆成单个词并行搜索，合并去重
+        platform: taobao / jd / all
+        sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
+        """
+        if not keyword or not keyword.strip():
+            return []
+        
+        # 把多关键词拆成单个词
+        keywords = [k.strip() for k in keyword.split() if k.strip()]
+        if not keywords:
+            return []
+        
+        seen_titles = set()
+        items = []
+        
+        def search_single_keyword(single_kw: str) -> list:
+            """搜索单个关键词，搜多页直到凑够数量"""
+            search_kw = f"{single_kw} 有机"
+            result = []
+            local_titles = set()
+            # 别名：标题里不一定出现原词（如搜"生姜"，标题写"小黄姜/姜粉"）
+            aliases = SEARCH_ALIASES.get(single_kw, [])
+            match_words = [single_kw.lower()] + [a.lower() for a in aliases]
+            page_no = 1
+            max_pages = 5  # 每个关键词最多搜5页
+            while len(result) < page_size and page_no <= max_pages:
+                sub_items = self._search_taobao(search_kw, page_no, page_size, sort)
+                if not sub_items:
+                    break
+                for item in sub_items:
+                    title = item.get('title', '')
+                    if title and title not in local_titles and not self._is_excluded(item):
+                        tl = title.lower()
+                        if any(w in tl for w in match_words):
+                            local_titles.add(title)
+                            result.append(item)
+                        if len(result) >= page_size:
+                            break
+                page_no += 1
+            return result
+        
+        # 所有关键词并行搜索
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(keywords), 15)) as executor:
+            future_map = {executor.submit(search_single_keyword, kw): kw for kw in keywords}
+            for future in concurrent.futures.as_completed(future_map, timeout=15):
+                try:
+                    for item in future.result():
+                        title = item.get('title', '')
+                        if title and title not in seen_titles:
+                            seen_titles.add(title)
+                            items.append(item)
+                except Exception:
+                    pass
+        
+        return items
+
+    def get_category_keyword(self, keyword: str) -> str:
+        """根据分类名返回对应的关键词列表"""
+        if not keyword:
+            return ''
+        # 直接按分类名匹配
+        for cat_name, info in CATEGORY_MAP.items():
+            if cat_name == keyword.strip():
+                return info['keyword']
+        # 没匹配到分类名，返回原词（用户自定义搜索）
+        return keyword
+
+    def search_from_cache(self, keyword: str, page: int = 1, page_size: int = 10) -> List[dict]:
+        """从SQLite缓存数据库搜索商品"""
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
+        if not os.path.exists(db_path):
+            return []
+        
+        # 过滤空关键词和纯空白
+        if not keyword or not keyword.strip():
+            return []
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # 用多个关键词组合匹配
+            search_parts = [p.strip() for p in keyword.split() if p.strip()][:5]
+            if not search_parts:
+                conn.close()
+                return []
+            
+            conditions = []
+            params = []
+            or_groups = []
+            for part in search_parts:
+                or_groups.append(f'(title LIKE ? OR click_url LIKE ? OR desc_text LIKE ?)')
+                params.extend([f'%{part}%', f'%{part}%', f'%{part}%'])
+            where = ' OR '.join(or_groups)
+            
+            sql = f'''
+                SELECT item_id, platform, title, price, main_image as image,
+                       shop_name, brand, commission_rate, click_url as url,
+                       images, sales
+                FROM product_cache
+                WHERE {where}
+                ORDER BY updated_at DESC
+                LIMIT ? OFFSET ?
+            '''
+            
+            cursor.execute(sql, params + [page_size * 2, (page - 1) * page_size])
+            rows = cursor.fetchall()
+            conn.close()
+            
+            items = []
+            seen_ids = set()
+            for row in rows:
+                r = dict(row)
+                rid = r.get('item_id', '')
+                if rid not in seen_ids and not self._is_excluded(r):
+                    seen_ids.add(rid)
+                    items.append({
+                        'item_id': rid,
+                        'title': r.get('title', ''),
+                        'price': r.get('price', ''),
+                        'image': r.get('main_image', '') or r.get('images', '').strip('[]"') if isinstance(r.get('images'), str) else (r.get('images') or [])[0] if isinstance(r.get('images'), list) else '',
+                        'url': r.get('click_url', ''),
+                        'platform': r.get('platform', 'taobao'),
+                        'commission_rate': r.get('commission_rate', ''),
+                        'shop_name': r.get('shop_name', ''),
+                        'brand': r.get('brand', ''),
+                        'sales': r.get('sales', ''),
+                    })
+                if len(items) >= page_size * 3:
+                    break
+            return items[:page_size * 2]
+        except Exception as e:
+            print(f"缓存搜索异常: {e}")
+            return []
+
+    def get_cache_stats(self) -> dict:
+        """获取缓存统计信息"""
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
+        if not os.path.exists(db_path):
+            return {'total': 0, 'error': 'cache db not found'}
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM product_cache')
+            total = cursor.fetchone()[0]
+            cursor.execute("SELECT platform, COUNT(*) as cnt FROM product_cache GROUP BY platform")
+            platforms = {}
+            for row in cursor.fetchall():
+                platforms[row[0]] = row[1]
+            cursor.execute('SELECT MAX(updated_at) FROM product_cache')
+            latest = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(DISTINCT category) FROM product_cache WHERE category != ''")
+            categories = cursor.fetchone()[0]
+            conn.close()
+            return {
+                'total': total,
+                'platforms': platforms,
+                'latest_update': latest,
+                'categories': categories,
+            }
+        except Exception as e:
+            return {'total': 0, 'error': str(e)}
+
+    def _is_excluded(self, item: dict) -> bool:
+        """检查商品是否应该被排除（书籍、化工、玩具等无关品类）"""
+        title = (item.get('title', '') or '').lower()
+        for ex in EXCLUDE_KEYWORDS:
+            if ex in title:
+                return True
+        return False
+
+    def _split_keywords(self, keyword: str) -> list:
+        """将长关键词拆分成2-3个词的短组合，确保淘宝能搜到"""
+        words = keyword.split()
+        if len(words) <= 3:
+            return [keyword]
+        # 取前2个词作为基础，然后依次追加
+        result = []
+        base = ' '.join(words[:2])
+        result.append(base)
+        for i in range(2, len(words)):
+            result.append(f"{words[0]} {words[i]}")
+        return result
+
+    def _ensure_organic(self, keyword: str) -> str:
+        """确保搜索词包含有机认证关键词"""
+        # 强制在开头加'有机'，确保搜索结果是有机认证产品
+        return f"有机 {keyword}"
+
+    # ========== 淘宝联盟 ==========
+
+    def _sign_tb(self, params: dict) -> str:
+        """淘宝联盟MD5签名"""
+        sorted_params = sorted(params.items())
+        sign_str = self.tb_config["app_secret"] + ''.join(f"{k}{v}" for k, v in sorted_params) + self.tb_config["app_secret"]
+        return hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
+
+    def _search_taobao(self, keyword: str, page: int, page_size: int, sort: str = "") -> List[dict]:
+        """淘宝联盟物料搜索（升级版API）"""
+        # 淘宝API排序参数映射
+        sort_map = {
+            'price_asc': 'price_asc',
+            'price_desc': 'price_desc',
+            'sales': 'sales_desc',
+            'credit': 'credit_desc',
+        }
+        tb_sort = sort_map.get(sort, '')
+        
+        params = {
+            'app_key': self.tb_config["app_key"],
+            'method': 'taobao.tbk.dg.material.optional.upgrade',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'format': 'json',
+            'v': '2.0',
+            'sign_method': 'md5',
+            'adzone_id': self.tb_config["adzone_id"],
+            'site_id': self.tb_config["site_id"],
+            'q': keyword,
+            'page_size': str(page_size),
+            'page_no': str(page),
+            'platform': '2',
+        }
+        if tb_sort:
+            params['sort'] = tb_sort
+        params['sign'] = self._sign_tb(params)
+
+        try:
+            resp = requests.get("https://eco.taobao.com/router/rest", params=params, timeout=10)
+            result = resp.json()
+
+            if 'error_response' in result:
+                return []
+
+            # 解析返回数据
+            for key in result:
+                if key != 'error_response':
+                    data = result[key]
+                    if isinstance(data, dict) and 'result_list' in data:
+                        items_data = data['result_list'].get('map_data', [])
+                        items = []
+                        for item in items_data:
+                            basic = item.get('item_basic_info', {})
+                            price_info = item.get('price_promotion_info', {})
+                            publish = item.get('publish_info', {})
+                            income = publish.get('income_info', {})
+                            
+                            # 生成淘宝APP deeplink（优先打开APP）
+                            click_url = publish.get('click_url', '')
+                            # 确保click_url有协议前缀
+                            if click_url.startswith('//'):
+                                click_url = 'https:' + click_url
+                            
+                            # 基于click_url生成APP deeplink，保留佣金追踪参数
+                            app_url = ''
+                            if click_url:
+                                # 将 https://s.click.taobao.com/... 转为 taobao:// 协议
+                                app_url = click_url.replace('https://', 'taobao://', 1)
+                            
+                            # 提取主图和副图
+                            main_image = basic.get('pict_url', '')
+                            small_images_raw = basic.get('small_images', {})
+                            if isinstance(small_images_raw, dict):
+                                small_imgs = [u for u in small_images_raw.get('string', []) if u]
+                            elif isinstance(small_images_raw, list):
+                                small_imgs = [u for u in small_images_raw if u]
+                            else:
+                                small_imgs = []
+                            all_images = [main_image] + [img for img in small_imgs if img and img != main_image]
+                            
+                            items.append({
+                                'item_id': item.get('item_id', ''),
+                                'title': basic.get('short_title', '') or basic.get('title', ''),
+                                'price': price_info.get('zk_final_price', '') or price_info.get('reserve_price', ''),
+                                'image': main_image,
+                                'images': all_images[:5],
+                                'url': click_url,  # 网页版推广链接（带佣金）
+                                'app_url': app_url,  # APP deeplink（优先，带佣金追踪）
+                                'platform': 'taobao',
+                                'commission_rate': income.get('commission_rate', ''),
+                                'shop_name': basic.get('shop_title', ''),
+                                'brand': basic.get('brand_name', ''),
+                            })
+                        return items
+        except Exception as e:
+            print(f"淘宝搜索异常: {e}")
+        return []
+
+    # ========== 淘口令 ==========
+
+    def create_tpwd(self, url: str, text: str = "") -> dict:
+        """生成淘口令（taobao.tbk.tpwd.create）
+        返回: {"tpwd": "￥xxx￥", "url": "..."} 或 {"error": "..."}
+        """
+        params = {
+            'app_key': self.tb_config["app_key"],
+            'method': 'taobao.tbk.tpwd.create',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'format': 'json',
+            'v': '2.0',
+            'sign_method': 'md5',
+            'url': url,
+        }
+        if text:
+            params['text'] = text
+        params['sign'] = self._sign_tb(params)
+
+        try:
+            resp = requests.get("https://eco.taobao.com/router/rest", params=params, timeout=10)
+            result = resp.json()
+
+            if 'error_response' in result:
+                err = result['error_response']
+                print(f"淘口令生成失败: {err}")
+                return {"error": err.get('sub_msg', err.get('msg', '生成失败'))}
+
+            tpwd_data = result.get('tbk_tpwd_create_response', {}).get('data', {})
+            tpwd = tpwd_data.get('password_simple', '') or tpwd_data.get('model', '')
+            if tpwd:
+                return {"tpwd": tpwd, "model": tpwd_data.get('model', ''), "url": url}
+            return {"error": "未获取到淘口令"}
+        except Exception as e:
+            print(f"淘口令异常: {e}")
+            return {"error": str(e)}
+
+    # ========== 京东联盟 ==========
+
+    def _sign_jd(self, params: dict) -> str:
+        """京东联盟MD5签名（排除sign和sign_method参数）"""
+        filtered = {k: v for k, v in params.items() if k not in ('sign', 'sign_method')}
+        sorted_params = sorted(filtered.items())
+        sign_str = self.jd_config["app_secret"] + ''.join(f"{k}{v}" for k, v in sorted_params) + self.jd_config["app_secret"]
+        return hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
+
+    def _get_beijing_time(self) -> str:
+        """获取北京时间"""
+        from datetime import datetime, timezone, timedelta
+        utc_now = datetime.now(timezone.utc)
+        beijing_tz = timezone(timedelta(hours=8))
+        return utc_now.astimezone(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')
+
+    def _search_jd(self, keyword: str, page: int, page_size: int) -> List[dict]:
+        """京东联盟商品查询"""
+        params = {
+            'app_key': self.jd_config["app_key"],
+            'method': 'jd.union.open.goods.query',
+            'timestamp': self._get_beijing_time(),
+            'format': 'json',
+            'v': '1.0',
+            'sign_method': 'md5',
+            'param_json': json.dumps({
+                'goodsReqDTO': {
+                    'keyword': keyword,
+                    'pageSize': page_size,
+                    'pageIndex': page,
+                    'pid': self.jd_config.get('pid', ''),
+                }
+            }, separators=(',', ':'))
+        }
+        params['sign'] = self._sign_jd(params)
+
+        try:
+            resp = requests.post("https://router.jd.com/api", data=params, timeout=10)
+            result = resp.json()
+
+            if 'error_response' in result:
+                return []
+
+            # 解析京东返回
+            resp_key = 'jd_union_open_goods_query_response'
+            if resp_key in result:
+                data = result[resp_key]
+                if 'result' in data:
+                    result_data = json.loads(data['result'])
+                    goods_list = result_data.get('data', [])
+                    items = []
+                    for item in goods_list:
+                        price_info = item.get('priceInfo', {})
+                        commission_info = item.get('commissionInfo', {})
+                        items.append({
+                            'title': item.get('skuName', ''),
+                            'price': price_info.get('price', ''),
+                            'image': item.get('imageInfo', {}).get('imageList', [{}])[0].get('url', '') if item.get('imageInfo', {}).get('imageList') else '',
+                            'url': item.get('materialUrl', ''),
+                            'platform': 'jd',
+                            'commission_rate': f"{commission_info.get('commissionShare', 0)}%",
+                            'shop_name': item.get('shopInfo', {}).get('shopName', ''),
+                        })
+                    return items
+        except Exception as e:
+            print(f"京东搜索异常: {e}")
+        return []

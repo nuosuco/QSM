@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>SOM 松麦 - 智能养生平台</title>
+    <meta name="description" content="小麦SOM - 中医辨证养生，有机食品推荐">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <img class="logo-icon" src="/public/logo.jpg" alt="松麦logo">
+                    <div class="logo-text">
+                        <h1>SOM 松麦</h1>
+                        <p>智能养生平台</p>
+                    </div>
+                </div>
+                <nav class="nav">
+                    <button class="nav-btn active" data-tab="chat">小麦SOM</button>
+                    <button class="nav-btn" data-tab="products">有机好物</button>
+                    <button class="nav-btn" data-tab="yangshenggu">养生谷</button>
+                    <button class="nav-btn" data-tab="profile">我</button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main">
+            <!-- 对话页面 -->
+            <div class="tab-content active" id="chat-tab">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message assistant">
+                            <div class="message-avatar">麦</div>
+                            <div class="message-content">
+                                <div class="message-text">
+                                    你好，我是小麦SOM，你的养生助手。<br><br>
+                                    告诉我你最近的身体状况，比如：<br>
+                                    • 失眠、疲劳、上火<br>
+                                    • 口干、胃口不好<br>
+                                    • 手脚冰凉、湿气重<br><br>
+                                    我会帮你辨证分析，推荐适合的养生方案和有机好物。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <div class="chat-input-row">
+                            <button class="upload-btn" id="upload-btn" title="拍照/上传照片（可多张）">📷</button>
+                            <textarea 
+                                class="chat-input" 
+                                id="chat-input" 
+                                placeholder="描述身体状况，或📷拍舌苔/面色/皮肤照片..."
+                                rows="2"
+                            ></textarea>
+                            <button class="send-btn" id="send-btn">发送</button>
+                        </div>
+                        <div class="image-preview-list" id="image-preview-list" style="display:none;"></div>
+                        <input type="file" id="image-input" accept="image/*" multiple style="display:none;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 商品页面 -->
+            <div class="tab-content" id="products-tab">
+                <div class="products-container">
+                    <div class="search-box">
+                        <input type="text" id="product-search" placeholder="搜索有机食材，如：枸杞、红枣、山药...">
+                        <button id="search-btn">搜索</button>
+                    </div>
+                    <div class="platform-filter">
+                        <button class="filter-btn active" data-platform="taobao">淘宝</button>
+                        <button class="filter-btn" data-platform="jd">京东</button>
+                        <button class="filter-btn" data-platform="all">全部</button>
+                    </div>
+                    <!-- 排序按钮 -->
+                    <div class="sort-filter">
+                        <button class="sort-btn active" data-sort="default">综合</button>
+                        <button class="sort-btn" data-sort="price_asc">价格最低</button>
+                        <button class="sort-btn" data-sort="price_desc">价格最高</button>
+                        <button class="sort-btn" data-sort="sales">销量最高</button>
+                        <button class="sort-btn" data-sort="credit">评价最高</button>
+                    </div>
+                    <!-- 分类目录 -->
+                    <div class="category-nav" id="category-nav">
+                        <div class="category-loading">加载分类...</div>
+                    </div>
+                    <div class="products-grid" id="products-grid">
+                        <div class="empty-state">
+                            <p>选择分类或搜索有机食材</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 养生谷页面 -->
+            <div class="tab-content" id="yangshenggu-tab">
+                <div class="knowledge-container">
+                    <!-- 健康测评入口 -->
+                    <div class="test-banner" id="test-banner" onclick="switchToHealthTest('yangshenggu')">
+                        <div class="test-banner-left">
+                            <div class="test-banner-title">🔍 测测你的健康</div>
+                            <div class="test-banner-desc">体质测评 + 症状自评</div>
+                        </div>
+                        <div class="test-banner-btn">3分钟 →</div>
+                    </div>
+                    <!-- 节气养生 -->
+                    <div class="knowledge-section">
+                        <h2>🌿 节气养生</h2>
+                        <div class="jieqi-card" id="jieqi-card">
+                            <div class="jieqi-loading">加载中...</div>
+                        </div>
+                    </div>
+                    <!-- 护眼训练 -->
+                    <div class="knowledge-section">
+                        <h2>👁️ 护眼训练</h2>
+                        <div class="eye-exercise" id="eye-exercise">
+                            <div class="jieqi-loading">加载中...</div>
+                        </div>
+                    </div>
+                    <!-- 九种体质 -->
+                    <div class="knowledge-section">
+                        <h2>九种体质</h2>
+                        <div class="tizhi-grid" id="tizhi-grid"></div>
+                    </div>
+                    <!-- 药食同源 -->
+                    <div class="knowledge-section">
+                        <h2>药食同源</h2>
+                        <div class="yaoshi-list" id="yaoshi-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 健康测评页面（从养生谷/小麦入口进入） -->
+            <div class="tab-content" id="health-test-tab">
+                <div class="knowledge-container">
+                    <div class="test-back-bar">
+                        <button class="test-back-nav" onclick="goBackFromTest()">← 返回养生谷</button>
+                    </div>
+                    <div id="test-container"></div>
+                </div>
+            </div>
+
+            <!-- 个人中心页面 -->
+            <div class="tab-content" id="profile-tab">
+                <div class="profile-container">
+                    <!-- 登录/注册区域（未登录时显示） -->
+                    <div class="login-section" id="login-section">
+                        <div class="login-card">
+                            <h3>🌿 登录 / 注册</h3>
+                            <p class="login-hint">登录后体质记录、收藏、签到数据云端同步</p>
+                            <!-- 登录方式切换 -->
+                            <div class="login-tabs">
+                                <button class="login-tab active" data-channel="wechat" onclick="switchLoginChannel('wechat')">💬 微信</button>
+                                <button class="login-tab" data-channel="password" onclick="switchLoginChannel('password')">🔑 账号密码</button>
+                                <button class="login-tab" data-channel="email" onclick="switchLoginChannel('email')">✉️ 邮箱</button>
+                            </div>
+                            <!-- 微信登录 -->
+                            <div class="login-form" id="login-form-wechat">
+                                <div class="wechat-login-hint">
+                                    <p>点击下方按钮，使用微信服务号登录</p>
+                                    <p class="wechat-hint-sub">登录后体质记录、收藏、签到数据云端同步</p>
+                                </div>
+                                <button class="wechat-login-btn" onclick="wechatLogin()">
+                                    <span class="wechat-icon">💬</span> 微信登录
+                                </button>
+                                <p class="wechat-hint-footer">💡 请在微信服务号内打开使用微信登录，电脑/手机浏览器请使用账号密码登录</p>
+                            </div>
+                            <!-- 账号密码登录 -->
+                            <div class="login-form" id="login-form-password" style="display:none;">
+                                <div class="login-row">
+                                    <input type="text" class="login-input" id="password-account" placeholder="账号（邮箱或自定义账号）">
+                                </div>
+                                <div class="login-row">
+                                    <input type="password" class="login-input" id="password-input" placeholder="密码">
+                                </div>
+                                <button class="login-btn" onclick="doPasswordLogin()">登录</button>
+                                <p class="login-link" onclick="showRegisterModal()">没有账号？立即注册</p>
+                                <p class="login-link" onclick="showForgotPassword()">忘记密码？</p>
+                            </div>
+                            <!-- 绑定账号弹窗 -->
+                            <div class="forgot-password-modal" id="bind-account-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>绑定账号</h4>
+                                    <input type="text" class="login-input" id="bind-account-input" placeholder="输入邮箱或账号">
+                                    <button class="login-btn" onclick="doBindAccount()">确认绑定</button>
+                                    <button class="login-btn secondary" onclick="hideBindAccountModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 设置密码弹窗 -->
+                            <div class="forgot-password-modal" id="bind-password-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>设置密码</h4>
+                                    <input type="password" class="login-input" id="bind-password-input" placeholder="输入密码（至少6位）">
+                                    <input type="password" class="login-input" id="bind-password-confirm" placeholder="确认密码">
+                                    <button class="login-btn" onclick="doBindPassword()">确认设置</button>
+                                    <button class="login-btn secondary" onclick="hideBindPasswordModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 注册弹窗 -->
+                            <div class="forgot-password-modal" id="register-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>注册新账号</h4>
+                                    <input type="text" class="login-input" id="register-account" placeholder="账号（邮箱或自定义）">
+                                    <input type="text" class="login-input" id="register-nickname" placeholder="昵称（可选）">
+                                    <input type="password" class="login-input" id="register-password" placeholder="密码">
+                                    <input type="password" class="login-input" id="register-confirm-password" placeholder="确认密码">
+                                    <button class="login-btn" onclick="registerAccount()">注册</button>
+                                    <button class="login-btn secondary" onclick="hideRegisterModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 忘记密码弹窗 -->
+                            <div class="forgot-password-modal" id="forgot-password-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>重置密码</h4>
+                                    <input type="text" class="login-input" id="forgot-account" placeholder="输入你的账号">
+                                    <button class="login-btn" onclick="sendForgotPassword()">发送重置链接</button>
+                                    <button class="login-btn secondary" onclick="hideForgotPassword()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 手机号登录（隐藏，代码保留） -->
+                            <div class="login-form" id="login-form-sms" style="display:none;"></div>
+                            <!-- 邮箱登录 -->
+                            <div class="login-form" id="login-form-email" style="display:none;">
+                                <div class="login-row">
+                                    <input type="email" class="login-input" id="email-addr" placeholder="邮箱地址">
+                                </div>
+                                <div class="login-row">
+                                    <input type="text" class="login-input" id="email-code" placeholder="验证码" maxlength="6">
+                                    <button class="code-btn" id="email-code-btn" onclick="sendLoginCode('email')">获取验证码</button>
+                                </div>
+                                <button class="login-btn" onclick="doLogin('email')">登录 / 注册</button>
+                            </div>
+                            <p class="login-error" id="login-error" style="display:none;"></p>
+                        </div>
+                    </div>
+                    <!-- 用户信息卡片（登录后显示） -->
+                    <div class="profile-card" id="profile-card" style="display:none;">
+                        <div class="profile-avatar">松</div>
+                        <div class="profile-info">
+                            <h3 id="profile-name">养生用户</h3>
+                            <p id="profile-tizhi">体质：未检测</p>
+                            <p id="profile-points">积分：0</p>
+                            <p id="profile-checkin">签到：今天未签到</p>
+                        </div>
+                        <button class="logout-btn" onclick="doLogout()">退出</button>
+                    </div>
+                    <div class="profile-section">
+                        <h3>🔐 账号绑定</h3>
+                        <div class="account-binding">
+                            <div class="binding-item">
+                                <span class="binding-label">📧 邮箱账号</span>
+                                <span class="binding-value" id="binding-email">未绑定</span>
+                                <button class="binding-btn" onclick="showBindAccountModal('email')">绑定</button>
+                            </div>
+                            <div class="binding-item">
+                                <span class="binding-label">🔑 密码</span>
+                                <span class="binding-value" id="binding-password">未设置</span>
+                                <button class="binding-btn" onclick="showBindPasswordModal()">设置</button>
+                            </div>
+                            <div class="binding-item">
+                                <span class="binding-label">💬 微信</span>
+                                <span class="binding-value" id="binding-wechat">未绑定</span>
+                                <button class="binding-btn" onclick="alert('微信登录请在登录页面操作')">绑定</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="profile-section">
+                        <h3>📋 我的体质记录</h3>
+                        <div class="profile-history" id="profile-history">
+                            <p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>
+                        </div>
+                    </div>
+                    <div class="profile-section">
+                        <h3>📊 我的数据</h3>
+                        <div class="profile-stats">
+                            <div class="stat-item">
+                                <span class="stat-num" id="stat-chats">0</span>
+                                <span class="stat-label">对话次数</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-num" id="stat-checkins">0</span>
+                                <span class="stat-label">签到天数</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-num" id="stat-products">0</span>
+                                <span class="stat-label">浏览商品</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部 -->
+        <footer class="footer">
+            <p>SOM 松麦 · 中医辨证 · 有机养生</p>
+        </footer>
+    </div>
+
+    <script src="js/qrcode.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

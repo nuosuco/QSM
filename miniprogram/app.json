@@ -1,0 +1,45 @@
+{
+  "pages": [
+    "pages/chat/chat",
+    "pages/products/products",
+    "pages/yangshenggu/yangshenggu",
+    "pages/profile/profile",
+    "pages/product-detail/product-detail",
+    "pages/webview/webview",
+    "pages/tizhi-test/tizhi-test"
+  ],
+  "window": {
+    "navigationBarTitleText": "SOM 松麦",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f5f7f6",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#7f8c8d",
+    "selectedColor": "#4a9d6e",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/chat/chat",
+        "text": "小麦SOM",
+        "iconPath": "images/chat.png",
+        "selectedIconPath": "images/chat-active.png"
+      },
+      {
+        "pagePath": "pages/yangshenggu/yangshenggu",
+        "text": "养生谷",
+        "iconPath": "images/yangshenggu.png",
+        "selectedIconPath": "images/yangshenggu-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我",
+        "iconPath": "images/profile.png",
+        "selectedIconPath": "images/profile-active.png"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}
