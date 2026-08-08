@@ -642,6 +642,16 @@ def do_builtin(bname, nargs):
         push_int(apply_icphase(pop1_i, pop2_i, pop3_i, pop4_i))
         return
     end
+    if (str_eq(bname, "apply_ry")):
+        do_pop3()
+        push_int(apply_ry(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_swap")):
+        do_pop3()
+        push_int(apply_swap(pop1_i, pop2_i, pop3_i))
+        return
+    end
     if (str_eq(bname, "apply_ccz")):
         do_pop4()
         push_int(apply_ccz(pop1_i, pop2_i, pop3_i, pop4_i))

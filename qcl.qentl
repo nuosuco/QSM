@@ -702,6 +702,8 @@ def is_builtin(nm):
     if (str_eq(nm, "apply_iphase")): return 1 end
     if (str_eq(nm, "apply_cphase")): return 1 end
     if (str_eq(nm, "apply_icphase")): return 1 end
+    if (str_eq(nm, "apply_ry")): return 1 end
+    if (str_eq(nm, "apply_swap")): return 1 end
     if (str_eq(nm, "measure")): return 1 end
     return 0
 end
@@ -1068,10 +1070,14 @@ def parse_statement():
                                 if (str_eq(ident_nm, "cphase") or str_eq(ident_nm, "icphase")):
                                     parse_quantum_cphase(ident_ns, ident_nl)
                                 else:
-                                    if (str_eq(ident_nm, "measure")):
-                                        parse_quantum_measure(ident_ns, ident_nl)
+                                    if (str_eq(ident_nm, "swap")):
+                                        parse_quantum_swap(ident_ns, ident_nl)
                                     else:
-                                        parse_ident_stmt()
+                                        if (str_eq(ident_nm, "measure") and peek_type() != T_LPAREN):
+                                            parse_quantum_measure(ident_ns, ident_nl)
+                                        else:
+                                            parse_ident_stmt()
+                                        end
                                     end
                             end
                         end
@@ -1356,6 +1362,44 @@ def parse_quantum_ccccz(ns, nl):
     emit_byte(OP_POP)
 end
 
+# swap q[a], q[b] — 交换两个量子位
+def parse_quantum_swap(ns, nl):
+    advance()
+    var r1_ns = g_tok_start[g_parse_pos]
+    var r1_nl = g_tok_len[g_parse_pos]
+    advance()
+    expect(T_LBRACKET, "swap缺[")
+    var r1_idx = 0
+    if (cur_type() == T_NUMBER):
+        r1_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    expect(T_RBRACKET, "swap缺]")
+    if (cur_type() == T_COMMA):
+        advance()
+    end
+    var r2_ns = g_tok_start[g_parse_pos]
+    var r2_nl = g_tok_len[g_parse_pos]
+    advance()
+    expect(T_LBRACKET, "swap缺[")
+    var r2_idx = 0
+    if (cur_type() == T_NUMBER):
+        r2_idx = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+        advance()
+    end
+    expect(T_RBRACKET, "swap缺]")
+    emit_byte(OP_LOAD_VAR)
+    emit_u16(sym_resolve(r1_ns, r1_nl))
+    emit_byte(OP_PUSH_INT)
+    emit_u16(r1_idx)
+    emit_byte(OP_PUSH_INT)
+    emit_u16(r2_idx)
+    emit_byte(OP_BUILTIN)
+    emit_u16(pool_add_string("apply_swap"))
+    emit_byte(3)
+    emit_byte(OP_POP)
+end
+
 # phase q[0], k / iphase q[0], k — 单量子位相位门 π/2^k
 def parse_quantum_phase(ns, nl):
     advance()
@@ -1471,6 +1515,23 @@ def parse_var_decl():
     var ns = g_tok_start[g_parse_pos]
     var nl = g_tok_len[g_parse_pos]
     advance()  # consume name
+    # 数组声明: var arr[N] (无初始化式)
+    if (cur_type() == T_LBRACKET):
+        advance()
+        parse_expr()
+        expect(T_RBRACKET, "数组声明缺]")
+        var slot = 0
+        if (g_in_func == 1):
+            slot = sym_add_local(ns, nl)
+        else:
+            slot = sym_add_global(ns, nl)
+        end
+        emit_byte(OP_ARRAY_NEW)
+        emit_u16(0)
+        emit_byte(OP_STORE_VAR)
+        emit_u16(slot)
+        return
+    end
     expect(T_ASSIGN, "var缺=")
     # 检查是否是量子门赋值: var m0 = measure q[0]
     var cur_t = cur_type()
@@ -1478,7 +1539,7 @@ def parse_var_decl():
         var gate_ns = g_tok_start[g_parse_pos]
         var gate_nl = g_tok_len[g_parse_pos]
         var gate_nm = str_substring(g_src, gate_ns, gate_nl)
-        if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")):
+        if ((str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")) and peek_type() != T_LPAREN):
             advance()  # consume gate name
             # 发射量子门代码（不POP，让结果留在栈上供STORE_VAR）
             if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t")):

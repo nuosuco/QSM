@@ -670,6 +670,58 @@ static Value call_builtin(VM *vm, const char *name, Value *args, int nargs) {
         }
         return mk_int(-1);
     }
+    /* ---- SWAP门: 交换量子位a和b ---- */
+    if (strcmp(name, "apply_swap") == 0) {
+        if (nargs >= 3 && args[0].type == V_INT && args[1].type == V_INT && args[2].type == V_INT) {
+            int id = (int)args[0].i, qa = (int)args[1].i, qb = (int)args[2].i;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || qa < 0 || qa >= qregs[id].n || qb < 0 || qb >= qregs[id].n)
+                return mk_int(-1);
+            if (qa == qb) return mk_int(0);
+            int sz = 1 << qregs[id].n;
+            double *s = qregs[id].state;
+            int ba = 1 << qa, bb = 1 << qb;
+            for (int i = 0; i < sz; i++) {
+                int ia = (i & ba) != 0, ib = (i & bb) != 0;
+                if (ia != ib) {
+                    int j = i ^ ba ^ bb;  /* swap bits */
+                    if (i < j) {
+                        double r = s[2 * i], im = s[2 * i + 1];
+                        s[2 * i] = s[2 * j]; s[2 * i + 1] = s[2 * j + 1];
+                        s[2 * j] = r; s[2 * j + 1] = im;
+                    }
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
+    /* ---- 任意角度Y旋转: RY(θ), θ以毫弧度(mrad)传入, 1000=1rad ---- */
+    if (strcmp(name, "apply_ry") == 0) {
+        if (nargs >= 3 && args[0].type == V_INT && args[1].type == V_INT && args[2].type == V_INT) {
+            int id = (int)args[0].i, q = (int)args[1].i;
+            double ang = args[2].i / 1000.0;
+            if (id < 0 || id >= qreg_count || !qregs[id].state || q < 0 || q >= qregs[id].n)
+                return mk_int(-1);
+            int n = qregs[id].n, sz = 1 << n;
+            double *s = qregs[id].state;
+            int step = 1 << q;
+            double cs = cos(ang / 2.0), sn = sin(ang / 2.0);
+            for (int i = 0; i < sz; i += (step << 1)) {
+                for (int j = 0; j < step; j++) {
+                    int a = i + j, b = a + step;
+                    double ar = s[2 * a], ai = s[2 * a + 1];
+                    double br = s[2 * b], bi = s[2 * b + 1];
+                    /* RY = [[cos, -sin], [sin, cos]] on real subspace */
+                    s[2 * a]     = cs * ar - sn * br;
+                    s[2 * a + 1] = cs * ai - sn * bi;
+                    s[2 * b]     = sn * ar + cs * br;
+                    s[2 * b + 1] = sn * ai + cs * bi;
+                }
+            }
+            return mk_int(0);
+        }
+        return mk_int(-1);
+    }
     if (strcmp(name, "apply_z") == 0) {
         if (nargs >= 2 && args[0].type == V_INT && args[1].type == V_INT) {
             int id = (int)args[0].i, q = (int)args[1].i;
@@ -1390,7 +1442,7 @@ static int is_builtin_name(Comp *c, long start, long len) {
         "exec",
         "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx",
         "apply_x", "apply_z", "apply_cz", "apply_ccx", "apply_ccz",
-        "apply_phase", "apply_iphase", "apply_cphase", "apply_icphase", "apply_cccz", "apply_ccccz", "measure"
+        "apply_phase", "apply_iphase", "apply_cphase", "apply_icphase", "apply_cccz", "apply_ccccz", "apply_ry", "apply_swap", "measure"
     };
     for (int k = 0; k < (int)(sizeof(names) / sizeof(names[0])); k++)
         if (kw_match(c->src + start, len, names[k])) return 1;
