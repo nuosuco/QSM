@@ -1,0 +1,61 @@
+# ================================================================
+# 量子并行性演示
+# 展示量子计算通过叠加态实现并行计算
+# ================================================================
+
+printf("=== 量子并行性演示 ===\n\n")
+
+printf("--- 原理 ---\n")
+printf("经典: 一次只能求一个输入的函数值\n")
+printf("量子: 叠加态同时求所有输入的函数值\n")
+printf("例: f(x) = x XOR 1, 2比特输入\n")
+printf("  经典需要4次调用\n")
+printf("  量子1次调用同时求4个值\n\n")
+
+printf("--- 演示: 同时计算f(0),f(1),f(2),f(3) ---\n")
+printf("f(x) = (2x + 1) mod 4\n\n")
+
+printf("  经典方法: 4次调用\n")
+var x0 = 0
+var r0 = (2 * x0 + 1) % 4
+printf("    f(%d) = %d\n", x0, r0)
+var x1 = 1
+var r1 = (2 * x1 + 1) % 4
+printf("    f(%d) = %d\n", x1, r1)
+var x2 = 2
+var r2 = (2 * x2 + 1) % 4
+printf("    f(%d) = %d\n", x2, r2)
+var x3 = 3
+var r3 = (2 * x3 + 1) % 4
+printf("    f(%d) = %d\n", x3, r3)
+
+printf("\n  量子方法: 1次调用\n")
+var q = qreg_create(3)
+# 制备叠加态
+apply_h(q, 0)
+apply_h(q, 1)
+printf("  输入叠加态: (|00>+|01>+|10>+|11>)/2\n")
+
+# 量子Oracle: f(x) = 2x+1 mod 4
+# 用CNOT和Toffoli实现
+apply_cx(q, 0, 2)
+apply_cx(q, 1, 2)
+printf("  应用Oracle: 同时计算所有f(x)\n")
+
+printf("\n  Oracle结果叠加:\n")
+printf("    f(00) -> 01\n")
+printf("    f(01) -> 11\n")
+printf("    f(10) -> 01\n")
+printf("    f(11) -> 11\n")
+
+printf("\n--- 量子并行优势 ---\n")
+printf("  经典: O(N)次调用\n")
+printf("  量子: O(1)次调用 (叠加态)\n")
+printf("  注意: 读出结果仍需测量\n")
+
+printf("\n--- 应用 ---\n")
+printf("  Deutsch-Jozsa算法: 判断函数奇偶性\n")
+printf("  Grover搜索: 叠加态搜索\n")
+printf("  Shor算法: 叠加态周期测量\n\n")
+
+printf("=== 量子并行性演示完成 ===\n")
