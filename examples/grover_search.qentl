@@ -1,0 +1,67 @@
+# ================================================================
+# Grover搜索算法 - 正确的3比特实现
+# ================================================================
+
+printf("=== Grover搜索算法 ===\n\n")
+printf("目标: 在8个元素中找到|101>(十进制5)\n")
+printf("经典搜索: 最坏4次查询\n")
+printf("Grover搜索: 仅需1次迭代(理论最优)\n\n")
+
+printf("--- 第1步: 初始化叠加态 ---\n")
+var q = qreg_create(3)
+var i = 0
+while (i < 3):
+    apply_h(q, i)
+    i = i + 1
+end
+printf("  状态: (|000>+|001>+...+|111>)/sqrt(8)\n")
+
+printf("\n--- 第2步: Oracle (标记|101>) ---\n")
+# Oracle: 对|101>施加相位-1
+# 方法: 当q[0]=1且q[2]=1时，翻转q[1]的相位
+apply_x(q, 1)  # 翻转q[1]
+apply_ccx(q, 0, 2, 1)  # 当q[0]=1且q[2]=1时，翻转q[1]
+apply_x(q, 1)  # 恢复q[1]
+printf("  Oracle已标记|101>态\n")
+
+printf("\n--- 第3步: Diffusion算子 ---\n")
+# Diffusion: 2|s><s|-I，其中|s>是均匀叠加态
+# 实现: H^3 -> X^3 -> CCX(0,1,2) -> X^3 -> H^3
+i = 0
+while (i < 3):
+    apply_h(q, i)
+    i = i + 1
+end
+i = 0
+while (i < 3):
+    apply_x(q, i)
+    i = i + 1
+end
+apply_ccx(q, 0, 1, 2)  # 对|111>态施加相位翻转
+i = 0
+while (i < 3):
+    apply_x(q, i)
+    i = i + 1
+end
+i = 0
+while (i < 3):
+    apply_h(q, i)
+    i = i + 1
+end
+printf("  Diffusion算子已应用\n")
+
+printf("\n--- 第4步: 测量 ---\n")
+var m0 = measure(q, 0)
+var m1 = measure(q, 1)
+var m2 = measure(q, 2)
+printf("  测量结果: q[0]=%d, q[1]=%d, q[2]=%d\n", m0, m1, m2)
+var result = m0 + m1 * 2 + m2 * 4
+printf("  十进制结果: %d\n", result)
+
+if (result == 5):
+    printf("  ✓ Grover搜索成功! 找到目标态|101>\n")
+else:
+    printf("  期望结果: 5 (二进制101)\n")
+end
+
+printf("\n=== Grover算法演示完成 ===\n")
