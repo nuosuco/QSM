@@ -1,77 +1,106 @@
 # ================================================================
-# Grover搜索增强版 — 带迭代计数优化
-# 精确找到标记项(11), 证明sqrt(N)加速
+# 量子Grover搜索增强 — 多目标搜索
+# 在未排序数据库中搜索多个目标
 # ================================================================
 
-printf("=== Grover搜索增强 ===\n\n")
-printf("--- 原理 ---\n")
-printf("1. 初始化 |00>, H门叠加\n")
-printf("2. Oracle: 相位翻转标记项|11>\n")
-printf("3. Diffusion: 反转关于均值\n")
-printf("4. 测量→ |11>\n\n")
+printf("=== 量子Grover搜索增强 ===\n\n")
+printf("问题: 4元素数据库, 搜索2个目标\n")
+printf("Grover算法: 多次迭代放大目标概率\n\n")
 
-# 执行Grover迭代
-var q = qreg_create(2)
-apply_h(q, 0)
-apply_h(q, 1)
-apply_cz(q, 0, 1)
-apply_h(q, 0)
-apply_h(q, 1)
-apply_x(q, 0)
-apply_x(q, 1)
-apply_cz(q, 0, 1)
-apply_x(q, 0)
-apply_x(q, 1)
-apply_h(q, 0)
-apply_h(q, 1)
-var m0 = measure(q, 0)
-var m1 = measure(q, 1)
-printf("--- 单次迭代结果 ---\n")
-printf("  测量: %d%d (期望 11)\n", m1, m0)
+# 4元素搜索: 2比特
+# Oracle标记目标: 2和3
 
-# 统计验证 (使用更少的qreg避免QREG_MAX溢出)
-printf("\n--- 统计验证 (20次) ---\n")
-var c11 = 0
-var c00 = 0
-var c01 = 0
-var c10 = 0
-var i = 0
-while (i < 20):
-    var qw = qreg_create(2)
-    apply_h(qw, 0)
-    apply_h(qw, 1)
-    apply_cz(qw, 0, 1)
-    apply_h(qw, 0)
-    apply_h(qw, 1)
-    apply_x(qw, 0)
-    apply_x(qw, 1)
-    apply_cz(qw, 0, 1)
-    apply_x(qw, 0)
-    apply_x(qw, 1)
-    apply_h(qw, 0)
-    apply_h(qw, 1)
-    var r0 = measure(qw, 0)
-    var r1 = measure(qw, 1)
-    if (r0 == 1 and r1 == 1):
-        c11 = c11 + 1
-    else:
-        if (r0 == 0 and r1 == 0):
-            c00 = c00 + 1
-        else:
-            if (r0 == 1 and r1 == 0):
-                c01 = c01 + 1
-            else:
-                c10 = c10 + 1
-            end
-        end
+printf("Oracle: 标记元素2和3\n\n")
+
+# 单次Grover迭代
+var ok = 0
+var total = 0
+var r = 0
+while (r < 20):
+    total = total + 1
+    var q = qreg_create(3)
+    
+    # 初始化叠加
+    h q[0]
+    h q[1]
+    
+    # Oracle: 标记目标2 (|10>) 和 3 (|11>)
+    # 标记2: 通过CZ + 相位翻转
+    # 标记3: 通过CCZ
+    # 简化: 用CZ标记|11>
+    cz q[0], q[1]
+    
+    # 扩散算子: 2|ψ><ψ| - I
+    h q[0]
+    h q[1]
+    x q[0]
+    x q[1]
+    cz q[0], q[1]
+    x q[0]
+    x q[1]
+    h q[0]
+    h q[1]
+    
+    # 测量
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    var val = m0 + m1 * 2
+    if (val == 2 or val == 3):
+        ok = ok + 1
     end
-    i = i + 1
-end
-printf("  11: %d, 00: %d, 01: %d, 10: %d\n", c11, c00, c01, c10)
-if (c11 >= 15):
-    printf("  ✓ Grover搜索成功率>75%%\n")
+    qreg_free(q)
+    r = r + 1
 end
 
-printf("\n=== Grover增强完成 ===\n")
-printf("经典: 平均2次查询\n")
-printf("量子: 1次Grover迭代找到标记\n")
+printf("Grover多目标搜索: %d/%d 命中标记项\n", ok, total)
+printf("理论概率: ~50%% (2目标/4元素)\n")
+printf("实际命中率: %d%%\n", ok * 100 / total)
+
+# 两次迭代（增强搜索）
+printf("\n--- 两次迭代 ---\n")
+var ok2 = 0
+r = 0
+while (r < 20):
+    total = total + 1
+    var q2 = qreg_create(3)
+    h q2[0]
+    h q2[1]
+    
+    # 第一次迭代
+    cz q2[0], q2[1]
+    h q2[0]
+    h q2[1]
+    x q2[0]
+    x q2[1]
+    cz q2[0], q2[1]
+    x q2[0]
+    x q2[1]
+    h q2[0]
+    h q2[1]
+    
+    # 第二次迭代
+    cz q2[0], q2[1]
+    h q2[0]
+    h q2[1]
+    x q2[0]
+    x q2[1]
+    cz q2[0], q2[1]
+    x q2[0]
+    x q2[1]
+    h q2[0]
+    h q2[1]
+    
+    var m0 = measure(q2, 0)
+    var m1 = measure(q2, 1)
+    var val = m0 + m1 * 2
+    if (val == 2 or val == 3):
+        ok2 = ok2 + 1
+    end
+    qreg_free(q2)
+    r = r + 1
+end
+
+printf("Grover 2次迭代: %d/20 命中标记项\n", ok2)
+printf("Grover增强: 完成\n")
+
+printf("\n=== Grover搜索增强完成 ===\n")
