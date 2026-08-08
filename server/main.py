@@ -1162,6 +1162,66 @@ async def auth_reset_password(request: ResetPasswordRequest):
     reset_password(token_data["user_id"], request.new_password)
     return {"success": True, "message": "密码重置成功"}
 
+import hashlib
+import xml.etree.ElementTree as ET
+
+@app.get("/wechat-message")
+async def wechat_message_verify(
+    signature: str = None,
+    timestamp: str = None,
+    nonce: str = None,
+    echostr: str = None
+):
+    """微信消息推送验证"""
+    from services import auth_service
+    cfg = auth_service._load_auth_config()
+    wx_cfg = cfg.get("wechat", {})
+    token = wx_cfg.get("token", "")
+    
+    if not token:
+        return {"error": "Token未配置"}
+    
+    # 验证签名
+    list = [token, timestamp, nonce]
+    list.sort()
+    string = ''.join(list)
+    sha1 = hashlib.sha1(string.encode('utf-8')).hexdigest()
+    
+    if sha1 != signature:
+        return {"error": "签名验证失败"}
+    
+    # 返回echostr完成验证
+    return echostr
+
+@app.post("/wechat-message")
+async def wechat_message_receive():
+    """接收微信消息推送"""
+    from services import auth_service
+    cfg = auth_service._load_auth_config()
+    wx_cfg = cfg.get("wechat", {})
+    token = wx_cfg.get("token", "")
+    encoding_aes_key = wx_cfg.get("encoding_aes_key", "")
+    
+    # 读取XML消息
+    import xml.etree.ElementTree as ET
+    xml_data = await request.body()
+    root = ET.fromstring(xml_data)
+    
+    # 解析消息类型
+    msg_type = root.find('MsgType').text if root.find('MsgType') is not None else ''
+    
+    # 根据消息类型处理
+    if msg_type == 'text':
+        content = root.find('Content').text if root.find('Content') is not None else ''
+        # TODO: 处理用户发送的文本消息
+        pass
+    elif msg_type == 'event':
+        event = root.find('Event').text if root.find('Event') is not None else ''
+        # TODO: 处理事件（关注、扫码等）
+        pass
+    
+    return 'success'
+
 @app.get("/wechat-callback")
 async def wechat_oauth_callback(code: str = None, state: str = None):
     """微信服务号OAuth2.0回调"""
