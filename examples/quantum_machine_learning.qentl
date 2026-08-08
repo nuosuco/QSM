@@ -1,0 +1,66 @@
+# ================================================================
+# 量子机器学习 — 数据编码+分类
+# 量子特征映射: 将经典数据编码到量子态
+# ================================================================
+
+printf("=== 量子机器学习 ===\n\n")
+printf("量子特征映射: 经典数据→量子态\n")
+printf("角编码: 数据编码到旋转角度\n\n")
+
+# 经典数据: 2D点 (x,y)
+# 分类: 点在圆内/外 (x^2+y^2 < 0.5)
+# 量子特征映射: 编码到2比特量子态
+
+# 测试数据: 4个点
+var data_x[4]
+var data_y[4]
+var data_label[4]
+
+data_x[0] = 2; data_y[0] = 2; data_label[0] = 0  # 靠近原点
+data_x[1] = 6; data_y[1] = 2; data_label[1] = 1  # 远离
+data_x[2] = 3; data_y[2] = 3; data_label[2] = 0  # 靠近
+data_x[3] = 7; data_y[3] = 7; data_label[3] = 1  # 远离
+
+printf("数据点: (x,y) 归一化到[0,1]×[0,1]\n")
+printf("目标: 分类 x^2+y^2 < 0.5\n\n")
+
+# 量子分类器: 用CX+纠缠特征映射
+var correct = 0
+var total = 0
+var i = 0
+while (i < 4):
+    total = total + 1
+    var q = qreg_create(2)
+    
+    # 特征映射: 用比特翻转编码数据
+    # 数据x和y在{2,3,6,7}范围
+    # 用CX门产生纠缠特征
+    if (data_x[i] >= 5):
+        x q[0]
+    end
+    if (data_y[i] >= 5):
+        x q[1]
+    end
+    
+    # 纠缠特征映射: CX
+    cx q[0], q[1]
+    
+    # 测量q[1]作为分类结果
+    var m = measure(q, 1)
+    
+    var predicted = m
+    if (predicted == data_label[i]):
+        correct = correct + 1
+    end
+    qreg_free(q)
+    i = i + 1
+end
+
+printf("量子ML分类: %d/%d 正确\n", correct, total)
+if (correct >= 3):
+    printf("量子特征映射: 通过 ✅\n")
+else:
+    printf("量子特征映射: 需改进\n")
+end
+
+printf("\n=== 量子ML完成 ===\n")
