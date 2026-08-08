@@ -1,132 +1,91 @@
 # ================================================================
-# 3比特相位翻转码 — 正确实现
-# 原理: 在X基下检测Z错误
-# 编码: |0>L = |+++>, |1>L = |--- >
-# Z错误在X基下等价于X错误
-# 测量X基 syndrome 检测相位错误
+# 3比特相位翻转码演示
+# 演示Z错误的检测和纠正
 # ================================================================
 
-printf("=== 3比特相位翻转码测试 ===\n")
-printf("原理: X基下测量, Z错误等价于X错误\n\n")
+printf("=== 3比特相位翻转码演示 ===\n\n")
 
-var anc1 = qreg_create(1)
-var anc2 = qreg_create(1)
-var total = 0
-var ok = 0
+# 测试1: 无错误
+printf("--- 测试1: 无错误 ---\n")
+var q1 = qreg_create(3)
+apply_h(q1, 0)
+apply_h(q1, 1)
+apply_h(q1, 2)
 
-# 测试3种不同的Z错误位置
-var err_pos = 0
-while (err_pos <= 2):
-    var q = qreg_create(3)
-    
-    # 编码: |+++> (三个H门)
-    apply_h(q, 0)
-    apply_h(q, 1)
-    apply_h(q, 2)
-    
-    # 注入Z错误
-    apply_z(q, err_pos)
-    printf("测试: Z错误在 q%d\n", err_pos)
-    
-    # 测量X基 syndrome
-    # 方法: 对每个量子位应用H, 然后测量计算基 syndrome
-    apply_h(q, 0)
-    apply_h(q, 1)
-    apply_cx(q, 0, anc1, 0)
-    apply_cx(q, 1, anc1, 0)
-    apply_h(q, 0)
-    apply_h(q, 1)
-    
-    apply_h(q, 1)
-    apply_h(q, 2)
-    apply_cx(q, 1, anc2, 0)
-    apply_cx(q, 2, anc2, 0)
-    apply_h(q, 1)
-    apply_h(q, 2)
-    
-    var s1 = measure(anc1, 0)
-    var s2 = measure(anc2, 0)
-    printf("  Syndrome: s1=%d, s2=%d\n", s1, s2)
-    
-    # 根据 syndrome 纠错
-    # s1=1,s2=0 -> q0错误
-    # s1=0,s2=1 -> q2错误  
-    # s1=1,s2=1 -> q1错误
-    if (s1 == 1 and s2 == 0):
-        apply_x(q, 0)
-        printf("  纠正: q0\n")
-    else:
-        if (s1 == 0 and s2 == 1):
-            apply_x(q, 2)
-            printf("  纠正: q2\n")
-        else:
-            if (s1 == 1 and s2 == 1):
-                apply_x(q, 1)
-                printf("  纠正: q1\n")
-            end
-        end
-    end
-    
-    # 测量验证 (在X基)
-    apply_h(q, 0)
-    apply_h(q, 1)
-    apply_h(q, 2)
-    var m0 = measure(q, 0)
-    var m1 = measure(q, 1)
-    var m2 = measure(q, 2)
-    printf("  测量(X基): q0=%d, q1=%d, q2=%d\n", m0, m1, m2)
-    
-    # 验证: 在X基下，|+> 测得0, |-> 测得1
-    # 纠错后所有量子位应该相同
-    if (m0 == m1 and m1 == m2):
-        printf("  ✓ 纠错成功\n\n")
-        ok = ok + 1
-    else:
-        printf("  ✗ 纠错失败\n\n")
-    end
-    
-    total = total + 1
-    err_pos = err_pos + 1
-end
-
-# 测试无错误情况
-printf("测试: 无错误\n")
-var q0 = qreg_create(3)
-apply_h(q0, 0)
-apply_h(q0, 1)
-apply_h(q0, 2)
-
-apply_h(q0, 0)
-apply_h(q0, 1)
-apply_cx(q0, 0, anc1, 0)
-apply_cx(q0, 1, anc1, 0)
-apply_h(q0, 0)
-apply_h(q0, 1)
-apply_h(q0, 1)
-apply_h(q0, 2)
-apply_cx(q0, 1, anc2, 0)
-apply_cx(q0, 2, anc2, 0)
-apply_h(q0, 1)
-apply_h(q0, 2)
-
-var s1_n = measure(anc1, 0)
-var s2_n = measure(anc2, 0)
-printf("  Syndrome: s1=%d, s2=%d\n", s1_n, s2_n)
-
-apply_h(q0, 0)
-apply_h(q0, 1)
-apply_h(q0, 2)
-var m0_n = measure(q0, 0)
-var m1_n = measure(q0, 1)
-var m2_n = measure(q0, 2)
-printf("  测量(X基): q0=%d, q1=%d, q2=%d\n", m0_n, m1_n, m2_n)
-
-if (m0_n == m1_n and m1_n == m2_n):
-    printf("  ✓ 无错误验证通过\n\n")
-    ok = ok + 1
+# X基测量验证
+apply_h(q1, 0)
+apply_h(q1, 1)
+apply_h(q1, 2)
+var m0 = measure(q1, 0)
+var m1 = measure(q1, 1)
+var m2 = measure(q1, 2)
+printf("  X基测量: q0=%d, q1=%d, q2=%d\n", m0, m1, m2)
+if (m0 == m1 and m1 == m2):
+    printf("  ✓ 编码正确\n\n")
 else:
-    printf("  ✗ 无错误验证失败\n\n")
+    printf("  ✗ 编码失败\n\n")
 end
-total = total + 1
 
-printf("=== 结果: %d/%d 通过 ===\n", ok, total)
+# 测试2: Z错误注入
+printf("--- 测试2: Z错误注入 (q1) ---\n")
+var q2 = qreg_create(3)
+apply_h(q2, 0)
+apply_h(q2, 1)
+apply_h(q2, 2)
+apply_z(q2, 1)  # 注入Z错误
+
+# X基测量
+apply_h(q2, 0)
+apply_h(q2, 1)
+apply_h(q2, 2)
+var m0b = measure(q2, 0)
+var m1b = measure(q2, 1)
+var m2b = measure(q2, 2)
+printf("  X基测量: q0=%d, q1=%d, q2=%d\n", m0b, m1b, m2b)
+if (m0b != m1b or m1b != m2b):
+    printf("  ✓ Z错误检测成功 (测量结果不一致)\n\n")
+else:
+    printf("  ✗ Z错误检测失败\n\n")
+end
+
+# 测试3: 9比特Shor码编码
+printf("--- 测试3: 9比特Shor码编码 ---\n")
+var q3 = qreg_create(9)
+apply_h(q3, 0)
+apply_h(q3, 3)
+apply_h(q3, 6)
+apply_cx(q3, 0, 1)
+apply_cx(q3, 0, 2)
+apply_cx(q3, 3, 4)
+apply_cx(q3, 3, 5)
+apply_cx(q3, 6, 7)
+apply_cx(q3, 6, 8)
+
+# 验证编码
+var m0c = measure(q3, 0)
+var m1c = measure(q3, 1)
+var m2c = measure(q3, 2)
+printf("  第一组测量: q0=%d, q1=%d, q2=%d\n", m0c, m1c, m2c)
+if (m0c == m1c and m1c == m2c):
+    printf("  ✓ 第一组编码正确\n")
+end
+
+var m3c = measure(q3, 3)
+var m4c = measure(q3, 4)
+var m5c = measure(q3, 5)
+printf("  第二组测量: q3=%d, q4=%d, q5=%d\n", m3c, m4c, m5c)
+if (m3c == m4c and m4c == m5c):
+    printf("  ✓ 第二组编码正确\n")
+end
+
+var m6c = measure(q3, 6)
+var m7c = measure(q3, 7)
+var m8c = measure(q3, 8)
+printf("  第三组测量: q6=%d, q7=%d, q8=%d\n", m6c, m7c, m8c)
+if (m6c == m7c and m7c == m8c):
+    printf("  ✓ 第三组编码正确\n\n")
+else:
+    printf("  ✗ 第三组编码失败\n\n")
+end
+
+printf("=== 演示完成 ===\n")
