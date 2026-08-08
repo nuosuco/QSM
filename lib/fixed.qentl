@@ -52,6 +52,29 @@ def fx_from_parts(ip, frac3):
     return ip * FIXED_SCALE + frac3
 end
 
+# 牛顿法平方根(定点): sqrt(a) 满足 y*y = a*SCALE
+# 迭代 y = (y + a*SCALE/y) / 2, 收敛到定点结果
+def fx_sqrt(a):
+    if (a <= 0):
+        return 0
+    end
+    var target = a * FIXED_SCALE
+    var y = target / 2
+    if (a < FIXED_SCALE):
+        y = FIXED_SCALE
+    end
+    var i = 0
+    while (i < 30):
+        var yn = (y + target / y) / 2
+        if (yn == y):
+            break
+        end
+        y = yn
+        i = i + 1
+    end
+    return y
+end
+
 # 定点转可读字符串: 3140 -> "3.140"
 def fx_to_str(a):
     var neg = 0
