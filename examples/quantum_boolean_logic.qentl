@@ -1,83 +1,105 @@
 # ================================================================
-# 量子布尔逻辑 — 用Toffoli门精确实现AND/OR/NAND
-# 量子门的确定性强项: 通用布尔逻辑
+# 量子布尔逻辑 — 完备门集
+# 展示量子门实现所有布尔函数
 # ================================================================
 
-printf("=== 量子布尔逻辑实现 ===\n\n")
-printf("用Toffoli(CCX)门实现通用布尔函数\n")
-printf("CCX: |a,b,c> -> |a,b, c XOR (a AND b)>\n\n")
+printf("=== 量子布尔逻辑完备门集 ===\n\n")
 
-# 测试所有4个输入组合
-printf("--- 测试AND ---\n")
-var and_correct = 0
-var i = 0
-while (i < 4):
-    var a = i % 2
-    var b = i / 2
-    var q = qreg_create(3)
-    if (a > 0): apply_x(q, 0) end
-    if (b > 0): apply_x(q, 1) end
-    apply_ccx(q, 0, 1, 2)  # Toffoli: |a,b,0> -> |a,b,a AND b>
-    var m = measure(q, 2)
-    var expected = a * b
-    if (m == expected):
-        printf("  %d AND %d = %d ✓\n", a, b, m)
-    else:
-        printf("  %d AND %d = %d ✗\n", a, b, m)
+# 完备门集: NOT, AND, OR, XOR, NAND, NOR
+# 量子实现: 用X/CX/CCX门
+
+printf("--- 1. NOT (X门) ---\n")
+var qn = qreg_create(1)
+x qn[0]
+var mnot = measure(qn, 0)
+printf("  NOT(0) = %d\n", mnot)
+qreg_free(qn)
+
+printf("--- 2. AND (CCX门) ---\n")
+var and_ok = 0
+var and_total = 0
+var a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        var qa = qreg_create(3)
+        if (a == 1): x qa[0] end
+        if (b == 1): x qa[1] end
+        ccx qa[0], qa[1], qa[2]
+        var r = measure(qa, 2)
+        var expected = 0
+        if (a == 1 and b == 1): expected = 1 end
+        and_total = and_total + 1
+        if (r == expected): and_ok = and_ok + 1 end
+        qreg_free(qa)
+        b = b + 1
     end
-    if (m == expected): and_correct = and_correct + 1 end
-    i = i + 1
+    a = a + 1
 end
-printf("  AND准确率: %d/4\n", and_correct)
+printf("  AND: %d/%d\n", and_ok, and_total)
 
-# XOR用CX实现
-printf("\n--- 测试XOR ---\n")
-var xor_correct = 0
-i = 0
-while (i < 4):
-    var a = i % 2
-    var b = i / 2
-    var q = qreg_create(2)
-    if (a > 0): apply_x(q, 0) end
-    if (b > 0): apply_x(q, 1) end
-    apply_cx(q, 0, 1)  # |a,b> -> |a, a XOR b>
-    var m = measure(q, 1)
-    var expected = (a + b) % 2
-    if (m == expected):
-        printf("  %d XOR %d = %d ✓\n", a, b, m)
-    else:
-        printf("  %d XOR %d = %d ✗\n", a, b, m)
+printf("--- 3. XOR (CX门) ---\n")
+var xor_ok = 0
+var xor_total = 0
+a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        var qx = qreg_create(3)
+        if (a == 1): x qx[0] end
+        if (b == 1): x qx[1] end
+        cx qx[0], qx[2]
+        cx qx[1], qx[2]
+        var r = measure(qx, 2)
+        var expected = 0
+        if (a != b): expected = 1 end
+        xor_total = xor_total + 1
+        if (r == expected): xor_ok = xor_ok + 1 end
+        qreg_free(qx)
+        b = b + 1
     end
-    if (m == expected): xor_correct = xor_correct + 1 end
-    i = i + 1
+    a = a + 1
 end
-printf("  XOR准确率: %d/4\n", xor_correct)
+printf("  XOR: %d/%d\n", xor_ok, xor_total)
 
-# OR用CCX+NOT实现: OR(a,b) = NOT(AND(NOT a, NOT b))
-printf("\n--- 测试OR (通过NOT+CCX组合) ---\n")
-var or_correct = 0
-i = 0
-while (i < 4):
-    var a = i % 2
-    var b = i / 2
-    var q = qreg_create(3)
-    # 准备 NOT a, NOT b 到辅助位
-    if (a == 0): apply_x(q, 0) end
-    if (b == 0): apply_x(q, 1) end
-    apply_ccx(q, 0, 1, 2)  # AND(NOT a, NOT b)
-    # 目标位取反得到 OR
-    if (measure(q, 2) == 0):
-        # OR = 1
-        printf("  %d OR %d = 1 ✓\n", a, b)
-        or_correct = or_correct + 1
-    else:
-        printf("  %d OR %d = 0 ✓\n", a, b)
-        or_correct = or_correct + 1
+printf("--- 4. OR (逻辑等价) ---\n")
+var or_ok = 0
+var or_total = 0
+a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        var qo = qreg_create(4)
+        if (a == 1): x qo[0] end
+        if (b == 1): x qo[1] end
+        # OR = NOT(NOT a AND NOT b)
+        x qo[0]
+        x qo[1]
+        ccx qo[0], qo[1], qo[2]
+        x qo[2]
+        var r = measure(qo, 2)
+        var expected = 0
+        if (a == 1 or b == 1): expected = 1 end
+        or_total = or_total + 1
+        if (r == expected): or_ok = or_ok + 1 end
+        qreg_free(qo)
+        b = b + 1
     end
-    i = i + 1
+    a = a + 1
 end
-printf("  OR准确率: %d/4\n", or_correct)
+printf("  OR: %d/%d\n", or_ok, or_total)
 
-printf("\n=== 量子布尔逻辑演示完成 ===\n")
-printf("结论: 量子门集(CCX/CX/NOT)可精确实现任意布尔函数\n")
-printf("这是确定的, 非概率的 - 量子计算的基础保证\n")
+printf("\n--- 5. NAND (通用门) ---\n")
+var qn2 = qreg_create(3)
+x qn2[0]
+x qn2[1]
+ccx qn2[0], qn2[1], qn2[2]
+x qn2[2]
+var m_nand = measure(qn2, 2)
+printf("  NAND(1,1) = %d (期望0)\n", m_nand)
+qreg_free(qn2)
+
+printf("\n门集: X(单比特), CX(受控), CCX(Toffoli) 是通用门集\n")
+printf("可构造任意布尔电路: 已验证AND/XOR/OR\n")
+
+printf("\n=== 量子布尔逻辑完成 ===\n")
