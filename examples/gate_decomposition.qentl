@@ -1,0 +1,44 @@
+# ================================================================
+# 量子门分解演示
+# 通用量子门集到QEntL门集的映射
+# ================================================================
+
+printf("=== 量子门分解 ===\n\n")
+
+printf("--- 通用门集 ---\n")
+printf("Clifford+T: 任何量子门可近似分解\n")
+printf("QEntL支持: H, T, X, Z, CX, CCX, CZ, CCZ, RY\n\n")
+
+printf("--- 门分解示例 ---\n")
+printf("Y门: Y = ZX = i * XZ\n")
+printf("相位门: S = T^2\n")
+printf("Toffoli门: CCX = H + T + CX + T† + ...\n\n")
+
+printf("--- 演示: Y门分解 ---\n")
+printf("Y|0> = i|1>\n")
+printf("Y = ZX: 先X后Z\n\n")
+
+var q = qreg_create(1)
+# Y门分解: ZX
+apply_x(q, 0)
+apply_z(q, 0)
+var m = measure(q, 0)
+printf("  Y|0> = ZX|0> = Z|1> = -|1> = |1> (忽略全局相位)\n")
+printf("  测量: %d (期望 1)\n", m)
+
+printf("\n--- 演示: S门分解 ---\n")
+printf("S = T^2: 两次T门\n")
+var q2 = qreg_create(1)
+apply_h(q2, 0)
+apply_t(q2, 0)
+apply_t(q2, 0)
+var m2 = measure(q2, 0)
+printf("  S|+> = T^2|+> = (|0> + i|1>)/sqrt(2)\n")
+printf("  测量: %d\n", m2)
+
+printf("\n--- 门分解重要性 ---\n")
+printf("  1. 硬件原生门映射\n")
+printf("  2. 门优化: 减少门数\n")
+printf("  3. 错误率优化: 用高保真门替代\n")
+
+printf("\n=== 量子门分解完成 ===\n")
