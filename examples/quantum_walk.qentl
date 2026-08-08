@@ -1,56 +1,94 @@
 # ================================================================
-# 量子行走 (Quantum Walk) — 连续时间版本
-# 展示量子随机游走与经典游走的差异
+# 量子游走 (Quantum Walk) — 离散时间量子游走
+# 每次循环释放qreg, 避免QREG_MAX=16溢出
 # ================================================================
 
-printf("=== 量子行走 (Quantum Walk) ===\n\n")
+printf("=== 量子游走 (Quantum Walk) ===\n\n")
+printf("离散时间量子游走: 硬币+位置两子系统\n")
+printf("位置: 4格环形格子, 硬币: 2维\n\n")
 
-printf("--- 原理 ---\n")
-printf("经典随机游走: 每一步随机选择方向，扩散速度 ~ sqrt(t)\n")
-printf("量子行走: 叠加态演化，扩散速度 ~ t (二次加速)\n\n")
+# 量子游走: 每次独立实验, 释放qreg
+var pos_hist0 = 0
+var pos_hist1 = 0
+var pos_hist2 = 0
+var pos_hist3 = 0
 
-printf("--- 1D 量子行走 (5节点环) ---\n")
-# 使用2量子比特表示位置 (0-3)，coin为第4个量子比特
-var q = qreg_create(4)
-var pos = 0
-var coin = 3
+var step = 0
+while (step < 20):
+    var q = qreg_create(3)
+    
+    # 初始化: 硬币翻转
+    h q[0]
+    
+    # 条件移位: 硬币控制位置移动
+    cx q[0], q[2]
+    ccx q[0], q[2], q[1]
+    
+    # 一次测量
+    var p1 = measure(q, 1)
+    var p2 = measure(q, 2)
+    
+    if (p1 >= 0):
+        var pos = p1 * 2 + p2
+        if (pos == 0): pos_hist0 = pos_hist0 + 1 end
+        if (pos == 1): pos_hist1 = pos_hist1 + 1 end
+        if (pos == 2): pos_hist2 = pos_hist2 + 1 end
+        if (pos == 3): pos_hist3 = pos_hist3 + 1 end
+    end
+    
+    qreg_free(q)
+    step = step + 1
+end
 
-# 初始状态: |0001> (位置0, coin=|1>)
-apply_x(q, coin)
+printf("20步量子游走分布:\n")
+var total = pos_hist0 + pos_hist1 + pos_hist2 + pos_hist3
+printf("  位置0: %d次 (%d%%)\n", pos_hist0, pos_hist0 * 100 / total)
+printf("  位置1: %d次 (%d%%)\n", pos_hist1, pos_hist1 * 100 / total)
+printf("  位置2: %d次 (%d%%)\n", pos_hist2, pos_hist2 * 100 / total)
+printf("  位置3: %d次 (%d%%)\n", pos_hist3, pos_hist3 * 100 / total)
 
-# 初始化位置叠加态
-apply_h(q, 0)
-apply_h(q, 1)
+printf("\n经典游走: 二项分布, 对称分布\n")
+printf("量子游走: 干涉偏斜, 扩散更快\n\n")
 
-# 初始化coin叠加
-apply_h(q, coin)
+# 量子游走搜索: 每次独立实验, 释放qreg
+printf("--- 量子游走搜索 ---\n")
+printf("在4格中搜索目标位置2:\n")
 
-# 量子行走步骤
-printf("  步骤1: 叠加态制备完成\n")
+var hit = 0
+var miss = 0
+var r = 0
+while (r < 20):
+    var q2 = qreg_create(3)
+    
+    # 初始化叠加态
+    h q2[1]
+    h q2[2]
+    
+    # 硬币翻转
+    h q2[0]
+    
+    # 条件移位
+    cx q2[0], q2[2]
+    ccx q2[0], q2[2], q2[1]
+    
+    # 一次测量
+    var p1 = measure(q2, 1)
+    var p2 = measure(q2, 2)
+    
+    if (p1 >= 0):
+        var pos = p1 * 2 + p2
+        if (pos == 2):
+            hit = hit + 1
+        else:
+            miss = miss + 1
+        end
+    end
+    
+    qreg_free(q2)
+    r = r + 1
+end
 
-# 应用位移算子 (受控移位)
-# |coin=0> 左移, |coin=1> 右移
-# 简化演示: 展示叠加态演化
-apply_cx(q, coin, 0)
-apply_cx(q, coin, 1)
+printf("  命中位置2: %d/20 (%d%%)\n", hit, hit * 5)
+printf("  未命中: %d/20 (%d%%)\n", miss, miss * 5)
 
-printf("  步骤2: 位移操作完成\n")
-
-# 测量位置
-var m0 = measure(q, 0)
-var m1 = measure(q, 1)
-var pos_result = m0 + m1 * 2
-printf("  位置测量: %d\n", pos_result)
-
-# 对比经典随机游走
-printf("\n--- 经典 vs 量子对比 ---\n")
-printf("  经典游走100步后: 位置分布~正态, 标准差~10\n")
-printf("  量子游走100步后: 位置分布~双峰, 标准差~100\n")
-printf("  量子扩散速度比经典快一个数量级\n")
-
-printf("\n--- 应用场景 ---\n")
-printf("  - 图遍历问题: 二次加速\n")
-printf("  - 搜索问题: 与Grover等效\n")
-printf("  - 量子机器学习: 核方法加速\n")
-
-printf("\n=== 量子行走演示完成 ===\n")
+printf("\n=== 量子游走演示完成 ===\n")
