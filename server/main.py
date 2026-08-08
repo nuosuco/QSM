@@ -1383,3 +1383,137 @@ if __name__ == "__main__":
         port=CONFIG["server"]["port"],
         reload=CONFIG["server"]["debug"]
     )
+# ========== YouTube 自动上传 ==========
+@app.get("/api/youtube/init-auth")
+async def youtube_init_auth():
+    """初始化YouTube OAuth授权"""
+    from services import youtube_service
+    auth_url = youtube_service.init_auth()
+    return {"success": True, "auth_url": auth_url}
+
+@app.get("/api/youtube/callback")
+async def youtube_callback(code: str = None, error: str = None):
+    """YouTube OAuth回调处理"""
+    from services import youtube_service
+    
+    if error:
+        return {"success": False, "error": f"授权失败: {error}"}
+    
+    if not code:
+        return {"success": False, "error": "未获取到授权码"}
+    
+    success, message = youtube_service.complete_auth(code)
+    
+    if success:
+        return {
+            "success": True,
+            "message": message,
+            "html": f"""
+            <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
+                <h2 style="color:#28a745;">✅ YouTube授权成功！</h2>
+                <p>现在可以上传视频到YouTube了</p>
+                <p><a href="/" style="padding:10px 20px;background:#0066cc;color:#fff;text-decoration:none;border-radius:5px;">返回首页</a></p>
+            </div>
+            """
+        }
+    else:
+        return {"success": False, "error": message}
+
+@app.get("/api/youtube/channel")
+async def youtube_get_channel():
+    """获取YouTube频道信息"""
+    from services import youtube_service
+    info = youtube_service.get_channel_info()
+    return info
+
+@app.get("/api/youtube/videos")
+async def youtube_list_videos(limit: int = 10):
+    """列出最近上传的视频"""
+    from services import youtube_service
+    videos = youtube_service.list_videos(page_size=limit)
+    return videos
+
+@app.post("/api/youtube/upload")
+async def youtube_upload_video(
+    video_path: str = None,
+    title: str = None,
+    description: str = None,
+    keywords: list = None,
+    category_id: str = "22",
+    privacy_status: str = "public"
+):
+    """上传视频到YouTube"""
+    from services import youtube_service
+    
+    if not video_path:
+        return {"success": False, "error": "缺少视频路径"}
+    
+    if not title:
+        return {"success": False, "error": "缺少标题"}
+    
+    result = youtube_service.upload_video(
+        video_path=video_path,
+        title=title,
+        description=description or "",
+        keywords=keywords or [],
+        category_id=category_id,
+        privacy_status=privacy_status
+    )
+    
+    return result
+
+@app.post("/api/youtube/publish-daily")
+async def youtube_publish_daily():
+    """自动发布今日YouTube视频"""
+    from datetime import datetime, timezone, timedelta
+    from pathlib import Path
+    import json
+    
+    # 获取今日日期
+    TZ = timezone(timedelta(hours=8))
+    TODAY = datetime.now(TZ).strftime("%Y%m%d")
+    
+    # 视频路径
+    video_path = f"/root/SOM/content/videos/{TODAY}/final.mp4"
+    if not Path(video_path).exists():
+        return {"success": False, "error": f"今日视频不存在: {video_path}"}
+    
+    # 读取文章信息
+    article_dir = Path(f"/root/SOM/content/articles/{TODAY}")
+    topic_file = article_dir / "topic.json"
+    
+    if topic_file.exists():
+        with open(topic_file) as f:
+            topic = json.load(f)
+        title = topic.get("title_cn", f"SOM松麦 - {TODAY}")
+        description = topic.get("description", "")
+        keywords = topic.get("key_points", [])[:5]
+    else:
+        title = f"SOM松麦 - {TODAY}"
+        description = "每日养生科普视频"
+        keywords = ["养生", "中医", "健康"]
+    
+    # 上传视频
+    from services import youtube_service
+    result = youtube_service.upload_video(
+        video_path=video_path,
+        title=title,
+        description=description,
+        keywords=keywords,
+        privacy_status="public"
+    )
+    
+    # 更新发布日志
+    publish_log = {
+        "date": TODAY,
+        "title": title,
+        "video_path": video_path,
+        "published_at": datetime.now(TZ).isoformat(),
+        "result": result
+    }
+    logs_dir = Path("/root/SOM/content/logs")
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    with open(logs_dir / f"{TODAY}_youtube.json", "w") as f:
+        json.dump(publish_log, f, ensure_ascii=False, indent=2)
+    
+    return result

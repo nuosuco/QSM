@@ -1575,12 +1575,25 @@ async function sendForgotPassword() {
 
 // 微信服务号登录
 function wechatLogin() {
-    // 微信服务号OAuth2.0授权
+    // 检测是否在微信内
+    var ua = navigator.userAgent.toLowerCase();
+    var isWechat = ua.indexOf('micromessenger') !== -1;
+    
+    if (isWechat) {
+        // 微信内：直接跳转授权页
+        doWechatOAuth();
+    } else {
+        // 非微信：显示二维码
+        showWechatQRCode();
+    }
+}
+
+// 执行微信OAuth授权
+function doWechatOAuth() {
     var appId = 'wx82287ef5c8de2fd2';
     var redirectUrl = encodeURIComponent(window.location.origin + '/wechat-callback');
-    var state = 'som_wechat_login';
+    var state = 'som_wechat_login_' + Date.now();
     
-    // 跳转到微信授权页
     var authUrl = 'https://open.weixin.qq.com/connect/oauth2/authorize' +
         '?appid=' + appId +
         '&redirect_uri=' + redirectUrl +
@@ -1590,6 +1603,84 @@ function wechatLogin() {
         '#wechat_redirect';
     
     window.location.href = authUrl;
+}
+
+// 显示微信二维码
+function showWechatQRCode() {
+    // 隐藏按钮，显示二维码容器
+    var btn = document.getElementById('wechat-login-btn');
+    var container = document.getElementById('wechat-qrcode-container');
+    if (btn) btn.style.display = 'none';
+    if (container) container.style.display = 'block';
+    
+    // 刷新二维码（加时间戳避免缓存）
+    refreshQRCode();
+    
+    // 启动轮询检查登录状态
+    startQRLoginPolling();
+}
+
+// 刷新二维码
+function refreshQRCode() {
+    var img = document.getElementById('wechat-qrcode-img');
+    if (img) {
+        img.src = '/qrcode.png?ts=' + Date.now();
+    }
+}
+
+// 开始轮询检查二维码登录状态
+function startQRLoginPolling() {
+    // 清除旧的定时器
+    if (window.qrPollTimer) {
+        clearInterval(window.qrPollTimer);
+    }
+    
+    // 每3秒检查一次登录状态
+    window.qrPollTimer = setInterval(function() {
+        checkQRLoginStatus();
+    }, 3000);
+    
+    // 5分钟后自动停止轮询
+    setTimeout(function() {
+        if (window.qrPollTimer) {
+            clearInterval(window.qrPollTimer);
+            window.qrPollTimer = null;
+        }
+    }, 5 * 60 * 1000);
+}
+
+// 检查二维码登录状态
+function checkQRLoginStatus() {
+    fetch('/api/auth/check-login-status')
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (data.logged_in) {
+                // 登录成功，刷新页面
+                if (window.qrPollTimer) {
+                    clearInterval(window.qrPollTimer);
+                    window.qrPollTimer = null;
+                }
+                window.location.reload();
+            }
+        })
+        .catch(function() {
+            // 静默失败
+        });
+}
+
+// 返回微信登录按钮
+function backToWechatLogin() {
+    // 清除定时器
+    if (window.qrPollTimer) {
+        clearInterval(window.qrPollTimer);
+        window.qrPollTimer = null;
+    }
+    
+    // 显示按钮，隐藏二维码
+    var btn = document.getElementById('wechat-login-btn');
+    var container = document.getElementById('wechat-qrcode-container');
+    if (btn) btn.style.display = 'block';
+    if (container) container.style.display = 'none';
 }
 
 function showLoginError(msg) {

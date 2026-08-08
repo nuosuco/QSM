@@ -436,8 +436,7 @@ def wechat_web_login(code: str) -> dict:
 
     return {"success": True, "user": user, "token": token}
 
-    # 查找/创建用户
-    from services import user_system
+    # 这个代码永远不会执行，因为上面已经return了
 
     conn = user_system._conn()
     now = user_system._now_beijing().isoformat()
