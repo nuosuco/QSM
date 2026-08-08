@@ -1,0 +1,43 @@
+# ================================================================
+# 量子算法复杂度分析
+# 展示各类量子算法的复杂度优势
+# ================================================================
+
+printf("=== 量子算法复杂度分析 ===\n\n")
+
+printf("--- 1. 搜索问题 ---\n")
+printf("  经典: O(N)\n")
+printf("  Grover: O(sqrt(N))\n")
+printf("  加速: 平方级\n")
+printf("  最优性: 已证明是下界\n\n")
+
+printf("--- 2. 因子分解 ---\n")
+printf("  经典: O(exp((log N)^(1/3)))\n")
+printf("  Shor: O((log N)^3)\n")
+printf("  加速: 指数级\n")
+printf("  意义: 威胁RSA密码系统\n\n")
+
+printf("--- 3. 线性方程组 ---\n")
+printf("  经典: O(N) 到 O(N^1.5)\n")
+printf("  HHL: O(log N)\n")
+printf("  加速: 指数级\n")
+printf("  条件: 稀疏矩阵、条件数小\n\n")
+
+printf("--- 4. 量子模拟 ---\n")
+printf("  经典: O(e^N)\n")
+printf("  量子: O(poly(N))\n")
+printf("  加速: 指数级\n")
+printf("  意义: 费曼提出的量子计算初衷\n\n")
+
+printf("--- 5. 排序问题 ---\n")
+printf("  经典: O(N log N)\n")
+printf("  量子: O(N log N) (无加速)\n")
+printf("  结论: 不是所有问题都有量子加速\n\n")
+
+printf("--- 6. NISQ算法 ---\n")
+printf("  VQE: 多项式时间+经典优化\n")
+printf("  QAOA: 近似优化解\n")
+printf("  深度: O(poly(n))\n")
+printf("  误差容忍: 高\n\n")
+
+printf("=== 复杂度分析完成 ===\n")
