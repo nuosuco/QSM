@@ -17,6 +17,7 @@
 | 量子门14个 | 2026-08-07 | H/T/X/Z/CX/CZ/CCX/CCZ/CCCZ/CCCCZ/phase±/cphase± |
 | 97算法+14库 | 2026-08-07 | Grover/Shor/QFT/BB84/teleport/QNS/QDFS全部QCL编译QVM运行 |
 | 环境自生长验证 | 2026-08-08 | env_test.qentl现场写→编译errors=0→执行全对→回归零破坏 |
+| QDFS+QNS经QVM运行确认 | 2026-08-08 | QDFS叠加态/纠缠文件、QNS训练+全流水线均QCL编译→QVM执行通过；QCL自编译产物QBC1 |
 | 能力边界①分号 | 2026-08-08 | 词法器跳过`;`+peek_type防门名冲突，一行多语句通过 |
 | 能力边界②浮点 | 2026-08-08 | 定点数scale=1000，3.14→3140，lib/fixed.qentl，π×e=8.534 |
 | fx_sqrt | 2026-08-08 | 牛顿法纯QEntL，√2=1.414验证通过 |
