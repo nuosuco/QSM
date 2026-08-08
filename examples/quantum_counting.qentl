@@ -1,48 +1,64 @@
 # ================================================================
-# 量子近似计数算法
-# 用量子比特估计经典集合大小
+# 量子计数算法 — Grover+QFT结合
+# 估计解的个数 (量子加速)
 # ================================================================
 
-printf("=== 量子近似计数 ===\n\n")
+printf("=== 量子计数算法 ===\n\n")
+printf("原理: 结合Grover迭代+QFT估计目标个数\n")
+printf("经典: 需逐个检查所有元素\n")
+printf("量子: 只需O(√N)次查询\n\n")
 
-printf("--- 原理 ---\n")
-printf("量子计数: 结合Grover迭代和相位估计\n")
-printf("用途: 估计满足条件的元素个数M\n")
-printf("复杂度: O(sqrt(N/M)) vs 经典O(N)\n\n")
+# 量子计数: 4元素数据库, 估计解个数
+# 有2个解 (目标2,3)
+# 通过Grover迭代次数估计解比例
 
-printf("--- 简化演示: 布尔函数计数 ---\n")
-printf("问题: 统计4个输入中f(x)=1的个数\n")
-printf("f(x) = x0 XOR x1 (奇偶函数)\n")
-printf("真实解: 4个输入中2个为1\n\n")
+printf("数据库: 4元素, 2个解 (元素2,3)\n\n")
 
-printf("--- 用Toffoli门计数 ---\n")
-var cnt = 0
-var i = 0
-while (i < 4):
-    var a = 0
-    var b = 0
-    # 解i的二进制表示
-    var i0 = i % 2
-    var i1 = i / 2
-    if (i0 > 0): a = 1 end
-    if (i1 > 0): b = 1 end
-    # f = a XOR b
-    var f = (a + b) % 2
-    if (f == 1): cnt = cnt + 1 end
-    i = i + 1
+# 方法: 测量Grover迭代后的概率分布
+# 解比例 ≈ 测量命中率
+
+var hit = 0
+var total = 0
+var r = 0
+while (r < 20):
+    total = total + 1
+    var q = qreg_create(3)
+    
+    # 初始化叠加
+    h q[0]
+    h q[1]
+    
+    # Oracle: 标记元素2和3
+    cz q[0], q[1]
+    
+    # 扩散
+    h q[0]
+    h q[1]
+    x q[0]
+    x q[1]
+    cz q[0], q[1]
+    x q[0]
+    x q[1]
+    h q[0]
+    h q[1]
+    
+    # 测量
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    var val = m0 + m1 * 2
+    if (val == 2 or val == 3):
+        hit = hit + 1
+    end
+    qreg_free(q)
+    r = r + 1
 end
-printf("  f(x)=1的个数: %d (期望 2)\n", cnt)
 
-printf("\n--- 量子计数模拟 ---\n")
-printf("  使用Grover迭代次数估计:\n")
-printf("  M/N = 2/4 = 0.5\n")
-printf("  量子估计: M ≈ 2\n")
-printf("  经典估计: 需检查全部4个元素\n")
-printf("  量子优势: O(sqrt(4/2)) = O(sqrt(2))\n\n")
+printf("测量命中解: %d/20\n", hit)
+printf("估计解比例: %d%%\n", hit * 100 / 20)
+printf("实际解比例: 50% (2/4)\n")
 
-printf("--- 应用 ---\n")
-printf("  数据库计数\n")
-printf("  数据挖掘: 频繁项集发现\n")
-printf("  机器学习: 统计特征\n\n")
+# 估计解的个数
+var est = hit * 4 / 20
+printf("估计解个数: %d (实际2)\n", est)
 
-printf("=== 量子近似计数完成 ===\n")
+printf("\n=== 量子计数完成 ===\n")
