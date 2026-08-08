@@ -204,7 +204,7 @@ def qdfs_search(keyword):
         end
         s = str_substring(s, j + 1, str_len(s) - j - 1)
     end
-    var result = str_concat("找到 ", str_concat(str_from_int(count), str_concat(" 个文件包含 \"", str_concat(keyword, "\""))))
+    var result = str_concat("找到 ", str_concat(int_to_str(count), str_concat(" 个文件包含 \"", str_concat(keyword, "\""))))
     if (count > 0):
         result = str_concat(result, str_concat("\n文件列表:\n", results))
     end
@@ -235,7 +235,7 @@ def qdfs_stats():
         end
         s = str_substring(s, j + 1, str_len(s) - j - 1)
     end
-    return str_concat("总文件数: ", str_concat(str_from_int(class_count + super_count + ent_count), str_concat("\n  经典文件: ", str_concat(str_from_int(class_count), str_concat("\n  叠加态文件: ", str_concat(str_from_int(super_count), str_concat("\n  纠缠文件: ", str_from_int(ent_count))))))))
+    return str_concat("总文件数: ", str_concat(int_to_str(class_count + super_count + ent_count), str_concat("\n  经典文件: ", str_concat(int_to_str(class_count), str_concat("\n  叠加态文件: ", str_concat(int_to_str(super_count), str_concat("\n  纠缠文件: ", int_to_str(ent_count))))))))
 end
 
 # 演示程序
