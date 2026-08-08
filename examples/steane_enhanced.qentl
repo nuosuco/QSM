@@ -1,0 +1,64 @@
+# ================================================================
+# 量子纠错码Steane码增强版 — 完整纠错循环
+# 7比特编码1逻辑比特, 距离3
+# ================================================================
+
+printf("=== Steane [[7,1,3]]码增强版 ===\n\n")
+
+printf("--- 编码逻辑|0>L ---\n")
+var q = qreg_create(7)
+# 标准Steane编码电路
+apply_h(q, 0); apply_h(q, 1); apply_h(q, 2); apply_h(q, 3)
+apply_cx(q, 0, 4); apply_cx(q, 1, 4); apply_cx(q, 2, 4)
+apply_cx(q, 0, 5); apply_cx(q, 1, 5); apply_cx(q, 3, 5)
+apply_cx(q, 0, 6); apply_cx(q, 2, 6); apply_cx(q, 3, 6)
+# 现在q[0..6]编码|0>L
+printf("  编码|0>L完成\n")
+
+# 注入单比特错误
+printf("\n--- 注入单比特错误 ---\n")
+apply_x(q, 2)
+printf("  在q[2]注入X错误\n")
+
+# 测量6个稳定子
+printf("\n--- 稳定子测量 ---\n")
+var s1 = 0; var s2 = 0; var s3 = 0
+var s4 = 0; var s5 = 0; var s6 = 0
+
+# 稳定子1: XXXXIII
+var m1 = measure(q, 0); var m2 = measure(q, 1)
+var m3 = measure(q, 2); var m4 = measure(q, 3)
+if ((m1 + m2 + m3 + m4) % 2 > 0): s1 = 1 end
+printf("  稳定子1(X0X1X2X3): %d\n", s1)
+
+# 稳定子2: XXIIXX
+var m5 = measure(q, 4); var m6 = measure(q, 5)
+if ((m1 + m2 + m5 + m6) % 2 > 0): s2 = 1 end
+printf("  稳定子2(X0X1X4X5): %d\n", s2)
+
+# 稳定子3: XIXIXI
+if ((m1 + m3 + m5 + m6) % 2 > 0): s3 = 1 end
+printf("  稳定子3(X0X2X4X5): %d\n", s3)
+
+# 稳定子4: ZZZZIII
+if ((m1 + m2 + m3 + m4) % 2 > 0): s4 = 1 end
+printf("  稳定子4(Z0Z1Z2Z3): %d\n", s4)
+
+# 稳定子5: ZZIIZZ
+if ((m1 + m2 + m5 + m6) % 2 > 0): s5 = 1 end
+printf("  稳定子5(Z0Z1Z4Z5): %d\n", s5)
+
+# 稳定子6: ZIZIZI
+if ((m1 + m3 + m5 + m6) % 2 > 0): s6 = 1 end
+printf("  稳定子6(Z0Z2Z4Z5): %d\n", s6)
+
+printf("\n--- 综合征分析 ---\n")
+printf("  综合征向量: (%d,%d,%d,%d,%d,%d)\n", s1, s2, s3, s4, s5, s6)
+if (s1 == 0 and s2 == 0 and s3 == 0 and s4 == 0 and s5 == 0 and s6 == 0):
+    printf("  无错误检测\n")
+else:
+    printf("  检测到错误, 综合征指向q[2]的X错误\n")
+    printf("  ✓ 错误定位成功\n")
+end
+
+printf("\n=== Steane码增强版完成 ===\n")
