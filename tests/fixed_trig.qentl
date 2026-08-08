@@ -152,3 +152,50 @@ def fx_to_str(a):
     end
     return s
 end
+# ================================================================
+# tests/fixed_trig.qentl — fx_sin/fx_cos 验证 (内联lib/fixed.qentl)
+# ================================================================
+
+# 检查 v 与期望 e 的差在 tol 内
+def chk(name, v, e, tol):
+    var d = v - e
+    if (d < 0):
+        d = 0 - d
+    end
+    if (d <= tol):
+        printf("%s = %d OK\n", name, v)
+    else:
+        printf("%s = %d FAIL 期望%d\n", name, v, e)
+    end
+end
+
+chk("sin(0)", fx_sin(0), 0, 3)
+chk("sin(pi/2)", fx_sin(FX_PI_HALF), 1000, 3)
+chk("sin(pi)", fx_sin(FX_PI), 0, 3)
+chk("sin(3pi/2)", fx_sin(FX_PI + FX_PI_HALF), 0 - 1000, 3)
+chk("sin(pi/6)", fx_sin(524), 500, 5)
+chk("cos(0)", fx_cos(0), 1000, 3)
+chk("cos(pi/2)", fx_cos(FX_PI_HALF), 0, 3)
+chk("cos(pi)", fx_cos(FX_PI), 0 - 1000, 3)
+chk("sin(5pi/6)", fx_sin(2618), 500, 5)
+chk("sin(2pi)", fx_sin(6284), 0, 3)
+
+# sin^2 + cos^2 = 1 恒等式验证 (多点)
+var bad = 0
+var i = 0
+while (i < 20):
+    var x = i * 314
+    var s = fx_sin(x)
+    var c = fx_cos(x)
+    var iden = fx_mul(s, s) + fx_mul(c, c)
+    if (iden < 990 or iden > 1010):
+        bad = bad + 1
+    end
+    i = i + 1
+end
+if (bad == 0):
+    printf("sin^2+cos^2=1 恒等式: 20/20点通过\n")
+else:
+    printf("sin^2+cos^2=1 恒等式: %d点失败\n", bad)
+end
+printf("三角函数测试完成\n")

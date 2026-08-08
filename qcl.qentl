@@ -225,6 +225,13 @@ def peek_type():
     return T_EOF
 end
 
+def peek_type2():
+    if (g_parse_pos + 2 < g_tok_count):
+        return g_tok_type[g_parse_pos + 2]
+    end
+    return T_EOF
+end
+
 def expect(tt, msg):
     if (g_abort == 1): return end
     if (cur_type() != tt):
@@ -1539,7 +1546,8 @@ def parse_var_decl():
         var gate_ns = g_tok_start[g_parse_pos]
         var gate_nl = g_tok_len[g_parse_pos]
         var gate_nm = str_substring(g_src, gate_ns, gate_nl)
-        if ((str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")) and peek_type() != T_LPAREN):
+        # 门赋值必须形如 `门名 寄存器名 [`, 两token前瞻防误判(如 var sum = t)
+        if ((str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")) and peek_type() == T_IDENT and peek_type2() == T_LBRACKET):
             advance()  # consume gate name
             # 发射量子门代码（不POP，让结果留在栈上供STORE_VAR）
             if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t")):
