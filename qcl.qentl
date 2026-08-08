@@ -701,6 +701,9 @@ def is_builtin(nm):
     if (str_eq(nm, "apply_h")): return 1 end
     if (str_eq(nm, "apply_t")): return 1 end
     if (str_eq(nm, "apply_cx")): return 1 end
+    if (str_eq(nm, "apply_x")): return 1 end
+    if (str_eq(nm, "apply_z")): return 1 end
+    if (str_eq(nm, "apply_cz")): return 1 end
     if (str_eq(nm, "apply_ccx")): return 1 end
     if (str_eq(nm, "apply_ccz")): return 1 end
     if (str_eq(nm, "apply_cccz")): return 1 end
