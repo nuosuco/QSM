@@ -20,7 +20,7 @@ _parent = str(_server_dir.parent)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from services.api_auth import APIAuthMiddleware
@@ -1191,7 +1191,8 @@ async def wechat_message_verify(
         return {"error": "签名验证失败"}
     
     # 返回echostr完成验证
-    return echostr
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(content=echostr, media_type='text/plain')
 
 @app.post("/wechat-message")
 async def wechat_message_receive():
