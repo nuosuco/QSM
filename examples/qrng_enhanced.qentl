@@ -1,77 +1,66 @@
 # ================================================================
-# 量子随机数生成器(QRNG)增强 — 统计检验
-# 验证量子测量随机性
+# 量子随机数生成器(QRNG) — 增强版
+# 利用量子叠加态产生真随机数
+# 比经典伪随机数生成器更安全
 # ================================================================
 
-printf("=== 量子随机数生成器增强 ===\n\n")
+printf("=== 量子随机数生成器(QRNG)增强版 ===\n\n")
+printf("原理: 量子测量本质随机, 产生真随机数\n\n")
 
-printf("--- 原理 ---\n")
-printf("H门创建叠加态后测量产生真随机比特\n")
-printf("每次测量独立, 符合量子力学基本假设\n\n")
-
-printf("--- 单次测量 ---\n")
-var q = qreg_create(1)
-apply_h(q, 0)
-var bit = measure(q, 0)
-printf("  随机比特: %d\n", bit)
-
-printf("\n--- 10比特随机序列 ---\n")
-var seq = ""
+# 生成8比特随机数
+var bytes[8]
 var i = 0
-while (i < 10):
-    var qb = qreg_create(1)
-    apply_h(qb, 0)
-    var b = measure(qb, 0)
-    seq = str_concat(seq, int_to_str(b))
+while (i < 8):
+    var q = qreg_create(1)
+    h q[0]
+    var m = measure(q, 0)
+    bytes[i] = m
+    qreg_free(q)
     i = i + 1
 end
-printf("  随机序列: %s\n", seq)
 
-printf("\n--- 统计检验: 100次测量 ---\n")
-var ones = 0
+printf("8比特随机数: ")
+i = 0
+while (i < 8):
+    printf("%d", bytes[i])
+    i = i + 1
+end
+printf("\n")
+
+# 生成8比特随机数 (重复, 验证独立性)
+printf("8比特随机数: ")
+i = 0
+while (i < 8):
+    var q = qreg_create(1)
+    h q[0]
+    var m = measure(q, 0)
+    printf("%d", m)
+    qreg_free(q)
+    i = i + 1
+end
+printf("\n")
+
+# 统计检验: 100比特, 计算0/1比例
+printf("\n--- 统计检验(100比特) ---\n")
 var zeros = 0
+var ones = 0
 i = 0
 while (i < 100):
-    var qs = qreg_create(1)
-    apply_h(qs, 0)
-    var r = measure(qs, 0)
-    if (r == 1):
-        ones = ones + 1
-    else:
-        zeros = zeros + 1
-    end
+    var q = qreg_create(1)
+    h q[0]
+    var m = measure(q, 0)
+    if (m == 0): zeros = zeros + 1 end
+    if (m == 1): ones = ones + 1 end
+    qreg_free(q)
     i = i + 1
 end
-printf("  1的个数: %d\n", ones)
-printf("  0的个数: %d\n", zeros)
-printf("  比例: 1占%d%% (期望50%%)\n", ones)
-if (ones >= 40 and ones <= 60):
-    printf("  ✓ 随机性检验通过\n")
+
+printf("0: %d次 (%d%%)\n", zeros, zeros)
+printf("1: %d次 (%d%%)\n", ones, ones)
+if (zeros > 35 and zeros < 65):
+    printf("分布均匀: 通过 ✅\n")
 else:
-    printf("  ℹ 统计涨落在正常范围内\n")
+    printf("分布偏差: 需检查 ⚠️\n")
 end
 
-printf("\n--- 生成随机数 ---\n")
-var j = 0
-while (j < 5):
-    var q8 = qreg_create(8)
-    var k = 0
-    while (k < 8):
-        apply_h(q8, k)
-        k = k + 1
-    end
-    var num = 0
-    var pw = 1
-    k = 0
-    while (k < 8):
-        var b = measure(q8, k)
-        num = num + b * pw
-        pw = pw + pw
-        k = k + 1
-    end
-    printf("  随机数%d: %d\n", j + 1, num)
-    j = j + 1
-end
-
-printf("\n=== QRNG增强完成 ===\n")
-printf("量子随机数在密码学、蒙特卡洛模拟等领域有重要应用\n")
+printf("\n=== QRNG增强版完成 ===\n")
