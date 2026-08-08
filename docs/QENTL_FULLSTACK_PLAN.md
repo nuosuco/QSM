@@ -18,6 +18,8 @@
 | 97算法+14库 | 2026-08-07 | Grover/Shor/QFT/BB84/teleport/QNS/QDFS全部QCL编译QVM运行 |
 | 环境自生长验证 | 2026-08-08 | env_test.qentl现场写→编译errors=0→执行全对→回归零破坏 |
 | QDFS+QNS经QVM运行确认 | 2026-08-08 | QDFS叠加态/纠缠文件、QNS训练+全流水线均QCL编译→QVM执行通过；QCL自编译产物QBC1 |
+| 全栈19组件QVM可运行 | 2026-08-08 | QDFS/QNS/四大模型8版/彝文/部署/API/服务器/HTTP均QCL→QVM通过；QCL-on-QVM三层嵌套编译bell_pair逐字节一致；教训:QEntL字面量u16上限,池边界用运行时算术 |
+| is_builtin补齐 | 2026-08-08 | 缺失apply_x/z/cz导致增强版四大模型QVM报"未定义函数"；补齐后8/8通过 |
 | 能力边界①分号 | 2026-08-08 | 词法器跳过`;`+peek_type防门名冲突，一行多语句通过 |
 | 能力边界②浮点 | 2026-08-08 | 定点数scale=1000，3.14→3140，lib/fixed.qentl，π×e=8.534 |
 | fx_sqrt | 2026-08-08 | 牛顿法纯QEntL，√2=1.414验证通过 |
