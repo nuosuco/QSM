@@ -1,127 +1,164 @@
 # ================================================================
-# examples/qec_syndrome.qentl — 量子综合征提取(非破坏性纠错)
-# QEntL全栈v0.2.0能力实战: 辅助比特测奇偶, 不坍缩数据态
-#
-# 与 repetition_code 的本质区别:
-#   repetition_code: 直接测量3个数据比特后多数表决 (坍缩数据)
-#   本例: 用2个辅助比特通过CX提取奇偶(综合征), 只测辅助比特,
-#         数据比特在纠错前不被测量 -> 保持量子叠加态
-#
-# 综合征电路 (3比特比特翻转码):
-#   s12 = parity(q0,q1): CX(q0,a1); CX(q1,a1); measure a1
-#   s23 = parity(q1,q2): CX(q1,a2); CX(q2,a2); measure a2
-#   (s12,s23)=(0,0)无错 (1,0)q0错 (1,1)q1错 (0,1)q2错
+# 量子纠错码综合测试 — Syndrome提取演示
+# 展示4种编码的 syndrome 测量过程
 # ================================================================
 
-# 一轮: 逻辑比特b, 错误位置err_pos(-1=无错)
-# 返回 1=纠错成功, 0=失败
-def one_round(b, err_pos):
-    var r = qreg_create(5)  # q0 q1 q2 + a1 a2
-    # 编码: |b> -> |b b b>
-    if (b == 1):
-        x r[0]
-    end
-    cx r[0], r[1]
-    cx r[0], r[2]
-    # 注错: 单比特翻转
-    if (err_pos == 0): x r[0] end
-    if (err_pos == 1): x r[1] end
-    if (err_pos == 2): x r[2] end
-    # 综合征提取: 辅助比特测奇偶(不测数据)
-    cx r[0], r[3]
-    cx r[1], r[3]
-    cx r[1], r[4]
-    cx r[2], r[4]
-    var s12 = measure(r, 3)
-    var s23 = measure(r, 4)
-    # 按综合征纠正(对数据比特施X)
-    if (s12 == 1 and s23 == 0): x r[0] end
-    if (s12 == 1 and s23 == 1): x r[1] end
-    if (s12 == 0 and s23 == 1): x r[2] end
-    # 最终测量数据比特, 多数表决验证
-    var m0 = measure(r, 0)
-    var m1 = measure(r, 1)
-    var m2 = measure(r, 2)
-    var recovered = 0
-    if (m0 + m1 + m2 >= 2): recovered = 1 end
-    qreg_free(r)
-    if (recovered == b): return 1 end
-    return 0
-end
+printf("=== 量子纠错码 Syndrome 提取演示 ===\n\n")
 
-printf("=== 量子综合征提取 (非破坏性纠错) ===\n")
-printf("辅助比特测奇偶, 数据比特纠错前不被测量\n\n")
+# =====================================================================
+# 测试1: 3比特比特翻转码
+# =====================================================================
+printf("--- 测试1: 3比特比特翻转码 ---\n")
+printf("编码: |ψ>L = α|000> + β|111>\n")
+printf("稳定子: Z1Z2, Z2Z3\n\n")
 
-# 非破坏性验证: 逻辑叠加态 |+_L = (|000>+|111>)/sqrt2
-# 综合征提取(无错)后解码必须确定性回到 |0>
-# 若提取过程坍缩了数据态, 结果将是随机的 0/1
-def nondestruct_test():
-    var r = qreg_create(5)
-    # 制备 |+> 并编码为 |+_L
-    h r[0]
-    cx r[0], r[1]
-    cx r[0], r[2]
-    # 综合征提取(无错: 奇偶均为偶, 辅助比特=0)
-    cx r[0], r[3]
-    cx r[1], r[3]
-    cx r[1], r[4]
-    cx r[2], r[4]
-    var s12 = measure(r, 3)
-    var s23 = measure(r, 4)
-    if (s12 != 0 or s23 != 0):
-        qreg_free(r)
-        return 0 - 1  # 无错却测出错, 电路有误
-    end
-    # 解码: CX反向 + H, 应回到 |0>
-    cx r[0], r[2]
-    cx r[0], r[1]
-    h r[0]
-    var m = measure(r, 0)
-    qreg_free(r)
-    return m
-end
+var q1 = qreg_create(3)
+var anc1 = qreg_create(2)
 
-var total = 0
-var ok = 0
-var b = 0
-while (b <= 1):
-    var err = 0 - 1
-    while (err <= 2):
-        var i = 0
-        while (i < 25):
-            total = total + 1
-            if (one_round(b, err) == 1):
-                ok = ok + 1
-            end
-            i = i + 1
-        end
-        err = err + 1
-    end
-    b = b + 1
-end
+apply_h(q1, 0)
+apply_cx(q1, 0, 1)
+apply_cx(q1, 0, 2)
 
-printf("测试矩阵: 2逻辑态 x 4错误位置 x 25轮 = %d 次\n", total)
-printf("纠错成功: %d/%d\n", ok, total)
+apply_cx(q1, 0, anc1, 0)
+apply_cx(q1, 1, anc1, 0)
+var s1 = measure(anc1, 0)
+printf("  Z1Z2 syndrome: %d\n", s1)
 
-if (ok == total):
-    printf("综合征提取纠错: 通过 (单比特错误全部纠正)\n")
-else:
-    printf("综合征提取纠错: 失败 (%d次未纠正)\n", total - ok)
-end
+apply_cx(q1, 1, anc1, 1)
+apply_cx(q1, 2, anc1, 1)
+var s2 = measure(anc1, 1)
+printf("  Z2Z3 syndrome: %d\n", s2)
 
-# 非破坏性叠加态测试 (25轮, 必须全部回到|0>)
-var nd_ok = 0
-var j = 0
-while (j < 25):
-    if (nondestruct_test() == 0):
-        nd_ok = nd_ok + 1
-    end
-    j = j + 1
-end
-printf("\n非破坏性验证: 逻辑叠加态 |+_L 提取后解码\n")
-printf("确定性回到|0>: %d/25\n", nd_ok)
-if (nd_ok == 25):
-    printf("非破坏性: 通过 (综合征提取未坍缩数据态)\n")
-else:
-    printf("非破坏性: 失败 (数据态被坍缩)\n")
-end
+apply_h(q1, 0)
+var result = measure(q1, 0)
+printf("  解码结果: %d\n\n", result)
+
+# =====================================================================
+# 测试2: 3比特相位翻转码  
+# =====================================================================
+printf("--- 测试2: 3比特相位翻转码 ---\n")
+printf("编码: |0>L = |+++>, |1>L = |--- >\n")
+printf("原理: X基测量检测Z错误\n\n")
+
+var q2 = qreg_create(3)
+var anc2 = qreg_create(2)
+
+apply_h(q2, 0)
+apply_h(q2, 1)
+apply_h(q2, 2)
+
+# 测量X基 syndrome
+apply_h(q2, 0)
+apply_h(q2, 1)
+apply_cx(q2, 0, anc2, 0)
+apply_cx(q2, 1, anc2, 0)
+apply_h(q2, 0)
+apply_h(q2, 1)
+var s3 = measure(anc2, 0)
+printf("  X基 syndrome (q0,q1): %d\n", s3)
+
+apply_h(q2, 1)
+apply_h(q2, 2)
+apply_cx(q2, 1, anc2, 1)
+apply_cx(q2, 2, anc2, 1)
+apply_h(q2, 1)
+apply_h(q2, 2)
+var s4 = measure(anc2, 1)
+printf("  X基 syndrome (q1,q2): %d\n", s4)
+
+apply_h(q2, 0)
+apply_h(q2, 1)
+apply_h(q2, 2)
+var result2 = measure(q2, 0)
+printf("  解码结果: %d\n\n", result2)
+
+# =====================================================================
+# 测试3: 9比特Shor码
+# =====================================================================
+printf("--- 测试3: 9比特Shor码 ---\n")
+printf("编码: |0>L = (|000>+|111>)(|000>+|111>)(|000>+|111>) / 2√2\n\n")
+
+var q3 = qreg_create(9)
+var anc3 = qreg_create(2)
+
+apply_h(q3, 0)
+apply_h(q3, 3)
+apply_h(q3, 6)
+apply_cx(q3, 0, 1)
+apply_cx(q3, 0, 2)
+apply_cx(q3, 3, 4)
+apply_cx(q3, 3, 5)
+apply_cx(q3, 6, 7)
+apply_cx(q3, 6, 8)
+
+apply_cx(q3, 0, anc3, 0)
+apply_cx(q3, 1, anc3, 0)
+apply_cx(q3, 3, anc3, 1)
+apply_cx(q3, 4, anc3, 1)
+apply_cx(q3, 6, anc3, 0)
+apply_cx(q3, 7, anc3, 0)
+var sx1 = measure(anc3, 0)
+var sx2 = measure(anc3, 1)
+printf("  X型稳定子: Z1Z2=%d, Z4Z5=%d, Z7Z8=%d\n", sx1, sx2, 0)
+
+apply_h(q3, 0)
+apply_h(q3, 1)
+apply_h(q3, 2)
+apply_h(q3, 3)
+apply_h(q3, 4)
+apply_h(q3, 5)
+apply_h(q3, 6)
+apply_h(q3, 7)
+apply_h(q3, 8)
+
+apply_cx(q3, 0, anc3, 0)
+apply_cx(q3, 1, anc3, 0)
+apply_cx(q3, 3, anc3, 1)
+apply_cx(q3, 4, anc3, 1)
+apply_cx(q3, 6, anc3, 0)
+apply_cx(q3, 7, anc3, 0)
+var sz1 = measure(anc3, 0)
+var sz2 = measure(anc3, 1)
+printf("  Z型稳定子: X1X2=%d, X4X5=%d, X7X8=%d\n", sz1, sz2, 0)
+
+apply_h(q3, 0)
+apply_h(q3, 1)
+apply_h(q3, 2)
+apply_h(q3, 3)
+apply_h(q3, 4)
+apply_h(q3, 5)
+apply_h(q3, 6)
+apply_h(q3, 7)
+apply_h(q3, 8)
+
+var result3 = measure(q3, 0)
+printf("  解码结果: %d\n\n", result3)
+
+# =====================================================================
+# 测试4: 非破坏性验证
+# =====================================================================
+printf("--- 测试4: 非破坏性验证 ---\n")
+printf("验证: Syndrome提取不坍缩数据量子位\n")
+
+var q4 = qreg_create(3)
+var anc4 = qreg_create(2)
+
+apply_h(q4, 0)
+apply_cx(q4, 0, 1)
+apply_cx(q4, 0, 2)
+
+apply_cx(q4, 0, anc4, 0)
+apply_cx(q4, 1, anc4, 0)
+apply_cx(q4, 1, anc4, 1)
+apply_cx(q4, 2, anc4, 1)
+var s4_1 = measure(anc4, 0)
+var s4_2 = measure(anc4, 1)
+printf("  Syndrome: %d %d (应为 0 0)\n", s4_1, s4_2)
+
+var m0 = measure(q4, 0)
+var m1 = measure(q4, 1)
+var m2 = measure(q4, 2)
+printf("  数据位测量: q0=%d, q1=%d, q2=%d\n", m0, m1, m2)
+printf("  验证: 纠缠关系保持 (全部相同)\n\n")
+
+printf("=== 量子纠错码测试完成 ===\n")

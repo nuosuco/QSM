@@ -715,6 +715,9 @@ def is_builtin(nm):
     if (str_eq(nm, "apply_ry")): return 1 end
     if (str_eq(nm, "apply_swap")): return 1 end
     if (str_eq(nm, "measure")): return 1 end
+    if (str_eq(nm, "pool_add_string")): return 1 end
+    if (str_eq(nm, "pool_add_substr")): return 1 end
+    if (str_eq(nm, "str_from_pool")): return 1 end
     return 0
 end
 

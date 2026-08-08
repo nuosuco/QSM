@@ -1,0 +1,259 @@
+# examples/surface_code.qentl — [[5,1,3]] Surface码
+# 引入Stabilizer库
+# stabilizer.qentl - Stabilizer code library
+# Uses arithmetic instead of bitwise operations (QCL does not support &)
+
+var st_count = 0
+var st_n = 0
+var st_k = 0
+var st_d = 0
+var st_x[32]
+var st_z[32]
+var st_name[32]
+
+def st_init(n, k, d):
+    st_n = n
+    st_k = k
+    st_d = d
+    st_count = 0
+end
+
+def st_add(xmask, zmask, nm):
+    st_x[st_count] = xmask
+    st_z[st_count] = zmask
+    st_name[st_count] = pool_add_string(nm)
+    st_count = st_count + 1
+end
+
+def st_get_x(i):
+    return st_x[i]
+end
+
+def st_get_z(i):
+    return st_z[i]
+end
+
+def st_get_count():
+    return st_count
+end
+
+def st_get_n():
+    return st_n
+end
+
+# Get bit at position (arithmetic version of (mask >> pos) & 1)
+def st_get_bit(mask, pos):
+    var result = mask
+    var i = 0
+    while (i < pos):
+        result = result / 2
+        result = result - (result / 2) * 2
+        i = i + 1
+    end
+    return result - (result / 2) * 2
+end
+
+# Set bit at position (arithmetic version of mask | (1 << pos))
+def st_set_bit(mask, pos):
+    var power = 1
+    var i = 0
+    while (i < pos):
+        power = power + power
+        i = i + 1
+    end
+    return mask + power
+end
+
+def st_measure_syndrome(reg, anc):
+    var syn = 0
+    var i = 0
+    while (i < st_count):
+        var xmask = st_x[i]
+        var zmask = st_z[i]
+        var j = 0
+        while (j < st_n):
+            var xi = st_get_bit(xmask, j)
+            var zi = st_get_bit(zmask, j)
+            if (xi == 1 and zi == 1):
+                apply_h(reg, j)
+                apply_cx(reg, j, anc, i)
+                apply_h(reg, j)
+            else:
+                if (xi == 1):
+                    apply_h(reg, j)
+                    apply_cx(reg, j, anc, i)
+                    apply_h(reg, j)
+                else:
+                    if (zi == 1):
+                        apply_cx(reg, j, anc, i)
+                    end
+                end
+            end
+            j = j + 1
+        end
+        var m = measure(anc, i)
+        if (m == 1):
+            syn = st_set_bit(syn, i)
+        end
+        i = i + 1
+    end
+    return syn
+end
+
+# Check if syndrome bit is set
+def st_check_syndrome_bit(syn, bit):
+    return st_get_bit(syn, bit)
+end
+
+def st_lookup_error(syn):
+    if (syn == 0):
+        return -1
+    end
+    var j = 0
+    while (j < st_n):
+        var x_syn = 0
+        var i = 0
+        while (i < st_count):
+            if (st_get_bit(st_z[i], j) == 1):
+                x_syn = st_set_bit(x_syn, i)
+            end
+            i = i + 1
+        end
+        var z_syn = 0
+        var i = 0
+        while (i < st_count):
+            if (st_get_bit(st_x[i], j) == 1):
+                z_syn = st_set_bit(z_syn, i)
+            end
+            i = i + 1
+        end
+        var y_syn = x_syn + z_syn
+        if (x_syn == syn):
+            return j * 4 + 0
+        end
+        if (z_syn == syn):
+            return j * 4 + 1
+        end
+        if (y_syn == syn):
+            return j * 4 + 2
+        end
+        j = j + 1
+    end
+    return -2
+end
+
+
+# ================================================================
+# [[5,1,3]] Surface码 (量子纠错码)
+# 稳定子生成元:
+#   S1 = XZZXI  (q0: X, q1: Z, q2: Z, q3: X, q4: I)
+#   S2 = IXZZXI (q0: I, q1: X, q2: Z, q3: Z, q4: X)
+#   S3 = XIXZZ  (q0: X, q1: I, q2: X, q3: Z, q4: Z)
+#   S4 = ZXIXZ  (q0: Z, q1: X, q2: I, q3: X, q4: Z)
+# 
+# 二进制表示 (bitmask):
+#   S1: x=10010(18), z=01101(13)
+#   S2: x=01001(9),  z=10110(22)
+#   S3: x=10100(20), z=00110(6)
+#   S4: x=01001(9),  z=10010(18)
+# ================================================================
+
+printf("=== [[5,1,3]] Surface Code Demo ===\n")
+printf("Stabilizer generators:\n")
+
+# 初始化 [[5,1,3]] 码
+st_init(5, 1, 3)
+# 添加4个稳定子生成元
+st_add(18, 13, "S1(XZZXI)")
+st_add(9, 22, "S2(IXZZXI)")
+st_add(20, 6, "S3(XIXZZ)")
+st_add(9, 18, "S4(ZXIXZ)")
+
+# 打印稳定子
+st_print_generators()
+
+# 测试纠错
+printf("\nError correction test:\n")
+var total = 0
+var ok = 0
+var b = 0
+while (b <= 1):
+    # 测试逻辑 |b> 态
+    var err = 0 - 1
+    while (err <= 2):
+        var i = 0
+        while (i < 20):
+            # 从 |0...0> 开始
+            var q = create_qreg(5)
+            var anc = create_qreg(4)
+            
+            # 如果测试 |1> 态, 应用逻辑 X
+            if (b == 1):
+                # 逻辑 X 操作: X⊗5
+                apply_x(q, 0)
+                apply_x(q, 1)
+                apply_x(q, 2)
+                apply_x(q, 3)
+                apply_x(q, 4)
+            end
+            
+            # 注入错误
+            if (err >= 0):
+                if (err == 0):
+                    apply_x(q, i)  # X错误
+                else:
+                    if (err == 1):
+                        apply_z(q, i)  # Z错误
+                    else:
+                        apply_x(q, i)  # Y错误
+                        apply_z(q, i)
+                    end
+                end
+            end
+            
+            # 测量综合征
+            var syn = st_measure_syndrome(q, anc)
+            total = total + 1
+            
+            # 查找并纠正错误
+            var corr = st_lookup_error(syn)
+            if (corr >= 0):
+                var target = corr / 4
+                var etype = corr - target * 4
+                apply_x(q, target)
+                if (etype >= 1):
+                    apply_z(q, target)
+                end
+            end
+            
+            # 验证: 测量所有量子位
+            var i2 = 0
+            var zero_count = 0
+            var one_count = 0
+            while (i2 < 5):
+                var m = measure(q, i2)
+                if (m == 0):
+                    zero_count = zero_count + 1
+                else:
+                    one_count = one_count + 1
+                end
+                i2 = i2 + 1
+            end
+            
+            # 检查是否验证通过
+            if (b == 0 and zero_count >= 3):
+                ok = ok + 1
+            end
+            if (b == 1 and one_count >= 3):
+                ok = ok + 1
+            end
+            
+            i = i + 1
+        end
+        err = err + 1
+    end
+    b = b + 1
+end
+
+printf("\nResults: %d/%d passed\n", ok, total)
+printf("Surface code test completed.\n")

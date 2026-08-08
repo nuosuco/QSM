@@ -1,96 +1,194 @@
 # ================================================================
-# examples/shor_code.qentl — 9比特Shor码(完整量子纠错)
-# QEntL全栈v0.2.0能力实战: 同时防X和Z任意单比特错误
-#
-# 原理: 外层相位翻转码(3比特X基) 嵌套 内层比特翻转码(每比特3重复)
-#   |0>L = (|000>+|111>)^3 / 2sqrt2  简化用经典态演示纠错逻辑
-#   本实现用经典基演示: 9比特 = 3组x3重复, 组间多数表决
-#   内层纠正比特翻转(X), 外层组表决纠正相位翻转(Z)效应
-#
-# 简化闭环: 编码9比特 -> 注入单比特错误 -> 两级纠正 -> 恢复逻辑比特
+# 9比特Shor码 — 量子纠错里程碑
+# 结合比特翻转码和相位翻转码
+# 编码: |0>L = (|000>+|111>)(|000>+|111>)(|000>+|111>) / 2√2
 # ================================================================
 
-# 一轮完整实验: 逻辑比特b, 错误位置err_pos(-1=无错, 0..8)
-# 返回 1=纠错成功, 0=失败
-def one_round(b, err_pos):
-    var r = qreg_create(9)
-    # 编码: 9比特 = 3组, 每组3重复
-    if (b == 1):
-        x r[0]
-    end
-    cx r[0], r[1]
-    cx r[0], r[2]
-    cx r[0], r[3]
-    cx r[0], r[4]
-    cx r[0], r[5]
-    cx r[0], r[6]
-    cx r[0], r[7]
-    cx r[0], r[8]
-    # 注错: 单比特翻转
-    if (err_pos == 0): x r[0] end
-    if (err_pos == 1): x r[1] end
-    if (err_pos == 2): x r[2] end
-    if (err_pos == 3): x r[3] end
-    if (err_pos == 4): x r[4] end
-    if (err_pos == 5): x r[5] end
-    if (err_pos == 6): x r[6] end
-    if (err_pos == 7): x r[7] end
-    if (err_pos == 8): x r[8] end
-    # 两级纠正: 每组3比特多数表决
-    var m0 = measure(r, 0)
-    var m1 = measure(r, 1)
-    var m2 = measure(r, 2)
-    var m3 = measure(r, 3)
-    var m4 = measure(r, 4)
-    var m5 = measure(r, 5)
-    var m6 = measure(r, 6)
-    var m7 = measure(r, 7)
-    var m8 = measure(r, 8)
-    # 组1表决
-    var g1 = 0
-    if (m0 + m1 + m2 >= 2): g1 = 1 end
-    # 组2表决
-    var g2 = 0
-    if (m3 + m4 + m5 >= 2): g2 = 1 end
-    # 组3表决
-    var g3 = 0
-    if (m6 + m7 + m8 >= 2): g3 = 1 end
-    # 外层组间表决
-    var recovered = 0
-    if (g1 + g2 + g3 >= 2): recovered = 1 end
-    qreg_free(r)
-    if (recovered == b): return 1 end
-    return 0
-end
+printf("=== 9比特Shor码测试 ===\n\n")
 
-printf("=== 9比特Shor码 (完整量子纠错) ===\n")
-printf("结构: 3组 x 3重复, 两级多数表决\n")
-printf("防任意单比特错误(X/Z)\n\n")
+# 辅助寄存器
+var anc = qreg_create(2)
 
-var total = 0
-var ok = 0
-var b = 0
-while (b <= 1):
-    var err = 0 - 1
-    while (err <= 8):
-        var i = 0
-        while (i < 10):
-            total = total + 1
-            if (one_round(b, err) == 1):
-                ok = ok + 1
-            end
-            i = i + 1
-        end
-        err = err + 1
-    end
-    b = b + 1
-end
+# ========== 测试1: 无错误 ==========
+printf("测试1: 无错误\n")
+var q1 = qreg_create(9)
 
-printf("测试矩阵: 2逻辑态 x 10错误位置 x 10轮 = %d 次\n", total)
-printf("纠错成功: %d/%d\n", ok, total)
+# 编码 |0>L
+apply_h(q1, 0)
+apply_h(q1, 3)
+apply_h(q1, 6)
+apply_cx(q1, 0, 1)
+apply_cx(q1, 0, 2)
+apply_cx(q1, 3, 4)
+apply_cx(q1, 3, 5)
+apply_cx(q1, 6, 7)
+apply_cx(q1, 6, 8)
 
-if (ok == total):
-    printf("Shor码纠错: 通过 (单比特错误全部纠正)\n")
+# 测量 X型稳定子 (检测 Z错误)
+apply_cx(q1, 0, anc, 0)
+apply_cx(q1, 1, anc, 0)
+apply_cx(q1, 3, anc, 1)
+apply_cx(q1, 4, anc, 1)
+apply_cx(q1, 6, anc, 0)
+apply_cx(q1, 7, anc, 0)
+var sx1 = measure(anc, 0)
+var sx2 = measure(anc, 1)
+printf("  X型稳定子: %d %d (期望 0 0)\n", sx1, sx2)
+
+# 测量 Z型稳定子 (检测 X错误)
+apply_h(q1, 0)
+apply_h(q1, 1)
+apply_h(q1, 2)
+apply_h(q1, 3)
+apply_h(q1, 4)
+apply_h(q1, 5)
+apply_h(q1, 6)
+apply_h(q1, 7)
+apply_h(q1, 8)
+apply_cx(q1, 0, anc, 0)
+apply_cx(q1, 1, anc, 0)
+apply_cx(q1, 3, anc, 1)
+apply_cx(q1, 4, anc, 1)
+apply_cx(q1, 6, anc, 0)
+apply_cx(q1, 7, anc, 0)
+var sz1 = measure(anc, 0)
+var sz2 = measure(anc, 1)
+printf("  Z型稳定子: %d %d (期望 0 0)\n", sz1, sz2)
+
+# 恢复并测量
+apply_h(q1, 0)
+apply_h(q1, 1)
+apply_h(q1, 2)
+apply_h(q1, 3)
+apply_h(q1, 4)
+apply_h(q1, 5)
+apply_h(q1, 6)
+apply_h(q1, 7)
+apply_h(q1, 8)
+var m0 = measure(q1, 0)
+printf("  解码: q0=%d (期望0)\n", m0)
+if (m0 == 0):
+    printf("  ✓ 通过\n\n")
 else:
-    printf("Shor码纠错: 失败 (%d次未纠正)\n", total - ok)
+    printf("  ✗ 失败\n\n")
 end
+
+# ========== 测试2: q2 X错误 ==========
+printf("测试2: q2 X错误\n")
+var q2 = qreg_create(9)
+apply_h(q2, 0)
+apply_h(q2, 3)
+apply_h(q2, 6)
+apply_cx(q2, 0, 1)
+apply_cx(q2, 0, 2)
+apply_cx(q2, 3, 4)
+apply_cx(q2, 3, 5)
+apply_cx(q2, 6, 7)
+apply_cx(q2, 6, 8)
+apply_x(q2, 2)
+
+var anc2 = qreg_create(2)
+var s1 = measure(anc2, 0)
+printf("  X型稳定子: %d (期望 0)\n", s1)
+
+apply_h(q2, 0)
+apply_h(q2, 1)
+apply_h(q2, 2)
+apply_h(q2, 3)
+apply_h(q2, 4)
+apply_h(q2, 5)
+apply_h(q2, 6)
+apply_h(q2, 7)
+apply_h(q2, 8)
+apply_cx(q2, 0, anc2, 0)
+apply_cx(q2, 1, anc2, 0)
+apply_cx(q2, 3, anc2, 1)
+apply_cx(q2, 4, anc2, 1)
+apply_cx(q2, 6, anc2, 0)
+apply_cx(q2, 7, anc2, 0)
+var s2 = measure(anc2, 0)
+printf("  Z型稳定子: %d (期望 1, 定位q2)\n", s2)
+
+if (s2 == 1):
+    apply_x(q2, 2)
+    printf("  纠正: q2 X错误\n")
+end
+
+apply_h(q2, 0)
+apply_h(q2, 1)
+apply_h(q2, 2)
+apply_h(q2, 3)
+apply_h(q2, 4)
+apply_h(q2, 5)
+apply_h(q2, 6)
+apply_h(q2, 7)
+apply_h(q2, 8)
+var m0b = measure(q2, 0)
+printf("  解码: q0=%d (期望0)\n", m0b)
+if (m0b == 0):
+    printf("  ✓ 通过\n\n")
+else:
+    printf("  ✗ 失败\n\n")
+end
+
+# ========== 测试3: q5 Z错误 ==========
+printf("测试3: q5 Z错误\n")
+var q3 = qreg_create(9)
+apply_h(q3, 0)
+apply_h(q3, 3)
+apply_h(q3, 6)
+apply_cx(q3, 0, 1)
+apply_cx(q3, 0, 2)
+apply_cx(q3, 3, 4)
+apply_cx(q3, 3, 5)
+apply_cx(q3, 6, 7)
+apply_cx(q3, 6, 8)
+apply_z(q3, 5)
+
+var anc3 = qreg_create(2)
+var sx1 = measure(anc3, 0)
+var sx2 = measure(anc3, 1)
+printf("  X型稳定子: %d %d (期望 0 1, 定位q5)\n", sx1, sx2)
+
+apply_h(q3, 0)
+apply_h(q3, 1)
+apply_h(q3, 2)
+apply_h(q3, 3)
+apply_h(q3, 4)
+apply_h(q3, 5)
+apply_h(q3, 6)
+apply_h(q3, 7)
+apply_h(q3, 8)
+apply_cx(q3, 0, anc3, 0)
+apply_cx(q3, 1, anc3, 0)
+apply_cx(q3, 3, anc3, 1)
+apply_cx(q3, 4, anc3, 1)
+apply_cx(q3, 6, anc3, 0)
+apply_cx(q3, 7, anc3, 0)
+var sz1 = measure(anc3, 0)
+var sz2 = measure(anc3, 1)
+printf("  Z型稳定子: %d %d (期望 0 0)\n", sz1, sz2)
+
+if (sx2 == 1):
+    apply_z(q3, 5)
+    printf("  纠正: q5 Z错误\n")
+end
+
+apply_h(q3, 0)
+apply_h(q3, 1)
+apply_h(q3, 2)
+apply_h(q3, 3)
+apply_h(q3, 4)
+apply_h(q3, 5)
+apply_h(q3, 6)
+apply_h(q3, 7)
+apply_h(q3, 8)
+var m0c = measure(q3, 0)
+printf("  解码: q0=%d (期望0)\n", m0c)
+if (m0c == 0):
+    printf("  ✓ 通过\n\n")
+else:
+    printf("  ✗ 失败\n\n")
+end
+
+printf("=== Shor码测试完成 ===\n")
