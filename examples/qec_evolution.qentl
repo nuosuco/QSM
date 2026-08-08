@@ -1,0 +1,43 @@
+# ================================================================
+# 量子纠错码的容错演变
+# 从经典到量子的容错纠错发展
+# ================================================================
+
+printf("=== 量子纠错容错演变 ===\n\n")
+
+printf("--- 经典纠错 ---\n")
+printf("  1948: Hamming码 (7,4)\n")
+printf("  1950: Reed-Muller码\n")
+printf("  1960: Reed-Solomon码\n")
+printf("  1993: 涡轮码 (Turbo)\n")
+printf("  1996: LDPC码\n")
+printf("  经典: 重复编码, 多数表决\n\n")
+
+printf("--- 量子纠错初期 ---\n")
+printf("  1995: Shor 9比特码\n")
+printf("  1996: Steane 7比特码\n")
+printf("  1996: CSS码构造\n")
+printf("  1997: 5比特最小完美码\n")
+printf("  1998: 稳定子形式化\n\n")
+
+printf("--- 容错发展 ---\n")
+printf("  1996: 容错门概念\n")
+printf("  1997: 阈值定理\n")
+printf("  2000: 表面码 (Surface Code)\n")
+printf("  2003: 拓扑码 (Kitaev)\n")
+printf("  2006: 颜色码 (Color Code)\n")
+printf("  2012: 量子LDPC\n\n")
+
+printf("--- 当前前沿 ---\n")
+printf("  2020: 超导逻辑量子比特\n")
+printf("  2022: 中性原子表面码\n")
+printf("  2023: 逻辑门演示\n")
+printf("  2024: 大规模纠错\n\n")
+
+printf("--- QEntL实现 ---\n")
+printf("  2026: 6种纠错码全实现\n")
+printf("  2026: Surface码2x2\n")
+printf("  2026: 容错阈值分析\n")
+printf("  2026: 综合征提取\n\n")
+
+printf("=== 容错演变完成 ===\n")
