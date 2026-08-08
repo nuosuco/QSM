@@ -54,17 +54,20 @@ var gl_int[512]
 var gl_str[512]
 var gl_arr[512]
 
-# ---- 数组池: 碰撞分配器, 双段存储 ----
+# ---- 数组池: 碰撞分配器, 三段存储(容量196605, 支撑QCL-on-QVM) ----
 var ar_off[128]
 var ar_size[128]
 var ar_used = 0
 var ar_next = 0
 var ae_type0[65535]
 var ae_type1[65535]
+var ae_type2[65535]
 var ae_int0[65535]
 var ae_int1[65535]
+var ae_int2[65535]
 var ae_str0[65535]
 var ae_str1[65535]
+var ae_str2[65535]
 
 # ---- 函数表 ----
 var fn_nameoff[128]
@@ -173,44 +176,66 @@ def do_pop5():
 end
 
 # ================================================================
-# 数组元素池访问（双段）
+# 数组元素池访问（三段, 容量196605）
+# 注意: 字面量上限65535(u16), 段边界必须运行时算术
 # ================================================================
 def ae_t_get(pos):
+    var seg2 = 65535 + 65535
     if (pos < 65535): return ae_type0[pos] end
-    return ae_type1[pos - 65535]
+    if (pos < seg2): return ae_type1[pos - 65535] end
+    return ae_type2[pos - seg2]
 end
 
 def ae_t_set(pos, v):
+    var seg2 = 65535 + 65535
     if (pos < 65535):
         ae_type0[pos] = v
     else:
-        ae_type1[pos - 65535] = v
+        if (pos < seg2):
+            ae_type1[pos - 65535] = v
+        else:
+            ae_type2[pos - seg2] = v
+        end
     end
 end
 
 def ae_i_get(pos):
+    var seg2 = 65535 + 65535
     if (pos < 65535): return ae_int0[pos] end
-    return ae_int1[pos - 65535]
+    if (pos < seg2): return ae_int1[pos - 65535] end
+    return ae_int2[pos - seg2]
 end
 
 def ae_i_set(pos, v):
+    var seg2 = 65535 + 65535
     if (pos < 65535):
         ae_int0[pos] = v
     else:
-        ae_int1[pos - 65535] = v
+        if (pos < seg2):
+            ae_int1[pos - 65535] = v
+        else:
+            ae_int2[pos - seg2] = v
+        end
     end
 end
 
 def ae_s_get(pos):
+    var seg2 = 65535 + 65535
     if (pos < 65535): return ae_str0[pos] end
-    return ae_str1[pos - 65535]
+    if (pos < seg2): return ae_str1[pos - 65535] end
+    return ae_str2[pos - seg2]
 end
 
 def ae_s_set(pos, v):
+    var seg2 = 65535 + 65535
     if (pos < 65535):
         ae_str0[pos] = v
     else:
-        ae_str1[pos - 65535] = v
+        if (pos < seg2):
+            ae_str1[pos - 65535] = v
+        else:
+            ae_str2[pos - seg2] = v
+        end
     end
 end
 
@@ -721,6 +746,7 @@ def vm_run():
     var running = 1
     var op = 0
     var npc = 0
+    var prev_pc = 0
     var fname = ""
     var nargs = 0
     var fi = 0
@@ -738,6 +764,11 @@ def vm_run():
     var xa = ""
     var xb = ""
     while (running == 1):
+        if (pc < 0 or pc >= g_code_len):
+            printf("[QVM-Q] pc越界: pc=%d len=%d 上一op=%d 上一pc=%d sp=%d\n", pc, g_code_len, op, prev_pc, sp)
+            break
+        end
+        prev_pc = pc
         op = byte_at(pc)
         npc = pc + 1
         if (op == 1):
@@ -910,12 +941,17 @@ def vm_run():
                 sz = pop1_i
             end
             if (sz < 0): sz = 0 end
-            h = ar_used
-            ar_used = ar_used + 1
-            ar_off[h] = ar_next
-            ar_size[h] = sz
-            ar_next = ar_next + sz
-            push_arr(h)
+            if (ar_next + sz > 65535 + 65535 + 65535):
+                printf("[QVM-Q] 池溢出拦截: sz=%d next=%d pc=%d used=%d\n", sz, ar_next, pc, ar_used)
+                running = 0
+            else:
+                h = ar_used
+                ar_used = ar_used + 1
+                ar_off[h] = ar_next
+                ar_size[h] = sz
+                ar_next = ar_next + sz
+                push_arr(h)
+            end
             npc = pc + 3
         end
         if (op == 23):
