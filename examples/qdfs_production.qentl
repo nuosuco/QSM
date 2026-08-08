@@ -1,4 +1,316 @@
 # ================================================================
-# QDFS生产化增强 — 版本控制+文件历史+重命名
-# 作为生产级量子文件系统的基础
-# ================================================================...[truncated]
+# QDFS生产化演示 — 量子文件系统实际应用场景
+# 展示QDFS在真实业务中的使用
+# ================================================================
+# 内联QDFS库
+var g_root = ""
+var g_meta = ""
+
+def meta_field(line, idx):
+    var i = 0
+    var n = str_len(line)
+    var f = 0
+    var start = 0
+    while (i <= n):
+        var issep = 0
+        if (i == n):
+            issep = 1
+        else:
+            var ch = str_char_at(line, i)
+            if (str_eq(ch, "|")):
+                issep = 1
+            end
+        end
+        if (issep == 1):
+            if (f == idx):
+                return str_substring(line, start, i - start)
+            end
+            f = f + 1
+            start = i + 1
+        end
+        i = i + 1
+    end
+    return ""
+end
+
+def meta_find(name):
+    var s = str_concat("\n", g_meta)
+    var key = str_concat(str_concat("\n", name), "|")
+    var i = str_index_of(s, key)
+    if (i < 0):
+        return ""
+    end
+    var rest = str_substring(s, i + 1, str_len(s) - i - 1)
+    var j = str_index_of(rest, "\n")
+    if (j < 0):
+        return rest
+    end
+    return str_substring(rest, 0, j)
+end
+
+def meta_remove(name):
+    var s = str_concat("\n", g_meta)
+    var key = str_concat(str_concat("\n", name), "|")
+    var i = str_index_of(s, key)
+    if (i < 0):
+        return 0
+    end
+    var rest = str_substring(s, i + 1, str_len(s) - i - 1)
+    var j = str_index_of(rest, "\n")
+    var oldlen = j + 1
+    if (j < 0):
+        oldlen = str_len(rest)
+    end
+    g_meta = str_concat(str_substring(g_meta, 0, i), str_substring(g_meta, i + oldlen, str_len(g_meta) - i - oldlen))
+    file_write_bytes(str_concat(g_root, "/meta"), g_meta)
+    return 1
+end
+
+def meta_set(name, state, partner, collapsed, owner):
+    meta_remove(name)
+    var l1 = str_concat(name, "|")
+    var l2 = str_concat(l1, state)
+    var l3 = str_concat(l2, "|")
+    var l4 = str_concat(l3, partner)
+    var l5 = str_concat(l4, "|")
+    var l6 = str_concat(l5, collapsed)
+    var l7 = str_concat(l6, "|")
+    var newline = str_concat(str_concat(l7, owner), "\n")
+    g_meta = str_concat(g_meta, newline)
+    file_write_bytes(str_concat(g_root, "/meta"), g_meta)
+    return 1
+end
+
+def meta_set_collapse(name, idx):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return 0
+    end
+    meta_set(name, meta_field(line, 1), meta_field(line, 2), int_to_str(idx), meta_field(line, 4))
+    return 1
+end
+
+def qdfs_init(root):
+    g_root = root
+    mkdir(root)
+    mkdir(str_concat(root, "/branches"))
+    var mp = str_concat(root, "/meta")
+    if (file_exists(mp) == 0):
+        file_write_bytes(mp, "")
+    end
+    g_meta = file_read(mp)
+    return 1
+end
+
+def qdfs_write(name, content):
+    var path = str_concat(str_concat(str_concat(g_root, "/"), name), ".data")
+    file_write_bytes(path, content)
+    meta_set(name, "0", "", "-1", name)
+    return 1
+end
+
+def qdfs_superpose(name, c0, c1):
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), name), "/")
+    mkdir(str_concat(str_concat(g_root, "/branches/"), name))
+    file_write_bytes(str_concat(bd, "b0"), c0)
+    file_write_bytes(str_concat(bd, "b1"), c1)
+    meta_set(name, "1", "", "-1", name)
+    return 1
+end
+
+def qdfs_entangle(a, b, c0, c1):
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), a), "/")
+    mkdir(str_concat(str_concat(g_root, "/branches/"), a))
+    file_write_bytes(str_concat(bd, "b0"), c0)
+    file_write_bytes(str_concat(bd, "b1"), c1)
+    meta_set(a, "2", b, "-1", a)
+    meta_set(b, "2", a, "-1", a)
+    return 1
+end
+
+def qdfs_read(name):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return ""
+    end
+    var state = meta_field(line, 1)
+    if (str_eq(state, "0")):
+        return file_read(str_concat(str_concat(str_concat(g_root, "/"), name), ".data"))
+    end
+    var collapsed = str_to_int(meta_field(line, 3))
+    if (collapsed < 0):
+        collapsed = rand_int(2)
+        meta_set_collapse(name, collapsed)
+        var partner = meta_field(line, 2)
+        if (str_len(partner) > 0):
+            meta_set_collapse(partner, collapsed)
+        end
+    end
+    var owner = meta_field(line, 4)
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), owner), "/")
+    if (collapsed == 0):
+        return file_read(str_concat(bd, "b0"))
+    end
+    return file_read(str_concat(bd, "b1"))
+end
+
+def qdfs_info(name):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return str_concat(name, ": 不存在")
+    end
+    var state = meta_field(line, 1)
+    var collapsed = meta_field(line, 3)
+    if (str_eq(state, "0")):
+        return str_concat(name, ": 经典态")
+    end
+    if (str_eq(state, "1")):
+        if (str_eq(collapsed, "-1")):
+            return str_concat(name, ": 叠加态(未观测)")
+        end
+        return str_concat(str_concat(str_concat(name, ": 叠加态 已坍缩->"), collapsed), "分支")
+    end
+    var partner = meta_field(line, 2)
+    if (str_eq(collapsed, "-1")):
+        return str_concat(str_concat(str_concat(name, ": 纠缠<->"), partner), "(未观测)")
+    end
+    return str_concat(str_concat(str_concat(str_concat(name, ": 纠缠<->"), partner), " 已坍缩->"), collapsed)
+end
+
+def qdfs_ls():
+    var out = ""
+    var s = g_meta
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        var rest = ""
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            rest = str_substring(s, j + 1, str_len(s) - j - 1)
+        end
+        if (str_len(line) > 0):
+            out = str_concat(str_concat(out, qdfs_info(meta_field(line, 0))), "\n")
+        end
+        s = rest
+    end
+    return out
+end
+
+def qdfs_delete(name):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return 0
+    end
+    file_delete(str_concat(str_concat(str_concat(g_root, "/"), name), ".data"))
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), name), "/")
+    file_delete(str_concat(bd, "b0"))
+    file_delete(str_concat(bd, "b1"))
+    meta_remove(name)
+    return 1
+end
+
+# ===== 新增生产级功能 =====
+
+# 版本控制: 保存文件历史版本
+def qdfs_version(name, content):
+    var ver_dir = str_concat(str_concat(str_concat(g_root, "/versions/"), name), "/")
+    mkdir(str_concat(str_concat(g_root, "/versions/"), name))
+    var t = 0
+    while (t < 1000):
+        var vpath = str_concat(ver_dir, int_to_str(t))
+        if (file_exists(vpath) == 0):
+            file_write_bytes(vpath, content)
+            return str_concat(str_concat(name, " v"), int_to_str(t))
+        end
+        t = t + 1
+    end
+    return ""
+end
+
+# 文件重命名
+def qdfs_rename(old_name, new_name):
+    var line = meta_find(old_name)
+    if (str_len(line) == 0):
+        return 0
+    end
+    var content = qdfs_read(old_name)
+    qdfs_write(new_name, content)
+    qdfs_delete(old_name)
+    return 1
+end
+
+# 文件内容统计
+def qdfs_count(name):
+    var content = qdfs_read(name)
+    if (str_len(content) == 0):
+        return "0"
+    end
+    var n = 0
+    var i = 0
+    while (i < str_len(content)):
+        var c = str_char_at(content, i)
+        if (str_eq(c, " ") or str_eq(c, "\n")):
+            n = n + 1
+        end
+        i = i + 1
+    end
+    return int_to_str(str_len(content))
+end
+
+# ===== 演示程序 =====
+printf("=== QDFS生产化演示 ===\n\n")
+
+# 初始化
+qdfs_init("/tmp/qdfs_prod")
+printf("QDFS初始化完成\n\n")
+
+# 1. 经典文件操作
+printf("--- 1. 经典文件操作 ---\n")
+qdfs_write("config", "server=9802;mode=production;debug=0")
+qdfs_write("data", "量子计算训练数据\n第1行: 编码\n第2行: 纠缠\n第3行: 测量")
+printf("已创建2个文件\n")
+
+# 2. 版本控制
+printf("\n--- 2. 版本控制 ---\n")
+var v1 = qdfs_version("config", "server=9802;mode=dev;debug=1")
+printf("保存版本1: %s\n", v1)
+var v2 = qdfs_version("config", "server=9802;mode=prod;debug=0")
+printf("保存版本2: %s\n", v2)
+
+# 3. 叠加态文件
+printf("\n--- 3. 叠加态文件 ---\n")
+qdfs_superpose("quantum_config", "mode=叠加态A: 实验模式", "mode=叠加态B: 生产模式")
+printf("量子配置: 叠加态(未观测)\n")
+
+# 4. 纠缠文件对
+printf("\n--- 4. 纠缠文件对 ---\n")
+qdfs_entangle("key_A", "key_B", "量子密钥: 分支0", "量子密钥: 分支1")
+printf("纠缠密钥对: key_A ↔ key_B\n")
+
+# 5. 观测验证
+printf("\n--- 5. 观测验证 ---\n")
+var read_a = qdfs_read("key_A")
+printf("观测key_A: %s\n", read_a)
+var read_b = qdfs_read("key_B")
+printf("观测key_B: %s\n", read_b)
+if (read_a == read_b):
+    printf("纠缠同步: 通过 ✅\n")
+else:
+    printf("纠缠同步: 失败 ❌\n")
+end
+
+# 6. 文件统计
+printf("\n--- 6. 文件统计 ---\n")
+printf("config内容长度: %s\n", qdfs_count("config"))
+printf("data内容长度: %s\n", qdfs_count("data"))
+
+# 7. 文件重命名
+printf("\n--- 7. 文件重命名 ---\n")
+qdfs_rename("data", "training_data")
+printf("data → training_data 重命名成功\n")
+
+# 8. 文件列表
+printf("\n--- 8. 文件列表 ---\n")
+printf("%s\n", qdfs_ls())
+
+printf("\n=== QDFS生产化演示完成 ===\n")
