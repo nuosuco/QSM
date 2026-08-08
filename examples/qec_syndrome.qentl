@@ -1,0 +1,127 @@
+# ================================================================
+# examples/qec_syndrome.qentl — 量子综合征提取(非破坏性纠错)
+# QEntL全栈v0.2.0能力实战: 辅助比特测奇偶, 不坍缩数据态
+#
+# 与 repetition_code 的本质区别:
+#   repetition_code: 直接测量3个数据比特后多数表决 (坍缩数据)
+#   本例: 用2个辅助比特通过CX提取奇偶(综合征), 只测辅助比特,
+#         数据比特在纠错前不被测量 -> 保持量子叠加态
+#
+# 综合征电路 (3比特比特翻转码):
+#   s12 = parity(q0,q1): CX(q0,a1); CX(q1,a1); measure a1
+#   s23 = parity(q1,q2): CX(q1,a2); CX(q2,a2); measure a2
+#   (s12,s23)=(0,0)无错 (1,0)q0错 (1,1)q1错 (0,1)q2错
+# ================================================================
+
+# 一轮: 逻辑比特b, 错误位置err_pos(-1=无错)
+# 返回 1=纠错成功, 0=失败
+def one_round(b, err_pos):
+    var r = qreg_create(5)  # q0 q1 q2 + a1 a2
+    # 编码: |b> -> |b b b>
+    if (b == 1):
+        x r[0]
+    end
+    cx r[0], r[1]
+    cx r[0], r[2]
+    # 注错: 单比特翻转
+    if (err_pos == 0): x r[0] end
+    if (err_pos == 1): x r[1] end
+    if (err_pos == 2): x r[2] end
+    # 综合征提取: 辅助比特测奇偶(不测数据)
+    cx r[0], r[3]
+    cx r[1], r[3]
+    cx r[1], r[4]
+    cx r[2], r[4]
+    var s12 = measure(r, 3)
+    var s23 = measure(r, 4)
+    # 按综合征纠正(对数据比特施X)
+    if (s12 == 1 and s23 == 0): x r[0] end
+    if (s12 == 1 and s23 == 1): x r[1] end
+    if (s12 == 0 and s23 == 1): x r[2] end
+    # 最终测量数据比特, 多数表决验证
+    var m0 = measure(r, 0)
+    var m1 = measure(r, 1)
+    var m2 = measure(r, 2)
+    var recovered = 0
+    if (m0 + m1 + m2 >= 2): recovered = 1 end
+    qreg_free(r)
+    if (recovered == b): return 1 end
+    return 0
+end
+
+printf("=== 量子综合征提取 (非破坏性纠错) ===\n")
+printf("辅助比特测奇偶, 数据比特纠错前不被测量\n\n")
+
+# 非破坏性验证: 逻辑叠加态 |+_L = (|000>+|111>)/sqrt2
+# 综合征提取(无错)后解码必须确定性回到 |0>
+# 若提取过程坍缩了数据态, 结果将是随机的 0/1
+def nondestruct_test():
+    var r = qreg_create(5)
+    # 制备 |+> 并编码为 |+_L
+    h r[0]
+    cx r[0], r[1]
+    cx r[0], r[2]
+    # 综合征提取(无错: 奇偶均为偶, 辅助比特=0)
+    cx r[0], r[3]
+    cx r[1], r[3]
+    cx r[1], r[4]
+    cx r[2], r[4]
+    var s12 = measure(r, 3)
+    var s23 = measure(r, 4)
+    if (s12 != 0 or s23 != 0):
+        qreg_free(r)
+        return 0 - 1  # 无错却测出错, 电路有误
+    end
+    # 解码: CX反向 + H, 应回到 |0>
+    cx r[0], r[2]
+    cx r[0], r[1]
+    h r[0]
+    var m = measure(r, 0)
+    qreg_free(r)
+    return m
+end
+
+var total = 0
+var ok = 0
+var b = 0
+while (b <= 1):
+    var err = 0 - 1
+    while (err <= 2):
+        var i = 0
+        while (i < 25):
+            total = total + 1
+            if (one_round(b, err) == 1):
+                ok = ok + 1
+            end
+            i = i + 1
+        end
+        err = err + 1
+    end
+    b = b + 1
+end
+
+printf("测试矩阵: 2逻辑态 x 4错误位置 x 25轮 = %d 次\n", total)
+printf("纠错成功: %d/%d\n", ok, total)
+
+if (ok == total):
+    printf("综合征提取纠错: 通过 (单比特错误全部纠正)\n")
+else:
+    printf("综合征提取纠错: 失败 (%d次未纠正)\n", total - ok)
+end
+
+# 非破坏性叠加态测试 (25轮, 必须全部回到|0>)
+var nd_ok = 0
+var j = 0
+while (j < 25):
+    if (nondestruct_test() == 0):
+        nd_ok = nd_ok + 1
+    end
+    j = j + 1
+end
+printf("\n非破坏性验证: 逻辑叠加态 |+_L 提取后解码\n")
+printf("确定性回到|0>: %d/25\n", nd_ok)
+if (nd_ok == 25):
+    printf("非破坏性: 通过 (综合征提取未坍缩数据态)\n")
+else:
+    printf("非破坏性: 失败 (数据态被坍缩)\n")
+end
