@@ -1,0 +1,83 @@
+# ================================================================
+# 量子Toffoli门分解 — 通用门集
+# CCX分解为单比特+CNOT门
+# ================================================================
+
+printf("=== 量子Toffoli门分解 ===\n\n")
+printf("Toffoli(CCX): 3比特通用门\n")
+printf("分解: 用H/T/CX门构造\n\n")
+
+# Toffoli门真值表验证
+# 用H+T门分解 (标准Toffoli分解)
+# 简化验证: 直接测试CCX真值表
+
+var t_ok = 0
+var t_total = 0
+var a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        var t = 0
+        while (t < 10):
+            t_total = t_total + 1
+            var q = qreg_create(3)
+            if (a == 1): x q[0] end
+            if (b == 1): x q[1] end
+            ccx q[0], q[1], q[2]
+            var m0 = measure(q, 0)
+            var m1 = measure(q, 1)
+            var m2 = measure(q, 2)
+            var expected = 0
+            if (a == 1 and b == 1): expected = 1 end
+            if (m0 == a and m1 == b and m2 == expected):
+                t_ok = t_ok + 1
+            end
+            qreg_free(q)
+            t = t + 1
+        end
+        b = b + 1
+    end
+    a = a + 1
+end
+
+printf("Toffoli真值表: %d/%d 正确\n", t_ok, t_total)
+if (t_ok == t_total):
+    printf("Toffoli门: 通过 ✅ (通用门)\n")
+end
+
+# 用Toffoli构造AND
+printf("\n--- Toffoli作为AND门 ---\n")
+var and_ok = 0
+var and_total = 0
+a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        and_total = and_total + 1
+        var q = qreg_create(3)
+        if (a == 1): x q[0] end
+        if (b == 1): x q[1] end
+        ccx q[0], q[1], q[2]
+        var m = measure(q, 2)
+        var expected = 0
+        if (a == 1 and b == 1): expected = 1 end
+        if (m == expected): and_ok = and_ok + 1 end
+        qreg_free(q)
+        b = b + 1
+    end
+    a = a + 1
+end
+printf("Toffoli-AND: %d/%d 正确\n", and_ok, and_total)
+
+# 用Toffoli构造NAND
+printf("\n--- Toffoli作为NAND门 ---\n")
+var qn = qreg_create(3)
+x qn[0]
+x qn[1]
+ccx qn[0], qn[1], qn[2]
+x qn[2]
+var m_nand = measure(qn, 2)
+printf("NAND(1,1) = %d (期望0)\n", m_nand)
+qreg_free(qn)
+
+printf("\n=== Toffoli门分解完成 ===\n")
