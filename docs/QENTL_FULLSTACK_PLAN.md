@@ -161,7 +161,91 @@ init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP → 编译为量子电路字节码（�
 
 ---
 
-## 四、八阶段构建（每阶段有验证命令）
+## ★ 完整构建链（全流程）—— 从底到顶
+
+这是整个QEntL全栈QSM的**完整构建链**，每个组件环环相扣，从底到顶逐层构建。**C种子（C启动器）是最小启动的编译器+VM**，是整个系统的原点——花了几年心血才完成这颗种子和QEntL全栈自举成功。
+
+```
+C种子 → QCL → 自举验证 → QVM → QBC1 → 标准库 → QDFS → QNS → 四大模型 → HTTP/QOS
+```
+
+### 每一层的作用（一句话+详细说明）
+
+#### 1️⃣ C种子 — 最小启动的编译器+VM（项目的原点）
+**src/qcl_bootstrap.c**，项目中唯一C文件，编译为`bin/qcl_bootstrap`。
+**一句话**：**系统的"精子细胞"**——体积最小但包含全部生命力，让系统从零诞生。
+**详细**：三合一：（a）量子指令子集编译（保留v1量子路径）；（b）最小QEntL子集编译器，刚好够编译qcl.qentl自己（def/var/if/while/return/赋值/表达式/数组/builtins）；（c）QBC1 VM执行器，31条opcode + 全部builtin。**红线**：QCL活了后C种子不再加新功能，只做最原始的启动。
+
+#### 2️⃣ QCL编译器 — 系统的"编译器自我"
+**qcl.qentl**，用QEntL写的QCL完整编译器，约10200个token。
+**一句话**：**系统能编译自己**——QCL读input.qentl，做词法分析→语法分析→代码生成，输出QBC1字节码到output.qbc。
+**关键**：QCL是**自举**的——QCL能编译自己，这是整个系统能自我进化的核心。QCL活了后，C编译器路径退役，所有编译工作都在QEntL环境上做。
+
+#### 3️⃣ 自举验证 — 关键里程碑（成年礼）
+**一句话**：**证明系统能自我生存**。
+**过程**：C种子编译qcl.qentl → build/qcl.qbc；用build/qcl.qbc（QCL自己）再次编译qcl.qentl → output.qbc；对比两次产物字节级一致。从此所有工作都在QEntL环境上做，C种子只做启动。
+
+#### 4️⃣ QVM虚拟机 — 系统的"运行时自我"
+**qvm.qentl**，用QEntL写的QBC1字节码虚拟机，约4570个token。
+**一句话**：**系统能运行自己**——加载QBC1文件，执行opcode分发（31条指令），管理栈/调用帧/变量/builtin调度。
+**注意**：量子门（H/CX/measure等）不是QVM实现的，是QVM调用C种子层的内置函数。QVM本身是纯QEntL，不做复数运算——量子门在C种子层实现。
+
+#### 5️⃣ QBC1字节码格式 — 统一接口语言
+**一句话**：**系统各组件之间的通用语言**——QCL编译输出QBC1，QVM加载执行QBC1，C种子也跑QBC1。
+**格式**：4字节magic"QBC1" + 2字节code_len + 字节码 + 2字节pool_len + 字符串池。31条指令（0x01-0x1F）。栈65536 / 调用深度1024 / 变量4096。
+
+#### 6️⃣ 标准库 — 基础运算能力
+**lib/*.qentl**，14个库：core/io/qdfs/qnn×3/qns×2/qsv/yi×2/fixed/deploy×2。
+**一句话**：**提供字符串、文件、量子网络、定点数等基础运算**。
+
+#### 7️⃣ QDFS（量子动态文件系统）— 叠加态并行基础
+**lib/qdfs.qentl**，约270行。
+**一句话**：**量子化的数据存储**——文件有叠加态，文件可以纠缠。
+**详细**：铁律第4条明确——QDFS是叠加态并行运算的基础，所有上层建筑（QNS/四大模型）都基于QDFS。实现了叠加态文件、纠缠文件对、文件搜索统计、版本控制（叠加态分支）。
+
+#### 8️⃣ QNS（量子神经叠加态）— 神经叠加态框架
+**lib/qns.qentl + lib/qns_framework.qentl**。
+**一句话**：**量子化的神经网络框架**——QNS是QNN的**上层框架**，不是平级的。
+**详细**：QNS基于QDFS提供量子神经叠加态能力：特征编码（经典数据→量子态）、前向传播（量子线路执行）、测量解码、训练循环。QNN（量子神经网络）是QNS体系下的具体算法应用。**QNS ≠ QNN，QNS包含QNN**。
+
+#### 9️⃣ 四大模型 — 应用层
+**QSM（主/叠加态模型）/ SOM（经济模型）/ WeQ（社交模型）/ Ref（自反省模型）**。
+**一句话**：**QNS之上的具体应用**。训练方向：彝文4120字三语（彝中英）。
+
+#### 🔟 HTTP服务器 + QOS — 对外接口
+**server_qentl.qentl**，425行纯QEntL HTTP服务器。
+**一句话**：**对外提供服务**——9802端口运行，nginx反代HTTPS（qsm.som.top），在线IDE沙箱、API接口、状态查询。
+
+### 完整的编译运行命令链
+```bash
+# 1. C种子编译QCL
+bin/qcl_bootstrap compile qcl.qentl build/qcl.qbc
+
+# 2. C种子编译QVM
+bin/qcl_bootstrap compile qvm.qentl build/qvm.qbc
+
+# 3. QCL编译用户程序
+cp my_program.qentl input.qentl
+bin/qcl_bootstrap run build/qcl.qbc  → output.qbc
+
+# 4. QVM执行
+cp output.qbc target.qbc
+bin/qcl_bootstrap run build/qvm.qbc
+```
+
+### 构建链总结（每层一句话）
+| 层级 | 组件 | 一句话 |
+|:---:|:----:|--------|
+| 0 | **C种子** | 最小启动的编译器+VM，系统的原点 |
+| 1 | **QCL** | 系统能编译自己 |
+| 2 | **自举验证** | 证明系统能自我生存 |
+| 3 | **QVM** | 系统能运行自己 |
+| 4 | **QBC1** | 各组件之间的通用语言 |
+| 5 | **标准库** | 基础运算能力 |
+| 6 | **QDFS** | 叠加态文件系统，量子化的数据存储 |
+| 7 | **QNS** | 神经叠加态框架，量子化的神经网络，**包含QNN** |
+| 8 | **四大模型** | 应用层（QSM/SOM/WeQ/Ref） |
+| 9 | **HTTP/QOS** | 对外接口 |
 
 ### 阶段1: C启动器 src/qcl_bootstrap.c（三合一）
 **职责**（启动器本职工作，不是堆功能）：
