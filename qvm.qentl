@@ -35,6 +35,7 @@ var gl_str[64]
 var fn_body[32]
 var fn_params[32]
 var fn_count = 0
+var fr_retpc[32]
 
 # ---- 彈棧結果 ----
 var p1_t = 0
@@ -43,6 +44,9 @@ var p1_s = ""
 var p2_t = 0
 var p2_i = 0
 var p2_s = ""
+var p3_t = 0
+var p3_i = 0
+var p3_s = ""
 
 # ================================================================
 # 工具函數
@@ -86,6 +90,22 @@ def do_pop2():
     p2_t = t2
     p2_i = i2
     p2_s = s2
+end
+
+def do_pop3():
+    do_pop2()
+    var t3 = p1_t
+    var i3 = p1_i
+    var s3 = p1_s
+    p1_t = st_type[sp - 1]
+    p1_i = st_int[sp - 1]
+    p1_s = st_str[sp - 1]
+    p2_t = st_type[sp - 1]
+    p2_i = st_int[sp - 1]
+    p2_s = st_str[sp - 1]
+    p3_t = t3
+    p3_i = i3
+    p3_s = s3
 end
 
 def truthy_val(t, i, s, a):
@@ -192,15 +212,15 @@ def bi_printf(nargs):
     var i = 0
     var idx = 0
     while (idx < str_len(fmt)):
-        if (str_char_at(fmt, idx) == '%' and idx + 1 < str_len(fmt)):
+        if (str_char_at(fmt, idx) == "%" and idx + 1 < str_len(fmt)):
             var fc = str_char_at(fmt, idx + 1)
-            if (fc == 'd' and i < nargs):
+            if (fc == "d" and i < nargs):
                 do_pop1()
                 var v = p1_i
                 printf("%d", v)
                 i = i + 1
             end
-            if (fc == 's' and i < nargs):
+            if (fc == "s" and i < nargs):
                 do_pop1()
                 printf("%s", p1_s)
                 i = i + 1
