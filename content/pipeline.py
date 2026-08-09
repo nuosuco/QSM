@@ -559,7 +559,7 @@ def compose_video(scenes, topic, images_map, output_path):
             "-c:v", "mpeg4", "-q:v", "3",
             "-c:a", "aac", "-b:a", "128k",
             "-pix_fmt", "yuv420p",
-            "-vf", "scale=1920:1080:force_original_aspect_ratio=disable,setsar=1",
+            "-vf", "scale=1920:1080:force_original_aspect_ratio=1,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1",
             "-shortest",
             "-movflags", "+faststart",
             str(temp_video),
@@ -572,7 +572,7 @@ def compose_video(scenes, topic, images_map, output_path):
             "-c:v", "mpeg4", "-q:v", "3",
             "-c:a", "aac", "-b:a", "128k",
             "-pix_fmt", "yuv420p",
-            "-vf", "scale=1920:1080:force_original_aspect_ratio=disable,setsar=1",
+            "-vf", "scale=1920:1080:force_original_aspect_ratio=1,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1",
             "-shortest",
             "-movflags", "+faststart",
             str(temp_video),
@@ -626,12 +626,14 @@ def compose_video(scenes, topic, images_map, output_path):
         drawtext_filters = []
         for idx, (start, dur, text_cn, text_en) in enumerate(segments):
             # 中文drawtext（大字，底部，fontsize=56）
-            if escaped_cn:
+            if text_cn:
+                escaped_cn = text_cn.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
                 drawtext_filters.append(
                     'drawtext=text=' + escaped_cn + ':fontfile=' + font_path + ':fontsize=56:fontcolor=white:x=(w-text_w)/2:y=h-180:box=1:boxcolor=black@0.5:boxborderw=5'
                 )
             # 英文drawtext（中字号，中文上方，fontsize=36）
-            if text_en and escaped_en:
+            if text_en:
+                escaped_en = text_en.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
                 drawtext_filters.append(
                     'drawtext=text=' + escaped_en + ':fontfile=' + font_path + ':fontsize=36:fontcolor=white@0.9:x=(w-text_w)/2:y=h-260:box=1:boxcolor=black@0.3:boxborderw=3'
                 )
