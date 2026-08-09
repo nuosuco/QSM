@@ -641,23 +641,23 @@ def compose_video(scenes, topic, images_map, output_path):
         # 构建drawtext滤镜链（中英双语）
         drawtext_filters = []
         for idx, (start, dur, text_cn, text_en) in enumerate(segments):
-            # 中文字幕居中，底部显示
-            y_cn = 60 + idx * 40
-            # 英文字幕在中文下方
-            y_en = 100 + idx * 40
+            # 字幕位置：中文在上，英文在下
+            y_cn = h - 100 - idx * 40
+            y_en = h - 60 - idx * 40
             
             # 处理文本中的特殊字符
             escaped_cn = text_cn.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39))
             escaped_en = text_en.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39)) if text_en else ""
             
-            # 中文drawtext
-            drawtext_filters.append(
-                'drawtext=text=' + chr(39) + escaped_cn + chr(39) + ':fontfile=' + font_path + ':fontsize=32:fontcolor=white:x=(w-text_w)/2:y=' + str(y_cn) + ':box=1:boxcolor=black@0.5:boxborderw=5'
-            )
-            # 英文drawtext
-            if text_en and escaped_en:
+            # 中文drawtext（只在第一段显示）
+            if idx == 0 and escaped_cn:
                 drawtext_filters.append(
-                    'drawtext=text=' + chr(39) + escaped_en + chr(39) + ':fontfile=' + font_path + ':fontsize=24:fontcolor=white@0.8:x=(w-text_w)/2:y=' + str(y_en) + ':box=1:boxcolor=black@0.3:boxborderw=3'
+                    'drawtext=text='' + escaped_cn + '':fontfile=' + font_path + ':fontsize=32:fontcolor=white:x=(w-text_w)/2:y=' + str(y_cn) + ':box=1:boxcolor=black@0.5:boxborderw=5'
+                )
+            # 英文drawtext（只在第一段显示）
+            if idx == 0 and text_en and escaped_en:
+                drawtext_filters.append(
+                    'drawtext=text='' + escaped_en + '':fontfile=' + font_path + ':fontsize=24:fontcolor=white@0.8:x=(w-text_w)/2:y=' + str(y_en) + ':box=1:boxcolor=black@0.3:boxborderw=3'
                 )
         filter_complex = ";".join(drawtext_filters)
         cmd = [
