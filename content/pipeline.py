@@ -512,9 +512,22 @@ def compose_video(scenes, topic, images_map, output_path):
     audio_duration = float(r.stdout.strip()) if r.stdout.strip() else 60
     log(f"音频总时长: {audio_duration:.1f}秒")
     
-    # 3. 找背景图
-    bg_img = str(today_img_dir / "cover.jpg") if (today_img_dir / "cover.jpg").exists() else \
-             str(today_img_dir / "video_cover.jpg") if (today_img_dir / "video_cover.jpg").exists() else None
+    # 3. 找背景图（使用多张图片轮换）
+    bg_imgs = []
+    if (today_img_dir / "cover.jpg").exists():
+        bg_imgs.append(str(today_img_dir / "cover.jpg"))
+    if (today_img_dir / "video_cover.jpg").exists():
+        bg_imgs.append(str(today_img_dir / "video_cover.jpg"))
+    for i in range(3):
+        img = today_img_dir / f"xhs_{i}.jpg"
+        if img.exists():
+            bg_imgs.append(str(img))
+    
+    # 去重
+    bg_imgs = list(dict.fromkeys(bg_imgs))
+    
+    if not bg_imgs:
+        bg_imgs = [str(today_img_dir / "cover.jpg")] if (today_img_dir / "cover.jpg").exists() else None
     
     # 4. 生成字幕 SRT
     srt_file = video_dir / "subtitles.srt"
@@ -535,10 +548,30 @@ def compose_video(scenes, topic, images_map, output_path):
     # 5. 合成视频（图片+音频）
     temp_video = video_dir / "temp.mp4"
     
-    if bg_img and os.path.exists(bg_img):
+    if bg_imgs and len(bg_imgs) > 0:
+        # 构建图片列表文件，实现多张图片轮换
+        img_list_file = video_dir / "images.txt"
+        with open(img_list_file, "w") as f:
+            for img in bg_imgs:
+                f.write(f"file '{img}'\n")
+                f.write(f"duration 5\n")  # 每张图显示5秒
+        
         cmd = [
             "ffmpeg", "-y",
-            "-loop", "1", "-i", bg_img,
+            "-f", "concat", "-safe", "0", "-i", str(img_list_file),
+            "-i", str(concat_audio),
+            "-c:v", "mpeg4", "-q:v", "3",
+            "-c:a", "aac", "-b:a", "128k",
+            "-pix_fmt", "yuv420p",
+            "-vf", "scale=1920:1080:force_original_aspect_ratio=1,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1",
+            "-shortest",
+            "-movflags", "+faststart",
+            str(temp_video),
+        ]
+    elif bg_imgs and len(bg_imgs) == 1:
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1", "-i", bg_imgs[0],
             "-i", str(concat_audio),
             "-c:v", "mpeg4", "-q:v", "3",
             "-c:a", "aac", "-b:a", "128k",
@@ -570,7 +603,7 @@ def compose_video(scenes, topic, images_map, output_path):
         log("视频产物不存在")
         return None
     
-    # 6. 加字幕
+    # 6. 加字幕（使用drawtext更可靠）
     final_output = str(output_path)
     font_path = str(FONTS / "NotoSansSC-Regular.ttf")
     
@@ -579,29 +612,44 @@ def compose_video(scenes, topic, images_map, output_path):
         os.rename(str(temp_video), final_output)
         return final_output
     
-    # 用 drawtext 逐段加字幕（更兼容）
-    # 或者用 subtitles filter（需要 libass）
-    # 先试 subtitles
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(temp_video),
-        "-vf", f"subtitles={srt_file}:force_style='FontName=NotoSansSC,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=1,Shadow=0,MarginV=40'",
-        "-c:v", "mpeg4", "-q:v", "3",
-        "-c:a", "copy",
-        "-movflags", "+faststart",
-        final_output,
-    ]
+    # 逐段添加字幕（更可靠）
+    segments = []
+    cur = 0
+    for i, scene in enumerate(scenes):
+        if i >= len(tts_files):
+            break
+        dur = scene.get("duration_sec", 15) * 1000
+        narration = scene.get("narration", "")
+        if narration.strip():
+            segments.append((cur, dur, narration))
+        cur += dur
     
-    log("添加字幕中...")
-    r = subprocess.run(cmd, capture_output=True, timeout=300)
-    if r.returncode != 0:
-        log(f"字幕添加失败，用无字幕版: {r.stderr.decode()[-100:]}")
-        if os.path.exists(final_output):
-            os.unlink(final_output)
-        os.rename(str(temp_video), final_output)
+    if segments:
+        # 构建drawtext滤镜链
+        drawtext_filters = []
+        for idx, (start, dur, text) in enumerate(segments):
+            # 字幕居中，底部显示
+            y_offset = 60 + idx * 50  # 每段字幕不同位置
+            # 处理文本中的特殊字符
+            escaped_text = text.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39))
+            drawtext_filters.append(
+                f"drawtext=text='{escaped_text}':"
+                f"fontfile={font_path}:fontsize=32:fontcolor=white:"
+                f"x=(w-text_w)/2:y=h-{y_offset}:box=1:boxcolor=black@0.5:boxborderw=5"
+            )
+        filter_complex = ";".join(drawtext_filters)
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(temp_video),
+            "-vf", filter_complex,
+            "-c:v", "mpeg4", "-q:v", "3",
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            final_output,
+        ]
     else:
-        if temp_video.exists():
-            temp_video.unlink()
+        # 没有字幕，直接复制
+        os.rename(str(temp_video), final_output)
     
     if os.path.exists(final_output):
         size = os.path.getsize(final_output) / (1024 * 1024)
