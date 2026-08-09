@@ -249,14 +249,25 @@ def tok_push(tt, ts, tl):
     g_tok_start[g_tok_count] = ts
     g_tok_len[g_tok_count] = tl
     g_tok_count = g_tok_count + 1
+    if (g_tok_count <= 10):
+        printf("[DBG] token %d: type=%d start=%d len=%d\n", g_tok_count-1, tt, ts, tl)
+    end
 end
 
 def lex_run():
     var pos = 0
     var n = g_src_len
+    # 调试：打印前20个字符
+    var debug_i = 0
+    var debug_max = 20
+    while (debug_i < n and debug_i < debug_max):
+        var dc = str_char_at(g_src, debug_i)
+        printf("[DBG] char[%d]='%s' ord=%d\n", debug_i, dc, ord(dc))
+        debug_i = debug_i + 1
+    end
     while (pos < n):
         var ch = str_char_at(g_src, pos)
-        var ch_ord = str_to_int(int_to_str(str_char_at(ch, 0)))
+        var ch_ord = ord(ch)
         var handled = 0
         # 跳过非ASCII字节（UTF-8多字节字符的高字节）
         if (ch_ord > 127):
@@ -1914,8 +1925,7 @@ def build_full_qbc():
         i = i + 1
     end
     # 主JMP目标 = 主区起点（绝对）
-    g_code[1] = mbase % 256
-    g_code[2] = mbase / 256
+    # 注意：JMP指令在g_code[0..2]，但组装时j...[truncated]
     g_code[32768 + g_mc] = OP_HALT
     # 组装: QBC1 + code_len + 代码 + pool_len + pool
     var out = str_concat("QBC1", byte_char(total % 256))
@@ -1961,6 +1971,10 @@ g_src_len = str_len(g_src)
 if (g_src_len == 0):
     printf("qcl: 错误: 无法读取 %s\n", g_input_file)
 else:
+    printf("[DBG] g_src_len=%d\n", g_src_len)
+    if (g_src_len > 20):
+        printf("[DBG] g_src[0:20]='%s'\n", str_substring(g_src, 0, 20))
+    end
     g_fc = 0
     g_mc = 0
     g_in_func = 0
