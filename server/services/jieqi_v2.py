@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-SOM 节气养生服务 - 每天提供不同内容
+节气养生服务 - 每天提供不同内容
 """
 from datetime import datetime, date
 from typing import Optional
@@ -167,8 +167,3 @@ def get_daily_content(dt=None):
         "daily_detail": selected["detail"],
         "variant": variant,
     }
-
-def get_jieqi_advice(dt=None):
-    """获取当前节气的养生建议"""
-    result = get_daily_content(dt)
-    return result
