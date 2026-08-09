@@ -119,8 +119,17 @@ def download_image(url, save_path):
         if resp.status_code == 200:
             save_path = Path(save_path)
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_path.write_bytes(resp.content)
-            log(f"图片已下载: {save_path.name}")
+            # 下载后 resize 到 1920x1080
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(resp.content))
+            img.thumbnail((1920, 1080), Image.Resampling.LANCZOS)
+            if img.width < 1920 or img.height < 1080:
+                canvas = Image.new('RGB', (1920, 1080), (0, 0, 0))
+                canvas.paste(img, ((1920 - img.width) // 2, (1080 - img.height) // 2))
+                img = canvas
+            img.save(save_path, 'JPEG', quality=90)
+            log(f"图片已下载+Resize: {save_path.name} ({img.width}x{img.height})")
             return str(save_path)
     except Exception as e:
         log(f"图片下载异常: {e}")
@@ -358,21 +367,26 @@ def generate_images(topic):
     today_dir.mkdir(parents=True, exist_ok=True)
     images = {}
     
-    # 封面图 — 4K高清
-    url = call_image_gen(f"传统中医养生风格，{topic['title_cn']}，自然食材，高清摄影，温暖色调", "3840x2160")
+    # 封面图 — 1080p（避免4K速率限制）
+    url = call_image_gen(f"传统中医养生风格，{topic['title_cn']}，自然食材，高清摄影，温暖色调", "1920x1080")
     if url:
         path = download_image(url, today_dir / "cover.jpg")
         if path: images["cover"] = path
     
-    # 小红书配图（3张）— 4K高清
-    for i, food in enumerate(topic.get("recommended_foods", [])[:3]):
-        url = call_image_gen(f"高品质有机{food}摄影，自然光，木桌背景，极简，细节清晰", "3840x2160")
+    # 小红书配图（8张）— 1080p
+    foods = topic.get("recommended_foods", [])
+    for i in range(8):  # 生成8张配图
+        if i < len(foods):
+            prompt = f"高品质有机{foods[i]}摄影，自然光，木桌背景，极简，细节清晰"
+        else:
+            prompt = f"中医养生食材摄影，自然光，木桌背景，高清"
+        url = call_image_gen(prompt, "1920x1080")
         if url:
             path = download_image(url, today_dir / f"xhs_{i}.jpg")
             if path: images[f"xhs_{i}"] = path
     
-    # 视频封面 — 4K高清
-    url = call_image_gen(f"养生食疗视频封面，{topic['title_cn']}，温暖色调，文字留白，高清", "3840x2160")
+    # 视频封面 — 1080p
+    url = call_image_gen(f"养生食疗视频封面，{topic['title_cn']}，温暖色调，文字留白，高清", "1920x1080")
     if url:
         path = download_image(url, today_dir / "video_cover.jpg")
         if path: images["video_cover"] = path
@@ -455,6 +469,9 @@ def compose_video(scenes, topic, images_map, output_path):
     video_dir.mkdir(parents=True, exist_ok=True)
     audio_dir.mkdir(parents=True, exist_ok=True)
     today_img_dir = IMAGES / TODAY
+    
+    # 字体路径
+    font_path = "/root/SOM/content/fonts/NotoSansSC-Regular.ttf"
     
     # 1. 生成所有 TTS 音频
     tts_files = []
@@ -599,18 +616,48 @@ def compose_video(scenes, topic, images_map, output_path):
         log("视频产物不存在")
         return None
     
-    # 6. 加字幕（使用drawtext更可靠）
+    # 6. 生成标题帧（前5秒显示大标题）
+    title_output = str(video_dir / "title_temp.mp4")
+    if topic.get('title_cn'):
+        title_frame = str(video_dir / "title_frame.jpg")
+        # 生成标题背景图（纯背景+大标题文字）
+        title_bg = str(video_dir / "title_bg.png")
+        if not os.path.exists(title_bg):
+            # 创建黑色背景图用于标题显示
+            cmd_title_bg = [
+                "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=1920x1080:d=5",
+                "-vf", f"drawtext=fontfile={font_path}:text='{topic['title_cn']}':fontsize=100:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=black@0.7:boxborderw=10",
+                "-frames:v", "1", title_frame
+            ]
+            subprocess.run(cmd_title_bg, capture_output=True, timeout=30)
+        
+        # 创建标题视频片段（5秒）- 使用更稳定的方式
+        cmd_title = [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", f"color=c=black:s=1920x1080:d=5:r=1",
+            "-c:v", "mpeg4", "-q:v", "5",
+            "-shortest", title_output
+        ]
+        subprocess.run(cmd_title, capture_output=True, timeout=30)
+    
+    # 7. 加字幕（使用drawtext更可靠）
     final_output = str(output_path)
-    font_path = str(FONTS / "NotoSansSC-Regular.ttf")
     
     if not os.path.exists(font_path):
         log("字体不存在，跳过字幕")
         os.rename(str(temp_video), final_output)
         return final_output
     
-    # 逐段添加字幕（中英双语）
+    # 逐段添加字幕（中英双语+标题）
     segments = []
     cur = 0
+    
+    # 先添加标题帧（前5秒显示大标题）
+    title_text = topic.get('title_cn', '')
+    if title_text:
+        # 标题单独一行，fontsize=90，居中，前5秒显示
+        segments.append((0, 5000, title_text, ''))
+    
     for i, scene in enumerate(scenes):
         if i >= len(tts_files):
             break
@@ -622,26 +669,43 @@ def compose_video(scenes, topic, images_map, output_path):
         cur += dur
     
     if segments:
-        # 构建drawtext滤镜链（中英双语）
-        drawtext_filters = []
+        # 构建drawtext滤镜链（中英双语）- 正确链式语法
+        filter_parts = []
+        labels = []
         for idx, (start, dur, text_cn, text_en) in enumerate(segments):
-            # 中文drawtext（大字，底部，fontsize=56）
+            # 中文drawtext（大字，底部，fontsize=70）
             if text_cn:
                 escaped_cn = text_cn.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
-                drawtext_filters.append(
-                    'drawtext=text=' + escaped_cn + ':fontfile=' + font_path + ':fontsize=56:fontcolor=white:x=(w-text_w)/2:y=h-180:box=1:boxcolor=black@0.5:boxborderw=5'
-                )
-            # 英文drawtext（中字号，中文上方，fontsize=36）
+                # 标题用居中位置（y=(h-text_h)/2），字幕用底部（y=h-200）
+                if idx == 0 and dur == 5000:
+                    y_pos = "(h-text_h)/2"  # 标题居中
+                    fontsize = "100"  # 标题更大
+                else:
+                    y_pos = "h-200"  # 字幕底部
+                    fontsize = "70"
+                label_cn = f'cn_{idx}'
+                filter_parts.append(f"drawtext=text={escaped_cn}:fontfile={font_path}:fontsize={fontsize}:fontcolor=white:x=(w-text_w)/2:y={y_pos}:box=1:boxcolor=black@0.7:boxborderw=5[{label_cn}]")
+                labels.append(label_cn)
+            # 英文drawtext（中字号，中文上方，fontsize=48）
             if text_en:
                 escaped_en = text_en.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
-                drawtext_filters.append(
-                    'drawtext=text=' + escaped_en + ':fontfile=' + font_path + ':fontsize=36:fontcolor=white@0.9:x=(w-text_w)/2:y=h-260:box=1:boxcolor=black@0.3:boxborderw=3'
-                )
-        filter_complex = ";".join(drawtext_filters)
+                label_en = f'en_{idx}'
+                filter_parts.append(f"drawtext=text={escaped_en}:fontfile={font_path}:fontsize=48:fontcolor=white@0.9:x=(w-text_w)/2:y=h-280:box=1:boxcolor=black@0.3:boxborderw=3[{label_en}]")
+                labels.append(label_en)
+        
+        # 用 [v] 作为输入，[vout] 作为输出，链式连接所有字幕
+        filter_chain = '[v]'
+        for label in labels:
+            filter_chain += f'[{label}]'
+        filter_chain += '[vout]'
+        
+        filter_complex = ";".join(filter_parts) + filter_chain
+        
         cmd = [
             "ffmpeg", "-y",
             "-i", str(temp_video),
-            "-vf", filter_complex,
+            "-filter_complex", filter_complex,
+            "-map", "[vout]",
             "-c:v", "mpeg4", "-q:v", "3",
             "-c:a", "copy",
             "-movflags", "+faststart",
