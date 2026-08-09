@@ -322,7 +322,7 @@ def generate_topic():
             log(f"未找到JSON，用默认选题: {result[:120]}")
     
     # 兜底：大暑节气选题（不是立秋！）
-    return {{
+    return {
         "title_cn": "大暑天湿气最重！这3件事千万别做，伤脾胃毁阳气",
         "title_en": "Great Heat: 3 Things That Damage Your Spleen and Yang",
         "description": "大暑节气祛湿养阳指南",
