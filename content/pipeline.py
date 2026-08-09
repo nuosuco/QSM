@@ -429,15 +429,15 @@ def generate_video_script(topic):
         except:
             log(f"脚本JSON解析失败")
     
-    # 默认脚本
+    # 默认脚本（中英双语）
     return {
         "scenes": [
-            {"scene": 1, "duration_sec": 25, "narration": f"你是不是经常觉得身体沉重、没精神？这可能不是累，是湿气在作怪。中医讲'湿气重，百病生'，尤其在换季的时候，湿气最容易入侵。", "visual": "展示湿气重的人日常状态"},
-            {"scene": 2, "duration_sec": 25, "narration": topic['key_points'][0] if len(topic['key_points']) > 0 else "湿气重的5个信号"},
-            {"scene": 3, "duration_sec": 25, "narration": topic['key_points'][1] if len(topic['key_points']) > 1 else "夏天最伤脾胃的3件事"},
-            {"scene": 4, "duration_sec": 25, "narration": topic['key_points'][2] if len(topic['key_points']) > 2 else "祛湿食疗方"},
-            {"scene": 5, "duration_sec": 25, "narration": f"推荐大家试试{topic['recommended_foods'][0] if len(topic['recommended_foods']) > 0 else '薏米'}，搭配{topic['recommended_foods'][1] if len(topic['recommended_foods']) > 1 else '赤小豆'}，祛湿效果特别好。", "visual": f"展示食材"},
-            {"scene": 6, "duration_sec": 25, "narration": "不确定自己什么体质？点链接让AI帮你看，3分钟出食疗方案。关注我，每天学点养生小常识。", "visual": "引导关注"},
+            {"scene": 1, "duration_sec": 25, "narration": f"你是不是经常觉得身体沉重、没精神？这可能不是累，是湿气在作怪。中医讲'湿气重，百病生'，尤其在换季的时候，湿气最容易入侵。", "narration_en": "Do you often feel heavy and tired? This might not be fatigue, but dampness. TCM says 'dampness causes a hundred diseases', especially during seasonal changes.", "visual": "展示湿气重的人日常状态"},
+            {"scene": 2, "duration_sec": 25, "narration": topic['key_points'][0] if len(topic['key_points']) > 0 else "湿气重的5个信号", "narration_en": "5 Signs of Dampness"},
+            {"scene": 3, "duration_sec": 25, "narration": topic['key_points'][1] if len(topic['key_points']) > 1 else "夏天最伤脾胃的3件事", "narration_en": "3 Things That Damage Spleen in Summer"},
+            {"scene": 4, "duration_sec": 25, "narration": topic['key_points'][2] if len(topic['key_points']) > 2 else "祛湿食疗方", "narration_en": "Dampness-Removing Food Therapy"},
+            {"scene": 5, "duration_sec": 25, "narration": f"推荐大家试试{topic['recommended_foods'][0] if len(topic['recommended_foods']) > 0 else '薏米'}，搭配{topic['recommended_foods'][1] if len(topic['recommended_foods']) > 1 else '赤小豆'}，祛湿效果特别好。", "narration_en": f"We recommend trying {topic['recommended_foods'][0] if len(topic['recommended_foods']) > 0 else 'Coix Seed'}, paired with {topic['recommended_foods'][1] if len(topic['recommended_foods']) > 1 else 'Red Bean'}, for excellent dampness-removing effects.", "visual": f"展示食材"},
+            {"scene": 6, "duration_sec": 25, "narration": "不确定自己什么体质？点链接让AI帮你看，3分钟出食疗方案。关注我，每天学点养生小常识。", "narration_en": "Not sure about your body type? Click the link for AI analysis, get personalized diet plan in 3 minutes. Follow us for daily wellness tips.", "visual": "引导关注"},
         ]
     }
 
@@ -529,7 +529,7 @@ def compose_video(scenes, topic, images_map, output_path):
     if not bg_imgs:
         bg_imgs = [str(today_img_dir / "cover.jpg")] if (today_img_dir / "cover.jpg").exists() else None
     
-    # 4. 生成字幕 SRT
+    # 4. 生成字幕 SRT（中英双语）
     srt_file = video_dir / "subtitles.srt"
     srt_lines = []
     cur = 0
@@ -537,10 +537,15 @@ def compose_video(scenes, topic, images_map, output_path):
         if i >= len(tts_files):
             break
         dur = scene.get("duration_sec", 15) * 1000
+        narration_cn = scene.get("narration", "")
+        narration_en = scene.get("narration_en", "")  # 英文翻译
+        
         srt_lines.append(str(i + 1))
         srt_lines.append(f"{cur//3600000:02d}:{(cur%3600000)//60000:02d}:{(cur%60000)//1000:02d},{cur%1000:03d} --> "
                         f"{(cur+dur)//3600000:02d}:{((cur+dur)%3600000)//60000:02d}:{((cur+dur)%60000)//1000:02d},{(cur+dur)%1000:03d}")
-        srt_lines.append(scene.get("narration", ""))
+        srt_lines.append(narration_cn)
+        if narration_en:
+            srt_lines.append(narration_en)
         srt_lines.append("")
         cur += dur
     srt_file.write_text("\n".join(srt_lines), encoding="utf-8")
@@ -549,12 +554,19 @@ def compose_video(scenes, topic, images_map, output_path):
     temp_video = video_dir / "temp.mp4"
     
     if bg_imgs and len(bg_imgs) > 0:
-        # 构建图片列表文件，实现多张图片轮换
+        # 构建图片列表文件，实现多张图片轮换（循环到音频时长）
         img_list_file = video_dir / "images.txt"
+        # 计算需要多少张图片才能填满音频时长
+        imgs_per_cycle = len(bg_imgs)
+        duration_per_img = 5  # 每张图5秒
+        total_img_duration = imgs_per_cycle * duration_per_img
+        # 需要循环几次
+        cycles_needed = max(1, int(audio_duration / total_img_duration) + 1)
         with open(img_list_file, "w") as f:
-            for img in bg_imgs:
-                f.write(f"file '{img}'\n")
-                f.write(f"duration 5\n")  # 每张图显示5秒
+            for cycle in range(cycles_needed):
+                for img in bg_imgs:
+                    f.write(f"file '{img}'\n")
+                    f.write(f"duration {duration_per_img}\n")
         
         cmd = [
             "ffmpeg", "-y",
@@ -612,31 +624,41 @@ def compose_video(scenes, topic, images_map, output_path):
         os.rename(str(temp_video), final_output)
         return final_output
     
-    # 逐段添加字幕（更可靠）
+    # 逐段添加字幕（中英双语）
     segments = []
     cur = 0
     for i, scene in enumerate(scenes):
         if i >= len(tts_files):
             break
         dur = scene.get("duration_sec", 15) * 1000
-        narration = scene.get("narration", "")
-        if narration.strip():
-            segments.append((cur, dur, narration))
+        narration_cn = scene.get("narration", "")
+        narration_en = scene.get("narration_en", "")
+        if narration_cn.strip():
+            segments.append((cur, dur, narration_cn, narration_en))
         cur += dur
     
     if segments:
-        # 构建drawtext滤镜链
+        # 构建drawtext滤镜链（中英双语）
         drawtext_filters = []
-        for idx, (start, dur, text) in enumerate(segments):
-            # 字幕居中，底部显示
-            y_offset = 60 + idx * 50  # 每段字幕不同位置
+        for idx, (start, dur, text_cn, text_en) in enumerate(segments):
+            # 中文字幕居中，底部显示
+            y_cn = 60 + idx * 40
+            # 英文字幕在中文下方
+            y_en = 100 + idx * 40
+            
             # 处理文本中的特殊字符
-            escaped_text = text.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39))
+            escaped_cn = text_cn.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39))
+            escaped_en = text_en.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39)) if text_en else ""
+            
+            # 中文drawtext
             drawtext_filters.append(
-                f"drawtext=text='{escaped_text}':"
-                f"fontfile={font_path}:fontsize=32:fontcolor=white:"
-                f"x=(w-text_w)/2:y=h-{y_offset}:box=1:boxcolor=black@0.5:boxborderw=5"
+                'drawtext=text=' + chr(39) + escaped_cn + chr(39) + ':fontfile=' + font_path + ':fontsize=32:fontcolor=white:x=(w-text_w)/2:y=' + str(y_cn) + ':box=1:boxcolor=black@0.5:boxborderw=5'
             )
+            # 英文drawtext
+            if text_en and escaped_en:
+                drawtext_filters.append(
+                    'drawtext=text=' + chr(39) + escaped_en + chr(39) + ':fontfile=' + font_path + ':fontsize=24:fontcolor=white@0.8:x=(w-text_w)/2:y=' + str(y_en) + ':box=1:boxcolor=black@0.3:boxborderw=3'
+                )
         filter_complex = ";".join(drawtext_filters)
         cmd = [
             "ffmpeg", "-y",
