@@ -458,3 +458,169 @@ end
 def qdfs_search_all(keyword, state_filter):
     return qdfs_ns_search_all(NS_SYSTEM, keyword)
 end
+
+# ---- 动态合并/分离（QDFS叫"动态"文件系统的核心能力）----
+
+# 合并两个命名空间: ns_b 的所有文件和目录合并到 ns_a
+# 合并后 ns_b 消失，其文件全部归入 ns_a
+# 这是 "及时瞬时瞬间移动、传送数据" 的体现
+def qdfs_ns_merge(ns_a, ns_b):
+    var out = ""
+    var s = g_meta
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        var rest = ""
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            rest = str_substring(s, j + 1, str_len(s) - j - 1)
+        end
+        if (str_len(line) > 0):
+            var fname = meta_field(line, 0)
+            if (str_eq(ns_of(fname), ns_b)):
+                var nm = ns_name(fname)
+                var new_key = ns_key(ns_a, nm)
+                var old_path = ns_path(fname)
+                # 移动文件数据
+                var content = file_read(old_path)
+                if (str_len(content) > 0):
+                    var new_path = ns_path(new_key)
+                    ns_ensure_dir(ns_a, nm)
+                    file_write_bytes(new_path, content)
+                    file_delete(old_path)
+                end
+                # 移动分支数据
+                var old_bd = ns_branch_dir(fname)
+                var b0 = file_read(str_concat(old_bd, "/b0"))
+                var b1 = file_read(str_concat(old_bd, "/b1"))
+                if (str_len(b0) > 0 or str_len(b1) > 0):
+                    var new_bd = ns_branch_dir(new_key)
+                    ns_ensure_dir(ns_a, nm)
+                    mkdir(new_bd)
+                    file_write_bytes(str_concat(new_bd, "/b0"), b0)
+                    file_write_bytes(str_concat(new_bd, "/b1"), b1)
+                end
+                # 更新元数据: ns_b:name → ns_a:name
+                var state = meta_field(line, 1)
+                var partner = meta_field(line, 2)
+                if (str_len(partner) > 0):
+                    # 更新纠缠伙伴的引用
+                    var p_line = meta_find(partner)
+                    if (str_len(p_line) > 0):
+                        var p_state = meta_field(p_line, 1)
+                        var p_partner = meta_field(p_line, 2)
+                        var p_collapsed = meta_field(p_line, 3)
+                        var p_owner = meta_field(p_line, 4)
+                        meta_set(partner, p_state, new_key, p_collapsed, p_owner)
+                    end
+                end
+                var collapsed = meta_field(line, 3)
+                meta_remove(fname)
+                meta_set(new_key, state, partner, collapsed, ns_a)
+                out = str_concat(out, str_concat(fname, " -> "), str_concat(new_key, "\n"))
+            end
+        end
+        s = rest
+    end
+    # 删除源命名空间目录
+    var ns_b_dir = str_concat(str_concat(g_root, "/ns/"), ns_b)
+    file_delete(str_concat(ns_b_dir, "/meta"))
+    var delout = str_concat("合并完成: ", str_concat(ns_b, " -> "), ns_a)
+    if (str_len(out) == 0):
+        return str_concat(delout, " (无文件)")
+    end
+    return str_concat(delout, "\n", out)
+end
+
+# 分离一个命名空间为两个: 按文件名前缀分离
+# ns_a 中文件名以 prefix 开头的文件移动到新的 ns_b
+def qdfs_ns_split(ns_a, ns_b, prefix):
+    var out = ""
+    var s = g_meta
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        var rest = ""
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            rest = str_substring(s, j + 1, str_len(s) - j - 1)
+        end
+        if (str_len(line) > 0):
+            var fname = meta_field(line, 0)
+            if (str_eq(ns_of(fname), ns_a)):
+                var nm = ns_name(fname)
+                # 检查前缀匹配
+                var pfx = str_index_of(nm, prefix)
+                if (pfx == 0):
+                    var new_key = ns_key(ns_b, nm)
+                    # 移动文件数据
+                    var old_path = ns_path(fname)
+                    var content = file_read(old_path)
+                    if (str_len(content) > 0):
+                        var new_path = ns_path(new_key)
+                        ns_ensure_dir(ns_b, nm)
+                        file_write_bytes(new_path, content)
+                        file_delete(old_path)
+                    end
+                    # 移动分支
+                    var old_bd = ns_branch_dir(fname)
+                    var b0 = file_read(str_concat(old_bd, "/b0"))
+                    var b1 = file_read(str_concat(old_bd, "/b1"))
+                    if (str_len(b0) > 0 or str_len(b1) > 0):
+                        var new_bd = ns_branch_dir(new_key)
+                        ns_ensure_dir(ns_b, nm)
+                        mkdir(new_bd)
+                        file_write_bytes(str_concat(new_bd, "/b0"), b0)
+                        file_write_bytes(str_concat(new_bd, "/b1"), b1)
+                    end
+                    var state = meta_field(line, 1)
+                    var partner = meta_field(line, 2)
+                    var collapsed = meta_field(line, 3)
+                    meta_remove(fname)
+                    meta_set(new_key, state, partner, collapsed, ns_b)
+                    out = str_concat(out, str_concat(fname, " -> "), str_concat(new_key, "\n"))
+                end
+            end
+        end
+        s = rest
+    end
+    if (str_len(out) == 0):
+        return str_concat("分离: ", str_concat(ns_a, " 中无匹配 '"), str_concat(prefix, "' 的文件"))
+    end
+    return str_concat(str_concat("分离完成: ", ns_a), " -> ", str_concat(ns_b, "\n"), out)
+end
+
+# ---- 每个应用独立拥有QDFS实例 ----
+
+# 创建新的QDFS实例（每个应用独立拥有自己的QDFS）
+# 返回应用实例的根路径
+def qdfs_instance_create(root_base, app_name):
+    mkdir(root_base)
+    var app_root = str_concat(str_concat(root_base, "/"), app_name)
+    qdfs_init(app_root)
+    return app_root
+end
+
+# 获取当前QDFS状态的快照
+def qdfs_status():
+    var out = str_concat("QDFS根目录: ", g_root)
+    out = str_concat(out, "\n")
+    var s = g_meta
+    var total = 0
+    var ns_map = ""
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        var rest = ""
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            rest = str_substring(s, j + 1, str_len(s) - j - 1)
+        end
+        if (str_len(line) > 0):
+            total = total + 1
+        end
+        s = rest
+    end
+    out = str_concat(out, str_concat("总文件数: ", int_to_str(total)))
+    return out
+end

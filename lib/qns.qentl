@@ -1,73 +1,40 @@
 # ================================================================
-# lib/qns.qentl — 量子神经网络训练框架
-# 基于QDFS叠加态并行，实现量子权重更新
+# lib/qns.qentl — 量子神经叠加态 (Quantum Neural Superposition)
+# 每个量子应用独立拥有QNS+QDFS两个基础
+# QNS基于QDFS实现自动合并/分离
 # ================================================================
 
-# 量子权重向量（使用量子叠加态表示）
-def qweight_create(n):
-    var qreg = qreg_create(n)
-    # 初始化叠加态
-    var i = 0
-    while (i < n):
-        h(qreg, i)
-        i = i + 1
-    end
-    return qreg
+# ---- QNS实例创建 ----
+# 每个应用有自己的QNS，数据存在自己的QDFS实例里
+def qns_instance_create(qdfs_base, app_name):
+    var root = qdfs_instance_create(qdfs_base, app_name)
+    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪")
+    qdfs_ns_write(NS_MODELS, "qns_weights", "权重: 初始态")
+    printf(" QNS实例创建: %s\n", root)
+    return root
 end
 
-# 量子权重测量
-def qweight_measure(qreg):
-    var n = qreg
-    var values = []
-    var i = 0
-    while (i < n):
-        var bit = measure(qreg, i)
-        values[i] = bit
-        i = i + 1
-    end
-    return values
+# ---- QNS算力合并 ----
+# 将两个QNS实例的数据合并为一个
+# 基于QDFS的文件夹合并，权重/训练数据随之合并
+def qns_merge(ns_a, ns_b):
+    var out = qdfs_ns_merge(ns_a, ns_b)
+    printf(" QNS合并: %s\n", out)
+    return out
 end
 
-# 梯度下降更新（经典模拟）
-def qgd_update(weights, gradients, learning_rate):
-    var new_weights = weights
-    var i = 0
-    while (i < len(weights)):
-        new_weights[i] = weights[i] - learning_rate * gradients[i]
-        i = i + 1
-    end
-    return new_weights
+# ---- QNS算力分离 ----
+# 将一个QNS实例的数据分离为两个独立实例
+def qns_split(ns_a, ns_b, prefix):
+    var out = qdfs_ns_split(ns_a, ns_b, prefix)
+    printf(" QNS分离: %s\n", out)
+    return out
 end
 
-# 量子损失函数
-def qloss(predicted, target):
-    var loss = 0
-    var i = 0
-    while (i < len(predicted)):
-        var diff = predicted[i] - target[i]
-        loss = loss + diff * diff
-        i = i + 1
-    end
-    return loss / len(predicted)
-end
-
-# 量子反向传播
-def qbackprop(weights, gradients):
-    return qgd_update(weights, gradients, 0.01)
-end
-
-# 训练循环
-def qtrain(model, data, epochs):
-    var loss = 999
-    var epoch = 0
-    while (epoch < epochs):
-        var predictions = qforward(model, data)
-        var new_loss = qloss(predictions, data.targets)
-        if (new_loss < loss):
-            loss = new_loss
-            printf("Epoch %d: loss=%.4f\n", epoch, loss)
-        end
-        epoch = epoch + 1
-    end
-    return loss
+# ---- QNS状态报告 ----
+def qns_status():
+    printf(" QNS状态: %s\n", qdfs_ns_read(NS_SYSTEM, "qns_meta"))
+    printf(" QNS权重: %s\n", qdfs_ns_read(NS_MODELS, "qns_weights"))
+    printf(" QNS文件: %s\n", qdfs_ns_ls(NS_MODELS))
+    return 1
 end
