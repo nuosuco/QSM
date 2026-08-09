@@ -346,6 +346,13 @@ def route(path, req):
         var out38 = exec("cd /root/QSM && timeout 10 bin/qcl_bootstrap run build/yi_demo.qbc 2>&1")
         return http_response("200 OK", "text/plain; charset=utf-8", out38)
     end
+    if (str_eq(path, "/qdesktop")):
+        var html = file_read("/root/QSM/web/qdesktop.html")
+        if (str_len(html) == 0):
+            html = "<html><body><h1>QDesktops未找到</h1></body></html>"
+        end
+        return http_response("200 OK", "text/html; charset=utf-8", html)
+    end
     if (str_eq(path, "/api/status")):
         var body = "{\"server\":\"QEntL/1.0\",\"vm\":\"QVM\",\"compiler\":\"QCL\",\"bootstrap\":\"self-hosted\",\"ide\":\"online\",\"status\":\"running\",\"models\":[\"QSM\",\"SOM\",\"WeQ\",\"Ref\"],\"qns\":\"ready\",\"yi_data\":\"ready\"}"
         return http_response("200 OK", "application/json", body)
@@ -353,6 +360,20 @@ def route(path, req):
     if (str_eq(path, "/api/stack")):
         var body = "{\"layers\":[\"C种子(量子编译+系统接口)\",\"QCL编译器(QEntL)\",\"QVM虚拟机(QEntL)\",\"标准库lib/*.qentl\",\"HTTP服务器(纯QEntL)\"],\"third_party\":\"zero\",\"quantum_gates\":15,\"algorithms\":64,\"api_endpoints\":40,\"models\":[\"QSM\",\"SOM\",\"WeQ\",\"Ref\"],\"qns\":true,\"yi_data\":true}"
         return http_response("200 OK", "application/json", body)
+    end
+    if (str_eq(path, "/api/qdesktop")):
+        var html = file_read("/root/QSM/web/qdesktop.html")
+        if (str_len(html) == 0):
+            html = "<html><body><h1>QDesktops未找到</h1></body></html>"
+        end
+        return http_response("200 OK", "text/html; charset=utf-8", html)
+    end
+    if (str_eq(path, "/q3d")):
+        var html = file_read("/root/QSM/web/q3d_scene.html")
+        if (str_len(html) == 0):
+            html = "<html><body><h1>Q3D未找到</h1></body></html>"
+        end
+        return http_response("200 OK", "text/html; charset=utf-8", html)
     end
     return http_response("404 Not Found", "text/plain", "404 - QEntL Server")
 end

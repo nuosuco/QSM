@@ -1,0 +1,8 @@
+printf("简单测试程序\n")
+var q = qreg_create(2)
+apply_h(q, 0)
+apply_cx(q, 0, 1)
+var m0 = measure(q, 0)
+var m1 = measure(q, 1)
+printf("Bell态: %d%d\n", m0, m1)
+qreg_free(q)
