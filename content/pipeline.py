@@ -273,7 +273,7 @@ def generate_topic():
   "key_points": ["知识点1", "知识点2", "知识点3"],
   "target_condition": "针对的病痛/症状",
   "recommended_foods": ["食材1", "食材2", "食材3"]
-}}"""
+}}}"""
     
     trends_text = "\n".join(trends[:40]) if trends else "（热点获取失败，请基于节气+当季高发病选题）"
     
@@ -350,7 +350,7 @@ def generate_article(topic):
     user_prompt = f"""标题：{topic['title_cn']}
 针对问题：{topic['target_condition']}
 核心知识点：{'、'.join(topic['key_points'])}
-推荐食材：{'、'.join(topic['recommended_foods'])}}"""
+推荐食材：{'、'.join(topic['recommended_foods'])}}}"""
     
     article = call_llm("chat", sys_prompt, user_prompt, temperature=0.7, max_tokens=3000, timeout=120)
     article = article or f"# {topic['title_cn']}\n\n内容生成中..."
@@ -358,7 +358,7 @@ def generate_article(topic):
     # 小红书
     xhs_prompt = f"""写一篇小红书种草文案（300字以内），口语化，加emoji，结尾加标签。
 标题：{topic['title_cn']}
-推荐食材：{'、'.join(topic['recommended_foods'])}}"""
+推荐食材：{'、'.join(topic['recommended_foods'])}}}"""
     
     xhs = call_llm("chat", sys_prompt, xhs_prompt, temperature=0.8, max_tokens=1000, timeout=60)
     xhs = xhs or f"今天来聊聊{topic['title_cn']}...#养生 #中医食疗"
@@ -413,7 +413,7 @@ def generate_video_script(topic):
     user_prompt = f"""标题：{topic['title_cn']}
 针对：{topic['target_condition']}
 知识点：{'、'.join(topic['key_points'])}
-推荐食材：{'、'.join(topic['recommended_foods'])}}"""
+推荐食材：{'、'.join(topic['recommended_foods'])}}}"""
     
     result = call_llm("chat", system_prompt, user_prompt, temperature=0.7, max_tokens=2000, timeout=60)
     
