@@ -358,21 +358,21 @@ def generate_images(topic):
     today_dir.mkdir(parents=True, exist_ok=True)
     images = {}
     
-    # 封面图
-    url = call_image_gen(f"传统中医养生风格，{topic['title_cn']}，自然食材，高清摄影，温暖色调", "1792x1024")
+    # 封面图 — 4K高清
+    url = call_image_gen(f"传统中医养生风格，{topic['title_cn']}，自然食材，高清摄影，温暖色调", "3840x2160")
     if url:
         path = download_image(url, today_dir / "cover.jpg")
         if path: images["cover"] = path
     
-    # 小红书配图（3张）— 强制16:9横屏
+    # 小红书配图（3张）— 4K高清
     for i, food in enumerate(topic.get("recommended_foods", [])[:3]):
-        url = call_image_gen(f"高品质有机{food}摄影，自然光，木桌背景，极简，细节清晰", "1920x1080")
+        url = call_image_gen(f"高品质有机{food}摄影，自然光，木桌背景，极简，细节清晰", "3840x2160")
         if url:
             path = download_image(url, today_dir / f"xhs_{i}.jpg")
             if path: images[f"xhs_{i}"] = path
     
-    # 视频封面
-    url = call_image_gen(f"养生食疗视频封面，{topic['title_cn']}，温暖色调，文字留白，高清", "1792x1024")
+    # 视频封面 — 4K高清
+    url = call_image_gen(f"养生食疗视频封面，{topic['title_cn']}，温暖色调，文字留白，高清", "3840x2160")
     if url:
         path = download_image(url, today_dir / "video_cover.jpg")
         if path: images["video_cover"] = path
