@@ -273,7 +273,7 @@ def generate_topic():
   "key_points": ["知识点1", "知识点2", "知识点3"],
   "target_condition": "针对的病痛/症状",
   "recommended_foods": ["食材1", "食材2", "食材3"]
-}}"""
+}"""
     
     trends_text = "\n".join(trends[:40]) if trends else "（热点获取失败，请基于节气+当季高发病选题）"
     
