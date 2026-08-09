@@ -683,6 +683,39 @@ def compose_video(scenes, topic, images_map, output_path):
 # ============================================================
 # 7. 保存文章
 # ============================================================
+
+# ============================================================
+# 6. 上传YouTube
+# ============================================================
+def upload_to_youtube(video_path, topic):
+    """上传视频到YouTube"""
+    try:
+        from services.youtube_service import upload_video
+        
+        title = topic['title_cn']
+        description = topic.get('description', '')
+        keywords = topic.get('recommended_foods', []) + ['养生', '中医', '节气']
+        
+        log(f"上传YouTube: {title}")
+        result = upload_video(
+            video_path=video_path,
+            title=title,
+            description=description,
+            keywords=keywords,
+            privacy_status='public'
+        )
+        
+        if result.get('success'):
+            log(f"✅ YouTube上传成功: {result.get('video_url')}")
+            return result
+        else:
+            log(f"❌ YouTube上传失败: {result.get('error')}")
+            return None
+    except Exception as e:
+        log(f"❌ YouTube上传异常: {e}")
+        return None
+
+
 def save_article(topic, article_data, images):
     today_dir = ARTICLES / TODAY
     today_dir.mkdir(parents=True, exist_ok=True)
@@ -748,7 +781,13 @@ def main():
     
     video_path = compose_video(scenes, topic, images, str(VIDEOS / TODAY / "final.mp4"))
     
-    # 6. 输出摘要
+    # 6. 上传YouTube
+    if video_path:
+        youtube_result = upload_to_youtube(video_path, topic)
+    else:
+        youtube_result = None
+    
+    # 7. 输出摘要
     log("\n" + "=" * 50)
     log("📋 今日产出摘要")
     log("=" * 50)
@@ -771,7 +810,7 @@ def main():
         "video": video_path,
         "images": list(images.keys()),
         "status": "generated",
-        "published": {"wechat": False, "youtube": False},
+        "published": {"wechat": False, "youtube": youtube_result is not None},
     }
     (LOGS / f"{TODAY}_publish.json").write_text(json.dumps(publish_log, ensure_ascii=False, indent=2), encoding="utf-8")
     
