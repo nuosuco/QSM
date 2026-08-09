@@ -229,7 +229,7 @@ def generate_topic():
     
     注意：
     - 节气信息由系统精确提供，LLM 不可用自己的知识覆盖
-    - 今天是2026年8月1日，实际节气是大暑（立秋是8月7日才开始）
+    - 今天是{DATE_CN}（立秋是8月7日才开始）
     - 如果热点无法结合养生，才用节气+当季高发病兜底
     """
     solar_term = get_current_solar_term()
@@ -237,13 +237,13 @@ def generate_topic():
     
     # 构建精确的节气信息块（放在最前面，LLM 必须遵守）
     jieqi_block = f"""【当前节气信息 - 精确数据，LLM必须遵守，不可用自身知识覆盖】
-- 今天日期：{DATE_CN}（2026年8月1日）
+- 今天日期：{DATE_CN}
 - 当前节气：{solar_term['name']}（{solar_term['season']}季）
 - 节气描述：{solar_term['desc']}
 - 养生方向：{solar_term['yangsheng']}
 - 当季食材：{'、'.join(solar_term['foods'])}
 - 下一个节气：{solar_term['next_name']}（{solar_term['next_month']}月{solar_term['next_day']}日开始）
-⚠️ 注意：8月1日~8月6日仍然是{solar_term['name']}，不是{solar_term['next_name']}！
+⚠️ 注意：请根据实际日期判断当前节气，不是{solar_term['next_name']}！
 ⚠️ 不要因为8月就到了就写"立秋"相关内容！"""
     
     system_prompt = f"""你是松麦养生的内容策划专家，擅长蹭热点做养生科普。
