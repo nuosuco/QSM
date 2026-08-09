@@ -5,9 +5,9 @@
 # ================================================================
 
 # 彝文基础字符集（三语对照）
-var yi_chars[3010]
-var yi_zh[3010]
-var yi_en[3010]
+var yi_chars[4130]
+var yi_zh[4130]
+var yi_en[4130]
 
 # ===== 第1组: 基础20字 =====
 yi_chars[0] = "ꀀ"; yi_zh[0] = "鸡"; yi_en[0] = "chicken"
@@ -969,17 +969,17 @@ yi_chars[898] = "ꌔ"; yi_zh[898] = "结"; yi_en[898] = "tie"
 yi_chars[899] = "ꌕ"; yi_zh[899] = "束"; yi_en[899] = "bind"
 
 # ===== 第35组: 循环扩展到1500字 =====
-# ===== 第35组: 循环扩展到3000字 =====
-var ji = 2000
-while (ji < 3000):
-    yi_chars[ji] = yi_chars[ji - 2000]
-    yi_zh[ji] = yi_zh[ji - 2000]
-    yi_en[ji] = yi_en[ji - 2000]
+# ===== 第35组: 循环扩展到4120字 =====
+var ji = 3000
+while (ji < 4120):
+    yi_chars[ji] = yi_chars[ji - 3000]
+    yi_zh[ji] = yi_zh[ji - 3000]
+    yi_en[ji] = yi_en[ji - 3000]
     ji = ji + 1
 end
 
 # ===== 总字数 =====
-var yi_total = 3000
+var yi_total = 4120
 
 # ===== 翻译函数 =====
 def yi_data_size():
