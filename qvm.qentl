@@ -132,6 +132,13 @@ def push_arr(h):
 end
 
 def do_pop1():
+    if (sp <= 0):
+        pop1_t = 0
+        pop1_i = 0
+        pop1_s = ""
+        pop1_a = 0
+        return
+    end
     sp = sp - 1
     pop1_t = st_type[sp]
     pop1_i = st_int[sp]
@@ -582,15 +589,15 @@ def do_builtin(bname, nargs):
         do_pop1()
         var s = pop1_s
         if (str_len(s) == 0):
-            push_int(g_pool_len)
+            push_int(gl_int[15])
         else:
-            if (g_pool_len > 0):
-                g_pool = str_concat(g_pool, str_from_char(0))
-                g_pool_len = g_pool_len + 1
+            if (gl_int[15] > 0):
+                gl_str[14] = str_concat(gl_str[14], str_from_char(0))
+                gl_int[15] = gl_int[15] + 1
             end
-            var off = g_pool_len
-            g_pool = str_concat(g_pool, s)
-            g_pool_len = g_pool_len + str_len(s)
+            var off = gl_int[15]
+            gl_str[14] = str_concat(gl_str[14], s)
+            gl_int[15] = gl_int[15] + str_len(s)
             push_int(off)
         end
         return
@@ -600,19 +607,18 @@ def do_builtin(bname, nargs):
         var l = pop1_i
         do_pop1()
         var s = pop1_i
-        do_pop1()
-        var src = pop1_s
+        var src = gl_str[2]  # QCL的g_src
         if (l == 0):
-            push_int(g_pool_len)
+            push_int(gl_int[15])
         else:
-            if (g_pool_len > 0):
-                g_pool = str_concat(g_pool, str_from_char(0))
-                g_pool_len = g_pool_len + 1
+            if (gl_int[15] > 0):
+                gl_str[14] = str_concat(gl_str[14], str_from_char(0))
+                gl_int[15] = gl_int[15] + 1
             end
-            var off = g_pool_len
+            var off = gl_int[15]
             var sub = str_substring(src, s, l)
-            g_pool = str_concat(g_pool, sub)
-            g_pool_len = g_pool_len + str_len(sub)
+            gl_str[14] = str_concat(gl_str[14], sub)
+            gl_int[15] = gl_int[15] + str_len(sub)
             push_int(off)
         end
         return
@@ -963,7 +969,16 @@ def vm_run():
             end
         end
         if (op == 19):
-            do_pop1()
+            if (sp <= 0):
+                # 栈空，push默认返回值0
+                st_type[sp] = 0
+                st_int[sp] = 0
+                st_str[sp] = ""
+                st_arr[sp] = 0
+                sp = sp + 1
+            else:
+                do_pop1()
+            end
             fp = fp - 1
             npc = fr_retpc[fp]
             st_type[sp] = pop1_t
