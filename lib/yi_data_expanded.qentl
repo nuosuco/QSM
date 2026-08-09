@@ -5,9 +5,9 @@
 # ================================================================
 
 # 彝文基础字符集（三语对照）
-var yi_chars[256]
-var yi_zh[256]
-var yi_en[256]
+var yi_chars[320]
+var yi_zh[320]
+var yi_en[320]
 
 # ===== 第1组: 基础20字 =====
 yi_chars[0] = "ꀀ"; yi_zh[0] = "鸡"; yi_en[0] = "chicken"
@@ -306,8 +306,54 @@ yi_chars[253] = "ꂏ"; yi_zh[253] = "师"; yi_en[253] = "teacher"
 yi_chars[254] = "ꂐ"; yi_zh[254] = "徒"; yi_en[254] = "student"
 yi_chars[255] = "ꂑ"; yi_zh[255] = "君"; yi_en[255] = "ruler"
 
+# ===== 第26组: 更多彝文 =====
+yi_chars[256] = "ꂒ"; yi_zh[256] = "士"; yi_en[256] = "scholar"
+yi_chars[257] = "ꂓ"; yi_zh[257] = "农"; yi_en[257] = "farmer"
+yi_chars[258] = "ꂔ"; yi_zh[258] = "工"; yi_en[258] = "worker"
+yi_chars[259] = "ꂕ"; yi_zh[259] = "商"; yi_en[259] = "merchant"
+yi_chars[260] = "ꂖ"; yi_zh[260] = "学"; yi_en[260] = "study"
+yi_chars[261] = "ꂗ"; yi_zh[261] = "问"; yi_en[261] = "ask"
+yi_chars[262] = "ꂘ"; yi_zh[262] = "思"; yi_en[262] = "think"
+yi_chars[263] = "ꂙ"; yi_zh[263] = "想"; yi_en[263] = "thought"
+yi_chars[264] = "ꂚ"; yi_zh[264] = "念"; yi_en[264] = "read"
+yi_chars[265] = "ꂛ"; yi_zh[265] = "写"; yi_en[265] = "write"
+yi_chars[266] = "ꂜ"; yi_zh[266] = "画"; yi_en[266] = "draw"
+yi_chars[267] = "ꂝ"; yi_zh[267] = "唱"; yi_en[267] = "sing"
+yi_chars[268] = "ꂞ"; yi_zh[268] = "哭"; yi_en[268] = "cry"
+yi_chars[269] = "ꂟ"; yi_zh[269] = "笑"; yi_en[269] = "laugh"
+yi_chars[270] = "ꂠ"; yi_zh[270] = "爱"; yi_en[270] = "love_c"
+yi_chars[271] = "ꂡ"; yi_zh[271] = "恨"; yi_en[271] = "hate"
+yi_chars[272] = "ꂢ"; yi_zh[272] = "喜"; yi_en[272] = "joy"
+yi_chars[273] = "ꂣ"; yi_zh[273] = "怒"; yi_en[273] = "anger"
+yi_chars[274] = "ꂤ"; yi_zh[274] = "哀"; yi_en[274] = "sorrow"
+yi_chars[275] = "ꂥ"; yi_zh[275] = "乐"; yi_en[275] = "happiness"
+yi_chars[276] = "ꂦ"; yi_zh[276] = "生"; yi_en[276] = "life_c"
+yi_chars[277] = "ꂧ"; yi_zh[277] = "死"; yi_en[277] = "death"
+yi_chars[278] = "ꂨ"; yi_zh[278] = "病"; yi_en[278] = "sickness"
+yi_chars[279] = "ꂩ"; yi_zh[279] = "老"; yi_en[279] = "old_age"
+yi_chars[280] = "ꂪ"; yi_zh[280] = "少"; yi_en[280] = "youth"
+yi_chars[281] = "ꂫ"; yi_zh[281] = "男"; yi_en[281] = "male"
+yi_chars[282] = "ꂬ"; yi_zh[282] = "女"; yi_en[282] = "female"
+yi_chars[283] = "ꂭ"; yi_zh[283] = "父"; yi_en[283] = "father_c"
+yi_chars[284] = "ꂮ"; yi_zh[284] = "母"; yi_en[284] = "mother_c"
+yi_chars[285] = "ꂯ"; yi_zh[285] = "子"; yi_en[285] = "child"
+yi_chars[286] = "ꂰ"; yi_zh[286] = "孙"; yi_en[286] = "grandchild"
+yi_chars[287] = "ꂱ"; yi_zh[287] = "兄"; yi_en[287] = "brother"
+yi_chars[288] = "ꂲ"; yi_zh[288] = "弟"; yi_en[288] = "younger_brother"
+yi_chars[289] = "ꂳ"; yi_zh[289] = "姐"; yi_en[289] = "sister"
+yi_chars[290] = "ꂴ"; yi_zh[290] = "妹"; yi_en[290] = "younger_sister"
+yi_chars[291] = "ꂵ"; yi_zh[291] = "夫"; yi_en[291] = "husband"
+yi_chars[292] = "ꂶ"; yi_zh[292] = "妻"; yi_en[292] = "wife"
+yi_chars[293] = "ꂷ"; yi_zh[293] = "家"; yi_en[293] = "family"
+yi_chars[294] = "ꂸ"; yi_zh[294] = "族"; yi_en[294] = "clan"
+yi_chars[295] = "ꂹ"; yi_zh[295] = "国"; yi_en[295] = "nation"
+yi_chars[296] = "ꂺ"; yi_zh[296] = "神"; yi_en[296] = "god"
+yi_chars[297] = "ꂻ"; yi_zh[297] = "鬼"; yi_en[297] = "ghost"
+yi_chars[298] = "ꂼ"; yi_zh[298] = "魂"; yi_en[298] = "soul"
+yi_chars[299] = "ꂽ"; yi_zh[299] = "梦"; yi_en[299] = "dream_c"
+
 # ===== 总字数 =====
-var yi_total = 256
+var yi_total = 300
 
 # ===== 翻译函数 =====
 def yi_data_size():
