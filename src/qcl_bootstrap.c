@@ -1200,12 +1200,15 @@ vm_done:
  * QEntL 最小编译器（够编译 qcl.qentl）
  * ================================================================ */
 enum {
-    TK_EOF = 0, TK_IDENT, TK_NUMBER, TK_STRING,
-    TK_DEF, TK_VAR, TK_IF, TK_ELSE, TK_WHILE, TK_RETURN, TK_END,
-    TK_AND, TK_OR, TK_BREAK, TK_QREG,
-    TK_PLUS, TK_MINUS, TK_MUL, TK_DIV, TK_MOD,
-    TK_EQ, TK_NEQ, TK_LT, TK_GT, TK_LE, TK_GE, TK_NOT, TK_ASSIGN,
-    TK_LPAREN, TK_RPAREN, TK_LBRACKET, TK_RBRACKET, TK_COLON, TK_COMMA
+    TK_IDENT = 1, TK_NUMBER = 2, TK_STRING = 3,
+    TK_DEF = 4, TK_VAR = 5, TK_IF = 6, TK_ELSE = 7, TK_WHILE = 8, TK_RETURN = 9, TK_END = 10,
+    TK_LAND = 11, TK_LOR = 12,
+    TK_PLUS = 13, TK_MINUS = 14, TK_MUL = 15, TK_DIV = 16, TK_MOD = 17,
+    TK_EQ = 18, TK_NEQ = 19, TK_LT = 20, TK_GT = 21, TK_LE = 22, TK_GE = 23,
+    TK_NOT = 24, TK_ASSIGN = 25,
+    TK_LPAREN = 26, TK_RPAREN = 27,
+    TK_LBRACKET = 28, TK_RBRACKET = 29, TK_COLON = 30, TK_COMMA = 31,
+    TK_EOF = 32, TK_BREAK = 33, TK_QREG = 34
 };
 
 typedef struct { int type; long start; long len; } Tok;
@@ -1307,6 +1310,7 @@ static void lex_run(Comp *c) {
     while (pos < n) {
         char ch = c->src[pos];
         if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') { pos++; continue; }
+        if (ch > 127) { pos++; continue; }  /* 跳过UTF-8多字节字符 */
         if (ch == '#') { while (pos < n && c->src[pos] != '\n') pos++; continue; }
         if (ch == '"') {
             long s = pos; pos++;
@@ -1342,8 +1346,8 @@ static void lex_run(Comp *c) {
             else if (kw_match(w, L, "while")) t = TK_WHILE;
             else if (kw_match(w, L, "return")) t = TK_RETURN;
             else if (kw_match(w, L, "end")) t = TK_END;
-            else if (kw_match(w, L, "and")) t = TK_AND;
-            else if (kw_match(w, L, "or")) t = TK_OR;
+            else if (kw_match(w, L, "and")) t = TK_LAND;
+            else if (kw_match(w, L, "or")) t = TK_LOR;
             else if (kw_match(w, L, "break")) t = TK_BREAK;
             else if (kw_match(w, L, "qreg")) t = TK_QREG;
             add_tok(c, t, s, L);
@@ -1358,9 +1362,9 @@ static void lex_run(Comp *c) {
         if (ch == '<') { add_tok(c, TK_LT, pos, 1); pos++; continue; }
         if (ch == '>' && pos + 1 < n && c->src[pos + 1] == '=') { add_tok(c, TK_GE, pos, 2); pos += 2; continue; }
         if (ch == '>') { add_tok(c, TK_GT, pos, 1); pos++; continue; }
-        if (ch == '&' && pos + 1 < n && c->src[pos + 1] == '&') { add_tok(c, TK_AND, pos, 2); pos += 2; continue; }
+        if (ch == '&' && pos + 1 < n && c->src[pos + 1] == '&') { add_tok(c, TK_LAND, pos, 2); pos += 2; continue; }
         if (ch == '&') { pos++; continue; }
-        if (ch == '|' && pos + 1 < n && c->src[pos + 1] == '|') { add_tok(c, TK_OR, pos, 2); pos += 2; continue; }
+        if (ch == '|' && pos + 1 < n && c->src[pos + 1] == '|') { add_tok(c, TK_LOR, pos, 2); pos += 2; continue; }
         if (ch == '|') { pos++; continue; }
         if (ch == '+') { add_tok(c, TK_PLUS, pos, 1); pos++; continue; }
         if (ch == '-') { add_tok(c, TK_MINUS, pos, 1); pos++; continue; }
@@ -1616,11 +1620,11 @@ static void parse_eq_expr(Comp *c) {
 }
 static void parse_and_expr(Comp *c) {
     parse_eq_expr(c);
-    while (cur(c) == TK_AND) { advance(c); parse_eq_expr(c); emit_b(c, 0x1C); }
+    while (cur(c) == TK_LAND) { advance(c); parse_eq_expr(c); emit_b(c, 0x1C); }
 }
 static void parse_or_expr(Comp *c) {
     parse_and_expr(c);
-    while (cur(c) == TK_OR) { advance(c); parse_and_expr(c); emit_b(c, 0x1D); }
+    while (cur(c) == TK_LOR) { advance(c); parse_and_expr(c); emit_b(c, 0x1D); }
 }
 static void parse_expr(Comp *c) { parse_or_expr(c); }
 

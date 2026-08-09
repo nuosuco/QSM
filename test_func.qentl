@@ -1,0 +1,8 @@
+# QVM test with functions
+def add(a, b):
+    var result = a + b
+    return result
+end
+
+var x = add(3, 4)
+printf("add result: %d\n", x)
