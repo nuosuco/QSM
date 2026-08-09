@@ -380,9 +380,9 @@ def generate_images(topic):
         path = download_image(url, today_dir / "cover.jpg")
         if path: images["cover"] = path
     
-    # 小红书配图（3张）
+    # 小红书配图（3张）— 强制16:9横屏
     for i, food in enumerate(topic.get("recommended_foods", [])[:3]):
-        url = call_image_gen(f"高品质有机{food}摄影，自然光，木桌背景，极简，细节清晰", "1024x1024")
+        url = call_image_gen(f"高品质有机{food}摄影，自然光，木桌背景，极简，细节清晰", "1920x1080")
         if url:
             path = download_image(url, today_dir / f"xhs_{i}.jpg")
             if path: images[f"xhs_{i}"] = path
@@ -641,23 +641,15 @@ def compose_video(scenes, topic, images_map, output_path):
         # 构建drawtext滤镜链（中英双语）
         drawtext_filters = []
         for idx, (start, dur, text_cn, text_en) in enumerate(segments):
-            # 字幕位置
-            y_cn = 60 + idx * 40
-            y_en = 100 + idx * 40
-            
-            # 处理文本中的特殊字符
-            escaped_cn = text_cn.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39))
-            escaped_en = text_en.replace('\\', '\\\\').replace(chr(39), chr(92)+chr(39)) if text_en else ""
-            
-            # 中文drawtext
+            # 中文drawtext（大字，底部，fontsize=56）
             if escaped_cn:
                 drawtext_filters.append(
-                    'drawtext=text='' + escaped_cn + '':fontfile=' + font_path + ':fontsize=32:fontcolor=white:x=(w-text_w)/2:y=' + str(y_cn) + ':box=1:boxcolor=black@0.5:boxborderw=5'
+                    'drawtext=text=' + escaped_cn + ':fontfile=' + font_path + ':fontsize=56:fontcolor=white:x=(w-text_w)/2:y=h-180:box=1:boxcolor=black@0.5:boxborderw=5'
                 )
-            # 英文drawtext
+            # 英文drawtext（中字号，中文上方，fontsize=36）
             if text_en and escaped_en:
                 drawtext_filters.append(
-                    'drawtext=text='' + escaped_en + '':fontfile=' + font_path + ':fontsize=24:fontcolor=white@0.8:x=(w-text_w)/2:y=' + str(y_en) + ':box=1:boxcolor=black@0.3:boxborderw=3'
+                    'drawtext=text=' + escaped_en + ':fontfile=' + font_path + ':fontsize=36:fontcolor=white@0.9:x=(w-text_w)/2:y=h-260:box=1:boxcolor=black@0.3:boxborderw=3'
                 )
         filter_complex = ";".join(drawtext_filters)
         cmd = [
@@ -694,7 +686,7 @@ def upload_to_youtube(video_path, topic):
         
         title = topic['title_cn']
         description = topic.get('description', '')
-        keywords = topic.get('recommended_foods', []) + ['养生', '中医', '节气']
+        keywords = topic.get('recommended_foods', []) + ['养生', '中医', '体质', '食疗']
         
         log(f"上传YouTube: {title}")
         result = upload_video(
@@ -710,9 +702,17 @@ def upload_to_youtube(video_path, topic):
             return result
         else:
             log(f"❌ YouTube上传失败: {result.get('error')}")
+            # 上传失败时删除本地视频，避免堆积
+            if os.path.exists(video_path):
+                os.remove(video_path)
+                log(f"🗑️ 已删除失败的本地视频: {video_path}")
             return None
     except Exception as e:
         log(f"❌ YouTube上传异常: {e}")
+        # 上传异常时也删除本地视频
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            log(f"🗑️ 已删除异常的本地视频: {video_path}")
         return None
 
 
