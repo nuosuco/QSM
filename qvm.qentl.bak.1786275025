@@ -1,0 +1,1033 @@
+# ================================================================
+# QVM v1 — QBC1 虚拟机（QEntL编写，阶段3）
+# 输入: target.qbc   输出: 程序的printf透传
+# 目标: 完全取代C启动器的VM，构建纯QEntL运行环境
+#
+# QBC1格式: [4B]"QBC1" [2B]code_len [code] [2B]pool_len [pool]
+# 布局: [JMP main | funcs | main | HALT]
+# 值模型: 并行数组 (type: 0=int 1=str 2=arr句柄)
+# ================================================================
+
+# ---- 目标文件 ----
+var g_target = "target.qbc"
+
+# ---- QBC加载状态 ----
+var g_raw = ""
+var g_raw_len = 0
+var g_code_len = 0
+var g_pool_off = 0
+var g_pool_len = 0
+var g_main_start = 0
+# 函数名缓存: 连续调用同一函数直接命中
+var g_last_fname = ""
+var g_last_fi = -1
+# 预解码字节码: 加载时一次性把code段转成int数组, fetch变纯数组访问
+var g_code[65535]
+
+# 快速字节码读取(走预解码数组)
+def byte_at(p):
+    return g_code[p]
+end
+
+def u16_at(p):
+    return g_code[p] + g_code[p + 1] * 256
+end
+
+# ---- 值栈: 4096深 ----
+var st_type[4096]
+var st_int[4096]
+var st_str[4096]
+var st_arr[4096]
+var sp = 0
+
+# ---- 调用帧: 64帧 × 64局部 ----
+var fr_retpc[64]
+var fp = 0
+var loc_type[4096]
+var loc_int[4096]
+var loc_str[4096]
+var loc_arr[4096]
+
+# ---- 全局槽: 512 ----
+var gl_type[512]
+var gl_int[512]
+var gl_str[512]
+var gl_arr[512]
+
+# ---- 数组池: 碰撞分配器, 三段存储(容量196605, 支撑QCL-on-QVM) ----
+var ar_off[128]
+var ar_size[128]
+var ar_used = 0
+var ar_next = 0
+var ae_type0[65535]
+var ae_type1[65535]
+var ae_type2[65535]
+var ae_int0[65535]
+var ae_int1[65535]
+var ae_int2[65535]
+var ae_str0[65535]
+var ae_str1[65535]
+var ae_str2[65535]
+
+# ---- 函数表 ----
+var fn_nameoff[128]
+var fn_nparams[128]
+var fn_bodypc[128]
+var fn_count = 0
+
+# ---- pop结果寄存器 ----
+var pop1_t = 0
+var pop1_i = 0
+var pop1_s = ""
+var pop1_a = 0
+var pop2_t = 0
+var pop2_i = 0
+var pop2_s = ""
+var pop2_a = 0
+var pop3_i = 0
+var pop3_s = ""
+var pop4_i = 0
+var pop4_s = ""
+var pop5_i = 0
+var pop5_s = ""
+var pop6_i = 0
+var pop6_s = ""
+var g_cmp_r = 0
+
+# ================================================================
+# 字节码访问 — 已移至顶部走预解码数组g_code[]
+# ================================================================
+
+def pool_str(off):
+    if (off < 0): return "" end
+    if (off >= g_pool_len): return "" end
+    var e = off
+    while (e < g_pool_len):
+        if (ord(str_char_at(g_raw, g_pool_off + e)) == 0): break end
+        e = e + 1
+    end
+    return str_substring(g_raw, g_pool_off + off, e - off)
+end
+
+# ================================================================
+# 值栈操作
+# ================================================================
+def push_int(v):
+    st_type[sp] = 0
+    st_int[sp] = v
+    sp = sp + 1
+end
+
+def push_str(s):
+    st_type[sp] = 1
+    st_str[sp] = s
+    sp = sp + 1
+end
+
+def push_arr(h):
+    st_type[sp] = 2
+    st_arr[sp] = h
+    sp = sp + 1
+end
+
+def do_pop1():
+    sp = sp - 1
+    pop1_t = st_type[sp]
+    pop1_i = st_int[sp]
+    pop1_s = st_str[sp]
+    pop1_a = st_arr[sp]
+end
+
+def do_pop2():
+    do_pop1()
+    pop2_t = pop1_t
+    pop2_i = pop1_i
+    pop2_s = pop1_s
+    pop2_a = pop1_a
+    do_pop1()
+end
+
+def do_pop3():
+    do_pop1()
+    pop3_i = pop1_i
+    pop3_s = pop1_s
+    do_pop2()
+end
+
+def do_pop4():
+    do_pop1()
+    pop4_i = pop1_i
+    pop4_s = pop1_s
+    do_pop3()
+end
+
+def do_pop6():
+    do_pop1()
+    pop6_i = pop1_i
+    pop6_s = pop1_s
+    do_pop5()
+end
+
+def do_pop5():
+    do_pop1()
+    pop5_i = pop1_i
+    pop5_s = pop1_s
+    do_pop4()
+end
+
+# ================================================================
+# 数组元素池访问（三段, 容量196605）
+# 注意: 字面量上限65535(u16), 段边界必须运行时算术
+# ================================================================
+def ae_t_get(pos):
+    var seg2 = 65535 + 65535
+    if (pos < 65535): return ae_type0[pos] end
+    if (pos < seg2): return ae_type1[pos - 65535] end
+    return ae_type2[pos - seg2]
+end
+
+def ae_t_set(pos, v):
+    var seg2 = 65535 + 65535
+    if (pos < 65535):
+        ae_type0[pos] = v
+    else:
+        if (pos < seg2):
+            ae_type1[pos - 65535] = v
+        else:
+            ae_type2[pos - seg2] = v
+        end
+    end
+end
+
+def ae_i_get(pos):
+    var seg2 = 65535 + 65535
+    if (pos < 65535): return ae_int0[pos] end
+    if (pos < seg2): return ae_int1[pos - 65535] end
+    return ae_int2[pos - seg2]
+end
+
+def ae_i_set(pos, v):
+    var seg2 = 65535 + 65535
+    if (pos < 65535):
+        ae_int0[pos] = v
+    else:
+        if (pos < seg2):
+            ae_int1[pos - 65535] = v
+        else:
+            ae_int2[pos - seg2] = v
+        end
+    end
+end
+
+def ae_s_get(pos):
+    var seg2 = 65535 + 65535
+    if (pos < 65535): return ae_str0[pos] end
+    if (pos < seg2): return ae_str1[pos - 65535] end
+    return ae_str2[pos - seg2]
+end
+
+def ae_s_set(pos, v):
+    var seg2 = 65535 + 65535
+    if (pos < 65535):
+        ae_str0[pos] = v
+    else:
+        if (pos < seg2):
+            ae_str1[pos - 65535] = v
+        else:
+            ae_str2[pos - seg2] = v
+        end
+    end
+end
+
+# ================================================================
+# 变量槽访问（operand >= 32768 = 全局）
+# ================================================================
+def slot_get(operand):
+    if (operand >= 32768):
+        var g = operand - 32768
+        st_type[sp] = gl_type[g]
+        st_int[sp] = gl_int[g]
+        st_str[sp] = gl_str[g]
+        st_arr[sp] = gl_arr[g]
+        sp = sp + 1
+    else:
+        var base = (fp - 1) * 64 + operand
+        st_type[sp] = loc_type[base]
+        st_int[sp] = loc_int[base]
+        st_str[sp] = loc_str[base]
+        st_arr[sp] = loc_arr[base]
+        sp = sp + 1
+    end
+end
+
+def slot_set(operand):
+    do_pop1()
+    if (operand >= 32768):
+        var g = operand - 32768
+        gl_type[g] = pop1_t
+        gl_int[g] = pop1_i
+        gl_str[g] = pop1_s
+        gl_arr[g] = pop1_a
+    else:
+        var base = (fp - 1) * 64 + operand
+        loc_type[base] = pop1_t
+        loc_int[base] = pop1_i
+        loc_str[base] = pop1_s
+        loc_arr[base] = pop1_a
+    end
+end
+
+def slot_get_arr_handle(operand):
+    if (operand >= 32768): return gl_arr[operand - 32768] end
+    return loc_arr[(fp - 1) * 64 + operand]
+end
+
+# ================================================================
+# 真值判断
+# ================================================================
+def truthy_pop():
+    if (pop1_t == 0):
+        if (pop1_i != 0): return 1 end
+        return 0
+    end
+    if (pop1_t == 1):
+        if (str_len(pop1_s) > 0): return 1 end
+        return 0
+    end
+    if (ar_size[pop1_a] > 0): return 1 end
+    return 0
+end
+
+def truthy_val(t, i, s, a):
+    if (t == 0):
+        if (i != 0): return 1 end
+        return 0
+    end
+    if (t == 1):
+        if (str_len(s) > 0): return 1 end
+        return 0
+    end
+    if (ar_size[a] > 0): return 1 end
+    return 0
+end
+
+# ================================================================
+# 比较
+# ================================================================
+def str_cmp(x, y):
+    var lx = str_len(x)
+    var ly = str_len(y)
+    var n = lx
+    if (ly < n): n = ly end
+    var i = 0
+    while (i < n):
+        var cx = ord(str_char_at(x, i))
+        var cy = ord(str_char_at(y, i))
+        if (cx != cy):
+            if (cx < cy): return -1 end
+            return 1
+        end
+        i = i + 1
+    end
+    if (lx < ly): return -1 end
+    if (lx > ly): return 1 end
+    return 0
+end
+
+def do_cmp():
+    if (pop1_t == 0 and pop2_t == 0):
+        if (pop1_i < pop2_i):
+            g_cmp_r = -1
+        else:
+            if (pop1_i > pop2_i):
+                g_cmp_r = 1
+            else:
+                g_cmp_r = 0
+            end
+        end
+    else:
+        if (pop1_t == 1 and pop2_t == 1):
+            g_cmp_r = str_cmp(pop1_s, pop2_s)
+        else:
+            if (pop1_t < pop2_t):
+                g_cmp_r = -1
+            else:
+                if (pop1_t > pop2_t):
+                    g_cmp_r = 1
+                else:
+                    g_cmp_r = 0
+                end
+            end
+        end
+    end
+end
+
+# ================================================================
+# 函数表
+# ================================================================
+def find_func(fname):
+    var k = 0
+    while (k < fn_count):
+        if (str_eq(pool_str(fn_nameoff[k]), fname)): return k end
+        k = k + 1
+    end
+    return -1
+end
+
+def build_func_table():
+    var p = 3
+    fn_count = 0
+    while (p < g_main_start):
+        var op = byte_at(p)
+        if (op == 30):
+            fn_nameoff[fn_count] = u16_at(p + 1)
+            var np = byte_at(p + 3)
+            fn_nparams[fn_count] = np
+            fn_bodypc[fn_count] = p + 4 + 2 * np
+            fn_count = fn_count + 1
+            p = p + 4 + 2 * np
+        else:
+            if (op == 18 or op == 21):
+                p = p + 4
+            else:
+                if (op == 1 or op == 2 or op == 3 or op == 4 or op == 16 or op == 17 or op == 22 or op == 23 or op == 24):
+                    p = p + 3
+                else:
+                    p = p + 1
+                end
+            end
+        end
+    end
+end
+
+# ================================================================
+# 内置函数
+# ================================================================
+def bi_printf(nargs):
+    var base = sp - nargs
+    var fmt = st_str[base]
+    var ai = base + 1
+    var out = ""
+    var k = 0
+    var fl = str_len(fmt)
+    while (k < fl):
+        var ch = str_char_at(fmt, k)
+        if (str_eq(ch, "%") and k + 1 < fl):
+            var nx = str_char_at(fmt, k + 1)
+            if (str_eq(nx, "d")):
+                out = str_concat(out, int_to_str(st_int[ai]))
+                ai = ai + 1
+                k = k + 2
+            else:
+                if (str_eq(nx, "s")):
+                    if (st_type[ai] == 1):
+                        out = str_concat(out, st_str[ai])
+                    else:
+                        if (st_type[ai] == 2):
+                            out = str_concat(out, "<arr>")
+                        else:
+                            out = str_concat(out, int_to_str(st_int[ai]))
+                        end
+                    end
+                    ai = ai + 1
+                    k = k + 2
+                else:
+                    if (str_eq(nx, "%")):
+                        out = str_concat(out, "%")
+                        k = k + 2
+                    else:
+                        out = str_concat(out, ch)
+                        k = k + 1
+                    end
+                end
+            end
+        else:
+            out = str_concat(out, ch)
+            k = k + 1
+        end
+    end
+    printf("%s", out)
+    sp = base
+end
+
+def do_builtin(bname, nargs):
+    if (str_eq(bname, "printf")):
+        bi_printf(nargs)
+        push_int(0)
+        return
+    end
+    if (str_eq(bname, "str_len")):
+        do_pop1()
+        push_int(str_len(pop1_s))
+        return
+    end
+    if (str_eq(bname, "str_char_at")):
+        do_pop2()
+        push_str(str_char_at(pop1_s, pop2_i))
+        return
+    end
+    if (str_eq(bname, "str_substring")):
+        do_pop1()
+        var ln = pop1_i
+        do_pop1()
+        var stx = pop1_i
+        do_pop1()
+        push_str(str_substring(pop1_s, stx, ln))
+        return
+    end
+    if (str_eq(bname, "str_concat")):
+        do_pop2()
+        var xa = pop1_s
+        if (pop1_t == 0): xa = int_to_str(pop1_i) end
+        var xb = pop2_s
+        if (pop2_t == 0): xb = int_to_str(pop2_i) end
+        push_str(str_concat(xa, xb))
+        return
+    end
+    if (str_eq(bname, "str_eq")):
+        do_pop2()
+        push_int(str_eq(pop1_s, pop2_s))
+        return
+    end
+    if (str_eq(bname, "str_index_of")):
+        do_pop2()
+        push_int(str_index_of(pop1_s, pop2_s))
+        return
+    end
+    if (str_eq(bname, "str_from_char")):
+        do_pop1()
+        push_str(str_from_char(pop1_i))
+        return
+    end
+    if (str_eq(bname, "str_to_int")):
+        do_pop1()
+        push_int(str_to_int(pop1_s))
+        return
+    end
+    if (str_eq(bname, "int_to_str")):
+        do_pop1()
+        push_str(int_to_str(pop1_i))
+        return
+    end
+    if (str_eq(bname, "len")):
+        do_pop1()
+        if (pop1_t == 2):
+            push_int(ar_size[pop1_a])
+        else:
+            if (pop1_t == 1):
+                push_int(str_len(pop1_s))
+            else:
+                push_int(0)
+            end
+        end
+        return
+    end
+    if (str_eq(bname, "file_read")):
+        do_pop1()
+        push_str(file_read(pop1_s))
+        return
+    end
+    if (str_eq(bname, "file_write_bytes")):
+        do_pop2()
+        push_int(file_write_bytes(pop1_s, pop2_s))
+        return
+    end
+    if (str_eq(bname, "file_exists")):
+        do_pop1()
+        push_int(file_exists(pop1_s))
+        return
+    end
+    if (str_eq(bname, "file_delete")):
+        do_pop1()
+        push_int(file_delete(pop1_s))
+        return
+    end
+    if (str_eq(bname, "file_list")):
+        do_pop1()
+        push_str(file_list(pop1_s))
+        return
+    end
+    if (str_eq(bname, "mkdir")):
+        do_pop1()
+        push_int(mkdir(pop1_s))
+        return
+    end
+    if (str_eq(bname, "rand_int")):
+        do_pop1()
+        push_int(rand_int(pop1_i))
+        return
+    end
+    if (str_eq(bname, "exec")):
+        do_pop1()
+        push_str(exec(pop1_s))
+        return
+    end
+    if (str_eq(bname, "ord")):
+        do_pop1()
+        push_int(ord(pop1_s))
+        return
+    end
+    if (str_eq(bname, "chr")):
+        do_pop1()
+        push_str(chr(pop1_i))
+        return
+    end
+    if (str_eq(bname, "tcp_listen")):
+        do_pop1()
+        push_int(tcp_listen(pop1_i))
+        return
+    end
+    if (str_eq(bname, "tcp_accept")):
+        do_pop1()
+        push_int(tcp_accept(pop1_i))
+        return
+    end
+    if (str_eq(bname, "tcp_recv")):
+        do_pop2()
+        push_str(tcp_recv(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "tcp_send")):
+        do_pop2()
+        push_int(tcp_send(pop1_i, pop2_s))
+        return
+    end
+    if (str_eq(bname, "tcp_close")):
+        do_pop1()
+        push_int(tcp_close(pop1_i))
+        return
+    end
+    if (str_eq(bname, "tcp_shutdown")):
+        do_pop1()
+        push_int(tcp_shutdown(pop1_i))
+        return
+    end
+    if (str_eq(bname, "qreg_create")):
+        do_pop1()
+        push_int(qreg_create(pop1_i))
+        return
+    end
+    if (str_eq(bname, "qreg_free")):
+        do_pop1()
+        push_int(qreg_free(pop1_i))
+        return
+    end
+    if (str_eq(bname, "apply_h")):
+        do_pop2()
+        push_int(apply_h(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "apply_t")):
+        do_pop2()
+        push_int(apply_t(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "apply_cx")):
+        do_pop3()
+        push_int(apply_cx(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_x")):
+        do_pop2()
+        push_int(apply_x(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "apply_z")):
+        do_pop2()
+        push_int(apply_z(pop1_i, pop2_i))
+        return
+    end
+    if (str_eq(bname, "apply_cz")):
+        do_pop3()
+        push_int(apply_cz(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_ccx")):
+        do_pop4()
+        push_int(apply_ccx(pop1_i, pop2_i, pop3_i, pop4_i))
+        return
+    end
+    if (str_eq(bname, "apply_phase")):
+        do_pop3()
+        push_int(apply_phase(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_iphase")):
+        do_pop3()
+        push_int(apply_iphase(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_cphase")):
+        do_pop4()
+        push_int(apply_cphase(pop1_i, pop2_i, pop3_i, pop4_i))
+        return
+    end
+    if (str_eq(bname, "apply_icphase")):
+        do_pop4()
+        push_int(apply_icphase(pop1_i, pop2_i, pop3_i, pop4_i))
+        return
+    end
+    if (str_eq(bname, "apply_ry")):
+        do_pop3()
+        push_int(apply_ry(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_swap")):
+        do_pop3()
+        push_int(apply_swap(pop1_i, pop2_i, pop3_i))
+        return
+    end
+    if (str_eq(bname, "apply_ccz")):
+        do_pop4()
+        push_int(apply_ccz(pop1_i, pop2_i, pop3_i, pop4_i))
+        return
+    end
+    if (str_eq(bname, "apply_ccccz")):
+        do_pop6()
+        push_int(apply_ccccz(pop1_i, pop2_i, pop3_i, pop4_i, pop5_i, pop6_i))
+        return
+    end
+    if (str_eq(bname, "apply_cccz")):
+        do_pop5()
+        push_int(apply_cccz(pop1_i, pop2_i, pop3_i, pop4_i, pop5_i))
+        return
+    end
+    if (str_eq(bname, "measure")):
+        do_pop2()
+        push_int(measure(pop1_i, pop2_i))
+        return
+    end
+    printf("[QVM-Q] 未知内置函数: %s\n", bname)
+    sp = sp - nargs
+    push_int(0)
+end
+
+# ================================================================
+# QBC加载
+# ================================================================
+def load_qbc():
+    g_raw = file_read(g_target)
+    g_raw_len = str_len(g_raw)
+    if (g_raw_len < 8):
+        printf("[QVM-Q] 无法读取: %s\n", g_target)
+        return 0
+    end
+    if (str_eq(str_substring(g_raw, 0, 4), "QBC1") == 0):
+        printf("[QVM-Q] 不是QBC1格式: %s\n", g_target)
+        return 0
+    end
+    g_code_len = ord(str_char_at(g_raw, 4)) + ord(str_char_at(g_raw, 5)) * 256
+    if (6 + g_code_len + 2 > g_raw_len):
+        printf("[QVM-Q] QBC截断\n")
+        return 0
+    end
+    # 预解码: 一次性把code段转成int数组, 后续fetch走数组
+    var di = 0
+    while (di < g_code_len):
+        g_code[di] = ord(str_char_at(g_raw, 6 + di))
+        di = di + 1
+    end
+    var pp = 6 + g_code_len
+    g_pool_len = ord(str_char_at(g_raw, pp)) + ord(str_char_at(g_raw, pp + 1)) * 256
+    g_pool_off = pp + 2
+    if (byte_at(0) != 16):
+        printf("[QVM-Q] 布局错误(缺JMP头)\n")
+        return 0
+    end
+    g_main_start = u16_at(1)
+    return 1
+end
+
+# ================================================================
+# 主执行循环
+# ================================================================
+def vm_run():
+    var pc = g_main_start
+    var running = 1
+    var op = 0
+    var npc = 0
+    var prev_pc = 0
+    var fname = ""
+    var nargs = 0
+    var fi = 0
+    var base = 0
+    var k = 0
+    var bname = ""
+    var sz = 0
+    var h = 0
+    var idx = 0
+    var pos = 0
+    var et = 0
+    var tv = 0
+    var ta = 0
+    var tb = 0
+    var xa = ""
+    var xb = ""
+    while (running == 1):
+        if (pc < 0 or pc >= g_code_len):
+            printf("[QVM-Q] pc越界: pc=%d len=%d 上一op=%d 上一pc=%d sp=%d\n", pc, g_code_len, op, prev_pc, sp)
+            break
+        end
+        prev_pc = pc
+        op = byte_at(pc)
+        npc = pc + 1
+        if (op == 1):
+            push_int(u16_at(pc + 1))
+            npc = pc + 3
+        end
+        if (op == 2):
+            push_str(pool_str(u16_at(pc + 1)))
+            npc = pc + 3
+        end
+        if (op == 3):
+            slot_get(u16_at(pc + 1))
+            npc = pc + 3
+        end
+        if (op == 4):
+            slot_set(u16_at(pc + 1))
+            npc = pc + 3
+        end
+        if (op == 5):
+            do_pop2()
+            if (pop1_t == 1 or pop2_t == 1):
+                xa = pop1_s
+                if (pop1_t == 0): xa = int_to_str(pop1_i) end
+                xb = pop2_s
+                if (pop2_t == 0): xb = int_to_str(pop2_i) end
+                push_str(str_concat(xa, xb))
+            else:
+                push_int(pop1_i + pop2_i)
+            end
+        end
+        if (op == 6):
+            do_pop2()
+            push_int(pop1_i - pop2_i)
+        end
+        if (op == 7):
+            do_pop2()
+            push_int(pop1_i * pop2_i)
+        end
+        if (op == 8):
+            do_pop2()
+            if (pop2_i == 0):
+                printf("[QVM-Q] 除零 pc=%d\n", pc)
+                running = 0
+            else:
+                push_int(pop1_i / pop2_i)
+            end
+        end
+        if (op == 9):
+            do_pop2()
+            if (pop2_i == 0):
+                printf("[QVM-Q] 模零 pc=%d\n", pc)
+                running = 0
+            else:
+                push_int(pop1_i % pop2_i)
+            end
+        end
+        if (op == 10):
+            do_pop2()
+            do_cmp()
+            if (g_cmp_r == 0): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 11):
+            do_pop2()
+            do_cmp()
+            if (g_cmp_r != 0): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 12):
+            do_pop2()
+            do_cmp()
+            if (g_cmp_r < 0): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 13):
+            do_pop2()
+            do_cmp()
+            if (g_cmp_r > 0): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 14):
+            do_pop2()
+            do_cmp()
+            if (g_cmp_r <= 0): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 15):
+            do_pop2()
+            do_cmp()
+            if (g_cmp_r >= 0): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 16):
+            npc = u16_at(pc + 1)
+        end
+        if (op == 17):
+            do_pop1()
+            tv = truthy_pop()
+            if (tv == 0):
+                npc = u16_at(pc + 1)
+            else:
+                npc = pc + 3
+            end
+        end
+        if (op == 18):
+            fname = pool_str(u16_at(pc + 1))
+            nargs = byte_at(pc + 3)
+            # 函数名缓存: 连续调用同一函数(热循环)直接命中, 免重复扫描
+            if (str_eq(fname, g_last_fname)):
+                fi = g_last_fi
+            else:
+                fi = find_func(fname)
+                g_last_fname = fname
+                g_last_fi = fi
+            end
+            if (fi < 0):
+                printf("[QVM-Q] 未定义函数: %s\n", fname)
+                running = 0
+            else:
+                if (fp >= 64):
+                    printf("[QVM-Q] 调用栈溢出\n")
+                    running = 0
+                else:
+                    base = fp * 64
+                    # 惰性清零: QCL强制var初始化, 参数总是覆盖写入, 无需每次清64槽
+                    k = nargs - 1
+                    while (k >= 0):
+                        do_pop1()
+                        loc_type[base + k] = pop1_t
+                        loc_int[base + k] = pop1_i
+                        loc_str[base + k] = pop1_s
+                        loc_arr[base + k] = pop1_a
+                        k = k - 1
+                    end
+                    fr_retpc[fp] = pc + 4
+                    fp = fp + 1
+                    npc = fn_bodypc[fi]
+                end
+            end
+        end
+        if (op == 19):
+            do_pop1()
+            fp = fp - 1
+            npc = fr_retpc[fp]
+            st_type[sp] = pop1_t
+            st_int[sp] = pop1_i
+            st_str[sp] = pop1_s
+            st_arr[sp] = pop1_a
+            sp = sp + 1
+        end
+        if (op == 20):
+            running = 0
+        end
+        if (op == 21):
+            bname = pool_str(u16_at(pc + 1))
+            nargs = byte_at(pc + 3)
+            do_builtin(bname, nargs)
+            npc = pc + 4
+        end
+        if (op == 22):
+            sz = u16_at(pc + 1)
+            if (sz == 0):
+                do_pop1()
+                sz = pop1_i
+            end
+            if (sz < 0): sz = 0 end
+            if (ar_next + sz > 65535 + 65535 + 65535):
+                printf("[QVM-Q] 池溢出拦截: sz=%d next=%d pc=%d used=%d\n", sz, ar_next, pc, ar_used)
+                running = 0
+            else:
+                h = ar_used
+                ar_used = ar_used + 1
+                ar_off[h] = ar_next
+                ar_size[h] = sz
+                ar_next = ar_next + sz
+                push_arr(h)
+            end
+            npc = pc + 3
+        end
+        if (op == 23):
+            do_pop1()
+            idx = pop1_i
+            h = slot_get_arr_handle(u16_at(pc + 1))
+            pos = ar_off[h] + idx
+            et = ae_t_get(pos)
+            if (et == 1):
+                push_str(ae_s_get(pos))
+            else:
+                if (et == 2):
+                    push_arr(ae_i_get(pos))
+                else:
+                    push_int(ae_i_get(pos))
+                end
+            end
+            npc = pc + 3
+        end
+        if (op == 24):
+            do_pop2()
+            h = slot_get_arr_handle(u16_at(pc + 1))
+            pos = ar_off[h] + pop1_i
+            ae_t_set(pos, pop2_t)
+            if (pop2_t == 2):
+                ae_i_set(pos, pop2_a)
+            else:
+                ae_i_set(pos, pop2_i)
+            end
+            ae_s_set(pos, pop2_s)
+            npc = pc + 3
+        end
+        if (op == 25):
+            sp = sp - 1
+        end
+        if (op == 26):
+            do_pop1()
+            push_int(0 - pop1_i)
+        end
+        if (op == 27):
+            do_pop1()
+            tv = truthy_pop()
+            if (tv == 0): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 28):
+            do_pop2()
+            ta = truthy_val(pop1_t, pop1_i, pop1_s, pop1_a)
+            tb = truthy_val(pop2_t, pop2_i, pop2_s, pop2_a)
+            if (ta == 1 and tb == 1): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 29):
+            do_pop2()
+            ta = truthy_val(pop1_t, pop1_i, pop1_s, pop1_a)
+            tb = truthy_val(pop2_t, pop2_i, pop2_s, pop2_a)
+            if (ta == 1 or tb == 1): push_int(1)
+            else: push_int(0)
+            end
+        end
+        if (op == 30):
+            printf("[QVM-Q] 执行期遇到FUNC_DEF(布局错误) pc=%d\n", pc)
+            running = 0
+        end
+        pc = npc
+    end
+end
+
+# ================================================================
+# 主入口
+# ================================================================
+printf("QVM v1: QEntL编写的QBC1虚拟机\n")
+if (load_qbc() == 1):
+    build_func_table()
+    printf("[QVM-Q] 加载 %s code=%d pool=%d funcs=%d\n", g_target, g_code_len, g_pool_len, fn_count)
+    vm_run()
+end
