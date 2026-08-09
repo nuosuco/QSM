@@ -90,6 +90,25 @@ var g_tok_len[16384]
 var g_tok_count = 0
 var g_parse_pos = 0
 
+# 函数符号表：用全局变量对存储（最多32个函数）
+var g_fn_name1 = ""
+var g_fn_pid1 = 0
+var g_fn_name2 = ""
+var g_fn_pid2 = 0
+var g_fn_name3 = ""
+var g_fn_pid3 = 0
+var g_fn_name4 = ""
+var g_fn_pid4 = 0
+var g_fn_name5 = ""
+var g_fn_pid5 = 0
+var g_fn_name6 = ""
+var g_fn_pid6 = 0
+var g_fn_name7 = ""
+var g_fn_pid7 = 0
+var g_fn_name8 = ""
+var g_fn_pid8 = 0
+var g_fn_count = 0
+
 # 代码缓冲：f=函数区 m=主区（int数组，emit后转字节串）
 # 65535 = u16字面量上限，也是QBC1 code_len上限
 var g_code[65535]
@@ -542,6 +561,45 @@ def sym_reset_local():
     g_lc = 0
     g_ln = 0
 end
+
+def sym_find_func(s, l):
+    # 线性搜索最多8个函数
+    var i = 0
+    var found_pid = -1
+    while (i < g_fn_count):
+        var ns = ""
+        var pid = 0
+        if (i == 0): ns = g_fn_name1; pid = g_fn_pid1
+        if (i == 1): ns = g_fn_name2; pid = g_fn_pid2
+        if (i == 2): ns = g_fn_name3; pid = g_fn_pid3
+        if (i == 3): ns = g_fn_name4; pid = g_fn_pid4
+        if (i == 4): ns = g_fn_name5; pid = g_fn_pid5
+        if (i == 5): ns = g_fn_name6; pid = g_fn_pid6
+        if (i == 6): ns = g_fn_name7; pid = g_fn_pid7
+        if (i == 7): ns = g_fn_name8; pid = g_fn_pid8
+        if (str_eq(ns, s)):
+            found_pid = pid
+            i = g_fn_count
+        else:
+            i = i + 1
+        end
+    end
+    return found_pid
+end
+
+def sym_add_func(s, l, pid):
+    if (g_fn_count == 0): g_fn_name1 = s; g_fn_pid1 = pid
+    if (g_fn_count == 1): g_fn_name2 = s; g_fn_pid2 = pid
+    if (g_fn_count == 2): g_fn_name3 = s; g_fn_pid3 = pid
+    if (g_fn_count == 3): g_fn_name4 = s; g_fn_pid4 = pid
+    if (g_fn_count == 4): g_fn_name5 = s; g_fn_pid5 = pid
+    if (g_fn_count == 5): g_fn_name6 = s; g_fn_pid6 = pid
+    if (g_fn_count == 6): g_fn_name7 = s; g_fn_pid7 = pid
+    if (g_fn_count == 7): g_fn_name8 = s; g_fn_pid8 = pid
+    g_fn_count = g_fn_count + 1
+end
+
+
 
 def sym_resolve(sname, slen):
     var i = g_lc - 1
@@ -1037,7 +1095,10 @@ def parse_call(ns, nl):
     end
     expect(T_RPAREN, "调用缺)")
     var nm = str_substring(g_src, ns, nl)
-    var pid = pool_add_substr(ns, nl)
+    var pid = sym_find_func(ns, nl)
+    if (pid == -1):
+        pid = pool_add_substr(ns, nl)
+    end
     if (is_builtin(nm)):
         emit_byte(OP_BUILTIN)
         emit_u16(pid)
@@ -1827,6 +1888,7 @@ def parse_func_def():
     var fpid = pool_add_substr(fs, fl)
     emit_byte(OP_FUNC_DEF)
     emit_u16(fpid)
+    sym_add_func(fs, fl, fpid)
     emit_byte(np)
     var i = 0
     while (i < np):
@@ -1962,6 +2024,7 @@ else:
     g_parse_pos = 0
     g_fxc = 0
     g_mxc = 0
+    g_fn_count = 0
     # 主JMP头直接写g_code[0..2]（不走emit_byte，避免落入函数区）
     g_code[0] = OP_JMP
     g_code[1] = 0

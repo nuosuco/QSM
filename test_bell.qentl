@@ -1,1 +1,0 @@
-var q = qreg_create(1); apply_h(q, 0); var m = measure(q, 0); printf("Bell: %d\n", m); qreg_free(q);
