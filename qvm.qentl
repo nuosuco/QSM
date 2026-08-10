@@ -1117,7 +1117,7 @@ end
 # 主入口
 # ================================================================
 printf("QVM v1: QEntL编写的QBC1虚拟机\\n")
-g_trace_array = 1
+g_trace_array = 0
 printf("[QVM-DBG] 数组调试已启用\\n")
 if (load_qbc() == 1):
     build_func_table()

@@ -250,10 +250,10 @@ def tok_push(tt, ts, tl):
     g_tok_len[g_tok_count] = tl
     g_tok_count = g_tok_count + 1
     if (g_tok_count <= 10):
-        printf("[DBG] token %d: type=%d start=%d len=%d\n", g_tok_count-1, tt, ts, tl)
+        
     end
     if (g_tok_count >= 3330 and g_tok_count <= 3340):
-        printf("[DBG-TOK] tok %d: type=%d start=%d len=%d tt=%d\n", g_tok_count-1, tt, ts, tl, tt)
+        
     end
 end
 
@@ -261,13 +261,6 @@ def lex_run():
     var pos = 0
     var n = g_src_len
     # 调试：打印前20个字符
-    var debug_i = 0
-    var debug_max = 20
-    while (debug_i < n and debug_i < debug_max):
-        var dc = str_char_at(g_src, debug_i)
-        printf("[DBG] char[%d]='%s' ord=%d\n", debug_i, dc, ord(dc))
-        debug_i = debug_i + 1
-    end
     while (pos < n):
         var ch = str_char_at(g_src, pos)
         var ch_ord = ord(ch)
@@ -406,7 +399,7 @@ def lex_run():
                 if (str_eq(word, "qreg")):   tt = T_QREG end
                 tok_push(tt, i_start, pos - i_start)
                 if (g_tok_count >= 3325 and g_tok_count <= 3345):
-                    printf("[DBG-LEX] tok %d type=%d text='%s'\\n", g_tok_count-1, tt, word)
+                    
                 end
                 handled = 1
             end
@@ -564,7 +557,7 @@ def lex_run():
         end
     end
     tok_push(T_EOF, n, 0)
-    printf("[DBG-LEX] lex完成，tokens=%d\\n", g_tok_count)
+    
 end
 
 # ---- 符号表 ----
@@ -672,7 +665,13 @@ end
 
 def emit_u16(v):
     emit_byte(v % 256)
-    emit_byte(v / 256)
+    var high = 0
+    var temp = v
+    while (temp >= 256):
+        temp = temp - 256
+        high = high + 1
+    end
+    emit_byte(high)
 end
 
 def code_pos():
@@ -755,8 +754,6 @@ def is_builtin(nm):
     if (str_eq(nm, "apply_ry")): return 1 end
     if (str_eq(nm, "apply_swap")): return 1 end
     if (str_eq(nm, "measure")): return 1 end
-    if (str_eq(nm, "pool_add_string")): return 1 end
-    if (str_eq(nm, "pool_add_substr")): return 1 end
     if (str_eq(nm, "str_from_pool")): return 1 end
     return 0
 end
@@ -1077,11 +1074,11 @@ def parse_call(ns, nl):
     end
     if (g_parse_pos >= 3300 and g_parse_pos <= 3350):
         var nm_check = str_substring(g_src, ns, nl)
-        printf("[DBG-CALL] pos=%d cur_type=%d nargs=%d nm='%s' nl=%d\\n", g_parse_pos, cur_type(), nargs, nm_check, nl)
+        
     end
     expect(T_RPAREN, "调用缺)")
     if (g_parse_pos >= 3300 and g_parse_pos <= 3350):
-        printf("[DBG-CALL] after expect pos=%d\\n", g_parse_pos)
+        
     end
     var nm = str_substring(g_src, ns, nl)
     var pid = sym_find_func(ns, nl)
@@ -1942,7 +1939,13 @@ def build_full_qbc():
         var p = 3 + g_fx_pos[i]
         var tgt = 3 + g_fx_val[i]
         g_code[p] = tgt % 256
-        g_code[p + 1] = tgt / 256
+        var high = 0
+        var temp = tgt
+        while (temp >= 256):
+            temp = temp - 256
+            high = high + 1
+        end
+        g_code[p + 1] = high
         i = i + 1
     end
     # 主区跳转回填：索引在g_code[32768..]，目标绝对=3+g_fc+相对
@@ -1952,15 +1955,34 @@ def build_full_qbc():
         var p = 32768 + g_mx_pos[i]
         var tgt = mbase + g_mx_val[i]
         g_code[p] = tgt % 256
-        g_code[p + 1] = tgt / 256
+        var high = 0
+        var temp = tgt
+        while (temp >= 256):
+            temp = temp - 256
+            high = high + 1
+        end
+        g_code[p + 1] = high
         i = i + 1
     end
-    # 主JMP目标 = 主区起点（绝对）
-    # 注意：JMP指令在g_code[0..2]，但组装时j...[truncated]
+    # 回填JMP头：主区起点 = 3 + g_fc
+    g_code[1] = mbase % 256
+    var high = 0
+    var temp = mbase
+    while (temp >= 256):
+        temp = temp - 256
+        high = high + 1
+    end
+    g_code[2] = high
     g_code[32768 + g_mc] = OP_HALT
     # 组装: QBC1 + code_len + 代码 + pool_len + pool
     var out = str_concat("QBC1", byte_char(total % 256))
-    out = str_concat(out, byte_char(total / 256))
+    var high = 0
+    var temp = total
+    while (temp >= 256):
+        temp = temp - 256
+        high = high + 1
+    end
+    out = str_concat(out, byte_char(high))
     var chunk = ""
     var chunk_n = 0
     i = 0
@@ -1986,7 +2008,13 @@ def build_full_qbc():
         out = str_concat(out, chunk)
     end
     out = str_concat(out, byte_char(g_pool_len % 256))
-    out = str_concat(out, byte_char(g_pool_len / 256))
+    var high = 0
+    var temp = g_pool_len
+    while (temp >= 256):
+        temp = temp - 256
+        high = high + 1
+    end
+    out = str_concat(out, byte_char(high))
     out = str_concat(out, g_pool)
     file_write_bytes(g_output_file, out)
     return str_len(out)
@@ -2002,9 +2030,9 @@ g_src_len = str_len(g_src)
 if (g_src_len == 0):
     printf("qcl: 错误: 无法读取 %s\n", g_input_file)
 else:
-    printf("[DBG] g_src_len=%d\n", g_src_len)
+    
     if (g_src_len > 20):
-        printf("[DBG] g_src[0:20]='%s'\n", str_substring(g_src, 0, 20))
+        
     end
     g_fc = 0
     g_mc = 0

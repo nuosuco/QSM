@@ -1129,10 +1129,10 @@ def parse_statement():
                                 else:
                                     if (str_eq(ident_nm, "phase") or str_eq(ident_nm, "iphase")):
                                         parse_quantum_phase(ident_ns, ident_nl)
-                            else:
-                                if (str_eq(ident_nm, "cphase") or str_eq(ident_nm, "icphase")):
-                                    parse_quantum_cphase(ident_ns, ident_nl)
-                                else:
+                                    else:
+                                        if (str_eq(ident_nm, "cphase") or str_eq(ident_nm, "icphase")):
+                                            parse_quantum_cphase(ident_ns, ident_nl)
+                                        else:
                                     if (str_eq(ident_nm, "swap")):
                                         parse_quantum_swap(ident_ns, ident_nl)
                                     else:
