@@ -42,13 +42,13 @@ var st_str[4096]
 var st_arr[4096]
 var sp = 0
 
-# ---- 调用帧: 64帧 × 64局部 ----
-var fr_retpc[64]
+# ---- 调用帧: 128帧 × 64局部 ----
+var fr_retpc[128]
 var fp = 0
-var loc_type[4096]
-var loc_int[4096]
-var loc_str[4096]
-var loc_arr[4096]
+var loc_type[8192]
+var loc_int[8192]
+var loc_str[8192]
+var loc_arr[8192]
 
 # ---- 全局槽: 512 ----
 var gl_type[512]
@@ -955,7 +955,7 @@ def vm_run():
                 printf("[QVM-Q] 未定义函数: %s\n", fname)
                 running = 0
             else:
-                if (fp >= 64):
+                if (fp >= 128):
                     printf("[QVM-Q] 调用栈溢出\n")
                     running = 0
                 else:
