@@ -16,9 +16,43 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEyeExercise();
     loadTizhiGrid();
     loadYaoshiList();
+    
+    // 根据URL路径初始化对应tab（支持微信菜单直接跳转）
+    var path = window.location.pathname;
+    if (path === '/products' || path === '/yangshenggu' || path === '/profile') {
+        var tabName = path.substring(1); // 去掉开头的/
+        switchTab(tabName);
+    }
 });
 
 // ========== 导航切换 ==========
+
+function switchTab(targetTab) {
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    navBtns.forEach(btn => {
+        if (btn.dataset.tab === targetTab) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    var tabEl = document.getElementById(targetTab + '-tab');
+    if (tabEl) {
+        tabEl.classList.add('active');
+    }
+    
+    // 切换到健康测评时渲染
+    if (targetTab === 'health-test') {
+        renderHealthTestPage();
+    }
+}
 
 function initNavigation() {
     const navBtns = document.querySelectorAll('.nav-btn');
