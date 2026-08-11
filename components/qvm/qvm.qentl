@@ -68,8 +68,7 @@ def qvm_gc_count():
 end
 
 def qvm_gc_stats():
-    printf("QVM内存统计: 全局=%d 已用=%d
-", g_gc, g_gc_used)
+    printf("QVM内存统计: 全局=%d 已用=%d\n", g_gc_stats, g_gc_used)
     return 1
 end
 
