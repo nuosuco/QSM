@@ -13,7 +13,7 @@ var NS_MODELS = "models"
 # ---- QNS实例创建 ----
 def qns_instance_create(qdfs_base, app_name):
     var root = qdfs_instance_create(qdfs_base, app_name)
-    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪 v28")
+    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪 v39")
     qdfs_ns_write(NS_MODELS, "qns_weights", "权重: 生长态")
     printf(" QNS实例创建: %s\n", root)
     return root
@@ -166,8 +166,8 @@ end
 
 # ---- QNS状态报告 ----
 def qns_status():
-    printf(" QNS状态: 就绪 v28\n")
-    printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级, 代码生成 v28\n")
+    printf(" QNS状态: 就绪 v39\n")
+    printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级, 代码生成 v39\n")
     return 1
 end
 
