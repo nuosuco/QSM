@@ -321,6 +321,18 @@ def qns_build_growth_lib():
     qns_save_source("lib/qns_version_report.qentl", vlib)
     printf(" QNS: 生成版本报告库 v%s\n", ver)
     
+    # 生成QCL增强库
+    var clib = "# QCL增强库 v"
+    clib = str_concat(clib, ver)
+    clib = str_concat(clib, "\n# QNS生成\n\n")
+    clib = str_concat(clib, "def qcl_enhanced_check():\n")
+    clib = str_concat(clib, "    printf(\"QCL增强库: 正常\n\")
+")
+    clib = str_concat(clib, "    return 1\n")
+    clib = str_concat(clib, "end\n")
+    qns_save_source("lib/qcl_enhanced.qentl", clib)
+    printf(" QNS: 生成QCL增强库 v%s\n", ver)
+    
     # 生成QSM增强版
     qns_gen_qsm_model("qsm_enhanced", "5", "QSM增强版")
     
