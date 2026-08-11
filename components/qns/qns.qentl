@@ -291,7 +291,7 @@ def qns_build_growth_lib():
     
     printf(" ✓ 生长库已生成: %s (%d字节)\n", fpath, str_len(lib))
     
-    # 生成QVM统计库
+    # 生成QVM统计库（增强版）
     var vmlib = "# QVM统计库 v"
     vmlib = str_concat(vmlib, ver)
     vmlib = str_concat(vmlib, "\n# QNS生成\n\n")
