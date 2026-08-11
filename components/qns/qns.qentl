@@ -3,6 +3,7 @@
 # v8-生长: 新增代码生成能力
 # 每个量子应用独立拥有QNS+QDFS两个基础
 # QNS基于QDFS实现自动合并/分离 + 源码升级 + 代码生成
+# 自举生长: QNS能自己生成QEntL源码函数
 # ================================================================
 
 # ---- QNS常量定义 ----
@@ -69,22 +70,18 @@ end
 # ---- QNS自动生长：生成并添加新函数 ----
 def qns_grow(component, marker, name, args, body):
     printf(" QNS: 自动生长 %s\n", component)
-    
     var filepath = str_concat("components/", str_concat(component, "/"))
     filepath = str_concat(filepath, str_concat(component, ".qentl"))
-    
     var source = qns_read_source(filepath)
     if (str_len(source) == 0):
         return 0
     end
-    
     var new_func = qns_gen_func(name, args, body)
     var new_source = qns_add_func(source, marker, new_func)
     if (str_eq(new_source, source)):
         printf(" QNS: 插入失败\n")
         return 0
     end
-    
     qns_save_source(filepath, new_source)
     printf(" QNS: 自动生长完成！\n")
     return 1
@@ -173,8 +170,6 @@ def qns_status():
     printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级, 代码生成 v8\n")
     return 1
 end
-
-# ---- QNS自测试 ----
 
 # ---- QNS入口 ----
 qns_status()
