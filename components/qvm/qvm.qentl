@@ -59,6 +59,20 @@ var gl_arr[512]
 # ---- 数组调试开关 ----
 var g_trace_array = 0
 
+# ---- QVM内存优化: 池化释放 + 统计 ----
+var g_gc_stats = 0
+var g_gc_used = 0
+
+def qvm_gc_count():
+    return g_gc_used
+end
+
+def qvm_gc_stats():
+    printf("QVM内存统计: 全局=%d 已用=%d
+", g_gc, g_gc_used)
+    return 1
+end
+
 # ---- 数组池: 碰撞分配器, 三段存储(容量196605, 支撑QCL-on-QVM) ----
 var ar_off[512]
 var ar_size[512]
