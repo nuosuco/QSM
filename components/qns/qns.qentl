@@ -313,6 +313,9 @@ def qns_build_growth_lib():
     qns_save_source("lib/qns_version_report.qentl", vlib)
     printf(" QNS: 生成版本报告库 v%s\n", ver)
     
+    # 生成QSM增强版
+    qns_gen_qsm_model("qsm_enhanced", "5", "QSM增强版")
+    
     printf("=== QNS 自举生长完成 ===\n")
     return 1
 end
