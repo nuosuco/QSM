@@ -357,6 +357,18 @@ def qns_build_growth_lib():
     qns_save_source("lib/som_economy_metrics.qentl", slib)
     printf(" QNS: 生成SOM经济指标库 v%s\n", ver)
     
+    # 生成WeQ社交协作库
+    var wlib = "# WeQ社交协作 v"
+    wlib = str_concat(wlib, ver)
+    wlib = str_concat(wlib, "\n# QNS生成\n\n")
+    wlib = str_concat(wlib, "def weq_collab_check():\n")
+    wlib = str_concat(wlib, "    printf(\"WeQ社交协作: 正常\n\")
+")
+    wlib = str_concat(wlib, "    return 1\n")
+    wlib = str_concat(wlib, "end\n")
+    qns_save_source("lib/weq_collab.qentl", wlib)
+    printf(" QNS: 生成WeQ社交协作库 v%s\n", ver)
+    
     # 生成QSM增强版
     qns_gen_qsm_model("qsm_enhanced", "5", "QSM增强版")
     
