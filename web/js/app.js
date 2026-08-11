@@ -1573,11 +1573,19 @@ async function sendForgotPassword() {
     }
 }
 
-// 微信服务号登录（简化版 - 消息推送已授权，不需要网页OAuth）
+// 微信服务号登录
 function wechatLogin() {
-    // 提示用户使用账号密码登录
-    alert('微信服务号消息推送已授权，请使用账号密码登录或注册');
-    switchLoginChannel('password');
+    // 检测是否在微信内
+    var ua = navigator.userAgent.toLowerCase();
+    var isWechat = ua.indexOf('micromessenger') !== -1;
+    
+    if (isWechat) {
+        // 微信内：直接跳转授权页
+        doWechatOAuth();
+    } else {
+        // 非微信：显示二维码
+        showWechatQRCode();
+    }
 }
 
 // 执行微信OAuth授权
