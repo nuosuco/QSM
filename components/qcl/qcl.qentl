@@ -717,6 +717,11 @@ def is_builtin(nm):
     if (str_eq(nm, "str_index_of")): return 1 end
     if (str_eq(nm, "str_from_char")): return 1 end
     if (str_eq(nm, "str_to_int")): return 1 end
+    if (str_eq(nm, "str_to_float")): return 1 end
+    if (str_eq(nm, "float_to_str")): return 1 end
+    if (str_eq(nm, "str_trim")): return 1 end
+    if (str_eq(nm, "str_upper")): return 1 end
+    if (str_eq(nm, "str_lower")): return 1 end
     if (str_eq(nm, "int_to_str")): return 1 end
     if (str_eq(nm, "len")): return 1 end
     if (str_eq(nm, "file_read")): return 1 end
