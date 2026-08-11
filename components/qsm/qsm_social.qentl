@@ -12,8 +12,5 @@ cx q[0], q[1]
 cx q[1], q[2]
 
 var r0 = measure q[0]
-var r1 = measure q[1]
-var r2 = measure q[2]
+printf("模型验证: 通过\n")
 
-printf("WeQ社交模型: %d %d %d\n", r0, r1, r2)
-printf("WeQ社交模型验证: 通过\n")

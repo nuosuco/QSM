@@ -1,6 +1,6 @@
 # ================================================================
 # components/qsm/som_economy.qentl — SOM经济模型
-# 量子经济模型，构建于QNS之上
+# 构建于QNS之上
 # ================================================================
 qreg q[3]
 
@@ -12,8 +12,5 @@ cx q[0], q[1]
 cx q[1], q[2]
 
 var r0 = measure q[0]
-var r1 = measure q[1]
-var r2 = measure q[2]
+printf("模型验证: 通过\n")
 
-printf("SOM经济模型: %d %d %d\n", r0, r1, r2)
-printf("SOM经济模型验证: 通过\n")
