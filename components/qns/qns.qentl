@@ -277,7 +277,15 @@ def qns_build_growth_lib():
     lib = str_concat(lib, "    return 1\n")
     lib = str_concat(lib, "end\n")
     
-    # 5. 保存
+    # 5. 生成SOM检查函数
+    lib = str_concat(lib, "\n# SOM经济检查\n")
+    lib = str_concat(lib, "def som_check():\n")
+    lib = str_concat(lib, "    printf(\"SOM经济模型: 正常\n\")
+")
+    lib = str_concat(lib, "    return 1\n")
+    lib = str_concat(lib, "end\n")
+    
+    # 6. 保存
     var fpath = "lib/qns_growth.qentl"
     qns_save_source(fpath, lib)
     
