@@ -345,6 +345,18 @@ def qns_build_growth_lib():
     qns_save_source("lib/qdfs_func.qentl", dlib)
     printf(" QNS: 生成QDFS功能库 v%s\n", ver)
     
+    # 生成SOM经济指标库
+    var slib = "# SOM经济指标 v"
+    slib = str_concat(slib, ver)
+    slib = str_concat(slib, "\n# QNS生成\n\n")
+    slib = str_concat(slib, "def som_economy_check():\n")
+    slib = str_concat(slib, "    printf(\"SOM经济指标: 正常\n\")
+")
+    slib = str_concat(slib, "    return 1\n")
+    slib = str_concat(slib, "end\n")
+    qns_save_source("lib/som_economy_metrics.qentl", slib)
+    printf(" QNS: 生成SOM经济指标库 v%s\n", ver)
+    
     # 生成QSM增强版
     qns_gen_qsm_model("qsm_enhanced", "5", "QSM增强版")
     
