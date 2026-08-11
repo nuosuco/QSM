@@ -1,1 +1,6 @@
-# QVM统计库 v53\n# QNS生成\n\ndef qvm_stats_check():\n    var qcl_ok = file_exists(\"run/qcl.qbc\")\n    var qvm_ok = file_exists(\"run/qvm.qbc\")\n    printf(\"QVM统计: QCL=%d QVM=%d\\n\", qcl_ok, qvm_ok)\n    return 1\nend\n
+# QVM统计库 v54
+# QNS生成
+
+def qvm_stats_check():
+    var qcl_ok = file_exists(\"run/qcl.qbc\")\n    var qvm_ok = file_exists(\"run/qvm.qbc\")\n    printf(\"QVM统计: QCL=%d QVM=%d\\n\", qcl_ok, qvm_ok)\n    return 1
+end
