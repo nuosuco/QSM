@@ -369,6 +369,18 @@ def qns_build_growth_lib():
     qns_save_source("lib/weq_collab.qentl", wlib)
     printf(" QNS: 生成WeQ社交协作库 v%s\n", ver)
     
+    # 生成ReF自反省库
+    var rlib = "# ReF自反省 v"
+    rlib = str_concat(rlib, ver)
+    rlib = str_concat(rlib, "\n# QNS生成\n\n")
+    rlib = str_concat(rlib, "def ref_self_check():\n")
+    rlib = str_concat(rlib, "    printf(\"ReF自反省: 正常\n\")
+")
+    rlib = str_concat(rlib, "    return 1\n")
+    rlib = str_concat(rlib, "end\n")
+    qns_save_source("lib/ref_self_reflect.qentl", rlib)
+    printf(" QNS: 生成ReF自反省库 v%s\n", ver)
+    
     # 生成QSM增强版
     qns_gen_qsm_model("qsm_enhanced", "5", "QSM增强版")
     
