@@ -1,8 +1,8 @@
 # ================================================================
 # lib/qns.qentl — 量子神经叠加态 (Quantum Neural Superposition)
-# v5-生长: 新增源码升级能力
+# v8-生长: 新增代码生成能力
 # 每个量子应用独立拥有QNS+QDFS两个基础
-# QNS基于QDFS实现自动合并/分离 + 源码升级
+# QNS基于QDFS实现自动合并/分离 + 源码升级 + 代码生成
 # ================================================================
 
 # ---- QNS常量定义 ----
@@ -12,7 +12,7 @@ var NS_MODELS = "models"
 # ---- QNS实例创建 ----
 def qns_instance_create(qdfs_base, app_name):
     var root = qdfs_instance_create(qdfs_base, app_name)
-    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪 v5")
+    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪 v8")
     qdfs_ns_write(NS_MODELS, "qns_weights", "权重: 生长态")
     printf(" QNS实例创建: %s\n", root)
     return root
@@ -30,6 +30,64 @@ def qns_split(ns_a, ns_b, prefix):
     var out = qdfs_ns_split(ns_a, ns_b, prefix)
     printf(" QNS分离: %s\n", out)
     return out
+end
+
+# ---- QNS生成函数定义 ----
+def qns_gen_func(name, args, body):
+    var line = "\n# QNS生成的函数\n"
+    line = str_concat(line, "def ")
+    line = str_concat(line, name)
+    line = str_concat(line, "(")
+    line = str_concat(line, args)
+    line = str_concat(line, "):\n    ")
+    line = str_concat(line, body)
+    line = str_concat(line, "\nend\n")
+    printf(" QNS: 生成函数 %s\n", name)
+    return line
+end
+
+# ---- QNS生成变量声明 ----
+def qns_gen_var(name, value):
+    var line = str_concat("var ", name)
+    line = str_concat(line, " = ")
+    line = str_concat(line, value)
+    line = str_concat(line, "\n")
+    printf(" QNS: 生成变量 %s\n", name)
+    return line
+end
+
+# ---- QNS生成注释 ----
+def qns_gen_comment(text):
+    return str_concat("# ", str_concat(text, "\n"))
+end
+
+# ---- QNS在标记后添加函数 ----
+def qns_add_func(source, marker, new_func):
+    return qns_insert_after(source, marker, new_func)
+end
+
+# ---- QNS自动生长：生成并添加新函数 ----
+def qns_grow(component, marker, name, args, body):
+    printf(" QNS: 自动生长 %s\n", component)
+    
+    var filepath = str_concat("components/", str_concat(component, "/"))
+    filepath = str_concat(filepath, str_concat(component, ".qentl"))
+    
+    var source = qns_read_source(filepath)
+    if (str_len(source) == 0):
+        return 0
+    end
+    
+    var new_func = qns_gen_func(name, args, body)
+    var new_source = qns_add_func(source, marker, new_func)
+    if (str_eq(new_source, source)):
+        printf(" QNS: 插入失败\n")
+        return 0
+    end
+    
+    qns_save_source(filepath, new_source)
+    printf(" QNS: 自动生长完成！\n")
+    return 1
 end
 
 # ---- QNS源码读取 ----
@@ -71,7 +129,7 @@ def qns_insert_after(source, marker, new_code):
     var pos = idx + str_len(marker)
     var before = str_substring(source, 0, pos)
     var after = str_substring(source, pos, str_len(source) - pos)
-    printf(" QNS: 在 '%s' 后插入新代码 (位置 %d)\n", marker, pos)
+    printf(" QNS: 在 '%s' 后插入 (位置 %d)\n", marker, pos)
     return str_concat(before, str_concat(new_code, after))
 end
 
@@ -93,34 +151,30 @@ end
 def qns_upgrade(component_name):
     var filepath = str_concat("components/", str_concat(component_name, "/"))
     filepath = str_concat(filepath, str_concat(component_name, ".qentl"))
-    
-    printf(" QNS: 开始升级 %s\n", component_name)
-    printf(" QNS: 读取 %s\n", filepath)
-    
+    printf(" QNS: 升级 %s\n", component_name)
     var source = qns_read_source(filepath)
     if (str_len(source) == 0):
         printf(" QNS: 升级失败！\n")
         return 0
     end
-    
-    # 添加版本标记
-    var new_source = qns_add_version_marker(source, component_name, "5生长")
+    var new_source = qns_add_version_marker(source, component_name, "8生长")
     if (str_eq(new_source, source)):
-        printf(" QNS: 无需修改 %s\n", component_name)
+        printf(" QNS: 无需修改\n")
         return 0
     end
-    
-    # 保存新源码
-    var ret = qns_save_source(filepath, new_source)
+    qns_save_source(filepath, new_source)
     printf(" QNS: 升级完成！\n")
     return 1
 end
 
 # ---- QNS状态报告 ----
 def qns_status():
-    printf(" QNS状态: %s\n", qdfs_ns_read(NS_SYSTEM, "qns_meta"))
-    printf(" QNS权重: %s\n", qdfs_ns_read(NS_MODELS, "qns_weights"))
-    printf(" QNS文件: %s\n", qdfs_ns_ls(NS_MODELS))
-    printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级 v5\n")
+    printf(" QNS状态: 就绪 v8\n")
+    printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级, 代码生成 v8\n")
     return 1
 end
+
+# ---- QNS自测试 ----
+
+# ---- QNS入口 ----
+qns_status()
