@@ -525,6 +525,76 @@ def do_builtin(bname, nargs):
         push_int(str_to_int(pop1_s))
         return
     end
+    if (str_eq(bname, "str_to_float")):
+        do_pop1()
+        # QEntL不支持float，返回原始字符串表示的整数值
+        push_int(str_to_int(pop1_s))
+        return
+    end
+    if (str_eq(bname, "float_to_str")):
+        do_pop1()
+        push_str(int_to_str(pop1_i))
+        return
+    end
+    if (str_eq(bname, "str_trim")):
+        do_pop1()
+        # 去除首尾空白字符
+        var s = pop1_s
+        while (str_len(s) > 0):
+            var c = str_char_at(s, 0)
+            if (c == " " or c == "\n" or c == "\r" or c == "\t"):
+                s = str_substring(s, 1, str_len(s) - 1)
+            else:
+                break
+            end
+        end
+        while (str_len(s) > 0):
+            var c = str_char_at(s, str_len(s) - 1)
+            if (c == " " or c == "\n" or c == "\r" or c == "\t"):
+                s = str_substring(s, 0, str_len(s) - 1)
+            else:
+                break
+            end
+        end
+        push_str(s)
+        return
+    end
+    if (str_eq(bname, "str_upper")):
+        do_pop1()
+        # 简单的ASCII转大写
+        var s = pop1_s
+        var result = ""
+        var i = 0
+        while (i < str_len(s)):
+            var c = str_char_at(s, i)
+            var ord = ord(c)
+            if (ord >= 97 and ord <= 122):
+                c = chr(ord - 32)
+            end
+            result = str_concat(result, c)
+            i = i + 1
+        end
+        push_str(result)
+        return
+    end
+    if (str_eq(bname, "str_lower")):
+        do_pop1()
+        # 简单的ASCII转小写
+        var s = pop1_s
+        var result = ""
+        var i = 0
+        while (i < str_len(s)):
+            var c = str_char_at(s, i)
+            var ord = ord(c)
+            if (ord >= 65 and ord <= 90):
+                c = chr(ord + 32)
+            end
+            result = str_concat(result, c)
+            i = i + 1
+        end
+        push_str(result)
+        return
+    end
     if (str_eq(bname, "int_to_str")):
         do_pop1()
         push_str(int_to_str(pop1_i))
