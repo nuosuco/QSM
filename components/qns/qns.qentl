@@ -298,6 +298,21 @@ def qns_build_growth_lib():
     qns_save_source("lib/qvm_stats.qentl", vmlib)
     printf(" QNS: 生成QVM统计库 v%s\n", ver)
     
+    # 生成版本报告库
+    var vlib = "# QNS版本报告 v"
+    vlib = str_concat(vlib, ver)
+    vlib = str_concat(vlib, "\n# QNS生成\n\n")
+    vlib = str_concat(vlib, "def qns_version_report():
+")
+    vlib = str_concat(vlib, "    printf(\"QNS版本报告: 正常\n\")
+")
+    vlib = str_concat(vlib, "    return 1
+")
+    vlib = str_concat(vlib, "end
+")
+    qns_save_source("lib/qns_version_report.qentl", vlib)
+    printf(" QNS: 生成版本报告库 v%s\n", ver)
+    
     printf("=== QNS 自举生长完成 ===\n")
     return 1
 end
