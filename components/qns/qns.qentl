@@ -333,6 +333,18 @@ def qns_build_growth_lib():
     qns_save_source("lib/qcl_enhanced.qentl", clib)
     printf(" QNS: 生成QCL增强库 v%s\n", ver)
     
+    # 生成QDFS功能库
+    var dlib = "# QDFS功能库 v"
+    dlib = str_concat(dlib, ver)
+    dlib = str_concat(dlib, "\n# QNS生成\n\n")
+    dlib = str_concat(dlib, "def qdfs_health():\n")
+    dlib = str_concat(dlib, "    printf(\"QDFS功能库: 正常\n\")
+")
+    dlib = str_concat(dlib, "    return 1\n")
+    dlib = str_concat(dlib, "end\n")
+    qns_save_source("lib/qdfs_func.qentl", dlib)
+    printf(" QNS: 生成QDFS功能库 v%s\n", ver)
+    
     # 生成QSM增强版
     qns_gen_qsm_model("qsm_enhanced", "5", "QSM增强版")
     
