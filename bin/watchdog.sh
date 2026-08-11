@@ -2,7 +2,7 @@
 # QEntL HTTP服务器看门狗脚本
 # 如果服务器挂了，自动重启
 SERVER_PORT=9802
-SERVER_BIN="/root/QSM/bin/qcl_bootstrap"
+SERVER_BIN="/root/QSM/bin/q_bootstrap"
 SERVER_QBC="/root/QSM/build/server.qbc"
 SERVER_LOG="/root/QSM/server.log"
 

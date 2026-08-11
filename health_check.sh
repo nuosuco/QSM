@@ -12,7 +12,7 @@ echo ""
 echo "【3/8】QOS公网:"
 curl -s -m 5 https://qsm.som.top/api/status 2>/dev/null
 echo ""
-echo "【4/8】量子门: $(grep -oE 'apply_[a-z]+' src/qcl_bootstrap.c | sort -u | wc -l)种"
+echo "【4/8】量子门: $(grep -oE 'apply_[a-z]+' src/q_bootstrap.c | sort -u | wc -l)种"
 echo "【5/8】算法: $(ls examples/*.qentl | wc -l)个"
 echo "【6/8】标准库: $(ls lib/*.qentl | wc -l)个"
 echo "【7/8】API端点: $(grep -c 'str_eq(path,' server_qentl.qentl)个"
@@ -22,7 +22,7 @@ P=0; T=0
 for f in grover grover3 grover4 qft qft6 pea shor shor15 teleport dj qwalk bb84 qdfs_demo superposition ghz qclustering qoptimization qnn_demo qsvm qsm_main qns_full_pipeline yi_data_4120; do
   T=$((T+1))
   if [ -f "build/$f.qbc" ]; then
-    O=$(timeout 15 bin/qcl_bootstrap run build/$f.qbc 2>&1)
+    O=$(timeout 15 bin/q_bootstrap run build/$f.qbc 2>&1)
     if echo "$O" | grep -qE "通过|命中|正确|分解成功|验证"; then
       echo "  ✅ $f"
       P=$((P+1))
