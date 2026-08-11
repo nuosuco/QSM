@@ -1573,19 +1573,11 @@ async function sendForgotPassword() {
     }
 }
 
-// 微信服务号登录
+// 微信服务号登录（简化版 - 消息推送已授权，不需要网页OAuth）
 function wechatLogin() {
-    // 检测是否在微信内
-    var ua = navigator.userAgent.toLowerCase();
-    var isWechat = ua.indexOf('micromessenger') !== -1;
-    
-    if (isWechat) {
-        // 微信内：直接跳转授权页
-        doWechatOAuth();
-    } else {
-        // 非微信：显示二维码
-        showWechatQRCode();
-    }
+    // 提示用户使用账号密码登录
+    alert('微信服务号消息推送已授权，请使用账号密码登录或注册');
+    switchLoginChannel('password');
 }
 
 // 执行微信OAuth授权
@@ -1605,19 +1597,9 @@ function doWechatOAuth() {
     window.location.href = authUrl;
 }
 
-// 显示微信二维码
+// 二维码登录已废弃（消息推送已授权）
 function showWechatQRCode() {
-    // 隐藏按钮，显示二维码容器
-    var btn = document.getElementById('wechat-login-btn');
-    var container = document.getElementById('wechat-qrcode-container');
-    if (btn) btn.style.display = 'none';
-    if (container) container.style.display = 'block';
-    
-    // 刷新二维码（加时间戳避免缓存）
-    refreshQRCode();
-    
-    // 启动轮询检查登录状态
-    startQRLoginPolling();
+    wechatLogin();
 }
 
 // 刷新二维码

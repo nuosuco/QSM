@@ -1225,25 +1225,123 @@ async def wechat_message_receive():
 
 @app.get("/wechat-callback")
 async def wechat_oauth_callback(code: str = None, state: str = None):
-    """微信服务号OAuth2.0回调"""
-    if not code:
-        return HTMLResponse("<script>window.location.href='/';alert('微信授权失败');</script>")
-    
+    """微信服务号OAuth2.0回调（已废弃，保留兼容）"""
+    return HTMLResponse("<script>window.location.href='/';alert('请使用账号密码登录');</script>")
+
+@app.post("/api/wechat/menu")
+async def wechat_menu_create():
+    """创建服务号菜单（4个网页版菜单）"""
+    import requests as http_requests
     from services import auth_service
-    result = auth_service.wechat_web_login(code)
     
-    if result.get('success'):
-        # 设置cookie
-        response = HTMLResponse(f"""
-            <script>
-                localStorage.setItem('som_auth_token', '{result['token']}');
-                localStorage.setItem('som_auth_user', JSON.stringify({json.dumps(result['user'])}));
-                window.location.href='/';
-            </script>
-        """)
-        return response
-    else:
-        return HTMLResponse(f"<script>window.location.href='/';alert('{result.get('error', '登录失败')}');</script>")
+    cfg = auth_service._load_auth_config()
+    wx_cfg = cfg.get("wechat", {})
+    appid = wx_cfg.get("appid", "")
+    secret = wx_cfg.get("secret", "")
+    
+    if not appid or not secret:
+        return {"success": False, "error": "微信服务号未配置"}
+    
+    try:
+        # 获取access_token
+        resp = http_requests.get(
+            "https://api.weixin.qq.com/cgi-bin/token",
+            params={"appid": appid, "secret": secret, "grant_type": "client_credential"},
+            timeout=10
+        )
+        token_data = resp.json()
+        if "access_token" not in token_data:
+            return {"success": False, "error": f"获取access_token失败: {token_data.get('errmsg', '未知错误')}"}
+        
+        access_token = token_data["access_token"]
+        
+        # 菜单配置（微信限制3个按钮，合并小麦SOM+有机好物）
+        menu_json = {
+            "button": [
+                {
+                    "type": "view",
+                    "name": "首页",
+                    "url": "https://som.top/"
+                },
+                {
+                    "type": "view",
+                    "name": "养生谷",
+                    "url": "https://som.top/#yangshenggu"
+                },
+                {
+                    "type": "view",
+                    "name": "我的",
+                    "url": "https://som.top/#profile"
+                }
+            ]
+        }
+        
+        # 创建菜单
+        menu_resp = http_requests.post(
+            f"https://api.weixin.qq.com/cgi-bin/menu/create?access_token={access_token}",
+            data=json.dumps(menu_json, ensure_ascii=False).encode('utf-8'),
+            timeout=10
+        )
+        menu_result = menu_resp.json()
+        
+        if menu_result.get("errcode") == 0:
+            return {"success": True, "message": "菜单创建成功"}
+        else:
+            return {"success": False, "error": f"创建菜单失败: {menu_result.get('errmsg', '未知错误')}"}
+    
+    except Exception as e:
+        return {"success": False, "error": f"创建菜单异常: {str(e)}"}
+
+@app.get("/api/wechat/menu")
+async def wechat_menu_get():
+    """获取当前服务号菜单"""
+    import requests as http_requests
+    from services import auth_service
+    
+    cfg = auth_service._load_auth_config()
+    wx_cfg = cfg.get("wechat", {})
+    appid = wx_cfg.get("appid", "")
+    secret = wx_cfg.get("secret", "")
+    
+    if not appid or not secret:
+        return {"success": False, "error": "微信服务号未配置"}
+    
+    try:
+        # 获取access_token
+        resp = http_requests.get(
+            "https://api.weixin.qq.com/cgi-bin/token",
+            params={"appid": appid, "secret": secret, "grant_type": "client_credential"},
+            timeout=10
+        )
+        token_data = resp.json()
+        if "access_token" not in token_data:
+            return {"success": False, "error": f"获取access_token失败: {token_data.get('errmsg', '未知错误')}"}
+        
+        access_token = token_data["access_token"]
+        
+        # 获取菜单
+        menu_resp = http_requests.get(
+            f"https://api.weixin.qq.com/cgi-bin/menu/get?access_token={access_token}",
+            timeout=10
+        )
+        menu_data = menu_resp.json()
+        
+        # 微信API返回的是 {"menu": {"button": [...]}} 或 {"errcode": xxx}
+        if "menu" in menu_data and "button" in menu_data.get("menu", {}):
+            return {"success": True, "menu": menu_data["menu"]["button"]}
+        else:
+            return {"success": False, "error": f"获取菜单失败: {menu_data.get('errmsg', '未知错误')}"}
+    except Exception as e:
+        return {"success": False, "error": f"获取菜单异常: {str(e)}"}
+
+@app.post("/api/auth/wechat-login")
+async def auth_wechat_login():
+    """微信服务号登录（二维码扫描方式）"""
+    return {
+        "success": True,
+        "message": "请使用账号密码登录",
+        "login_methods": ["password", "email"]
+    }
 
 @app.post("/api/auth/bind-phone")
 async def auth_bind_phone(request: BindPhoneRequest):
