@@ -171,5 +171,55 @@ def qns_status():
     return 1
 end
 
+# ---- QNS自动生长：生成生长库 ----
+def qns_build_growth_lib():
+    printf("\n=== QNS 自举生长 ===\n")
+    
+    # 1. 读取当前版本
+    var ver = file_read(".current_version")
+    if (str_len(ver) == 0):
+        ver = "0"
+    else:
+        # 去掉末尾的换行符
+        if (str_char_at(ver, str_len(ver) - 1) == chr(10)):
+            ver = str_substring(ver, 0, str_len(ver) - 1)
+        end
+    end
+    printf(" 当前版本: v%s\n", ver)
+    
+    # 2. 生成生长库内容
+    var lib = "# QNS自动生成的生长库 v"
+    lib = str_concat(lib, ver)
+    lib = str_concat(lib, "\n# 由QNS自举生成，无需人工编辑\n")
+    
+    # 3. 生成版本函数
+    lib = str_concat(lib, "\n# QNS版本函数\n")
+    lib = str_concat(lib, "def qns_lib_version():\n")
+    lib = str_concat(lib, "    printf(\"QNS生长库 v")
+    lib = str_concat(lib, ver)
+    lib = str_concat(lib, chr(92))
+    lib = str_concat(lib, "n\")\n")
+    lib = str_concat(lib, "    return 1\n")
+    lib = str_concat(lib, "end\n")
+    
+    # 4. 生成健康检查函数
+    lib = str_concat(lib, "\n# QNS健康检查\n")
+    lib = str_concat(lib, "def qns_health():\n")
+    lib = str_concat(lib, "    var q = file_exists(\"run/qcl.qbc\")\n")
+    lib = str_concat(lib, "    var v = file_exists(\"run/qvm.qbc\")\n")
+    lib = str_concat(lib, "    printf(\"健康检查: QCL=%d QVM=%d\\n\", q, v)\n")
+    lib = str_concat(lib, "    return 1\n")
+    lib = str_concat(lib, "end\n")
+    
+    # 5. 保存
+    var fpath = "lib/qns_growth.qentl"
+    qns_save_source(fpath, lib)
+    
+    printf(" ✓ 生长库已生成: %s (%d字节)\n", fpath, str_len(lib))
+    printf("=== QNS 自举生长完成 ===\n")
+    return 1
+end
+
 # ---- QNS入口 ----
 qns_status()
+qns_build_growth_lib()
