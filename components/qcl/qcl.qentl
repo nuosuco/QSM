@@ -728,6 +728,8 @@ def is_builtin(nm):
     if (str_eq(nm, "file_write_bytes")): return 1 end
     if (str_eq(nm, "file_exists")): return 1 end
     if (str_eq(nm, "file_delete")): return 1 end
+    if (str_eq(nm, "sort_int")): return 1 end
+    if (str_eq(nm, "sort_str")): return 1 end
     if (str_eq(nm, "file_list")): return 1 end
     if (str_eq(nm, "mkdir")): return 1 end
     if (str_eq(nm, "rand_int")): return 1 end
