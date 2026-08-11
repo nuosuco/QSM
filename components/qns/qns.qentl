@@ -296,12 +296,13 @@ def qns_build_growth_lib():
     vmlib = str_concat(vmlib, ver)
     vmlib = str_concat(vmlib, "\n# QNS生成\n\n")
     vmlib = str_concat(vmlib, "def qvm_stats_check():\n")
-    vmlib = str_concat(vmlib, "    var qcl_ok = file_exists(\\\"run/qcl.qbc\\\")\\n")
-    vmlib = str_concat(vmlib, "    var qvm_ok = file_exists(\\\"run/qvm.qbc\\\")\\n")
-    vmlib = str_concat(vmlib, "    printf(\\\"QVM统计: QCL=%d QVM=%d\\\\n\\\", qcl_ok, qvm_ok)\\n")
+    vmlib = str_concat(vmlib, "    var qcl_ok = file_exists("run/qcl.qbc")\n")
+    vmlib = str_concat(vmlib, "    var qvm_ok = file_exists("run/qvm.qbc")\n")
+    vmlib = str_concat(vmlib, "    printf("QVM统计: QCL=%d QVM=%d\n", qcl_ok, qvm_ok)\n")
     vmlib = str_concat(vmlib, "    return 1\n")
     vmlib = str_concat(vmlib, "end\n")
     qns_save_source("lib/qvm_stats.qentl", vmlib)
+    printf(" QNS: 生成QVM统计库 v%s\n", ver)
     printf(" QNS: 生成QVM统计库 v%s\n", ver)
     
     # 生成版本报告库
