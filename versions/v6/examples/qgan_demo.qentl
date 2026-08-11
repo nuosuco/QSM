@@ -1,0 +1,48 @@
+# ================================================================
+# 量子对抗生成网络演示 — 量子生成建模
+# 量子生成对抗网络: 量子判别器+经典生成器
+# ================================================================
+
+printf("=== 量子生成对抗网络(QGAN)演示 ===\n\n")
+printf("生成器: 量子线路生成数据分布\n")
+printf("判别器: 区分真实/生成数据\n\n")
+
+# QGAN核心: 量子线路生成目标分布
+# 目标: 生成3比特偶校验模式 (000, 011, 101, 110)
+
+printf("目标分布: GHZ态 (|000>+|111>)/√2, 全同奇偶\n\n")
+
+# 量子生成器: 制备GHZ态
+# GHZ: 所有比特相同, 测量q[0]即可确定奇偶
+var even = 0
+var odd = 0
+var i = 0
+while (i < 40):
+    var q = qreg_create(3)
+    h q[0]
+    cx q[0], q[1]
+    cx q[0], q[2]
+    # GHZ态: 只测q[0] (所有比特相同)
+    var m0 = measure(q, 0)
+    # GHZ态|000>或|111>都是偶校验, 但展示奇偶分布
+    if (m0 == 0): even = even + 1 end
+    if (m0 == 1): odd = odd + 1 end
+    qreg_free(q)
+    i = i + 1
+end
+
+printf("生成器输出: q[0]=0 %d/40 (%d%%)\n", even, even * 100 / 40)
+printf("          q[0]=1 %d/40 (%d%%)\n", odd, odd * 100 / 40)
+printf("GHZ态: 所有比特相同, 奇偶一致\n")
+
+# 判别器: 验证生成数据是否符合目标分布
+printf("\n判别器验证: 生成数据是否为目标分布\n")
+var correct = 0
+if (even > odd): correct = correct + 1 end
+var is_even = "否"
+if (even > odd):
+    is_even = "是"
+end
+printf("偶校验为主导: %s\n", is_even)
+
+printf("\n=== QGAN演示完成 ===\n")

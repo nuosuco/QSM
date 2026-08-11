@@ -1,0 +1,135 @@
+# ================================================================
+# examples/vqe_heisenberg.qentl — 2比特VQE多比特哈密顿量
+# QEntL全栈v0.2.0能力实战: 浮点定点 + RY旋转门 + CX纠缠 + 变分优化
+#
+# 任务: 求解 H = Z0 + Z1 + Z0*Z1 的基态能量
+# 拟设: RY(t1)|0> --CX--> RY(t2)|1> (2比特硬件高效拟设)
+# 理论基态: |11>, E = -1 + -1 + 1 = -1.000
+# 优化: 坐标下降(参数偏移法, 2参数联合)
+# ================================================================
+var FIXED_SCALE = 1000
+
+def fx_mul(a, b):
+    return a * b / FIXED_SCALE
+end
+
+def fx_to_str(a):
+    var neg = 0
+    if (a < 0):
+        neg = 1
+        a = 0 - a
+    end
+    var ip = a / FIXED_SCALE
+    var frac = a % FIXED_SCALE
+    var fs = int_to_str(frac)
+    while (str_len(fs) < 3):
+        fs = str_concat("0", fs)
+    end
+    var s = str_concat(int_to_str(ip), str_concat(".", fs))
+    if (neg == 1):
+        s = str_concat("-", s)
+    end
+    return s
+end
+
+# 执行拟设电路并采样一次, 返回 m0*10 + m1
+def ansatz_sample(t1, t2):
+    var r = qreg_create(2)
+    apply_ry(r, 0, t1)
+    cx r[0], r[1]
+    apply_ry(r, 1, t2)
+    var m0 = measure(r, 0)
+    var m1 = measure(r, 1)
+    qreg_free(r)
+    return m0 * 10 + m1
+end
+
+# <Z0 Z1>: m0==m1 则+1, 否则-1
+def estimate_zz(t1, t2, shots):
+    var same = 0
+    var i = 0
+    while (i < shots):
+        var s = ansatz_sample(t1, t2)
+        var m0 = s / 10
+        var m1 = s % 10
+        if (m0 == m1): same = same + 1 end
+        i = i + 1
+    end
+    return (2 * same - shots) * FIXED_SCALE / shots
+end
+
+# <Z1>: m1==1 则-1
+def estimate_z1(t1, t2, shots):
+    var cnt1 = 0
+    var i = 0
+    while (i < shots):
+        var s = ansatz_sample(t1, t2)
+        if (s % 10 == 1): cnt1 = cnt1 + 1 end
+        i = i + 1
+    end
+    return (shots - 2 * cnt1) * FIXED_SCALE / shots
+end
+
+# <Z0>: m0==1 则-1
+def estimate_z0(t1, t2, shots):
+    var cnt1 = 0
+    var i = 0
+    while (i < shots):
+        var s = ansatz_sample(t1, t2)
+        if (s / 10 == 1): cnt1 = cnt1 + 1 end
+        i = i + 1
+    end
+    return (shots - 2 * cnt1) * FIXED_SCALE / shots
+end
+
+# 总能量 E = <Z0> + <Z1> + <Z0Z1>
+def energy(t1, t2, shots):
+    var e0 = estimate_z0(t1, t2, shots)
+    var e1 = estimate_z1(t1, t2, shots)
+    var e01 = estimate_zz(t1, t2, shots)
+    return e0 + e1 + e01
+end
+
+printf("=== 2比特VQE: H = Z0 + Z1 + Z0*Z1 ===\n")
+printf("拟设: RY(t1) --CX--> RY(t2)\n")
+printf("理论基态: |11>, E = -1.000\n\n")
+
+var t1 = 500
+var t2 = 500
+var lr = 300
+printf("初始 t1=%s t2=%s\n\n", fx_to_str(t1), fx_to_str(t2))
+
+var step = 0
+while (step < 15):
+    var d = 100
+    # t1梯度
+    var ep = energy(t1 + d, t2, 60)
+    var em = energy(t1 - d, t2, 60)
+    var g1 = (ep - em) * FIXED_SCALE / (2 * d)
+    # t2梯度
+    ep = energy(t1, t2 + d, 60)
+    em = energy(t1, t2 - d, 60)
+    var g2 = (ep - em) * FIXED_SCALE / (2 * d)
+    t1 = t1 - fx_mul(lr, g1)
+    t2 = t2 - fx_mul(lr, g2)
+    if (t1 < 0): t1 = 0 end
+    if (t1 > 6283): t1 = 6283 end
+    if (t2 < 0): t2 = 0 end
+    if (t2 > 6283): t2 = 6283 end
+    if (step % 5 == 0):
+        var en = energy(t1, t2, 100)
+        printf("step %d: t1=%s t2=%s E=%s\n", step, fx_to_str(t1), fx_to_str(t2), fx_to_str(en))
+    end
+    step = step + 1
+end
+
+var final_e = energy(t1, t2, 300)
+printf("\n=== 2比特VQE结果 ===\n")
+printf("最优 t1=%s t2=%s\n", fx_to_str(t1), fx_to_str(t2))
+printf("基态能量 E = %s (理论 -1.000)\n", fx_to_str(final_e))
+
+if (final_e < 0 - 700):
+    printf("2比特VQE求解: 通过 (E<-0.7)\n")
+else:
+    printf("2比特VQE求解: 未收敛\n")
+end

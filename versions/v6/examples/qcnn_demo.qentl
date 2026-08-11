@@ -1,0 +1,130 @@
+# ================================================================
+# QNN深度建设 — 量子卷积神经网络
+# 量子卷积层 + 量子池化层 + 变分分类器
+# 模仿经典CNN的层级结构，量子版本
+# ================================================================
+
+printf("=== 量子卷积神经网络 (QCNN) 演示 ===\n\n")
+
+# 架构:
+# 量子卷积层: 相邻量子位纠缠
+# 量子池化层: 部分测量坍缩
+# 变分分类器: 输出层
+
+# ================================================================
+# 测试1: 量子卷积层
+# ================================================================
+printf("--- 测试1: 量子卷积层 ---\n")
+printf("原理: 相邻量子位CNOT纠缠 + 旋转\n\n")
+
+var q_conv = qreg_create(4)
+
+# 初始化: 全0态
+
+# 卷积: 相邻CNOT
+apply_cx(q_conv, 0, 1)
+apply_cx(q_conv, 1, 2)
+apply_cx(q_conv, 2, 3)
+
+# 旋转
+apply_ry(q_conv, 0, 1571)
+apply_ry(q_conv, 1, 1571)
+apply_ry(q_conv, 2, 1571)
+apply_ry(q_conv, 3, 1571)
+
+# 测量纠缠
+var m0 = measure(q_conv, 0)
+var m1 = measure(q_conv, 1)
+var m2 = measure(q_conv, 2)
+var m3 = measure(q_conv, 3)
+printf("  卷积后测量: q0=%d, q1=%d, q2=%d, q3=%d\n", m0, m1, m2, m3)
+
+# 多次测量验证纠缠
+var same_pairs = 0
+var i = 0
+while (i < 10):
+    var q_conv2 = qreg_create(4)
+    apply_cx(q_conv2, 0, 1)
+    apply_cx(q_conv2, 1, 2)
+    apply_cx(q_conv2, 2, 3)
+    apply_ry(q_conv2, 0, 1571)
+    apply_ry(q_conv2, 1, 1571)
+    apply_ry(q_conv2, 2, 1571)
+    apply_ry(q_conv2, 3, 1571)
+    var a = measure(q_conv2, 0)
+    var b = measure(q_conv2, 1)
+    if (a == b):
+        same_pairs = same_pairs + 1
+    end
+    i = i + 1
+end
+printf("  相邻纠缠: 10次中 %d 次q0=q1\n\n", same_pairs)
+
+# ================================================================
+# 测试2: 量子池化层
+# ================================================================
+printf("--- 测试2: 量子池化层 ---\n")
+printf("原理: 测量部分量子位, 选择性坍缩\n\n")
+
+var q_pool = qreg_create(4)
+# 创建纠缠
+apply_h(q_pool, 0)
+apply_h(q_pool, 1)
+apply_cx(q_pool, 0, 2)
+apply_cx(q_pool, 1, 3)
+
+# 池化: 测量 q0, q1 (坍缩后保留q2,q3)
+var pool_m0 = measure(q_pool, 0)
+var pool_m1 = measure(q_pool, 1)
+printf("  池化测量: q0=%d, q1=%d (坍缩后)\n", pool_m0, pool_m1)
+
+# 保留的量子位
+var remain_m0 = measure(q_pool, 2)
+var remain_m1 = measure(q_pool, 3)
+printf("  保留位: q2=%d, q3=%d\n", remain_m0, remain_m1)
+
+# 验证: q2应与q0相关, q3应与q1相关
+if (pool_m0 == remain_m0 and pool_m1 == remain_m1):
+    printf("  ✓ 池化层: 纠缠关系保持\n")
+else:
+    printf("  ✗ 池化层: 纠缠关系丢失\n")
+end
+
+printf("\n")
+
+# ================================================================
+# 测试3: 完整QCNN线路
+# ================================================================
+printf("--- 测试3: 完整QCNN线路 ---\n")
+printf("架构: 量子卷积(4→4) → 量子池化(4→2) → 变分分类\n\n")
+
+var q_cnn = qreg_create(4)
+var anc_cnn = qreg_create(1)
+
+# 1) 卷积层
+apply_cx(q_cnn, 0, 1)
+apply_cx(q_cnn, 1, 2)
+apply_cx(q_cnn, 2, 3)
+apply_ry(q_cnn, 0, 785)
+apply_ry(q_cnn, 1, 785)
+apply_ry(q_cnn, 2, 785)
+apply_ry(q_cnn, 3, 785)
+
+# 2) 池化层: 测量q0, q2
+var pool0 = measure(q_cnn, 0)
+var pool2 = measure(q_cnn, 2)
+printf("  池化: q0=%d, q2=%d\n", pool0, pool2)
+
+# 3) 变分分类
+var q_out = qreg_create(1)
+apply_ry(q_out, 0, 1571)
+if (pool0 == 1):
+    apply_x(q_out, 0)
+end
+if (pool2 == 1):
+    apply_x(q_out, 0)
+end
+var classification = measure(q_out, 0)
+printf("  分类结果: %d\n", classification)
+
+printf("\n=== QCNN演示完成 ===\n")

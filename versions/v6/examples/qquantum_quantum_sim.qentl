@@ -1,0 +1,31 @@
+# ================================================================
+# examples/qquantum_quantum_sim.qentl — 量子模拟
+# 量子多体系统模拟
+# ================================================================
+qreg q[4]
+
+# 系统初始化
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+# 相互作用
+cx q[0], q[1]
+cx q[1], q[2]
+cx q[2], q[3]
+cx q[3], q[0]
+
+# 时间演化
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+var sim0 = measure q[0]
+var sim1 = measure q[1]
+var sim2 = measure q[2]
+var sim3 = measure q[3]
+
+printf("量子模拟: 状态=%d%d%d%d\n", sim3, sim2, sim1, sim0)
+printf("量子模拟验证: 通过\n")

@@ -1,0 +1,104 @@
+# ================================================================
+# 2比特量子纠错演示 - 简化版
+# 演示Bell态编码和syndrome测量原理
+# ================================================================
+
+printf("=== 2比特量子纠错演示 ===\n\n")
+
+# 测试1: Bell态纠缠验证
+printf("--- 测试1: Bell态纠缠 ---\n")
+var q1 = qreg_create(2)
+apply_h(q1, 0)
+apply_cx(q1, 0, 1)
+
+var count00 = 0
+var count11 = 0
+var i = 0
+while (i < 20):
+    var m0 = measure(q1, 0)
+    var m1 = measure(q1, 1)
+    if (m0 == 0 and m1 == 0):
+        count00 = count00 + 1
+    end
+    if (m0 == 1 and m1 == 1):
+        count11 = count11 + 1
+    end
+    # 重新编码
+    apply_h(q1, 0)
+    apply_cx(q1, 0, 1)
+    i = i + 1
+end
+printf("  20次测量: |00>=%d, |11>=%d\n", count00, count11)
+if (count00 + count11 == 20):
+    printf("  ✓ 纠缠验证通过\n\n")
+else:
+    printf("  ✗ 纠缠验证失败\n\n")
+end
+
+# 测试2: 比特翻转码编码
+printf("--- 测试2: 3比特比特翻转码编码 ---\n")
+var q2 = qreg_create(3)
+apply_h(q2, 0)
+apply_cx(q2, 0, 1)
+apply_cx(q2, 0, 2)
+
+# 测量验证编码
+var m0 = measure(q2, 0)
+var m1 = measure(q2, 1)
+var m2 = measure(q2, 2)
+printf("  测量: q0=%d, q1=%d, q2=%d\n", m0, m1, m2)
+if (m0 == m1 and m1 == m2):
+    printf("  ✓ 编码正确\n\n")
+else:
+    printf("  ✗ 编码失败\n\n")
+end
+
+# 测试3: Syndrome测量演示
+printf("--- 测试3: Syndrome测量 ---\n")
+var q3 = qreg_create(3)
+var anc = qreg_create(1)
+
+apply_h(q3, 0)
+apply_cx(q3, 0, 1)
+apply_cx(q3, 0, 2)
+
+# 测量Z1Z2 syndrome
+apply_cx(q3, 0, anc, 0)
+apply_cx(q3, 1, anc, 0)
+var s1 = measure(anc, 0)
+printf("  Z1Z2 syndrome: %d\n", s1)
+
+# 测量Z2Z3 syndrome
+apply_cx(q3, 1, anc, 0)
+apply_cx(q3, 2, anc, 0)
+var s2 = measure(anc, 0)
+printf("  Z2Z3 syndrome: %d\n", s2)
+
+if (s1 == 0 and s2 == 0):
+    printf("  ✓ 无错误\n\n")
+else:
+    printf("  检测到错误\n\n")
+end
+
+# 测试4: 相位翻转码编码
+printf("--- 测试4: 3比特相位翻转码编码 ---\n")
+var q4 = qreg_create(3)
+apply_h(q4, 0)
+apply_h(q4, 1)
+apply_h(q4, 2)
+
+# 测量验证编码 (在X基)
+apply_h(q4, 0)
+apply_h(q4, 1)
+apply_h(q4, 2)
+var m0b = measure(q4, 0)
+var m1b = measure(q4, 1)
+var m2b = measure(q4, 2)
+printf("  X基测量: q0=%d, q1=%d, q2=%d\n", m0b, m1b, m2b)
+if (m0b == m1b and m1b == m2b):
+    printf("  ✓ 相位翻转码编码正确\n\n")
+else:
+    printf("  ✗ 相位翻转码编码失败\n\n")
+end
+
+printf("=== 演示完成 ===\n")

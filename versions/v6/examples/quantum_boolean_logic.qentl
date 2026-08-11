@@ -1,0 +1,105 @@
+# ================================================================
+# 量子布尔逻辑 — 完备门集
+# 展示量子门实现所有布尔函数
+# ================================================================
+
+printf("=== 量子布尔逻辑完备门集 ===\n\n")
+
+# 完备门集: NOT, AND, OR, XOR, NAND, NOR
+# 量子实现: 用X/CX/CCX门
+
+printf("--- 1. NOT (X门) ---\n")
+var qn = qreg_create(1)
+x qn[0]
+var mnot = measure(qn, 0)
+printf("  NOT(0) = %d\n", mnot)
+qreg_free(qn)
+
+printf("--- 2. AND (CCX门) ---\n")
+var and_ok = 0
+var and_total = 0
+var a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        var qa = qreg_create(3)
+        if (a == 1): x qa[0] end
+        if (b == 1): x qa[1] end
+        ccx qa[0], qa[1], qa[2]
+        var r = measure(qa, 2)
+        var expected = 0
+        if (a == 1 and b == 1): expected = 1 end
+        and_total = and_total + 1
+        if (r == expected): and_ok = and_ok + 1 end
+        qreg_free(qa)
+        b = b + 1
+    end
+    a = a + 1
+end
+printf("  AND: %d/%d\n", and_ok, and_total)
+
+printf("--- 3. XOR (CX门) ---\n")
+var xor_ok = 0
+var xor_total = 0
+a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        var qx = qreg_create(3)
+        if (a == 1): x qx[0] end
+        if (b == 1): x qx[1] end
+        cx qx[0], qx[2]
+        cx qx[1], qx[2]
+        var r = measure(qx, 2)
+        var expected = 0
+        if (a != b): expected = 1 end
+        xor_total = xor_total + 1
+        if (r == expected): xor_ok = xor_ok + 1 end
+        qreg_free(qx)
+        b = b + 1
+    end
+    a = a + 1
+end
+printf("  XOR: %d/%d\n", xor_ok, xor_total)
+
+printf("--- 4. OR (逻辑等价) ---\n")
+var or_ok = 0
+var or_total = 0
+a = 0
+while (a <= 1):
+    var b = 0
+    while (b <= 1):
+        var qo = qreg_create(4)
+        if (a == 1): x qo[0] end
+        if (b == 1): x qo[1] end
+        # OR = NOT(NOT a AND NOT b)
+        x qo[0]
+        x qo[1]
+        ccx qo[0], qo[1], qo[2]
+        x qo[2]
+        var r = measure(qo, 2)
+        var expected = 0
+        if (a == 1 or b == 1): expected = 1 end
+        or_total = or_total + 1
+        if (r == expected): or_ok = or_ok + 1 end
+        qreg_free(qo)
+        b = b + 1
+    end
+    a = a + 1
+end
+printf("  OR: %d/%d\n", or_ok, or_total)
+
+printf("\n--- 5. NAND (通用门) ---\n")
+var qn2 = qreg_create(3)
+x qn2[0]
+x qn2[1]
+ccx qn2[0], qn2[1], qn2[2]
+x qn2[2]
+var m_nand = measure(qn2, 2)
+printf("  NAND(1,1) = %d (期望0)\n", m_nand)
+qreg_free(qn2)
+
+printf("\n门集: X(单比特), CX(受控), CCX(Toffoli) 是通用门集\n")
+printf("可构造任意布尔电路: 已验证AND/XOR/OR\n")
+
+printf("\n=== 量子布尔逻辑完成 ===\n")

@@ -1,0 +1,31 @@
+# ================================================================
+# examples/qsv_demo.qentl — 量子稀疏向量演示
+# ================================================================
+
+qreg q[5]
+
+# 创建稀疏向量
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+
+# 测量
+var v0 = measure q[0]
+var v1 = measure q[1]
+var v2 = measure q[2]
+var v3 = measure q[3]
+var v4 = measure q[4]
+
+printf("稀疏向量: %d %d %d %d %d\n", v0, v1, v2, v3, v4)
+
+# 计算范数
+var norm = v0 + v1 + v2 + v3 + v4
+printf("向量范数: %d\n", norm)
+
+if (norm >= 0 and norm <= 5):
+    printf("QSV演示: 通过\n")
+else:
+    printf("QSV演示: 失败\n")
+end

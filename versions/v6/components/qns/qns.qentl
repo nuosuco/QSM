@@ -1,0 +1,126 @@
+# ================================================================
+# lib/qns.qentl — 量子神经叠加态 (Quantum Neural Superposition)
+# v5-生长: 新增源码升级能力
+# 每个量子应用独立拥有QNS+QDFS两个基础
+# QNS基于QDFS实现自动合并/分离 + 源码升级
+# ================================================================
+
+# ---- QNS常量定义 ----
+var NS_SYSTEM = "system"
+var NS_MODELS = "models"
+
+# ---- QNS实例创建 ----
+def qns_instance_create(qdfs_base, app_name):
+    var root = qdfs_instance_create(qdfs_base, app_name)
+    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪 v5")
+    qdfs_ns_write(NS_MODELS, "qns_weights", "权重: 生长态")
+    printf(" QNS实例创建: %s\n", root)
+    return root
+end
+
+# ---- QNS算力合并 ----
+def qns_merge(ns_a, ns_b):
+    var out = qdfs_ns_merge(ns_a, ns_b)
+    printf(" QNS合并: %s\n", out)
+    return out
+end
+
+# ---- QNS算力分离 ----
+def qns_split(ns_a, ns_b, prefix):
+    var out = qdfs_ns_split(ns_a, ns_b, prefix)
+    printf(" QNS分离: %s\n", out)
+    return out
+end
+
+# ---- QNS源码读取 ----
+def qns_read_source(filepath):
+    var content = file_read(filepath)
+    if (str_len(content) == 0):
+        printf(" QNS: 无法读取 %s\n", filepath)
+        return ""
+    end
+    printf(" QNS: 读取 %s (%d 字节)\n", filepath, str_len(content))
+    return content
+end
+
+# ---- QNS源码查找 ----
+def qns_find(source, keyword):
+    return str_index_of(source, keyword)
+end
+
+# ---- QNS源码替换 ----
+def qns_replace(source, old, new):
+    var idx = str_index_of(source, old)
+    if (idx < 0):
+        printf(" QNS: 未找到 '%s'\n", old)
+        return source
+    end
+    var before = str_substring(source, 0, idx)
+    var after = str_substring(source, idx + str_len(old), str_len(source) - idx - str_len(old))
+    printf(" QNS: 替换 '%s' -> '%s' (位置 %d)\n", old, new, idx)
+    return str_concat(before, str_concat(new, after))
+end
+
+# ---- QNS源码插入 ----
+def qns_insert_after(source, marker, new_code):
+    var idx = str_index_of(source, marker)
+    if (idx < 0):
+        printf(" QNS: 未找到标记 '%s'\n", marker)
+        return source
+    end
+    var pos = idx + str_len(marker)
+    var before = str_substring(source, 0, pos)
+    var after = str_substring(source, pos, str_len(source) - pos)
+    printf(" QNS: 在 '%s' 后插入新代码 (位置 %d)\n", marker, pos)
+    return str_concat(before, str_concat(new_code, after))
+end
+
+# ---- QNS保存源码 ----
+def qns_save_source(filepath, content):
+    var ret = file_write_bytes(filepath, content)
+    printf(" QNS: 保存 %s (%d 字节)\n", filepath, str_len(content))
+    return ret
+end
+
+# ---- QNS版本标记 ----
+def qns_add_version_marker(source, component, version):
+    var old_ver = "v2: QEntL"
+    var new_ver = str_concat("v", str_concat(version, ": QEntL"))
+    return qns_replace(source, old_ver, new_ver)
+end
+
+# ---- QNS升级组件 ----
+def qns_upgrade(component_name):
+    var filepath = str_concat("components/", str_concat(component_name, "/"))
+    filepath = str_concat(filepath, str_concat(component_name, ".qentl"))
+    
+    printf(" QNS: 开始升级 %s\n", component_name)
+    printf(" QNS: 读取 %s\n", filepath)
+    
+    var source = qns_read_source(filepath)
+    if (str_len(source) == 0):
+        printf(" QNS: 升级失败！\n")
+        return 0
+    end
+    
+    # 添加版本标记
+    var new_source = qns_add_version_marker(source, component_name, "5生长")
+    if (str_eq(new_source, source)):
+        printf(" QNS: 无需修改 %s\n", component_name)
+        return 0
+    end
+    
+    # 保存新源码
+    var ret = qns_save_source(filepath, new_source)
+    printf(" QNS: 升级完成！\n")
+    return 1
+end
+
+# ---- QNS状态报告 ----
+def qns_status():
+    printf(" QNS状态: %s\n", qdfs_ns_read(NS_SYSTEM, "qns_meta"))
+    printf(" QNS权重: %s\n", qdfs_ns_read(NS_MODELS, "qns_weights"))
+    printf(" QNS文件: %s\n", qdfs_ns_ls(NS_MODELS))
+    printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级 v5\n")
+    return 1
+end

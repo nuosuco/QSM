@@ -1,0 +1,25 @@
+# ================================================================
+# examples/bell_pair.qentl — Bell态对演示
+# 创建多个Bell态对，展示最大纠缠
+# ================================================================
+qreg q[4]
+# 创建第一个Bell态对: q[0]-q[1]
+h q[0]
+cx q[0], q[1]
+# 创建第二个Bell态对: q[2]-q[3]
+h q[2]
+cx q[2], q[3]
+# 测量所有量子位
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var m3 = measure q[3]
+printf("Bell态对测量: q0=%d q1=%d q2=%d q3=%d\n", m0, m1, m2, m3)
+# 验证纠缠: 同一对量子位测量结果相同
+var bell1_ok = (m0 == m1)
+var bell2_ok = (m2 == m3)
+if (bell1_ok and bell2_ok):
+    printf("Bell态对验证: 通过 (两对量子位完全纠缠)\n")
+else:
+    printf("Bell态对验证: 失败\n")
+end

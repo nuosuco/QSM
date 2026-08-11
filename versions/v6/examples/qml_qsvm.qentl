@@ -1,0 +1,30 @@
+# ================================================================
+# examples/qml_qsvm.qentl — 量子支持向量机
+# 使用量子叠加态进行分类
+# ================================================================
+
+qreg q[3]
+
+# 数据编码
+h q[0]
+h q[1]
+h q[2]
+
+# 纠缠
+cx q[0], q[1]
+cx q[1], q[2]
+
+# 分类决策
+var c0 = measure q[0]
+var c1 = measure q[1]
+var c2 = measure q[2]
+
+printf("QSVM分类: %d %d %d\n", c0, c1, c2)
+
+# 决策边界验证
+var decision = c0 + c1 + c2
+if (decision >= 1 and decision <= 2):
+    printf("量子SVM验证: 通过\n")
+else:
+    printf("量子SVM验证: 失败\n")
+end

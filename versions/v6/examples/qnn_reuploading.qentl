@@ -1,0 +1,79 @@
+# ================================================================
+# 量子变分分类器 — 数据重新上传(Data Re-uploading)
+# 多层变分拟设解决OR函数
+# 之前RY-CX单层拟设无法表达OR
+# Data Re-uploading: 多次编码输入增强表达力
+# ================================================================
+
+printf("=== 量子Data Re-uploading分类器 ===\n\n")
+
+# 3层拟设: 编码→RY→CX→编码→RY→CX→编码→RY→测量
+printf("--- 3层拟设结构 ---\n")
+printf("  层1: 编码 → RY(t1) → CX\n")
+printf("  层2: 编码 → RY(t2) → CX\n")
+printf("  层3: 编码 → RY(t3) → 测量\n\n")
+
+# 用3组参数(t1,t2,t3)做网格搜索
+printf("--- 网格搜索训练 ---\n")
+var best_loss = 100
+var best_t1 = 0
+var best_t2 = 0
+var best_t3 = 0
+var t1 = 0
+while (t1 <= 3141):
+    var t2 = 0
+    while (t2 <= 3141):
+        # 用固定t3=1000, 只扫t1,t2
+        var loss = 0
+        var input0 = 0
+        while (input0 <= 1):
+            var input1 = 0
+            while (input1 <= 1):
+                var q = qreg_create(2)
+                # 层1: 编码+RY+CX
+                if (input0 > 0): apply_ry(q, 0, 1570) end
+                if (input1 > 0): apply_ry(q, 1, 1570) end
+                apply_ry(q, 0, t1)
+                apply_ry(q, 1, t1)
+                apply_cx(q, 0, 1)
+                # 层2: 编码+RY+CX
+                if (input0 > 0): apply_ry(q, 0, 1570) end
+                if (input1 > 0): apply_ry(q, 1, 1570) end
+                apply_ry(q, 0, t2)
+                apply_ry(q, 1, t2)
+                apply_cx(q, 1, 0)
+                # 层3: 编码+RY, 测量
+                if (input0 > 0): apply_ry(q, 0, 1570) end
+                if (input1 > 0): apply_ry(q, 1, 1570) end
+                apply_ry(q, 0, 1000)
+                var result = measure(q, 0)
+                var expected = 0
+                if (input0 > 0 or input1 > 0): expected = 1 end
+                if (result != expected): loss = loss + 1 end
+                input1 = input1 + 1
+            end
+            input0 = input0 + 1
+        end
+        if (loss < best_loss):
+            best_loss = loss
+            best_t1 = t1
+            best_t2 = t2
+            best_t3 = 1000
+            printf("  新最优: t1=%d, t2=%d, loss=%d\n", t1, t2, loss)
+        end
+        t2 = t2 + 1000
+    end
+    t1 = t1 + 1000
+end
+
+printf("\n--- 最终结果 ---\n")
+printf("  最优参数: t1=%d, t2=%d, t3=%d\n", best_t1, best_t2, best_t3)
+printf("  最优损失: %d/4\n", best_loss)
+if (best_loss == 0):
+    printf("  ✓ 3层Data Re-uploading成功表达OR!\n")
+else:
+    printf("  ✗ 仍需更多层或更优参数, 损失=%d/4\n", best_loss)
+    printf("  → 启发: 量子变分线路的表达力受限于层数和纠缠结构\n")
+end
+
+printf("\n=== QNN Data Re-uploading演示完成 ===\n")

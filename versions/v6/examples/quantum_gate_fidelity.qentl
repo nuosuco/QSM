@@ -1,0 +1,97 @@
+# ================================================================
+# 量子门保真度基准 — 单门/双门保真度
+# 基准测试: 量子门实现的质量
+# ================================================================
+
+printf("=== 量子门保真度基准 ===\n\n")
+
+# 测试1: 单比特门保真度 (H-H恒等)
+printf("--- 单比特门: H-H恒等 ---\n")
+var hh_ok = 0
+var i = 0
+while (i < 100):
+    var q = qreg_create(1)
+    h q[0]
+    h q[0]
+    var m = measure(q, 0)
+    if (m == 0): hh_ok = hh_ok + 1 end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  H-H=|0>: %d/100 (%d%%)\n", hh_ok, hh_ok)
+
+# 测试2: X-X恒等
+printf("\n--- 单比特门: X-X恒等 ---\n")
+var xx_ok = 0
+i = 0
+while (i < 100):
+    var q = qreg_create(1)
+    x q[0]
+    var m = measure(q, 0)
+    if (m == 1): xx_ok = xx_ok + 1 end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  X=|1>: %d/100 (%d%%)\n", xx_ok, xx_ok)
+
+# 测试3: 双比特门 (CX-CX恒等)
+printf("\n--- 双比特门: CX-CX恒等 ---\n")
+var cx_ok = 0
+i = 0
+while (i < 100):
+    var q = qreg_create(2)
+    x q[0]
+    cx q[0], q[1]
+    cx q[0], q[1]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    if (m0 == 1 and m1 == 0): cx_ok = cx_ok + 1 end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  CX-CX: %d/100 (%d%%)\n", cx_ok, cx_ok)
+
+# 测试4: Bell态纠缠保真度
+printf("\n--- 双比特门: Bell态纠缠 ---\n")
+var bell_ok = 0
+i = 0
+while (i < 100):
+    var q = qreg_create(2)
+    h q[0]
+    cx q[0], q[1]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    if (m0 == m1): bell_ok = bell_ok + 1 end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  Bell态: %d/100 (%d%%)\n", bell_ok, bell_ok)
+
+# 测试5: 三比特门 (CCX-Toffoli恒等)
+printf("\n--- 三比特门: Toffoli恒等 ---\n")
+var ccx_ok = 0
+i = 0
+while (i < 100):
+    var q = qreg_create(3)
+    x q[0]
+    x q[1]
+    ccx q[0], q[1], q[2]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    var m2 = measure(q, 2)
+    if (m0 == 1 and m1 == 1 and m2 == 1): ccx_ok = ccx_ok + 1 end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  CCX(1,1): %d/100 (%d%%)\n", ccx_ok, ccx_ok)
+
+# 汇总
+printf("\n=== 门保真度汇总 ===\n")
+printf("H-H恒等: %d%%\n", hh_ok)
+printf("X门: %d%%\n", xx_ok)
+printf("CX-CX恒等: %d%%\n", cx_ok)
+printf("Bell态纠缠: %d%%\n", bell_ok)
+printf("Toffoli: %d%%\n", ccx_ok)
+printf("平均保真度: %d%%\n", (hh_ok + xx_ok + cx_ok + bell_ok + ccx_ok) / 5)
+
+printf("\n=== 门保真度基准完成 ===\n")

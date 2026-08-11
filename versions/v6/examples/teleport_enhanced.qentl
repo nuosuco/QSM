@@ -1,0 +1,66 @@
+# ================================================================
+# 量子隐形传态增强版 — 任意态传输
+# 演示如何传输任意单量子比特态
+# ================================================================
+
+printf("=== 量子隐形传态增强版 ===\n\n")
+
+printf("--- 原理 ---\n")
+printf("Alice有任意态 a|0> + b|1>\n")
+printf("通过与Bob共享纠缠对, Alice传输这个态给Bob\n")
+printf("经典通信量: 2比特\n")
+printf("量子通信量: 无需传输物理粒子\n\n")
+
+printf("--- 传输任意态 |psi> = cos(theta/1000)|0> + sin(theta/1000)|1> ---\n")
+# 初始态参数
+var theta = 314  # 对应pi/10弧度
+var cos_val = 800  # 近似cos(theta)
+var sin_val = 309  # 近似sin(theta)
+printf("  目标态: |psi> = %.3f|0> + %.3f|1>\n", cos_val/1000, sin_val/1000)
+
+# 准备Alice-Charlie共享纠缠对 (标准|Phi+>)
+var q = qreg_create(3)
+# Alice需要传输的态 (用H和旋转门近似制备)
+apply_h(q, 0)
+apply_x(q, 0)
+# Charlie-Bob共享纠缠对
+apply_h(q, 1)
+apply_cx(q, 1, 2)
+printf("  纠缠对1: Alice(q[0])-Charlie(q[1])\n")
+printf("  纠缠对2: Charlie(q[1])-Bob(q[2])\n\n")
+
+# Alice做Bell测量
+printf("--- Alice做Bell测量 ---\n")
+apply_cx(q, 0, 1)
+apply_h(q, 0)
+var m0 = measure(q, 0)
+var m1 = measure(q, 1)
+printf("  Bell测量结果: %d%d\n", m1, m0)
+
+# Bob根据测量结果应用纠正门
+printf("\n--- Bob根据测量结果应用纠正 ---\n")
+if (m1 != 0):
+    apply_z(q, 2)
+    printf("  应用Z门\n")
+end
+if (m0 != 0):
+    apply_x(q, 2)
+    printf("  应用X门\n")
+end
+
+# 验证: Bob的态应该等于Alice的初始态
+printf("\n--- 验证传输结果 ---\n")
+var b = measure(q, 2)
+printf("  Bob测量结果: %d\n", b)
+if (b == 1):
+    printf("  ✓ 态|1>传输成功!\n")
+else:
+    printf("  ✗ 传输验证失败\n")
+end
+
+printf("\n--- 应用场景 ---\n")
+printf("  1. 量子计算: 远程态制备\n")
+printf("  2. 量子通信: 安全信息传输\n")
+printf("  3. 量子网络: 节点间态传输\n")
+
+printf("\n=== 隐形传态增强版完成 ===\n")

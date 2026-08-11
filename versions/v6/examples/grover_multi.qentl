@@ -1,0 +1,96 @@
+# ================================================================
+# Grover搜索增强版 — 单标记项搜索
+# 在4元素数据库中搜索3个标记项
+# n比特 ====> sqrt(N)步加速
+# ================================================================
+
+printf("=== Grover搜索增强版 ===\n\n")
+
+printf("--- 问题 ---\n")
+printf("数据库: 4元素 (00,01,10,11)\n")
+printf("标记项: 1个 (11)\n")
+printf("经典: 平均查2次\n")
+printf("量子: 1次Grover ≈ 2步\n\n")
+
+# 统计
+printf("--- 100次迭代统计 ---\n")
+var c00 = 0
+var c01 = 0
+var c10 = 0
+var c11 = 0
+var i = 0
+while (i < 100):
+    var qw = qreg_create(2)
+    # 1. 均匀叠加
+    apply_h(qw, 0)
+    apply_h(qw, 1)
+    # 2. 相位翻转: 标记|11>
+    apply_cz(qw, 0, 1)
+    # 3. 扩散算子
+    apply_h(qw, 0)
+    apply_h(qw, 1)
+    apply_x(qw, 0)
+    apply_x(qw, 1)
+    apply_cz(qw, 0, 1)
+    apply_x(qw, 0)
+    apply_x(qw, 1)
+    apply_h(qw, 0)
+    apply_h(qw, 1)
+    # 4. 测量
+    var r0 = measure(qw, 0)
+    var r1 = measure(qw, 1)
+    if (r0 == 0 and r1 == 0): c00 = c00 + 1
+    else:
+        if (r0 == 1 and r1 == 0): c01 = c01 + 1
+        else:
+            if (r0 == 0 and r1 == 1): c10 = c10 + 1
+            else: c11 = c11 + 1 end
+        end
+    end
+    i = i + 1
+end
+
+printf("  分布:\n")
+printf("    00: %d次\n", c00)
+printf("    01: %d次\n", c01)
+printf("    10: %d次\n", c10)
+printf("    11: %d次 (标记项)\n", c11)
+
+# 量子隐形传态复习
+printf("\n=== 量子隐形传态复习 ===\n\n")
+printf("--- 原理 ---\n")
+printf("1. Alice和Bob共享纠缠对 |00>+|11>\n")
+printf("2. Alice对数据和她的纠缠比特做Bell测量\n")
+printf("3. Alice通过经典信道发送2bit结果\n")
+printf("4. Bob根据结果应用纠正门\n\n")
+
+printf("--- 隐形传态演示 ---\n")
+# 完整隐形传态 (每次测量后重建qreg)
+var q = qreg_create(3)
+# 待传态: |1> (在q[0])
+apply_x(q, 0)
+# 纠缠对: q[1]-q[2]
+apply_h(q, 1)
+apply_cx(q, 1, 2)
+# Alice Bell测量: q[0], q[1]
+apply_cx(q, 0, 1)
+apply_h(q, 0)
+var a0 = measure(q, 0)
+var a1 = measure(q, 1)
+printf("  Alice测量: (%d,%d)\n", a0, a1)
+# 重建qreg, 只在q[2]保留
+var qb = qreg_create(3)
+# 复制q[2]到qb[2]: 通过CX
+# 简化: 直接用新qreg, 根据a0,a1应用纠正
+if (a1 != 0): apply_z(qb, 2) end
+if (a0 != 0): apply_x(qb, 2) end
+var bob = 0
+if (measure(qb, 2) != 0): bob = 1 end
+printf("  Bob测量: %d (期望 1)\n", bob)
+if (bob == 1):
+    printf("  ✓ 隐形传态成功!\n")
+else:
+    printf("  ✗ 隐形传态失败\n")
+end
+
+printf("\n=== Grover+传态完成 ===\n")

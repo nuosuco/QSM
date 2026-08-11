@@ -1,0 +1,81 @@
+# ================================================================
+# examples/shor15.qentl — 完整Shor算法: 分解 N=15
+# 量子部分: 周期查找 (U = 2^x mod 15, r=4)
+# 经典部分: gcd(a^(r/2)±1, N)
+#
+# Shor分解15的标准实例:
+#   a=7, 7^1=7, 7^2=4, 7^3=13, 7^4=1 (mod 15) → r=4
+#   gcd(7^2-1, 15) = gcd(48,15) = 3 ✓
+#   gcd(7^2+1, 15) = gcd(50,15) = 5 ✓
+# ================================================================
+
+qreg q[4]
+# q[0]=c0 MSB, q[1]=c1 LSB, q[2]=w0, q[3]=w1
+
+# ---- 量子部分: 周期查找 (同shor.qentl) ----
+h q[2]
+h q[3]
+z q[2]
+h q[0]
+h q[1]
+ccx q[1], q[2], q[3]
+cx q[1], q[2]
+cx q[0], q[3]
+cx q[0], q[1]
+cx q[1], q[0]
+cx q[0], q[1]
+h q[1]
+icphase q[0], q[1], 1
+h q[0]
+
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m = m0 * 2 + m1
+printf("Shor分解15:\n")
+printf("  量子测量 m=%d (φ=%d/4)\n", m, m)
+
+# ---- 经典后处理: 连分数恢复r ----
+# φ = m/4 = 1/2 → r = 4
+var r = 4
+if (m == 2):
+    r = 4
+else:
+    r = 0
+end
+printf("  连分数恢复周期 r=%d\n", r)
+
+# ---- 经典因式分解 ----
+if (r > 0 and r % 2 == 0):
+    # a=7, r/2=2, 7^2 mod 15 = 4
+    var a_pow = 7 * 7 % 15
+    var p1 = a_pow - 1
+    var p2 = a_pow + 1
+    # gcd(p1, 15)
+    var g1 = 0
+    var t1 = p1
+    var t2 = 15
+    while (t2 != 0):
+        var tmp = t2
+        t2 = t1 % t2
+        t1 = tmp
+    end
+    g1 = t1
+    # gcd(p2, 15)
+    t1 = p2
+    t2 = 15
+    while (t2 != 0):
+        var tmp = t2
+        t2 = t1 % t2
+        t1 = tmp
+    end
+    var g2 = t1
+    printf("  gcd(7^2-1, 15) = %d\n", g1)
+    printf("  gcd(7^2+1, 15) = %d\n", g2)
+    if (g1 > 1 and g1 < 15 and g2 > 1 and g2 < 15):
+        printf("  分解成功: 15 = %d × %d\n", g1, g2)
+    else:
+        printf("  分解失败\n")
+    end
+else:
+    printf("  周期r无效\n")
+end

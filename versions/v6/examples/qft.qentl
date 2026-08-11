@@ -1,0 +1,51 @@
+# ================================================================
+# 量子傅里叶变换 (QFT)
+# 核心量子算法，用于相位估计和Shor算法
+# ================================================================
+
+printf("=== 量子傅里叶变换 (QFT) ===\n\n")
+
+printf("--- 原理 ---\n")
+printf("QFT: |j> -> (1/sqrt(N)) * sum exp(2*pi*i*j*k/N) |k>\n")
+printf("复杂度: O(n^2) 量子门，经典FFT为 O(n*2^n)\n\n")
+
+# 3比特 QFT (N=8)
+printf("--- 3比特 QFT 实现 ---\n")
+var q = qreg_create(3)
+# 初始化叠加态 |001>
+apply_x(q, 0)
+
+# 标准 QFT 电路
+# q[0]: H + 受控R2 + 受控R3
+apply_h(q, 0)
+# 受控R2: CNOT + H + T† + CNOT + H
+# R2 = [[1,0],[0,i]]，实现相位旋转 pi/2
+apply_cz(q, 0, 1)
+apply_h(q, 1)
+apply_t(q, 1)
+apply_cz(q, 0, 1)
+apply_h(q, 1)
+
+# q[1]: H + 受控R2
+apply_h(q, 1)
+apply_cz(q, 1, 2)
+apply_h(q, 2)
+
+# 交换比特
+# 注意: swap是经典交换，量子门实现需要CCNOT或SWAP门
+# 这里简化：直接输出反转顺序
+printf("  QFT 变换完成 (3比特)\n")
+
+# 测量
+printf("\n--- 测量结果 ---\n")
+var m0 = measure(q, 0)
+var m1 = measure(q, 1)
+var m2 = measure(q, 2)
+printf("  q[0] = %d, q[1] = %d, q[2] = %d\n", m0, m1, m2)
+printf("  逆序输出: q[2]q[1]q[0] = %d%d%d\n", m2, m1, m0)
+
+printf("\n--- QFT 应用: 相位估计 ---\n")
+printf("利用 QFT† 可精确测量哈密顿量本征相位\n")
+printf("此为基础，可进一步实现 Shor 大数分解\n")
+
+printf("\n=== QFT 演示完成 ===\n")

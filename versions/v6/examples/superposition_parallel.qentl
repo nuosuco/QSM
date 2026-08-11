@@ -1,0 +1,51 @@
+# ================================================================
+# 叠加态并行 — QEntL量子并行执行基础
+# 展示: 3比特寄存器 = 8个平行世界同时存在
+# 叠加态并行是所有量子应用的基础
+# ================================================================
+
+printf("=== 叠加态并行 ===\n")
+printf("3比特H门 = 8个平行世界叠加态并行\n")
+printf("这是量子并行的基础: 一次计算处理所有分支\n\n")
+
+# 3比特全H门 → 等概率叠加8个基态
+var q = qreg_create(3)
+apply_h(q, 0)
+apply_h(q, 1)
+apply_h(q, 2)
+
+# 8个世界叠加态: |000⟩+|001⟩+...+|111⟩
+# 一次测量坍缩到一个世界
+var b0 = measure(q, 0)
+var b1 = measure(q, 1)
+var b2 = measure(q, 2)
+printf("单次测量坍缩到世界: %d%d%d\n", b2, b1, b0)
+qreg_free(q)
+
+# 多次运行统计分布
+printf("\n--- 64次运行, 8个世界分布统计 ---\n")
+var cnt[8]
+cnt[0]=0; cnt[1]=0; cnt[2]=0; cnt[3]=0
+cnt[4]=0; cnt[5]=0; cnt[6]=0; cnt[7]=0
+
+var run = 0
+while (run < 64):
+    var q2 = qreg_create(3)
+    apply_h(q2, 0); apply_h(q2, 1); apply_h(q2, 2)
+    var x0 = measure(q2, 0)
+    var x1 = measure(q2, 1)
+    var x2 = measure(q2, 2)
+    var idx = x0 + x1 * 2 + x2 * 4
+    cnt[idx] = cnt[idx] + 1
+    qreg_free(q2)
+    run = run + 1
+end
+
+run = 0
+while (run < 8):
+    printf("  世界%d: %d次\n", run, cnt[run])
+    run = run + 1
+end
+
+printf("\n8个世界等概率分布, 叠加态并行 ✅\n")
+printf("=== 叠加态并行基础完成 ===\n")

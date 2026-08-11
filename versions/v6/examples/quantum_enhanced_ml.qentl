@@ -1,0 +1,78 @@
+# ================================================================
+# 量子计算+AI融合 — 量子增强学习
+# 演示量子电路在强化学习中的应用
+# ================================================================
+
+printf("=== 量子增强学习演示 ===\n\n")
+
+# 强化学习环境: 简单迷宫问题
+# 状态: 4个位置 (0,1,2,3)
+# 动作: 2个选择 (左/右)
+# 奖励: 到达目标位置得+1, 其他-1
+
+# 量子编码状态和动作
+# 状态: 2比特量子寄存器
+# 动作: 通过测量结果选择
+
+printf("环境: 4位置迷宫\n")
+printf("目标: 到达位置3\n\n")
+
+# 测试不同初始状态下的最优策略
+var total_reward = 0
+var i = 0
+while (i < 4):
+    printf("--- 状态 %d ---\n", i)
+    
+    # 量子编码状态
+    qreg q[2]
+    var s0 = i % 2
+    var s1 = i / 2
+    if (s0 == 1):
+        x q[0]
+    end
+    if (s1 == 1):
+        x q[1]
+    end
+    
+    # 量子策略: H门产生叠加态
+    h q[0]
+    h q[1]
+    
+    # 测量选择动作
+    var a0 = measure q[0]
+    var a1 = measure q[1]
+    var action = a0 * 2 + a1
+    
+    # 确定移动方向
+    var next_state = 0
+    if (action == 0 or action == 1):
+        next_state = i - 1
+        if (next_state < 0):
+            next_state = 0
+        end
+    else:
+        next_state = i + 1
+        if (next_state > 3):
+            next_state = 3
+        end
+    end
+    
+    # 计算奖励
+    var reward = 0
+    if (next_state == 3):
+        reward = 1
+    else:
+        reward = -1
+    end
+    total_reward = total_reward + reward
+    
+    printf("  状态=%d, 动作=%d → 下一状态=%d, 奖励=%d\n", i, action, next_state, reward)
+    i = i + 1
+end
+
+printf("\n总奖励: %d\n", total_reward)
+if (total_reward > 0):
+    printf("量子增强学习: 通过 ✅\n")
+else:
+    printf("量子增强学习: 尝试中...\n")
+end
