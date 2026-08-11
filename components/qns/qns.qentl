@@ -391,6 +391,23 @@ def qns_build_growth_lib():
     qns_save_source("lib/ref_self_reflect.qentl", rlib)
     printf(" QNS: 生成ReF自反省库 v%s\n", ver)
     
+    # 生成自举生长脚本
+    var bootstrap = "# QNS自举生长脚本 v"
+    bootstrap = str_concat(bootstrap, ver)
+    bootstrap = str_concat(bootstrap, "\n# QNS生成\n\n")
+    bootstrap = str_concat(bootstrap, "def qns_bootstrap_run():\n")
+    bootstrap = str_concat(bootstrap, "    printf(\"QNS自举生长脚本: 正常\n\")
+")
+    bootstrap = str_concat(bootstrap, "    var ver = file_read(\".current_version\")
+")
+    bootstrap = str_concat(bootstrap, "    if (str_len(ver) > 0):\n")
+    bootstrap = str_concat(bootstrap, "        printf(\"当前版本: v%s\n\", ver)\n")
+    bootstrap = str_concat(bootstrap, "    end\n")
+    bootstrap = str_concat(bootstrap, "    return 1\n")
+    bootstrap = str_concat(bootstrap, "end\n")
+    qns_save_source("lib/qns_bootstrap_script.qentl", bootstrap)
+    printf(" QNS: 生成自举生长脚本 v%s\n", ver)
+    
     # 生成QSM增强版
     qns_gen_qsm_model("qsm_enhanced", "5", "QSM增强版")
     

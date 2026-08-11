@@ -1,0 +1,13 @@
+# QNS自举生长脚本 v50
+# QNS生成
+
+def qns_bootstrap_run():
+    printf("QNS自举生长脚本: 正常
+")
+    var ver = file_read(".current_version")
+    if (str_len(ver) > 0):
+        printf("当前版本: v%s
+", ver)
+    end
+    return 1
+end
