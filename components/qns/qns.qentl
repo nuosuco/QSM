@@ -312,8 +312,14 @@ def qns_build_growth_lib():
     vlib = str_concat(vlib, "\n# QNS生成\n\n")
     vlib = str_concat(vlib, "def qns_version_report():
 ")
-    vlib = str_concat(vlib, "    printf(\"QNS版本报告: 正常\n\")
+    vlib = str_concat(vlib, "    var ver = file_read(\".current_version\")\n")
+    vlib = str_concat(vlib, "    if (str_len(ver) > 0):\n")
+    vlib = str_concat(vlib, "        printf(\"QNS版本报告: 当前版本 %s\n\", ver)
 ")
+    vlib = str_concat(vlib, "    else:\n")
+    vlib = str_concat(vlib, "        printf(\"QNS版本报告: 未知版本\n\")
+")
+    vlib = str_concat(vlib, "    end\n")
     vlib = str_concat(vlib, "    return 1
 ")
     vlib = str_concat(vlib, "end
