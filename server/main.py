@@ -1287,7 +1287,7 @@ async def wechat_menu_create():
                 },
                 {
                     "type": "view",
-                    "name": "我的",
+                    "name": "我",
                     "url": "https://som.top/profile"
                 }
             ]
