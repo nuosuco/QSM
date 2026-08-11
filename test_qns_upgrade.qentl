@@ -1,0 +1,19 @@
+# QNS升级能力测试
+var ns = qns_instance_create("/tmp/qns_test", "qns_test")
+qns_status()
+
+# 测试读取QCL源码
+var src = qns_read_source("components/qcl/qcl.qentl")
+printf(" 读取QCL: 长度=%d\n", str_len(src))
+
+# 测试查找
+var found = qns_find(src, "自举")
+printf(" 查找'自举': 位置=%d\n", found)
+
+# 测试替换
+var new_src = qns_replace(src, "v2: QEntL", "v2: QEntL-QNS自举")
+printf(" 替换完成: 长度=%d\n", str_len(new_src))
+
+# 测试保存
+qns_save_source("/tmp/qns_upgrade_test.qentl", new_src)
+printf(" 保存完成\n")
