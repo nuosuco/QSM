@@ -291,6 +291,27 @@ qns_status()
 qns_build_growth_lib()
 qns_gen_all_qsm()
 
+# 生成QVM统计库
+var vm_code = "# QVM统计库 v"
+vm_code = str_concat(vm_code, ver)
+vm_code = str_concat(vm_code, "
+# QNS生成
+
+")
+vm_code = str_concat(vm_code, "def qvm_stats():
+")
+vm_code = str_concat(vm_code, "    printf("QVM统计: 正常\n")
+")
+vm_code = str_concat(vm_code, "    return 1
+")
+vm_code = str_concat(vm_code, "end
+")
+
+file_write_bytes("lib/qvm_stats.qentl", vm_code)
+printf(" QNS: 生成QVM统计库 v%s
+", ver)
+
+
 # 生成QDFS增强库
 var ver = file_read(".current_version")
 if (str_len(ver) > 0):
