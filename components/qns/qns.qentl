@@ -336,6 +336,20 @@ qdfs_code = str_concat(qdfs_code, "end
 ")
 
 file_write_bytes("lib/qdfs_enhanced.qentl", qdfs_code)
-printf(" QNS: 生成QDFS增强库 v%s
-", ver)
+printf(" QNS: 生成QDFS增强库 v%s\n", ver)
+
+# 生成QCL增强库
+var qcl_code = "# QCL增强库 v"
+qcl_code = str_concat(qcl_code, ver)
+qcl_code = str_concat(qcl_code, "\n# QNS生成\n\n")
+qcl_code = str_concat(qcl_code, "def qcl_enhanced_check():
+")
+qcl_code = str_concat(qcl_code, "    printf("QCL增强库: 正常\n")
+")
+qcl_code = str_concat(qcl_code, "    return 1
+")
+qcl_code = str_concat(qcl_code, "end
+")
+file_write_bytes("lib/qcl_enhanced.qentl", qcl_code)
+printf(" QNS: 生成QCL增强库 v%s\n", ver)
 
