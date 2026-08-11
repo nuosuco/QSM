@@ -21,6 +21,7 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
 from fastapi import FastAPI, HTTPException, Query, Response
+from starlette.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from services.api_auth import APIAuthMiddleware
@@ -1225,8 +1226,24 @@ async def wechat_message_receive():
 
 @app.get("/wechat-callback")
 async def wechat_oauth_callback(code: str = None, state: str = None):
-    """微信服务号OAuth2.0回调（已废弃，保留兼容）"""
-    return HTMLResponse("<script>window.location.href='/';alert('请使用账号密码登录');</script>")
+    """微信服务号OAuth2.0回调"""
+    if not code:
+        return HTMLResponse("<script>window.location.href='/';alert('微信授权失败');</script>")
+    
+    from services import auth_service
+    result = auth_service.wechat_web_login(code)
+    
+    if result.get('success'):
+        response = HTMLResponse(f"""
+            <script>
+                localStorage.setItem('som_auth_token', '{result['token']}');
+                localStorage.setItem('som_auth_user', JSON.stringify({json.dumps(result['user'])}));
+                window.location.href='/';
+            </script>
+        """)
+        return response
+    else:
+        return HTMLResponse(f"<script>window.location.href='/';alert('{result.get('error', '登录失败')}');</script>")
 
 @app.post("/api/wechat/menu")
 async def wechat_menu_create():
