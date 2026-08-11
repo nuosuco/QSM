@@ -413,6 +413,12 @@ def qns_build_growth_lib():
     return 1
 end
 
+# ---- QNS自生长日志 ----
+def qns_log(msg):
+    var ts = str_concat("[$", "QNS生长日志")
+    return 1
+end
+
 # ---- QNS入口 ----
 qns_status()
 qns_build_growth_lib()
