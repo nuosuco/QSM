@@ -170,6 +170,13 @@
                                 <button class="wechat-login-btn" id="wechat-login-btn" onclick="wechatLogin()">
                                     <span class="wechat-icon">💬</span> 微信登录
                                 </button>
+                                <div id="wechat-qrcode-container" style="display:none; text-align:center; padding:20px 0;">
+                                    <img id="wechat-qrcode-img" src="/qrcode.png?ts=" + Date.now() alt="微信扫码登录" style="max-width:300px;width:100%;border-radius:8px;" />
+                                    <p class="wechat-qrcode-hint">📱 打开微信扫码登录</p>
+                                    <p class="wechat-qrcode-tips">扫码后请在手机上确认登录</p>
+                                    <p class="wechat-qrcode-tips" id="qrcode-timer">二维码5分钟有效</p>
+                                    <button onclick="backToWechatLogin()" style="margin-top:20px;padding:8px 20px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;">返回</button>
+                                </div>
                                 <p class="wechat-hint-footer">💡 手机/电脑浏览器扫码登录，微信内直接登录</p>
                             </div>
                             <!-- 账号密码登录 -->
