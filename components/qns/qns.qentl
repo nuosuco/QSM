@@ -390,6 +390,19 @@ def qns_build_growth_lib():
     qns_save_source("lib/ref_self_reflect.qentl", rlib)
     printf(" QNS: 生成ReF自反省库 v%s\n", ver)
     
+    # 生成QDFS统计库
+    var dfstat = "# QDFS统计库 v"
+    dfstat = str_concat(dfstat, ver)
+    dfstat = str_concat(dfstat, "\n# QNS生成\n\n")
+    dfstat = str_concat(dfstat, "def qdfs_stats():\n")
+    dfstat = str_concat(dfstat, "    var count = qdfs_meta_count()\n")
+    dfstat = str_concat(dfstat, "    var size = qdfs_data_size()\n")
+    dfstat = str_concat(dfstat, "    printf("QDFS统计: 数量=%d 大小=%d\\n\", count, size)\n")
+    dfstat = str_concat(dfstat, "    return 1\n")
+    dfstat = str_concat(dfstat, "end\n")
+    qns_save_source("lib/qdfs_stats.qentl", dfstat)
+    printf(" QNS: 生成QDFS统计库 v%s\n", ver)
+    
     # 生成自举生长脚本
     var bootstrap = "# QNS自举生长脚本 v"
     bootstrap = str_concat(bootstrap, ver)
