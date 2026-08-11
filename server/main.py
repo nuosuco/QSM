@@ -1283,7 +1283,7 @@ async def wechat_menu_create():
                 {
                     "type": "view",
                     "name": "有机好物",
-                    "url": "https://som.top/products"
+                    "url": "https://som.top/yangshenggu"
                 },
                 {
                     "type": "view",
