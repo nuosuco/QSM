@@ -1605,9 +1605,19 @@ function doWechatOAuth() {
     window.location.href = authUrl;
 }
 
-// 二维码登录已废弃（消息推送已授权）
+// 二维码登录
 function showWechatQRCode() {
-    wechatLogin();
+    // 隐藏按钮，显示二维码容器
+    var btn = document.getElementById('wechat-login-btn');
+    var container = document.getElementById('wechat-qrcode-container');
+    if (btn) btn.style.display = 'none';
+    if (container) container.style.display = 'block';
+    
+    // 刷新二维码（加时间戳避免缓存）
+    refreshQRCode();
+    
+    // 开始轮询检查登录状态
+    startQRLoginPolling();
 }
 
 // 刷新二维码
