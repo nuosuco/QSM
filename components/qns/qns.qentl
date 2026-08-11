@@ -13,7 +13,7 @@ var NS_MODELS = "models"
 # ---- QNS实例创建 ----
 def qns_instance_create(qdfs_base, app_name):
     var root = qdfs_instance_create(qdfs_base, app_name)
-    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪 v57")
+    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪 v49")
     qdfs_ns_write(NS_MODELS, "qns_weights", "权重: 生长态")
     printf(" QNS实例创建: %s\n", root)
     return root
@@ -166,8 +166,8 @@ end
 
 # ---- QNS状态报告 ----
 def qns_status():
-    printf(" QNS状态: 就绪 v57\n")
-    printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级, 代码生成 v57\n")
+    printf(" QNS状态: 就绪 v49\n")
+    printf(" QNS能力: 实例创建, 算力合并/分离, 源码升级, 代码生成 v49\n")
     return 1
 end
 
@@ -296,13 +296,12 @@ def qns_build_growth_lib():
     vmlib = str_concat(vmlib, ver)
     vmlib = str_concat(vmlib, "\n# QNS生成\n\n")
     vmlib = str_concat(vmlib, "def qvm_stats_check():\n")
-    vmlib = str_concat(vmlib, "    var qcl_ok = file_exists("run/qcl.qbc")\n")
-    vmlib = str_concat(vmlib, "    var qvm_ok = file_exists("run/qvm.qbc")\n")
-    vmlib = str_concat(vmlib, "    printf("QVM统计: QCL=%d QVM=%d\n", qcl_ok, qvm_ok)\n")
+    vmlib = str_concat(vmlib, "    var qcl_ok = file_exists(\\\"run/qcl.qbc\\\")\\n")
+    vmlib = str_concat(vmlib, "    var qvm_ok = file_exists(\\\"run/qvm.qbc\\\")\\n")
+    vmlib = str_concat(vmlib, "    printf(\\\"QVM统计: QCL=%d QVM=%d\\\\n\\\", qcl_ok, qvm_ok)\\n")
     vmlib = str_concat(vmlib, "    return 1\n")
     vmlib = str_concat(vmlib, "end\n")
     qns_save_source("lib/qvm_stats.qentl", vmlib)
-    printf(" QNS: 生成QVM统计库 v%s\n", ver)
     printf(" QNS: 生成QVM统计库 v%s\n", ver)
     
     # 生成版本报告库
