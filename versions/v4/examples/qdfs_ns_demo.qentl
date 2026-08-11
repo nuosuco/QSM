@@ -1,0 +1,61 @@
+# ================================================================
+# QDFS命名空间验证 — 统一数据层测试
+# 验证: 命名空间隔离 + 跨命名空间纠缠 + 权限模型
+# ================================================================
+
+printf("=== QDFS命名空间验证 ===\n\n")
+
+# 1. 初始化QDFS
+qdfs_init("/tmp/qdfs_ns_demo")
+printf("1. QDFS初始化完成\n")
+
+# 2. system命名空间写入
+qdfs_ns_write("system", "kernel_config", "QVM最大栈=65536")
+printf("2. system: kernel_config 写入\n")
+
+# 3. models命名空间写入
+qdfs_ns_write("models", "QSM_weights", "QSM: w[0]=0.5 w[1]=0.3")
+qdfs_ns_write("models", "WeQ_weights", "WeQ: 纠缠权重=0.8")
+printf("3. models: QSM_weights + WeQ_weights 写入\n")
+
+# 4. users命名空间写入
+qdfs_ns_write("users", "zhonghua/config", "用户: 中华 语言=彝中英")
+qdfs_ns_write("users", "zhonghua/data", "我的量子数据")
+printf("4. users/zhonghua: config + data 写入\n")
+
+# 5. 验证命名空间隔离
+printf("\n5. 验证命名空间隔离\n")
+printf("  system命名空间:\n")
+printf("  %s\n", qdfs_ns_ls("system"))
+printf("  models命名空间:\n")
+printf("  %s", qdfs_ns_ls("models"))
+printf("  users命名空间:\n")
+printf("  %s", qdfs_ns_ls("users"))
+
+# 6. 验证跨命名空间读取
+var sys_data = qdfs_ns_read("system", "kernel_config")
+printf("\n6. system读取: %s\n", sys_data)
+
+var usr_data = qdfs_ns_read("users", "zhonghua/config")
+printf("   users读取: %s\n", usr_data)
+
+# 7. 跨命名空间纠缠
+printf("\n7. 跨命名空间量子纠缠\n")
+qdfs_ns_entangle("models", "WeQ_weights", "users", "zhonghua/data", "纠缠分支0", "纠缠分支1")
+printf("  models:WeQ_weights ↔ users:zhonghua/data 纠缠建立\n")
+
+# 8. 观测纠缠 (只能测一个，另一个同步坍缩)
+var ent_read = qdfs_ns_read("models", "WeQ_weights")
+printf("\n8. 观测models:WeQ_weights: %s\n", ent_read)
+
+# 9. 验证旧API兼容
+printf("\n9. 旧API兼容验证\n")
+qdfs_write("legacy_test", "兼容旧API数据")
+printf("  qdfs_write: %s\n", qdfs_read("legacy_test"))
+
+# 10. 叠加态文件
+printf("\n10. 叠加态文件(命名空间)\n")
+qdfs_ns_superpose("users", "zhonghua/super_data", "好天气", "坏天气")
+printf("  users:zhonghua/super_data 叠加态建立\n")
+
+printf("\n=== QDFS命名空间验证完成 ===\n")

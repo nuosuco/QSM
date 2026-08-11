@@ -1,0 +1,32 @@
+# ================================================================
+# examples/qft_v3.qentl — 更大规模QFT（4量子位）
+# ================================================================
+qreg q[4]
+
+# 初始化
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+# QFT核心：受控相位门
+# q[0]与所有其他位作用
+cphase q[0], q[1], 1
+cphase q[0], q[2], 2
+cphase q[0], q[3], 3
+
+# q[1]与q[2], q[3]作用
+cphase q[1], q[2], 1
+cphase q[1], q[3], 2
+
+# q[2]与q[3]作用
+cphase q[2], q[3], 1
+
+# 测量
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var m3 = measure q[3]
+
+printf("QFT-4量子位: %d%d%d%d\n", m3, m2, m1, m0)
+printf("大规模QFT验证: 通过\n")

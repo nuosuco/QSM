@@ -1,0 +1,81 @@
+# ================================================================
+# 量子Bernstein-Vazirani — 寻找隐藏比特串
+# 量子优势: O(1)次查询 vs O(n)次经典
+# ================================================================
+
+printf("=== Bernstein-Vazirani算法 ===\n\n")
+printf("寻找隐藏比特串s\n")
+printf("经典: 需要n次查询\n")
+printf("量子: 只需1次查询\n\n")
+
+# BV算法: n比特隐藏串s
+# 输入: n比特查询, 1比特工作
+# 输出: f(x)=s·x (mod 2)
+# 测量恢复s
+
+printf("隐藏串s = 101 (5)\n\n")
+
+# 3比特BV: 3数据+1工作
+var q = qreg_create(4)
+
+# 初始化: 工作比特|1>
+x q[3]
+
+# 叠加
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+# Oracle: f(x)=s·x, s=101
+# s0=1: CX q[0]->q[3]
+# s1=0: 无
+# s2=1: CX q[2]->q[3]
+cx q[0], q[3]
+cx q[2], q[3]
+
+# 干涉
+h q[0]
+h q[1]
+h q[2]
+
+# 测量: 恢复s
+var m0 = measure(q, 0)
+var m1 = measure(q, 1)
+var m2 = measure(q, 2)
+printf("恢复的s: %d%d%d\n", m2, m1, m0)
+printf("期望s: 101\n")
+
+# 多次运行验证
+var ok = 0
+var r = 0
+while (r < 20):
+    var q2 = qreg_create(4)
+    x q2[3]
+    h q2[0]
+    h q2[1]
+    h q2[2]
+    h q2[3]
+    cx q2[0], q2[3]
+    cx q2[2], q2[3]
+    h q2[0]
+    h q2[1]
+    h q2[2]
+    var a = measure(q2, 0)
+    var b = measure(q2, 1)
+    var c = measure(q2, 2)
+    if (a == 1 and b == 0 and c == 1):
+        ok = ok + 1
+    end
+    qreg_free(q2)
+    r = r + 1
+end
+
+printf("BV算法: %d/20 正确恢复s=101\n", ok)
+if (ok == 20):
+    printf("BV算法: 通过 ✅ (O(1)查询优势)\n")
+else:
+    printf("BV: 部分正确\n")
+end
+
+printf("\n=== BV算法完成 ===\n")

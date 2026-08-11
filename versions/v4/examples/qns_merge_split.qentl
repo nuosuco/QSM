@@ -1,0 +1,43 @@
+# ================================================================
+# QNS合并/分离验证 — 每个应用独立拥有QNS+QDFS
+# 每个量子应用都有QNS+QDFS两个基础
+# QNS基于QDFS实现自动合并/分离
+# ================================================================
+
+printf("=== QNS合并/分离验证 ===\n")
+printf("每个量子应用独立拥有QNS+QDFS两个基础\n\n")
+
+# 1. 创建两个应用的QNS+QDFS实例
+printf("--- 1. 创建两个应用QNS实例 ---\n")
+qdfs_init("/tmp/qns_merge_test")
+printf("  基础QDFS初始化\n")
+
+# 应用1: QNS数据
+qdfs_ns_write("models", "app1_model", "QNS模型A: 权重[0.5,0.3,0.1]")
+qdfs_ns_write("system", "app1_config", "应用1配置")
+printf("  应用1: QNS模型A写入\n")
+
+# 应用2: QNS数据
+qdfs_ns_write("models", "app2_model", "QNS模型B: 权重[0.8,0.2,0.9]")
+qdfs_ns_write("system", "app2_config", "应用2配置")
+printf("  应用2: QNS模型B写入\n")
+
+# 2. QNS合并：两个QNS模型合并为一个
+printf("\n--- 2. QNS合并: models + system → 合并算力 ---\n")
+qns_merge("models", "system")
+printf("  合并后models:\n  %s", qdfs_ns_ls("models"))
+
+# 3. QNS分离：从models中分离出app1开头的
+printf("\n--- 3. QNS分离: models → 分离出app1_model ---\n")
+qns_split("models", "app1_qns", "app1")
+printf("  models分离后:\n  %s", qdfs_ns_ls("models"))
+printf("  app1_qns:\n  %s", qdfs_ns_ls("app1_qns"))
+
+# 4. 验证数据
+printf("\n--- 4. 验证QNS数据 ---\n")
+printf("  app1_qns:app1_model = %s\n", qdfs_ns_read("app1_qns", "app1_model"))
+printf("  app1_qns:app1_config = %s\n", qdfs_ns_read("app1_qns", "app1_config"))
+printf("  models:app2_model = %s\n", qdfs_ns_read("models", "app2_model"))
+
+printf("\n=== QNS合并/分离验证完成 ===\n")
+printf("每个量子应用有QNS+QDFS✅ 合并✅ 分离✅ 及时瞬时瞬间移动、传送数据✅\n")

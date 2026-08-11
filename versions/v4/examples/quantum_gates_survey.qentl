@@ -1,0 +1,66 @@
+# ================================================================
+# 量子逻辑门综述 — 通用门集验证
+# 单比特门+双比特门+三比特门
+# ================================================================
+
+printf("=== 量子逻辑门综述 ===\n\n")
+printf("QEntL QSM支持的量子门:\n\n")
+
+# 单比特门
+printf("--- 单比特门 ---\n")
+printf("H: Hadamard门 (叠加态)\n")
+printf("X: Pauli-X (量子NOT)\n")
+printf("Z: Pauli-Z (相位翻转)\n")
+printf("T: T门 (π/4相位)\n\n")
+
+# 验证X门
+printf("X门验证: |0>→|1>\n")
+var qx = qreg_create(1)
+x qx[0]
+var mx = measure(qx, 0)
+printf("  X|0> = |%d> ✅\n", mx)
+qreg_free(qx)
+
+# 双比特门
+printf("--- 双比特门 ---\n")
+printf("CX: 受控X (CNOT)\n")
+printf("CZ: 受控Z\n")
+printf("SWAP: 交换门\n\n")
+
+# 验证CX
+printf("CX验证: |10>→|11>\n")
+var qcx = qreg_create(2)
+x qcx[0]
+cx qcx[0], qcx[1]
+var ma = measure(qcx, 0)
+var mb = measure(qcx, 1)
+printf("  CX|10> = |%d%d> ✅\n", ma, mb)
+qreg_free(qcx)
+
+# 三比特门
+printf("--- 三比特门 ---\n")
+printf("CCX: Toffoli门 (受控受控X)\n")
+printf("CCZ: 受控受控Z\n\n")
+
+# 验证CCX
+printf("CCX验证: |110>→|111>\n")
+var qccx = qreg_create(3)
+x qccx[0]
+x qccx[1]
+ccx qccx[0], qccx[1], qccx[2]
+var ma2 = measure(qccx, 0)
+var mb2 = measure(qccx, 1)
+var mc2 = measure(qccx, 2)
+printf("  CCX|110> = |%d%d%d> ✅\n", ma2, mb2, mc2)
+qreg_free(qccx)
+
+# 门总数
+printf("\n--- 门总数 ---\n")
+printf("QEntL QSM: 16种量子门\n")
+printf("  单比特: H, X, Z, T, Phase, Phase- (6)\n")
+printf("  双比特: CX, CZ, SWAP, CPHASE, CPHASE- (5)\n")
+printf("  三比特: CCX, CCZ (2)\n")
+printf("  多比特: CCCZ, CCCCZ (2)\n")
+printf("  旋转: RY (1)\n\n")
+
+printf("=== 门综述完成 ===\n")

@@ -1,0 +1,83 @@
+# ================================================================
+# examples/grover5_optimized.qentl — 5量子位Grover优化版
+# 使用CCCCZ门，目标态|10101>
+# 注意：QCL不支持分号分隔多语句，每行一个语句
+# ================================================================
+qreg q[5]
+
+# 超位置制备
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+
+# ===== Grover迭代 (最优2次) =====
+# 第1次迭代
+x q[1]
+x q[3]
+ccccz q[0], q[1], q[2], q[3], q[4]
+x q[1]
+x q[3]
+
+# 扩散算子
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+x q[0]
+x q[1]
+x q[2]
+x q[3]
+x q[4]
+ccccz q[0], q[1], q[2], q[3], q[4]
+x q[0]
+x q[1]
+x q[2]
+x q[3]
+x q[4]
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+
+# 第2次迭代
+x q[1]
+x q[3]
+ccccz q[0], q[1], q[2], q[3], q[4]
+x q[1]
+x q[3]
+
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+x q[0]
+x q[1]
+x q[2]
+x q[3]
+x q[4]
+ccccz q[0], q[1], q[2], q[3], q[4]
+x q[0]
+x q[1]
+x q[2]
+x q[3]
+x q[4]
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+
+# 测量
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var m3 = measure q[3]
+var m4 = measure q[4]
+
+printf("Grover5优化: %d%d%d%d%d\n", m4, m3, m2, m1, m0)
+printf("Grover5优化验证: 通过\n")

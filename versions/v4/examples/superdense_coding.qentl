@@ -1,0 +1,69 @@
+# ================================================================
+# 量子超密编码 — 传输2比特到1量子比特
+# 利用纠缠: 1量子比特=2经典比特
+# ================================================================
+
+printf("=== 量子超密编码 ===\n\n")
+printf("原理: 通过纠缠, 1量子比特传输2比特\n")
+printf("Alice: 1量子比特, Bob: 1量子比特(纠缠对)\n\n")
+
+# 超密编码协议
+# 1. 制备Bell态: |Φ+> = (|00>+|11>)/√2
+# 2. Alice编码: 根据2比特消息应用门
+# 3. Bob解码: Bell测量
+
+printf("编码4种消息: 00,01,10,11\n\n")
+
+var ok = 0
+var total = 0
+var msg = 0
+while (msg < 4):
+    var r = 0
+    while (r < 10):
+        total = total + 1
+        var q = qreg_create(2)
+        
+        # 制备Bell态
+        h q[0]
+        cx q[0], q[1]
+        
+        # Alice编码: 根据消息应用门
+        # 00: 无操作
+        if (msg == 1):
+            # 01: X门
+            x q[0]
+        end
+        if (msg == 2):
+            # 10: Z门
+            z q[0]
+        end
+        if (msg == 3):
+            # 11: XZ门
+            x q[0]
+            z q[0]
+        end
+        
+        # Bob解码: Bell测量
+        cx q[0], q[1]
+        h q[0]
+        var m0 = measure(q, 0)
+        var m1 = measure(q, 1)
+        var decoded = m0 + m1 * 2
+        
+        if (decoded == msg):
+            ok = ok + 1
+        end
+        qreg_free(q)
+        r = r + 1
+    end
+    msg = msg + 1
+end
+
+printf("超密编码: %d/%d 正确\n", ok, total)
+if (ok == total):
+    printf("超密编码: 通过 ✅ (1量子比特=2经典比特)\n")
+else:
+    printf("超密编码: 部分正确\n")
+end
+
+printf("\n=== 超密编码完成 ===\n")

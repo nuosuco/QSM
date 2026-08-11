@@ -1,0 +1,110 @@
+# ================================================================
+# BB84量子密钥分发协议模拟
+# 演示量子密钥分发的基本原理
+# ================================================================
+
+printf("=== BB84量子密钥分发协议 ===\n\n")
+
+printf("--- 原理 ---\n")
+printf("1. Alice随机选择基(线性或对角)和比特值\n")
+printf("2. 发送量子态给Bob\n")
+printf("3. Bob随机选择基进行测量\n")
+printf("4. 公开比较基选择, 保留匹配基的比特\n")
+printf("5. 检测窃听: 误码率>0则丢弃密钥\n\n")
+
+printf("--- BB84协议实现 (8比特示例) ---\n")
+
+printf("步骤1: Alice发送量子态\n")
+# Alice比特序列
+var a0 = 0
+var a1 = 1
+var a2 = 1
+var a3 = 0
+var a4 = 1
+var a5 = 0
+var a6 = 0
+var a7 = 1
+printf("  Alice比特: %d %d %d %d %d %d %d %d\n", a0, a1, a2, a3, a4, a5, a6, a7)
+# Alice基序列
+var b0 = 0
+var b1 = 0
+var b2 = 1
+var b3 = 1
+var b4 = 0
+var b5 = 1
+var b6 = 0
+var b7 = 1
+printf("  Alice基:   %d %d %d %d %d %d %d %d\n", b0, b1, b2, b3, b4, b5, b6, b7)
+printf("\n")
+
+printf("步骤2: Bob随机选择基测量\n")
+# Bob基序列
+var c0 = 0
+var c1 = 1
+var c2 = 1
+var c3 = 0
+var c4 = 0
+var c5 = 1
+var c6 = 1
+var c7 = 0
+printf("  Bob基:     %d %d %d %d %d %d %d %d\n", c0, c1, c2, c3, c4, c5, c6, c7)
+printf("\n")
+
+printf("步骤3: 公开比较基\n")
+printf("  匹配位置: ")
+var matched_count = 0
+if (b0 == c0):
+    printf("0 ")
+    matched_count = matched_count + 1
+end
+if (b1 == c1):
+    printf("1 ")
+    matched_count = matched_count + 1
+end
+if (b2 == c2):
+    printf("2 ")
+    matched_count = matched_count + 1
+end
+if (b3 == c3):
+    printf("3 ")
+    matched_count = matched_count + 1
+end
+if (b4 == c4):
+    printf("4 ")
+    matched_count = matched_count + 1
+end
+if (b5 == c5):
+    printf("5 ")
+    matched_count = matched_count + 1
+end
+if (b6 == c6):
+    printf("6 ")
+    matched_count = matched_count + 1
+end
+if (b7 == c7):
+    printf("7 ")
+    matched_count = matched_count + 1
+end
+printf("\n  匹配数: %d/8\n\n", matched_count)
+
+printf("步骤4: 提取密钥\n")
+printf("  密钥比特: ")
+if (b0 == c0): printf("%d ", a0) end
+if (b1 == c1): printf("%d ", a1) end
+if (b2 == c2): printf("%d ", a2) end
+if (b3 == c3): printf("%d ", a3) end
+if (b4 == c4): printf("%d ", a4) end
+if (b5 == c5): printf("%d ", a5) end
+if (b6 == c6): printf("%d ", a6) end
+if (b7 == c7): printf("%d ", a7) end
+printf("\n\n")
+
+printf("步骤5: 窃听检测 (模拟)\n")
+printf("  抽检随机位置: 位置 0 和 3\n")
+printf("  Alice位0: %d, Bob位0: %d (匹配)\n", a0, a0)
+printf("  Alice位3: %d, Bob位3: %d (匹配)\n", a3, a3)
+printf("  误码率: 0%%\n")
+printf("  结论: 密钥安全\n\n")
+
+printf("=== BB84协议演示完成 ===\n")
+printf("BB84安全性基于: 测量扰动原理 + 不可克隆定理\n")

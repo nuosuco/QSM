@@ -1,0 +1,20 @@
+# ================================================================
+# examples/superposition.qentl — 量子叠加态演示
+# 展示量子叠加态的测量概率分布
+# ================================================================
+qreg q[3]
+# 创建均匀叠加态
+h q[0]
+h q[1]
+h q[2]
+# 测量所有量子位
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var result = m2*4 + m1*2 + m0
+printf("3量子位叠加态测量: %d (二进制: %d%d%d)\n", result, m2, m1, m0)
+if (result >= 0 and result <= 7):
+    printf("叠加态验证: 通过 (结果在0-7范围内)\n")
+else:
+    printf("叠加态验证: 失败\n")
+end

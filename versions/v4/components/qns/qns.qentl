@@ -1,0 +1,40 @@
+# ================================================================
+# lib/qns.qentl — 量子神经叠加态 (Quantum Neural Superposition)
+# 每个量子应用独立拥有QNS+QDFS两个基础
+# QNS基于QDFS实现自动合并/分离
+# ================================================================
+
+# ---- QNS实例创建 ----
+# 每个应用有自己的QNS，数据存在自己的QDFS实例里
+def qns_instance_create(qdfs_base, app_name):
+    var root = qdfs_instance_create(qdfs_base, app_name)
+    qdfs_ns_write(NS_SYSTEM, "qns_meta", "QNS: 就绪")
+    qdfs_ns_write(NS_MODELS, "qns_weights", "权重: 初始态")
+    printf(" QNS实例创建: %s\n", root)
+    return root
+end
+
+# ---- QNS算力合并 ----
+# 将两个QNS实例的数据合并为一个
+# 基于QDFS的文件夹合并，权重/训练数据随之合并
+def qns_merge(ns_a, ns_b):
+    var out = qdfs_ns_merge(ns_a, ns_b)
+    printf(" QNS合并: %s\n", out)
+    return out
+end
+
+# ---- QNS算力分离 ----
+# 将一个QNS实例的数据分离为两个独立实例
+def qns_split(ns_a, ns_b, prefix):
+    var out = qdfs_ns_split(ns_a, ns_b, prefix)
+    printf(" QNS分离: %s\n", out)
+    return out
+end
+
+# ---- QNS状态报告 ----
+def qns_status():
+    printf(" QNS状态: %s\n", qdfs_ns_read(NS_SYSTEM, "qns_meta"))
+    printf(" QNS权重: %s\n", qdfs_ns_read(NS_MODELS, "qns_weights"))
+    printf(" QNS文件: %s\n", qdfs_ns_ls(NS_MODELS))
+    return 1
+end

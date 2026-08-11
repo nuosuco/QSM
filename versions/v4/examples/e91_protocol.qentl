@@ -1,0 +1,50 @@
+# ================================================================
+# E91量子密钥分发协议 (基于纠缠)
+# 演示基于贝尔态的QKD协议
+# ================================================================
+
+printf("=== E91量子密钥分发协议 ===\n\n")
+
+printf("--- 原理 ---\n")
+printf("1. Alice和Bob共享纠缠对 |Phi+> = (|00>+|11>)/sqrt(2)\n")
+printf("2. Alice随机选择测量基: 0, 1, 2 (间隔pi/4)\n")
+printf("3. Bob随机选择测量基: 0, 1, 2\n")
+printf("4. 公开比较基选择, 使用特定基对提取密钥\n")
+printf("5. 贝尔不等式检验检测窃听\n\n")
+
+printf("--- E91协议实现 ---\n")
+
+printf("步骤1: 制备纠缠对\n")
+var q = qreg_create(2)
+apply_h(q, 0)
+apply_cx(q, 0, 1)
+printf("  纠缠态: (|00> + |11>)/sqrt(2)\n\n")
+
+printf("步骤2: Alice测量 (基0)\n")
+var alice_result = measure(q, 0)
+printf("  Alice测量结果: %d\n", alice_result)
+
+printf("步骤3: Bob测量 (基0)\n")
+var bob_result = measure(q, 1)
+printf("  Bob测量结果: %d\n", bob_result)
+
+printf("步骤4: 密钥生成\n")
+if (alice_result == bob_result):
+    printf("  ✓ 结果匹配, 生成密钥比特\n")
+    printf("  密钥: %d\n", alice_result)
+else:
+    printf("  ✗ 结果不匹配 (理想情况下应完全相关)\n")
+end
+
+printf("\n--- 贝尔不等式检验 (简化) ---\n")
+printf("S = E(a,b) - E(a,b') + E(a',b) + E(a',b')\n")
+printf("经典极限: |S| <= 2\n")
+printf("量子力学: |S| <= 2sqrt(2) ≈ 2.828\n")
+printf("实验验证: 量子力学预测正确\n\n")
+
+printf("--- 应用场景 ---\n")
+printf("  - 安全通信: 军事/政府/金融\n")
+printf("  - 分布式密钥管理\n")
+printf("  - 量子互联网基础\n\n")
+
+printf("=== E91协议演示完成 ===\n")

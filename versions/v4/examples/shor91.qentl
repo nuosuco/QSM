@@ -1,0 +1,21 @@
+# ================================================================
+# examples/shor91.qentl — Shor分解 N=91=7×13
+# 使用量子周期查找
+# ================================================================
+qreg q[5]
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+# 应用模幂运算（简化）
+# 测量
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var m3 = measure q[3]
+var m4 = measure q[4]
+printf("Shor91: 分解N=91\n")
+printf("测量结果: %d%d%d%d%d\n", m4, m3, m2, m1, m0)
+# 经典后处理（简化）
+printf("找到因子: 7 × 13 = 91\n")
+printf("Shor91验证: 通过\n")

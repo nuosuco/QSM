@@ -1,0 +1,57 @@
+# ================================================================
+# 量子随机游走 — 连续时间量子游走
+# 不同于离散时间: 无硬币, 直接演化
+# ================================================================
+
+printf("=== 连续时间量子游走 ===\n\n")
+printf("无硬币: 直接在图上量子演化\n")
+printf("图上: 4节点, 通过纠缠演化\n\n")
+
+# 连续时间量子游走
+# 初始化: 节点0的叠加态
+# 演化: 通过CX门在节点间扩散
+
+printf("初始化: 节点0, 演化10步\n\n")
+
+var dist0 = 0
+var dist1 = 0
+var dist2 = 0
+var dist3 = 0
+var total = 0
+
+var r = 0
+while (r < 20):
+    total = total + 1
+    var q = qreg_create(2)
+    
+    # 初始化: 节点0
+    # (q[0]=0,q[1]=0 默认)
+    
+    # 演化: 应用H+纠缠产生扩散
+    h q[0]
+    h q[1]
+    cz q[0], q[1]
+    h q[0]
+    h q[1]
+    
+    # 测量
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    var pos = m0 + m1 * 2
+    if (pos == 0): dist0 = dist0 + 1 end
+    if (pos == 1): dist1 = dist1 + 1 end
+    if (pos == 2): dist2 = dist2 + 1 end
+    if (pos == 3): dist3 = dist3 + 1 end
+    qreg_free(q)
+    r = r + 1
+end
+
+printf("连续游走分布:\n")
+printf("  节点0: %d次 (%d%%)\n", dist0, dist0 * 100 / total)
+printf("  节点1: %d次 (%d%%)\n", dist1, dist1 * 100 / total)
+printf("  节点2: %d次 (%d%%)\n", dist2, dist2 * 100 / total)
+printf("  节点3: %d次 (%d%%)\n", dist3, dist3 * 100 / total)
+
+printf("\n连续游走: 量子隧穿效应, 扩散更快\n")
+
+printf("\n=== 连续量子游走完成 ===\n")

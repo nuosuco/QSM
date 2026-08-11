@@ -1,0 +1,37 @@
+# ================================================================
+# examples/qsva.qentl — 量子稀疏向量分析 (QSV)
+# 用于大数据处理和模式识别
+# ================================================================
+
+qreg q[5]
+
+# 初始化叠加态
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+
+# 应用Grover扩散算子
+# 标记目标状态 |11111>
+x q[0]
+x q[1]
+x q[2]
+x q[3]
+x q[4]
+ccccz q[0], q[1], q[2], q[3], q[4]
+x q[0]
+x q[1]
+x q[2]
+x q[3]
+x q[4]
+
+# 测量
+var m0 = measure q[0]
+var m1 = measure q[1]
+var m2 = measure q[2]
+var m3 = measure q[3]
+var m4 = measure q[4]
+
+printf("QSV测量: %d%d%d%d%d\n", m4, m3, m2, m1, m0)
+printf("QSV演示完成\n")
