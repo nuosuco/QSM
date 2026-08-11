@@ -1277,18 +1277,18 @@ async def wechat_menu_create():
             "button": [
                 {
                     "type": "view",
-                    "name": "首页",
+                    "name": "小麦SOM",
                     "url": "https://som.top/"
                 },
                 {
                     "type": "view",
-                    "name": "养生谷",
-                    "url": "https://som.top/#yangshenggu"
+                    "name": "有机好物",
+                    "url": "https://som.top/yangshenggu"
                 },
                 {
                     "type": "view",
                     "name": "我的",
-                    "url": "https://som.top/#profile"
+                    "url": "https://som.top/profile"
                 }
             ]
         }
@@ -1632,3 +1632,14 @@ async def youtube_publish_daily():
         json.dump(publish_log, f, ensure_ascii=False, indent=2)
     
     return result
+
+# ========== 页面路由（支持微信菜单直接跳转）==========
+
+@app.get("/products")
+@app.get("/yangshenggu")
+@app.get("/profile")
+async def serve_page():
+    """返回SPA页面，前端根据URL路径初始化对应tab"""
+    from fastapi.responses import HTMLResponse
+    with open("/root/SOM/web/index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
