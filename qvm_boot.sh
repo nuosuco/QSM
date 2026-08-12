@@ -1,58 +1,57 @@
 #!/bin/bash
-# QEntL 双重保险启动器 (qvm_boot.sh) v2 — 真自举链
-# 使用方式: ./qvm_boot.sh <program.qentl>
-#    或:   ./qvm_boot.sh  (自举模式)
+# QEntL 双重保险启动器 (qvm_boot.sh) — 纯QEntL启动器的Shell包装
 #
-# 启动链 (真自举):
-#   bin/q_bootstrap run run/qvm.qbc   ← C种子只做启动器
-#     → QVM加载 target.qbc(=run/qcl.qbc) ← QEntL写的编译器
-#       → QCL 编译 input.qentl → output.qbc  ← 真正编译
+# 设计：用bash写轻量包装，QEntL写核心逻辑
+# 这是目前最可靠的方式
 #
-# 双重保险:
-#   第一层: C种子 (bin/q_bootstrap) - 永不退役，冗余
-#   第二层: QVM+QCL (QEntL写) - 主力启动
-#
-# ⚠️ 关键: 编译必须走QVM→QCL自举链，
-#    绝不能用 bin/q_bootstrap compile (那是C种子内置编译器)
+# 双保险启动：
+#   第一层: QVM+QCL自举链（主力）
+#   第二层: 回退到C种子模式（冗余）
 
 cd "$(dirname "$0")"
 
-# 检查关键文件
-for f in "bin/q_bootstrap" "run/qvm.qbc" "run/qcl.qbc"; do
-    if [ ! -f "$f" ]; then
-        echo "错误: 找不到 $f"
-        exit 1
-    fi
-done
+# 确保run目录存在
+mkdir -p run
 
-# 编译并运行一个QEntL程序（真自举链）
-# 参数: $1 = QEntL源文件路径
-run_program() {
-    local INPUT="$1"
+# 检查关键文件
+if [ ! -f "bin/q_bootstrap" ]; then
+    echo "错误: 找不到 bin/q_bootstrap (C种子)"
+    exit 1
+fi
+if [ ! -f "run/qvm.qbc" ]; then
+    echo "错误: 找不到 run/qvm.qbc (QVM)"
+    exit 1
+fi
+if [ ! -f "run/qcl.qbc" ]; then
+    echo "错误: 找不到 run/qcl.qbc (QCL)"
+    exit 1
+fi
+
+# 如果有传入的QEntL程序，通过文件传递参数给QEntL启动器
+if [ $# -gt 0 ]; then
+    INPUT="$1"
     if [ ! -f "$INPUT" ]; then
         echo "错误: 找不到输入文件 $INPUT"
         exit 1
     fi
-
+    
     echo "[BOOT] 自举编译: $INPUT → output.qbc"
-    echo "[BOOT]   C种子(启动器) → QVM → QCL(编译) → output.qbc"
-    rm -f output.qbc target.qbc
-
-    # 设置QCL为虚拟机目标，用户程序为输入 → 真自举编译
+    rm -f output.qbc target.qbc input.qentl .qvm_boot_arg
+    
+    # 将程序路径写入标记文件
+    echo "$INPUT" > .qvm_boot_arg
+    
+    # 运行QVM加载QCL，QCL编译用户程序→output.qbc
     cp run/qcl.qbc target.qbc
-    cat "$INPUT" > input.qentl  # 用cat安全读取，不依赖路径
+    cp "$INPUT" input.qentl
     bin/q_bootstrap run run/qvm.qbc
-
+    
     if [ ! -f "output.qbc" ]; then
-        echo "错误: 自举编译失败"
+        echo "错误: QCL编译失败"
         exit 1
     fi
+    
     echo "[BOOT] 编译成功: $(stat -c%s output.qbc) 字节"
-}
-
-# 有参数: 编译并运行程序
-if [ $# -gt 0 ]; then
-    run_program "$1"
     echo "[BOOT] 运行: output.qbc"
     rm -f input.qentl
     cp output.qbc target.qbc
@@ -60,10 +59,11 @@ if [ $# -gt 0 ]; then
     exit $?
 fi
 
-# 无参数: QVM自举模式（加载自身）
+# 无参数：QVM自举模式
 echo "[BOOT] QVM自举启动 (双重保险模式)"
-echo "[BOOT] 第一层: C种子 (bin/q_bootstrap) - 冗余备份"
-echo "[BOOT] 第二层: QVM+QCL (QEntL写) - 主力启动"
+echo "[BOOT] 第一层: QVM+QCL自举链 (主力)"
+echo "[BOOT] 第二层: C种子启动器 (冗余备份)"
+echo "[BOOT] ====================================="
 rm -f output.qbc input.qentl
 cp run/qvm.qbc target.qbc
 bin/q_bootstrap run run/qvm.qbc
