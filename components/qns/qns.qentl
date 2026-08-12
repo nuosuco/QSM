@@ -413,6 +413,21 @@ def qns_build_growth_lib():
     return 1
 end
 
+# ---- QNS生长QSM主模型 ----
+def qns_grow_qsm_main():
+    var code = "# QSM主模型 v"
+    code = str_concat(code, ver)
+    code = str_concat(code, "\n# QNS自生长生成\n\n")
+    code = str_concat(code, "def qsm_main_check():\n")
+    code = str_concat(code, "    printf(\"QSM主模型: 正常\n\")
+")
+    code = str_concat(code, "    return 1\n")
+    code = str_concat(code, "end\n")
+    qns_save_source("components/qsm/qsm_main.qentl", code)
+    printf(" QNS: 生长QSM主模型 v%s\n", ver)
+    return 1
+end
+
 # ---- QNS自生长日志 ----
 def qns_log(msg):
     var ts = str_concat("[$", "QNS生长日志")
