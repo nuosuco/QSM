@@ -1,14 +1,22 @@
 # ================================================================
 # qvm_boot.qentl — QEntL 自举启动器（纯QEntL，无sh依赖）
 # ================================================================
-# 使用方式：
-#   1. 自举模式: bin/q_bootstrap run lib/qvm_boot.qbc
-#   2. 编译模式: 设置 QVM_BOOT_INPUT 环境变量后运行
-#                 或: cp <程序.qentl> input.qentl && bin/q_bootstrap run lib/qvm_boot.qbc
-# ================================================================
 
-# 配置
 var g_root = "/root/QSM"
+
+# ================================================================
+# 辅助函数：去除字符串末尾的换行符
+# ================================================================
+def trim_newline(s):
+    var len = str_len(s)
+    if (len > 0):
+        var last_char = str_substring(s, len - 1, 1)
+        if (last_char == "\n"):
+            return str_substring(s, 0, len - 1)
+        end
+    end
+    return s
+end
 
 # ================================================================
 # 主入口
@@ -16,20 +24,28 @@ var g_root = "/root/QSM"
 printf("[BOOT] QEntL自举启动器 v1\n")
 printf("[BOOT] 工作目录: %s\n", g_root)
 
-# 检查环境（使用绝对路径，避免cd问题）
+# 检查input.qentl是否存在（去除换行符）
+var input_check_raw = exec("test -f /root/QSM/input.qentl && echo EXISTS || echo MISSING")
+var input_check = trim_newline(input_check_raw)
+printf("[BOOT] input.qentl: %s\n", input_check)
+
+# 检查环境
 var bootstrap_check = exec("test -f /root/QSM/bin/q_bootstrap && echo OK || echo FAIL")
+bootstrap_check = trim_newline(bootstrap_check)
 if (bootstrap_check == "FAIL"):
     printf("[BOOT] 错误: 找不到 C种子 (bin/q_bootstrap)\n")
     exec("exit 1")
 end
 
 var qvm_check = exec("test -f /root/QSM/run/qvm.qbc && echo OK || echo FAIL")
+qvm_check = trim_newline(qvm_check)
 if (qvm_check == "FAIL"):
     printf("[BOOT] 错误: 找不到 QVM (run/qvm.qbc)\n")
     exec("exit 1")
 end
 
 var qcl_check = exec("test -f /root/QSM/run/qcl.qbc && echo OK || echo FAIL")
+qcl_check = trim_newline(qcl_check)
 if (qcl_check == "FAIL"):
     printf("[BOOT] 错误: 找不到 QCL (run/qcl.qbc)\n")
     exec("exit 1")
@@ -37,11 +53,8 @@ end
 
 printf("[BOOT] 环境检查通过\n")
 
-# 检查是否有程序要编译运行
-var has_input = exec("test -f /root/QSM/input.qentl && echo OK || echo FAIL")
-
-if (has_input == "OK"):
-    # 编译运行模式
+# 关键修复：使用trimmed的比较值
+if (input_check == "EXISTS"):
     printf("[BOOT] 发现 input.qentl，开始自举编译\n")
     
     # 清理旧文件
@@ -51,32 +64,35 @@ if (has_input == "OK"):
     exec("cp /root/QSM/run/qcl.qbc /root/QSM/target.qbc")
     
     # 运行QVM→QCL→编译
-    exec("cd /root/QSM && /root/QSM/bin/q_bootstrap run /root/QSM/run/qvm.qbc")
+    exec("cd /root/QSM && bin/q_bootstrap run run/qvm.qbc")
     
     # 检查编译结果
     var compile_check = exec("test -f /root/QSM/output.qbc && echo OK || echo FAIL")
+    compile_check = trim_newline(compile_check)
+    printf("[BOOT] 编译结果: %s\n", compile_check)
+    
     if (compile_check == "FAIL"):
         printf("[BOOT] 错误: QCL编译失败\n")
         exec("exit 1")
     end
     
     var output_size = exec("stat -c%s /root/QSM/output.qbc")
+    output_size = trim_newline(output_size)
     printf("[BOOT] 编译成功: %s 字节\n", output_size)
     
     # 运行编译后的程序
     printf("[BOOT] 运行: output.qbc\n")
     exec("rm -f /root/QSM/input.qentl")
     exec("cp /root/QSM/output.qbc /root/QSM/target.qbc")
-    exec("cd /root/QSM && /root/QSM/bin/q_bootstrap run /root/QSM/run/qvm.qbc")
+    exec("cd /root/QSM && bin/q_bootstrap run run/qvm.qbc")
 else:
-    # 自举模式
     printf("[BOOT] QVM自举启动 (双重保险模式)\n")
     printf("[BOOT] 第一层: QVM+QCL自举链 (主力)\n")
     printf("[BOOT] 第二层: C种子启动器 (冗余备份)\n")
     printf("[BOOT] =====================================\n")
     exec("rm -f /root/QSM/output.qbc /root/QSM/input.qentl")
     exec("cp /root/QSM/run/qvm.qbc /root/QSM/target.qbc")
-    exec("cd /root/QSM && /root/QSM/bin/q_bootstrap run /root/QSM/run/qvm.qbc")
+    exec("cd /root/QSM && bin/q_bootstrap run run/qvm.qbc")
 end
 
 printf("[BOOT] 启动完成\n")
