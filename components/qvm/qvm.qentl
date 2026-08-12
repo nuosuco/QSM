@@ -1221,10 +1221,30 @@ while (g_running == 1):
         end
     end
     if (next_check == "YES"):
-        var next_file = exec("cat .qvm_next | tr -d '\\n'")
-        g_target = next_file
-        printf("[QVM-Q] 加载下一个: %s\\n", next_file)
-        exec("rm -f .qvm_next")
+        # 读取.qvm_next第一行作为下一个任务
+        var next_file = exec("head -1 .qvm_next | tr -d '\\n'")
+        # 删除第一行，保留剩余任务
+        exec("tail -n +2 .qvm_next > .qvm_next_tmp && mv .qvm_next_tmp .qvm_next")
+        # 检查是否还有剩余任务
+        var remain = exec("test -s .qvm_next && echo YES || echo NO")
+        var rlen = str_len(remain)
+        if (rlen > 0):
+            var rl = str_substring(remain, rlen - 1, 1)
+            if (rl == "\\n"):
+                remain = str_substring(remain, 0, rlen - 1)
+            end
+        end
+        if (remain == "NO"):
+            exec("rm -f .qvm_next")
+        end
+        # 检查读取的文件名是否有效
+        if (str_len(next_file) > 0 and next_file != ""):
+            g_target = next_file
+            printf("[QVM-Q] 加载下一个: %s\\n", next_file)
+        else:
+            printf("[QVM-Q] 任务链为空，退出\\n")
+            g_running = 0
+        end
     else:
         printf("[QVM-Q] 无更多任务，退出\\n")
         g_running = 0

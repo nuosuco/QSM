@@ -50,14 +50,15 @@ has_input = trim_newline(has_input)
 exec("rm -f /root/QSM/.qvm_next /root/QSM/output.qbc /root/QSM/target.qbc")
 
 if (has_input == "YES"):
-    # 有源码要编译：先写第一个任务
-    printf("[BOOT] 发现 input.qentl，写入任务链\n")
+    # 有源码要编译：写入完整任务链（两行）
+    printf("[BOOT] 发现 input.qentl，写入完整任务链\n")
+    printf("[BOOT] 任务1: run/qcl.qbc（编译input.qentl→output.qbc）\n")
+    printf("[BOOT] 任务2: output.qbc（运行编译结果）\n")
     exec("echo 'run/qcl.qbc' > /root/QSM/.qvm_next")
-    printf("[BOOT] 任务1: run/qcl.qbc（编译input.qentl）\n")
+    exec("echo 'output.qbc' >> /root/QSM/.qvm_next")
 else:
-    # 无源码：启动QCL作为常驻运行时
-    printf("[BOOT] 启动QVM常驻运行时\n")
-    printf("[BOOT] 第一层: QVM常驻 (主力)\n")
+    # 无源码：写入单任务链，启动QCL
+    printf("[BOOT] 启动QVM常驻运行时（无输入）\n")
     printf("[BOOT] =====================================\n")
     exec("echo 'run/qcl.qbc' > /root/QSM/.qvm_next")
 end
@@ -66,4 +67,4 @@ end
 exec("cp /root/QSM/run/qcl.qbc /root/QSM/target.qbc")
 
 printf("[BOOT] 启动完成，QVM进入常驻模式\n")
-printf("[BOOT] QVM将自动处理.qvm_next中的任务链\n")
+printf("[BOOT] QVM将自动逐行处理.qvm_next中的任务链\n")
