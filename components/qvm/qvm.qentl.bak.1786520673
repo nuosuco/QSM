@@ -844,55 +844,6 @@ def do_builtin(bname, nargs):
     push_int(0)
 end
 
-
-# ================================================================
-# QVM 自启动功能（双重保险：C种子 + QVM自举）
-# ================================================================
-
-# 自启动模式：0=C种子启动, 1=QVM自举启动
-var g_bootstrap_mode = 0
-var g_self_qbc = "run/qvm.qbc"  # QVM自身的QBC路径
-var g_qcl_qbc = "run/qcl.qbc"  # QCL的QBC路径（自举链下一步）
-var g_stacked_depth = 0  # 防止无限递归
-
-# 自启动：尝试加载QVM自身或指定目标
-def qvm_self_start(target):
-    var save_target = g_target
-    g_target = target
-    g_stacked_depth = g_stacked_depth + 1
-    if (g_stacked_depth > 5):
-        printf("[QVM-DBG] 递归深度超限，回退C种子模式\n")
-        g_target = save_target
-        g_stacked_depth = 0
-        return 0
-    end
-    printf("[QVM-Q] 自启动模式: 加载 %s\n", target)
-    var result = load_qbc()
-    if (result == 0):
-        printf("[QVM-Q] 自启动失败: %s，回退C种子\n", target)
-        g_target = save_target
-        g_stacked_depth = 0
-        return 0
-    end
-    printf("[QVM-Q] 自启动成功: %s code=%d pool=%d funcs=%d\n", target, g_code_len, g_pool_len, fn_count)
-    g_bootstrap_mode = 1
-    g_stacked_depth = 0
-    return 1
-end
-
-# QVM自检：验证自身完整性
-def qvm_self_check():
-    if (g_bootstrap_mode == 1):
-        printf("[QVM-CHECK] QVM自举模式运行中\n")
-    else:
-        printf("[QVM-CHECK] C种子模式运行中\n")
-    end
-    printf("[QVM-CHECK] 第一层保险: C种子启动器 (bin/q_bootstrap ELF)\n")
-    printf("[QVM-CHECK] 第二层保险: QVM自启动 (qvm.qentl -> run/qvm.qbc)\n")
-    printf("[QVM-CHECK] 第三层保险: QCL自举 (qcl.qentl -> run/qcl.qbc)\n")
-    return 1
-end
-
 # ================================================================
 # QBC加载
 # ================================================================
@@ -1249,31 +1200,8 @@ end
 # 主入口
 # ================================================================
 printf("QVM v1: QEntL编写的QBC1虚拟机\\n")
-printf("[QVM-DBG] 双重保险启动: C种子备份 + QVM自举\\n")
 g_trace_array = 0
 printf("[QVM-DBG] 数组调试已启用\\n")
-
-# 优先尝试自启动：加载QVM自身
-if (file_exists(g_self_qbc) == 1):
-    if (qvm_self_start(g_self_qbc) == 1):
-        build_func_table()
-        printf("[QVM-Q] 自举模式运行\\n")
-        qvm_self_check()
-        vm_run()
-        # 自举运行完成后，尝试启动QCL
-        if (file_exists(g_qcl_qbc) == 1):
-            printf("[QVM-Q] 启动QCL编译器...\\n")
-            if (qvm_self_start(g_qcl_qbc) == 1):
-                build_func_table()
-                vm_run()
-            end
-        end
-        return 0
-    end
-end
-
-# 回退C种子模式
-printf("[QVM-Q] 回退C种子模式: 加载 %s\\n", g_target)
 if (load_qbc() == 1):
     build_func_table()
     printf("[QVM-Q] 加载 %s code=%d pool=%d funcs=%d\\n", g_target, g_code_len, g_pool_len, fn_count)
