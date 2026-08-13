@@ -9,3 +9,14 @@ miniprogram/private.key
 server/llm_providers.json
 *.bak*
 web/uploads/
+
+# API Keys
+qnt/config/api_keys.json
+config/api_keys.json
+.env
+
+# QNT环境变量
+/root/.qnt_env
+.qnt_env
+*.env
+!*.env.example
