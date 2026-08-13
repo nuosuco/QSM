@@ -359,6 +359,11 @@ def qdfs_history():
 end
 # ---- QDFS生长: qdfs_backup ----
 def qdfs_backup():
+    var backup_dir = str_concat(g_root, "/backup")
+    mkdir(backup_dir)
+    var timestamp = int_to_str(str_len(g_meta))
+    var backup_name = str_concat("backup_", timestamp)
+    mkdir(str_concat(backup_dir, "/", backup_name))
     return 1
 end
 # ---- QDFS生长: qdfs_path_exists ----

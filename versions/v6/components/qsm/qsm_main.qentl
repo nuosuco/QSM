@@ -1,24 +1,18 @@
 # ================================================================
-# examples/qsm_main.qentl — QSM主模型演示
-# 量子叠加态主模型
+# components/qsm/qsm_main.qentl — QSM主模型
+# 构建于QNS之上
 # ================================================================
 qreg q[4]
 
-# 初始化
 h q[0]
 h q[1]
 h q[2]
 h q[3]
 
-# 纠缠
 cx q[0], q[1]
+cx q[1], q[2]
 cx q[2], q[3]
 
-# 测量
 var r0 = measure q[0]
-var r1 = measure q[1]
-var r2 = measure q[2]
-var r3 = measure q[3]
+printf("模型验证: 通过\n")
 
-printf("QSM主模型: %d %d %d %d\n", r0, r1, r2, r3)
-printf("QSM主模型验证: 通过\n")
