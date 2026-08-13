@@ -421,7 +421,7 @@ def qdfs_analyze_file(filepath):
         # 统计函数定义
         if (str_index_of(str_substring(content, i, 10), "def ") >= 0):
             var j = i
-            while (j < str_len(content) and str_char_at(content, j) != '\n'):
+            while (j < str_len(content) and str_char_at(content, j) != chr(10)):
                 j = j + 1
             end
             var line = str_substring(content, i, j - i)
