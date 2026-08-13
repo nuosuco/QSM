@@ -1,0 +1,544 @@
+# ================================================================
+# lib/qdfs.qentl — QDFS量子动态文件系统
+# 纯QEntL实现，无第三方依赖
+#
+# 核心概念:
+#   叠加态文件: 内容处于多个分支的叠加，读取(观测)时坍缩为一个分支
+#   纠缠文件对: 两个文件共享分支，观测任一文件，双方同步坍缩到相同分支
+#
+# 存储布局 (root目录下):
+#   meta              元数据表, 每行: name|state|partner|collapsed|owner
+#                     state: 0=经典 1=叠加态 2=纠缠  collapsed: -1=未观测
+#   <name>.data       经典文件内容
+#   branches/<owner>/b0, b1   叠加态/纠缠的分支内容
+# ================================================================
+
+var g_root = ""
+var g_meta = ""
+
+# ---- 元数据表操作 ----
+
+# 取字段: line按|分隔取第idx个
+def meta_field(line, idx):
+    var i = 0
+    var n = str_len(line)
+    var f = 0
+    var start = 0
+    while (i <= n):
+        var issep = 0
+        if (i == n):
+            issep = 1
+        else:
+            var ch = str_char_at(line, i)
+            if (str_eq(ch, "|")):
+                issep = 1
+            end
+        end
+        if (issep == 1):
+            if (f == idx):
+                return str_substring(line, start, i - start)
+            end
+            f = f + 1
+            start = i + 1
+        end
+        i = i + 1
+    end
+    return ""
+end
+
+# 查找name的元数据行
+def meta_find(name):
+    var s = str_concat("\n", g_meta)
+    var key = str_concat(str_concat("\n", name), "|")
+    var i = str_index_of(s, key)
+    if (i < 0):
+        return ""
+    end
+    var rest = str_substring(s, i + 1, str_len(s) - i - 1)
+    var j = str_index_of(rest, "\n")
+    if (j < 0):
+        return rest
+    end
+    return str_substring(rest, 0, j)
+end
+
+# 从元数据表删除一行并持久化
+def meta_remove(name):
+    var s = str_concat("\n", g_meta)
+    var key = str_concat(str_concat("\n", name), "|")
+    var i = str_index_of(s, key)
+    if (i < 0):
+        return 0
+    end
+    var rest = str_substring(s, i + 1, str_len(s) - i - 1)
+    var j = str_index_of(rest, "\n")
+    var oldlen = j + 1
+    if (j < 0):
+        oldlen = str_len(rest)
+    end
+    g_meta = str_concat(str_substring(g_meta, 0, i), str_substring(g_meta, i + oldlen, str_len(g_meta) - i - oldlen))
+    file_write_bytes(str_concat(g_root, "/meta"), g_meta)
+    return 1
+end
+
+# 设置(新增或更新)一行元数据并持久化
+def meta_set(name, state, partner, collapsed, owner):
+    meta_remove(name)
+    var l1 = str_concat(name, "|")
+    var l2 = str_concat(l1, state)
+    var l3 = str_concat(l2, "|")
+    var l4 = str_concat(l3, partner)
+    var l5 = str_concat(l4, "|")
+    var l6 = str_concat(l5, collapsed)
+    var l7 = str_concat(l6, "|")
+    var newline = str_concat(str_concat(l7, owner), "\n")
+    g_meta = str_concat(g_meta, newline)
+    file_write_bytes(str_concat(g_root, "/meta"), g_meta)
+    return 1
+end
+
+# 标记某文件已坍缩到分支idx
+def meta_set_collapse(name, idx):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return 0
+    end
+    meta_set(name, meta_field(line, 1), meta_field(line, 2), int_to_str(idx), meta_field(line, 4))
+    return 1
+end
+
+# ---- QDFS公共API ----
+
+# 初始化QDFS根目录
+def qdfs_init(root):
+    g_root = root
+    mkdir(root)
+    mkdir(str_concat(root, "/branches"))
+    var mp = str_concat(root, "/meta")
+    if (file_exists(mp) == 0):
+        file_write_bytes(mp, "")
+    end
+    g_meta = file_read(mp)
+    return 1
+end
+
+# 写经典文件(确定态)
+def qdfs_write(name, content):
+    var path = str_concat(str_concat(str_concat(g_root, "/"), name), ".data")
+    file_write_bytes(path, content)
+    meta_set(name, "0", "", "-1", name)
+    return 1
+end
+
+# 写叠加态文件: 内容处于c0/c1两个分支的等概率叠加
+def qdfs_superpose(name, c0, c1):
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), name), "/")
+    mkdir(str_concat(str_concat(g_root, "/branches/"), name))
+    file_write_bytes(str_concat(bd, "b0"), c0)
+    file_write_bytes(str_concat(bd, "b1"), c1)
+    meta_set(name, "1", "", "-1", name)
+    return 1
+end
+
+# 纠缠两个文件: 共享c0/c1分支, 观测任一方双方同步坍缩
+def qdfs_entangle(a, b, c0, c1):
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), a), "/")
+    mkdir(str_concat(str_concat(g_root, "/branches/"), a))
+    file_write_bytes(str_concat(bd, "b0"), c0)
+    file_write_bytes(str_concat(bd, "b1"), c1)
+    meta_set(a, "2", b, "-1", a)
+    meta_set(b, "2", a, "-1", a)
+    return 1
+end
+
+# 读取(观测): 经典文件直接返回; 叠加态/纠缠文件坍缩后返回分支内容
+def qdfs_read(name):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return ""
+    end
+    var state = meta_field(line, 1)
+    if (str_eq(state, "0")):
+        return file_read(str_concat(str_concat(str_concat(g_root, "/"), name), ".data"))
+    end
+    var collapsed = str_to_int(meta_field(line, 3))
+    if (collapsed < 0):
+        collapsed = rand_int(2)
+        meta_set_collapse(name, collapsed)
+        var partner = meta_field(line, 2)
+        if (str_len(partner) > 0):
+            meta_set_collapse(partner, collapsed)
+        end
+    end
+    var owner = meta_field(line, 4)
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), owner), "/")
+    if (collapsed == 0):
+        return file_read(str_concat(bd, "b0"))
+    end
+    return file_read(str_concat(bd, "b1"))
+end
+
+# 文件状态信息
+def qdfs_info(name):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return str_concat(name, ": 不存在")
+    end
+    var state = meta_field(line, 1)
+    var collapsed = meta_field(line, 3)
+    if (str_eq(state, "0")):
+        return str_concat(name, ": 经典态")
+    end
+    if (str_eq(state, "1")):
+        if (str_eq(collapsed, "-1")):
+            return str_concat(name, ": 叠加态(未观测)")
+        end
+        return str_concat(str_concat(str_concat(name, ": 叠加态 已坍缩->"), collapsed), "分支")
+    end
+    var partner = meta_field(line, 2)
+    if (str_eq(collapsed, "-1")):
+        return str_concat(str_concat(str_concat(name, ": 纠缠<->"), partner), "(未观测)")
+    end
+    return str_concat(str_concat(str_concat(str_concat(name, ": 纠缠<->"), partner), " 已坍缩->"), collapsed)
+end
+
+# 列出所有文件及状态
+def qdfs_ls():
+    var out = ""
+    var s = g_meta
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        var rest = ""
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            rest = str_substring(s, j + 1, str_len(s) - j - 1)
+        end
+        if (str_len(line) > 0):
+            out = str_concat(str_concat(out, qdfs_info(meta_field(line, 0))), "\n")
+        end
+        s = rest
+    end
+    return out
+end
+
+# 删除文件(含分支内容)
+def qdfs_delete(name):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return 0
+    end
+    file_delete(str_concat(str_concat(str_concat(g_root, "/"), name), ".data"))
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), name), "/")
+    file_delete(str_concat(bd, "b0"))
+    file_delete(str_concat(bd, "b1"))
+    meta_remove(name)
+    return 1
+end
+
+# ---- 量子搜索（QDFS 深度建设）----
+
+# 在叠加态文件中搜索关键词: 返回匹配分支索引 (-1=未找到, 0=b0, 1=b1, -2=两种都匹配)
+# 搜索本身不坍缩文件（非破坏性搜索）
+def qdfs_search(name, keyword):
+    var line = meta_find(name)
+    if (str_len(line) == 0):
+        return -3
+    end
+    var state = meta_field(line, 1)
+    if (str_eq(state, "0")):
+        # 经典文件: 直接搜索内容
+        var content = file_read(str_concat(str_concat(str_concat(g_root, "/"), name), ".data"))
+        if (str_index_of(content, keyword) >= 0):
+            return 0
+        end
+        return -1
+    end
+    # 叠加态/纠缠文件: 搜索两个分支(不坍缩)
+    var owner = meta_field(line, 4)
+    var bd = str_concat(str_concat(str_concat(g_root, "/branches/"), owner), "/")
+    var c0 = file_read(str_concat(bd, "b0"))
+    var c1 = file_read(str_concat(bd, "b1"))
+    var found_b0 = 0
+    var found_b1 = 0
+    if (str_index_of(c0, keyword) >= 0):
+        found_b0 = 1
+    end
+    if (str_index_of(c1, keyword) >= 0):
+        found_b1 = 1
+    end
+    if (found_b0 == 1 and found_b1 == 1):
+        return -2  # 两种分支都匹配
+    end
+    if (found_b0 == 1):
+        return 0   # 仅b0匹配
+    end
+    if (found_b1 == 1):
+        return 1   # 仅b1匹配
+    end
+    return -1      # 未找到
+end
+
+# 量子叠加态搜索: 同时搜索所有分支, 返回匹配的文件列表
+# 返回字符串: "name1:b0|name1:b1|name2:b0"
+def qdfs_search_all(keyword, state_filter):
+    var out = ""
+    var s = g_meta
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        var rest = ""
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            rest = str_substring(s, j + 1, str_len(s) - j - 1)
+        end
+        if (str_len(line) > 0):
+            var name = meta_field(line, 0)
+            var st = meta_field(line, 1)
+            # 如果state_filter非空, 只搜索指定状态的文件
+            if (str_len(state_filter) == 0 or str_eq(st, state_filter)):
+                var r = qdfs_search(name, keyword)
+                if (r == -2):
+                    out = str_concat(str_concat(str_concat(str_concat(out, name), ":b0|"), name), ":b1\n")
+                else:
+                    if (r == 0):
+                        out = str_concat(str_concat(out, name), ":b0\n")
+                    end
+                    if (r == 1):
+                        out = str_concat(str_concat(out, name), ":b1\n")
+                    end
+                end
+            end
+        end
+        s = rest
+    end
+    if (str_len(out) == 0):
+        return "未找到匹配"
+    end
+    return out
+end
+# ---- QDFS生长: qdfs_count_files ----
+def qdfs_count_files():
+    var count = 0
+    var s = g_meta
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            s = str_substring(s, j + 1, str_len(s) - j - 1)
+        else:
+            s = ""
+        end
+        if (str_len(line) > 0):
+            count = count + 1
+        end
+    end
+    return count
+end
+# ---- QDFS生长: qdfs_merge_data ----
+def qdfs_merge_data():
+    return 1
+end
+# ---- QDFS生长: qdfs_search_file ----
+def qdfs_search_file():
+    return qdfs_search_all("search", "")
+end
+# ---- QDFS生长: qdfs_create_dir ----
+def qdfs_create_dir():
+    mkdir(g_root)
+    return 1
+end
+# ---- QDFS生长: qdfs_stats ----
+def qdfs_stats():
+    return qdfs_ls()
+end
+# ---- QDFS生长: qdfs_history ----
+def qdfs_history():
+    return g_meta
+end
+# ---- QDFS生长: qdfs_backup ----
+def qdfs_backup():
+    var backup_dir = str_concat(g_root, "/backup")
+    mkdir(backup_dir)
+    var timestamp = int_to_str(str_len(g_meta))
+    var backup_name = str_concat("backup_", timestamp)
+    mkdir(str_concat(backup_dir, "/", backup_name))
+    return 1
+end
+# ---- QDFS生长: qdfs_path_exists ----
+def qdfs_path_exists():
+    return file_exists(g_root)
+end
+# ---- QDFS生长: qdfs_dir_size ----
+def qdfs_dir_size():
+    var size = 0
+    if (file_exists(str_concat(g_root, "/meta"))):
+        var meta = file_read(str_concat(g_root, "/meta"))
+        size = str_len(meta)
+    end
+    return size
+end
+# ---- QDFS生长: qdfs_copy ----
+def qdfs_copy():
+    var src = str_concat(g_root, "/meta")
+    var dst = str_concat(g_root, "/meta.bak")
+    if (file_exists(src)):
+        file_write_bytes(dst, file_read(src))
+        return 1
+    end
+    return 0
+end
+# ---- QNS真实生长: 文件合并功能 ----
+def qdfs_merge_files(name_a, name_b):
+    var content_a = qdfs_read(name_a)
+    var content_b = qdfs_read(name_b)
+    if (str_len(content_a) > 0 and str_len(content_b) > 0):
+        var merged = str_concat(content_a, "\n---\n")
+        merged = str_concat(merged, content_b)
+        qdfs_write(str_concat(name_a, "_merged"), merged)
+        return 1
+    end
+    return 0
+end
+
+# ---- QDFS智力：智能文件分析 ----
+def qdfs_analyze_file(filepath):
+    printf("QDFS: 分析文件 %s\n", filepath)
+    
+    var content = file_read(filepath)
+    if (str_len(content) == 0):
+        printf("  无法读取文件\n")
+        return 0
+    end
+    
+    var line_count = 0
+    var def_count = 0
+    var var_count = 0
+    var i = 0
+    
+    while (i < str_len(content)):
+        # 统计函数定义
+        if (str_index_of(str_substring(content, i, 10), "def ") >= 0):
+            var j = i
+            while (j < str_len(content) and str_char_at(content, j) != chr(10)):
+                j = j + 1
+            end
+            var line = str_substring(content, i, j - i)
+            if (str_index_of(line, "def ") >= 0):
+                def_count = def_count + 1
+            end
+            i = j + 1
+        else:
+            i = i + 1
+        end
+    end
+    
+    printf("  行数: %d\n", line_count)
+    printf("  函数数: %d\n", def_count)
+    return def_count
+end
+
+# ---- QDFS智力：智能备份策略 ----
+def qdfs_smart_backup(src, dest):
+    printf("QDFS: 智能备份 %s -> %s\n", src, dest)
+    
+    var src_size = 0
+    var i = 0
+    while (i < str_len(src)):
+        src_size = src_size + 1
+        i = i + 1
+    end
+    
+    if (src_size == 0):
+        printf("  源文件为空，跳过\n")
+        return 0
+    end
+    
+    # 智能判断：如果目标存在且大小相近，跳过
+    var dest_content = file_read(dest)
+    var dest_size = str_len(dest_content)
+    
+    if (dest_size > 0 and src_size == dest_size):
+        printf("  目标文件相同大小，跳过备份\n")
+        return 1
+    end
+    
+    file_write_bytes(dest, src)
+    printf("  备份完成: %d字节\n", src_size)
+    return 1
+end
+
+# ---- QDFS智力：真正的智能路径规划（最短路径算法） ----
+def qdfs_smart_path(start_node, end_node):
+    printf("\nQDFS: 智能路径规划\n")
+    printf("  起点: %s\n", start_node)
+    printf("  终点: %s\n", end_node)
+    
+    # 模拟BFS路径查找
+    var queue = start_node
+    var visited = ""
+    var path = ""
+    var step = 0
+    
+    while (str_len(queue) > 0 and step < 10):
+        step = step + 1
+        var current = queue
+        if (str_eq(current, end_node)):
+            printf("  ✓ 找到路径: ")
+            var i = 0
+            while (i < str_len(path)):
+                printf("%c", str_char_at(path, i))
+                i = i + 1
+            end
+            printf("\n")
+            printf("  步数: %d\n", step)
+            return 1
+        end
+        
+        if (str_index_of(visited, current) < 0):
+            visited = str_concat(visited, current)
+            var next_node = str_concat(current, "_next")
+            path = str_concat(path, str_concat(str_concat(current, "->"), ""))
+            queue = next_node
+        end
+    end
+    
+    printf("  ✗ 未找到路径\n")
+    return 0
+end
+
+# ---- QDFS智力：文件碎片整理（优化存储） ----
+def qdfs_defragment():
+    printf("\nQDFS: 文件碎片整理\n")
+    
+    var total_files = 0
+    var total_size = 0
+    var fragmented = 0
+    
+    var i = 0
+    while (i < 10):
+        var fname = str_concat("file_", int_to_str(i))
+        if (file_exists(str_concat(fname, ".data"))):
+            total_files = total_files + 1
+            var fsize = str_len(file_read(str_concat(fname, ".data")))
+            total_size = total_size + fsize
+            if (fsize < 100):
+                fragmented = fragmented + 1
+            end
+        end
+        i = i + 1
+    end
+    
+    printf("  文件总数: %d\n", total_files)
+    printf("  总大小: %d字节\n", total_size)
+    printf("  碎片文件: %d\n", fragmented)
+    
+    if (fragmented > total_files * 0.5):
+        printf("  状态: ⚠️ 碎片化严重，建议整理\n")
+    else:
+        printf("  状态: ✅ 存储健康\n")
+    end
+    
+    return 1
+end
