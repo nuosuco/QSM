@@ -381,5 +381,11 @@ def qdfs_dir_size():
 end
 # ---- QDFS生长: qdfs_copy ----
 def qdfs_copy():
-    return 1
+    var src = str_concat(g_root, "/meta")
+    var dst = str_concat(g_root, "/meta.bak")
+    if (file_exists(src)):
+        file_write_bytes(dst, file_read(src))
+        return 1
+    end
+    return 0
 end
