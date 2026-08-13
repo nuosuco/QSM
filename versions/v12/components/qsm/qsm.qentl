@@ -1,0 +1,62 @@
+# ================================================================
+# qsm.qentl — QSM主模型（四大模型统一入口）
+# ================================================================
+
+# 初始化四大模型
+def qsm_init():
+    # QSM主模型
+    # SOM经济模型
+    # WeQ社交模型
+    # Ref自反省模型
+    return 1
+end
+
+# 主模型功能
+def qsm_main():
+    printf("QSM v8 - 主模型\n")
+    return 0
+end
+
+# 经济模型入口
+def qsm_som():
+    printf("SOM - 经济模型\n")
+    return 0
+end
+
+# 社交模型入口
+def qsm_weq():
+    printf("WeQ - 社交模型\n")
+    return 0
+end
+
+# 自反省模型入口
+def qsm_ref():
+    printf("Ref - 自反省模型\n")
+    return 0
+end
+
+# 健康检查
+def qsm_health():
+    var ok = 0
+    if (file_exists("components/qcl/qcl.qentl")):
+        ok = ok + 1
+    end
+    if (file_exists("components/qvm/qvm.qentl")):
+        ok = ok + 1
+    end
+    if (file_exists("components/qdfs/qdfs.qentl")):
+        ok = ok + 1
+    end
+    if (file_exists("components/qns/qns.qentl")):
+        ok = ok + 1
+    end
+    printf("QSM健康: %d/4 通过\n", ok)
+    return ok
+end
+
+# 主入口
+def qsm_main_entry():
+    qsm_init()
+    qsm_health()
+    return 0
+end

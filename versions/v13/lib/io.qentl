@@ -1,0 +1,84 @@
+# ================================================================
+# lib/io.qentl — QEntL文件IO标准库
+# 纯QEntL实现，封装builtin文件操作
+# ================================================================
+
+# ---- 读取文本文件，失败返回空串 ----
+def io_read(path):
+    if (file_exists(path) == 0):
+        printf("[io] 文件不存在: %s\n", path)
+        return ""
+    end
+    return file_read(path)
+end
+
+# ---- 写入文本文件，返回字节数 ----
+def io_write(path, content):
+    return file_write_bytes(path, content)
+end
+
+# ---- 追加写入：读旧内容+新内容 ----
+def io_append(path, content):
+    var old = ""
+    if (file_exists(path) == 1):
+        old = file_read(path)
+    end
+    return file_write_bytes(path, str_concat(old, content))
+end
+
+# ---- 文件行数 ----
+def io_line_count(text):
+    var count = 0
+    var i = 0
+    while (i < str_len(text)):
+        if (str_eq(str_char_at(text, i), "\n")): count = count + 1 end
+        i = i + 1
+    end
+    return count
+end
+
+# ---- 取第n行（1-based），不存在返回空 ----
+def io_get_line(text, n):
+    var line_num = 1
+    var start = 0
+    var i = 0
+    var tl = str_len(text)
+    while (i <= tl):
+        var is_break = 0
+        if (i == tl): is_break = 1 end
+        if (i < tl and str_eq(str_char_at(text, i), "\n")): is_break = 1 end
+        if (is_break == 1):
+            if (line_num == n):
+                return str_substring(text, start, i - start)
+            end
+            line_num = line_num + 1
+            start = i + 1
+        end
+        i = i + 1
+    end
+    return ""
+end
+
+# ================================================================
+# 测试
+# ================================================================
+printf("=== lib/io.qentl 测试 ===\n")
+
+var test_file = "/tmp/qentl_io_test.txt"
+var w1 = io_write(test_file, "第一行\n第二行\n第三行\n")
+printf("write=%d\n", w1)
+
+var content = io_read(test_file)
+printf("read_len=%d lines=%d\n", str_len(content), io_line_count(content))
+printf("line1=[%s]\n", io_get_line(content, 1))
+printf("line2=[%s]\n", io_get_line(content, 2))
+printf("line3=[%s]\n", io_get_line(content, 3))
+
+io_append(test_file, "第四行\n")
+var content2 = io_read(test_file)
+printf("after_append lines=%d line4=[%s]\n", io_line_count(content2), io_get_line(content2, 4))
+
+var missing = io_read("/tmp/nonexistent_file_xyz.txt")
+printf("missing_len=%d\n", str_len(missing))
+
+printf("=== 全部测试完成 ===\n")
