@@ -137,144 +137,64 @@ var g_loop_depth = 0
 
 # ---- 辅助 ----
 def sub_eq(a, as, al, b, bs, bl):
-    iif (al != bl):
-        return 0
-    end
+    if (al != bl): return 0 end
     var x = str_substring(a, as, al)
     var y = str_substring(b, bs, bl)
-    rvar _tmp = str_eq(x, y)
-    rreturn _tmp
+    return str_eq(x, y)
 end
 
 def is_space(ch):
-    iif (str_eq(ch, " ")):
-        return 1
-    end
-    iif (str_eq(ch, "\t")):
-        return 1
-    end
-    iif (str_eq(ch, "\n")):
-        return 1
-    end
-    iif (str_eq(ch, "\r")):
-        return 1
-    end
+    if (str_eq(ch, " ")): return 1 end
+    if (str_eq(ch, "\t")): return 1 end
+    if (str_eq(ch, "\n")): return 1 end
+    if (str_eq(ch, "\r")): return 1 end
     return 0
 end
 
 def is_digit(ch):
-    iif (str_eq(ch, "0")):
-        return 1
-    end
-    iif (str_eq(ch, "1")):
-        return 1
-    end
-    iif (str_eq(ch, "2")):
-        return 1
-    end
-    iif (str_eq(ch, "3")):
-        return 1
-    end
-    iif (str_eq(ch, "4")):
-        return 1
-    end
-    iif (str_eq(ch, "5")):
-        return 1
-    end
-    iif (str_eq(ch, "6")):
-        return 1
-    end
-    iif (str_eq(ch, "7")):
-        return 1
-    end
-    iif (str_eq(ch, "8")):
-        return 1
-    end
-    iif (str_eq(ch, "9")):
-        return 1
-    end
+    if (str_eq(ch, "0")): return 1 end
+    if (str_eq(ch, "1")): return 1 end
+    if (str_eq(ch, "2")): return 1 end
+    if (str_eq(ch, "3")): return 1 end
+    if (str_eq(ch, "4")): return 1 end
+    if (str_eq(ch, "5")): return 1 end
+    if (str_eq(ch, "6")): return 1 end
+    if (str_eq(ch, "7")): return 1 end
+    if (str_eq(ch, "8")): return 1 end
+    if (str_eq(ch, "9")): return 1 end
     return 0
 end
 
 def is_ident_char(ch):
-    iif (is_space(ch)):
-        return 0
-    end
-    iif (str_eq(ch, "(")):
-        return 0
-    end
-    iif (str_eq(ch, ")")):
-        return 0
-    end
-    iif (str_eq(ch, "[")):
-        return 0
-    end
-    iif (str_eq(ch, "]")):
-        return 0
-    end
-    iif (str_eq(ch, ":")):
-        return 0
-    end
-    iif (str_eq(ch, ",")):
-        return 0
-    end
-    iif (str_eq(ch, "+")):
-        return 0
-    end
-    iif (str_eq(ch, "-")):
-        return 0
-    end
-    iif (str_eq(ch, "*")):
-        return 0
-    end
-    iif (str_eq(ch, "/")):
-        return 0
-    end
-    iif (str_eq(ch, "%")):
-        return 0
-    end
-    iif (str_eq(ch, "=")):
-        return 0
-    end
-    iif (str_eq(ch, "!")):
-        return 0
-    end
-    iif (str_eq(ch, "<")):
-        return 0
-    end
-    iif (str_eq(ch, ">")):
-        return 0
-    end
-    iif (str_eq(ch, "&")):
-        return 0
-    end
-    iif (str_eq(ch, "|")):
-        return 0
-    end
-    iif (str_eq(ch, "\"")):
-        return 0
-    end
-    iif (str_eq(ch, "#")):
-        return 0
-    end
-    iif (str_eq(ch, "'")):
-        return 0
-    end
-    iif (str_eq(ch, ";")):
-        return 0
-    end
-    iif (str_eq(ch, ".")):
-        return 0
-    end
+    if (is_space(ch)): return 0 end
+    if (str_eq(ch, "(")): return 0 end
+    if (str_eq(ch, ")")): return 0 end
+    if (str_eq(ch, "[")): return 0 end
+    if (str_eq(ch, "]")): return 0 end
+    if (str_eq(ch, ":")): return 0 end
+    if (str_eq(ch, ",")): return 0 end
+    if (str_eq(ch, "+")): return 0 end
+    if (str_eq(ch, "-")): return 0 end
+    if (str_eq(ch, "*")): return 0 end
+    if (str_eq(ch, "/")): return 0 end
+    if (str_eq(ch, "%")): return 0 end
+    if (str_eq(ch, "=")): return 0 end
+    if (str_eq(ch, "!")): return 0 end
+    if (str_eq(ch, "<")): return 0 end
+    if (str_eq(ch, ">")): return 0 end
+    if (str_eq(ch, "&")): return 0 end
+    if (str_eq(ch, "|")): return 0 end
+    if (str_eq(ch, "\"")): return 0 end
+    if (str_eq(ch, "#")): return 0 end
+    if (str_eq(ch, "'")): return 0 end
+    if (str_eq(ch, ";")): return 0 end
+    if (str_eq(ch, ".")): return 0 end
     return 1
 end
 
 def is_ident_start(ch):
-    iif (is_digit(ch)):
-        return 0
-    end
-    rvar _tmp = is_ident_char(ch)
-    rreturn _tmp
+    if (is_digit(ch)): return 0 end
+    return is_ident_char(ch)
 end
 
 # ---- token访问 ----
@@ -287,8 +207,7 @@ end
 
 def cur_text():
     if (g_parse_pos < g_tok_count):
-        rvar _tmp = str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos])
-        rreturn _tmp
+        return str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos])
     end
     return ""
 end
@@ -315,9 +234,7 @@ def peek_type2():
 end
 
 def expect(tt, msg):
-    if (g_abort == 1):
-        return
-    end
+    if (g_abort == 1): return end
     if (cur_type() != tt):
         printf("qcl: 语法错误: %s (tok %d)\n", msg, g_parse_pos)
         g_errors = g_errors + 1
@@ -699,15 +616,11 @@ end
 
 def sym_add_assign(s, l):
     var r = sym_resolve(s, l)
-    iif (r >= 0):
-        return r
-    end
+    if (r >= 0): return r end
     if (g_in_func == 1):
-        rvar _tmp = sym_add_local(s, l)
-        rreturn _tmp
+        return sym_add_local(s, l)
     end
-    rvar _tmp = sym_add_global(s, l)
-    rreturn _tmp
+    return sym_add_global(s, l)
 end
 
 # ---- 字符串池（修复v1偏移bug：先加分隔符再取偏移）----
@@ -762,9 +675,7 @@ def emit_u16(v):
 end
 
 def code_pos():
-    iif (g_in_func == 1):
-        return g_fc
-    end
+    if (g_in_func == 1): return g_fc end
     return g_mc
 end
 
@@ -797,178 +708,64 @@ end
 
 # ---- 内置函数名检测 ----
 def is_builtin(nm):
-    iif (str_eq(nm, "printf")):
-        return 1
-    end
-    iif (str_eq(nm, "str_len")):
-        return 1
-    end
-    iif (str_eq(nm, "str_char_at")):
-        return 1
-    end
-    iif (str_eq(nm, "str_substring")):
-        return 1
-    end
-    iif (str_eq(nm, "str_concat")):
-        return 1
-    end
-    iif (str_eq(nm, "str_eq")):
-        return 1
-    end
-    iif (str_eq(nm, "str_index_of")):
-        return 1
-    end
-    iif (str_eq(nm, "str_from_char")):
-        return 1
-    end
-    iif (str_eq(nm, "str_to_int")):
-        return 1
-    end
-    iif (str_eq(nm, "str_to_float")):
-        return 1
-    end
-    iif (str_eq(nm, "float_to_str")):
-        return 1
-    end
-    iif (str_eq(nm, "str_trim")):
-        return 1
-    end
-    iif (str_eq(nm, "str_upper")):
-        return 1
-    end
-    iif (str_eq(nm, "str_lower")):
-        return 1
-    end
-    iif (str_eq(nm, "int_to_str")):
-        return 1
-    end
-    iif (str_eq(nm, "len")):
-        return 1
-    end
-    iif (str_eq(nm, "file_read")):
-        return 1
-    end
-    iif (str_eq(nm, "file_write_bytes")):
-        return 1
-    end
-    iif (str_eq(nm, "file_exists")):
-        return 1
-    end
-    iif (str_eq(nm, "file_delete")):
-        return 1
-    end
-    iif (str_eq(nm, "sort_int")):
-        return 1
-    end
-    iif (str_eq(nm, "sort_str")):
-        return 1
-    end
-    iif (str_eq(nm, "qdfs_get")):
-        return 1
-    end
-    iif (str_eq(nm, "qdfs_set")):
-        return 1
-    end
-    iif (str_eq(nm, "qdfs_del")):
-        return 1
-    end
+    if (str_eq(nm, "printf")): return 1 end
+    if (str_eq(nm, "str_len")): return 1 end
+    if (str_eq(nm, "str_char_at")): return 1 end
+    if (str_eq(nm, "str_substring")): return 1 end
+    if (str_eq(nm, "str_concat")): return 1 end
+    if (str_eq(nm, "str_eq")): return 1 end
+    if (str_eq(nm, "str_index_of")): return 1 end
+    if (str_eq(nm, "str_from_char")): return 1 end
+    if (str_eq(nm, "str_to_int")): return 1 end
+    if (str_eq(nm, "str_to_float")): return 1 end
+    if (str_eq(nm, "float_to_str")): return 1 end
+    if (str_eq(nm, "str_trim")): return 1 end
+    if (str_eq(nm, "str_upper")): return 1 end
+    if (str_eq(nm, "str_lower")): return 1 end
+    if (str_eq(nm, "int_to_str")): return 1 end
+    if (str_eq(nm, "len")): return 1 end
+    if (str_eq(nm, "file_read")): return 1 end
+    if (str_eq(nm, "file_write_bytes")): return 1 end
+    if (str_eq(nm, "file_exists")): return 1 end
+    if (str_eq(nm, "file_delete")): return 1 end
+    if (str_eq(nm, "sort_int")): return 1 end
+    if (str_eq(nm, "sort_str")): return 1 end
+    if (str_eq(nm, "qdfs_get")): return 1 end
+    if (str_eq(nm, "qdfs_set")): return 1 end
+    if (str_eq(nm, "qdfs_del")): return 1 end
     if (str_eq(nm, "qdfs_list")))
-    iif (str_eq(nm, "file_list")):
-        return 1
-    end
-    iif (str_eq(nm, "mkdir")):
-        return 1
-    end
-    iif (str_eq(nm, "rand_int")):
-        return 1
-    end
-    iif (str_eq(nm, "exec")):
-        return 1
-    end
-    iif (str_eq(nm, "ord")):
-        return 1
-    end
-    iif (str_eq(nm, "chr")):
-        return 1
-    end
-    iif (str_eq(nm, "tcp_listen")):
-        return 1
-    end
-    iif (str_eq(nm, "tcp_accept")):
-        return 1
-    end
-    iif (str_eq(nm, "tcp_recv")):
-        return 1
-    end
-    iif (str_eq(nm, "tcp_send")):
-        return 1
-    end
-    iif (str_eq(nm, "tcp_close")):
-        return 1
-    end
-    iif (str_eq(nm, "tcp_shutdown")):
-        return 1
-    end
-    iif (str_eq(nm, "qreg_create")):
-        return 1
-    end
-    iif (str_eq(nm, "qreg_free")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_h")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_t")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_cx")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_x")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_z")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_cz")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_ccx")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_ccz")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_cccz")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_ccccz")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_phase")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_iphase")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_cphase")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_icphase")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_ry")):
-        return 1
-    end
-    iif (str_eq(nm, "apply_swap")):
-        return 1
-    end
-    iif (str_eq(nm, "measure")):
-        return 1
-    end
-    iif (str_eq(nm, "str_from_pool")):
-        return 1
-    end
+    if (str_eq(nm, "file_list")): return 1 end
+    if (str_eq(nm, "mkdir")): return 1 end
+    if (str_eq(nm, "rand_int")): return 1 end
+    if (str_eq(nm, "exec")): return 1 end
+    if (str_eq(nm, "ord")): return 1 end
+    if (str_eq(nm, "chr")): return 1 end
+    if (str_eq(nm, "tcp_listen")): return 1 end
+    if (str_eq(nm, "tcp_accept")): return 1 end
+    if (str_eq(nm, "tcp_recv")): return 1 end
+    if (str_eq(nm, "tcp_send")): return 1 end
+    if (str_eq(nm, "tcp_close")): return 1 end
+    if (str_eq(nm, "tcp_shutdown")): return 1 end
+    if (str_eq(nm, "qreg_create")): return 1 end
+    if (str_eq(nm, "qreg_free")): return 1 end
+    if (str_eq(nm, "apply_h")): return 1 end
+    if (str_eq(nm, "apply_t")): return 1 end
+    if (str_eq(nm, "apply_cx")): return 1 end
+    if (str_eq(nm, "apply_x")): return 1 end
+    if (str_eq(nm, "apply_z")): return 1 end
+    if (str_eq(nm, "apply_cz")): return 1 end
+    if (str_eq(nm, "apply_ccx")): return 1 end
+    if (str_eq(nm, "apply_ccz")): return 1 end
+    if (str_eq(nm, "apply_cccz")): return 1 end
+    if (str_eq(nm, "apply_ccccz")): return 1 end
+    if (str_eq(nm, "apply_phase")): return 1 end
+    if (str_eq(nm, "apply_iphase")): return 1 end
+    if (str_eq(nm, "apply_cphase")): return 1 end
+    if (str_eq(nm, "apply_icphase")): return 1 end
+    if (str_eq(nm, "apply_ry")): return 1 end
+    if (str_eq(nm, "apply_swap")): return 1 end
+    if (str_eq(nm, "measure")): return 1 end
+    if (str_eq(nm, "str_from_pool")): return 1 end
     return 0
 end
 
@@ -1013,8 +810,7 @@ def process_string_lit(idx):
         end
         i = i + 1
     end
-    rvar _tmp = pool_add_string(result)
-    rreturn _tmp
+    return pool_add_string(result)
 end
 
 def tok_num(idx):
@@ -2143,8 +1939,7 @@ end
 
 # ---- 输出：回填两个修正表，组装完整QBC一次性写入 ----
 def byte_char(v):
-    rvar _tmp = str_from_char(v % 256)
-    rreturn _tmp
+    return str_from_char(v % 256)
 end
 
 def build_full_qbc():
@@ -2233,8 +2028,7 @@ def build_full_qbc():
     out = str_concat(out, byte_char(high))
     out = str_concat(out, g_pool)
     file_write_bytes(g_output_file, out)
-    rvar _tmp = str_len(out)
-    rreturn _tmp
+    return str_len(out)
 end
 
 # ---- 编译器版本 ----
