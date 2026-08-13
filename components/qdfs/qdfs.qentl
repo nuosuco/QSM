@@ -320,4 +320,9 @@ def qdfs_search_all(keyword, state_filter):
 # ---- QDFS生长: qdfs_count_files ----
 def qdfs_count_files():
     return file_list(".")
+
+# ---- QDFS生长: qdfs_count_files ----
+def qdfs_count_files():
+    return file_list(".")
+
 end
