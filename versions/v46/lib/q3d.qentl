@@ -1,0 +1,275 @@
+# ================================================================
+# lib/q3d.qentl — QEntL 3D渲染引擎（纯QEntL源码）
+# 
+# 不依赖C种子图形原语。QEntL输出3D场景数学描述（JSON格式），
+# 通过HTTP服务器传给浏览器，浏览器渲染为3D图像。
+# 未来QVM直接驱动3D时，本文件仍然适用——只是输出目标从HTTP变成直接渲染。
+#
+# 视觉隐喻：每个QEntL=一个小球/圆柱体，QSM=大球包含无数小球
+# ================================================================
+
+# ---- 3D场景对象 ----
+# 所有3D对象用字符串描述，QEntL本身不渲染，只输出数据
+
+# 创建一个球体（代表一个QEntL/一个量子应用/一个宇宙）
+def q3d_sphere(x, y, z, r, color, label):
+    var obj = "{"
+    obj = str_concat(obj, "\"type\":\"sphere\",")
+    obj = str_concat(obj, "\"x\":")
+    obj = str_concat(obj, int_to_str(x))
+    obj = str_concat(obj, ",\"y\":")
+    obj = str_concat(obj, int_to_str(y))
+    obj = str_concat(obj, ",\"z\":")
+    obj = str_concat(obj, int_to_str(z))
+    obj = str_concat(obj, ",\"r\":")
+    obj = str_concat(obj, int_to_str(r))
+    obj = str_concat(obj, ",\"color\":\"")
+    obj = str_concat(obj, color)
+    obj = str_concat(obj, "\",\"label\":\"")
+    obj = str_concat(obj, label)
+    obj = str_concat(obj, "\"}")
+    return obj
+end
+
+# 创建一个圆柱体（代表QSM大容器）
+def q3d_cylinder(x, y, z, r, h, color, label):
+    var obj = "{"
+    obj = str_concat(obj, "\"type\":\"cylinder\",")
+    obj = str_concat(obj, "\"x\":")
+    obj = str_concat(obj, int_to_str(x))
+    obj = str_concat(obj, ",\"y\":")
+    obj = str_concat(obj, int_to_str(y))
+    obj = str_concat(obj, ",\"z\":")
+    obj = str_concat(obj, int_to_str(z))
+    obj = str_concat(obj, ",\"r\":")
+    obj = str_concat(obj, int_to_str(r))
+    obj = str_concat(obj, ",\"h\":")
+    obj = str_concat(obj, int_to_str(h))
+    obj = str_concat(obj, ",\"color\":\"")
+    obj = str_concat(obj, color)
+    obj = str_concat(obj, "\",\"label\":\"")
+    obj = str_concat(obj, label)
+    obj = str_concat(obj, "\"}")
+    return obj
+end
+
+# 创建一个光链（代表纠缠通信WeQ）
+def q3d_beam(x1, y1, z1, x2, y2, z2, color):
+    var obj = "{"
+    obj = str_concat(obj, "\"type\":\"beam\",")
+    obj = str_concat(obj, "\"x1\":")
+    obj = str_concat(obj, int_to_str(x1))
+    obj = str_concat(obj, ",\"y1\":")
+    obj = str_concat(obj, int_to_str(y1))
+    obj = str_concat(obj, ",\"z1\":")
+    obj = str_concat(obj, int_to_str(z1))
+    obj = str_concat(obj, ",\"x2\":")
+    obj = str_concat(obj, int_to_str(x2))
+    obj = str_concat(obj, ",\"y2\":")
+    obj = str_concat(obj, int_to_str(y2))
+    obj = str_concat(obj, ",\"z2\":")
+    obj = str_concat(obj, int_to_str(z2))
+    obj = str_concat(obj, ",\"color\":\"")
+    obj = str_concat(obj, color)
+    obj = str_concat(obj, "\"}")
+    return obj
+end
+
+# 创建一个光点（代表量子态传送）
+def q3d_particle(x, y, z, color, speed):
+    var obj = "{"
+    obj = str_concat(obj, "\"type\":\"particle\",")
+    obj = str_concat(obj, "\"x\":")
+    obj = str_concat(obj, int_to_str(x))
+    obj = str_concat(obj, ",\"y\":")
+    obj = str_concat(obj, int_to_str(y))
+    obj = str_concat(obj, ",\"z\":")
+    obj = str_concat(obj, int_to_str(z))
+    obj = str_concat(obj, ",\"color\":\"")
+    obj = str_concat(obj, color)
+    obj = str_concat(obj, "\",\"speed\":")
+    obj = str_concat(obj, int_to_str(speed))
+    obj = str_concat(obj, "\"}")
+    return obj
+end
+
+# ---- 3D场景构建 ----
+# 构建一个完整的QSM大球场景描述（JSON数组）
+
+# 构建QSM场景：大球+内部多个QEntL小球
+def q3d_scene_qsm(target_x, target_y, target_z, large_r, small_r, count):
+    var scene = "["
+    # 大球（QSM容器，代表平行宇宙）
+    scene = str_concat(scene, q3d_sphere(target_x, target_y, target_z, large_r, "#00d4ff", "QSM"))
+    scene = str_concat(scene, ",")
+    # 内部无数小球（每个QEntL=一个宇宙）
+    var i = 0
+    while (i < count):
+        # 球体内随机分布（用rand_int生成相对位置）
+        var angle_x = rand_int(360)
+        var angle_y = rand_int(360)
+        var offset = rand_int(large_r - small_r * 2)
+        if (offset < small_r):
+            offset = small_r
+        end
+        var px = target_x + offset / 2
+        var py = target_y + offset / 3
+        var pz = target_z + offset / 4
+        scene = str_concat(scene, q3d_sphere(px, py, pz, small_r, "#ff6b9d", "QEntL"))
+        if (i < count - 1):
+            scene = str_concat(scene, ",")
+        end
+        i = i + 1
+    end
+    scene = str_concat(scene, "]")
+    return scene
+end
+
+# 构建纠缠场景：两个QEntL之间的光链
+def q3d_scene_entangle(x1, y1, z1, x2, y2, z2):
+    var scene = "["
+    # 两个小球
+    scene = str_concat(scene, q3d_sphere(x1, y1, z1, 10, "#ff6b9d", "QEntL_A"))
+    scene = str_concat(scene, ",")
+    scene = str_concat(scene, q3d_sphere(x2, y2, z2, 10, "#ff6b9d", "QEntL_B"))
+    scene = str_concat(scene, ",")
+    # 纠缠光链
+    scene = str_concat(scene, q3d_beam(x1, y1, z1, x2, y2, z2, "#ffd700"))
+    scene = str_concat(scene, ",")
+    # 传送光点
+    var mid_x = (x1 + x2) / 2
+    var mid_y = (y1 + y2) / 2
+    var mid_z = (z1 + z2) / 2
+    scene = str_concat(scene, q3d_particle(mid_x, mid_y, mid_z, "#00d4ff", 5))
+    scene = str_concat(scene, "]")
+    return scene
+end
+
+# 构建合并场景：两个QEntL融合为一个
+def q3d_scene_merge(x1, y1, z1, x2, y2, z2):
+    var scene = "["
+    scene = str_concat(scene, q3d_sphere(x1, y1, z1, 15, "#ff6b9d", "合并中_A"))
+    scene = str_concat(scene, ",")
+    scene = str_concat(scene, q3d_sphere(x2, y2, z2, 15, "#ff6b9d", "合并中_B"))
+    scene = str_concat(scene, ",")
+    # 合并后的结果（中间位置，更大）
+    var mid_x = (x1 + x2) / 2
+    var mid_y = (y1 + y2) / 2
+    scene = str_concat(scene, q3d_sphere(mid_x, mid_y, 0, 25, "#7bed9f", "合并完成"))
+    scene = str_concat(scene, "]")
+    return scene
+end
+
+# 构建分离场景：一个分裂为两个
+def q3d_scene_split(x, y, z):
+    var scene = "["
+    scene = str_concat(scene, q3d_sphere(x, y, z, 25, "#ffd700", "分裂前"))
+    scene = str_concat(scene, ",")
+    scene = str_concat(scene, q3d_sphere(x - 30, y, z, 15, "#ff6b9d", "分裂_A"))
+    scene = str_concat(scene, ",")
+    scene = str_concat(scene, q3d_sphere(x + 30, y, z, 15, "#00d4ff", "分裂_B"))
+    scene = str_concat(scene, "]")
+    return scene
+end
+
+# 构建并行运算场景：多个QEntL同时运算
+def q3d_scene_parallel(count):
+    var scene = "["
+    var i = 0
+    while (i < count):
+        var x = (i - count / 2) * 40
+        var y = rand_int(60) - 30
+        var z = rand_int(60) - 30
+        scene = str_concat(scene, q3d_sphere(x, y, z, 8, "#00d4ff", "并行"))
+        if (i < count - 1):
+            scene = str_concat(scene, ",")
+        end
+        i = i + 1
+    end
+    scene = str_concat(scene, "]")
+    return scene
+end
+
+# ---- 3D场景输出 ----
+# 输出场景JSON到HTTP响应（通过HTTP服务器）
+def q3d_render(scene_json):
+    # 场景JSON嵌入HTML，供浏览器渲染
+    var html = "<!DOCTYPE html>\n<html>\n<head>\n"
+    html = str_concat(html, "<meta charset=\"utf-8\">\n")
+    html = str_concat(html, "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">\n")
+    html = str_concat(html, "<title>Q3D — QEntL量子3D场景</title>\n")
+    html = str_concat(html, "<style>\n")
+    html = str_concat(html, "body{margin:0;overflow:hidden;background:#0a0e1a;font-family:sans-serif}\n")
+    html = str_concat(html, "canvas{display:block}\n")
+    html = str_concat(html, "#info{position:fixed;bottom:10px;left:10px;color:#6a7a8a;font-size:12px}\n")
+    html = str_concat(html, "</style>\n</head>\n<body>\n")
+    html = str_concat(html, "<div id=\"info\">QEntL 3D — 纯量子操作系统视觉化</div>\n")
+    html = str_concat(html, "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js\"></script>\n")
+    html = str_concat(html, "<script>\n")
+    html = str_concat(html, "var sceneData = ")
+    html = str_concat(html, scene_json)
+    html = str_concat(html, ";\n")
+    html = str_concat(html, "// Three.js 场景渲染（读取sceneData，渲染球体/光链/粒子）\n")
+    html = str_concat(html, "var scene=new THREE.Scene();\n")
+    html = str_concat(html, "var camera=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,1,1000);\n")
+    html = str_concat(html, "camera.position.set(0,50,150);\n")
+    html = str_concat(html, "var renderer=new THREE.WebGLRenderer({antialias:true});\n")
+    html = str_concat(html, "renderer.setSize(window.innerWidth,window.innerHeight);\n")
+    html = str_concat(html, "renderer.setClearColor(0x0a0e1a);\n")
+    html = str_concat(html, "document.body.appendChild(renderer.domElement);\n")
+    html = str_concat(html, "sceneData.forEach(function(obj){\n")
+    html = str_concat(html, "  if(obj.type=='sphere'){\n")
+    html = str_concat(html, "    var geo=new THREE.SphereGeometry(obj.r,32,32);\n")
+    html = str_concat(html, "    var mat=new THREE.MeshPhongMaterial({color:obj.color,transparent:true,opacity:0.8});\n")
+    html = str_concat(html, "    var mesh=new THREE.Mesh(geo,mat);\n")
+    html = str_concat(html, "    mesh.position.set(obj.x,obj.y,obj.z);\n")
+    html = str_concat(html, "    scene.add(mesh);\n")
+    html = str_concat(html, "  }else if(obj.type=='beam'){\n")
+    html = str_concat(html, "    var points=[];points.push(new THREE.Vector3(obj.x1,obj.y1,obj.z1));\n")
+    html = str_concat(html, "    points.push(new THREE.Vector3(obj.x2,obj.y2,obj.z2));\n")
+    html = str_concat(html, "    var geo=new THREE.BufferGeometry().setFromPoints(points);\n")
+    html = str_concat(html, "    var mat=new THREE.LineBasicMaterial({color:obj.color});\n")
+    html = str_concat(html, "    scene.add(new THREE.Line(geo,mat));\n")
+    html = str_concat(html, "  }else if(obj.type=='particle'){\n")
+    html = str_concat(html, "    var geo=new THREE.SphereGeometry(2,8,8);\n")
+    html = str_concat(html, "    var mat=new THREE.MeshBasicMaterial({color:obj.color});\n")
+    html = str_concat(html, "    var mesh=new THREE.Mesh(geo,mat);\n")
+    html = str_concat(html, "    mesh.position.set(obj.x,obj.y,obj.z);\n")
+    html = str_concat(html, "    scene.add(mesh);\n")
+    html = str_concat(html, "  }\n")
+    html = str_concat(html, "});\n")
+    html = str_concat(html, "var light=new THREE.AmbientLight(0x404060);scene.add(light);\n")
+    html = str_concat(html, "var light2=new THREE.DirectionalLight(0xffffff,0.5);light2.position.set(1,1,1);scene.add(light2);\n")
+    html = str_concat(html, "function animate(){requestAnimationFrame(animate);renderer.render(scene,camera)}\n")
+    html = str_concat(html, "animate();\n")
+    html = str_concat(html, "window.addEventListener('resize',function(){renderer.setSize(window.innerWidth,window.innerHeight);camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix()});\n")
+    html = str_concat(html, "</script>\n</body>\n</html>")
+    return html
+end
+
+# ---- 完整3D场景生成 ----
+# 生成QSM平行宇宙3D场景（包含所有可视化元素）
+def q3d_full_scene():
+    var scene = "["
+    # QSM大球
+    scene = str_concat(scene, q3d_sphere(0, 0, 0, 60, "#00d4ff", "QSM"))
+    scene = str_concat(scene, ",")
+    # 多个QEntL小球
+    var i = 0
+    while (i < 8):
+        var angle = i * 45
+        var px = 40
+        var py = 0
+        var pz = 0
+        scene = str_concat(scene, q3d_sphere(px, py, pz, 10, "#ff6b9d", "QEntL"))
+        scene = str_concat(scene, ",")
+        i = i + 1
+    end
+    # 纠缠光链
+    scene = str_concat(scene, q3d_beam(40, 0, 0, -40, 0, 0, "#ffd700"))
+    scene = str_concat(scene, ",")
+    # 传送光点
+    scene = str_concat(scene, q3d_particle(0, 0, 0, "#7bed9f", 3))
+    scene = str_concat(scene, "]")
+    return scene
+end
