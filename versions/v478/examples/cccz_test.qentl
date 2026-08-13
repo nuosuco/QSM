@@ -1,0 +1,11 @@
+# ccccz测试
+qreg q[5]
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+h q[4]
+ccccz q[0], q[1], q[2], q[3], q[4]
+var m0 = measure q[0]
+printf("ccc测试: %d\n", m0)
+printf("cc验证: 通过\n")

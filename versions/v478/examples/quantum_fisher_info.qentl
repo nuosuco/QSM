@@ -1,0 +1,52 @@
+# ================================================================
+# 量子Fisher信息 — 量子测量精度极限
+# 量子参数估计: 海森堡极限
+# ================================================================
+
+printf("=== 量子Fisher信息 ===\n\n")
+printf("量子参数估计: 超越经典极限\n")
+printf("经典极限: 1/√N (散粒噪声)\n")
+printf("量子极限: 1/N (海森堡极限)\n\n")
+
+# 量子Fisher信息: 纠缠态提高测量精度
+# 比较: 独立比特 vs 纠缠比特
+
+printf("--- 独立比特测量 ---\n")
+var ind_avg = 0
+var i = 0
+while (i < 20):
+    var q = qreg_create(1)
+    h q[0]
+    var m = measure(q, 0)
+    ind_avg = ind_avg + m
+    qreg_free(q)
+    i = i + 1
+end
+printf("独立比特: 平均=%d/20\n", ind_avg)
+
+# 纠缠比特 (GHZ态)
+printf("\n--- 纠缠比特(GHZ)测量 ---\n")
+var ent_avg = 0
+i = 0
+while (i < 20):
+    var q = qreg_create(2)
+    h q[0]
+    cx q[0], q[1]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    # 纠缠测量: 仅测0相位
+    if (m0 == m1):
+        ent_avg = ent_avg + 1
+    end
+    qreg_free(q)
+    i = i + 1
+end
+printf("纠缠比特: 相关=%d/20\n", ent_avg)
+
+# 相位估计精度
+printf("\n--- 相位估计精度 ---\n")
+printf("独立比特: 精度1/√N (经典极限)\n")
+printf("纠缠比特: 精度1/N (海森堡极限)\n")
+printf("量子Fisher信息: 纠缠可提高精度√N倍\n")
+
+printf("\n=== Fisher信息完成 ===\n")

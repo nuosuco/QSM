@@ -1,0 +1,112 @@
+# ================================================================
+# 量子贝尔不等式验证 — 非局域性检验
+# CHSH不等式: 量子纠缠违反经典极限
+# ================================================================
+
+printf("=== 量子贝尔不等式验证 ===\n\n")
+printf("CHSH不等式: S = E(a,b) + E(a,b') + E(a',b) - E(a',b') ≤ 2\n")
+printf("量子力学预言: S = 2√2 ≈ 2.828 (最大违反)\n\n")
+
+# 测量Bell态在不同基矢下的关联
+# |Φ+> = (|00>+|11>)/√2
+# 测量基: 0°, 45°, 90°, 135°
+
+printf("制备Bell态 |Φ+> = (|00>+|11>)/√2\n\n")
+
+# 测量在不同角度下的关联
+# 角度0: 标准Z基测量
+# 角度1: 通过H旋转后测量
+
+var s_sum = 0
+var r = 0
+while (r < 20):
+    var q = qreg_create(2)
+    h q[0]
+    cx q[0], q[1]
+    
+    # Alice测量: Z基 (0°)
+    var a = measure(q, 0)
+    # Bob测量: Z基 (0°)
+    var b = measure(q, 1)
+    
+    if (a == b): s_sum = s_sum + 1 end
+    qreg_free(q)
+    r = r + 1
+end
+
+printf("关联E(0°,0°): %d/20 相同\n", s_sum)
+
+# Alice 0°, Bob 45° (H旋转后)
+var s2 = 0
+r = 0
+while (r < 20):
+    var q = qreg_create(2)
+    h q[0]
+    cx q[0], q[1]
+    
+    var a = measure(q, 0)
+    # Bob: 45°旋转
+    h q[1]
+    var b = measure(q, 1)
+    
+    if (a == b): s2 = s2 + 1 end
+    qreg_free(q)
+    r = r + 1
+end
+printf("关联E(0°,45°): %d/20 相同\n", s2)
+
+# Alice 45° (H后), Bob 0°
+var s3 = 0
+r = 0
+while (r < 20):
+    var q = qreg_create(2)
+    h q[0]
+    cx q[0], q[1]
+    
+    h q[0]
+    var a = measure(q, 0)
+    var b = measure(q, 1)
+    
+    if (a == b): s3 = s3 + 1 end
+    qreg_free(q)
+    r = r + 1
+end
+printf("关联E(45°,0°): %d/20 相同\n", s3)
+
+# Alice 45°, Bob 45°
+var s4 = 0
+r = 0
+while (r < 20):
+    var q = qreg_create(2)
+    h q[0]
+    cx q[0], q[1]
+    
+    h q[0]
+    h q[1]
+    var a = measure(q, 0)
+    var b = measure(q, 1)
+    
+    if (a == b): s4 = s4 + 1 end
+    qreg_free(q)
+    r = r + 1
+end
+printf("关联E(45°,45°): %d/20 相同\n", s4)
+
+# CHSH计算 (整数: ×100避免浮点)
+var E1 = s_sum * 2 / 20 * 100 - 100  # 归一化到[-100,100]
+var E2 = s2 * 2 / 20 * 100 - 100
+var E3 = s3 * 2 / 20 * 100 - 100
+var E4 = s4 * 2 / 20 * 100 - 100
+var S = E1 + E2 + E3 - E4
+var S10 = S / 10  # S/10 (因×100后S是2.828×100=282, 但这里用关联计数)
+
+printf("\nCHSH参数(×100): S = %d\n", S)
+printf("经典极限: |S| ≤ 200\n")
+printf("量子极限: |S| ≤ 282\n")
+if (S > 200):
+    printf("贝尔不等式违反: 是 ✅ (量子非局域性)\n")
+else:
+    printf("贝尔不等式违反: 需增加测量次数\n")
+end
+
+printf("\n=== 贝尔不等式验证完成 ===\n")

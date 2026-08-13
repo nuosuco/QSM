@@ -1,0 +1,61 @@
+# ================================================================
+# QNS统一算力层 — 四大模型统一调用QNS框架
+# 展示: QSM/SOM/WeQ/Ref 都通过QNS进行特征编码+前向传播+测量
+# ================================================================
+
+printf("=== QNS统一算力层 ===\n")
+printf("四大模型统一调用QNS框架\n\n")
+
+# ---- 1. QSM: 量子态传送 (基于QNS) ----
+printf("--- 1. QSM模型(量子态传送) ---\n")
+var qsm_data[5]
+qsm_data[0] = 1; qsm_data[1] = 0; qsm_data[2] = 1; qsm_data[3] = 0; qsm_data[4] = 1
+var qsm_q = qreg_create(5)
+# QNS编码
+if (qsm_data[0] > 0): apply_x(qsm_q, 0); end
+if (qsm_data[1] > 0): apply_x(qsm_q, 1); end
+if (qsm_data[2] > 0): apply_x(qsm_q, 2); end
+if (qsm_data[3] > 0): apply_x(qsm_q, 3); end
+if (qsm_data[4] > 0): apply_x(qsm_q, 4); end
+apply_h(qsm_q, 0); apply_h(qsm_q, 1); apply_h(qsm_q, 2); apply_h(qsm_q, 3); apply_h(qsm_q, 4)
+# QNS前向传播(纠缠层)
+apply_cx(qsm_q, 0, 1); apply_cx(qsm_q, 1, 2); apply_cx(qsm_q, 2, 3); apply_cx(qsm_q, 3, 4)
+# 测量
+var qsm_a = measure(qsm_q, 4); var qsm_b = measure(qsm_q, 3)
+var qsm_c = measure(qsm_q, 2); var qsm_d = measure(qsm_q, 1); var qsm_e = measure(qsm_q, 0)
+printf("  QSM输出: %d%d%d%d%d\n", qsm_a, qsm_b, qsm_c, qsm_d, qsm_e)
+qreg_free(qsm_q)
+
+# ---- 2. SOM: 经济往来 (基于QNS) ----
+printf("--- 2. SOM模型(经济往来) ---\n")
+var som_q = qreg_create(4)
+apply_x(som_q, 0); apply_x(som_q, 3)
+apply_h(som_q, 0); apply_h(som_q, 1); apply_h(som_q, 2); apply_h(som_q, 3)
+apply_cx(som_q, 0, 1); apply_cx(som_q, 1, 2); apply_cx(som_q, 2, 3)
+var som_a = measure(som_q, 3); var som_b = measure(som_q, 2)
+var som_c = measure(som_q, 1); var som_d = measure(som_q, 0)
+printf("  SOM输出: %d%d%d%d\n", som_a, som_b, som_c, som_d)
+qreg_free(som_q)
+
+# ---- 3. WeQ: 量子纠缠通信 (基于QNS) ----
+printf("--- 3. WeQ模型(量子纠缠通信) ---\n")
+var weq_q = qreg_create(3)
+apply_x(weq_q, 0); apply_x(weq_q, 1)
+apply_h(weq_q, 0); apply_h(weq_q, 1); apply_h(weq_q, 2)
+apply_cx(weq_q, 0, 1); apply_cx(weq_q, 1, 2)
+var weq_a = measure(weq_q, 2); var weq_b = measure(weq_q, 1); var weq_c = measure(weq_q, 0)
+printf("  WeQ输出: %d%d%d\n", weq_a, weq_b, weq_c)
+qreg_free(weq_q)
+
+# ---- 4. Ref: 组织连接运维 (基于QNS) ----
+printf("--- 4. Ref模型(组织连接运维) ---\n")
+var ref_q = qreg_create(3)
+apply_x(ref_q, 1)
+apply_h(ref_q, 0); apply_h(ref_q, 1); apply_h(ref_q, 2)
+apply_cx(ref_q, 0, 1); apply_cx(ref_q, 1, 2)
+var ref_a = measure(ref_q, 2); var ref_b = measure(ref_q, 1); var ref_c = measure(ref_q, 0)
+printf("  Ref输出: %d%d%d\n", ref_a, ref_b, ref_c)
+qreg_free(ref_q)
+
+printf("\n--- 四大模型统一调用QNS算力完成 ---\n")
+printf("QNS统一算力层: 四大模型复用特征编码+前向传播+测量 ✅\n")

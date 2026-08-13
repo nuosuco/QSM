@@ -1,0 +1,73 @@
+# ================================================================
+# 量子隐形传态增强 — 完整三比特协议
+# 将量子态从Alice传输到Bob
+# ================================================================
+
+printf("=== 量子隐形传态(增强) ===\n\n")
+printf("三比特: 消息态+纠缠对\n")
+printf("Alice: q0(消息), q1(纠缠一半)\n")
+printf("Bob: q2(纠缠另一半)\n\n")
+
+# 隐形传态协议
+# 1. 准备纠缠对: |Bell> = (|00>+|11>)/√2 on q1,q2
+# 2. Alice对q0,q1做Bell测量
+# 3. 结果传给Bob, Bob施加相应门恢复消息
+
+var ok = 0
+var total = 0
+var msg = 0
+while (msg <= 1):
+    var round = 0
+    while (round < 20):
+        total = total + 1
+        var q = qreg_create(3)
+        
+        # 准备消息态: |msg>
+        if (msg == 1):
+            x q[0]
+        end
+        
+        # 准备纠缠对: q1,q2 = Bell态
+        h q[1]
+        cx q[1], q[2]
+        
+        # Alice操作: Bell测量
+        cx q[0], q[1]
+        h q[0]
+        
+        # 测量Alice的两个比特
+        var m0 = measure(q, 0)
+        var m1 = measure(q, 1)
+        
+        # 经典通信: 结果传给Bob
+        # Bob根据结果应用纠正门
+        # 00: 无操作
+        # 01: X
+        # 10: Z
+        # 11: XZ
+        if (m1 == 1):
+            x q[2]
+        end
+        if (m0 == 1):
+            z q[2]
+        end
+        
+        # Bob测量: 应该恢复msg
+        var out = measure(q, 2)
+        if (out == msg):
+            ok = ok + 1
+        end
+        qreg_free(q)
+        round = round + 1
+    end
+    msg = msg + 1
+end
+
+printf("传送消息|0>和|1>: %d/%d 正确\n", ok, total)
+if (ok == total):
+    printf("量子隐形传态: 通过 ✅\n")
+else:
+    printf("量子隐形传态: 部分失败\n")
+end
+
+printf("\n=== 量子隐形传态完成 ===\n")

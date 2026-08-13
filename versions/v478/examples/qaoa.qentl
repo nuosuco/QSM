@@ -1,0 +1,66 @@
+# ================================================================
+# QAOA 量子近似优化算法
+# 解决MaxCut问题的量子-经典混合算法
+# ================================================================
+
+printf("=== QAOA 量子近似优化 ===\n\n")
+
+printf("--- MaxCut问题 ---\n")
+printf("图: 4节点, 3条边 (0-1, 1-2, 2-3)\n")
+printf("目标: 分割节点使跨边数最大\n\n")
+
+printf("--- 简化QAOA流程 ---\n")
+printf("1. 制备均匀叠加态\n")
+printf("2. 应用成本哈密顿量编码 (相位)\n")
+printf("3. 应用混合哈密顿量 (CX纠缠)\n")
+printf("4. 测量得到候选解\n")
+printf("5. 经典优化器调整参数\n\n")
+
+# 单次QAOA迭代演示
+printf("--- QAOA迭代 ---\n")
+var best_cut = 0
+var best_config = ""
+var trials = 20
+var i = 0
+while (i < trials):
+    var q = qreg_create(4)
+    # 1. 均匀叠加
+    var j = 0
+    while (j < 4):
+        apply_h(q, j)
+        j = j + 1
+    end
+    # 2/3. 近似：用CZ编码边成本, CX混合
+    apply_cz(q, 0, 1)
+    apply_cz(q, 1, 2)
+    apply_cz(q, 2, 3)
+    apply_cx(q, 0, 1)
+    apply_cx(q, 1, 2)
+    apply_cx(q, 2, 3)
+    # 4. 测量
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    var m2 = measure(q, 2)
+    var m3 = measure(q, 3)
+    # 5. 计算Cut值
+    var cut = 0
+    if (m0 != m1): cut = cut + 1 end
+    if (m1 != m2): cut = cut + 1 end
+    if (m2 != m3): cut = cut + 1 end
+    if (cut > best_cut):
+        best_cut = cut
+        best_config = str_concat(str_concat(str_concat(str_concat(int_to_str(m3), int_to_str(m2)), int_to_str(m1)), int_to_str(m0)))
+    end
+    i = i + 1
+end
+
+printf("  最优Cut值: %d/3\n", best_cut)
+printf("  最优分割: %s\n", best_config)
+if (best_cut >= 2):
+    printf("  ✓ QAOA找到接近最优解!\n")
+else:
+    printf("  ℹ 需更多迭代或参数优化\n")
+end
+
+printf("\n=== QAOA演示完成 ===\n")
+printf("QAOA是NISQ时代最有前景的量子算法之一\n")

@@ -1,0 +1,106 @@
+# ================================================================
+# 量子Bell态制备 — 四种Bell态验证
+# 量子纠缠基础: 4种最大纠缠态
+# ================================================================
+
+printf("=== 量子Bell态制备 ===\n\n")
+printf("4种Bell态:\n")
+printf("  |Φ+> = (|00>+|11>)/√2\n")
+printf("  |Φ-> = (|00>-|11>)/√2\n")
+printf("  |Ψ+> = (|01>+|10>)/√2\n")
+printf("  |Ψ-> = (|01>-|10>)/√2\n\n")
+
+# 制备4种Bell态并验证
+var bell_ok = 0
+var bell_total = 0
+
+# |Φ+>
+printf("--- |Φ+> = (|00>+|11>)/√2 ---\n")
+var phi_ok = 0
+var i = 0
+while (i < 10):
+    bell_total = bell_total + 1
+    var q = qreg_create(2)
+    h q[0]
+    cx q[0], q[1]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    if (m0 == m1):
+        phi_ok = phi_ok + 1
+        bell_ok = bell_ok + 1
+    end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  相关: %d/10\n", phi_ok)
+
+# |Ψ+>
+printf("--- |Ψ+> = (|01>+|10>)/√2 ---\n")
+var psi_ok = 0
+i = 0
+while (i < 10):
+    bell_total = bell_total + 1
+    var q = qreg_create(2)
+    x q[1]
+    h q[0]
+    cx q[0], q[1]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    if (m0 != m1):
+        psi_ok = psi_ok + 1
+        bell_ok = bell_ok + 1
+    end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  反相关: %d/10\n", psi_ok)
+
+# |Φ->: 应用Z门
+printf("--- |Φ-> = (|00>-|11>)/√2 ---\n")
+var phim_ok = 0
+i = 0
+while (i < 10):
+    bell_total = bell_total + 1
+    var q = qreg_create(2)
+    h q[0]
+    z q[0]
+    cx q[0], q[1]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    if (m0 == m1):
+        phim_ok = phim_ok + 1
+        bell_ok = bell_ok + 1
+    end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  相关: %d/10\n", phim_ok)
+
+# |Ψ->: X+Z
+printf("--- |Ψ-> = (|01>-|10>)/√2 ---\n")
+var psim_ok = 0
+i = 0
+while (i < 10):
+    bell_total = bell_total + 1
+    var q = qreg_create(2)
+    x q[1]
+    h q[0]
+    z q[0]
+    cx q[0], q[1]
+    var m0 = measure(q, 0)
+    var m1 = measure(q, 1)
+    if (m0 != m1):
+        psim_ok = psim_ok + 1
+        bell_ok = bell_ok + 1
+    end
+    qreg_free(q)
+    i = i + 1
+end
+printf("  反相关: %d/10\n", psim_ok)
+
+printf("\n4种Bell态: %d/%d 相关正确\n", bell_ok, bell_total)
+if (bell_ok == bell_total):
+    printf("Bell态制备: 通过 ✅ (完整纠缠家族)\n")
+end
+
+printf("\n=== Bell态制备完成 ===\n")

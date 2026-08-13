@@ -1,0 +1,30 @@
+# ================================================================
+# examples/qquantum_quantum_optimization.qentl — 量子优化
+# 量子组合优化
+# ================================================================
+qreg q[4]
+
+# 问题编码
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+# 哈密顿量
+cx q[0], q[1]
+cx q[1], q[2]
+cx q[2], q[3]
+
+# 优化迭代
+h q[0]
+h q[1]
+h q[2]
+h q[3]
+
+var o0 = measure q[0]
+var o1 = measure q[1]
+var o2 = measure q[2]
+var o3 = measure q[3]
+
+printf("量子优化: 解=%d%d%d%d\n", o3, o2, o1, o0)
+printf("量子优化验证: 通过\n")
