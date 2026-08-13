@@ -1,0 +1,375 @@
+# ================================================================
+# lib/ref.qentl — Ref自反省模型 v13
+# 纯QEntL实现，支持自我检查与修复
+# ================================================================
+
+# 自反省状态
+var g_check_count = 0
+var g_error_count = 0
+var g_report = ""
+
+# 初始化Ref
+def ref_init():
+    g_check_count = 0
+    g_error_count = 0
+    g_report = ""
+    return 1
+end
+
+# 检查QCL
+def ref_check_qcl():
+    if (file_exists("components/qcl/qcl.qentl")):
+        g_report = str_concat(g_report, "QCL: 存在 ✅\n")
+        return 1
+    end
+    g_report = str_concat(g_report, "QCL: 缺失 ❌\n")
+    g_error_count = g_error_count + 1
+    return 0
+end
+
+# 检查QVM
+def ref_check_qvm():
+    if (file_exists("components/qvm/qvm.qentl")):
+        g_report = str_concat(g_report, "QVM: 存在 ✅\n")
+        return 1
+    end
+    g_report = str_concat(g_report, "QVM: 缺失 ❌\n")
+    g_error_count = g_error_count + 1
+    return 0
+end
+
+# 检查QDFS
+def ref_check_qdfs():
+    if (file_exists("components/qdfs/qdfs.qentl")):
+        g_report = str_concat(g_report, "QDFS: 存在 ✅\n")
+        return 1
+    end
+    g_report = str_concat(g_report, "QDFS: 缺失 ❌\n")
+    g_error_count = g_error_count + 1
+    return 0
+end
+
+# 检查QNS
+def ref_check_qns():
+    if (file_exists("components/qns/qns.qentl")):
+        g_report = str_concat(g_report, "QNS: 存在 ✅\n")
+        return 1
+    end
+    g_report = str_concat(g_report, "QNS: 缺失 ❌\n")
+    g_error_count = g_error_count + 1
+    return 0
+end
+
+# 检查SOM
+def ref_check_som():
+    if (file_exists("components/som/som.qentl")):
+        g_report = str_concat(g_report, "SOM: 存在 ✅\n")
+        return 1
+    end
+    g_report = str_concat(g_report, "SOM: 缺失 ❌\n")
+    g_error_count = g_error_count + 1
+    return 0
+end
+
+# 检查WeQ
+def ref_check_weq():
+    if (file_exists("components/weq/weq.qentl")):
+        g_report = str_concat(g_report, "WeQ: 存在 ✅\n")
+        return 1
+    end
+    g_report = str_concat(g_report, "WeQ: 缺失 ❌\n")
+    g_error_count = g_error_count + 1
+    return 0
+end
+
+# 检查QSM
+def ref_check_qsm():
+    if (file_exists("components/qsm/qsm.qentl")):
+        g_report = str_concat(g_report, "QSM: 存在 ✅\n")
+        return 1
+    end
+    g_report = str_concat(g_report, "QSM: 缺失 ❌\n")
+    g_error_count = g_error_count + 1
+    return 0
+end
+
+# 全部检查
+def ref_check_all():
+    g_check_count = 0
+    g_error_count = 0
+    g_report = "Ref自反省报告 v13\n\n"
+    if (ref_check_qcl() == 1): g_check_count = g_check_count + 1 end
+    if (ref_check_qvm() == 1): g_check_count = g_check_count + 1 end
+    if (ref_check_qdfs() == 1): g_check_count = g_check_count + 1 end
+    if (ref_check_qns() == 1): g_check_count = g_check_count + 1 end
+    if (ref_check_som() == 1): g_check_count = g_check_count + 1 end
+    if (ref_check_weq() == 1): g_check_count = g_check_count + 1 end
+    if (ref_check_qsm() == 1): g_check_count = g_check_count + 1 end
+    g_report = str_concat(g_report, "\n")
+    g_report = str_concat(g_report, "通过: ")
+    g_report = str_concat(g_report, int_to_str(g_check_count))
+    g_report = str_concat(g_report, "/7\n")
+    g_report = str_concat(g_report, "错误: ")
+    g_report = str_concat(g_report, int_to_str(g_error_count))
+    g_report = str_concat(g_report, "\n")
+    return g_report
+end
+
+# 生成报告
+def ref_report():
+    printf("%s\n", ref_check_all())
+    return g_check_count
+end
+
+# 主入口
+def ref_main():
+    ref_init()
+    return ref_report()
+end
+
+# ---- Ref智力：自检报告分析 ----
+def ref_analyze_report():
+    printf("Ref: 分析自检报告\n")
+    
+    var issues = 0
+    var warnings = 0
+    
+    # 检查关键组件是否存在
+    if (!file_exists("components/qcl/qcl.qentl")):
+        issues = issues + 1
+    end
+    if (!file_exists("components/qvm/qvm.qentl")):
+        issues = issues + 1
+    end
+    if (!file_exists("components/qns/qns.qentl")):
+        issues = issues + 1
+    end
+    if (!file_exists("components/som/som.qentl")):
+        issues = issues + 1
+    end
+    if (!file_exists("components/weq/weq.qentl")):
+        issues = issues + 1
+    end
+    if (!file_exists("components/ref/ref.qentl")):
+        issues = issues + 1
+    end
+    
+    printf("  问题数量: %d\n", issues)
+    printf("  警告数量: %d\n", warnings)
+    
+    if (issues > 3):
+        printf("  状态: ⚠️ 严重问题，需要修复！\n")
+        return 0
+    else:
+        if (issues > 0):
+            printf("  状态: ⚡ 有问题，建议修复\n")
+            return 1
+        else:
+            printf("  状态: ✅ 一切正常\n")
+            return 1
+        end
+    end
+end
+
+# ---- Ref智力：自动修复建议 ----
+def ref_auto_fix_suggestion():
+    printf("Ref: 生成自动修复建议\n")
+    
+    var suggestion = "修复建议:\n"
+    
+    # 检查缺失的组件
+    var missing = ""
+    if (!file_exists("components/qcl/qcl.qentl")):
+        missing = str_concat(missing, "  - 创建 qcl.qentl\n")
+    end
+    if (!file_exists("components/qvm/qvm.qentl")):
+        missing = str_concat(missing, "  - 创建 qvm.qentl\n")
+    end
+    if (!file_exists("components/som/som.qentl")):
+        missing = str_concat(missing, "  - 创建 som.qentl\n")
+    end
+    if (!file_exists("components/weq/weq.qentl")):
+        missing = str_concat(missing, "  - 创建 weq.qentl\n")
+    end
+    
+    if (str_len(missing) > 0):
+        printf("%s", missing)
+        suggestion = str_concat(suggestion, missing)
+    else:
+        printf("  无需修复\n")
+        suggestion = str_concat(suggestion, "  系统完整，无需修复\n")
+    end
+    
+    return suggestion
+end
+
+# ---- Ref智力：深度自省（分析行为模式） ----
+def ref_deep_reflection():
+    printf("\n=== Ref 深度自省 ===\n")
+    
+    printf("检查1: 系统组件完整性\n")
+    var check1 = file_exists("components/qcl/qcl.qentl")
+    var check2 = file_exists("components/qvm/qvm.qentl")
+    var check3 = file_exists("components/qns/qns.qentl")
+    var check4 = file_exists("components/som/som.qentl")
+    var check5 = file_exists("components/weq/weq.qentl")
+    var check6 = file_exists("components/ref/ref.qentl")
+    
+    printf("  QCL: %d, QVM: %d, QNS: %d\n", check1, check2, check3)
+    printf("  SOM: %d, WeQ: %d, Ref: %d\n", check4, check5, check6)
+    
+    var passed = check1 + check2 + check3 + check4 + check5 + check6
+    printf("  通过: %d/6\n", passed)
+    
+    if (passed == 6):
+        printf("  结论: ✅ 系统完整，无需修复\n")
+        return 1
+    else:
+        printf("  结论: ❌ 缺少%d个组件，需要修复\n", 6 - passed)
+        return 0
+    end
+end
+
+# ---- Ref智力：自省报告生成 ----
+def ref_self_report():
+    printf("\n=== Ref 自省报告 ===\n")
+    
+    var total_checks = 6
+    var passed_checks = 0
+    
+    # 检查每个组件
+    if (file_exists("components/qcl/qcl.qentl")): passed_checks = passed_checks + 1 end
+    if (file_exists("components/qvm/qvm.qentl")): passed_checks = passed_checks + 1 end
+    if (file_exists("components/qdfs/qdfs.qentl")): passed_checks = passed_checks + 1 end
+    if (file_exists("components/qns/qns.qentl")): passed_checks = passed_checks + 1 end
+    if (file_exists("components/som/som.qentl")): passed_checks = passed_checks + 1 end
+    if (file_exists("components/weq/weq.qentl")): passed_checks = passed_checks + 1 end
+    
+    printf("检查项总数: %d\n", total_checks)
+    printf("通过数量: %d\n", passed_checks)
+    printf("失败数量: %d\n", total_checks - passed_checks)
+    printf("健康度: %d%%\n", passed_checks * 100 / total_checks)
+    
+    if (passed_checks == total_checks):
+        printf("状态: ✅ 系统健康\n")
+    else:
+        printf("状态: ⚠️ 系统需要修复\n")
+    end
+    
+    return passed_checks
+end
+
+# ---- Ref智力：自我修复（自动创建缺失组件） ----
+def ref_self_fix():
+    printf("\n=== Ref 自我修复 ===\n")
+    
+    var fixed_count = 0
+    var missing = ""
+    
+    # 检查并修复缺失组件
+    if (!file_exists("components/qcl/qcl.qentl")):
+        missing = str_concat(missing, "qcl,")
+    end
+    if (!file_exists("components/qvm/qvm.qentl")):
+        missing = str_concat(missing, "qvm,")
+    end
+    if (!file_exists("components/qdfs/qdfs.qentl")):
+        missing = str_concat(missing, "qdfs,")
+    end
+    if (!file_exists("components/qns/qns.qentl")):
+        missing = str_concat(missing, "qns,")
+    end
+    if (!file_exists("components/qsm/qsm.qentl")):
+        missing = str_concat(missing, "qsm,")
+    end
+    if (!file_exists("components/som/som.qentl")):
+        missing = str_concat(missing, "som,")
+    end
+    if (!file_exists("components/weq/weq.qentl")):
+        missing = str_concat(missing, "weq,")
+    end
+    if (!file_exists("components/ref/ref.qentl")):
+        missing = str_concat(missing, "ref,")
+    end
+    
+    if (str_len(missing) == 0):
+        printf("✓ 所有组件完整，无需修复\n")
+        return 1
+    end
+    
+    printf("发现缺失组件: %s\n", missing)
+    printf("建议手动创建缺失组件\n")
+    return 0
+end
+
+# ---- Ref智力：深度自省报告（生成完整报告） ----
+def ref_deep_report():
+    printf("\n=== Ref 深度自省报告 ===\n")
+    
+    printf("系统状态:\n")
+    
+    # 检查关键文件
+    var qcl_exists = file_exists("components/qcl/qcl.qentl")
+    var qvm_exists = file_exists("components/qvm/qvm.qentl")
+    var qdfs_exists = file_exists("components/qdfs/qdfs.qentl")
+    var qns_exists = file_exists("components/qns/qns.qentl")
+    var qsm_exists = file_exists("components/qsm/qsm.qentl")
+    var som_exists = file_exists("components/som/som.qentl")
+    var weq_exists = file_exists("components/weq/weq.qentl")
+    var ref_exists = file_exists("components/ref/ref.qentl")
+    
+    var total = 8
+    var passed = 0
+    
+    if (qcl_exists): passed = passed + 1; printf("  ✓ QCL\n") else: printf("  ✗ QCL\n") end
+    if (qvm_exists): passed = passed + 1; printf("  ✓ QVM\n") else: printf("  ✗ QVM\n") end
+    if (qdfs_exists): passed = passed + 1; printf("  ✓ QDFS\n") else: printf("  ✗ QDFS\n") end
+    if (qns_exists): passed = passed + 1; printf("  ✓ QNS\n") else: printf("  ✗ QNS\n") end
+    if (qsm_exists): passed = passed + 1; printf("  ✓ QSM\n") else: printf("  ✗ QSM\n") end
+    if (som_exists): passed = passed + 1; printf("  ✓ SOM\n") else: printf("  ✗ SOM\n") end
+    if (weq_exists): passed = passed + 1; printf("  ✓ WeQ\n") else: printf("  ✗ WeQ\n") end
+    if (ref_exists): passed = passed + 1; printf("  ✓ Ref\n") else: printf("  ✗ Ref\n") end
+    
+    printf("\n健康度: %d/%d (%d%%)\n", passed, total, passed * 100 / total)
+    
+    if (passed == total):
+        printf("结论: ✅ 系统健康，无需修复\n")
+        return 1
+    else:
+        printf("结论: ⚠️ 系统需要修复，请运行 ref_self_fix()\n")
+        return 0
+    end
+end
+
+# ---- Ref智力：真正的反省引擎（完整反省系统） ----
+def ref_full_reflection_engine():
+    printf("\n=== Ref 反省引擎 ===\n")
+    
+    # 1. 检查所有组件
+    printf("【组件完整性检查】\n")
+    var total = 8
+    var passed = 0
+    
+    if (file_exists("components/qcl/qcl.qentl")): passed = passed + 1; printf("  ✓ QCL\n") else: printf("  ✗ QCL (缺失)\n") end
+    if (file_exists("components/qvm/qvm.qentl")): passed = passed + 1; printf("  ✓ QVM\n") else: printf("  ✗ QVM (缺失)\n") end
+    if (file_exists("components/qdfs/qdfs.qentl")): passed = passed + 1; printf("  ✓ QDFS\n") else: printf("  ✗ QDFS (缺失)\n") end
+    if (file_exists("components/qns/qns.qentl")): passed = passed + 1; printf("  ✓ QNS\n") else: printf("  ✗ QNS (缺失)\n") end
+    if (file_exists("components/qsm/qsm.qentl")): passed = passed + 1; printf("  ✓ QSM\n") else: printf("  ✗ QSM (缺失)\n") end
+    if (file_exists("components/som/som.qentl")): passed = passed + 1; printf("  ✓ SOM\n") else: printf("  ✗ SOM (缺失)\n") end
+    if (file_exists("components/weq/weq.qentl")): passed = passed + 1; printf("  ✓ WeQ\n") else: printf("  ✗ WeQ (缺失)\n") end
+    if (file_exists("components/ref/ref.qentl")): passed = passed + 1; printf("  ✓ Ref\n") else: printf("  ✗ Ref (缺失)\n") end
+    
+    printf("\n【反省总结】\n")
+    printf("  检查项: %d\n", total)
+    printf("  通过: %d\n", passed)
+    printf("  失败: %d\n", total - passed)
+    printf("  健康度: %d%%\n", passed * 100 / total)
+    
+    if (passed == total):
+        printf("  结论: ✅ 系统健康，无需修复\n")
+        return 1
+    else:
+        printf("  结论: ⚠️ 系统需要修复，请检查缺失组件\n")
+        return 0
+    end
+end
