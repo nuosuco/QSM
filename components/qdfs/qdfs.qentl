@@ -323,4 +323,9 @@ def qdfs_history(path):
     return 0
 end
 
+
+# ---- QDFS生长: 文件统计 ----
+def qdfs_count_files():
+    return file_list(".")
+end
 end
