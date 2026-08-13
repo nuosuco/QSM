@@ -316,4 +316,9 @@ def qdfs_search_all(keyword, state_filter):
         return "未找到匹配"
     end
     return out
+
+# ---- QDFS生长: qdfs_count_files ----
+def qdfs_count_files():
+    return file_list(".")
+end
 end
