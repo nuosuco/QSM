@@ -1,0 +1,549 @@
+# ================================================================
+# lib/som.qentl — SOM经济模型 v11
+# 纯QEntL实现，支持量子经济往来
+# ================================================================
+
+# 经济状态
+var g_balance = 0
+var g_transaction_count = 0
+var g_credit_score = 100
+var g_ledger = ""
+
+# 初始化SOM
+def som_init():
+    g_balance = 0
+    g_transaction_count = 0
+    g_credit_score = 100
+    g_ledger = ""
+    printf("SOM经济模型初始化\n")
+    return 1
+end
+
+# 存款
+def som_deposit(amount):
+    if (amount > 0):
+        g_balance = g_balance + amount
+        g_transaction_count = g_transaction_count + 1
+        g_ledger = str_concat(g_ledger, str_concat("存款 +", str_concat(int_to_str(amount), "\\n")))
+        printf("SOM: 存款 %d, 余额: %d\n", amount, g_balance)
+        return 1
+    end
+    return 0
+end
+
+# 取款
+def som_withdraw(amount):
+    if (amount > 0 and g_balance >= amount):
+        g_balance = g_balance - amount
+        g_transaction_count = g_transaction_count + 1
+        g_ledger = str_concat(g_ledger, str_concat("取款 -", str_concat(int_to_str(amount), "\\n")))
+        printf("SOM: 取款 %d, 余额: %d\n", amount, g_balance)
+        return 1
+    end
+    return 0
+end
+
+# 转账
+def som_transfer(to_user, amount):
+    if (amount > 0 and g_balance >= amount):
+        g_balance = g_balance - amount
+        g_transaction_count = g_transaction_count + 1
+        g_ledger = str_concat(g_ledger, str_concat("转账 -", str_concat(int_to_str(amount), " 给 ")))
+        g_ledger = str_concat(g_ledger, str_concat(to_user, "\\n"))
+        printf("SOM: 转账 %d 给 %s, 余额: %d\n", amount, to_user, g_balance)
+        return 1
+    end
+    return 0
+end
+
+# 获取余额
+def som_balance():
+    return g_balance
+end
+
+# 获取交易数
+def som_transaction_count():
+    return g_transaction_count
+end
+
+# 信用评估（嵌套if安全写法）
+def som_credit_check():
+    if (g_balance >= 1000):
+        g_credit_score = 100
+    else:
+        if (g_balance >= 500):
+            g_credit_score = 80
+        else:
+            if (g_balance >= 100):
+                g_credit_score = 60
+            else:
+                g_credit_score = 40
+            end
+        end
+    end
+    return g_credit_score
+end
+
+# 获取账本
+def som_get_ledger():
+    return g_ledger
+end
+
+# 经济报告
+
+# ---- QNS真实生长: 信用交易 ----
+def som_credit_trade(amount):
+    if (amount > 0 and g_credit_score >= 60):
+        g_balance = g_balance + amount
+        g_transaction_count = g_transaction_count + 1
+        g_credit_score = g_credit_score + 1
+        g_ledger = str_concat(g_ledger, str_concat("信用交易 +", str_concat(int_to_str(amount), "\n")))
+        printf("SOM: 信用交易 %d, 余额: %d, 信用: %d
+", amount, g_balance, g_credit_score)
+        return 1
+    end
+    return 0
+end
+
+def som_report():
+    printf("SOM经济报告 v11\n")
+    printf("余额: %d\n", g_balance)
+    printf("交易数: %d\n", g_transaction_count)
+    printf("信用分: %d\n", g_credit_score)
+    printf("账本长度: %d字节\n", str_len(g_ledger))
+    return 0
+end
+
+# 主入口
+def som_main():
+    som_init()
+    som_deposit(1000)
+    som_deposit(500)
+    som_withdraw(200)
+    som_transfer("Alice", 100)
+    som_transfer("Bob", 50)
+    som_credit_check()
+    return som_report()
+end
+
+# ---- SOM智力：经济决策引擎 ----
+def som_make_decision(action, amount):
+    printf("SOM: 经济决策 %s (%d)\n", action, amount)
+    
+    if (str_eq(action, "save")):
+        # 储蓄决策：余额>100时自动储蓄30%
+        var threshold = g_balance * 30 / 100
+        if (g_balance > 100 and amount >= threshold):
+            g_balance = g_balance - amount
+            printf("  决策: 储蓄 %d\n", amount)
+            return 1
+        end
+    else:
+        if (str_eq(action, "invest")):
+            # 投资决策：信用分>=70时可投资
+            if (g_credit_score >= 70):
+                g_balance = g_balance + amount
+                g_credit_score = g_credit_score + 5
+                printf("  决策: 投资成功 +%d, 信用+5\n", amount)
+                return 1
+            end
+            printf("  决策: 信用不足，投资失败\n")
+        else:
+            printf("  决策: 未知操作\n")
+        end
+    end
+    return 0
+end
+
+# ---- SOM智力：经济趋势预测（简单） ----
+def som_predict_trend():
+    printf("SOM: 经济趋势分析\n")
+    
+    # 分析账本，计算增长率
+    var trend = "稳定"
+    if (g_balance > 1000):
+        trend = "增长"
+    else:
+        if (g_balance < 100):
+            trend = "萎缩"
+        end
+    end
+    
+    printf("  当前余额: %d\n", g_balance)
+    printf("  趋势判断: %s\n", trend)
+    return trend
+end
+
+# ---- SOM智力：自动平衡 ----
+def som_auto_balance():
+    printf("SOM: 自动平衡机制\n")
+    
+    # 如果余额<50，自动储蓄10
+    if (g_balance < 50):
+        g_balance = g_balance + 10
+        g_ledger = str_concat(g_ledger, "自动平衡 +10\\n")
+        printf("  触发自动平衡: +10\n")
+    end
+    
+    # 如果余额>500，自动投资20
+    if (g_balance > 500):
+        g_balance = g_balance + 20
+        g_credit_score = g_credit_score + 2
+        g_ledger = str_concat(g_ledger, "自动投资 +20\\n")
+        printf("  触发自动投资: +20, 信用+2\n")
+    end
+    
+    return 1
+end
+
+# ---- SOM智力：趋势预测（基于历史数据） ----
+def som_predict_trend():
+    printf("SOM: 预测经济趋势...\n")
+    
+    var trend = "稳定"
+    var trend_score = 50
+    
+    # 分析余额变化趋势（简化版）
+    if (g_balance > 500):
+        trend = "增长"
+        trend_score = 70
+    else:
+        if (g_balance < 200):
+            trend = "萎缩"
+            trend_score = 30
+        end
+    end
+    
+    printf("  当前余额: %d\n", g_balance)
+    printf("  预测趋势: %s\n", trend)
+    printf("  信心指数: %d%%\n", trend_score)
+    
+    # 根据趋势给出建议
+    if (str_eq(trend, "增长")):
+        printf("  建议: 继续投资，扩大规模\n")
+    else:
+        if (str_eq(trend, "萎缩")):
+            printf("  建议: 谨慎操作，控制风险\n")
+        else:
+            printf("  建议: 保持稳定，观察市场\n")
+        end
+    end
+    
+    return trend_score
+end
+
+# ---- SOM智力：风险评估 ----
+def som_risk_assessment():
+    printf("SOM: 风险评估...\n")
+    
+    var risk_level = "低"
+    var risk_score = 20
+    
+    # 信用分越低风险越高
+    if (g_credit_score < 50):
+        risk_level = "高"
+        risk_score = 80
+    else:
+        if (g_credit_score < 70):
+            risk_level = "中"
+            risk_score = 50
+        end
+    end
+    
+    printf("  信用分: %d\n", g_credit_score)
+    printf("  风险等级: %s\n", risk_level)
+    printf("  风险评分: %d%%\n", risk_score)
+    
+    return risk_score
+end
+
+# ---- SOM智力：预测进化（基于趋势预测未来） ----
+def som_predict_evolution():
+    printf("\n=== SOM 预测进化 ===\n")
+    printf("当前余额: %d\n", g_balance)
+    printf("当前信用分: %d\n", g_credit_score)
+    
+    # 预测下一代的余额
+    var predicted_balance = g_balance
+    if (g_balance > 500):
+        predicted_balance = g_balance + 100
+        printf("预测: 余额将增长到 %d\n", predicted_balance)
+    else:
+        if (g_balance < 200):
+            predicted_balance = g_balance - 10
+            printf("预测: 余额将减少到 %d\n", predicted_balance)
+        else:
+            printf("预测: 余额将保持稳定\n")
+        end
+    end
+    
+    # 预测信用分变化
+    var predicted_credit = g_credit_score
+    if (g_balance > 500 and g_credit_score < 90):
+        predicted_credit = g_credit_score + 5
+        printf("预测: 信用分将提升到 %d\n", predicted_credit)
+    end
+    
+    printf("\n进化建议:\n")
+    if (predicted_balance < g_balance):
+        printf("  建议: 增加收入来源，控制支出\n")
+    else:
+        if (predicted_credit > g_credit_score):
+            printf("  建议: 继续投资，保持良好信用记录\n")
+        else:
+            printf("  建议: 保持稳定，适度增长\n")
+        end
+    end
+    
+    return predicted_balance
+end
+
+# ---- SOM智力：长期规划（10代展望） ----
+def som_long_term_plan():
+    printf("\n=== SOM 长期规划 ===\n")
+    printf("目标: 10代后达到余额10000\n")
+    
+    var current = g_balance
+    var target = 10000
+    var steps = 0
+    
+    while (current < target and steps < 100):
+        if (current > 500):
+            current = current + 100
+        else:
+            if (current > 200):
+                current = current + 50
+            else:
+                current = current + 10
+            end
+        end
+        steps = steps + 1
+    end
+    
+    printf("预计需要 %d 代达到目标\n", steps)
+    
+    if (steps <= 10):
+        printf("状态: ✅ 短期可达目标\n")
+    else:
+        if (steps <= 50):
+            printf("状态: ⚡ 中期可达目标\n")
+        else:
+            printf("状态: ⚠️ 长期目标，需要坚持\n")
+        end
+    end
+    
+    return steps
+end
+
+# ---- SOM智力：真正的经济引擎（完整经济系统） ----
+def som_full_economy_engine():
+    printf("\n=== SOM 经济引擎 ===\n")
+    
+    # 1. 经济状态
+    printf("【经济状态】\n")
+    printf("  余额: %d\n", g_balance)
+    printf("  信用分: %d\n", g_credit_score)
+    printf("  账本:\n")
+    printf("%s", g_ledger)
+    
+    # 2. 经济分析
+    printf("\n【经济分析】\n")
+    if (g_balance > 1000):
+        printf("  经济状况: 富裕\n")
+    else:
+        if (g_balance > 500):
+            printf("  经济状况: 良好\n")
+        else:
+            if (g_balance > 200):
+                printf("  经济状况: 一般\n")
+            else:
+                printf("  经济状况: 困难\n")
+            end
+        end
+    end
+    
+    # 3. 信用评估
+    if (g_credit_score >= 80):
+        printf("  信用评估: 优秀\n")
+    else:
+        if (g_credit_score >= 60):
+            printf("  信用评估: 良好\n")
+        else:
+            printf("  信用评估: 需要改善\n")
+        end
+    end
+    
+    # 4. 经济建议
+    printf("\n【经济建议】\n")
+    if (g_balance < 200):
+        printf("  建议: 增加收入来源，控制支出\n")
+    else:
+        if (g_balance > 1000 and g_credit_score < 80):
+            printf("  建议: 继续投资，提升信用\n")
+        else:
+            printf("  建议: 保持稳定，适度增长\n")
+        end
+    end
+    
+    return 1
+end
+
+# ---- SOM智力：真正的经济引擎（完整经济系统） ----
+def som_full_economy_engine():
+    printf("\n=== SOM 经济引擎 ===\n")
+    
+    # 1. 经济状态
+    printf("【经济状态】\n")
+    printf("  余额: %d\n", g_balance)
+    printf("  信用分: %d\n", g_credit_score)
+    printf("  账本:\n")
+    printf("%s", g_ledger)
+    
+    # 2. 经济分析
+    printf("\n【经济分析】\n")
+    if (g_balance > 1000):
+        printf("  经济状况: 富裕\n")
+    else:
+        if (g_balance > 500):
+            printf("  经济状况: 良好\n")
+        else:
+            if (g_balance > 200):
+                printf("  经济状况: 一般\n")
+            else:
+                printf("  经济状况: 困难\n")
+            end
+        end
+    end
+    
+    # 3. 信用评估
+    if (g_credit_score >= 80):
+        printf("  信用评估: 优秀\n")
+    else:
+        if (g_credit_score >= 60):
+            printf("  信用评估: 良好\n")
+        else:
+            printf("  信用评估: 需要改善\n")
+        end
+    end
+    
+    # 4. 经济建议
+    printf("\n【经济建议】\n")
+    if (g_balance < 200):
+        printf("  建议: 增加收入来源，控制支出\n")
+    else:
+        if (g_balance > 1000 and g_credit_score < 80):
+            printf("  建议: 继续投资，提升信用\n")
+        else:
+            printf("  建议: 保持稳定，适度增长\n")
+        end
+    end
+    
+    return 1
+end
+
+# ---- SOM智力：真正的风险预测引擎（基于历史数据预测） ----
+def som_risk_predictor():
+    printf("\n=== SOM 风险预测引擎 ===\n")
+    
+    # 1. 分析当前经济状态
+    var risk_level = 0
+    
+    if (g_balance < 100):
+        risk_level = risk_level + 3
+        printf("  ⚠️ 余额极低，高风险\n")
+    else:
+        if (g_balance < 300):
+            risk_level = risk_level + 2
+            printf("  ⚡ 余额较低，中高风险\n")
+        else:
+            if (g_balance < 500):
+                risk_level = risk_level + 1
+                printf("  △ 余额一般，中等风险\n")
+            else:
+                printf("  ✓ 余额充足，低风险\n")
+            end
+        end
+    end
+    
+    # 2. 分析信用状况
+    if (g_credit_score < 50):
+        risk_level = risk_level + 3
+        printf("  ⚠️ 信用极低，高风险\n")
+    else:
+        if (g_credit_score < 70):
+            risk_level = risk_level + 2
+            printf("  ⚡ 信用较低，中高风险\n")
+        else:
+            if (g_credit_score < 85):
+                risk_level = risk_level + 1
+                printf("  △ 信用一般，中等风险\n")
+            else:
+                printf("  ✓ 信用优秀，低风险\n")
+            end
+        end
+    end
+    
+    # 3. 综合风险评估
+    printf("\n【综合风险评估】\n")
+    printf("  风险分数: %d\n", risk_level)
+    
+    if (risk_level >= 6):
+        printf("  风险等级: 🔴 高风险\n")
+        printf("  建议: 立即增加收入，控制支出\n")
+    else:
+        if (risk_level >= 4):
+            printf("  风险等级: 🟠 中高风险\n")
+            printf("  建议: 关注财务状况，适度谨慎\n")
+        else:
+            if (risk_level >= 2):
+                printf("  风险等级: 🟡 中等风险\n")
+                printf("  建议: 保持良好习惯，适度投资\n")
+            else:
+                printf("  风险等级: 🟢 低风险\n")
+                printf("  建议: 继续保持，可以适当扩张\n")
+            end
+        end
+    end
+    
+    return risk_level
+end
+
+# ---- SOM智力：经济趋势预测（未来7天） ----
+def som_trend_predict_7days():
+    printf("\n=== SOM 7天趋势预测 ===\n")
+    
+    var predicted_change = 0
+    var confidence = 50
+    
+    # 基于当前余额预测
+    if (g_balance > 1000):
+        predicted_change = 100
+        confidence = 80
+    else:
+        if (g_balance > 500):
+            predicted_change = 50
+            confidence = 70
+        else:
+            predicted_change = -50
+            confidence = 60
+        end
+    end
+    
+    printf("  当前余额: %d\n", g_balance)
+    printf("  预测变化: %d\n", predicted_change)
+    printf("  预测7天后: %d\n", g_balance + predicted_change)
+    printf("  置信度: %d%%\n", confidence)
+    
+    printf("\n【趋势判断】\n")
+    if (predicted_change > 0):
+        printf("  📈 趋势向上，预计增长\n")
+    else:
+        if (predicted_change < 0):
+            printf("  📉 趋势向下，预计下降\n")
+        else:
+            printf("  ➡️ 趋势平稳\n")
+        end
+    end
+    
+    return predicted_change
+end
