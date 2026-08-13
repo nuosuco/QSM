@@ -181,7 +181,7 @@ def weq_network_analysis():
     var msg_content = g_messages
     var i = 0
     while (i < str_len(msg_content)):
-        if (str_char_at(msg_content, i) == '\n'):
+        if (str_char_at(msg_content, i) == chr(10)):
             edge_count = edge_count + 1
         end
         i = i + 1
@@ -245,13 +245,4 @@ def weq_influence_analysis():
     
     printf("  核心人物: %s (影响力: %d)\n", top_friend, highest_influence)
     return highest_influence
-end
-
-# ---- WeQ智力：社交网络分析（找出核心节点） ----
-def weq_network_analysis():
-    printf("WeQ: 社交网络分析...\n")
-    var node_count = g_friend_count
-    printf("  节点数: %d\n", node_count)
-    printf("  状态: 网络分析完成\n")
-    return node_count
 end
