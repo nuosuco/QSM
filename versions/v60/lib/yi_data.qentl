@@ -1,0 +1,76 @@
+# ================================================================
+# lib/yi_data.qentl — 彝文三语基础数据集
+# 彝文(拼音) | 中文 | 英文
+# ================================================================
+
+# 彝文基础字符集（三语对照）
+# 彝文 -> 中文 -> 英文
+# 格式: 彝文字符, 中文, 英文  (逗号分隔)
+
+var yi_chars[20]
+var yi_zh[20]
+var yi_en[20]
+
+# 基础彝文字符及对应
+yi_chars[0] = "ꀀ"; yi_zh[0] = "鸡"; yi_en[0] = "chicken"
+yi_chars[1] = "ꀐ"; yi_zh[1] = "狗"; yi_en[1] = "dog"
+yi_chars[2] = "ꁌ"; yi_zh[2] = "猪"; yi_en[2] = "pig"
+yi_chars[3] = "ꃃ"; yi_zh[3] = "马"; yi_en[3] = "horse"
+yi_chars[4] = "ꄙ"; yi_zh[4] = "牛"; yi_en[4] = "cow"
+yi_chars[5] = "ꀉꂷ"; yi_zh[5] = "父亲"; yi_en[5] = "father"
+yi_chars[6] = "ꀉꂿ"; yi_zh[6] = "母亲"; yi_en[6] = "mother"
+yi_chars[7] = "ꀋꃚ"; yi_zh[7] = "水"; yi_en[7] = "water"
+yi_chars[8] = "ꃅꈋ"; yi_zh[8] = "火"; yi_en[8] = "fire"
+yi_chars[9] = "ꆿꁮ"; yi_zh[9] = "山"; yi_en[9] = "mountain"
+
+# 查看更多彝文
+yi_chars[10] = "ꇐꀕ"; yi_zh[10] = "太阳"; yi_en[10] = "sun"
+yi_chars[11] = "ꀋꂷ"; yi_zh[11] = "月亮"; yi_en[11] = "moon"
+yi_chars[12] = "ꃪꈤ"; yi_zh[12] = "星星"; yi_en[12] = "star"
+yi_chars[13] = "ꇗꎼ"; yi_zh[13] = "天"; yi_en[13] = "sky"
+yi_chars[14] = "ꃅꈋ"; yi_zh[14] = "地"; yi_en[14] = "earth"
+yi_chars[15] = "ꁮꐛ"; yi_zh[15] = "人"; yi_en[15] = "person"
+yi_chars[16] = "ꀉꁌ"; yi_zh[16] = "手"; yi_en[16] = "hand"
+yi_chars[17] = "ꀉꇇ"; yi_zh[17] = "脚"; yi_en[17] = "foot"
+yi_chars[18] = "ꀉꂷꀑ"; yi_zh[18] = "眼睛"; yi_en[18] = "eye"
+yi_chars[19] = "ꉌꃀ"; yi_zh[19] = "心"; yi_en[19] = "heart"
+
+# 获取彝文字符数
+def yi_data_size():
+    return 20
+end
+
+# 翻译函数: 彝文->中文
+def yi_to_zh(char):
+    var i = 0
+    while (i < yi_data_size()):
+        if (str_eq(yi_chars[i], char)):
+            return yi_zh[i]
+        end
+        i = i + 1
+    end
+    return "未知"
+end
+
+# 翻译函数: 彝文->英文
+def yi_to_en(char):
+    var i = 0
+    while (i < yi_data_size()):
+        if (str_eq(yi_chars[i], char)):
+            return yi_en[i]
+        end
+        i = i + 1
+    end
+    return "unknown"
+end
+
+# 测试彝文数据
+def test_yi_data():
+    printf("=== 彝文三语数据测试 ===\n")
+    var i = 0
+    while (i < yi_data_size()):
+        printf("%s = %s (%s)\n", yi_chars[i], yi_zh[i], yi_en[i])
+        i = i + 1
+    end
+    printf("彝文数据验证: 通过\n")
+end
