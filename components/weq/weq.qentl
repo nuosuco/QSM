@@ -246,3 +246,51 @@ def weq_influence_analysis():
     printf("  核心人物: %s (影响力: %d)\n", top_friend, highest_influence)
     return highest_influence
 end
+
+# ---- WeQ智力：真正的社交网络引擎（完整社交系统） ----
+def weq_full_social_engine():
+    printf("\n=== WeQ 社交引擎 ===\n")
+    
+    # 1. 社交状态
+    printf("【社交状态】\n")
+    printf("  好友总数: %d\n", g_friend_count)
+    printf("  消息总数: %d\n", g_msg_count)
+    printf("  好友列表:\n%s", g_friends)
+    printf("  最近消息:\n%s", g_messages)
+    
+    # 2. 社交分析
+    printf("\n【社交分析】\n")
+    if (g_friend_count > 10):
+        printf("  社交活跃度: 高\n")
+    else:
+        if (g_friend_count > 5):
+            printf("  社交活跃度: 中\n")
+        else:
+            printf("  社交活跃度: 低\n")
+        end
+    end
+    
+    if (g_msg_count > 20):
+        printf("  消息频率: 高\n")
+    else:
+        if (g_msg_count > 10):
+            printf("  消息频率: 中\n")
+        else:
+            printf("  消息频率: 低\n")
+        end
+    end
+    
+    # 3. 社交建议
+    printf("\n【社交建议】\n")
+    if (g_friend_count < 5 and g_msg_count < 10):
+        printf("  建议: 增加社交活动，主动联系好友\n")
+    else:
+        if (g_friend_count > 10 and g_msg_count > 20):
+            printf("  建议: 保持良好的社交习惯\n")
+        else:
+            printf("  建议: 继续维持当前社交状态\n")
+        end
+    end
+    
+    return 1
+end

@@ -334,3 +334,109 @@ def som_long_term_plan():
     
     return steps
 end
+
+# ---- SOM智力：真正的经济引擎（完整经济系统） ----
+def som_full_economy_engine():
+    printf("\n=== SOM 经济引擎 ===\n")
+    
+    # 1. 经济状态
+    printf("【经济状态】\n")
+    printf("  余额: %d\n", g_balance)
+    printf("  信用分: %d\n", g_credit_score)
+    printf("  账本:\n")
+    printf("%s", g_ledger)
+    
+    # 2. 经济分析
+    printf("\n【经济分析】\n")
+    if (g_balance > 1000):
+        printf("  经济状况: 富裕\n")
+    else:
+        if (g_balance > 500):
+            printf("  经济状况: 良好\n")
+        else:
+            if (g_balance > 200):
+                printf("  经济状况: 一般\n")
+            else:
+                printf("  经济状况: 困难\n")
+            end
+        end
+    end
+    
+    # 3. 信用评估
+    if (g_credit_score >= 80):
+        printf("  信用评估: 优秀\n")
+    else:
+        if (g_credit_score >= 60):
+            printf("  信用评估: 良好\n")
+        else:
+            printf("  信用评估: 需要改善\n")
+        end
+    end
+    
+    # 4. 经济建议
+    printf("\n【经济建议】\n")
+    if (g_balance < 200):
+        printf("  建议: 增加收入来源，控制支出\n")
+    else:
+        if (g_balance > 1000 and g_credit_score < 80):
+            printf("  建议: 继续投资，提升信用\n")
+        else:
+            printf("  建议: 保持稳定，适度增长\n")
+        end
+    end
+    
+    return 1
+end
+
+# ---- SOM智力：真正的经济引擎（完整经济系统） ----
+def som_full_economy_engine():
+    printf("\n=== SOM 经济引擎 ===\n")
+    
+    # 1. 经济状态
+    printf("【经济状态】\n")
+    printf("  余额: %d\n", g_balance)
+    printf("  信用分: %d\n", g_credit_score)
+    printf("  账本:\n")
+    printf("%s", g_ledger)
+    
+    # 2. 经济分析
+    printf("\n【经济分析】\n")
+    if (g_balance > 1000):
+        printf("  经济状况: 富裕\n")
+    else:
+        if (g_balance > 500):
+            printf("  经济状况: 良好\n")
+        else:
+            if (g_balance > 200):
+                printf("  经济状况: 一般\n")
+            else:
+                printf("  经济状况: 困难\n")
+            end
+        end
+    end
+    
+    # 3. 信用评估
+    if (g_credit_score >= 80):
+        printf("  信用评估: 优秀\n")
+    else:
+        if (g_credit_score >= 60):
+            printf("  信用评估: 良好\n")
+        else:
+            printf("  信用评估: 需要改善\n")
+        end
+    end
+    
+    # 4. 经济建议
+    printf("\n【经济建议】\n")
+    if (g_balance < 200):
+        printf("  建议: 增加收入来源，控制支出\n")
+    else:
+        if (g_balance > 1000 and g_credit_score < 80):
+            printf("  建议: 继续投资，提升信用\n")
+        else:
+            printf("  建议: 保持稳定，适度增长\n")
+        end
+    end
+    
+    return 1
+end
