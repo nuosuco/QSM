@@ -1,0 +1,39 @@
+# ================================================================
+# lib/qsv.qentl — 量子稀疏向量
+# 用于QNN和QSVM的向量表示
+# ================================================================
+
+# 量子稀疏向量结构
+def qsv_create(n):
+    # 创建n维量子向量
+    return qreg_create(n)
+end
+
+def qsv_set(qsv_id, index, value):
+    # 设置向量元素
+    if (value > 0):
+        apply_x(qsv_id, index)
+    end
+end
+
+def qsv_get(qsv_id, index):
+    # 获取向量元素
+    return measure(qsv_id, index)
+end
+
+def qsv_norm(qsv_id):
+    # 计算范数
+    var sum = 0
+    var i = 0
+    while (i < qsv_size(qsv_id)):
+        var bit = measure(qsv_id, i)
+        sum = sum + bit
+        i = i + 1
+    end
+    return sum
+end
+
+def qsv_size(qsv_id):
+    # 向量维度
+    return qsv_id
+end
