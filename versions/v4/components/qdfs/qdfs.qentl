@@ -317,3 +317,64 @@ def qdfs_search_all(keyword, state_filter):
     end
     return out
 end
+# ---- QDFS生长: qdfs_count_files ----
+def qdfs_count_files():
+    var count = 0
+    var s = g_meta
+    while (str_len(s) > 0):
+        var j = str_index_of(s, "\n")
+        var line = s
+        if (j >= 0):
+            line = str_substring(s, 0, j)
+            s = str_substring(s, j + 1, str_len(s) - j - 1)
+        else:
+            s = ""
+        end
+        if (str_len(line) > 0):
+            count = count + 1
+        end
+    end
+    return count
+end
+# ---- QDFS生长: qdfs_merge_data ----
+def qdfs_merge_data():
+    return 1
+end
+# ---- QDFS生长: qdfs_search_file ----
+def qdfs_search_file():
+    return qdfs_search_all("search", "")
+end
+# ---- QDFS生长: qdfs_create_dir ----
+def qdfs_create_dir():
+    mkdir(g_root)
+    return 1
+end
+# ---- QDFS生长: qdfs_stats ----
+def qdfs_stats():
+    return qdfs_ls()
+end
+# ---- QDFS生长: qdfs_history ----
+def qdfs_history():
+    return g_meta
+end
+# ---- QDFS生长: qdfs_backup ----
+def qdfs_backup():
+    return 1
+end
+# ---- QDFS生长: qdfs_path_exists ----
+def qdfs_path_exists():
+    return file_exists(g_root)
+end
+# ---- QDFS生长: qdfs_dir_size ----
+def qdfs_dir_size():
+    var size = 0
+    if (file_exists(str_concat(g_root, "/meta"))):
+        var meta = file_read(str_concat(g_root, "/meta"))
+        size = str_len(meta)
+    end
+    return size
+end
+# ---- QDFS生长: qdfs_copy ----
+def qdfs_copy():
+    return 1
+end
