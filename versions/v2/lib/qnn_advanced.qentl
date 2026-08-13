@@ -1,0 +1,42 @@
+# ================================================================
+# lib/qnn_advanced.qentl — 量子神经网络高级模块
+# 包含：量子感知机、量子卷积层、量子注意力机制
+# ================================================================
+
+# 量子感知机
+def qperceptron(input_qreg, weights, threshold):
+    var output = 0
+    var i = 0
+    while (i < len(weights)):
+        if (weights[i] > 0):
+            apply_x(input_qreg, i)
+        end
+        var bit = measure(input_qreg, i)
+        output = output + bit
+        i = i + 1
+    end
+    return output > threshold
+end
+
+# 量子卷积核
+def qconv_kernel(qreg_id, kernel_size):
+    # 创建纠缠态模拟卷积
+    var i = 0
+    while (i < kernel_size - 1):
+        cx(qreg_id, i, i + 1)
+        i = i + 1
+    end
+    return qreg_id
+end
+
+# 量子注意力权重
+def qattention_weights(qreg_id, n_qubits):
+    var weights = []
+    var i = 0
+    while (i < n_qubits):
+        var w = measure(qreg_id, i)
+        weights[i] = w
+        i = i + 1
+    end
+    return weights
+end

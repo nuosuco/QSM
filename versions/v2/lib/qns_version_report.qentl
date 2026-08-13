@@ -1,0 +1,14 @@
+# QNS版本报告 v479
+# QNS生成
+
+def qns_version_report():
+    var ver = file_read(".current_version")
+    if (str_len(ver) > 0):
+        printf("QNS版本报告: 当前版本 %s
+", ver)
+    else:
+        printf("QNS版本报告: 未知版本
+")
+    end
+    return 1
+end
