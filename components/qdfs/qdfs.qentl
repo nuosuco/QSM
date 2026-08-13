@@ -401,3 +401,70 @@ def qdfs_merge_files(name_a, name_b):
     end
     return 0
 end
+
+# ---- QDFS智力：智能文件分析 ----
+def qdfs_analyze_file(filepath):
+    printf("QDFS: 分析文件 %s\n", filepath)
+    
+    var content = file_read(filepath)
+    if (str_len(content) == 0):
+        printf("  无法读取文件\n")
+        return 0
+    end
+    
+    var line_count = 0
+    var def_count = 0
+    var var_count = 0
+    var i = 0
+    
+    while (i < str_len(content)):
+        # 统计函数定义
+        if (str_index_of(str_substring(content, i, 10), "def ") >= 0):
+            var j = i
+            while (j < str_len(content) and str_char_at(content, j) != '\n'):
+                j = j + 1
+            end
+            var line = str_substring(content, i, j - i)
+            if (str_index_of(line, "def ") >= 0):
+                def_count = def_count + 1
+            end
+            i = j + 1
+        else:
+            i = i + 1
+        end
+    end
+    
+    printf("  行数: %d\n", line_count)
+    printf("  函数数: %d\n", def_count)
+    return def_count
+end
+
+# ---- QDFS智力：智能备份策略 ----
+def qdfs_smart_backup(src, dest):
+    printf("QDFS: 智能备份 %s -> %s\n", src, dest)
+    
+    var src_size = 0
+    var i = 0
+    while (i < str_len(src)):
+        src_size = src_size + 1
+        i = i + 1
+    end
+    
+    if (src_size == 0):
+        printf("  源文件为空，跳过\n")
+        return 0
+    end
+    
+    # 智能判断：如果目标存在且大小相近，跳过
+    var dest_content = file_read(dest)
+    var dest_size = str_len(dest_content)
+    
+    if (dest_size > 0 and src_size == dest_size):
+        printf("  目标文件相同大小，跳过备份\n")
+        return 1
+    end
+    
+    file_write_bytes(dest, src)
+    printf("  备份完成: %d字节\n", src_size)
+    return 1
+end
