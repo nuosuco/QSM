@@ -1,0 +1,91 @@
+# ================================================================
+# QEntL 双重保险启动器 (boot_qentl.qentl)
+# ================================================================
+# 
+# 设计：C种子 + QVM自举 双重保险
+# 
+# 启动链：
+#   第一层: bin/q_bootstrap run run/qvm.qbc  (C种子启动QVM)
+#   第二层: bin/q_bootstrap run lib/boot_qentl.qbc (QVM自举启动链)
+#     → boot_qentl加载run/qvm.qbc
+#     → QVM运行后自动加载run/qcl.qbc  
+#     → QCL编译用户程序
+#
+# 使用方式：
+#   1. 常规: bin/q_bootstrap run run/qvm.qbc
+#   2. 自举: bin/q_bootstrap run lib/boot_qentl.qbc
+#
+# ================================================================
+
+# 启动器配置
+var boot_qvm = "run/qvm.qbc"
+var boot_qcl = "run/qcl.qbc"
+var boot_stage = 0
+
+# ================================================================
+# Stage 1: 加载QVM
+# ================================================================
+printf("[BOOT] 双重保险启动器 v1\n")
+printf("[BOOT] Stage 1: 加载QVM虚拟机...\n")
+
+if (file_exists(boot_qvm) == 0):
+    printf("[BOOT] 错误: 找不到 %s，回退C种子模式\n", boot_qvm)
+    # 回退到C种子默认行为
+    var fallback_target = "target.qbc"
+    g_target = fallback_target
+else:
+    # 设置QVM运行目标
+    var vm_loader = "var g_target = \"" + boot_qvm + "\"\n"
+    # 这里需要QVM直接运行自身，通过QVM的自举能力
+    printf("[BOOT] 找到QVM: %s\n", boot_qvm)
+    printf("[BOOT] 将QVM作为运行时环境...\n")
+    
+    # QVM加载自身逻辑通过环境变量或文件标记
+    var marker = "[BOOT] QVM自举模式已激活\n"
+    # 通过创建一个标记文件让QVM知道自己是自举模式
+    file_write_bytes(".boot_mode", "self")
+    g_target = boot_qvm
+end
+
+# ================================================================
+# Stage 2: QVM运行后启动QCL
+# ================================================================
+# 这个函数在QVM运行QVM自身后被调用
+# QVM自举后会加载此脚本，然后继续加载QCL
+# ================================================================
+
+def boot_continue():
+    printf("[BOOT] Stage 2: 启动QCL编译器...\n")
+    
+    if (file_exists(boot_qcl) == 0):
+        printf("[BOOT] 错误: 找不到 %s\n", boot_qcl)
+        return 0
+    end
+    
+    # 标记QCL已就绪
+    file_write_bytes(".qcl_ready", "1")
+    printf("[BOOT] QCL已就绪: %s\n", boot_qcl)
+    
+    # 设置下一轮运行目标为QCL
+    g_target = boot_qcl
+    return 1
+end
+
+# ================================================================
+# 主入口
+# ================================================================
+printf("[BOOT] QEntL双重保险启动器初始化\n")
+printf("[BOOT] 第一层保险: C种子启动器 (bin/q_bootstrap)\n")
+printf("[BOOT] 第二层保险: QVM自举启动 (qvm.qentl)\n")
+printf("[BOOT] 第三层保险: QCL自举 (qcl.qentl)\n")
+
+# 检查是否已经运行过
+if (file_exists(".boot_started") == 1):
+    # 第二次运行，继续到QCL
+    boot_continue()
+else:
+    # 第一次运行，标记并启动QVM
+    file_write_bytes(".boot_started", "1")
+    printf("[BOOT] 首次启动，运行QVM...\n")
+    # QVM会自动加载自身
+end
