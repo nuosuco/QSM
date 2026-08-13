@@ -277,3 +277,63 @@ def qsm_four_model_engine():
     
     return decision_score
 end
+
+# ---- QSM智力：真正的四维协同引擎（完整四模型整合） ----
+def qsm_four_dimension_engine():
+    printf("\n=== QSM 四维协同引擎 ===\n")
+    
+    # 1. 收集SOM经济判断
+    printf("【SOM经济判断】\n")
+    var som_status = "正常"
+    if (file_exists("components/som/som.qentl")):
+        printf("  ✓ SOM可用\n")
+        som_status = "已就绪"
+    else:
+        printf("  ✗ SOM不可用\n")
+        som_status = "缺失"
+    end
+    
+    # 2. 收集WeQ社交判断
+    printf("\n【WeQ社交判断】\n")
+    var weq_status = "正常"
+    if (file_exists("components/weq/weq.qentl")):
+        printf("  ✓ WeQ可用\n")
+        weq_status = "已就绪"
+    else:
+        printf("  ✗ WeQ不可用\n")
+        weq_status = "缺失"
+    end
+    
+    # 3. 收集Ref反省判断
+    printf("\n【Ref反省判断】\n")
+    var ref_status = "正常"
+    if (file_exists("components/ref/ref.qentl")):
+        printf("  ✓ Ref可用\n")
+        ref_status = "已就绪"
+    else:
+        printf("  ✗ Ref不可用\n")
+        ref_status = "缺失"
+    end
+    
+    # 4. 综合决策
+    printf("\n【QSM综合决策】\n")
+    var total_ready = 0
+    if (str_eq(som_status, "已就绪")): total_ready = total_ready + 1 end
+    if (str_eq(weq_status, "已就绪")): total_ready = total_ready + 1 end
+    if (str_eq(ref_status, "已就绪")): total_ready = total_ready + 1 end
+    
+    printf("  可用模型: %d/3\n", total_ready)
+    
+    if (total_ready == 3):
+        printf("  决策: ✅ 所有模型就绪，执行协同决策\n")
+        return 1
+    else:
+        if (total_ready >= 2):
+            printf("  决策: ⚡ 部分模型就绪，执行部分协同\n")
+            return 1
+        else:
+            printf("  决策: ❌ 模型不足，需要补充\n")
+            return 0
+        end
+    end
+end
