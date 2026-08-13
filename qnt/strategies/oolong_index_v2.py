@@ -1,6 +1,6 @@
 """
 捡乌龙指策略 v2.0
-核心：同平台跨厅对冲，瞬间锁利，不持仓
+核心：同平台跨厅对冲，永续开多+现货卖单，瞬间锁利，不持仓
 """
 import ccxt
 import os
@@ -29,10 +29,13 @@ class OolongSignal:
 class OolongIndexStrategy:
     """
     捡乌龙指策略 v2.0
-    - 同平台操作（不能跨平台）
-    - 永续开多 + 现货卖单
-    - 不持仓过夜
-    - 不等价格恢复
+    
+    正确理解：
+    1. 同一平台操作（不能跨平台）
+    2. 永续厅价格异常偏离（有人敲错价）
+    3. 现货厅价格正常（参考系）
+    4. 永续开多 + 现货卖单 → 瞬间锁利
+    5. 不等价格恢复，不持仓过夜
     """
     
     def __init__(self, symbol: str = None):
@@ -73,29 +76,21 @@ class OolongIndexStrategy:
         """
         检测捡乌龙指机会
         
-        正确理解：
-        1. 必须在同平台操作
-        2. 永续厅价格异常偏离
-        3. 现货厅价格正常（参考系）
-        4. 永续开多 + 现货卖单
-        5. 不等价格恢复，瞬间对冲
+        核心逻辑：
+        - 永续ask < 现货bid → 永续打9折买入，现货原价卖出
+        - 同时成交 → 锁死利润
+        - 不持仓 → 不会爆仓
         """
         signals = []
         
-        # 只检查Bitget同平台机会
         try:
             # 获取现货价格
             spot = self.bitget.fetch_ticker(f'{self.symbol}/USDT')
             spot_bid = float(spot['bid'])
-            spot_ask = float(spot['ask'])
             
             # 获取永续价格
             perp = self.bitget.fetch_ticker(f'{self.symbol}/USDT:USDT')
-            perp_bid = float(perp['bid'])
             perp_ask = float(perp['ask'])
-            
-            # 捡乌龙指核心：永续价格异常偏离
-            # 永续ask < 现货bid → 永续打9折，现货原价卖
             
             # 计算价差（永续买 vs 现货卖）
             spread = (spot_bid - perp_ask) / perp_ask * 100
@@ -126,9 +121,11 @@ class OolongIndexStrategy:
         all_signals = []
         
         for coin in coins:
+            old_symbol = self.symbol
+            self.symbol = coin
             signals = self.detect_oolong_index()
-            if signals:
-                all_signals.extend(signals)
+            self.symbol = old_symbol
+            all_signals.extend(signals)
         
         return all_signals
     
