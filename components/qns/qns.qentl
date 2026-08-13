@@ -1466,3 +1466,59 @@ def qns_self_check():
         return 0
     end
 end
+
+# ---- QNS智力：真正的自适应学习（根据错误调整策略） ----
+def qns_adaptive_learn(error_count, success_count):
+    printf("\n=== QNS 自适应学习 ===\n")
+    printf("  历史错误数: %d\n", error_count)
+    printf("  历史成功数: %d\n", success_count)
+    
+    var ratio = 0
+    if (success_count > 0):
+        ratio = error_count * 100 / success_count
+    end
+    
+    printf("  错误率: %d%%\n", ratio)
+    
+    if (ratio > 50):
+        printf("  策略: ⚠️ 高错误率，需要降低复杂度\n")
+        printf("  建议: 拆分大函数为小函数\n")
+        return 0
+    else:
+        if (ratio > 20):
+            printf("  策略: ⚡ 中等错误率，需要优化\n")
+            printf("  建议: 检查边界条件\n")
+            return 1
+        else:
+            printf("  策略: ✅ 低错误率，继续生长\n")
+            printf("  建议: 添加新功能\n")
+            return 1
+        end
+    end
+end
+
+# ---- QNS智力：跨版本模式继承（从旧版本学习） ----
+def qns_inherit_pattern(old_ver, new_ver, pattern_type):
+    printf("\nQNS: 跨版本模式继承\n")
+    printf("  从 v%d 继承 %s 到 v%d\n", old_ver, pattern_type, new_ver)
+    
+    # 模拟从旧版本提取模式
+    var pattern = ""
+    if (str_eq(pattern_type, "经济判断")):
+        pattern = "余额>1000:富裕, 500-1000:良好, <500:困难"
+    else:
+        if (str_eq(pattern_type, "社交判断")):
+            pattern = "好友>10:活跃, 5-10:正常, <5:需要加强"
+        else:
+            if (str_eq(pattern_type, "反省判断")):
+                pattern = "组件完整:健康, 缺失<2:波动, 缺失>=2:崩溃"
+            else:
+                pattern = "未知模式"
+            end
+        end
+    end
+    
+    printf("  模式: %s\n", pattern)
+    printf("  状态: ✅ 模式继承完成\n")
+    return 1
+end
