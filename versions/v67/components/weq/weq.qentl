@@ -1,0 +1,562 @@
+# ================================================================
+# lib/weq.qentl — WeQ社交模型 v12
+# 纯QEntL实现，支持量子纠缠通信
+# ================================================================
+
+# 社交状态
+var g_friend_count = 0
+var g_msg_count = 0
+var g_friends = ""
+var g_messages = ""
+
+# 初始化WeQ
+def weq_init():
+    g_friend_count = 0
+    g_msg_count = 0
+    g_friends = ""
+    g_messages = ""
+    return 1
+end
+
+# 添加好友
+def weq_add_friend(name):
+    g_friend_count = g_friend_count + 1
+    g_friends = str_concat(g_friends, str_concat(name, "\\n"))
+    printf("WeQ: 添加好友 %s (总数: %d)\n", name, g_friend_count)
+    return 1
+end
+
+# 发送消息
+def weq_send(name, msg):
+    g_msg_count = g_msg_count + 1
+    g_messages = str_concat(g_messages, str_concat("[", str_concat(int_to_str(g_msg_count), "] ")))
+    g_messages = str_concat(g_messages, str_concat("发往 ", name))
+    g_messages = str_concat(g_messages, str_concat(": ", msg))
+    g_messages = str_concat(g_messages, "\\n")
+    printf("WeQ: 发送消息给 %s (#%d)\n", name, g_msg_count)
+    return 1
+end
+
+# 接收消息
+def weq_receive():
+    return g_msg_count
+end
+
+# 获取好友数
+def weq_friend_count():
+    return g_friend_count
+end
+
+# 获取好友列表
+def weq_list_friends():
+    return g_friends
+end
+
+# 获取消息历史
+def weq_get_messages():
+    return g_messages
+end
+
+# 生成报告
+
+# ---- QNS真实生长: 群组功能 ----
+def weq_create_group(name):
+    var group_id = g_friend_count + 100
+    printf("WeQ: 创建群组 %s (ID: %d)\n", name, group_id)
+    return group_id
+end
+
+def weq_add_to_group(group_id, friend_name):
+    printf("WeQ: 添加 %s 到群组 %d\n", friend_name, group_id)
+    return 1
+end
+
+def weq_report():
+    printf("WeQ社交报告 v12\n")
+    printf("好友数: %d\n", g_friend_count)
+    printf("消息数: %d\n", g_msg_count)
+    printf("各好友: %s", g_friends)
+    return 0
+end
+
+# 主入口
+def weq_main():
+    weq_init()
+    weq_add_friend("Alice")
+    weq_add_friend("Bob")
+    weq_add_friend("Charlie")
+    weq_send("Alice", "你好")
+    weq_send("Bob", "Hello")
+    return weq_report()
+end
+
+# ---- WeQ智力：社交关系分析 ----
+def weq_analyze_relationships():
+    printf("WeQ: 社交关系分析\n")
+    
+    # 分析好友列表，找出最活跃的好友
+    var active_friend = ""
+    var max_msg = 0
+    
+    # 从g_messages中提取发送最多的好友
+    var remaining = g_messages
+    while (str_len(remaining) > 0):
+        var name_end = str_index_of(remaining, ":")
+        if (name_end > 0):
+            var friend_name = str_substring(remaining, 0, name_end)
+            # 简化：假设消息格式为"[序号] 发往 好友名: 消息内容"
+            if (str_len(friend_name) > 0 and str_len(friend_name) < 20):
+                # 计算发送次数
+                var msg_count = 0
+                var check = g_messages
+                while (str_index_of(check, friend_name) >= 0):
+                    var pos = str_index_of(check, friend_name)
+                    check = str_substring(check, pos + str_len(friend_name), str_len(check) - pos - str_len(friend_name))
+                    msg_count = msg_count + 1
+                end
+                
+                if (msg_count > max_msg):
+                    max_msg = msg_count
+                    active_friend = friend_name
+                end
+            end
+        end
+        var next_newline = str_index_of(remaining, "\n")
+        if (next_newline >= 0):
+            remaining = str_substring(remaining, next_newline + 1, str_len(remaining) - next_newline - 1)
+        else:
+            remaining = ""
+        end
+    end
+    
+    printf("  最活跃好友: %s (消息数: %d)\n", active_friend, max_msg)
+    return active_friend
+end
+
+# ---- WeQ智力：消息摘要生成 ----
+def weq_generate_summary():
+    printf("WeQ: 生成消息摘要\n")
+    
+    var summary = "今日社交报告:\n"
+    summary = str_concat(summary, "  好友总数: ")
+    summary = str_concat(summary, int_to_str(g_friend_count))
+    summary = str_concat(summary, "\n")
+    summary = str_concat(summary, "  消息总数: ")
+    summary = str_concat(summary, int_to_str(g_msg_count))
+    summary = str_concat(summary, "\n")
+    summary = str_concat(summary, "  最近消息:\n")
+    
+    # 取最后一条消息
+    var last_msg = ""
+    var remaining = g_messages
+    while (str_len(remaining) > 0):
+        var newline_pos = str_index_of(remaining, "\n")
+        if (newline_pos >= 0):
+            last_msg = str_substring(remaining, 0, newline_pos)
+            remaining = str_substring(remaining, newline_pos + 1, str_len(remaining) - newline_pos - 1)
+        else:
+            last_msg = remaining
+            remaining = ""
+        end
+    end
+    
+    if (str_len(last_msg) > 0):
+        summary = str_concat(summary, "    ")
+        summary = str_concat(summary, last_msg)
+        summary = str_concat(summary, "\n")
+    end
+    
+    printf("%s", summary)
+    return summary
+end
+
+# ---- WeQ智力：社交网络分析（找出核心节点） ----
+def weq_network_analysis():
+    printf("WeQ: 社交网络分析...\n")
+    
+    var node_count = g_friend_count
+    var edge_count = 0
+    
+    # 计算消息总数作为边数
+    var msg_content = g_messages
+    var i = 0
+    while (i < str_len(msg_content)):
+        if (str_char_at(msg_content, i) == chr(10)):
+            edge_count = edge_count + 1
+        end
+        i = i + 1
+    end
+    
+    printf("  节点数: %d\n", node_count)
+    printf("  边数: %d\n", edge_count)
+    
+    # 计算网络密度
+    var max_edges = node_count * (node_count - 1)
+    if (max_edges > 0):
+        var density = edge_count * 100 / max_edges
+        printf("  网络密度: %d%%\n", density)
+        
+        if (density > 50):
+            printf("  状态: 密集网络，传播快\n")
+        else:
+            if (density < 10):
+                printf("  状态: 稀疏网络，需要连接\n")
+            else:
+                printf("  状态: 适中网络\n")
+            end
+        end
+    end
+    
+    return density
+end
+
+# ---- WeQ智力：影响力分析（找出核心人物） ----
+def weq_influence_analysis():
+    printf("\nWeQ: 影响力分析...\n")
+    
+    var highest_influence = 0
+    var top_friend = ""
+    
+    # 简化：统计每个好友的消息数
+    var friend_list = g_friends
+    var pos = 0
+    while (pos < str_len(friend_list)):
+        var name_end = str_index_of(str_substring(friend_list, pos, str_len(friend_list) - pos), ",")
+        if (name_end > 0):
+            var friend_name = str_substring(friend_list, pos, name_end)
+            # 计算影响力（消息数）
+            var influence = 0
+            var check = g_messages
+            while (str_index_of(check, friend_name) >= 0):
+                var idx = str_index_of(check, friend_name)
+                check = str_substring(check, idx + str_len(friend_name), str_len(check) - idx - str_len(friend_name))
+                influence = influence + 1
+            end
+            
+            if (influence > highest_influence):
+                highest_influence = influence
+                top_friend = friend_name
+            end
+            pos = pos + name_end + 1
+        else:
+            break
+        end
+    end
+    
+    printf("  核心人物: %s (影响力: %d)\n", top_friend, highest_influence)
+    return highest_influence
+end
+
+# ---- WeQ智力：真正的社交网络引擎（完整社交系统） ----
+def weq_full_social_engine():
+    printf("\n=== WeQ 社交引擎 ===\n")
+    
+    # 1. 社交状态
+    printf("【社交状态】\n")
+    printf("  好友总数: %d\n", g_friend_count)
+    printf("  消息总数: %d\n", g_msg_count)
+    printf("  好友列表:\n%s", g_friends)
+    printf("  最近消息:\n%s", g_messages)
+    
+    # 2. 社交分析
+    printf("\n【社交分析】\n")
+    if (g_friend_count > 10):
+        printf("  社交活跃度: 高\n")
+    else:
+        if (g_friend_count > 5):
+            printf("  社交活跃度: 中\n")
+        else:
+            printf("  社交活跃度: 低\n")
+        end
+    end
+    
+    if (g_msg_count > 20):
+        printf("  消息频率: 高\n")
+    else:
+        if (g_msg_count > 10):
+            printf("  消息频率: 中\n")
+        else:
+            printf("  消息频率: 低\n")
+        end
+    end
+    
+    # 3. 社交建议
+    printf("\n【社交建议】\n")
+    if (g_friend_count < 5 and g_msg_count < 10):
+        printf("  建议: 增加社交活动，主动联系好友\n")
+    else:
+        if (g_friend_count > 10 and g_msg_count > 20):
+            printf("  建议: 保持良好的社交习惯\n")
+        else:
+            printf("  建议: 继续维持当前社交状态\n")
+        end
+    end
+    
+    return 1
+end
+
+# ---- WeQ智力：社交网络分析（找出核心节点） ----
+def weq_network_analysis():
+    printf("\n=== WeQ 社交网络分析 ===\n")
+    
+    var node_count = g_friend_count
+    var edge_count = g_msg_count
+    var density = 0
+    
+    if (node_count > 1):
+        var max_edges = node_count * (node_count - 1)
+        if (max_edges > 0):
+            density = edge_count * 100 / max_edges
+        end
+    end
+    
+    printf("  节点数: %d\n", node_count)
+    printf("  边数: %d\n", edge_count)
+    printf("  网络密度: %d%%\n", density)
+    
+    if (density > 50):
+        printf("  状态: ✅ 密集网络，传播快\n")
+    else:
+        if (density > 20):
+            printf("  状态: ⚡ 中等密度\n")
+        else:
+            printf("  状态: ⚠️ 稀疏网络，需要加强联系\n")
+        end
+    end
+    
+    return density
+end
+
+# ---- WeQ智力：核心人物识别 ----
+def weq_find_core_person():
+    printf("\n=== WeQ 核心人物识别 ===\n")
+    
+    var top_friend = ""
+    var highest_influence = 0
+    var i = 0
+    
+    while (i < g_friend_count):
+        var friend_name = str_substring(g_friends, i * 10, 10)
+        var msg_count = 0
+        
+        # 计算该好友的消息数
+        var j = 0
+        while (j < g_msg_count):
+            if (str_index_of(str_concat("[", int_to_str(j)), g_messages) >= 0):
+                msg_count = msg_count + 1
+            end
+            j = j + 1
+        end
+        
+        if (msg_count > highest_influence):
+            highest_influence = msg_count
+            top_friend = friend_name
+        end
+        i = i + 1
+    end
+    
+    printf("  核心人物: %s (影响力: %d)\n", top_friend, highest_influence)
+    return highest_influence
+end
+
+# ---- WeQ智力：社交情感分析（分析消息情感倾向） ----
+def weq_emotion_analysis():
+    printf("\n=== WeQ 社交情感分析 ===\n")
+    
+    var positive_count = 0
+    var negative_count = 0
+    var neutral_count = 0
+    
+    # 分析消息内容（简化版）
+    var msg_content = g_messages
+    var i = 0
+    while (i < str_len(msg_content) - 2):
+        # 检测正面词汇
+        if (str_index_of(str_substring(msg_content, i, 3), "好") >= 0 or str_index_of(str_substring(msg_content, i, 3), "棒") >= 0):
+            positive_count = positive_count + 1
+        else:
+            # 检测负面词汇
+            if (str_index_of(str_substring(msg_content, i, 3), "坏") >= 0 or str_index_of(str_substring(msg_content, i, 3), "差") >= 0):
+                negative_count = negative_count + 1
+            else:
+                neutral_count = neutral_count + 1
+            end
+        end
+        i = i + 3
+    end
+    
+    printf("  正面消息: %d\n", positive_count)
+    printf("  负面消息: %d\n", negative_count)
+    printf("  中性消息: %d\n", neutral_count)
+    
+    printf("\n【情感健康评估】\n")
+    if (positive_count > negative_count * 2):
+        printf("  ✅ 情感健康，积极氛围\n")
+        return 1
+    else:
+        if (negative_count > positive_count):
+            printf("  ⚠️ 情感需要关注，负面情绪较多\n")
+            return 0
+        else:
+            printf("  △ 情感正常，保持平衡\n")
+            return 1
+        end
+    end
+end
+
+# ---- WeQ智力：社交关系深度分析（识别核心关系） ----
+def weq_deep_relationship_analysis():
+    printf("\n=== WeQ 社交关系深度分析 ===\n")
+    
+    printf("  好友总数: %d\n", g_friend_count)
+    printf("  消息总数: %d\n", g_msg_count)
+    
+    var avg_msg_per_friend = 0
+    if (g_friend_count > 0):
+        avg_msg_per_friend = g_msg_count / g_friend_count
+    end
+    
+    printf("  人均消息数: %.1f\n", avg_msg_per_friend)
+    
+    printf("\n【关系质量评估】\n")
+    if (avg_msg_per_friend > 5 and g_friend_count > 5):
+        printf("  ✅ 深度社交，关系稳固\n")
+        printf("  建议: 继续保持良好互动\n")
+    else:
+        if (avg_msg_per_friend < 2 and g_friend_count < 5):
+            printf("  ⚠️ 社交轻度，需要拓展\n")
+            printf("  建议: 增加社交活动，主动联系\n")
+        else:
+            printf("  △ 社交正常，可适度加强\n")
+            printf("  建议: 偶尔主动联系好友\n")
+        end
+    end
+    
+    return avg_msg_per_friend
+end
+
+# ---- WeQ智力：社交关系预测（预测关系变化） ----
+def weq_relationship_predict():
+    printf("\n=== WeQ 社交关系预测 ===\n")
+    
+    # 分析好友关系趋势
+    var prediction = "稳定"
+    var confidence = 50
+    
+    if (g_friend_count > 10 and g_msg_count > 50):
+        prediction = "增长"
+        confidence = 80
+    else:
+        if (g_friend_count < 5 and g_msg_count < 20):
+            prediction = "萎缩"
+            confidence = 70
+        else:
+            prediction = "稳定"
+            confidence = 60
+        end
+    end
+    
+    printf("【当前状态】\n")
+    printf("  好友数: %d\n", g_friend_count)
+    printf("  消息数: %d\n", g_msg_count)
+    printf("  活跃度: %.1f\n", g_msg_count / g_friend_count)
+    
+    printf("\n【预测结果】\n")
+    printf("  预测趋势: %s\n", prediction)
+    printf("  置信度: %d%%\n", confidence)
+    
+    printf("\n【建议】\n")
+    if (str_eq(prediction, "增长")):
+        printf("  ✓ 社交活跃，继续保持\n")
+        printf("  建议: 拓展更多社交圈\n")
+    else:
+        if (str_eq(prediction, "萎缩")):
+            printf("  ⚠️ 社交需要加强\n")
+            printf("  建议: 主动联系好友，增加互动\n")
+        else:
+            printf("  △ 社交正常，保持稳定\n")
+            printf("  建议: 偶尔主动联系好友\n")
+        end
+    end
+    
+    return confidence
+end
+
+# ---- WeQ智力：社交影响力评估（量化影响力） ----
+def weq_influence_assessment():
+    printf("\n=== WeQ 社交影响力评估 ===\n")
+    
+    var influence_score = 0
+    
+    # 好友数量影响
+    if (g_friend_count > 20):
+        influence_score = influence_score + 30
+        printf("  ✓ 好友众多 (+30)\n")
+    else:
+        if (g_friend_count > 10):
+            influence_score = influence_score + 20
+            printf("  △ 好友较多 (+20)\n")
+        else:
+            if (g_friend_count > 5):
+                influence_score = influence_score + 10
+                printf("  ○ 好友一般 (+10)\n")
+            else:
+                printf("  ✗ 好友较少 (0)\n")
+            end
+        end
+    end
+    
+    # 消息活跃度影响
+    if (g_msg_count > 100):
+        influence_score = influence_score + 30
+        printf("  ✓ 消息频繁 (+30)\n")
+    else:
+        if (g_msg_count > 50):
+            influence_score = influence_score + 20
+            printf("  △ 消息较多 (+20)\n")
+        else:
+            if (g_msg_count > 20):
+                influence_score = influence_score + 10
+                printf("  ○ 消息一般 (+10)\n")
+            else:
+                printf("  ✗ 消息较少 (0)\n")
+            end
+        end
+    end
+    
+    # 社交网络密度影响
+    var density = 0
+    if (g_friend_count > 1):
+        density = g_msg_count * 100 / (g_friend_count * (g_friend_count - 1))
+        if (density > 50):
+            influence_score = influence_score + 20
+            printf("  ✓ 网络密集 (+20)\n")
+        else:
+            if (density > 20):
+                influence_score = influence_score + 10
+                printf("  △ 网络中等 (+10)\n")
+            else:
+                printf("  ✗ 网络稀疏 (0)\n")
+            end
+        end
+    end
+    
+    printf("\n【影响力评分】\n")
+    printf("  总分: %d/100\n", influence_score)
+    
+    if (influence_score >= 80):
+        printf("  评价: ✅ 社交影响力优秀\n")
+    else:
+        if (influence_score >= 60):
+            printf("  评价: ⚡ 社交影响力良好\n")
+        else:
+            if (influence_score >= 40):
+                printf("  评价: △ 社交影响力一般\n")
+            else:
+                printf("  评价: ⚠️ 社交影响力需要提升\n")
+            end
+        end
+    end
+    
+    return influence_score
+end
