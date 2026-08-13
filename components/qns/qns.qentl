@@ -1365,3 +1365,36 @@ def qns_quantum_forecast(next_ver):
     printf("  预测: %s\n", prediction)
     return 1
 end
+
+# ---- QNS智力：真正的自我复制（备份自身代码） ----
+def qns_self_replicate():
+    printf("\n=== QNS 自我复制 ===\n")
+    
+    # 读取自身代码
+    var self_code = file_read("components/qns/qns.qentl")
+    if (str_len(self_code) == 0):
+        printf("  ✗ 无法读取自身代码\n")
+        return 0
+    end
+    
+    printf("  自身代码大小: %d字节\n", str_len(self_code))
+    
+    # 创建备份
+    file_write_bytes("qns_backup.qentl", self_code)
+    printf("  ✓ 备份已创建: qns_backup.qentl\n")
+    
+    # 统计函数数量
+    var func_count = 0
+    var i = 0
+    while (i < str_len(self_code) - 3):
+        if (str_substring(self_code, i, 4) == "def "):
+            func_count = func_count + 1
+        end
+        i = i + 1
+    end
+    
+    printf("  函数数量: %d\n", func_count)
+    printf("  状态: ✅ 自我复制完成\n")
+    
+    return func_count
+end
