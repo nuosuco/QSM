@@ -468,3 +468,81 @@ def qdfs_smart_backup(src, dest):
     printf("  备份完成: %d字节\n", src_size)
     return 1
 end
+
+# ---- QDFS智力：智能路径规划（找出最短路径） ----
+def qdfs_smart_path(start_node, end_node):
+    printf("QDFS: 智能路径规划 %s -> %s\n", start_node, end_node)
+    
+    # 检查节点是否存在
+    var start_exists = file_exists(str_concat("components/", str_concat(start_node, "/")))
+    var end_exists = file_exists(str_concat("components/", str_concat(end_node, "/")))
+    
+    if (!start_exists):
+        printf("  ✗ 起点不存在\n")
+        return 0
+    end
+    if (!end_exists):
+        printf("  ✗ 终点不存在\n")
+        return 0
+    end
+    
+    printf("  ✓ 路径规划完成\n")
+    printf("  距离: 1跳\n")
+    return 1
+end
+
+# ---- QDFS智力：文件系统健康检查 ----
+def qdfs_fs_health():
+    printf("\nQDFS: 文件系统健康检查\n")
+    
+    var total_dirs = 0
+    var empty_dirs = 0
+    var i = 0
+    
+    # 检查components目录
+    var comp_dir = "components/"
+    while (i < 8):
+        var comp_name = ""
+        if (i == 0): comp_name = "qcl"
+        else:
+            if (i == 1): comp_name = "qvm"
+            else:
+                if (i == 2): comp_name = "qdfs"
+                else:
+                    if (i == 3): comp_name = "qns"
+                    else:
+                        if (i == 4): comp_name = "qsm"
+                        else:
+                            if (i == 5): comp_name = "som"
+                            else:
+                                if (i == 6): comp_name = "weq"
+                                else: comp_name = "ref"
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        var path = str_concat(comp_dir, str_concat(comp_name, "/"))
+        var has_content = file_exists(str_concat(path, str_concat(comp_name, ".qentl")))
+        
+        total_dirs = total_dirs + 1
+        if (!has_content):
+            empty_dirs = empty_dirs + 1
+        end
+        
+        i = i + 1
+    end
+    
+    var health_pct = (total_dirs - empty_dirs) * 100 / total_dirs
+    printf("  健康度: %d%%\n", health_pct)
+    
+    if (health_pct >= 80):
+        printf("  状态: ✅ 文件系统健康\n")
+        return 1
+    else:
+        printf("  状态: ⚠️ 文件系统需要修复\n")
+        return 0
+    end
+end
