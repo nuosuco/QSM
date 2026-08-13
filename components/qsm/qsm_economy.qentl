@@ -1,6 +1,6 @@
 # ================================================================
-# examples/qsm_social.qentl — WeQ社交模型演示
-# 量子社交模型
+# examples/qsm_economy.qentl — QSM经济模型演示
+# 量子经济模型
 # ================================================================
 qreg q[3]
 
@@ -18,5 +18,5 @@ var r0 = measure q[0]
 var r1 = measure q[1]
 var r2 = measure q[2]
 
-printf("WeQ社交模型: %d %d %d\n", r0, r1, r2)
-printf("WeQ社交模型验证: 通过\n")
+printf("QSM经济模型: %d %d %d\n", r0, r1, r2)
+printf("QSM经济模型验证: 通过\n")
