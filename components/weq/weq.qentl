@@ -169,3 +169,80 @@ def weq_generate_summary():
     printf("%s", summary)
     return summary
 end
+
+# ---- WeQ智力：社交网络分析（找出核心节点） ----
+def weq_network_analysis():
+    printf("WeQ: 社交网络分析...\n")
+    
+    var node_count = g_friend_count
+    var edge_count = 0
+    
+    # 计算消息总数作为边数
+    var msg_content = g_messages
+    var i = 0
+    while (i < str_len(msg_content)):
+        if (str_char_at(msg_content, i) == '\n'):
+            edge_count = edge_count + 1
+        end
+        i = i + 1
+    end
+    
+    printf("  节点数: %d\n", node_count)
+    printf("  边数: %d\n", edge_count)
+    
+    # 计算网络密度
+    var max_edges = node_count * (node_count - 1)
+    if (max_edges > 0):
+        var density = edge_count * 100 / max_edges
+        printf("  网络密度: %d%%\n", density)
+        
+        if (density > 50):
+            printf("  状态: 密集网络，传播快\n")
+        else:
+            if (density < 10):
+                printf("  状态: 稀疏网络，需要连接\n")
+            else:
+                printf("  状态: 适中网络\n")
+            end
+        end
+    end
+    
+    return density
+end
+
+# ---- WeQ智力：影响力分析（找出核心人物） ----
+def weq_influence_analysis():
+    printf("\nWeQ: 影响力分析...\n")
+    
+    var highest_influence = 0
+    var top_friend = ""
+    
+    # 简化：统计每个好友的消息数
+    var friend_list = g_friends
+    var pos = 0
+    while (pos < str_len(friend_list)):
+        var name_end = str_index_of(str_substring(friend_list, pos, str_len(friend_list) - pos), ",")
+        if (name_end > 0):
+            var friend_name = str_substring(friend_list, pos, name_end)
+            # 计算影响力（消息数）
+            var influence = 0
+            var check = g_messages
+            while (str_index_of(check, friend_name) >= 0):
+                var idx = str_index_of(check, friend_name)
+                check = str_substring(check, idx + str_len(friend_name), str_len(check) - idx - str_len(friend_name))
+                influence = influence + 1
+            end
+            
+            if (influence > highest_influence):
+                highest_influence = influence
+                top_friend = friend_name
+            end
+            pos = pos + name_end + 1
+        else:
+            break
+        end
+    end
+    
+    printf("  核心人物: %s (影响力: %d)\n", top_friend, highest_influence)
+    return highest_influence
+end
