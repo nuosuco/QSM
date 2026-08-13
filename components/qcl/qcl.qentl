@@ -1116,7 +1116,7 @@ def parse_statement():
                 var ident_ns = g_tok_start[g_parse_pos]
                 var ident_nl = g_tok_len[g_parse_pos]
                 var ident_nm = str_substring(g_src, ident_ns, ident_nl)
-                if ((str_eq(ident_nm, "h") or str_eq(ident_nm, "t") or str_eq(ident_nm, "x") or str_eq(ident_nm, "z")) and peek_type() != T_ASSIGN):
+                if (str_eq(ident_nm, "h") or str_eq(ident_nm, "t") or str_eq(ident_nm, "x") or str_eq(ident_nm, "z")) and peek_type() != T_ASSIGN):
                     parse_quantum_gate_1arg(ident_ns, ident_nl)
                 else:
                     if (str_eq(ident_nm, "cx") or str_eq(ident_nm, "cz")):
@@ -1613,7 +1613,7 @@ def parse_var_decl():
         var gate_nl = g_tok_len[g_parse_pos]
         var gate_nm = str_substring(g_src, gate_ns, gate_nl)
         # 门赋值必须形如 `门名 寄存器名 [`, 两token前瞻防误判(如 var sum = t)
-        if ((str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")) and peek_type() == T_IDENT and peek_type2() == T_LBRACKET):
+        if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")) and peek_type() == T_IDENT and peek_type2() == T_LBRACKET):
             advance()  # consume gate name
             # 发射量子门代码（不POP，让结果留在栈上供STORE_VAR）
             if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t")):
