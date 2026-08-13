@@ -42,7 +42,7 @@ def http_response(status, ctype, body):
     head = str_concat(head, ctype)
     head = str_concat(head, "\r\nContent-Length: ")
     head = str_concat(head, int_to_str(str_len(body)))
-    head = str_concat(head, "\r\nConnection: close\r\nServer: QEntL/1.0\r\n\r\n")
+    head = str_concat(head, "\r\nCache-Control: no-cache, no-store, must-revalidate\r\nConnection: close\r\nServer: QEntL/1.0\r\n\r\n")
     return str_concat(head, body)
 end
 
@@ -191,9 +191,13 @@ def route(path, req):
         return http_response("200 OK", "text/plain; charset=utf-8", out)
     end
     if (str_eq(path, "/")):
-        var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>QSM — QEntL量子计算平台</title>\n<style>\nbody { font-family: -apple-system, sans-serif; background: #0a0e17; color: #e0e6ed; margin: 0; }\n.wrap { max-width: 900px; margin: 0 auto; padding: 60px 20px; }\nh1 { color: #4fc3f7; }\n.badge { display: inline-block; background: #1a2332; border: 1px solid #4fc3f7; border-radius: 6px; padding: 4px 12px; margin: 4px; font-size: 13px; }\n.card { background: #111827; border-radius: 10px; padding: 24px; margin-top: 24px; border: 1px solid #1f2937; }\ncode { color: #7ee787; }\na { color: #4fc3f7; }\n.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }\n.grid-item { background: #1a2332; padding: 12px; border-radius: 8px; text-align: center; }\n.grid-item:hover { background: #1f2937; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n<h1>&#9883; QSM — QEntL量子计算平台</h1>\n<div class=\"badge\">QOS平台: qsm.som.top</div>\n<div class=\"badge\">纯QEntL实现</div>\n<div class=\"badge\">自举编译器</div>\n<div class=\"badge\">15种量子门</div>\n<div class=\"badge\">32个算法</div>\n<div class=\"badge\">30个API端点</div>\n<div class=\"card\">\n<h2>&#9889; <a href=\"/ide\">在线IDE</a></h2>\n<p>浏览器写QEntL，云端编译运行。</p>\n</div>\n<div class=\"card\">\n<h2>量子算法演示</h2>\n<div class=\"grid\">\n<div class=\"grid-item\"><a href=\"/api/grover4\">Grover搜索</a></div>\n<div class=\"grid-item\"><a href=\"/api/qft\">QFT</a></div>\n<div class=\"grid-item\"><a href=\"/api/shor15\">Shor分解</a></div>\n<div class=\"grid-item\"><a href=\"/api/teleport\">隐形传态</a></div>\n<div class=\"grid-item\"><a href=\"/api/qnn\">量子神经网络</a></div>\n<div class=\"grid-item\"><a href=\"/api/qsvm\">量子SVM</a></div>\n<div class=\"grid-item\"><a href=\"/api/qclustering\">量子聚类</a></div>\n<div class=\"grid-item\"><a href=\"/api/qoptimization\">量子优化</a></div>\n<div class=\"grid-item\"><a href=\"/api/qrbm\">量子RBM</a></div>\n</div>\n</div>\n<div class=\"card\">\n<h2>技术栈</h2>\n<p><code>C种子 → QCL → QVM → 标准库 → HTTP服务器</code></p>\n<p>零第三方依赖，纯QEntL实现</p>\n</div>\n</div>\n</body>\n</html>\n"
+        var html = file_read("/root/QSM/web/qdesktop.html")
+        if (str_len(html) == 0):
+            html = "<html><body><h1>QDesktop未找到</h1></body></html>"
+        end
         return http_response("200 OK", "text/html; charset=utf-8", html)
     end
+    if (str_eq(path, "/api/grover")):    end
     if (str_eq(path, "/api/grover")):
         var out = exec("cd /root/QSM && for i in 1 2 3 4 5; do timeout 10 bin/qcl_bootstrap run build/grover.qbc 2>&1; done")
         return http_response("200 OK", "text/plain; charset=utf-8", out)
@@ -345,6 +349,20 @@ def route(path, req):
     if (str_eq(path, "/api/yi")):
         var out38 = exec("cd /root/QSM && timeout 10 bin/qcl_bootstrap run build/yi_demo.qbc 2>&1")
         return http_response("200 OK", "text/plain; charset=utf-8", out38)
+    end
+    if (str_eq(path, "/fonts/lingyi.ttf")):
+        var fbody = file_read("/root/QSM/web/fonts/lingyi.ttf")
+        if (str_len(fbody) == 0):
+            return http_response("404 Not Found", "text/plain", "字体未找到")
+        end
+        return http_response("200 OK", "application/x-font-ttf", fbody)
+    end
+    if (str_eq(path, "/fonts/lingyi_smp.ttf")):
+        var fbody2 = file_read("/root/QSM/web/fonts/lingyi_smp.ttf")
+        if (str_len(fbody2) == 0):
+            return http_response("404 Not Found", "text/plain", "字体未找到")
+        end
+        return http_response("200 OK", "application/x-font-ttf", fbody2)
     end
     if (str_eq(path, "/qdesktop")):
         var html = file_read("/root/QSM/web/qdesktop.html")
