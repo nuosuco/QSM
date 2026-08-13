@@ -137,7 +137,7 @@ var g_loop_depth = 0
 
 # ---- 辅助 ----
 def sub_eq(a, as, al, b, bs, bl):
-    if (al != bl)):
+    iif (al != bl):
         return 0
     end
     var x = str_substring(a, as, al)
@@ -147,130 +147,130 @@ def sub_eq(a, as, al, b, bs, bl):
 end
 
 def is_space(ch):
-    if (str_eq(ch, " "))):
+    iif (str_eq(ch, " ")):
         return 1
     end
-    if (str_eq(ch, "\t"))):
+    iif (str_eq(ch, "\t")):
         return 1
     end
-    if (str_eq(ch, "\n"))):
+    iif (str_eq(ch, "\n")):
         return 1
     end
-    if (str_eq(ch, "\r"))):
+    iif (str_eq(ch, "\r")):
         return 1
     end
     return 0
 end
 
 def is_digit(ch):
-    if (str_eq(ch, "0"))):
+    iif (str_eq(ch, "0")):
         return 1
     end
-    if (str_eq(ch, "1"))):
+    iif (str_eq(ch, "1")):
         return 1
     end
-    if (str_eq(ch, "2"))):
+    iif (str_eq(ch, "2")):
         return 1
     end
-    if (str_eq(ch, "3"))):
+    iif (str_eq(ch, "3")):
         return 1
     end
-    if (str_eq(ch, "4"))):
+    iif (str_eq(ch, "4")):
         return 1
     end
-    if (str_eq(ch, "5"))):
+    iif (str_eq(ch, "5")):
         return 1
     end
-    if (str_eq(ch, "6"))):
+    iif (str_eq(ch, "6")):
         return 1
     end
-    if (str_eq(ch, "7"))):
+    iif (str_eq(ch, "7")):
         return 1
     end
-    if (str_eq(ch, "8"))):
+    iif (str_eq(ch, "8")):
         return 1
     end
-    if (str_eq(ch, "9"))):
+    iif (str_eq(ch, "9")):
         return 1
     end
     return 0
 end
 
 def is_ident_char(ch):
-    if (is_space(ch))):
+    iif (is_space(ch)):
         return 0
     end
-    if (str_eq(ch, "("))):
+    iif (str_eq(ch, "(")):
         return 0
     end
-    if (str_eq(ch, ")"))):
+    iif (str_eq(ch, ")")):
         return 0
     end
-    if (str_eq(ch, "["))):
+    iif (str_eq(ch, "[")):
         return 0
     end
-    if (str_eq(ch, "]"))):
+    iif (str_eq(ch, "]")):
         return 0
     end
-    if (str_eq(ch, ":"))):
+    iif (str_eq(ch, ":")):
         return 0
     end
-    if (str_eq(ch, ","))):
+    iif (str_eq(ch, ",")):
         return 0
     end
-    if (str_eq(ch, "+"))):
+    iif (str_eq(ch, "+")):
         return 0
     end
-    if (str_eq(ch, "-"))):
+    iif (str_eq(ch, "-")):
         return 0
     end
-    if (str_eq(ch, "*"))):
+    iif (str_eq(ch, "*")):
         return 0
     end
-    if (str_eq(ch, "/"))):
+    iif (str_eq(ch, "/")):
         return 0
     end
-    if (str_eq(ch, "%"))):
+    iif (str_eq(ch, "%")):
         return 0
     end
-    if (str_eq(ch, "="))):
+    iif (str_eq(ch, "=")):
         return 0
     end
-    if (str_eq(ch, "!"))):
+    iif (str_eq(ch, "!")):
         return 0
     end
-    if (str_eq(ch, "<"))):
+    iif (str_eq(ch, "<")):
         return 0
     end
-    if (str_eq(ch, ">"))):
+    iif (str_eq(ch, ">")):
         return 0
     end
-    if (str_eq(ch, "&"))):
+    iif (str_eq(ch, "&")):
         return 0
     end
-    if (str_eq(ch, "|"))):
+    iif (str_eq(ch, "|")):
         return 0
     end
-    if (str_eq(ch, "\""))):
+    iif (str_eq(ch, "\"")):
         return 0
     end
-    if (str_eq(ch, "#"))):
+    iif (str_eq(ch, "#")):
         return 0
     end
-    if (str_eq(ch, "'"))):
+    iif (str_eq(ch, "'")):
         return 0
     end
-    if (str_eq(ch, ";"))):
+    iif (str_eq(ch, ";")):
         return 0
     end
-    if (str_eq(ch, "."))):
+    iif (str_eq(ch, ".")):
         return 0
     end
     return 1
 end
 
 def is_ident_start(ch):
-    if (is_digit(ch))):
+    iif (is_digit(ch)):
         return 0
     end
     rvar _tmp = is_ident_char(ch)
@@ -699,7 +699,7 @@ end
 
 def sym_add_assign(s, l):
     var r = sym_resolve(s, l)
-    if (r >= 0)):
+    iif (r >= 0):
         return r
     end
     if (g_in_func == 1):
@@ -762,7 +762,7 @@ def emit_u16(v):
 end
 
 def code_pos():
-    if (g_in_func == 1)):
+    iif (g_in_func == 1):
         return g_fc
     end
     return g_mc
@@ -797,176 +797,176 @@ end
 
 # ---- 内置函数名检测 ----
 def is_builtin(nm):
-    if (str_eq(nm, "printf"))):
+    iif (str_eq(nm, "printf")):
         return 1
     end
-    if (str_eq(nm, "str_len"))):
+    iif (str_eq(nm, "str_len")):
         return 1
     end
-    if (str_eq(nm, "str_char_at"))):
+    iif (str_eq(nm, "str_char_at")):
         return 1
     end
-    if (str_eq(nm, "str_substring"))):
+    iif (str_eq(nm, "str_substring")):
         return 1
     end
-    if (str_eq(nm, "str_concat"))):
+    iif (str_eq(nm, "str_concat")):
         return 1
     end
-    if (str_eq(nm, "str_eq"))):
+    iif (str_eq(nm, "str_eq")):
         return 1
     end
-    if (str_eq(nm, "str_index_of"))):
+    iif (str_eq(nm, "str_index_of")):
         return 1
     end
-    if (str_eq(nm, "str_from_char"))):
+    iif (str_eq(nm, "str_from_char")):
         return 1
     end
-    if (str_eq(nm, "str_to_int"))):
+    iif (str_eq(nm, "str_to_int")):
         return 1
     end
-    if (str_eq(nm, "str_to_float"))):
+    iif (str_eq(nm, "str_to_float")):
         return 1
     end
-    if (str_eq(nm, "float_to_str"))):
+    iif (str_eq(nm, "float_to_str")):
         return 1
     end
-    if (str_eq(nm, "str_trim"))):
+    iif (str_eq(nm, "str_trim")):
         return 1
     end
-    if (str_eq(nm, "str_upper"))):
+    iif (str_eq(nm, "str_upper")):
         return 1
     end
-    if (str_eq(nm, "str_lower"))):
+    iif (str_eq(nm, "str_lower")):
         return 1
     end
-    if (str_eq(nm, "int_to_str"))):
+    iif (str_eq(nm, "int_to_str")):
         return 1
     end
-    if (str_eq(nm, "len"))):
+    iif (str_eq(nm, "len")):
         return 1
     end
-    if (str_eq(nm, "file_read"))):
+    iif (str_eq(nm, "file_read")):
         return 1
     end
-    if (str_eq(nm, "file_write_bytes"))):
+    iif (str_eq(nm, "file_write_bytes")):
         return 1
     end
-    if (str_eq(nm, "file_exists"))):
+    iif (str_eq(nm, "file_exists")):
         return 1
     end
-    if (str_eq(nm, "file_delete"))):
+    iif (str_eq(nm, "file_delete")):
         return 1
     end
-    if (str_eq(nm, "sort_int"))):
+    iif (str_eq(nm, "sort_int")):
         return 1
     end
-    if (str_eq(nm, "sort_str"))):
+    iif (str_eq(nm, "sort_str")):
         return 1
     end
-    if (str_eq(nm, "qdfs_get"))):
+    iif (str_eq(nm, "qdfs_get")):
         return 1
     end
-    if (str_eq(nm, "qdfs_set"))):
+    iif (str_eq(nm, "qdfs_set")):
         return 1
     end
-    if (str_eq(nm, "qdfs_del"))):
+    iif (str_eq(nm, "qdfs_del")):
         return 1
     end
     if (str_eq(nm, "qdfs_list")))
-    if (str_eq(nm, "file_list"))):
+    iif (str_eq(nm, "file_list")):
         return 1
     end
-    if (str_eq(nm, "mkdir"))):
+    iif (str_eq(nm, "mkdir")):
         return 1
     end
-    if (str_eq(nm, "rand_int"))):
+    iif (str_eq(nm, "rand_int")):
         return 1
     end
-    if (str_eq(nm, "exec"))):
+    iif (str_eq(nm, "exec")):
         return 1
     end
-    if (str_eq(nm, "ord"))):
+    iif (str_eq(nm, "ord")):
         return 1
     end
-    if (str_eq(nm, "chr"))):
+    iif (str_eq(nm, "chr")):
         return 1
     end
-    if (str_eq(nm, "tcp_listen"))):
+    iif (str_eq(nm, "tcp_listen")):
         return 1
     end
-    if (str_eq(nm, "tcp_accept"))):
+    iif (str_eq(nm, "tcp_accept")):
         return 1
     end
-    if (str_eq(nm, "tcp_recv"))):
+    iif (str_eq(nm, "tcp_recv")):
         return 1
     end
-    if (str_eq(nm, "tcp_send"))):
+    iif (str_eq(nm, "tcp_send")):
         return 1
     end
-    if (str_eq(nm, "tcp_close"))):
+    iif (str_eq(nm, "tcp_close")):
         return 1
     end
-    if (str_eq(nm, "tcp_shutdown"))):
+    iif (str_eq(nm, "tcp_shutdown")):
         return 1
     end
-    if (str_eq(nm, "qreg_create"))):
+    iif (str_eq(nm, "qreg_create")):
         return 1
     end
-    if (str_eq(nm, "qreg_free"))):
+    iif (str_eq(nm, "qreg_free")):
         return 1
     end
-    if (str_eq(nm, "apply_h"))):
+    iif (str_eq(nm, "apply_h")):
         return 1
     end
-    if (str_eq(nm, "apply_t"))):
+    iif (str_eq(nm, "apply_t")):
         return 1
     end
-    if (str_eq(nm, "apply_cx"))):
+    iif (str_eq(nm, "apply_cx")):
         return 1
     end
-    if (str_eq(nm, "apply_x"))):
+    iif (str_eq(nm, "apply_x")):
         return 1
     end
-    if (str_eq(nm, "apply_z"))):
+    iif (str_eq(nm, "apply_z")):
         return 1
     end
-    if (str_eq(nm, "apply_cz"))):
+    iif (str_eq(nm, "apply_cz")):
         return 1
     end
-    if (str_eq(nm, "apply_ccx"))):
+    iif (str_eq(nm, "apply_ccx")):
         return 1
     end
-    if (str_eq(nm, "apply_ccz"))):
+    iif (str_eq(nm, "apply_ccz")):
         return 1
     end
-    if (str_eq(nm, "apply_cccz"))):
+    iif (str_eq(nm, "apply_cccz")):
         return 1
     end
-    if (str_eq(nm, "apply_ccccz"))):
+    iif (str_eq(nm, "apply_ccccz")):
         return 1
     end
-    if (str_eq(nm, "apply_phase"))):
+    iif (str_eq(nm, "apply_phase")):
         return 1
     end
-    if (str_eq(nm, "apply_iphase"))):
+    iif (str_eq(nm, "apply_iphase")):
         return 1
     end
-    if (str_eq(nm, "apply_cphase"))):
+    iif (str_eq(nm, "apply_cphase")):
         return 1
     end
-    if (str_eq(nm, "apply_icphase"))):
+    iif (str_eq(nm, "apply_icphase")):
         return 1
     end
-    if (str_eq(nm, "apply_ry"))):
+    iif (str_eq(nm, "apply_ry")):
         return 1
     end
-    if (str_eq(nm, "apply_swap"))):
+    iif (str_eq(nm, "apply_swap")):
         return 1
     end
-    if (str_eq(nm, "measure"))):
+    iif (str_eq(nm, "measure")):
         return 1
     end
-    if (str_eq(nm, "str_from_pool"))):
+    iif (str_eq(nm, "str_from_pool")):
         return 1
     end
     return 0
@@ -1324,7 +1324,7 @@ def parse_statement():
                 var ident_ns = g_tok_start[g_parse_pos]
                 var ident_nl = g_tok_len[g_parse_pos]
                 var ident_nm = str_substring(g_src, ident_ns, ident_nl)
-                if (str_eq(ident_nm, "h") or str_eq(ident_nm, "t") or str_eq(ident_nm, "x") or str_eq(ident_nm, "z")) and peek_type() != T_ASSIGN):
+                if ((str_eq(ident_nm, "h") or str_eq(ident_nm, "t") or str_eq(ident_nm, "x") or str_eq(ident_nm, "z")) and peek_type() != T_ASSIGN):
                     parse_quantum_gate_1arg(ident_ns, ident_nl)
                 else:
                     if (str_eq(ident_nm, "cx") or str_eq(ident_nm, "cz")):
@@ -1572,21 +1572,9 @@ def parse_quantum_cccz(ns, nl):
             advance()
         end
         expect(T_RBRACKET, "cccz缺]")
-if (i == 0):
-    c2_ns = r_ns
-    c2_nl = r_nl
-    c2_idx = r_idx
-end
-if (i == 1):
-    c3_ns = r_ns
-    c3_nl = r_nl
-    c3_idx = r_idx
-end
-if (i == 2):
-    t_ns = r_ns
-    t_nl = r_nl
-    t_idx = r_idx
-end
+        if (i == 0): c2_ns = r_ns; c2_nl = r_nl; c2_idx = r_idx end
+        if (i == 1): c3_ns = r_ns; c3_nl = r_nl; c3_idx = r_idx end
+        if (i == 2): t_ns = r_ns; t_nl = r_nl; t_idx = r_idx end
         i = i + 1
     end
     emit_byte(OP_LOAD_VAR)
@@ -1631,26 +1619,10 @@ def parse_quantum_ccccz(ns, nl):
             advance()
         end
         expect(T_RBRACKET, "ccccz缺]")
-if (i == 0):
-    c2_ns = r_ns
-    c2_nl = r_nl
-    c2_idx = r_idx
-end
-if (i == 1):
-    c3_ns = r_ns
-    c3_nl = r_nl
-    c3_idx = r_idx
-end
-if (i == 2):
-    c4_ns = r_ns
-    c4_nl = r_nl
-    c4_idx = r_idx
-end
-if (i == 3):
-    t_ns = r_ns
-    t_nl = r_nl
-    t_idx = r_idx
-end
+        if (i == 0): c2_ns = r_ns; c2_nl = r_nl; c2_idx = r_idx end
+        if (i == 1): c3_ns = r_ns; c3_nl = r_nl; c3_idx = r_idx end
+        if (i == 2): c4_ns = r_ns; c4_nl = r_nl; c4_idx = r_idx end
+        if (i == 3): t_ns = r_ns; t_nl = r_nl; t_idx = r_idx end
         i = i + 1
     end
     emit_byte(OP_LOAD_VAR)
@@ -1849,7 +1821,7 @@ def parse_var_decl():
         var gate_nl = g_tok_len[g_parse_pos]
         var gate_nm = str_substring(g_src, gate_ns, gate_nl)
         # 门赋值必须形如 `门名 寄存器名 [`, 两token前瞻防误判(如 var sum = t)
-        if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")) and peek_type() == T_IDENT and peek_type2() == T_LBRACKET):
+        if ((str_eq(gate_nm, "h") or str_eq(gate_nm, "t") or str_eq(gate_nm, "cx") or str_eq(gate_nm, "measure")) and peek_type() == T_IDENT and peek_type2() == T_LBRACKET):
             advance()  # consume gate name
             # 发射量子门代码（不POP，让结果留在栈上供STORE_VAR）
             if (str_eq(gate_nm, "h") or str_eq(gate_nm, "t")):
