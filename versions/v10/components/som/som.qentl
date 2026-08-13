@@ -1,0 +1,98 @@
+# ================================================================
+# lib/som.qentl — SOM经济模型
+# 纯QEntL实现，支持量子经济往来
+# ================================================================
+
+# 经济状态
+var g_balance = 0
+var g_transaction_count = 0
+var g_credit_score = 100
+
+# 初始化SOM
+def som_init():
+    g_balance = 0
+    g_transaction_count = 0
+    g_credit_score = 100
+    return 1
+end
+
+# 存款
+def som_deposit(amount):
+    if (amount > 0):
+        g_balance = g_balance + amount
+        g_transaction_count = g_transaction_count + 1
+        printf("SOM: 存款 %d, 余额: %d\n", amount, g_balance)
+        return 1
+    end
+    return 0
+end
+
+# 取款
+def som_withdraw(amount):
+    if (amount > 0 and g_balance >= amount):
+        g_balance = g_balance - amount
+        g_transaction_count = g_transaction_count + 1
+        printf("SOM: 取款 %d, 余额: %d\n", amount, g_balance)
+        return 1
+    end
+    return 0
+end
+
+# 转账
+def som_transfer(to_user, amount):
+    if (amount > 0 and g_balance >= amount):
+        g_balance = g_balance - amount
+        g_transaction_count = g_transaction_count + 1
+        printf("SOM: 转账 %d 给 %s, 余额: %d\n", amount, to_user, g_balance)
+        return 1
+    end
+    return 0
+end
+
+# 获取余额
+def som_balance():
+    return g_balance
+end
+
+# 获取交易数
+def som_transaction_count():
+    return g_transaction_count
+end
+
+# 信用评估
+def som_credit_check():
+    if (g_balance >= 1000):
+        g_credit_score = 100
+    else:
+        if (g_balance >= 500):
+            g_credit_score = 80
+        else:
+            if (g_balance >= 100):
+                g_credit_score = 60
+            else:
+                g_credit_score = 40
+            end
+        end
+    end
+    return g_credit_score
+end
+
+# 经济报告
+def som_report():
+    printf("SOM经济报告 v9\n")
+    printf("余额: %d\n", g_balance)
+    printf("交易数: %d\n", g_transaction_count)
+    printf("信用分: %d\n", g_credit_score)
+    return 0
+end
+
+# 主入口
+def som_main():
+    som_init()
+    som_deposit(1000)
+    som_deposit(500)
+    som_withdraw(200)
+    som_transfer("Alice", 100)
+    som_credit_check()
+    return som_report()
+end
