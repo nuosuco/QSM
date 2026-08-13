@@ -137,7 +137,9 @@ var g_loop_depth = 0
 
 # ---- 辅助 ----
 def sub_eq(a, as, al, b, bs, bl):
-    if (al != bl): return 0 end
+    if (al != bl):
+        return 0
+    end
     var x = str_substring(a, as, al)
     var y = str_substring(b, bs, bl)
     return str_eq(x, y)
@@ -234,7 +236,9 @@ def peek_type2():
 end
 
 def expect(tt, msg):
-    if (g_abort == 1): return end
+    if (g_abort == 1):
+        return end
+    end
     if (cur_type() != tt):
         printf("qcl: 语法错误: %s (tok %d)\n", msg, g_parse_pos)
         g_errors = g_errors + 1
@@ -616,7 +620,9 @@ end
 
 def sym_add_assign(s, l):
     var r = sym_resolve(s, l)
-    if (r >= 0): return r end
+    if (r >= 0):
+        return r
+    end
     if (g_in_func == 1):
         return sym_add_local(s, l)
     end
@@ -675,7 +681,9 @@ def emit_u16(v):
 end
 
 def code_pos():
-    if (g_in_func == 1): return g_fc end
+    if (g_in_func == 1):
+        return g_fc
+    end
     return g_mc
 end
 
