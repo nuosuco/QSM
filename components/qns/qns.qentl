@@ -1434,3 +1434,35 @@ def qns_quantum_teleport(data):
         return 0
     end
 end
+
+# ---- QNS智力：系统自检（检查所有组件健康状态） ----
+def qns_self_check():
+    printf("\n=== QNS 系统自检 ===\n")
+    
+    var total = 8
+    var passed = 0
+    
+    printf("【组件完整性检查】\n")
+    if (file_exists("components/qcl/qcl.qentl")): passed = passed + 1; printf("  ✓ QCL\n") else: printf("  ✗ QCL (缺失)\n") end
+    if (file_exists("components/qvm/qvm.qentl")): passed = passed + 1; printf("  ✓ QVM\n") else: printf("  ✗ QVM (缺失)\n") end
+    if (file_exists("components/qdfs/qdfs.qentl")): passed = passed + 1; printf("  ✓ QDFS\n") else: printf("  ✗ QDFS (缺失)\n") end
+    if (file_exists("components/qns/qns.qentl")): passed = passed + 1; printf("  ✓ QNS\n") else: printf("  ✗ QNS (缺失)\n") end
+    if (file_exists("components/qsm/qsm.qentl")): passed = passed + 1; printf("  ✓ QSM\n") else: printf("  ✗ QSM (缺失)\n") end
+    if (file_exists("components/som/som.qentl")): passed = passed + 1; printf("  ✓ SOM\n") else: printf("  ✗ SOM (缺失)\n") end
+    if (file_exists("components/weq/weq.qentl")): passed = passed + 1; printf("  ✓ WeQ\n") else: printf("  ✗ WeQ (缺失)\n") end
+    if (file_exists("components/ref/ref.qentl")): passed = passed + 1; printf("  ✓ Ref\n") else: printf("  ✗ Ref (缺失)\n") end
+    
+    printf("\n【健康度评估】\n")
+    printf("  检查项: %d\n", total)
+    printf("  通过: %d\n", passed)
+    printf("  失败: %d\n", total - passed)
+    printf("  健康度: %d%%\n", passed * 100 / total)
+    
+    if (passed == total):
+        printf("  结论: ✅ 系统健康\n")
+        return 1
+    else:
+        printf("  结论: ⚠️ 系统需要修复\n")
+        return 0
+    end
+end
