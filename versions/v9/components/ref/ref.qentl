@@ -1,0 +1,57 @@
+# Ref自反省模型 v4
+# 支持自我检查与修复
+
+def ref_init():
+    return 1
+end
+
+def ref_check_qcl():
+    if (file_exists("components/qcl/qcl.qentl")):
+        return 1
+    end
+    return 0
+end
+
+def ref_check_qvm():
+    if (file_exists("components/qvm/qvm.qentl")):
+        return 1
+    end
+    return 0
+end
+
+def ref_check_qdfs():
+    if (file_exists("components/qdfs/qdfs.qentl")):
+        return 1
+    end
+    return 0
+end
+
+def ref_check_qns():
+    if (file_exists("components/qns/qns.qentl")):
+        return 1
+    end
+    return 0
+end
+
+def ref_report():
+    var ok = 0
+    if (ref_check_qcl() == 1):
+        ok = ok + 1
+    end
+    if (ref_check_qvm() == 1):
+        ok = ok + 1
+    end
+    if (ref_check_qdfs() == 1):
+        ok = ok + 1
+    end
+    if (ref_check_qns() == 1):
+        ok = ok + 1
+    end
+    printf("Ref自检: %d/4 通过\n", ok)
+    return ok
+end
+
+def ref_main():
+    ref_init()
+    return ref_report()
+end
