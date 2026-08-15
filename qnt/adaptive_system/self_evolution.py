@@ -2,8 +2,7 @@
 自进化交易系统 - 整合版
 - 实时数据收集
 - 自动模式发现
-- 模拟盘交易总结
-- 实盘交易总结
+- 三个引擎交易总结（回测、模拟盘、实盘）
 - 阶段性策略升级
 - 自适应风控调整
 """
@@ -22,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('SelfEvolutionSystem')
 
 class SelfEvolutionTradingSystem:
-    """自进化交易系统 - 全链路自动学习"""
+    """自进化交易系统 - 全链路自动学习三个引擎的数据"""
     
     def __init__(self, config: SystemConfig = None):
         self.config = config or SystemConfig()
@@ -51,6 +50,7 @@ class SelfEvolutionTradingSystem:
         self.thread.start()
         logger.info("=" * 60)
         logger.info("🧬 自进化交易系统启动")
+        logger.info("   分析目标: 回测引擎 + 模拟盘引擎 + 实盘引擎")
         logger.info("=" * 60)
         logger.info(f"   监控币种: {len(self.config.data.symbols)} 个")
         logger.info(f"   数据收集: 每{self.config.data.update_interval}秒")
@@ -99,15 +99,17 @@ class SelfEvolutionTradingSystem:
                 time.sleep(5)
     
     def _analyze_and_adapt(self):
-        """分析和自适应调整"""
-        logger.info("📊 开始全链路分析...")
+        """分析和自适应调整 - 分析三个引擎的数据"""
+        logger.info("📊 开始三引擎数据分析...")
         
         # 1. 发现新模式
         new_patterns = self.detector.analyze_all()
         
-        # 2. 分析交易总结（模拟盘+实盘）
-        sim_analysis = self.analyzer.analyze_simulated_trades(24)
-        live_analysis = self.analyzer.analyze_live_trades(24)
+        # 2. 分析三个引擎的交易数据
+        all_analysis = self.analyzer.analyze_all_modes()
+        backtest = all_analysis['backtest']
+        paper = all_analysis['paper']
+        live = all_analysis['live']
         
         # 3. 分析市场状态
         risk_status = self.risk_manager.get_current_risk_status()
@@ -119,17 +121,26 @@ class SelfEvolutionTradingSystem:
         self._apply_risk_adjustments(risk_status)
         
         # 6. 打印状态
-        self._log_status(sim_analysis, live_analysis, risk_status)
+        self._log_status(all_analysis, risk_status)
     
     def _check_upgrade(self):
         """检查是否需要升级"""
-        logger.info("🔄 检查阶段升级...")
+        logger.info("🔄 检查三引擎升级条件...")
         
         recommendation = self.upgrade_manager.get_upgrade_recommendation()
         
         logger.info(f"   当前阶段: {recommendation['phase']}")
         logger.info(f"   下一步: {recommendation['next_action']}")
         logger.info(f"   消息: {recommendation['message']}")
+        
+        # 打印详细数据
+        details = recommendation.get('details', {})
+        if details:
+            logger.info(f"   数据点: {details.get('data_points', 0)}")
+            logger.info(f"   模拟盘交易: {details.get('paper_trades', 0)}")
+            logger.info(f"   实盘交易: {details.get('live_trades', 0)}")
+            logger.info(f"   模拟盘胜率: {details.get('paper_win_rate', 0)*100:.1f}%")
+            logger.info(f"   实盘胜率: {details.get('live_win_rate', 0)*100:.1f}%")
         
         # 如果建议升级，执行升级
         if recommendation['phase'] == 'complete':
@@ -152,7 +163,7 @@ class SelfEvolutionTradingSystem:
         
         # 3. 记录升级事件
         logger.info(f"   ✅ 升级完成")
-        logger.info(f"   📸 快照已保存")
+        logger.info(f"   📸 快照已保存: {len(snapshot)} 条策略参数")
     
     def _load_best_strategy(self):
         """加载最优策略"""
@@ -182,16 +193,34 @@ class SelfEvolutionTradingSystem:
             logger.info(f"   风控调整: 仓位={adjustments.get('position_size', 1.0)}x "
                        f"止损={adjustments.get('stop_loss_pct', 2.0)}%")
     
-    def _log_status(self, sim_analysis, live_analysis, risk_status):
+    def _log_status(self, all_analysis, risk_status):
         """打印当前状态"""
+        backtest = all_analysis['backtest']
+        paper = all_analysis['paper']
+        live = all_analysis['live']
+        
         logger.info("=" * 60)
-        logger.info("📈 自进化系统状态")
+        logger.info("📈 三引擎自进化系统状态")
         logger.info("=" * 60)
         logger.info(f"   当前策略: {self.current_strategy}")
         logger.info(f"   数据收集: {self.collector.total_ticks} ticks")
-        logger.info(f"   模拟盘分析: {sim_analysis.get('total_trades', 0)} trades, "
-                   f"胜率{sim_analysis.get('win_rate', 0)*100:.1f}%")
-        logger.info(f"   实盘分析: {live_analysis.get('total_trades', 0)} trades")
+        logger.info("")
+        logger.info("   📊 回测引擎:")
+        logger.info(f"      交易数: {backtest.get('total_trades', 0)}")
+        logger.info(f"      胜率: {backtest.get('win_rate', 0)*100:.1f}%")
+        logger.info(f"      平均利润: ${backtest.get('avg_profit', 0):.4f}")
+        logger.info("")
+        logger.info("   📊 模拟盘引擎:")
+        logger.info(f"      交易数: {paper.get('total_trades', 0)}")
+        logger.info(f"      胜率: {paper.get('win_rate', 0)*100:.1f}%")
+        logger.info(f"      最佳币种: {paper.get('best_symbol', 'N/A')}")
+        logger.info(f"      最佳利润: ${paper.get('best_symbol_profit', 0):.4f}")
+        logger.info("")
+        logger.info("   📊 实盘引擎:")
+        logger.info(f"      交易数: {live.get('total_trades', 0)}")
+        logger.info(f"      滑点: {live.get('avg_slippage', 0)*100:.3f}%")
+        logger.info(f"      执行质量: {live.get('execution_quality', 'N/A')}")
+        logger.info("")
         logger.info(f"   市场状态: {risk_status['market_regime']['regime']}")
         logger.info(f"   策略权重:")
         for name, params in self.config.strategy.strategies.items():
@@ -201,8 +230,7 @@ class SelfEvolutionTradingSystem:
     
     def get_status(self) -> Dict:
         """获取系统状态"""
-        sim_analysis = self.analyzer.analyze_simulated_trades(24)
-        live_analysis = self.analyzer.analyze_live_trades(24)
+        all_analysis = self.analyzer.analyze_all_modes()
         risk_status = self.risk_manager.get_current_risk_status()
         upgrade_rec = self.upgrade_manager.get_upgrade_recommendation()
         
@@ -210,8 +238,9 @@ class SelfEvolutionTradingSystem:
             'running': self.running,
             'current_strategy': self.current_strategy,
             'total_ticks': self.collector.total_ticks,
-            'sim_trades': sim_analysis.get('total_trades', 0),
-            'live_trades': live_analysis.get('total_trades', 0),
+            'backtest_trades': all_analysis['backtest'].get('total_trades', 0),
+            'paper_trades': all_analysis['paper'].get('total_trades', 0),
+            'live_trades': all_analysis['live'].get('total_trades', 0),
             'market_regime': risk_status['market_regime']['regime'],
             'upgrade_phase': upgrade_rec['phase'],
             'upgrade_next': upgrade_rec['next_action']

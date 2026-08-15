@@ -70,6 +70,11 @@ class BacktestConfig:
 
 
 @dataclass
+class DataConfig:
+    """数据配置"""
+    db_path: str = "/root/SOM/data/trading_system/adaptive.db"
+
+@dataclass
 class SystemConfig:
     """系统总配置 - v2多交易所版"""
     exchanges: Dict[str, ExchangeConfig] = field(default_factory=lambda: {
@@ -84,6 +89,7 @@ class SystemConfig:
     risk: RiskConfig = field(default_factory=RiskConfig)
     capital: CapitalConfig = field(default_factory=CapitalConfig)
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
+    data: DataConfig = field(default_factory=DataConfig)
     symbols: List[str] = field(default_factory=lambda: [
         "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"
     ])
