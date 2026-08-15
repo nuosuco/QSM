@@ -42,8 +42,47 @@ class TradingEngine:
         
         if mode == "live":
             self._run_live()
+        elif mode == "paper":
+            self._run_paper()
+        elif mode == "scan":
+            self._run_scan_once()
         elif mode == "backtest":
             self._run_backtest()
+    
+    def _run_paper(self):
+        """模拟盘模式 - 用真实实时数据，但不实际下单"""
+        print(f"📊 模拟盘模式 - 监控交易对: {', '.join(self.config.symbols)}")
+        print(f"  本金: {self.config.capital.initial_capital} USDT")
+        print(f"  模式: 真实实时数据扫描 + 模拟下单")
+        print()
+        
+        while self.running:
+            try:
+                current_time = time.time()
+                if current_time - self.last_scan_time < 5:
+                    time.sleep(1)
+                    continue
+                self.last_scan_time = current_time
+                
+                for exchange_name, adapter in self.exchanges.items():
+                    for symbol in self.config.symbols:
+                        self._scan_symbol(exchange_name, adapter, symbol)
+                self._check_risk()
+            except KeyboardInterrupt:
+                print("\n🛑 用户中断")
+                break
+            except Exception as e:
+                print(f"⚠️ 运行时错误: {e}")
+                time.sleep(5)
+        self.stop()
+    
+    def _run_scan_once(self):
+        """单次扫描 - 检测当前是否有乌龙指机会"""
+        print(f"📡 单次扫描 - 检测当前市场")
+        for exchange_name, adapter in self.exchanges.items():
+            for symbol in self.config.symbols:
+                self._scan_symbol(exchange_name, adapter, symbol)
+        print(f"\n✅ 扫描完成，发现 {self.trade_count} 个信号")
     
     def _run_live(self):
         """实盘运行"""
@@ -130,8 +169,9 @@ class TradingEngine:
             max_position = self.capital_manager.get_position_size()
             position_size = min(signal.depth_available * 0.1, max_position)
             
-            if position_size < 10:  # 最小10 USDT
-                print(f"⚠️ 仓位太小: {position_size} USDT")
+            min_position = 5.0 if self.config.exchanges.get(signal.exchange, {}).testnet else 5.0
+            if position_size < min_position:
+                print(f"⚠️ 仓位太小({position_size:.2f} USDT < {min_position} U)跳过")
                 return
             
             # 永续开多
