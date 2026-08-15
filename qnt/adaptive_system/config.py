@@ -22,8 +22,8 @@ class DataCollectionConfig:
 @dataclass
 class PatternConfig:
     """模式识别配置"""
-    # 价差异常阈值
-    spread_threshold: float = 0.5  # 0.5%
+    # 价差异常阈值（统一为2%，与原系统一致）
+    spread_threshold: float = 2.0  # 2% - 捡乌龙指标准
     # 深度异常阈值
     depth_imbalance_ratio: float = 3.0  # 买卖深度比
     # Z-Score异常检测
