@@ -21,40 +21,45 @@ class ExchangeConfig:
 
 @dataclass
 class DetectionConfig:
-    """乌龙指检测参数"""
-    price_deviation_pct: float = 2.0  # 价格偏离中间价百分比阈值
-    zscore_threshold: float = 3.0  # Z-Score异常阈值
-    mad_threshold: float = 3.5  # MAD异常阈值
-    stat_window_size: int = 200  # 统计窗口大小(tick数)
-    min_depth_btc: float = 0.01  # 最小深度(BTC)
-    min_depth_usdt: float = 100.0  # 最小深度(USDT对)
-    cross_exchange_spread_pct: float = 0.8  # 跨所价差阈值
-    cross_exchange_min_profit_pct: float = 0.3  # 跨所最低净利润率
-    cooldown_seconds: float = 5.0  # 同一交易对冷却期(秒)
-    max_signals_per_minute: int = 10  # 每分钟最大信号数
-    min_signal_strength: float = 0.5  # 最低信号强度
+    """检测参数 - v3做市策略"""
+    # 价差阈值
+    spread_threshold_pct: float = 0.12  # 价差超过此值才交易（成本线0.12%）
+    min_profit_threshold_pct: float = 0.02  # 最小净利润阈值（留安全边际）
+    
+    # 做市策略参数
+    post_only_enabled: bool = True  # 强制Post-Only
+    immediate_cancel: bool = True  # 立即成交则取消
+    
+    # 原有参数保留
+    price_deviation_pct: float = 2.0
+    zscore_threshold: float = 3.0
+    mad_threshold: float = 3.5
+    stat_window_size: int = 200
+    min_depth_btc: float = 0.01
+    min_depth_usdt: float = 100.0
+    cooldown_seconds: float = 1.0  # 做市策略冷却时间更短
+    max_signals_per_minute: int = 60  # 做市策略更高频率
 
 
 @dataclass
 class RiskConfig:
-    """风控参数 - 碧树西风标准"""
-    max_loss_per_trade_pct: float = 2.0  # 单笔最大亏损占总资金%
-    max_daily_loss_pct: float = 5.0  # 单日最大亏损占总资金%
-    max_drawdown_pct: float = 10.0  # 最大回撤%
-    max_consecutive_losses: int = 5  # 最大连续亏损次数
-    circuit_breaker_loss_pct: float = 8.0  # 熔断触发亏损%
-    cooldown_after_losses_minutes: int = 30  # 连续亏损后冷却(分钟)
-    max_single_exchange_exposure_pct: float = 40.0  # 单交易所最大敞口%
+    """风控参数 - 做市策略版"""
+    max_loss_per_trade_pct: float = 0.5  # 单笔最大亏损（做市风险低）
+    max_daily_loss_pct: float = 3.0  # 单日最大亏损
+    max_drawdown_pct: float = 10.0
+    max_consecutive_losses: int = 10  # 做市策略可承受更多连续亏损
+    circuit_breaker_loss_pct: float = 5.0
+    cooldown_after_losses_minutes: int = 10
 
 
 @dataclass
 class CapitalConfig:
-    """资金管理参数 - 碧树西风标准"""
-    initial_capital: float = 10000.0  # 初始资金(USDT)
-    withdraw_after_double: bool = True  # 本金翻倍后提取原始投入
-    profit_tier_pct: float = 50.0  # 利润分级提取阈值%
-    profit_tier_withdraw_pct: float = 20.0  # 分级提取比例%
-    max_position_pct: float = 10.0  # 单笔最大仓位占总资金%
+    """资金管理参数 - 做市策略版"""
+    initial_capital: float = 100.0  # 做市策略本金较小
+    withdraw_after_double: bool = True
+    profit_tier_pct: float = 50.0
+    profit_tier_withdraw_pct: float = 20.0
+    max_position_pct: float = 20.0  # 做市策略仓位可稍大
 
 
 @dataclass
