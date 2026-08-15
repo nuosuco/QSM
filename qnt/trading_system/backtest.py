@@ -109,9 +109,10 @@ class BacktestEngine:
         actual_buy = buy_price * (1 + slippage)
         actual_sell = sell_price * (1 - slippage)
         
-        # 仓位大小（用10%资金）
-        position_pct = 0.1
-        cost = self.equity * position_pct
+        # 仓位大小（固定金额，不全仓复投）
+        # 碧树西风标准：单笔最大仓位不超过总资金10%
+        max_position = self.config.initial_capital * 0.1  # 固定1000 USDT
+        cost = min(max_position, signal.depth_available * 0.5)  # 取较小值
         amount = cost / actual_buy
         buy_fee = cost * fee_rate
         sell_amount = amount * actual_sell
@@ -135,9 +136,15 @@ class BacktestEngine:
             pnl=net_profit
         )
         
-        # 更新权益
+        # 更新权益（本金翻倍后只取出原始投入）
         self.equity += net_profit
         self.peak_equity = max(self.peak_equity, self.equity)
+        
+        # 碧树西风资金管理：本金翻倍后取出原始投入
+        if self.equity >= self.config.initial_capital * 2:
+            withdraw = self.config.initial_capital
+            self.equity -= withdraw
+            print(f"💰 利润提取: ${withdraw:,.2f} (本金已翻倍)")
         
         # 更新连续亏损计数
         if net_profit < 0:

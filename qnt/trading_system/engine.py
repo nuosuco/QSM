@@ -25,7 +25,7 @@ class TradingEngine:
         self.capital_manager = CapitalManager(config.capital.initial_capital)
         
         # 初始化交易所适配器
-        self.exchanges: Dict[str, ExchangeAdapter] = {}
+        self.exchanges: dict = {}
         for name, ex_config in config.exchanges.items():
             adapter = ExchangeAdapter(ex_config)
             if adapter.exchange:
@@ -60,9 +60,10 @@ class TradingEngine:
                 
                 self.last_scan_time = current_time
                 
-                # 扫描每个交易对
-                for symbol in self.config.symbols:
-                    self._scan_symbol(symbol)
+                # 扫描每个交易所的每个交易对
+                for exchange_name, adapter in self.exchanges.items():
+                    for symbol in self.config.symbols:
+                        self._scan_symbol(exchange_name, adapter, symbol)
                 
                 # 检查风控
                 self._check_risk()
@@ -76,20 +77,17 @@ class TradingEngine:
         
         self.stop()
     
-    def _scan_symbol(self, symbol: str):
+    def _scan_symbol(self, exchange_name: str, adapter: ExchangeAdapter, symbol: str):
         """扫描单个交易对"""
-        # 获取现货和永续合约
-        spot_symbol = f"{symbol.replace('/USDT', '')}/USDT"
-        perp_symbol = f"{symbol.replace('/', '/USDT:')} (永续)"
-        
+        spot_symbol = symbol  # BTC/USDT等
         try:
-            ob = self.exchanges['bitget'].fetch_orderbook(spot_symbol)
+            ob = adapter.fetch_orderbook(spot_symbol)
             if not ob:
                 return
             
             # 检测信号
             signals = self.detector.detect_single_exchange(
-                'bitget', symbol, ob, []
+                exchange_name, symbol, ob, []
             )
             
             for signal in signals:
@@ -115,11 +113,16 @@ class TradingEngine:
     
     def _execute_trade(self, signal: FatFingerSignal):
         """执行交易 - 永续开多 + 现货卖单对冲"""
-        print(f"🎯 执行交易: {signal.symbol} 偏离{signal.deviation_pct:.2f}%")
+        print(f"🎯 执行交易: {signal.symbol} ({signal.exchange}) 偏离{signal.deviation_pct:.2f}%")
         
         try:
+            adapter = self.exchanges.get(signal.exchange)
+            if not adapter:
+                print(f"❌ 找不到交易所适配器: {signal.exchange}")
+                return
+            
             # 获取当前价格
-            ticker = self.exchanges['bitget'].fetch_ticker(signal.symbol.replace(':', ''))
+            ticker = adapter.fetch_ticker(signal.symbol.replace('/USDT', '/USDT'))
             if not ticker:
                 return
             
@@ -133,12 +136,12 @@ class TradingEngine:
             
             # 永续开多
             perp_symbol = f"{signal.symbol.split('/')[0]}/USDT:USDT"
-            self.exchanges['bitget'].create_post_only_order(
+            adapter.create_post_only_order(
                 perp_symbol, OrderSide.BUY, position_size, signal.price * 0.99
             )
             
             # 现货卖单
-            self.exchanges['bitget'].create_post_only_order(
+            adapter.create_post_only_order(
                 signal.symbol, OrderSide.SELL, position_size / signal.price, signal.price
             )
             
@@ -167,4 +170,5 @@ class TradingEngine:
             "trades": self.trade_count,
             "risk": self.risk_manager.get_status(),
             "capital": self.capital_manager.get_status(),
+            "exchanges": list(self.exchanges.keys()),
         }

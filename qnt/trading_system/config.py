@@ -71,32 +71,39 @@ class BacktestConfig:
 
 @dataclass
 class SystemConfig:
-    """系统总配置 - Bitget单平台版"""
+    """系统总配置 - v2多交易所版"""
     exchanges: Dict[str, ExchangeConfig] = field(default_factory=lambda: {
-        "bitget": ExchangeConfig(
-            name="bitget",
-            api_key="",  # 从环境变量读取
-            api_secret="",  # 从环境变量读取
-            passphrase="qntsomtop",  # 默认passphrase
-            testnet=True,  # 先用模拟盘！
-            fees_taker=0.0006,  # Bitget taker费率0.06%
-            fees_maker=0.0004,  # Bitget maker费率0.04%
-        ),
+        "bitget": ExchangeConfig(name="bitget", fees_taker=0.0006, fees_maker=0.0004, passphrase=""),
+        "binance": ExchangeConfig(name="binance", fees_taker=0.001, fees_maker=0.0008),
+        "okx": ExchangeConfig(name="okx", fees_taker=0.0008, fees_maker=0.0006, passphrase=""),
+        "bybit": ExchangeConfig(name="bybit", fees_taker=0.001, fees_maker=0.0007),
+        "htx": ExchangeConfig(name="htx", fees_taker=0.002, fees_maker=0.0015),
+        "gate": ExchangeConfig(name="gate", fees_taker=0.0015, fees_maker=0.001),
     })
     detection: DetectionConfig = field(default_factory=DetectionConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     capital: CapitalConfig = field(default_factory=CapitalConfig)
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
     symbols: List[str] = field(default_factory=lambda: [
-        "BTC/USDT", "ETH/USDT", "SOL/USDT"
+        "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"
     ])
     log_level: str = "INFO"
 
     def load_api_keys(self):
-        """从环境变量加载API密钥"""
+        """从环境变量或~/.qnt_env文件加载API密钥"""
         import os
+        # 如果环境变量没设置，从文件读取
+        if not os.getenv('BITGET_API_KEY'):
+            env_file = os.path.expanduser('~/.qnt_env')
+            if os.path.exists(env_file):
+                with open(env_file) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and '=' in line and not line.startswith('#'):
+                            k, v = line.split('=', 1)
+                            os.environ[k] = v
         for exchange in self.exchanges.values():
-            if exchange.name == "bitget":
-                exchange.api_key = os.getenv('BITGET_API_KEY', '')
-                exchange.api_secret = os.getenv('BITGET_API_SECRET', '')
-                exchange.passphrase = os.getenv('BITGET_API_PASSPHRASE', 'qntsomtop')
+            exchange.api_key = os.getenv(f'{exchange.name.upper()}_API_KEY', exchange.api_key)
+            exchange.api_secret = os.getenv(f'{exchange.name.upper()}_API_SECRET', exchange.api_secret)
+            if exchange.passphrase:
+                exchange.passphrase = os.getenv(f'{exchange.name.upper()}_API_PASSPHRASE', exchange.passphrase)
