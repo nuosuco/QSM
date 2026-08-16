@@ -23,9 +23,9 @@ class DataCollectionConfig:
 class PatternConfig:
     """模式识别配置"""
     # 价差成本线（做市策略成本线约0.12%）
-    spread_threshold: float = 0.08  # 0.12% - 做市成本线
-    # 做市可盈利阈值（价差 > 成本线 + 0.02% margin）
-    profitable_spread: float = 0.10  # 0.14% - 保守做市阈值
+    spread_threshold: float = 0.12  # 0.12% - 成本线（价差大于此值才看）
+    # 做市可盈利阈值（价差 > 成本线 + 安全边际）
+    profitable_spread: float = 0.14  # 0.14% - 保守做市阈值
     # 深度异常阈值
     depth_imbalance_ratio: float = 3.0  # 买卖深度比
     # Z-Score异常检测（降低以便更容易发现价差机会）
@@ -69,6 +69,14 @@ class StrategyConfig:
     })
 
 @dataclass
+class ExecutionConfig:
+    """执行引擎配置（可调整）"""
+    # 价差阈值：价差必须大于此值才考虑
+    spread_pct: float = 0.05
+    # 净利阈值：净利必须大于此值才交易
+    net_profit_pct: float = 0.01
+
+@dataclass
 class PerformanceConfig:
     """性能追踪配置"""
     # 滚动窗口大小
@@ -97,6 +105,7 @@ class SystemConfig:
     pattern: PatternConfig = field(default_factory=PatternConfig)
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     
     # 三平台配置
     exchanges: Dict[str, ExchangeConfig] = field(default_factory=lambda: {
@@ -104,6 +113,9 @@ class SystemConfig:
         "htx": ExchangeConfig(name="htx", enabled=True),
         "gate": ExchangeConfig(name="gate", enabled=True),
     })
+    
+    # 执行引擎配置
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     
     def load_api_keys(self):
         """从环境变量加载API密钥"""
