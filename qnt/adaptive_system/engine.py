@@ -111,8 +111,15 @@ class AdaptiveTradingEngine:
         """更新某个平台的策略权重"""
         for pattern in patterns:
             if pattern.pattern_type == "spread_arbitrage":
-                self.config.strategy.strategies["fat_finger_arb"]["weight"] = \
-                    min(pattern.confidence * pattern.profitability * 10, 1.0)
+                score = min(pattern.confidence * pattern.profitability * 10, 1.0)
+                self.config.strategy.strategies["fat_finger_arb"]["weight"] = max(
+                    self.config.strategy.strategies["fat_finger_arb"]["weight"], score
+                )
+            elif pattern.pattern_type == "market_maker":
+                score = min(pattern.confidence * pattern.profitability * 10, 1.0)
+                self.config.strategy.strategies["market_maker"]["weight"] = max(
+                    self.config.strategy.strategies["market_maker"]["weight"], score
+                )
     
     def _log_status(self):
         """打印当前状态"""

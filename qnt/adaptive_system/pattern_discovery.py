@@ -71,7 +71,7 @@ class PatternDiscovery:
         return patterns
     
     def _detect_spread_arb_pattern(self, ex_name: str, symbol: str) -> Optional[DiscoveredPattern]:
-        """检测价差套利模式（按平台）"""
+        """检测价差套利模式（按平台）- 支持两种：大价差捡漏 + 做市稳定套利"""
         cursor = self.conn.cursor()
         
         cursor.execute('''
@@ -87,36 +87,57 @@ class PatternDiscovery:
             return None
         
         spreads = np.array([r[0] for r in rows])
-        
         mean_spread = np.mean(spreads)
         std_spread = np.std(spreads)
         
-        threshold = mean_spread + self.pattern_config.zscore_threshold * std_spread
-        high_spread_events = spreads[spreads > threshold]
+        # 策略1: 大价差捡漏（fat_finger_arb）- 需要>0.5%价差
+        threshold_big = mean_spread + self.pattern_config.zscore_threshold * std_spread
+        high_spread_events = spreads[spreads > threshold_big]
         
-        if len(high_spread_events) < 3:
-            return None
+        # 策略2: 做市稳定套利（market_maker）- 只要平均价差>成本线
+        profitable_events = spreads[spreads > self.pattern_config.profitable_spread]
         
-        avg_profit = np.mean(high_spread_events) - 0.28
-        if avg_profit <= 0:
-            return None
+        # 优先返回做市模式（更稳定的机会）
+        if len(profitable_events) >= 10:
+            avg_profit = np.mean(profitable_events) - self.pattern_config.spread_threshold
+            if avg_profit > 0:
+                confidence = min(len(profitable_events) / max(len(rows) * 0.3, 10), 1.0)
+                return DiscoveredPattern(
+                    exchange=ex_name,
+                    pattern_type="market_maker",
+                    symbol=symbol,
+                    confidence=float(confidence),
+                    profitability=float(avg_profit),
+                    parameters={
+                        "mean_spread": float(mean_spread),
+                        "std_spread": float(std_spread),
+                        "profitable_ratio": float(len(profitable_events) / len(rows)),
+                        "event_count": int(len(profitable_events))
+                    },
+                    status="active" if confidence > 0.3 else "experimental"
+                )
         
-        confidence = min(len(high_spread_events) / 10, 1.0)
+        # 其次返回大价差捡漏
+        if len(high_spread_events) >= 3:
+            avg_profit = np.mean(high_spread_events) - 0.28
+            if avg_profit > 0:
+                confidence = min(len(high_spread_events) / 10, 1.0)
+                return DiscoveredPattern(
+                    exchange=ex_name,
+                    pattern_type="spread_arbitrage",
+                    symbol=symbol,
+                    confidence=float(confidence),
+                    profitability=float(avg_profit),
+                    parameters={
+                        "mean_spread": float(mean_spread),
+                        "std_spread": float(std_spread),
+                        "threshold": float(threshold_big),
+                        "event_count": int(len(high_spread_events))
+                    },
+                    status="active" if confidence > 0.5 else "experimental"
+                )
         
-        return DiscoveredPattern(
-            exchange=ex_name,
-            pattern_type="spread_arbitrage",
-            symbol=symbol,
-            confidence=float(confidence),
-            profitability=float(avg_profit),
-            parameters={
-                "mean_spread": float(mean_spread),
-                "std_spread": float(std_spread),
-                "threshold": float(threshold),
-                "event_count": int(len(high_spread_events))
-            },
-            status="active" if confidence > 0.5 else "experimental"
-        )
+        return None
     
     def _detect_mean_reversion(self, ex_name: str, symbol: str) -> Optional[DiscoveredPattern]:
         """检测均值回归模式（按平台）"""
@@ -200,7 +221,7 @@ class PatternDiscovery:
                      (depths < 1.0 / self.pattern_config.depth_imbalance_ratio)
         
         imbalance_events = np.sum(imbalanced)
-        if imbalance_events < 3:
+        if imbalance_events < 5:
             return None
         
         abnormal_spreads = spreads[imbalanced]
@@ -213,7 +234,7 @@ class PatternDiscovery:
             pattern_type="depth_anomaly",
             symbol=symbol,
             confidence=float(imbalance_events / len(rows)),
-            profitability=float(avg_spread - 0.28),
+            profitability=float(avg_spread - self.pattern_config.spread_threshold),
             parameters={
                 "imbalance_events": int(imbalance_events),
                 "avg_spread": float(avg_spread),

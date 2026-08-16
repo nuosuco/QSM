@@ -22,12 +22,14 @@ class DataCollectionConfig:
 @dataclass
 class PatternConfig:
     """模式识别配置"""
-    # 价差异常阈值（统一为2%，与原系统一致）
-    spread_threshold: float = 2.0  # 2% - 捡乌龙指标准
+    # 价差成本线（做市策略成本线约0.12%）
+    spread_threshold: float = 0.12  # 0.12% - 做市成本线
+    # 做市可盈利阈值（价差 > 成本线 + 0.02% margin）
+    profitable_spread: float = 0.14  # 0.14% - 保守做市阈值
     # 深度异常阈值
     depth_imbalance_ratio: float = 3.0  # 买卖深度比
-    # Z-Score异常检测
-    zscore_threshold: float = 3.0
+    # Z-Score异常检测（降低以便更容易发现价差机会）
+    zscore_threshold: float = 1.5
     # 成交量异常倍数
     volume_spike_multiplier: float = 5.0
     # 价格跳变阈值
@@ -42,15 +44,15 @@ class StrategyConfig:
     strategies: Dict[str, Dict] = field(default_factory=lambda: {
         "fat_finger_arb": {
             "name": "捡乌龙指套利",
-            "description": "永续vs现货价差套利",
-            "weight": 1.0,
+            "description": "永续vs现货价差套利（需要>0.5%价差）",
+            "weight": 0.3,
             "params": {"spread_threshold": 0.5, "min_profit": 0.3}
         },
         "market_maker": {
             "name": "做市策略",
-            "description": "挂双边单赚取价差",
-            "weight": 0.0,
-            "params": {"spread": 0.1, "order_size": 100}
+            "description": "挂双边单赚取价差（需要>0.12%价差覆盖成本）",
+            "weight": 0.7,
+            "params": {"spread": 0.12, "order_size": 100}
         },
         "momentum": {
             "name": "动量跟踪",
