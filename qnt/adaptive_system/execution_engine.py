@@ -89,8 +89,8 @@ class ExecutionEngine:
         self.running = True
         logger.info("🚀 交易执行引擎启动")
         logger.info(f"   监控平台: {', '.join(self.exchanges.keys())}")
-        logger.info(f"   做市阈值: >{self.BI_SIDE_COST*100:.2f}%价差")
-        logger.info(f"   最小净利: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}%")
+        logger.info(f"   价差阈值: >0.22% (成本线0.12% + 风控0.1%)")
+        logger.info(f"   净利阈值: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}%")
         
         self._run_loop()
     
