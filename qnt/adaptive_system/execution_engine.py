@@ -144,13 +144,14 @@ class ExecutionEngine:
                 mid_perp = (perp_bid + perp_ask) / 2
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
                 
-                # 检查是否超过阈值（激进型：0.03%）
-                if spread_pct < 0.03:
+                # 检查是否超过阈值（保守型：覆盖成本+风控要求）
+                # 成本线0.12% + 风控要求0.1% = 0.22%
+                if spread_pct < 0.22:
                     continue
                 
                 # 计算预期利润
                 net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
-                if net_profit_pct < 0:  # 不亏钱就交易
+                if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT * 100:
                     continue
                 
                 # 执行做市
