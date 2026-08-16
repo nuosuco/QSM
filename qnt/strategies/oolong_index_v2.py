@@ -51,14 +51,8 @@ class OolongIndexStrategy:
         self.conn = sqlite3.connect(self.db_path)
         
     def load_api_keys(self):
-        if not os.path.exists(self.env_file):
-            raise Exception(f"API密钥文件不存在: {self.env_file}")
-        
-        for line in open(self.env_file):
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                k, _, v = line.partition('=')
-                os.environ[k.strip()] = v.strip().strip('"').strip("'")
+        """API密钥只从环境变量读取"""
+        pass
         
         self.bitget_key = os.getenv('BITGET_API_KEY')
         self.bitget_secret = os.getenv('BITGET_API_SECRET')

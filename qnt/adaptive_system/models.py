@@ -1,5 +1,5 @@
 """
-自适应策略引擎 - 数据模型
+自适应策略引擎 - 数据模型（三平台版）
 """
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -9,25 +9,29 @@ from typing import Dict, List, Optional
 class MarketDataPoint:
     """市场数据点"""
     timestamp: float
-    symbol: str
-    spot_bid: float
-    spot_ask: float
-    spot_last: float
-    perp_bid: float
-    perp_ask: float
-    perp_last: float
-    spread_pct: float
-    basis_pct: float
-    depth_ratio: float
+    exchange: str = ""
+    symbol: str = ""
+    spot_bid: float = 0.0
+    spot_ask: float = 0.0
+    spot_last: float = 0.0
+    perp_bid: float = 0.0
+    perp_ask: float = 0.0
+    perp_last: float = 0.0
+    spot_volume: float = 0.0
+    perp_volume: float = 0.0
+    spread_pct: float = 0.0
+    basis_pct: float = 0.0
+    depth_ratio: float = 1.0
 
 @dataclass
 class SignalRecord:
     """信号记录"""
     timestamp: float
-    symbol: str
-    signal_type: str
-    strategy: str
-    expected_profit: float
+    exchange: str = ""
+    symbol: str = ""
+    signal_type: str = ""
+    strategy: str = ""
+    expected_profit: float = 0.0
     actual_profit: float = 0.0
     executed: bool = False
     metadata: Dict = field(default_factory=dict)
@@ -35,16 +39,17 @@ class SignalRecord:
 @dataclass
 class DiscoveredPattern:
     """发现的模式"""
-    pattern_type: str
-    symbol: str
-    confidence: float
-    profitability: float
-    parameters: Dict
+    exchange: str = ""
+    pattern_type: str = ""
+    symbol: str = ""
+    confidence: float = 0.0
+    profitability: float = 0.0
+    parameters: Dict = field(default_factory=dict)
     status: str = "experimental"
     
     @property
     def is_profitable(self) -> bool:
-        return self.profitability > 0.28  # 扣除手续费后仍有利润
+        return self.profitability > 0.28
     
     @property
     def is_reliable(self) -> bool:
@@ -53,8 +58,8 @@ class DiscoveredPattern:
 @dataclass
 class StrategyProfile:
     """策略档案"""
-    name: str
-    description: str
+    name: str = ""
+    description: str = ""
     weight: float = 0.0
     total_trades: int = 0
     winning_trades: int = 0
@@ -66,5 +71,4 @@ class StrategyProfile:
     
     @property
     def score(self) -> float:
-        """综合评分"""
         return self.weight * (0.5 + self.win_rate * 0.3 + min(self.avg_profit, 1.0) * 0.2)

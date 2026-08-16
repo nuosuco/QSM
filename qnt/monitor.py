@@ -15,13 +15,8 @@ from pathlib import Path
 from datetime import datetime
 import statistics
 
-# 加载环境变量
-env_file = Path.home() / '.qnt_env'
-for line in open(env_file):
-    line = line.strip()
-    if line and not line.startswith('#') and '=' in line:
-        k, _, v = line.partition('=')
-        os.environ[k.strip()] = v.strip().strip('"').strip("'")
+# 只从环境变量读取，不依赖文件
+# API密钥请通过 export 设置到环境变量中
 
 key = os.getenv('BITGET_API_KEY')
 secret = os.getenv('BITGET_API_SECRET')

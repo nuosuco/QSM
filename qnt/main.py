@@ -25,26 +25,13 @@ SMALL_SYMBOLS = ['RVN', 'AXS', 'LINK', 'DOT', 'UNI', 'ATOM', 'MATIC', 'AVAX', 'L
                  'FIL', 'SAND', 'MANA', 'ALGO', 'XTZ', 'EGLD', 'FTM', 'ONE', 'ZEC', 'DASH']
 
 def load_api_keys():
-    """加载API密钥"""
-    env_file = Path.home() / '.qnt_env'
-    if not env_file.exists():
-        logger.error(f"❌ API密钥文件不存在: {env_file}")
-        return None
-    
-    for line in open(env_file):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if '=' in line:
-            key, _, value = line.partition('=')
-            os.environ[key.strip()] = value.strip().strip('"').strip("'")
-    
+    """加载API密钥 - 只从环境变量读取"""
     api_key = os.getenv('BITGET_API_KEY')
     api_secret = os.getenv('BITGET_API_SECRET')
     api_passphrase = os.getenv('BITGET_API_PASSPHRASE', 'qntsomtop')
     
     if not api_key or not api_secret:
-        logger.error("❌ API密钥加载失败")
+        logger.error("❌ BITGET_API_KEY 或 BITGET_API_SECRET 未设置，请先 export 到环境变量")
         return None
     
     return {

@@ -1,5 +1,5 @@
 """
-自适应策略引擎 - 主配置
+自适应策略引擎 - 主配置（三平台版）
 """
 import json
 import os
@@ -79,12 +79,45 @@ class PerformanceConfig:
     max_drawdown: float = 10.0
 
 @dataclass
+class ExchangeConfig:
+    """交易所配置"""
+    name: str = ""
+    enabled: bool = True
+    api_key: str = ""
+    api_secret: str = ""
+    passphrase: str = ""
+    options: Dict = field(default_factory=lambda: {"defaultType": "spot"})
+
+@dataclass
 class SystemConfig:
-    """系统总配置"""
+    """系统总配置（三平台版）"""
     data: DataCollectionConfig = field(default_factory=DataCollectionConfig)
     pattern: PatternConfig = field(default_factory=PatternConfig)
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
+    
+    # 三平台配置
+    exchanges: Dict[str, ExchangeConfig] = field(default_factory=lambda: {
+        "bitget": ExchangeConfig(name="bitget", enabled=True, passphrase="qntsomtop"),
+        "htx": ExchangeConfig(name="htx", enabled=True),
+        "gate": ExchangeConfig(name="gate", enabled=True),
+    })
+    
+    def load_api_keys(self):
+        """从环境变量加载API密钥"""
+        exchange_map = {
+            'bitget': ('BITGET_API_KEY', 'BITGET_API_SECRET', 'BITGET_API_PASSPHRASE'),
+            'htx': ('HTX_API_KEY', 'HTX_API_SECRET', None),
+            'gate': ('GATE_API_KEY', 'GATE_API_SECRET', None),
+        }
+        for ex_name, ex_cfg in self.exchanges.items():
+            key, secret, passphrase = exchange_map.get(ex_name, (None, None, None))
+            if key:
+                ex_cfg.api_key = os.getenv(key, '')
+            if secret:
+                ex_cfg.api_secret = os.getenv(secret, '')
+            if passphrase:
+                ex_cfg.passphrase = os.getenv(passphrase, '')
     
     def save(self, path: str = None):
         if path is None:

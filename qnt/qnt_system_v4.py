@@ -117,14 +117,8 @@ class QNTSystem:
         logger.info("=" * 70)
     
     def _load_api_keys(self):
-        if not self.env_file.exists():
-            raise FileNotFoundError(f"API密钥文件不存在: {self.env_file}")
-        
-        for line in open(self.env_file):
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                k, _, v = line.partition('=')
-                os.environ[k.strip()] = v.strip().strip('"').strip("'")
+        """API密钥只从环境变量读取"""
+        pass
     
     def _create_exchange(self):
         api_key = os.getenv('BITGET_API_KEY')
