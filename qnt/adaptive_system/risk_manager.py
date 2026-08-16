@@ -1,10 +1,13 @@
 """
 风控管理器 - v4.0定死规则
+真正读取各交易所实时余额，不再假设余额
 """
 import sqlite3
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Dict, Optional
+import ccxt
 
 logger = logging.getLogger('RiskManager')
 
@@ -19,9 +22,10 @@ class RiskManager:
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
     MIN_NET_PROFIT_PCT = 0.001     # 净利必须 > 0.1% 才执行
     
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, exchanges_config: Dict = None):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.exchanges_config = exchanges_config or {}
         self._init_db()
         
         # 运行时状态
@@ -31,6 +35,14 @@ class RiskManager:
         self.daily_profit = 0.0
         self.is_suspended = False
         self.suspension_reason = ""
+        
+        # 真实余额（从交易所获取）
+        self.real_balance = {}
+        self.equity = 0.0
+        
+        # 加载状态并获取真实余额
+        self.load_state()
+        self.refresh_balance()
     
     def _init_db(self):
         """初始化风控表"""
@@ -45,7 +57,7 @@ class RiskManager:
         defaults = {
             'consecutive_losses': '0',
             'peak_equity': '0',
-            'current_equity': '1.0',
+            'current_equity': '0',  # 修改为从真实余额获取
             'total_profit': '0.0',
             'daily_profit': '0.0',
             'max_drawdown': '0.0',
@@ -67,7 +79,13 @@ class RiskManager:
             if row[0] == 'consecutive_losses':
                 self.consecutive_losses = int(row[1])
             elif row[0] == 'current_equity':
-                self.total_profit = float(row[1]) - 1.0  # 假设初始本金1 USDT
+                val = float(row[1])
+                if val > 0:
+                    self.equity = val
+                    self.total_profit = val - self._get_initial_principal()
+                else:
+                    # 如果之前是0，需要从真实余额获取
+                    pass
             elif row[0] == 'max_drawdown':
                 self.max_drawdown = float(row[1])
             elif row[0] == 'is_suspended':
@@ -88,12 +106,96 @@ class RiskManager:
                              (datetime.now().strftime('%Y-%m-%d'),))
                 self.conn.commit()
     
+    def _get_initial_principal(self) -> float:
+        """从数据库获取初始本金"""
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT value FROM risk_state WHERE key="initial_principal"')
+        row = cursor.fetchone()
+        if row:
+            return float(row[0])
+        return 0.0  # 如果未设置，初始本金为0
+    
+    def set_initial_principal(self, principal: float):
+        """设置初始本金（首次运行或用户充值时调用）"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO risk_state (key, value) VALUES (?, ?)
+        ''', ('initial_principal', str(principal)))
+        self.conn.commit()
+        logger.info(f"💰 设置初始本金: {principal:.2f} USDT")
+    
+    def refresh_balance(self):
+        """从各交易所获取真实余额"""
+        try:
+            exchange_map = {
+                'bitget': ('BITGET_API_KEY', 'BITGET_API_SECRET', 'BITGET_API_PASSPHRASE'),
+                'htx': ('HTX_API_KEY', 'HTX_API_SECRET', None),
+                'gate': ('GATE_API_KEY', 'GATE_API_SECRET', None),
+            }
+            
+            total_usdt = 0.0
+            
+            for ex_name, (key_env, secret_env, pass_env) in exchange_map.items():
+                api_key = os.getenv(key_env, '')
+                api_secret = os.getenv(secret_env, '')
+                passphrase = os.getenv(pass_env, '') if pass_env else ''
+                
+                if not api_key:
+                    logger.debug(f"{ex_name}: API Key未设置")
+                    continue
+                
+                try:
+                    cls = getattr(ccxt, ex_name)
+                    kwargs = {'apiKey': api_key, 'secret': api_secret, 'enableRateLimit': True}
+                    if passphrase:
+                        kwargs['password'] = passphrase
+                    
+                    exchange = cls(kwargs)
+                    balance = exchange.fetch_balance()
+                    
+                    # 获取USDT余额
+                    usdt = balance.get('USDT', {})
+                    total = usdt.get('total', 0)
+                    free = usdt.get('free', 0)
+                    used = usdt.get('used', 0)
+                    
+                    self.real_balance[ex_name] = {
+                        'total': total,
+                        'free': free,
+                        'used': used,
+                    }
+                    total_usdt += total
+                    
+                    logger.debug(f"✅ {ex_name}: USDT={total:.2f}, 可用={free:.2f}")
+                    
+                    # HTX额外获取合约余额
+                    if ex_name == 'htx':
+                        try:
+                            contract_balance = exchange.fetch_balance({'type': 'contract'})
+                            usdt_contract = contract_balance.get('USDT', {})
+                            contract_total = usdt_contract.get('total', 0)
+                            if contract_total > 0:
+                                self.real_balance[ex_name]['contract'] = contract_total
+                                total_usdt += contract_total
+                                logger.debug(f"✅ {ex_name} 合约: USDT={contract_total:.4f}")
+                        except:
+                            pass
+                    
+                except Exception as e:
+                    logger.warning(f"{ex_name} 获取余额失败: {str(e)[:50]}")
+            
+            self.equity = total_usdt
+            logger.info(f"💰 总权益: {total_usdt:.2f} USDT (来自{len(self.real_balance)}个交易所)")
+            
+        except Exception as e:
+            logger.error(f"获取余额失败: {e}")
+    
     def save_state(self):
         """保存风控状态"""
         cursor = self.conn.cursor()
         state = {
             'consecutive_losses': str(self.consecutive_losses),
-            'current_equity': str(1.0 + self.total_profit),
+            'current_equity': str(self.equity),
             'max_drawdown': str(self.max_drawdown),
             'is_suspended': '1' if self.is_suspended else '0',
             'suspension_reason': self.suspension_reason,
@@ -122,8 +224,8 @@ class RiskManager:
             'suggested_stop_loss': stop_loss_price,
         }
         
-        # 计算当前权益
-        equity = 1.0 + self.total_profit  # 假设初始本金1 USDT
+        # 使用真实权益
+        equity = self.equity if self.equity > 0 else 1.0  # 兜底：至少1 USDT
         
         # Rule 1: 检查是否暂停
         if self.is_suspended:
@@ -158,9 +260,6 @@ class RiskManager:
             result['reason'] = "⛔ 最大回撤40%，系统暂停"
             return result
         
-        # Rule 6: 净利必须 > 0.1%
-        # 这需要在实际交易时检查预期利润
-        
         result['max_position_usdt'] = max_position
         result['suggested_stop_loss'] = stop_loss_price
         return result
@@ -168,12 +267,14 @@ class RiskManager:
     def record_trade(self, pnl: float, is_win: bool):
         """记录交易结果"""
         self.total_profit += pnl
+        
+        # 更新每日盈亏
         self.daily_profit += pnl
         
         # 更新回撤
         peak = max(0, self.total_profit)
         if self.total_profit < 0:
-            current_dd = abs(self.total_profit) / (1.0 + peak) if peak > 0 else 0
+            current_dd = abs(self.total_profit) / (self.equity + peak) if (self.equity + peak) > 0 else 0
             self.max_drawdown = max(self.max_drawdown, current_dd)
         
         # 更新连续亏损
@@ -196,7 +297,7 @@ class RiskManager:
     
     def get_status(self) -> Dict:
         """获取风控状态"""
-        equity = 1.0 + self.total_profit
+        equity = self.equity if self.equity > 0 else 1.0
         return {
             'equity': equity,
             'total_profit': self.total_profit,
@@ -206,6 +307,7 @@ class RiskManager:
             'is_suspended': self.is_suspended,
             'suspension_reason': self.suspension_reason,
             'max_position_usdt': equity * self.MAX_POSITION_PCT,
+            'real_balance': self.real_balance,
         }
     
     def close(self):

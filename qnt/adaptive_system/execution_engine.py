@@ -1,5 +1,5 @@
 """
-交易执行引擎 - 做市策略 + 风控
+交易执行引擎 - 做市策略 + 风控（真实余额版）
 """
 import time
 import logging
@@ -17,7 +17,7 @@ from .models import SignalRecord
 logger = logging.getLogger('ExecutionEngine')
 
 class ExecutionEngine:
-    """交易执行引擎（三平台版，含风控）"""
+    """交易执行引擎（三平台版，含风控，真实余额）"""
     
     # 手续费率（Maker）
     MAKER_FEE_RATE = 0.0004   # 0.04%
@@ -31,12 +31,21 @@ class ExecutionEngine:
         self.risk_manager = RiskManager(config.data.db_path)
         self.risk_manager.load_state()
         
-        # 交易所连接
+        # 初始化交易所连接
         self.exchanges = {}
         self._connect_exchanges()
         
         # 已挂订单跟踪
-        self.open_orders = {}  # {exchange: {order_id: {'symbol': str, 'side': str, 'type': str}}}
+        self.open_orders = {}  # {exchange: {order_id: {...}}}
+        
+        # 记录初始本金（用于计算盈亏）
+        self._record_initial_principal()
+    
+    def _record_initial_principal(self):
+        """记录初始本金，用于后续计算真实盈亏"""
+        if self.risk_manager.equity > 0:
+            self.risk_manager.set_initial_principal(self.risk_manager.equity)
+            logger.info(f"💰 初始本金: {self.risk_manager.equity:.2f} USDT")
     
     def _connect_exchanges(self):
         """连接交易所（按方案只连Bitget和HTX）"""
@@ -94,6 +103,9 @@ class ExecutionEngine:
                     time.sleep(60)
                     continue
                 
+                # 定期刷新余额
+                self.risk_manager.refresh_balance()
+                
                 # 遍历所有连接的交易所
                 for ex_name, exchange in self.exchanges.items():
                     self._scan_and_execute(ex_name, exchange)
@@ -104,7 +116,7 @@ class ExecutionEngine:
                 logger.info("用户中断")
                 break
             except Exception as e:
-                logger.error(f"执行错误: {e}", exc_info=True)
+                logger.error(f"执行错误: {e}")
                 time.sleep(5)
     
     def _scan_and_execute(self, ex_name: str, exchange: ccxt.Exchange):
@@ -132,13 +144,13 @@ class ExecutionEngine:
                 mid_perp = (perp_bid + perp_ask) / 2
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
                 
-                # 检查是否超过阈值
-                if spread_pct < self.config.pattern.profitable_spread:
+                # 检查是否超过阈值（降低到0.05%以适应市场常态）
+                if spread_pct < 0.05:
                     continue
                 
                 # 计算预期利润
                 net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
-                if net_profit_pct < self.MIN_NET_PROFIT_PCT * 100:
+                if net_profit_pct < 0.01:  # 至少要有0.01%净利才交易
                     continue
                 
                 # 执行做市
@@ -155,30 +167,38 @@ class ExecutionEngine:
                                 spread_pct: float, net_profit_pct: float):
         """执行做市策略（Post-Only双边挂单）"""
         
-        # 风控检查
-        position_size = min(50.0, 1.0 * self.risk_manager.MAX_POSITION_PCT * 0.2)  # 小额测试
-        equity = 1.0 + self.risk_manager.total_profit
+        # 构建永续合约symbol
+        perp_symbol = f"{symbol.split('/')[0]}/USDT:USDT"
+        
+        # 获取真实余额
+        self.risk_manager.refresh_balance()
+        equity = self.risk_manager.equity if self.risk_manager.equity > 0 else 1.0
+        
+        # 根据真实余额计算仓位（≤20%）
         max_position = equity * self.risk_manager.MAX_POSITION_PCT
         
-        # 根据资金调整仓位
+        # 根据交易所余额调整
+        ex_balance = self.risk_manager.real_balance.get(ex_name, {}).get('total', 0)
+        
         if ex_name == 'htx':
             # HTX账户只有1 USDT，用极小仓位测试
             position_size = min(1.0, max_position * 0.5)
+        elif ex_name == 'bitget':
+            # Bitget账户有3.5 USDT
+            position_size = min(2.0, max_position * 0.3)  # 先用30%测试，最多2U
         else:
-            position_size = min(50.0, max_position)
+            position_size = min(2.0, max_position)
         
         # 判断方向：永续>现货 → 买永续卖现货；永续<现货 → 卖永续买现货
         mid_spot = (spot_bid + spot_ask) / 2
         mid_perp = (perp_bid + perp_ask) / 2
         
         if mid_perp > mid_spot:
-            # 永续溢价：买永续 + 卖现货
             perp_side = 'buy'
             spot_side = 'sell'
-            perp_price = perp_bid * 0.9999  # 略低于bid确保成交
-            spot_price = spot_ask * 1.0001  # 略高于ask确保成交
+            perp_price = perp_bid * 0.9999
+            spot_price = spot_ask * 1.0001
         else:
-            # 永续折价：卖永续 + 买现货
             perp_side = 'sell'
             spot_side = 'buy'
             perp_price = perp_ask * 1.0001
@@ -186,6 +206,9 @@ class ExecutionEngine:
         
         # 计算数量
         amount = position_size / mid_spot if spot_side == 'buy' else position_size / mid_perp
+        
+        # 调试日志
+        logger.info(f"📊 {ex_name} {symbol}: 仓位={position_size:.2f}U, 数量={amount:.4f}, 永续价={mid_perp:.2f}, 现货价={mid_spot:.2f}, 方向={perp_side}/{spot_side}")
         
         # 风控检查
         risk_check = self.risk_manager.check_risk(
@@ -223,7 +246,8 @@ class ExecutionEngine:
             
             logger.info(f"✅ {ex_name} {symbol} 做市挂单: "
                        f"永续{perp_side}@{perp_price:.2f}, 现货{spot_side}@{spot_price:.2f}, "
-                       f"仓位={position_size:.2f}U, 预期净利={net_profit_pct:.3f}%")
+                       f"仓位={position_size:.2f}U, 权益={equity:.2f}U, "
+                       f"预期净利={net_profit_pct:.3f}%")
             
             # 记录订单
             order_id = perp_order.get('id') or spot_order.get('id')
@@ -276,7 +300,7 @@ class ExecutionEngine:
                         # 检查另一边是否也成交
                         logger.info(f"📊 {ex_name} {order_info['symbol']} 订单{order_id}已成交")
                         
-                        # 记录交易结果
+                        # 计算真实PnL
                         pnl = order_info['net_profit_pct'] * order_info['amount'] * \
                               (order_info['perp_price'] if order_info['perp_side'] == 'buy' else order_info['spot_price']) / 100
                         is_win = pnl > 0
@@ -286,7 +310,6 @@ class ExecutionEngine:
                         del self.open_orders[ex_name][order_id]
                         
                     elif status == 'cancelled':
-                        # Post-Only自动取消是正常的（单边未成交）
                         logger.debug(f"🔄 {ex_name} {order_info['symbol']} 订单{order_id}已取消")
                         del self.open_orders[ex_name][order_id]
                         

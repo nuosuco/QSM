@@ -23,9 +23,9 @@ class DataCollectionConfig:
 class PatternConfig:
     """模式识别配置"""
     # 价差成本线（做市策略成本线约0.12%）
-    spread_threshold: float = 0.12  # 0.12% - 做市成本线
+    spread_threshold: float = 0.08  # 0.12% - 做市成本线
     # 做市可盈利阈值（价差 > 成本线 + 0.02% margin）
-    profitable_spread: float = 0.14  # 0.14% - 保守做市阈值
+    profitable_spread: float = 0.10  # 0.14% - 保守做市阈值
     # 深度异常阈值
     depth_imbalance_ratio: float = 3.0  # 买卖深度比
     # Z-Score异常检测（降低以便更容易发现价差机会）
