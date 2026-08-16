@@ -89,8 +89,9 @@ class ExecutionEngine:
         self.running = True
         logger.info("🚀 交易执行引擎启动")
         logger.info(f"   监控平台: {', '.join(self.exchanges.keys())}")
-        logger.info(f"   价差阈值: >0.22% (成本线0.12% + 风控0.1%)")
-        logger.info(f"   净利阈值: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}%")
+        logger.info(f"   价差阈值: >0.05% (执行引擎层)")
+        logger.info(f"   净利阈值: >0.01% (执行引擎层)")
+        logger.info(f"   风控净利: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}% (风控层)")
         
         self._run_loop()
     
@@ -144,13 +145,16 @@ class ExecutionEngine:
                 mid_perp = (perp_bid + perp_ask) / 2
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
                 
-                # 检查是否超过阈值（保守型：覆盖成本+风控要求）
-                # 成本线0.12% + 风控要求0.1% = 0.22%
-                if spread_pct < 0.22:
-                    continue
-                
                 # 计算预期利润
                 net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
+                
+                # 检查是否超过阈值（执行引擎层：spread>0.05%, net_profit>0.01%）
+                if spread_pct < 0.05:
+                    continue
+                if net_profit_pct < 0.01:
+                    continue
+                
+                # 风控检查（风控层：net_profit>0.1%）
                 if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT * 100:
                     continue
                 
