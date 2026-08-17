@@ -134,3 +134,30 @@ end
 printf("=== 坍缩(投票)后准确率: %d/%d (%d%%) ===\n", correct, N, correct * 100 / N)
 printf("态1[0]=%d 态2[0]=%d 态3[0]=%d 态4[0]=%d\n", E1[0], E2[0], E3[0], E4[0])
 printf("态1[10]=%d 态2[10]=%d 态3[10]=%d 态4[10]=%d\n", E1[10], E2[10], E3[10], E4[10])
+
+
+# ========== 权重落盘到qdfs/ns/models/ ==========
+def save_arr_to_file(path, prefix, arr, n_elems):
+    var content = ""
+    var i = 0
+    while (i < n_elems):
+        var line = str_concat(prefix, int_to_str(i))
+        line = str_concat(line, ":")
+        line = str_concat(line, int_to_str(arr[i]))
+        line = str_concat(line, "\n")
+        content = str_concat(content, line)
+        i = i + 1
+    end
+    return file_write_bytes(path, content)
+end
+
+printf("=== 保存4态权重到qdfs/ns/models/ ===\n")
+save_arr_to_file("qdfs/ns/models/e_state_1.w", "E1:", E1, 128)
+save_arr_to_file("qdfs/ns/models/e_state_2.w", "E2:", E2, 128)
+save_arr_to_file("qdfs/ns/models/e_state_3.w", "E3:", E3, 128)
+save_arr_to_file("qdfs/ns/models/e_state_4.w", "E4:", E4, 128)
+save_arr_to_file("qdfs/ns/models/w_state_1.w", "W1:", W1, 128)
+save_arr_to_file("qdfs/ns/models/w_state_2.w", "W2:", W2, 128)
+save_arr_to_file("qdfs/ns/models/w_state_3.w", "W3:", W3, 128)
+save_arr_to_file("qdfs/ns/models/w_state_4.w", "W4:", W4, 128)
+printf("=== 权重落盘完成 ===\n")

@@ -240,12 +240,13 @@ def route(path, req):
             code_str = "993040"
         else:
             if (str_index_of(body, "{") >= 0):
-                var start = str_index_of(body, "\"text\":\"")
-                if (start >= 0):
-                    start = start + 8
-                    var end_pos = str_index_of(body, "\"", start)
-                    if (end_pos > start):
-                        code_str = str_substring(body, start, end_pos - start)
+                # JSON: {"text":"993040"} - 用find_pos逐步解析(避免builtin 2参限制)
+                var tq = str_index_of(body, "\"text\":\"")
+                if (tq >= 0):
+                    var vstart = tq + 8
+                    var vend = find_pos(body, vstart, "\"")
+                    if (vend > vstart):
+                        code_str = str_substring(body, vstart, vend - vstart)
                     end
                 end
             end
