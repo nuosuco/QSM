@@ -58,7 +58,6 @@ def cmd_exchange(args):
     
     if args.action == 'status':
         print(json.dumps({
-            'pair': eng.pair,
             'trades': len(eng.trades),
             'bids': len(eng.orderbook.bids),
             'asks': len(eng.orderbook.asks)
