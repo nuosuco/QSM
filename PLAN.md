@@ -213,7 +213,7 @@
 | Phase 5: API | ✅ 已完成 | 80% | Flask REST+WebSocket已建 |
 | Phase 6: 测试部署 | 🔲 未开始 | 10% | 集成测试待写 |
 
-**下一步：** 修复撮合引擎bug，然后Phase 1-2收尾
+**下一步：** Phase 6 完善测试、API优化、文档补充
 
 ---
 *Created: 2026-08-18 | Author: 小蕊 | Version: 1.0*
