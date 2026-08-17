@@ -26,7 +26,7 @@ def cmd_blockchain(args):
     if args.action == 'status':
         print(json.dumps({
             'blocks': len(chain.chain),
-            'difficulty': chain.config.difficulty,
+            'difficulty': chain.difficulty,
             'latest_hash': chain.chain[-1].hash if chain.chain else None
         }, indent=2))
     
