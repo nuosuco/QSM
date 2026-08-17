@@ -130,11 +130,16 @@ class MatchingEngine:
     
     def _execute_trade(self, order1: Order, book_entry, price: float, quantity: float):
         """执行成交"""
-        trade_id = f"{order1.order_id}:{book_entry.orders[0].order_id}:{time.time()}"
+        # 安全获取对手订单ID
+        other_order_id = ""
+        if book_entry.orders:
+            other_order_id = book_entry.orders[-1].order_id
+        
+        trade_id = f"{order1.order_id}:{other_order_id}:{time.time()}"
         trade = Trade(
             trade_id=trade_id,
             order_id_1=order1.order_id,
-            order_id_2=book_entry.orders[0].order_id,
+            order_id_2=other_order_id,
             price=price,
             quantity=quantity,
             timestamp=time.time(),
