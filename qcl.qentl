@@ -663,12 +663,6 @@ def is_builtin(nm):
     if (str_eq(nm, "softmax")): return 1 end
     if (str_eq(nm, "argmax")): return 1 end
     if (str_eq(nm, "backprop")): return 1 end
-    # ---- QSCL builtin ----
-    if (str_eq(nm, "embedding")): return 1 end
-    if (str_eq(nm, "mat_mul")): return 1 end
-    if (str_eq(nm, "softmax")): return 1 end
-    if (str_eq(nm, "argmax")): return 1 end
-    if (str_eq(nm, "backprop")): return 1 end
     return 0
 end
 

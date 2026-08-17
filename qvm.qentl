@@ -67,8 +67,10 @@ var pop2_t = 0
 var pop2_i = 0
 var pop2_s = ""
 var pop2_a = 0
+var pop3_t = 0
 var pop3_i = 0
 var pop3_s = ""
+var pop3_a = 0
 var pop4_t = 0
 var pop4_i = 0
 var pop4_s = ""
@@ -141,22 +143,28 @@ end
 
 def do_pop3():
     do_pop1()
+    pop3_t = pop1_t
     pop3_i = pop1_i
     pop3_s = pop1_s
+    pop3_a = pop1_a
     do_pop2()
 end
 
 def do_pop4():
     do_pop1()
+    pop4_t = pop1_t
     pop4_i = pop1_i
     pop4_s = pop1_s
+    pop4_a = pop1_a
     do_pop3()
 end
 
 def do_pop5():
     do_pop1()
+    pop5_t = pop1_t
     pop5_i = pop1_i
     pop5_s = pop1_s
+    pop5_a = pop1_a
     do_pop4()
 end
 
@@ -414,65 +422,6 @@ def bi_printf(nargs):
 end
 
 def do_builtin(bname, nargs):
-    var base = 0
-    var fmt = ""
-    var ai = 0
-    var out = ""
-    var k = 0
-    var fl = 0
-    var ch = ""
-    var nx = ""
-    var ln = 0
-    var stx = 0
-    var xa = ""
-    var xb = ""
-    var e = 0
-    var code = 0
-    var dim = 0
-    var e_arr = 0
-    var n_out = 0
-    var n_in = 0
-    var w_arr = 0
-    var x_off = 0
-    var y_off = 0
-    var i = 0
-    var sum = 0
-    var j = 0
-    var x_val = 0
-    var w_val = 0
-    var arr = 0
-    var n = 0
-    var max_val = 0
-    var max_idx = 0
-    var diff = 0
-    var v = 0
-    var exp_v = 0
-    var total = 0
-    var grad = 0
-    var scale = 0
-    var lr = 0
-    var grad_arr = 0
-    var w_idx = 0
-    var g = 0
-    var p = 0
-    var op = 0
-    var np = 0
-    var fname = ""
-    var sl = 0
-    var sx = 0
-    var sy = 0
-    var cx = 0
-    var cy = 0
-    var ix = 0
-    var iy = 0
-    var r = 0
-    var h = 0
-    var sz = 0
-    var pos = 0
-    var idx = 0
-    var t = 0
-    var s = ""
-    var q = 0
     if (str_eq(bname, "printf")):
         bi_printf(nargs)
         push_int(0)
@@ -559,11 +508,6 @@ def do_builtin(bname, nargs):
         push_int(file_exists(pop1_s))
         return
     end
-    if (str_eq(bname, "exec")):
-        do_pop1()
-        push_str(exec(pop1_s))
-        return
-    end
     if (str_eq(bname, "ord")):
         do_pop1()
         push_int(ord(pop1_s))
@@ -572,122 +516,6 @@ def do_builtin(bname, nargs):
     if (str_eq(bname, "chr")):
         do_pop1()
         push_str(chr(pop1_i))
-        return
-    end
-    # ---- QSCL builtin ----
-    if (str_eq(bname, "embedding")):
-        do_pop3()
-        var dim = pop1_i
-        var e_arr = pop2_a
-        var code = pop3_i
-        # embedding: 返回向量的偏移量
-        push_int(code * dim)
-        return
-    end
-    if (str_eq(bname, "mat_mul")):
-        do_pop4()
-        n_out = pop1_i
-        n_in = pop2_i
-        w_arr = pop3_a
-        x_off = pop4_i
-        # mat_mul: x[n_in] @ W[n_out*n_in] -> y[n_out]
-        var y_off = ar_used * 1
-        if (ar_used >= 127): y_off = 0 end
-        ar_used = ar_used + 1
-        ar_off[ar_used-1] = ar_next
-        ar_size[ar_used-1] = n_out
-        ar_next = ar_next + n_out
-        var i = 0
-        while (i < n_out):
-            var sum = 0
-            var j = 0
-            while (j < n_in):
-                var x_val = ae_i_get(x_off + j)
-                var w_val = ae_i_get(w_arr + i * n_in + j)
-                sum = sum + x_val * w_val / 100
-                j = j + 1
-            end
-            ae_i_set(ar_off[ar_used-1] + i, sum)
-            i = i + 1
-        end
-        push_arr(ar_used - 1)
-        return
-    end
-    if (str_eq(bname, "softmax")):
-        do_pop2()
-        var arr = pop1_a
-        var n = pop2_i
-        # softmax: 返回logits偏移量(原地计算)
-        var max_val = ae_i_get(arr)
-        var i = 0
-        while (i < n):
-            var v = ae_i_get(arr + i)
-            if (v > max_val): max_val = v end
-            i = i + 1
-        end
-        i = 0
-        while (i < n):
-            var diff = ae_i_get(arr + i) - max_val
-            ae_i_set(arr + i, diff)
-            i = i + 1
-        end
-        # 用exp近似
-        i = 0
-        while (i < n):
-            var v = ae_i_get(arr + i)
-            var exp_v = 0
-            if (v > 0): exp_v = 100 + v * 10 end
-            ae_i_set(arr + i, exp_v)
-            i = i + 1
-        end
-        # 归一化
-        var total = 0
-        i = 0
-        while (i < n):
-            total = total + ae_i_get(arr + i)
-            i = i + 1
-        end
-        i = 0
-        while (i < n):
-            ae_i_set(arr + i, ae_i_get(arr + i) * 10000 / (total + 1))
-            i = i + 1
-        end
-        push_int(arr)
-        return
-    end
-    if (str_eq(bname, "argmax")):
-        do_pop2()
-        var arr = pop1_a
-        var n = pop2_i
-        var max_idx = 0
-        var max_val = ae_i_get(arr)
-        var i = 0
-        while (i < n):
-            var v = ae_i_get(arr + i)
-            if (v > max_val):
-                max_val = v
-                max_idx = i
-            end
-            i = i + 1
-        end
-        push_int(max_idx)
-        return
-    end
-    if (str_eq(bname, "backprop")):
-        do_pop5()
-        scale = pop1_i
-        n = pop2_i
-        w_arr = pop3_a
-        grad_arr = pop4_a
-        lr = pop5_i
-        # backprop: W[k] += lr * grad[k] / scale
-        var k = 0
-        while (k < n):
-            var grad = ae_i_get(grad_arr + k)
-            ae_i_set(w_arr + k, ae_i_get(w_arr + k) + lr * grad / scale)
-            k = k + 1
-        end
-        push_int(n)
         return
     end
     if (str_eq(bname, "tcp_listen")):
@@ -720,34 +548,126 @@ def do_builtin(bname, nargs):
         push_int(tcp_shutdown(pop1_i))
         return
     end
-    if (str_eq(bname, "qreg_create")):
-        do_pop1()
-        push_int(qreg_create(pop1_i))
+    # ================= QSCL builtin =================
+    # mat_mul(x[], W[], n, m): x是n维输入, W是n*m矩阵, 返回m维结果数组句柄
+    if (str_eq(bname, "mat_mul")):
+        do_pop4()
+        var m = pop4_i
+        var n = pop3_i
+        var w_h = pop2_a
+        var x_h = pop1_a
+        var h = ar_used
+        ar_used = ar_used + 1
+        var xoff = ar_off[x_h]
+        var woff = ar_off[w_h]
+        ar_off[h] = ar_next
+        ar_size[h] = m
+        ar_next = ar_next + m
+        var i = 0
+        var j = 0
+        var acc = 0
+        while (i < m):
+            acc = 0
+            j = 0
+            while (j < n):
+                acc = acc + ae_i_get(xoff + j) * ae_i_get(woff + j * m + i) / 100
+                j = j + 1
+            end
+            ae_i_set(ar_off[h] + i, acc)
+            i = i + 1
+        end
+        push_arr(h)
         return
     end
-    if (str_eq(bname, "qreg_free")):
-        do_pop1()
-        push_int(qreg_free(pop1_i))
-        return
-    end
-    if (str_eq(bname, "apply_h")):
+    # softmax(a[], n): 定点softmax(不减max,直接exp近似), 返回原数组句柄
+    if (str_eq(bname, "softmax")):
         do_pop2()
-        push_int(apply_h(pop1_i, pop2_i))
+        var n = pop2_i
+        var ah = pop1_a
+        var aoff = ar_off[ah]
+        var i = 0
+        var s = 0
+        var v = 0
+        s = 0
+        i = 0
+        while (i < n):
+            v = ae_i_get(aoff + i)
+            # 定点exp近似: e^v ≈ 100 + v*20 (v>=0时)
+            if (v < 0): v = 0 end
+            if (v > 100): v = 100 end
+            ae_i_set(aoff + i, 100 + v * 20)
+            s = s + 100 + v * 20
+            i = i + 1
+        end
+        if (s == 0): s = 1 end
+        i = 0
+        while (i < n):
+            ae_i_set(aoff + i, ae_i_get(aoff + i) * 10000 / s)
+            i = i + 1
+        end
+        push_arr(ah)
         return
     end
-    if (str_eq(bname, "apply_t")):
+    # argmax(a[], n): 返回最大值的索引
+    if (str_eq(bname, "argmax")):
         do_pop2()
-        push_int(apply_t(pop1_i, pop2_i))
+        var n = pop2_i
+        var ah = pop1_a
+        var aoff = ar_off[ah]
+        var i = 0
+        var bi = 0
+        var bv = 0
+        var v = 0
+        bv = ae_i_get(aoff)
+        bi = 0
+        i = 1
+        while (i < n):
+            v = ae_i_get(aoff + i)
+            if (v > bv):
+                bv = v
+                bi = i
+            end
+            i = i + 1
+        end
+        push_int(bi)
         return
     end
-    if (str_eq(bname, "apply_cx")):
+    # embedding(code, dim, E[]): 返回E中code*dim处dim长的行偏移
+    if (str_eq(bname, "embedding")):
         do_pop3()
-        push_int(apply_cx(pop1_i, pop2_i, pop3_i))
+        var e_h = pop3_a
+        var dim = pop2_i
+        var code = pop1_i
+        var eoff = ar_off[e_h]
+        var h = ar_used
+        ar_used = ar_used + 1
+        ar_off[h] = eoff + code * dim
+        ar_size[h] = dim
+        var i = 0
+        while (i < dim):
+            ae_i_set(ar_off[h] + i, ae_i_get(eoff + code * dim + i))
+            i = i + 1
+        end
+        push_arr(h)
         return
     end
-    if (str_eq(bname, "measure")):
-        do_pop2()
-        push_int(measure(pop1_i, pop2_i))
+    # backprop(W[], grad[], n, lr): W[i] += lr*grad[i]/100
+    if (str_eq(bname, "backprop")):
+        do_pop4()
+        var lr = pop4_i
+        var n = pop3_i
+        var g_h = pop2_a
+        var w_h = pop1_a
+        var woff = ar_off[w_h]
+        var goff = ar_off[g_h]
+        var i = 0
+        var up = 0
+        while (i < n):
+            up = lr * ae_i_get(goff + i) / 100
+            ae_i_set(woff + i, ae_i_get(woff + i) + up)
+            i = i + 1
+        end
+        push_int(n)
         return
     end
     printf("[QVM-Q] 未知内置函数: %s\n", bname)
