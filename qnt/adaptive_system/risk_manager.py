@@ -20,7 +20,7 @@ class RiskManager:
     MAX_CONSECUTIVE_LOSSES = 5     # 连续亏损 5 次暂停
     MAX_DRAWDOWN_PCT = 0.40        # 最大回撤 40% 停止
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.0005  # 0.05%     # 净利必须 > 0.1% 才执行
+    MIN_NET_PROFIT_PCT = 0.0001  # 0.01%     # 测试模式：净利必须 > 0.01% 才执行
     
     def __init__(self, db_path: str, exchanges_config: Dict = None):
         self.db_path = db_path
