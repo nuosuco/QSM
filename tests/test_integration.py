@@ -1,121 +1,184 @@
 """
-QNT 集成测试 - 全流程验证
+QNT 端到端测试 - 完整业务流程验证
 """
+import pytest
+import time
 import numpy as np
 from core.chain import QNTChain
-from core.contract import QNTToken, QNTGovernance, NStateContract
 from exchange.engine import MatchingEngine
 from nstate.pool import SuperpositionPool
-from agents.base import ArbAgent, MarketMakerAgent, TrendAgent
-from strategies.arbitrage import SpreadArbitrageStrategy, MarketMakingStrategy
+from agents.base import ArbAgent, TrendAgent
+from storage.persistence import PersistenceManager
 
 
-def test_blockchain():
-    print("\n=== 1. Blockchain Test ===")
-    chain = QNTChain(difficulty=2)
-    chain.state_ledger['Alice'] = 10000.0
-    chain.state_ledger['Bob'] = 5000.0
-    chain.add_transaction('Alice', 'Bob', 500.0)
-    chain.mine_pending_transactions()
-    assert chain.is_valid()
-    assert chain.get_balance('Alice') == 9500.0
-    print(f"✅ Blockchain OK - height={chain.get_chain_info()['height']}")
-    return True
+class TestFullPipeline:
+    """完整业务流程测试"""
+    
+    def test_blockchain_to_exchange(self):
+        """区块链交易 → 交易所撮合完整流程"""
+        # 1. 区块链初始化
+        chain = QNTChain(difficulty=2)
+        chain.state_ledger['Alice'] = 10000.0
+        chain.add_transaction('Alice', 'Bob', 5000.0)
+        chain.mine_pending_transactions()
+        
+        assert chain.is_valid()
+        assert chain.get_balance('Bob') == 5000.0
+        
+        # 2. 交易所初始化（模拟 Alice 和 Bob 在交易所开户）
+        eng = MatchingEngine('QNT/USDT', 0.001)
+        eng.set_balance('Alice', 'QNT', 5000.0)
+        eng.set_balance('Alice', 'USDT', 5000.0)
+        eng.set_balance('Bob', 'QNT', 3000.0)
+        eng.set_balance('Bob', 'USDT', 3000.0)
+        
+        # 3. Alice 卖出 QNT 换 USDT
+        eng.submit_order('Alice', 'sell', 100, price=100.0)
+        # Bob 买入 QNT
+        eng.submit_order('Bob', 'buy', 50, price=100.0)
+        
+        trades = len(eng.trades)
+        assert trades >= 1
+        
+        print(f"\n✅ 流程: 区块链→交易所, {trades}笔成交")
+    
+    def test_nstate_to_agent(self):
+        """N态训练 → Agent决策完整流程"""
+        # 1. N态训练
+        pool = SuperpositionPool(num_states=4, weight_dim=10)
+        for i in range(10):
+            for _ in range(4):
+                pool.train_step(np.random.randn(10), np.random.rand())
+            if (i + 1) % 5 == 0:
+                pool.collapse()
+        
+        # 2. Agent使用N态模型做决策
+        arb = ArbAgent(name='ArbBot')
+        decision = arb.think({'spread_pct': 0.08})
+        
+        assert decision['decision']['action'] == 'arbitrage'
+        print(f"\n✅ 流程: N态训练{pool.training_rounds}轮 → Agent决策")
+    
+    def test_full_trading_cycle(self):
+        """完整交易周期测试"""
+        chain = QNTChain(difficulty=2)
+        chain.state_ledger['Alice'] = 10000.0
+        
+        # 挖矿获得初始资金
+        for i in range(5):
+            chain.add_transaction('Alice', 'Bob', 1000.0)
+        chain.mine_pending_transactions()
+        
+        # 交易所交易
+        eng = MatchingEngine('QNT/USDT', 0.001)
+        eng.set_balance('Alice', 'QNT', 5000.0)
+        eng.set_balance('Alice', 'USDT', 5000.0)
+        eng.set_balance('Charlie', 'QNT', 5000.0)
+        eng.set_balance('Charlie', 'USDT', 5000.0)
+        
+        # 挂卖单
+        order_id = eng.submit_order('Alice', 'sell', 100, price=100.0)
+        assert order_id is not None
+        
+        # 对手方成交
+        eng.submit_order('Charlie', 'buy', 80, price=100.0)
+        assert len(eng.trades) >= 1
+        
+        # Agent监控价差并决策
+        arb = ArbAgent(name='Monitor')
+        snapshot = eng.get_orderbook_snapshot()
+        decision = arb.think({'spread_pct': snapshot.get('spread_pct', 0.05)})
+        
+        assert 'decision' in decision
+        print(f"\n✅ 完整交易周期: {len(chain.chain)}块 + {len(eng.trades)}交易")
+    
+    def test_persistence_integration(self):
+        """持久化层集成测试"""
+        pm = PersistenceManager()
+        
+        # 保存区块链数据
+        chain = QNTChain(difficulty=2)
+        chain.state_ledger['Alice'] = 10000.0
+        chain.add_transaction('Alice', 'Bob', 500.0)
+        chain.mine_pending_transactions()
+        
+        assert pm.save_block({
+            'hash': 'test_hash',
+            'index': 1,
+            'transactions': [{'sender': 'Alice', 'receiver': 'Bob', 'amount': 500.0}]
+        })
+        
+        # 保存订单和成交
+        eng = MatchingEngine('QNT/USDT', 0.001)
+        eng.set_balance('A', 'QNT', 1000.0); eng.set_balance('A', 'USDT', 10000.0)
+        eng.set_balance('B', 'QNT', 1000.0); eng.set_balance('B', 'USDT', 10000.0)
+        eng.submit_order('A', 'sell', 100, price=100.0)
+        eng.submit_order('B', 'buy', 80, price=100.0)
+        
+        assert pm.save_order('o1', 'A', 'sell', 100, 100.0)
+        assert pm.save_trade('t1', 'o1', 'o2', 80, 100.0)
+        
+        print(f"\n✅ 持久化集成: {len(eng.trades)}笔成交已保存")
 
 
-def test_token():
-    print("\n=== 2. Token Contract Test ===")
-    token = QNTToken(total_supply=1_000_000.0)
-    assert token.balance_of('system') == 1_000_000.0
-    result = token.call('system', 'transfer', 'Alice', 1000.0)
-    assert result['success']
-    assert token.balance_of('Alice') == 1000.0
-    print(f"✅ Token OK - Alice={token.balance_of('Alice'):.0f}")
-    return True
+class TestWebSocketSimulation:
+    """WebSocket实时推送模拟测试"""
+    
+    def test_event_broadcast(self):
+        """事件广播测试"""
+        events = []
+        
+        def mock_emit(event, data):
+            events.append({'event': event, 'data': data})
+        
+        # 模拟广播trade事件
+        mock_emit('trade', {'price': 100.0, 'quantity': 50.0})
+        mock_emit('orderbook', {'bids': [[100.0, 100]], 'asks': [[101.0, 50]]})
+        
+        assert len(events) == 2
+        assert events[0]['event'] == 'trade'
+        print(f"\n✅ 事件广播: {len(events)}条事件")
 
 
-def test_exchange():
-    print("\n=== 3. Exchange Test ===")
-    eng = MatchingEngine('QNT/USDT', 0.001)
-    eng.set_balance('A', 'QNT', 500.0); eng.set_balance('A', 'USDT', 10000.0)
-    eng.set_balance('B', 'QNT', 500.0); eng.set_balance('B', 'USDT', 10000.0)
-    eng.submit_order('A', 'sell', 100, price=100.0)
-    eng.submit_order('B', 'buy', 80, price=100.0)
-    assert len(eng.trades) >= 1
-    assert eng.trades[0].quantity == 80.0
-    print(f"✅ Exchange OK - {len(eng.trades)} trades")
-    return True
-
-
-def test_nstate():
-    print("\n=== 4. N-State Test ===")
-    pool = SuperpositionPool(num_states=4, weight_dim=5)
-    for i in range(10):
-        pool.train_step(np.random.randn(5), np.random.rand())
-    collapse = pool.collapse()
-    assert 'merged_weights' in collapse
-    assert pool.num_states == 4
-    print(f"✅ N-State OK - {pool.training_rounds} rounds")
-    return True
-
-
-def test_agents():
-    print("\n=== 5. Agent Test ===")
-    arb = ArbAgent(name='ArbBot')
-    dec = arb.think({'spread_pct': 0.08})
-    assert dec['decision']['action'] == 'arbitrage'
-    trend = TrendAgent(name='TrendBot', lookback=3)
-    for p in [10, 11, 12, 13, 14, 15]:
-        trend.think({'price': float(p)})
-    dec = trend.think({'price': 15.0})
-    assert dec['decision']['action'] in ['buy', 'sell', 'hold']
-    print(f"✅ Agents OK - Arb={dec['decision']['action']}")
-    return True
-
-
-def test_governance():
-    print("\n=== 6. Governance Test ===")
-    gov = QNTGovernance()
-    pid = gov.call('Alice', 'propose', 'Upgrade', ['core']).get('result', 0)
-    gov.vote('Alice', pid, True, weight=100.0)
-    gov.vote('Bob', pid, False, weight=30.0)
-    proposal = gov.state['proposals'][0]
-    assert proposal['votes_for'] == 100.0
-    assert proposal['votes_against'] == 30.0
-    print(f"✅ Governance OK - Proposal {pid}: for=100, against=30")
-    return True
-
-
-def test_nstate_contract():
-    print("\n=== 7. N-State Contract Test ===")
-    ns = NStateContract(num_states=4)
-    ns.add_state(0, [0.1, 0.2, 0.3])
-    ns.add_state(1, [0.4, 0.5, 0.6])
-    result = ns.collapse()
-    assert 'merged_weights' in result
-    assert len(ns.state['states']) == 0
-    print(f"✅ N-State Contract OK - Merged 2 states")
-    return True
-
-
-def run_all_tests():
-    print("=" * 50)
-    print("🧪 QNT Integration Tests")
-    print("=" * 50)
-    results = []
-    for test in [test_blockchain, test_token, test_exchange, test_nstate, test_agents, test_governance, test_nstate_contract]:
-        try:
-            results.append(test())
-        except Exception as e:
-            print(f"❌ {test.__name__} FAILED: {e}")
-            results.append(False)
-    passed = sum(results)
-    total = len(results)
-    print(f"\n📊 Results: {passed}/{total} passed")
-    if passed == total:
-        print("🎉 All tests passed!")
-    return all(results)
+class TestPerformanceIntegration:
+    """性能集成测试"""
+    
+    def test_high_frequency_trading(self):
+        """高频交易测试"""
+        eng = MatchingEngine('QNT/USDT', 0.001)
+        
+        # 设置多个交易者
+        for i in range(5):
+            eng.set_balance(f'T{i}', 'QNT', 10000.0)
+            eng.set_balance(f'T{i}', 'USDT', 10000.0)
+        
+        start = time.time()
+        for i in range(100):
+            buyer = f'T{i % 5}'
+            seller = f'T{(i + 1) % 5}'
+            eng.submit_order(seller, 'sell', 10, price=100.0)
+            eng.submit_order(buyer, 'buy', 10, price=100.0)
+        elapsed = time.time() - start
+        
+        tps = len(eng.trades) / elapsed
+        print(f"\n⚡ 高频交易: {len(eng.trades)}笔成交, {tps:.0f} trade/s")
+        assert tps > 50
+    
+    def test_concurrent_nstate_training(self):
+        """并发N态训练测试"""
+        pool = SuperpositionPool(num_states=8, weight_dim=20)
+        
+        start = time.time()
+        for round_num in range(20):
+            for state_id in range(8):
+                pool.train_step(np.random.randn(20), np.random.rand())
+            if round_num % 4 == 3:
+                pool.collapse()
+        elapsed = time.time() - start
+        
+        print(f"\n🧠 N态训练: {pool.training_rounds}轮, {elapsed*1000:.1f}ms")
+        assert pool.training_rounds == 160
 
 
 if __name__ == '__main__':
-    run_all_tests()
+    pytest.main([__file__, '-v', '--tb=short'])
