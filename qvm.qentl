@@ -651,6 +651,50 @@ def do_builtin(bname, nargs):
         push_arr(h)
         return
     end
+    # embedding_to(code, dim, E[], dst[]): 复制E[code]行到dst(原地复用,不新建数组)
+    if (str_eq(bname, "embedding_to")):
+        do_pop4()
+        var dst_h = pop4_a
+        var e_h = pop3_a
+        var dim = pop2_i
+        var code = pop1_i
+        var eoff = ar_off[e_h]
+        var doff = ar_off[dst_h]
+        var i = 0
+        while (i < dim):
+            ae_i_set(doff + i, ae_i_get(eoff + code * dim + i))
+            i = i + 1
+        end
+        push_int(dim)
+        return
+    end
+    # mat_mul_to(x[], W[], n, m, dst[]): 结果写入dst(原地复用,不新建数组)
+    if (str_eq(bname, "mat_mul_to")):
+        do_pop5()
+        var dst_h = pop5_a
+        var m = pop4_i
+        var n = pop3_i
+        var w_h = pop2_a
+        var x_h = pop1_a
+        var xoff = ar_off[x_h]
+        var woff = ar_off[w_h]
+        var doff = ar_off[dst_h]
+        var i = 0
+        var j = 0
+        var acc = 0
+        while (i < m):
+            acc = 0
+            j = 0
+            while (j < n):
+                acc = acc + ae_i_get(xoff + j) * ae_i_get(woff + j * m + i) / 10
+                j = j + 1
+            end
+            ae_i_set(doff + i, acc)
+            i = i + 1
+        end
+        push_int(m)
+        return
+    end
     # backprop(W[], grad[], n, lr): W[i] += lr*grad[i]/100 (符号感知, 步长=grad)
     if (str_eq(bname, "backprop")):
         do_pop4()
