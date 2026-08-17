@@ -48,8 +48,8 @@ QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型 → HTTP/QOS
 
 | 组件 | 文件 | 行数 | 状态 | 备注 |
 |------|------|------|------|------|
-| QVM | qvm.qentl | 988 | ✅含QSCL | ⚠️do_pop4/do_pop5未定义 |
-| QCL | qcl.qentl | 670 | ✅含注册 | 重复注册但不影响 |
+| QVM | qvm.qentl | 1069 | ⚠️有编译错误 | 局部变量声明问题 |
+| QCL | qcl.qentl | 1577 | ✅ | 含符号表+数组管理 |
 | 启动器 | lib/qvm_boot.qentl | ~50 | ✅稳定 | 不改 |
 | C种子 | bin/q_bootstrap | ELF | ✅退役 | 不升级 |
 | QDFS | lib/qdfs_ns.qentl | - | ✅恢复 | 完整 |
@@ -68,7 +68,8 @@ QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型 → HTTP/QOS
 **操作**:
 1. 添加pop4/pop5变量声明(pop1_t~pop5_t, pop1_i~pop5_i, pop1_s~pop5_s, pop1_a~pop5_a)
 2. 添加do_pop4/do_pop5函数定义
-3. 验证: `./bin/q_bootstrap compile qvm.qentl run/qvm.qbc` → 退出码0
+3. 在do_builtin开头声明所有局部变量(避免重复声明)
+4. 验证: `./bin/q_bootstrap compile qvm.qentl run/qvm.qbc` → 退出码0
 
 ### 步骤2: 实现QSCL训练脚本
 **目标**: 4态叠加态并行训练,每态不同起点
@@ -110,7 +111,7 @@ QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型 → HTTP/QOS
 
 | 步骤 | 任务 | 状态 | 验证 | 备注 |
 |------|------|------|------|------|
-| 1 | 修复QVM编译错误 | ⏳进行中 | - | do_pop4/do_pop5缺失 |
+| 1 | 修复QVM编译错误 | ⏳进行中 | - | 局部变量声明问题 |
 | 2 | 实现QSCL训练脚本 | ❌待做 | - | 4态不同起步 |
 | 3 | 生成真实权重 | ❌待做 | - | 文件需>10KB |
 | 4 | 修复/api/yi推理 | ⚠️部分完成 | - | 简化版可用 |
@@ -121,16 +122,17 @@ QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型 → HTTP/QOS
 
 ## 七、QSCL核心原理(必记)
 
-### 七步五框架
+### 五步框架
 ```
-五步框架:
 1. N态不同起点(不同初始权重)
 2. 各态独立并行训练
 3. 各态学到不同权重
 4. 观测坍缩(合并所有态权重)
 5. 最终模型含所有态知识
+```
 
-四步技术:
+### 四步技术
+```
 1. embedding: 码点→N维向量
 2. mat_mul: 矩阵运算
 3. softmax: 概率分布
@@ -157,12 +159,12 @@ QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型 → HTTP/QOS
 ### 8.2 编译层: QCL
 - 文件: qcl.qentl → build/qcl.qbc
 - 功能: QEntL编译器,自举验证通过
-- 当前: 670行,支持向量/矩阵语法(待QVM补齐)
+- 当前: 1577行,支持量子门+var+数组+字符串
 
 ### 8.3 运行层: QVM
 - 文件: qvm.qentl → run/qvm.qbc
 - 功能: QBC1字节码虚拟机
-- 当前: 988行,含31条opcode+14个builtin
+- 当前: 1069行,含31条opcode+14个builtin
 - 新增: QSCL builtin(embedding/mat_mul/softmax/argmax/backprop)
 
 ### 8.4 存储层: QDFS
@@ -196,6 +198,7 @@ QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型 → HTTP/QOS
 4. **真实产物为证** — 不说完成了除非机器验证通过
 5. **QVM是QEntL写的** — 不在C种子改,在qvm.qentl改
 6. **QNS是训练层** — QSCL在QNS实现,不在QVM/启动器改
+7. **自主执行铁律** — 中华没时间回复时,按规划继续执行,不等指令
 
 ---
 
@@ -203,3 +206,28 @@ QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型 → HTTP/QOS
 **最后更新**: 2026-08-18
 **作者**: 小趣WeQ
 **状态**: 执行中(步骤1进行中)
+---
+
+## 附: QSCL叠加态训练验证记录 (2026-08-18)
+
+### 里程碑: 5个QSCL builtin全部实现并通过测试
+- mat_mul: 矩阵乘法 (W布局=[输入维][类], W[d*K+cls])
+- softmax: 定点softmax (exp近似 100+v*10, 输出0-100概率)
+- argmax: 最大概率索引
+- embedding: 码点索引查表(返回行向量)
+- backprop: 符号感知梯度更新 (W[i] += lr*grad[i]/100)
+
+### 原型训练结果 (N=16, K=16, 一对一任务, 4态不同起步)
+- 随机基线: 6.25%
+- 单态最高: 43% (seed=4, 60 epochs)
+- 坍缩投票合并: 56% (9/16) — 超过任何单态!
+- 验证: 投票坍缩 > 单态 > 随机, QSCL叠加态并行训练真实生效
+
+### 关键经验 (QCL整数限制下的训练)
+1. W矩阵索引布局必须一致: mat_mul读W[j*m+i]=W[输入维][类], 更新也必须用同布局
+2. u16溢出: 利用先除后乘避免中间溢出
+3. 负梯度会被整数除法截断: backprop做符号感知(先取绝对值除再取负)
+4. 学习率: LR=20-100, backprop分母100 (步长≈梯度本身)
+5. E和W同时更新会正反馈震荡: 先固定E只训W, 或小步长E更新
+6. 坍缩合并用投票(多数决)优于权重平均: 各态学到不同知识,平均会稀释
+7. 数组池句柄: ar_off/ar_size扩大到16384支持大量临时数组

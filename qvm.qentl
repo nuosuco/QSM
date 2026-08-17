@@ -41,8 +41,8 @@ var gl_str[512]
 var gl_arr[512]
 
 # ---- 数组池: 碰撞分配器, 双段存储 ----
-var ar_off[128]
-var ar_size[128]
+var ar_off[16384]
+var ar_size[16384]
 var ar_used = 0
 var ar_next = 0
 var ae_type0[65535]
@@ -570,7 +570,7 @@ def do_builtin(bname, nargs):
             acc = 0
             j = 0
             while (j < n):
-                acc = acc + ae_i_get(xoff + j) * ae_i_get(woff + j * m + i) / 100
+                acc = acc + ae_i_get(xoff + j) * ae_i_get(woff + j * m + i) / 10
                 j = j + 1
             end
             ae_i_set(ar_off[h] + i, acc)
@@ -579,7 +579,7 @@ def do_builtin(bname, nargs):
         push_arr(h)
         return
     end
-    # softmax(a[], n): 定点softmax(不减max,直接exp近似), 返回原数组句柄
+    # softmax(a[], n): 定点softmax, 返回原数组句柄 (0-100概率)
     if (str_eq(bname, "softmax")):
         do_pop2()
         var n = pop2_i
@@ -592,17 +592,17 @@ def do_builtin(bname, nargs):
         i = 0
         while (i < n):
             v = ae_i_get(aoff + i)
-            # 定点exp近似: e^v ≈ 100 + v*20 (v>=0时)
+            # 定点exp近似: e^v ≈ 100 + v*10 (logits 0-500范围)
             if (v < 0): v = 0 end
-            if (v > 100): v = 100 end
-            ae_i_set(aoff + i, 100 + v * 20)
-            s = s + 100 + v * 20
+            if (v > 500): v = 500 end
+            ae_i_set(aoff + i, 100 + v * 10)
+            s = s + 100 + v * 10
             i = i + 1
         end
         if (s == 0): s = 1 end
         i = 0
         while (i < n):
-            ae_i_set(aoff + i, ae_i_get(aoff + i) * 10000 / s)
+            ae_i_set(aoff + i, ae_i_get(aoff + i) * 100 / s)
             i = i + 1
         end
         push_arr(ah)
@@ -651,7 +651,7 @@ def do_builtin(bname, nargs):
         push_arr(h)
         return
     end
-    # backprop(W[], grad[], n, lr): W[i] += lr*grad[i]/100
+    # backprop(W[], grad[], n, lr): W[i] += lr*grad[i]/100 (符号感知, 步长=grad)
     if (str_eq(bname, "backprop")):
         do_pop4()
         var lr = pop4_i
@@ -662,8 +662,14 @@ def do_builtin(bname, nargs):
         var goff = ar_off[g_h]
         var i = 0
         var up = 0
+        var dz = 0
         while (i < n):
-            up = lr * ae_i_get(goff + i) / 100
+            dz = ae_i_get(goff + i)
+            if (dz > 0):
+                up = lr * dz / 100
+            else:
+                up = 0 - (lr * (0 - dz) / 100)
+            end
             ae_i_set(woff + i, ae_i_get(woff + i) + up)
             i = i + 1
         end
