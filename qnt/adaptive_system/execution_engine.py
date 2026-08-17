@@ -76,6 +76,18 @@ class ExecutionEngine:
                     kwargs['password'] = passphrase
                 
                 self.exchanges[ex_name] = cls(kwargs)
+                
+                # HTX设置100倍杠杆
+                if ex_name == 'htx':
+                    try:
+                        leverage = 100
+                        for symbol in self.config.data.symbols:
+                            perp_symbol = f"{symbol.split('/')[0]}/USDT:USDT"
+                            self.exchanges[ex_name].set_leverage(leverage, perp_symbol)
+                            logger.info(f"✅ {ex_name} {perp_symbol} 杠杆已设置为 {leverage}x")
+                    except Exception as e:
+                        logger.warning(f"⚠️ {ex_name} 杠杆设置失败: {e}")
+                
                 logger.info(f"✅ {ex_name} 交易引擎已连接")
             except Exception as e:
                 logger.error(f"❌ {ex_name} 连接失败: {e}")

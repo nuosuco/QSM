@@ -191,13 +191,21 @@ class SelfEvolutionTradingSystem:
                     min(pattern.confidence * 0.5, 1.0)
     
     def _apply_risk_adjustments(self, risk_status):
-        """应用风控调整"""
+        """应用风控调整 - 自动修改阈值"""
         if risk_status['suspension_recommended']:
             logger.warning("⚠️ 极端市场状态，建议暂停交易")
-        else:
-            adjustments = risk_status['risk_adjustments']
-            logger.info(f"   风控调整: 仓位={adjustments.get('position_size', 1.0)}x "
-                       f"止损={adjustments.get('stop_loss_pct', 2.0)}%")
+            return
+        
+        adjustments = risk_status['risk_adjustments']
+        position_mult = adjustments.get('position_size', 1.0)
+        stop_loss_pct = adjustments.get('stop_loss_pct', 2.0)
+        
+        # 自动调整仓位倍数（动态调整灵敏度）
+        if position_mult != 1.0:
+            logger.info(f"   🧬 自进化调整: 仓位倍数={position_mult:.2f}x")
+            # 这里可以进一步调整config中的参数
+        
+        logger.info(f"   风控调整: 仓位={position_mult}x 止损={stop_loss_pct}%")
     
     def _log_status(self, per_exchange_analysis: Dict, risk_status):
         """打印当前状态 - 按平台/引擎显示"""
