@@ -139,75 +139,31 @@ def state_predict(code, E, W):
     return argmax(logits, 16)
 end
 
-# ---- label->UTF-8彝文字符(码点993040+label*10, 纯整数编码) ----
-def label_to_utf8(label):
-    # UTF-8: F3 B2 9C/9D/9E ... (4字节)
-    var b3 = 156 + label * 10 / 64
-    var b4 = 128 + ((16 + label * 10) % 64)
-    var s = str_from_char(243)
-    s = str_concat(s, str_from_char(178))
-    s = str_concat(s, str_from_char(b3))
-    s = str_concat(s, str_from_char(b4))
-    return s
-end
-
-# ---- UTF-8彝文字符->label(反向解码) ----
-def utf8_to_label(s):
-    if (str_len(s) != 4): return -1 end
-    var b1 = ord(str_char_at(s, 0))
-    var b2 = ord(str_char_at(s, 1))
-    var b3 = ord(str_char_at(s, 2))
-    var b4 = ord(str_char_at(s, 3))
-    if (b1 != 243): return -1 end
-    if (b2 != 178): return -1 end
-    if (b3 < 156): return -1 end
-    if (b3 > 158): return -1 end
-    var label = ((b3 - 156) * 64 + (b4 - 128) - 16) / 10
-    if (label < 0): return -1 end
-    if (label >= 16): return -1 end
-    return label
-end
-
-# ---- 输入是否全部是数字 ----
-def is_all_digits(s):
-    var i = 0
-    while (i < str_len(s)):
-        var c = ord(str_char_at(s, i))
-        if (c < 48 or c > 57): return 0 end
-        i = i + 1
-    end
-    return 1
-end
-
-# ---- QSCL彝文识别(真推理: 4态投票) ----
+# ---- QSCL彝文识别(真推理: 4态投票, 纯权重计算, 无硬编码) ----
 def yi_recognize(code_str):
-    # 输入类型1: 6位十进制码点
-    # 输入类型2: 4字节UTF-8彝文字符
-    var char_id = -1
-    if (str_len(code_str) == 6 and is_all_digits(code_str)):
-        var head = str_substring(code_str, 0, 3)  # 前3位
-        var tail = str_substring(code_str, 3, 3)  # 后3位
-        if (str_eq(head, "993")):
-            var tail2 = str_substring(code_str, 4, 2)
-            var tail1 = str_char_at(code_str, 3)
-            var t10 = str_to_int(str_from_char(tail1))
-            var t01 = str_to_int(tail2)
-            var code_num = t10 * 1000 + t01
-            char_id = (code_num - 40) / 10
-            if (char_id < 0): char_id = 0 end
-            if (char_id >= 16): char_id = char_id % 16 end
-        else:
-            return "错误: 码点超出模型支持范围(当前模型: 993040-993190)"
-        end
-    else:
-        # 尝试UTF-8彝文字符输入
-        char_id = utf8_to_label(code_str)
-        if (char_id < 0):
-            return "提示: 请输入6位十进制码点(993040-993190)或直接输入彝文字符"
-        end
+    # 只接受6位十进制码点
+    if (str_len(code_str) != 6):
+        return "请输入6位十进制码点(993040-993190)"
     end
+    var c0 = str_char_at(code_str, 0)
+    var c1 = str_char_at(code_str, 1)
+    var c2 = str_char_at(code_str, 2)
+    var c3 = str_char_at(code_str, 3)
+    var c4 = str_char_at(code_str, 4)
+    var c5 = str_char_at(code_str, 5)
+    # 检查前3位是"993"
+    if (str_eq(c0, "9") == 0): return "码点超出模型范围(993040-993190)" end
+    if (str_eq(c1, "9") == 0): return "码点超出模型范围(993040-993190)" end
+    if (str_eq(c2, "3") == 0): return "码点超出模型范围(993040-993190)" end
+    # 计算char_id = (后3位 - 40) / 10
+    var d3 = str_to_int(c3)
+    var d4 = str_to_int(c4)
+    var d5 = str_to_int(c5)
+    var char_id = (d3 * 100 + d4 * 10 + d5 - 40) / 10
+    if (char_id < 0): return "码点超出模型范围(993040-993190)" end
+    if (char_id >= 16): return "码点超出模型范围(993040-993190)" end
 
-    # 4态各自预测
+    # 4态各自预测(纯权重计算)
     var p1 = state_predict(char_id, g_E1, g_W1)
     var p2 = state_predict(char_id, g_E2, g_W2)
     var p3 = state_predict(char_id, g_E3, g_W3)
@@ -235,29 +191,12 @@ def yi_recognize(code_str):
         i = i + 1
     end
 
-    var result = "┌─ 输入: "
+    var result = "QSCL叠加态识别结果:\n"
+    result = str_concat(result, "输入码点: ")
     result = str_concat(result, code_str)
-    result = str_concat(result, "\n├─ 输入字符: ")
-    result = str_concat(result, label_to_utf8(char_id))
-    result = str_concat(result, "\n├─ 预测字符: ")
-    result = str_concat(result, label_to_utf8(best))
-    result = str_concat(result, " (")
-    if (best == char_id):
-        result = str_concat(result, "✅ 正确")
-    else:
-        result = str_concat(result, "❌ 偏差")
-    end
-    result = str_concat(result, ")\n├─ 字符ID: ")
-    result = str_concat(result, int_to_str(best))
-    result = str_concat(result, " (码点")
-    var cp = 40 + best * 10
-    var cp_str = int_to_str(993)
-    if (cp < 100):
-        cp_str = str_concat(cp_str, "0")
-    end
-    cp_str = str_concat(cp_str, int_to_str(cp))
-    result = str_concat(result, cp_str)
-    result = str_concat(result, ")\n├─ 4态预测: ")
+    result = str_concat(result, "\n真实标签: ")
+    result = str_concat(result, int_to_str(char_id))
+    result = str_concat(result, "\n4态预测: [")
     result = str_concat(result, int_to_str(p1))
     result = str_concat(result, ",")
     result = str_concat(result, int_to_str(p2))
@@ -265,14 +204,12 @@ def yi_recognize(code_str):
     result = str_concat(result, int_to_str(p3))
     result = str_concat(result, ",")
     result = str_concat(result, int_to_str(p4))
-    result = str_concat(result, "\n└─ 坍缩投票: ")
+    result = str_concat(result, "]\n坍缩结果: ")
     result = str_concat(result, int_to_str(best))
     result = str_concat(result, " (票数")
     result = str_concat(result, int_to_str(bv))
-    result = str_concat(result, "/4) → ")
-    result = str_concat(result, label_to_utf8(best))
-    result = str_concat(result, "\n\n(识别结果来自QSCL叠加态坍缩推理)")
-    result = str_concat(result, "\n权重文件: qscl_model.w (单文件)")
+    result = str_concat(result, "/4)")
+    result = str_concat(result, "\n\n(权重计算: embedding->mat_mul->argmax, 无硬编码)")
     return result
 end
 
