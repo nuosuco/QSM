@@ -6,9 +6,17 @@ from flask_cors import CORS
 import json
 import time
 
-
 app = Flask(__name__)
 CORS(app)
+
+# WebSocket支持（可选）
+try:
+    from flask_socketio import SocketIO
+    socketio = SocketIO(app, cors_allowed_origins="*")
+    HAS_WEBSOCKET = True
+except ImportError:
+    HAS_WEBSOCKET = False
+    socketio = None
 
 
 # ============ Blockchain API ============
