@@ -1,75 +1,76 @@
-# QSCL叠加态并行训练 v3 - 全量4120彝文字(分片4态×1030)
-# 每态独立训练本态1030字, 4态覆盖4120, 串行训练
-# 数组复用(embedding_to/mat_mul_to)避免池耗尽
-# D=8, 每态1030类, 每态E+W=16480元素, 单态运行
-# 时间: 每态3epoch约9分钟, 4态约36分钟
-
-var D = 8
+# QSCL叠加态联想记忆训练 v5 - 全量4120彝文字
+# 方法: E=确定性唯一模式(31进制主码+种子噪声), W=Hebbian学习(W[label]←E[label])
+# 推理: mat_mul点积+argmax (mat_mul fastest path)
+# 4态: 不同种子生成不同噪声维, 各自训练, 投票坍缩
+# 单态准确率应与唯一模式完整性相关, 投票提高鲁棒性
+var D = 12
 var K = 1030
 var N = 4120
 var PER_STATE = 1030
-var EPOCHS = 3
-var LR = 100
+var ROUNDS = 3
 
-def prand(c, s):
-    var v = c * 137 + s * 7919
-    v = v % 97
-    return v + 3
-end
-
-# 单态权重(串行)
-var E[8240]
-var W[8240]
+# 单态权重(串行复用)
+var E[12360]
+var W[12360]
 var x[16]
 var logits[1030]
-var gradW[8240]
+var votes[4120]
 
+# 唯一模式: 主码31进制4位(确定性, 保证唯一) + 噪声维6-8维
 def init_weights(seed):
+    var local = 0
+    while (local < PER_STATE):
+        var n = local + (seed - 1) * PER_STATE  # 全局码位(保证4态主码不同错开)
+        var d = 0
+        while (d < 4):
+            E[local * D + d] = n % 31 + 1
+            n = n / 31
+            d = d + 1
+        end
+        var d2 = 4
+        while (d2 < D):
+            E[local * D + d2] = ((local * 131 + seed * 7919 + d2 * 373) % 250) + 2
+            d2 = d2 + 1
+        end
+        local = local + 1
+    end
+    # W清零
     var i = 0
     while (i < PER_STATE * D):
-        E[i] = prand(i, seed) % 19 + 1
-        i = i + 1
-    end
-    i = 0
-    while (i < PER_STATE * D):
-        W[i] = prand(i * 17, seed * 3) % 19 + 1
+        W[i] = 1
         i = i + 1
     end
 end
 
-# 训练单态: 处理自己的PER_STATE个样本
-def train_state(seed, global_base):
-    var epoch = 0
-    while (epoch < EPOCHS):
-        var correct = 0
+# Hebbian: W[label] += E[label] (ROUNDS轮增强)
+def hebbian_learn():
+    var r = 0
+    while (r < ROUNDS):
         var local = 0
         while (local < PER_STATE):
-            var code = global_base + local
-            var label = local  # 态内label
-            embedding_to(local, D, E, x)
-            mat_mul_to(x, W, D, K, logits)
-            var pred = argmax(logits, K)
-            if (pred == label):
-                correct = correct + 1
-            else:
-                var i = 0
-                while (i < PER_STATE * D):
-                    gradW[i] = 0
-                    i = i + 1
-                end
-                var d = 0
-                while (d < D):
-                    gradW[d * K + label] = x[d]
-                    gradW[d * K + pred] = 0 - x[d]
-                    d = d + 1
-                end
-                backprop(W, gradW, PER_STATE * D, LR)
+            var d = 0
+            while (d < D):
+                W[local * D + d] = W[local * D + d] + E[local * D + d]
+                d = d + 1
             end
             local = local + 1
         end
-        printf("  [态%d] epoch%d acc=%d/%d (%d%%)  W[0]=%d\n", seed, epoch, correct, PER_STATE, correct * 100 / PER_STATE, W[0])
-        epoch = epoch + 1
+        r = r + 1
     end
+end
+
+# 态内匹配(点积+argmax)
+def verify_state():
+    var correct = 0
+    var local = 0
+    while (local < PER_STATE):
+        embedding_to(local, D, E, x)
+        mat_mul_to(x, W, D, K, logits)
+        var pred = argmax(logits, K)
+        if (pred == local): correct = correct + 1 end
+        local = local + 1
+    end
+    return correct
 end
 
 # 保存权重
@@ -87,37 +88,28 @@ def save_arr(path, prefix, arr, n_elems):
     return file_write_bytes(path, content)
 end
 
-printf("=== 全量4120彝文字 QSCL叠加态训练 v3 ===\n")
-printf("配置: 4态 x %d字/态 x %d维 x %d轮\n", PER_STATE, D, EPOCHS)
+printf("=== 全量4120彝文字 QSCL联想记忆训练 v5 ===\n")
+printf("配置: 4态 x %d字 x %d维, Hebbian%d轮, 唯一模式+点积推理\n", PER_STATE, D, ROUNDS)
 
 var s = 1
 while (s <= 4):
-    printf("--- 开始训练态%d (seed=%d, 字范围%d-%d) ---\n", s, s, (s-1)*PER_STATE, s*PER_STATE-1)
+    printf("--- 训练态%d (seed=%d, 全局字%d-%d) ---\n", s, s, (s-1)*PER_STATE, s*PER_STATE-1)
     init_weights(s)
-    train_state(s, (s-1)*PER_STATE)
-    printf("--- 态%d训练完成, 落盘 ---\n", s)
-    var epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_1.w"
-    var wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_1.w"
-    if (s == 2):
-        epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_2.w"
-        wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_2.w"
-    end
-    if (s == 3):
-        epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_3.w"
-        wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_3.w"
-    end
-    if (s == 4):
-        epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_4.w"
-        wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_4.w"
-    end
+    hebbian_learn()
+    var ok = verify_state()
+    printf("  态%d训练完成, 态内准确率: %d/%d (%d%%)\n", s, ok, PER_STATE, ok * 100 / PER_STATE)
+    var epath = str_concat("/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_", int_to_str(s))
+    epath = str_concat(epath, ".w")
+    var wpath = str_concat("/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_", int_to_str(s))
+    wpath = str_concat(wpath, ".w")
     var eprefix = str_concat("E", int_to_str(s))
     eprefix = str_concat(eprefix, ":")
     var wprefix = str_concat("W", int_to_str(s))
     wprefix = str_concat(wprefix, ":")
     save_arr(epath, eprefix, E, PER_STATE * D)
     save_arr(wpath, wprefix, W, PER_STATE * D)
-    printf("--- 态%d权重已保存(%d字) ---\n", s, PER_STATE)
+    printf("  态%d权重已保存\n", s)
     s = s + 1
 end
 
-printf("=== 全量训练完成: 4态×%d字=4120全覆盖 ===\n", PER_STATE)
+printf("=== 全量训练完成: 4态权重已落盘 ===\n")
