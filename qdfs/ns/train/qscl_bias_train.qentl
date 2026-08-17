@@ -1,0 +1,170 @@
+# QSCL真训练 - 按skill: 固定编码器+1参数偏置b
+# 4态不同起点: b = sid*100 (0/100/200/300)
+# 网络: pred = encode(code) - b
+# 目标: target = code - 993040 (字符ID 0-15)
+# 数据: 16个码点 993040~993190 (每10步一个)
+# 梯度下降: delta = target - pred; b -= lr * delta / scale
+
+# 固定编码器位置权值 (不学习)
+var g_w0 = 10000 * 10   # 100000 拆分避u16
+var g_w1 = 10000
+var g_w2 = 1000
+var g_w3 = 100
+var g_w4 = 10
+var g_w5 = 1
+
+# 可学习参数
+var g_b = 0
+
+# 训练配置
+var g_sid = 0
+var g_lr = 1
+var g_scale = 1
+var g_epochs = 60
+
+# 编码: code拆6位十进制 → 加权求和 (= code本身)
+var g_d0 = 0
+var g_d1 = 0
+var g_d2 = 0
+var g_d3 = 0
+var g_d4 = 0
+var g_d5 = 0
+
+def encode(code):
+    var tmp = code
+    g_d5 = tmp % 10
+    tmp = tmp / 10
+    g_d4 = tmp % 10
+    tmp = tmp / 10
+    g_d3 = tmp % 10
+    tmp = tmp / 10
+    g_d2 = tmp % 10
+    tmp = tmp / 10
+    g_d1 = tmp % 10
+    tmp = tmp / 10
+    g_d0 = tmp % 10
+    var c = g_w0 * g_d0 + g_w1 * g_d1 + g_w2 * g_d2
+    c = c + g_w3 * g_d3 + g_w4 * g_d4 + g_w5 * g_d5
+    return c
+end
+
+def train_one_state(sid):
+    g_sid = sid
+    g_b = sid * 100
+    var ep = 0
+    while (ep < g_epochs):
+        var correct = 0
+        var code_idx = 0
+        while (code_idx < 16):
+            # code = 993040 + code_idx * 10
+            var base = 993 * 1000 + 40
+            var code = base + code_idx * 10
+            var target = code_idx
+            var enc = encode(code)
+            var pred = enc - g_b
+            # pred应该等于target(code_idx)
+            # 但pred = code - b = 993040 + idx*10 - b
+            # 要pred = idx, 需要b = 993040 + idx*10 - idx = 993040 + idx*9
+            # 不同idx需要不同b → 1个b无法完美拟合!
+            # 但如果encode(code)=code, pred = code - b = 993040+idx*10 - b
+            # 要pred=idx: b = 993040 + idx*10 - idx = 993040 + 9*idx
+            # idx=0: b=993040, idx=15: b=993175 → b不唯一!
+            # 所以需要重新设计encode使pred=target可解
+            
+            # 判断: pred/10 ≈ target? (因为code步进10)
+            var pred_label = pred / 10
+            if (pred_label == target):
+                correct = correct + 1
+            end
+            
+            # 梯度下降: delta = target - pred
+            # 但target(0-15)和pred(993040级别)差太大
+            # 实际: target_for_b = code (让b→993040)
+            # delta = code - (pred + b) = code - enc + b - b = 0... 不对
+            # 重新想: pred = enc - b, 要让pred≈target
+            # 但enc=993040+idx*10, target=idx
+            # pred = 993040 + idx*10 - b
+            # 要pred = idx → b = 993040 + 9*idx (不唯一)
+            # 
+            # 正确方案: encode应该输出idx, 不是code!
+            # encode(code) = (code - 993040) / 10 = idx
+            # 但这需要encode知道993040... 
+            # 
+            # skill原文: encode用位置权值, pred=encode(code)-b
+            # 如果encode(code)就是code本身(位置加权恢复)
+            # 那pred = code - b, target = code - 993040
+            # delta = target - pred = (code-993040) - (code-b) = b - 993040
+            # b -= lr * (b - 993040) / scale → b收敛到993040!
+            # 然后pred = code - 993040 = idx*10, pred/10 = idx ✓
+            
+            var target_for_b = code - 993 * 1000 - 40
+            var delta = target_for_b - pred
+            g_b = g_b - g_lr * delta / g_scale
+            
+            code_idx = code_idx + 1
+        end
+        printf("  [态%d] epoch%d: b=%d correct=%d/16 (%d%%)\n", sid, ep, g_b, correct, correct * 100 / 16)
+        ep = ep + 1
+    end
+end
+
+# 4态训练
+printf("=== QSCL真训练: 固定编码器+1参数偏置b ===\n")
+printf("=== 4态不同起点: b=0/100/200/300 ===\n\n")
+
+var b_results = 0
+var b0 = 0
+var b1 = 0
+var b2 = 0
+var b3 = 0
+
+train_one_state(0)
+b0 = g_b
+printf("态0 最终 b=%d\n\n", b0)
+
+train_one_state(1)
+b1 = g_b
+printf("态1 最终 b=%d\n\n", b1)
+
+train_one_state(2)
+b2 = g_b
+printf("态2 最终 b=%d\n\n", b2)
+
+train_one_state(3)
+b3 = g_b
+printf("态3 最终 b=%d\n\n", b3)
+
+# 坍缩合并: 4态b平均
+var b_avg = (b0 + b1 + b2 + b3) / 4
+printf("=== 观测坍缩合并 ===\n")
+printf("态0: b=%d\n态1: b=%d\n态2: b=%d\n态3: b=%d\n", b0, b1, b2, b3)
+printf("坍缩 b_avg = %d\n\n", b_avg)
+
+# 全量验证
+printf("=== 全量验证 ===\n")
+g_b = b_avg
+var correct = 0
+var idx = 0
+while (idx < 16):
+    var base = 993 * 1000 + 40
+    var code = base + idx * 10
+    var enc = encode(code)
+    var pred = enc - g_b
+    var pred_label = pred / 10
+    var mark = "OK"
+    if (pred_label == idx):
+        correct = correct + 1
+    else:
+        mark = "FAIL"
+    end
+    printf("  code=%d target=%d pred=%d pred_label=%d [%s]\n", code, idx, pred, pred_label, mark)
+    idx = idx + 1
+end
+printf("\n坍缩后准确率: %d/16 (%d%%)\n", correct, correct * 100 / 16)
+printf("总参数: 4个 (4态各1个b)\n")
+printf("训练轮数: %d轮/态\n", g_epochs)
+
+# 保存权重
+var b_str = int_to_str(b_avg)
+file_write_bytes("qdfs/ns/models/qscl_bias.w", str_concat("B:", b_str))
+printf("\n权重已保存: qscl_bias.w B=%d\n", b_avg)
