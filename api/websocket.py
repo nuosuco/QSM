@@ -1,57 +1,95 @@
 """
-QNT WebSocket 实时推送
+QNT API WebSocket实时推送
 """
-from flask_socketio import SocketIO, emit
-import threading
-import time
+import asyncio
+import json
+from datetime import datetime
+from typing import Dict, List, Callable, Any
 
 
-class QNTWebSocket:
-    """QNT WebSocket 服务"""
+class WebSocketManager:
+    """WebSocket连接管理器"""
     
-    def __init__(self, app):
-        self.socketio = SocketIO(app, cors_allowed_origins="*")
-        self.clients = []
-        self._start_background()
+    def __init__(self):
+        self.clients: List[Callable] = []
+        self._handlers: Dict[str, Callable] = {}
+        self._running = False
     
-    def _start_background(self):
-        """后台推送行情"""
-        def push_loop():
-            while True:
-                time.sleep(1)
-                # 推送心跳
-                self.socketio.emit('heartbeat', {'time': time.time()})
+    def connect(self, client: Callable):
+        """注册客户端"""
+        self.clients.append(client)
+        print(f"📡 New WebSocket client connected ({len(self.clients)} total)")
+    
+    def disconnect(self, client: Callable):
+        """取消注册客户端"""
+        if client in self.clients:
+            self.clients.remove(client)
+            print(f"📡 WebSocket client disconnected ({len(self.clients)} total)")
+    
+    async def send(self, data: Dict[str, Any]):
+        """发送消息"""
+        message = json.dumps(data, default=str)
+        for client in self.clients:
+            try:
+                await client(message)
+            except Exception as e:
+                print(f"⚠️ WebSocket send error: {e}")
+    
+    def broadcast(self, event: str, payload: Dict[str, Any]):
+        """广播事件"""
+        message = json.dumps({
+            'event': event,
+            'timestamp': datetime.now().isoformat(),
+            'payload': payload
+        }, default=str)
         
-        t = threading.Thread(target=push_loop, daemon=True)
-        t.start()
+        for client in self.clients:
+            try:
+                asyncio.create_task(client(message))
+            except Exception as e:
+                print(f"⚠️ WebSocket broadcast error: {e}")
     
-    def on_connect(self):
-        self.clients.append(self.socketio.session_id)
-        emit('connected', {'clients': len(self.clients)})
+    def register_handler(self, event: str, handler: Callable):
+        """注册事件处理器"""
+        self._handlers[event] = handler
     
-    def on_disconnect(self):
-        if self.socketio.session_id in self.clients:
-            self.clients.remove(self.socketio.session_id)
-    
-    def broadcast_trade(self, trade_data):
-        """广播成交信息"""
-        self.socketio.emit('trade', trade_data)
-    
-    def broadcast_orderbook(self, orderbook_data):
-        """广播订单簿"""
-        self.socketio.emit('orderbook', orderbook_data)
+    def handle_event(self, event: str, data: Dict[str, Any]):
+        """分发事件"""
+        if event in self._handlers:
+            self._handlers[event](data)
 
 
-def create_socketio(app):
-    """创建SocketIO实例"""
-    socketio = SocketIO(app, cors_allowed_origins="*")
+# 全局WebSocket管理器
+ws_manager = WebSocketManager()
+
+
+class EventBus:
+    """事件总线 - 用于模块间通信"""
     
-    @socketio.on('connect')
-    def handle_connect():
-        emit('connected', {'status': 'ok'})
+    def __init__(self):
+        self._listeners: Dict[str, List[Callable]] = {}
     
-    @socketio.on('disconnect')
-    def handle_disconnect():
-        pass
+    def subscribe(self, event: str, callback: Callable):
+        """订阅事件"""
+        if event not in self._listeners:
+            self._listeners[event] = []
+        self._listeners[event].append(callback)
     
-    return socketio
+    def publish(self, event: str, data: Dict[str, Any] = None):
+        """发布事件"""
+        if event in self._listeners:
+            for callback in self._listeners[event]:
+                try:
+                    callback(data)
+                except Exception as e:
+                    print(f"⚠️ Event handler error: {e}")
+    
+    def unsubscribe(self, event: str, callback: Callable):
+        """取消订阅"""
+        if event in self._listeners:
+            if callback in self._listeners[event]:
+                self._listeners[event].remove(callback)
+
+
+# 全局事件总线
+event_bus = EventBus()
