@@ -77,10 +77,11 @@ def test_governance():
     print("\n=== 6. Governance Test ===")
     gov = QNTGovernance()
     pid = gov.call('Alice', 'propose', 'Upgrade', ['core']).get('result', 0)
-    gov.call('Alice', 'vote', pid, True, weight=100.0)
-    gov.call('Bob', 'vote', pid, False, weight=30.0)
+    gov.vote('Alice', pid, True, weight=100.0)
+    gov.vote('Bob', pid, False, weight=30.0)
     proposal = gov.state['proposals'][0]
     assert proposal['votes_for'] == 100.0
+    assert proposal['votes_against'] == 30.0
     print(f"✅ Governance OK - Proposal {pid}: for=100, against=30")
     return True
 
@@ -88,10 +89,10 @@ def test_governance():
 def test_nstate_contract():
     print("\n=== 7. N-State Contract Test ===")
     ns = NStateContract(num_states=4)
-    ns.call('system', 'add_state', 0, [0.1, 0.2, 0.3])
-    ns.call('system', 'add_state', 1, [0.4, 0.5, 0.6])
-    result = ns.call('system', 'collapse')
-    assert result['success']
+    ns.add_state(0, [0.1, 0.2, 0.3])
+    ns.add_state(1, [0.4, 0.5, 0.6])
+    result = ns.collapse()
+    assert 'merged_weights' in result
     assert len(ns.state['states']) == 0
     print(f"✅ N-State Contract OK - Merged 2 states")
     return True
