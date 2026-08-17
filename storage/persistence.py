@@ -3,6 +3,7 @@ QNT 持久化存储层 - 集成数据库
 """
 import json
 import time
+import pickle
 from typing import Dict, List, Optional, Any
 from database import Database
 
