@@ -25,7 +25,7 @@ class PersistentStore:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS blocks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                index INTEGER UNIQUE,
+                block_index INTEGER UNIQUE,
                 hash TEXT,
                 previous_hash TEXT,
                 timestamp REAL,
@@ -43,9 +43,9 @@ class PersistentStore:
                 sender TEXT,
                 receiver TEXT,
                 amount REAL,
-                block_index INTEGER,
+                block_idx INTEGER,
                 timestamp REAL,
-                FOREIGN KEY (block_index) REFERENCES blocks(index)
+                FOREIGN KEY (block_idx) REFERENCES blocks(block_index)
             )
         ''')
         
@@ -96,7 +96,7 @@ class PersistentStore:
         
         cursor.execute('''
             INSERT OR REPLACE INTO blocks 
-            (index, hash, previous_hash, timestamp, transactions, nonce, difficulty)
+            (block_index, hash, previous_hash, timestamp, transactions, nonce, difficulty)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             block['index'],
@@ -118,7 +118,7 @@ class PersistentStore:
         
         cursor.execute('''
             INSERT OR REPLACE INTO transactions
-            (tx_hash, sender, receiver, amount, block_index, timestamp)
+            (tx_hash, sender, receiver, amount, block_idx, timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             tx.get('tx_hash'),
