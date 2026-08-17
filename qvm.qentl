@@ -69,6 +69,14 @@ var pop2_s = ""
 var pop2_a = 0
 var pop3_i = 0
 var pop3_s = ""
+var pop4_t = 0
+var pop4_i = 0
+var pop4_s = ""
+var pop4_a = 0
+var pop5_t = 0
+var pop5_i = 0
+var pop5_s = ""
+var pop5_a = 0
 var g_cmp_r = 0
 
 # ================================================================
@@ -136,6 +144,20 @@ def do_pop3():
     pop3_i = pop1_i
     pop3_s = pop1_s
     do_pop2()
+end
+
+def do_pop4():
+    do_pop1()
+    pop4_i = pop1_i
+    pop4_s = pop1_s
+    do_pop3()
+end
+
+def do_pop5():
+    do_pop1()
+    pop5_i = pop1_i
+    pop5_s = pop1_s
+    do_pop4()
 end
 
 # ================================================================
@@ -392,6 +414,65 @@ def bi_printf(nargs):
 end
 
 def do_builtin(bname, nargs):
+    var base = 0
+    var fmt = ""
+    var ai = 0
+    var out = ""
+    var k = 0
+    var fl = 0
+    var ch = ""
+    var nx = ""
+    var ln = 0
+    var stx = 0
+    var xa = ""
+    var xb = ""
+    var e = 0
+    var code = 0
+    var dim = 0
+    var e_arr = 0
+    var n_out = 0
+    var n_in = 0
+    var w_arr = 0
+    var x_off = 0
+    var y_off = 0
+    var i = 0
+    var sum = 0
+    var j = 0
+    var x_val = 0
+    var w_val = 0
+    var arr = 0
+    var n = 0
+    var max_val = 0
+    var max_idx = 0
+    var diff = 0
+    var v = 0
+    var exp_v = 0
+    var total = 0
+    var grad = 0
+    var scale = 0
+    var lr = 0
+    var grad_arr = 0
+    var w_idx = 0
+    var g = 0
+    var p = 0
+    var op = 0
+    var np = 0
+    var fname = ""
+    var sl = 0
+    var sx = 0
+    var sy = 0
+    var cx = 0
+    var cy = 0
+    var ix = 0
+    var iy = 0
+    var r = 0
+    var h = 0
+    var sz = 0
+    var pos = 0
+    var idx = 0
+    var t = 0
+    var s = ""
+    var q = 0
     if (str_eq(bname, "printf")):
         bi_printf(nargs)
         push_int(0)
@@ -496,19 +577,19 @@ def do_builtin(bname, nargs):
     # ---- QSCL builtin ----
     if (str_eq(bname, "embedding")):
         do_pop3()
-        var code = pop1_i
+        var dim = pop1_i
         var e_arr = pop2_a
-        var dim = pop3_i
+        var code = pop3_i
         # embedding: 返回向量的偏移量
         push_int(code * dim)
         return
     end
     if (str_eq(bname, "mat_mul")):
         do_pop4()
-        var x_off = pop1_i
-        var w_arr = pop2_a
-        var n_in = pop3_i
-        var n_out = pop4_i
+        n_out = pop1_i
+        n_in = pop2_i
+        w_arr = pop3_a
+        x_off = pop4_i
         # mat_mul: x[n_in] @ W[n_out*n_in] -> y[n_out]
         var y_off = ar_used * 1
         if (ar_used >= 127): y_off = 0 end
@@ -594,11 +675,11 @@ def do_builtin(bname, nargs):
     end
     if (str_eq(bname, "backprop")):
         do_pop5()
-        var lr = pop1_i
-        var grad_arr = pop2_a
-        var w_arr = pop3_a
-        var n = pop4_i
-        var scale = pop5_i
+        scale = pop1_i
+        n = pop2_i
+        w_arr = pop3_a
+        grad_arr = pop4_a
+        lr = pop5_i
         # backprop: W[k] += lr * grad[k] / scale
         var k = 0
         while (k < n):
