@@ -8,6 +8,7 @@ from core.chain import QNTChain
 from exchange.engine import MatchingEngine
 from nstate.pool import SuperpositionPool
 from agents.base import ArbAgent, MarketMakerAgent, TrendAgent
+from agents.strategies import GridTradingAgent, MomentumAgent
 
 
 class TestBlockchainPerformance:
@@ -40,7 +41,7 @@ class TestBlockchainPerformance:
         elapsed = time.time() - start
         
         print(f"\n⛏️  挖矿时间: {elapsed:.4f}s")
-        assert elapsed < 1.0  # 应该1秒内完成
+        assert elapsed < 1.0
     
     def test_chain_validation(self):
         """链验证性能"""
@@ -88,12 +89,12 @@ class TestExchangePerformance:
         eng.set_balance('B', 'QNT', 100000.0)
         eng.set_balance('B', 'USDT', 1000000.0)
         
-        # 提交订单
         for i in range(20):
             eng.submit_order('A', 'sell', 10.0, price=100.0)
             eng.submit_order('B', 'buy', 10.0, price=100.0)
         
-        assert len(eng.trades) >= 20  # 可能有多笔成交
+        assert len(eng.trades) >= 20
+        print(f"\n✅ 撮合完成: {len(eng.trades)} trades")
 
 
 class TestNStatePerformance:
@@ -124,7 +125,7 @@ class TestNStatePerformance:
         elapsed = time.time() - start
         
         print(f"\n🔭 坍缩时间: {elapsed:.4f}s")
-        assert elapsed < 0.1  # 应该很快
+        assert elapsed < 0.1
 
 
 class TestAgentPerformance:
@@ -132,9 +133,13 @@ class TestAgentPerformance:
     
     def test_decision_speed(self):
         """决策速度"""
-        arb = ArbAgent(name='Arb')
-        mm = MarketMakerAgent(name='MM')
-        trend = TrendAgent(name='Trend')
+        agents = [
+            ArbAgent(name='Arb'),
+            MarketMakerAgent(name='MM'),
+            TrendAgent(name='Trend'),
+            GridTradingAgent(name='Grid'),
+            MomentumAgent(name='Mom')
+        ]
         
         observations = [
             {'spread_pct': 0.08},
@@ -142,15 +147,13 @@ class TestAgentPerformance:
             {'price': 100.0}
         ]
         
-        agents = [arb, mm, trend]
-        
         start = time.time()
         for obs in observations:
             for agent in agents:
                 agent.think(obs)
         elapsed = time.time() - start
         
-        decisions_per_sec = 3 / elapsed if elapsed > 0 else float('inf')
+        decisions_per_sec = len(observations) * len(agents) / elapsed if elapsed > 0 else float('inf')
         print(f"\n🤖 决策速度: {decisions_per_sec:.0f} decisions/sec")
         assert decisions_per_sec > 0
 

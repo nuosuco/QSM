@@ -1,84 +1,162 @@
 """
-QNT 性能监控
+QNT 监控系统
 """
 import time
 import threading
-from typing import Dict, List, Optional
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
-class PerformanceMetrics:
-    """性能指标"""
+class Metrics:
+    """指标数据"""
     timestamp: float
-    trades_per_second: float
-    orders_per_second: float
-    memory_usage_mb: float
-    cpu_usage_percent: float
+    blocks: int
+    transactions: int
+    trades: int
+    nstate_rounds: int
+    nstate_collapses: int
+    agent_count: int
+    active_agents: int
 
 
-class PerformanceMonitor:
-    """性能监控器"""
+class MetricsCollector:
+    """指标收集器"""
     
     def __init__(self):
-        self._start_time = time.time()
-        self._trade_count = 0
-        self._order_count = 0
-        self._metrics_history: List[PerformanceMetrics] = []
+        self._metrics: List[Metrics] = []
+        self._max_history = 10000
         self._lock = threading.Lock()
     
-    def record_trade(self):
-        """记录成交"""
+    def record(self, metrics: Metrics):
+        """记录指标"""
         with self._lock:
-            self._trade_count += 1
+            self._metrics.append(metrics)
+            if len(self._metrics) > self._max_history:
+                self._metrics = self._metrics[-self._max_history:]
     
-    def record_order(self):
-        """记录订单"""
+    def get_latest(self) -> Optional[Metrics]:
+        """获取最新指标"""
         with self._lock:
-            self._order_count += 1
+            return self._metrics[-1] if self._metrics else None
     
-    def get_metrics(self) -> Dict[str, any]:
-        """获取当前指标"""
+    def get_history(self, minutes: int = 60) -> List[Metrics]:
+        """获取历史指标"""
+        cutoff = time.time() - (minutes * 60)
         with self._lock:
-            elapsed = time.time() - self._start_time
+            return [m for m in self._metrics if m.timestamp >= cutoff]
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """获取汇总数据"""
+        with self._lock:
+            if not self._metrics:
+                return {}
+            
+            recent = [m for m in self._metrics if m.timestamp >= time.time() - 3600]
+            
             return {
-                'uptime_seconds': elapsed,
-                'total_trades': self._trade_count,
-                'total_orders': self._order_count,
-                'trades_per_second': self._trade_count / elapsed if elapsed > 0 else 0,
-                'orders_per_second': self._order_count / elapsed if elapsed > 0 else 0
+                'total_blocks': self._metrics[-1].blocks if self._metrics else 0,
+                'total_transactions': self._metrics[-1].transactions if self._metrics else 0,
+                'total_trades': self._metrics[-1].trades if self._metrics else 0,
+                'total_nstate_rounds': self._metrics[-1].nstate_rounds if self._metrics else 0,
+                'total_nstate_collapses': self._metrics[-1].nstate_collapses if self._metrics else 0,
+                'agent_count': self._metrics[-1].agent_count if self._metrics else 0,
+                'history_points': len(self._metrics),
+                'recent_hours': len(recent)
             }
+
+
+class HealthChecker:
+    """健康检查器"""
     
-    def snapshot(self) -> PerformanceMetrics:
-        """生成性能快照"""
-        import psutil
-        metrics = PerformanceMetrics(
-            timestamp=time.time(),
-            trades_per_second=self.get_metrics()['trades_per_second'],
-            orders_per_second=self.get_metrics()['orders_per_second'],
-            memory_usage_mb=psutil.Process().memory_info().rss / 1024 / 1024,
-            cpu_usage_percent=psutil.Process().cpu_percent()
-        )
-        with self._lock:
-            self._metrics_history.append(metrics)
-            # 只保留最近1000个快照
-            if len(self._metrics_history) > 1000:
-                self._metrics_history = self._metrics_history[-1000:]
-        return metrics
+    def __init__(self):
+        self._checks: Dict[str, bool] = {}
+        self._last_check: Dict[str, float] = {}
     
-    def get_stats(self) -> Dict[str, any]:
-        """获取统计信息"""
-        metrics = self.get_metrics()
-        with self._lock:
-            history = self._metrics_history[-100:] if self._metrics_history else []
+    def add_check(self, name: str, check_func):
+        """添加检查项"""
+        self._checks[name] = check_func
+    
+    def run_all(self) -> Dict[str, Dict[str, Any]]:
+        """运行所有检查"""
+        results = {}
+        now = time.time()
         
+        for name, check_func in self._checks.items():
+            try:
+                status = check_func()
+                results[name] = {
+                    'status': 'healthy' if status else 'unhealthy',
+                    'timestamp': now,
+                    'latency_ms': 0
+                }
+            except Exception as e:
+                results[name] = {
+                    'status': 'error',
+                    'error': str(e),
+                    'timestamp': now
+                }
+            
+            self._last_check[name] = now
+        
+        return results
+
+
+class MonitorService:
+    """监控服务"""
+    
+    def __init__(self, interval: float = 60.0):
+        self.interval = interval
+        self.collector = MetricsCollector()
+        self.health_checker = HealthChecker()
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+    
+    def start(self):
+        """启动监控"""
+        self._running = True
+        self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self._thread.start()
+        print("📊 Monitor service started")
+    
+    def stop(self):
+        """停止监控"""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=5)
+        print("📊 Monitor service stopped")
+    
+    def _monitor_loop(self):
+        """监控循环"""
+        while self._running:
+            try:
+                # 收集指标
+                metrics = self._collect_metrics()
+                if metrics:
+                    self.collector.record(metrics)
+                
+                # 健康检查
+                health = self.health_checker.run_all()
+                
+                time.sleep(self.interval)
+            except Exception as e:
+                print(f"⚠️ Monitor error: {e}")
+    
+    def _collect_metrics(self) -> Optional[Metrics]:
+        """收集指标（由外部注入）"""
+        # 这里需要外部提供数据源
+        # 暂时返回None
+        return None
+    
+    def get_status(self) -> Dict[str, Any]:
+        """获取状态"""
         return {
-            **metrics,
-            'samples_count': len(history),
-            'avg_tps': sum(m.trades_per_second for m in history) / len(history) if history else 0,
-            'avg_ops': sum(m.orders_per_second for m in history) / len(history) if history else 0
+            'running': self._running,
+            'metrics': self.collector.get_summary(),
+            'health': self.health_checker.run_all()
         }
 
 
 # 全局监控实例
-monitor = PerformanceMonitor()
+monitor = MonitorService()
