@@ -63,7 +63,12 @@ class PatternDiscovery:
         if mean_rev_pattern:
             patterns.append(mean_rev_pattern)
         
-        # 3. 深度异常模式
+        # 3. 动量跟踪模式
+        momentum_pattern = self._detect_momentum_pattern(ex_name, symbol)
+        if momentum_pattern:
+            patterns.append(momentum_pattern)
+        
+        # 4. 深度异常模式
         depth_pattern = self._detect_depth_anomaly(ex_name, symbol)
         if depth_pattern:
             patterns.append(depth_pattern)
@@ -198,6 +203,75 @@ class PatternDiscovery:
             status="active" if success_rate > 0.7 else "experimental"
         )
     
+    def _detect_momentum_pattern(self, ex_name: str, symbol: str) -> Optional[DiscoveredPattern]:
+        """检测动量跟踪模式（按平台）"""
+        cursor = self.conn.cursor()
+        
+        cursor.execute('''
+            SELECT spot_last, timestamp 
+            FROM market_data 
+            WHERE exchange = ? AND symbol = ?
+            ORDER BY timestamp DESC 
+            LIMIT 500
+        ''', (ex_name, symbol))
+        
+        rows = cursor.fetchall()
+        if len(rows) < 100:
+            return None
+        
+        prices = np.array([r[0] for r in rows])
+        window = self.config.strategy.strategies.get('momentum', {}).get('params', {}).get('lookback', 20)
+        threshold = self.config.strategy.strategies.get('momentum', {}).get('params', {}).get('threshold', 2.0)
+        
+        if len(prices) < window * 2:
+            return None
+        
+        momentum_events = 0
+        successful_moments = 0
+        
+        for i in range(window, len(prices) - window):
+            local_returns = np.diff(prices[i-window:i+window])
+            if len(local_returns) == 0:
+                continue
+            
+            mean_return = np.mean(local_returns)
+            std_return = np.std(local_returns)
+            if std_return == 0:
+                continue
+            
+            momentum_score = abs(mean_return) / std_return
+            if momentum_score > threshold:
+                momentum_events += 1
+                # 检查后续是否继续同方向
+                direction = np.sign(mean_return)
+                future_change = prices[i+window] - prices[i]
+                if np.sign(future_change) == direction:
+                    successful_moments += 1
+        
+        if momentum_events < 5:
+            return None
+        
+        success_rate = successful_moments / momentum_events
+        if success_rate < 0.6:
+            return None
+        
+        avg_profit = success_rate * np.mean(np.abs(np.diff(prices[-window:]))) / prices[-1] * 100
+        
+        return DiscoveredPattern(
+            exchange=ex_name,
+            pattern_type="momentum",
+            symbol=symbol,
+            confidence=float(success_rate),
+            profitability=float(avg_profit),
+            parameters={
+                "window": window,
+                "momentum_events": momentum_events,
+                "success_rate": float(success_rate),
+                "threshold": threshold
+            },
+            status="active" if success_rate > 0.7 else "experimental"
+        )
+    
     def _detect_depth_anomaly(self, ex_name: str, symbol: str) -> Optional[DiscoveredPattern]:
         """检测深度异常模式（按平台）"""
         cursor = self.conn.cursor()
@@ -266,8 +340,8 @@ class PatternDiscovery:
                     'total_trades': total
                 })
     
-    def get_best_strategy(self) -> Tuple[str, float]:
-        """获取最佳策略"""
+    def get_best_strategy(self, exchange: str = None, symbol: str = None) -> Tuple[str, float]:
+        """获取最佳策略（可指定平台和币种）"""
         best_strategy = "fat_finger_arb"
         best_score = 0.0
         
@@ -276,6 +350,14 @@ class PatternDiscovery:
             if score > best_score:
                 best_score = score
                 best_strategy = name
+        
+        # 如果有发现的策略，优先使用发现的
+        if exchange and symbol:
+            if exchange in self.discovered_strategies:
+                if symbol in self.discovered_strategies[exchange]:
+                    pattern = self.discovered_strategies[exchange][symbol]
+                    if pattern.confidence > 0.5 and pattern.profitability > 0:
+                        return pattern.pattern_type, pattern.confidence * pattern.profitability
         
         return best_strategy, best_score
     
