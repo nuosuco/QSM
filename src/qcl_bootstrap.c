@@ -1112,9 +1112,11 @@ static int is_builtin_name(Comp *c, long start, long len) {
         "len", "file_read", "file_write_bytes", "file_exists", "ord", "chr",
         "tcp_listen", "tcp_accept", "tcp_recv", "tcp_send", "tcp_close", "tcp_shutdown",
         "exec",
-        "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx", "measure"
+        "qreg_create", "qreg_free", "apply_h", "apply_t", "apply_cx", "measure",
+        "embedding", "mat_mul", "softmax", "argmax", "backprop",
+        "embedding_to", "mat_mul_to"
     };
-    for (int k = 0; k < 29; k++)
+    for (int k = 0; k < 36; k++)
         if (kw_match(c->src + start, len, names[k])) return 1;
     return 0;
 }

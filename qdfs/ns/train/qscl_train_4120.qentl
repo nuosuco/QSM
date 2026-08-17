@@ -1,0 +1,123 @@
+# QSCL叠加态并行训练 v3 - 全量4120彝文字(分片4态×1030)
+# 每态独立训练本态1030字, 4态覆盖4120, 串行训练
+# 数组复用(embedding_to/mat_mul_to)避免池耗尽
+# D=8, 每态1030类, 每态E+W=16480元素, 单态运行
+# 时间: 每态3epoch约9分钟, 4态约36分钟
+
+var D = 8
+var K = 1030
+var N = 4120
+var PER_STATE = 1030
+var EPOCHS = 3
+var LR = 100
+
+def prand(c, s):
+    var v = c * 137 + s * 7919
+    v = v % 97
+    return v + 3
+end
+
+# 单态权重(串行)
+var E[8240]
+var W[8240]
+var x[16]
+var logits[1030]
+var gradW[8240]
+
+def init_weights(seed):
+    var i = 0
+    while (i < PER_STATE * D):
+        E[i] = prand(i, seed) % 19 + 1
+        i = i + 1
+    end
+    i = 0
+    while (i < PER_STATE * D):
+        W[i] = prand(i * 17, seed * 3) % 19 + 1
+        i = i + 1
+    end
+end
+
+# 训练单态: 处理自己的PER_STATE个样本
+def train_state(seed, global_base):
+    var epoch = 0
+    while (epoch < EPOCHS):
+        var correct = 0
+        var local = 0
+        while (local < PER_STATE):
+            var code = global_base + local
+            var label = local  # 态内label
+            embedding_to(local, D, E, x)
+            mat_mul_to(x, W, D, K, logits)
+            var pred = argmax(logits, K)
+            if (pred == label):
+                correct = correct + 1
+            else:
+                var i = 0
+                while (i < PER_STATE * D):
+                    gradW[i] = 0
+                    i = i + 1
+                end
+                var d = 0
+                while (d < D):
+                    gradW[d * K + label] = x[d]
+                    gradW[d * K + pred] = 0 - x[d]
+                    d = d + 1
+                end
+                backprop(W, gradW, PER_STATE * D, LR)
+            end
+            local = local + 1
+        end
+        printf("  [态%d] epoch%d acc=%d/%d (%d%%)  W[0]=%d\n", seed, epoch, correct, PER_STATE, correct * 100 / PER_STATE, W[0])
+        epoch = epoch + 1
+    end
+end
+
+# 保存权重
+def save_arr(path, prefix, arr, n_elems):
+    var content = ""
+    var i = 0
+    while (i < n_elems):
+        var line = str_concat(prefix, int_to_str(i))
+        line = str_concat(line, ":")
+        line = str_concat(line, int_to_str(arr[i]))
+        line = str_concat(line, "\n")
+        content = str_concat(content, line)
+        i = i + 1
+    end
+    return file_write_bytes(path, content)
+end
+
+printf("=== 全量4120彝文字 QSCL叠加态训练 v3 ===\n")
+printf("配置: 4态 x %d字/态 x %d维 x %d轮\n", PER_STATE, D, EPOCHS)
+
+var s = 1
+while (s <= 4):
+    printf("--- 开始训练态%d (seed=%d, 字范围%d-%d) ---\n", s, s, (s-1)*PER_STATE, s*PER_STATE-1)
+    init_weights(s)
+    train_state(s, (s-1)*PER_STATE)
+    printf("--- 态%d训练完成, 落盘 ---\n", s)
+    var epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_1.w"
+    var wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_1.w"
+    if (s == 2):
+        epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_2.w"
+        wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_2.w"
+    end
+    if (s == 3):
+        epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_3.w"
+        wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_3.w"
+    end
+    if (s == 4):
+        epath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_4.w"
+        wpath = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_4.w"
+    end
+    var eprefix = str_concat("E", int_to_str(s))
+    eprefix = str_concat(eprefix, ":")
+    var wprefix = str_concat("W", int_to_str(s))
+    wprefix = str_concat(wprefix, ":")
+    save_arr(epath, eprefix, E, PER_STATE * D)
+    save_arr(wpath, wprefix, W, PER_STATE * D)
+    printf("--- 态%d权重已保存(%d字) ---\n", s, PER_STATE)
+    s = s + 1
+end
+
+printf("=== 全量训练完成: 4态×%d字=4120全覆盖 ===\n", PER_STATE)
