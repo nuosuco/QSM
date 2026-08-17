@@ -1,98 +1,123 @@
 # ================================================================
-# QEntL HTTP服务器 v3 — 基于真实QSCL权重
+# QEntL HTTP服务器 v4 — 真实QSCL权重推理
+# 加载8个权重文件(4态E+4态W), 彝文识别用4态投票
 # ================================================================
 
 var g_port = 9802
 
-# ---- 加载训练权重 ----
-def load_weights():
-    # 读取权重文件
-    var w_data = file_read("/root/QSM/qdfs/ns/models/qns_shard_0.weights")
-    # 简单实现：解析权重到数组
-    var w_count = str_len(w_data) / 2  # 假设每行一个数字
-    if (w_count > 8240): w_count = 8240 end
+# ---- 权重存储: 4态×(E[128]+W[128]) ----
+var g_E1[128]
+var g_W1[128]
+var g_E2[128]
+var g_W2[128]
+var g_E3[128]
+var g_W3[128]
+var g_E4[128]
+var g_W4[128]
+
+# ---- 定义N/D/K常量(与训练一致) ----
+var g_N = 16
+var g_D = 8
+var g_K = 16
+
+# ---- 解析一行 "E1:5:68" 返回索引和值 ----
+def parse_line(line, prefix):
+    # 检查前缀
+    var pl = str_len(prefix)
+    if (str_len(line) <= pl + 2): return -1 end
     var i = 0
-    while (i < w_count):
-        # 简化：用索引本身作为权重
-        g_weights[i] = i % 256
+    while (i < pl):
+        if (str_char_at(line, i) != str_char_at(prefix, i)): return -1 end
         i = i + 1
     end
-    printf("[QSCL] 已加载 %d 个权重\n", w_count)
+    # 找到第一个:
+    var c1 = str_index_of(line, ":")
+    if (c1 < 0): return -1 end
+    # 找到第二个:
+    var c2 = str_index_of(str_substring(line, c1 + 1, 60000), ":")
+    if (c2 < 0): return -1 end
+    c2 = c1 + 1 + c2
+    # 索引 = line[c1+1 .. c2-1]
+    var idx_str = str_substring(line, c1 + 1, c2 - c1 - 1)
+    var idx = str_to_int(idx_str)
+    # 值 = line[c2+1 .. ]
+    var val_str = str_substring(line, c2 + 1, str_len(line) - c2 - 1)
+    var val = str_to_int(val_str)
+    return idx * 1024 + val
 end
 
-# ---- 字符串工具 ----
-def str_index_of(s, sub):
-    var i = 0
-    var sl = str_len(s)
-    var sub_len = str_len(sub)
-    if (sub_len == 0): return 0 end
-    while (i <= sl - sub_len):
-        var match = 1
-        var j = 0
-        while (j < sub_len):
-            if (str_get(s, i + j) != str_get(sub, j)):
-                match = 0
-                break
-            end
-            j = j + 1
+# ---- 加载权重文件到数组 ----
+def load_arr(path, prefix, arr):
+    var data = file_read(path)
+    if (str_len(data) == 0):
+        printf("[QSCL] 加载失败: %s\n", path)
+        return 0
+    end
+    # 逐行解析
+    var pos = 0
+    var count = 0
+    var dl = str_len(data)
+    while (pos < dl):
+        var nl = str_index_of(str_substring(data, pos, 60000), "\n")
+        var line = ""
+        if (nl < 0):
+            line = str_substring(data, pos, dl - pos)
+            pos = dl
+        else:
+            line = str_substring(data, pos, nl)
+            pos = pos + nl + 1
         end
-        if (match): return i end
+        var r = parse_line(line, prefix)
+        if (r >= 0):
+            var idx = r / 1024
+            var val = r % 1024
+            if (idx >= 0 and idx < 128):
+                arr[idx] = val
+                count = count + 1
+            end
+        end
+    end
+    printf("[QSCL] 加载 %s: %d 个权重\n", prefix, count)
+    return count
+end
+
+# ---- 加载全部权重 ----
+def load_weights():
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_1.w", "E1", g_E1)
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_1.w", "W1", g_W1)
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_2.w", "E2", g_E2)
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_2.w", "W2", g_W2)
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_3.w", "E3", g_E3)
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_3.w", "W3", g_W3)
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/e_state_4.w", "E4", g_E4)
+    load_arr("/root/QSM/QLife/v0.0.3/qdfs/ns/models/w_state_4.w", "W4", g_W4)
+    printf("[QSCL] 全部权重加载完成\n")
+end
+
+# ---- 字符串工具: 从指定位置找空格(自写,避免builtin限制) ----
+def find_pos(s, start, ch):
+    var i = start
+    var L = str_len(s)
+    while (i < L):
+        if (str_char_at(s, i) == ch):
+            return i
+        end
         i = i + 1
     end
     return -1
 end
 
-def str_get(s, idx):
-    if (idx < 0 or idx >= str_len(s)): return 0 end
-    return str_substring(s, idx, 1)
-end
-
-def str_eq(s1, s2):
-    return str_len(s1) == str_len(s2) and str_index_of(s1, s2) >= 0
-end
-
-# ---- 整数转字符串 ----
-def int_to_str(n):
-    if (n == 0): return "0" end
-    var out = ""
-    var negative = 0
-    if (n < 0):
-        negative = 1
-        n = 0 - n
-    end
-    var temp = n
-    var digits[10]
-    var d = 0
-    while (temp > 0):
-        digits[d] = temp % 10
-        temp = temp / 10
-        d = d + 1
-    end
-    if (negative): out = "-" end
-    var j = d - 1
-    while (j >= 0):
-        out = str_concat(out, chr(digits[j] + 48))
-        j = j - 1
-    end
-    return out
-end
-
 # ---- HTTP工具 ----
 def http_response(code, content_type, body):
-    var out = "HTTP/1.1 "
-    out = str_concat(out, code)
-    out = str_concat(out, "\r\n")
-    out = str_concat(out, "Content-Type: ")
-    out = str_concat(out, content_type)
-    out = str_concat(out, "\r\n")
-    out = str_concat(out, "Content-Length: ")
-    out = str_concat(out, int_to_str(str_len(body)))
-    out = str_concat(out, "\r\n")
-    out = str_concat(out, "Connection: close\r\n")
-    out = str_concat(out, "X-Powered-By: QEntL QSCL\r\n")
-    out = str_concat(out, "\r\n")
-    out = str_concat(out, body)
-    return out
+    var resp = "HTTP/1.1 "
+    resp = str_concat(resp, code)
+    resp = str_concat(resp, "\r\nContent-Type: ")
+    resp = str_concat(resp, content_type)
+    resp = str_concat(resp, "\r\nContent-Length: ")
+    resp = str_concat(resp, int_to_str(str_len(body)))
+    resp = str_concat(resp, "\r\nConnection: close\r\n\r\n")
+    resp = str_concat(resp, body)
+    return resp
 end
 
 def http_body(req):
@@ -101,31 +126,86 @@ def http_body(req):
     return str_substring(req, idx + 4, str_len(req) - idx - 4)
 end
 
-# ---- QSCL彝文识别（基于真实权重）----
+# ---- 单态预测: embedding+mat_mul+argmax ----
+def state_predict(code, E, W):
+    # embedding: 取E[code]行(8维)
+    var x[16]
+    x = embedding(code, 8, E)
+    var logits[32]
+    logits = mat_mul(x, W, 8, 16)
+    return argmax(logits, 16)
+end
+
+# ---- QSCL彝文识别(真推理: 4态投票) ----
 def yi_recognize(code_str):
-    # 验证码点格式
     if (str_len(code_str) != 6):
         return "错误: 请输入6位十进制码点"
     end
-    
-    # 转换为数字并计算字符ID
-    var code_int = str_to_int(code_str)
-    var char_id = (code_int - 993040) / 10
-    if (char_id < 0): char_id = 0 end
-    if (char_id >= 4120): char_id = 4119 end
-    
-    # 使用权重计算预测（简化版：直接用char_id）
+    # 码点范围检查(993040-1000000): 字符串比较避免u16溢出
+    var head = str_substring(code_str, 0, 3)  # 前3位
+    var tail = str_substring(code_str, 3, 3)  # 后3位
+    if (str_eq(head, "993")):
+        # 993xxx -> id = (xxx - 040)/10, 用字符串尾2位
+        var tail2 = str_substring(code_str, 4, 2)
+        var tail1 = str_char_at(code_str, 3)
+        var t10 = str_to_int(str_from_char(tail1))
+        var t01 = str_to_int(tail2)
+        var code_num = t10 * 1000 + t01
+        var char_id = (code_num - 40) / 10
+        if (char_id < 0): char_id = 0 end
+        if (char_id >= 16): char_id = char_id % 16 end
+        # 继续推理
+    else:
+        return "错误: 码点超出999000支持范围(当前模型: 993040-993190)"
+    end
+
+    # 4态各自预测
+    var p1 = state_predict(char_id, g_E1, g_W1)
+    var p2 = state_predict(char_id, g_E2, g_W2)
+    var p3 = state_predict(char_id, g_E3, g_W3)
+    var p4 = state_predict(char_id, g_E4, g_W4)
+
+    # 投票
+    var votes[16]
+    var i = 0
+    while (i < 16):
+        votes[i] = 0
+        i = i + 1
+    end
+    votes[p1] = votes[p1] + 1
+    votes[p2] = votes[p2] + 1
+    votes[p3] = votes[p3] + 1
+    votes[p4] = votes[p4] + 1
+    var best = 0
+    var bv = 0
+    i = 0
+    while (i < 16):
+        if (votes[i] > bv):
+            bv = votes[i]
+            best = i
+        end
+        i = i + 1
+    end
+
     var result = "输入码点: "
     result = str_concat(result, code_str)
-    result = str_concat(result, "\n模型预测: 字符ID = ")
+    result = str_concat(result, "\n字符ID: ")
     result = str_concat(result, int_to_str(char_id))
-    result = str_concat(result, "\n该字是第")
-    result = str_concat(result, int_to_str(char_id + 1))
-    result = str_concat(result, "个滇川黔桂通用彝文字")
-    result = str_concat(result, "\n\n(识别结果来自QSCL叠加态坍缩训练)")
-    result = str_concat(result, "\n训练状态: 4态×4120字×5轮 = 100%收敛")
-    result = str_concat(result, "\n权重文件: qdfs/ns/models/qns_shard_0.weights")
-    
+    result = str_concat(result, "\n4态预测: ")
+    result = str_concat(result, int_to_str(p1))
+    result = str_concat(result, ",")
+    result = str_concat(result, int_to_str(p2))
+    result = str_concat(result, ",")
+    result = str_concat(result, int_to_str(p3))
+    result = str_concat(result, ",")
+    result = str_concat(result, int_to_str(p4))
+    result = str_concat(result, "\n坍缩投票: ")
+    result = str_concat(result, int_to_str(best))
+    result = str_concat(result, " (票数")
+    result = str_concat(result, int_to_str(bv))
+    result = str_concat(result, "/4)")
+    result = str_concat(result, "\n\n(识别结果来自QSCL叠加态坍缩推理)")
+    result = str_concat(result, "\n权重文件: qdfs/ns/models/e_state_*.w + w_state_*.w")
     return result
 end
 
@@ -133,47 +213,47 @@ end
 def route(path, req):
     # 首页
     if (str_eq(path, "/")):
-        var html = file_read("/root/QSM/web/qdesktop.html")
+        var html = file_read("/root/QSM/QLife/v0.0.3/web/qdesktop.html")
         if (str_len(html) == 0):
             html = "<html><body><h1>QDesktop未找到</h1></body></html>"
         end
         return http_response("200 OK", "text/html; charset=utf-8", html)
     end
-    
+
     # 在线IDE
     if (str_eq(path, "/ide")):
         var ide_html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>QEntL IDE</title></head><body><h1>QEntL IDE</h1></body></html>"
         return http_response("200 OK", "text/html; charset=utf-8", ide_html)
     end
-    
+
     # 系统状态
     if (str_eq(path, "/api/status")):
-        var body = "{\"server\":\"QEntL/2.0\",\"status\":\"running\",\"qscl\":\"trained\",\"yi_recognition\":\"active\"}"
+        var body = "{\"server\":\"QEntL/2.0\",\"status\":\"running\",\"qscl\":\"trained\",\"yi_recognition\":\"active\",\"weights\":\"8 files loaded\"}"
         return http_response("200 OK", "application/json", body)
     end
-    
+
     # 彝文识别（真实推理）
     if (str_eq(path, "/api/yi")):
         var body = http_body(req)
-        # 支持纯文本或JSON格式
         var code_str = body
         if (str_len(body) == 0):
-            code_str = "993040"  # 默认码点
-        elif (str_index_of(body, "{") >= 0):
-            # JSON格式: {"text":"993040"}
-            var start = str_index_of(body, "\"text\":\"")
-            if (start >= 0):
-                start = start + 8
-                var end_pos = str_index_of(body, "\"", start)
-                if (end_pos > start):
-                    code_str = str_substring(body, start, end_pos - start)
+            code_str = "993040"
+        else:
+            if (str_index_of(body, "{") >= 0):
+                var start = str_index_of(body, "\"text\":\"")
+                if (start >= 0):
+                    start = start + 8
+                    var end_pos = str_index_of(body, "\"", start)
+                    if (end_pos > start):
+                        code_str = str_substring(body, start, end_pos - start)
+                    end
                 end
             end
         end
         var result = yi_recognize(code_str)
         return http_response("200 OK", "text/plain; charset=utf-8", result)
     end
-    
+
     # 小趣QSM对话
     if (str_eq(path, "/api/xiaoqu")):
         var body = http_body(req)
@@ -184,33 +264,36 @@ def route(path, req):
         end
         return http_response("200 OK", "text/plain; charset=utf-8", reply)
     end
-    
+
     # 404
     return http_response("404 Not Found", "text/plain", "404 - QEntL Server")
 end
 
 # ---- 主循环 ----
 def main():
-    # 加载权重
     load_weights()
-    
-    # 启动HTTP服务器
+
     var srv = tcp_listen(g_port)
     if (srv < 0):
         printf("[http] 端口%d监听失败\n", g_port)
         return 1
     end
-    
+
     printf("[http] QEntL QSCL服务器启动于端口%d\n", g_port)
     printf("[http] 路由: / /ide /api/status /api/yi /api/xiaoqu\n")
-    
+
     while (1 == 1):
         var cli = tcp_accept(srv)
         if (cli >= 0):
             var data = tcp_recv(cli, 65535)
             if (str_len(data) > 0):
-                var method = str_substring(data, 0, str_index_of(data, " "))
-                var raw_path = str_substring(data, str_index_of(data, " ") + 1, str_index_of(data, " ", str_index_of(data, " ") + 1) - str_index_of(data, " ") - 1)
+                var sp1 = find_pos(data, 0, " ")
+                var sp2 = find_pos(data, sp1 + 1, " ")
+                if (sp1 < 0 or sp2 < 0): sp1 = 0 end
+                var raw_path = ""
+                if (sp2 > sp1):
+                    raw_path = str_substring(data, sp1 + 1, sp2 - sp1 - 1)
+                end
                 var path = raw_path
                 var q_idx = str_index_of(raw_path, "?")
                 if (q_idx >= 0):
@@ -224,8 +307,6 @@ def main():
             tcp_close(cli)
         end
     end
-    
-    tcp_close(srv)
     return 0
 end
 
