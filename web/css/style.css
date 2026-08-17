@@ -29,8 +29,12 @@ body {
 .app {
     display: flex;
     flex-direction: column;
+<<<<<<< HEAD
     height: 100vh;
     overflow: hidden;
+=======
+    min-height: 100vh;
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 /* 头部 */
@@ -62,8 +66,19 @@ body {
 .logo-icon {
     width: 48px;
     height: 48px;
+<<<<<<< HEAD
     border-radius: 50%;
     object-fit: cover;
+=======
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 .logo-text h1 {
@@ -110,8 +125,11 @@ body {
     width: 100%;
     margin: 0 auto;
     padding: 16px;
+<<<<<<< HEAD
     overflow-y: auto;
     min-height: 0;
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 .tab-content {
@@ -129,18 +147,27 @@ body {
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
+<<<<<<< HEAD
     height: calc(100vh - 120px);
     min-height: 0;
     max-height: calc(100vh - 120px);
     overflow: hidden;
+=======
+    height: calc(100vh - 200px);
+    min-height: 500px;
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+<<<<<<< HEAD
     padding: 12px 16px;
     scroll-behavior: smooth;
     position: relative;
+=======
+    padding: 16px;
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 .message {
@@ -189,12 +216,16 @@ body {
 
 .chat-input-area {
     display: flex;
+<<<<<<< HEAD
     flex-direction: column;
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     gap: 8px;
     padding: 16px;
     border-top: 1px solid var(--border-color);
 }
 
+<<<<<<< HEAD
 .chat-input-row {
     display: flex;
     gap: 8px;
@@ -300,6 +331,8 @@ body {
     background: #e0f0e8;
 }
 
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 .chat-input {
     flex: 1;
     padding: 12px;
@@ -566,6 +599,7 @@ body {
     color: var(--text-secondary);
 }
 
+<<<<<<< HEAD
 /* 聊天中推荐商品 */
 .chat-products {
     margin-top: 12px;
@@ -597,6 +631,8 @@ body {
     object-fit: cover;
 }
 
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 /* 知识界面 */
 .knowledge-container {
     display: flex;
@@ -706,8 +742,13 @@ body {
     }
     
     .chat-container {
+<<<<<<< HEAD
         height: 100%;
         min-height: 0;
+=======
+        height: calc(100vh - 200px);
+        min-height: 400px;
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     }
     
     .message-content {
@@ -794,6 +835,10 @@ body {
     .logo-icon {
         width: 36px;
         height: 36px;
+<<<<<<< HEAD
+=======
+        font-size: 18px;
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     }
     
     .logo-text h1 {
@@ -974,6 +1019,7 @@ body {
 
 /* ========== 养生谷 ========== */
 
+<<<<<<< HEAD
 .knowledge-container {
     padding: 16px;
     max-width: 800px;
@@ -2337,3 +2383,36 @@ body {
 .binding-btn:hover {
     background: var(--secondary-color);
 }
+=======
+.yangshenggu-container {
+    padding: 16px;
+}
+
+.yangshenggu-modules {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.module-banner {
+    background: linear-gradient(135deg, #4a8c6f, #6cb488);
+    border-radius: 16px;
+    padding: 40px 24px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 4px 15px rgba(74, 140, 111, 0.3);
+}
+
+.module-banner h3 {
+    margin: 0 0 12px 0;
+    font-size: 24px;
+    color: white;
+}
+
+.module-banner p {
+    margin: 0;
+    font-size: 15px;
+    opacity: 0.9;
+    color: white;
+}
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)

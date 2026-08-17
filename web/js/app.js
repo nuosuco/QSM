@@ -8,6 +8,7 @@ const API_BASE = '';
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initChat();
+<<<<<<< HEAD
     initHealthTest();
     initProductSearch();
     loadCategories();
@@ -16,6 +17,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEyeExercise();
     loadTizhiGrid();
     loadYaoshiList();
+=======
+    initProductSearch();
+    loadCategories();
+    initProfile();
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 });
 
 // ========== 导航切换 ==========
@@ -35,17 +41,21 @@ function initNavigation() {
                 content.classList.remove('active');
             });
             document.getElementById(`${targetTab}-tab`).classList.add('active');
+<<<<<<< HEAD
             
             // 切换到健康测评时渲染
             if (targetTab === 'health-test') {
                 renderHealthTestPage();
             }
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         });
     });
 }
 
 // ========== 对话功能 ==========
 
+<<<<<<< HEAD
 // 新用户引导标记（是否已引导过）
 let _guidedNewUser = false;
 
@@ -54,6 +64,11 @@ function initChat() {
     const chatInput = document.getElementById('chat-input');
     const uploadBtn = document.getElementById('upload-btn');
     const imageInput = document.getElementById('image-input');
+=======
+function initChat() {
+    const sendBtn = document.getElementById('send-btn');
+    const chatInput = document.getElementById('chat-input');
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keydown', (e) => {
@@ -62,6 +77,7 @@ function initChat() {
             sendMessage();
         }
     });
+<<<<<<< HEAD
     
     // 图片上传/拍照（支持多张，连续拍）
     uploadBtn.addEventListener('click', () => {
@@ -206,12 +222,15 @@ function removePreviewImage(idx) {
 function clearImagePreview() {
     pendingImages = [];
     renderImagePreviews();
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 async function sendMessage() {
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
     const message = input.value.trim();
+<<<<<<< HEAD
     const hasImage = pendingImages.length > 0;
     
     if (!message && !hasImage) return;
@@ -272,16 +291,45 @@ async function sendMessage() {
         }
         clearTimeout(timeoutId);
         clearTimeout(slowTimer);
+=======
+    
+    if (!message) return;
+    
+    // 显示用户消息
+    appendMessage(message, 'user');
+    input.value = '';
+    sendBtn.disabled = true;
+    
+    // 显示加载状态
+    const loadingId = appendMessage('<div class="loading"></div>', 'assistant', true);
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: message,
+                session_id: getSessionId()
+            })
+        });
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         
         const data = await response.json();
         
         // 移除加载状态
+<<<<<<< HEAD
         const loadingEl = document.getElementById(loadingId);
         if (loadingEl) loadingEl.remove();
+=======
+        document.getElementById(loadingId).remove();
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         
         // 显示AI回复
         let replyText = data.reply;
         
+<<<<<<< HEAD
         // 图片辨证：显示回复 + 商品推荐 + 多轮引导（3个建议问题）+ 收藏分享
         if (hasImage) {
             const msgId = appendMessage(replyText, 'assistant', false, false);
@@ -436,12 +484,28 @@ async function sendMessage() {
             };
             errDiv.querySelector('.message-content').appendChild(retryBtn);
         }
+=======
+        // 如果有推荐商品，添加到回复中
+        if (data.products && data.products.length > 0) {
+            replyText += '\n\n为你找到以下有机好物：';
+            data.products.slice(0, 3).forEach((product, index) => {
+                replyText += `\n${index + 1}. ${product.title} - ¥${product.price}`;
+            });
+        }
+        
+        appendMessage(replyText, 'assistant');
+        
+    } catch (error) {
+        document.getElementById(loadingId).remove();
+        appendMessage('抱歉，网络出现问题，请稍后重试。', 'assistant');
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         console.error('发送消息失败:', error);
     } finally {
         sendBtn.disabled = false;
     }
 }
 
+<<<<<<< HEAD
 // ========== 多轮引导：小麦回复末尾留 3 个建议问题 ==========
 // 用户点一个就自动提交给小麦，引导继续拍照/补充症状，最终多维辩证
 function appendFollowUpSuggestions(afterImage) {
@@ -651,6 +715,9 @@ function scrollToLastUserMessage() {
 }
 
 function appendMessage(text, type, isHtml = false, autoScroll = true) {
+=======
+function appendMessage(text, type, isHtml = false) {
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     const messagesContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
@@ -677,9 +744,13 @@ function appendMessage(text, type, isHtml = false, autoScroll = true) {
     }
     
     messagesContainer.appendChild(messageDiv);
+<<<<<<< HEAD
     if (autoScroll) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+=======
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     
     return messageId;
 }
@@ -691,11 +762,18 @@ function escapeHtml(text) {
 }
 
 function getSessionId() {
+<<<<<<< HEAD
     // 用 localStorage 持久化，关闭浏览器再打开也不丢会话
     let sessionId = localStorage.getItem('som_session_id');
     if (!sessionId) {
         sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('som_session_id', sessionId);
+=======
+    let sessionId = sessionStorage.getItem('som_session_id');
+    if (!sessionId) {
+        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('som_session_id', sessionId);
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     }
     return sessionId;
 }
@@ -805,7 +883,11 @@ function searchByCategory(keyword, categoryName = '') {
     currentCategory = keyword;
     // 用分类名称作为搜索框显示，但实际搜索用后端关键词
     // 取关键词的第一个词作为搜索关键词，避免太长
+<<<<<<< HEAD
     currentKeyword = keyword;
+=======
+    currentKeyword = keyword.split(' ')[0];
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     currentPage = 1;
     hasMore = true;
     searchProducts(true);
@@ -897,14 +979,18 @@ async function loadMoreProducts() {
     }
 }
 
+<<<<<<< HEAD
 // 商品数据缓存，用ID索引
 let _productCache = {};
 let _productIndex = 0;
 
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
     
     const productHtml = products.map(product => {
+<<<<<<< HEAD
         // 用唯一索引存数据，避免JSON.stringify嵌入HTML导致特殊字符炸掉
         _productIndex++;
         _productCache[_productIndex] = product;
@@ -912,6 +998,15 @@ function displayProducts(products, append = false) {
         return `
         <div class="product-card" data-product-idx="${_productIndex}">
             <img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+=======
+        // 淘宝商品：优先使用APP deeplink，网页版使用推广链接
+        let appUrl = product.app_url || '';
+        let webUrl = product.url || '#';
+        
+        return `
+        <div class="product-card" onclick="openProduct('${appUrl}', '${webUrl}', '${product.platform}')">
+            <img class="product-image" src="${product.image}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
             <div class="product-info">
                 <div class="product-title">${escapeHtml(product.title)}</div>
                 <div class="product-price">¥${product.price}</div>
@@ -928,6 +1023,7 @@ function displayProducts(products, append = false) {
     }
 }
 
+<<<<<<< HEAD
 // 事件委托：商品卡片点击
 document.addEventListener('click', (e) => {
     const card = e.target.closest('.product-card');
@@ -1720,15 +1816,33 @@ function updateLoginUI() {
     } else {
         loginSection.style.display = 'block';
         profileCard.style.display = 'none';
+=======
+function openProduct(appUrl, webUrl, platform) {
+    if (platform === 'taobao' && appUrl) {
+        // 先尝试打开淘宝APP
+        window.location.href = appUrl;
+        // 2.5秒后如果页面还可见（APP没安装），回退到网页版
+        setTimeout(() => {
+            if (!document.hidden) {
+                window.open(webUrl, '_blank');
+            }
+        }, 2500);
+    } else {
+        window.open(webUrl, '_blank');
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     }
 }
 
 // ========== 个人中心 ==========
 
 function initProfile() {
+<<<<<<< HEAD
     updateLoginUI();
     loadProfile();
     loadUserAccount();
+=======
+    loadProfile();
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 function getUserId() {
@@ -1736,12 +1850,16 @@ function getUserId() {
     if (!uid) {
         uid = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('som_user_id', uid);
+<<<<<<< HEAD
         // 首次生成时，向后端注册匿名用户
         registerUserToBackend(uid);
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     }
     return uid;
 }
 
+<<<<<<< HEAD
 // 向后端注册用户（匿名，无需登录）
 async function registerUserToBackend(uid) {
     try {
@@ -1755,6 +1873,8 @@ async function registerUserToBackend(uid) {
     }
 }
 
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 function getUserData() {
     const key = 'som_user_data_' + getUserId();
     const dataStr = localStorage.getItem(key);
@@ -1794,6 +1914,7 @@ function loadProfile() {
     document.getElementById('stat-checkins').textContent = (data.checkins || []).length;
     document.getElementById('stat-products').textContent = data.productBrowses || 0;
     
+<<<<<<< HEAD
     // 优先从后端加载体质记录，失败则用本地
     loadTizhiRecordsFromBackend().catch(() => loadTizhiRecords(data));
 }
@@ -1820,6 +1941,9 @@ async function loadTizhiRecordsFromBackend() {
         html += '</div>';
     }
     history.innerHTML = html;
+=======
+    loadTizhiRecords(data);
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 }
 
 function loadTizhiRecords(data) {
@@ -1863,13 +1987,17 @@ function saveChatRecord(message, reply, tizhi) {
             desc: message.substring(0, 50)
         });
         data.tizhi = tizhi;
+<<<<<<< HEAD
         // 同步体质记录到后端
         saveTizhiToBackend(tizhi, message);
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
     }
     
     saveUserData(data);
 }
 
+<<<<<<< HEAD
 // 同步体质评测结果到后端
 async function saveTizhiToBackend(tizhi, symptoms) {
     try {
@@ -1888,12 +2016,15 @@ async function saveTizhiToBackend(tizhi, symptoms) {
     }
 }
 
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 function saveProductBrowse(keyword, count) {
     const data = getUserData();
     if (!data.productBrowses) data.productBrowses = 0;
     data.productBrowses += count;
     saveUserData(data);
 }
+<<<<<<< HEAD
 
 // ========== 养生谷：体质 + 药食同源 ==========
 
@@ -2588,3 +2719,5 @@ function shareScanResult() {
   // 扫描结果用通用分享图
   generateShareImage('📷 AI拍照扫描：' + part + '\n\n' + scanText.substring(0, 600));
 }
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)

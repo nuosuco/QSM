@@ -35,6 +35,7 @@ EXCLUDE_KEYWORDS = [
     '猫粮', '狗粮', '宠物', '猫砂',
     # 其他无关
     '塑料', '包装', '纸箱', '胶带',
+<<<<<<< HEAD
     # 机械/五金/仪器
     '机械', '设备', '机器', '电机', '五金', '工具', '仪器', '仪表', '阀', '泵',
     # 小米相关的电子产品（小米作为食材是谷物，但淘宝会搜出手机/电视/手表）
@@ -63,6 +64,8 @@ PROCESSED_EXCLUDE_KEYWORDS = [
     '精华液', '面膜', '护肤', '注射', '颗粒剂', '含片', '泡腾片', '软糖',
     '代餐', '奶昔', '果汁', '酵素', '益生菌粉',
     '膏方', '养生膏', '桑椹膏', '秋梨膏', '阿胶膏', '固元膏',
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 ]
 
 # 分类目录：全品类有机认证 + 环保认证产品
@@ -70,53 +73,93 @@ PROCESSED_EXCLUDE_KEYWORDS = [
 # 搜索时自动追加'有机 原生态 野生'前缀
 CATEGORY_MAP = {
     '全部': {
+<<<<<<< HEAD
         'keyword': '食品 养生 食材 滋补品 药膳 母婴 日用品 家居 绿植 健身 保健 棉品 美妆',
+=======
+        'keyword': '食品 养生 食材 滋补品 药膳 母婴 原生态 野生 日用品 家居 绿植 健身 保健 棉品 美妆',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🌿',
         'desc': '所有有机认证、环保认证产品',
     },
     # ====== 食品粮油 ======
     '谷物杂粮': {
+<<<<<<< HEAD
         'keyword': '五谷杂粮 大米 小米 燕麦 藜麦',
+=======
+        'keyword': '五谷杂粮 大米 小米 燕麦 藜麦 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🌾',
         'desc': '有机五谷杂粮、米面粮油',
     },
     '滋补养生': {
+<<<<<<< HEAD
         'keyword': '滋补 枸杞 红枣 黄芪 党参 人参',
+=======
+        'keyword': '滋补 枸杞 红枣 黄芪 党参 人参 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🫖',
         'desc': '枸杞、红枣、黄芪、党参等滋补品',
     },
     '药膳食材': {
+<<<<<<< HEAD
         'keyword': '药膳 药食同源 黄芪 党参 山药 莲子 茯苓',
+=======
+        'keyword': '药膳 药食同源 黄芪 党参 山药 莲子 茯苓 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🍲',
         'desc': '药膳食材、药食同源目录食材',
     },
     '茶饮酒水': {
+<<<<<<< HEAD
         'keyword': '茶 养生茶 花茶 红茶 绿茶 药酒 果酒',
+=======
+        'keyword': '茶 养生茶 花茶 红茶 绿茶 药酒 果酒 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🍵',
         'desc': '有机茶、养生茶、药酒、果酒',
     },
     '坚果干果': {
+<<<<<<< HEAD
         'keyword': '坚果 核桃 杏仁 腰果 干果 果脯',
+=======
+        'keyword': '坚果 核桃 杏仁 腰果 干果 果脯 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🥜',
         'desc': '有机坚果、干果、果脯',
     },
     '菌菇干货': {
+<<<<<<< HEAD
         'keyword': '菌菇 香菇 木耳 银耳 干货 山珍',
+=======
+        'keyword': '菌菇 香菇 木耳 银耳 干货 山珍 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🍄',
         'desc': '有机菌菇、木耳、银耳等山珍干货',
     },
     '调味佐料': {
+<<<<<<< HEAD
         'keyword': '调味品 酱油 醋 橄榄油 调料 蜂蜜',
+=======
+        'keyword': '调味品 酱油 醋 橄榄油 调料 蜂蜜 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🧂',
         'desc': '有机调味品、蜂蜜、橄榄油等',
     },
     '新鲜果蔬': {
+<<<<<<< HEAD
         'keyword': '蔬菜 水果 新鲜 时令',
+=======
+        'keyword': '蔬菜 水果 新鲜 时令 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🥬',
         'desc': '有机认证新鲜蔬果',
     },
     '母婴食品': {
+<<<<<<< HEAD
         'keyword': '母婴 婴儿食品 奶粉 辅食',
+=======
+        'keyword': '母婴 婴儿食品 奶粉 辅食 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🍼',
         'desc': '有机婴幼儿食品、奶粉',
     },
@@ -127,61 +170,102 @@ CATEGORY_MAP = {
         'desc': '有机棉、丝、麻等天然面料服装家纺',
     },
     '日化洗护': {
+<<<<<<< HEAD
         'keyword': '洗发水 沐浴露 护肤品 化妆品 手工皂 环保',
+=======
+        'keyword': '洗发水 沐浴露 护肤品 化妆品 手工皂 环保 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🧴',
         'desc': '有机/环保认证日化洗护用品',
     },
     '美妆护肤': {
+<<<<<<< HEAD
         'keyword': '护肤品 化妆品 面膜 精油 纯露 口红',
+=======
+        'keyword': '护肤品 化妆品 面膜 精油 纯露 口红 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '💄',
         'desc': '有机/天然成分美妆护肤品',
     },
     # ====== 家居生活 ======
     '家居日用': {
+<<<<<<< HEAD
         'keyword': '家居 日用 收纳 竹制品 藤编 环保',
+=======
+        'keyword': '家居 日用 收纳 竹制品 藤编 环保 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🏠',
         'desc': '环保家居用品、竹木藤编制品',
     },
     '绿植盆栽': {
+<<<<<<< HEAD
         'keyword': '绿植 盆栽 花卉 多肉 盆景 园艺',
+=======
+        'keyword': '绿植 盆栽 花卉 多肉 盆景 园艺 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🪴',
         'desc': '绿植盆栽、花卉园艺、盆景',
     },
     '环保餐具': {
+<<<<<<< HEAD
         'keyword': '餐具 厨具 水杯 竹纤维 麦秸秆 环保',
+=======
+        'keyword': '餐具 厨具 水杯 竹纤维 麦秸秆 环保 原生态',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🍽️',
         'desc': '环保餐具、竹纤维/麦秸秆制品',
     },
     # ====== 健康养生 ======
     '保健器械': {
+<<<<<<< HEAD
         'keyword': '保健品 艾灸 刮痧 拔罐 按摩 理疗',
+=======
+        'keyword': '保健品 艾灸 刮痧 拔罐 按摩 理疗 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '💊',
         'desc': '有机保健品、艾灸刮痧等中医器具',
     },
     '健身运动': {
+<<<<<<< HEAD
         'keyword': '健身 瑜伽 太极 运动 器材 跳绳',
+=======
+        'keyword': '健身 瑜伽 太极 运动 器材 跳绳 原生态',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🏋️',
         'desc': '环保健身器材、瑜伽用品、太极用品',
     },
     '户外出行': {
+<<<<<<< HEAD
         'keyword': '户外 露营 徒步 登山 环保 水杯',
+=======
+        'keyword': '户外 露营 徒步 登山 环保 水杯 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🥾',
         'desc': '环保户外用品、露营装备',
     },
     # ====== 医疗健康 ======
     '医用环保': {
+<<<<<<< HEAD
         'keyword': '医用 棉签 口罩 纱布 消毒 环保',
+=======
+        'keyword': '医用 棉签 口罩 纱布 消毒 环保 原生态',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🏥',
         'desc': '有机棉医用耗材、环保医疗用品',
     },
     '中医养生': {
+<<<<<<< HEAD
         'keyword': '艾草 足浴 泡脚 养生壶 经络 穴位',
+=======
+        'keyword': '艾草 足浴 泡脚 养生壶 经络 穴位 原生态 野生',
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         'icon': '🧘',
         'desc': '中医养生用品、艾草足浴、经络调理',
     },
 }
 
 
+<<<<<<< HEAD
 # 搜索别名表：用户搜的词 vs 淘宝商品标题常用词
 # 匹配标题时，原词或任一别名命中即算匹配（不改搜索逻辑，只扩展匹配）
 SEARCH_ALIASES = {
@@ -201,6 +285,8 @@ SEARCH_ALIASES = {
 }
 
 
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 class ShopService:
     """商品搜索与推荐服务 - 只推荐有机认证产品"""
 
@@ -217,6 +303,7 @@ class ShopService:
 
     def search(self, keyword: str, platform: str = "taobao", page: int = 1, page_size: int = 10, sort: str = "") -> List[dict]:
         """
+<<<<<<< HEAD
         搜索商品 - 多关键词拆成单个词并行搜索，合并去重
         platform: taobao / jd / all
         sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
@@ -384,6 +471,40 @@ class ShopService:
             }
         except Exception as e:
             return {'total': 0, 'error': str(e)}
+=======
+        搜索商品 - 自动追加"有机"关键词，只返回有机认证产品
+        platform: taobao / jd / all
+        sort: 空=综合, price_asc=价格最低, price_desc=价格最高, sales=销量最高, credit=评价最高
+        """
+        # 强制追加有机认证关键词
+        search_keyword = self._ensure_organic(keyword)
+
+        items = []
+        if platform in ("taobao", "all"):
+            # 把长关键词拆成2-3个词的短组合，分别搜索再合并
+            sub_keywords = self._split_keywords(search_keyword)
+            seen_ids = set()
+            for sub_kw in sub_keywords:
+                # 每个子关键词搜3页，覆盖更多商品
+                for page_num in range(1, 4):
+                    sub_items = self._search_taobao(sub_kw, page_num, page_size, sort)
+                    if not sub_items:
+                        break  # 这一页没结果了，跳过
+                    for item in sub_items:
+                        item_id = item.get('item_id', '') or item.get('title', '')
+                        if item_id not in seen_ids and not self._is_excluded(item):
+                            seen_ids.add(item_id)
+                            items.append(item)
+                # 如果已经收集够多了，就不再继续
+                if len(items) >= page_size * 10:
+                    break
+        if platform in ("jd", "all"):
+            for page_num in range(1, 4):
+                for item in self._search_jd(search_keyword, page_num, page_size):
+                    if not self._is_excluded(item):
+                        items.append(item)
+        return items
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
 
     def _is_excluded(self, item: dict) -> bool:
         """检查商品是否应该被排除（书籍、化工、玩具等无关品类）"""
@@ -480,6 +601,7 @@ class ShopService:
                                 # 将 https://s.click.taobao.com/... 转为 taobao:// 协议
                                 app_url = click_url.replace('https://', 'taobao://', 1)
                             
+<<<<<<< HEAD
                             # 提取主图和副图
                             main_image = basic.get('pict_url', '')
                             small_images_raw = basic.get('small_images', {})
@@ -491,12 +613,18 @@ class ShopService:
                                 small_imgs = []
                             all_images = [main_image] + [img for img in small_imgs if img and img != main_image]
                             
+=======
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
                             items.append({
                                 'item_id': item.get('item_id', ''),
                                 'title': basic.get('short_title', '') or basic.get('title', ''),
                                 'price': price_info.get('zk_final_price', '') or price_info.get('reserve_price', ''),
+<<<<<<< HEAD
                                 'image': main_image,
                                 'images': all_images[:5],
+=======
+                                'image': basic.get('pict_url', ''),
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
                                 'url': click_url,  # 网页版推广链接（带佣金）
                                 'app_url': app_url,  # APP deeplink（优先，带佣金追踪）
                                 'platform': 'taobao',
@@ -509,6 +637,7 @@ class ShopService:
             print(f"淘宝搜索异常: {e}")
         return []
 
+<<<<<<< HEAD
     # ========== 淘口令 ==========
 
     def create_tpwd(self, url: str, text: str = "") -> dict:
@@ -552,6 +681,13 @@ class ShopService:
         """京东联盟MD5签名（排除sign和sign_method参数）"""
         filtered = {k: v for k, v in params.items() if k not in ('sign', 'sign_method')}
         sorted_params = sorted(filtered.items())
+=======
+    # ========== 京东联盟 ==========
+
+    def _sign_jd(self, params: dict) -> str:
+        """京东联盟MD5签名"""
+        sorted_params = sorted(params.items())
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         sign_str = self.jd_config["app_secret"] + ''.join(f"{k}{v}" for k, v in sorted_params) + self.jd_config["app_secret"]
         return hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
 
@@ -571,6 +707,7 @@ class ShopService:
             'format': 'json',
             'v': '1.0',
             'sign_method': 'md5',
+<<<<<<< HEAD
             'param_json': json.dumps({
                 'goodsReqDTO': {
                     'keyword': keyword,
@@ -579,11 +716,24 @@ class ShopService:
                     'pid': self.jd_config.get('pid', ''),
                 }
             }, separators=(',', ':'))
+=======
+            '360buy_param_json': json.dumps({
+                'goodsReq': {
+                    'keyword': keyword,
+                    'pageSize': page_size,
+                    'pageIndex': page,
+                }
+            })
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
         }
         params['sign'] = self._sign_jd(params)
 
         try:
+<<<<<<< HEAD
             resp = requests.post("https://router.jd.com/api", data=params, timeout=10)
+=======
+            resp = requests.post("https://api.jd.com/routerjson", data=params, timeout=10)
+>>>>>>> ede169b4 (SOM: 恢复Git版本，修复后端systemd服务python路径，商品链接用click_url推广链接)
             result = resp.json()
 
             if 'error_response' in result:
