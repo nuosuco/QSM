@@ -86,6 +86,13 @@ class TestFullPipeline:
     
     def test_persistence_integration(self):
         """持久化层集成测试"""
+        import os
+        import shutil
+        # 确保数据目录干净
+        data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+        if os.path.exists(data_dir):
+            shutil.rmtree(data_dir)
+        
         pm = PersistenceManager()
         
         # 保存区块链数据
