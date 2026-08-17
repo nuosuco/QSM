@@ -29,9 +29,7 @@ class MatchingEngine:
         self.orderbook = OrderBook(symbol)
         self.fee_rate = fee_rate
         self.trades: List[Trade] = []
-        self.fills: Dict[str, float] = {}  # order_id -> filled_amount
-        self.balance: Dict[str, Dict[str, float]] = {}  # trader -> {asset: amount}
-        self.trade_callback: Optional[Callable] = None
+        self.balance: Dict[str, Dict[str, float]] = {}
     
     def set_balance(self, trader: str, asset: str, amount: float):
         """设置账户余额"""
@@ -43,15 +41,15 @@ class MatchingEngine:
     def get_balance(self, trader: str, asset: str) -> float:
         return self.balance.get(trader, {}).get(asset, 0.0)
     
-    def submit_order(self, trader: str, side: OrderSide, quantity: float, 
-                     price: float = 0.0, order_type: OrderType = OrderType.LIMIT) -> Optional[str]:
+    def submit_order(self, trader: str, side, quantity: float, 
+                     price: float = 0.0, order_type="limit") -> Optional[str]:
         """提交订单"""
         if quantity <= 0:
             return None
         
         # 市场单自动定价
-        if order_type == OrderType.MARKET:
-            if side == OrderSide.BUY:
+        if order_type == "market":
+            if side == "buy":
                 price = self.orderbook.get_best_ask() or (self.orderbook.get_mid_price() or 100) * 1.01
             else:
                 price = self.orderbook.get_best_bid() or (self.orderbook.get_mid_price() or 100) * 0.99
@@ -59,15 +57,15 @@ class MatchingEngine:
         order_id = str(uuid.uuid4())[:8]
         order = Order(
             order_id=order_id,
-            side=side,
-            order_type=order_type,
+            side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
+            order_type=OrderType.LIMIT,
             quantity=quantity,
             price=price,
             trader=trader
         )
         
         # 检查余额
-        if side == OrderSide.BUY:
+        if order.side == OrderSide.BUY:
             cost = quantity * price
             if self.get_balance(trader, "USDT") < cost:
                 print(f"❌ Insufficient balance for {trader}")
@@ -79,8 +77,7 @@ class MatchingEngine:
                 return None
         
         self.orderbook.add_order(order)
-        side_str = side.value if hasattr(side, 'value') else str(side)
-        print(f"📤 Order submitted: {side_str} {quantity} @ {price:.4f} ({order_id})")
+        print(f"📤 Order submitted: {side} {quantity} @ {price:.4f} ({order_id})")
         
         # 尝试撮合
         self._match_orders(order)
@@ -90,21 +87,20 @@ class MatchingEngine:
     def _match_orders(self, incoming: Order):
         """撮合订单"""
         if incoming.side == OrderSide.BUY:
-            matched = self._match_buy(incoming)
+            self._match_buy(incoming)
         else:
-            matched = self._match_sell(incoming)
+            self._match_sell(incoming)
     
-    def _match_buy(self, buy_order: Order) -> bool:
-        """买入撮合"""
+    def _match_buy(self, buy_order: Order):
+        """买入撮合 - 匹配ask"""
         while buy_order.remaining > 0.0001 and self.orderbook.asks:
             best_ask = self.orderbook.asks[0]
             if best_ask.price > buy_order.price:
-                break  # 价格不合适
+                break  # 卖价高于买价，不成交
             
             trade_qty = min(buy_order.remaining, best_ask.quantity)
             trade_price = best_ask.price
             
-            # 执行成交
             self._execute_trade(buy_order, best_ask, trade_price, trade_qty)
             
             # 扣手续费
@@ -112,15 +108,13 @@ class MatchingEngine:
             self._deduct_fee(buy_order.trader, "USDT", fee)
             self._deduct_fee(best_ask.orders[0].trader, self.symbol.split("/")[0], 
                            trade_qty * self.fee_rate)
-        
-        return buy_order.is_complete
     
-    def _match_sell(self, sell_order: Order) -> bool:
-        """卖出撮合"""
+    def _match_sell(self, sell_order: Order):
+        """卖出撮合 - 匹配bid"""
         while sell_order.remaining > 0.0001 and self.orderbook.bids:
             best_bid = self.orderbook.bids[0]
             if best_bid.price < sell_order.price:
-                break  # 价格不合适
+                break  # 买价低于卖价，不成交
             
             trade_qty = min(sell_order.remaining, best_bid.quantity)
             trade_price = best_bid.price
@@ -131,8 +125,6 @@ class MatchingEngine:
             fee = trade_qty * trade_price * self.fee_rate
             self._deduct_fee(sell_order.trader, self.symbol.split("/")[0], trade_qty * self.fee_rate)
             self._deduct_fee(best_bid.orders[0].trader, "USDT", fee)
-        
-        return sell_order.is_complete
     
     def _execute_trade(self, order1: Order, book_entry, price: float, quantity: float):
         """执行成交"""
@@ -193,6 +185,5 @@ class MatchingEngine:
         }
 
 
-# 便捷函数
 def create_exchange(symbol: str = "QNT/USDT", fee_rate: float = 0.001) -> MatchingEngine:
     return MatchingEngine(symbol=symbol, fee_rate=fee_rate)

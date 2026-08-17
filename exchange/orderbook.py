@@ -71,16 +71,16 @@ class OrderBook:
         return True
     
     def _add_bid(self, order: Order):
-        """添加买单"""
+        """添加买单到bids"""
         inserted = False
-        for entry in self.bids:
+        for i, entry in enumerate(self.bids):
             if abs(entry.price - order.price) < 0.0001:
                 entry.quantity += order.remaining
                 entry.orders.append(order)
                 inserted = True
                 break
             elif entry.price < order.price:
-                self.bids.insert(self.bids.index(entry), OrderBookEntry(
+                self.bids.insert(i, OrderBookEntry(
                     price=order.price, quantity=order.remaining, orders=[order]
                 ))
                 inserted = True
@@ -91,16 +91,16 @@ class OrderBook:
         self.bids.sort(key=lambda x: x.price, reverse=True)
     
     def _add_ask(self, order: Order):
-        """添加卖单"""
+        """添加卖单到asks"""
         inserted = False
-        for entry in self.asks:
+        for i, entry in enumerate(self.asks):
             if abs(entry.price - order.price) < 0.0001:
                 entry.quantity += order.remaining
                 entry.orders.append(order)
                 inserted = True
                 break
             elif entry.price > order.price:
-                self.asks.insert(self.asks.index(entry), OrderBookEntry(
+                self.asks.insert(i, OrderBookEntry(
                     price=order.price, quantity=order.remaining, orders=[order]
                 ))
                 inserted = True
