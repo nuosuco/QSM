@@ -14,7 +14,9 @@ from nstate.pool import SuperpositionPool
 from agents.base import ArbAgent, MarketMakerAgent, TrendAgent
 from agents.strategies import create_agent
 from database.persistent import PersistentStore
-from utils.logger import setup_logger
+from utils.logger import QNTLogger
+
+log = QNTLogger()
 
 
 def cmd_blockchain(args):
