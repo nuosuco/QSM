@@ -303,6 +303,14 @@ class TradeAnalyzer:
 class AdaptiveRiskManager:
     """自适应风控管理器 - 根据市场状态动态调整风控参数"""
     
+    # 风控铁律（与RiskManager保持一致）
+    MIN_NET_PROFIT_PCT = 0.0005  # 0.05%
+    MAX_POSITION_PCT = 0.20
+    MAX_STOP_LOSS_PCT = 0.02
+    MAX_CONSECUTIVE_LOSSES = 5
+    MAX_DRAWDOWN_PCT = 0.40
+    PROFIT_WITHDRAW_PCT = 0.50
+    
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
