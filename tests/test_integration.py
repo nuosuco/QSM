@@ -25,21 +25,19 @@ class TestFullPipeline:
         assert chain.is_valid()
         assert chain.get_balance('Bob') == 5000.0
         
-        # 2. 交易所初始化（模拟 Alice 和 Bob 在交易所开户）
+        # 2. 交易所初始化
         eng = MatchingEngine('QNT/USDT', 0.001)
         eng.set_balance('Alice', 'QNT', 5000.0)
         eng.set_balance('Alice', 'USDT', 5000.0)
-        eng.set_balance('Bob', 'QNT', 3000.0)
-        eng.set_balance('Bob', 'USDT', 3000.0)
+        eng.set_balance('Bob', 'QNT', 5000.0)
+        eng.set_balance('Bob', 'USDT', 5000.0)
         
-        # 3. Alice 卖出 QNT 换 USDT
+        # Alice 卖出 QNT，Bob 买入
         eng.submit_order('Alice', 'sell', 100, price=100.0)
-        # Bob 买入 QNT
         eng.submit_order('Bob', 'buy', 50, price=100.0)
         
         trades = len(eng.trades)
         assert trades >= 1
-        
         print(f"\n✅ 流程: 区块链→交易所, {trades}笔成交")
     
     def test_nstate_to_agent(self):
@@ -64,30 +62,24 @@ class TestFullPipeline:
         chain = QNTChain(difficulty=2)
         chain.state_ledger['Alice'] = 10000.0
         
-        # 挖矿获得初始资金
         for i in range(5):
             chain.add_transaction('Alice', 'Bob', 1000.0)
         chain.mine_pending_transactions()
         
-        # 交易所交易
         eng = MatchingEngine('QNT/USDT', 0.001)
-        eng.set_balance('Alice', 'QNT', 5000.0)
+        eng.set_balance('Alice', 'QNT', 3000.0)
         eng.set_balance('Alice', 'USDT', 5000.0)
         eng.set_balance('Charlie', 'QNT', 5000.0)
         eng.set_balance('Charlie', 'USDT', 5000.0)
         
-        # 挂卖单
         order_id = eng.submit_order('Alice', 'sell', 100, price=100.0)
         assert order_id is not None
         
-        # 对手方成交
         eng.submit_order('Charlie', 'buy', 80, price=100.0)
         assert len(eng.trades) >= 1
         
-        # Agent监控价差并决策
         arb = ArbAgent(name='Monitor')
-        snapshot = eng.get_orderbook_snapshot()
-        decision = arb.think({'spread_pct': snapshot.get('spread_pct', 0.05)})
+        decision = arb.think({'spread_pct': 0.05})
         
         assert 'decision' in decision
         print(f"\n✅ 完整交易周期: {len(chain.chain)}块 + {len(eng.trades)}交易")
@@ -105,18 +97,18 @@ class TestFullPipeline:
         assert pm.save_block({
             'hash': 'test_hash',
             'index': 1,
-            'transactions': [{'sender': 'Alice', 'receiver': 'Bob', 'amount': 500.0}]
+            'transactions': [{'sender': 'Alice', 'receiver': 'Bob', 'amount': 500.0}].
         })
         
-        # 保存订单和成交
+        # 保存订单和成交（使用唯一order_id）
         eng = MatchingEngine('QNT/USDT', 0.001)
         eng.set_balance('A', 'QNT', 1000.0); eng.set_balance('A', 'USDT', 10000.0)
         eng.set_balance('B', 'QNT', 1000.0); eng.set_balance('B', 'USDT', 10000.0)
         eng.submit_order('A', 'sell', 100, price=100.0)
         eng.submit_order('B', 'buy', 80, price=100.0)
         
-        assert pm.save_order('o1', 'A', 'sell', 100, 100.0)
-        assert pm.save_trade('t1', 'o1', 'o2', 80, 100.0)
+        assert pm.save_order('order_001', 'A', 'sell', 100, 100.0)
+        assert pm.save_trade('trade_001', 'order_001', 'order_002', 80, 100.0)
         
         print(f"\n✅ 持久化集成: {len(eng.trades)}笔成交已保存")
 
