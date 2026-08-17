@@ -1,0 +1,23 @@
+{
+  "blockchain": {
+    "difficulty": 2,
+    "block_time": 10.0,
+    "genesis_reward": 50.0
+  },
+  "exchange": {
+    "fee_rate": 0.001,
+    "min_order_size": 0.001
+  },
+  "nstate": {
+    "num_states": 8,
+    "weight_dim": 5,
+    "collapse_interval": 10
+  },
+  "agent": {
+    "arb_spread_threshold": 0.05,
+    "mm_spread": 0.02
+  },
+  "debug": false,
+  "host": "0.0.0.0",
+  "port": 5000
+}
