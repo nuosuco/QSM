@@ -1,0 +1,46 @@
+# 合并8个权重文件为1个: qscl_model.w
+# 用file_append逐个追加
+
+var model_path = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/qscl_model.w"
+var base = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/"
+
+# 先清空(覆盖写空)
+file_write_bytes(model_path, "")
+
+# 逐个读取+追加
+var files[8]
+files[0] = "e_state_1.w"
+files[1] = "w_state_1.w"
+files[2] = "e_state_2.w"
+files[3] = "w_state_2.w"
+files[4] = "e_state_3.w"
+files[5] = "w_state_3.w"
+files[6] = "e_state_4.w"
+files[7] = "w_state_4.w"
+
+var i = 0
+while (i < 8):
+    var path = str_concat(base, files[i])
+    var data = file_read(path)
+    if (str_len(data) > 0):
+        file_append(model_path, data)
+        printf("合并 %s: %d 字节\n", files[i], str_len(data))
+    else:
+        printf("失败 %s\n", files[i])
+    end
+    i = i + 1
+end
+
+# 验证
+var merged = file_read(model_path)
+printf("\n合并完成: qscl_model.w = %d 字节\n", str_len(merged))
+printf("行数: ")
+var nl = 0
+var p = 0
+while (p < str_len(merged)):
+    if (str_char_at(merged, p) == "\n"):
+        nl = nl + 1
+    end
+    p = p + 1
+end
+printf("%d 行\n", nl)

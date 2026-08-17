@@ -503,6 +503,14 @@ def do_builtin(bname, nargs):
         push_int(file_write_bytes(pop1_s, pop2_s))
         return
     end
+    # file_append(path, content): 追加写入(读旧内容+拼接+写回,纯QEntL实现)
+    if (str_eq(bname, "file_append")):
+        do_pop2()
+        var old = file_read(pop1_s)
+        var merged = str_concat(old, pop2_s)
+        push_int(file_write_bytes(pop1_s, merged))
+        return
+    end
     if (str_eq(bname, "file_exists")):
         do_pop1()
         push_int(file_exists(pop1_s))
