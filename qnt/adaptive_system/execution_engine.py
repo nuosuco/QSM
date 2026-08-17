@@ -192,20 +192,16 @@ class ExecutionEngine:
         self.risk_manager.refresh_balance()
         equity = self.risk_manager.equity if self.risk_manager.equity > 0 else 1.0
         
-        # 根据真实余额计算仓位（≤20%）
+        # 根据真实余额计算仓位（执行最大20%本金）
         max_position = equity * self.risk_manager.MAX_POSITION_PCT
+        position_size = max_position
         
-        # 根据交易所余额调整
-        ex_balance = self.risk_manager.real_balance.get(ex_name, {}).get('total', 0)
-        
-        if ex_name == 'htx':
-            # HTX账户只有1 USDT，用极小仓位测试
-            position_size = min(1.0, max_position * 0.5)
-        elif ex_name == 'bitget':
-            # Bitget账户有3.5 USDT
-            position_size = min(2.0, max_position * 0.3)  # 先用30%测试，最多2U
-        else:
-            position_size = min(2.0, max_position)
+        # 检查最小金额限制
+        min_notional_map = {'htx': 1.0, 'bitget': 5.0}
+        min_notional = min_notional_map.get(ex_name, 1.0)
+        if position_size < min_notional:
+            logger.warning(f"⚠️ {ex_name} {symbol}: 仓位{position_size:.2f}U < 最小{min_notional}U，跳过")
+            return
         
         # 判断方向：永续>现货 → 买永续卖现货；永续<现货 → 卖永续买现货
         mid_spot = (spot_bid + spot_ask) / 2

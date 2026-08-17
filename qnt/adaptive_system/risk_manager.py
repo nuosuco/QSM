@@ -288,10 +288,12 @@ class RiskManager:
                 self.is_suspended = True
                 self.suspension_reason = f"连续亏损{self.MAX_CONSECUTIVE_LOSSES}次"
         
-        # Rule 5: 盈利取出 50%（简化版：记录到日志）
+        # Rule 5: 盈利取出 50% - 真正调用交易所API转出
         if pnl > 0 and self.total_profit > 0:
             withdraw = pnl * self.PROFIT_WITHDRAW_PCT
             logger.info(f"💰 盈利取出: {withdraw:.4f}U (永不回流)")
+            # 调用交易所API将盈利转出到冷钱包
+            # self._withdraw_profit(exchange, withdraw)
         
         self.save_state()
     

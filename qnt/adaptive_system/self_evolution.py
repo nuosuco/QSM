@@ -16,6 +16,7 @@ from .config import SystemConfig
 from .data_collector import DataCollector
 from .pattern_discovery import PatternDiscovery
 from .trade_analyzer import TradeAnalyzer, AdaptiveRiskManager, PhaseUpgradeManager
+from .execution_engine import ExecutionEngine
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('SelfEvolutionSystem')
@@ -200,12 +201,23 @@ class SelfEvolutionTradingSystem:
         position_mult = adjustments.get('position_size', 1.0)
         stop_loss_pct = adjustments.get('stop_loss_pct', 2.0)
         
-        # 自动调整仓位倍数（动态调整灵敏度）
+        # 真正调整config中的参数（让自进化生效）
         if position_mult != 1.0:
-            logger.info(f"   🧬 自进化调整: 仓位倍数={position_mult:.2f}x")
-            # 这里可以进一步调整config中的参数
+            old_val = self.config.execution.spread_pct
+            # 仓位倍数增大 → 灵敏度提高（阈值降低）
+            self.config.execution.spread_pct = old_val / position_mult
+            logger.info(f"   🧬 自进化调整: 仓位倍数={position_mult:.2f}x, spread阈值 {old_val:.4f}% → {self.config.execution.spread_pct:.4f}%")
         
-        logger.info(f"   风控调整: 仓位={position_mult}x 止损={stop_loss_pct}%")
+        # 根据市场状态调整净利阈值
+        market_regime = risk_status.get('market_regime', {}).get('regime', 'normal')
+        if market_regime == 'volatile':
+            old_net = self.config.execution.net_profit_pct
+            self.config.execution.net_profit_pct = old_net * 0.5  # 高波动时降低灵敏度
+            logger.info(f"   🧬 自进化调整: 波动市场, net阈值 {old_net:.4f}% → {self.config.execution.net_profit_pct:.4f}%")
+        
+        # 更新实际交易门槛日志
+        actual_threshold = (self.risk_manager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST) * 100
+        logger.info(f"   风控调整: 仓位={position_mult}x 止损={stop_loss_pct}% | 实际门槛: 价差 > {actual_threshold:.2f}%")
     
     def _log_status(self, per_exchange_analysis: Dict, risk_status):
         """打印当前状态 - 按平台/引擎显示"""
