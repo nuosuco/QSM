@@ -1,0 +1,4 @@
+# SoM叠加态worker测试: 初始化后各态各评估一策略
+som_init()
+var r = som_qs_decision()
+printf("态%d完成,返回%d\n", qstate_id(), r)

@@ -9,9 +9,10 @@
 
 ## 一、铁律（不可违反）
 
-1. C语言只是启动器。全项目**唯一C文件** = `src/qcl_bootstrap.c`
+1. C语言只是点火器
+- QEntl启动器(lib/qvm_boot.qentl)才是日常启动入口。全项目**唯一C文件** = `src/qcl_bootstrap.c`
 2. QEntL全栈，不依赖任何第三方（无.js/.py/.rs/.go）
-3. 构建链：C启动器 → QCL → QVM → QDFS → QNS → 四大模型
+3. 构建链：QEntl启动器 → QCL → QVM → QDFS → QNS → 四大模型
 4. QDFS是叠加态并行基础，QNS基于QDFS，四大模型基于QNS
 5. 量子基因编码 + 量子纠缠信道
 6. 三种部署：终端QOS / 虚拟机 / Web QOS
@@ -100,7 +101,7 @@ init/H/X/Y/Z/T/S/CNOT/MEASURE/PRINT/STOP → 编译为量子电路字节码（�
 
 ## 四、八阶段构建（每阶段有验证命令）
 
-### 阶段1: C启动器 src/qcl_bootstrap.c（三合一）
+### 阶段1: QEntl启动器 src/qcl_bootstrap.c（三合一）
 **职责**（启动器本职工作，不是堆功能）：
 - (a) 量子指令子集编译（保留）
 - (b) 最小QEntL子集编译器：刚好够编译qcl.qentl
@@ -130,7 +131,7 @@ bin/qcl_bootstrap run build/qcl.qbc --help          # QCL活了，打印banner
 
 ### 阶段3: QVM虚拟机 qvm.qentl（QEntL写）
 - 加载QBC1、opcode分发、栈、调用帧、builtin
-**验证**: C启动器编译qvm.qentl → qvm.qbc；用qvm.qbc执行hello.qbc
+**验证**: QEntl启动器编译qvm.qentl → qvm.qbc；用qvm.qbc执行hello.qbc
 
 ### 阶段4: 标准库 lib/*.qentl
 - str.qentl / math.qentl / io.qentl
@@ -171,7 +172,7 @@ QSM/
 
 1. 一步一个脚印：验证命令通过才进下一阶段
 2. 诚实：不虚报，测试输出为证
-3. 不在C里堆功能：C启动器三合一是启动器职责；QCL活了后C编译器路径退役
+3. 不在C里堆功能：QEntl启动器三合一是启动器职责；QCL活了后C编译器路径退役
 4. 不用第三方语言写核心：.js/.py只允许出现在web/和_archive/
 5. 归档≠删除：旧代码进_archive/，开发文档永不删除
 6. git提交保存每个里程碑
@@ -182,7 +183,7 @@ QSM/
 
 - [x] 项目细读完成（失败根因定位）
 - [ ] 旧代码归档 → _archive/
-- [ ] 阶段1: C启动器三合一
+- [ ] 阶段1: QEntl启动器三合一
 - [ ] 阶段2: QCL
 - [ ] 阶段3: QVM
 - [ ] 阶段4: 标准库

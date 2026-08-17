@@ -493,6 +493,122 @@ def do_builtin(bname, nargs):
         push_str(chr(pop1_i))
         return
     end
+    # ---- QSCL builtin ----
+    if (str_eq(bname, "embedding")):
+        do_pop3()
+        var code = pop1_i
+        var e_arr = pop2_a
+        var dim = pop3_i
+        # embedding: 返回向量的偏移量
+        push_int(code * dim)
+        return
+    end
+    if (str_eq(bname, "mat_mul")):
+        do_pop4()
+        var x_off = pop1_i
+        var w_arr = pop2_a
+        var n_in = pop3_i
+        var n_out = pop4_i
+        # mat_mul: x[n_in] @ W[n_out*n_in] -> y[n_out]
+        var y_off = ar_used * 1
+        if (ar_used >= 127): y_off = 0 end
+        ar_used = ar_used + 1
+        ar_off[ar_used-1] = ar_next
+        ar_size[ar_used-1] = n_out
+        ar_next = ar_next + n_out
+        var i = 0
+        while (i < n_out):
+            var sum = 0
+            var j = 0
+            while (j < n_in):
+                var x_val = ae_i_get(x_off + j)
+                var w_val = ae_i_get(w_arr + i * n_in + j)
+                sum = sum + x_val * w_val / 100
+                j = j + 1
+            end
+            ae_i_set(ar_off[ar_used-1] + i, sum)
+            i = i + 1
+        end
+        push_arr(ar_used - 1)
+        return
+    end
+    if (str_eq(bname, "softmax")):
+        do_pop2()
+        var arr = pop1_a
+        var n = pop2_i
+        # softmax: 返回logits偏移量(原地计算)
+        var max_val = ae_i_get(arr)
+        var i = 0
+        while (i < n):
+            var v = ae_i_get(arr + i)
+            if (v > max_val): max_val = v end
+            i = i + 1
+        end
+        i = 0
+        while (i < n):
+            var diff = ae_i_get(arr + i) - max_val
+            ae_i_set(arr + i, diff)
+            i = i + 1
+        end
+        # 用exp近似
+        i = 0
+        while (i < n):
+            var v = ae_i_get(arr + i)
+            var exp_v = 0
+            if (v > 0): exp_v = 100 + v * 10 end
+            ae_i_set(arr + i, exp_v)
+            i = i + 1
+        end
+        # 归一化
+        var total = 0
+        i = 0
+        while (i < n):
+            total = total + ae_i_get(arr + i)
+            i = i + 1
+        end
+        i = 0
+        while (i < n):
+            ae_i_set(arr + i, ae_i_get(arr + i) * 10000 / (total + 1))
+            i = i + 1
+        end
+        push_int(arr)
+        return
+    end
+    if (str_eq(bname, "argmax")):
+        do_pop2()
+        var arr = pop1_a
+        var n = pop2_i
+        var max_idx = 0
+        var max_val = ae_i_get(arr)
+        var i = 0
+        while (i < n):
+            var v = ae_i_get(arr + i)
+            if (v > max_val):
+                max_val = v
+                max_idx = i
+            end
+            i = i + 1
+        end
+        push_int(max_idx)
+        return
+    end
+    if (str_eq(bname, "backprop")):
+        do_pop5()
+        var lr = pop1_i
+        var grad_arr = pop2_a
+        var w_arr = pop3_a
+        var n = pop4_i
+        var scale = pop5_i
+        # backprop: W[k] += lr * grad[k] / scale
+        var k = 0
+        while (k < n):
+            var grad = ae_i_get(grad_arr + k)
+            ae_i_set(w_arr + k, ae_i_get(w_arr + k) + lr * grad / scale)
+            k = k + 1
+        end
+        push_int(n)
+        return
+    end
     if (str_eq(bname, "tcp_listen")):
         do_pop1()
         push_int(tcp_listen(pop1_i))

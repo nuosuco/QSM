@@ -1,0 +1,54 @@
+# build/qns_debug.qentl — 调试
+var g_W[60]
+var g_b = 993 * 1000 + 40
+
+def digit_at(code, i):
+    var tmp = code
+    var k = 0
+    while (k < i):
+        tmp = tmp / 10
+        k = k + 1
+    end
+    return tmp % 10
+end
+
+def place_val(i):
+    var p = 1
+    var k = 0
+    while (k < 5 - i):
+        p = p * 10
+        k = k + 1
+    end
+    return p
+end
+
+def main():
+    var code = 993 * 1000 + 40
+    printf("code=%d\n", code)
+    var i = 0
+    while (i < 6):
+        var d = digit_at(code, i)
+        var gd = digit_at(g_b, i)
+        var pv = place_val(i)
+        printf("位%d: d=%d gb=%d place=%d target=%d\n", i, d, gd, pv, (d - gd) * pv)
+        i = i + 1
+    end
+    # 检查训练一步
+    var i2 = 0
+    while (i2 < 60):
+        g_W[i2] = i2
+        i2 = i2 + 1
+    end
+    # train_one(code=993040, target=0, lr=1)
+    var j = 0
+    while (j < 6):
+        var d2 = digit_at(code, j)
+        var target_c = (d2 - digit_at(g_b, j)) * place_val(j)
+        var err = target_c - g_W[j * 10 + d2]
+        g_W[j * 10 + d2] = g_W[j * 10 + d2] + err * 1
+        printf("训练位%d: W[%d]=%d -> %d (target=%d err=%d)\n", j, j*10+d2, g_W[j*10+d2] - err, g_W[j*10+d2], target_c, err)
+        j = j + 1
+    end
+    return 1
+end
+main()

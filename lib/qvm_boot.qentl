@@ -1,0 +1,162 @@
+# ================================================================
+# lib/qvm_boot.qentl v6.0 — QEntL全栈启动器(真并行叠加态版)
+# 架构: C种子=BIOS(只点火本启动器一次)
+#       本启动器拉起双QVM守护(真pthread并行),然后自然结束
+#       QVM-A: 点火载荷=server.qbc(HTTP服务器常驻)
+#       QVM-B: 点火载荷=noop.qbc(任务队列守护,消费.qvm_next)
+#       之后全栈跑在QVM里,C种子永不再使用
+# v6.0真并行叠加态: 
+#   - 使用--superpose N参数启动pthread多线程
+#   - 每态独立VM副本，共享只读代码段
+#   - 单进程内N态同时演化(真并行非轮转)
+#   - 验证门: VERDICT=REAL/FAKE检测
+# 注意: QEntL无exit原语,用if/else结构控制流程
+# ================================================================
+var g_root = "/root/QSM"
+var QS_N = 4  # 真并行叠加度(态数量)
+
+# ---- 健康自检 ----
+def boot_health():
+    var qvm_ok = exec("test -f /root/QSM/run/qvm.qbc && echo OK || echo FAIL")
+    var srv_ok = exec("test -f /root/QSM/build/server.qbc && echo OK || echo FAIL")
+    var noop_ok = exec("test -f /root/QSM/build/noop.qbc && echo OK || echo FAIL")
+    var healthy = 1
+    if (str_index_of(qvm_ok, "OK") < 0):
+        healthy = 0
+        printf("[BOOT] 缺失: run/qvm.qbc\n")
+    end
+    if (str_index_of(srv_ok, "OK") < 0):
+        healthy = 0
+        printf("[BOOT] 缺失: build/server.qbc\n")
+    end
+    if (str_index_of(noop_ok, "OK") < 0):
+        healthy = 0
+        printf("[BOOT] 缺失: build/noop.qbc\n")
+    end
+    return healthy
+end
+
+# ---- 真并行叠加态内核自检 ----
+def superpose_kernel_check():
+    # 检查C种子是否支持--superpose参数
+    var test_out = exec("/root/QSM/bin/q_bootstrap run --superpose 2 build/qstate_test.qbc 2>&1")
+    var has_verdict = str_index_of(test_out, "VERDICT=")
+    var is_real = str_index_of(test_out, "VERDICT=REAL")
+    if (has_verdict < 0):
+        printf("[BOOT] ⚠️ 启动器无法执行叠加态任务(C种子可能不支持--superpose)\n")
+        return 0
+    end
+    if (is_real >= 0):
+        printf("[BOOT] ✅ C种子支持真并行叠加态(--superpose VERDICT=REAL)\n")
+        return 1
+    else:
+        printf("[BOOT] ⚠️ 叠加态验证失败,可能为假并行\n")
+        return 0
+    end
+end
+
+# ---- 启动双QVM守护(真并行模式) ----
+def spawn_daemons():
+    # 写引导脚本
+    var boot_sh = "#!/bin/bash\n"
+    boot_sh = boot_sh + "mkdir -p /root/QSM/srv\n"
+    boot_sh = boot_sh + "cp -f /root/QSM/build/server.qbc /root/QSM/srv/target.qbc\n"
+    boot_sh = boot_sh + "echo target.qbc > /root/QSM/srv/.qvm_target\n"
+    boot_sh = boot_sh + "cp -f /root/QSM/build/noop.qbc /root/QSM/target.qbc\n"
+    boot_sh = boot_sh + "echo target.qbc > /root/QSM/.qvm_target\n"
+    boot_sh = boot_sh + "rm -f /root/QSM/.qvm_next\n"
+    # 关键: 使用--superpose QS_N参数启动真并行
+    boot_sh = boot_sh + "setsid bash -c 'cd /root/QSM/srv && exec /root/QSM/bin/q_bootstrap run --superpose "
+    boot_sh = boot_sh + int_to_str(QS_N)
+    boot_sh = boot_sh + " /root/QSM/run/qvm.qbc >> /root/QSM/qvm_server.log 2>&1' < /dev/null &\n"
+    boot_sh = boot_sh + "setsid bash -c 'cd /root/QSM && exec /root/QSM/bin/q_bootstrap run --superpose "
+    boot_sh = boot_sh + int_to_str(QS_N)
+    boot_sh = boot_sh + " /root/QSM/run/qvm.qbc >> /root/QSM/qvm_queue.log 2>&1' < /dev/null &\n"
+    boot_sh = boot_sh + "exit 0\n"
+    file_write_bytes("/root/QSM/srv/boot_daemons.sh", boot_sh)
+    exec("chmod +x /root/QSM/srv/boot_daemons.sh")
+    var spawn_out = exec("setsid /root/QSM/srv/boot_daemons.sh < /dev/null")
+    return spawn_out
+end
+
+printf("=====================================================\n")
+printf("[BOOT] QEntL全栈启动器 v6.0 (一次点火,真并行叠加态版)\n")
+printf("[BOOT] 真并行: pthread多线程,每态独立VM副本,共享只读代码段\n")
+printf("[BOOT] 叠加度: %d态同时演化\n", QS_N)
+printf("=====================================================\n")
+
+# 防重复启动: 9802端口已在监听则跳过点火
+var port_check = exec("ss -tln 2>/dev/null | grep -q 9802 && echo UP || echo DOWN")
+if (str_index_of(port_check, "UP") >= 0):
+    printf("[BOOT] 服务器已在运行(端口9802),无需重复启动,退出\n")
+else:
+    # QLife健康自检
+    var health = boot_health()
+    if (health == 0):
+        printf("[BOOT] 错误: 关键组件缺失,放弃点火\n")
+    else:
+        printf("[QLife] ✅ 全栈健康检查通过\n")
+
+        # 真并行叠加态内核验证
+        var sp_ok = superpose_kernel_check()
+        if (sp_ok == 0):
+            printf("[BOOT] ⚠️ 叠加态内核验证失败,但继续启动\n")
+        end
+
+        # 启动双QVM守护
+        printf("[BOOT] 启动双QVM守护(真并行%d态)...\n", QS_N)
+        spawn_daemons()
+        printf("[BOOT] 双QVM守护进程已拉起\n")
+
+        # 验证HTTP
+        exec("sleep 3")
+        var srv_up = exec("ss -tln 2>/dev/null | grep -q 9802 && echo UP || echo DOWN")
+        if (str_index_of(srv_up, "UP") >= 0):
+            printf("[BOOT] ✅ HTTP服务器已在9802端口监听\n")
+        else:
+            printf("[BOOT] ⚠️ 服务器尚未监听9802(可能仍在启动)\n")
+        end
+
+        # 真并行叠加态点火自检
+        printf("[BOOT] 真并行叠加态点火自检: 投递%d态任务到队列QVM\n", QS_N)
+        exec("rm -f /root/QSM/.qvm_next /tmp/boot_sp_test.txt")
+        # 投递格式: 任务.qbc|结果文件|叠加度
+        var task_line = "build/qstate_test.qbc|/tmp/boot_sp_test.txt|"
+        task_line = task_line + int_to_str(QS_N)
+        file_write_bytes("/root/QSM/.qvm_next", task_line)
+        exec("sleep 15")
+        var sp_out = exec("cat /tmp/boot_sp_test.txt 2>/dev/null")
+        
+        # 验证真并行输出
+        var has_verdict = str_index_of(sp_out, "VERDICT=")
+        var is_real = str_index_of(sp_out, "VERDICT=REAL")
+        var state_count = 0
+        var kk = 0
+        while (kk < QS_N):
+            var state_label = "量子态" + int_to_str(kk)
+            if (str_index_of(sp_out, state_label) >= 0):
+                state_count = state_count + 1
+            end
+            kk = kk + 1
+        end
+        
+        if (has_verdict >= 0 && is_real >= 0 && state_count >= QS_N):
+            printf("[BOOT] ✅ 真并行叠加态点火自检通过\n")
+            printf("[BOOT]    - VERDICT=REAL: %d态独立演化并坍缩合并\n", state_count)
+        else:
+            printf("[BOOT] ⚠️ 叠加态自检输出:\n")
+            var verdict_str = "UNKNOWN"
+            if (is_real >= 0):
+                verdict_str = "REAL"
+            end
+            printf("[BOOT]    VERDICT=%s, 观测到%d/%d态\n", verdict_str, state_count, QS_N)
+        end
+        
+        printf("[BOOT] =====================================\n")
+        printf("[BOOT] 点火完成,启动器结束。全栈进入QVM常驻模式\n")
+        printf("[BOOT] 任务投递: echo '任务.qbc|结果文件|%d' >> /root/QSM/.qvm_next\n", QS_N)
+        printf("[BOOT] 真并行叠加态: %d态pthread多线程同时演化\n", QS_N)
+        printf("[BOOT] C种子使命结束(BIOS只点火一次)\n")
+    end
+end
+printf("[BOOT] 启动器流程结束\n")

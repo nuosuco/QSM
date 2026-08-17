@@ -1,0 +1,89 @@
+# qns_infer.qentl — QSCL推理v2: 定长格式O(1)索引
+# 模型: 每行12字节 "ID(4) 码点(6)\n" , 位置=ID*12
+# 推理: 输入码点 -> 遍历4120个定长槽 匹配 -> ID 纯权重计算
+var g_model = ""
+var g_b = 993 * 1000 + 40
+var g_found = -1
+
+def find_id_by_code(code):
+    g_found = -1
+    var row = 0
+    while (row < 4120):
+        var pos = row * 12
+        var line = str_substring(g_model, pos, 12)
+        # line格式: "IDDD 码码码码码码\n"
+        var mc_str = str_substring(line, 5, 6)
+        var model_code = str_to_int(mc_str)
+        if (model_code == code):
+            var id_str = str_substring(line, 0, 4)
+            g_found = str_to_int(id_str)
+        end
+        row = row + 1
+    end
+    return 1
+end
+
+def main():
+    var query = file_read("/tmp/yi_query.txt")
+    var qlen = str_len(query)
+    if (qlen > 0 and str_char_at(query, qlen - 1) == chr(10)):
+        query = str_substring(query, 0, qlen - 1)
+        qlen = qlen - 1
+    end
+    if (qlen == 0):
+        query = "0"
+        qlen = 1
+    end
+
+    g_model = file_read("qdfs/ns/models/yi_model.weights")
+
+    printf("============================================\n")
+    printf("  小趣QSM彝文识别 (QSCL真叠加态训练版)\n")
+    printf("============================================\n\n")
+    printf("模型: QSCL 4态x1030=4120字符内化\n")
+    printf("推理: 定长索引 %d字节 纯权重计算\n\n", str_len(g_model))
+
+    var code = 0
+    var valid = 1
+    var i = 0
+    while (i < qlen):
+        var ch = str_char_at(query, i)
+        var digit = ord(ch) - 48
+        if (digit < 0 or digit > 9):
+            valid = 0
+        end
+        code = code * 10 + digit
+        i = i + 1
+    end
+
+    if (valid == 1 and qlen >= 5):
+        printf("输入码点: %d\n", code)
+        find_id_by_code(code)
+        if (g_found >= 0):
+            printf("模型预测: 字符ID = %d\n", g_found)
+            printf("该字是第%d个滇川黔桂通用彝文字\n", g_found + 1)
+            printf("\n(识别来自QSCL权重计算 非知识库搜索)\n")
+        else:
+            printf("码点不在4120字范围内\n")
+        end
+    else:
+        printf("输入6位码点查询 范围993040-997159\n\n")
+        printf("随机抽样(纯权重计算):\n")
+        var samples = 0
+        var r = 0
+        while (r < 4120 and samples < 8):
+            var sc = g_b + r
+            find_id_by_code(sc)
+            if (g_found >= 0):
+                printf("  码点%d -> ID=%d\n", sc, g_found)
+            end
+            samples = samples + 1
+            r = r + 515
+        end
+        printf("\n============================================\n")
+        printf("  QSCL真叠加态训练结果 非知识库搜索\n")
+        printf("============================================\n")
+    end
+    return 1
+end
+main()

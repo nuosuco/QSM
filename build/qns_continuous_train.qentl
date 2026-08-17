@@ -1,0 +1,214 @@
+# QNS持续叠加态并行训练
+# 每态处理不同数据分片 -> 学到不同知识 -> 坍缩合并
+# 数据格式: 每行9字节(6位数字+空格+1标签+换行)
+# 使用固定长度跳转，不需要找换行符
+var g_data_path = "qdfs/ns/data/yi_train_4120.data"
+var g_qid = 0
+var g_lr = 100
+var g_epochs = 5
+var g_batch = 64
+var g_line_size = 9
+var g_total_lines = 4120
+var g_ok = 0
+
+var g_input[6]
+var g_target[10]
+var g_w1[48]
+var g_w2[80]
+var g_h[8]
+var g_o[10]
+var g_delta_o[10]
+var g_delta_h[8]
+
+def init_weights():
+    var i = 0
+    while (i < 48):
+        g_w1[i] = ((i + g_qid * 7) % 7) - 3
+        i = i + 1
+    end
+    i = 0
+    while (i < 80):
+        g_w2[i] = ((i + g_qid * 5) % 5) - 2
+        i = i + 1
+    end
+    printf("[态%d] 权重初始化\n", g_qid)
+    return 1
+end
+
+def parse_sample(data, line_no):
+    var pos = line_no * g_line_size
+    g_input[0] = str_to_int(str_substring(data, pos, 1))
+    g_input[1] = str_to_int(str_substring(data, pos + 1, 1))
+    g_input[2] = str_to_int(str_substring(data, pos + 2, 1))
+    g_input[3] = str_to_int(str_substring(data, pos + 3, 1))
+    g_input[4] = str_to_int(str_substring(data, pos + 4, 1))
+    g_input[5] = str_to_int(str_substring(data, pos + 5, 1))
+    var label = str_to_int(str_substring(data, pos + 7, 1))
+    var k = 0
+    while (k < 10):
+        g_target[k] = 0
+        k = k + 1
+    end
+    g_target[label] = 1000
+    g_ok = 1
+end
+
+def forward():
+    var i = 0
+    while (i < 8):
+        var sum = 0
+        var j = 0
+        while (j < 6):
+            sum = sum + g_input[j] * g_w1[j * 8 + i]
+            j = j + 1
+        end
+        if (sum < 0): sum = 0
+        end
+        if (sum > 10000): sum = 10000
+        end
+        g_h[i] = sum
+        i = i + 1
+    end
+    i = 0
+    while (i < 10):
+        var sum = 0
+        var j = 0
+        while (j < 8):
+            sum = sum + g_h[j] * g_w2[j * 10 + i]
+            j = j + 1
+        end
+        if (sum < 0): sum = 0
+        end
+        if (sum > 50000): sum = 50000
+        end
+        g_o[i] = sum
+        i = i + 1
+    end
+    return 1
+end
+
+def backward():
+    var i = 0
+    while (i < 10):
+        var err = g_target[i] - g_o[i]
+        if (err > 100): err = 100
+        end
+        if (err < -100): err = -100
+        end
+        g_delta_o[i] = err
+        i = i + 1
+    end
+    var j = 0
+    while (j < 8):
+        var sum = 0
+        var i = 0
+        while (i < 10):
+            sum = sum + g_delta_o[i] * g_w2[j * 10 + i]
+            i = i + 1
+        end
+        if (g_h[j] > 0):
+            if (sum > 100): sum = 100
+            end
+            if (sum < -100): sum = -100
+            end
+            g_delta_h[j] = sum
+        else:
+            g_delta_h[j] = 0
+        end
+        j = j + 1
+    end
+    j = 0
+    while (j < 8):
+        var i = 0
+        while (i < 10):
+            g_w2[j * 10 + i] = g_w2[j * 10 + i] + g_lr * g_h[j] * g_delta_o[i] / 5000
+            i = i + 1
+        end
+        j = j + 1
+    end
+    j = 0
+    while (j < 6):
+        var i = 0
+        while (i < 8):
+            g_w1[j * 8 + i] = g_w1[j * 8 + i] + g_lr * g_input[j] * g_delta_h[i] / 5000
+            i = i + 1
+        end
+        j = j + 1
+    end
+    return 1
+end
+
+def train_cycle():
+    var data = file_read(g_data_path)
+    var shard_size = g_total_lines / 4
+    var shard_start = g_qid * shard_size
+    var shard_end = shard_start + shard_size
+    if (g_qid == 3):
+        shard_end = g_total_lines
+    end
+    var correct = 0
+    var total = 0
+    var epoch = 0
+    while (epoch < g_epochs):
+        var line = shard_start
+        var batch_count = 0
+        while (line < shard_end and batch_count < g_batch):
+            parse_sample(data, line)
+            if (g_ok == 1):
+                forward()
+                backward()
+                var pred = 0
+                var max_val = g_o[0]
+                var i = 1
+                while (i < 10):
+                    if (g_o[i] > max_val):
+                        max_val = g_o[i]
+                        pred = i
+                    end
+                    i = i + 1
+                end
+                if (g_target[pred] == 1000):
+                    correct = correct + 1
+                end
+                total = total + 1
+                batch_count = batch_count + 1
+            end
+            line = line + 1
+        end
+        epoch = epoch + 1
+    end
+    printf("[态%d] 训练: %d轮, %d样本, 正确=%d/%d\n", g_qid, g_epochs, total, correct, total)
+    return 1
+end
+
+def save_weights():
+    var path = "qdfs/ns/models/yi_v003_shard_" + int_to_str(g_qid) + ".weights"
+    var out = ""
+    var i = 0
+    while (i < 48):
+        if (i > 0): out = out + ","
+        end
+        out = out + int_to_str(g_w1[i])
+        i = i + 1
+    end
+    i = 0
+    while (i < 80):
+        out = out + ","
+        out = out + int_to_str(g_w2[i])
+        i = i + 1
+    end
+    file_write_bytes(path, out)
+    return 1
+end
+
+def main():
+    g_qid = qstate_id()
+    init_weights()
+    printf("[态%d] QNS训练开始 shard=[%d,%d)\n", g_qid, g_qid * (g_total_lines / 4), (g_qid + 1) * (g_total_lines / 4))
+    train_cycle()
+    save_weights()
+    printf("[态%d] QNS训练完成\n", g_qid)
+    return 1
+end
+
+main()

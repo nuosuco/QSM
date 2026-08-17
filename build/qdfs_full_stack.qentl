@@ -1,0 +1,101 @@
+# ================================================================
+# build/qdfs_full_stack.qentl — QEntL全栈全量导入QDFS v1.0
+# QDFS量子动态文件系统 = 唯一地基
+# 所有文件(组件/产物/库/数据/Web)按量子命名空间存储
+#   system   → QCL QVM QDFS QLife QID (系统级)
+#   models   → QNS QSM SOM WeQ Ref (模型级)
+#   lib      → 量子库
+#   data     → 彝文数据(全部)
+#   apps     → 应用/Web/构建产物
+# ================================================================
+
+var NS_SYSTEM = "system"
+var NS_MODELS = "models"
+var NS_LIB = "lib"
+var NS_DATA = "data"
+var NS_APPS = "apps"
+var g_root = "/root/QSM/qdfs"
+
+# 从源文件读并入QDFS命名空间
+def import_file(ns, name, path):
+    var content = file_read(path)
+    var clen = str_len(content)
+    if (clen == 0):
+        printf("  ⚠️ 跳过空文件: %s\n", path)
+        return 0
+    end
+    var ok = qdfs_ns_write(ns, name, content)
+    printf("  ⚛ %s/%s ← %s (%d字节) %d\n", ns, name, path, clen, ok)
+    return 1
+end
+
+def main():
+    printf("============================================\n")
+    printf("  QEntL全栈全量导入QDFS v1.0\n")
+    printf("  QDFS量子动态文件系统 = 唯一地基\n")
+    printf("============================================\n")
+    
+    # 0. 初始化
+    var init_ok = qdfs_init("/root/QSM/qdfs")
+    printf("\n[0] QDFS初始化: 就绪\n")
+    var total = 0
+    
+    # 1. 系统组件 (QCL QVM QDFS QLife QID)
+    printf("\n[1] 系统组件 → system命名空间\n")
+    total = total + import_file(NS_SYSTEM, "qcl", "components/qcl/qcl.qentl")
+    total = total + import_file(NS_SYSTEM, "qcl_qbc", "components/qcl/qcl.qbc")
+    total = total + import_file(NS_SYSTEM, "qvm", "components/qvm/qvm.qentl")
+    total = total + import_file(NS_SYSTEM, "qvm_qbc", "components/qvm/qvm.qbc")
+    total = total + import_file(NS_SYSTEM, "qdfs", "components/qdfs/qdfs.qentl")
+    total = total + import_file(NS_SYSTEM, "qdfs_qbc", "components/qdfs/qdfs.qbc")
+    total = total + import_file(NS_SYSTEM, "qdfs_ns", "lib/qdfs_ns.qentl")
+    total = total + import_file(NS_SYSTEM, "qid", "components/qid/qid.qentl")
+    total = total + import_file(NS_SYSTEM, "qid_qbc", "components/qid/qid.qbc")
+    total = total + import_file(NS_SYSTEM, "qlife", "components/life/life.qentl")
+    total = total + import_file(NS_SYSTEM, "qlife_qbc", "components/life/life.qbc")
+    
+    # 2. 四大模型+ (QNS QSM SOM WeQ Ref)
+    printf("\n[2] 智能力量 → models命名空间\n")
+    total = total + import_file(NS_MODELS, "qns", "components/qns/qns.qentl")
+    total = total + import_file(NS_MODELS, "qns_qbc", "components/qns/qns.qbc")
+    total = total + import_file(NS_MODELS, "qsm", "components/qsm/qsm.qentl")
+    total = total + import_file(NS_MODELS, "qsm_qbc", "components/qsm/qsm.qbc")
+    total = total + import_file(NS_MODELS, "som", "components/som/som.qentl")
+    total = total + import_file(NS_MODELS, "som_qbc", "components/som/som.qbc")
+    total = total + import_file(NS_MODELS, "weq", "components/weq/weq.qentl")
+    total = total + import_file(NS_MODELS, "weq_qbc", "components/weq/weq.qbc")
+    total = total + import_file(NS_MODELS, "ref", "components/ref/ref.qentl")
+    total = total + import_file(NS_MODELS, "ref_qbc", "components/ref/ref.qbc")
+    
+    # 3. 量子库
+    printf("\n[3] 量子库 → lib命名空间\n")
+    total = total + import_file(NS_LIB, "qvm_boot", "lib/qvm_boot.qentl")
+    total = total + import_file(NS_LIB, "boot_qentl", "lib/boot_qentl.qentl")
+    total = total + import_file(NS_LIB, "qnn", "lib/qnn.qentl")
+    total = total + import_file(NS_LIB, "qnn_train", "lib/qnn_train.qentl")
+    total = total + import_file(NS_LIB, "stabilizer", "lib/stabilizer.qentl")
+    total = total + import_file(NS_LIB, "core", "lib/core.qentl")
+    
+    # 4. 彝文数据 → data命名空间
+    printf("\n[4] 彝文数据 → data命名空间\n")
+    total = total + import_file(NS_DATA, "yi_data_simple", "data/yi_data_simple.txt")
+    total = total + import_file(NS_DATA, "yi_kb_decimal", "data/yi_kb_decimal.txt")
+    total = total + import_file(NS_DATA, "yi_knowledge", "data/yi_knowledge.txt")
+    total = total + import_file(NS_DATA, "yi_train_sample", "data/yi_train_sample.txt")
+    
+    # 5. 桌面应用 → apps命名空间
+    printf("\n[5] 桌面应用 → apps命名空间\n")
+    total = total + import_file(NS_APPS, "qdesktop", "web/qdesktop.html")
+    total = total + import_file(NS_APPS, "index", "web/index.html")
+    total = total + import_file(NS_APPS, "q3d", "web/q3d_scene.html")
+    
+    # 6. 汇总
+    printf("\n============================================\n")
+    printf("  全栈导入完成!\n")
+    printf("  总文件数: %d\n", total)
+    printf("  命名空间: system/models/lib/data/apps\n")
+    printf("  QDFS量子地基: 全栈都在叠加态存储\n")
+    printf("============================================\n")
+    return 1
+end
+main()
