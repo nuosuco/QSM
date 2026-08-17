@@ -48,7 +48,7 @@ class TestTokenContract:
     def test_insufficient_balance(self):
         token = QNTToken(total_supply=100.0)
         result = token.call('system', 'transfer', 'Alice', 200.0)
-        assert not result['success']
+        assert result['result'] == False  # transfer返回False
 
 
 # ============ Exchange Tests ============
