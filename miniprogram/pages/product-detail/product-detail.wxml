@@ -1,0 +1,45 @@
+<!-- 对应 app.js showProductDetail() 生成的弹窗DOM -->
+<view class="detail-page">
+  <!-- 图片轮播（对应 .detail-img-wrap + 箭头 + 计数器 + 缩略图） -->
+  <swiper class="detail-swiper" indicator-dots="{{allImgs.length > 1}}" autoplay="{{autoplay}}" interval="3000" duration="500" circular current="{{currentImgIdx}}" bindchange="onSwiperChange">
+    <swiper-item wx:for="{{allImgs}}" wx:key="index">
+      <image class="detail-main-img" src="{{item}}" mode="aspectFit" bindtap="previewImage" data-idx="{{index}}"></image>
+    </swiper-item>
+  </swiper>
+  <view class="detail-img-counter" wx:if="{{allImgs.length > 1}}">{{currentImgIdx + 1}}/{{allImgs.length}}</view>
+
+  <!-- 缩略图（对应 .detail-thumbs） -->
+  <scroll-view class="detail-thumbs" scroll-x wx:if="{{allImgs.length > 1}}">
+    <view class="detail-thumb {{currentImgIdx === index ? 'active' : ''}}" wx:for="{{allImgs}}" wx:key="index" bindtap="switchImg" data-idx="{{index}}">
+      <image src="{{item}}" mode="aspectFill"></image>
+    </view>
+  </scroll-view>
+
+  <!-- 商品信息（对应 .detail-body） -->
+  <view class="detail-body">
+    <view class="detail-title">{{product.title}}</view>
+    <view class="detail-price"><text class="sym">¥</text>{{product.price || '0'}}</view>
+    <view class="detail-shop">{{product.shop_name || ''}} · {{product.platform === 'taobao' ? '淘宝' : '京东'}}</view>
+    <view class="detail-brand" wx:if="{{product.brand}}">品牌：{{product.brand}}</view>
+    <view class="modal-sales" wx:if="{{product.sales}}">月销：{{product.sales}}</view>
+
+    <!-- 操作按钮（对应 .detail-actions） -->
+    <view class="detail-actions">
+      <button class="detail-buy" bindtap="buyProduct">点击购买</button>
+      <button class="detail-fav {{favorited ? 'favorited' : ''}}" bindtap="toggleFavorite">{{favorited ? '♥ 已收藏' : '♡ 收藏'}}</button>
+    </view>
+  </view>
+
+  <!-- 商品详情区域（对应 .detail-detail-section） -->
+  <view class="detail-detail-section">
+    <view class="detail-detail-title">— 商品详情 —</view>
+    <view class="detail-detail-gallery">
+      <view class="detail-detail-img" wx:for="{{allImgs}}" wx:key="index">
+        <image src="{{item}}" mode="widthFix" bindtap="previewImage" data-idx="{{index}}"></image>
+      </view>
+    </view>
+    <view class="detail-detail-footer">
+      <button class="detail-detail-btn" bindtap="buyProduct">点击购买</button>
+    </view>
+  </view>
+</view>

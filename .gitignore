@@ -10,10 +10,30 @@ input.qentl
 # Python缓存
 __pycache__/
 *.pyc
+*.pyo
 
-# 日志
+# 数据库和日志
+*.db
 *.log
 server/server.log
+
+# 环境变量
+.env
+config/api_keys.json
+qnt/config/api_keys.json
+/root/.qnt_env
+.qnt_env
+*.env
+!*.env.example
+
+# 服务端数据
+server/data/
+server/llm_providers.json
+miniprogram/private.key
+web/uploads/
+
+# 备份文件
+*.bak*
 
 # 临时
 /tmp/*

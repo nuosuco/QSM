@@ -1,0 +1,32 @@
+{
+    "exchanges": {
+        "okx": {
+            "name": "OKX",
+            "enabled": true,
+            "api_base": "https://www.okx.com",
+            "public_api": true,
+            "private_api": false,
+            "note": "中文友好，国内可直接访问",
+            "supported_markets": ["spot", "futures", "swap", "options"],
+            "rate_limit": 10,
+            "delay_ms": 100
+        },
+        "binance": {
+            "name": "Binance",
+            "enabled": false,
+            "api_base": "https://api.binance.com",
+            "reason": "国内被屏蔽(Hard 451)",
+            "need_proxy": true
+        },
+        "bybit": {
+            "name": "Bybit",
+            "enabled": false,
+            "api_base": "https://api.bybit.com",
+            "reason": "待测试",
+            "need_proxy": true
+        }
+    },
+    "default_exchange": "okx",
+    "mode": "self_use_only",
+    "public_only": true
+}

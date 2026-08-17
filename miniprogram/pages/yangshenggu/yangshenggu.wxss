@@ -1,0 +1,328 @@
+/* 养生谷：节气 + 护眼 + 体质 + 药食同源 */
+.knowledge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  padding: 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+}
+
+.knowledge-section {
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.08);
+  padding: 32rpx;
+}
+
+.section-title {
+  font-size: 36rpx;
+  color: #4a9d6e;
+  margin-bottom: 24rpx;
+  font-weight: bold;
+}
+
+/* 节气养生 */
+.jieqi-card {
+  padding: 24rpx;
+  background: #f0f7f3;
+  border-radius: 16rpx;
+  border-left: 8rpx solid #4a9d6e;
+}
+
+.jieqi-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+  flex-wrap: wrap;
+}
+
+.jieqi-name {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #4a9d6e;
+}
+
+.jieqi-season {
+  background: #7bc49f;
+  color: #fff;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+}
+
+.jieqi-next {
+  font-size: 24rpx;
+  color: #7f8c8d;
+  margin-left: auto;
+}
+
+.jieqi-desc {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  margin-bottom: 16rpx;
+}
+
+.jieqi-yangsheng {
+  font-size: 28rpx;
+  line-height: 1.7;
+  margin-bottom: 20rpx;
+  padding: 16rpx;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
+.jieqi-foods {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10rpx;
+  margin-bottom: 16rpx;
+}
+
+.jieqi-label {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.jieqi-food-tag {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+}
+
+.jieqi-tea, .jieqi-avoid {
+  font-size: 26rpx;
+  margin-bottom: 10rpx;
+}
+
+.jieqi-avoid {
+  color: #e65100;
+}
+
+/* 护眼训练 */
+.eye-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.eye-item {
+  padding: 24rpx;
+  background: #f5f7f6;
+  border-radius: 16rpx;
+}
+
+.eye-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.eye-duration {
+  font-size: 22rpx;
+  color: #4a9d6e;
+  background: #e8f5e9;
+  padding: 4rpx 12rpx;
+  border-radius: 12rpx;
+  margin-left: 12rpx;
+}
+
+.eye-steps {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  margin-bottom: 8rpx;
+  line-height: 1.5;
+}
+
+.eye-benefit {
+  font-size: 24rpx;
+  color: #4a9d6e;
+}
+
+.eye-tips {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  padding: 16rpx;
+  background: #f5f7f6;
+  border-radius: 12rpx;
+  font-style: italic;
+}
+
+/* 九种体质 */
+.tizhi-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.tizhi-card {
+  padding: 24rpx;
+  background: #f5f7f6;
+  border-radius: 24rpx;
+  border-left: 8rpx solid #4a9d6e;
+}
+
+.tizhi-name {
+  font-size: 32rpx;
+  color: #4a9d6e;
+  margin-bottom: 12rpx;
+  font-weight: 500;
+}
+
+.tizhi-desc {
+  font-size: 26rpx;
+  color: #7f8c8d;
+  line-height: 1.5;
+  margin-bottom: 8rpx;
+}
+
+.tizhi-diet {
+  font-size: 24rpx;
+  color: #2c3e50;
+  background: #f0f7f3;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+/* 药食同源 */
+.yaoshi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.yaoshi-item {
+  padding: 24rpx;
+  background: #f5f7f6;
+  border-radius: 24rpx;
+}
+
+.yaoshi-name {
+  font-size: 30rpx;
+  color: #4a9d6e;
+  margin-bottom: 8rpx;
+  font-weight: 500;
+}
+
+.yaoshi-info {
+  display: flex;
+  gap: 16rpx;
+  flex-wrap: wrap;
+  margin-bottom: 8rpx;
+}
+
+.yaoshi-tag {
+  font-size: 22rpx;
+  color: #7f8c8d;
+  background: #eee;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.yaoshi-gongxiao {
+  font-size: 26rpx;
+  color: #2c3e50;
+  margin-bottom: 6rpx;
+}
+
+.yaoshi-jinji {
+  font-size: 24rpx;
+  color: #e65100;
+}
+
+/* 通用 */
+.empty-state {
+  text-align: center;
+  padding: 40rpx;
+  color: #7f8c8d;
+  font-size: 26rpx;
+}
+
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 32rpx;
+  color: #7f8c8d;
+  font-size: 26rpx;
+}
+
+/* 搜索框（审核版：只做搜索入口，跳转到商品页） */
+.yg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: #f5f7f6;
+  border-radius: 48rpx;
+  padding: 20rpx 28rpx;
+  margin-bottom: 16rpx;
+  border: 2rpx solid #e8eee9;
+}
+.yg-search-icon {
+  font-size: 28rpx;
+  flex-shrink: 0;
+}
+.yg-search-placeholder {
+  font-size: 26rpx;
+  color: #999;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 健康测评入口横幅（紧凑版） */
+.test-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #4a9d6e, #6abf8a);
+  border-radius: 16rpx;
+  padding: 18rpx 28rpx;
+  margin-bottom: 16rpx;
+}
+.test-banner-title { font-size: 28rpx; font-weight: bold; color: #fff; }
+.test-banner-desc { font-size: 22rpx; color: rgba(255,255,255,0.85); margin-top: 4rpx; }
+.test-banner-btn {
+  background: #fff;
+  color: #4a9d6e;
+  font-size: 24rpx;
+  font-weight: bold;
+  padding: 10rpx 24rpx;
+  border-radius: 24rpx;
+  white-space: nowrap;
+}
+
+/* 快捷操作栏 */
+.quick-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+.quick-btn {
+  flex: 1;
+  background: #fff;
+  color: #4a9d6e;
+  font-size: 26rpx;
+  font-weight: bold;
+  border: 2rpx solid #4a9d6e;
+  border-radius: 16rpx;
+  padding: 20rpx 0;
+  text-align: center;
+  line-height: 1.4;
+}
+.quick-btn::after { border: none; }
+
+/* 分享海报 canvas（隐藏） */
+.yg-share-canvas {
+  position: fixed;
+  left: -9999rpx;
+  top: 0;
+  width: 375px;
+  height: 400px;
+}
