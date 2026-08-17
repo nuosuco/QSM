@@ -19,11 +19,11 @@ logger = logging.getLogger('ExecutionEngine')
 class ExecutionEngine:
     """交易执行引擎（三平台版，含风控，真实余额）"""
     
-    # 手续费率（Maker）
-    MAKER_FEE_RATE = 0.0004   # 0.04%
-    SLIPPAGE_RATE = 0.0002    # 0.02%
-    TOTAL_COST = MAKER_FEE_RATE + SLIPPAGE_RATE  # 单边成本
-    BI_SIDE_COST = TOTAL_COST * 2  # 双边成本 = 0.12%
+    # 手续费率（Maker）- 交易所真实费率，不要改！
+    MAKER_FEE_RATE = 0.0004   # 0.04%（永续Maker费率）
+    SLIPPAGE_RATE = 0.0002    # 0.02%（预估滑点）
+    TOTAL_COST = MAKER_FEE_RATE + SLIPPAGE_RATE  # 单边成本 = 0.06%
+    BI_SIDE_COST = TOTAL_COST * 2  # 双边成本 = 0.12%（永续+现货）
     
     def __init__(self, config: SystemConfig):
         self.config = config
@@ -89,9 +89,10 @@ class ExecutionEngine:
         self.running = True
         logger.info("🚀 交易执行引擎启动")
         logger.info(f"   监控平台: {', '.join(self.exchanges.keys())}")
-        logger.info(f"   价差阈值: >{self.config.execution.spread_pct:.2f}% (执行引擎层)")
-        logger.info(f"   净利阈值: >{self.config.execution.net_profit_pct:.2f}% (执行引擎层)")
-        logger.info(f"   风控净利: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}% (风控层，定死)")
+        logger.info(f"   价差阈值: >{self.config.execution.spread_pct:.2f}% (执行引擎层，灵敏度门槛)")
+        logger.info(f"   净利阈值: >{self.config.execution.net_profit_pct:.2f}% (执行引擎层，灵敏度门槛)")
+        logger.info(f"   风控净利: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}% (风控层，定死不变)")
+        logger.info(f"   ⚠️ 实际交易门槛: 价差 > {(RiskManager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST)*100:.2f}%（成本0.12%+净利0.1%）")
         
         self._run_loop()
     

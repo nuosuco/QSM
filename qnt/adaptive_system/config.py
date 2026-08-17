@@ -21,11 +21,15 @@ class DataCollectionConfig:
 
 @dataclass
 class PatternConfig:
-    """模式识别配置"""
-    # 价差成本线（做市策略成本线约0.12%）
-    spread_threshold: float = 0.08  # 0.08% - 模式识别阈值
-    # 做市可盈利阈值（价差 > 成本线 + 安全边际）
-    profitable_spread: float = 0.10  # 0.10% - 可盈利阈值
+    """模式识别配置（观察用，不影响实盘交易）
+    
+    注意：模式发现阈值与执行引擎/风控层完全独立
+    只用于历史数据分析，不控制实际交易决策
+    """
+    # 价差模式识别阈值（0.08% < 成本线0.12%，用于识别潜在模式）
+    spread_threshold: float = 0.08
+    # 可盈利模式判断阈值（0.10% < 成本线0.12%，辅助分析用）
+    profitable_spread: float = 0.10
     # 深度异常阈值
     depth_imbalance_ratio: float = 3.0  # 买卖深度比
     # Z-Score异常检测（降低以便更容易发现价差机会）
@@ -70,10 +74,14 @@ class StrategyConfig:
 
 @dataclass
 class ExecutionConfig:
-    """执行引擎配置（可调整）"""
-    # 价差阈值：价差必须大于此值才考虑
+    """执行引擎配置（可调整）
+    
+    风控底线：spread>0.22%（=成本0.12%+净利0.1%），net>0.1%
+    改这里只影响灵敏度，不影响实际交易门槛！
+    """
+    # 价差阈值：价差必须大于此值才触发信号记录（风控底线: >0.22%）
     spread_pct: float = 0.05
-    # 净利阈值：净利必须大于此值才交易
+    # 净利阈值：净利必须大于此值才标记为可交易机会（风控底线: >0.1%）
     net_profit_pct: float = 0.01
 
 @dataclass
