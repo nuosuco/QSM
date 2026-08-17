@@ -70,7 +70,7 @@ class TestFullPipeline:
         eng.set_balance('Alice', 'QNT', 3000.0)
         eng.set_balance('Alice', 'USDT', 5000.0)
         eng.set_balance('Charlie', 'QNT', 5000.0)
-        eng.set_balance('Charlie', 'USDT', 5000.0)
+        eng.set_balance('Charlie', 'USDT', 10000.0)  # 需要足够USDT买入
         
         order_id = eng.submit_order('Alice', 'sell', 100, price=100.0)
         assert order_id is not None
@@ -97,7 +97,7 @@ class TestFullPipeline:
         assert pm.save_block({
             'hash': 'test_hash',
             'index': 1,
-            'transactions': [{'sender': 'Alice', 'receiver': 'Bob', 'amount': 500.0}].
+            'transactions': [{'sender': 'Alice', 'receiver': 'Bob', 'amount': 500.0}]
         })
         
         # 保存订单和成交（使用唯一order_id）
