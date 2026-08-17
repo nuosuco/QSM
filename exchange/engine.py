@@ -125,7 +125,8 @@ class MatchingEngine:
             # 扣手续费
             fee = trade_qty * trade_price * self.fee_rate
             self._deduct_fee(sell_order.trader, self.symbol.split("/")[0], trade_qty * self.fee_rate)
-            self._deduct_fee(best_bid.orders[0].trader, "USDT", fee)
+            if best_bid.orders:
+                self._deduct_fee(best_bid.orders[0].trader, "USDT", fee)
     
     def _execute_trade(self, order1: Order, book_entry, price: float, quantity: float):
         """执行成交"""
