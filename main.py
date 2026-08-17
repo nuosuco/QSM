@@ -16,9 +16,33 @@ from nstate.pool import SuperpositionPool
 from agents.base import ArbAgent, MarketMakerAgent, TrendAgent
 from agents.strategies import GridTradingAgent, MomentumAgent, MeanReversionAgent
 from database.persistent import PersistentStore
-from api.app import create_app
+from api.app import app as api_app
 from market.feeds import FeedManager
-from utils.logger import setup_logger
+from utils.logger import QNTLogger
+
+
+class LoggerAdapter:
+    """简单日志适配器"""
+    def __init__(self, name: str):
+        import logging
+        self._logger = logging.getLogger(name)
+    
+    def info(self, msg):
+        self._logger.info(msg)
+    
+    def debug(self, msg):
+        self._logger.debug(msg)
+    
+    def warning(self, msg):
+        self._logger.warning(msg)
+    
+    def error(self, msg):
+        self._logger.error(msg)
+
+
+def setup_logger(name: str = 'QNT') -> LoggerAdapter:
+    """获取日志适配器"""
+    return LoggerAdapter(name)
 
 
 class QNTSystem:
@@ -76,7 +100,7 @@ class QNTSystem:
         self.logger.info(f"✅ Created {len(self.agents)} agents")
         
         # 7. 初始化API
-        self.app = create_app(self)
+        self.app = api_app
         self.app_context = self.app.app_context()
         self.app_context.push()
         self.logger.info("✅ API initialized")
@@ -117,8 +141,9 @@ class QNTSystem:
         self.logger.info(f"🌐 Starting API server on http://{host}:{port}")
         
         import uvicorn
+        from api.app import app as flask_app
         config = uvicorn.Config(
-            self.app,
+            flask_app,
             host=host,
             port=port,
             log_level='info' if not debug else 'debug'
