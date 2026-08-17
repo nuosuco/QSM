@@ -118,7 +118,7 @@ class Database:
     # ============ 账户操作 ============
     def create_account(self, address: str, initial_balance: float = 0.0) -> bool:
         """创建账户"""
-        now = os.time()
+        now = time.time()
         with self._connect() as conn:
             try:
                 conn.execute(

@@ -106,8 +106,9 @@ class MatchingEngine:
             # 扣手续费
             fee = trade_qty * trade_price * self.fee_rate
             self._deduct_fee(buy_order.trader, "USDT", fee)
-            self._deduct_fee(best_ask.orders[0].trader, self.symbol.split("/")[0], 
-                           trade_qty * self.fee_rate)
+            if best_ask.orders:
+                self._deduct_fee(best_ask.orders[0].trader, self.symbol.split("/")[0], 
+                               trade_qty * self.fee_rate)
     
     def _match_sell(self, sell_order: Order):
         """卖出撮合 - 匹配bid"""
