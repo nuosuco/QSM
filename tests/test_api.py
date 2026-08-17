@@ -11,38 +11,35 @@ def test_websocket_manager():
     from api.websocket import WebSocketManager
     
     ws = WebSocketManager()
-    received = []
     
-    async def test_client(msg):
-        received.append(msg)
+    # 使用AsyncMock模拟websocket
+    from unittest.mock import AsyncMock
+    mock_ws = AsyncMock()
+    ws.connect('test_client', mock_ws)
     
-    ws.connect(test_client)
-    
-    # 同步发送测试
-    import json
-    ws.broadcast('test_event', {'data': 123})
-    
-    assert len(ws.clients) == 1
-    print(f"✅ WebSocketManager: {len(ws.clients)} clients")
+    assert 'test_client' in ws._connections
+    print(f"✅ WebSocketManager: {len(ws._connections)} clients")
 
 
 def test_event_bus():
     """测试事件总线"""
-    from api.websocket import EventBus
+    from api.websocket import QNTEventBus, WebSocketManager
     
-    bus = EventBus()
+    ws_mgr = WebSocketManager()
+    bus = QNTEventBus(ws_mgr)
     events = []
     
     def handler(data):
         events.append(data)
     
-    bus.subscribe('trade', handler)
-    bus.publish('trade', {'price': 100})
-    bus.publish('trade', {'price': 101})
+    bus.register('trade', handler)
+    import asyncio
+    asyncio.run(bus.handle('trade', {'price': 100}))
+    asyncio.run(bus.handle('trade', {'price': 101}))
     
     assert len(events) == 2
     assert events[0]['price'] == 100
-    print(f"✅ EventBus: {len(events)} events handled")
+    print(f"✅ QNTEventBus: {len(events)} events handled")
 
 
 def test_market_feed():
