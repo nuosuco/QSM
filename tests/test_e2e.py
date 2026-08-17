@@ -6,7 +6,7 @@ import numpy as np
 from core.chain import QNTChain
 from exchange.engine import MatchingEngine
 from nstate.pool import SuperpositionPool
-from agents.base import ArbAgent
+from agents.base import ArbAgent, TrendAgent
 
 
 def test_full_pipeline():
