@@ -52,7 +52,7 @@ class ExecutionEngine:
         exchange_map = {
             'bitget': ('BITGET_API_KEY', 'BITGET_API_SECRET', 'BITGET_API_PASSPHRASE'),
             'htx': ('HTX_API_KEY', 'HTX_API_SECRET', None),
-            # gate不交易，不连接
+            'gate': ('GATE_API_KEY', 'GATE_API_SECRET', None),
         }
         
         for ex_name, (key_env, secret_env, pass_env) in exchange_map.items():
@@ -197,7 +197,7 @@ class ExecutionEngine:
         position_size = max_position
         
         # 检查最小金额限制
-        min_notional_map = {'htx': 1.0, 'bitget': 5.0}
+        min_notional_map = {'htx': 1.0, 'bitget': 5.0, 'gate': 0.1}
         min_notional = min_notional_map.get(ex_name, 1.0)
         if position_size < min_notional:
             logger.warning(f"⚠️ {ex_name} {symbol}: 仓位{position_size:.2f}U < 最小{min_notional}U，跳过")
