@@ -136,18 +136,17 @@ class QNTGovernance(SmartContract):
         self.state["proposals"].append(proposal)
         return proposal_id
     
-    def vote(self, caller: str, proposal_id: int, support: bool) -> bool:
+    def vote(self, caller: str, proposal_id: int, support: bool, weight: float = 1.0) -> bool:
         """投票"""
         if proposal_id >= len(self.state["proposals"]):
             return False
         
         proposal = self.state["proposals"][proposal_id]
-        balance = caller  # 简化：用地址代表权重
         
         if support:
-            proposal["votes_for"] += balance
+            proposal["votes_for"] += weight
         else:
-            proposal["votes_against"] += balance
+            proposal["votes_against"] += weight
         
         return True
 
