@@ -90,9 +90,10 @@ class StrategyRegistry:
                         if hasattr(attr, '_strategy_meta'):
                             self.register(attr._strategy_meta)
             except Exception as e:
-                # TODO: 添加策略加载失败日志
-                pass
+                logger.warning(f"策略加载失败 {modname}: {e}")
 
+
+logger = logging.getLogger(__name__)
 
 # 全局注册中心
 _registry = StrategyRegistry()

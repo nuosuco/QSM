@@ -66,8 +66,19 @@ class AgentBase:
     
     def _update_from_experience(self, experience: Dict[str, Any]):
         """根据经验更新内部状态"""
-        # TODO: 实现经验学习逻辑
-        pass
+        action = experience.get("action", "")
+        success = experience.get("success", False)
+        
+        if success:
+            self.actions_taken += 1
+            self.success_rate = min(1.0, self.success_rate + 0.05)  # 小幅提升成功率
+        else:
+            self.success_rate = max(0.0, self.success_rate - 0.1)  # 失败时降低
+        
+        # 根据action类型调整阈值
+        if action == "arbitrage":
+            if hasattr(self, 'spread_threshold'):
+                self.spread_threshold = max(0.01, self.spread_threshold - 0.005 if success else self.spread_threshold + 0.005)
     
     def get_status(self) -> Dict[str, Any]:
         return {
