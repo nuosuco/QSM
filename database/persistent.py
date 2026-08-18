@@ -221,7 +221,7 @@ class PersistentStore:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        cursor.execute('SELECT * FROM blocks ORDER BY index DESC LIMIT ?', (limit,))
+        cursor.execute('SELECT * FROM blocks ORDER BY block_index DESC LIMIT ?', (limit,))
         blocks = [dict(row) for row in cursor.fetchall()]
         
         cursor.execute('SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?', (limit,))
