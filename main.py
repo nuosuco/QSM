@@ -229,7 +229,7 @@ class QNTSystem:
                 'difficulty': self.chain.difficulty if self.chain else 0
             },
             'exchange': {
-                'pair': self.exchange.pair if self.exchange else None,
+                'pair': self.exchange.symbol if self.exchange else None,
                 'trades': len(self.exchange.trades) if self.exchange else 0,
                 'bids': len(self.exchange.orderbook.bids) if self.exchange else 0,
                 'asks': len(self.exchange.orderbook.asks) if self.exchange else 0
