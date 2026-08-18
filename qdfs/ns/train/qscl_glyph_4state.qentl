@@ -1,0 +1,196 @@
+# QSCL字形训练 — 单态训练器(可传种子)
+# 用法: 改g_SEED值再编译运行, 每次生成一个态权重
+# 态0: g_SEED=1, 态1: g_SEED=101, 态2: g_SEED=202, 态3: g_SEED=303
+
+var g_LR = 1000
+var g_EP = 20
+var g_SEED = 303
+var g_data = ""
+var g_N = 16
+
+var g_P[1024]
+var g_W[1024]
+var g_L[16]
+
+var g_i = 0
+var g_j = 0
+var g_base = 0
+var g_sum = 0
+var g_updates = 0
+var g_correct = 0
+var g_pred = 0
+var g_n = 0
+var g_ep = 0
+var g_s = 0
+var g_label = 0
+var g_nl = 0
+var g_line = ""
+var g_c1 = 0
+var g_rest = ""
+var g_c2 = 0
+var g_pix_str = ""
+var g_ps = 0
+var g_pe = 0
+var g_pv = ""
+var g_max_idx = 0
+var g_max_val = 0
+var g_rnd = 0
+var g_w_str = ""
+
+def main():
+    printf("[开始] 态: seed=%d\n", g_SEED)
+    
+    # === 数据加载 ===
+    g_data = file_read("qdfs/ns/data/yi_glyph_16_real.data")
+    g_n = 0
+    g_base = 0
+    while (g_n < 16):
+        g_nl = str_index_of(str_substring(g_data, g_base, 60000), "\n")
+        g_line = ""
+        if (g_nl < 0):
+            g_line = str_substring(g_data, g_base, str_len(g_data) - g_base)
+            g_base = str_len(g_data)
+        else:
+            g_line = str_substring(g_data, g_base, g_nl)
+            g_base = g_base + g_nl + 1
+        end
+        g_c1 = str_index_of(g_line, ":")
+        if (g_c1 >= 0):
+            g_rest = str_substring(g_line, g_c1 + 1, 60000)
+            g_c2 = str_index_of(g_rest, ":")
+            if (g_c2 >= 0):
+                g_pix_str = str_substring(g_rest, 0, g_c2)
+                g_j = 0
+                g_ps = 0
+                while (g_j < 64):
+                    g_pe = str_index_of(str_substring(g_pix_str, g_ps, 60000), ",")
+                    g_pv = ""
+                    if (g_pe < 0):
+                        g_pv = str_substring(g_pix_str, g_ps, 60000)
+                        g_ps = 60000
+                    else:
+                        g_pv = str_substring(g_pix_str, g_ps, g_pe)
+                        g_ps = g_ps + g_pe + 1
+                    end
+                    g_P[g_n * 64 + g_j] = str_to_int(g_pv)
+                    g_j = g_j + 1
+                end
+            end
+        end
+        g_n = g_n + 1
+    end
+    printf("[数据] %d个样本×64像素\n", g_n)
+    
+    # === 随机初始化权重(用种子) ===
+    g_rnd = g_SEED
+    g_i = 0
+    while (g_i < 1024):
+        g_rnd = g_rnd * 1103 + 12345
+        g_W[g_i] = g_rnd % 10
+        g_i = g_i + 1
+    end
+    printf("[初始化] 种子=%d 权重随机化完成\n", g_SEED)
+    
+    # === 训练循环 ===
+    g_ep = 0
+    while (g_ep < g_EP):
+        g_updates = 0
+        g_s = 0
+        while (g_s < g_n):
+            # 前向传播
+            g_base = g_s * 64
+            g_j = 0
+            while (g_j < 16):
+                g_sum = 0
+                g_i = 0
+                while (g_i < 64):
+                    g_sum = g_sum + g_W[g_j * 64 + g_i] * g_P[g_base + g_i]
+                    g_i = g_i + 1
+                end
+                g_L[g_j] = g_sum
+                g_j = g_j + 1
+            end
+            
+            # argmax
+            g_max_idx = 0
+            g_max_val = g_L[0]
+            g_i = 1
+            while (g_i < 16):
+                if (g_L[g_i] > g_max_val):
+                    g_max_val = g_L[g_i]
+                    g_max_idx = g_i
+                end
+                g_i = g_i + 1
+            end
+            g_pred = g_max_idx
+            g_label = g_s
+            
+            if (g_pred == g_label):
+                # 正确
+            else:
+                # 梯度更新
+                g_base = g_s * 64
+                g_i = 0
+                while (g_i < 64):
+                    if (g_P[g_base + g_i] > 0):
+                        g_W[g_label * 64 + g_i] = g_W[g_label * 64 + g_i] + g_LR
+                        g_W[g_pred * 64 + g_i] = g_W[g_pred * 64 + g_i] - g_LR
+                    end
+                    g_i = g_i + 1
+                end
+                g_updates = g_updates + 1
+            end
+            g_s = g_s + 1
+        end
+        
+        # 验证
+        g_correct = 0
+        g_s = 0
+        while (g_s < g_n):
+            g_base = g_s * 64
+            g_j = 0
+            while (g_j < 16):
+                g_sum = 0
+                g_i = 0
+                while (g_i < 64):
+                    g_sum = g_sum + g_W[g_j * 64 + g_i] * g_P[g_base + g_i]
+                    g_i = g_i + 1
+                end
+                g_L[g_j] = g_sum
+                g_j = g_j + 1
+            end
+            g_max_idx = 0
+            g_max_val = g_L[0]
+            g_i = 1
+            while (g_i < 16):
+                if (g_L[g_i] > g_max_val):
+                    g_max_val = g_L[g_i]
+                    g_max_idx = g_i
+                end
+                g_i = g_i + 1
+            end
+            if (g_max_idx == g_s):
+                g_correct = g_correct + 1
+            end
+            g_s = g_s + 1
+        end
+        
+        if (g_ep == g_EP - 1):
+            printf("态%d epoch%d: %d/%d (%d%%)\n", g_SEED, g_ep, g_correct, g_n, g_correct * 100 / g_n)
+        end
+        g_ep = g_ep + 1
+    end
+    
+    # === 保存权重 ===
+    g_w_str = ""
+    g_i = 0
+    while (g_i < 1024):
+        g_w_str = str_concat(g_w_str, int_to_str(g_W[g_i]))
+        g_w_str = str_concat(g_w_str, "\n")
+        g_i = g_i + 1
+    end
+    file_write_bytes("qdfs/ns/models/glyph_state_" + int_to_str(g_SEED) + ".w", g_w_str)
+    printf("[保存] glyph_state_%d.w\n", g_SEED)
+end
+
+main()
