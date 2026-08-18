@@ -4,6 +4,7 @@ QNT 策略注册中心
 """
 import importlib
 import json
+import logging
 from typing import Dict, List, Any, Optional, Type
 from dataclasses import dataclass, field
 
