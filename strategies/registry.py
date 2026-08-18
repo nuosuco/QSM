@@ -89,7 +89,8 @@ class StrategyRegistry:
                         attr = getattr(module, attr_name)
                         if hasattr(attr, '_strategy_meta'):
                             self.register(attr._strategy_meta)
-            except Exception:
+            except Exception as e:
+                # TODO: 添加策略加载失败日志
                 pass
 
 

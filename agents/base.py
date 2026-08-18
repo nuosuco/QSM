@@ -66,6 +66,7 @@ class AgentBase:
     
     def _update_from_experience(self, experience: Dict[str, Any]):
         """根据经验更新内部状态"""
+        # TODO: 实现经验学习逻辑
         pass
     
     def get_status(self) -> Dict[str, Any]:
