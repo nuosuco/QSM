@@ -8,6 +8,16 @@ from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass
 from datetime import datetime
 
+# 延迟导入event_bus，避免循环依赖
+_event_bus = None
+
+def _get_event_bus():
+    global _event_bus
+    if _event_bus is None:
+        from api.websocket import event_bus
+        _event_bus = event_bus
+    return _event_bus
+
 
 @dataclass
 class MarketData:
@@ -139,8 +149,8 @@ class FeedManager:
             self.order_book.update(data)
             
             # 触发事件
-            event_bus.publish('market_tick', data.__dict__)
-            event_bus.publish('orderbook_update', {
+            _get_event_bus().publish('market_tick', data.__dict__)
+            _get_event_bus().publish('orderbook_update', {
                 'symbol': self.order_book.symbol,
                 'best_bid': self.order_book.get_best_bid(),
                 'best_ask': self.order_book.get_best_ask(),
