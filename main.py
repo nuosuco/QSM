@@ -226,7 +226,7 @@ class QNTSystem:
             'status': 'running' if self._running else 'stopped',
             'chain': {
                 'blocks': len(self.chain.chain) if self.chain else 0,
-                'difficulty': self.chain.config.difficulty if self.chain else 0
+                'difficulty': self.chain.difficulty if self.chain else 0
             },
             'exchange': {
                 'pair': self.exchange.pair if self.exchange else None,
