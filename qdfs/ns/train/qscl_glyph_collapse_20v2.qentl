@@ -1,0 +1,295 @@
+# QSCL字形训练 — 20样本4态投票坍缩(简化版)
+
+var g_data = ""
+var g_N = 20
+
+var g_P[1280]
+var g_W[1280]
+var g_L[20]
+var g_preds[80]
+
+var g_i = 0
+var g_j = 0
+var g_base = 0
+var g_sum = 0
+var g_n = 0
+var g_s = 0
+var g_nl = 0
+var g_line = ""
+var g_c1 = 0
+var g_rest = ""
+var g_c2 = 0
+var g_pix_str = ""
+var g_ps = 0
+var g_pe = 0
+var g_pv = ""
+var g_max_idx = 0
+var g_max_val = 0
+var g_pred = 0
+var g_seed = 0
+var g_w_str = ""
+var g_correct = 0
+var g_t = 0
+var g_best_vote = 0
+var g_best_count = 0
+var g_vote0 = 0
+var g_vote1 = 0
+var g_vote2 = 0
+var g_vote3 = 0
+var g_vote4 = 0
+var g_vote5 = 0
+var g_vote6 = 0
+var g_vote7 = 0
+var g_vote8 = 0
+var g_vote9 = 0
+var g_vote10 = 0
+var g_vote11 = 0
+var g_vote12 = 0
+var g_vote13 = 0
+var g_vote14 = 0
+var g_vote15 = 0
+var g_vote16 = 0
+var g_vote17 = 0
+var g_vote18 = 0
+var g_vote19 = 0
+
+def main():
+    printf("[开始] 20样本4态投票坍缩\n")
+    
+    # === 加载数据 ===
+    g_data = file_read("qdfs/ns/data/yi_glyph_20_v2.data")
+    g_n = 0
+    g_base = 0
+    while (g_n < g_N):
+        g_nl = str_index_of(str_substring(g_data, g_base, 60000), "\n")
+        g_line = ""
+        if (g_nl < 0):
+            g_line = str_substring(g_data, g_base, str_len(g_data) - g_base)
+            g_base = str_len(g_data)
+        else:
+            g_line = str_substring(g_data, g_base, g_nl)
+            g_base = g_base + g_nl + 1
+        end
+        g_c1 = str_index_of(g_line, ":")
+        if (g_c1 >= 0):
+            g_rest = str_substring(g_line, g_c1 + 1, 60000)
+            g_c2 = str_index_of(g_rest, ":")
+            if (g_c2 >= 0):
+                g_pix_str = str_substring(g_rest, 0, g_c2)
+                g_j = 0
+                g_ps = 0
+                while (g_j < 64):
+                    g_pe = str_index_of(str_substring(g_pix_str, g_ps, 60000), ",")
+                    g_pv = ""
+                    if (g_pe < 0):
+                        g_pv = str_substring(g_pix_str, g_ps, 60000)
+                        g_ps = 60000
+                    else:
+                        g_pv = str_substring(g_pix_str, g_ps, g_pe)
+                        g_ps = g_ps + g_pe + 1
+                    end
+                    g_P[g_n * 64 + g_j] = str_to_int(g_pv)
+                    g_j = g_j + 1
+                end
+            end
+        end
+        g_n = g_n + 1
+    end
+    printf("[数据] %d个样本×64像素\n", g_n)
+    
+    # === 加载4个态并预测 ===
+    g_s = 0
+    while (g_s < 4):
+        if (g_s == 0): g_seed = 1
+        else:
+            if (g_s == 1): g_seed = 101
+            else:
+                if (g_s == 2): g_seed = 202
+                else:
+                    if (g_s == 3): g_seed = 303
+                    end
+                end
+            end
+        end
+        
+        g_w_str = file_read("qdfs/ns/models/glyph_state_" + int_to_str(g_seed) + "_n20.w")
+        g_i = 0
+        g_ps = 0
+        while (g_i < g_N * 64):
+            g_pe = str_index_of(str_substring(g_w_str, g_ps, 60000), "\n")
+            g_pv = ""
+            if (g_pe < 0):
+                g_pv = str_substring(g_w_str, g_ps, 60000)
+                g_ps = 60000
+            else:
+                g_pv = str_substring(g_w_str, g_ps, g_pe)
+                g_ps = g_ps + g_pe + 1
+            end
+            g_W[g_i] = str_to_int(g_pv)
+            g_i = g_i + 1
+        end
+        
+        g_correct = 0
+        g_t = 0
+        while (g_t < g_n):
+            g_base = g_t * 64
+            g_j = 0
+            while (g_j < g_N):
+                g_sum = 0
+                g_i = 0
+                while (g_i < 64):
+                    g_sum = g_sum + g_W[g_j * 64 + g_i] * g_P[g_base + g_i]
+                    g_i = g_i + 1
+                end
+                g_L[g_j] = g_sum
+                g_j = g_j + 1
+            end
+            
+            g_max_idx = 0
+            g_max_val = g_L[0]
+            g_i = 1
+            while (g_i < g_N):
+                if (g_L[g_i] > g_max_val):
+                    g_max_val = g_L[g_i]
+                    g_max_idx = g_i
+                end
+                g_i = g_i + 1
+            end
+            g_pred = g_max_idx
+            
+            g_preds[g_s * g_N + g_t] = g_pred
+            
+            if (g_pred == g_t):
+                g_correct = g_correct + 1
+            end
+            g_t = g_t + 1
+        end
+        printf("[态%d] %d/%d 正确 (%d%%)\n", g_seed, g_correct, g_n, g_correct * 100 / g_n)
+        g_s = g_s + 1
+    end
+    
+    # === 投票坍缩 ===
+    printf("\n[投票坍缩]\n")
+    g_correct = 0
+    g_t = 0
+    while (g_t < g_n):
+        g_vote0 = 0
+        g_vote1 = 0
+        g_vote2 = 0
+        g_vote3 = 0
+        g_vote4 = 0
+        g_vote5 = 0
+        g_vote6 = 0
+        g_vote7 = 0
+        g_vote8 = 0
+        g_vote9 = 0
+        g_vote10 = 0
+        g_vote11 = 0
+        g_vote12 = 0
+        g_vote13 = 0
+        g_vote14 = 0
+        g_vote15 = 0
+        g_vote16 = 0
+        g_vote17 = 0
+        g_vote18 = 0
+        g_vote19 = 0
+        
+        g_s = 0
+        while (g_s < 4):
+            g_pred = g_preds[g_s * g_N + g_t]
+            if (g_pred == 0): g_vote0 = g_vote0 + 1
+            else:
+                if (g_pred == 1): g_vote1 = g_vote1 + 1
+                else:
+                    if (g_pred == 2): g_vote2 = g_vote2 + 1
+                    else:
+                        if (g_pred == 3): g_vote3 = g_vote3 + 1
+                        else:
+                            if (g_pred == 4): g_vote4 = g_vote4 + 1
+                            else:
+                                if (g_pred == 5): g_vote5 = g_vote5 + 1
+                                else:
+                                    if (g_pred == 6): g_vote6 = g_vote6 + 1
+                                    else:
+                                        if (g_pred == 7): g_vote7 = g_vote7 + 1
+                                        else:
+                                            if (g_pred == 8): g_vote8 = g_vote8 + 1
+                                            else:
+                                                if (g_pred == 9): g_vote9 = g_vote9 + 1
+                                                else:
+                                                    if (g_pred == 10): g_vote10 = g_vote10 + 1
+                                                    else:
+                                                        if (g_pred == 11): g_vote11 = g_vote11 + 1
+                                                        else:
+                                                            if (g_pred == 12): g_vote12 = g_vote12 + 1
+                                                            else:
+                                                                if (g_pred == 13): g_vote13 = g_vote13 + 1
+                                                                else:
+                                                                    if (g_pred == 14): g_vote14 = g_vote14 + 1
+                                                                    else:
+                                                                        if (g_pred == 15): g_vote15 = g_vote15 + 1
+                                                                        else:
+                                                                            if (g_pred == 16): g_vote16 = g_vote16 + 1
+                                                                            else:
+                                                                                if (g_pred == 17): g_vote17 = g_vote17 + 1
+                                                                                else:
+                                                                                    if (g_pred == 18): g_vote18 = g_vote18 + 1
+                                                                                    else:
+                                                                                        if (g_pred == 19): g_vote19 = g_vote19 + 1
+                                                                                        end
+                                                                                    end
+                                                                                end
+                                                                            end
+                                                                        end
+                                                                    end
+                                                                end
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            g_s = g_s + 1
+        end
+        
+        g_best_vote = 0
+        g_best_count = g_vote0
+        if (g_vote1 > g_best_count): g_best_vote = 1; g_best_count = g_vote1 end
+        if (g_vote2 > g_best_count): g_best_vote = 2; g_best_count = g_vote2 end
+        if (g_vote3 > g_best_count): g_best_vote = 3; g_best_count = g_vote3 end
+        if (g_vote4 > g_best_count): g_best_vote = 4; g_best_count = g_vote4 end
+        if (g_vote5 > g_best_count): g_best_vote = 5; g_best_count = g_vote5 end
+        if (g_vote6 > g_best_count): g_best_vote = 6; g_best_count = g_vote6 end
+        if (g_vote7 > g_best_count): g_best_vote = 7; g_best_count = g_vote7 end
+        if (g_vote8 > g_best_count): g_best_vote = 8; g_best_count = g_vote8 end
+        if (g_vote9 > g_best_count): g_best_vote = 9; g_best_count = g_vote9 end
+        if (g_vote10 > g_best_count): g_best_vote = 10; g_best_count = g_vote10 end
+        if (g_vote11 > g_best_count): g_best_vote = 11; g_best_count = g_vote11 end
+        if (g_vote12 > g_best_count): g_best_vote = 12; g_best_count = g_vote12 end
+        if (g_vote13 > g_best_count): g_best_vote = 13; g_best_count = g_vote13 end
+        if (g_vote14 > g_best_count): g_best_vote = 14; g_best_count = g_vote14 end
+        if (g_vote15 > g_best_count): g_best_vote = 15; g_best_count = g_vote15 end
+        if (g_vote16 > g_best_count): g_best_vote = 16; g_best_count = g_vote16 end
+        if (g_vote17 > g_best_count): g_best_vote = 17; g_best_count = g_vote17 end
+        if (g_vote18 > g_best_count): g_best_vote = 18; g_best_count = g_vote18 end
+        if (g_vote19 > g_best_count): g_best_vote = 19; g_best_count = g_vote19 end
+        
+        if (g_best_vote == g_t):
+            g_correct = g_correct + 1
+        end
+        
+        printf("样本%d: 投票=%d 真实=%d\n", g_t, g_best_vote, g_t)
+        g_t = g_t + 1
+    end
+    
+    printf("\n[最终] 投票坍缩: %d/%d 正确 (%d%%)\n", g_correct, g_n, g_correct * 100 / g_n)
+end
+
+main()
