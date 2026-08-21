@@ -1,0 +1,121 @@
+# ================================================================
+# build/hebbian_train_qcl.qentl — 真·4态叠加态Hebbian训练(纯QEntL)
+# 读 yi_flat_b{batch}.bin (每字128字节=64像素"0\n"/"1\n")
+# 输出 qscl_b{batch}_s{state}.w (515×64=32960整数, handler_v14格式)
+# 4态 seed 1/101/202/303, epoch 30/40/50/60 → 真不同起点叠加态
+# 外层bash循环: for b in 0..7; for s in 0..3; qvm_boot this
+# 铁律: QCL整型常量≤65535, 无负数常量, 数组用全局
+# ================================================================
+var g_NB = 515
+var g_NX = 64
+var g_WW = 32960
+var g_batch = 0
+var g_state = 0
+var g_seed = 0
+var g_ep_max = 25
+var g_rnd = 0
+var g_i = 0 g_j = 0 g_k = 0 g_n = 0
+var g_D[32960]
+var g_W[32960]
+var g_ep = 0
+
+def load_data():
+    var p = "qdfs/ns/data/yi_flat_b" + int_to_str(g_batch) + ".bin"
+    var raw = file_read("/root/QSM/QLife/"+p)
+    var rl = str_len(raw)
+    var pos = 0
+    g_n = 0
+    while (pos < rl and g_n < g_WW):
+        var nl = str_index_of(str_substring(raw, pos, 60000), "\n")
+        var tok = ""
+        if (nl < 0):
+            tok = str_substring(raw, pos, rl - pos)
+            pos = rl
+        else:
+            tok = str_substring(raw, pos, nl)
+            pos = pos + nl + 1
+        end
+        if (str_len(tok) > 0):
+            g_D[g_n] = str_to_int(tok)
+            g_n = g_n + 1
+        end
+    end
+    printf("[load] batch=%d data=%d\n", g_batch, g_n)
+end
+
+# xorshift(常量全≤65535): 简单PRNG, 不同seed→不同序列
+def rand_init():
+    g_rnd = g_seed
+    g_i = 0
+    while (g_i < g_WW):
+        g_rnd = g_rnd + 31337
+        g_rnd = (g_rnd * 11035) & 32767
+        g_W[g_i] = (g_rnd + g_seed) % 10
+        g_i = g_i + 1
+    end
+end
+
+def save_w():
+    var outp = "qdfs/ns/models/qscl_b" + int_to_str(g_batch) + "_s" + int_to_str(g_state) + ".w"
+    g_i = 0
+    while (g_i < g_WW):
+        printf("%d\n", g_W[g_i])
+        g_i = g_i + 1
+    end
+    printf("[save] %s done\n", outp)
+end
+
+def main():
+    printf("=== QSCL Hebbian 4态 b=%d s=%d seed=%d ep=%d ===\n", g_batch, g_state, g_seed, g_ep_max)
+    printf("  515类×64像素\n")
+    load_data()
+    rand_init()
+    g_ep = 0
+    while (g_ep < g_ep_max):
+        var correct = 0
+        g_n = 0
+        while (g_n < g_NB):
+            var label = g_n
+            # 前向 argmax + 感知机更新(仅错分类时: 正确类+=data, 错类-=data)
+            var dbase = label * g_NX
+            var best = 0 bi = 0 g_class = 0
+            while (g_class < g_NB):
+                var dot = 0 sb = g_class * g_NX
+                g_k = 0
+                while (g_k < g_NX):
+                    dot = dot + g_W[sb + g_k] * g_D[dbase + g_k]
+                    g_k = g_k + 1
+                end
+                if (dot >= best):
+                    best = dot
+                    bi = g_class
+                end
+                g_class = g_class + 1
+            end
+            if (bi != label):
+                var wbase = label * g_NX
+                g_k = 0
+                while (g_k < g_NX):
+                    g_W[wbase + g_k] = g_W[wbase + g_k] + g_D[dbase + g_k]
+                    g_k = g_k + 1
+                end
+                var wbase2 = bi * g_NX
+                g_k = 0
+                while (g_k < g_NX):
+                    g_W[wbase2 + g_k] = g_W[wbase2 + g_k] - g_D[dbase + g_k]
+                    g_k = g_k + 1
+                end
+            end
+            if (bi == label):
+                correct = correct + 1
+            end
+            g_n = g_n + 1
+        end
+        var acc = correct * 100 / g_NB
+        printf("  ep%d: %d/%d (%d%%)\n", g_ep, correct, g_NB, acc)
+        g_ep = g_ep + 1
+    end
+    save_w()
+end
+
+main()
