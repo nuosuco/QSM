@@ -1,7 +1,7 @@
 # qb_gen.qentl — QEntL自举生成引擎(纯QEntL, 4态叠加, 无Python)
-# 4态点积相加到 g_score[81], 然后温度采样.
-# 权重: qdfs/ns/models/qb_w{0-3}.txt 每行=W1或W2的6561空格数字串
-var g_steps = 12
+# 读 qdfs/ns/models/qb_seed.txt 格式: "p1 p2" 空格分隔两个前缀
+# 读 qdfs/ns/models/qb_w{0-3}.txt 每行=W1或W2的6561空格数字串
+# 4态点积累加到 g_score[81], 温度采样, 输出 SEQ=...
 var g_W[6561]
 var g_W2[6561]
 var g_score[81]
@@ -10,9 +10,9 @@ var g_out = ""
 var g_p1 = 3
 var g_p2 = 13
 var g_prev = 3
+var g_steps = 12
 var g_phase = 0
 
-# 解析空格数字串 到 g_W 或 g_W2 (由 g_phase 选择, 0=W 1=W2)
 def parse_w(str):
     var i = 0
     while (i < 6561):
@@ -43,7 +43,6 @@ def load_state(sidx):
     parse_w(rest)
 end
 
-# 对当前(g_W,g_W2)计算点积, 加到 g_score[81] (4态累加)
 def accumulate(p1, p2):
     var i = 0
     var s1 = 0
@@ -102,7 +101,10 @@ def sample_class(p1, p2, prev):
         var bi = 0
         var b = 1
         while (b < 81):
-            if (g_score[b] > best): best = g_score[b] bi = b end
+            if (g_score[b] > best):
+                best = g_score[b]
+                bi = b
+            end
             b = b + 1
         end
         return bi
@@ -117,8 +119,11 @@ def sample_class(p1, p2, prev):
     var chosen = 0
     while (a < 81):
         acc = acc + g_score[a]
-        if (acc > target): chosen = a a = 81 end
-        a = a + 1
+        if (acc > target):
+            chosen = a
+            a = 81
+        end
+        if (a < 81): a = a + 1 end
     end
     return chosen
 end
@@ -151,7 +156,8 @@ def main():
     var raw = file_read(pth)
     var sp = str_index_of(raw, " ")
     var a1 = str_to_int(str_substring(raw, 0, sp))
-    var a2 = str_to_int(str_substring(raw, sp + 1, 5))
+    var rest = str_substring(raw, sp + 1, 60000)
+    var a2 = str_to_int(rest)
     g_p1 = a1
     g_p2 = a2
     gen()
