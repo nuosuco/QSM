@@ -1,0 +1,140 @@
+# build/train_qscl_cls.qentl — class recognizer (pixels -> class, 4-state, unified)
+# input 64 pixels (0/1) -> output class (0-80). W[64][81]=5184.
+# perceptron: argmax over 81 classes. error: tgt class +1, pred class -1.
+# 4 states -> qscl_cls_s{0-3}.w  header 64 / 81 / W*5184
+# pairs file: each line "class 0 1 0 1 ... 64 bits"
+var g_V = 81
+var g_P = 64
+var g_WW = 5184
+var g_seed = 1
+var g_state = 0
+var g_ep_max = 30
+var g_NP = 0
+var g_CLS[1000]
+var g_PX[65535]
+var g_rnd = 0
+var g_W[5184]
+
+def load_pairs():
+    var raw = file_read("/root/QSM/QLife/qdfs/ns/corpus/qscl_inv_pairs.txt")
+    var pos = 0
+    var n = 0
+    var c = 0
+    var c2 = 0
+    var cn = 0
+    var cl = 0
+    var cls_s = ""
+    var pxs = ""
+    while (1 == 1):
+        if (pos >= str_len(raw)):
+            break
+        end
+        c = str_index_of(str_substring(raw, pos, 60000), " ")
+        if (c < 0):
+            break
+        end
+        cls_s = str_substring(raw, pos, c)
+        var cls = str_to_int(cls_s)
+        pos = pos + c + 1
+        var pxbase = n * g_P
+        var k = 0
+        while (k < g_P):
+            c2 = str_index_of(str_substring(raw, pos, 60000), " ")
+            cn = str_index_of(str_substring(raw, pos, 60000), "\n")
+            cl = cn
+            if (c2 > 0 && cn > 0 && c2 < cn):
+                cl = c2
+            end
+            if (cl < 0):
+                cl = str_len(raw) - pos
+            end
+            pxs = str_substring(raw, pos, cl)
+            g_PX[pxbase + k] = str_to_int(pxs)
+            pos = pos + cl + 1
+            k = k + 1
+        end
+        g_CLS[n] = cls
+        n = n + 1
+        if (n >= 1000):
+            break
+        end
+    end
+    g_NP = n
+end
+
+def rand_init():
+    g_rnd = g_seed
+    var i = 0
+    while (i < g_WW):
+        g_rnd = g_rnd + 31337
+        g_rnd = (g_rnd * 11035) & 32767
+        g_W[i] = (g_rnd + g_seed) % 10 - 5
+        i = i + 1
+    end
+end
+
+def save_w():
+    var outp = "qscl_cls_s" + int_to_str(g_state) + ".w"
+    printf("%d\n", 64)
+    printf("%d\n", 81)
+    var i = 0
+    while (i < g_WW):
+        printf("%d\n", g_W[i])
+        i = i + 1
+    end
+    printf("[save] %s done\n", outp)
+end
+
+def main():
+    printf("QSCL-CLS s=%d seed=%d ep=%d\n", g_state, g_seed, g_ep_max)
+    load_pairs()
+    printf("pairs=%d\n", g_NP)
+    rand_init()
+    var ep = 0
+    while (ep < g_ep_max):
+        var ok = 0
+        var i = 0
+        while (i < g_NP):
+            var cls = g_CLS[i]
+            var pxbase = i * g_P
+            var best = 0
+            var bi = 0
+            var c = 0
+            while (c < g_V):
+                var dot = 0
+                var k = 0
+                while (k < g_P):
+                    dot = dot + g_PX[pxbase + k] * g_W[k * g_V + c]
+                    k = k + 1
+                end
+                if (dot > best):
+                    best = dot
+                    bi = c
+                end
+                c = c + 1
+            end
+            if (bi == cls):
+                ok = ok + 1
+            end
+            if (bi != cls):
+                var k = 0
+                while (k < g_P):
+                    g_W[k * g_V + cls] = g_W[k * g_V + cls] + g_PX[pxbase + k]
+                    g_W[k * g_V + bi] = g_W[k * g_V + bi] - g_PX[pxbase + k]
+                    k = k + 1
+                end
+            end
+            i = i + 1
+        end
+        var acc = 0
+        if (g_NP > 0):
+            acc = ok * 100 / g_NP
+        end
+        if (ep % 5 == 0 || ep == g_ep_max - 1):
+            printf("ep=%d ok=%d acc=%d\n", ep, ok, acc)
+        end
+        ep = ep + 1
+    end
+    save_w()
+end
+main()
