@@ -1,6 +1,0 @@
-#!/bin/bash
-cp=$1; cd /root/QSM/QLife
-d=$(grep "^${cp} " qdfs/ns/data/cp2d.txt | head -1 | cut -d' ' -f2)
-if [ -z "$d" ]; then printf "不在训练集"; exit 0; fi
-out=$(bash build/yi_infer_v4.sh $d 2>/dev/null)
-printf "码点U+%s d=%s 结果=%s" "$(printf '%X' $cp)" "$d" "$out"
