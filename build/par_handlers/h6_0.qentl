@@ -1,0 +1,45 @@
+var g_c = 515
+var g_p = 64
+var g_W[32960]
+var g_D[64]
+def main():
+    var raw = file_read("/tmp/yi_data.txt")
+    var pos = 0
+    var di = 0
+    while (di < 64):
+        var nl = str_index_of(str_substring(raw, pos, 100), "\n")
+        var tok = str_substring(raw, pos, nl)
+        g_D[di] = str_to_int(tok)
+        pos = pos + nl + 1
+        di = di + 1
+    end
+    raw = file_read("/root/QSM/QLife/qdfs/ns/models/qscl_b6_s0.w")
+    pos = 0
+    var wi = 0
+    while (wi < 32960):
+        var nl = str_index_of(str_substring(raw, pos, 100), "\n")
+        var tok = str_substring(raw, pos, nl)
+        g_W[wi] = str_to_int(tok)
+        pos = pos + nl + 1
+        wi = wi + 1
+    end
+    var best = 0
+    var bi = 0
+    var si = 0
+    while (si < 515):
+        var lg = 0
+        var sj = 0
+        var wb = si * 64
+        while (sj < 64):
+            lg = lg + g_W[wb + sj] * g_D[sj]
+            sj = sj + 1
+        end
+        if (lg > best):
+            best = lg
+            bi = si
+        end
+        si = si + 1
+    end
+    exec("printf %s > /tmp/yi_res0.txt " + int_to_str(bi))
+end
+main()
