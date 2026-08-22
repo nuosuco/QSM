@@ -66,7 +66,6 @@ d=4000 4态=[395,395,395,395] top=395 → OK
 
 ## 五、关键文件
 
-- `build/yi_infer_v4.sh` — 并行推理入口(替换旧 yi_infer.sh)
-- `build/par_handlers/h{0-7}_s{0-3}.qbc` — 32个预编译4态处理器
+- 并行推理/训练入口 — 真QNS框架(不同起点叠加态并行); 旧bash壳与旧handler迭代(2026-08-23)已退场回收
 - `docs/QYI_TRAIN_PLAN.md` — 训练规划(已按本原则改写)
 - `docs/PAPER_UNIFIED_GENERATION.md` — 论文(已按本原则改写)
