@@ -1,0 +1,129 @@
+# ================================================================
+# build/train_qscl_lm.qentl — QSCL-LM 语言生成模型 v0.0.4(纯QEntL, 真·叠加态)
+# 给前缀字预测下一字 —— 让模型会"想", 是造词造句写文章的核心
+#
+# 架构(第一版, 按"慢慢升级"先跑通框架):
+#   输入: 前缀字 p1 (one-hot 81维) → 权重 W[81][81]=6561 → 输出81类 argmax=下一字
+#   训练: 感知机对比式(已验证可收敛): argmax!=目标 → W[p1行][目标]+=1, W[p1行][预测]-=1
+#   权重维度 6561 < u16上限(65535), 编译通过
+#   升级路线: 跑通后升级为 bigram(p1+p2)+515隐层 → 更强
+#
+# 叠加态铁律: 4态独立seed(seed=1/101/202/303)→ qscl_lm_s{0-3}.w (不同起点=真叠加)
+#   运行时4态各自一个QVM进程并行, 生成时4态并行+真多数投票选下一字
+#   严禁把4态写成串行for循环(串行=假叠加态=错)
+#
+# 用法:
+#   bin/qvm_boot compile train_qscl_lm.qentl /tmp/lm_s0.qbc
+#   修改 g_seed/g_state/g_ep_max 后编译4份, 4个QVM进程并行运行 → qscl_lm_s{0-3}.w
+#   数据: qdfs/ns/corpus/qscl_lm_pairs.txt (每行 "p1 p2 tgt"), 本版只用 p1→tgt
+# ================================================================
+
+var g_V = 81
+var g_WW = 6561     # 81*81
+var g_seed = 1
+var g_state = 0
+var g_ep_max = 20
+var g_NP = 0
+var g_P1[30000]
+var g_TGT[30000]
+var g_rnd = 0
+var g_W[6561]
+
+# 读训练对(每行 "p1 p2 tgt"), 本版只用 p1→tgt
+def load_pairs():
+    var raw = file_read("/root/QSM/QLife/qdfs/ns/corpus/qscl_lm_pairs.txt")
+    var pos = 0
+    var n = 0
+    var line = ""
+    var c1 = 0
+    var p1s = ""
+    var tgs = ""
+    var rest = ""
+    var nl = str_index_of(raw, "\n")
+    while (nl > 0):
+        line = str_substring(raw, 0, nl)
+        if (str_len(line) > 0):
+            c1 = str_index_of(line, " ")
+            if (c1 > 0):
+                p1s = str_substring(line, 0, c1)
+                rest = str_substring(line, c1 + 1, 200)
+                c1 = str_index_of(rest, " ")
+                if (c1 > 0):
+                    tgs = str_substring(rest, c1 + 1, 200)
+                    g_P1[n] = str_to_int(p1s)
+                    g_TGT[n] = str_to_int(tgs)
+                    n = n + 1
+                end
+            end
+        end
+        raw = str_substring(raw, nl + 1, 60000)
+        nl = str_index_of(raw, "\n")
+    end
+    g_NP = n
+end
+
+def rand_init():
+    g_rnd = g_seed
+    var i = 0
+    while (i < g_WW):
+        g_rnd = g_rnd + 31337
+        g_rnd = (g_rnd * 11035) & 32767
+        g_W[i] = (g_rnd + g_seed) % 10 - 5
+        i = i + 1
+    end
+end
+
+def save_w():
+    var outp = "qdfs/ns/models/qscl_lm_s" + int_to_str(g_state) + ".w"
+    var i = 0
+    while (i < g_WW):
+        printf("%d\n", g_W[i])
+        i = i + 1
+    end
+    printf("[save] %s done\n", outp)
+end
+
+def main():
+    printf("=== QSCL-LM 4态 s=%d seed=%d ep=%d ===\n", g_state, g_seed, g_ep_max)
+    load_pairs()
+    printf("  训练对: %d\n", g_NP)
+    rand_init()
+    var ep = 0
+    while (ep < g_ep_max):
+        var ok = 0
+        var i = 0
+        while (i < g_NP):
+            var p1 = g_P1[i]
+            var tgt = g_TGT[i]
+            var best = 0
+            var bi = 0
+            var base = p1 * g_V
+            var cls = 0
+            while (cls < g_V):
+                var dot = g_W[base + cls]
+                if (dot >= best):
+                    best = dot
+                    bi = cls
+                end
+                cls = cls + 1
+            end
+            if (bi == tgt):
+                ok = ok + 1
+            else:
+                g_W[base + tgt] = g_W[base + tgt] + 1
+                g_W[base + bi] = g_W[base + bi] - 1
+            end
+            i = i + 1
+        end
+        var acc = 0
+        if (g_NP > 0):
+            acc = ok * 100 / g_NP
+        end
+        if (ep % 2 == 0 or ep == g_ep_max - 1):
+            printf("  ep%3d: %d/%d (%d%%)\n", ep, ok, g_NP, acc)
+        end
+        ep = ep + 1
+    end
+    save_w()
+end
+main()
