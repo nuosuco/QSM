@@ -1,0 +1,152 @@
+# ================================================================
+# build/train_qscl_lm2.qentl — 统一生成核心 v0.0.5(纯QEntL, 真·叠加态, 不分类)
+# 升级: 前缀2字 [p1,p2] → 下一字(argmax). 双线性 bigram: out[c]=W1[p1][c]+W2[p2][c]
+# 维度 W1[6561]+W2[6561], 各6561<u16. 感知机对比式(已验证可收敛).
+# 4态独立seed→qscl_lm_s{0-3}.w  文件头 81\n6561\n[W1...]\n6561\n[W2...]
+# ================================================================
+var g_V = 81
+var g_WW = 6561
+var g_seed = 1
+var g_state = 0
+var g_ep_max = 30
+var g_NP = 0
+var g_P1[40000]
+var g_P2[40000]
+var g_TGT[40000]
+var g_rnd = 0
+var g_W1[6561]
+var g_W2[6561]
+
+def load_pairs():
+    var raw = file_read("/root/QSM/QLife/qdfs/ns/corpus/qscl_lm_pairs.txt")
+    var pos = 0
+    var n = 0
+    var c = 0
+    var c2 = 0
+    var cn = 0
+    var cl = 0
+    var p1s = ""
+    var p2s = ""
+    var tgs = ""
+    while (1 == 1):
+        if (pos >= str_len(raw)):
+            break
+        end
+        c = str_index_of(str_substring(raw, pos, 60000), " ")
+        if (c < 0):
+            break
+        end
+        p1s = str_substring(raw, pos, c)
+        pos = pos + c + 1
+        c2 = str_index_of(str_substring(raw, pos, 60000), " ")
+        if (c2 < 0):
+            break
+        end
+        p2s = str_substring(raw, pos, c2)
+        pos = pos + c2 + 1
+        cn = str_index_of(str_substring(raw, pos, 60000), "\n")
+        c = str_index_of(str_substring(raw, pos, 60000), " ")
+        cl = cn
+        if (c > 0 && cn > 0 && c < cn):
+            cl = c
+        end
+        if (cl < 0):
+            cl = str_len(raw) - pos
+        end
+        tgs = str_substring(raw, pos, cl)
+        pos = pos + cl + 1
+        g_P1[n] = str_to_int(p1s)
+        g_P2[n] = str_to_int(p2s)
+        g_TGT[n] = str_to_int(tgs)
+        n = n + 1
+        if (n >= 39500):
+            break
+        end
+    end
+    g_NP = n
+end
+
+def rand_init():
+    g_rnd = g_seed
+    var i = 0
+    while (i < g_WW):
+        g_rnd = g_rnd + 31337
+        g_rnd = (g_rnd * 11035) & 32767
+        g_W1[i] = (g_rnd + g_seed) % 10 - 5
+        i = i + 1
+    end
+    i = 0
+    while (i < g_WW):
+        g_rnd = g_rnd + 31337
+        g_rnd = (g_rnd * 11035) & 32767
+        g_W2[i] = (g_rnd + g_seed * 3) % 10 - 5
+        i = i + 1
+    end
+end
+
+def save_w():
+    var outp = "qscl_lm_s" + int_to_str(g_state) + ".w"
+    printf("%d\n", 81)
+    printf("%d\n", 6561)
+    var i = 0
+    while (i < g_WW):
+        printf("%d\n", g_W1[i])
+        i = i + 1
+    end
+    printf("%d\n", 6561)
+    i = 0
+    while (i < g_WW):
+        printf("%d\n", g_W2[i])
+        i = i + 1
+    end
+    printf("[save] %s done\n", outp)
+end
+
+def main():
+    printf("QSCL-LM2 s=%d seed=%d ep=%d\n", g_state, g_seed, g_ep_max)
+    load_pairs()
+    printf("pairs=%d\n", g_NP)
+    rand_init()
+    var ep = 0
+    while (ep < g_ep_max):
+        var ok = 0
+        var i = 0
+        while (i < g_NP):
+            var p1 = g_P1[i]
+            var p2 = g_P2[i]
+            var tgt = g_TGT[i]
+            var best = 0
+            var bi = 0
+            var b1 = p1 * g_V
+            var b2 = p2 * g_V
+            var cls = 0
+            while (cls < g_V):
+                var dot = g_W1[b1 + cls] + g_W2[b2 + cls]
+                if (dot >= best):
+                    best = dot
+                    bi = cls
+                end
+                cls = cls + 1
+            end
+            if (bi == tgt):
+                ok = ok + 1
+            else:
+                g_W1[b1 + tgt] = g_W1[b1 + tgt] + 1
+                g_W1[b1 + bi] = g_W1[b1 + bi] - 1
+                g_W2[b2 + tgt] = g_W2[b2 + tgt] + 1
+                g_W2[b2 + bi] = g_W2[b2 + bi] - 1
+            end
+            i = i + 1
+        end
+        var acc = 0
+        if (g_NP > 0):
+            acc = ok * 100 / g_NP
+        end
+        if (ep % 5 == 0 || ep == g_ep_max - 1):
+            printf("ep=%d ok=%d acc=%d\n", ep, ok, acc)
+        end
+        ep = ep + 1
+    end
+    save_w()
+end
+main()
