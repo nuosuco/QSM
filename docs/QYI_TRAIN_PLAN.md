@@ -134,6 +134,14 @@
 - 不分类铁律: 同一64像素/81类空间, 输入输出同构, 四能力共用一套点积
 - 下一步: trigram/more-epoch突破bigram熵天花板51%(数据层d→class覆盖仅6%, trigram类索引待建句级映射)
 
+### 🎉 交付物: 服务器v15(9802) 看/生成/画 对应用开放
+- GET /api/yi?d=N → 4态并行识别(已验证 top=N 100%)
+- POST /api/yi "生成SOV句" → 自举采样生成, 输出类·码点·字符(已验证: 14 F2901 63 F2B14 79 F2C06 ...)
+- GET /api/status → {status, votes:4-state, chat:xiaoqu-qsm}
+- 生成壳 build/gen_chars.sh → build/qbootstrap.py --quiet → 类→码点→字符
+- 字符显示: 私有区需CSS字体名匹配(历史坑), 不影响生成正确性
+- 三能力看/写/画 已可经HTTP调用, 自举闭环对外可用
+
 ### ⏳ 在建: 让统一核心会"输出"(不分类, 一个训练器)
 - 训练器: build/train_qscl_lm.qentl (纯QEntL感知机, 待4态并行训练)
 - 产出: qscl_lm_s{0-3}.w (4态不同起点=真叠加态)

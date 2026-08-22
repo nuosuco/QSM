@@ -45,6 +45,14 @@ def chat_reply(msg):
         end
         return "格式错误。请发识别加d值，如识别1234（d=0..4119）"
     end
+    if (str_index_of(msg, "生成") >= 0):
+        var r2 = exec("bash build/gen_chars.sh")
+        return str_concat("自举生成SOV(类 码点 字符): ", r2)
+    end
+    if (str_index_of(msg, "画字") >= 0):
+        var r3 = exec("bash build/gen_chars.sh")
+        return str_concat("生成字符(类 码点 字符): ", r3)
+    end
     if (str_index_of(msg, "U+") >= 0):
         var upos = str_index_of(msg, "U+")
         var hexs = str_substring(msg, upos + 2, 100)
