@@ -108,7 +108,8 @@ def chat_reply(msg):
     if (str_index_of(msg, "模型") >= 0):
         return "当前QSCL模型：4120彝文字符 × 8批 × 4叠加态 = 32份权重，识别准确率99%。"
     end
-    return "我收到了你的消息。我是小趣QSM，可以聊QEntL、量子计算、彝文，或帮你查询字形识别。"
+    var r4 = exec("bash build/gen_chars.sh")
+    return str_concat("QEntL生成(类序列): ", r4)
 end
 
 def handle_request(req):
@@ -140,7 +141,7 @@ def handle_request(req):
                 body = str_substring(req, bd + 4, 10000)
             end
             var reply = chat_reply(body)
-            resp = str_concat("{\"role\":\"assistant\",\"text\":\"", str_concat(reply, "\"}"))
+            resp = str_concat("小趣QSM: ", reply)
         end
     else:
         if (str_index_of(path, "/api/status") >= 0):
