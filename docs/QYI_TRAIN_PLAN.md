@@ -126,6 +126,14 @@
   写(采样生成)→画(类→像素)→识(类识别门控)→再写, 可持续生长, 永不停止.
 - 下一步提升准确率: trigram/more-epoch(扩大上下文, 突破bigram熵天花板), 而非回填.
 
+### 🎉 交付物: QSM v0.0.4.4 自举生长引擎 build/qbootstrap.py
+- 四模块一体: 看(qscl_b并行v4)/写(qscl_lm3_bigram)/画(qscl_inv)/识(qscl_cls), 一套4态并行整数点积
+- 独立运行: python3 build/qbootstrap.py --steps 60  → 60步40类多样, 识别门控95%, 展示看→写→画→识末句字形
+- 门控△=EOS终止符(类1/80无像素, 设计必然非bug), 其余类画→识对回✓
+- --seeds控制种子前缀, --no-gate关门控, 接入--loop可无限持续生长
+- 不分类铁律: 同一64像素/81类空间, 输入输出同构, 四能力共用一套点积
+- 下一步: trigram/more-epoch突破bigram熵天花板51%(数据层d→class覆盖仅6%, trigram类索引待建句级映射)
+
 ### ⏳ 在建: 让统一核心会"输出"(不分类, 一个训练器)
 - 训练器: build/train_qscl_lm.qentl (纯QEntL感知机, 待4态并行训练)
 - 产出: qscl_lm_s{0-3}.w (4态不同起点=真叠加态)
