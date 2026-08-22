@@ -134,6 +134,14 @@
 - 不分类铁律: 同一64像素/81类空间, 输入输出同构, 四能力共用一套点积
 - 下一步: trigram/more-epoch突破bigram熵天花板51%(数据层d→class覆盖仅6%, trigram类索引待建句级映射)
 
+### 🎉 交付物: v0.0.4.6 自举生成引擎QEntL全栈化(纯QEntL, 0第三方, 0Python运行时)
+- build/qb_gen.qentl 纯QCL自举生成引擎(4态点积累加+温度采样+EOS抑制), 编译→/tmp/qb_gen.qbc
+- build/gen_chars.sh 调QVM直接执行, 不再经任何Python
+- 服务器9802(v14)POST生成 已端到端验证: SEQ=60 53 80(纯QEntL)
+- 已删除违纪Python运行时入口: qbootstrap.py / bootstrap_loop.py / loop_e2e.py (归档/tmp/banned_py)
+- 数据搬运: 4态权重预串化 qdfs/ns/models/qb_w0-3.txt (每态W1+W2=13122整数)
+- 铁律: QEntL是唯一语言/环境, 零第三方, 零Python运行时入口
+
 ### 🎉 交付物: 服务器v15(9802) 看/生成/画 对应用开放
 - GET /api/yi?d=N → 4态并行识别(已验证 top=N 100%)
 - POST /api/yi "生成SOV句" → 自举采样生成, 输出类·码点·字符(已验证: 14 F2901 63 F2B14 79 F2C06 ...)
