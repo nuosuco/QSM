@@ -10,9 +10,9 @@ var g_seed = 1
 var g_state = 0
 var g_ep_max = 30
 var g_NP = 0
-var g_P1[40000]
-var g_P2[40000]
-var g_TGT[40000]
+var g_P1[50000]
+var g_P2[50000]
+var g_TGT[50000]
 var g_rnd = 0
 var g_W1[6561]
 var g_W2[6561]
@@ -59,7 +59,7 @@ def load_pairs():
         g_P2[n] = str_to_int(p2s)
         g_TGT[n] = str_to_int(tgs)
         n = n + 1
-        if (n >= 39500):
+        if (n >= 50000):
             break
         end
     end
