@@ -150,10 +150,16 @@ else{url='/api/xiaoqu';method='POST';body=msg;}
 var opts={method:method,headers:{'Content-Type':'text/plain; charset=utf-8'}};
 if(body)opts.body=body;
 fetch(url,opts).then(function(r){return r.text();}).then(function(data){
-/* 去掉服务器加的"小趣QSM:"前缀 */
-var d=data.replace(/^小趣QSM:\s*/,'');
-/* 如果是JSON,格式化显示 */
-try{var j=JSON.parse(d);d=JSON.stringify(j,null,2);}catch(e){}
+var d=data;
+if(pureNum && /^\{.*"class"/.test(d)){
+try{var j=JSON.parse(d);d="小趣QSM: 生成类 "+j.class+(j.art?"\n\n"+j.art:"")+(j.art&&j.binary?"\n\n64像素: "+j.binary.join(','):");}catch(e){d="小趣QSM: "+d;}
+}
+else if(isPixels && /^\{/.test(d)){
+try{var j=JSON.parse(d);d="小趣QSM: 识别=类 "+j.class+", score="+j.score+(j.codepoint?" → U+"+j.codepoint.toString(16).toUpperCase():"");}catch(e){d="小趣QSM: "+d;}
+}
+else{
+d="小趣QSM: "+d;
+}
 msgs.innerHTML+='<div style="margin:6px 0;padding:8px;background:rgba(255,107,157,0.1);border-radius:6px;white-space:pre-wrap;font-size:12px">'+d+'</div>';msgs.scrollTop=msgs.scrollHeight;
 }).catch(function(e){msgs.innerHTML+='<div style="margin:6px 0;color:var(--yi)">连接中...</div>';msgs.scrollTop=msgs.scrollHeight;});}
 function handleFile(file){if(!file)return;var msgs=document.getElementById('chatMsgs');msgs.innerHTML+='<div style="margin:6px 0;padding:8px;background:rgba(0,212,255,0.1);border-radius:6px">📎 文件: '+file.name+'</div>';msgs.scrollTop=msgs.scrollHeight;
