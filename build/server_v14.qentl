@@ -39,97 +39,12 @@ def get_body(req):
     return str_substring(req, bd + 4, 60000)
 end
 
-# ---- 小趣QSM 智能体对话(关键词匹配, 三语言) ----
+# ---- 小趣QSM 智能体对话 ----
 def chat_reply(msg):
-    var mlen = str_len(msg)
-    if (mlen <= 0):
-        return "你好！我是小趣QSM，QEntL量子操作系统的智能助手。"
-    end
-    if (str_index_of(msg, "识别") >= 0):
-        var zpos = str_index_of(msg, "识别")
-        var rest = str_substring(msg, zpos + 2, 100)
-        var nlen = str_len(rest)
-        var d = 0
-        var i = 0
-        while (i < nlen):
-            var cc = ord(str_char_at(rest, i))
-            if (cc >= 48 && cc <= 57):
-                d = d * 10 + cc - 48
-            end
-            i = i + 1
-        end
-        if (d >= 0 && d <= 4119):
-            var cmd = str_concat("bash build/yi_infer_v4.sh ", int_to_str(d))
-            var r = exec(cmd)
-            return str_concat("QSCL权重识别字", str_concat(int_to_str(d), str_concat("结果=", r)))
-        end
-        return "格式错误。请发识别加d值，如识别1234（d=0..4119）"
-    end
-    if (str_index_of(msg, "生成") >= 0):
-        var r2 = exec("bash build/gen_chars.sh")
-        return str_concat("自举生成SOV(类 码点 字符): ", r2)
-    end
-    if (str_index_of(msg, "画字") >= 0):
-        var r3 = exec("bash build/gen_chars.sh")
-        return str_concat("生成字符(类 码点 字符): ", r3)
-    end
-    if (str_index_of(msg, "U+") >= 0):
-        var upos = str_index_of(msg, "U+")
-        var hexs = str_substring(msg, upos + 2, 100)
-        var hlen = str_len(hexs)
-        var cp = 0
-        var j = 0
-        while (j < hlen):
-            var cc2 = ord(str_char_at(hexs, j))
-            var v = 0
-            if (cc2 >= 48 && cc2 <= 57): v = cc2 - 48 end
-            if (cc2 >= 97 && cc2 <= 102): v = cc2 - 97 + 10 end
-            if (cc2 >= 65 && cc2 <= 70): v = cc2 - 65 + 10 end
-            cp = cp * 16 + v
-            j = j + 1
-        end
-        var cmd0 = str_concat("bash build/yi_recog_cp_v4.sh ", int_to_str(cp))
-        var r0 = exec(cmd0)
-        return r0
-    end
-    var yi = 0
-    var yi_cp = 0
-    var k = 0
-    while (k < mlen):
-        var ch = str_char_at(msg, k)
-        var cval = ord(ch)
-        if (cval > 63000): yi = 1 end
-        if (yi == 1): yi_cp = cval end
-        k = k + 1
-    end
-    if (yi == 1):
-        var cmd1 = str_concat("bash build/yi_recog_cp_v4.sh ", int_to_str(yi_cp))
-        var r = exec(cmd1)
-        return r
-    end
-    if (str_index_of(msg, "hi") >= 0):
-        return "Hello! I am XiaoQu QSM, your QEntL quantum OS assistant."
-    end
-    if (str_index_of(msg, "hello") >= 0):
-        return "Hello! I am XiaoQu QSM. Type in Chinese, English, or Yi."
-    end
-    if (str_index_of(msg, "你好") >= 0):
-        return "你好！我是小趣QSM，QEntL量子操作系统的智能助手。可以用中文、英文或彝文交流。"
-    end
-    if (str_index_of(msg, "你") >= 0):
-        return "你好！我在听。可以问QEntL、量子计算、彝文、字形识别，或随便聊聊。"
-    end
-    if (str_index_of(msg, "QEntL") >= 0):
-        return "QEntL是QNS自举生长的量子编程语言和操作系统，构建链：C 到 QCL 到 QVM 到 QDFS 到 QNS 到 4模型。"
-    end
-    if (str_index_of(msg, "量子") >= 0):
-        return "量子叠加态让我能同时处理多种状态，4态投票推理是当前QSCL模型的推理方式。"
-    end
-    if (str_index_of(msg, "模型") >= 0):
-        return "当前QSCL模型：4120彝文字符 × 8批 × 4叠加态 = 32份权重，识别准确率99%。"
-    end
-    var r4 = exec("bash build/gen_chars.sh")
-    return str_concat("QEntL生成(类序列): ", r4)
+    # 把请求体写到临时文件(字节完整), 脚本读文件避免多字节编码问题
+    file_write_bytes("/tmp/yi_chat_in.txt", msg)
+    var cmd = "bash build/yi_api_chat_file.sh"
+    return exec(cmd)
 end
 
 def handle_request(req):
@@ -161,17 +76,17 @@ def handle_request(req):
                 body = str_substring(req, bd + 4, 10000)
             end
             var reply = chat_reply(body)
-            resp = str_concat("小趣QSM: ", reply)
+            resp = reply
         end
     else:
         if (str_index_of(path, "/api/status") >= 0):
-            resp = "{\"status\":\"ok\",\"model\":\"qscl\",\"votes\":\"4-state\",\"weights\":\"qscl_b{0-7}_s{0-3}.w x32\",\"dim\":\"515x64\",\"engine\":\"qscl_engine.sh\",\"chat\":\"xiaoqu-qsm\"}"
+            resp = "{\"status\":\"ok\",\"model\":\"qscl_unified\",\"votes\":\"4-state\",\"weights\":\"qscl_unified_b{0-7}_s{0-3}.w x32 + 8 merged\",\"dim\":\"515x64\",\"glyphs\":\"4120 yi\",\"engine\":\"gen_unified.sh\",\"chat\":\"xiaoqu-qsm\"}"
         else:
             if (str_index_of(path, "/api/generate") >= 0):
                 var k = get_k_param(req)
                 if (k < 0): k = 0 end
-                if (k > 514): k = 514 end
-                var cmdg = str_concat("/root/QSM/QLife/build/qscl_engine.sh gen ", int_to_str(k))
+                if (k > 4119): k = 4119 end
+                var cmdg = str_concat("/root/QSM/QLife/build/gen_unified.sh ", int_to_str(k))
                 resp = exec(cmdg)
             else:
                 if (str_index_of(path, "/api/recognize") >= 0):
