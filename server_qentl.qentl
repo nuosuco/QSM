@@ -1,235 +1,170 @@
-# ================================================================
-# QEntL HTTP服务器 v5 — QSCL真训练权重推理
-# 固定编码器+1参数偏置b, 4态不同起点训练→坍缩b=993040
-# 推理: pred = encode(code) - b → pred/10 = char_id
-# 无硬编码, 无矩阵运算, 纯权重计算
-# ================================================================
-
+# QEntL HTTP服务器 v6 — 多模态统一生成
+# 架构: QEntL只做HTTP解析+路由,字符串/JSON/HTML全部交给qscl_engine.sh生成
+#   (str_concat循环32960次会OOM,QEntL只做轻薄请求壳)
+# 路由: /api/generate GET ?k=N | /api/recognize POST 64像素 | /api/image POST 文件路径
+#        /api/yi /api/xiaoqu /api/status / /ide
+# 在QVM常驻,启动用qvm_boot.qentl,qcl_bootstrap只点火
 var g_port = 9802
 
-# ---- QSCL训练参数(从qscl_bias.w加载) ----
-var g_b = 0
-
-# ---- 固定编码器位置权值(不学习) ----
-var g_w0 = 10000 * 10   # 100000
-var g_w1 = 10000
-var g_w2 = 1000
-var g_w3 = 100
-var g_w4 = 10
-var g_w5 = 1
-
-# ---- 编码: code拆6位十进制 → 加权求和(=code本身) ----
-var g_d0 = 0
-var g_d1 = 0
-var g_d2 = 0
-var g_d3 = 0
-var g_d4 = 0
-var g_d5 = 0
-
-def encode(code):
-    var tmp = code
-    g_d5 = tmp % 10
-    tmp = tmp / 10
-    g_d4 = tmp % 10
-    tmp = tmp / 10
-    g_d3 = tmp % 10
-    tmp = tmp / 10
-    g_d2 = tmp % 10
-    tmp = tmp / 10
-    g_d1 = tmp % 10
-    tmp = tmp / 10
-    g_d0 = tmp % 10
-    var c = g_w0 * g_d0 + g_w1 * g_d1 + g_w2 * g_d2
-    c = c + g_w3 * g_d3 + g_w4 * g_d4 + g_w5 * g_d5
-    return c
-end
-
-# ---- 加载训练权重 ----
-def load_weights():
-    var path = "/root/QSM/QLife/v0.0.3/qdfs/ns/models/qscl_bias.w"
-    var data = file_read(path)
-    if (str_len(data) == 0):
-        printf("[QSCL] 权重加载失败: %s\n", path)
-        return 0
-    end
-    # 解析 "B:993040"
-    var c1 = str_index_of(data, ":")
-    if (c1 < 0):
-        printf("[QSCL] 权重格式错误\n")
-        return 0
-    end
-    var val_str = str_substring(data, c1 + 1, str_len(data) - c1 - 1)
-    g_b = str_to_int(val_str)
-    printf("[QSCL] 偏置b=%d (来自: qscl_bias.w)\n", g_b)
-    return 1
-end
-
-# ---- HTTP工具 ----
-def http_response(code, content_type, body):
-    var resp = "HTTP/1.1 "
-    resp = str_concat(resp, code)
-    resp = str_concat(resp, "\r\nContent-Type: ")
-    resp = str_concat(resp, content_type)
-    resp = str_concat(resp, "\r\nContent-Length: ")
-    resp = str_concat(resp, int_to_str(str_len(body)))
-    resp = str_concat(resp, "\r\nConnection: close\r\n\r\n")
-    resp = str_concat(resp, body)
-    return resp
-end
-
-def http_body(req):
-    var idx = str_index_of(req, "\r\n\r\n")
-    if (idx < 0): return "" end
-    return str_substring(req, idx + 4, str_len(req) - idx - 4)
-end
-
-def find_pos(s, start, ch):
+def find_next(s, start, ch):
     var i = start
     var L = str_len(s)
     while (i < L):
-        if (str_char_at(s, i) == ch):
-            return i
-        end
+        if (str_char_at(s, i) == ch): return i end
         i = i + 1
     end
     return -1
 end
 
-# ---- QSCL彝文识别(真推理: 纯权重计算, 无硬编码) ----
-def yi_recognize(code_str):
-    # 只接受6位十进制码点
-    if (str_len(code_str) != 6):
-        return "请输入6位十进制码点(993040-993190)"
-    end
-    var c0 = str_char_at(code_str, 0)
-    var c1 = str_char_at(code_str, 1)
-    var c2 = str_char_at(code_str, 2)
-    # 检查前3位是"993"
-    if (str_eq(c0, "9") == 0): return "码点超出模型范围(993040-993190)" end
-    if (str_eq(c1, "9") == 0): return "码点超出模型范围(993040-993190)" end
-    if (str_eq(c2, "3") == 0): return "码点超出模型范围(993040-993190)" end
-    # 解析码点
-    var c3 = str_char_at(code_str, 3)
-    var c4 = str_char_at(code_str, 4)
-    var c5 = str_char_at(code_str, 5)
-    var d3 = str_to_int(c3)
-    var d4 = str_to_int(c4)
-    var d5 = str_to_int(c5)
-    var char_id = (d3 * 100 + d4 * 10 + d5 - 40) / 10
-    if (char_id < 0): return "码点超出模型范围(993040-993190)" end
-    if (char_id >= 16): return "码点超出模型范围(993040-993190)" end
-
-    # QSCL推理: pred = encode(code) - b
-    var base = 993 * 1000 + 40
-    var code = base + char_id * 10
-    var enc = encode(code)
-    var pred = enc - g_b
-    var pred_label = pred / 10
-
-    var result = "QSCL叠加态识别结果:\n"
-    result = str_concat(result, "输入码点: ")
-    result = str_concat(result, code_str)
-    result = str_concat(result, "\n真实标签: ")
-    result = str_concat(result, int_to_str(char_id))
-    result = str_concat(result, "\n坍缩偏置b: ")
-    result = str_concat(result, int_to_str(g_b))
-    result = str_concat(result, "\n编码值: ")
-    result = str_concat(result, int_to_str(enc))
-    result = str_concat(result, "\n预测值: ")
-    result = str_concat(result, int_to_str(pred))
-    result = str_concat(result, "\n预测标签: ")
-    result = str_concat(result, int_to_str(pred_label))
-    if (pred_label == char_id):
-        result = str_concat(result, "\n结果: 正确")
-    else:
-        result = str_concat(result, "\n结果: 错误")
-    end
-    result = str_concat(result, "\n\n(纯权重计算: encode(code)-b, 无硬编码)")
-    return result
+def parse_url(data):
+    var s1 = str_index_of(data, " ")
+    if (s1 < 0): return "/" end
+    var s2 = find_next(data, s1 + 1, " ")
+    if (s2 <= s1): return "/" end
+    var raw = str_substring(data, s1 + 1, s2 - s1 - 1)
+    var q = str_index_of(raw, "?")
+    if (q >= 0): raw = str_substring(raw, 0, q) end
+    return raw
 end
 
-# ---- 路由 ----
-def route(path, req):
-    # 首页
-    if (str_eq(path, "/") or str_eq(path, "/qdesktop")):
-        var html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>QSM量子桌面</title></head><body><h1>QSM量子操作系统</h1><p>QSCL彝文识别在线</p><form onsubmit='fetch(\"/api/yi\",{method:\"POST\",body:document.getElementById(\"c\").value}).then(r=>r.text()).then(t=>document.getElementById(\"o\").innerText=t)'><input id=\"c\" placeholder=\"993040\"><button>识别</button></form><pre id=\"o\" style=\"white-space:pre-wrap\"></pre></body></html>"
-        return http_response("200 OK", "text/html; charset=utf-8", html)
+def parse_body(req):
+    var idx = str_index_of(req, "\r\n\r\n")
+    if (idx < 0): return "" end
+    return str_substring(req, idx + 4, str_len(req) - idx - 4)
+end
+
+def parse_method(req):
+    var m = ""
+    if (str_index_of(req, "GET ") >= 0): m = "GET" end
+    if (str_index_of(req, "POST ") >= 0): m = "POST" end
+    return m
+end
+
+def query_k(req):
+    var qi = str_index_of(req, "?k=")
+    if (qi < 0): return "0" end
+    var start = qi + 3
+    var L = str_len(req)
+    var e = start
+    while (e < L):
+        var ch = str_char_at(req, e)
+        if (str_eq(ch, "&") or str_eq(ch, " ") or str_eq(ch, "\r")): break end
+        e = e + 1
     end
-    # 在线IDE
+    return str_substring(req, start, e - start)
+end
+
+def http_response(code, ct, body):
+    var l = str_len(body)
+    var r = "HTTP/1.1 "
+    r = str_concat(r, code)
+    r = str_concat(r, "\r\nContent-Type: ")
+    r = str_concat(r, ct)
+    r = str_concat(r, "\r\nContent-Length: ")
+    r = str_concat(r, int_to_str(l))
+    r = str_concat(r, "\r\n\r\n")
+    r = str_concat(r, body)
+    return r
+end
+
+def call_engine(op):
+    var cmd = "/root/QSM/QLife/build/qscl_engine.sh"
+    cmd = str_concat(cmd, " ")
+    cmd = str_concat(cmd, op)
+    return exec(cmd)
+end
+
+def call_gen(k):
+    var cmd = "/root/QSM/QLife/build/qscl_engine.sh"
+    cmd = str_concat(cmd, " gen ")
+    cmd = str_concat(cmd, k)
+    return exec(cmd)
+end
+
+def call_argmax(pxs):
+    var cmd = "/root/QSM/QLife/build/qscl_engine.sh"
+    cmd = str_concat(cmd, " argmax ")
+    cmd = str_concat(cmd, pxs)
+    return exec(cmd)
+end
+
+def call_img(path):
+    var cmd = "/root/QSM/QLife/build/qscl_engine.sh"
+    cmd = str_concat(cmd, " img ")
+    cmd = str_concat(cmd, path)
+    return exec(cmd)
+end
+
+def call_page(slug):
+    var cmd = "/root/QSM/QLife/build/qscl_engine.sh"
+    cmd = str_concat(cmd, " json_page ")
+    cmd = str_concat(cmd, slug)
+    return exec(cmd)
+end
+
+def call_xiaoqu(body):
+    var cmd = "/root/QSM/QLife/build/qscl_engine.sh"
+    cmd = str_concat(cmd, " json_page xiaoqu ")
+    cmd = str_concat(cmd, body)
+    return exec(cmd)
+end
+
+def route(data):
+    var path = parse_url(data)
+    var body = parse_body(data)
+    var out = ""
+    var ct = "text/plain; charset=utf-8"
+    if (str_eq(path, "/")):
+        out = call_page("index")
+        ct = "text/html; charset=utf-8"
+    end
     if (str_eq(path, "/ide")):
-        var ide_html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>QEntL IDE</title></head><body><h1>QEntL IDE</h1></body></html>"
-        return http_response("200 OK", "text/html; charset=utf-8", ide_html)
+        out = call_page("ide")
+        ct = "text/html; charset=utf-8"
     end
-    # 系统状态
     if (str_eq(path, "/api/status")):
-        var body = "{\"server\":\"QEntL/2.0\",\"status\":\"running\",\"qscl\":\"trained\",\"b\":"
-        body = str_concat(body, int_to_str(g_b))
-        body = str_concat(body, ",\"weights\":\"qscl_bias.w\"}")
-        return http_response("200 OK", "application/json", body)
+        out = call_page("status")
+        ct = "application/json; charset=utf-8"
     end
-    # 彝文识别
+    if (str_eq(path, "/api/generate")):
+        var k = query_k(data)
+        out = call_gen(k)
+        ct = "application/json; charset=utf-8"
+    end
+    if (str_eq(path, "/api/recognize")):
+        out = call_argmax(body)
+        ct = "application/json; charset=utf-8"
+    end
+    if (str_eq(path, "/api/image")):
+        out = call_img(body)
+        ct = "application/json; charset=utf-8"
+    end
     if (str_eq(path, "/api/yi")):
-        var body = http_body(req)
-        var code_str = body
-        if (str_len(body) == 0):
-            code_str = "993040"
-        else:
-            if (str_index_of(body, "{") >= 0):
-                var tq = str_index_of(body, "\"text\":\"")
-                if (tq >= 0):
-                    var vstart = tq + 8
-                    var vend = find_pos(body, vstart, "\"")
-                    if (vend > vstart):
-                        code_str = str_substring(body, vstart, vend - vstart)
-                    end
-                end
-            end
-        end
-        var result = yi_recognize(code_str)
-        return http_response("200 OK", "text/plain; charset=utf-8", result)
+        out = call_argmax(body)
     end
-    # 小趣QSM对话
     if (str_eq(path, "/api/xiaoqu")):
-        var body = http_body(req)
-        var reply = "小趣QSM已就绪，正在运行QEntL量子操作系统"
-        if (str_len(body) > 0):
-            reply = str_concat(reply, "\n你对我说: ")
-            reply = str_concat(reply, body)
-        end
-        return http_response("200 OK", "text/plain; charset=utf-8", reply)
+        out = call_xiaoqu(body)
     end
-    # 404
-    return http_response("404 Not Found", "text/plain", "404 - QEntL Server")
+    if (str_len(out) == 0):
+        out = "404"
+    end
+    return http_response("200 OK", ct, out)
 end
 
-# ---- 主循环 ----
 def main():
-    load_weights()
+    printf("[QSM] v6多模态统一生成 启动于端口 %d\n", g_port)
+    printf("[QSM] 生成=识别对称反向 | W=515x64 | 4态真并行\n")
     var srv = tcp_listen(g_port)
     if (srv < 0):
-        printf("[http] 端口%d监听失败\n", g_port)
+        printf("[QSM] 端口监听失败\n")
         return 1
     end
-    printf("[http] QEntL QSCL服务器启动于端口%d\n", g_port)
-    printf("[http] 路由: / /ide /api/status /api/yi /api/xiaoqu\n")
     while (1 == 1):
         var cli = tcp_accept(srv)
         if (cli >= 0):
             var data = tcp_recv(cli, 65535)
             if (str_len(data) > 0):
-                var sp1 = find_pos(data, 0, " ")
-                var sp2 = find_pos(data, sp1 + 1, " ")
-                if (sp1 < 0 or sp2 < 0): sp1 = 0 end
-                var raw_path = ""
-                if (sp2 > sp1):
-                    raw_path = str_substring(data, sp1 + 1, sp2 - sp1 - 1)
-                end
-                var path = raw_path
-                var q_idx = str_index_of(raw_path, "?")
-                if (q_idx >= 0):
-                    path = str_substring(raw_path, 0, q_idx)
-                end
-                var resp = route(path, data)
+                var resp = route(data)
                 if (str_len(resp) > 0):
                     tcp_send(cli, resp)
                 end
