@@ -194,11 +194,17 @@ def handle_request(req):
                             resp = exec(cmdi)
                         end
                     else:
-                        resp = "{\"error\":\"unknown endpoint\"}"
+                        if (str_index_of(path, "/api/xiaoqu") >= 0):
+                            var body = get_body(req)
+                            var reply = chat_reply(body)
+                            resp = reply
+                        else:
+                            resp = "{\"error\":\"unknown endpoint\"}"
                     end
                 end
             end
         end
+    end
     end
     return resp
 end
