@@ -71,3 +71,40 @@ size=17最省(仅8字重复), 4对共8字用独立size后清零。
 - 校验: `qdfs/ns/data/yi_glyph_4120.data`
 - 训练脚本: `build/hebbian_train.sh`
 - 训练源备份: `qdfs/ns/data_backup_oldpixels/`
+---
+
+## 7. v0.0.6 重大修正 (2026-08-24 夜)
+
+### 7.1 class_codepoint.txt 伪表修正（铁证）
+
+**旧表是错的**: 类 k 码点 = U+F2710 + 10k（等差10跳序）。类10 原表给 U+F2774(993140)，实际应为 U+F271A(993050)="雪"(hgpxn)。字形渲染比对证实: yi_glyph 行11(类10) 与 U+F271A 渲染 7/8 行 95%+ 吻合，与 U+F2774 不符。
+
+**正确映射**: 类 k → U+F2710 + k (连续), 十进制 993040+k。三语表 4120 行码点连续 F2710..F3727 零断点，与类号一一对齐。
+
+**受影响的端到端**: 9802 /api/yi、/api/generate、识别反向头输出码点/字符全部曾因伪表偏移 10 步错位; 现修复后: 类10→993050(U+F271A), 类0→993040(U+F2710), 类4119→997159(U+F3727)。
+
+**修复文件**: qdfs/ns/models/class_codepoint.txt (备份: /tmp/class_codepoint_buggy_10x.bak)
+
+### 7.2 真 16×16 字形渲染管线 (禁Python, 纯ffmpeg+od+awk)
+
+- 源: lingyi.ttf (含私有区 F2710..F3727 全 glyph, fc-query 证实区间 f2710-f3a97)
+- 工具: ffmpeg 7.0.2 drawtext 渲染灰度 PGM(P5 二进制) → od 转十进制 → awk bbox 居中方形缩放 16×16 → 二值化(暗像素占比>=1/2 置1)
+- 脚本: build/rasterize16.sh (单字) + build/render_all_16x16.sh (全量4并发)
+- 产物: qdfs/ns/data/yi_glyph_4120_16x16_real.data (4120类 × 256像素, hex标签 0..FFF, 零缺失)
+- **这是真 256 像素字形（非 2×2 放大）**，信息量 > 8×8，是破 99.4% 天花板的正确数据源
+- 旧 bug: 2×2 放大版 yi_glyph_4120_16x16.data 无新信息已弃用(备份 /tmp/yi_16x16_buggy_backup.data)
+
+### 7.3 16×16 真权重导出 (32份, 原型归一化+4态扰动)
+
+- 脚本: build/export_16x16_real_weights.sh
+- 原理: 原型归一化最近邻(0-epoch)最优; 4态不同seed扰动=不同起点叠加态
+- 产物: qdfs/ns/models/qscl_16x16_weights/qscl_16x16_b{0..7}_s{0..3}.w
+  (32份 × 515类 × 256像素, 4态 md5 各不相同=真不同起点)
+- 旧"纯原型空壳"(4态md5全同, 73%单标量行) 已备份 /tmp/qscl_16x16_weights_prototype_backup
+
+### 7.4 性能基准 (2核 AMD EPYC 9754, awk)
+
+- awk 纯乘加: 1.24亿/秒
+- 16×16 单轮感知机 515²×256: ~2分钟 (60轮不可行, 需优化或降维)
+- 16×16 全量识别 4120类×4态×256: ~73分钟单核, 2核分块~36分钟
+- 验证脚本: build/verify16_chunk.sh (分块, 2核并行)
