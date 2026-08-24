@@ -41,9 +41,10 @@ gen|infer)
     }
     thr=0.005
     for(j=0;j<DIM;j++){ n1=0; for(s=0;s<4;s++) n1+=(wr[j+s*DIM]>=thr?1:0); raw[j]=(n1>=3)?1:0 }
-    print "class="k" batch="b" codepoint="cp_arr[k]" size="SZ
-    print "pixels:"
-    for(rr=0;rr<SZ;rr++){ln=""; for(c2=0;c2<SZ;c2++) ln=ln (raw[rr*SZ+c2]?"#":"."); print ln}
+    # 模型直接输出像素(空格分隔), 桌面CSS grid直接渲染
+    printf "像素: "
+    for(j=0;j<DIM;j++){if(j>0)printf " ";printf "%d",raw[j]}
+    printf "\n"
   }'
   ;;
 esac
