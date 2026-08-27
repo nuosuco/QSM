@@ -1,0 +1,266 @@
+# QSCL 32x32 真训练器 — QEntL全栈, 不同起点叠加态并行
+# 架构: 1024像素(分16子切片)→32隐层(ReLU)→515类
+# 数据: yi_glyph_4120_32x32_real.data (4120×1024像素, 十六进制标签)
+# 4态不同seed/不同LR → 各自独立判别学习
+# W1[32×1024]=32768  OK < 65535
+# W2[515×32]=16480  OK
+# P[515×1024]=528000 > 65535 → 不缓存P, 边读边用
+
+var g_EP = 15
+var g_BATCHES = 8
+var g_NB = 515
+var g_NX = 1024
+var g_NX64 = 16
+var g_HN = 32
+var g_NS = 4
+var g_LR0 = 500
+var g_EP0 = 15
+
+var g_W1[32768]
+var g_W2[16480]
+var g_H[32]
+var g_L[515]
+var g_px[1024]
+
+var g_data = ""
+var g_path = ""
+var g_i = 0
+var g_j = 0
+var g_k = 0
+var g_n = 0
+var g_ep = 0
+var g_base = 0
+var g_sum = 0
+var g_max_idx = 0
+var g_max_val = 0
+var g_correct = 0
+var g_pred = 0
+var g_label = 0
+var g_rnd = 0
+var g_seed = 0
+var g_state = 0
+var g_w_str = ""
+var g_nl = 0
+var g_line = ""
+var g_c1 = 0
+var g_rest = ""
+var g_ps = 0
+var g_pe = 0
+var g_pv = ""
+var g_skip = 0
+var g_h = 0
+var g_lr = 0
+var g_batch = 0
+var g_v = 0
+var g_nc = 0
+
+def hex2dec(s)
+    var v = 0
+    var i = 0
+    var ch = 0
+    while (i < str_len(s))
+        ch = str_substring(s, i, 1)
+        if (ch >= "0" && ch <= "9"): v = v * 16 + str_to_int(ch) - str_to_int("0") end
+        if (ch >= "A" && ch <= "F"): v = v * 16 + str_to_int(ch) - str_to_int("A") + 10 end
+        if (ch >= "a" && ch <= "f"): v = v * 16 + str_to_int(ch) - str_to_int("a") + 10 end
+        i = i + 1
+    end
+    return v
+end
+
+def main()
+    printf("=== QSCL 32x32 4态叠加训练器 ===\n")
+    printf("  架构: 1024像素(16×64子切片)→32隐层→515类\n")
+    printf("  4态: seed 1/101/202/303, LR 500/1000/2000/3000\n")
+
+    g_path = "/root/QSM/QLife/qdfs/ns/models/qscl_32x32_weights/qscl_32x32_all.w"
+    exec("truncate -s 0 " + g_path)
+    exec("printf -- '8 515 1024 32 4\n' > " + g_path)
+
+    g_data = file_read("/root/QSM/QLife/qdfs/ns/data/yi_glyph_4120_32x32_real.data")
+    if (str_len(g_data) < 1000): printf("[错] 数据为空\n")
+
+    g_batch = 0
+    while (g_batch < g_BATCHES)
+        printf("\n[批次%d/8] 类%d-%d\n", g_batch, g_batch * 515, g_batch * 515 + 514)
+
+        g_nc = 0
+        g_skip = g_batch * 515
+        g_n = 0
+        g_base = 0
+        g_i = 0
+        while (g_i < g_skip)
+            g_nl = str_index_of(str_substring(g_data, g_base, 20000), "\n")
+            if (g_nl < 0): g_base = str_len(g_data)
+            else: g_base = g_base + g_nl + 1 end
+            g_i = g_i + 1
+        end
+
+        g_n = 0
+        while (g_n < 515)
+            g_nl = str_index_of(str_substring(g_data, g_base, 20000), "\n")
+            if (g_nl < 0)
+                g_line = str_substring(g_data, g_base, str_len(g_data) - g_base)
+                g_base = str_len(g_data)
+            else
+                g_line = str_substring(g_data, g_base, g_nl)
+                g_base = g_base + g_nl + 1
+            end
+            g_c1 = str_index_of(g_line, ":")
+            if (g_c1 < 0)
+                g_nc = g_nc + 1
+                g_n = g_n + 1
+                continue
+            end
+            g_v = hex2dec(str_substring(g_line, 0, g_c1))
+            if (int(g_v / 515) != g_batch)
+                g_nc = g_nc + 1
+                g_n = g_n + 1
+                continue
+            end
+            g_v = g_v - g_batch * 515
+            if (g_v >= 515)
+                g_nc = g_nc + 1
+                g_n = g_n + 1
+                continue
+            end
+
+            g_rest = str_substring(g_line, g_c1 + 1, 60000)
+            g_j = 0
+            g_ps = 0
+            while (g_j < 1024)
+                g_pe = str_index_of(str_substring(g_rest, g_ps, 60000), ",")
+                if (g_pe < 0)
+                    g_pv = str_substring(g_rest, g_ps, 60000)
+                    g_ps = 60000
+                else
+                    g_pv = str_substring(g_rest, g_ps, g_pe)
+                    g_ps = g_ps + g_pe + 1
+                end
+                g_j = g_j + 1
+            end
+            g_n = g_n + 1
+        end
+        g_n = g_n - g_nc
+        printf("  数据: %d样本\n", g_n)
+
+        g_state = 0
+        while (g_state < g_NS)
+            g_seed = 1 + g_state * 100
+            g_lr = g_LR0 + g_state * 500
+            printf("  [态%d seed=%d LR=%d EP=%d]\n", g_state, g_seed, g_lr, g_EP)
+
+            g_rnd = g_seed
+            g_i = 0
+            while (g_i < 32768)
+                g_rnd = g_rnd * 1103 + 12345
+                g_W1[g_i] = g_rnd % 10
+                g_i = g_i + 1
+            end
+            g_i = 0
+            while (g_i < 16480)
+                g_rnd = g_rnd * 1103 + 12345
+                g_W2[g_i] = g_rnd % 10
+                g_i = g_i + 1
+            end
+
+            g_ep = 0
+            while (g_ep < g_EP)
+                g_correct = 0
+                g_n = g_n
+                g_i = 0
+                while (g_i < g_n)
+                    g_base = g_i * 1024
+
+                    g_h = 0
+                    while (g_h < 32)
+                        g_sum = 0
+                        g_j = 0
+                        while (g_j < 16)
+                            g_k = 0
+                            while (g_k < 64)
+                                g_sum = g_sum + g_W1[g_h * 1024 + g_j * 64 + g_k] * g_P[g_base + g_j * 64 + g_k]
+                                g_k = g_k + 1
+                            end
+                            g_j = g_j + 1
+                        end
+                        if (g_sum > 0): g_H[g_h] = g_sum
+                        else: g_H[g_h] = 0 end
+                        g_h = g_h + 1
+                    end
+
+                    g_j = 0
+                    while (g_j < 515)
+                        g_sum = 0
+                        g_k = 0
+                        while (g_k < 32)
+                            g_sum = g_sum + g_W2[g_j * 32 + g_k] * g_H[g_k]
+                            g_k = g_k + 1
+                        end
+                        g_L[g_j] = g_sum
+                        g_j = g_j + 1
+                    end
+
+                    g_max_idx = 0
+                    g_max_val = g_L[0]
+                    g_j = 1
+                    while (g_j < 515)
+                        if (g_L[g_j] > g_max_val)
+                            g_max_val = g_L[g_j]
+                            g_max_idx = g_j
+                        end
+                        g_j = g_j + 1
+                    end
+                    g_pred = g_max_idx
+                    g_label = g_i
+                    if (g_pred != g_label)
+                        g_k = 0
+                        while (g_k < 32)
+                            if (g_H[g_k] > 0)
+                                g_W2[g_label * 32 + g_k] = g_W2[g_label * 32 + g_k] + g_lr
+                                g_W2[g_pred * 32 + g_k] = g_W2[g_pred * 32 + g_k] - g_lr
+                            end
+                            g_k = g_k + 1
+                        end
+                    end
+                    if (g_pred == g_label): g_correct = g_correct + 1 end
+                    g_i = g_i + 1
+                end
+                if (g_ep % 5 == 4 || g_ep == g_EP - 1)
+                    printf("    态%d ep%d: %d/%d (%d%%)\n", g_state, g_ep, g_correct, g_n, g_correct * 100 / g_n)
+                end
+                g_ep = g_ep + 1
+            end
+
+            g_w_str = ""
+            g_i = 0
+            while (g_i < 32768)
+                g_j = 0
+                while (g_j < 40 && g_i < 32768)
+                    g_w_str = g_w_str + int_to_str(g_W1[g_i]) + "\n"
+                    g_i = g_i + 1
+                    g_j = g_j + 1
+                end
+                exec("printf -- '" + g_w_str + "' >> " + g_path)
+                g_w_str = ""
+            end
+            g_i = 0
+            while (g_i < 16480)
+                g_j = 0
+                while (g_j < 40 && g_i < 16480)
+                    g_w_str = g_w_str + int_to_str(g_W2[g_i]) + "\n"
+                    g_i = g_i + 1
+                    g_j = g_j + 1
+                end
+                exec("printf -- '" + g_w_str + "' >> " + g_path)
+                g_w_str = ""
+            end
+            printf("  [保存] 批次%d 态%d (49248权重)\n", g_batch, g_state)
+            g_state = g_state + 1
+        end
+        g_batch = g_batch + 1
+    end
+    printf("\n=== v32 训练完成 ===\n")
+end
+
+main()

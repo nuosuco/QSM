@@ -40,17 +40,38 @@ var gl_int[512]
 var gl_str[512]
 var gl_arr[512]
 
-# ---- 数组池: 碰撞分配器, 双段存储 ----
+# ---- 数组池: 碰撞分配器, 9段存储(升级版, 支持515×1024=527360) ----
 var ar_off[16384]
 var ar_size[16384]
 var ar_used = 0
 var ar_next = 0
 var ae_type0[65535]
 var ae_type1[65535]
+var ae_type2[65535]
+var ae_type3[65535]
+var ae_type4[65535]
+var ae_type5[65535]
+var ae_type6[65535]
+var ae_type7[65535]
+var ae_type8[65535]
 var ae_int0[65535]
 var ae_int1[65535]
+var ae_int2[65535]
+var ae_int3[65535]
+var ae_int4[65535]
+var ae_int5[65535]
+var ae_int6[65535]
+var ae_int7[65535]
+var ae_int8[65535]
 var ae_str0[65535]
 var ae_str1[65535]
+var ae_str2[65535]
+var ae_str3[65535]
+var ae_str4[65535]
+var ae_str5[65535]
+var ae_str6[65535]
+var ae_str7[65535]
+var ae_str8[65535]
 
 # ---- 函数表 ----
 var fn_nameoff[128]
@@ -172,41 +193,164 @@ end
 # 数组元素池访问（双段）
 # ================================================================
 def ae_t_get(pos):
-    if (pos < 65535): return ae_type0[pos] end
-    return ae_type1[pos - 65535]
+    var p = pos
+    if (p < 65535): return ae_type0[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type1[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type2[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type3[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type4[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type5[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type6[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type7[p] end
+    return ae_type8[p - 65535]
 end
 
 def ae_t_set(pos, v):
-    if (pos < 65535):
-        ae_type0[pos] = v
+    var p = pos
+    if (p < 65535): ae_type0[p] = v
     else:
-        ae_type1[pos - 65535] = v
+        p = p - 65535
+        if (p < 65535): ae_type1[p] = v
+        else:
+            p = p - 65535
+            if (p < 65535): ae_type2[p] = v
+            else:
+                p = p - 65535
+                if (p < 65535): ae_type3[p] = v
+                else:
+                    p = p - 65535
+                    if (p < 65535): ae_type4[p] = v
+                    else:
+                        p = p - 65535
+                        if (p < 65535): ae_type5[p] = v
+                        else:
+                            p = p - 65535
+                            if (p < 65535): ae_type6[p] = v
+                            else:
+                                p = p - 65535
+                                if (p < 65535): ae_type7[p] = v
+                                else: ae_type8[p - 65535] = v end
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end
 
 def ae_i_get(pos):
-    if (pos < 65535): return ae_int0[pos] end
-    return ae_int1[pos - 65535]
+    var p = pos
+    if (p < 65535): return ae_int0[p] end
+    p = p - 65535
+    if (p < 65535): return ae_int1[p] end
+    p = p - 65535
+    if (p < 65535): return ae_int2[p] end
+    p = p - 65535
+    if (p < 65535): return ae_int3[p] end
+    p = p - 65535
+    if (p < 65535): return ae_int4[p] end
+    p = p - 65535
+    if (p < 65535): return ae_int5[p] end
+    p = p - 65535
+    if (p < 65535): return ae_int6[p] end
+    p = p - 65535
+    if (p < 65535): return ae_int7[p] end
+    return ae_int8[p - 65535]
 end
 
 def ae_i_set(pos, v):
-    if (pos < 65535):
-        ae_int0[pos] = v
+    var p = pos
+    if (p < 65535): ae_int0[p] = v
     else:
-        ae_int1[pos - 65535] = v
+        p = p - 65535
+        if (p < 65535): ae_int1[p] = v
+        else:
+            p = p - 65535
+            if (p < 65535): ae_int2[p] = v
+            else:
+                p = p - 65535
+                if (p < 65535): ae_int3[p] = v
+                else:
+                    p = p - 65535
+                    if (p < 65535): ae_int4[p] = v
+                    else:
+                        p = p - 65535
+                        if (p < 65535): ae_int5[p] = v
+                        else:
+                            p = p - 65535
+                            if (p < 65535): ae_int6[p] = v
+                            else:
+                                p = p - 65535
+                                if (p < 65535): ae_int7[p] = v
+                                else: ae_int8[p - 65535] = v end
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end
 
 def ae_s_get(pos):
-    if (pos < 65535): return ae_str0[pos] end
-    return ae_str1[pos - 65535]
+    var p = pos
+    if (p < 65535): return ae_str0[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str1[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str2[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str3[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str4[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str5[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str6[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str7[p] end
+    return ae_str8[p - 65535]
 end
 
 def ae_s_set(pos, v):
-    if (pos < 65535):
-        ae_str0[pos] = v
+    var p = pos
+    if (p < 65535): ae_str0[p] = v
     else:
-        ae_str1[pos - 65535] = v
+        p = p - 65535
+        if (p < 65535): ae_str1[p] = v
+        else:
+            p = p - 65535
+            if (p < 65535): ae_str2[p] = v
+            else:
+                p = p - 65535
+                if (p < 65535): ae_str3[p] = v
+                else:
+                    p = p - 65535
+                    if (p < 65535): ae_str4[p] = v
+                    else:
+                        p = p - 65535
+                        if (p < 65535): ae_str5[p] = v
+                        else:
+                            p = p - 65535
+                            if (p < 65535): ae_str6[p] = v
+                            else:
+                                p = p - 65535
+                                if (p < 65535): ae_str7[p] = v
+                                else: ae_str8[p - 65535] = v end
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end
 

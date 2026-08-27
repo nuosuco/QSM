@@ -37,3 +37,6 @@ web/uploads/
 
 # 临时
 /tmp/*
+
+# 训练中间chunk产物不入库(只入最终尾权重 *_final.w)
+qdfs/ns/models/qscl_32x32_weights/*/

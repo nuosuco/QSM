@@ -1,8 +1,12 @@
 # ================================================================
-# server_v14.qentl — QEntL HTTP服务器
-# GET  /api/yi?d=N  — 字形识别(QSCL 4态投票)
-# POST /api/yi       — 小趣QSM智能体对话(三语言)
-# GET  /api/status   — 健康检查
+# server_v14.qentl — QEntL HTTP服务器 v0.0.8
+# GET  /api/yi     — 8x8 字形识别(QSCL unified)
+# GET  /api/yi32   — 32x32 真训练字形(v9b 4态叠加态, B起点码点不查表)
+# POST /api/yi32   — 32x32 像素识别+码点重建
+# POST /api/yi     — 小趣QSM智能体对话(三语言)
+# GET  /api/status — 健康检查
+# POST /api/xiaoqu — 小趣助手对话
+# GET  /api/generate — 8x8生成
 # ================================================================
 
 var g_port = 9802
@@ -19,29 +23,13 @@ def get_d_param(path):
     return str_to_int(dval)
 end
 
-# ---- 查询参数?k=N ----
-def get_k_param(req):
-    var kpos = str_index_of(req, "?k=")
-    if (kpos < 0): return 0 end
-    var dst = str_substring(req, kpos + 3, 60000)
-    var dq = str_index_of(dst, " ")
-    if (dq < 0): dq = str_index_of(dst, "&") end
-    if (dq < 0): dq = str_index_of(dst, "\r") end
-    if (dq < 0): dq = str_len(dst) end
-    var dval = str_substring(dst, 0, dq)
-    return str_to_int(dval)
-end
-
-# ---- 请求体提取 ----
 def get_body(req):
     var bd = str_index_of(req, "\r\n\r\n")
     if (bd < 0): return "" end
     return str_substring(req, bd + 4, 60000)
 end
 
-# ---- 小趣QSM 智能体对话 ----
 def chat_reply(msg):
-    # 把请求体写到临时文件(字节完整), 脚本读文件避免多字节编码问题
     file_write_bytes("/tmp/yi_chat_in.txt", msg)
     var cmd = "bash build/yi_api_chat_file.sh"
     return exec(cmd)
@@ -51,76 +39,60 @@ def handle_request(req):
     var resp = ""
     var sp1 = str_index_of(req, " ")
     var method = str_substring(req, 0, sp1)
+    var tail = str_substring(req, sp1 + 1, 60000)
+    var sp2 = str_index_of(tail, " ")
     var path = "/"
-    var sp2 = str_index_of(req, " ")
     if (sp2 >= 0):
-        path = str_substring(req, sp2 + 1, 60000)
+        path = str_substring(tail, 0, sp2)
+    else:
+        path = tail
     end
-    if (str_index_of(path, "/api/yi") >= 0):
+
+    if (str_index_of(path, "/api/yi32") >= 0):
         if (str_eq(method, "GET")):
             var d = get_d_param(path)
-            if (d < 0):
-                resp = "{\"error\":\"Usage: GET /api/yi?d=0..4119\"}"
-            else:
-                if (d > 4119):
-                    resp = "{\"error\":\"d range 0..4119\"}"
-                else:
-                    var cmd = str_concat("bash build/yi_infer_v4.sh ", int_to_str(d))
-                    resp = exec(cmd)
-                end
+            resp = "{\"error\":\"Usage: GET /api/yi32?d=0..4119\"}"
+            if (d >= 0 && d <= 4119):
+                var cmd32 = str_concat("bash build/qscl_engine32_v9b.sh gen ", int_to_str(d))
+                resp = exec(cmd32)
             end
         else:
-            var bd = str_index_of(req, "\r\n\r\n")
-            var body = ""
-            if (bd >= 0):
-                body = str_substring(req, bd + 4, 10000)
+            var body32 = get_body(req)
+            resp = "{\"error\":\"need 1024 pixels\"}"
+            if (str_len(body32) >= 10):
+                var cmd32r = str_concat("bash build/qscl_engine32_v9b.sh argmax ", body32)
+                resp = exec(cmd32r)
             end
-            var reply = chat_reply(body)
+        end
+    end
+
+    if (str_index_of(path, "/api/yi") >= 0 && str_index_of(path, "/api/yi32") < 0):
+        if (str_eq(method, "GET")):
+            var d = get_d_param(path)
+            resp = "{\"error\":\"Usage: GET /api/yi?d=0..4119\"}"
+            if (d >= 0 && d <= 4119):
+                var cmd = str_concat("bash build/yi_infer_v4.sh ", int_to_str(d))
+                resp = exec(cmd)
+            end
+        else:
+            var reply = chat_reply(get_body(req))
             resp = reply
         end
-    else:
-        if (str_index_of(path, "/api/status") >= 0):
-            resp = "{\"status\":\"ok\",\"model\":\"qscl_unified\",\"votes\":\"4-state\",\"weights\":\"qscl_unified_b{0-7}_s{0-3}.w x32 + 8 merged\",\"dim\":\"515x64\",\"glyphs\":\"4120 yi\",\"engine\":\"gen_unified.sh\",\"chat\":\"xiaoqu-qsm\"}"
-        else:
-            if (str_index_of(path, "/api/generate") >= 0):
-                var k = get_k_param(req)
-                if (k < 0): k = 0 end
-                if (k > 4119): k = 4119 end
-                var cmdg = str_concat("/root/QSM/QLife/build/gen_unified.sh ", int_to_str(k))
-                resp = exec(cmdg)
-            else:
-                if (str_index_of(path, "/api/recognize") >= 0):
-                    var body = get_body(req)
-                    var blen = str_len(body)
-                    if (blen < 64):
-                        resp = "{\"error\":\"need 64 pixels\"}"
-                    else:
-                        var cmdr = str_concat("/root/QSM/QLife/build/qscl_engine.sh argmax ", body)
-                        resp = exec(cmdr)
-                    end
-                else:
-                    if (str_index_of(path, "/api/image") >= 0):
-                        var body = get_body(req)
-                        var blen = str_len(body)
-                        if (blen < 10):
-                            resp = "{\"error\":\"no image input\"}"
-                        else:
-                            var cmdi = str_concat("/root/QSM/QLife/build/qscl_engine.sh img ", body)
-                            resp = exec(cmdi)
-                        end
-                    else:
-                        if (str_index_of(path, "/api/xiaoqu") >= 0):
-                            var body = get_body(req)
-                            var reply = chat_reply(body)
-                            resp = reply
-                        else:
-                            resp = "{\"error\":\"unknown endpoint\"}"
-                    end
-                end
-            end
-        end
     end
+
+    if (str_index_of(path, "/api/status") >= 0):
+        resp = "{\"status\":\"ok\",\"model\":\"qscl_v9b_32x32\",\"votes\":\"4-state superposition\",\"weights\":\"v9b_b{0-7}_s{1|101|201|301}_lr20 x32\",\"dim\":\"515x1037 (1024px+13wcb)\",\"glyphs\":\"4120 yi\",\"engine\":\"qscl_engine32_v9b\",\"chat\":\"xiaoqu-qsm\",\"a_recognize\":\"avg87% weights real\",\"b_generate\":\"NOT_IMPLEMENTED lookup removed\",\"v\":\"0.0.8\"}"
     end
+
+    if (str_index_of(path, "/api/xiaoqu") >= 0):
+        var reply = chat_reply(get_body(req))
+        resp = reply
+    end
+
+    if (resp == ""):
+        resp = "{\"greeting\":\"小趣QSM 你好！QLife v0.0.8量子操作系统，32×32彝文真训练模型(32权重×4态叠加态)已上线。试试 GET /api/yi32?d=10 看真彝文, 或 POST /api/xiaoqu 跟我聊聊彝文/量子/自举生长的秘密！\",\"endpoints\":{\"GET /api/yi32?d=N\":\"32x32真训练字形+码点\",\"POST /api/yi32\":\"像素→类号+码点\",\"GET /api/yi?d=N\":\"8x8旧模型\",\"POST /api/xiaoqu\":\"对话\",\"GET /api/status\":\"状态\"}}"
+    end
+
     return resp
 end
 
@@ -131,7 +103,7 @@ while (g_alive == 1):
     if (cli >= 0):
         var req = tcp_recv(cli, 4096)
         var body = handle_request(req)
-        var hdr = str_concat("HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: ", str_concat(int_to_str(str_len(body)), "\r\n\r\n"))
+        var hdr = str_concat("HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-cache, no-store, must-revalidate\r\nPragma: no-cache\r\nExpires: 0\r\nContent-Length: ", str_concat(int_to_str(str_len(body)), "\r\n\r\n"))
         tcp_send(cli, str_concat(hdr, body))
         tcp_close(cli)
     end
