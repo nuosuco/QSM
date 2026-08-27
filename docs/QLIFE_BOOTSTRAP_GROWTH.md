@@ -34,7 +34,47 @@
 
 **自举生长方向永远自下而上**：QSCL(训练器) → QCL/QVM/QDFS(工具链) → QNS → 四大模型 → 应用。
 
-## 四、与"零碎编程"的本质区别
+## 四、QNS = 执行自举生长的智能体（完成升级任务的执行者）
+
+**QNS（Quantum Neural System）不是一个静态模块，它就是 QLife 自举生长的执行者/智能体。**
+
+> 中华 2026-08-28 定调："完成 QEntL 全栈 QLife 自举生长任务的就是由 QNS 完成了。
+> 哪里需要升级，它就哪里编程/创建新 QEntL 源码，然后编译成 qbc 运行，完成升级。"
+
+**QNS 的自编程能力（components/qns/qns.qentl 2401 行，已实锤）：**
+
+| 函数 | 能力 |
+|---|---|
+| `qns_gen_func(name, args, body)` | 生成新 QEntL 函数源码 |
+| `qns_grow(component, marker, name, args, body)` | 读组件源码 → 生成函数 → 插入 → 保存（自动生长） |
+| `qns_upgrade(component_name)` | 升级指定组件 |
+| `qns_gen_smart(pattern, param)` | 按模式生成新函数 |
+| `qns_self_evolve()` | 自我进化（读自己源码、检查、增长） |
+| `qns_self_bootstrap(cycles)` | 自举循环：写源码 → exec 编译运行 → 验证 → 快照 |
+| `qns_grow_qsm_main()` | 生长四大模型（qsm/som/weq/ref）源码 |
+| `qns_save_source / file_write_bytes` | 写 QEntL 源码落盘 |
+| `exec` | 调用编译链：qentl → qbc → 运行 |
+
+**QNS 完成一次自举生长的闭环：**
+
+```
+发现需求(哪里需要升级)
+  → 编程：qns_gen_func / qns_grow 生成新 QEntL 源码(或全新 .qentl 文件)
+  → 写盘：qns_save_source / file_write_bytes
+  → 编译：exec qcl → .qbc
+  → 运行：exec qvm → 升级完成
+  → 验证 + 快照(qns_backup) + 记录(qns_growth_history.log) + 版本号(.current_version)
+```
+
+**QNS 与 QSCL 的分工（二者不可混淆）：**
+- **QSCL = 训练器**（神经叠加态并行训练架构），被升级的对象，负责"学"。
+- **QNS = 智能体**（升级任务的执行者），负责"改"——哪里要升级就编程改哪里。
+- 训练B起点 = QNS 编程/升级 QSCL（加生成算子）→ QCL 编译 → QVM 训练 → 权重落盘；
+  QNS 继续接管：验证、改进、自我进化、驱动整个 QSM 永续生长。
+
+**判断标准补充**：不仅是"QSM 长大一点吗"，还要问"这一步是 QNS 驱动的生长循环的一环吗"——是则做，否（零碎手工脚本）= 不做。
+
+## 五、与"零碎编程"的本质区别
 
 | 零碎编程（禁止） | QLife 自举生长（必须） |
 |---|---|
