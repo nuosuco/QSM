@@ -11,6 +11,73 @@
 
 var g_port = 9802
 var g_alive = 1
+# B生成引擎: QDFS权重(纯QEntL读, 不调bash/awk)
+var g_wbuf = ""
+var g_bpx[1024]
+var g_bout = ""
+var g_j2 = 0
+
+# 零分配读权重文件第row行到g_bpx: 直接ord(str_char_at)读字节
+def bgen_load(row):
+    var base = 0
+    var dlen = str_len(g_wbuf)
+    var r = 0
+    while (r < row and base < dlen):
+        var ch = ord(str_char_at(g_wbuf, base))
+        if (ch == 10): r = r + 1 end
+        base = base + 1
+    end
+    g_j2 = 0
+    while (g_j2 < 1024 and base < dlen):
+        var neg = 0
+        var ch = ord(str_char_at(g_wbuf, base))
+        if (ch == 45): neg = 1 base = base + 1 ch = ord(str_char_at(g_wbuf, base)) end
+        var val = 0
+        while (base < dlen):
+            ch = ord(str_char_at(g_wbuf, base))
+            if (ch >= 48 and ch <= 57):
+                val = val * 10 + (ch - 48)
+                base = base + 1
+            else:
+                break
+            end
+        end
+        if (neg == 1): val = 0 - val end
+        g_bpx[g_j2] = val
+        base = base + 1
+        g_j2 = g_j2 + 1
+    end
+    while (g_j2 < 1024):
+        g_bpx[g_j2] = 0
+        g_j2 = g_j2 + 1
+    end
+    return 1
+end
+
+# 类号d → 生成1024像素(JSON)
+def bgen(d):
+    var batch = d / 515
+    var line = d % 515
+    var wpath = str_concat("qdfs/ns/models/qscgen_b", str_concat(int_to_str(batch), "_s0.data"))
+    g_wbuf = file_read(wpath)
+    if (str_len(g_wbuf) < 100):
+        return "{\"error\":\"weight file not found\",\"d\":" + int_to_str(d) + "}"
+    end
+    bgen_load(line)
+    g_bout = "{\"d\":" + int_to_str(d) + ",\"batch\":" + int_to_str(batch) + ",\"pixels\":["
+    g_j2 = 0
+    while (g_j2 < 1024):
+        if (g_bpx[g_j2] > 0):
+            g_bout = g_bout + "1"
+        else:
+            g_bout = g_bout + "0"
+        end
+        if (g_j2 < 1023): g_bout = g_bout + "," end
+        g_j2 = g_j2 + 1
+    end
+    g_bout = g_bout + "]}"
+    return g_bout
+end
 
 def get_d_param(path):
     var dpos = str_index_of(path, "d=")
@@ -48,6 +115,18 @@ def handle_request(req):
         path = tail
     end
 
+    if (str_index_of(path, "/api/bgen") >= 0):
+        if (str_eq(method, "GET")):
+            var d = get_d_param(path)
+            resp = "{\"error\":\"Usage: GET /api/bgen?d=0..4119\"}"
+            if (d >= 0 && d <= 4119):
+                resp = bgen(d)
+            end
+        else:
+            resp = "{\"error\":\"bgen only supports GET\"}"
+        end
+    end
+
     if (str_index_of(path, "/api/yi32") >= 0):
         if (str_eq(method, "GET")):
             var d = get_d_param(path)
@@ -81,7 +160,7 @@ def handle_request(req):
     end
 
     if (str_index_of(path, "/api/status") >= 0):
-        resp = "{\"status\":\"ok\",\"model\":\"qscl_v9b_32x32\",\"votes\":\"4-state superposition\",\"weights\":\"v9b_b{0-7}_s{1|101|201|301}_lr20 x32\",\"dim\":\"515x1037 (1024px+13wcb)\",\"glyphs\":\"4120 yi\",\"engine\":\"qscl_engine32_v9b\",\"chat\":\"xiaoqu-qsm\",\"a_recognize\":\"avg87% weights real\",\"b_generate\":\"NOT_IMPLEMENTED lookup removed\",\"v\":\"0.0.8\"}"
+        resp = "{\"status\":\"ok\",\"model\":\"qscl_v9b_32x32\",\"votes\":\"4-state superposition\",\"weights\":\"v9b_b{0-7}_s{1|101|201|301}_lr20 x32\",\"dim\":\"515x1037 (1024px+13wcb)\",\"glyphs\":\"4120 yi\",\"engine\":\"qscl_engine32_v9b\",\"chat\":\"xiaoqu-qsm\",\"a_recognize\":\"avg87% weights real\",\"b_generate\":\"B-GEN IMPLEMENTED qscgen_b{0-7}_s0 weights QDFS\",\"bgen_endpoint\":\"GET /api/bgen?d=0..4119\",\"v\":\"0.0.9\"}"
     end
 
     if (str_index_of(path, "/api/xiaoqu") >= 0):

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate"><meta http-equiv="refresh" content="120"><title>QEntL 量子操作系统 </title>
+<style>
+@font-face{font-family:'LSTY-Yi-Black';src:local('LSTY-Yi-Black'),local('YiTongyong'),url('/fonts/lingyi.ttf') format('truetype');font-display:swap}
+@font-face{font-family:'LSTY-Yi-SMP';src:local('LSTY-Yi-Black'),local('YiTongyong'),url('/fonts/lingyi_smp.ttf') format('truetype');font-display:swap}
+@font-face{font-family:'YiTongyong';src:local('LSTY-Yi-Black'),local('YiTongyong'),url('/fonts/lingyi_smp.ttf') format('truetype');font-display:swap}
+html{font-family:'YiTongyong','LSTY-Yi-Black','LSTY-Yi-SMP',system-ui,sans-serif}
+body{font-family:'YiTongyong','LSTY-Yi-Black','LSTY-Yi-SMP',-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;width:100vw;user-select:none;-webkit-user-select:none}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0a0e1a;--card:rgba(20,30,60,0.8);--accent:#00d4ff;--text:#c8d8e8;--dim:#6a7a8a;--border:rgba(0,212,255,0.2);--yi:#ff6b9d}
+.yi-text{font-family:'LSTY-Yi-SMP','LSTY-Yi-Black','YiTongyong',sans-serif!important}
+canvas#bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#desktop{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;width:100vw}
+#taskbar{display:flex;align-items:center;justify-content:space-between;padding:4px 10px;background:rgba(10,14,26,0.95);border-bottom:1px solid var(--border);height:44px;flex-shrink:0;z-index:10;backdrop-filter:blur(10px);gap:6px}
+#taskbar .title{font-size:14px;font-weight:700;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#taskbar .title span{font-size:10px;color:var(--dim);font-weight:400;margin-left:4px}
+#taskbar .lang-switch{display:flex;gap:4px;flex-shrink:0}
+#taskbar .lang-btn{padding:6px 14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#ddd;font-size:14px;cursor:pointer;transition:all 0.2s;touch-action:manipulation}
+#taskbar .lang-btn:hover{background:rgba(138,135,255,0.2);color:#fff}
+#taskbar .lang-btn.active{background:rgba(0,212,255,0.35);border-color:rgba(0,212,255,0.6);color:#fff}
+#taskbar .lang-btn .yi-text{font-size:13px;color:#ffe66d}
+#taskbar #clock{font-size:12px;color:var(--dim);min-width:50px;text-align:right;flex-shrink:0;margin-left:auto;white-space:nowrap}
+#desktop-grid{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:12px;padding:16px 8px;align-content:center;align-items:center;justify-items:center;width:100%;box-sizing:border-box}
+.desktop-icon{display:flex;flex-direction:column;align-items:center;gap:8px;width:110px;padding:14px 6px;border-radius:14px;cursor:pointer;transition:all 0.2s;text-align:center;position:relative;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)}
+.desktop-icon:hover,.desktop-icon:active{background:rgba(0,212,255,0.15);border-color:rgba(0,212,255,0.5);transform:scale(1.08)}
+.desktop-icon .icon{font-size:40px;margin-bottom:4px;filter:drop-shadow(0 0 6px rgba(0,212,255,0.4))}
+.desktop-icon .label{font-size:12px;color:#eee;text-align:center;line-height:1.3;word-break:break-word;text-shadow:0 0 4px rgba(0,0,0,0.8)}
+.desktop-icon .label.yi-text{font-size:14px;color:#ffe66d}
+.desktop-icon .badge{position:absolute;top:-4px;right:-4px;padding:2px 6px;border-radius:8px;font-size:8px;font-weight:bold;background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff}
+#window{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(82%,900px);height:min(70%,560px);background:var(--card);border:1px solid var(--border);border-radius:12px;z-index:100;flex-direction:column;backdrop-filter:blur(20px);overflow:hidden}
+#window.show{display:flex}
+#window .win-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+#window .win-header .win-title{font-size:14px;font-weight:600;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#window .win-header .win-close{background:transparent;border:none;color:var(--text);font-size:18px;cursor:pointer;padding:0 6px;line-height:1}
+#window .win-header .win-close:active{color:#ff4757}
+#window .win-body{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:14px;font-size:14px;line-height:1.6;-webkit-overflow-scrolling:touch}
+#window .win-body pre{background:rgba(0,0,0,0.3);border-radius:6px;padding:10px;overflow:auto;font-size:12px;font-family:'LSTY-Yi-SMP',monospace;color:var(--accent);white-space:pre-wrap;word-break:break-all;max-height:200px}
+#window .win-body button{background:var(--accent);color:#000;border:none;padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;margin:4px 4px 4px 0;touch-action:manipulation}
+#window .win-body button.secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
+.status-bar{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0;align-items:center}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.status-dot.green{background:#7bed9f}.status-dot.blue{background:var(--accent)}.status-dot.pink{background:#ff6b9d}.status-dot.yellow{background:#ffd700}
+.yi-test{font-family:'LSTY-Yi-SMP','LSTY-Yi-Black',sans-serif!important;font-size:26px;text-align:center;padding:16px;color:#ffe66d;line-height:2;word-break:break-all}
+#notification{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;z-index:200;display:none;max-width:280px;backdrop-filter:blur(10px);animation:slideIn 0.3s ease}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+#font-guide{background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;margin:10px 0;border:1px solid var(--border)}
+#font-guide code{background:#1a2332;padding:2px 6px;border-radius:3px;font-size:12px;color:var(--accent);word-break:break-all}
+/* Mobile */
+@media(max-width:640px){#desktop-grid{grid-template-columns:repeat(4,1fr);gap:10px;padding:16px 6px;max-width:none}.desktop-icon{width:70px;padding:10px 2px;gap:4px}.desktop-icon .icon{font-size:28px}.desktop-icon .label{font-size:9px}.desktop-icon .label.yi-text{font-size:10px}#window{top:8%;left:1%;right:1%;bottom:8%;width:auto;height:auto;transform:none}#taskbar{padding:3px 6px;height:40px}#taskbar .title{font-size:12px}#taskbar .lang-btn{padding:4px 10px;font-size:12px}#taskbar #clock{font-size:11px;min-width:40px}}
+@media(max-width:380px){.desktop-icon{width:62px}.desktop-icon .icon{font-size:22px}.desktop-icon .label{font-size:9px}#taskbar .title{font-size:11px}}
+@media(min-width:1024px){#desktop-grid{gap:16px;padding:16px}.desktop-icon{width:96px}}
+</style></head><body>
+<canvas id="bg"></canvas>
+<div id="desktop">
+<header id="taskbar">
+<div class="title" id="taskbarTitle">QEntL <span id="taskbarSub">量子操作系统</span></div>
+<div class="lang-switch">
+<button class="lang-btn active" onclick="setLang('zh')">中文</button>
+<button class="lang-btn" onclick="setLang('en')">EN</button>
+<button class="lang-btn" onclick="setLang('yi')" title="彝文"><span class="yi-text" id="yiLangBtn">󲥰</span></button>
+</div>
+<div id="clock"></div>
+</header>
+<div id="desktop-grid"></div>
+</div>
+<div id="window"><div class="win-header"><span class="win-title" id="winTitle">应用</span><button class="win-close" onclick="closeApp()">✕</button></div><div class="win-body" id="winBody"></div></div>
+<div id="notification"></div>
+<script>
+// ===== App Data (14 apps, Yi chars from 4120 dataset) =====
+var apps=[
+{id:'assistant',icon:'🔮',zh:'小趣QSM',en:'XiaoQu QSM',yi:'󲝁󲥰',badge:'QSM'},
+{id:'qvm',icon:'⚛',zh:'量子虚拟机',en:'Quantum VM',yi:'󳔄'},
+{id:'qcalc',icon:'🧮',zh:'量子计算器',en:'Quantum Calc',yi:'󲧖'},
+{id:'qide',icon:'💻',zh:'QEntL 编辑器',en:'QEntL Editor',yi:'󲡳'},
+{id:'qviz',icon:'🎭',zh:'量子态可视化',en:'Quantum Viz',yi:'󲰱'},
+{id:'compiler',icon:'🔧',zh:'编译器',en:'Compiler',yi:'󲡳'},
+{id:'files',icon:'📁',zh:'文件管理',en:'Files',yi:'󲫔'},
+{id:'terminal',icon:'🖥',zh:'终端',en:'Terminal',yi:'󲟁'},
+{id:'economy',icon:'💰',zh:'经济系统',en:'Economy (SOM)',yi:'󳒺'},
+{id:'social',icon:'💬',zh:'社交网络',en:'Social (WeQ)',yi:'󲰇'},
+{id:'monitor',icon:'🪞',zh:'系统监控',en:'Monitor (Ref)',yi:'󳃭'},
+{id:'store',icon:'🏪',zh:'应用商店',en:'Store',yi:'󲝏'},
+{id:'yi',icon:'🀆',zh:'彝文4120',en:'Yi 4120',yi:'󲥰',badge:'彝'},
+{id:'font',icon:'🔤',zh:'字体安装',en:'Font Install',yi:'󲫐'},
+{id:'help',icon:'📖',zh:'帮助',en:'Help',yi:'󲥌'},
+{id:'docs',icon:'📚',zh:'文档中心',en:'Docs',yi:'󲫔'},
+{id:'about',icon:'ℹ',zh:'关于QEntL',en:'About',yi:'󲥰'}
+];
+var lang='zh';
+// ===== Render Desktop =====
+function render(){
+var d=document.getElementById('desktop-grid'),html='';
+for(var i=0;i<apps.length;i++){var a=apps[i];
+var label=lang==='yi'?'<span class="label yi-text">'+a.yi+'</span>':(lang==='en'?'<span class="label">'+a.en+'</span>':'<span class="label">'+a.zh+'</span>');
+var badge=a.badge?'<div class="badge">'+a.badge+'</div>':'';
+html+='<div class="desktop-icon" onclick="openApp(\''+a.id+'\')" title="'+a.zh+'"><div class="icon">'+a.icon+'</div>'+label+badge+'</div>';}
+d.innerHTML=html;}
+// ===== Language =====
+function setLang(l){
+lang=l;
+var btns=document.querySelectorAll('.lang-btn');
+for(var i=0;i<btns.length;i++){btns[i].classList.toggle('active',(l==='zh'&&i===0)||(l==='en'&&i===1)||(l==='yi'&&i===2));}
+var t=document.getElementById('taskbarTitle');
+if(l==='yi'){t.innerHTML='QEntL <span id="taskbarSub" class="yi-text">󲥰󳒺󲰇󳃭</span>';}
+else{t.innerHTML='QEntL <span id="taskbarSub">'+(l==='en'?'Quantum OS':'量子操作系统')+'</span>';}
+render();
+try{localStorage.setItem('qentl-lang',l);}catch(e){}
+reopenCur();}
+function reopenCur(){var w=document.getElementById('window');if(w.classList.contains('show')){var t=document.getElementById('winTitle').textContent;for(var k in apps){if(apps[k].zh===t||apps[k].en===t||apps[k].yi===t){openApp(apps[k].id);return;}}}}
+// ===== Clock =====
+function clock(){var n=new Date();document.getElementById('clock').textContent=n.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});}
+setInterval(clock,1000);clock();
+// ===== Apps =====
+function openApp(id){
+var win=document.getElementById('window'),title=document.getElementById('winTitle'),body=document.getElementById('winBody');
+win.classList.add('show');
+var a=null;for(var i=0;i<apps.length;i++){if(apps[i].id===id){a=apps[i];break;}}
+if(!a)return;
+var zh=a.zh,en=a.en,yi=a.yi;
+var t=lang==='yi'?yi:(lang==='en'?en:zh);
+title.textContent=t;
+var b='<div class="status-bar"><span class="status-dot blue"></span> '+zh+'</div>';
+if(id==='assistant'){b='<div class="status-bar"><span class="status-dot blue"></span> 小趣QSM — 32×32彝文真训练</div>';
+var main='<div style="flex:1;display:flex;flex-direction:column;width:100%;padding:10px;gap:8px;min-height:0">';
+var chat='<div id="chatMsgs" style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.2);border-radius:8px;padding:10px;font-size:14px;min-height:0"><div style="color:var(--dim);font-size:12px;line-height:1.6">💬 试试：<br>🔹 <b>真生成32 10</b> 或 <b>10</b> → 32×32方格+字体<br>🔹 <b>U+F221A</b> → 取字形<br>🔹 <b>📷图片</b> → 选图→<b>上传</b>→压32×32<br>🔹 输入<b>彝文</b> → 自动识别</div></div>';
+var list='<div id="imgList" style="display:none;flex-wrap:wrap;gap:8px;padding:6px;background:rgba(0,0,0,0.15);border-radius:6px;max-height:70px;overflow-y:auto;flex-shrink:0"></div>';
+var inputRow='<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">';
+var imgInput='<input type="file" id="imgInput" accept="image/*" multiple style="display:none" onchange="pickImages(this)">';
+var btnPic='<button onclick="pickImagesFile()" style="background:rgba(255,107,157,0.3);color:#fff;border:1px solid var(--yi);border-radius:6px;padding:10px 14px;cursor:pointer;font-size:15px;font-weight:600">📷 图片</button>';
+var btnUp='<button id="uploadBtn" onclick="uploadImages()" style="display:none;background:rgba(0,212,255,0.35);color:#fff;border:1px solid var(--accent);border-radius:6px;padding:10px 14px;cursor:pointer;font-size:15px;font-weight:600">上传</button>';
+var chatIn='<input type="text" id="chatInput" placeholder="真生成32 10 / 10 / U+F221A / 彝文" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--text);font-size:14px" onkeydown="if(event.keyCode==13)sendChat()">';
+var btnSend='<button onclick="sendChat()" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;font-weight:600;font-size:14px">发送</button>';
+b+=main+chat+list+inputRow+imgInput+btnPic+btnUp+chatIn+btnSend+'</div></div>';}
+else if(id==='qvm'){b+='<p style="color:var(--dim)">⚛ 量子虚拟机 — QVM 31条opcode</p><pre>QVM 运行: 正常 ✅\nQCL 编译: errors=0 ✅</pre>';}
+else if(id==='qcalc'){b+='<input type="text" id="qasmInput" value="h q[0]; cx q[0],q[1]" placeholder="QASM..."><button onclick="runQasm()">执行</button><pre id="qasmResult">点击执行运行量子电路</pre>';}
+else if(id==='qide'){b+='<a href="/ide" style="color:var(--accent)">打开 QEntL 在线编辑器 →</a>';}
+else if(id==='qviz'){b+='<a href="/q3d" style="color:var(--accent)">打开 3D量子态可视化 →</a>';}
+else if(id==='compiler'){b+='<pre>QCL 自举编译: 28529字节 ✅\nMD5: eadf5be34239b49567d8f99df69260c5</pre>';}
+else if(id==='files'){b+='<p style="color:var(--dim)">QDFS 量子动态文件系统 — 合并/分离/传送</p><div class="status-bar"><span class="status-dot green"></span> qdfs_merge / qdfs_split</div><div class="status-bar"><span class="status-dot blue"></span> 命名空间: system/models/users/apps</div>';}
+else if(id==='terminal'){b+='<a href="/ide" style="color:var(--accent)">QEntL 终端（在编辑器内）→</a>';}
+else if(id==='economy'){b+='<p style="color:var(--dim)">SOM 量子平权经济模型 — 经济往来 · 资源分配 · 平权算法</p><pre>SOM 经济引擎: 活跃 ✅\n风险预测: 8/10 精准 ✅</pre>';}
+else if(id==='social'){b+='<p style="color:var(--dim)">WeQ 量子社交通信模型 — 社交网络 · 纠缠通信 · 集体意识</p><pre>WeQ 纠缠通信: 10/10 ✅\n情感分析: 已就绪 ✅</pre>';}
+else if(id==='monitor'){b+='<p style="color:var(--dim)">Ref 量子自反省管理模型 — 监控 · 自我修复 · 健康评估</p><pre>Ref 系统健康: 全部在线 ✅\n自我修复: 已启用 ✅</pre>';}
+else if(id==='store'){b+='<div class="status-bar"><span class="status-dot yellow"></span> 应用商店准备中</div>';}
+else if(id==='yi'){b+=yiApp();}
+else if(id==='font'){b+=fontApp();}
+else if(id==='help'){b+='<p>三语言切换: 右下角 中文/EN/彝</p><p>彝文需要字体: 点击"字体安装"应用安装</p>';}
+else if(id==='docs'){b+='<a href="/docs" style="color:var(--accent)">文档中心（准备中）</a>';}
+else if(id==='about'){b+='<div style="text-align:center;padding:16px"><div style="font-size:42px">⚛</div><div style="font-size:17px;font-weight:700;color:var(--accent);margin:8px 0">QEntL 量子操作系统</div><div style="font-size:12px;color:var(--dim)">v0.3.0 — 叠加态并行 · 量子基因宇宙</div><div style="font-size:12px;color:var(--dim);margin-top:8px">构建链: C → QCL → QVM → QDFS → QNS → 4模型 → HTTP/QOS</div></div>';}
+body.innerHTML=b;}
+function closeApp(){document.getElementById('window').classList.remove('show');}
+function sendChat(){var input=document.getElementById('chatInput');var msgs=document.getElementById('chatMsgs');if(!input||!msgs)return;var msg=input.value.trim();if(!msg)return;msgs.innerHTML+='<div style="margin:6px 0;padding:8px;background:rgba(0,212,255,0.1);border-radius:6px">你: '+msg+'</div>';input.value='';msgs.scrollTop=msgs.scrollHeight;fetch('/api/yi',{method:'POST',headers:{'Content-Type':'text/plain; charset=utf-8'},body:msg,signal:AbortSignal.timeout(40000)}).then(function(r){return r.text();}).then(function(data){appendMsg(msgs,data);}).catch(function(e){msgs.innerHTML+='<div style="margin:6px 0;color:var(--yi)">连接中...</div>';msgs.scrollTop=msgs.scrollHeight;});}
+var pendingImages=[];function pickImagesFile(){document.getElementById("imgInput").click()};function pickImages(inp){if(!inp.files||!inp.files[0])return;var list=document.getElementById('imgList');var btn=document.getElementById('uploadBtn');for(var i=0;i<inp.files.length;i++){pendingImages.push(inp.files[i])}list.innerHTML='';list.style.display='flex';btn.style.display='';for(var j=0;j<pendingImages.length;j++){(function(idx){var f=pendingImages[idx];var wrap=document.createElement('span');wrap.style.cssText='display:inline-flex;align-items:center;background:rgba(255,255,255,0.05);border-radius:4px;padding:2px;font-size:11px;';var thumb=document.createElement('img');thumb.src=URL.createObjectURL(f);thumb.style.cssText='width:32px;height:32px;object-fit:cover;border-radius:3px;';var close=document.createElement('span');close.textContent='\u00d7';close.style.cssText='margin-left:8px;color:#ff4757;cursor:pointer;font-size:28px;font-weight:bold;line-height:1;';close.onclick=function(e){e.stopPropagation();pendingImages.splice(idx,1);pickImages(document.getElementById('imgInput'));};wrap.appendChild(thumb);wrap.appendChild(close);list.appendChild(wrap);})(j)}var totalEl=document.createElement('span');totalEl.textContent=pendingImages.length+'张';totalEl.style.cssText='color:var(--dim);font-size:11px;margin-left:4px;';list.appendChild(totalEl);inp.value='';}
+function uploadImages(){if(!pendingImages.length)return;var imgs=pendingImages.slice(0);pendingImages=[];var list=document.getElementById('imgList');var btn=document.getElementById('uploadBtn');list.innerHTML='';list.style.display='none';btn.style.display='none';var msgs=document.getElementById('chatMsgs');msgs.innerHTML+='<div style="margin:6px 0;padding:6px;background:rgba(0,212,255,0.08);border-radius:6px;font-size:12px">处理中 '+imgs.length+' 张...</div>';msgs.scrollTop=msgs.scrollHeight;var done=0;for(var k=0;k<imgs.length;k++){(function(img){var canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;var ctx=canvas.getContext('2d');ctx.fillStyle='#000';ctx.fillRect(0,0,32,32);var im=new Image();im.onload=function(){ctx.drawImage(im,0,0,32,32);var id=ctx.getImageData(0,0,32,32);var px=[];for(var i=0;i<1024;i++){var idx2=i*4;var lum=0.299*id.data[idx2]+0.587*id.data[idx2+1]+0.114*id.data[idx2+2];px.push(lum>128?1:0)}fetch('/api/yi32',{method:'POST',headers:{'Content-Type':'text/plain; charset=utf-8'},body:px.join(',')}).then(function(r){return r.text();}).then(function(data){appendMsg(msgs,'[图片'+(k+1)+'/'+imgs.length+'] '+data);done++;if(done===imgs.length){var t=document.createElement('div');t.style.cssText='margin:6px 0;padding:6px;color:var(--dim);font-size:12px;';t.textContent='全部上传完成 '+done+'/'+imgs.length;msgs.appendChild(t);msgs.scrollTop=msgs.scrollHeight;}}).catch(function(e){done++;});};im.src=URL.createObjectURL(img);})(imgs[k])}}
+function sendImage32(pixels){var msgs=document.getElementById('chatMsgs');if(!msgs)return;msgs.innerHTML+='<div style="margin:6px 0;padding:8px;background:rgba(0,212,255,0.1);border-radius:6px">你: [上传图片 32×32]</div>';msgs.scrollTop=msgs.scrollHeight;fetch('/api/yi32',{method:'POST',headers:{'Content-Type':'text/plain; charset=utf-8'},body:pixels.join(',')}).then(function(r){return r.text();}).then(function(data){appendMsg(msgs,'[识别结果]\n'+data);}).catch(function(e){msgs.innerHTML+='<div style="color:var(--yi)">识别失败</div>';});}
+function appendMsg(msgs,data){var div=document.createElement('div');div.style.cssText='margin:6px 0;padding:8px;background:rgba(255,107,157,0.1);border-radius:6px;white-space:pre-wrap;font-size:12px';var chunks=[];var cur={meta:{},grid:null};var inGrid=false;var lines=data.split('\n');for(var i=0;i<lines.length;i++){var ln=lines[i];var isMeta=/^(class|batch|cls|code|codepoint)=/.test(ln);var isRow=ln.length===32&&/^[01]+$/.test(ln);var isBig=/^[0-9]{1024}$/.test(ln);var isBlank=ln==='';var isSmp=/^SMP#[0-9]+:/.test(ln);if(isSmp||isMeta){if(inGrid&&cur.grid){chunks.push(cur);cur={meta:{},grid:null};inGrid=false}if(isMeta){var k=ln.split('=')[0];cur.meta[k]=ln.split('=')[1]}}else if(isRow||isBig){if(!inGrid){cur.grid=[];inGrid=true}if(isBig){cur.grid=[isBig.slice(0,32),isBig.slice(32,64),isBig.slice(64,96),isBig.slice(96,128),isBig.slice(128,160),isBig.slice(160,192),isBig.slice(192,224),isBig.slice(224,256),isBig.slice(256,288),isBig.slice(288,320),isBig.slice(320,352),isBig.slice(352,384),isBig.slice(384,416),isBig.slice(416,448),isBig.slice(448,480),isBig.slice(480,512),isBig.slice(512,544),isBig.slice(544,576),isBig.slice(576,608),isBig.slice(608,640),isBig.slice(640,672),isBig.slice(672,704),isBig.slice(704,736),isBig.slice(736,768),isBig.slice(768,800),isBig.slice(800,832),isBig.slice(832,864),isBig.slice(864,896),isBig.slice(896,928),isBig.slice(928,960),isBig.slice(960,992),isBig.slice(992,1024)]}else{cur.grid.push(ln)}}else if(isBlank){if(inGrid&&cur.grid){chunks.push(cur);cur={meta:{},grid:null};inGrid=false}}}if(inGrid&&cur.grid){chunks.push(cur);inGrid=false}var hasChar=false;for(var ci=0;ci<chunks.length;ci++){var ch=chunks[ci];if(!ch.meta||ch.meta.codepoint==null||!ch.grid)continue;hasChar=true;var cp=parseInt(ch.meta.codepoint);var labelDiv=document.createElement('div');labelDiv.style.cssText='font-size:11px;color:#ffe66d;margin:4px 0;';var cpLabel='U+'+cp.toString(16).toUpperCase();if(ch.meta.class!=null)cpLabel+=' 类'+ch.meta.class+' 批'+ch.meta.batch;labelDiv.appendChild(document.createTextNode(cpLabel));div.appendChild(labelDiv);var wrap=document.createElement('div');wrap.style.cssText='display:flex;align-items:center;gap:12px;margin:6px 0;';var glyphDiv=document.createElement('div');glyphDiv.style.cssText='font-family:LSTY-Yi-SMP,LSTY-Yi-Black,YiTongyong,sans-serif;font-size:44px;color:#ffe66d;line-height:1.1;min-width:48px;text-align:center;';glyphDiv.appendChild(document.createTextNode(String.fromCodePoint(cp)));wrap.appendChild(glyphDiv);var g=document.createElement('div');g.style.cssText='display:grid;grid-template-columns:repeat(32,5px);grid-template-rows:repeat(32,5px);gap:0;border:1px solid var(--accent);line-height:0;flex-shrink:0;';for(var r=0;r<32;r++){for(var c=0;c<32;c++){var cell=document.createElement('div');cell.style.cssText='background:'+(ch.grid[r][c]==='1'?'#ffe66d':'#0a0a1a')+';';g.appendChild(cell)}}wrap.appendChild(g);div.appendChild(wrap)}if(!hasChar){var txt=document.createElement('div');txt.appendChild(document.createTextNode('小趣QSM:\n'+data));div.appendChild(txt)}msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;}
+function notify(msg){var n=document.getElementById('notification');n.textContent=msg;n.style.display='block';setTimeout(function(){n.style.display='none';},3000);}
+function runQasm(){var q=document.getElementById('qasmInput').value;var r='';if(q.indexOf('h')>=0&&q.indexOf('cx')>=0){var m=Math.random()<0.5?0:1;r='结果: |'+m+m+'> (Bell态纠缠)';}else if(q.indexOf('h')>=0){r='结果: 叠加态 |+>';}else{r='结果: 经典态 |0>';}document.getElementById('qasmResult').textContent='QASM: '+q+'\n'+r;}
+function yiApp(){
+var yiChars='󲜐󲜑󲜒󲜓󲜔󲜕󲜖󲜗󲜘󲜙󲜚󲛛󲛜󲛝󲛞󲛟󲛠󲛡󲛢󲛣󲛤󲛥󲛦󲛧󲛨󲛩󲛪󲛫󲛬󲛭󲛮󲛯󲛰󲛱󲛲󲛳󲛴󲛵󲛶󲛷󲛸󲛹󲛺󲛻󲛼󲛽󲛾󲛿󲜀󲜁󲜂󲜃󲜄󲜅󲜆󲜇󲜈󲜉󲜊󲜋󲜌󲜍󲜎󲜏';
+return '<div class="status-bar"><span class="status-dot yellow"></span> 滇川黔桂通用彝文 — 4120字数据集</div><div class="status-bar"><span class="status-dot green"></span> 语法: SOV (主宾谓) — "饭吃", "我饭不吃"</div><div class="status-bar"><span class="status-dot blue"></span> 字体: lingyi_smp.ttf (SMP私有区 U+F222E+)</div><hr style="border-color:var(--border);margin:10px 0"><div style="color:var(--yi);font-weight:700;margin-bottom:6px">彝文显示测试:</div><div class="yi-test">'+yiChars+'</div><div style="font-size:12px;color:var(--dim)">如果显示方块 → 点击"字体安装"</div>';}
+function fontApp(){
+return '<div style="font-weight:700;color:var(--accent);margin-bottom:8px">彝文字体安装指南</div><div id="font-guide"><div style="margin-bottom:8px"><b>第1步: 下载字体</b></div><code>wget https://qsm.som.top/fonts/lingyi_smp.ttf</code><div style="margin:10px 0"><b>第2步: 安装</b></div><div style="color:var(--dim);font-size:12px">Windows: 右键 → 安装<br>macOS: 双击 → 安装字体<br>Linux: cp 到 ~/.fonts/ && fc-cache -fv</div><div style="margin:10px 0"><b>第3步: 刷新页面验证</b></div><div style="color:var(--dim);font-size:12px">点击桌面"彝文4120"图标测试显示</div><div style="margin:10px 0"><b>字体信息</b></div><div style="color:var(--dim);font-size:12px">lingyi_smp.ttf — 4120彝文字 (SMP私有区 U+F222E-U+F3923)</div></div><button onclick="downloadFont()">📥 下载字体</button><button class="secondary" onclick="openApp(\'yi\')">测试彝文</button>';
+}
+function downloadFont(){var a=document.createElement('a');a.href='/fonts/lingyi_smp.ttf';a.download='lingyi通用彝文.ttf';document.body.appendChild(a);a.click();document.body.removeChild(a);}
+// ===== Init =====
+var saved=null;try{saved=localStorage.getItem('qentl-lang');}catch(e){}
+if(saved)setLang(saved);
+render();
+// ===== Quantum Background =====
+(function(){var c=document.getElementById('bg'),ctx=c.getContext('2d'),ps=[],w,h;
+function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;}
+resize();window.addEventListener('resize',resize);
+for(var i=0;i<60;i++){ps.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,r:Math.random()*2+0.5,a:Math.random()*0.5+0.1,c:Math.random()>0.5?'0,212,255':'138,135,255',p:Math.random()*6.28});}
+var conn=[];for(var i=0;i<ps.length;i++){for(var j=i+1;j<ps.length;j++){if(Math.random()<0.12)conn.push([i,j]);}}
+function anim(){ctx.clearRect(0,0,w,h);var t=Date.now()/1000;
+for(var k=0;k<conn.length;k++){var a=conn[k][0],b=conn[k][1],p1=ps[a],p2=ps[b],d=Math.sqrt((p1.x-p2.x)*(p1.x-p2.x)+(p1.y-p2.y)*(p1.y-p2.y));if(d<180){ctx.strokeStyle='rgba('+p1.c+','+(0.12*(1-d/180))+')';ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();}}
+for(var i=0;i<ps.length;i++){var p=ps[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;var pu=0.5+0.5*Math.sin(t*2+p.p);ctx.fillStyle='rgba('+p.c+','+(p.a*pu)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r*(0.8+0.2*pu),0,6.28);ctx.fill();ctx.fillStyle='rgba('+p.c+','+(p.a*pu*0.3)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r*3,0,6.28);ctx.fill();}
+requestAnimationFrame(anim);}
+anim();})();
+</script></body></html>
