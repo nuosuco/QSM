@@ -18,7 +18,7 @@ def main():
     printf("=== QSCL 10字 4态验证 ===\n")
     g_path = "qdfs/ns/models/qscl4120_test.w"
     exec("truncate -s 0 " + g_path)
-    g_data = file_read("qdfs/ns/data/yi_glyph_4120.data")
+    g_data = file_read("qdfs/ns/data/yi_glyph_4120_8x8.data")
     g_n = 0
     g_base = 0
     while (g_n < 10):

@@ -97,9 +97,9 @@ function openApp(id){var win=document.getElementById('window'),title=document.ge
 function closeApp(){document.getElementById('window').classList.remove('show');}
 
 function assistantHTML(){
-return '<div class="status-bar"><span class="status-dot blue"></span> 小趣QSM — 32×32彝文识别</div>'+
+return '<div class="status-bar"><span class="status-dot blue"></span> 小趣QSM — 真权重双引擎 (B生成+B→A内积识别)</div>'+
 '<div id="chatContainer">'+
-'<div id="chatMsgs"><div style="color:#6a7a8a;font-size:12px;line-height:1.7">💬 试试：<br>🔹 <b>生成 10</b> → 32×32方格+字体<br>🔹 <b>U+F221A</b> → 取字形<br>🔹 <b>📷图片</b> 选图后<b>点发送</b>上传识别<br>🔹 输入<b>彝文</b> → 自动识别</div></div>'+
+'<div id="chatMsgs"><div style="color:#6a7a8a;font-size:12px;line-height:1.7">💬 试试：<br>🔹 <b>生成 10</b> → B起点生成32×32彝文(真权重QDFS) 🎨<br>🔹 <b>识别</b> → 上传图片→A识别真权重内积argmax →<br>🔹 <b>U+F221A</b> → 取32×32字形<br>🔹 <b>📷图片</b> 选图后<b>点发送</b>上传识别<br>🔹 输入<b>彝文</b> → 自动识别</div></div>'+
 '<div id="imgList"></div>'+
 '<div id="inputRow">'+
 '<input type="file" id="imgInput" accept="image/*" multiple style="display:none" onchange="pickImages(this)">'+

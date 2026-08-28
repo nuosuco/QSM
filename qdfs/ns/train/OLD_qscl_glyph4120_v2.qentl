@@ -58,7 +58,7 @@ def main():
         printf("\n[批次%d/8] 字%d-%d\n", g_batch, g_batch * 515, g_batch * 515 + 514)
 
         # 加载数据
-        g_data = file_read("qdfs/ns/data/yi_glyph_4120.data")
+        g_data = file_read("qdfs/ns/data/yi_glyph_4120_8x8.data")
         g_skip = g_batch * 515
         g_n = 0
         g_base = 0

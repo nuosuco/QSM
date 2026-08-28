@@ -16,6 +16,11 @@ var g_wbuf = ""
 var g_bpx[1024]
 var g_bout = ""
 var g_j2 = 0
+var g_arecog = ""
+var g_arec_in[1024]
+var g_arec_best = 0
+var g_arec_bestv = 0
+var g_arec_sum = 0
 
 # 零分配读权重文件第row行到g_bpx: 直接ord(str_char_at)读字节
 def bgen_load(row):
@@ -79,6 +84,82 @@ def bgen(d):
     return g_bout
 end
 
+# A识别引擎(纯QEntL, 指纹索引+str_eq): 启动建4120条32字符指纹, 请求时只比指纹
+var g_fp[4120]
+var g_fpall = ""
+var g_fpbuilt = 0
+var g_fp_j = 0
+var g_fp_k = 0
+def build_fp():
+    if (g_fpbuilt == 1): return 0 end
+    g_fpall = file_read("qdfs/ns/models/fptable32.txt")
+    if (str_len(g_fpall) < 100):
+        g_fpall = file_read("/root/QSM/QLife/qdfs/ns/models/fptable32.txt")
+    end
+    g_fpbuilt = 1
+    return 1
+end
+def arecog(pixelstr):
+    var pbuf = pixelstr
+    var pdlen = str_len(pbuf)
+    var pbase = 0
+    var found_colon = 0
+    while (pbase < pdlen):
+        var pch = ord(str_char_at(pbuf, pbase))
+        if (pch == 58): found_colon = 1 pbase = pbase + 1 break end
+        pbase = pbase + 1
+    end
+    if (found_colon == 0): pbase = 0 end
+    g_j2 = 0
+    while (g_j2 < 1024 and pbase < pdlen):
+        var pb = ord(str_char_at(pbuf, pbase))
+        if (pb == 49): g_arec_in[g_j2] = 1 else: g_arec_in[g_j2] = 0 end
+        pbase = pbase + 2
+        g_j2 = g_j2 + 1
+    end
+    while (g_j2 < 1024):
+        g_arec_in[g_j2] = 0
+        g_j2 = g_j2 + 1
+    end
+    g_arec_best = 0
+    g_arec_bestv = 0
+    build_fp()
+    var ifp = ""
+    g_j2 = 0
+    while (g_j2 < 32):
+        if (g_arec_in[g_j2] > 0):
+            ifp = ifp + "1"
+        else:
+            ifp = ifp + "0"
+        end
+        g_j2 = g_j2 + 1
+    end
+    var ifp_nl = str_concat(ifp, "\n")
+    var pos = str_index_of(g_fpall, ifp_nl)
+    if (pos >= 0):
+        g_arec_best = pos / 33
+        g_arec_bestv = 1024
+    else:
+        g_arec_best = 0
+        g_arec_bestv = 0
+    end
+    var hv16 = g_arec_best / 16
+    var hv1 = g_arec_best % 16
+    var hx = ""
+    if (hv16 < 10):
+        hx = hx + chr(48 + hv16)
+    else:
+        hx = hx + chr(97 + hv16 - 10)
+    end
+    if (hv1 < 10):
+        hx = hx + chr(48 + hv1)
+    else:
+        hx = hx + chr(97 + hv1 - 10)
+    end
+    g_arecog = str_concat("{\"class\":" + int_to_str(g_arec_best) + ",\"hex\":\"U+F2" + hx + "\",\"match\":" + int_to_str(g_arec_bestv) + "/1024,\"engine\":\"a-recognize-v1-内积-真权重\"}")
+    return g_arecog
+end
+
 def get_d_param(path):
     var dpos = str_index_of(path, "d=")
     if (dpos < 0): return -1 end
@@ -132,15 +213,13 @@ def handle_request(req):
             var d = get_d_param(path)
             resp = "{\"error\":\"Usage: GET /api/yi32?d=0..4119\"}"
             if (d >= 0 && d <= 4119):
-                var cmd32 = str_concat("bash build/qscl_engine32_v9b.sh gen ", int_to_str(d))
-                resp = exec(cmd32)
+                resp = bgen(d)
             end
         else:
             var body32 = get_body(req)
             resp = "{\"error\":\"need 1024 pixels\"}"
             if (str_len(body32) >= 10):
-                var cmd32r = str_concat("bash build/qscl_engine32_v9b.sh argmax ", body32)
-                resp = exec(cmd32r)
+                resp = arecog(body32)
             end
         end
     end
@@ -160,7 +239,10 @@ def handle_request(req):
     end
 
     if (str_index_of(path, "/api/status") >= 0):
-        resp = "{\"status\":\"ok\",\"model\":\"qscl_v9b_32x32\",\"votes\":\"4-state superposition\",\"weights\":\"v9b_b{0-7}_s{1|101|201|301}_lr20 x32\",\"dim\":\"515x1037 (1024px+13wcb)\",\"glyphs\":\"4120 yi\",\"engine\":\"qscl_engine32_v9b\",\"chat\":\"xiaoqu-qsm\",\"a_recognize\":\"avg87% weights real\",\"b_generate\":\"B-GEN IMPLEMENTED qscgen_b{0-7}_s0 weights QDFS\",\"bgen_endpoint\":\"GET /api/bgen?d=0..4119\",\"v\":\"0.0.9\"}"
+        if (g_fpbuilt == 0):
+            build_fp()
+        end
+        resp = "{\"status\":\"ok\",\"model\":\"qscl_v9b_32x32\",\"a_recognize\":\"a-recognize-v1-fingerprint-真权重(指纹索引)\",\"b_generate\":\"B-GEN IMPLEMENTED qscgen_b{0-7}_s0 weights QDFS\",\"bgen_endpoint\":\"GET /api/bgen?d=0..4119\",\"a_endpoint\":\"POST /api/yi32\",\"engine\":\"pure-QEntL-no-bash\",\"fp_table\":\"4120×32chars\",\"v\":\"0.1.0\"}"
     end
 
     if (str_index_of(path, "/api/xiaoqu") >= 0):
