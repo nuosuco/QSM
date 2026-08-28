@@ -103,7 +103,8 @@ class BacktestEngine:
             })
 
             if len(window) >= 60:
-                best_tick = max(window[:-1], key=lambda x: abs(x['spread']))
+                # 修复：取窗口内绝对价差最大的 tick
+                best_tick = max(window, key=lambda x: abs(x['spread']))
                 if abs(best_tick['spread']) >= threshold:
                     self._backtest_one(best_tick, window[-1], cursor)
                 window = window[-30:]
@@ -259,19 +260,26 @@ class PaperEngine:
                     time.sleep(0.5)
                     continue
 
-                last_check_ts = ticks[-1][1]
+                # 修复：ticks按DESC排列，[0]是最新的，[−1]是最旧的
+                last_check_ts = ticks[0][1]
 
                 for tick in ticks:
                     ts, tick_id, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
                     net_profit_pct = spread_pct - cost
-                    if net_profit_pct < 0.05 or random.random() >= 0.9:
+                    # 修复：成交率从10%提升到config.live.fill_rate（默认60%）
+                    if net_profit_pct < 0.05 or random.random() >= self.config.live.fill_rate:
                         continue
 
                     position = min(self.paper_balance * 0.10, 100)
                     if position < 10:
                         continue
 
-                    pnl = position * net_profit_pct / 100 * random.uniform(0.5, 1.5)
+                    # 修复：滑点按config配置，不再是固定0.5~1.5倍随机
+                    slipage = random.uniform(
+                        self.config.live.slipage_mult_min,
+                        self.config.live.slipage_mult_max
+                    )
+                    pnl = position * net_profit_pct / 100 * slipage
                     self.paper_balance += pnl
                     self.total_trades += 1
                     if pnl > 0:

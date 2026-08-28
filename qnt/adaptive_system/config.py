@@ -85,6 +85,36 @@ class ExecutionConfig:
     net_profit_pct: float = 0.01
 
 @dataclass
+@dataclass
+class LiveTradingConfig:
+    """实盘自动开关配置
+
+    职责：只控制实盘交易的开/停。回测+模拟始终运行，不受影响。
+    开启条件（全部满足）：权益>=min_equity 且 平台全连 且 模拟盘窗口达标
+    停止条件（任一触发）：连亏/回撤/日亏/极端市场
+    恢复：条件满足后自动解除，无需人工
+    """
+    # 总开关：false = 永久关实盘，回测+模拟照常
+    enabled: bool = True
+
+    # ---- 开启门槛 ----
+    # 账户最低权益（USDT）。低于此值一律不开实盘：
+    # 25U 是因为 Bitget 最小下单 5U，25U×20%=5U 刚好够单
+    min_equity: float = 25.0
+    # 模拟盘滚动窗口小时数
+    paper_window_hours: int = 24
+    # 窗口内最少交易笔数（样本不足不开实盘）
+    min_paper_trades: int = 30
+    # 窗口内最低胜率
+    min_paper_win_rate: float = 0.55
+
+    # ---- 模拟盘/回测成交率（用于贴近实盘真实成交）----
+    fill_rate: float = 0.6          # 挂单成交概率（Post-Only 偏低）
+    slipage_mult_min: float = 0.6   # 滑点/执行损耗下限
+    slipage_mult_max: float = 0.95  # 滑点/执行损耗上限
+
+
+@dataclass
 class PerformanceConfig:
     """性能追踪配置"""
     # 滚动窗口大小
@@ -114,6 +144,7 @@ class SystemConfig:
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    live: LiveTradingConfig = field(default_factory=LiveTradingConfig)
     
     # 三平台配置
     exchanges: Dict[str, ExchangeConfig] = field(default_factory=lambda: {

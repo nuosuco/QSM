@@ -6,6 +6,7 @@ from adaptive_system.engine import AdaptiveTradingEngine
 from adaptive_system.execution_engine import ExecutionEngine
 from adaptive_system.self_evolution import SelfEvolutionTradingSystem
 from adaptive_system.dual_engine import DualEngineSystem
+from adaptive_system.live_trading_controller import LiveTradingController
 
 if __name__ == "__main__":
     # 加载API密钥
@@ -33,6 +34,12 @@ if __name__ == "__main__":
     # 启动交易执行引擎（含风控）
     exec_engine = ExecutionEngine(config)
     exec_engine.start()
+    
+    # 启动实盘自动开关控制器
+    live_controller = LiveTradingController(
+        config, config.data.db_path, dual_engine, exec_engine
+    )
+    live_controller.start()
     
     try:
         import time
@@ -64,10 +71,15 @@ if __name__ == "__main__":
                 # 自进化状态
                 print(f"📊 ticks: {evolution.collector.total_ticks}")
                 print(f"🧬 阶段: {evolution.current_phase}")
+                
+                # 实盘开关状态
+                lc = live_controller.get_status()
+                print(f"🎛️ 实盘: {'✅已开' if lc['live_enabled'] else '🔒已关'} | 原因: {lc['suspension_reasons'] or '无'}")
                 print(f"{'='*60}")
                 last_status = now
                 
     except KeyboardInterrupt:
+        live_controller.stop()
         dual_engine.stop()
         evolution.stop()
         exec_engine.stop()
