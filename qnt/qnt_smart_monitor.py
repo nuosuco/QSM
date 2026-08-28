@@ -98,7 +98,7 @@ def check_spreads():
     except:
         log("⚠️ Gate.io连接失败")
     
-    symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT', 'DOGE/USDT']
+    symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT', 'DOGE/USDT', 'AVAX/USDT', 'LINK/USDT', 'PEPE/USDT', 'WIF/USDT', 'SUI/USDT', 'SEI/USDT', 'ARB/USDT', 'OP/USDT', 'DOT/USDT', 'ATOM/USDT', 'ONDO/USDT', 'FET/USDT', 'INJ/USDT', 'TIA/USDT']
     
     all_spreads = []
     for ex_name, ex in exchanges.items():

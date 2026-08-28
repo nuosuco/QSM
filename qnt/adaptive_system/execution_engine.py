@@ -94,17 +94,15 @@ class ExecutionEngine:
     
     def start(self):
         """启动执行引擎"""
-        if self.risk_manager.is_suspended:
-            logger.warning(f"⛔ 风控暂停: {self.risk_manager.suspension_reason}")
-            return
-        
         self.running = True
+        if self.risk_manager.is_suspended:
+            logger.warning(f"⛔ 风控暂停（仅停止实盘下单）: {self.risk_manager.suspension_reason}")
         logger.info("🚀 交易执行引擎启动")
         logger.info(f"   监控平台: {', '.join(self.exchanges.keys())}")
         logger.info(f"   价差阈值: >{self.config.execution.spread_pct:.2f}% (执行引擎层，灵敏度门槛)")
         logger.info(f"   净利阈值: >{self.config.execution.net_profit_pct:.2f}% (执行引擎层，灵敏度门槛)")
         logger.info(f"   风控净利: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}% (风控层，定死不变)")
-        logger.info(f"   ⚠️ 实际交易门槛: 价差 > {(RiskManager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST)*100:.2f}%（成本0.12%+净利0.05%）")
+        logger.info(f"   ⚠️ 实际交易门槛: 价差 > {(RiskManager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST)*100:.2f}%（成本0.12%+净利0.01%）")
         
         self._run_loop()
     
@@ -120,9 +118,15 @@ class ExecutionEngine:
                 # 定期刷新余额
                 self.risk_manager.refresh_balance()
                 
-                # 遍历所有连接的交易所
-                for ex_name, exchange in self.exchanges.items():
-                    self._scan_and_execute(ex_name, exchange)
+                # 遍历所有连接的交易所（暂停时只跳过下单，其他线程继续运行）
+                if not self.risk_manager.is_suspended:
+                    for ex_name, exchange in self.exchanges.items():
+                        self._scan_and_execute(ex_name, exchange)
+                else:
+                    logger.debug("⛔ 实盘已暂停，跳过下单扫描")
+                
+                # 检查挂单状态（无论是否暂停都执行）
+                self.check_orders()
                 
                 time.sleep(self.config.data.update_interval)
                 
@@ -163,12 +167,15 @@ class ExecutionEngine:
                 
                 # 执行引擎层阈值检查
                 if spread_pct < self.config.execution.spread_pct:
+                    logger.debug(f"📊 {ex_name} {symbol}: spread={spread_pct:.4f}% < 阈值{self.config.execution.spread_pct:.2f}%，跳过")
                     continue
                 if net_profit_pct < self.config.execution.net_profit_pct:
+                    logger.debug(f"📊 {ex_name} {symbol}: net={net_profit_pct:.4f}% < 阈值{self.config.execution.net_profit_pct:.2f}%，跳过")
                     continue
                 
-                # 风控层检查（定死不变）：净利必须 > 0.1%
+                # 风控层检查（定死不变）
                 if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT * 100:
+                    logger.debug(f"📊 {ex_name} {symbol}: net={net_profit_pct:.4f}% < 风控{RiskManager.MIN_NET_PROFIT_PCT*100:.4f}%，跳过")
                     continue
                 
                 # 执行做市
@@ -329,6 +336,35 @@ class ExecutionEngine:
                         
                 except Exception as e:
                     logger.debug(f"检查订单失败: {e}")
+    
+    def scan_spread_opportunities(self):
+        """扫描价差机会（仅记录，不下单）—— 供回测/模拟使用"""
+        for ex_name, exchange in self.exchanges.items():
+            try:
+                spot_ticker = exchange.fetch_ticker('SOL/USDT')
+                perp_symbol = 'SOL/USDT:USDT'
+                perp_ticker = exchange.fetch_ticker(perp_symbol)
+                
+                if not spot_ticker or not perp_ticker:
+                    continue
+                
+                spot_bid = spot_ticker.get('bid', 0) or 0
+                spot_ask = spot_ticker.get('ask', 0) or 0
+                perp_bid = perp_ticker.get('bid', 0) or 0
+                perp_ask = perp_ticker.get('ask', 0) or 0
+                
+                if not all([spot_bid, spot_ask, perp_bid, perp_ask]):
+                    continue
+                
+                mid_spot = (spot_bid + spot_ask) / 2
+                mid_perp = (perp_bid + perp_ask) / 2
+                spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
+                
+                if spread_pct > 0.15:
+                    logger.info(f"📊 {ex_name} SOL/USDT: spread={spread_pct:.4f}% > 0.15%")
+                    
+            except Exception as e:
+                logger.debug(f"{ex_name} 扫描价差失败: {e}")
     
     def get_status(self) -> Dict:
         """获取执行引擎状态"""

@@ -23,6 +23,7 @@ if _parent not in sys.path:
 from fastapi import FastAPI, HTTPException, Query, Response
 from starlette.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from api_qnt import router as qnt_router
 from fastapi.staticfiles import StaticFiles
 from services.api_auth import APIAuthMiddleware
 from pydantic import BaseModel
@@ -1643,3 +1644,5 @@ async def serve_page():
     from fastapi.responses import HTMLResponse
     with open("/root/SOM/web/index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+

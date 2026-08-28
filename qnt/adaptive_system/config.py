@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 class DataCollectionConfig:
     """数据收集配置"""
     # 监控的交易对
-    symbols: List[str] = field(default_factory=lambda: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT"])
+    symbols: List[str] = field(default_factory=lambda: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "DOGE/USDT", "AVAX/USDT", "LINK/USDT", "PEPE/USDT", "WIF/USDT", "SUI/USDT", "SEI/USDT", "ARB/USDT", "OP/USDT", "DOT/USDT", "ATOM/USDT", "ONDO/USDT", "FET/USDT", "INJ/USDT", "TIA/USDT"])
     # 更新频率(秒)
     update_interval: float = 1.0
     # 保留历史数据点数
