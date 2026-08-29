@@ -153,27 +153,43 @@ class RiskManager:
                     exchange = cls(kwargs)
                     balance = exchange.fetch_balance()
                     
-                    # 获取USDT余额
-                    usdt = balance.get('USDT', {})
-                    total = usdt.get('total', 0)
-                    free = usdt.get('free', 0)
-                    used = usdt.get('used', 0)
+                    # ccxt v4兼容：balance可能是list或dict
+                    if isinstance(balance, list):
+                        # ccxt v4 返回list格式，遍历查找USDT
+                        usdt_total = usdt_free = usdt_used = 0.0
+                        for section in balance:
+                            if isinstance(section, dict) and 'USDT' in section:
+                                usdt_total += float(section['USDT'].get('total', 0) or 0)
+                                usdt_free += float(section['USDT'].get('free', 0) or 0)
+                                usdt_used += float(section['USDT'].get('used', 0) or 0)
+                    else:
+                        # ccxt v3 返回dict格式
+                        usdt = balance.get('USDT', {})
+                        usdt_total = float(usdt.get('total', 0) or 0)
+                        usdt_free = float(usdt.get('free', 0) or 0)
+                        usdt_used = float(usdt.get('used', 0) or 0)
                     
                     self.real_balance[ex_name] = {
-                        'total': total,
-                        'free': free,
-                        'used': used,
+                        'total': usdt_total,
+                        'free': usdt_free,
+                        'used': usdt_used,
                     }
-                    total_usdt += total
+                    total_usdt += usdt_total
                     
-                    logger.debug(f"✅ {ex_name}: USDT={total:.2f}, 可用={free:.2f}")
+                    logger.debug(f"✅ {ex_name}: USDT={usdt_total:.2f}, 可用={usdt_free:.2f}")
                     
                     # HTX额外获取合约余额
                     if ex_name == 'htx':
                         try:
                             contract_balance = exchange.fetch_balance({'type': 'contract'})
-                            usdt_contract = contract_balance.get('USDT', {})
-                            contract_total = usdt_contract.get('total', 0)
+                            if isinstance(contract_balance, list):
+                                contract_total = 0.0
+                                for section in contract_balance:
+                                    if isinstance(section, dict) and 'USDT' in section:
+                                        contract_total += float(section['USDT'].get('total', 0) or 0)
+                            else:
+                                usdt_contract = contract_balance.get('USDT', {})
+                                contract_total = float(usdt_contract.get('total', 0) or 0)
                             if contract_total > 0:
                                 self.real_balance[ex_name]['contract'] = contract_total
                                 total_usdt += contract_total

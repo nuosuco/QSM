@@ -150,10 +150,7 @@ class BacktestEngine:
         spread_pct = best_tick['spread']
         net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
 
-        if net_profit_pct <= 0:
-            return
-
-        # 70% 挂单成功率模拟
+        # 只有价差达标且随机命中才模拟交易（70%挂单成功率）
         if random.random() >= 0.7:
             return
 
@@ -172,7 +169,8 @@ class BacktestEngine:
             if pnl > 0:
                 self.winning_trades += 1
             if self.total_trades % 100 == 0:
-                logger.info(f"   回测进度: {self.total_trades} 笔, 胜率 {self.winning_trades/self.total_trades*100:.1f}%")
+                win_rate = self.winning_trades / self.total_trades * 100
+                logger.info(f"   回测进度: {self.total_trades} 笔, 胜率 {win_rate:.1f}%")
         except Exception as e:
             logger.debug(f"插入交易失败: {e}")
 
@@ -181,7 +179,8 @@ class BacktestEngine:
         ts, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
         net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
 
-        if net_profit_pct <= 0.05 or random.random() >= 0.7:
+        # 只有价差达标且随机命中才模拟交易（70%挂单成功率）
+        if random.random() >= 0.7:
             return
 
         position = 10
