@@ -44,7 +44,7 @@ class BacktestEngine:
         logger.info("📊 回测引擎已停止")
 
     def _run_loop(self):
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
         cursor = conn.cursor()
 
         # 找最后处理的 timestamp
@@ -103,7 +103,7 @@ class BacktestEngine:
             })
 
             if len(window) >= 60:
-                # 修复：取窗口内绝对价差最大的 tick
+                # 取窗口内绝对价差最大的 tick
                 best_tick = max(window, key=lambda x: abs(x['spread']))
                 if abs(best_tick['spread']) >= threshold:
                     self._backtest_one(best_tick, window[-1], cursor)
@@ -154,7 +154,8 @@ class BacktestEngine:
         if random.random() >= 0.7:
             return
 
-        position = 10  # 固定 10 USDT 仓位
+        # 固定 10 USDT 仓位（符合各交易所最小金额要求）
+        position = 10
         pnl = position * net_profit_pct / 100
 
         try:
@@ -232,7 +233,7 @@ class PaperEngine:
         logger.info("📝 模拟引擎已停止")
 
     def _run_loop(self):
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
         cursor = conn.cursor()
 
         # 加载模拟盘状态
@@ -259,13 +260,12 @@ class PaperEngine:
                     time.sleep(0.5)
                     continue
 
-                # 修复：ticks按DESC排列，[0]是最新的，[−1]是最旧的
                 last_check_ts = ticks[0][1]
 
                 for tick in ticks:
                     ts, tick_id, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
                     net_profit_pct = spread_pct - cost
-                    # 修复：成交率从10%提升到config.live.fill_rate（默认60%）
+                    # 净利多才考虑交易
                     if net_profit_pct < 0.05 or random.random() >= self.config.live.fill_rate:
                         continue
 
@@ -273,7 +273,6 @@ class PaperEngine:
                     if position < 10:
                         continue
 
-                    # 修复：滑点按config配置，不再是固定0.5~1.5倍随机
                     slipage = random.uniform(
                         self.config.live.slipage_mult_min,
                         self.config.live.slipage_mult_max

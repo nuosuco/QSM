@@ -24,7 +24,7 @@ class RiskManager:
     
     def __init__(self, db_path: str, exchanges_config: Dict = None):
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self.exchanges_config = exchanges_config or {}
         self._init_db()
         
@@ -170,32 +170,55 @@ class RiskManager:
                         usdt_used = float(usdt.get('used', 0) or 0)
                     
                     self.real_balance[ex_name] = {
-                        'total': usdt_total,
+                        'spot': usdt_total,
                         'free': usdt_free,
                         'used': usdt_used,
+                        'total': usdt_total,  # 兼容旧代码
                     }
                     total_usdt += usdt_total
+                    logger.debug(f"✅ {ex_name}: 现货USDT={usdt_total:.2f}, 可用={usdt_free:.2f}")
                     
-                    logger.debug(f"✅ {ex_name}: USDT={usdt_total:.2f}, 可用={usdt_free:.2f}")
-                    
-                    # HTX额外获取合约余额
+                    # HTX: 额外获取永续合约余额（type=swap），与现货分开统计
                     if ex_name == 'htx':
                         try:
-                            contract_balance = exchange.fetch_balance({'type': 'contract'})
-                            if isinstance(contract_balance, list):
-                                contract_total = 0.0
-                                for section in contract_balance:
-                                    if isinstance(section, dict) and 'USDT' in section:
-                                        contract_total += float(section['USDT'].get('total', 0) or 0)
+                            swap_balance = exchange.fetch_balance({'type': 'swap'})
+                            if isinstance(swap_balance, list):
+                                swap_total = sum(
+                                    float(s.get('USDT', {}).get('total', 0) or 0)
+                                    for s in swap_balance if isinstance(s, dict)
+                                )
                             else:
-                                usdt_contract = contract_balance.get('USDT', {})
-                                contract_total = float(usdt_contract.get('total', 0) or 0)
-                            if contract_total > 0:
-                                self.real_balance[ex_name]['contract'] = contract_total
-                                total_usdt += contract_total
-                                logger.debug(f"✅ {ex_name} 合约: USDT={contract_total:.4f}")
-                        except:
-                            pass
+                                swap_total = float(swap_balance.get('USDT', {}).get('total', 0) or 0)
+                            if swap_total > 0:
+                                self.real_balance[ex_name]['perp'] = swap_total
+                                total_usdt += swap_total
+                                logger.info(f"✅ {ex_name}: 现货={usdt_total:.2f}U + 永续={swap_total:.2f}U")
+                            else:
+                                logger.warning(f"⚠️ {ex_name}: 永续账户USDT=0，无法做市交易")
+                        except Exception as e:
+                            logger.warning(f"{ex_name} 永续余额获取失败: {str(e)[:50]}")
+                    
+                    # Gate: 用 type=swap 实例单独获取永续余额（用free避免含持仓保证金）
+                    if ex_name == 'gate':
+                        try:
+                            swap_cls = getattr(ccxt, 'gate')
+                            swap_ex = swap_cls({'apiKey': api_key, 'secret': api_secret, 'enableRateLimit': True, 'type': 'swap'})
+                            swap_balance = swap_ex.fetch_balance()
+                            if isinstance(swap_balance, list):
+                                swap_total = sum(
+                                    float(s.get('USDT', {}).get('free', 0) or 0)
+                                    for s in swap_balance if isinstance(s, dict)
+                                )
+                            else:
+                                swap_total = float(swap_balance.get('USDT', {}).get('free', 0) or 0)
+                            if swap_total > 0:
+                                self.real_balance[ex_name]['perp'] = swap_total
+                                total_usdt += swap_total
+                                logger.info(f"✅ {ex_name}: 现货={usdt_total:.2f}U + 永续={swap_total:.2f}U")
+                            else:
+                                logger.warning(f"⚠️ {ex_name}: 永续账户USDT=0，无法做市交易")
+                        except Exception as e:
+                            logger.warning(f"{ex_name} 永续余额获取失败: {str(e)[:50]}")
                     
                 except Exception as e:
                     logger.warning(f"{ex_name} 获取余额失败: {str(e)[:50]}")
@@ -221,9 +244,9 @@ class RiskManager:
         self.conn.commit()
     
     def check_risk(self, symbol: str, side: str, position_size_usdt: float, 
-                   entry_price: float, stop_loss_price: float) -> Dict:
+                   entry_price: float, stop_loss_price: float, ex_name: str = '') -> Dict:
         """
-        检查风控规则
+        检查风控规则（支持按交易所独立限额）
         
         Returns:
             {
@@ -240,8 +263,21 @@ class RiskManager:
             'suggested_stop_loss': stop_loss_price,
         }
         
-        # 使用真实权益
-        equity = self.equity if self.equity > 0 else 1.0  # 兜底：至少1 USDT
+        # 按交易所使用永续账户独立权益做风控，否则用总权益兜底
+        if ex_name and ex_name in self.real_balance:
+            reb = self.real_balance[ex_name]
+            perp_equity = reb.get('perp', 0.0)
+            spot_equity = reb.get('spot', reb.get('total', 0.0))
+            # BTC/ETH用永续余额(可充现货)，USDT用现货余额
+            symbol_btc_eth = 'BTC' in symbol or 'ETH' in symbol
+            if symbol_btc_eth:
+                equity = max(perp_equity, spot_equity, 0.01)  # BTC/ETH：永续或现货够就行
+            else:
+                equity = max(spot_equity, perp_equity, 0.01)  # USDT：取大值兜底
+            # 保底：至少用永续free+现货free的总和
+            equity = max(equity, perp_equity + spot_equity, 0.01)
+        else:
+            equity = self.equity if self.equity > 0 else 1.0  # 兜底：至少1 USDT
         
         # Rule 1: 检查是否暂停
         if self.is_suspended:
