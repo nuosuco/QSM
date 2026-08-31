@@ -419,6 +419,19 @@ class ExecutionEngine:
             
         except Exception as e:
             logger.error(f"❌ {ex_name} {symbol} 下单失败: {e}")
+            # 下单失败也记录信号（用于审计）
+            try:
+                conn = sqlite3.connect(self.config.data.db_path, timeout=30)
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO engine_signals (timestamp, mode, exchange, symbol,
+                        signal_type, strategy, expected_profit, executed, error)
+                    VALUES (?, 'live', ?, ?, 'market_make', 'market_maker', ?, 0, ?)
+                ''', (int(time.time()), ex_name, symbol, net_profit_pct, str(e)[:200]))
+                conn.commit()
+                conn.close()
+            except Exception as e2:
+                logger.debug(f"记录失败信号失败: {e2}")
     
     def _record_signal(self, exchange: str, symbol: str, side: str, profit: float, position_size: float = 0):
         """记录信号到数据库"""
@@ -428,7 +441,7 @@ class ExecutionEngine:
             cursor.execute('''
                 INSERT INTO engine_signals (timestamp, mode, exchange, symbol, 
                     signal_type, strategy, expected_profit, executed)
-                VALUES (?, 'live', ?, ?, 'market_make', 'market_maker', ?, 0)
+                VALUES (?, 'live', ?, ?, 'market_make', 'market_maker', ?, 1)
             ''', (int(time.time()), exchange, symbol, profit))
             conn.commit()
             conn.close()
@@ -484,6 +497,18 @@ class ExecutionEngine:
                             contracts = p['contracts']
                             perp_exchange.create_order(sym, 'market', close_side, contracts, None, {'reduceOnly': True})
                             logger.info(f"✅ {ex_name} {sym} 已紧急平仓")
+                            # 紧急平仓写入engine_trades
+                            try:
+                                conn = sqlite3.connect(self.config.data.db_path, timeout=30)
+                                cursor = conn.cursor()
+                                cursor.execute('''
+                                    INSERT INTO engine_trades (timestamp, mode, exchange, symbol, side, price, amount, cost, fee, pnl, pnl_pct, status)
+                                    VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'emergency_close')
+                                ''', (int(time.time()), ex_name, sym, close_side, 0, contracts, 0, 0, 0, 0, 'emergency'))
+                                conn.commit()
+                                conn.close()
+                            except Exception as e2:
+                                logger.debug(f"紧急平仓记录失败: {e2}")
                         elif abs(dist) < 2:
                             logger.warning(f"⚠️ {ex_name} {sym} 接近强平: 距强平{dist:.2f}%")
                     except:
