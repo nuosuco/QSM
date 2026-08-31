@@ -26,9 +26,9 @@ class PatternConfig:
     注意：模式发现阈值与执行引擎/风控层完全独立
     只用于历史数据分析，不控制实际交易决策
     """
-    # 价差模式识别阈值（0.08% < 成本线0.12%，用于识别潜在模式）
+    # 价差模式识别阈值（0.08% < 成本线0.16%，用于识别潜在模式）
     spread_threshold: float = 0.08
-    # 可盈利模式判断阈值（0.10% < 成本线0.12%，辅助分析用）
+    # 可盈利模式判断阈值（0.10% < 成本线0.16%，辅助分析用）
     profitable_spread: float = 0.10
     # 深度异常阈值
     depth_imbalance_ratio: float = 3.0  # 买卖深度比
@@ -54,7 +54,7 @@ class StrategyConfig:
         },
         "market_maker": {
             "name": "做市策略",
-            "description": "挂双边单赚取价差（需要>0.12%价差覆盖成本）",
+            "description": "挂双边单赚取价差（需要>0.16%价差覆盖成本）",
             "weight": 0.7,
             "params": {"spread": 0.12, "order_size": 100}
         },
@@ -76,13 +76,11 @@ class StrategyConfig:
 class ExecutionConfig:
     """执行引擎配置（可调整）
     
-    风控底线：spread>0.22%（=成本0.12%+净利0.1%），net>0.1%
-    改这里只影响灵敏度，不影响实际交易门槛！
-    """
-    # 价差阈值：价差必须大于此值才触发信号记录（风控底线: >0.22%）
-    spread_pct: float = 0.05
-    # 净利阈值：净利必须大于此值才标记为可交易机会（风控底线: >0.1%）
-    net_profit_pct: float = 0.01
+    风控底线：spread>0.41%（=成本0.16%+净利0.25%），net>0.25%
+    # 价差阈值：价差必须大于此值才触发信号记录（风控底线: >0.41% = 成本0.16%+净利0.25%）
+    spread_pct: float = 0.5
+    # 净利阈值：净利必须大于此值才标记为可交易机会（风控底线: >0.25%）
+    net_profit_pct: float = 0.3
 
 @dataclass
 @dataclass

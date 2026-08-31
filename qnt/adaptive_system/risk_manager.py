@@ -17,10 +17,12 @@ class RiskManager:
     # ========== 风控铁律（v4方案） ==========
     MAX_POSITION_PCT = 0.20        # 单笔仓位 ≤ 总资金 20%
     MAX_STOP_LOSS_PCT = 0.02       # 单笔止损 ≤ 总资金 2%
-    MAX_CONSECUTIVE_LOSSES = 5     # 连续亏损 5 次暂停
-    MAX_DRAWDOWN_PCT = 0.40        # 最大回撤 40% 停止
+    MAX_CONSECUTIVE_LOSSES = 3     # 连续亏损 3 次暂停（原来是5次，太宽松）
+    MAX_DRAWDOWN_PCT = 0.30        # 最大回撤 30% 停止（原来是40%）
+    MAX_SINGLE_LOSS_PCT = 0.05     # 单笔最大亏损 ≤ 总资金 5%
+    MAX_DAILY_LOSS_PCT = 0.10      # 单日最大亏损 ≤ 总资金 10%
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.0001  # 0.01%     # 测试模式：净利必须 > 0.01% 才执行
+    MIN_NET_PROFIT_PCT = 0.25     # 2026-08-31 修复：净利必须 > 0.25%（大于双边成本0.24%）
     
     def __init__(self, db_path: str, exchanges_config: Dict = None):
         self.db_path = db_path
@@ -198,11 +200,11 @@ class RiskManager:
                         except Exception as e:
                             logger.warning(f"{ex_name} 永续余额获取失败: {str(e)[:50]}")
                     
-                    # Gate: 用 type=swap 实例单独获取永续余额（用free避免含持仓保证金）
+                    # Gate: 用 options=defaultType=swap 获取永续合约余额
                     if ex_name == 'gate':
                         try:
                             swap_cls = getattr(ccxt, 'gate')
-                            swap_ex = swap_cls({'apiKey': api_key, 'secret': api_secret, 'enableRateLimit': True, 'type': 'swap'})
+                            swap_ex = swap_cls({'apiKey': api_key, 'secret': api_secret, 'enableRateLimit': True, 'options': {'defaultType': 'swap'}})
                             swap_balance = swap_ex.fetch_balance()
                             if isinstance(swap_balance, list):
                                 swap_total = sum(

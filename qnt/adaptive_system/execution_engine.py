@@ -20,10 +20,10 @@ logger = logging.getLogger('ExecutionEngine')
 # ============================================================
 # 各交易所真实参数（Market数据查出来写死，避免反复load_markets）
 # ============================================================
-# 永续合约最小仓位（USDT）
-PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 1.0}
+# 永续合约最小仓位（USDT）- Gate要求3U，HTX要求1U
+PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
 # 现货最小订单金额（USDT）
-SPOT_MIN_NOTIONAL = {'bitget': 1.0, 'htx': 1.0, 'gate': 1.0}
+SPOT_MIN_NOTIONAL = {'bitget': 1.0, 'htx': 1.0, 'gate': 3.0}
 # 余额基准：实际最小仓位 = min_notional × (perp_bal / BALANCE_BASELINE)
 # 小额账户按比例缩小最小仓位，避免永远低于门槛
 BALANCE_BASELINE = {'bitget': 25.0, 'htx': 5.0, 'gate': 5.0}
@@ -34,10 +34,10 @@ class ExecutionEngine:
     """交易执行引擎（三平台版，Post-Only做市策略）"""
     
     # 手续费率（Maker）- 交易所真实费率，不要改！
-    MAKER_FEE_RATE = 0.0004   # 0.04%（永续Maker费率）
+    MAKER_FEE_RATE = 0.0006   # 0.06%（永续Maker费率，含可能的Taker）
     SLIPPAGE_RATE = 0.0002    # 0.02%（预估滑点）
-    TOTAL_COST = MAKER_FEE_RATE + SLIPPAGE_RATE  # 单边成本 = 0.06%
-    BI_SIDE_COST = TOTAL_COST * 2  # 双边成本 = 0.12%（永续+现货）
+    TOTAL_COST = MAKER_FEE_RATE + SLIPPAGE_RATE  # 单边成本 = 0.08%
+    BI_SIDE_COST = TOTAL_COST * 2  # 双边成本 = 0.16%（永续+现货）
     
     def __init__(self, config: SystemConfig):
         self.config = config
@@ -147,13 +147,12 @@ class ExecutionEngine:
         """获取永续合约账户可用余额"""
         try:
             if ex_name == 'gate':
-                # Gate: 必须用type='swap'创建新实例，避免options导致读跨账户总余额(15U含持仓)
-                # 与risk_manager保持一致，读取free USDT作为可用余额
+                # Gate: 用 options=defaultType=swap 获取永续余额
                 import os as _os
                 gate_key = _os.getenv('GATE_API_KEY', '')
                 gate_secret = _os.getenv('GATE_API_SECRET', '')
                 swap_cls = getattr(ccxt, 'gate')
-                swap_ex = swap_cls({'apiKey': gate_key, 'secret': gate_secret, 'enableRateLimit': True, 'type': 'swap'})
+                swap_ex = swap_cls({'apiKey': gate_key, 'secret': gate_secret, 'enableRateLimit': True, 'options': {'defaultType': 'swap'}})
                 swap_bal = swap_ex.fetch_balance()
                 if isinstance(swap_bal, list):
                     return sum(float(s.get('USDT', {}).get('free', 0) or 0) for s in swap_bal if isinstance(s, dict))
@@ -191,7 +190,7 @@ class ExecutionEngine:
         logger.info(f"   价差阈值: >{self.config.execution.spread_pct:.2f}% (执行引擎层，灵敏度门槛)")
         logger.info(f"   净利阈值: >{self.config.execution.net_profit_pct:.2f}% (执行引擎层，灵敏度门槛)")
         logger.info(f"   风控净利: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}% (风控层，定死不变)")
-        logger.info(f"   ⚠️ 实际交易门槛: 价差 > {(RiskManager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST)*100:.2f}%（成本0.12%+净利0.01%）")
+        logger.info(f"   ⚠️ 实际交易门槛: 价差 > {(RiskManager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST)*100:.2f}%（成本0.16%+净利0.25%）")
         logger.info(f"   📌 杠杆: {LEVERAGE}x | 仓位: 永续余额×20%")
         
         self._run_loop()
@@ -302,17 +301,22 @@ class ExecutionEngine:
         # 仓位 = 永续余额 × 20%（永续做本金池）
         position_size = perp_bal * self.risk_manager.MAX_POSITION_PCT
         
-        # 检查最小金额限制（按余额比例缩放，小额账户也能交易）
-        baseline = BALANCE_BASELINE.get(ex_name, 5.0)
-        scale_factor = max(perp_bal / baseline, 0.15)  # 至少0.15倍
-        perp_min = PERP_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
-        spot_min = SPOT_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
-        if position_size < perp_min:
-            logger.warning(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < 最小{perp_min:.2f}U(余额{perp_bal:.2f}U×20%)，跳过")
-            return
-        if position_size < spot_min:
-            logger.warning(f"⚠️ {ex_name} {symbol}: 现货仓位{position_size:.2f}U < 最小{spot_min:.2f}U，跳过")
-            return
+        # 检查最小金额限制 - Gate要求3U硬门槛
+        if ex_name == 'gate':
+            if position_size < 3.0:
+                logger.warning(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < Gate最小3U，跳过")
+                return
+        else:
+            baseline = BALANCE_BASELINE.get(ex_name, 5.0)
+            scale_factor = max(perp_bal / baseline, 0.15)  # 至少0.15倍
+            perp_min = PERP_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
+            spot_min = SPOT_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
+            if position_size < perp_min:
+                logger.warning(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < 最小{perp_min:.2f}U，跳过")
+                return
+            if position_size < spot_min:
+                logger.warning(f"⚠️ {ex_name} {symbol}: 现货仓位{position_size:.2f}U < 最小{spot_min:.2f}U，跳过")
+                return
         
         # 方向：永续>现货 → 永续买+现货卖；永续<现货 → 永续卖+现货买
         mid_spot = (spot_bid + spot_ask) / 2
@@ -474,13 +478,13 @@ class ExecutionEngine:
                         t = spot_exchange.fetch_ticker(sym.replace(':USDT', ''))
                         last = t['last']
                         dist = (liq - entry) / entry * 100 if side == 'short' else (entry - liq) / entry * 100
-                        if abs(dist) < 3:
+                        if abs(dist) < 1:
                             logger.critical(f"🔴 {ex_name} {sym} 即将强平! 距强平{dist:.2f}%，紧急平仓!")
                             close_side = 'buy' if side == 'short' else 'sell'
                             contracts = p['contracts']
                             perp_exchange.create_order(sym, 'market', close_side, contracts, None, {'reduceOnly': True})
                             logger.info(f"✅ {ex_name} {sym} 已紧急平仓")
-                        elif abs(dist) < 8:
+                        elif abs(dist) < 2:
                             logger.warning(f"⚠️ {ex_name} {sym} 接近强平: 距强平{dist:.2f}%")
                     except:
                         pass
