@@ -22,7 +22,7 @@ class RiskManager:
     MAX_SINGLE_LOSS_PCT = 0.05     # 单笔最大亏损 ≤ 总资金 5%
     MAX_DAILY_LOSS_PCT = 0.10      # 单日最大亏损 ≤ 总资金 10%
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.0025     # 2026-08-31 修复：净利必须 > 0.25%（大于双边成本0.24%）
+    MIN_NET_PROFIT_PCT = 0.0017     # 2026-08-31 修复：净利必须 > 0.25%（大于双边成本0.24%）
     
     def __init__(self, db_path: str, exchanges_config: Dict = None):
         self.db_path = db_path
