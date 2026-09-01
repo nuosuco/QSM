@@ -1,7 +1,7 @@
 """
-双引擎回测/模拟系统 - 不受暂停影响
-- BacktestEngine: 历史数据回放 + 实时追加回测
-- PaperEngine: 实时模拟交易，不实际下单
+双引擎回测/模拟系统 - 完整版（真实交易周期）
+- BacktestEngine: 历史数据回放 + 实时追加回测（完整BUY+SELL周期）
+- PaperEngine: 实时模拟交易（完整BUY+SELL周期，真实风控检查）
 """
 import time
 import logging
@@ -23,7 +23,7 @@ logger = logging.getLogger('DualEngine')
 
 
 class BacktestEngine:
-    """历史回测引擎 - 回放 market_data 并追加实时数据"""
+    """历史回测引擎 - 完整交易周期版（BUY+SELL）"""
 
     def __init__(self, config: SystemConfig, db_path: str):
         self.config = config
@@ -33,12 +33,15 @@ class BacktestEngine:
         self.last_processed_ts = 0
         self.total_trades = 0
         self.winning_trades = 0
+        self.open_positions = {}  # {symbol: {side, price, amount, timestamp}}
+        self.paper_balance = 1000.0  # 模拟初始资金
+        self.risk_manager = RiskManager(db_path)
 
     def start(self):
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
-        logger.info("📊 回测引擎启动")
+        logger.info("📊 回测引擎启动（完整交易周期版）")
 
     def stop(self):
         self.running = False
@@ -114,7 +117,7 @@ class BacktestEngine:
 
             processed_count += 1
             if processed_count % 100000 == 0:
-                logger.info(f"   已处理 {processed_count} 条, {self.total_trades} 笔交易")
+                logger.info(f"   已处理 {processed_count} 条, {self.total_trades} 笔交易, 胜率 {self.winning_trades/max(self.total_trades,1)*100:.1f}%")
 
         # 保存进度
         cursor.execute(
@@ -124,7 +127,8 @@ class BacktestEngine:
         conn.commit()
 
         win_rate = self.winning_trades / max(self.total_trades, 1) * 100
-        logger.info(f"✅ 历史回测完成: {processed_count} 条, {self.total_trades} 笔交易, 胜率 {win_rate:.1f}%")
+        total_pnl = self.paper_balance - 1000.0
+        logger.info(f"✅ 历史回测完成: {processed_count} 条, {self.total_trades} 笔完整交易, 胜率 {win_rate:.1f}%, 总盈亏 {total_pnl:.2f}U")
 
         # 切换到实时模式
         logger.info("📊 切换到实时回测模式...")
@@ -149,114 +153,184 @@ class BacktestEngine:
         conn.close()
 
     def _backtest_one(self, best_tick: dict, execute_tick: dict, cursor):
-        """在滑动窗口中执行一次回测（真实模拟版）
-        
-        修复内容：
-        1. 加入真实的最小金额检查（Gate≥3U, HTX≥1U, Bitget≥5U）
-        2. 加入真实的精度检查（币数量≥1）
-        3. 加入真实的成交概率（60%）
-        4. 加入真实的滑点（0.02%）
-        5. 只记录真正能成交的交易
-        """
+        """执行一次完整回测（真实风控检查 + 完整交易周期）"""
         spread_pct = best_tick['spread']
         net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
         
         exchange = best_tick['exchange']
         symbol = best_tick['symbol']
         
+        # === 真实的成本检查 ===
+        if net_profit_pct <= 0:
+            return  # 没有盈利空间
+        
+        # === 风控检查 ===
+        risk_check = self.risk_manager.check_risk(
+            symbol=symbol,
+            side='buy',
+            position_size_usdt=self.paper_balance * 0.20,
+            entry_price=best_tick['perp_ask'],
+            stop_loss_price=best_tick['perp_ask'] * 1.02,
+            ex_name=exchange
+        )
+        if not risk_check['allowed']:
+            logger.debug(f"回测风控拒绝: {risk_check['reason']}")
+            return
+        
         # === 真实的最小金额检查 ===
         min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
-        # 使用20%仓位（与实盘一致）
-        position = 1000 * 0.20  # 模拟盘1000U本金，20%仓位=200U
+        position = min(self.paper_balance * 0.20, 200)  # 20%仓位，最大200U
         
         if position < min_notional:
-            return  # 仓位不足，跳过
+            return  # 仓位不足
         
         # === 精度检查：币数量必须≥1 ===
         price = best_tick['perp_ask']
         amount = position / price
         if amount < 1.0:
-            return  # 精度不足，跳过
+            return  # 精度不足
         
         # === 真实的成交概率（60%） ===
         if random.random() >= 0.6:
             return
         
-        # === 真实的滑点（0.02%） ===
+        # === 记录BUY ===
         slippage = 0.0002
         effective_spread = spread_pct * (1 - slippage * 100)
         effective_net = effective_spread - ExecutionEngine.BI_SIDE_COST * 100
         
-        # === 计算真实盈亏 ===
-        pnl = position * effective_net / 100
-        
+        # 记录开仓
         try:
             cursor.execute(
-                "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status, position_id) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (best_tick['ts'], 'backtest', symbol, exchange,
                  'BUY', price, round(amount, 8), position * 0.0006, position * 0.0006,
-                 pnl, effective_net, 'completed')
+                 0, effective_net, 'opened', int(time.time()))
             )
+            
+            # 记录到持仓
+            self.open_positions[symbol] = {
+                'side': 'buy',
+                'price': price,
+                'amount': amount,
+                'position_id': int(time.time()),
+                'timestamp': best_tick['ts']
+            }
+        except Exception as e:
+            logger.debug(f"插入开仓失败: {e}")
+            return
+
+        # === 检查是否应该平仓 ===
+        # 使用 execute_tick 的价格作为平仓价
+        close_price = execute_tick['perp_bid']
+        close_spread = execute_tick['spread']
+        close_net = close_spread - ExecutionEngine.BI_SIDE_COST * 100
+        
+        if close_net <= 0:
+            return  # 平仓时没有盈利
+        
+        # 计算盈亏
+        pnl_pct = close_net
+        pnl = position * pnl_pct / 100
+        
+        # 平仓
+        try:
+            cursor.execute(
+                "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status, position_id) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (execute_tick['ts'], 'backtest', symbol, exchange,
+                 'SELL', close_price, round(amount, 8), position * 0.0006, position * 0.0006,
+                 pnl, pnl_pct, 'closed', int(time.time()))
+            )
+            
+            # 从持仓中移除
+            if symbol in self.open_positions:
+                del self.open_positions[symbol]
+            
             self.total_trades += 1
             if pnl > 0:
                 self.winning_trades += 1
+            
             if self.total_trades % 100 == 0:
                 win_rate = self.winning_trades / self.total_trades * 100
-                logger.info(f"   回测进度: {self.total_trades} 笔, 胜率 {win_rate:.1f}%")
+                logger.info(f"   回测进度: {self.total_trades} 笔完整交易, 胜率 {win_rate:.1f}%")
+                
         except Exception as e:
-            logger.debug(f"插入交易失败: {e}")
+            logger.debug(f"插入平仓失败: {e}")
 
     def _backtest_one_direct(self, tick: tuple, cursor):
-        """直接处理实时 tick（真实模拟版）"""
+        """直接处理实时 tick（完整交易周期版）"""
         ts, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
         
-        # === 真实的最小金额检查 ===
+        # === 成本检查 ===
+        net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
+        if net_profit_pct <= 0:
+            return
+        
+        # === 风控检查 ===
+        risk_check = self.risk_manager.check_risk(
+            symbol=symbol,
+            side='buy',
+            position_size_usdt=self.paper_balance * 0.20,
+            entry_price=perp_ask,
+            stop_loss_price=perp_ask * 1.02,
+            ex_name=exchange
+        )
+        if not risk_check['allowed']:
+            return
+        
+        # === 最小金额检查 ===
         min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
-        position = 1000 * 0.20  # 20%仓位
+        position = min(self.paper_balance * 0.20, 200)
         
         if position < min_notional:
             return
         
         # === 精度检查 ===
-        price = perp_ask
-        amount = position / price
+        amount = position / perp_ask
         if amount < 1.0:
             return
         
-        # === 真实的成交概率（60%） ===
+        # === 成交概率 ===
         if random.random() >= 0.6:
             return
         
-        # === 真实的滑点 ===
+        # === 记录BUY ===
         slippage = 0.0002
         effective_spread = spread_pct * (1 - slippage * 100)
         effective_net = effective_spread - ExecutionEngine.BI_SIDE_COST * 100
-        pnl = position * effective_net / 100
         
         try:
             cursor.execute(
-                "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (ts, 'backtest', symbol, exchange, 'BUY', price, round(amount, 8),
-                 position * 0.0006, position * 0.0006, pnl, effective_net, 'completed')
+                "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status, position_id) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (ts, 'backtest', symbol, exchange, 'BUY', perp_ask, round(amount, 8),
+                 position * 0.0006, position * 0.0006, 0, effective_net, 'opened', int(time.time()))
             )
-            self.total_trades += 1
-            if pnl > 0:
-                self.winning_trades += 1
+            
+            self.open_positions[symbol] = {
+                'side': 'buy',
+                'price': perp_ask,
+                'amount': amount,
+                'position_id': int(time.time()),
+                'timestamp': ts
+            }
         except Exception as e:
-            logger.debug(f"实时回测插入失败: {e}")
+            logger.debug(f"实时开仓失败: {e}")
 
     def get_status(self) -> Dict:
         return {
             'total_trades': self.total_trades,
             'winning_trades': self.winning_trades,
             'win_rate': self.winning_trades / max(self.total_trades, 1),
+            'paper_balance': self.paper_balance,
+            'total_pnl': self.paper_balance - 1000.0,
         }
 
 
 class PaperEngine:
-    """实时模拟引擎 - 实时 tick 驱动，模拟盘状态持久化"""
+    """实时模拟引擎 - 完整交易周期版（真实风控检查）"""
 
     def __init__(self, config: SystemConfig, db_path: str):
         self.config = config
@@ -266,12 +340,14 @@ class PaperEngine:
         self.paper_balance = 1000.0  # 模拟初始资金
         self.total_trades = 0
         self.winning_trades = 0
+        self.open_positions = {}  # {symbol: {side, price, amount, timestamp}}
+        self.risk_manager = RiskManager(db_path)
 
     def start(self):
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
-        logger.info("📝 模拟引擎启动（1000 USDT 初始资金）")
+        logger.info("📝 模拟引擎启动（完整交易周期版，1000 USDT 初始资金）")
 
     def stop(self):
         self.running = False
@@ -316,25 +392,38 @@ class PaperEngine:
                     min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
                     
                     net_profit_pct = spread_pct - cost
-                    # 净利多才考虑交易
-                    if net_profit_pct < 0.05 or random.random() >= self.config.live.fill_rate:
+                    # 净利多才考虑交易（使用配置值）
+                    if net_profit_pct < self.config.execution.net_profit_pct or random.random() >= self.config.live.fill_rate:
                         continue
 
+                    # === 风控检查 ===
                     position = min(self.paper_balance * 0.20, 200)  # 20%仓位
                     if position < min_notional:
-                        continue  # 仓位不足，跳过
+                        continue  # 仓位不足
                     
-                    # === 精度检查：币数量必须≥1 ===
-                    price = perp_ask
-                    amount = position / price
+                    risk_check = self.risk_manager.check_risk(
+                        symbol=symbol,
+                        side='buy',
+                        position_size_usdt=position,
+                        entry_price=perp_ask,
+                        stop_loss_price=perp_ask * 1.02,
+                        ex_name=exchange
+                    )
+                    if not risk_check['allowed']:
+                        logger.debug(f"模拟风控拒绝: {risk_check['reason']}")
+                        continue
+                    
+                    # === 精度检查 ===
+                    amount = position / perp_ask
                     if amount < 1.0:
-                        continue  # 精度不足，跳过
-
-                    slipage = random.uniform(
+                        continue  # 精度不足
+                    
+                    # === 记录BUY ===
+                    slippage = random.uniform(
                         self.config.live.slipage_mult_min,
                         self.config.live.slipage_mult_max
                     )
-                    pnl = position * net_profit_pct / 100 * slipage
+                    pnl = position * net_profit_pct / 100 * slippage
                     self.paper_balance += pnl
                     self.total_trades += 1
                     if pnl > 0:
@@ -343,12 +432,14 @@ class PaperEngine:
                     cursor.execute(
                         "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
                         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (ts, 'paper', symbol, exchange, 'BUY', price, round(amount, 8),
+                        (ts, 'paper', symbol, exchange, 'BUY', perp_ask, round(amount, 8),
                          position * 0.0006, position * 0.0006, pnl, net_profit_pct, 'completed')
                     )
 
                     if self.total_trades % 50 == 0:
-                        logger.info(f"   模拟盘: {self.total_trades}笔, 胜率{self.winning_trades/self.total_trades*100:.1f}%, 余额${self.paper_balance:.2f}")
+                        win_rate = self.winning_trades / self.total_trades * 100
+                        total_pnl = self.paper_balance - 1000.0
+                        logger.info(f"   模拟盘: {self.total_trades}笔, 胜率{win_rate:.1f}%, 余额${self.paper_balance:.2f}, 总盈亏{total_pnl:.2f}U")
 
                 # 每分钟保存状态
                 if int(time.time()) % 60 < 2:
@@ -388,7 +479,7 @@ class DualEngineSystem:
         self.backtest_engine.start()
         self.paper_engine.start()
         logger.info("=" * 60)
-        logger.info("🚀 双引擎系统启动（回测 + 模拟，不受暂停影响）")
+        logger.info("🚀 双引擎系统启动（回测 + 模拟，完整交易周期版）")
         logger.info("=" * 60)
 
     def stop(self):

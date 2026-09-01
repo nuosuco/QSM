@@ -272,13 +272,13 @@ class ExecutionEngine:
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
                 net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
                 
-                # 三层阈值检查
+                # 三层阈值检查（统一使用百分比值）
                 if spread_pct < self.config.execution.spread_pct:
                     continue
                 if net_profit_pct < self.config.execution.net_profit_pct:
                     continue
                 if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT * 100:
-                    continue
+                    continue  # MIN_NET_PROFIT_PCT=0.0001(0.01%), *100=1%, 实际要求净利>1%
                 
                 # 执行做市
                 self._execute_market_making(ex_name, spot_exchange, perp_exchange, symbol, 
