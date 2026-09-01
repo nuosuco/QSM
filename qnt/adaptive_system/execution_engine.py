@@ -272,14 +272,18 @@ class ExecutionEngine:
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
                 net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
                 
-                # 三层阈值检查（统一使用百分比值）
-                # spread_pct/net_profit_pct 都是百分比值（如0.17表示0.17%）
+                # === 严格的价差检查：必须>0.17%才能交易 ===
+                # 用户要求：净利=0.01%，成本=0.16%，价差=0.17%
+                if spread_pct < self.BI_SIDE_COST * 100 + RiskManager.MIN_NET_PROFIT_PCT:
+                    continue  # 价差不足成本线+净利要求，跳过
+                
+                # 执行引擎层检查（灵敏度调整，不影响实际门槛）
                 if spread_pct < self.config.execution.spread_pct:
-                    continue  # 价差不足
+                    continue
                 if net_profit_pct < self.config.execution.net_profit_pct:
-                    continue  # 净利不足（执行层）
+                    continue
                 if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT:
-                    continue  # MIN_NET_PROFIT_PCT=0.01（百分比），定死不变
+                    continue
                 
                 # 执行做市
                 self._execute_market_making(ex_name, spot_exchange, perp_exchange, symbol, 

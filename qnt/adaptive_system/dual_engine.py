@@ -155,18 +155,19 @@ class BacktestEngine:
     def _backtest_one(self, best_tick: dict, execute_tick: dict, cursor):
         """执行一次完整回测（真实风控检查 + 完整交易周期）"""
         spread_pct = best_tick['spread']
+        # 成本线 = 0.16%，用户要求净利>0.01%，所以价差必须>0.17%
         net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
         
         exchange = best_tick['exchange']
         symbol = best_tick['symbol']
         
-        # === 真实的成本检查 ===
-        if net_profit_pct <= 0:
-            return  # 没有盈利空间
+        # === 严格的成本检查：价差必须>0.17%才能盈利 ===
+        if spread_pct < ExecutionEngine.BI_SIDE_COST * 100 + RiskManager.MIN_NET_PROFIT_PCT:
+            return  # 价差不足成本线+净利要求
         
         # === 净利阈值检查（使用配置值）===
-        if net_profit_pct < ExecutionEngine.BI_SIDE_COST * 100 + self.config.execution.net_profit_pct:
-            return  # 净利不足，跳过
+        if net_profit_pct < self.config.execution.net_profit_pct:
+            return  # 执行引擎层净利不足，跳过
         
         # === 风控检查 ===
         risk_check = self.risk_manager.check_risk(
@@ -267,10 +268,9 @@ class BacktestEngine:
         """直接处理实时 tick（完整交易周期版）"""
         ts, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
         
-        # === 成本检查 ===
-        net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
-        if net_profit_pct <= 0:
-            return
+        # === 严格的成本检查：价差必须>0.17%才能盈利 ===
+        if spread_pct < ExecutionEngine.BI_SIDE_COST * 100 + RiskManager.MIN_NET_PROFIT_PCT:
+            return  # 价差不足成本线+净利要求
         
         # === 风控检查 ===
         risk_check = self.risk_manager.check_risk(
@@ -396,8 +396,14 @@ class PaperEngine:
                     min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
                     
                     net_profit_pct = spread_pct - cost
-                    # 净利多才考虑交易（使用配置值）
-                    if net_profit_pct < self.config.execution.net_profit_pct or random.random() >= self.config.live.fill_rate:
+                    # === 严格的价差检查：必须>0.17%才能交易 ===
+                    if spread_pct < ExecutionEngine.BI_SIDE_COST * 100 + RiskManager.MIN_NET_PROFIT_PCT:
+                        continue
+                    # 净利超过成本线才考虑交易
+                    if net_profit_pct < self.config.execution.net_profit_pct:
+                        continue
+                    # 成交概率检查
+                    if random.random() >= self.config.live.fill_rate:
                         continue
 
                     # === 风控检查 ===
