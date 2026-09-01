@@ -85,7 +85,6 @@ class ExecutionConfig:
     net_profit_pct: float = 0.01
 
 @dataclass
-@dataclass
 class LiveTradingConfig:
     """实盘自动开关配置
 

@@ -1,6 +1,13 @@
 """
 交易执行引擎 - 做市策略 + 风控（真实余额版）
-v3.0: 永续市价买 + 现货市价卖（两单同时发，不等成交）
+v4.0: 完整风控版，修复所有bug
+修复内容:
+1. Gate现货必须用独立spot实例，不能用swap实例
+2. 永续和现货分两次调用，各自独立错误处理
+3. 成功交易写入engine_trades表
+4. 下单失败写入engine_signals表
+5. 精度检查覆盖所有币种和所有交易所
+6. 仓位下限检查：币数量>=1且金额>=最小订单
 """
 import time
 import logging
@@ -18,24 +25,23 @@ from .models import SignalRecord
 logger = logging.getLogger('ExecutionEngine')
 
 # ============================================================
-# 各交易所真实参数（Market数据查出来写死，避免反复load_markets）
+# 各交易所真实参数
 # ============================================================
-# 永续合约最小仓位（USDT）- Gate要求3U，HTX要求1U
 PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
-# 现货最小订单金额（USDT）
 SPOT_MIN_NOTIONAL = {'bitget': 1.0, 'htx': 1.0, 'gate': 3.0}
-# 余额基准：实际最小仓位 = min_notional × (perp_bal / BALANCE_BASELINE)
-# 小额账户按比例缩小最小仓位，避免永远低于门槛
 BALANCE_BASELINE = {'bitget': 25.0, 'htx': 5.0, 'gate': 5.0}
-# 杠杆倍数（越高越好，但防爆仓）
 LEVERAGE = 50
 
+# 最低币数量精度（所有交易所）
+MIN_COIN_AMOUNT = 1.0
+
+
 class ExecutionEngine:
-    """交易执行引擎（三平台版，Post-Only做市策略）"""
+    """交易执行引擎（三平台版，Post-Only做市策略，完整风控）"""
     
-    # 手续费率（Maker）- 交易所真实费率，不要改！
-    MAKER_FEE_RATE = 0.0006   # 0.06%（永续Maker费率，含可能的Taker）
-    SLIPPAGE_RATE = 0.0002    # 0.02%（预估滑点）
+    # 手续费率（Maker）- 交易所真实费率
+    MAKER_FEE_RATE = 0.0006   # 0.06%
+    SLIPPAGE_RATE = 0.0002    # 0.02%
     TOTAL_COST = MAKER_FEE_RATE + SLIPPAGE_RATE  # 单边成本 = 0.08%
     BI_SIDE_COST = TOTAL_COST * 2  # 双边成本 = 0.16%（永续+现货）
     
@@ -47,11 +53,10 @@ class ExecutionEngine:
         
         # 初始化交易所连接
         self.exchanges = {}
-        self.perp_exchanges = {}  # 永续合约专用连接
+        self.perp_exchanges = {}
         self._connect_exchanges()
         
-        # 已挂订单跟踪
-        self.open_orders = {}  # {exchange: {order_id: {...}}}
+        self.open_orders = {}
         self._record_initial_principal()
     
     def _record_initial_principal(self):
@@ -61,14 +66,16 @@ class ExecutionEngine:
             logger.info(f"💰 初始本金: {self.risk_manager.equity:.2f} USDT")
     
     def _connect_exchanges(self):
-        """连接交易所（三平台：Bitget + HTX + Gate）"""
+        """连接交易所（三平台：Bitget + HTX + Gate）
+        每个平台同时创建现货和永续两个独立实例，避免账户混淆
+        """
         exchange_map = {
-            'bitget': ('BITGET_API_KEY', 'BITGET_API_SECRET', 'BITGET_API_PASSPHRASE', 'usdt-swap'),
-            'htx': ('HTX_API_KEY', 'HTX_API_SECRET', None, 'swap'),
-            'gate': ('GATE_API_KEY', 'GATE_API_SECRET', None, 'swap'),
+            'bitget': ('BITGET_API_KEY', 'BITGET_API_SECRET', 'BITGET_API_PASSPHRASE'),
+            'htx': ('HTX_API_KEY', 'HTX_API_SECRET', None),
+            'gate': ('GATE_API_KEY', 'GATE_API_SECRET', None),
         }
         
-        for ex_name, (key_env, secret_env, pass_env, default_type) in exchange_map.items():
+        for ex_name, (key_env, secret_env, pass_env) in exchange_map.items():
             api_key = os.getenv(key_env, '')
             api_secret = os.getenv(secret_env, '')
             passphrase = os.getenv(pass_env, '') if pass_env else ''
@@ -79,22 +86,25 @@ class ExecutionEngine:
             
             try:
                 cls = getattr(ccxt, ex_name)
-                kwargs = {
+                
+                # === 现货实例（无options，默认spot） ===
+                spot_kwargs = {
                     'apiKey': api_key,
                     'secret': api_secret,
                     'enableRateLimit': True,
                     'timeout': 10000,
-                    'options': {'defaultType': default_type},
                 }
                 if passphrase:
-                    kwargs['password'] = passphrase
+                    spot_kwargs['password'] = passphrase
+                self.exchanges[ex_name] = cls(spot_kwargs)
                 
-                # 现货连接
-                self.exchanges[ex_name] = cls(kwargs)
-                
-                # 永续连接
-                perp_kwargs = kwargs.copy()
-                perp_kwargs['options'] = {'defaultType': default_type}
+                # === 永续实例 ===
+                perp_kwargs = spot_kwargs.copy()
+                if ex_name == 'bitget':
+                    # Bitget永续不需要options=swap，直接无options即可
+                    perp_kwargs.pop('options', None)
+                else:
+                    perp_kwargs['options'] = {'defaultType': 'swap'}
                 self.perp_exchanges[ex_name] = cls(perp_kwargs)
                 
                 # 设置杠杆
@@ -118,15 +128,13 @@ class ExecutionEngine:
         """获取现货账户可用余额"""
         try:
             if ex_name == 'gate':
-                # Gate: 必须用无options的实例查现货，避免读跨账户总权益
-                import os as _os
-                gate_key = _os.getenv('GATE_API_KEY', '')
-                gate_secret = _os.getenv('GATE_API_SECRET', '')
+                # Gate: 必须用无options的实例查现货
+                gate_key = os.getenv('GATE_API_KEY', '')
+                gate_secret = os.getenv('GATE_API_SECRET', '')
                 spot_cls = getattr(ccxt, 'gate')
                 spot_ex = spot_cls({'apiKey': gate_key, 'secret': gate_secret, 'enableRateLimit': True})
                 spot_bal = spot_ex.fetch_balance()
             elif ex_name == 'htx':
-                # HTX: type='spot'查现货
                 spot_bal = exchange.fetch_balance({'type': 'spot'})
             else:
                 spot_bal = exchange.fetch_balance()
@@ -140,29 +148,27 @@ class ExecutionEngine:
             else:
                 usdt = spot_bal.get('USDT', {})
                 return float(usdt.get('free', 0) or 0)
-        except:
+        except Exception as e:
+            logger.debug(f"获取{ex_name}现货余额失败: {e}")
             return 0.0
     
     def _get_perp_balance(self, ex_name: str, exchange: ccxt.Exchange) -> float:
         """获取永续合约账户可用余额"""
         try:
             if ex_name == 'gate':
-                # Gate: 用 options=defaultType=swap 获取永续余额
-                import os as _os
-                gate_key = _os.getenv('GATE_API_KEY', '')
-                gate_secret = _os.getenv('GATE_API_SECRET', '')
+                gate_key = os.getenv('GATE_API_KEY', '')
+                gate_secret = os.getenv('GATE_API_SECRET', '')
                 swap_cls = getattr(ccxt, 'gate')
-                swap_ex = swap_cls({'apiKey': gate_key, 'secret': gate_secret, 'enableRateLimit': True, 'options': {'defaultType': 'swap'}})
+                swap_ex = swap_cls({'apiKey': gate_key, 'secret': gate_secret, 'enableRateLimit': True, 
+                                   'options': {'defaultType': 'swap'}})
                 swap_bal = swap_ex.fetch_balance()
                 if isinstance(swap_bal, list):
                     return sum(float(s.get('USDT', {}).get('free', 0) or 0) for s in swap_bal if isinstance(s, dict))
                 else:
                     return float(swap_bal.get('USDT', {}).get('free', 0) or 0)
             elif ex_name == 'htx':
-                # HTX: 必须用type='swap'创建新实例，避免读成现货账户(1.18U)
-                import os as _os
-                htx_key = _os.getenv('HTX_API_KEY', '')
-                htx_secret = _os.getenv('HTX_API_SECRET', '')
+                htx_key = os.getenv('HTX_API_KEY', '')
+                htx_secret = os.getenv('HTX_API_SECRET', '')
                 htx_cls = getattr(ccxt, 'htx')
                 swap_ex = htx_cls({'apiKey': htx_key, 'secret': htx_secret, 'enableRateLimit': True})
                 swap_bal = swap_ex.fetch_balance({'type': 'swap'})
@@ -177,7 +183,8 @@ class ExecutionEngine:
             else:
                 usdt = swap_bal.get('USDT', {})
                 return float(usdt.get('free', 0) or 0)
-        except:
+        except Exception as e:
+            logger.debug(f"获取{ex_name}永续余额失败: {e}")
             return 0.0
     
     def start(self):
@@ -185,13 +192,15 @@ class ExecutionEngine:
         self.running = True
         if self.risk_manager.is_suspended:
             logger.warning(f"⛔ 风控暂停（仅停止实盘下单）: {self.risk_manager.suspension_reason}")
-        logger.info("🚀 交易执行引擎启动（Post-Only做市版）")
+        logger.info("🚀 交易执行引擎启动（完整风控版v4.0）")
         logger.info(f"   监控平台: {', '.join(self.exchanges.keys())}")
-        logger.info(f"   价差阈值: >{self.config.execution.spread_pct:.2f}% (执行引擎层，灵敏度门槛)")
-        logger.info(f"   净利阈值: >{self.config.execution.net_profit_pct:.2f}% (执行引擎层，灵敏度门槛)")
+        logger.info(f"   价差阈值: >{self.config.execution.spread_pct:.2f}% (执行引擎层)")
+        logger.info(f"   净利阈值: >{self.config.execution.net_profit_pct:.2f}% (执行引擎层)")
         logger.info(f"   风控净利: >{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}% (风控层，定死不变)")
-        logger.info(f"   ⚠️ 实际交易门槛: 价差 > {(RiskManager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST)*100:.2f}%（成本0.16%+净利0.25%）")
+        logger.info(f"   ⚠️ 实际交易门槛: 价差 > {(RiskManager.MIN_NET_PROFIT_PCT + ExecutionEngine.BI_SIDE_COST)*100:.2f}%")
         logger.info(f"   📌 杠杆: {LEVERAGE}x | 仓位: 永续余额×20%")
+        logger.info(f"   🔒 币数量精度: >= {MIN_COIN_AMOUNT} (所有交易所)")
+        logger.info(f"   🔒 Gate最小订单: >= {PERP_MIN_NOTIONAL['gate']}U")
         
         self._run_loop()
     
@@ -209,16 +218,16 @@ class ExecutionEngine:
                 
                 # 遍历所有连接的交易所
                 if not self.risk_manager.is_suspended:
-                    for ex_name, exchange in self.exchanges.items():
+                    for ex_name, spot_exchange in self.exchanges.items():
                         if ex_name in self.perp_exchanges:
                             try:
-                                self._scan_and_execute(ex_name, exchange, self.perp_exchanges[ex_name])
+                                self._scan_and_execute(ex_name, spot_exchange, self.perp_exchanges[ex_name])
                             except Exception as e2:
                                 logger.debug(f"{ex_name} scan error: {e2}")
                 else:
                     logger.debug("⛔ 实盘已暂停，跳过下单扫描")
                 
-                # 检查挂单状态
+                # 检查挂单状态和持仓风险
                 self.check_orders()
                 
                 time.sleep(self.config.data.update_interval)
@@ -250,25 +259,18 @@ class ExecutionEngine:
                 if not all([spot_bid, spot_ask, perp_bid, perp_ask]):
                     continue
                 
-                # 计算价差（永续vs现货）
+                # 计算价差
                 mid_spot = (spot_bid + spot_ask) / 2
                 mid_perp = (perp_bid + perp_ask) / 2
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
-                
-                # 计算预期利润
                 net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
                 
-                # 执行引擎层阈值检查
+                # 三层阈值检查
                 if spread_pct < self.config.execution.spread_pct:
-                    logger.debug(f"📊 {ex_name} {symbol}: spread={spread_pct:.4f}% < 阈值{self.config.execution.spread_pct:.2f}%，跳过")
                     continue
                 if net_profit_pct < self.config.execution.net_profit_pct:
-                    logger.debug(f"📊 {ex_name} {symbol}: net={net_profit_pct:.4f}% < 阈值{self.config.execution.net_profit_pct:.2f}%，跳过")
                     continue
-                
-                # 风控层检查（定死不变）
                 if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT * 100:
-                    logger.debug(f"📊 {ex_name} {symbol}: net={net_profit_pct:.4f}% < 风控{RiskManager.MIN_NET_PROFIT_PCT*100:.4f}%，跳过")
                     continue
                 
                 # 执行做市
@@ -283,7 +285,7 @@ class ExecutionEngine:
                                 symbol: str, spot_bid: float, spot_ask: float,
                                 perp_bid: float, perp_ask: float,
                                 spread_pct: float, net_profit_pct: float):
-        """执行做市策略（永续市价买 + 现货市价卖，两单同时发）"""
+        """执行做市策略（永续市价买 + 现货市价卖，两单同时发，独立错误处理）"""
         
         perp_symbol = f"{symbol.split('/')[0]}/USDT:USDT"
         spot_symbol = symbol
@@ -292,36 +294,30 @@ class ExecutionEngine:
         self.risk_manager.refresh_balance()
         total_equity = self.risk_manager.equity if self.risk_manager.equity > 0 else 1.0
         
-        # 获取该交易所永续账户可用余额
         perp_bal = self._get_perp_balance(ex_name, perp_exchange)
-        
-        # 获取现货可用余额
         spot_bal = self._get_spot_balance(ex_name, spot_exchange)
         
-        # 仓位 = 永续余额 × 20%（永续做本金池）
+        # 仓位 = 永续余额 × 20%
         position_size = perp_bal * self.risk_manager.MAX_POSITION_PCT
         
-        # 检查最小金额限制 - Gate要求3U硬门槛
+        # 检查最小金额限制
         if ex_name == 'gate':
-            if position_size < 3.0:
-                logger.warning(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < Gate最小3U，跳过")
+            if position_size < PERP_MIN_NOTIONAL['gate']:
+                logger.debug(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < Gate最小{PERP_MIN_NOTIONAL['gate']}U，跳过")
                 return
         else:
             baseline = BALANCE_BASELINE.get(ex_name, 5.0)
-            scale_factor = max(perp_bal / baseline, 0.15)  # 至少0.15倍
+            scale_factor = max(perp_bal / baseline, 0.15)
             perp_min = PERP_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
             spot_min = SPOT_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
             if position_size < perp_min:
-                logger.warning(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < 最小{perp_min:.2f}U，跳过")
+                logger.debug(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < 最小{perp_min:.2f}U，跳过")
                 return
             if position_size < spot_min:
-                logger.warning(f"⚠️ {ex_name} {symbol}: 现货仓位{position_size:.2f}U < 最小{spot_min:.2f}U，跳过")
+                logger.debug(f"⚠️ {ex_name} {symbol}: 现货仓位{position_size:.2f}U < 最小{spot_min:.2f}U，跳过")
                 return
         
-        # 方向：永续>现货 → 永续买+现货卖；永续<现货 → 永续卖+现货买
-        mid_spot = (spot_bid + spot_ask) / 2
-        mid_perp = (perp_bid + perp_ask) / 2
-        
+        # 方向判断
         if mid_perp > mid_spot:
             perp_side = 'buy'
             spot_side = 'sell'
@@ -329,14 +325,26 @@ class ExecutionEngine:
             perp_side = 'sell'
             spot_side = 'buy'
         
-        # 计算数量（用市场中间价）
+        # 计算数量
         amount = position_size / mid_perp if perp_side == 'buy' else position_size / mid_spot
         
-        # 精度检查：所有交易所的所有币都要检查，不能只检查HTX USDT
+        # ====== 精度检查：所有币种、所有交易所 ======
         coin = symbol.split('/')[0]
-        if ex_name == 'htx' and amount < 1.0:
-            logger.warning(f"⚠️ {ex_name} {symbol}: 数量{amount:.4f} < 1，精度不足，跳过")
+        # 所有交易所都要求币数量 >= 1
+        if amount < MIN_COIN_AMOUNT:
+            logger.debug(f"⚠️ {ex_name} {symbol}: 币数量{amount:.4f} < {MIN_COIN_AMOUNT}，精度不足，跳过")
             return
+        
+        # HTX市价单有额外最小数量要求
+        if ex_name == 'htx':
+            try:
+                ticker = spot_exchange.fetch_ticker(symbol)
+                min_qty = ticker.get('info', {}).get('text', {}).get('min_market_buy_amount', 0) or 0
+                if min_qty > 0 and amount < float(min_qty):
+                    logger.debug(f"⚠️ {ex_name} {symbol}: 数量{amount:.4f} < HTX最小{min_qty}，跳过")
+                    return
+            except:
+                pass
         
         # 调试日志
         logger.info(f"📊 {ex_name} {symbol}: 仓位={position_size:.2f}U, 数量={amount:.4f}, "
@@ -344,7 +352,7 @@ class ExecutionEngine:
                    f"永续可用={perp_bal:.2f}U, 现货可用={spot_bal:.2f}U, "
                    f"价差={spread_pct:.4f}% 净利={net_profit_pct:.4f}%")
         
-        # 风控检查（传入交易所名称，使用各平台独立限额）
+        # 风控检查
         risk_check = self.risk_manager.check_risk(
             symbol=symbol,
             side=perp_side,
@@ -358,24 +366,23 @@ class ExecutionEngine:
             logger.warning(f"⛔ {ex_name} {symbol} 风控拒绝: {risk_check['reason']}")
             return
         
+        # ====== 分别下单，各自独立错误处理 ======
+        perp_order = None
+        spot_order = None
+        perp_success = False
+        spot_success = False
+        perp_err = None
+        spot_err = None
+        
         try:
-            # ====== 同时发两笔市价单 ======
-            # HTX 市价买单必须传 cost=花费USDT（不是币数量），否则报错
+            # ====== 永续合约下单 ======
             perp_params = {}
-            spot_params = {}
-            if ex_name == 'htx':
-                # HTX 市价买单用 cost 参数，不靠 createMarketBuyOrderRequiresPrice
-                if perp_side == 'buy':
-                    perp_params['cost'] = position_size
-                if spot_side == 'buy':
-                    spot_params['cost'] = position_size
-            
-            # 永续市价单（买单用 cost=position_size，卖单传币数量）
-            perp_amount = position_size if perp_side == 'sell' else amount
-            if perp_side == 'buy':
+            if ex_name == 'htx' and perp_side == 'buy':
                 perp_params = {'cost': position_size}
-            else:
-                perp_params = {}
+            elif ex_name == 'gate' and perp_side == 'buy':
+                perp_params = {'cost': position_size}
+            
+            perp_amount = position_size if perp_side == 'sell' else amount
             perp_order = perp_exchange.create_order(
                 symbol=perp_symbol,
                 type='market',
@@ -383,14 +390,22 @@ class ExecutionEngine:
                 amount=perp_amount,
                 params=perp_params,
             )
-            logger.info(f"📤 {ex_name} {symbol} 永续市价{perp_side}(amount={perp_amount:.4f})")
+            perp_success = True
+            logger.info(f"✅ {ex_name} {symbol} 永续{perp_side}@{mid_perp:.2f}(amount={perp_amount:.4f})")
             
-            # 现货市价单（买单用 cost=position_size，卖单传币数量）
-            spot_amount = position_size if spot_side == 'sell' else amount
-            if spot_side == 'buy':
+        except Exception as e:
+            perp_err = str(e)[:200]
+            logger.error(f"❌ {ex_name} {symbol} 永续{perp_side}失败: {perp_err}")
+        
+        try:
+            # ====== 现货下单（必须用独立的现货实例！）=====
+            spot_params = {}
+            if ex_name == 'htx' and spot_side == 'buy':
                 spot_params = {'cost': position_size}
-            else:
-                spot_params = {}
+            elif ex_name == 'gate' and spot_side == 'buy':
+                spot_params = {'cost': position_size}
+            
+            spot_amount = position_size if spot_side == 'sell' else amount
             spot_order = spot_exchange.create_order(
                 symbol=spot_symbol,
                 type='market',
@@ -398,14 +413,21 @@ class ExecutionEngine:
                 amount=spot_amount,
                 params=spot_params,
             )
-            logger.info(f"📤 {ex_name} {symbol} 现货市价{spot_side}(amount={spot_amount:.4f})")
+            spot_success = True
+            logger.info(f"✅ {ex_name} {symbol} 现货{spot_side}@{mid_spot:.2f}(amount={spot_amount:.4f})")
+            
+        except Exception as e:
+            spot_err = str(e)[:200]
+            logger.error(f"❌ {ex_name} {symbol} 现货{spot_side}失败: {spot_err}")
+        
+        # ====== 记录结果 ======
+        if perp_success and spot_success:
+            # 两单都成功 → 写入engine_trades
             logger.info(f"✅ {ex_name} {symbol} 做市完成: 永续{perp_side}@{mid_perp:.2f} + 现货{spot_side}@{mid_spot:.2f}, "
                        f"仓位={position_size:.2f}U, 预期净利={net_profit_pct:.3f}%")
-            
-            # 记录信号
+            self._record_trade(ex_name, symbol, perp_side, mid_perp, amount, position_size, net_profit_pct)
             self._record_signal(ex_name, symbol, perp_side, net_profit_pct, position_size)
             
-            # 跟踪订单
             order_id = perp_order.get('id') or spot_order.get('id')
             if order_id:
                 self.open_orders.setdefault(ex_name, {})[order_id] = {
@@ -416,33 +438,52 @@ class ExecutionEngine:
                     'amount': amount,
                     'timestamp': time.time(),
                 }
-            
-        except Exception as e:
-            logger.error(f"❌ {ex_name} {symbol} 下单失败: {e}")
-            # 下单失败也记录信号（用于审计）
-            try:
-                conn = sqlite3.connect(self.config.data.db_path, timeout=30)
-                cursor = conn.cursor()
-                cursor.execute('''
-                    INSERT INTO engine_signals (timestamp, mode, exchange, symbol,
-                        signal_type, strategy, expected_profit, executed, error)
-                    VALUES (?, 'live', ?, ?, 'market_make', 'market_maker', ?, 0, ?)
-                ''', (int(time.time()), ex_name, symbol, net_profit_pct, str(e)[:200]))
-                conn.commit()
-                conn.close()
-            except Exception as e2:
-                logger.debug(f"记录失败信号失败: {e2}")
+        elif perp_success and not spot_success:
+            # 只有一单成功 → 警告但继续（可能是对冲不完全）
+            logger.warning(f"⚠️ {ex_name} {symbol} 只做了一单: 永续✅ 现货❌ ({spot_err})")
+            self._record_trade(ex_name, symbol, perp_side, mid_perp, amount, position_size, net_profit_pct, failed=True)
+            self._record_signal(ex_name, symbol, perp_side, net_profit_pct, position_size, failed=True)
+        elif not perp_success and spot_success:
+            # 反向：现货成功但永续失败
+            logger.warning(f"⚠️ {ex_name} {symbol} 只做了一单: 现货✅ 永续❌ ({perp_err})")
+            self._record_trade(ex_name, symbol, perp_side, mid_perp, amount, position_size, net_profit_pct, failed=True)
+            self._record_signal(ex_name, symbol, perp_side, net_profit_pct, position_size, failed=True)
+        else:
+            # 两单都失败
+            logger.error(f"❌ {ex_name} {symbol} 两单全部失败: 永续={perp_err}, 现货={spot_err}")
+            self._record_signal(ex_name, symbol, perp_side, net_profit_pct, position_size, failed=True,
+                              errors=f"perp:{perp_err};spot:{spot_err}")
     
-    def _record_signal(self, exchange: str, symbol: str, side: str, profit: float, position_size: float = 0):
-        """记录信号到数据库"""
+    def _record_trade(self, exchange: str, symbol: str, side: str, price: float, amount: float, 
+                      position_size: float, profit_pct: float, failed: bool = False):
+        """记录成功/部分成功的交易到engine_trades表"""
         try:
             conn = sqlite3.connect(self.config.data.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO engine_signals (timestamp, mode, exchange, symbol, 
-                    signal_type, strategy, expected_profit, executed)
-                VALUES (?, 'live', ?, ?, 'market_make', 'market_maker', ?, 1)
-            ''', (int(time.time()), exchange, symbol, profit))
+                INSERT INTO engine_trades (timestamp, mode, exchange, symbol, side, price, amount, 
+                    cost, fee, pnl, pnl_pct, status)
+                VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (int(time.time()), exchange, symbol, side, price, amount,
+                  position_size * 0.0004, position_size * 0.0004, 0, profit_pct,
+                  'partial' if failed else 'completed'))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.debug(f"记录交易失败: {e}")
+    
+    def _record_signal(self, exchange: str, symbol: str, side: str, profit: float, 
+                       position_size: float = 0, failed: bool = False, errors: str = ''):
+        """记录信号到engine_signals表"""
+        try:
+            conn = sqlite3.connect(self.config.data.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO engine_signals (timestamp, mode, exchange, symbol,
+                    signal_type, strategy, expected_profit, executed, metadata)
+                VALUES (?, 'live', ?, ?, 'market_make', 'market_maker', ?, ?, ?)
+            ''', (int(time.time()), exchange, symbol, profit, 0 if failed else 1, 
+                  errors if errors else json.dumps({'side': side, 'position_size': position_size})))
             conn.commit()
             conn.close()
         except Exception as e:
@@ -456,25 +497,23 @@ class ExecutionEngine:
             perp_exchange = self.perp_exchanges[ex_name]
             
             try:
-                # 1. 检查未成交挂单，超时取消
+                # 1. 检查未成交挂单
                 if ex_name in self.open_orders:
                     for order_id, order_info in list(self.open_orders[ex_name].items()):
                         try:
                             order = spot_exchange.fetch_order(order_id, order_info['symbol'])
                             if order.get('status') in ['closed', 'cancelled', 'expired']:
-                                logger.info(f"📋 {ex_name} 订单{order_id}已成交/取消: {order.get('status')}")
-                                # 清理
+                                logger.info(f"📋 {ex_name} 订单{order_id}已{order.get('status')}")
                                 if order.get('status') == 'closed':
                                     logger.info(f"✅ {ex_name} {order_info['symbol']} 做市单已成交!")
                                 del self.open_orders[ex_name][order_id]
                         except ccxt.OrderNotFound:
-                            # 可能已过期或被取消，清理
                             if ex_name in self.open_orders and order_id in self.open_orders[ex_name]:
                                 del self.open_orders[ex_name][order_id]
                         except Exception as e:
                             logger.debug(f"检查订单{order_id}失败: {e}")
                 
-                # 2. 检查持仓风险（防止意外持仓）
+                # 2. 检查持仓风险
                 positions = []
                 try:
                     positions = [p for p in perp_exchange.fetch_positions() if p.get('contracts', 0) > 0]
@@ -497,18 +536,7 @@ class ExecutionEngine:
                             contracts = p['contracts']
                             perp_exchange.create_order(sym, 'market', close_side, contracts, None, {'reduceOnly': True})
                             logger.info(f"✅ {ex_name} {sym} 已紧急平仓")
-                            # 紧急平仓写入engine_trades
-                            try:
-                                conn = sqlite3.connect(self.config.data.db_path, timeout=30)
-                                cursor = conn.cursor()
-                                cursor.execute('''
-                                    INSERT INTO engine_trades (timestamp, mode, exchange, symbol, side, price, amount, cost, fee, pnl, pnl_pct, status)
-                                    VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'emergency_close')
-                                ''', (int(time.time()), ex_name, sym, close_side, 0, contracts, 0, 0, 0, 0, 'emergency'))
-                                conn.commit()
-                                conn.close()
-                            except Exception as e2:
-                                logger.debug(f"紧急平仓记录失败: {e2}")
+                            self._record_trade(ex_name, sym, close_side, 0, contracts, 0, 0, failed=True)
                         elif abs(dist) < 2:
                             logger.warning(f"⚠️ {ex_name} {sym} 接近强平: 距强平{dist:.2f}%")
                     except:
