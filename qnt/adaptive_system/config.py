@@ -149,7 +149,7 @@ class SystemConfig:
     # 三平台配置
     exchanges: Dict[str, ExchangeConfig] = field(default_factory=lambda: {
         "bitget": ExchangeConfig(name="bitget", enabled=True, passphrase="qntsomtop"),
-        "htx": ExchangeConfig(name="htx", enabled=True),
+        "htx": ExchangeConfig(name="htx", enabled=False),
         "gate": ExchangeConfig(name="gate", enabled=True),
     })
     
