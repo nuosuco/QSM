@@ -17,6 +17,7 @@ from adaptive_system.dual_engine import DualEngineSystem, BacktestEngine, PaperE
 from adaptive_system.execution_engine import ExecutionEngine
 from adaptive_system.live_trading_controller import LiveTradingController
 from adaptive_system.evolution_manager import EvolutionManager
+from adaptive_system.data_collector import DataCollector
 import logging
 
 # 配置日志
@@ -65,6 +66,10 @@ class AdaptiveEvolutionSystem:
         
         # 启动自进化管理器（每24小时分析一次）
         self.evolution_manager = EvolutionManager(config.data.db_path, config)
+        
+        # 启动数据收集器（三平台并行采集）
+        self.data_collector = DataCollector(config)
+        self.data_collector.start()
         
         logger.info("✅ 系统初始化完成")
         logger.info("📊 铁律确认:")

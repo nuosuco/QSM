@@ -63,7 +63,11 @@ class Position:
 
 
 class BacktestEngine:
-    """历史回测引擎 - 完整交易周期版（真实BUY+SELL配对）"""
+    """历史回测引擎 - 完整交易周期版（真实BUY+SELL配对）
+    铁律：每个平台独立管理余额，互不影响"""
+
+    # 每个平台的初始回测资金
+    PLATFORM_INITIAL_BALANCE = {'bitget': 1000.0, 'htx': 1000.0, 'gate': 1000.0}
 
     def __init__(self, config: SystemConfig, db_path: str):
         self.config = config
@@ -71,12 +75,20 @@ class BacktestEngine:
         self.running = False
         self.thread = None
         self.last_processed_ts = 0
+        
+        # === 按平台独立管理余额 ===
+        self.platforms = ['bitget', 'htx', 'gate']
+        self.platform_balances: Dict[str, float] = dict(self.PLATFORM_INITIAL_BALANCE)  # {platform: balance}
+        self.platform_trades: Dict[str, int] = {p: 0 for p in self.platforms}  # {platform: trade_count}
+        self.platform_wins: Dict[str, int] = {p: 0 for p in self.platforms}  # {platform: win_count}
+        self.platform_pnl: Dict[str, float] = {p: 0.0 for p in self.platforms}  # {platform: total_pnl}
+        
+        self.open_positions: Dict[str, Position] = {}  # {exchange|symbol: Position}
         self.total_trades = 0
         self.winning_trades = 0
-        self.open_positions: Dict[str, Position] = {}  # {symbol: Position}
-        self.paper_balance = 1000.0  # 模拟初始资金
+        
         # 创建独立的模拟风控管理器，使用模拟余额而非实盘余额
-        self.risk_manager = RiskManager(db_path, paper_mode=True, paper_balance=self.paper_balance)
+        self.risk_manager = RiskManager(db_path, paper_mode=True, paper_balance=sum(self.platform_balances.values()))
 
     def start(self):
         self.running = True
@@ -122,9 +134,9 @@ class BacktestEngine:
         logger.info(f"   数据范围: {datetime.fromtimestamp(min_ts).strftime('%m-%d %H:%M')} ~ "
                    f"{datetime.fromtimestamp(max_ts).strftime('%m-%d %H:%M')} ({total_hours:.1f}小时)")
 
-        # 分批处理
+        # 分批处理 - 按平台独立维护窗口
         processed_count = 0
-        window = []
+        windows = {p: [] for p in self.platforms}  # 每个平台独立窗口
         threshold = self.config.execution.spread_pct
         cost = ExecutionEngine.BI_SIDE_COST * 100
         min_net_profit = RiskManager.MIN_NET_PROFIT_PCT
@@ -145,27 +157,27 @@ class BacktestEngine:
 
             self.last_processed_ts = max(self.last_processed_ts, ts)
 
-            # 维护滑动窗口（最近30秒的数据）
-            window.append({
-                'ts': ts, 'exchange': exchange, 'symbol': symbol,
-                'spot_bid': spot_bid, 'spot_ask': spot_ask,
-                'perp_bid': perp_bid, 'perp_ask': perp_ask,
-                'spread': spread_pct
-            })
-
-            # 清理超过30秒的旧数据
-            while window and ts - window[0]['ts'] > 30:
-                window.pop(0)
-
-            if len(window) < 5:
-                continue
-
-            # 检查是否有开仓机会
-            if spread_pct >= threshold and spread_pct >= cost + min_net_profit:
-                self._try_open_position(window, cursor)
-
-            # 检查是否需要平仓
-            self._check_close_positions(window, cursor)
+            # 只维护当前platform的窗口（避免跨平台数据混合）
+            if exchange in windows:
+                tick = {
+                    'ts': ts, 'exchange': exchange, 'symbol': symbol,
+                    'spot_bid': spot_bid, 'spot_ask': spot_ask,
+                    'perp_bid': perp_bid, 'perp_ask': perp_ask,
+                    'spread': spread_pct
+                }
+                windows[exchange].append(tick)
+                
+                # 清理超过30秒的旧数据
+                while windows[exchange] and ts - windows[exchange][0]['ts'] > 30:
+                    windows[exchange].pop(0)
+                
+                # 每个平台独立检查开仓机会
+                if len(windows[exchange]) >= 5:
+                    if spread_pct >= threshold and spread_pct >= cost + min_net_profit:
+                        self._try_open_position([tick], cursor)  # 只传当前tick，不传混合窗口
+                
+                # 检查平仓
+                self._check_close_positions(windows[exchange], cursor)
 
             processed_count += 1
             if processed_count % 100000 == 0:
@@ -179,8 +191,17 @@ class BacktestEngine:
         conn.commit()
 
         win_rate = self.winning_trades / max(self.total_trades, 1) * 100
-        total_pnl = self.paper_balance - 1000.0
-        logger.info(f"✅ 历史回测完成: {processed_count} 条, {self.total_trades} 笔完整交易, 胜率 {win_rate:.1f}%, 总盈亏 {total_pnl:.2f}U")
+
+        # === 按平台统计回测结果 ===
+        logger.info(f"✅ 历史回测完成: {processed_count} 条, {self.total_trades} 笔完整交易")
+        logger.info(f"   总体胜率: {win_rate:.1f}%")
+        logger.info(f"   按平台统计:")
+        for p in self.platforms:
+            p_trades = self.platform_trades[p]
+            p_wins = self.platform_wins[p]
+            p_pnl = self.platform_pnl[p]
+            p_win_rate = p_wins / max(p_trades, 1) * 100 if p_trades > 0 else 0
+            logger.info(f"     {p}: {p_trades}笔, 胜率{p_win_rate:.1f}%, 盈亏{p_pnl:+.2f}U")
 
         # 切换到实时模式
         logger.info("📊 切换到实时回测模式...")
@@ -241,7 +262,7 @@ class BacktestEngine:
         risk_check = self.risk_manager.check_risk(
             symbol=symbol,
             side='buy',
-            position_size_usdt=self.paper_balance * 0.20,
+            position_size_usdt=self.platform_balances[exchange] * 0.20,
             entry_price=best_tick['perp_ask'],
             stop_loss_price=best_tick['perp_ask'] * 1.02,
             ex_name=exchange
@@ -252,7 +273,7 @@ class BacktestEngine:
         
         # 最小金额检查
         min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
-        position = min(self.paper_balance * 0.20, 200)
+        position = min(self.platform_balances[exchange] * 0.20, 200)
         
         if position < min_notional:
             logger.debug(f"[回测] 跳过: 仓位{position:.2f}U < 最小{min_notional}U")
@@ -265,20 +286,21 @@ class BacktestEngine:
             logger.debug(f"[回测] 跳过: 币数量{amount:.4f} < 1.0")
             return
         
-        # 成交概率（60%）
-        if random.random() >= 0.6:
+        # 成交概率（30%）- 降低过滤门槛
+        if random.random() >= 0.3:
             logger.debug(f"[回测] 跳过: 成交概率未命中")
             return
         
-        # 检查是否已有同币种同方向持仓
-        if symbol in self.open_positions:
-            logger.debug(f"[回测] 跳过: 已有持仓 {symbol}")
+        # 检查是否已有同币种同方向持仓（按exchange隔离）
+        pos_key = f"{exchange}|{symbol}"
+        if pos_key in self.open_positions:
+            logger.debug(f"[回测] 跳过: 已有持仓 {pos_key}")
             return
         
         # 开仓
         position_id = int(time.time() * 1000)
         position = Position(symbol, exchange, 'buy', price, amount, position_id, best_tick['ts'])
-        self.open_positions[symbol] = position
+        self.open_positions[pos_key] = position
         
         # 记录到数据库
         try:
@@ -297,8 +319,9 @@ class BacktestEngine:
         """检查是否需要平仓"""
         to_close = []
         
-        for symbol, pos in self.open_positions.items():
-            # 找最近的匹配tick
+        for pos_key, pos in list(self.open_positions.items()):
+            symbol = pos_key.split('|', 1)[1]
+            # 找最近的匹配tick（只查当前platform的窗口）
             matching_ticks = [t for t in window if t['symbol'] == symbol]
             if not matching_ticks:
                 continue
@@ -316,9 +339,9 @@ class BacktestEngine:
             should_close = (pnl_result['net_pnl'] > 0 and pnl_result['pnl_pct'] > 0.01) or hold_time > 60
             
             if should_close:
-                to_close.append((symbol, pos, pnl_result, latest))
+                to_close.append((pos_key, pos, pnl_result, latest))
         
-        for symbol, pos, pnl_result, tick in to_close:
+        for pos_key, pos, pnl_result, tick in to_close:
             # 平仓
             try:
                 cursor.execute(
@@ -333,10 +356,13 @@ class BacktestEngine:
                 self.total_trades += 1
                 if pnl_result['net_pnl'] > 0:
                     self.winning_trades += 1
-                    self.paper_balance += pnl_result['net_pnl']
+                self.platform_trades[pos.exchange] += 1
+                self.platform_wins[pos.exchange] += (1 if pnl_result['net_pnl'] > 0 else 0)
+                self.platform_pnl[pos.exchange] += pnl_result['net_pnl']
+                self.platform_balances[pos.exchange] += pnl_result['net_pnl']
                 
                 # 从持仓中移除
-                del self.open_positions[symbol]
+                del self.open_positions[pos_key]
                 
                 logger.debug(f"回测平仓: {symbol} @ {pnl_result['close_price']:.4f}, PnL={pnl_result['net_pnl']:+.4f}U ({pnl_result['pnl_pct']:+.3f}%)")
                 
@@ -344,30 +370,54 @@ class BacktestEngine:
                 logger.debug(f"插入平仓失败: {e}")
 
     def get_status(self) -> Dict:
+        # === 按平台统计回测状态 ===
+        platform_stats = {}
+        for p in self.platforms:
+            p_trades = self.platform_trades[p]
+            p_wins = self.platform_wins[p]
+            p_pnl = self.platform_pnl[p]
+            platform_stats[p] = {
+                'balance': self.platform_balances[p],
+                'trades': p_trades,
+                'wins': p_wins,
+                'win_rate': p_wins / max(p_trades, 1) * 100 if p_trades > 0 else 0,
+                'pnl': p_pnl,
+            }
+        
         return {
             'total_trades': self.total_trades,
             'winning_trades': self.winning_trades,
             'win_rate': self.winning_trades / max(self.total_trades, 1),
-            'paper_balance': self.paper_balance,
-            'total_pnl': self.paper_balance - 1000.0,
-            'open_positions': len(self.open_positions),
+            'platform_stats': platform_stats,
+            'total_pnl': sum(self.platform_pnl.values()),
         }
 
 
 class PaperEngine:
-    """实时模拟引擎 - 完整交易周期版（真实风控检查）"""
+    """实时模拟引擎 - 完整交易周期版（真实风控检查）
+    铁律：每个平台独立管理余额，互不影响"""
+
+    # 每个平台的初始模拟资金
+    PLATFORM_INITIAL_BALANCE = {'bitget': 1000.0, 'htx': 1000.0, 'gate': 1000.0}
 
     def __init__(self, config: SystemConfig, db_path: str):
         self.config = config
         self.db_path = db_path
         self.running = False
         self.thread = None
-        self.paper_balance = 1000.0  # 模拟初始资金
+        
+        # === 按平台独立管理余额 ===
+        self.platforms = ['bitget', 'htx', 'gate']
+        self.platform_balances: Dict[str, float] = dict(self.PLATFORM_INITIAL_BALANCE)  # {platform: balance}
+        self.platform_trades: Dict[str, int] = {p: 0 for p in self.platforms}
+        self.platform_wins: Dict[str, int] = {p: 0 for p in self.platforms}
+        self.platform_pnl: Dict[str, float] = {p: 0.0 for p in self.platforms}
+        
         self.total_trades = 0
         self.winning_trades = 0
-        self.open_positions: Dict[str, Position] = {}
+        self.open_positions: Dict[str, Position] = {}  # {exchange|symbol: Position}
         # 创建独立的模拟风控管理器，使用模拟余额而非实盘余额
-        self.risk_manager = RiskManager(db_path, paper_mode=True, paper_balance=self.paper_balance)
+        self.risk_manager = RiskManager(db_path, paper_mode=True, paper_balance=sum(self.platform_balances.values()))
         self.last_save_time = 0
 
     def start(self):
@@ -386,12 +436,34 @@ class PaperEngine:
         conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
         cursor = conn.cursor()
 
-        # 加载模拟盘状态
-        cursor.execute("SELECT balance, total_pnl FROM simulated_balance WHERE id=1")
-        row = cursor.fetchone()
-        if row:
-            self.paper_balance = row[0]
-            logger.info(f"📝 恢复模拟盘余额: {self.paper_balance:.2f} USDT")
+        # 加载模拟盘状态（按平台恢复）
+        try:
+            cursor.execute("SELECT platform, balance FROM simulated_platform_balance")
+            for row in cursor.fetchall():
+                platform, bal = row
+                if platform in self.platform_balances:
+                    self.platform_balances[platform] = bal
+                    logger.info(f"📝 恢复{platform}模拟盘余额: {bal:.2f} USDT")
+        except:
+            pass  # 首次运行或表不存在，使用默认值
+
+        # 从数据库恢复未平仓的持仓
+        try:
+            cursor.execute("""
+                SELECT symbol, exchange, side, price, amount, timestamp, status
+                FROM engine_trades
+                WHERE mode='paper' AND status='opened' AND timestamp > 1000000000
+            """)
+            for row in cursor.fetchall():
+                symbol, exchange, side, price, amount, ts, status = row
+                position_id = int(time.time() * 1000)
+                position = Position(symbol, exchange, side, price, amount, position_id, ts)
+                pos_key = f"{exchange}|{symbol}"
+                self.open_positions[pos_key] = position
+                logger.info(f"📝 恢复持仓: {symbol} {exchange} {side} @ {price}")
+            logger.info(f"📝 恢复了 {len(self.open_positions)} 个持仓")
+        except Exception as e:
+            logger.warning(f"⚠️ 恢复持仓失败: {e}")
 
         last_check_ts = 0
         threshold = self.config.execution.spread_pct
@@ -432,10 +504,11 @@ class PaperEngine:
                     if random.random() >= self.config.live.fill_rate:
                         continue
                     
-                    # 检查是否已有同币种持仓
-                    if symbol in self.open_positions:
+                    # 检查是否已有同币种持仓（按exchange隔离）
+                    pos_key = f"{exchange}|{symbol}"
+                    if pos_key in self.open_positions:
                         # 检查是否需要平仓
-                        pos = self.open_positions[symbol]
+                        pos = self.open_positions[pos_key]
                         close_price = perp_bid if pos.side == 'buy' else perp_ask
                         pnl_result = pos.close(close_price)
                         
@@ -443,11 +516,15 @@ class PaperEngine:
                         should_close = (pnl_result['net_pnl'] > 0 and pnl_result['pnl_pct'] > 0.01) or hold_time > 60
                         
                         if should_close:
-                            # 平仓
+                            # 平仓 - 按平台统计
+                            platform = exchange  # exchange已经是'bitget','htx','gate'
+                            self.platform_trades[platform] += 1
                             self.total_trades += 1
                             if pnl_result['net_pnl'] > 0:
+                                self.platform_wins[platform] += 1
                                 self.winning_trades += 1
-                                self.paper_balance += pnl_result['net_pnl']
+                            self.platform_pnl[platform] += pnl_result['net_pnl']
+                            self.platform_balances[platform] += pnl_result['net_pnl']
                             
                             cursor.execute(
                                 "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
@@ -457,17 +534,19 @@ class PaperEngine:
                                  pnl_result['net_pnl'], pnl_result['pnl_pct'], 'completed')
                             )
                             
-                            del self.open_positions[symbol]
+                            del self.open_positions[pos_key]
                             
                             if self.total_trades % 10 == 0:
                                 win_rate = self.winning_trades / self.total_trades * 100
-                                total_pnl = self.paper_balance - 1000.0
-                                logger.info(f"   模拟盘: {self.total_trades}笔, 胜率{win_rate:.1f}%, 余额${self.paper_balance:.2f}, 总盈亏{total_pnl:.2f}U")
+                                logger.info(f"   模拟盘: {self.total_trades}笔, 胜率{win_rate:.1f}%")
+                                for p in self.platforms:
+                                    logger.info(f"     {p}: {self.platform_trades[p]}笔, 盈亏{self.platform_pnl[p]:+.2f}U")
                         continue
                     
-                    # === 风控检查 ===
+                    # === 风控检查（按平台余额）===
                     min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
-                    position = min(self.paper_balance * 0.20, 200)
+                    platform = exchange  # exchange已经是'bitget','htx','gate'
+                    position = min(self.platform_balances[platform] * 0.20, 200)
                     
                     if position < min_notional:
                         continue
@@ -489,10 +568,12 @@ class PaperEngine:
                     if amount < 1.0:
                         continue
                     
-                    # 开仓
+                    # 开仓 - 按平台统计
                     position_id = int(time.time() * 1000)
                     position = Position(symbol, exchange, 'buy', perp_ask, amount, position_id, ts)
-                    self.open_positions[symbol] = position
+                    self.open_positions[pos_key] = position
+                    self.platform_trades[platform] += 1
+                    self.total_trades += 1
                     
                     # 记录到数据库
                     try:
@@ -506,14 +587,15 @@ class PaperEngine:
                     except Exception as e:
                         logger.debug(f"插入开仓失败: {e}")
 
-                # 每分钟保存状态
+                # 每分钟保存状态（按平台）
                 now = time.time()
                 if now - self.last_save_time > 60:
-                    cursor.execute("DELETE FROM simulated_balance")
-                    cursor.execute(
-                        "INSERT INTO simulated_balance (id, timestamp, balance, total_pnl) VALUES (1, ?, ?, ?)",
-                        (now, self.paper_balance, self.paper_balance - 1000.0)
-                    )
+                    cursor.execute("DELETE FROM simulated_platform_balance")
+                    for p, bal in self.platform_balances.items():
+                        cursor.execute(
+                            "INSERT INTO simulated_platform_balance (platform, balance, updated_at) VALUES (?, ?, ?)",
+                            (p, bal, now)
+                        )
                     conn.commit()
                     self.last_save_time = now
 
@@ -526,12 +608,27 @@ class PaperEngine:
         conn.close()
 
     def get_status(self) -> Dict:
+        # === 按平台统计模拟状态 ===
+        platform_stats = {}
+        for p in self.platforms:
+            p_trades = self.platform_trades[p]
+            p_wins = self.platform_wins[p]
+            p_pnl = self.platform_pnl[p]
+            platform_stats[p] = {
+                'balance': self.platform_balances[p],
+                'trades': p_trades,
+                'wins': p_wins,
+                'win_rate': p_wins / max(p_trades, 1) * 100 if p_trades > 0 else 0,
+                'pnl': p_pnl,
+            }
+        
         return {
-            'balance': self.paper_balance,
-            'total_pnl': self.paper_balance - 1000.0,
+            'balance': sum(self.platform_balances.values()),
+            'total_pnl': sum(self.platform_pnl.values()),
             'total_trades': self.total_trades,
             'win_rate': self.winning_trades / max(self.total_trades, 1),
             'open_positions': len(self.open_positions),
+            'platform_stats': platform_stats,
         }
 
 
