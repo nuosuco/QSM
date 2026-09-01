@@ -273,12 +273,13 @@ class ExecutionEngine:
                 net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
                 
                 # 三层阈值检查（统一使用百分比值）
+                # spread_pct/net_profit_pct 都是百分比值（如0.17表示0.17%）
                 if spread_pct < self.config.execution.spread_pct:
-                    continue
+                    continue  # 价差不足
                 if net_profit_pct < self.config.execution.net_profit_pct:
-                    continue
-                if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT * 100:
-                    continue  # MIN_NET_PROFIT_PCT=0.0001(0.01%), *100=1%, 实际要求净利>1%
+                    continue  # 净利不足（执行层）
+                if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT:
+                    continue  # MIN_NET_PROFIT_PCT=0.01（百分比），定死不变
                 
                 # 执行做市
                 self._execute_market_making(ex_name, spot_exchange, perp_exchange, symbol, 
@@ -541,9 +542,25 @@ class ExecutionEngine:
                             logger.critical(f"🔴 {ex_name} {sym} 即将强平! 距强平{dist:.2f}%，紧急平仓!")
                             close_side = 'buy' if side == 'short' else 'sell'
                             contracts = p['contracts']
-                            perp_exchange.create_order(sym, 'market', close_side, contracts, None, {'reduceOnly': True})
-                            logger.info(f"✅ {ex_name} {sym} 已紧急平仓")
-                            self._record_trade(ex_name, sym, close_side, 0, contracts, 0, 0, failed=True)
+                            # 🔴 紧急平仓也检查仓位是否满足最小金额
+                            try:
+                                perp_ex = perp_exchange
+                                perp_symbol = sym
+                                if ex_name == 'htx' and close_side == 'buy':
+                                    perp_params = {'cost': float(contracts) * entry * 0.01}  # 最小1%
+                                else:
+                                    perp_params = {}
+                                perp_exchange.create_order(
+                                    symbol=perp_symbol,
+                                    type='market',
+                                    side=close_side,
+                                    amount=contracts,
+                                    params=perp_params,
+                                )
+                                logger.info(f"✅ {ex_name} {sym} 已紧急平仓")
+                                self._record_trade(ex_name, sym, close_side, last, contracts, 0, 0, failed=True)
+                            except Exception as e2:
+                                logger.error(f"❌ {ex_name} {sym} 紧急平仓失败: {e2}")
                         elif abs(dist) < 2:
                             logger.warning(f"⚠️ {ex_name} {sym} 接近强平: 距强平{dist:.2f}%")
                     except:

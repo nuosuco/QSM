@@ -164,6 +164,10 @@ class BacktestEngine:
         if net_profit_pct <= 0:
             return  # 没有盈利空间
         
+        # === 净利阈值检查（使用配置值）===
+        if net_profit_pct < ExecutionEngine.BI_SIDE_COST * 100 + self.config.execution.net_profit_pct:
+            return  # 净利不足，跳过
+        
         # === 风控检查 ===
         risk_check = self.risk_manager.check_risk(
             symbol=symbol,
