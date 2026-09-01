@@ -300,10 +300,8 @@ class BacktestEngine:
             logger.debug(f"[回测] 跳过: 已有持仓 {pos_key}")
             return
         
-        # 开仓（使用数据库自增ID避免重复）
-        cursor.execute("SELECT COALESCE(MAX(CAST(SUBSTR(position_id, 2) AS INTEGER)), 0) + 1 FROM engine_trades WHERE position_id LIKE 'bt%'")
-        next_id = cursor.fetchone()[0]
-        position_id = f"bt_{next_id}"
+        # 开仓（使用时间戳生成唯一ID）
+        position_id = f"bt_{int(time.time() * 1000)}"
         position = Position(symbol, exchange, 'buy', price, amount, position_id, best_tick['ts'])
         self.open_positions[pos_key] = position
         
@@ -574,10 +572,8 @@ class PaperEngine:
                         continue
                     
                     # 开仓 - 按平台统计
-                    # 使用数据库自增ID避免重复
-                    cursor.execute("SELECT COALESCE(MAX(CAST(SUBSTR(position_id, 2) AS INTEGER)), 0) + 1 FROM engine_trades WHERE position_id LIKE 'pa%'")
-                    next_id = cursor.fetchone()[0]
-                    position_id = f"pa_{next_id}"
+                    # 使用时间戳生成唯一ID
+                    position_id = f"pa_{int(time.time() * 1000)}"
                     position = Position(symbol, exchange, 'buy', perp_ask, amount, position_id, ts)
                     self.open_positions[pos_key] = position
                     self.platform_trades[platform] += 1
