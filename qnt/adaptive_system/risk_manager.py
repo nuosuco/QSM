@@ -22,13 +22,17 @@ class RiskManager:
     MAX_SINGLE_LOSS_PCT = 0.05     # 单笔最大亏损 ≤ 总资金 5%
     MAX_DAILY_LOSS_PCT = 0.10      # 单日最大亏损 ≤ 总资金 10%
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.01     # 2026-09-01 修复：净利必须 > 0.01%（用户要求）
+    MIN_NET_PROFIT_PCT = 0.0001   # 2026-09-01 修复：净利必须 > 0.01%（用户要求），定死不变
     
-    def __init__(self, db_path: str, exchanges_config: Dict = None):
+    def __init__(self, db_path: str, paper_mode: bool = False, paper_balance: float = 1000.0, exchanges_config: Dict = None):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self.exchanges_config = exchanges_config or {}
         self._init_db()
+        
+        # 模拟模式：使用模拟余额，不读取实盘余额
+        self.paper_mode = paper_mode
+        self.paper_balance = paper_balance
         
         # 运行时状态
         self.consecutive_losses = 0
@@ -42,9 +46,14 @@ class RiskManager:
         self.real_balance = {}
         self.equity = 0.0
         
-        # 加载状态并获取真实余额
-        self.load_state()
-        self.refresh_balance()
+        # 加载状态并获取真实余额（模拟模式跳过）
+        if not self.paper_mode:
+            self.load_state()
+            self.refresh_balance()
+        else:
+            # 模拟模式：使用模拟余额
+            self.equity = self.paper_balance
+            logger.info(f"💰 模拟模式：使用模拟余额 {self.paper_balance:.2f} USDT")
     
     def _init_db(self):
         """初始化风控表"""
@@ -266,7 +275,10 @@ class RiskManager:
         }
         
         # 按交易所使用永续账户独立权益做风控，否则用总权益兜底
-        if ex_name and ex_name in self.real_balance:
+        # 模拟模式：直接使用模拟余额
+        if self.paper_mode:
+            equity = self.paper_balance
+        elif ex_name and ex_name in self.real_balance:
             reb = self.real_balance[ex_name]
             perp_equity = reb.get('perp', 0.0)
             spot_equity = reb.get('spot', reb.get('total', 0.0))

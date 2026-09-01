@@ -21,7 +21,7 @@ import logging
 
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
     handlers=[
         logging.FileHandler('/root/SOM/qnt/evolution_system.log'),

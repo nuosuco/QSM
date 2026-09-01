@@ -75,7 +75,8 @@ class BacktestEngine:
         self.winning_trades = 0
         self.open_positions: Dict[str, Position] = {}  # {symbol: Position}
         self.paper_balance = 1000.0  # 模拟初始资金
-        self.risk_manager = RiskManager(db_path)
+        # 创建独立的模拟风控管理器，使用模拟余额而非实盘余额
+        self.risk_manager = RiskManager(db_path, paper_mode=True, paper_balance=self.paper_balance)
 
     def start(self):
         self.running = True
@@ -183,12 +184,13 @@ class BacktestEngine:
 
         # 切换到实时模式
         logger.info("📊 切换到实时回测模式...")
+        check_count = 0
         while self.running:
             try:
                 cursor.execute("""
                     SELECT timestamp, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct
                     FROM market_data
-                    WHERE timestamp > ? AND ABS(spread_pct) < 1.0
+                    WHERE timestamp > ? AND spread_pct > 0 AND spread_pct < 1.0
                     ORDER BY timestamp DESC LIMIT 1
                 """, (self.last_processed_ts,))
                 latest = cursor.fetchone()
@@ -196,7 +198,13 @@ class BacktestEngine:
                     self.last_processed_ts = latest[0]
                     ts, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = latest
                     
+                    # 调试日志：每100次检查打印一次
+                    check_count += 1
+                    if check_count % 100 == 0:
+                        logger.debug(f"[回测] 检查#{check_count}, 最新spread={spread_pct:.4f}%, 门槛={threshold:.2f}%")
+                    
                     if spread_pct >= threshold and spread_pct >= cost + min_net_profit:
+                        logger.debug(f"[回测] 发现机会: {exchange} {symbol} spread={spread_pct:.4f}% >= {cost+min_net_profit:.4f}%")
                         # 构造临时tick
                         tick = {'ts': ts, 'exchange': exchange, 'symbol': symbol,
                                'spot_bid': spot_bid, 'spot_ask': spot_ask,
@@ -221,8 +229,12 @@ class BacktestEngine:
         exchange = best_tick['exchange']
         symbol = best_tick['symbol']
         
+        # 调试日志
+        logger.debug(f"[回测开仓检查] {exchange} {symbol} spread={spread_pct:.4f}% perp_ask={best_tick['perp_ask']}")
+        
         # 严格的成本检查
         if spread_pct < ExecutionEngine.BI_SIDE_COST * 100 + RiskManager.MIN_NET_PROFIT_PCT:
+            logger.debug(f"[回测] 跳过: 价差{spread_pct:.4f}% < 成本线{ExecutionEngine.BI_SIDE_COST*100:.2f}%+净利{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}%")
             return
         
         # 风控检查
@@ -235,7 +247,7 @@ class BacktestEngine:
             ex_name=exchange
         )
         if not risk_check['allowed']:
-            logger.debug(f"回测风控拒绝: {risk_check['reason']}")
+            logger.debug(f"[回测] 风控拒绝: {risk_check['reason']}")
             return
         
         # 最小金额检查
@@ -243,20 +255,24 @@ class BacktestEngine:
         position = min(self.paper_balance * 0.20, 200)
         
         if position < min_notional:
+            logger.debug(f"[回测] 跳过: 仓位{position:.2f}U < 最小{min_notional}U")
             return
         
         # 精度检查
         price = best_tick['perp_ask']
         amount = position / price
         if amount < 1.0:
+            logger.debug(f"[回测] 跳过: 币数量{amount:.4f} < 1.0")
             return
         
         # 成交概率（60%）
         if random.random() >= 0.6:
+            logger.debug(f"[回测] 跳过: 成交概率未命中")
             return
         
         # 检查是否已有同币种同方向持仓
         if symbol in self.open_positions:
+            logger.debug(f"[回测] 跳过: 已有持仓 {symbol}")
             return
         
         # 开仓
@@ -350,7 +366,8 @@ class PaperEngine:
         self.total_trades = 0
         self.winning_trades = 0
         self.open_positions: Dict[str, Position] = {}
-        self.risk_manager = RiskManager(db_path)
+        # 创建独立的模拟风控管理器，使用模拟余额而非实盘余额
+        self.risk_manager = RiskManager(db_path, paper_mode=True, paper_balance=self.paper_balance)
         self.last_save_time = 0
 
     def start(self):
@@ -402,6 +419,9 @@ class PaperEngine:
                     # 严格检查：价差必须>0.17%才能交易
                     if spread_pct < cost + min_net_profit:
                         continue
+                    
+                    # 调试日志
+                    logger.debug(f"[模拟] 检查 {exchange} {symbol} spread={spread_pct:.4f}% perp_ask={perp_ask}")
                     
                     # 执行引擎层检查
                     net_profit_pct = spread_pct - cost

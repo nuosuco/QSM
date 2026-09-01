@@ -1,307 +1,423 @@
-# 自适应进化交易系统 v1.0 - 铁律方案
-
-## 一、铁律（不可违背）
-
-### 铁律1：三引擎必须真实运行
-- **回测**：历史数据回放 + 实时追加，必须有完整BUY+SELL周期，不能只记BUY
-- **模拟**：1000U初始资金，完整持仓管理，真实风控检查，模拟盈亏
-- **实盘**：完全受控，只有满足所有开启条件才允许开实盘
-
-### 铁律2：盈利验证才能开实盘
-- 回测盈利 → 开启实盘试验
-- 模拟盈利且样本足够 → 开启实盘交易
-- 实盘亏损 → 立即停止，退回模拟重新验证
-
-### 铁律3：风控层层收紧
-- 执行引擎层：检查价差、净利、最小金额、精度
-- 风控引擎层：检查仓位、止损、回撤、连续亏损
-- 自动开关层：检查模拟盘表现、市场环境
-
-### 铁律4：自适应进化
-- 每个周期结束后分析交易记录
-- 发现有效规律 → 更新策略参数
-- 发现无效/亏损规律 → 废弃该策略
-- 风控阈值随盈利情况动态调整
+# QNT自适应策略引擎方案 v1.0
+**版本**: 1.0  
+**更新日期**: 2026-09-01  
+**状态**: 三引擎系统运行中
 
 ---
 
-## 二、三引擎架构
+## 一、系统架构
 
+### 1.1 三引擎设计
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    AdaptiveEvolutionSystem                  │
-├─────────────┬─────────────┬─────────────┬───────────────────┤
-│ Backtest    │   Paper     │  Live       │  Evolution        │
-│ Engine      │   Engine    │  Controller │  Manager          │
-│ (历史+实时)  │ (实时模拟)   │ (真实交易)   │ (策略进化)         │
-├─────────────┼─────────────┼─────────────┼───────────────────┤
-│ - 完整BUY+S │ - 完整BUY+S │ - 真实下单   │ - 分析交易记录      │
-│   ELL周期    │   ELL周期    │ - 完整风控   │ - 总结有效规律      │
-│ - 1000U模拟 │ - 1000U模拟 │ - 最小金额   │ - 更新策略参数      │
-│   资金       │   资金       │ - 精度检查   │ - 调整风控阈值      │
-│ - 成交概率60%│ - 成交概率60%│ - 强平保护   │ - 生成进化报告      │
-│ - 滑点模拟   │ - 滑点模拟   │ - 自动开关   │                   │
-└─────────────┴─────────────┴─────────────┴───────────────────┘
+│                    自适应进化交易系统 v1.0                   │
+├─────────────────────────────────────────────────────────────┤
+│  📊 回测引擎                                                │
+│     ├── 历史数据回放（已完成599,154条）                      │
+│     └── 实时数据监控（已切换到实时模式）                      │
+│                                                             │
+│  📝 模拟引擎                                                │
+│     ├── 初始资金：1000 USDT                                 │
+│     └── 实时模拟交易（严格执行风控）                         │
+│                                                             │
+│  🔒 实盘控制器                                              │
+│     └── 状态：🔒 已关闭（等待验证通过）                     │
+│                                                             │
+│  🧬 自进化系统                                              │
+│     └── 每24小时分析交易记录，优化策略参数                   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.1 回测引擎 (BacktestEngine)
-
-**功能**：
-- 历史数据回放（从数据库读取过去N天的market_data）
-- 实时追加回测（新数据来了也回放）
-- 完整BUY+SELL周期管理
-- 真实风控检查（最小金额、精度、仓位限制）
-- 模拟成交概率和滑点
-
-**约束**：
-- 每个交易对最多1个持仓
-- 平仓条件：有盈利(净利>0.01%)或持仓超过60秒强制止损
-- 不写engine_trades的live记录（只写backtest模式）
-- 不触发真实下单
-
-**输出**：
-- engine_trades表（mode='backtest'）
-- 回测统计报告（胜率、盈亏、最大回撤）
-
-### 2.2 模拟引擎 (PaperEngine)
-
-**功能**：
-- 实时扫描市场数据
-- 完整BUY+SELL周期管理
-- 真实风控检查（同实盘）
-- 模拟盘资金独立（1000U初始，不与实盘混淆）
-- 成交概率60%，滑点0.02%
-
-**约束**：
-- 每个交易对最多1个持仓
-- 风控检查通过后才开仓
-- 平仓条件：有盈利(净利>0.01%)或持仓超过60秒强制止损
-- 不写engine_trades的live记录（只写paper模式）
-- 不触发真实下单
-
-**输出**：
-- engine_trades表（mode='paper'）
-- 实时余额表（simulated_balance）
-- 模拟盘统计报告
-
-### 2.3 实盘控制器 (LiveTradingController)
-
-**功能**：
-- 只控制ExecutionEngine的开关
-- 监控模拟盘表现
-- 根据条件自动开启/停止实盘
-- 风控状态持久化
-
-**开启条件（全部满足）**：
-1. 账户权益 >= min_equity (默认25U)
-2. 必需平台全部连接成功
-3. 模拟盘窗口 >= min_paper_trades (默认50笔)
-4. 模拟盘窗口胜率 >= min_paper_win_rate (默认50%)
-5. 市场环境不是extreme
-
-**停止条件（任一触发）**：
-- 连续亏损 >= MAX_CONSECUTIVE_LOSSES (默认3次)
-- 最大回撤 >= MAX_DRAWDOWN_PCT (默认8%)
-- 单日亏损 >= MAX_DAILY_LOSS_PCT (默认3%)
-- 市场状态 extreme 且连续2次确认
-
-**输出**：
-- 控制ExecutionEngine.running标志
-- 日志记录所有开关操作
-- 状态持久化到risk_state表
-
-### 2.4 自进化管理器 (EvolutionManager) ⭐新增
-
-**功能**：
-- 定期分析交易记录
-- 发现有效/无效交易规律
-- 自动调整策略参数
-- 生成进化报告
-
-**分析内容**：
-1. **交易统计**：总交易数、胜率、平均盈亏、最大单笔盈亏
-2. **策略效果**：不同策略在不同市场的表现
-3. **风控有效性**：止损触发率、强平预警率
-4. **市场适应性**：不同市场状态下盈利差异
-
-**进化动作**：
-- 如果发现某策略长期有效（胜率>55%，样本>100）→ 提升该策略优先级
-- 如果发现某策略无效（胜率<45%）→ 降低优先级或禁用
-- 如果市场波动增大但盈利稳定 → 可适当放宽阈值
-- 如果市场波动增大且开始亏损 → 收紧阈值
-
-**输出**：
-- evolution_history表（记录每次进化参数）
-- 进化报告（/root/SOM/qnt/evolution_report_YYYYMMDD.md）
-- 自动更新config.py参数
-
----
-
-## 三、风控铁律（所有引擎必须遵守）
-
-### 3.1 成本线（定死不变）
+### 1.2 引擎关系
 ```
-成本线 = BI_SIDE_COST = 0.16%（永续+现货双边）
-实际门槛 = 成本线 + MIN_NET_PROFIT_PCT = 0.16% + 0.01% = 0.17%
-```
-
-### 3.2 仓位限制（定死不变）
-```
-单币种最大仓位 = 账户权益 × MAX_POSITION_PCT (20%)
-单交易所最大仓位 = 账户权益 × 0.50
-```
-
-### 3.3 止损机制
-```
-强制止损：持仓超过60秒未盈利立即平仓
-硬止损：单笔亏损超过2%强制平仓
-```
-
-### 3.4 回撤保护
-```
-连续亏损5次 → 暂停实盘，退回模拟验证
-最大回撤40% → 停止所有交易，人工介入
-```
-
-### 3.5 最小金额限制
-```
-Bitget: 永续≥5U, 现货≥1U
-HTX:    永续≥1U, 现货≥1U
-Gate:   永续≥3U, 现货≥3U
-精度:   所有币数量≥1
+历史数据 → 回测引擎 → 发现规律 → 自进化系统 → 优化参数
+                                              ↓
+实时数据 → 回测引擎 → 验证规律 → 模拟引擎 → 验证策略
+                                              ↓
+                                          实盘控制器（用户确认后开启）
 ```
 
 ---
 
-## 四、文件清单
+## 二、风控体系
 
-| 文件 | 说明 |
-|------|------|
-| `adaptive_system/config.py` | 配置类（阈值定义） |
-| `adaptive_system/risk_manager.py` | 风控引擎（检查仓位、止损、回撤） |
-| `adaptive_system/execution_engine.py` | 实盘执行引擎（真实下单） |
-| `adaptive_system/dual_engine.py` | 回测+模拟双引擎（完整BUY+SELL） |
-| `adaptive_system/live_trading_controller.py` | 实盘自动开关（受模拟盘表现控制） |
-| `adaptive_system/evolution_manager.py` | ⭐新增：策略进化管理器 |
-| `adaptive_system/__main__.py` | 主入口（协调三个引擎） |
-| `STRATEGY_v4.md` | 策略文档（更新） |
-| `QNT自适应策略引擎方案_v0.0.1.md` | 方案文档（更新为v1.0） |
-
----
-
-## 五、验证流程
-
-```
-1. 启动系统
-   ↓
-2. 回测引擎回放历史数据（验证买入+卖出配对正确）
-   ↓
-3. 模拟引擎运行100笔交易（验证风控、胜率、盈亏）
-   ↓
-4. 检查模拟盘状态：
-   - 胜率 >= 50%？
-   - 样本 >= 50笔？
-   - 最大回撤 < 20%？
-   ↓ 不满足 → 退回步骤2重新调整策略
-   ↓ 满足 → 继续
-   ↓
-5. 用户确认后开启实盘试验（config.live.enabled=True）
-   ↓
-6. 实时监控：
-   - 前10笔交易每笔检查
-   - 发现异常立即停止
-   ↓
-7. 实盘盈利且样本足够 → 全量开启
-   实盘亏损 → 立即停止，退回模拟重新验证
-   ↓
-8. 每24小时运行进化分析
-   - 总结有效规律
-   - 调整策略参数
-   - 更新风控阈值
-   ↓
-9. 循环步骤2-8，持续进化
-```
-
----
-
-## 六、关键代码逻辑
-
-### 回测引擎核心逻辑（伪代码）
+### 2.1 核心阈值（定死不变）
 ```python
-class BacktestEngine:
-    def _run_loop(self):
-        for tick in market_data:
-            # 检查是否有开仓机会
-            if tick.spread >= cost + min_profit:
-                if can_open_position(tick):
-                    position = open_position(tick)
-                    record_trade(position, 'opened')
-            
-            # 检查是否需要平仓
-            for symbol, pos in open_positions:
-                if should_close(pos, tick):
-                    pnl_result = close_position(pos, tick)
-                    record_trade(pnl_result, 'closed')
-                    update_balance(pnl_result)
+# 风控层阈值
+MIN_NET_PROFIT_PCT = 0.0001    # 净利必须 > 0.01%
+MAX_POSITION_PCT = 0.20        # 单笔仓位 ≤ 20%
+MAX_STOP_LOSS_PCT = 0.02       # 止损 ≤ 2%
+MAX_CONSECUTIVE_LOSSES = 5     # 连续亏损5次暂停
+MAX_DRAWDOWN_PCT = 0.40        # 最大回撤40%停止
+PROFIT_WITHDRAW_PCT = 0.50     # 盈利50%提取永不回流
+
+# 执行层阈值（可调灵敏度）
+spread_pct = 0.17              # 价差阈值 > 0.17%
+net_profit_pct = 0.01          # 净利阈值 > 0.01%
+BI_SIDE_COST = 0.16%           # 双边成本（不改）
+
+# 实际交易门槛
+# 成本线 = 0.16%
+# 净利要求 = 0.01%
+# 实际门槛 = 价差 > 0.17%
 ```
 
-### 模拟引擎核心逻辑（伪代码）
-```python
-class PaperEngine:
-    def _run_loop(self):
-        while running:
-            tick = fetch_latest_tick()
-            
-            # 检查持仓是否需要平仓
-            for symbol, pos in open_positions:
-                if should_close(pos, tick):
-                    pnl = close_position(pos, tick)
-                    balance += pnl
-            
-            # 检查是否可以开仓
-            if can_open_position(tick):
-                position = open_position(tick)
-                record_trade(position, 'opened')
-            
-            time.sleep(0.5)
+### 2.2 风控检查流程
+```
+开仓前检查顺序：
+1. 价差检查：spread >= 0.17%？❌ 不通过 → 跳过
+2. 风控检查：check_risk()？❌ 不通过 → 跳过
+3. 最小金额：position >= min_notional？❌ 不通过 → 跳过
+4. 精度检查：amount >= 1.0？❌ 不通过 → 跳过
+5. 成交概率：random() < 0.6？❌ 未命中 → 跳过
+6. 持仓检查：无同币种同方向？❌ 已有 → 跳过
+✅ 全部通过 → 执行开仓
 ```
 
-### 实盘控制器核心逻辑（伪代码）
-```python
-class LiveTradingController:
-    def evaluate(self):
-        conditions = []
-        
-        # 检查所有开启条件
-        if equity < min_equity:
-            conditions.append("权益不足")
-        if not platforms_connected:
-            conditions.append("平台未连接")
-        if paper_trades < min_paper_trades:
-            conditions.append("模拟样本不足")
-        if paper_win_rate < min_win_rate:
-            conditions.append("模拟胜率不足")
-        if market_regime == 'extreme':
-            conditions.append("极端市场")
-        
-        # 应用结果
-        if len(conditions) == 0:
-            enable_live()
-        else:
-            disable_live(conditions)
+### 2.3 资金管理规则
+```
+交易BTC：
+  - BTC本金：20%
+  - USDT本金：80%
+
+交易其他币种：
+  - USDT+币种本金：20%
+  - HTC本金：80%
+
+盈利分配：
+  - 50%立即转入对应储备池
+  - 永不回流交易本金
 ```
 
 ---
 
-## 七、里程碑
+## 三、策略体系
 
-- [x] v0.0.1：基础三平台连接
-- [ ] v1.0：三引擎完整架构
-  - [ ] 回测引擎：完整BUY+SELL周期
-  - [ ] 模拟引擎：完整BUY+SELL周期
-  - [ ] 实盘控制器：自动开关
-  - [ ] 自进化管理器：策略优化
-- [ ] v1.1：模拟盘盈利验证
-- [ ] v1.2：实盘试验（小规模）
-- [ ] v1.3：实盘全量（盈利确认）
-- [ ] v2.0：多策略并行 + 自适应优化
+### 3.1 核心策略
+```
+策略一：捡乌龙指（跨厅套利）
+  - 必要条件：同一币种在≥2个交易点，A厅异常+B厅正常
+  - 操作：A厅买入异常价 + B厅卖出正常价，瞬间锁利
+  - 不等价格恢复，不停留
+
+策略二：单平台双厅套利（永续+现货）
+  - Post-Only订单确保只做Maker
+  - 永续买 + 现货卖同时挂出
+  - 两单都成交→完美对冲
+  - 只成交一单→另一单自动取消
+
+策略三：动量跟踪
+  - 识别趋势方向
+  - 跟随趋势交易
+  - 严格止损
+
+策略四：均值回归
+  - 识别价格偏离
+  - 反向交易
+  - 目标回归均值
+```
+
+### 3.2 辅助策略
+```
+深度异常检测：
+  - 监控订单簿深度变化
+  - 识别大单冲击
+  - 提前预判价格波动
+```
+
+---
+
+## 四、进化机制
+
+### 4.1 自进化流程
+```
+每24小时执行：
+1. 收集交易数据（最近7天）
+2. 分析胜率和盈亏
+3. 识别失败模式
+4. 调整策略参数
+5. 记录进化历史
+```
+
+### 4.2 可调参数
+```
+敏感度参数：
+  - spread_pct（价差敏感度）
+  - net_profit_pct（净利敏感度）
+  - 成交概率（0.6 → 可调）
+
+风控参数（定死）：
+  - MIN_NET_PROFIT_PCT
+  - MAX_POSITION_PCT
+  - MAX_STOP_LOSS_PCT
+```
+
+---
+
+## 五、数据库设计
+
+### 5.1 核心表结构
+```sql
+-- 交易记录表
+CREATE TABLE engine_trades (
+    id INTEGER PRIMARY KEY,
+    timestamp REAL,
+    mode TEXT,           -- backtest/paper/live
+    symbol TEXT,
+    exchange TEXT,
+    side TEXT,           -- BUY/SELL
+    price REAL,
+    amount REAL,
+    cost REAL,
+    fee REAL,
+    pnl REAL,
+    pnl_pct REAL,
+    status TEXT          -- opened/closed
+);
+
+-- 市场数据表
+CREATE TABLE market_data (
+    timestamp REAL,
+    exchange TEXT,
+    symbol TEXT,
+    spot_bid REAL,
+    spot_ask REAL,
+    perp_bid REAL,
+    perp_ask REAL,
+    spread_pct REAL
+);
+
+-- 信号记录表
+CREATE TABLE engine_signals (
+    timestamp REAL,
+    mode TEXT,
+    symbol TEXT,
+    exchange TEXT,
+    side TEXT,
+    spread_pct REAL,
+    net_profit_pct REAL,
+    position_size REAL,
+    status TEXT
+);
+
+-- 进化历史表
+CREATE TABLE evolution_history (
+    timestamp REAL,
+    metrics_json TEXT,
+    changes_json TEXT
+);
+```
+
+---
+
+## 六、部署架构
+
+### 6.1 文件结构
+```
+/root/SOM/qnt/
+├── adaptive_system/
+│   ├── __main__.py          # 主入口
+│   ├── config.py            # 配置管理
+│   ├── dual_engine.py       # 双引擎系统
+│   ├── execution_engine.py  # 执行引擎
+│   ├── risk_manager.py      # 风控管理
+│   ├── evolution_manager.py # 进化管理
+│   └── live_trading_controller.py
+├── STRATEGY_v4.md           # 策略文档
+├── QNT自适应策略引擎方案_v1.0.md
+└── 阈值配置记录_v1.0.md
+
+/root/SOM/data/trading_system/
+└── adaptive.db              # 主数据库
+
+/etc/systemd/system/
+└── qnt-engines.service      # 系统服务
+```
+
+### 6.2 服务配置
+```ini
+[Unit]
+Description=QNT Adaptive Dual Engine
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/SOM/qnt
+ExecStart=/usr/bin/python3.11 -m adaptive_system
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+---
+
+## 七、监控与告警
+
+### 7.1 实时监控
+```bash
+# 查看引擎状态
+systemctl status qnt-engines
+
+# 查看实时日志
+journalctl -u qnt-engines -f
+
+# 查看交易统计
+sqlite3 /root/SOM/data/trading_system/adaptive.db \
+  "SELECT mode, COUNT(*), SUM(pnl) FROM engine_trades GROUP BY mode;"
+```
+
+### 7.2 告警机制
+```
+价差预警：
+  - 价差 > 0.17% 时记录机会
+  - 日志显示"[回测] 发现机会"
+
+风控拒绝：
+  - 风控检查不通过时记录原因
+  - 日志显示"[回测] 风控拒绝: ..."
+
+异常检测：
+  - 连续亏损5次自动暂停
+  - 回撤超过40%自动停止
+```
+
+---
+
+## 八、当前状态（2026-09-01 22:25）
+
+### 8.1 引擎运行状态
+```
+📊 回测引擎:
+   状态: 运行中
+   交易数: 5 笔
+   胜率: 20.0%
+   总盈亏: +$0.11 U
+   持仓: 1 个
+
+📝 模拟引擎:
+   状态: 运行中
+   交易数: 1 笔
+   胜率: 100.0%
+   总盈亏: +$0.21 U
+   持仓: 8 个
+   余额: $1000.21 U
+
+🔒 实盘控制器:
+   状态: 已关闭
+   原因: 等待回测+模拟验证通过
+```
+
+### 8.2 交易所状态
+```
+Gate:
+  现货余额: 2.00 U
+  永续余额: 18.30 U
+  总权益: 20.30 U
+  状态: ✅ 可用
+
+Bitget:
+  余额: 3.50 U
+  状态: ✅ 可用
+
+HTX:
+  状态: ❌ 禁用（资金已亏损完毕）
+  API密钥: 已清空
+```
+
+---
+
+## 九、开启实盘流程
+
+### 9.1 前置条件
+1. ✅ 回测胜率 > 50%
+2. ✅ 模拟胜率 > 50%
+3. ✅ 回测+模拟累计盈利 > 0
+4. ✅ 用户明确确认开启
+
+### 9.2 开启步骤
+```bash
+# 1. 修改配置（用户操作）
+sed -i 's/live_enabled: false/live_enabled: true/' config.py
+
+# 2. 重启服务
+systemctl restart qnt-engines
+
+# 3. 监控日志
+journalctl -u qnt-engines -f | grep -i "实盘"
+```
+
+### 9.3 风险控制
+```
+首次开启：
+  - 单笔仓位 ≤ 5%
+  - 止损 ≤ 1%
+  - 每日最多5笔交易
+
+验证通过后：
+  - 逐步增加仓位至20%
+  - 恢复正常风控参数
+```
+
+---
+
+## 十、关键教训
+
+### 10.1 HTX亏损教训（2026-08-31）
+```
+问题：
+  - 旧代码 config.live.enabled 默认为 True
+  - 实盘自动开启但日志记录不完整
+  - 导致HTX账户亏损完毕
+
+修复：
+  - 默认改为 False
+  - 添加硬编码安全检查
+  - HTX API密钥清空，永久禁用
+
+教训：
+  - 实盘必须用户手动开启
+  - 日志必须完整记录每笔交易
+  - 任何代码改动必须经过回测验证
+```
+
+### 10.2 阈值配置教训
+```
+问题：
+  - MIN_NET_PROFIT_PCT = 0.01（1%）导致门槛过高
+  - 实际要求价差 > 1.16%，几乎无交易机会
+
+修复：
+  - 改为 0.0001（0.01%）
+  - 实际门槛降至 0.17%
+
+教训：
+  - 阈值必须实测验证
+  - 不能只看配置值，要算实际门槛
+```
+
+---
+
+## 十一、未来规划
+
+### 11.1 短期目标
+1. 提升回测胜率至 > 50%
+2. 增加模拟交易样本至50笔以上
+3. 积累足够盈利后开启实盘
+
+### 11.2 中期目标
+1. 引入更多策略（趋势跟踪、均值回归）
+2. 优化进化算法
+3. 支持更多交易所
+
+### 11.3 长期目标
+1. 全自动自适应交易系统
+2. 多策略组合
+3. 风险动态调整
+
+---
+
+**文档维护**: 小蕊 🤖  
+**最后更新**: 2026-09-01 22:25 GMT+8
