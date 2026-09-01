@@ -94,7 +94,8 @@ class LiveTradingConfig:
     恢复：条件满足后自动解除，无需人工
     """
     # 总开关：false = 永久关实盘，回测+模拟照常
-    enabled: bool = True
+    # 🔴 安全默认值：False，必须手动改为True才允许实盘交易
+    enabled: bool = False
 
     # ---- 开启门槛 ----
     # 账户最低权益（USDT）。低于此值一律不开实盘：

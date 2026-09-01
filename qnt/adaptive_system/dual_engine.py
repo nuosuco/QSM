@@ -16,6 +16,9 @@ from .config import SystemConfig
 from .risk_manager import RiskManager
 from .execution_engine import ExecutionEngine
 
+# 各交易所永续合约最小金额限制
+PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
+
 logger = logging.getLogger('DualEngine')
 
 
@@ -146,25 +149,54 @@ class BacktestEngine:
         conn.close()
 
     def _backtest_one(self, best_tick: dict, execute_tick: dict, cursor):
-        """在滑动窗口中执行一次回测"""
+        """在滑动窗口中执行一次回测（真实模拟版）
+        
+        修复内容：
+        1. 加入真实的最小金额检查（Gate≥3U, HTX≥1U, Bitget≥5U）
+        2. 加入真实的精度检查（币数量≥1）
+        3. 加入真实的成交概率（60%）
+        4. 加入真实的滑点（0.02%）
+        5. 只记录真正能成交的交易
+        """
         spread_pct = best_tick['spread']
         net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
-
-        # 只有价差达标且随机命中才模拟交易（70%挂单成功率）
-        if random.random() >= 0.7:
+        
+        exchange = best_tick['exchange']
+        symbol = best_tick['symbol']
+        
+        # === 真实的最小金额检查 ===
+        min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
+        # 使用20%仓位（与实盘一致）
+        position = 1000 * 0.20  # 模拟盘1000U本金，20%仓位=200U
+        
+        if position < min_notional:
+            return  # 仓位不足，跳过
+        
+        # === 精度检查：币数量必须≥1 ===
+        price = best_tick['perp_ask']
+        amount = position / price
+        if amount < 1.0:
+            return  # 精度不足，跳过
+        
+        # === 真实的成交概率（60%） ===
+        if random.random() >= 0.6:
             return
-
-        # 固定 10 USDT 仓位（符合各交易所最小金额要求）
-        position = 10
-        pnl = position * net_profit_pct / 100
-
+        
+        # === 真实的滑点（0.02%） ===
+        slippage = 0.0002
+        effective_spread = spread_pct * (1 - slippage * 100)
+        effective_net = effective_spread - ExecutionEngine.BI_SIDE_COST * 100
+        
+        # === 计算真实盈亏 ===
+        pnl = position * effective_net / 100
+        
         try:
             cursor.execute(
                 "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (best_tick['ts'], 'backtest', best_tick['symbol'], best_tick['exchange'],
-                 'BUY', best_tick['perp_ask'], 1.0, position * 0.0004, position * 0.0004,
-                 pnl, net_profit_pct, 'completed')
+                (best_tick['ts'], 'backtest', symbol, exchange,
+                 'BUY', price, round(amount, 8), position * 0.0006, position * 0.0006,
+                 pnl, effective_net, 'completed')
             )
             self.total_trades += 1
             if pnl > 0:
@@ -176,23 +208,38 @@ class BacktestEngine:
             logger.debug(f"插入交易失败: {e}")
 
     def _backtest_one_direct(self, tick: tuple, cursor):
-        """直接处理实时 tick"""
+        """直接处理实时 tick（真实模拟版）"""
         ts, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
-        net_profit_pct = spread_pct - ExecutionEngine.BI_SIDE_COST * 100
-
-        # 只有价差达标且随机命中才模拟交易（70%挂单成功率）
-        if random.random() >= 0.7:
+        
+        # === 真实的最小金额检查 ===
+        min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
+        position = 1000 * 0.20  # 20%仓位
+        
+        if position < min_notional:
             return
-
-        position = 10
-        pnl = position * net_profit_pct / 100
-
+        
+        # === 精度检查 ===
+        price = perp_ask
+        amount = position / price
+        if amount < 1.0:
+            return
+        
+        # === 真实的成交概率（60%） ===
+        if random.random() >= 0.6:
+            return
+        
+        # === 真实的滑点 ===
+        slippage = 0.0002
+        effective_spread = spread_pct * (1 - slippage * 100)
+        effective_net = effective_spread - ExecutionEngine.BI_SIDE_COST * 100
+        pnl = position * effective_net / 100
+        
         try:
             cursor.execute(
                 "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (ts, 'backtest', symbol, exchange, 'BUY', perp_ask, 1.0,
-                 position * 0.0004, position * 0.0004, pnl, net_profit_pct, 'completed')
+                (ts, 'backtest', symbol, exchange, 'BUY', price, round(amount, 8),
+                 position * 0.0006, position * 0.0006, pnl, effective_net, 'completed')
             )
             self.total_trades += 1
             if pnl > 0:
@@ -264,14 +311,24 @@ class PaperEngine:
 
                 for tick in ticks:
                     ts, tick_id, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
+                    
+                    # === 真实的最小金额检查 ===
+                    min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
+                    
                     net_profit_pct = spread_pct - cost
                     # 净利多才考虑交易
                     if net_profit_pct < 0.05 or random.random() >= self.config.live.fill_rate:
                         continue
 
-                    position = min(self.paper_balance * 0.10, 100)
-                    if position < 10:
-                        continue
+                    position = min(self.paper_balance * 0.20, 200)  # 20%仓位
+                    if position < min_notional:
+                        continue  # 仓位不足，跳过
+                    
+                    # === 精度检查：币数量必须≥1 ===
+                    price = perp_ask
+                    amount = position / price
+                    if amount < 1.0:
+                        continue  # 精度不足，跳过
 
                     slipage = random.uniform(
                         self.config.live.slipage_mult_min,
@@ -286,8 +343,8 @@ class PaperEngine:
                     cursor.execute(
                         "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
                         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (ts, 'paper', symbol, exchange, 'BUY', perp_ask, 1.0,
-                         position * 0.0004, position * 0.0004, pnl, net_profit_pct, 'completed')
+                        (ts, 'paper', symbol, exchange, 'BUY', price, round(amount, 8),
+                         position * 0.0006, position * 0.0006, pnl, net_profit_pct, 'completed')
                     )
 
                     if self.total_trades % 50 == 0:

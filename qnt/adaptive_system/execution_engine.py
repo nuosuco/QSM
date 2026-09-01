@@ -208,6 +208,13 @@ class ExecutionEngine:
         """主循环"""
         while self.running:
             try:
+                # 🔴 硬编码安全检查：config.live.enabled必须为True才允许实盘交易
+                if not self.config.live.enabled:
+                    logger.warning(f"⛔ 实盘交易未启用（config.live.enabled=False），仅运行风控监控")
+                    self.risk_manager.refresh_balance()
+                    time.sleep(30)
+                    continue
+                
                 if self.risk_manager.is_suspended:
                     logger.warning(f"⛔ 风控暂停中: {self.risk_manager.suspension_reason}")
                     time.sleep(60)
