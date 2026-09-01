@@ -364,8 +364,11 @@ class DataCollector:
         perp_ask = float(perp_ticker.get('ask', 0)) if perp_ticker else 0
         perp_last = float(perp_ticker.get('last', 0)) if perp_ticker else 0
         
-        # 价差计算
-        spread_pct = (spot_ask - perp_bid) / spot_ask * 100 if spot_ask > 0 else 0
+        # 价差计算 - 修复bug：当永续合约价格为0时跳过
+        if perp_bid <= 0 or spot_ask <= 0:
+            # 永续合约无数据，跳过此tick
+            return None
+        spread_pct = (spot_ask - perp_bid) / spot_ask * 100
         basis_pct = (perp_last - spot_last) / spot_last * 100 if spot_last > 0 else 0
         
         # 深度比

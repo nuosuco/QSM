@@ -173,8 +173,9 @@ class BacktestEngine:
                 
                 # 每个平台独立检查开仓机会
                 if len(windows[exchange]) >= 5:
-                    if spread_pct >= threshold and spread_pct >= cost + min_net_profit:
-                        self._try_open_position([tick], cursor)  # 只传当前tick，不传混合窗口
+                    # 严格检查：价差必须>0.17%（成本0.16%+净利0.01%）
+                    if spread_pct >= cost + min_net_profit:
+                        self._try_open_position([tick], cursor)
                 
                 # 检查平仓
                 self._check_close_positions(windows[exchange], cursor)
@@ -224,7 +225,8 @@ class BacktestEngine:
                     if check_count % 100 == 0:
                         logger.debug(f"[回测] 检查#{check_count}, 最新spread={spread_pct:.4f}%, 门槛={threshold:.2f}%")
                     
-                    if spread_pct >= threshold and spread_pct >= cost + min_net_profit:
+                    # 严格检查：价差必须>0.17%才能交易
+                    if spread_pct >= cost + min_net_profit:
                         logger.debug(f"[回测] 发现机会: {exchange} {symbol} spread={spread_pct:.4f}% >= {cost+min_net_profit:.4f}%")
                         # 构造临时tick
                         tick = {'ts': ts, 'exchange': exchange, 'symbol': symbol,
@@ -253,9 +255,10 @@ class BacktestEngine:
         # 调试日志
         logger.debug(f"[回测开仓检查] {exchange} {symbol} spread={spread_pct:.4f}% perp_ask={best_tick['perp_ask']}")
         
-        # 严格的成本检查
-        if spread_pct < ExecutionEngine.BI_SIDE_COST * 100 + RiskManager.MIN_NET_PROFIT_PCT:
-            logger.debug(f"[回测] 跳过: 价差{spread_pct:.4f}% < 成本线{ExecutionEngine.BI_SIDE_COST*100:.2f}%+净利{RiskManager.MIN_NET_PROFIT_PCT*100:.2f}%")
+        # 严格的成本检查：价差必须>0.17%（成本0.16%+净利0.01%）
+        min_spread = (ExecutionEngine.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT) * 100
+        if spread_pct < min_spread:
+            logger.debug(f"[回测] 跳过: 价差{spread_pct:.4f}% < 门槛{min_spread:.2f}%")
             return
         
         # 风控检查
