@@ -477,6 +477,26 @@ class DataCollector:
         """获取所有平台连接状态"""
         return [c.get_status() for c in self.connectors.values()]
     
+    def start(self):
+        """启动数据收集（后台线程）"""
+        import threading
+        
+        def _collect_loop():
+            logger = logging.getLogger('DataCollector')
+            logger.info("📡 数据收集器启动 (三平台并行)")
+            while True:
+                try:
+                    ticks = self.collect_tick()
+                    if ticks:
+                        logger.debug(f"采集到 {len(ticks)} 条tick数据")
+                except Exception as e:
+                    logger.error(f"采集失败: {e}")
+                time.sleep(5)  # 每5秒采集一次
+        
+        thread = threading.Thread(target=_collect_loop, daemon=True)
+        thread.start()
+        return thread
+    
     def close(self):
         """关闭连接"""
         if self.conn:
