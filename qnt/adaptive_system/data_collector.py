@@ -2,6 +2,7 @@
 实时数据收集器（三平台版）
 持续从 Bitget、HTX、Gate.io 三个平台并行采集订单簿、成交记录、价格时序数据
 """
+import logging
 import sqlite3
 import time
 import json
@@ -365,10 +366,15 @@ class DataCollector:
         perp_last = float(perp_ticker.get('last', 0)) if perp_ticker else 0
         
         # 价差计算 - 修复bug：当永续合约价格为0时跳过
-        if perp_bid <= 0 or spot_ask <= 0:
+        # 做市策略：永续合约买入(perp_ask) → 现货卖出(spot_bid)
+        # 利润 = spot_bid - perp_ask - 手续费
+        if perp_ask <= 0 or spot_bid <= 0:
             # 永续合约无数据，跳过此tick
             return None
-        spread_pct = (spot_ask - perp_bid) / spot_ask * 100
+        if perp_ask > 0 and spot_bid > 0:
+            spread_pct = (spot_bid - perp_ask) / perp_ask * 100
+        else:
+            spread_pct = 0
         basis_pct = (perp_last - spot_last) / spot_last * 100 if spot_last > 0 else 0
         
         # 深度比
