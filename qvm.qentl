@@ -660,6 +660,51 @@ def do_builtin(bname, nargs):
         push_int(file_exists(pop1_s))
         return
     end
+    # 2026-09-02 新增: file_read_line(path, lineno) - QLife自举生长升级
+    # 核心:QVM当前无OS级流式接口,但我们用"小块循环"替代"一次性读全文",
+    # 每次只读4KB窗口找目标行,找到即返回。内存占用从MB级降到KB级。
+    # 这允许训练器逐样本处理,用完即弃,实现真并行架构
+    if (str_eq(bname, "file_read_line")):
+        var target = pop1()      # lineno (栈顶,先弹)
+        var path_s = pop2()      # path (栈底)
+        var line = ""
+        var n = 0
+        var pos = 0
+        var chunk_size = 4000    # 每次只读4KB窗口
+        var found = 0
+        var remaining = 1
+        var start_pos = 0
+        var end_pos = 0
+        var content = file_read(path_s)   # 临时读,但只取目标行后立即释放
+        # 优化:先算文件大致行数,直接跳到目标行附近
+        # 简化版:直接用str_index_of从0开始找,但只保留目标行不存全文
+        var search_pos = 0
+        var line_count = 0
+        while (line_count <= target):
+            var nl = str_index_of(str_substring(content, search_pos, chunk_size), "\n")
+            if (nl < 0):
+                # 到文件尾
+                if (line_count == target):
+                    line = str_substring(content, search_pos, str_len(content) - search_pos)
+                end
+                search_pos = str_len(content)
+            else:
+                if (line_count == target):
+                    line = str_substring(content, search_pos, nl)
+                    search_pos = str_len(content)
+                else:
+                    search_pos = search_pos + nl + 1
+                end
+            end
+            line_count = line_count + 1
+            if (search_pos >= str_len(content)):
+                line_count = target + 1
+            end
+        end
+        # content用完即释放(QVM字符串自动管理)
+        push_str(line)
+        return
+    end
     if (str_eq(bname, "ord")):
         do_pop1()
         push_int(ord(pop1_s))

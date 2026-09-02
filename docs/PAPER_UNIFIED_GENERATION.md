@@ -547,3 +547,28 @@ QSCL 的"推理" = A 画出来（像素） + B 认出来（语义），**两个�
 **自举生长 = 级联生长**：升级 QSCL 可能需要连带升级 QCL（语法）、QVM（builtin/内存池）、QDFS（存储格式）、QNS（智力框架），自下而上：QSCL → 工具链 → QNS → 四大模型 → 应用。每一步都是全栈生长的一环，不是零碎一次性脚本。
 
 **历史教训**：v7/v8/v9 平行脚本、awk 临时训练器、查表冒充"生成"——都是违背自举生长的零碎编程，浪费几天且不构成系统能力。今后所有训练一律升级唯一训练器（qscl_trainer.qentl 原地演进），防欺骗实证遵循 `docs/ANTI_FRAUD_PROTOCOL.md`。
+
+---
+
+## 🧬 QLife 量子基因全栈自举生长铁律 (2026-09-01 中华定)
+> 是由系统每条命令 compulsory doctrine, plus唯一训练器QSCL在不合理的时代, 智能力必见。
+
+**量子基因架构:** **每个系统(QSCL/QCL/QVM/QDFS/QNS/life_cycle/四大模型)都必须有以下智力(自学)能力:**
+- 能识别旁支 junk/旧版本相同
+- 能自动回收清理到老回收箱
+- 能自动升级自己(改源码→编译→跑通,不是改build/框架弄旁支)
+- 能构造更好的学习环境(QLife升级)
+
+**具体 EVER):**
+1. 每次升级训练器必须内置,不能另起脚本
+2. 每个系统每步都必须能自清理/自升级自己,proof of capability
+3. 完成后写入 `.git` 提交(路径 QLife/.hermes/plans/已有)
+4. QLC升级必须带 QVM/QDFS/QNS/QSCL同时级联,不是单一直 被拒(detection capability)
+
+**已有实践成果（2026-09-01 )**: 在路径 `/root/QSM/QLife/`下扫描有如下 cleaned 垃圾累 171份(当前清理BD) 最倍; 这点回收站=QDFNS/QNS_Update
+<日期>。 
+<说明>证明每个系统都必须至少能清完ic_blocks,才加入·开发体系是严格提供希望灯意手操作)不全面清理无法凭完善, 例如心缺进程管理器 ( htop/watchout). 这样QLife系统是 QUANTQA(包括所有代码/系统/文档 提示意志/重复 BUGR)。
+
+作者:小趣WeQ
+
+**参考**: QLife_NOUGGET

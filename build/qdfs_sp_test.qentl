@@ -1,7 +1,0 @@
-# 真·叠加态QDFS验证: N态写同一逻辑文件名,各自路由到量子态视图
-# 注意: g_root是QDFS库的全局变量,这里只赋值不重复声明
-g_root = "/tmp/qdfs_sp_test"
-var sid = qstate_id()
-var val = str_concat("我是态", int_to_str(sid))
-var wrote = qdfs_qs_write("shared.txt", val)
-printf("态%d写shared.txt→视图%d (g_root=%s)\n", sid, wrote, g_root)

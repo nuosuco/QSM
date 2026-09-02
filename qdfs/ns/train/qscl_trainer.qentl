@@ -1,0 +1,277 @@
+# ================================================================
+# QSCL 4226字 32×32 真并行训练器 v5 — 纯QEntL全栈
+#
+# 核心架构 (QLife自举生长 2026-09-02):
+#   - 纯QEntL, 零C依赖: 用file_read+str_index_of实现行定位
+#   - 真正不同起点: 4态各自独立训练(独立的QVM进程,独立W)
+#   - 单进程内聚合保存——本进程是其中一个态(由TRAIN_STATE指定)
+#
+# 运行方式(真正4态并行 = 启动4个QVM进程):
+#   TRAIN_BATCH=0 TRAIN_STATE=0 qvm_boot run trainer.qbc &
+#   TRAIN_BATCH=0 TRAIN_STATE=1 qvm_boot run trainer.qbc &
+#   TRAIN_BATCH=0 TRAIN_STATE=2 qvm_boot run trainer.qbc &
+#   TRAIN_BATCH=0 TRAIN_STATE=3 qvm_boot run trainer.qbc &
+#   wait
+#
+# 推理时4态W合并: argmax(sum_s W[s][k]·x) → 类k
+# ================================================================
+
+var g_BATCHES = 9
+var g_NB = 515
+var g_NX = 1024
+var g_NS = 4
+var g_WSIZE = 65535 * 8 + 3080
+
+var g_W[65535 * 8 + 3080]
+var g_one_sample[1024]
+var g_data = ""
+var g_data_len = 0
+
+var g_score = 0
+var g_line = "" g_pix_str = "" g_pv = ""
+var g_path = ""
+var g_i = 0 g_j = 0 g_k = 0 g_n = 0 g_ep = 0 g_s = 0
+var g_base = 0 g_sum = 0
+var g_max_idx = 0 g_max_val = 0
+var g_correct = 0 g_updates = 0 g_pred = 0 g_label = 0
+var g_rnd = 0 g_seed = 0 g_state = 0
+var g_c1 = 0 g_ps = 0 g_pe = 0
+var g_lr = 0 g_ep_max = 0
+var g_diff = 0 g_batch = 0
+var g_n_target = 0 g_c = 0
+var g_idx = 0 g_idx2 = 0
+var g_nl = 0
+var g_row_start = 0 g_row_end = 0
+var g_tmp_pix[1024]
+var g_newr = 0 g_newc = 0
+var g_rem = ""
+
+def load_full_data():
+    g_data = file_read(g_path)
+    g_data_len = str_len(g_data)
+    printf("数据加载: %d字节\n", g_data_len)
+end
+
+# 找第lineno行的起始和结束位置(纯QEntL)
+def find_lineno_pos(lineno):
+    g_row_start = 0
+    g_row_end = 0
+    g_i = 0
+    g_n = 0
+    while ((g_n < lineno) and (g_row_start < g_data_len)):
+        g_rem = str_substring(g_data, g_row_start, g_data_len - g_row_start)
+        g_nl = str_index_of(g_rem, "\n")
+        if (g_nl < 0):
+            g_row_start = g_data_len
+        else:
+            g_row_start = g_row_start + g_nl + 1
+        end
+        g_n = g_n + 1
+    end
+    g_rem = str_substring(g_data, g_row_start, g_data_len - g_row_start)
+    g_nl = str_index_of(g_rem, "\n")
+    if (g_nl < 0):
+        g_row_end = g_data_len
+    else:
+        g_row_end = g_row_start + g_nl
+    end
+end
+
+def load_one_sample(lineno):
+    find_lineno_pos(lineno)
+    g_line = str_substring(g_data, g_row_start, g_row_end - g_row_start)
+    g_c1 = str_index_of(g_line, ":")
+    if (g_c1 >= 0):
+        g_pix_str = str_substring(g_line, g_c1 + 1, 60000)
+        g_ps = 0
+        g_i = 0
+        while (g_i < 1024):
+            g_rem = str_substring(g_pix_str, g_ps, 60000)
+            g_pe = str_index_of(g_rem, ",")
+            g_pv = ""
+            if (g_pe < 0):
+                g_pv = g_rem
+                g_ps = 60000
+            else:
+                g_pv = str_substring(g_rem, 0, g_pe)
+                g_ps = g_ps + g_pe + 1
+            end
+            g_one_sample[g_i] = str_to_int(g_pv)
+            g_i = g_i + 1
+        end
+    else:
+        g_i = 0
+        while (g_i < 1024):
+            g_one_sample[g_i] = 0
+            g_i = g_i + 1
+        end
+    end
+end
+
+def transform_state():
+    g_i = 0
+    while (g_i < 1024):
+        g_tmp_pix[g_i] = g_one_sample[g_i]
+        g_i = g_i + 1
+    end
+    var row = 0
+    var col = 0
+    while (row < 32):
+        col = 0
+        while (col < 32):
+            if (g_state == 0):
+                g_one_sample[row * 32 + col] = g_tmp_pix[row * 32 + col]
+            end
+            if (g_state == 1):
+                g_newc = col + 1
+                if (g_newc >= 32): g_newc = g_newc - 32 end
+                g_one_sample[row * 32 + col] = g_tmp_pix[row * 32 + g_newc]
+            end
+            if (g_state == 2):
+                g_newr = row + 1
+                if (g_newr >= 32): g_newr = g_newr - 32 end
+                g_one_sample[row * 32 + col] = g_tmp_pix[g_newr * 32 + col]
+            end
+            if (g_state == 3):
+                g_newr = row + 2
+                if (g_newr >= 32): g_newr = g_newr - 32 end
+                g_newc = col + 2
+                if (g_newc >= 32): g_newc = g_newc - 32 end
+                g_one_sample[row * 32 + col] = g_tmp_pix[g_newr * 32 + g_newc]
+            end
+            col = col + 1
+        end
+        row = row + 1
+    end
+end
+
+# argmax 前向: 用当前 g_one_sample 算 pred
+def forward_argmax():
+    g_max_idx = 0
+    g_max_val = 0
+    g_c = 0
+    while (g_c < 515):
+        g_score = 0
+        g_idx = g_c * 1024
+        g_i = 0
+        while (g_i < 1024):
+            g_score = g_score + g_W[g_idx + g_i] * g_one_sample[g_i]
+            g_i = g_i + 1
+        end
+        if (g_c == 0):
+            g_max_val = g_score
+            g_max_idx = 0
+        else:
+            if (g_score > g_max_val):
+                g_max_val = g_score
+                g_max_idx = g_c
+            end
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_max_idx
+end
+
+def train_one(label):
+    forward_argmax()
+    # 三合一更新
+    g_idx = label * 1024
+    g_i = 0
+    while (g_i < 1024):
+        g_diff = g_one_sample[g_i] - g_W[g_idx + g_i]
+        g_W[g_idx + g_i] = g_W[g_idx + g_i] + g_diff * g_lr / 1000
+        g_i = g_i + 1
+    end
+    if (g_pred != label):
+        g_idx2 = g_pred * 1024
+        g_i = 0
+        while (g_i < 1024):
+            g_diff = g_one_sample[g_i] - g_W[g_idx2 + g_i]
+            g_W[g_idx2 + g_i] = g_W[g_idx2 + g_i] - g_diff * g_lr / 1000
+            g_i = g_i + 1
+        end
+        g_updates = g_updates + 1
+    end
+end
+
+def main():
+    printf("=== QSCL v5 纯QEntL真并行 ===\n")
+    g_batch = str_to_int(exec("echo ${TRAIN_BATCH:-0}"))
+    g_state = str_to_int(exec("echo ${TRAIN_STATE:-0}"))
+    printf("批次%d 态%d (独立进程,独立W)\n", g_batch, g_state)
+
+    g_path = "qdfs/ns/data/yi_glyph_4226_32x32.data"
+    if (g_batch == 8):
+        g_n_target = 106
+    else:
+        g_n_target = 515
+    end
+    g_seed = 1 + g_state * 100
+    g_lr = 500 + g_state * 400
+    if (g_lr > 1500): g_lr = 1500 end
+    g_ep_max = 10
+    printf("seed=%d LR=%d EP=%d\n", g_seed, g_lr, g_ep_max)
+
+    # 不同起点的关键: seed 不同 → 初始 W 不同
+    g_rnd = g_seed
+    g_i = 0
+    while (g_i < g_WSIZE):
+        g_rnd = g_rnd * 1103 + 12345
+        g_W[g_i] = g_rnd % 10
+        g_i = g_i + 1
+    end
+    printf("权重初始化完成(%d元素,seed独立)\n", g_WSIZE)
+
+    load_full_data()
+
+    g_ep = 0
+    while (g_ep < g_ep_max):
+        g_updates = 0
+        g_s = 0
+        while (g_s < g_n_target):
+            load_one_sample(g_batch * 515 + g_s)
+            transform_state()
+            train_one(g_s)
+            g_s = g_s + 1
+        end
+
+        # 验证
+        g_correct = 0
+        g_s = 0
+        while (g_s < g_n_target):
+            load_one_sample(g_batch * 515 + g_s)
+            transform_state()
+            forward_argmax()
+            if (g_pred == g_s):
+                g_correct = g_correct + 1
+            end
+            g_s = g_s + 1
+        end
+        printf("态%d ep%d: %d/%d = %d%% 更新%d\n", g_state, g_ep, g_correct, g_n_target, g_correct * 100 / g_n_target, g_updates)
+        g_ep = g_ep + 1
+    end
+
+    g_path = "qdfs/ns/models/qscl_4226_32x32_b" + int_to_str(g_batch) + "_s" + int_to_str(g_state) + ".w"
+    var w_all = ""
+    var w_str = ""
+    g_c = 0
+    while (g_c < g_n_target):
+        w_str = ""
+        g_idx = g_c * 1024
+        g_i = 0
+        while (g_i < 1024):
+            w_str = str_concat(w_str, int_to_str(g_W[g_idx + g_i]))
+            if (g_i < 1023):
+                w_str = str_concat(w_str, ",")
+            end
+            g_i = g_i + 1
+        end
+        w_all = str_concat(w_all, str_concat(w_str, "\n"))
+        g_c = g_c + 1
+    end
+    file_write_bytes(g_path, w_all)
+    printf("保存: %s\n", g_path)
+    printf("=== 训练完成 ===\n")
+end
+
+main()

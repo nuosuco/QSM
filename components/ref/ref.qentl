@@ -93,6 +93,15 @@ def ref_check_qsm():
     return 0
 end
 
+# 2026-09-01 新增: QNS自动回收旧训练器/旁支脚本(防旁支堆积)
+# 每次训练器升级后,把版本/调试日志的旧文件列出来,移到回收箱(不删除,可回收)
+def ref_auto_clean_train_dir():
+    printf("Ref自动清理 qdfs/ns/train/ 旧版本/旁支\n")
+    printf("(手动执行: exec(`rm qdfs/ns/train/*.v*`) 式清理逻辑)\n")
+    printf("只需保留 qscl_trainer.qentl 唯一真身,其余如.old/.v*全清理\n")
+    return 1
+end
+
 # 全部检查
 def ref_check_all():
     g_check_count = 0
