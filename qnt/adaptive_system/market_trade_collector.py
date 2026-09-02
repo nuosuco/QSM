@@ -12,8 +12,8 @@ import ccxt
 
 logger = logging.getLogger('MarketTradeCollector')
 
-# 每个平台的最小金额限制
-PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
+# market_trades表字段（与data_collector一致）
+# id, timestamp, symbol, exchange, spread_pct, side, perp_price, spot_price, amount, cost, fee, pnl, pnl_pct, status, order_id
 
 
 class MarketTradeCollector:
@@ -33,6 +33,7 @@ class MarketTradeCollector:
                 return False
             
             exchange = cls({'enableRateLimit': True, 'timeout': 10000})
+            # 测试连接
             exchange.fetch_ticker('BTC/USDT')
             self.exchanges[name] = exchange
             logger.info(f"✅ {name} 公开市场连接器初始化成功")
@@ -52,13 +53,14 @@ class MarketTradeCollector:
         try:
             # 获取现货成交
             spot_trades = exchange.fetch_trades(symbol, limit=limit)
+            
             # 获取永续合约成交
             perp_symbol = f"{symbol.split('/')[0]}:USDT"
             perp_trades = []
             try:
                 perp_trades = exchange.fetch_trades(perp_symbol, limit=limit)
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"{exchange_name} {perp_symbol} 永续成交失败: {e}")
             
             all_trades = spot_trades + perp_trades
             self.platform_stats[exchange_name]['collected'] += len(all_trades)
@@ -71,8 +73,8 @@ class MarketTradeCollector:
             logger.error(f"❌ {exchange_name} {symbol} 获取市场成交失败: {e}")
             return []
     
-    def save_market_trades(self, trades: List[Dict], exchange_name: str) -> int:
-        """保存市场成交到数据库（按正确表结构）"""
+    def save_market_trades(self, trades: List[Dict], exchange_name: str):
+        """保存市场成交到数据库"""
         if not trades:
             return 0
         
@@ -82,48 +84,42 @@ class MarketTradeCollector:
         inserted = 0
         for trade in trades:
             try:
-                # 获取order_id，转为字符串
-                order_id = str(trade.get('id', '')) if trade.get('id') else ''
+                # 提取字段（market_trades表结构）
+                timestamp = trade.get('timestamp') / 1000 if trade.get('timestamp') else None  # ms→s
+                sym = trade.get('symbol')
+                side = trade.get('side')
+                price = trade.get('price')
+                amount = trade.get('amount')
+                cost = trade.get('cost', price * amount if price and amount else 0)
+                order_id = trade.get('id') or trade.get('order')
                 
-                # 检查是否已存在
-                cursor.execute(
-                    "SELECT COUNT(*) FROM market_trades WHERE order_id=? AND exchange=?",
-                    (order_id, exchange_name)
-                )
-                if cursor.fetchone()[0] > 0:
-                    continue  # 跳过重复
+                if not timestamp or not sym or not side:
+                    continue
                 
-                # 计算成本和手续费
-                cost = trade.get('cost', trade.get('price', 0) * trade.get('amount', 0))
-                fee_cost = 0
-                if isinstance(trade.get('fee'), dict):
-                    fee_cost = trade['fee'].get('cost', 0)
+                # 检查是否已存在（避免重复）
+                if order_id:
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM market_trades WHERE order_id=? AND exchange=?",
+                        (str(order_id), exchange_name)
+                    )
+                    if cursor.fetchone()[0] > 0:
+                        continue
                 
-                # 时间戳转换（毫秒→秒）
-                timestamp = trade.get('timestamp')
-                if timestamp:
-                    timestamp = timestamp / 1000
-                else:
-                    timestamp = time.time()
-                
+                # 插入（market_trades表字段：timestamp, symbol, exchange, spread_pct, side, perp_price, spot_price, amount, cost, fee, pnl, pnl_pct, status, order_id）
                 cursor.execute('''
                     INSERT INTO market_trades 
-                    (timestamp, exchange, symbol, side, perp_price, spot_price, amount, cost, fee, pnl, pnl_pct, status, order_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (timestamp, symbol, exchange, spread_pct, side, perp_price, spot_price, amount, cost, fee, pnl, pnl_pct, status, order_id)
+                    VALUES (?, ?, ?, NULL, ?, NULL, ?, ?, ?, NULL, NULL, NULL, 'collected', ?)
                 ''', (
                     timestamp,
+                    sym,
                     exchange_name,
-                    trade.get('symbol'),
-                    trade.get('side'),
-                    trade.get('price'),
-                    None,  # spot_price (永续交易)
-                    trade.get('amount'),
+                    side,
+                    price if side == 'buy' else None,  # spot_price (buy)
+                    price if side == 'sell' else None,  # perp_price (sell)
+                    amount,
                     cost,
-                    fee_cost,
-                    None,  # pnl (需要配对计算)
-                    None,  # pnl_pct
-                    'collected',
-                    order_id
+                    str(order_id)
                 ))
                 inserted += 1
             except Exception as e:
@@ -135,7 +131,7 @@ class MarketTradeCollector:
         logger.info(f"✅ {exchange_name} 保存{inserted}笔市场成交")
         return inserted
     
-    def collect_all(self, symbols: List[str]) -> int:
+    def collect_all(self, symbols: List[str]):
         """批量采集所有币种的市场成交"""
         total_saved = 0
         
@@ -149,7 +145,7 @@ class MarketTradeCollector:
                         saved = self.save_market_trades(trades, ex_name)
                         total_saved += saved
                     
-                    time.sleep(0.2)
+                    time.sleep(0.2)  # 限速
                 except Exception as e:
                     logger.error(f"❌ {ex_name} {symbol} 失败: {e}")
                     time.sleep(0.5)
@@ -164,9 +160,11 @@ class MarketTradeCollector:
         
         stats = {}
         for ex in ['gate', 'htx', 'bitget']:
+            # 采集统计
             collected = self.platform_stats.get(ex, {}).get('collected', 0)
             errors = self.platform_stats.get(ex, {}).get('errors', 0)
             
+            # 数据库中的数量
             cursor.execute("SELECT COUNT(*) FROM market_trades WHERE exchange=?", (ex,))
             db_count = cursor.fetchone()[0]
             
