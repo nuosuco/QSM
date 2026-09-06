@@ -40,7 +40,7 @@ var gl_int[512]
 var gl_str[512]
 var gl_arr[512]
 
-# ---- 数组池: 碰撞分配器, 9段存储(升级版, 支持515×1024=527360) ----
+# ---- 数组池: 碰撞分配器, 18段存储(升级版, 支持4态×515×1024=2109440) ----
 var ar_off[16384]
 var ar_size[16384]
 var ar_used = 0
@@ -72,6 +72,34 @@ var ae_str5[65535]
 var ae_str6[65535]
 var ae_str7[65535]
 var ae_str8[65535]
+# 扩容 9->18 段: 新增 9 段(in int/str, type 用 8 位占位见下)
+var ae_type9[65535]
+var ae_type10[65535]
+var ae_type11[65535]
+var ae_type12[65535]
+var ae_type13[65535]
+var ae_type14[65535]
+var ae_type15[65535]
+var ae_type16[65535]
+var ae_type17[65535]
+var ae_int9[65535]
+var ae_int10[65535]
+var ae_int11[65535]
+var ae_int12[65535]
+var ae_int13[65535]
+var ae_int14[65535]
+var ae_int15[65535]
+var ae_int16[65535]
+var ae_int17[65535]
+var ae_str9[65535]
+var ae_str10[65535]
+var ae_str11[65535]
+var ae_str12[65535]
+var ae_str13[65535]
+var ae_str14[65535]
+var ae_str15[65535]
+var ae_str16[65535]
+var ae_str17[65535]
 
 # ---- 函数表 ----
 var fn_nameoff[128]
@@ -209,11 +237,65 @@ def ae_t_get(pos):
     if (p < 65535): return ae_type6[p] end
     p = p - 65535
     if (p < 65535): return ae_type7[p] end
-    return ae_type8[p - 65535]
+    p = p - 65535
+    if (p < 65535): return ae_type8[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type9[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type10[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type11[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type12[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type13[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type14[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type15[p] end
+    p = p - 65535
+    if (p < 65535): return ae_type16[p] end
+    return ae_type17[p - 65535]
 end
 
 def ae_t_set(pos, v):
     var p = pos
+    # B组: 段9-17 (pos >= 589815)
+    if (p >= 589815):
+        p = p - 589815
+        if (p < 65535): ae_type9[p] = v
+        else:
+            p = p - 65535
+            if (p < 65535): ae_type10[p] = v
+            else:
+                p = p - 65535
+                if (p < 65535): ae_type11[p] = v
+                else:
+                    p = p - 65535
+                    if (p < 65535): ae_type12[p] = v
+                    else:
+                        p = p - 65535
+                        if (p < 65535): ae_type13[p] = v
+                        else:
+                            p = p - 65535
+                            if (p < 65535): ae_type14[p] = v
+                            else:
+                                p = p - 65535
+                                if (p < 65535): ae_type15[p] = v
+                                else:
+                                    p = p - 65535
+                                    if (p < 65535): ae_type16[p] = v
+                                    else: ae_type17[p - 65535] = v end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return
+    end
+    # A组: 段0-8
     if (p < 65535): ae_type0[p] = v
     else:
         p = p - 65535
@@ -248,26 +330,81 @@ end
 
 def ae_i_get(pos):
     var p = pos
-    if (p < 65535): return ae_int0[p] end
+    if (p < 589815):
+        if (p < 65535): return ae_int0[p] end
+        p = p - 65535
+        if (p < 65535): return ae_int1[p] end
+        p = p - 65535
+        if (p < 65535): return ae_int2[p] end
+        p = p - 65535
+        if (p < 65535): return ae_int3[p] end
+        p = p - 65535
+        if (p < 65535): return ae_int4[p] end
+        p = p - 65535
+        if (p < 65535): return ae_int5[p] end
+        p = p - 65535
+        if (p < 65535): return ae_int6[p] end
+        p = p - 65535
+        if (p < 65535): return ae_int7[p] end
+        return ae_int8[p - 65535]
+    end
+    p = p - 589815
+    if (p < 65535): return ae_int9[p] end
     p = p - 65535
-    if (p < 65535): return ae_int1[p] end
+    if (p < 65535): return ae_int10[p] end
     p = p - 65535
-    if (p < 65535): return ae_int2[p] end
+    if (p < 65535): return ae_int11[p] end
     p = p - 65535
-    if (p < 65535): return ae_int3[p] end
+    if (p < 65535): return ae_int12[p] end
     p = p - 65535
-    if (p < 65535): return ae_int4[p] end
+    if (p < 65535): return ae_int13[p] end
     p = p - 65535
-    if (p < 65535): return ae_int5[p] end
+    if (p < 65535): return ae_int14[p] end
     p = p - 65535
-    if (p < 65535): return ae_int6[p] end
+    if (p < 65535): return ae_int15[p] end
     p = p - 65535
-    if (p < 65535): return ae_int7[p] end
-    return ae_int8[p - 65535]
+    if (p < 65535): return ae_int16[p] end
+    return ae_int17[p - 65535]
 end
 
 def ae_i_set(pos, v):
     var p = pos
+    # B组: 段9-17 (pos >= 589815)
+    if (p >= 589815):
+        p = p - 589815
+        if (p < 65535): ae_int9[p] = v
+        else:
+            p = p - 65535
+            if (p < 65535): ae_int10[p] = v
+            else:
+                p = p - 65535
+                if (p < 65535): ae_int11[p] = v
+                else:
+                    p = p - 65535
+                    if (p < 65535): ae_int12[p] = v
+                    else:
+                        p = p - 65535
+                        if (p < 65535): ae_int13[p] = v
+                        else:
+                            p = p - 65535
+                            if (p < 65535): ae_int14[p] = v
+                            else:
+                                p = p - 65535
+                                if (p < 65535): ae_int15[p] = v
+                                else:
+                                    p = p - 65535
+                                    if (p < 65535): ae_int16[p] = v
+                                    else: ae_int17[p - 65535] = v end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return
+    end
+    # A组: 段0-8
     if (p < 65535): ae_int0[p] = v
     else:
         p = p - 65535
@@ -317,11 +454,65 @@ def ae_s_get(pos):
     if (p < 65535): return ae_str6[p] end
     p = p - 65535
     if (p < 65535): return ae_str7[p] end
-    return ae_str8[p - 65535]
+    p = p - 65535
+    if (p < 65535): return ae_str8[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str9[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str10[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str11[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str12[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str13[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str14[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str15[p] end
+    p = p - 65535
+    if (p < 65535): return ae_str16[p] end
+    return ae_str17[p - 65535]
 end
 
 def ae_s_set(pos, v):
     var p = pos
+    # B组: 段9-17 (pos >= 589815)
+    if (p >= 589815):
+        p = p - 589815
+        if (p < 65535): ae_str9[p] = v
+        else:
+            p = p - 65535
+            if (p < 65535): ae_str10[p] = v
+            else:
+                p = p - 65535
+                if (p < 65535): ae_str11[p] = v
+                else:
+                    p = p - 65535
+                    if (p < 65535): ae_str12[p] = v
+                    else:
+                        p = p - 65535
+                        if (p < 65535): ae_str13[p] = v
+                        else:
+                            p = p - 65535
+                            if (p < 65535): ae_str14[p] = v
+                            else:
+                                p = p - 65535
+                                if (p < 65535): ae_str15[p] = v
+                                else:
+                                    p = p - 65535
+                                    if (p < 65535): ae_str16[p] = v
+                                    else: ae_str17[p - 65535] = v end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return
+    end
+    # A组: 段0-8
     if (p < 65535): ae_str0[p] = v
     else:
         p = p - 65535
@@ -566,6 +757,17 @@ def bi_printf(nargs):
 end
 
 def do_builtin(bname, nargs):
+    # QSCL 专用: 创建 515x1024 权重矩阵
+    if (str_eq(bname, "qscl_init")):
+        var h = ar_used
+        ar_used = ar_used + 1
+        ar_off[h] = ar_next
+        ar_size[h] = 515 * 1024
+        ar_next = ar_next + 515 * 1024
+        push_arr(h)
+        return
+    end
+    
     if (str_eq(bname, "printf")):
         bi_printf(nargs)
         push_int(0)
@@ -890,6 +1092,45 @@ def do_builtin(bname, nargs):
             i = i + 1
         end
         push_int(m)
+        return
+    end
+    if (str_eq(bname, "arr_new")):
+        do_pop1()
+        var size = pop1_i
+        var h = ar_used
+        ar_used = ar_used + 1
+        ar_off[h] = ar_next
+        ar_size[h] = size
+        ar_next = ar_next + size
+        # 初始化数组元素为0
+        var i = 0
+        while (i < size):
+            ae_i_set(ar_off[h] + i, 0)
+            i = i + 1
+        end
+        push_arr(h)
+        return
+    end
+    
+    # arr_get(arr, index): 获取数组元素
+    if (str_eq(bname, "arr_get")):
+        do_pop2()
+        var idx = pop2_i
+        var h = pop1_a
+        var off = ar_off[h]
+        push_int(ae_i_get(off + idx))
+        return
+    end
+    
+    # arr_set(arr, index, value): 设置数组元素
+    if (str_eq(bname, "arr_set")):
+        do_pop3()
+        var val = pop3_i
+        var idx = pop2_i
+        var h = pop1_a
+        var off = ar_off[h]
+        ae_i_set(off + idx, val)
+        push_int(val)
         return
     end
     # backprop(W[], grad[], n, lr): W[i] += lr*grad[i]/100 (符号感知, 步长=grad)

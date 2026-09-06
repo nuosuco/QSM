@@ -666,6 +666,10 @@ def is_builtin(nm):
     if (str_eq(nm, "backprop")): return 1 end
     if (str_eq(nm, "embedding_to")): return 1 end
     if (str_eq(nm, "mat_mul_to")): return 1 end
+    if (str_eq(nm, "arr_new")): return 1 end
+    if (str_eq(nm, "arr_get")): return 1 end
+    if (str_eq(nm, "arr_set")): return 1 end
+    if (str_eq(nm, "qscl_init")): return 1 end
     return 0
 end
 
@@ -979,7 +983,15 @@ def parse_statement():
                 var ident_ns = g_tok_start[g_parse_pos]
                 var ident_nl = g_tok_len[g_parse_pos]
                 var ident_nm = str_substring(g_src, ident_ns, ident_nl)
+                # 量子门判断需lookahead: h/t 后紧跟 [ 或 = 是普通变量, 否则才是量子门 h q[0]
+                var is_single_gate = 0
                 if (str_eq(ident_nm, "h") or str_eq(ident_nm, "t")):
+                    var nt = g_tok_type[g_parse_pos + 1]
+                    if (nt != T_ASSIGN and nt != T_LBRACKET):
+                        is_single_gate = 1
+                    end
+                end
+                if (is_single_gate == 1):
                     parse_quantum_gate_1arg(ident_ns, ident_nl)
                 else:
                     if (str_eq(ident_nm, "cx")):
@@ -1138,6 +1150,27 @@ def parse_var_decl():
     var ns = g_tok_start[g_parse_pos]
     var nl = g_tok_len[g_parse_pos]
     advance()  # consume name
+    # QEntL 数组声明: var name[SIZE] => OP_ARRAY_NEW(内联size) 直接用ARRAY_NEW opcode
+    if (cur_type() == T_LBRACKET):
+        advance()  # consume '['
+        var arr_size = 0
+        if (cur_type() == T_NUMBER):
+            arr_size = str_to_int(str_substring(g_src, g_tok_start[g_parse_pos], g_tok_len[g_parse_pos]))
+            advance()
+        else:
+            printf("qcl: 数组大小必须是数字\n")
+            advance()
+        end
+        expect(T_RBRACKET, "数组声明缺]")
+        # 直接 emit ARRAY_NEW opcode (op=22) + u16 size 立即数
+        emit_byte(OP_ARRAY_NEW)
+        emit_u16(arr_size)
+        # store到变量(sym_add_assign: 不存在则创建)
+        var vslot = sym_add_assign(ns, nl)
+        emit_byte(OP_STORE_VAR)
+        emit_u16(vslot)
+        return
+    end
     expect(T_ASSIGN, "var缺=")
     # 检查是否是量子门赋值: var m0 = measure q[0]
     var cur_t = cur_type()
