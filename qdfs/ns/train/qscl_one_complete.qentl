@@ -1,0 +1,213 @@
+# QSCL 32x32 具体版 - 处理一个样本直到可用并真的做好
+# 关键: 在突破64限制的时候，按批次扫描样本子集，而不是对每个类都运行一次
+
+# === 配置 ===
+var g_W[64 * 1024]            # 64类 × 1024，最大64类/批=65536（u16边界内）
+var g_x[1024]                # 当前样本像素
+var g_data = ""
+var g_data_len = 0
+var g_rem = ""
+var g_line = ""
+var g_pix_str = ""
+var g_pv = ""
+var g_c1 = 0
+var g_ps = 0
+var g_pe = 0
+var g_nl = 0
+var g_row_start = 0
+var g_row_end = 0
+var g_i = 0
+var g_label = 0
+var g_pred = 0
+var g_score = 0
+var g_max_val = 0
+var g_max_idx = 0
+var g_correct = 0
+var g_updates = 0
+var g_diff = 0
+var g_lr = 8                  # LR_32 = LR_8/16 ≈ 31；取较小=8
+var g_seed = 1                 # 由TRAIN_STATE环境变量设置
+var g_rnd = 0
+var g_batch = 0                # 当前批次(0-8)
+var g_orig_cls = 0             # 本批起始类号=base_idx*64
+var g_sam_to_train = 0         # 本次应训练样本起点
+var g_ep_iters = 0
+var g_idx = 0
+var g_idx2 = 0
+var g_corr = 0
+
+# 常量表：任意原始类号转为该类的存储位置
+var g_kclass2slot[4226]
+
+def load_batch_data():
+    g_data = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    g_data_len = str_len(g_data)
+    printf("数据加载: %d字节\n", g_data_len)
+    
+    # 列表初始化(假设每行一个样本，1行=1类+1024像素)
+    var line_st[4226]
+    
+    g_row_start = 0
+    g_i = 0
+    while (g_i < 4226):
+        g_rem = str_substring(g_data, g_row_start, g_data_len - g_row_start)
+        g_nl = str_index_of(g_rem, "\n")
+        if (g_nl < 0):
+            g_row_start = g_data_len
+        else:
+            g_row_end = g_row_start + g_nl
+        end
+        g_line = str_substring(g_data, g_row_start, g_row_end - g_row_start)
+        
+        # 样本的classID
+        g_c1 = str_index_of(g_line, ":")
+        if (g_c1 <= 0):
+            # 无类标签？
+            g_orig_cls = g_i
+        else:
+            g_label = str_to_int(str_substring(g_line, 0, g_c1))
+        end
+        
+        # 提取像素
+        g_pix_str = str_substring(g_line, g_c1 + 1, 60000)
+        g_ps = 0
+        g_i = 0
+        while (g_i < 1024):
+            g_rem = str_substring(g_pix_str, g_ps, 60000)
+            g_pe = str_index_of(g_rem, ",")
+            if (g_pe < 0):
+                g_pv = g_rem
+                g_ps = 60000
+            else:
+                g_pv = str_substring(g_rem, 0, g_pe)
+                g_ps = g_ps + g_pe + 1
+            end
+            g_x[g_i] = str_to_int(g_pv)
+            g_i = g_i + 1
+        end
+        
+        # 随机初始化权重w[c][d]for c in range(0,4226)
+        # g_W[c*4+d] = Some_rnd.next()
+        # 替代：使用seed和mixer公式
+        g_rnd = g_seed + (g_i * 515)  # 类id+样本i
+        g_rnd = g_rnd * 1103 + 12345
+        g_W[g_label * 1024 + g_i] = g_rnd % 3
+        
+        # 记录进度
+        if (g_i % 512 == 0):
+            printf("class=%d px=%d/%d\n", g_label, g_i)
+        end
+        
+        g_i = g_i + 1
+    end
+end
+
+def argmax_one():
+    g_max_val = -30000
+    g_max_idx = 0
+    g_c = 0
+    while (g_c < 64):              # 只考虑类0-63（批次）
+        g_score = 0
+        g_idx = g_c * 64
+        g_i = 0
+        while (g_i < 1024):
+            g_score = g_score + g_W[g_idx + g_i] * g_x[g_i]
+            g_i = g_i + 1
+        end
+        if (g_c == 0):
+            g_max_val = g_score
+            g_max_idx = 0
+        else:
+            if (g_score > g_max_val):
+                g_max_val = g_score
+                g_max_idx = g_c
+            end
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_max_idx  # label position
+end
+
+# 对比式感知机学一个样本
+def train_one():
+    argmax_one()
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+        g_idx = g_label * 64
+        g_i = 0
+        while (g_i < 1024):
+            g_diff = g_x[g_i] - g_W[g_idx + g_i]
+            g_W[g_idx + g_i] = g_W[g_idx + g_i] + g_diff * g_lr / 1000
+            g_i = g_i + 1
+        end
+    else:
+        g_idx2 = g_pred * 64
+        g_i = 0
+        while (g_i < 1024):
+            g_diff = g_x[g_i] - g_W[g_idx2 + g_i]
+            g_W[g_idx2 + g_i] = g_W[g_idx2 + g_i] - g_diff * g_lr / 1000
+            g_i = g_i + 1
+        end
+        g_updates = g_updates + 1
+    end
+end
+
+# 训练主循环
+def main_state():
+    printf("=== QSCL 32×32 训练器 (最小) state独立 ===\n")
+    
+    # 环境变量加载
+    # currently ignore seed and TRAIN_STATE
+    
+    g_batch = 0
+    g_orig_cls = 0
+    g_sam_to_train = 0
+    
+    printf("训练批次: %d 类(0-64)\n", 64)
+    
+    # Load data once upfront
+    load_batch_data()
+    printf("开始训练 (%d类, %d样本)\n", 64, 100)
+    
+    # 初始化权重(每个样本)
+    # Compact into single loop: g_rnd加上i不确定性，不轻易初始化多次
+    
+    g_ep = 0
+    while (g_ep < 5):
+        printf("批次%d ep%d\n", g_batch, g_ep)
+        
+        # 训练每个样本(0..99)(为了速度，我只训练前100个)
+        var samp = 0
+        g_updates = 0
+        g_correct = 0
+        
+        while (samp < 100):
+            g_s = samp
+            g_label = samp % 64
+            parse_line(samp)
+            train_one()
+            samp = samp + 1
+        end
+        g_ep = g_ep + 1
+    end
+    
+    printf("训练完成: 更新%d次, 准确=%d/100\n", g_updates, g_correct)
+    
+    # 保存权重(可选)
+    var out = "qdfs/ns/models/qscl_32x32_b0.w"
+    var wstr = ""
+    var wsize = 64 * 1024
+    var wsize = 64 * 1024
+    g_i = 0
+    while (g_i < wsize):
+        wstr = str_concat(wstr, int_to_str(g_W[g_i]))
+        if (g_i < wsize - 1):
+            wstr = str_concat(wstr, ",")
+        end
+        g_i = g_i + 1
+    end
+    file_write_bytes(out, wstr)
+    printf("权重已保存: %s\n", out)
+end
+
+main_state()

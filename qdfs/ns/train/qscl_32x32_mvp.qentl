@@ -1,0 +1,213 @@
+# QSCL-32×32-MVP correct syntax
+var g_WBASE = 64
+var g_WSIZE = 64
+var g_x[1024]
+var g_data = ""
+var g_rem = ""
+var g_line = ""
+var g_pix_str = ""
+var g_pv = ""
+var g_c1 = 0
+var g_ps = 0
+var g_pe = 0
+var g_nl = 0
+var g_row_start = 0
+var g_row_end = 0
+var g_i = 0
+var g_c = 0
+var g_s = 0
+var g_ep = 0
+var g_idx = 0
+var g_idx2 = 0
+var g_score = 0
+var g_max_val = 0
+var g_max_idx = 0
+var g_pred = 0
+var g_label = 0
+var g_diff = 0
+var g_lr = 8
+var g_rnd = 0
+var g_updates = 0
+var g_correct = 0
+var g_state = 0
+var g_seed = 0
+var g_batch = 0
+var g_widx = 0
+var g_v1 = 0
+var g_max_local = 0
+var g_max_local_val = 0
+var g_tempv = 0
+
+def load_all_samples():
+    var fname = "qdfs/ns/data/yi_glyph_4226_32x32.data"
+    if (file_exists(fname)):
+        g_data = file_read(fname)
+        g_data_len = str_len(g_data)
+        printf("数据加载: %d bytes\n", g_data_len)
+    else:
+        printf("ERROR file missing: %s\n", fname)
+    end
+end
+
+def parse_line(linenum):
+    g_row_start = 0
+    var linectr = 0
+    var lookup = ""
+    
+    # walk through to find line
+    while (linectr < linenum):
+        g_rem = str_substring(g_data, g_row_start, g_data_len - g_row_start)
+        g_nl = str_index_of(g_rem, "\n")
+        if (g_nl < 0):
+            g_row_start = g_data_len
+        else:
+            g_row_start = g_row_start + g_nl + 1
+        end
+        linectr = linectr + 1
+    end
+    
+    # Extract the line
+    g_rem = str_substring(g_data, g_row_start, g_data_len - g_row_start)
+    g_nl = str_index_of(g_rem, "\n")
+    if (g_nl >= 0):
+        g_line = str_substring(g_data, g_row_start, g_nl)
+    else:
+        g_line = g_rem
+    end
+    
+    # Parse label and pixels
+    g_c1 = str_index_of(g_line, ":")
+    g_pix_str = str_substring(g_line, g_c1 + 1, 60000)
+    g_ps = 0
+    g_i = 0
+    while (g_i < 1024):
+        g_rem = str_substring(g_pix_str, g_ps, 60000)
+        g_pe = str_index_of(g_rem, ",")
+        if (g_pe < 0):
+            g_pv = g_rem
+            g_ps = 60000
+        else:
+            g_pv = str_substring(g_rem, 0, g_pe)
+            g_ps = g_ps + g_pe + 1
+        end
+        g_x[g_i] = str_to_int(g_pv)
+        g_i = g_i + 1
+    end
+end
+
+def compute_g_score(c):
+    g_score = 0
+    g_idx = c * 1024
+    g_i = 0
+    while (g_i < 1024):
+        g_score = g_score + g_W[g_idx + g_i] * g_x[g_i]
+        g_i = g_i + 1
+    end
+    return g_score
+end
+
+def argmax_batch0():
+    g_max_val = -30000
+    g_max_idx = 0
+    g_c = 0
+    while (g_c < 64):
+        g_score = compute_g_score(g_c)
+        if (g_c == 0):
+            g_max_val = g_score
+            g_max_idx = 0
+        else:
+            if (g_score > g_max_val):
+                g_max_val = g_score
+                g_max_idx = g_c
+            end
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_max_local + (g_batch * 64)
+end
+
+def train_sample(samp_id):
+    g_label = samp_id
+    g_i = 0
+    parse_line(samp_id)
+    
+    # Train all neurons for this class
+    g_idx = g_base_cls + samp_id
+    g_correct = 0
+    g_updates = 0
+    
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+    else:
+        g_updates = g_updates + 1
+        # Move W towards correct classification
+        g_idx2 = g_max_idx
+        g_i = 0
+        while (g_i < 1024):
+            g_diff = g_x[i] - g_W[g_idx + i]
+            g_W[g_idx2 + g_i] = g_W[g_idx2 + g_i] - g_diff * g_lr / 100
+            g_i = g_i + 1
+        end
+    end
+end
+
+def main():
+    g_state = 0
+    g_seed = 1
+    printf("QSCL-32×32-MVP Test 1 batch\n")
+    
+    # Initialize
+    g_rnd = g_seed
+    g_i = 0
+    while (g_i < 64 * 1024):
+        g_rnd = g_rnd * 1103 + 12345
+        g_W[g_i] = g_rnd % 3
+        g_i = g_i + 1
+    end
+    printf("W initialized\n")
+    
+    load_all_samples()
+    printf("starting training batch 0\n")
+    
+    g_max_local_val = -30000
+    g_max_local = 0
+    
+    var iter = 0
+    while (iter < 50):
+        g_s = 0
+        while (g_s < 100):
+            g_label = g_s
+            parse_line(g_s)
+            argmax_batch0()
+            
+            if (g_pred != g_label):
+                g_updates = g_updates + 1
+                g_idx = g_label * 1024
+                g_i = 0
+                while (g_i < 1024):
+                    g_diff = g_x[i] - g_W[g_idx + i]
+                    g_W[g_idx + i] = g_W[g_idx + i] + g_diff * g_lr / 100
+                    g_i = g_i + 1
+                end
+            end
+            g_s = g_s + 1
+        end
+        
+        # Verify
+        g_correct = 0
+        g_s = 0
+        while (g_s < 100):
+            g_label = g_s
+            parse_line(g_s)
+            argmax_batch0()
+            if (g_pred == g_label):
+                g_correct = g_correct + 1
+            end
+            g_s = g_s + 1
+        end
+        printf("ep %d: %d/%d (%d%%)\n", iter, g_correct, 100, g_correct)
+        iter = iter + 1
+    end
+end
+
+main()

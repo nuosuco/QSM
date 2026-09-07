@@ -1,0 +1,71 @@
+# Min smoke trainer: read line0, update 1024 weights, save tiny check file
+var g_W[1025]
+var g_x[1025]
+var g_data = ""
+var g_line = ""
+var g_rem = ""
+var g_pv = ""
+var g_c1 = 0
+var g_ps = 0
+var g_pe = 0
+var g_nl = 0
+var g_i = 0
+var g_label = 0
+var g_pred = 0
+var g_score = 0
+var g_diff = 0
+var g_out = ""
+
+def parse_line0():
+    g_data = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    g_nl = str_index_of(g_data, "\n")
+    g_line = str_substring(g_data, 0, g_nl)
+    g_c1 = str_index_of(g_line, ":")
+    g_line = str_substring(g_line, g_c1 + 1, 50000)
+    g_ps = 0
+    g_i = 0
+    while (g_i < 1024):
+        g_rem = str_substring(g_line, g_ps, 50000)
+        g_pe = str_index_of(g_rem, ",")
+        if (g_pe < 0):
+            g_pv = g_rem
+            g_ps = 50000
+        else:
+            g_pv = str_substring(g_rem, 0, g_pe)
+            g_ps = g_ps + g_pe + 1
+        end
+        g_x[g_i] = str_to_int(g_pv)
+        g_i = g_i + 1
+    end
+end
+
+def main():
+    printf("start\n")
+    g_i = 0
+    while (g_i < 1024):
+        g_W[g_i] = 1
+        g_i = g_i + 1
+    end
+    parse_line0()
+    printf("x0=%d x5=%d x1023=%d\n", g_x[0], g_x[5], g_x[1023])
+    g_score = 0
+    g_i = 0
+    while (g_i < 1024):
+        g_score = g_score + g_W[g_i] * g_x[g_i]
+        g_i = g_i + 1
+    end
+    printf("score0=%d\n", g_score)
+    g_i = 0
+    while (g_i < 1024):
+        g_W[g_i] = g_W[g_i] + g_x[g_i]
+        g_i = g_i + 1
+    end
+    printf("w0_after=%d\n", g_W[0])
+    g_out = int_to_str(g_W[0])
+    g_out = str_concat(g_out, ",")
+    g_out = str_concat(g_out, int_to_str(g_W[1]))
+    file_write_bytes("run/smoke_qscl_32.w", g_out)
+    printf("saved\n")
+end
+
+main()

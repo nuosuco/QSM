@@ -1,46 +1,38 @@
-# ================================================================
-# QSCL v5.1 - 最小可行训练器 (一次1态,逐样本流式)
-# 单进程、单态、单批:本进程只负责(0,1,515)号数据,g_state由环境变量定
-# ================================================================
-
-var g_W[65535 * 8 + 3080]   # 515×1024 = 527360
-var g_x[1024]                # 当前样本
+# QSCL最小验证版 - 只训100样本5轮，验证能跑通
+var g_WSIZE_BIG = 70 * 1024
+var g_W[70 * 1024]
+var g_x[1024]
 var g_data = ""
 var g_data_len = 0
 var g_line = ""
-
+var g_rem = ""
+var g_pix_str = ""
+var g_pv = ""
 var g_i = 0
 var g_c = 0
+var g_s = 0
+var g_ep = 0
 var g_row_start = 0
 var g_row_end = 0
 var g_nl = 0
-var g_rem = ""
-var g_max = 0
+var g_c1 = 0
+var g_ps = 0
+var g_pe = 0
 var g_max_val = 0
 var g_max_idx = 0
+var g_score = 0
+var g_diff = 0
 var g_correct = 0
 var g_updates = 0
 var g_pred = 0
 var g_label = 0
-var g_state = 0
-var g_batch = 0
-var g_seed = 0
-var g_lr = 0
-var g_diff = 0
-var g_path = ""
 var g_rnd = 0
-var g_i2 = 0
-var g_str = ""
-var g_state_id = 0
-var g_line = ""
-var g_c1 = 0
-var g_pix_str = ""
-var g_ps = 0
-var g_pe = 0
-var g_pv = ""
-var g_ep = 0
-var g_ep_max = 0
-var g_n_target = 515
+var g_idx = 0
+var g_idx2 = 0
+var g_state = 0
+var g_lr = 0
+var g_seed = 0
+var g_path = ""
 
 def load_line(lineno):
     g_row_start = 0
@@ -63,7 +55,6 @@ def load_line(lineno):
         g_row_end = g_data_len
     end
     g_line = str_substring(g_data, g_row_start, g_row_end - g_row_start)
-    
     g_c1 = str_index_of(g_line, ":")
     g_pix_str = str_substring(g_line, g_c1 + 1, 60000)
     g_ps = 0
@@ -83,20 +74,11 @@ def load_line(lineno):
     end
 end
 
-def init_weights():
-    g_i = 0
-    while (g_i < g_WSIZE):
-        g_rnd = g_rnd * 1103 + 12345
-        g_W[g_i] = g_rnd % 5
-        g_i = g_i + 1
-    end
-end
-
-def forward_argmax():
+def argmax():
     g_max_val = -30000
     g_max_idx = 0
     g_c = 0
-    while (g_c < 515):
+    while (g_c < 70):
         g_score = 0
         g_idx = g_c * 1024
         g_i = 0
@@ -118,8 +100,8 @@ def forward_argmax():
     g_pred = g_max_idx
 end
 
-def train_sample():
-    forward_argmax()
+def train():
+    argmax()
     g_idx = g_label * 1024
     g_i = 0
     while (g_i < 1024):
@@ -131,8 +113,7 @@ def train_sample():
         g_idx2 = g_pred * 1024
         g_i = 0
         while (g_i < 1024):
-            g_diff = g_x[g_i] - g_W[g_idx + g_i]
-            g_W[g_idx2 + g_i] = g_W[g_idx2 + g_i] - g_diff * g_lr / 1000
+            g_W[g_idx2 + g_i] = g_W[g_idx2 + g_i] + g_diff * g_lr / 1000
             g_i = g_i + 1
         end
         g_updates = g_updates + 1
@@ -140,67 +121,63 @@ def train_sample():
 end
 
 def main():
-    printf("=== QSCL最小版 v5.1 ===\n")
-    g_batch = str_to_int(exec("echo ${TRAIN_BATCH:-0}"))
+    printf("QSCL最小验证版\n")
     g_state = str_to_int(exec("echo ${TRAIN_STATE:-0}"))
-    g_seed = 1 + g_state * 7919
-    g_lr = 500 + g_state * 400
-    if (g_lr > 1500):
-        g_lr = 1500
-    end
-    g_ep_max = 20 + g_state * 10
-    printf("批次%d 态%d seed=%d LR=%d EP=%d\n", g_batch, g_state, g_seed, g_lr, g_ep_max)
-    
-    # 初始化权重
-    init_weights()
-    printf("权重初始化完成\n")
-    
-    # 读全文数据
+    g_seed = 1 + g_state * 7
+    g_lr = 500
     g_path = "qdfs/ns/data/yi_glyph_4226_32x32.data"
+    printf("态%d seed=%d\n", g_state, g_seed)
+    
+    g_rnd = g_seed
+    g_i = 0
+    while (g_i < 70 * 1024):
+        g_rnd = g_rnd * 1103 + 12345
+        g_W[g_i] = g_rnd % 3
+        g_i = g_i + 1
+    end
+    printf("权重初始化ok\n")
+    
     g_data = file_read(g_path)
     g_data_len = str_len(g_data)
-    printf("数据加载: %d字节\n", g_data_len)
+    printf("数据%d字节\n", g_data_len)
     
-    # 训练(只训练0-514号 = 第一个批次)
     g_ep = 0
-    while (g_ep < g_ep_max):
+    while (g_ep < 3):
         g_updates = 0
         g_s = 0
-        while (g_s < g_n_target):
+        while (g_s < 100):
+            g_label = g_s
             load_line(g_s)
-            train_sample()
+            train()
             g_s = g_s + 1
         end
-        # 验证
         g_correct = 0
         g_s = 0
-        while (g_s < g_n_target):
+        while (g_s < 100):
             load_line(g_s)
-            forward_argmax()
+            argmax()
             if (g_pred == g_s):
                 g_correct = g_correct + 1
             end
             g_s = g_s + 1
         end
-        printf("[态%d] ep%d: %d/%d = %.1f%% 更新%d\n", 
-               g_state, g_ep, g_correct, g_n_target, 100.0 * g_correct / g_n_target, g_updates)
+        printf("态%d ep%d: %d/100 更新%d\n", g_state, g_ep, g_correct, g_updates)
         g_ep = g_ep + 1
     end
     
-    # 保存权重
-    var out_path = "qdfs/ns/models/qscl_4226_32x32_b" + int_to_str(g_batch) + "_s" + int_to_str(g_state) + ".w"
-    var w_all = ""
-    var w_str = ""
+    var wsize = 70 * 1024
+    var out = "qdfs/ns/models/qscl_32x32_min_s" + int_to_str(g_state) + ".w"
+    var wstr = ""
     g_i = 0
-    while (g_i < g_WSIZE):
-        w_str = str_concat(w_str, int_to_str(g_W[i]))
-        if (g_i < g_WSIZE - 1):
-            w_str = str_concat(w_str, ",")
+    while (g_i < wsize):
+        wstr = str_concat(wstr, int_to_str(g_W[g_i]))
+        if (g_i < wsize - 1):
+            wstr = str_concat(wstr, ",")
         end
         g_i = g_i + 1
     end
-    file_write_bytes(out_path, w_str)
-    printf("权重保存: %s\n", out_path)
+    file_write_bytes(out, wstr)
+    printf("保存%s\n", out)
 end
 
 main()

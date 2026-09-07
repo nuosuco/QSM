@@ -1,0 +1,94 @@
+# QEntL 数据拆分器(预处理): 把4226行拆成4个文件,每份一个态
+# 每个训练进程只读自己那份,内存降低4倍,避免OOM
+# 铁律: 这是QEntL写的,不是shell/awk/python
+
+var g_data = ""
+var g_i = 0
+var g_total = 0
+var g_path = "qdfs/ns/data/yi_glyph_4226_32x32.data"
+var g_out_path = ""
+var g_batch_file = ""
+var g_state_offset = 0
+var g_batch_start = 0
+var g_batch_end = 0
+var g_line = ""
+var g_row_start = 0
+var g_row_end = 0
+var g_nl = 0
+
+def find_line(lineno):
+    g_row_start = 0
+    g_row_end = 0
+    g_i = 0
+    g_n = 0
+    while (g_i < lineno):
+        g_nl = str_index_of(str_substring(g_data, g_row_start, 60000), "\n")
+        if (g_nl < 0):
+            g_row_start = g_data_len
+        else:
+            g_row_start = g_row_start + g_nl + 1
+        end
+        g_i = g_i + 1
+    end
+    g_nl = str_index_of(str_substring(g_data, g_row_start, 60000), "\n")
+    if (g_nl < 0):
+        g_row_end = g_data_len
+    else:
+        g_row_end = g_row_start + g_nl
+    end
+end
+
+var g_data_len = 0
+var g_n = 0
+var g_state = 0
+
+def main():
+    printf("=== 拆分4226数据为4个态文件 ===\n")
+
+    g_data = file_read(g_path)
+    g_data_len = str_len(g_data)
+    printf("数据总量: %d 字节\n", g_data_len)
+
+    g_state = 0
+    while (g_state < 4):
+        g_out_path = "qdfs/ns/data/yi_glyph_4226_32x32_s" + int_to_str(g_state) + ".data"
+        printf("正在创建 %s\n", g_out_path)
+
+        # 每个态处理 4226/4 ≈ 1057 行(最后一个态少点)
+        if (g_state == 0):
+            g_batch_start = 0
+            g_batch_end = 1056
+        end
+        if (g_state == 1):
+            g_batch_start = 1057
+            g_batch_end = 2113
+        end
+        if (g_state == 2):
+            g_batch_start = 2114
+            g_batch_end = 3170
+        end
+        if (g_state == 3):
+            g_batch_start = 3171
+            g_batch_end = 4225
+        end
+
+        # 提取这个态的所有行
+        var state_content = ""
+        g_i = g_batch_start
+        while (g_i <= g_batch_end):
+            find_line(g_i)
+            g_line = str_substring(g_data, g_row_start, g_row_end - g_row_start)
+            state_content = str_concat(state_content, str_concat(g_line, "\n"))
+            g_i = g_i + 1
+        end
+
+        file_write_bytes(g_out_path, state_content)
+        printf("  完成 %s (%d行)\n", g_out_path, g_batch_end - g_batch_start + 1)
+
+        g_state = g_state + 1
+    end
+
+    printf("=== 4个态文件创建完成 ===\n")
+end
+
+main()
