@@ -3,6 +3,7 @@
 真正读取各交易所实时余额，不再假设余额
 """
 import sqlite3
+from .db_utils import get_connection
 import logging
 import os
 from datetime import datetime, timedelta
@@ -14,21 +15,27 @@ logger = logging.getLogger('RiskManager')
 class RiskManager:
     """风控管理器 - 规则定死不可更改"""
     
-    # ========== 风控铁律（v4方案） ==========
-    MAX_POSITION_PCT = 0.20        # 单笔仓位 ≤ 总资金 20%
+    # ========== 风控铁律（v2.1升级后） ==========
+    # 2026-09-02 v2.1升级：根据双模式回测分析结果收紧风控
+    MAX_POSITION_PCT = 0.15        # v2.1升级：从20%降低，降低风险敞口
     MAX_STOP_LOSS_PCT = 0.02       # 单笔止损 ≤ 总资金 2%
-    MAX_CONSECUTIVE_LOSSES = 3     # 连续亏损 3 次暂停（原来是5次，太宽松）
-    MAX_DRAWDOWN_PCT = 0.30        # 最大回撤 30% 停止（原来是40%）
+    MAX_CONSECUTIVE_LOSSES = 2     # v2.1升级：从3次收紧至2次，快速止损
+    MAX_DRAWDOWN_PCT = 0.20        # v2.1升级：从30%收紧至20%，减少损失
     MAX_SINGLE_LOSS_PCT = 0.05     # 单笔最大亏损 ≤ 总资金 5%
     MAX_DAILY_LOSS_PCT = 0.10      # 单日最大亏损 ≤ 总资金 10%
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.0001   # 2026-09-01 修复：净利必须 > 0.01%（用户要求），定死不变
+    MIN_NET_PROFIT_PCT = 0.0002   # v2.1升级：从0.01%提升至0.02%，确保盈利空间
     
     def __init__(self, db_path: str, paper_mode: bool = False, paper_balance: float = 1000.0, exchanges_config: Dict = None):
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self.exchanges_config = exchanges_config or {}
-        self._init_db()
+        # 初始化时用短连接，避免持久连接导致数据库锁死
+        conn = get_connection(db_path)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout=30000')
+        self._init_db(conn)
+        self._load_state(conn)
+        conn.close()
         
         # 模拟模式：使用模拟余额，不读取实盘余额
         self.paper_mode = paper_mode
@@ -48,16 +55,20 @@ class RiskManager:
         
         # 加载状态并获取真实余额（模拟模式跳过）
         if not self.paper_mode:
-            self.load_state()
+            conn = get_connection(self.db_path)
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.execute('PRAGMA busy_timeout=30000')
+            self._load_state(conn)
+            conn.close()
             self.refresh_balance()
         else:
             # 模拟模式：使用模拟余额
             self.equity = self.paper_balance
             logger.info(f"💰 模拟模式：使用模拟余额 {self.paper_balance:.2f} USDT")
     
-    def _init_db(self):
+    def _init_db(self, conn):
         """初始化风控表"""
-        cursor = self.conn.cursor()
+        cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS risk_state (
                 key TEXT PRIMARY KEY,
@@ -68,7 +79,7 @@ class RiskManager:
         defaults = {
             'consecutive_losses': '0',
             'peak_equity': '0',
-            'current_equity': '0',  # 修改为从真实余额获取
+            'current_equity': '0',
             'total_profit': '0.0',
             'daily_profit': '0.0',
             'max_drawdown': '0.0',
@@ -80,11 +91,11 @@ class RiskManager:
             cursor.execute('''
                 INSERT OR IGNORE INTO risk_state (key, value) VALUES (?, ?)
             ''', (k, v))
-        self.conn.commit()
+        conn.commit()
     
-    def load_state(self):
+    def _load_state(self, conn):
         """加载风控状态"""
-        cursor = self.conn.cursor()
+        cursor = conn.cursor()
         cursor.execute('SELECT key, value FROM risk_state')
         for row in cursor.fetchall():
             if row[0] == 'consecutive_losses':
@@ -95,7 +106,6 @@ class RiskManager:
                     self.equity = val
                     self.total_profit = val - self._get_initial_principal()
                 else:
-                    # 如果之前是0，需要从真实余额获取
                     pass
             elif row[0] == 'max_drawdown':
                 self.max_drawdown = float(row[1])
@@ -115,25 +125,39 @@ class RiskManager:
                              ('0',))
                 cursor.execute('UPDATE risk_state SET value=? WHERE key="last_reset_date"',
                              (datetime.now().strftime('%Y-%m-%d'),))
-                self.conn.commit()
+                conn.commit()
     
     def _get_initial_principal(self) -> float:
         """从数据库获取初始本金"""
-        cursor = self.conn.cursor()
+        conn = get_connection(self.db_path)
+        cursor = conn.cursor()
         cursor.execute('SELECT value FROM risk_state WHERE key="initial_principal"')
         row = cursor.fetchone()
+        conn.close()
         if row:
             return float(row[0])
-        return 0.0  # 如果未设置，初始本金为0
+        return 0.0
     
     def set_initial_principal(self, principal: float):
         """设置初始本金（首次运行或用户充值时调用）"""
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT OR REPLACE INTO risk_state (key, value) VALUES (?, ?)
-        ''', ('initial_principal', str(principal)))
-        self.conn.commit()
-        logger.info(f"💰 设置初始本金: {principal:.2f} USDT")
+        for attempt in range(3):
+            try:
+                conn = get_connection(self.db_path)
+                conn.execute('PRAGMA busy_timeout=30000')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO risk_state (key, value) VALUES (?, ?)
+                ''', ('initial_principal', str(principal)))
+                conn.commit()
+                conn.close()
+                logger.info(f"💰 设置初始本金: {principal:.2f} USDT")
+                return
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e) and attempt < 2:
+                    import time
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise
     
     def refresh_balance(self):
         """从各交易所获取真实余额"""
@@ -241,8 +265,10 @@ class RiskManager:
             logger.error(f"获取余额失败: {e}")
     
     def save_state(self):
-        """保存风控状态"""
-        cursor = self.conn.cursor()
+        """保存风控状态（短连接，避免锁死）"""
+        conn = get_connection(self.db_path)
+        conn.execute('PRAGMA busy_timeout=30000')
+        cursor = conn.cursor()
         state = {
             'consecutive_losses': str(self.consecutive_losses),
             'current_equity': str(self.equity),
@@ -252,7 +278,8 @@ class RiskManager:
         }
         for k, v in state.items():
             cursor.execute('UPDATE risk_state SET value=? WHERE key=?', (v, k))
-        self.conn.commit()
+        conn.commit()
+        conn.close()
     
     def check_risk(self, symbol: str, side: str, position_size_usdt: float, 
                    entry_price: float, stop_loss_price: float, ex_name: str = '') -> Dict:
@@ -379,4 +406,5 @@ class RiskManager:
         }
     
     def close(self):
-        self.conn.close()
+        """无需关闭持久连接（已改为短连接）"""
+        pass

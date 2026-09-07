@@ -4,6 +4,7 @@
 支持按平台（exchange）分别分析
 """
 import sqlite3
+from .db_utils import get_connection
 import numpy as np
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -16,7 +17,9 @@ class TradeAnalyzer:
     
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn = get_connection(db_path, check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self.conn.row_factory = sqlite3.Row
     
     def _exchange_filter(self, exchange: Optional[str]) -> str:
@@ -313,7 +316,9 @@ class AdaptiveRiskManager:
     
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn = get_connection(db_path, check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         
     def analyze_market_regime(self, exchange: Optional[str] = None) -> Dict:
         """分析当前市场状态，可指定平台"""
@@ -396,7 +401,9 @@ class PhaseUpgradeManager:
     
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn = get_connection(db_path, check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         
     def evaluate_phase_completion(self, exchange: Optional[str] = None) -> Dict:
         """评估当前阶段是否完成，可指定平台"""

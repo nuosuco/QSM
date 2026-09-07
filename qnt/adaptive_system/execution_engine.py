@@ -12,6 +12,7 @@ v4.0: 完整风控版，修复所有bug
 import time
 import logging
 import sqlite3
+from .db_utils import get_connection
 import json
 import os
 from datetime import datetime
@@ -49,7 +50,6 @@ class ExecutionEngine:
         self.config = config
         self.running = False
         self.risk_manager = RiskManager(config.data.db_path)
-        self.risk_manager.load_state()
         
         # 初始化交易所连接
         self.exchanges = {}
@@ -470,7 +470,7 @@ class ExecutionEngine:
                       position_size: float, profit_pct: float, failed: bool = False):
         """记录成功/部分成功的交易到engine_trades表"""
         try:
-            conn = sqlite3.connect(self.config.data.db_path, timeout=30)
+            conn = get_connection(self.config.data.db_path)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO engine_trades (timestamp, mode, exchange, symbol, side, price, amount, 
@@ -488,7 +488,7 @@ class ExecutionEngine:
                        position_size: float = 0, failed: bool = False, errors: str = ''):
         """记录信号到engine_signals表"""
         try:
-            conn = sqlite3.connect(self.config.data.db_path, timeout=30)
+            conn = get_connection(self.config.data.db_path)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO engine_signals (timestamp, mode, exchange, symbol,

@@ -3,8 +3,10 @@
 负责分析交易记录，发现有效/无效规律，自动调整策略参数
 """
 import sqlite3
+from .db_utils import get_connection
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -77,7 +79,11 @@ class EvolutionManager:
     def _analyze_historical_trades(self) -> Dict:
         """分析我们的真实成交历史（模式一）"""
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn = get_connection(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             cursor = conn.cursor()
 
             # 统计总览
@@ -143,7 +149,11 @@ class EvolutionManager:
     def _analyze_market_backtest(self) -> Dict:
         """分析市场成交回测（模式二）"""
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn = get_connection(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             cursor = conn.cursor()
 
             # 统计总览
@@ -215,6 +225,12 @@ class EvolutionManager:
                 'reason': '样本不足，无法对比',
                 'hist_trades': hist_stats.get('trades', 0),
                 'market_trades': market_stats.get('trades', 0),
+                'hist_direction': 'unknown',
+                'market_direction': 'unknown',
+                'hist_net_pnl': hist_stats.get('net_pnl', 0),
+                'market_net_pnl': market_stats.get('net_pnl', 0),
+                'common_profit_symbols': [],
+                'common_loss_symbols': [],
             }
         
         # 分析趋势一致性
@@ -297,7 +313,7 @@ class EvolutionManager:
         actions.append({
             'type': 'investigate',
             'message': '双模式结果不一致，需要深入分析',
-            'details': f'历史成交{comparison["hist_direction"]}，市场回测{comparison["market_direction"]}',
+            'details': f'历史成交{comparison.get("hist_direction", "未知")}，市场回测{comparison.get("market_direction", "未知")}',
             'suggestion': '检查数据质量，分析差异原因',
         })
         
@@ -306,7 +322,11 @@ class EvolutionManager:
     def _analyze_paper(self) -> Dict:
         """分析模拟盘交易统计"""
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn = get_connection(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             cursor = conn.cursor()
 
             # 获取最近1000笔模拟交易
@@ -358,7 +378,11 @@ class EvolutionManager:
             return
 
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn = get_connection(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -375,9 +399,18 @@ class EvolutionManager:
             logger.error(f"应用参数变更失败: {e}")
 
     def _save_report(self, report: Dict):
-        """保存进化报告"""
+        """保存进化报告（自动清理旧报告，防止磁盘膨胀）"""
         report_dir = '/root/SOM/qnt/evolution_reports'
         os.makedirs(report_dir, exist_ok=True)
+
+        # 清理24小时前的旧报告
+        now = time.time()
+        for fname in os.listdir(report_dir):
+            if fname.startswith('evolution_report_') and fname.endswith('.json'):
+                fpath = os.path.join(report_dir, fname)
+                mtime = os.path.getmtime(fpath)
+                if now - mtime > 86400:  # 24小时
+                    os.remove(fpath)
 
         filename = f"evolution_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         filepath = os.path.join(report_dir, filename)

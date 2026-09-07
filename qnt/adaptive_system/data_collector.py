@@ -4,6 +4,7 @@
 """
 import logging
 import sqlite3
+from .db_utils import get_connection
 import time
 import json
 import numpy as np
@@ -130,7 +131,9 @@ class DataCollector:
     
     def _init_db(self):
         """初始化数据库（增加交易所字段，兼容旧表）"""
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.conn = get_connection(self.db_path, check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self.conn.row_factory = sqlite3.Row
         cursor = self.conn.cursor()
         
@@ -166,29 +169,52 @@ class DataCollector:
             print(f"✅ 旧表迁移完成, {cursor.rowcount} 条数据已添加 exchange='bitget'")
         
         # 检查 signals 表
-        cursor.execute("PRAGMA table_info(signals)")
-        columns = [col[1] for col in cursor.fetchall()]
-        if 'exchange' not in columns:
-            print("🔄 迁移旧表: signals 增加 exchange 字段")
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS signals_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp REAL,
-                    exchange TEXT DEFAULT 'bitget',
-                    symbol TEXT,
-                    signal_type TEXT,
-                    strategy TEXT,
-                    expected_profit REAL,
-                    actual_profit REAL DEFAULT 0,
-                    executed INTEGER DEFAULT 0,
-                    metadata TEXT
-                )
-            ''')
-            cursor.execute('INSERT INTO signals_new (id, timestamp, symbol, signal_type, strategy, expected_profit, actual_profit, executed, metadata) SELECT id, timestamp, symbol, signal_type, strategy, expected_profit, actual_profit, executed, metadata FROM signals')
-            cursor.execute('DROP TABLE signals')
-            cursor.execute('ALTER TABLE signals_new RENAME TO signals')
+        try:
+            cursor.execute("PRAGMA table_info(signals)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'exchange' not in columns:
+                print("🔄 迁移旧表: signals 增加 exchange 字段")
+                # 先建signals_new
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS signals_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp REAL,
+                        exchange TEXT DEFAULT 'bitget',
+                        symbol TEXT,
+                        signal_type TEXT,
+                        strategy TEXT,
+                        expected_profit REAL,
+                        actual_profit REAL DEFAULT 0,
+                        executed INTEGER DEFAULT 0,
+                        metadata TEXT
+                    )
+                ''')
+                # 检查signals是否存在且有数据
+                try:
+                    cursor.execute("SELECT COUNT(*) FROM signals")
+                    count = cursor.fetchone()[0]
+                    if count > 0:
+                        cursor.execute('INSERT INTO signals_new (id, timestamp, symbol, signal_type, strategy, expected_profit, actual_profit, executed, metadata) SELECT id, timestamp, symbol, signal_type, strategy, expected_profit, actual_profit, executed, metadata FROM signals')
+                        cursor.execute('DROP TABLE signals')
+                        cursor.execute('ALTER TABLE signals_new RENAME TO signals')
+                        print(f"✅ signals 迁移完成 ({count}条)")
+                    else:
+                        # signals表为空，用signals_new替代
+                        cursor.execute("SELECT COUNT(*) FROM signals_new")
+                        cnt = cursor.fetchone()[0]
+                        if cnt > 0:
+                            cursor.execute('ALTER TABLE signals_new RENAME TO signals')
+                            print(f"✅ signals 重命名完成 ({cnt}条)")
+                        else:
+                            # 两个都空，signals表已存在(可能是空壳)
+                            pass
+                except:
+                    # signals表不存在
+                    pass
+                self.conn.commit()
+        except Exception as e:
+            print(f"⚠️ signals表迁移跳过: {e}")
             self.conn.commit()
-            print(f"✅ signals 旧表迁移完成")
         
         # 检查 strategy_performance 表
         cursor.execute("PRAGMA table_info(strategy_performance)")
@@ -210,11 +236,14 @@ class DataCollector:
                     sharpe_ratio REAL
                 )
             ''')
-            cursor.execute('INSERT INTO strategy_performance_new (id, timestamp, strategy, total_trades, winning_trades, losing_trades, win_rate, avg_profit, total_profit, sharpe_ratio) SELECT id, timestamp, strategy, total_trades, winning_trades, losing_trades, win_rate, avg_profit, total_profit, sharpe_ratio FROM strategy_performance')
-            cursor.execute('DROP TABLE strategy_performance')
-            cursor.execute('ALTER TABLE strategy_performance_new RENAME TO strategy_performance')
+            try:
+                cursor.execute('INSERT INTO strategy_performance_new (id, timestamp, strategy, total_trades, winning_trades, losing_trades, win_rate, avg_profit, total_profit, sharpe_ratio) SELECT id, timestamp, strategy, total_trades, winning_trades, losing_trades, win_rate, avg_profit, total_profit, sharpe_ratio FROM strategy_performance')
+                cursor.execute('DROP TABLE strategy_performance')
+                cursor.execute('ALTER TABLE strategy_performance_new RENAME TO strategy_performance')
+                print(f"✅ strategy_performance 迁移完成")
+            except Exception as e:
+                print(f"⚠️ strategy_performance迁移跳过: {e}")
             self.conn.commit()
-            print(f"✅ strategy_performance 旧表迁移完成")
         
         # 检查 patterns 表
         cursor.execute("PRAGMA table_info(patterns)")
@@ -234,11 +263,25 @@ class DataCollector:
                     status TEXT
                 )
             ''')
-            cursor.execute('INSERT INTO patterns_new (id, timestamp, pattern_type, symbol, confidence, profitability, parameters, status) SELECT id, timestamp, pattern_type, symbol, confidence, profitability, parameters, status FROM patterns')
-            cursor.execute('DROP TABLE patterns')
-            cursor.execute('ALTER TABLE patterns_new RENAME TO patterns')
+            try:
+                cursor.execute("SELECT COUNT(*) FROM patterns")
+                count = cursor.fetchone()[0]
+                if count > 0:
+                    cursor.execute('INSERT INTO patterns_new (id, timestamp, pattern_type, symbol, confidence, profitability, parameters, status) SELECT id, timestamp, pattern_type, symbol, confidence, profitability, parameters, status FROM patterns')
+                    cursor.execute('DROP TABLE patterns')
+                    cursor.execute('ALTER TABLE patterns_new RENAME TO patterns')
+                    print(f"✅ patterns 迁移完成 ({count}条)")
+                else:
+                    cursor.execute("SELECT COUNT(*) FROM patterns_new")
+                    cnt = cursor.fetchone()[0]
+                    if cnt > 0:
+                        cursor.execute('ALTER TABLE patterns_new RENAME TO patterns')
+                        print(f"✅ patterns 重命名完成 ({cnt}条)")
+                    else:
+                        pass
+            except Exception as e:
+                print(f"⚠️ patterns迁移跳过: {e}")
             self.conn.commit()
-            print(f"✅ patterns 旧表迁移完成")
         
         # 如果表不存在，创建新表（带exchange字段）
         cursor.execute('''

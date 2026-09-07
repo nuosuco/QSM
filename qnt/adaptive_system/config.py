@@ -12,10 +12,15 @@ class DataCollectionConfig:
     """数据收集配置"""
     # 监控的交易对
     symbols: List[str] = field(default_factory=lambda: [
+        # v2.1升级：禁用亏损币种OP，保留高胜率币种
+        # 重点交易：ARB(+11.08%), TIA(+0.74%), ATOM(+0.34%)
         "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT",
         "DOGE/USDT", "AVAX/USDT", "LINK/USDT", "PEPE/USDT", "WIF/USDT",
-        "SUI/USDT", "SEI/USDT", "ARB/USDT", "OP/USDT", "DOT/USDT",
-        "ATOM/USDT", "ONDO/USDT", "FET/USDT", "INJ/USDT", "TIA/USDT"
+        # "SUI/USDT",  # ❌ 禁用：市场净-106207U, "SEI/USDT", "ARB/USDT",  # ARB重点交易
+        # "OP/USDT",  # ❌ 永久禁用：历史亏损-20.72%
+        # "DOT/USDT",  # ⚠️ 谨慎交易：历史亏损-0.17%
+        "ATOM/USDT",  # ATOM可交易
+        "ONDO/USDT", "FET/USDT", "INJ/USDT", "TIA/USDT"  # TIA可交易
     ])
     # 更新频率(秒)
     update_interval: float = 1.0
@@ -69,10 +74,12 @@ class StrategyConfig:
 class ExecutionConfig:
     """执行引擎配置（可调整）
     
-    用户要求：净利=0.01%，成本=0.16%，价差=0.17%
+    v2.1升级后配置（2026-09-02）：
+    - 净利=0.02%，成本=0.16%，实际门槛=0.18%
+    - 建议阈值=0.20%（留出0.02%缓冲）
     """
-    spread_pct: float = 0.17
-    net_profit_pct: float = 0.01
+    spread_pct: float = 0.20  # v2.1升级：从0.17%提升
+    net_profit_pct: float = 0.02  # v2.1升级：从0.01%提升
     fill_rate: float = 0.6  # 成交概率
 
 @dataclass

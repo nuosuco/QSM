@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-09-07T18:55:02.277105",
+  "analysis": {
+    "historical": {
+      "trades": 322,
+      "buy_cost": 1499.8982,
+      "sell_cost": 784.8873560000001,
+      "net_pnl": -715.010844,
+      "net_pnl_pct": -47.67062484640624,
+      "symbol_stats": [
+        {
+          "symbol": "OP/USDT:USDT",
+          "trades": 101,
+          "pnl": -592.0
+        },
+        {
+          "symbol": "ATOM/USDT:USDT",
+          "trades": 86,
+          "pnl": 0.0
+        },
+        {
+          "symbol": "ARB/USDT:USDT",
+          "trades": 35,
+          "pnl": -187.0
+        },
+        {
+          "symbol": "DOT/USDT:USDT",
+          "trades": 26,
+          "pnl": 2.0
+        },
+        {
+          "symbol": "TIA/USDT:USDT",
+          "trades": 17,
+          "pnl": -12.0
+        },
+        {
+          "symbol": "FET/USDT:USDT",
+          "trades": 15,
+          "pnl": 0.0
+        },
+        {
+          "symbol": "WIF/USDT:USDT",
+          "trades": 10,
+          "pnl": 54.0
+        },
+        {
+          "symbol": "SEI/USDT:USDT",
+          "trades": 8,
+          "pnl": 0.0
+        },
+        {
+          "symbol": "DOT/USDT",
+          "trades": 8,
+          "pnl": -0.010900000000001242
+        },
+        {
+          "symbol": "ONDO/USDT:USDT",
+          "trades": 5,
+          "pnl": 9.0
+        }
+      ],
+      "exchange_stats": [
+        {
+          "exchange": "gate",
+          "trades": 305,
+          "pnl": -55.0
+        },
+        {
+          "exchange": "bitget",
+          "trades": 10,
+          "pnl": -0.01084400000000052
+        },
+        {
+          "exchange": "htx",
+          "trades": 7,
+          "pnl": -660.0
+        }
+      ],
+      "first_trade": null,
+      "last_trade": null
+    },
+    "market_backtest": {
+      "trades": 0,
+      "net_pnl": 0
+    },
+    "paper": {
+      "trades": 0,
+      "avg_pnl_pct": 0,
+      "win_rate": 0,
+      "total_pnl": 0
+    }
+  },
+  "actions": [
+    {
+      "type": "investigate",
+      "message": "双模式结果不一致，需要深入分析",
+      "details": "历史成交unknown，市场回测unknown",
+      "suggestion": "检查数据质量，分析差异原因"
+    }
+  ],
+  "parameter_changes": [],
+  "comparison": {
+    "consistent": false,
+    "reason": "样本不足，无法对比",
+    "hist_trades": 322,
+    "market_trades": 0,
+    "hist_direction": "unknown",
+    "market_direction": "unknown",
+    "hist_net_pnl": -715.010844,
+    "market_net_pnl": 0,
+    "common_profit_symbols": [],
+    "common_loss_symbols": []
+  }
+}

@@ -22,6 +22,7 @@
 状态持久化到 SQLite risk_state 表（risk_manager 会读取），重启不丢失。
 """
 import sqlite3
+from .db_utils import get_connection
 import logging
 import threading
 import time
@@ -214,7 +215,11 @@ class LiveTradingController:
     def _persist(self):
         """持久化到 risk_state，避免重启后状态丢失"""
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn = get_connection(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             c = conn.cursor()
             c.execute("CREATE TABLE IF NOT EXISTS risk_state (key TEXT PRIMARY KEY, value TEXT)")
             c.execute("INSERT OR REPLACE INTO risk_state (key, value) VALUES (?, ?)",
@@ -249,7 +254,11 @@ class LiveTradingController:
         try:
             if self.config.data.db_path != self.db_path:
                 return 'unknown'
-            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn = get_connection(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             c = conn.cursor()
             c.execute("""SELECT spread_pct FROM market_data
                          WHERE timestamp > strftime('%s','now','-24 hours')
@@ -274,7 +283,11 @@ class LiveTradingController:
     def _get_paper_window(self):
         """取模拟盘滚动窗口的交易数与胜率"""
         try:
-            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn = get_connection(self.db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             c = conn.cursor()
             live = self.config.live
             window = int(live.paper_window_hours * 3600)

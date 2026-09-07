@@ -4,6 +4,7 @@
 """
 import ccxt
 import sqlite3
+from .db_utils import get_connection
 import time
 import logging
 from datetime import datetime
@@ -97,7 +98,9 @@ class HistoricalFetcher:
         if not trades:
             return 0
         
-        conn = sqlite3.connect(self.db_path)
+        conn = get_connection(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
         cursor = conn.cursor()
         
         # 创建表
@@ -161,7 +164,9 @@ class HistoricalFetcher:
         if not trades:
             return 0
         
-        conn = sqlite3.connect(self.db_path)
+        conn = get_connection(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
         cursor = conn.cursor()
         
         # 创建表（如果不存在）
@@ -245,7 +250,9 @@ class HistoricalFetcher:
     
     def get_historical_stats(self) -> Dict:
         """获取历史成交统计（双模式）"""
-        conn = sqlite3.connect(self.db_path)
+        conn = get_connection(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
         cursor = conn.cursor()
         
         stats = {}

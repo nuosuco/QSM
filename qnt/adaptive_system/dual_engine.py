@@ -7,6 +7,7 @@
 import time
 import logging
 import sqlite3
+from .db_utils import get_connection
 import threading
 import random
 from datetime import datetime
@@ -101,7 +102,8 @@ class BacktestEngine:
         logger.info("📊 回测引擎已停止")
 
     def _run_loop(self):
-        conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
+        conn = get_connection(self.db_path, check_same_thread=False)
+        conn.isolation_level = None  # autocommit，写完立即释放锁
         cursor = conn.cursor()
 
         # === 模式一：分析我们的真实成交 ===
@@ -143,14 +145,17 @@ class BacktestEngine:
         logger.info("=== 平台成交统计 ===")
         total_buy = 0
         total_sell = 0
+        total_trades = 0
         for row in summary:
-            net = row[2] - row[1]
+            net = row[3] - row[2]  # 卖出 - 买入 = 净盈亏
             logger.info(f"  {row[0]}: {row[1]}笔, 买入{row[2]:.2f}U, 卖出{row[3]:.2f}U, 净盈亏{net:+.2f}U")
-            total_buy += row[1]
-            total_sell += row[2]
+            total_trades += row[1]
+            total_buy += row[2]   # 累加买入成本
+            total_sell += row[3]  # 累加卖出成本
         
         net_pnl = total_sell - total_buy
-        logger.info(f"=== 总净盈亏: {net_pnl:+.2f} USDT ({net_pnl/total_buy*100:.2f}%) ===")
+        pct = net_pnl / total_buy * 100 if total_buy > 0 else 0
+        logger.info(f"=== 总净盈亏: {net_pnl:+.2f} USDT ({pct:+.2f}%) ===")
         
         # 按币种统计
         cursor.execute("""
@@ -170,12 +175,8 @@ class BacktestEngine:
             net = row[3] - row[2]
             logger.info(f"  {row[0]}: {row[1]}笔, 净盈亏{net:+.2f}U")
         
-        # 保存分析结果
-        cursor.execute("""
-            INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status)
-            VALUES (?, 'backtest_hist', 'ANALYSIS', 'all', 'STATS', 0, 0, 0, 0, ?, ?, 'completed')
-        """, (time.time(), net_pnl, net_pnl/total_buy*100 if total_buy > 0 else 0))
-        conn.commit()
+        # 分析结果只记日志，不写入engine_trades（避免污染交易表）
+        logger.info(f"📊 模式一完成: {total_trades}笔, 买入{total_buy:.2f}U, 卖出{total_sell:.2f}U, 净盈亏{net_pnl:+.2f}U ({pct:+.2f}%)")
 
     def _backtest_market_trades(self, cursor):
         """模式二：回测平台公开市场成交（不交易，只统计胜率）"""
@@ -224,13 +225,7 @@ class BacktestEngine:
             ratio = row[2] / row[1] * 100 if row[1] > 0 else 0
             logger.info(f"  {row[0]}: 买入{row[1]:.2f}U, 卖出{row[2]:.2f}U, 卖出/买入={ratio:.1f}%")
         
-        # 保存统计结果
-        cursor.execute("""
-            INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status)
-            VALUES (?, 'backtest_market', 'MARKET_STATS', 'all', 'STATS', 0, 0, 0, 0, ?, ?, 'completed')
-        """, (time.time(), market_count, 0))
-        conn.commit()
-        
+        # 统计结果只记日志，不写入engine_trades
         logger.info(f"✅ 模式二完成，共{market_count}笔市场成交记录")
 
     def _realtime_backtest(self, cursor):
@@ -249,7 +244,7 @@ class BacktestEngine:
 
         threshold = self.config.execution.spread_pct
         cost = ExecutionEngine.BI_SIDE_COST * 100
-        min_net_profit = RiskManager.MIN_NET_PROFIT_PCT
+        min_net_profit = RiskManager.MIN_NET_PROFIT_PCT * 100  # 转换为百分比
 
         check_count = 0
         while self.running:
@@ -315,7 +310,7 @@ class BacktestEngine:
         
         # 风控检查
         min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
-        position = min(self.platform_balances.get(exchange, 1000) * 0.20, 200)
+        position = min(self.platform_balances.get(exchange, 1000) * 0.15, 200)  # v2.1升级：从20%降至15%
         
         if position < min_notional:
             return
@@ -465,7 +460,8 @@ class PaperEngine:
         logger.info("📝 模拟引擎已停止")
 
     def _run_loop(self):
-        conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
+        conn = get_connection(self.db_path, check_same_thread=False)
+        conn.isolation_level = None  # autocommit，写完立即释放锁
         cursor = conn.cursor()
 
         # 加载状态
@@ -495,7 +491,7 @@ class PaperEngine:
 
         last_check_ts = 0
         cost = ExecutionEngine.BI_SIDE_COST * 100
-        min_net_profit = RiskManager.MIN_NET_PROFIT_PCT
+        min_net_profit = RiskManager.MIN_NET_PROFIT_PCT * 100  # 转换为百分比
 
         while self.running:
             try:
@@ -503,14 +499,14 @@ class PaperEngine:
                     SELECT id, timestamp, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct
                     FROM market_data
                     WHERE timestamp > ? AND ABS(spread_pct) < 1.0
-                    ORDER BY timestamp DESC LIMIT 100
+                    ORDER BY timestamp ASC LIMIT 500
                 """, (last_check_ts,))
                 ticks = cursor.fetchall()
                 if not ticks:
                     time.sleep(0.5)
                     continue
 
-                last_check_ts = ticks[0][1]
+                last_check_ts = ticks[-1][1]
 
                 for tick in ticks:
                     ts, tick_id, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
@@ -522,7 +518,7 @@ class PaperEngine:
                     if net_profit_pct < self.config.execution.net_profit_pct:
                         continue
                     
-                    if random.random() >= self.config.live.fill_rate:
+                    if random.random() >= self.config.execution.fill_rate:
                         continue
                     
                     pos_key = f"{exchange}|{symbol}"
@@ -561,7 +557,7 @@ class PaperEngine:
                     
                     min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
                     platform = exchange
-                    position = min(self.platform_balances[platform] * 0.20, 200)
+                    position = min(self.platform_balances[platform] * 0.15, 200)  # v2.1升级：从20%降至15%
                     
                     if position < min_notional:
                         continue
@@ -607,7 +603,7 @@ class PaperEngine:
                             "INSERT INTO simulated_platform_balance (platform, balance, updated_at) VALUES (?, ?, ?)",
                             (p, bal, now)
                         )
-                    conn.commit()
+                    cursor.connection.commit()
                     self.last_save_time = now
 
                 time.sleep(0.5)

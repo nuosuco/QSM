@@ -3,6 +3,7 @@
 从三个平台的历史数据中自动识别可盈利的市场模式
 """
 import sqlite3
+from .db_utils import get_connection
 import numpy as np
 from collections import defaultdict
 from datetime import datetime
@@ -19,7 +20,9 @@ class PatternDiscovery:
     def __init__(self, config: SystemConfig):
         self.config = config
         self.pattern_config = config.pattern
-        self.conn = sqlite3.connect(config.data.db_path, check_same_thread=False)
+        self.conn = get_connection(config.data.db_path, check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self.conn.row_factory = sqlite3.Row
         
         # 按平台发现的策略

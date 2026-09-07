@@ -19,16 +19,26 @@ from adaptive_system.live_trading_controller import LiveTradingController
 from adaptive_system.evolution_manager import EvolutionManager
 from adaptive_system.data_collector import DataCollector
 import logging
+from logging.handlers import RotatingFileHandler
 
-# 配置日志
+# 配置日志（铁律：只写重要日志，自动轮转清理，禁止无限膨胀）
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,  # 只记录 INFO 及以上，砍掉 ccxt 的 DEBUG 原始请求/响应
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
     handlers=[
-        logging.FileHandler('/root/SOM/qnt/evolution_system.log'),
+        # 单个文件最大 512KB，保留 3 个备份，自动轮转清理旧数据
+        RotatingFileHandler(
+            '/root/SOM/qnt/evolution_system.log',
+            maxBytes=512 * 1024,   # 512KB
+            backupCount=3          # 保留 3 个历史备份，最旧自动删除
+        ),
         logging.StreamHandler()
     ]
 )
+# 单独压制 ccxt/urllib3 的 DEBUG 噪音，即使未来有人误开 DEBUG 也写不进来
+for _noise in ('ccxt', 'urllib3', 'requests', 'websocket'):
+    logging.getLogger(_noise).setLevel(logging.WARNING)
+
 logger = logging.getLogger('AdaptiveEvolutionSystem')
 
 
@@ -64,26 +74,43 @@ class AdaptiveEvolutionSystem:
         )
         self.live_controller.start()
         
-        # 启动自进化管理器（每24小时分析一次）
+        # 启动自进化管理器（每30分钟分析一次）
         self.evolution_manager = EvolutionManager(config.data.db_path, config)
         
-        # 启动数据收集器（三平台并行采集）
+        # 启动数据收集器（三平台并行采集market_data）
         self.data_collector = DataCollector(config)
         self.data_collector.start()
+        
+        # 启动市场成交采集器（模式二：平台公开市场成交）
+        from adaptive_system.market_trade_collector import MarketTradeCollector
+        self.market_collector = MarketTradeCollector(config.data.db_path)
+        for ex_name in ['gate', 'htx', 'bitget']:
+            self.market_collector.init_exchange(ex_name)
+        import threading as _threading
+        def _run_market_collector():
+            while True:
+                try:
+                    self.market_collector.collect_all(config.data.symbols)
+                except Exception as e:
+                    logger.error(f'市场成交采集异常: {e}')
+                time.sleep(300)  # 5分钟采集一次
+        _t = _threading.Thread(target=_run_market_collector, daemon=True)
+        _t.start()
+        logger.info('✅ 市场成交采集器已启动（模式二）')
         
         logger.info("✅ 系统初始化完成")
         logger.info("📊 铁律确认:")
         logger.info("   1. 回测 + 模拟 真实运行，完整BUY+SELL周期")
         logger.info("   2. 只有回测+模拟盈利后，才能开启实盘")
         logger.info("   3. 实盘由LiveTradingController自动控制")
-        logger.info("   4. 每24小时自进化分析，优化策略参数")
+        logger.info("   4. 每30分钟自进化分析，优化策略参数")
         logger.info("=" * 70)
 
     def run(self):
         """主运行循环"""
         last_evolution_time = time.time()
         last_status_time = time.time()
-        evolution_interval = 86400  # 24小时
+        evolution_interval = 1800  # 30分钟
         status_interval = 60       # 1分钟
         
         try:
@@ -95,7 +122,7 @@ class AdaptiveEvolutionSystem:
                     self._print_status()
                     last_status_time = now
                 
-                # 每24小时执行一次进化分析
+                # 每30分钟执行一次进化分析
                 if now - last_evolution_time >= evolution_interval:
                     self._run_evolution()
                     last_evolution_time = now
