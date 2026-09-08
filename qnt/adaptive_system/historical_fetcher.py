@@ -61,9 +61,10 @@ class HistoricalFetcher:
             except Exception as e:
                 logger.debug(f"{exchange_name} {symbol} 现货成交失败: {e}")
             
-            # 尝试永续合约
+            # 尝试永续合约 (Bitget/Gate/HTX格式)
             if not trades and ':' not in symbol:
-                perp_symbol = f"{symbol}:USDT"
+                base = symbol.split('/')[0]
+                perp_symbol = f"{base}/USDT:USDT"
                 try:
                     trades = exchange.fetch_my_trades(perp_symbol, limit=limit, since=since)
                     logger.debug(f"{exchange_name} {perp_symbol} 永续成交: {len(trades)}笔")
@@ -103,7 +104,7 @@ class HistoricalFetcher:
         conn.execute("PRAGMA busy_timeout=30000")
         cursor = conn.cursor()
         
-        # 创建表
+        # 创建表（如果不存在）
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS historical_trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,17 +122,31 @@ class HistoricalFetcher:
                 position_id TEXT,
                 strategy TEXT,
                 status TEXT,
-                data_source TEXT DEFAULT 'my_trades'
+                data_source TEXT DEFAULT 'my_trades',
+                pnl REAL DEFAULT 0,
+                pnl_pct REAL DEFAULT 0
             )
         ''')
+        
+        # 检查是否需要添加pnl字段（兼容旧表）
+        try:
+            cursor.execute("PRAGMA table_info(historical_trades)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'pnl' not in columns:
+                logger.info("添加pnl字段到historical_trades表")
+                cursor.execute("ALTER TABLE historical_trades ADD COLUMN pnl REAL DEFAULT 0")
+                cursor.execute("ALTER TABLE historical_trades ADD COLUMN pnl_pct REAL DEFAULT 0")
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"pnl字段检查跳过: {e}")
         
         inserted = 0
         for trade in trades:
             try:
                 cursor.execute('''
                     INSERT INTO historical_trades 
-                    (timestamp, exchange, symbol, side, type, price, amount, cost, fee, fee_currency, order_id, position_id, strategy, status, data_source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (timestamp, exchange, symbol, side, type, price, amount, cost, fee, fee_currency, order_id, position_id, strategy, status, data_source, pnl, pnl_pct)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
                 ''', (
                     trade.get('timestamp'),
                     exchange_name,
@@ -152,6 +167,9 @@ class HistoricalFetcher:
                 inserted += 1
             except Exception as e:
                 logger.debug(f"插入成交失败: {e}")
+        
+        # 计算pnl（按position配对）
+        self._calculate_pnl(conn, exchange_name)
         
         conn.commit()
         conn.close()
@@ -180,7 +198,10 @@ class HistoricalFetcher:
                 price REAL,
                 amount REAL,
                 cost REAL,
-                order_id TEXT
+                order_id TEXT,
+                spread_pct REAL DEFAULT 0,
+                perp_price REAL,
+                spot_price REAL
             )
         ''')
         
@@ -189,8 +210,8 @@ class HistoricalFetcher:
             try:
                 cursor.execute('''
                     INSERT INTO market_trades 
-                    (timestamp, exchange, symbol, side, price, amount, cost, order_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (timestamp, exchange, symbol, side, price, amount, cost, order_id, spread_pct, perp_price, spot_price)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL)
                 ''', (
                     trade.get('timestamp'),
                     exchange_name,
@@ -288,3 +309,69 @@ class HistoricalFetcher:
         
         conn.close()
         return stats
+
+    def _calculate_pnl(self, conn, exchange_name: str):
+        """计算并更新historical_trades的pnl（按position配对）"""
+        try:
+            cursor = conn.cursor()
+            
+            # 获取所有未计算pnl的交易
+            trades = cursor.execute("""
+                SELECT id, symbol, side, price, amount, cost 
+                FROM historical_trades 
+                WHERE exchange = ? AND (pnl IS NULL OR pnl = 0)
+                ORDER BY timestamp
+            """, (exchange_name,)).fetchall()
+            
+            if not trades:
+                return 0
+            
+            # 按symbol分组配对
+            by_symbol = {}
+            for trade in trades:
+                tid, symbol, side, price, amount, cost = trade
+                if symbol not in by_symbol:
+                    by_symbol[symbol] = []
+                by_symbol[symbol].append(trade)
+            
+            updated = 0
+            for symbol, symbol_trades in by_symbol.items():
+                # 配对buy和sell
+                buys = [t for t in symbol_trades if t[2] == 'buy']
+                sells = [t for t in symbol_trades if t[2] == 'sell']
+                
+                # 简单配对：按时间顺序配对
+                i = j = 0
+                while i < len(buys) and j < len(sells):
+                    buy = buys[i]
+                    sell = sells[j]
+                    
+                    # 计算盈亏
+                    buy_price = buy[3]
+                    sell_price = sell[3]
+                    buy_amount = buy[4]
+                    
+                    if sell_price > buy_price:
+                        pnl = (sell_price - buy_price) * buy_amount
+                    else:
+                        pnl = (sell_price - buy_price) * buy_amount
+                    
+                    pnl_pct = (pnl / buy[5] * 100) if buy[5] > 0 else 0
+                    
+                    # 更新两条记录
+                    cursor.execute("UPDATE historical_trades SET pnl=?, pnl_pct=? WHERE id=?", 
+                                  (pnl, pnl_pct, buy[0]))
+                    cursor.execute("UPDATE historical_trades SET pnl=?, pnl_pct=? WHERE id=?", 
+                                  (pnl, pnl_pct, sell[0]))
+                    
+                    i += 1
+                    j += 1
+                    updated += 2
+            
+            conn.commit()
+            logger.info(f"✅ 计算并更新{updated}条交易的pnl")
+            return updated
+            
+        except Exception as e:
+            logger.error(f"计算pnl失败: {e}")
+            return 0

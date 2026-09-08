@@ -51,8 +51,9 @@ class MarketTradeCollector:
         except Exception as e:
             logger.debug(f"{exchange_name} {symbol} 现货成交失败: {e}")
         
-        # 永续合约成交
-        perp_symbol = f"{symbol.split('/')[0]}:USDT"
+        # 永续合约成交 (Bitget/Gate/HTX格式: BTC/USDT:USDT)
+        base = symbol.split('/')[0]
+        perp_symbol = f"{base}/USDT:USDT"
         try:
             perp = exchange.fetch_trades(perp_symbol, limit=limit)
             if perp:
@@ -62,6 +63,44 @@ class MarketTradeCollector:
         
         self.platform_stats[exchange_name]['collected'] += len(all_trades)
         return all_trades
+    
+    def fetch_spread_data(self, exchange_name: str, symbol: str) -> Dict:
+        """获取永续vs现货价差数据"""
+        if exchange_name not in self.exchanges:
+            return {}
+        exchange = self.exchanges[exchange_name]
+        
+        result = {
+            'symbol': symbol,
+            'exchange': exchange_name,
+            'spot_price': None,
+            'perp_price': None,
+            'spread_pct': 0.0
+        }
+        
+        try:
+            # 获取现货ticker
+            spot_ticker = exchange.fetch_ticker(symbol)
+            if spot_ticker and spot_ticker.get('last'):
+                result['spot_price'] = float(spot_ticker['last'])
+        except Exception as e:
+            logger.debug(f"{exchange_name} {symbol} 现货行情失败: {e}")
+        
+        try:
+            # 获取永续合约ticker (格式: BTC/USDT:USDT)
+            base = symbol.split('/')[0]
+            perp_symbol = f"{base}/USDT:USDT"
+            perp_ticker = exchange.fetch_ticker(perp_symbol)
+            if perp_ticker and perp_ticker.get('last'):
+                result['perp_price'] = float(perp_ticker['last'])
+        except Exception as e:
+            logger.debug(f"{exchange_name} {perp_symbol} 永续行情失败: {e}")
+        
+        # 计算价差
+        if result['spot_price'] and result['perp_price'] and result['perp_price'] > 0:
+            result['spread_pct'] = (result['spot_price'] - result['perp_price']) / result['perp_price'] * 100
+        
+        return result
     
     def save_market_trades(self, trades: List[Dict], exchange_name: str):
         """保存市场成交到数据库"""
