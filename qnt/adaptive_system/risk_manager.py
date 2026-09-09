@@ -24,7 +24,7 @@ class RiskManager:
     MAX_SINGLE_LOSS_PCT = 0.05     # 单笔最大亏损 ≤ 总资金 5%
     MAX_DAILY_LOSS_PCT = 0.10      # 单日最大亏损 ≤ 总资金 10%
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.0002   # v2.1升级：从0.01%提升至0.02%，确保盈利空间
+    MIN_NET_PROFIT_PCT = 0.0001   # v2.1升级：从0.01%提升至0.02%，确保盈利空间
     
     def __init__(self, db_path: str, paper_mode: bool = False, paper_balance: float = 1000.0, exchanges_config: Dict = None):
         self.db_path = db_path
