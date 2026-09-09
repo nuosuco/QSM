@@ -257,23 +257,24 @@ class LiveTradingController:
             conn = get_connection(self.db_path)
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA busy_timeout=30000")
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA busy_timeout=30000")
             c = conn.cursor()
+            # 只统计正值价差（负价差是HTX的结构性问题，不影响波动性判断）
             c.execute("""SELECT spread_pct FROM market_data
                          WHERE timestamp > strftime('%s','now','-24 hours')
+                         AND spread_pct IS NOT NULL AND spread_pct > 0
                          ORDER BY timestamp DESC LIMIT 1000""")
-            spreads = [r[0] for r in c.fetchall() if r[0] is not None]
+            spreads = [r[0] for r in c.fetchall()]
             conn.close()
             if len(spreads) < 50:
                 return 'unknown'
             import numpy as np
             vol = float(np.std(spreads))
-            if vol < 0.02:
+            # 调整阈值：正价差的标准差通常需要更高
+            if vol < 0.03:
                 return 'calm'
-            if vol < 0.05:
+            if vol < 0.08:
                 return 'normal'
-            if vol < 0.10:
+            if vol < 0.15:
                 return 'volatile'
             return 'extreme'
         except Exception as e:

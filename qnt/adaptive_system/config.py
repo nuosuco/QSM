@@ -99,7 +99,7 @@ class BacktestConfig:
 @dataclass
 class LiveTradingConfig:
     """实盘自动开关配置"""
-    enabled: bool = False
+    enabled: bool = True
     min_equity: float = 25.0
     paper_window_hours: int = 24
     min_paper_trades: int = 30

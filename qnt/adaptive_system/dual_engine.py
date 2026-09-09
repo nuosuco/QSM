@@ -243,8 +243,8 @@ class BacktestEngine:
             logger.info("   从头开始回放")
 
         threshold = self.config.execution.spread_pct
-        cost = ExecutionEngine.BI_SIDE_COST * 100
-        min_net_profit = RiskManager.MIN_NET_PROFIT_PCT * 100  # 转换为百分比
+        cost = ExecutionEngine.BI_SIDE_COST
+        min_net_profit = RiskManager.MIN_NET_PROFIT_PCT
 
         check_count = 0
         while self.running:
@@ -288,7 +288,7 @@ class BacktestEngine:
                 
                 check_count += 1
                 if check_count % 100 == 0:
-                    logger.debug(f"[实时回测] 检查#{check_count}, 窗口内{len(window_data)}条, 门槛={cost+min_net_profit:.2f}%")
+                    logger.debug(f"[实时回测] 检查#{check_count}, 窗口内{len(window_data)}条, 门槛={cost+min_net_profit:.4f}")
                 
                 time.sleep(0.5)
                 

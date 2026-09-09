@@ -415,7 +415,7 @@ class DataCollector:
             # 永续合约无数据，跳过此tick
             return None
         if perp_ask > 0 and spot_bid > 0:
-            spread_pct = (spot_bid - perp_ask) / perp_ask * 100
+            spread_pct = (spot_bid - perp_ask) / perp_ask  # 不乘100，存为小数形式（如0.001表示0.1%）
         else:
             spread_pct = 0
         basis_pct = (perp_last - spot_last) / spot_last * 100 if spot_last > 0 else 0

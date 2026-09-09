@@ -269,12 +269,12 @@ class ExecutionEngine:
                 # 计算价差
                 mid_spot = (spot_bid + spot_ask) / 2
                 mid_perp = (perp_bid + perp_ask) / 2
-                spread_pct = abs(mid_perp - mid_spot) / mid_spot * 100
-                net_profit_pct = spread_pct - self.BI_SIDE_COST * 100
+                spread_pct = abs(mid_perp - mid_spot) / mid_spot  # 不乘100，存为小数形式
+                net_profit_pct = spread_pct - self.BI_SIDE_COST
                 
                 # === 严格的价差检查：必须>0.17%才能交易 ===
                 # 用户要求：净利=0.01%，成本=0.16%，价差=0.17%
-                if spread_pct < self.BI_SIDE_COST * 100 + RiskManager.MIN_NET_PROFIT_PCT:
+                if spread_pct < self.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT:
                     continue  # 价差不足成本线+净利要求，跳过
                 
                 # 执行引擎层检查（灵敏度调整，不影响实际门槛）
