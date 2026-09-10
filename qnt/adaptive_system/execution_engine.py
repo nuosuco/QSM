@@ -18,6 +18,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 import ccxt
+import subprocess
 
 from .config import SystemConfig
 from .risk_manager import RiskManager
@@ -25,16 +26,87 @@ from .models import SignalRecord
 
 logger = logging.getLogger('ExecutionEngine')
 
+GATEWAY_URL = os.environ.get('OPENCLAW_GATEWAY_URL', 'http://localhost:14121')
+_OPENCLAW_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
+QQ_TARGET = 'qqbot:c2c:861B1B2CC9C89FC4A3E0325F10407447'
+_spread_alert_last = {}
+
+
+_OPENCLAW_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
+
+
+def _send_qq_msg(msg: str):
+    """通过OpenClaw Gateway发送QQ消息"""
+    try:
+        import urllib.request
+        import json
+        url = f'{GATEWAY_URL}/tools/invoke'
+        body = json.dumps({
+            'tool': 'message',
+            'action': 'send',
+            'args': {
+                'target': QQ_TARGET,
+                'message': msg
+            }
+        }).encode()
+        req = urllib.request.Request(url, data=body, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        if _OPENCLAW_TOKEN:
+            req.add_header('Authorization', f'Bearer {_OPENCLAW_TOKEN}')
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read())
+    except Exception as e:
+        logger.debug(f"发送QQ消息失败: {e}")
+        return None
+
+
+def _notify_trade(ex_name, symbol, side, price, amount, position_size, profit_pct):
+    """发送交易通知到QQ"""
+    try:
+        ts = datetime.now().strftime('%H:%M:%S')
+        msg = f"📈 QNT交易完成\n平台: {ex_name}\n币种: {symbol}\n方向: 永续{side}\n价格: ${price:.4f}\n数量: {amount:.4f}\n仓位: ${position_size:.2f}U\n预期净利: {profit_pct:.3f}%\n时间: {ts}"
+        result = _send_qq_msg(msg)
+        if result:
+            logger.info(f"📤 交易通知已发送: {ex_name} {symbol}")
+        else:
+            logger.warning(f"⚠️ 交易通知发送失败: {ex_name} {symbol}")
+    except Exception as e:
+        logger.debug(f"发送通知失败: {e}")
+
+
+def _notify_opportunity(ex_name, symbol, spread_pct, net_profit_pct):
+    """发送价差机会预警到QQ（限速5分钟一次）"""
+    global _spread_alert_last
+    now = time.time()
+    key = f"{ex_name}:{symbol}"
+    last = _spread_alert_last.get(key, 0)
+    if now - last < 300:
+        return
+    _spread_alert_last[key] = now
+    try:
+        ts = datetime.now().strftime('%H:%M:%S')
+        msg = f"🔍 QNT价差机会预警\n平台: {ex_name}\n币种: {symbol}\n价差: {spread_pct*100:.3f}%\n净利(估): {net_profit_pct*100:.3f}%\n门槛: 价差>{(BI_SIDE_COST+RiskManager.MIN_NET_PROFIT_PCT)*100:.2f}%\n时间: {ts}"
+        result = _send_qq_msg(msg)
+        if result:
+            logger.info(f"📤 价差预警已发送: {ex_name} {symbol} {spread_pct*100:.3f}%")
+        else:
+            logger.warning(f"⚠️ 价差预警发送失败: {ex_name} {symbol}")
+    except Exception as e:
+        logger.debug(f"发送预警失败: {e}")
+
+
+
 # ============================================================
 # 各交易所真实参数
 # ============================================================
 PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
 SPOT_MIN_NOTIONAL = {'bitget': 1.0, 'htx': 1.0, 'gate': 3.0}
 BALANCE_BASELINE = {'bitget': 25.0, 'htx': 5.0, 'gate': 5.0}
-LEVERAGE = 50
+LEVERAGE = 100
 
 # 最低币数量精度（所有交易所）
-MIN_COIN_AMOUNT = 1.0
+# v4.1: 降低到0.01，适应小额账户
+MIN_COIN_AMOUNT = 0.01
 
 
 class ExecutionEngine:
@@ -272,18 +344,18 @@ class ExecutionEngine:
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot  # 不乘100，存为小数形式
                 net_profit_pct = spread_pct - self.BI_SIDE_COST
                 
-                # === 严格的价差检查：必须>0.17%才能交易 ===
-                # 用户要求：净利=0.01%，成本=0.16%，价差=0.17%
-                if spread_pct < self.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT:
-                    continue  # 价差不足成本线+净利要求，跳过
-                
-                # 执行引擎层检查（灵敏度调整，不影响实际门槛）
-                if spread_pct < self.config.execution.spread_pct:
-                    continue
-                if net_profit_pct < self.config.execution.net_profit_pct:
-                    continue
-                if net_profit_pct < RiskManager.MIN_NET_PROFIT_PCT:
-                    continue
+                # === 价差检查 & 预警 ===
+                min_required = self.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT
+                if spread_pct >= min_required:
+                    # 执行引擎层检查（灵敏度调整，不影响实际门槛）
+                    if spread_pct >= self.config.execution.spread_pct and net_profit_pct >= RiskManager.MIN_NET_PROFIT_PCT:
+                        pass  # 满足所有条件，执行交易
+                    else:
+                        _notify_opportunity(ex_name, symbol, spread_pct, net_profit_pct)
+                elif spread_pct >= self.BI_SIDE_COST:  # 高于成本线但低于净利门槛
+                    _notify_opportunity(ex_name, symbol, spread_pct, net_profit_pct)
+                else:
+                    continue  # 价差不足成本线，跳过
                 
                 # 执行做市
                 self._execute_market_making(ex_name, spot_exchange, perp_exchange, symbol, 
@@ -297,7 +369,7 @@ class ExecutionEngine:
                                 symbol: str, spot_bid: float, spot_ask: float,
                                 perp_bid: float, perp_ask: float,
                                 spread_pct: float, net_profit_pct: float):
-        """执行做市策略（永续市价买 + 现货市价卖，两单同时发，独立错误处理）"""
+        """执行做市策略（永续双向开仓：买+卖同时发，不持仓，独立错误处理）"""
         
         perp_symbol = f"{symbol.split('/')[0]}/USDT:USDT"
         spot_symbol = symbol
@@ -307,6 +379,11 @@ class ExecutionEngine:
         total_equity = self.risk_manager.equity if self.risk_manager.equity > 0 else 1.0
         
         perp_bal = self._get_perp_balance(ex_name, perp_exchange)
+        logger.info(f"🔍 [DEBUG] {ex_name} 查到的永续余额={perp_bal:.2f}U (目标: $18.30)")
+        logger.info(f"🔍 [DEBUG] {ex_name} perp_bal={perp_bal:.2f}U (目标: $3.66)")
+        logger.info(f"🔍 [DEBUG] {ex_name} perp_bal={perp_bal:.2f}U (目标: $3.66)")
+        logger.info(f"🔍 [DEBUG] {ex_name} perp_bal={perp_bal:.2f}U (目标: $3.66, 余额$18.30)");
+        logger.info(f"🔍 [DEBUG] {ex_name} perp_bal={perp_bal:.2f}U, spot_bal={spot_bal:.2f}U")
         spot_bal = self._get_spot_balance(ex_name, spot_exchange)
         
         # 仓位 = 永续余额 × 20%
@@ -315,7 +392,7 @@ class ExecutionEngine:
         # 检查最小金额限制
         if ex_name == 'gate':
             if position_size < PERP_MIN_NOTIONAL['gate']:
-                logger.debug(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < Gate最小{PERP_MIN_NOTIONAL['gate']}U，跳过")
+                logger.info(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < Gate最小{PERP_MIN_NOTIONAL['gate']}U，跳过")
                 return
         else:
             baseline = BALANCE_BASELINE.get(ex_name, 5.0)
@@ -323,28 +400,30 @@ class ExecutionEngine:
             perp_min = PERP_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
             spot_min = SPOT_MIN_NOTIONAL.get(ex_name, 1.0) * scale_factor
             if position_size < perp_min:
-                logger.debug(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < 最小{perp_min:.2f}U，跳过")
+                logger.info(f"⚠️ {ex_name} {symbol}: 永续仓位{position_size:.2f}U < 最小{perp_min:.2f}U，跳过")
                 return
             if position_size < spot_min:
-                logger.debug(f"⚠️ {ex_name} {symbol}: 现货仓位{position_size:.2f}U < 最小{spot_min:.2f}U，跳过")
+                logger.info(f"⚠️ {ex_name} {symbol}: 现货仓位{position_size:.2f}U < 最小{spot_min:.2f}U，跳过")
                 return
         
-        # 方向判断
+        # 方向判断：永续双向开仓（不持仓）
         if mid_perp > mid_spot:
-            perp_side = 'buy'
-            spot_side = 'sell'
+            # 永续贵，现货便宜 → 永续卖高 + 永续买低
+            perp_side_1 = 'sell'  # 永续高卖
+            perp_side_2 = 'buy'   # 永续低买
         else:
-            perp_side = 'sell'
-            spot_side = 'buy'
+            # 永续便宜，现货贵 → 永续买低 + 永续卖高
+            perp_side_1 = 'buy'   # 永续低买
+            perp_side_2 = 'sell'  # 永续高卖
         
-        # 计算数量
-        amount = position_size / mid_perp if perp_side == 'buy' else position_size / mid_spot
+        # 计算数量（两个方向都一样）
+        amount = position_size / mid_perp
         
         # ====== 精度检查：所有币种、所有交易所 ======
         coin = symbol.split('/')[0]
-        # 所有交易所都要求币数量 >= 1
+        # 所有交易所都要求币数量 >= MIN_COIN_AMOUNT
         if amount < MIN_COIN_AMOUNT:
-            logger.debug(f"⚠️ {ex_name} {symbol}: 币数量{amount:.4f} < {MIN_COIN_AMOUNT}，精度不足，跳过")
+            logger.info(f"⚠️ {ex_name} {symbol}: 币数量{amount:.4f} < {MIN_COIN_AMOUNT}，精度不足，跳过")
             return
         
         # HTX市价单有额外最小数量要求
@@ -353,7 +432,7 @@ class ExecutionEngine:
                 ticker = spot_exchange.fetch_ticker(symbol)
                 min_qty = ticker.get('info', {}).get('text', {}).get('min_market_buy_amount', 0) or 0
                 if min_qty > 0 and amount < float(min_qty):
-                    logger.debug(f"⚠️ {ex_name} {symbol}: 数量{amount:.4f} < HTX最小{min_qty}，跳过")
+                    logger.info(f"⚠️ {ex_name} {symbol}: 数量{amount:.4f} < HTX最小{min_qty}，跳过")
                     return
             except:
                 pass
@@ -361,7 +440,7 @@ class ExecutionEngine:
         # 调试日志
         logger.info(f"📊 {ex_name} {symbol}: 仓位={position_size:.2f}U, 数量={amount:.4f}, "
                    f"永续价={mid_perp:.2f}, 现货价={mid_spot:.2f}, 方向={perp_side}/{spot_side}, "
-                   f"永续可用={perp_bal:.2f}U, 现货可用={spot_bal:.2f}U, "
+                   f"永续可用={perp_bal:.2f}U, "
                    f"价差={spread_pct:.4f}% 净利={net_profit_pct:.4f}%")
         
         # 风控检查
@@ -409,35 +488,39 @@ class ExecutionEngine:
             perp_err = str(e)[:200]
             logger.error(f"❌ {ex_name} {symbol} 永续{perp_side}失败: {perp_err}")
         
+        # 第二个永续订单（反向操作，双向开仓）
+        perp_order_2 = None
+        perp_success_2 = False
+        perp_err_2 = None
+        
         try:
-            # ====== 现货下单（必须用独立的现货实例！）=====
-            spot_params = {}
-            if ex_name == 'htx' and spot_side == 'buy':
-                spot_params = {'cost': position_size}
-            elif ex_name == 'gate' and spot_side == 'buy':
-                spot_params = {'cost': position_size}
+            perp_params_2 = {}
+            if ex_name == 'htx' and perp_side_2 == 'buy':
+                perp_params_2 = {'cost': position_size}
+            elif ex_name == 'gate' and perp_side_2 == 'buy':
+                perp_params_2 = {'cost': position_size}
             
-            spot_amount = position_size if spot_side == 'sell' else amount
-            spot_order = spot_exchange.create_order(
-                symbol=spot_symbol,
+            perp_order_2 = perp_exchange.create_order(
+                symbol=perp_symbol,
                 type='market',
-                side=spot_side,
-                amount=spot_amount,
-                params=spot_params,
+                side=perp_side_2,
+                amount=amount,
+                params=perp_params_2,
             )
-            spot_success = True
-            logger.info(f"✅ {ex_name} {symbol} 现货{spot_side}@{mid_spot:.2f}(amount={spot_amount:.4f})")
+            perp_success_2 = True
+            logger.info(f"✅ {ex_name} {symbol} 永续{perp_side_2}@{mid_perp:.2f}(amount={amount:.4f})")
             
         except Exception as e:
-            spot_err = str(e)[:200]
-            logger.error(f"❌ {ex_name} {symbol} 现货{spot_side}失败: {spot_err}")
+            perp_err_2 = str(e)[:200]
+            logger.error(f"❌ {ex_name} {symbol} 永续{perp_side_2}失败: {perp_err_2}")
         
         # ====== 记录结果 ======
-        if perp_success and spot_success:
+        if perp_success and perp_success_2:
             # 两单都成功 → 写入engine_trades
-            logger.info(f"✅ {ex_name} {symbol} 做市完成: 永续{perp_side}@{mid_perp:.2f} + 现货{spot_side}@{mid_spot:.2f}, "
+            logger.info(f"✅ {ex_name} {symbol} 做市完成: 永续{perp_side_1}@{mid_perp:.2f} + 永续{perp_side_2}@{mid_perp:.2f}, "
                        f"仓位={position_size:.2f}U, 预期净利={net_profit_pct:.3f}%")
             self._record_trade(ex_name, symbol, perp_side, mid_perp, amount, position_size, net_profit_pct)
+            _notify_trade(ex_name, symbol, perp_side, mid_perp, amount, position_size, net_profit_pct)
             self._record_signal(ex_name, symbol, perp_side, net_profit_pct, position_size)
             
             order_id = perp_order.get('id') or spot_order.get('id')

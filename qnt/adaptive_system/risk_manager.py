@@ -17,7 +17,7 @@ class RiskManager:
     
     # ========== 风控铁律（v2.1升级后） ==========
     # 2026-09-02 v2.1升级：根据双模式回测分析结果收紧风控
-    MAX_POSITION_PCT = 0.15        # v2.1升级：从20%降低，降低风险敞口
+    MAX_POSITION_PCT = 0.20        # 2026-09-09修正：恢复20%仓位，确保Gate最小订单满足
     MAX_STOP_LOSS_PCT = 0.02       # 单笔止损 ≤ 总资金 2%
     MAX_CONSECUTIVE_LOSSES = 2     # v2.1升级：从3次收紧至2次，快速止损
     MAX_DRAWDOWN_PCT = 0.20        # v2.1升级：从30%收紧至20%，减少损失

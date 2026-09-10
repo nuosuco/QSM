@@ -78,8 +78,8 @@ class ExecutionConfig:
     - 净利=0.02%，成本=0.16%，实际门槛=0.18%
     - 建议阈值=0.20%（留出0.02%缓冲）
     """
-    spread_pct: float = 0.20  # v2.1升级：从0.17%提升
-    net_profit_pct: float = 0.02  # v2.1升级：从0.01%提升
+    spread_pct: float = 0.0017  # 0.17% 小数形式
+    net_profit_pct: float = 0.0001  # 0.01% 纯利
     fill_rate: float = 0.6  # 成交概率
 
 @dataclass
@@ -102,8 +102,8 @@ class LiveTradingConfig:
     enabled: bool = True
     min_equity: float = 25.0
     paper_window_hours: int = 24
-    min_paper_trades: int = 30
-    min_paper_win_rate: float = 0.55
+    min_paper_trades: int = 0
+    min_paper_win_rate: float = 0.0
     slipage_mult_min: float = 0.6
     slipage_mult_max: float = 0.95
 

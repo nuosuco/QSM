@@ -67,6 +67,7 @@ class AdaptiveEvolutionSystem:
         
         # 启动实盘执行引擎（初始状态：未启用）
         self.exec_engine = ExecutionEngine(config)
+        self.exec_engine.start()
         
         # 启动实盘自动开关控制器
         self.live_controller = LiveTradingController(
