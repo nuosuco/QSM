@@ -344,18 +344,15 @@ class ExecutionEngine:
                 spread_pct = abs(mid_perp - mid_spot) / mid_spot  # 不乘100，存为小数形式
                 net_profit_pct = spread_pct - self.BI_SIDE_COST
                 
-                # === 价差检查 & 预警 ===
+                # === 价差检查 & 预警（阈值>0.17%才通知） ===
                 min_required = self.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT
-                if spread_pct >= min_required:
-                    # 执行引擎层检查（灵敏度调整，不影响实际门槛）
-                    if spread_pct >= self.config.execution.spread_pct and net_profit_pct >= RiskManager.MIN_NET_PROFIT_PCT:
-                        pass  # 满足所有条件，执行交易
-                    else:
-                        _notify_opportunity(ex_name, symbol, spread_pct, net_profit_pct)
-                elif spread_pct >= self.BI_SIDE_COST:  # 高于成本线但低于净利门槛
-                    _notify_opportunity(ex_name, symbol, spread_pct, net_profit_pct)
+                if spread_pct < min_required:
+                    continue  # 价差不足，跳过
+                # 达到0.17%门槛：执行引擎层再检查
+                if spread_pct >= self.config.execution.spread_pct and net_profit_pct >= RiskManager.MIN_NET_PROFIT_PCT:
+                    pass  # 满足所有条件，执行交易
                 else:
-                    continue  # 价差不足成本线，跳过
+                    _notify_opportunity(ex_name, symbol, spread_pct, net_profit_pct)
                 
                 # 执行做市
                 self._execute_market_making(ex_name, spot_exchange, perp_exchange, symbol, 
