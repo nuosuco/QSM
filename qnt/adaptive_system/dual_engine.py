@@ -16,7 +16,7 @@ import ccxt
 
 from .config import SystemConfig
 from .risk_manager import RiskManager
-from .execution_engine import ExecutionEngine
+from .execution_engine import ExecutionEngine, MIN_COIN_AMOUNT
 
 # 各交易所永续合约最小金额限制
 PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
@@ -26,7 +26,7 @@ logger = logging.getLogger('DualEngine')
 
 class Position:
     """持仓对象"""
-    def __init__(self, symbol, exchange, side, price, amount, position_id, timestamp):
+    def __init__(self, symbol, exchange, side, price, amount, position_id, timestamp, spread_pct=None, entry_time=None):
         self.symbol = symbol
         self.exchange = exchange
         self.side = side  # 'buy' or 'sell'
@@ -36,6 +36,9 @@ class Position:
         self.timestamp = timestamp
         self.cost = amount * price
         self.fee_rate = ExecutionEngine.MAKER_FEE_RATE  # 0.06%
+        # 2026-09-13 新增：记录开仓时价差，用于分档平仓（价差方向判断）
+        self.entry_spread_pct = spread_pct if spread_pct is not None else 0.0
+        self.entry_time = entry_time if entry_time is not None else time.time()
 
     def close(self, close_price):
         """平仓，返回PnL"""
@@ -490,9 +493,21 @@ class PaperEngine:
             pass
 
         last_check_ts = 0
-        cost = ExecutionEngine.BI_SIDE_COST * 100
-        min_net_profit = RiskManager.MIN_NET_PROFIT_PCT * 100  # 转换为百分比
-
+        cost_pct = ExecutionEngine.BI_SIDE_COST * 100  # 0.16%
+        min_net_profit_pct = RiskManager.MIN_NET_PROFIT_PCT * 100  # 0.10%
+        # 2026-09-13 铁律：模拟盘开仓门槛与实盘同步 = 0.16% 成本 + 0.10% 净利 = 0.26%
+        entry_threshold = cost_pct + min_net_profit_pct
+        # 2026-09-13 铁律：模拟盘仓位与实盘同步 = 20% 平台余额
+        position_ratio = 0.20
+        from .execution_engine import SINGLE_SIDE_STOP_LOSS_PCT, SPREAD_POSITION_TIMEOUT
+        hard_stop_pct = SINGLE_SIDE_STOP_LOSS_PCT * 100  # 0.15%（标的价格口径，与实盘模块级常量同步，2026-09-13 澄清）
+        timeout_sec = SPREAD_POSITION_TIMEOUT  # 5400s（模块级常量，与实盘同步）
+        # 2026-09-13 铁律：模拟盘拉黑名单/白名单与实盘同步
+        # 2026-09-13修复：BLACKLIST_SYMBOLS/SINGLE_SIDE_STOP_LOSS_PCT 是模块级常量
+        #（execution_engine.py:129/137），不是类属性，旧写法 getattr(类) 永远拿到空集
+        from .execution_engine import BLACKLIST_SYMBOLS as _BL
+        blacklist = set(_BL)
+        
         while self.running:
             try:
                 cursor.execute("""
@@ -511,26 +526,72 @@ class PaperEngine:
                 for tick in ticks:
                     ts, tick_id, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = tick
                     
-                    if spread_pct < cost + min_net_profit:
+                    # 2026-09-13：拉黑名单跳过（与实盘同步）
+                    if symbol in blacklist:
                         continue
-                    
-                    net_profit_pct = spread_pct - cost
-                    if net_profit_pct < self.config.execution.net_profit_pct:
+
+                    # 2026-09-13：开仓门槛与实盘同步（价差 >= 0.26%）
+                    # 2026-09-13修复：market_data.spread_pct 是小数口径（0.0026=0.26%），
+                    # entry_threshold 是百分比口径（0.26），两者必须同口径比较
+                    # （历史 bug：0.0026 < 0.26 恒真，模拟盘永远开不了仓，0笔攒够4小时）
+                    # 2026-09-18 修复：方向必须与实盘同步——实盘策略铁律是
+                    #   永续价>现货价(升水) → 开空赌回归；永续价<现货价(贴水) → 开多赌回归。
+                    # market_data.spread_pct 口径=(spot_bid-perp_ask)/perp_ask（现货-永续），
+                    # 与实盘 signed_spread(永续-现货) 符号相反：
+                    #   spread_pct >= +门槛 → 贴水(现货高于永续) → 开多
+                    #   spread_pct <= -门槛 → 升水(永续高于现货) → 开空
+                    # 旧版只开多单且只在升水(>=+门槛)开=纯逆势单，模拟盘验证的根本不是实盘策略
+                    spread_pct_abs = abs(spread_pct) * 100
+                    if spread_pct_abs < entry_threshold:
                         continue
-                    
-                    if random.random() >= self.config.execution.fill_rate:
-                        continue
-                    
+                    open_side = 'buy' if spread_pct > 0 else 'sell'
+
                     pos_key = f"{exchange}|{symbol}"
                     if pos_key in self.open_positions:
                         pos = self.open_positions[pos_key]
-                        close_price = spot_bid if pos.side == 'buy' else spot_ask
-                        pnl_result = pos.close(close_price)
+                        # 当前价差（与实盘 _check_spread_positions 同口径：perp_mid vs spot_mid）
+                        spot_mid = (spot_bid + spot_ask) / 2
+                        perp_mid = (perp_bid + perp_ask) / 2
+                        cur_spread = ((perp_mid - spot_mid) / spot_mid * 100) if spot_mid > 0 else 0
+                        age = ts - pos.entry_time
+                        side = pos.side
                         
-                        hold_time = ts - pos.timestamp
-                        should_close = (pnl_result['net_pnl'] > 0 and pnl_result['pnl_pct'] > 0.01) or hold_time > 60
+                        # 毛盈亏（保证金口径，与实盘一致：(entry - perp_mid)/entry * 100）
+                        entry_price = pos.price
+                        if side == 'sell':
+                            pnl_pct = ((entry_price - perp_mid) / entry_price * 100) if entry_price > 0 else 0
+                        else:
+                            pnl_pct = ((perp_mid - entry_price) / entry_price * 100) if entry_price > 0 else 0
+                        net = pnl_pct - cost_pct
+                        
+                        # 价差方向判断（空单赌升水回归：价差缩小=回归中；多单赌贴水回归：价差增大=回归中）
+                        spread_shrinking = (side == 'sell' and cur_spread < pos.entry_spread_pct) or \
+                                           (side == 'buy' and cur_spread > pos.entry_spread_pct)
+                        
+                        # 2026-09-13 分档平仓（与实盘优先级一致）：硬止损 > 止盈(价差回归中) > 价差回归到目标线 > 90分钟超时兜底
+                        hard_stop = pnl_pct <= -hard_stop_pct
+                        take_profit = net >= min_net_profit_pct and spread_shrinking
+                        let_profit_run = net >= min_net_profit_pct and not spread_shrinking
+                        converged_and_profit = (not spread_shrinking) and net > 0
+                        timed_out = age >= timeout_sec
+                        
+                        # 2026-09-18 修复：超时单无条件平仓（与实盘同步：到90分钟没回归→按盈亏方向平）。
+                        # 旧写法 (timed_out and net > 0) 让亏损超时单永远挂死，与实盘风控铁律不同步
+                        should_close = hard_stop or take_profit or timed_out
                         
                         if should_close:
+                            close_price = perp_mid
+                            pnl_result = pos.close(close_price)
+                            
+                            if hard_stop:
+                                reason = f'硬止损{pnl_pct:+.2f}%'
+                            elif take_profit:
+                                reason = f'净利{net:+.2f}%达标+价差回归中，止盈'
+                            else:
+                                # 超时：浮盈记兜底平仓，浮亏记超时止损（与实盘口径一致）
+                                reason = (f'超时{int(age//60)}分钟兜底({net:+.2f}%)' if net > 0
+                                          else f'超时{int(age//60)}分钟止损({net:+.2f}%)')
+                            
                             platform = exchange
                             self.platform_trades[platform] += 1
                             self.total_trades += 1
@@ -543,46 +604,70 @@ class PaperEngine:
                             cursor.execute(
                                 "INSERT INTO engine_trades (timestamp, mode, symbol, exchange, side, price, amount, cost, fee, pnl, pnl_pct, status) "
                                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                                (ts, 'paper', symbol, exchange, 'SELL', pnl_result['close_price'], 
+                                (ts, 'paper', symbol, exchange, 'SELL' if side == 'buy' else 'BUY', close_price,
                                  round(pos.amount, 8), pos.cost, pos.cost * pos.fee_rate,
                                  pnl_result['net_pnl'], pnl_result['pnl_pct'], 'completed')
                             )
                             
                             del self.open_positions[pos_key]
                             
+                            logger.info(f"🏁 模拟盘 {exchange} {symbol} {reason}: 净利={pnl_result['pnl_pct']:+.4f}% → 已平仓")
                             if self.total_trades % 10 == 0:
                                 win_rate = self.winning_trades / self.total_trades * 100
                                 logger.info(f"   模拟盘: {self.total_trades}笔, 胜率{win_rate:.1f}%")
+                        
+                        # 让利润跑：净利达标但价差还在扩大 → 不平，继续持有（记录数据点）
+                        if let_profit_run and self.total_trades % 50 == 0:
+                            logger.info(f"⏳ 模拟盘 {exchange} {symbol} 净利{net:+.2f}%达标但价差扩大中，继续持有让利润跑")
                         continue
                     
+                    # 2026-09-13 铁律：仓位 = 平台余额 × 20%（与实盘同步，不再用 15%）
+                    # 2026-09-18 修复：分池 headroom 逐单扣减（与实盘一致）——
+                    # 本平台已开保证金合计 ≤ 平台余额×20%，本笔 = min(原公式, 剩余名额)
                     min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
                     platform = exchange
-                    position = min(self.platform_balances[platform] * 0.15, 200)  # v2.1升级：从20%降至15%
-                    
+                    position = self.platform_balances[platform] * position_ratio
+                    platform_cap = self.platform_balances[platform] * position_ratio
+                    opened = sum(p.cost for k, p in self.open_positions.items()
+                                 if k.split('|')[0] == platform)
+                    headroom = platform_cap - opened
+                    if headroom <= 0:
+                        continue
+                    if position > headroom:
+                        position = headroom
                     if position < min_notional:
                         continue
                     
+                    ref_price = perp_ask if open_side == 'buy' else perp_bid
                     risk_check = self.risk_manager.check_risk(
                         symbol=symbol,
-                        side='buy',
+                        side=open_side,
                         position_size_usdt=position,
-                        entry_price=perp_ask,
-                        stop_loss_price=perp_ask * 1.02,
+                        entry_price=ref_price,
+                        stop_loss_price=ref_price * (1 - 0.02 if open_side == 'sell' else 1.02) if open_side == 'sell' else ref_price * 1.02,
                         ex_name=exchange
                     )
                     if not risk_check['allowed']:
                         continue
                     
-                    amount = position / perp_ask
-                    if amount < 1.0:
+                    amount = position / ref_price if ref_price > 0 else 0
+                    if amount < MIN_COIN_AMOUNT:
                         continue
                     
                     position_id = f"pa_{int(time.time() * 1000000)}_{self._pa_counter}"
                     self._pa_counter += 1
-                    position = Position(symbol, exchange, 'buy', perp_ask, amount, position_id, ts)
+                    # 2026-09-13：记录开仓时价差，供后续分档平仓判断价差方向
+                    # 2026-09-18：方向与实盘同步（贴水开多/升水开空），并记录带符号的入口价差百分比
+                    entry_spread_signed = -spread_pct * 100 if open_side == 'buy' else spread_pct * 100
+                    position = Position(symbol, exchange, open_side,
+                                        perp_ask if open_side == 'buy' else perp_bid,
+                                        amount, position_id, ts,
+                                        spread_pct=entry_spread_signed, entry_time=ts)
                     self.open_positions[pos_key] = position
                     self.platform_trades[platform] += 1
                     self.total_trades += 1
+                    
+                    logger.info(f"📈 模拟盘开仓 {exchange} {symbol} BUY @{perp_ask:.4f} 数量={amount:.4f} 仓位={position:.2f}U 价差={spread_pct:.3f}% 预期净利={spread_pct - cost_pct:.3f}%")
                     
                     try:
                         cursor.execute(
@@ -592,8 +677,11 @@ class PaperEngine:
                              position.cost, position.cost * position.fee_rate,
                              0, 0, 'opened')
                         )
+                        # 2026-09-13：autocommit（isolation_level=None）下必须手动 COMMIT，
+                        # 否则 INSERT 一直滞留在内存事务里，重启即丢，外部查库永远是 0 笔
+                        cursor.connection.commit()
                     except Exception as e:
-                        logger.debug(f"插入开仓失败: {e}")
+                        logger.warning(f"模拟盘开仓写库失败 {exchange} {symbol}: {e}")
 
                 now = time.time()
                 if now - self.last_save_time > 60:

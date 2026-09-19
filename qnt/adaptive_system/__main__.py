@@ -89,16 +89,34 @@ class AdaptiveEvolutionSystem:
             self.market_collector.init_exchange(ex_name)
         import threading as _threading
         def _run_market_collector():
+            logger.info('市场成交采集线程开始运行（模式二）')
             while True:
                 try:
                     self.market_collector.collect_all(config.data.symbols)
                 except Exception as e:
                     logger.error(f'市场成交采集异常: {e}')
                 time.sleep(300)  # 5分钟采集一次
-        _t = _threading.Thread(target=_run_market_collector, daemon=True)
+        _t = _threading.Thread(target=_run_market_collector, daemon=True, name='market-collector')
         _t.start()
-        logger.info('✅ 市场成交采集器已启动（模式二）')
+        logger.info('✅ 市场成交采集器已启动（模式二，线程名 market-collector）')
         
+        # 2026-09-13 中华质询修复：引擎主循环周期性写心跳文件（qnt_patrol.py 检查引擎存活）
+        # 旧机制：cron 侧 qnt_heartbeat.py 自写自查恒真，巡检永远显示心跳正常，掩盖真实故障
+        import threading as _hb_threading
+        def _heartbeat_loop():
+            while True:
+                try:
+                    import subprocess as _subprocess
+                    _subprocess.run(
+                        ['/usr/bin/python3.11', os.environ.get('QNT_HEARTBEAT_WRITE_CMD', '/root/SOM/qnt/qnt_engines_heartbeat.py')],
+                        capture_output=True, timeout=10
+                    )
+                except Exception:
+                    pass
+                time.sleep(int(os.environ.get('QNT_HEARTBEAT_INTERVAL', '60')))
+        _hb_thread = _hb_threading.Thread(target=_heartbeat_loop, daemon=True, name='engine-heartbeat')
+        _hb_thread.start()
+        logger.info('✅ 引擎心跳写入线程已启动（每60s写 heartbeat.json）')
         logger.info("✅ 系统初始化完成")
         logger.info("📊 铁律确认:")
         logger.info("   1. 回测 + 模拟 真实运行，完整BUY+SELL周期")

@@ -6,6 +6,7 @@ import sqlite3
 from .db_utils import get_connection
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 import ccxt
@@ -19,12 +20,12 @@ class RiskManager:
     # 2026-09-02 v2.1升级：根据双模式回测分析结果收紧风控
     MAX_POSITION_PCT = 0.20        # 2026-09-09修正：恢复20%仓位，确保Gate最小订单满足
     MAX_STOP_LOSS_PCT = 0.02       # 单笔止损 ≤ 总资金 2%
-    MAX_CONSECUTIVE_LOSSES = 2     # v2.1升级：从3次收紧至2次，快速止损
+    MAX_CONSECUTIVE_LOSSES = 5     # 价差回归套利是"多次小亏+偶尔大赚"分布，连亏2太敏感会频繁熔断，提到5
     MAX_DRAWDOWN_PCT = 0.20        # v2.1升级：从30%收紧至20%，减少损失
     MAX_SINGLE_LOSS_PCT = 0.05     # 单笔最大亏损 ≤ 总资金 5%
     MAX_DAILY_LOSS_PCT = 0.10      # 单日最大亏损 ≤ 总资金 10%
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.0001   # v2.1升级：从0.01%提升至0.02%，确保盈利空间
+    MIN_NET_PROFIT_PCT = 0.0010   # 0.10% 净利门槛（2026-09-12 用户定稿：开仓门槛0.26%，只在有把握时交易，配合50x杠杆降低爆仓风险）
     
     def __init__(self, db_path: str, paper_mode: bool = False, paper_balance: float = 1000.0, exchanges_config: Dict = None):
         self.db_path = db_path
@@ -48,6 +49,7 @@ class RiskManager:
         self.daily_profit = 0.0
         self.is_suspended = False
         self.suspension_reason = ""
+        self.suspended_at = 0  # 2026-09-13: 暂停起点时间戳，30分钟后引擎自动恢复
         
         # 真实余额（从交易所获取）
         self.real_balance = {}
@@ -301,24 +303,12 @@ class RiskManager:
             'suggested_stop_loss': stop_loss_price,
         }
         
-        # 按交易所使用永续账户独立权益做风控，否则用总权益兜底
+        # 统一使用总权益做风控（跨交易所统一管理）
         # 模拟模式：直接使用模拟余额
         if self.paper_mode:
             equity = self.paper_balance
-        elif ex_name and ex_name in self.real_balance:
-            reb = self.real_balance[ex_name]
-            perp_equity = reb.get('perp', 0.0)
-            spot_equity = reb.get('spot', reb.get('total', 0.0))
-            # BTC/ETH用永续余额(可充现货)，USDT用现货余额
-            symbol_btc_eth = 'BTC' in symbol or 'ETH' in symbol
-            if symbol_btc_eth:
-                equity = max(perp_equity, spot_equity, 0.01)  # BTC/ETH：永续或现货够就行
-            else:
-                equity = max(spot_equity, perp_equity, 0.01)  # USDT：取大值兜底
-            # 保底：至少用永续free+现货free的总和
-            equity = max(equity, perp_equity + spot_equity, 0.01)
         else:
-            equity = self.equity if self.equity > 0 else 1.0  # 兜底：至少1 USDT
+            equity = self.equity if self.equity > 0 else 1.0  # 使用总权益
         
         # Rule 1: 检查是否暂停
         if self.is_suspended:
@@ -344,14 +334,22 @@ class RiskManager:
             result['reason'] = f"⛔ 止损距离过大: {stop_loss_distance:.2%} > {max_stop_loss_distance:.2%}"
             return result
         
-        # Rule 4: 最大回撤 40%
-        if equity < 0.6:  # 从峰值回撤超过40%
+        # Rule 4: 最大回撤 20%（v2.1铁律：MAX_DRAWDOWN_PCT=0.20）
+        # 2026-09-18 修复：旧代码写死0.6（40%回撤）且直接返回 allowed=True（形同虚设），
+        # 现在按 MAX_DRAWDOWN_PCT 常量执行：从峰值回撤超20% → 熔断暂停
+        peak_equity = self._get_peak_equity()
+        if peak_equity > 0 and equity < peak_equity * (1 - self.MAX_DRAWDOWN_PCT):
             self.is_suspended = True
-            self.suspension_reason = "最大回撤40%，强制停止"
+            self.suspension_reason = f"最大回撤{self.MAX_DRAWDOWN_PCT*100:.0f}%，强制停止"
+            self.suspended_at = time.time()  # 30分钟后自动恢复
             self.save_state()
             result['allowed'] = False
-            result['reason'] = "⛔ 最大回撤40%，系统暂停"
+            result['reason'] = f"⛔ 最大回撤{self.MAX_DRAWDOWN_PCT*100:.0f}%，系统暂停"
             return result
+
+        # 更新峰值权益（用于回撤计算）
+        if equity > peak_equity:
+            self._update_peak_equity(equity)
         
         result['max_position_usdt'] = max_position
         result['suggested_stop_loss'] = stop_loss_price
@@ -380,6 +378,7 @@ class RiskManager:
             if self.consecutive_losses >= self.MAX_CONSECUTIVE_LOSSES:
                 self.is_suspended = True
                 self.suspension_reason = f"连续亏损{self.MAX_CONSECUTIVE_LOSSES}次"
+                self.suspended_at = time.time()  # 记录暂停起点，30分钟后引擎自动恢复
         
         # Rule 5: 盈利取出 50% - 真正调用交易所API转出
         if pnl > 0 and self.total_profit > 0:
@@ -390,6 +389,30 @@ class RiskManager:
         
         self.save_state()
     
+    def _get_peak_equity(self) -> float:
+        """读取峰值权益（risk_state 表 peak_equity）"""
+        try:
+            conn = get_connection(self.db_path)
+            c = conn.cursor()
+            c.execute("SELECT value FROM risk_state WHERE key='peak_equity'")
+            r = c.fetchone()
+            conn.close()
+            return float(r[0]) if r and r[0] else 0.0
+        except Exception:
+            return 0.0
+
+    def _update_peak_equity(self, equity: float):
+        """更新峰值权益"""
+        try:
+            conn = get_connection(self.db_path)
+            conn.execute('PRAGMA busy_timeout=30000')
+            c = conn.cursor()
+            c.execute("INSERT OR REPLACE INTO risk_state (key, value) VALUES ('peak_equity', ?)", (str(equity),))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.debug(f"更新峰值权益失败: {e}")
+
     def get_status(self) -> Dict:
         """获取风控状态"""
         equity = self.equity if self.equity > 0 else 1.0

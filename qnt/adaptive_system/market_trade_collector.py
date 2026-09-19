@@ -11,38 +11,52 @@ from .db_utils import get_connection
 
 logger = logging.getLogger('MarketTradeCollector')
 
+# 数据保留时长（小时）：超过这个时长的旧数据自动清理，避免 DB 无限膨胀
+DATA_RETENTION_HOURS = 48
+
 
 class MarketTradeCollector:
     """三平台市场成交数据采集器（模式二）"""
-    
+
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.exchanges = {}
         self.platform_stats = {p: {'collected': 0, 'errors': 0} for p in ['gate', 'htx', 'bitget']}
-        
+        self._init_failed = {}  # 记录哪些交易所初始化失败，后续重试
+
     def init_exchange(self, name: str):
-        """初始化交易所（无密钥）"""
+        """初始化交易所（无密钥），失败不阻塞，标记为待重试"""
         try:
             cls = getattr(ccxt, name, None)
             if not cls:
-                logger.error(f"不支持的交易所: {name}")
+                logger.error(f"❌ {name} 不支持的交易所")
+                self._init_failed[name] = 'unsupported'
                 return False
             exchange = cls({'enableRateLimit': True, 'timeout': 15000})
             exchange.fetch_ticker('BTC/USDT')
             self.exchanges[name] = exchange
+            self._init_failed.pop(name, None)
             logger.info(f"✅ {name} 公开市场连接器初始化成功")
             return True
         except Exception as e:
-            logger.error(f"❌ {name} 初始化失败: {e}")
+            self._init_failed[name] = str(e)
+            logger.error(f"❌ {name} 初始化失败（将每轮重试）: {e}")
             return False
-    
+
+    def _retry_failed_init(self):
+        """重试之前初始化失败的交易所，成功后加入 self.exchanges"""
+        for name in list(self._init_failed.keys()):
+            ok = self.init_exchange(name)
+            if ok:
+                logger.info(f"🔄 {name} 重试初始化成功")
+
     def fetch_market_trades(self, exchange_name: str, symbol: str, limit: int = 500) -> List[Dict]:
         """获取平台公开市场成交"""
         if exchange_name not in self.exchanges:
             return []
         exchange = self.exchanges[exchange_name]
         all_trades = []
-        
+
         # 现货成交
         try:
             spot = exchange.fetch_trades(symbol, limit=limit)
@@ -50,7 +64,7 @@ class MarketTradeCollector:
                 all_trades.extend(spot)
         except Exception as e:
             logger.debug(f"{exchange_name} {symbol} 现货成交失败: {e}")
-        
+
         # 永续合约成交 (Bitget/Gate/HTX格式: BTC/USDT:USDT)
         base = symbol.split('/')[0]
         perp_symbol = f"{base}/USDT:USDT"
@@ -60,16 +74,16 @@ class MarketTradeCollector:
                 all_trades.extend(perp)
         except Exception as e:
             logger.debug(f"{exchange_name} {perp_symbol} 永续成交失败: {e}")
-        
+
         self.platform_stats[exchange_name]['collected'] += len(all_trades)
         return all_trades
-    
+
     def fetch_spread_data(self, exchange_name: str, symbol: str) -> Dict:
         """获取永续vs现货价差数据"""
         if exchange_name not in self.exchanges:
             return {}
         exchange = self.exchanges[exchange_name]
-        
+
         result = {
             'symbol': symbol,
             'exchange': exchange_name,
@@ -77,17 +91,15 @@ class MarketTradeCollector:
             'perp_price': None,
             'spread_pct': 0.0
         }
-        
+
         try:
-            # 获取现货ticker
             spot_ticker = exchange.fetch_ticker(symbol)
             if spot_ticker and spot_ticker.get('last'):
                 result['spot_price'] = float(spot_ticker['last'])
         except Exception as e:
             logger.debug(f"{exchange_name} {symbol} 现货行情失败: {e}")
-        
+
         try:
-            # 获取永续合约ticker (格式: BTC/USDT:USDT)
             base = symbol.split('/')[0]
             perp_symbol = f"{base}/USDT:USDT"
             perp_ticker = exchange.fetch_ticker(perp_symbol)
@@ -95,65 +107,86 @@ class MarketTradeCollector:
                 result['perp_price'] = float(perp_ticker['last'])
         except Exception as e:
             logger.debug(f"{exchange_name} {perp_symbol} 永续行情失败: {e}")
-        
-        # 计算价差
+
         if result['spot_price'] and result['perp_price'] and result['perp_price'] > 0:
             result['spread_pct'] = (result['spot_price'] - result['perp_price']) / result['perp_price'] * 100
-        
+
         return result
-    
-    def save_market_trades(self, trades: List[Dict], exchange_name: str):
-        """保存市场成交到数据库"""
+
+    def save_market_trades(self, trades: List[Dict], exchange_name: str) -> int:
+        """保存市场成交到数据库，自动去重"""
         if not trades:
             return 0
-        
+
         conn = get_connection(self.db_path)
         cursor = conn.cursor()
         inserted = 0
-        
+        skipped_dup = 0
+
         for trade in trades:
             try:
                 timestamp = trade.get('timestamp')
                 if not timestamp:
                     continue
                 ts = timestamp / 1000 if timestamp > 1e12 else timestamp
-                
+
                 sym = trade.get('symbol', '')
                 side = trade.get('side', '')
                 price = trade.get('price', 0) or 0
                 amount = trade.get('amount', 0) or 0
                 cost = trade.get('cost') or (price * amount)
                 order_id = str(trade.get('id', '') or trade.get('order', '') or '')
-                
+
                 if not order_id or not ts or not sym or not side:
                     continue
-                
-                # 去重
+
                 cursor.execute(
-                    "SELECT COUNT(*) FROM market_trades WHERE order_id=? AND exchange=?",
+                    "SELECT 1 FROM market_trades WHERE order_id=? AND exchange=? LIMIT 1",
                     (order_id, exchange_name)
                 )
-                if cursor.fetchone()[0] > 0:
+                if cursor.fetchone():
+                    skipped_dup += 1
                     continue
-                
+
                 cursor.execute('''
-                    INSERT INTO market_trades 
-                    (timestamp, symbol, exchange, spread_pct, side, perp_price, spot_price, amount, cost, fee, pnl, pnl_pct, status, order_id)
+                    INSERT INTO market_trades
+                    (timestamp, symbol, exchange, spread_pct, side, perp_price, spot_price,
+                     amount, cost, fee, pnl, pnl_pct, status, order_id)
                     VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, 'collected', ?)
                 ''', (ts, sym, exchange_name, side, price, price, amount, cost, order_id))
                 inserted += 1
             except Exception as e:
                 logger.debug(f"插入失败: {e}")
-        
+
         conn.commit()
         conn.close()
-        logger.info(f"✅ {exchange_name} 保存{inserted}笔市场成交")
+        if inserted or skipped_dup:
+            logger.info(f"✅ {exchange_name} 保存{inserted}笔市场成交（去重跳过{skipped_dup}）")
         return inserted
-    
-    def collect_all(self, symbols: List[str]):
-        """批量采集所有币种的市场成交"""
+
+    def cleanup_old_trades(self, retention_hours: int = DATA_RETENTION_HOURS) -> int:
+        """清理过时的市场成交数据，避免 DB 无限膨胀"""
+        conn = get_connection(self.db_path)
+        cursor = conn.cursor()
+        cutoff = time.time() - retention_hours * 3600
+        cursor.execute("DELETE FROM market_trades WHERE timestamp < ?", (cutoff,))
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        if deleted:
+            logger.info(f"🧹 清理 {retention_hours}h 前市场成交数据 {deleted} 条")
+        return deleted
+
+    def collect_all(self, symbols: List[str]) -> int:
+        """批量采集所有币种的市场成交，先重试失败的初始化"""
+        self._retry_failed_init()
+
+        if not self.exchanges:
+            logger.warning(f"⚠️ 所有交易所连接器不可用（{self._init_failed}），跳过本轮采集")
+            return 0
+
         total_saved = 0
-        for ex_name in self.exchanges.keys():
+        for ex_name in list(self.exchanges.keys()):
             logger.info(f"📊 开始采集 {ex_name} 市场成交（模式二）...")
             for symbol in symbols:
                 try:
@@ -165,5 +198,13 @@ class MarketTradeCollector:
                 except Exception as e:
                     logger.error(f"❌ {ex_name} {symbol} 失败: {e}")
                     time.sleep(0.5)
+
         logger.info(f"✅ 市场成交采集完成，共保存{total_saved}笔")
+
+        # 采集完成后清理过时数据
+        try:
+            self.cleanup_old_trades()
+        except Exception as e:
+            logger.error(f"清理旧数据失败: {e}")
+
         return total_saved

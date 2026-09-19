@@ -123,7 +123,6 @@ class DataCollector:
         self.price_history: Dict[str, Dict[str, Deque[float]]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=self.data_config.history_size)))
         self.spread_history: Dict[str, Dict[str, Deque[float]]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=self.data_config.history_size)))
         self.depth_history: Dict[str, Dict[str, Deque[float]]] = defaultdict(lambda: defaultdict(lambda: deque(maxlen=self.data_config.history_size)))
-        
         # 统计
         self.total_ticks = 0
         self.ticks_per_exchange: Dict[str, int] = defaultdict(int)
@@ -363,8 +362,9 @@ class DataCollector:
             self.connectors[ex_name] = connector
     
     def collect_tick(self) -> List[MarketDataPoint]:
-        """从所有平台收集一 tick 数据"""
+        """从所有平台收集一 tick 数据。2026-09-14 修：返回"实际成功写库的条数"(int)，不再是列表。"""
         all_ticks = []
+        written_ok = 0
         now = time.time()
         
         for ex_name, connector in self.connectors.items():
@@ -377,14 +377,20 @@ class DataCollector:
                     if tick:
                         all_ticks.append(tick)
                         self._update_cache(ex_name, symbol, tick)
-                        self._save_tick(tick)
+                        ok = self._save_tick(tick)   # 2026-09-14：_save_tick 返回 bool
+                        if ok:
+                            written_ok += 1
                         self.ticks_per_exchange[ex_name] += 1
                 except Exception as e:
-                    pass
+                    import logging as _logging
+                    _logging.getLogger('DataCollector').warning(
+                        f"⚠️ 采集 {ex_name}/{symbol} 失败: {e}")
         
         self.total_ticks += len(all_ticks)
         self.last_update = now
-        return all_ticks
+        # 2026-09-14 中华盯盘修正：返回"实际成功写库的条数"（int），
+        # 循环里只有 >0 才刷新 last_write_ts，真正 5 分钟没写入才停摆告警
+        return written_ok
     
     def _collect_single(self, ex_name: str, connector: ExchangeConnector,
                         symbol: str, now: float) -> Optional[MarketDataPoint]:
@@ -394,19 +400,34 @@ class DataCollector:
         if not spot_ticker:
             return None
         
-        spot_ob = connector.fetch_order_book(symbol, 10)
+        spot_ob = connector.fetch_order_book(symbol, 10) or {}
         
         # 获取永续数据
-        perp_ticker = connector.fetch_perp_ticker(symbol)
+        perp_ticker = connector.fetch_perp_ticker(symbol) or {}
         
-        # 计算指标
-        spot_bid = float(spot_ob.get('bids', [[0]])[0][0]) if spot_ob.get('bids') else 0
-        spot_ask = float(spot_ob.get('asks', [[0]])[0][0]) if spot_ob.get('asks') else 0
-        spot_last = float(spot_ticker.get('last', 0))
-        
-        perp_bid = float(perp_ticker.get('bid', 0)) if perp_ticker else 0
-        perp_ask = float(perp_ticker.get('ask', 0)) if perp_ticker else 0
-        perp_last = float(perp_ticker.get('last', 0)) if perp_ticker else 0
+        # 计算指标（2026-09-14 中华盯盘修正：对 ccxt 各平台返回类型鲁棒，
+        # 之前某平台返回 list 而非 dict，.get 在 list 上比较 'list'>'int' 崩溃 → 整轮采集失败、管道停摆）
+        def _book_px(ob, key):
+            lvl = (ob or {}).get(key) or []
+            if isinstance(lvl, list) and lvl and isinstance(lvl[0], (list, tuple)) and len(lvl[0]) >= 2:
+                try: return float(lvl[0][0])
+                except Exception: return 0.0
+            return 0.0
+        def _vol(lvl):
+            if isinstance(lvl, list) and lvl and isinstance(lvl[0], (list, tuple)) and len(lvl[0]) >= 2:
+                try: return float(lvl[0][1])
+                except Exception: return 0.0
+            return 0.0
+        spot_bid = _book_px(spot_ob, 'bids')
+        spot_ask = _book_px(spot_ob, 'asks')
+        try: spot_last = float((spot_ticker or {}).get('last', 0) or 0)
+        except Exception: spot_last = 0.0
+        try: perp_bid = float((perp_ticker or {}).get('bid', 0) or 0)
+        except Exception: perp_bid = 0.0
+        try: perp_ask = float((perp_ticker or {}).get('ask', 0) or 0)
+        except Exception: perp_ask = 0.0
+        try: perp_last = float((perp_ticker or {}).get('last', 0) or 0)
+        except Exception: perp_last = 0.0
         
         # 价差计算 - 修复bug：当永续合约价格为0时跳过
         # 做市策略：永续合约买入(perp_ask) → 现货卖出(spot_bid)
@@ -420,14 +441,16 @@ class DataCollector:
             spread_pct = 0
         basis_pct = (perp_last - spot_last) / spot_last * 100 if spot_last > 0 else 0
         
-        # 深度比
-        spot_bid_vol = float(spot_ob.get('bids', [[0, 0]])[0][1]) if spot_ob.get('bids') else 0
-        spot_ask_vol = float(spot_ob.get('asks', [[0, 0]])[0][1]) if spot_ob.get('asks') else 0
+        # 深度比（2026-09-14 中华盯盘修正：用鲁棒的 _vol，避免 list/dict 比较崩）
+        spot_bid_vol = _vol((spot_ob or {}).get('bids') or [])
+        spot_ask_vol = _vol((spot_ob or {}).get('asks') or [])
         depth_ratio = spot_bid_vol / spot_ask_vol if spot_ask_vol > 0 else 1.0
         
-        # 成交量
-        spot_volume = float(spot_ticker.get('baseVolume', 0))
-        perp_volume = float(perp_ticker.get('baseVolume', 0)) if perp_ticker else 0
+        # 成交量（2026-09-14 中华盯盘修正：baseVolume 可能是 list/None，兜底成 0，不让整轮崩）
+        try: spot_volume = float((spot_ticker or {}).get('baseVolume', 0) or 0)
+        except Exception: spot_volume = 0.0
+        try: perp_volume = float((perp_ticker or {}).get('baseVolume', 0) or 0)
+        except Exception: perp_volume = 0.0
         
         return MarketDataPoint(
             timestamp=now,
@@ -452,24 +475,50 @@ class DataCollector:
         self.spread_history[ex_name][symbol].append(tick.spread_pct)
         self.depth_history[ex_name][symbol].append(tick.depth_ratio)
     
-    def _save_tick(self, tick: MarketDataPoint):
-        """保存tick到数据库"""
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO market_data 
-            (timestamp, exchange, symbol, spot_bid, spot_ask, spot_last, 
-             perp_bid, perp_ask, perp_last, spot_volume, perp_volume,
-             spread_pct, basis_pct, depth_ratio)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            tick.timestamp, tick.exchange, tick.symbol,
-            tick.spot_bid, tick.spot_ask, tick.spot_last,
-            tick.perp_bid, tick.perp_ask, tick.perp_last,
-            tick.spot_volume, tick.perp_volume,
-            tick.spread_pct, tick.basis_pct, tick.depth_ratio
-        ))
-        self.conn.commit()
-    
+    def _save_tick(self, tick: MarketDataPoint) -> bool:
+        """保存tick到数据库（含锁等待重试）。2026-09-14 修：返回是否写库成功，
+        供 collect_tick 统计实际成功写库条数，只有真正写成功才刷新 last_write_ts，
+        否则监控自身坏（写库失败但 last_write_ts 仍刷新 → 停摆告警永不触发）。"""
+        def _do_insert():
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO market_data 
+                (timestamp, exchange, symbol, spot_bid, spot_ask, spot_last, 
+                 perp_bid, perp_ask, perp_last, spot_volume, perp_volume,
+                 spread_pct, basis_pct, depth_ratio)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                tick.timestamp, tick.exchange, tick.symbol,
+                tick.spot_bid, tick.spot_ask, tick.spot_last,
+                tick.perp_bid, tick.perp_ask, tick.perp_last,
+                tick.spot_volume, tick.perp_volume,
+                tick.spread_pct, tick.basis_pct, tick.depth_ratio
+            ))
+            self.conn.commit()
+
+        try:
+            _do_insert()
+            return True
+        except sqlite3.OperationalError:
+            # database is locked（多连接写同一WAL库）→ 重试最多3次，每次间隔0.5s
+            import time as _time
+            for _attempt in range(3):
+                _time.sleep(0.5)
+                try:
+                    _do_insert()
+                    return True
+                except sqlite3.OperationalError:
+                    continue
+            import logging as _logging
+            _logging.getLogger('DataCollector').error(
+                f"🚨 market_data 写库失败(重试3次仍锁库): tick={tick.exchange}/{tick.symbol}")
+            return False
+        except Exception as e:
+            # 2026-09-13：不再静默吞掉写库失败——历史上管道断更3天就是因为这里 except: pass
+            import logging as _logging
+            _logging.getLogger('DataCollector').error(
+                f"🚨 market_data 写库失败: {e} | tick={tick.exchange}/{tick.symbol}")
+            return False
     def get_recent_data(self, ex_name: str, symbol: str, n: int = 100) -> Dict:
         """获取某个平台某币种最近N条数据"""
         ex_name = ex_name.lower()
@@ -534,22 +583,44 @@ class DataCollector:
         import threading
         
         def _collect_loop():
+            import traceback as _tb
             logger = logging.getLogger('DataCollector')
             logger.info("📡 数据收集器启动 (三平台并行)")
-            while True:
-                try:
-                    ticks = self.collect_tick()
-                    if ticks:
-                        logger.debug(f"采集到 {len(ticks)} 条tick数据")
-                except Exception as e:
-                    logger.error(f"采集失败: {e}")
-                time.sleep(5)  # 每5秒采集一次
+            # 2026-09-13：整个循环体包在 try/except 里，线程因任何异常崩溃都会打 ERROR + 堆栈
+            last_write_ts = time.time()
+            try:
+                while self.running:
+                    try:
+                        written = self.collect_tick()   # 2026-09-14：返回"实际成功写库的条数"(int)
+                        if written > 0:
+                            last_write_ts = time.time()
+                            logger.info(f"📡 数据采集: 写库 {written} 条 tick")
+                        else:
+                            logger.warning("📡 数据采集: 本轮 0 条写库成功（检查各平台连接/数据库锁）")
+                    except Exception as e:
+                        import traceback as _tb
+                        logger.error(f"采集失败: {e}\n{_tb.format_exc()}")
+                    now = time.time()
+                    if now - last_write_ts > 300:
+                        logger.error(f"🚨 数据管道停摆 {int((now-last_write_ts)/60)} 分钟未写入 market_data，检查各平台连接/数据库锁")
+                    time.sleep(5)  # 每5秒采集一次
+            except BaseException as _e:
+                logger.error(f"🚨 数据采集线程崩溃退出: {_e}")
+                _tb.print_exc()
         
-        thread = threading.Thread(target=_collect_loop, daemon=True)
+        # 2026-09-13：加 running 开关，close() 可干净停止
+        self.running = True
+        thread = threading.Thread(target=_collect_loop, daemon=True, name='qnt-data-collector')
         thread.start()
+        import time as _t
+        _t.sleep(0.2)
+        if not thread.is_alive():
+            print("🚨 DataCollector 线程启动后立刻退出（self.running 初始值异常？），当前 running =", self.running)
+        self._collect_thread = thread
         return thread
     
     def close(self):
         """关闭连接"""
+        self.running = False
         if self.conn:
             self.conn.close()

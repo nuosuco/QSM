@@ -78,8 +78,8 @@ class ExecutionConfig:
     - 净利=0.02%，成本=0.16%，实际门槛=0.18%
     - 建议阈值=0.20%（留出0.02%缓冲）
     """
-    spread_pct: float = 0.0017  # 0.17% 小数形式
-    net_profit_pct: float = 0.0001  # 0.01% 纯利
+    spread_pct: float = 0.0019  # 0.19% 小数形式 (提高门槛)
+    net_profit_pct: float = 0.0005  # 0.05% 纯利
     fill_rate: float = 0.6  # 成交概率
 
 @dataclass
@@ -100,7 +100,7 @@ class BacktestConfig:
 class LiveTradingConfig:
     """实盘自动开关配置"""
     enabled: bool = True
-    min_equity: float = 25.0
+    min_equity: float = 19.0  # 2026-09-13 中华定：临时19U开实盘（没钱充值），权益到30U后改回25.0
     paper_window_hours: int = 24
     min_paper_trades: int = 0
     min_paper_win_rate: float = 0.0
