@@ -291,7 +291,12 @@ class BacktestEngine:
                     best_tick = max(ticks, key=lambda x: x[7])
                     ts, ex, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = best_tick
 
-                    if spread_pct >= cost + min_net_profit:
+                    # 2026-09-27 A同步（与实盘完全同门槛）：动态门槛=基础门槛+永续自身点差，
+                    # 防止浅价差碎单（TIA 0.29%价差 vs 0.55%真实成本的假机会被误放行）
+                    _perp_self_spread = 0.0
+                    if perp_ask and perp_bid and ((perp_ask + perp_bid) / 2) > 0:
+                        _perp_self_spread = max((perp_ask - perp_bid) / ((perp_ask + perp_bid) / 2), 0) * 100
+                    if spread_pct >= cost + min_net_profit + _perp_self_spread:
                         self._try_open_position(ticks, cursor)
                         self._check_close_positions(ticks, cursor)
 
