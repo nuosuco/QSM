@@ -356,12 +356,52 @@ class BacktestEngine:
         #   spread_pct <= -门槛 → 升水（永续高于现货）→ 开空赌回归
         # 旧版固定开多且门槛只比正价差 → 回测验证的根本不是实盘策略
         min_spread = (ExecutionEngine.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT) * 100
-        # 2026-09-27 A升级同步（与实盘同门槛）：动态门槛=基础门槛+永续自身买卖点差，
-        # 防止浅价差碎单（TIA 0.29%价差 vs 0.55%真实成本的假机会被误放行）
+        # 2026-09-28 尖峰升级同步（与实盘同门槛，市场母体回测验证19天108笔+33点）：
+        # 门槛=max(基础+永续自身点差, SPIKE_THRESHOLD 0.5%)；结构性贴水币禁开多、升水币禁开空；
+        # 近7天无尖峰回归记录的币不进。三条与 execution_engine._scan_and_execute 完全一致。
         perp_self_spread_pct = 0.0
-        if perp_ask and perp_bid and ((perp_ask + perp_bid) / 2) > 0:
-            perp_self_spread_pct = max((perp_ask - perp_bid) / ((perp_ask + perp_bid) / 2), 0) * 100
-        if abs(spread_pct) < min_spread + perp_self_spread_pct:
+        mid_perp = (perp_ask + perp_bid) / 2 if perp_ask and perp_bid else 0
+        if mid_perp > 0:
+            perp_self_spread_pct = max((perp_ask - perp_bid) / mid_perp, 0) * 100
+        spike_min = max(min_spread + perp_self_spread_pct, ExecutionEngine.SPIKE_THRESHOLD * 100)
+        if abs(spread_pct) < spike_min:
+            return
+        # 尖峰分类器（与实盘同规则，读 market_data）
+        from .execution_engine import (STRUCTURE_LOOKBACK_DAYS, STRUCTURE_DISCOUNT_LIMIT,
+                                       STRUCTURE_PREMIUM_LIMIT, SPIKE_LOOKBACK_DAYS)
+        import sqlite3
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+            look14 = time.time() - STRUCTURE_LOOKBACK_DAYS * 86400
+            row = cur.execute(
+                "SELECT AVG(spread_pct), COUNT(*) FROM market_data WHERE symbol=? AND exchange=? "
+                "AND timestamp>? AND spread_pct IS NOT NULL AND ABS(spread_pct)<1.0",
+                (symbol, exchange, look14)).fetchone()
+            conn.close()
+            mean_sp, cnt = row
+            if not cnt or cnt < 100:
+                return
+            # 方向禁令+尖峰历史
+            open_side = 'buy' if spread_pct > 0 else 'sell'
+            if open_side == 'buy' and mean_sp < -STRUCTURE_DISCOUNT_LIMIT:
+                return  # 贴水结构禁开多（接刀）
+            if open_side == 'sell' and mean_sp > STRUCTURE_PREMIUM_LIMIT:
+                return  # 升水结构禁开空
+            look7 = time.time() - SPIKE_LOOKBACK_DAYS * 86400
+            conn2 = sqlite3.connect(self.db_path)
+            spike_cnt = conn2.execute(
+                "SELECT COUNT(DISTINCT a.id) FROM market_data a "
+                "JOIN market_data b ON b.symbol=a.symbol AND b.exchange=a.exchange "
+                "AND b.timestamp > a.timestamp AND b.timestamp <= a.timestamp+600 "
+                "WHERE a.symbol=? AND a.exchange=? AND a.timestamp>? "
+                "AND a.spread_pct IS NOT NULL AND ABS(a.spread_pct)>=0.005 "
+                "AND b.spread_pct IS NOT NULL AND ABS(b.spread_pct)<0.0017",
+                (symbol, exchange, look7)).fetchone()[0]
+            conn2.close()
+            if spike_cnt < 3:
+                return  # 尖峰回归记录<3次，不进
+        except Exception:
             return
         open_side = 'buy' if spread_pct > 0 else 'sell'
         ref_price = perp_ask if open_side == 'buy' else perp_bid

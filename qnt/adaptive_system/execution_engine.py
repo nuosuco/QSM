@@ -173,6 +173,15 @@ UNDERPERFORMER_POSITION_SCALE = 0.5
 # 2026-09-27 B升级（大单模式参数化）：
 DEEP_SPREAD_THRESHOLD = 0.005     # 深价差线：|价差|≥0.5% = 大单模式（满仓+高追踪）
 TRAILING_HOLD_RATIO = 0.6        # 追踪止盈：峰值浮盈回撤到60%即落袋（旧0.5），多锁10%利润
+# 2026-09-28 尖峰分类器（市场母体回测验证：19天108笔+33点，胜率~96%，19/19组合全正）
+# 精髓：价差大≠赚钱。尖峰型价差（瞬间拉开、快速回归）能赚；结构性贴水（现货长期低于永续）接刀必亏。
+SPIKE_THRESHOLD = 0.005          # 尖峰门槛：|价差|≥0.5% 才视为可交易事件（比旧的0.17%动态门槛更严）
+SPIKE_RECOVERY_BUCKETS = 2       # 尖峰判定：5min桶×2=10min内打回0.17%以内=真尖峰
+STRUCTURE_LOOKBACK_DAYS = 14     # 结构性判定回看窗口（14天market_data）
+STRUCTURE_DISCOUNT_LIMIT = 0.0010  # 全期均值 < -0.10% = 结构性贴水 → 禁止开多（多=赌贴水回归=接刀）
+STRUCTURE_PREMIUM_LIMIT = 0.0010   # 全期均值 > +0.10% = 结构性升水 → 禁止开空
+SPIKE_LOOKBACK_DAYS = 7          # 尖峰历史判定窗口：该币近7天有过≥1次"10min内打回"记录才允许进场
+MAKER_FEE_BI = 0.0012           # 全maker双边成本0.12%（旧taker 0.16%），尖峰单默认全maker
 
 
 class ExecutionEngine:
@@ -573,20 +582,27 @@ class ExecutionEngine:
                     signed_spread = (mid_perp - mid_spot) / mid_spot
 
                     min_required = self.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT
-                    # 2026-09-27 A升级（中华拍板）：开仓门槛动态化——加「永续自身买卖点差」项。
-                    # 根因实锤（9-23 22:33 TIA单）：TIA永续自身点差0.39%+手续费0.16%=真实成本0.55%，
-                    # 旧门槛只算0.17%，+0.29%价差被放行→开仓即浮亏→2秒硬止损白送手续费。
-                    # 动态门槛 = 0.16%成本 + 0.01%净利 + 该币永续实时自身点差。
+                    # 2026-09-28 尖峰升级（市场母体回测验证：19天108笔+33点全正期望）：
+                    # 门槛从"0.17%动态门槛"升级为 SPIKE_THRESHOLD 尖峰门槛(0.5%) + 永续自身点差。
+                    # 精髓：只在尖峰型价差进场；结构性贴水/无尖峰历史的币由分类器拦掉。
+                    # 全maker成本0.12%（MAKER_FEE_BI）覆盖0.5%+尖峰回归空间。
                     perp_self_spread = (perp_ask - perp_bid) / mid_perp if mid_perp > 0 else 0
-                    dynamic_min_required = min_required + max(perp_self_spread, 0)
+                    spike_min_required = max(min_required + max(perp_self_spread, 0), SPIKE_THRESHOLD)
                     # 判定门槛必须用真实成交价（吃单方），不许再用 mid 价——这是假价差根源
-                    if real_spread_sell >= dynamic_min_required:
+                    if real_spread_sell >= spike_min_required:
                         main_perp_side = 'sell'
                         signed_spread = real_spread_sell
-                    elif real_spread_buy <= -dynamic_min_required:
+                    elif real_spread_buy <= -spike_min_required:
                         main_perp_side = 'buy'
                         signed_spread = real_spread_buy
                     else:
+                        continue
+
+                    # === 2026-09-28 尖峰分类器关卡（结构判断+尖峰历史）===
+                    # 结构性贴水→禁开多；结构性升水→禁开空；近7天无尖峰回归记录→不进
+                    _allowed, _why = self._classify_symbol_entry(ex_name, symbol)
+                    if not _allowed:
+                        logger.info(f"🧪 {ex_name} {symbol}: 尖峰分类拦截({_why})，跳过")
                         continue
 
                     # 2026-09-12：取消非黄金时段1.5x加严，全时段统一门槛
@@ -650,6 +666,51 @@ class ExecutionEngine:
         except Exception as e:
             logger.debug(f"{symbol} 趋势过滤查询失败(放行): {e}")
             return True
+
+    def _classify_symbol_entry(self, ex_name, symbol) -> tuple:
+        """2026-09-28 尖峰分类器（市场母体回测验证的正期望规则）。
+        返回 (allowed, reason):
+        - 结构性贴水(14天均值<-0.10%) → 禁止开多（接刀必亏）
+        - 结构性升水(>+0.10%) → 禁止开空
+        - 近7天无"10min内打回"尖峰记录 → 禁止进场（不是尖峰型价差）
+        数据源: market_data表（真实tick），按币+所聚合。
+        """
+        base = symbol.split('/')[0]
+        try:
+            conn = get_connection(self.config.data.db_path)
+            cur = conn.cursor()
+            # 14天结构均值
+            look14 = time.time() - STRUCTURE_LOOKBACK_DAYS * 86400
+            row = cur.execute(
+                "SELECT AVG(spread_pct), COUNT(*) FROM market_data "
+                "WHERE symbol=? AND exchange=? AND timestamp>? AND spread_pct IS NOT NULL AND ABS(spread_pct)<1.0",
+                (symbol, ex_name, look14)).fetchone()
+            mean_sp, cnt = row
+            conn.close()
+            if not cnt or cnt < 100:
+                return False, "样本不足"
+            if mean_sp < -STRUCTURE_DISCOUNT_LIMIT:
+                return False, f"结构性贴水{mean_sp*100:.2f}%，禁止开多(接刀)"
+            if mean_sp > STRUCTURE_PREMIUM_LIMIT:
+                return False, f"结构性升水{mean_sp*100:.2f}%，禁止开空"
+            # 7天尖峰历史（2026-09-28口径修复）：tick A|spread|>=0.5% 且 600s内存在 tick B<0.17%
+            # 旧bug：把"相邻两条>=0.5%的tick互查"当回归，40s一条tick下永远False→全拦
+            look7 = time.time() - SPIKE_LOOKBACK_DAYS * 86400
+            spike_cnt = cur.execute(
+                "SELECT COUNT(DISTINCT a.id) FROM market_data a "
+                "JOIN market_data b ON b.symbol=a.symbol AND b.exchange=a.exchange "
+                "AND b.timestamp > a.timestamp AND b.timestamp <= a.timestamp+600 "
+                "WHERE a.symbol=? AND a.exchange=? AND a.timestamp>? "
+                "AND a.spread_pct IS NOT NULL AND ABS(a.spread_pct)>=0.005 "
+                "AND b.spread_pct IS NOT NULL AND ABS(b.spread_pct)<0.0017",
+                (symbol, ex_name, look7)).fetchone()[0]
+            if spike_cnt < 3:
+                return False, f"近7天尖峰回归记录{spike_cnt}次(<3)，不够稳"
+            return True, f"ok(尖峰{spike_cnt}次)"
+        except Exception as e:
+            # 查询失败保守：不进（宁可错过，不接刀）
+            logger.debug(f"尖峰分类查询失败(按禁止处理): {e}")
+            return False, f"分类查询失败: {e}"
 
     def _risk_pause_spread_still_hot(self) -> bool:
         """2026-09-27 D升级：查最近一条亏损平仓的币，当前价差是否仍超动态门槛。
