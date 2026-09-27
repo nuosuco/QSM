@@ -181,11 +181,34 @@ class BacktestEngine:
         # 分析结果只记日志，不写入engine_trades（避免污染交易表）
         logger.info(f"📊 模式一完成: {total_trades}笔, 买入{total_buy:.2f}U, 卖出{total_sell:.2f}U, 净盈亏{net_pnl:+.2f}U ({pct:+.2f}%)")
 
+    def _check_memory_guard(self) -> bool:
+        """内存闸门：可用内存<1.5G时跳过重型回测，保护常驻服务（gateway/hermes/qnt引擎）。
+        回测随时可跑，但内存紧张时自动降级跳过，下次轮次再跑——不挤爆服务器。"""
+        try:
+            with open('/proc/meminfo') as f:
+                mem = {}
+                for line in f:
+                    parts = line.split()
+                    if parts[0] == 'MemAvailable:':
+                        mem['avail_kb'] = int(parts[1])
+                avail_mb = mem.get('avail_kb', 0) / 1024
+                if avail_mb < 1536:  # 1.5G
+                    logger.warning(f"⚠️ 内存闸门: 可用{avail_mb:.0f}MB<1536MB，跳过本轮重型回测（下轮再跑，不挤爆服务器）")
+                    return False
+                return True
+        except Exception as e:
+            logger.debug(f"内存检查失败(按放行处理): {e}")
+            return True
+
     def _backtest_market_trades(self, cursor):
         """模式二：回测平台公开市场成交（不交易，只统计胜率）"""
         logger.info("=" * 60)
         logger.info("📊 模式二：回测平台市场成交数据")
         logger.info("=" * 60)
+        
+        # 内存闸门：可用内存<1.5G跳过本轮重型回测
+        if not self._check_memory_guard():
+            return
         
         # 检查是否有市场成交数据
         cursor.execute("SELECT COUNT(*) FROM market_trades")
@@ -306,7 +329,13 @@ class BacktestEngine:
                                 f"{datetime.fromtimestamp(self.last_processed_ts).strftime('%m-%d %H:%M')} "
                                 f"(window={len(window_data)} rows)")
 
-                time.sleep(0.05)
+                # 2026-09-28 内存保护（中华要求：回测随时可跑但不能挤爆服务器）：
+                # 追赶历史数据阶段（尚未追上实时）每100轮检查一次内存，
+                # 可用<1.5G时休眠30s让路给常驻服务（gateway/hermes），追上实时后正常30s轮询不受影响
+                if check_count % 100 == 0 and not self._check_memory_guard():
+                    time.sleep(30)
+                    continue
+                time.sleep(0.05 if self.last_processed_ts < time.time() - 600 else 0.05)
 
             except Exception as e:
                 logger.error(f"realtime backtest error: {e}")
