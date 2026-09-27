@@ -250,53 +250,62 @@ class BacktestEngine:
         min_net_profit = RiskManager.MIN_NET_PROFIT_PCT
 
         check_count = 0
+        # 2026-09-21 fix19: forward-window scan. Old logic took max(ts) inside window,
+        # so on sparse data the cursor stuck at 09-09 10:18 for 12 days.
+        # Correct: process [last, last+300s) then advance cursor by 300s.
         while self.running:
             try:
-                # 查询最近5分钟数据
-                window_start = self.last_processed_ts - 300
                 cursor.execute("""
                     SELECT timestamp, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct
                     FROM market_data
-                    WHERE timestamp > ? AND spread_pct IS NOT NULL AND ABS(spread_pct) < 1.0
-                    ORDER BY timestamp DESC
-                    LIMIT 100
-                """, (window_start,))
+                    WHERE timestamp > ? AND timestamp <= ? AND spread_pct IS NOT NULL AND ABS(spread_pct) < 1.0
+                    ORDER BY timestamp ASC
+                    LIMIT 5000
+                """, (self.last_processed_ts, self.last_processed_ts + 300))
                 window_data = cursor.fetchall()
-                
+
+                # Advance cursor by 300s regardless of whether window had data
+                self.last_processed_ts += 300
+
                 if not window_data:
-                    time.sleep(1)
+                    # Empty window: if we've caught up to realtime, enter incremental mode
+                    cursor.execute("SELECT MAX(timestamp) FROM market_data")
+                    md_max = cursor.fetchone()[0]
+                    if md_max and self.last_processed_ts >= md_max:
+                        logger.info("✅ realtime backtest caught up to latest data, entering incremental mode")
+                        time.sleep(30)
+                        continue
+                    time.sleep(0.1)
                     continue
-                
-                # 更新最后处理时间
-                self.last_processed_ts = max(row[0] for row in window_data)
-                
-                # 按exchange分组
+
+                # Group by exchange
                 by_exchange = {}
                 for row in window_data:
                     ex = row[1]
                     if ex not in by_exchange:
                         by_exchange[ex] = []
                     by_exchange[ex].append(row)
-                
-                # 每个exchange独立处理
+
+                # Process each exchange independently
                 for exchange, ticks in by_exchange.items():
-                    # 找最大价差
                     best_tick = max(ticks, key=lambda x: x[7])
                     ts, ex, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = best_tick
-                    
+
                     if spread_pct >= cost + min_net_profit:
-                        # 执行回测逻辑
                         self._try_open_position(ticks, cursor)
                         self._check_close_positions(ticks, cursor)
-                
+
                 check_count += 1
-                if check_count % 100 == 0:
-                    logger.debug(f"[实时回测] 检查#{check_count}, 窗口内{len(window_data)}条, 门槛={cost+min_net_profit:.4f}")
-                
-                time.sleep(0.5)
-                
+                if check_count % 50 == 0:
+                    logger.info(f"📈 backtest replay progress: up to "
+                                f"{datetime.fromtimestamp(self.last_processed_ts).strftime('%m-%d %H:%M')} "
+                                f"(window={len(window_data)} rows)")
+
+                time.sleep(0.05)
+
             except Exception as e:
-                logger.error(f"实时回测错误: {e}")
+                logger.error(f"realtime backtest error: {e}")
+                time.sleep(5)
                 time.sleep(5)
 
         conn.close()
@@ -307,31 +316,52 @@ class BacktestEngine:
         ts, exchange, symbol, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = best_tick
         
         # 严格检查
+        # 2026-09-18 修复：方向必须与实盘铁律同步——
+        # market_data.spread_pct 口径=(spot_bid-perp_ask)/perp_ask（现货-永续）：
+        #   spread_pct >= +门槛 → 贴水（现货高于永续）→ 开多赌回归
+        #   spread_pct <= -门槛 → 升水（永续高于现货）→ 开空赌回归
+        # 旧版固定开多且门槛只比正价差 → 回测验证的根本不是实盘策略
         min_spread = (ExecutionEngine.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT) * 100
-        if spread_pct < min_spread:
+        # 2026-09-27 A升级同步（与实盘同门槛）：动态门槛=基础门槛+永续自身买卖点差，
+        # 防止浅价差碎单（TIA 0.29%价差 vs 0.55%真实成本的假机会被误放行）
+        perp_self_spread_pct = 0.0
+        if perp_ask and perp_bid and ((perp_ask + perp_bid) / 2) > 0:
+            perp_self_spread_pct = max((perp_ask - perp_bid) / ((perp_ask + perp_bid) / 2), 0) * 100
+        if abs(spread_pct) < min_spread + perp_self_spread_pct:
+            return
+        open_side = 'buy' if spread_pct > 0 else 'sell'
+        ref_price = perp_ask if open_side == 'buy' else perp_bid
+        if ref_price <= 0:
             return
         
         # 风控检查
+        # 2026-09-18 修复：仓位口径与实盘同步——平台余额×20% + 分池headroom逐单扣减
         min_notional = PERP_MIN_NOTIONAL.get(exchange, 1.0)
-        position = min(self.platform_balances.get(exchange, 1000) * 0.15, 200)  # v2.1升级：从20%降至15%
+        platform_cap = self.platform_balances.get(exchange, 1000) * 0.20
+        opened = sum(p.cost for k, p in self.open_positions.items()
+                     if k.split('|', 1)[0] == exchange)
+        headroom = platform_cap - opened
+        if headroom <= 0:
+            return
+        position_size = min(headroom, self.platform_balances.get(exchange, 1000) * 0.20)
         
-        if position < min_notional:
+        if position_size < min_notional:
             return
         
         risk_check = self.risk_manager.check_risk(
             symbol=symbol,
-            side='buy',
-            position_size_usdt=position,
-            entry_price=perp_ask,
-            stop_loss_price=perp_ask * 1.02,
+            side=open_side,
+            position_size_usdt=position_size,
+            entry_price=ref_price,
+            stop_loss_price=ref_price * 1.02,
             ex_name=exchange
         )
         if not risk_check['allowed']:
             return
         
-        # 精度检查
-        amount = position / perp_ask
-        if amount < 1.0:
+        # 精度检查（与实盘 MIN_COIN_AMOUNT 同步）
+        amount = position_size / ref_price
+        if amount < MIN_COIN_AMOUNT:
             return
         
         # 检查持仓
@@ -342,7 +372,7 @@ class BacktestEngine:
         # 开仓
         position_id = f"bt_{int(time.time() * 1000000)}_{self._bt_counter}"
         self._bt_counter += 1
-        position = Position(symbol, exchange, 'buy', perp_ask, amount, position_id, ts)
+        position = Position(symbol, exchange, open_side, ref_price, amount, position_id, ts)
         self.open_positions[pos_key] = position
         self.platform_balances[exchange] -= position.cost
         
@@ -361,6 +391,8 @@ class BacktestEngine:
         """检查是否需要平仓"""
         to_close = []
         
+        # 2026-09-18 修复：平仓口径对齐实盘（只动永续腿 + 止盈/硬止损/90min超时铁律）
+        from .execution_engine import SPREAD_POSITION_TIMEOUT, SINGLE_SIDE_STOP_LOSS_PCT
         for pos_key, pos in list(self.open_positions.items()):
             symbol = pos_key.split('|', 1)[1]
             matching_ticks = [t for t in window if t[2] == symbol]
@@ -370,11 +402,18 @@ class BacktestEngine:
             latest = matching_ticks[-1]
             ts, exchange, sym, spot_bid, spot_ask, perp_bid, perp_ask, spread_pct = latest
             
-            close_price = spot_bid if pos.side == 'buy' else spot_ask
+            # 实盘口径：多单按 perp_bid 平、空单按 perp_ask 平
+            close_price = perp_bid if pos.side == 'buy' else perp_ask
+            if close_price <= 0:
+                continue
             pnl_result = pos.close(close_price)
+            pnl_pct = pnl_result['pnl_pct']  # 价格变动百分比（含符号，未除杠杆）
             
-            hold_time = ts - pos.timestamp
-            should_close = (pnl_result['net_pnl'] > 0 and pnl_result['pnl_pct'] > 0.01) or hold_time > 60
+            hard_stop = pnl_pct <= -SINGLE_SIDE_STOP_LOSS_PCT
+            take_profit = pnl_result['net_pnl'] >= RiskManager.MIN_NET_PROFIT_PCT * pos.cost * 100 and abs(spread_pct) < abs(pos.spread_pct or 0)
+            timed_out = ts - pos.timestamp > SPREAD_POSITION_TIMEOUT
+            
+            should_close = hard_stop or take_profit or timed_out
             
             if should_close:
                 to_close.append((pos_key, pos, pnl_result, latest))

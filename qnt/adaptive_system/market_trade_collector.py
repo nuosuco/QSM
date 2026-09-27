@@ -132,9 +132,12 @@ class MarketTradeCollector:
 
                 sym = trade.get('symbol', '')
                 side = trade.get('side', '')
-                price = trade.get('price', 0) or 0
+                # 2026-09-27 C修复：price列此前INSERT漏写导致全表NULL（44万条无价）。
+                price = trade.get('price') or 0
                 amount = trade.get('amount', 0) or 0
                 cost = trade.get('cost') or (price * amount)
+                if not price and amount and cost:
+                    price = cost / amount
                 order_id = str(trade.get('id', '') or trade.get('order', '') or '')
 
                 if not order_id or not ts or not sym or not side:
@@ -148,12 +151,13 @@ class MarketTradeCollector:
                     skipped_dup += 1
                     continue
 
+                # 2026-09-27 C修复：补上漏写的 price 列（旧版只写 perp_price/spot_price，price列永远NULL）
                 cursor.execute('''
                     INSERT INTO market_trades
-                    (timestamp, symbol, exchange, spread_pct, side, perp_price, spot_price,
-                     amount, cost, fee, pnl, pnl_pct, status, order_id)
-                    VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, 'collected', ?)
-                ''', (ts, sym, exchange_name, side, price, price, amount, cost, order_id))
+                    (timestamp, symbol, exchange, spread_pct, side, price, amount,
+                     cost, fee, pnl, pnl_pct, status, order_id)
+                    VALUES (?, ?, ?, 0, ?, ?, ?, ?, 0, 0, 0, 'collected', ?)
+                ''', (ts, sym, exchange_name, side, price, amount, cost, order_id))
                 inserted += 1
             except Exception as e:
                 logger.debug(f"插入失败: {e}")

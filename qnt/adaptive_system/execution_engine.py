@@ -36,28 +36,33 @@ _OPENCLAW_TOKEN = os.environ.get('OPENCLAW_GATEWAY_TOKEN', '')
 
 
 def _send_qq_msg(msg: str):
-    """通过OpenClaw Gateway发送QQ消息"""
-    try:
-        import urllib.request
-        import json
-        url = f'{GATEWAY_URL}/tools/invoke'
-        body = json.dumps({
-            'tool': 'message',
-            'action': 'send',
-            'args': {
-                'target': QQ_TARGET,
-                'message': msg
-            }
-        }).encode()
-        req = urllib.request.Request(url, data=body, method='POST')
-        req.add_header('Content-Type', 'application/json')
-        if _OPENCLAW_TOKEN:
-            req.add_header('Authorization', f'Bearer {_OPENCLAW_TOKEN}')
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read())
-    except Exception as e:
-        logger.debug(f"发送QQ消息失败: {e}")
-        return None
+    """通过OpenClaw Gateway发送QQ消息（2026-09-21 修复：超时15s+自动重试1次）"""
+    import urllib.request
+    import json
+    url = f'{GATEWAY_URL}/tools/invoke'
+    body = json.dumps({
+        'tool': 'message',
+        'action': 'send',
+        'args': {
+            'target': QQ_TARGET,
+            'message': msg
+        }
+    }).encode()
+    req = urllib.request.Request(url, data=body, method='POST')
+    req.add_header('Content-Type', 'application/json')
+    if _OPENCLAW_TOKEN:
+        req.add_header('Authorization', f'Bearer {_OPENCLAW_TOKEN}')
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read())
+        except Exception as e:
+            if attempt == 1:
+                logger.debug(f"发送QQ消息第1次失败(重试): {e}")
+                import time as _t; _t.sleep(1)
+                continue
+            logger.warning(f"发送QQ消息失败(2次): {e}")
+            return None
 
 
 def _notify_close(ex_name, symbol, side, price, amount, position_size, net_pct, reason):
@@ -132,7 +137,7 @@ PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
 HTX_LOW_PRICE_SYMBOLS = {'DOGE/USDT', 'PEPE/USDT','SOL/USDT', 'XRP/USDT', 'ONDO/USDT', 'FET/USDT', 'SHIB/USDT', 'ADA/USDT', 'TRX/USDT', 'LTC/USDT', 'BCH/USDT', 'NEAR/USDT', 'SUI/USDT', 'APT/USDT', 'SAND/USDT', 'GALA/USDT', 'IMX/USDT', 'DYDX/USDT', '1INCH/USDT', 'AAVE/USDT', 'SNX/USDT', 'COMP/USDT', 'MKR/USDT', 'CRV/USDT', 'ZEC/USDT', 'XLM/USDT', 'ALGO/USDT', 'FIL/USDT', 'AR/USDT'}
 SPOT_MIN_NOTIONAL = {'bitget': 1.0, 'htx': 1.0, 'gate': 3.0}
 BALANCE_BASELINE = {'bitget': 25.0, 'htx': 5.0, 'gate': 5.0}
-LEVERAGE = 50
+LEVERAGE = 20  # 中华定稿 2026-09-11：20x（50x 一次反向1.2%≈保证金亏24%磨光账户）
 
 # 最低币数量精度（所有交易所）
 # v4.1: 降低到0.01，适应小额账户
@@ -144,8 +149,9 @@ MIN_COIN_AMOUNT = 0.01
 # 平仓门槛：价差回归到目标线以下（保证净利 >= MIN_NET_PROFIT_PCT）
 # 空头目标线 = -(BI_SIDE_COST - MIN_NET_PROFIT_PCT)
 # 多头目标线 = +(BI_SIDE_COST - MIN_NET_PROFIT_PCT)
-SPREAD_CLOSE_THRESHOLD = -0.001   # -0.10%：价差回归到目标线再平仓，让利润跑足（原-0.035%太紧，赚35bp就跑）
-SPREAD_POSITION_TIMEOUT = 5400    # 持仓超时90分钟（2026-09-12：ATOM等高价币价差回归慢，60分钟太紧被超时止损切掉，放宽到90分钟）
+SPREAD_CLOSE_THRESHOLD = -0.005   # -0.50%：让利润奔跑（2026-09-22中华选定A方案），仅当价差深度回归0.5%才落袋
+SPREAD_ENTRY_CALM_SECONDS = 60    # 开仓冷静期（2026-09-24 定稿，中华报"频繁交易亏手续费"）：开仓后60s内跳过止损/止盈检查，等瞬态价差尖峰衰减，杜绝2-5秒开平白送双边手续费
+SPREAD_POSITION_TIMEOUT = 7200   # 持仓超时120分钟（中华定稿 2026-09-11；90分钟被 openclaw 改错过）
 # 硬止损：标的价格变动 ≥ 0.4% 立即平仓。
 # 2026-09-13 口径澄清（中华指出模拟出现单笔-3.06%亏损远超止损线，定位到此处）：
 # 这里的 0.4% 是【标的价格】变动（pnl_pct = 价差价格变动百分比，不是保证金盈亏）。
@@ -158,21 +164,29 @@ SINGLE_SIDE_STOP_LOSS_PCT = 0.0015  # 硬止损：标的价格浮亏≥0.15%（�
 # 黄金时段加权：UTC 16-23 价差波动大、净利最高（历史+0.21%~0.26%），白天时段净利薄
 TRADING_WINDOW_UTC_START = 16
 TRADING_WINDOW_UTC_END = 23
-# 亏损币种降仓：历史净利为负的币种，仓位减半
-UNDERPERFORMER_SYMBOLS = {'TIA', 'FET'}
-# 2026-09-12 拉黑名单：实盘数据验证为亏损/零收益币种，全平台跳过，不再开仓
+# 亏损币种降仓：按 2026-09-21 最新回测(1673笔)重定名单，仓位减半
+# 第四大奶牛TIA(+8.99U)已移出降仓名单；垫底币ONDO/LINK/FET/DOGE进降仓
+UNDERPERFORMER_SYMBOLS = {'ONDO', 'LINK', 'FET', 'DOGE'}
+# 拉黑名单：实盘数据验证为亏损/零收益币种，全平台跳过，不再开仓
 BLACKLIST_SYMBOLS = {'WIF/USDT'}
 UNDERPERFORMER_POSITION_SCALE = 0.5
+# 2026-09-27 B升级（大单模式参数化）：
+DEEP_SPREAD_THRESHOLD = 0.005     # 深价差线：|价差|≥0.5% = 大单模式（满仓+高追踪）
+TRAILING_HOLD_RATIO = 0.6        # 追踪止盈：峰值浮盈回撤到60%即落袋（旧0.5），多锁10%利润
 
 
 class ExecutionEngine:
     """交易执行引擎（三平台版，永续价差回归套利，完整风控）"""
     
-    # 手续费率（Maker）- 交易所真实费率
-    MAKER_FEE_RATE = 0.0006   # 0.06%
-    SLIPPAGE_RATE = 0.0002    # 0.02%
-    TOTAL_COST = MAKER_FEE_RATE + SLIPPAGE_RATE  # 单边成本 = 0.08%
-    BI_SIDE_COST = TOTAL_COST * 2  # 双边成本 = 0.16%（永续+现货）
+    # 手续费率（2026-09-26 新策略v5.1：限价单版，中华定"开启新策略+实盘马上实践"）
+    # 根因（14天85对回测）：市价单=taker 0.05%×2+滑点≈0.14-0.16%，毛利中位0.07-0.14%<成本=负期望。
+    # 新方案：开仓挂限价单(maker 0.02%)在目标价等成交——开仓不吃半个点差+滑点；
+    #         平仓仍市价 reduceOnly(taker 0.05%，保止损时效)。混合成本 ≈ 0.09%。
+    MAKER_FEE_RATE = 0.0002   # 0.02% gate VIP0 maker（开仓腿：限价挂单）
+    TAKER_FEE_RATE = 0.0005   # 0.05% gate taker（平仓腿：市价 reduceOnly）
+    SLIPPAGE_RATE = 0.0002    # 0.02% 平仓滑点
+    BI_SIDE_COST = MAKER_FEE_RATE + TAKER_FEE_RATE + SLIPPAGE_RATE  # 双边混合成本 = 0.09%
+    LIMIT_ORDER_WAIT_SECONDS = 45   # 限价单未成交45s自动撤单，下轮扫描按新价重挂（不追价不市价补刀）
     
     def __init__(self, config: SystemConfig):
         self.config = config
@@ -240,16 +254,71 @@ class ExecutionEngine:
                 for symbol in list(self.spread_positions[ex_name].keys()):
                     perp_symbol = self.spread_positions[ex_name][symbol].get('perp_symbol', symbol)
                     if perp_symbol not in real_syms:
+                        # 2026-09-27 E升级（中华拍板）：成交确认前置——限价开仓单未成交期间
+                        # 交易所侧本来就没有持仓，旧逻辑直接误判"强平"虚计-100%亏损
+                        # （9-26 23:24 FET实锤：挂单1秒后误记强平-0.60U）。
+                        # 规则：开仓单未成交(状态open/查询失败) → 只删DB持仓记录，不记强平亏损。
+                        pos = self.spread_positions[ex_name].get(symbol, {})
+                        still_pending = False
+                        entry_oid = pos.get('entry_order_id')
+                        if entry_oid:
+                            try:
+                                o = perp_exchange.fetch_order(entry_oid, perp_symbol)
+                                still_pending = bool(o and o.get('status') == 'open')
+                            except Exception:
+                                still_pending = True  # 查询失败保守：按未成交处理，不误记
+                        # 开仓未满45s冷静期（挂单等待窗口内）也按未成交处理
+                        if not still_pending and time.time() - pos.get('entry_time', 0) < self.LIMIT_ORDER_WAIT_SECONDS:
+                            still_pending = True
+                        if still_pending:
+                            logger.info(f"⏳ {ex_name} {symbol} 开仓挂单未成交，跳过孤儿仓对账（不误记强平，下轮按新价重挂）")
+                            self.spread_positions[ex_name].pop(symbol, None)
+                            try:
+                                conn = get_connection(self.config.data.db_path)
+                                c = conn.cursor()
+                                c.execute("DELETE FROM spread_positions WHERE ex_name=? AND symbol=?", (ex_name, symbol))
+                                conn.commit(); conn.close()
+                            except Exception:
+                                pass
+                            continue
                         pos = self.spread_positions[ex_name].pop(symbol)
                         logger.warning(f"🧹 孤儿仓清理: {ex_name} {symbol} DB有仓但交易所无仓（可能已强平/被切），已移除DB记录。原仓 {pos.get('position_size', 0):.2f}U {pos.get('side')}")
+                        # 2026-09-21 修复：被强平的仓位从未入账 → 引擎账面永远正收益、
+                        # consecutive_losses 永远 0、熔断永不触发、平台亏光还蒙在鼓里（THX/Gate 爆仓根因）。
+                        # 保守按「亏损 = 全部保证金」计入，触发风控。
+                        liq_loss = -abs(pos.get('position_size', 0))
+                        try:
+                            if liq_loss < 0:
+                                self.risk_manager.record_trade(liq_loss, is_win=False)
+                                logger.error(f"💥 {ex_name} {symbol} 强平/意外平仓入账: 亏损≈{liq_loss:.2f}U → 连亏计数+1")
+                                if liq_loss >= self.risk_manager.equity * self.risk_manager.MAX_STOP_LOSS_PCT * 5:
+                                    # 单笔爆仓级别（保证金全没）→ 立即熔断
+                                    self.risk_manager.is_suspended = True
+                                    self.risk_manager.suspension_reason = f'{ex_name} {symbol} 强平爆仓 {liq_loss:.2f}U'
+                                    self.risk_manager.save_state()
+                                    logger.error(f"⛔ {ex_name} {symbol} 大额强平 → 风控熔断")
+                        except Exception as e3:
+                            logger.error(f"强平记账失败: {e3}")
                         try:
                             conn = get_connection(self.config.data.db_path)
                             c = conn.cursor()
                             c.execute("DELETE FROM spread_positions WHERE ex_name=? AND symbol=?", (ex_name, symbol))
+                            # 同步记一笔强平交易到 engine_trades（真实发生、真实亏损）
+                            c.execute(
+                                "INSERT INTO engine_trades (timestamp, mode, exchange, symbol, side, price, amount, "
+                                "cost, fee, pnl, pnl_pct, status, position_id) VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (int(time.time()), ex_name, symbol,
+                                 'liq_close' if pos.get('side') == 'buy' else 'liq_close_short',
+                                 pos.get('entry_price', 0), pos.get('amount', 0),
+                                 pos.get('position_size', 0), 0.0,
+                                 liq_loss,
+                                 -1.0,
+                                 'completed', 'liquidation')
+                            )
                             conn.commit()
                             conn.close()
                         except Exception as e2:
-                            logger.debug(f"删除孤儿仓DB记录失败: {e2}")
+                            logger.error(f"删除孤儿仓DB记录失败: {e2}")
             except Exception as e:
                 logger.debug(f"{ex_name} 持仓对账失败: {e}")
     
@@ -422,12 +491,22 @@ class ExecutionEngine:
                     # 否则盈利单卡死不平、亏损单无人管，还出现「暂停8小时无人发现」的孤儿仓。
                     logger.warning(f"⛔ 风控暂停中(仅停开新仓，持仓管理继续): {self.risk_manager.suspension_reason}")
                     # 自动恢复：暂停满 30 分钟自动解除（不是无限期卡死）
+                    # 2026-09-27 D升级（中华拍板）：恢复条件加价差门槛——到期后先看最近亏损币
+                    # 当前价差是否仍超开仓门槛，仍超说明行情没好，延长15min（最多5次），
+                    # 防止暂停一醒又连环开仓（9-22 实锤：暂停30秒即恢复又连亏）。
                     if time.time() - getattr(self.risk_manager, 'suspended_at', 0) >= 1800:
-                        self.risk_manager.is_suspended = False
-                        self.risk_manager.consecutive_losses = 0
-                        self.risk_manager.suspension_reason = ''
-                        self.risk_manager.save_state()
-                        logger.info('🔓 风控暂停30分钟到期，自动恢复开仓')
+                        _ext = getattr(self, '_pause_extension_count', 0)
+                        if _ext < 5 and self._risk_pause_spread_still_hot():
+                            self.risk_manager.suspended_at = time.time() - (1800 - 900)  # 再等15min
+                            self._pause_extension_count = _ext + 1
+                            logger.warning(f"⏸️ 风控暂停延长: 最近亏损币价差仍超门槛，再等15min（第{self._pause_extension_count}/5次）")
+                        else:
+                            self.risk_manager.is_suspended = False
+                            self.risk_manager.consecutive_losses = 0
+                            self.risk_manager.suspension_reason = ''
+                            self._pause_extension_count = 0
+                            self.risk_manager.save_state()
+                            logger.info('🔓 风控暂停30分钟到期，自动恢复开仓')
 
                 # 定期刷新余额
                 self.risk_manager.refresh_balance()
@@ -483,13 +562,32 @@ class ExecutionEngine:
 
                     mid_spot = (spot_bid + spot_ask) / 2
                     mid_perp = (perp_bid + perp_ask) / 2
+
+                    # 2026-09-23 修复（中华指出 Gate 频繁开平亏手续费）：
+                    # 旧用 mid 价算 signed_spread → 假贴水（流动性差币 bid/ask spread 本身就>0.15%），
+                    # 开仓按 ask 成交 → 进场即浮亏超过硬止损线 → 2秒后被硬平，每单白送双边手续费。
+                    # 修复：按真实成交方向算价差——开多腿要吃永续 ask（相对现货 bid），开空腿要吃永续 bid（相对现货 ask）。
+                    real_spread_buy = (perp_ask - spot_bid) / spot_bid    # 开多腿的真实价差
+                    real_spread_sell = (perp_bid - spot_ask) / spot_ask   # 开空腿的真实价差
+                    # 保留 mid 价用于日志与平仓逻辑
                     signed_spread = (mid_perp - mid_spot) / mid_spot
 
                     min_required = self.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT
-                    if abs(signed_spread) < min_required:
+                    # 2026-09-27 A升级（中华拍板）：开仓门槛动态化——加「永续自身买卖点差」项。
+                    # 根因实锤（9-23 22:33 TIA单）：TIA永续自身点差0.39%+手续费0.16%=真实成本0.55%，
+                    # 旧门槛只算0.17%，+0.29%价差被放行→开仓即浮亏→2秒硬止损白送手续费。
+                    # 动态门槛 = 0.16%成本 + 0.01%净利 + 该币永续实时自身点差。
+                    perp_self_spread = (perp_ask - perp_bid) / mid_perp if mid_perp > 0 else 0
+                    dynamic_min_required = min_required + max(perp_self_spread, 0)
+                    # 判定门槛必须用真实成交价（吃单方），不许再用 mid 价——这是假价差根源
+                    if real_spread_sell >= dynamic_min_required:
+                        main_perp_side = 'sell'
+                        signed_spread = real_spread_sell
+                    elif real_spread_buy <= -dynamic_min_required:
+                        main_perp_side = 'buy'
+                        signed_spread = real_spread_buy
+                    else:
                         continue
-
-                    main_perp_side = 'sell' if signed_spread > 0 else 'buy'
 
                     # 2026-09-12：取消非黄金时段1.5x加严，全时段统一门槛
                     # 价差 > 双边成本0.16% + 净利0.01% = 0.17% 时任何时候都赚，时段不再挡下单
@@ -507,6 +605,15 @@ class ExecutionEngine:
                     # 连环止损）。查该币最近一条「止损」交易的时间戳。
                     if self._in_stop_loss_cooldown(ex_name, symbol):
                         logger.info(f"❄️ {ex_name} {symbol}: 止损冷却中(30min)，跳过")
+                        continue
+
+                    # === 2026-09-27 F升级（碎单熔断，中华拍板）===
+                    # 30min内同所同币碎单(<60s开平)≥3笔 → 该币拉黑24h，
+                    # 根治"浅价差连环碎单白送手续费"（7天22笔<60s碎单实锤）
+                    _frag_ex = f"{ex_name}:{symbol}"
+                    _frag_exp = getattr(self, '_frag_blacklist', {}).get(_frag_ex, 0)
+                    if time.time() < _frag_exp:
+                        logger.info(f"🚫 {ex_name} {symbol}: 碎单熔断中(24h)，跳过至{time.strftime('%H:%M', time.localtime(_frag_exp))}")
                         continue
 
                     self._open_spread_position(ex_name, spot_exchange, perp_exchange, symbol,
@@ -543,6 +650,68 @@ class ExecutionEngine:
         except Exception as e:
             logger.debug(f"{symbol} 趋势过滤查询失败(放行): {e}")
             return True
+
+    def _risk_pause_spread_still_hot(self) -> bool:
+        """2026-09-27 D升级：查最近一条亏损平仓的币，当前价差是否仍超动态门槛。
+        仍热（价差≥门槛）→ 建议延长暂停；不热/查不到 → 正常恢复。"""
+        try:
+            conn = get_connection(self.config.data.db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT exchange, symbol FROM engine_trades "
+                        "WHERE mode='live' AND pnl < 0 AND pnl IS NOT NULL "
+                        "ORDER BY timestamp DESC LIMIT 1")
+            row = cur.fetchone()
+            conn.close()
+            if not row:
+                return False
+            ex_name, symbol = row[0], row[1]
+            if ex_name not in self.perp_exchanges:
+                return False
+            spot_exchange = self.exchanges.get(ex_name)
+            perp_exchange = self.perp_exchanges.get(ex_name)
+            if not spot_exchange or not perp_exchange:
+                return False
+            spot_ticker = spot_exchange.fetch_ticker(symbol)
+            base = symbol.split('/')[0]
+            perp_ticker = perp_exchange.fetch_ticker(f"{base}/USDT:USDT")
+            if not spot_ticker or not perp_ticker:
+                return False
+            s_bid = spot_ticker.get('bid') or spot_ticker.get('last') or 0
+            s_ask = spot_ticker.get('ask') or s_bid
+            p_bid = perp_ticker.get('bid') or 0
+            p_ask = perp_ticker.get('ask') or p_bid
+            mid_perp = (p_bid + p_ask) / 2
+            if not all([s_bid, p_bid]) or mid_perp <= 0:
+                return False
+            min_required = self.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT
+            perp_self_spread = (p_ask - p_bid) / mid_perp
+            dynamic_min_required = min_required + max(perp_self_spread, 0)
+            real_spread_sell = (p_bid - s_ask) / s_ask if s_ask else 0
+            real_spread_buy = (p_ask - s_bid) / s_bid
+            hot = (real_spread_sell >= dynamic_min_required) or (real_spread_buy <= -dynamic_min_required)
+            if hot:
+                logger.info(f"🔥 {ex_name} {symbol} 现价差仍热: sell={real_spread_sell*100:+.3f}% buy={real_spread_buy*100:+.3f}% ≥ 门槛{dynamic_min_required*100:.3f}%")
+            return hot
+        except Exception as e:
+            logger.debug(f"暂停延长检查失败(按不热处理): {e}")
+            return False
+
+    def _maybe_frag_breaker(self, ex_name, symbol, age_sec, net_pct):
+        """2026-09-27 F升级：碎单熔断判定。平仓持仓<60s且亏损 → 记一笔碎单事件；
+        30min内同所同币≥3笔碎单 → 拉黑24h。"""
+        if age_sec < 60 and net_pct < 0:
+            now = time.time()
+            events = getattr(self, '_frag_events', None)
+            if events is None:
+                events = defaultdict(list)
+                self._frag_events = events
+            key = f"{ex_name}:{symbol}"
+            events[key].append(now)
+            events[key] = [t for t in events[key] if now - t < 1800]
+            if len(events[key]) >= 3:
+                self._frag_blacklist = getattr(self, '_frag_blacklist', {})
+                self._frag_blacklist[key] = now + 86400
+                logger.warning(f"💥 碎单熔断: {ex_name} {symbol} 30min内{len(events[key])}笔碎单(<60s) → 拉黑24h")
 
     def _in_stop_loss_cooldown(self, ex_name, symbol):
         """止损冷却：同一交易所+币种最近 30 分钟内有「硬止损/超时止损」平仓的，禁止再开。
@@ -598,13 +767,16 @@ class ExecutionEngine:
         # 仓位基准 = 该交易所永续账户余额（不爆仓），但至少要够交易所最小订单才能成交
         position_size = perp_bal * self.risk_manager.MAX_POSITION_PCT
         
-        # 亏损币种降仓50% —— 2026-09-12 注释停用：WIF/ATOM/TIA/FET 被误标为亏损币，
-        # 每单被砍到余额10%，资金利用率减半，与"19U本金滚10U/天"目标冲突。
-        # 等实盘pnl记账修复后，用真实数据重新评估名单。当前停用降仓。
-        # base = symbol.split('/')[0]
-        # if base in UNDERPERFORMER_SYMBOLS:
-        #     position_size *= UNDERPERFORMER_POSITION_SCALE
-        #     logger.info(f"📉 {ex_name} {symbol}: 亏损币种仓位降{UNDERPERFORMER_POSITION_SCALE*100:.0f}% → {position_size:.2f}U")
+        # 亏损币种降仓50% —— 2026-09-21 恢复启用，名单按最新回测重定
+        # (ONDO/LINK/FET/DOGE 垫底币减半；TIA 已移出名单，恢复满仓)
+        base = symbol.split('/')[0]
+        # 2026-09-27 B升级（大单模式参数化）：深价差（≥DEEP_SPREAD_THRESHOLD）= 大单模式，
+        # 即使亏损币种也给满仓（9-22 TIA +0.25U大单即此类）；浅价差才降仓。
+        if base in UNDERPERFORMER_SYMBOLS and abs(signed_spread) < DEEP_SPREAD_THRESHOLD:
+            position_size *= UNDERPERFORMER_POSITION_SCALE
+            logger.info(f"📉 {ex_name} {symbol}: 亏损币种浅价差仓位降{UNDERPERFORMER_POSITION_SCALE*100:.0f}% → {position_size:.2f}U")
+        elif base in UNDERPERFORMER_SYMBOLS:
+            logger.info(f"🚀 {ex_name} {symbol}: 深价差{abs(signed_spread)*100:.2f}%≥{DEEP_SPREAD_THRESHOLD*100:.1f}% → 大单模式，亏损币种免降仓满仓{position_size:.2f}U")
         
         perp_side = main_perp_side
 
@@ -625,6 +797,58 @@ class ExecutionEngine:
             # 仓位买不起该币 1 个最低下单单位（高价币），自动跳过，不反复报错
             logger.info(f"⚠️ {ex_name} {symbol}: 下单量{amount:.4f} < 最小{amount_min}，高价币仓位不足，跳过")
             return
+
+        # === 2026-09-22 fix23：保证金+下单量兜底（gate PEPE 反复撞墙的根治版）===
+        # 根因：gate 永续 1张=contractSize 枚币，PEPE 1张名义≈50U、保证金≈5U；
+        # TIA 1张≈0.45U、保证金≈0.045U；DOGE 1张≈1U、保证金≈0.1U。
+        # 之前 fix22 只兜"最低量"，没兜"实际下单量 amount"，导致 amount=position_size/mid 可能 <1 张被拒
+        # （gate 最小下单=1张，但 PEPE 的 position_size/mid 远小于1张，被 INVALID_PARAM_VALUE 拒）。
+        # 修复：①实际下单量 amount 必须 ≥1张(即 ≥amount_min，gate 的 amount_min=1.0 张)
+        #      ②amount×mid 的名义价值 ×10% 保证金率 > 永续余额 → 跳过
+        #      ③amount > 平台 max(通常120000张) → 截断到 max
+        try:
+            contract_size = market.get('contractSize') if market else None
+            cs = float(contract_size) if contract_size and contract_size > 0 else 1.0
+            # 2026-09-23 修复HTX bug：不同交易所 amount_min 单位不同。
+            # Gate: 永续 amount 单位是"张"，1张=cs 币，amount_min=1.0 张
+            # HTX: 永续 amount 单位是"币"本身（ccxt 标准化），amount_min=最小币数
+            # 旧代码 max(amount_min,1.0) 把 HTX 的 amount_min=100(币) 当 1 张算 → 0.83 < 1.0 全部跳过，HTX 永远开不了仓。
+            # 现在按交易所区分真实最小单位。
+            if ex_name == 'gate':
+                min_amount = max(amount_min, 1.0)  # Gate 最小1张
+                perp_unit_name = '张'
+                # Gate: 1张名义 = cs × mid_price
+                one_unit_notional = mid_perp * cs
+            else:
+                # HTX/Bitget: amount_min 就是最小币数
+                min_amount = max(amount_min, 0.0)
+                perp_unit_name = '币'
+                one_unit_notional = mid_perp * max(amount_min, 1.0) if amount_min else mid_perp
+            max_amount = (market.get('limits', {}).get('amount', {}).get('max') or 0)
+            # 实际下单量换算成该交易所最小单位
+            if ex_name == 'gate':
+                amount_unit = position_size / (mid_perp * cs) if (mid_perp > 0 and cs > 0) else 0
+            else:
+                amount_unit = position_size / mid_perp if mid_perp > 0 else 0
+            if amount_unit < min_amount:
+                # 连最小单位都买不起
+                one_min_margin = one_unit_notional * 0.20  # 仓位=20%，20x杠杆下保证金=名义/20
+                if one_min_margin > perp_bal:
+                    logger.info(f"⚠️ {ex_name} {symbol}: 最小单位需保证金≈{one_min_margin:.4f}U > 永续余额{perp_bal:.2f}U，跳过")
+                    return
+                logger.info(f"⚠️ {ex_name} {symbol}: 仓位{position_size:.2f}U < 最小{perp_unit_name}量({min_amount})，跳过")
+                return
+            # 正常路径：截断到 max（按当前交易所单位）
+            if max_amount and amount_unit > max_amount:
+                amount_unit = max_amount
+            amount = amount_unit
+            # 反向同步 position_size 与名义金额
+            if ex_name == 'gate':
+                position_size = amount_unit * mid_perp * cs  # 张×面值×价
+            else:
+                position_size = amount_unit * mid_perp       # 币×价
+        except Exception:
+            pass
 
         # === 2026-09-14 中华复盘防线（上次爆仓根因：每笔都开20%，把该平台永续用100%，强平爆仓）===
         # 铁律（中华 2026-09-14 定稿，按【本平台】算，不跨平台总算）：
@@ -695,20 +919,41 @@ class ExecutionEngine:
             return
 
         try:
-            perp_params = {}
+            # === 2026-09-26 新策略v5.1：开仓改限价单(maker)，在目标价挂单等成交 ===
+            # 市价单=taker 0.05%+吃半个点差+滑点≈单边0.09-0.11%，是14天85对负期望的根因。
+            # 限价单：多腿挂在 min(perp_ask, 现货bid×(1+目标价差)) 之下不会成交不到——
+            # 直接挂 perp_ask 一档下方一个 tick：既能立刻吃到对方报价(成交=maker或深档taker)，
+            # 又比市价单省滑点。gate postOnly 保证 maker 费率；不成交45s撤单下轮重挂。
+            limit_price = perp_ask if perp_side == 'buy' else perp_bid
+            perp_params = {'postOnly': True}
             perp_order = perp_exchange.create_order(
                 symbol=perp_symbol,
-                type='market',
+                type='limit',
                 side=perp_side,
                 amount=amount,
+                price=limit_price,
                 params=perp_params,
             )
-            logger.info(f"✅ {ex_name} {symbol} 永续{'开空' if perp_side=='sell' else '开多'}@{mid_perp:.4f} 数量={amount:.4f} 仓位={position_size:.2f}U 价差={signed_spread*100:+.4f}%")
+            logger.info(f"✅ {ex_name} {symbol} 永续限价{'开空' if perp_side=='sell' else '开多'}挂单@{limit_price:.4f} 数量={amount:.4f} 仓位={position_size:.2f}U 价差={signed_spread*100:+.4f}%")
         except Exception as e:
-            perp_err = str(e)[:200]
-            logger.error(f"❌ {ex_name} {symbol} 永续{perp_side}下单失败: {perp_err}")
-            self._record_signal(ex_name, symbol, perp_side, abs(signed_spread) - self.BI_SIDE_COST, position_size, failed=True, errors=f"perp:{perp_err}")
-            return
+            # postOnly 被拒（价已越过对方档口=会吃单）→ 降级市价单并如实标注 taker
+            perp_err = str(e)[:120]
+            logger.warning(f"⚠️ {ex_name} {symbol} 限价挂单被拒({perp_err})，降级市价单(taker)")
+            try:
+                perp_params = {}
+                perp_order = perp_exchange.create_order(
+                    symbol=perp_symbol,
+                    type='market',
+                    side=perp_side,
+                    amount=amount,
+                    params=perp_params,
+                )
+                logger.info(f"✅ {ex_name} {symbol} 永续市价{'开空' if perp_side=='sell' else '开多'}@{mid_perp:.4f} 数量={amount:.4f} 仓位={position_size:.2f}U 价差={signed_spread*100:+.4f}%")
+            except Exception as e2:
+                perp_err = str(e2)[:200]
+                logger.error(f"❌ {ex_name} {symbol} 永续{perp_side}下单失败: {perp_err}")
+                self._record_signal(ex_name, symbol, perp_side, abs(signed_spread) - self.BI_SIDE_COST, position_size, failed=True, errors=f"perp:{perp_err}")
+                return
 
         self.spread_positions[ex_name][symbol] = {
             'perp_symbol': perp_symbol,
@@ -718,6 +963,19 @@ class ExecutionEngine:
             'entry_price': mid_perp,
             'entry_signed_spread': signed_spread,
             'entry_time': time.time(),
+            # 2026-09-26 新策略v5.1：开仓单ID（限价挂单需盯成交；45s未成交撤单重挂）
+            'entry_order_id': perp_order.get('id') if isinstance(perp_order, dict) else None,
+            'order_type': 'limit' if (isinstance(perp_order, dict) and perp_order.get('type') == 'limit' or isinstance(perp_order, dict) and perp_order.get('postOnly')) else 'market',
+            # 2026-09-24 修复秒开平（中华报"频繁交易亏手续费"）：
+            # ①进场基准价 = 市价单真实吃单方价（sell 成交在 bid、buy 成交在 ask）。
+            #   旧版 entry_price 只存 mid，pnl 评估自带 -半个点差的幻影亏损，
+            #   ONDO 点差大的直接 -0.99%/-2% 秒触硬止损（24h 实证多笔 2 秒单）。
+            'entry_exec_price': (perp_order.get('average') or perp_order.get('price')
+                                 or (perp_bid if perp_side == 'sell' else perp_ask)),
+            # ②开仓冷静期：止损/止盈检查延后 SPREAD_ENTRY_CALM_SECONDS（60s），
+            #   等瞬态价差尖峰衰减——0.17% 门槛抓到的多是尖峰，开仓几秒即"回归"止盈，
+            #   2-5 秒开平每轮白送双边手续费。
+            'calm_until': time.time() + SPREAD_ENTRY_CALM_SECONDS,
             'close_params': dict(perp_params),
         }
 
@@ -765,38 +1023,90 @@ class ExecutionEngine:
                 if not perp_ticker or not spot_ticker:
                     continue
 
-                perp_mid = (perp_ticker.get('bid', 0) + perp_ticker.get('ask', 0)) / 2
-                spot_mid = (spot_ticker.get('bid', 0) + spot_ticker.get('ask', 0)) / 2
-                if perp_mid <= 0 or spot_mid <= 0:
+                # 2026-09-23 修复（中华三问指出乱开乱平）：
+                # 旧版：开仓用 real_spread（吃单方 ask/bid），平仓用 cur_spread（mid 价）——
+                # 两套不同单位，开仓瞬间 cur_spread 已经比 entry_spread 乱跳 0.1%，
+                # 导致 spread_shrinking/converged 误判、立即触发 hard_stop / take_profit
+                # 每单白送双边手续费 0.16%。
+                # 修复：开仓、持仓、平仓全部统一用「吃单方 spread」（真正影响盈亏的价格）。
+                perp_bid = perp_ticker.get('bid', 0)
+                perp_ask = perp_ticker.get('ask', 0)
+                spot_bid = spot_ticker.get('bid', 0)
+                spot_ask = spot_ticker.get('ask', 0)
+                if not all([perp_bid, perp_ask, spot_bid, spot_ask]):
                     continue
-
-                cur_spread = (perp_mid - spot_mid) / spot_mid
-                age = time.time() - pos['entry_time']
+                # 平仓腿：多单卖出走 perp_bid（相对 spot_ask），空单买入走 perp_ask（相对 spot_bid）
                 side = pos['side']
-
-                # 2026-09-13 分档平仓逻辑（利润最大化 + 风险最小化）：
-                # 核心思路：止盈不是固定线，要看「价差方向」——
-                #   价差还在扩大（没回归迹象）→ 不平，让利润跑（50x下价差多回归0.1%=净利多0.10%）
-                #   价差开始回归（缩小）→ 立刻平，落袋
-                #   到90分钟还没回归 → 无条件超时切掉（防套牢）
-                #   浮亏≥0.4% → 硬止损立即平（风险最小化）
+                age = time.time() - pos['entry_time']
                 entry_price = pos['entry_price']
+                # 2026-09-24：pnl 用进场真实成交价（市价单成交在吃单方价，mid 是幻觉基准）；
+                # 旧仓无 entry_exec_price 时回退按方向推吃单方价
+                exec_price = pos.get('entry_exec_price') or entry_price
                 if side == 'sell':
-                    pnl_pct = (entry_price - perp_mid) / entry_price if entry_price > 0 else 0
+                    # 空单：开仓走 perp_bid（卖），平仓走 perp_ask（买），盈亏用 ask
+                    pnl_pct = (exec_price - perp_ask) / exec_price if exec_price > 0 else 0
                 else:
-                    pnl_pct = (perp_mid - entry_price) / entry_price if entry_price > 0 else 0
+                    # 多单：开仓走 perp_ask（买），平仓走 perp_bid（卖），盈亏用 bid
+                    pnl_pct = (perp_bid - exec_price) / exec_price if exec_price > 0 else 0
+                # cur_spread 也改用与开仓同口径（吃单方 real_spread）
+                cur_spread = (perp_bid - spot_ask) / spot_ask if side == 'sell' else (perp_ask - spot_bid) / spot_bid
                 net = pnl_pct - self.BI_SIDE_COST
 
-                # 价差方向判断：空单（赌升水回归）价差在缩小=回归中；多单（赌贴水回归）价差在增大=回归中
+                # 价差方向判断：side='sell'（高位空，赌回落至 0 或负）→ cur<entry 是回归
+                #               side='buy' （低位多，赌涨回 0 或正）→ cur>entry 是回归
                 entry_spread = pos.get('entry_signed_spread', 0)
                 spread_shrinking = (side == 'sell' and cur_spread < entry_spread) or \
                                    (side == 'buy' and cur_spread > entry_spread)
 
+                # 价差彻底越过均衡线（0）才算"深度回归"，多单回到正值区、空单回到负值区
                 converged = (side == 'sell' and cur_spread <= SPREAD_CLOSE_THRESHOLD) or \
                             (side == 'buy' and cur_spread >= -SPREAD_CLOSE_THRESHOLD)
                 timed_out = age >= SPREAD_POSITION_TIMEOUT
 
+                # 2026-09-24 开仓冷静期（中华报"频繁交易亏手续费"）：
+                # 开仓后 SPREAD_ENTRY_CALM_SECONDS 秒内跳过硬止损/追踪止盈/止盈，
+                # 只保留真超时判断（不可能触发）——等瞬态价差尖峰衰减再开始评估。
+                # 根因：0.17% 门槛抓到的多是尖峰，开仓几秒后尖峰衰减 → spread_shrinking
+                # 止盈立即触发 → 2-5 秒开平，每轮白送双边手续费（24h 实证 14 对多数 2-5 秒）。
+                # 注意：硬止损在冷静期内也跳过——进场幻影亏损已由 entry_exec_price 修复，
+                # 冷静期内的 -0.15% 只剩真实噪声，宁可给它 60s 也不白送双边手续费。
+                calm_until = pos.get('calm_until', 0)
+                # 2026-09-26 新策略v5.1：限价开仓单45s未成交 → 撤单下轮按新价重挂（不追价不补刀）。
+                # 挂单等成交期间价差可能已消失，硬扛到成交=违背新策略初衷（maker等好价）。
+                if pos.get('order_type') == 'limit' and pos.get('entry_order_id') and age >= self.LIMIT_ORDER_WAIT_SECONDS:
+                    try:
+                        o = perp_exchange.fetch_order(pos['entry_order_id'], pos['perp_symbol'])
+                        if o and o.get('status') == 'open':
+                            perp_exchange.cancel_order(pos['entry_order_id'], pos['perp_symbol'])
+                            del ex_positions[symbol]
+                            logger.info(f"🧹 {ex_name} {symbol} 限价开仓单45s未成交，已撤单（下轮按新价重挂）")
+                            try:
+                                conn = get_connection(self.config.data.db_path)
+                                c = conn.cursor()
+                                c.execute("DELETE FROM spread_positions WHERE ex_name=? AND symbol=?", (ex_name, symbol))
+                                conn.commit(); conn.close()
+                            except Exception:
+                                pass
+                            continue
+                        # 已成交(closed) → 转正常持仓管理，落下去
+                    except Exception as e3:
+                        logger.debug(f"{ex_name} {symbol} 限价单状态查询失败(按成交处理): {e3}")
+                if time.time() < calm_until and not timed_out:
+                    continue
+
                 hard_stop = pnl_pct <= -SINGLE_SIDE_STOP_LOSS_PCT
+                # 2026-09-22 A方案(中华选定)：追踪止盈——浮盈 ≥1% 后，回撤吃掉一半浮盈即落袋
+                # 例：TIA 浮盈37%，回撤到18.5%就平仓锁利，不再眼看利润归零
+                if not hard_stop and pnl_pct >= 0.01:
+                    trail_peak = pos.get('trail_peak', pnl_pct)
+                    if pnl_pct > trail_peak:
+                        trail_peak = pnl_pct
+                        pos['trail_peak'] = trail_peak  # 记录历史最高浮盈
+                    # 2026-09-27 B升级：追踪止盈比例 0.5→TRAILING_HOLD_RATIO(0.6)，
+                    # 多锁10%浮盈（大单利润最大化），仍防利润全回吐
+                    if pnl_pct <= trail_peak * TRAILING_HOLD_RATIO:
+                        hard_stop = True
+                        logger.info(f"🔒 {ex_name} {symbol} 追踪止盈: 峰值浮盈{trail_peak*100:+.2f}% 回撤至{pnl_pct*100:+.2f}% → 锁定一半利润平仓")
                 # 2026-09-18 修复：MIN_NET_PROFIT_PCT 在 RiskManager 类上，不在 ExecutionEngine，
                 # 旧写法 self.MIN_NET_PROFIT_PCT 抛 AttributeError 被 except 静默吞掉 →
                 # 止盈/止损/超时平仓全部瘫痪（ONDO 浮亏无人砍 4 天的直接根因）
@@ -848,10 +1158,13 @@ class ExecutionEngine:
                 if ok:
                     del ex_positions[symbol]
                     logger.info(f"✅ {ex_name} {symbol} 价差套利平仓完成: 净利≈{net*100:+.4f}%")
-                    self._record_trade(ex_name, symbol, close_side, perp_mid, pos['amount'],
+                    # 记账价用平仓腿真实成交价（与 pnl_pct 同口径）
+                    close_px = perp_ask if side == 'sell' else perp_bid
+                    self._record_trade(ex_name, symbol, close_side, close_px, pos['amount'],
                                        pos['position_size'], net, failed=False)
+                    self._maybe_frag_breaker(ex_name, symbol, age, net)
                     self.risk_manager.record_trade(net * pos['position_size'], is_win=(net > 0))
-                    _notify_close(ex_name, symbol, side, perp_mid, pos['amount'],
+                    _notify_close(ex_name, symbol, side, close_px, pos['amount'],
                                   pos['position_size'], net, reason)
                     # 从DB删除已平仓的持仓
                     try:
