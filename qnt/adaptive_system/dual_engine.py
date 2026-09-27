@@ -335,7 +335,7 @@ class BacktestEngine:
                 if check_count % 100 == 0 and not self._check_memory_guard():
                     time.sleep(30)
                     continue
-                time.sleep(0.05 if self.last_processed_ts < time.time() - 600 else 0.05)
+                time.sleep(0.05)
 
             except Exception as e:
                 logger.error(f"realtime backtest error: {e}")
