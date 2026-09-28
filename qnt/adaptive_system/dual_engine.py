@@ -16,7 +16,7 @@ import ccxt
 
 from .config import SystemConfig
 from .risk_manager import RiskManager
-from .execution_engine import ExecutionEngine, MIN_COIN_AMOUNT
+from .execution_engine import ExecutionEngine, MIN_COIN_AMOUNT, SPIKE_THRESHOLD, MAKER_FEE_BI, STRUCTURE_DISCOUNT_LIMIT, STRUCTURE_PREMIUM_LIMIT
 
 # 各交易所永续合约最小金额限制
 PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}
@@ -363,7 +363,7 @@ class BacktestEngine:
         mid_perp = (perp_ask + perp_bid) / 2 if perp_ask and perp_bid else 0
         if mid_perp > 0:
             perp_self_spread_pct = max((perp_ask - perp_bid) / mid_perp, 0) * 100
-        spike_min = max(min_spread + perp_self_spread_pct, ExecutionEngine.SPIKE_THRESHOLD * 100)
+        spike_min = max(min_spread + perp_self_spread_pct, SPIKE_THRESHOLD * 100)
         if abs(spread_pct) < spike_min:
             return
         # 尖峰分类器（与实盘同规则，读 market_data）
