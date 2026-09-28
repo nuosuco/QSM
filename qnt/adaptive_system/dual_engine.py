@@ -388,19 +388,6 @@ class BacktestEngine:
                 return  # 贴水结构禁开多（接刀）
             if open_side == 'sell' and mean_sp > STRUCTURE_PREMIUM_LIMIT:
                 return  # 升水结构禁开空
-            look7 = time.time() - SPIKE_LOOKBACK_DAYS * 86400
-            conn2 = sqlite3.connect(self.db_path)
-            spike_cnt = conn2.execute(
-                "SELECT COUNT(DISTINCT a.id) FROM market_data a "
-                "JOIN market_data b ON b.symbol=a.symbol AND b.exchange=a.exchange "
-                "AND b.timestamp > a.timestamp AND b.timestamp <= a.timestamp+600 "
-                "WHERE a.symbol=? AND a.exchange=? AND a.timestamp>? "
-                "AND a.spread_pct IS NOT NULL AND ABS(a.spread_pct)>=0.005 "
-                "AND b.spread_pct IS NOT NULL AND ABS(b.spread_pct)<0.0017",
-                (symbol, exchange, look7)).fetchone()[0]
-            conn2.close()
-            if spike_cnt < 3:
-                return  # 尖峰回归记录<3次，不进
         except Exception:
             return
         open_side = 'buy' if spread_pct > 0 else 'sell'

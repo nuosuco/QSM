@@ -685,16 +685,18 @@ class ExecutionEngine:
                 "SELECT AVG(spread_pct), COUNT(*) FROM market_data "
                 "WHERE symbol=? AND exchange=? AND timestamp>? AND spread_pct IS NOT NULL AND ABS(spread_pct)<1.0",
                 (symbol, ex_name, look14)).fetchone()
-            mean_sp, cnt = row
-            conn.close()
             if not cnt or cnt < 100:
+                conn.close()
                 return False, "样本不足"
             if mean_sp < -STRUCTURE_DISCOUNT_LIMIT:
+                conn.close()
                 return False, f"结构性贴水{mean_sp*100:.2f}%，禁止开多(接刀)"
             if mean_sp > STRUCTURE_PREMIUM_LIMIT:
+                conn.close()
                 return False, f"结构性升水{mean_sp*100:.2f}%，禁止开空"
             # 7天尖峰历史（2026-09-28口径修复）：tick A|spread|>=0.5% 且 600s内存在 tick B<0.17%
             # 旧bug：把"相邻两条>=0.5%的tick互查"当回归，40s一条tick下永远False→全拦
+            # 2026-09-28 修复：conn.close() 移到所有查询之后（旧代码先关库再查→"closed database"→全币被拦）
             look7 = time.time() - SPIKE_LOOKBACK_DAYS * 86400
             spike_cnt = cur.execute(
                 "SELECT COUNT(DISTINCT a.id) FROM market_data a "
@@ -704,12 +706,13 @@ class ExecutionEngine:
                 "AND a.spread_pct IS NOT NULL AND ABS(a.spread_pct)>=0.005 "
                 "AND b.spread_pct IS NOT NULL AND ABS(b.spread_pct)<0.0017",
                 (symbol, ex_name, look7)).fetchone()[0]
+            conn.close()
             if spike_cnt < 3:
                 return False, f"近7天尖峰回归记录{spike_cnt}次(<3)，不够稳"
             return True, f"ok(尖峰{spike_cnt}次)"
         except Exception as e:
             # 查询失败保守：不进（宁可错过，不接刀）
-            logger.debug(f"尖峰分类查询失败(按禁止处理): {e}")
+            logger.info(f"🧪 {ex_name} {symbol} 尖峰分类查询失败(按禁止处理): {e}")
             return False, f"分类查询失败: {e}"
 
     def _risk_pause_spread_still_hot(self) -> bool:
