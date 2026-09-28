@@ -48,7 +48,17 @@ def _set_cooldown(name: str, seconds: int):
 
 
 def _get_api_key(provider: dict) -> str:
-    """获取服务商的 API key（支持多 key 轮询）"""
+    """获取服务商的 API key（支持多 key 轮询 + 环境变量注入）
+    2026-08 中华规定：写 key 不能明文进 json，从环境变量读取：
+    agnes → AGNES_API_KEY, sensenova → SENSENOVA_API_KEY（由 openclaw 服务管理注入）
+    环境变量有值时优先用环境变量（单 key），json 里旧 key 作废。
+    """
+    import os
+    _env_map = {"agnes": "AGNES_API_KEY", "sensenova": "SENSENOVA_API_KEY"}
+    env_key = os.environ.get(_env_map.get(provider.get("name", ""), ""), "")
+    if env_key:
+        _round_robin[provider.get("name", "?")] = 0
+        return env_key
     keys = provider.get("api_keys") or []
     if keys:
         name = provider["name"]
@@ -74,13 +84,16 @@ def _get_providers_for(capability: str) -> list:
 
 def _call_openai(base_url: str, api_key: str, model: str, messages: list,
                  timeout: int = 15, temperature: float = 0.7,
-                 connect_timeout: int = 5) -> dict:
+                 connect_timeout: int = 5, auth_style: str = "bearer") -> dict:
     """调用 OpenAI 兼容接口，返回 {success, content, error, status_code}
     timeout: 读取超时（秒），connect_timeout: 连接超时（秒）
+    auth_style: "bearer"=Authorization: Bearer <key>（OpenAI 标准）
+                "raw" =Authorization: <key>（agnes / sensenova 实测不用 Bearer 前缀）
     """
     url = f"{base_url}/chat/completions"
+    auth_value = api_key if auth_style == "raw" else f"Bearer {api_key}"
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": auth_value,
         "Content-Type": "application/json",
     }
     payload = {
@@ -144,7 +157,8 @@ def chat(user_message: str, system_prompt: str = "", history: list = None,
         model = p["models"]["chat"]
         api_key = _get_api_key(p)
         result = _call_openai(p["base_url"], api_key, model, messages,
-                              timeout, temperature, connect_timeout)
+                              timeout, temperature, connect_timeout,
+                              auth_style=p.get("auth_style", "bearer"))
         if result["success"]:
             return {
                 "success": True,
@@ -254,7 +268,8 @@ def vision(user_message: str, image_url, system_prompt: str = "",
         model = p["models"]["vision"]
         api_key = _get_api_key(p)
         result = _call_openai(p["base_url"], api_key, model, messages,
-                              timeout, temperature, connect_timeout)
+                              timeout, temperature, connect_timeout,
+                              auth_style=p.get("auth_style", "bearer"))
         if result["success"]:
             return {
                 "success": True,
