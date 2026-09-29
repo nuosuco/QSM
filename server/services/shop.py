@@ -549,8 +549,8 @@ class ShopService:
     # ========== 京东联盟 ==========
 
     def _sign_jd(self, params: dict) -> str:
-        """京东联盟MD5签名（排除sign和sign_method参数）"""
-        filtered = {k: v for k, v in params.items() if k not in ('sign', 'sign_method')}
+        """京东联盟MD5签名（2026-09-29实测修正：sign_method须参与签名，仅排除sign）"""
+        filtered = {k: v for k, v in params.items() if k != 'sign'}
         sorted_params = sorted(filtered.items())
         sign_str = self.jd_config["app_secret"] + ''.join(f"{k}{v}" for k, v in sorted_params) + self.jd_config["app_secret"]
         return hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
