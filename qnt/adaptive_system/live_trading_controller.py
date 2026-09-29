@@ -71,6 +71,20 @@ class LiveTradingController:
             logger.info("   回测 + 模拟照常运行，实盘保持关闭")
             logger.info("=" * 60)
             return
+        # 2026-09-18 修复：启动时从DB恢复上次持久化的开关状态（旧版永远从False起步，
+        # 重启一次实盘开关就丢，要等 evaluate 跑完才重新判断）
+        try:
+            from .db_utils import get_connection as _gc
+            conn = _gc(self.db_path)
+            c = conn.cursor()
+            c.execute("SELECT value FROM risk_state WHERE key='live_enabled'")
+            r = c.fetchone()
+            conn.close()
+            if r and r[0] == '1':
+                self.is_live_enabled = True
+                logger.info("🔁 已从DB恢复实盘开关=ON（重启前已开启）")
+        except Exception as e:
+            logger.debug(f"恢复实盘开关状态失败: {e}")
 
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -188,6 +202,7 @@ class LiveTradingController:
                 except Exception as e:
                     logger.error(f"保存风控状态失败: {e}")
         self.is_live_enabled = True
+        self._persist()
         logger.info("=" * 60)
         logger.info("🟢 实盘交易已自动开启")
         logger.info(f"   模拟盘窗口满足开启条件，权益充足，平台正常，市场稳定")

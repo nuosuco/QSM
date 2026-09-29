@@ -130,9 +130,12 @@ class DataCollector:
     
     def _init_db(self):
         """初始化数据库（增加交易所字段，兼容旧表）"""
+        # 2026-09-18：走 get_connection（内部已单次设 WAL + busy_timeout），
+        # 不再手动重复 'PRAGMA journal_mode=WAL'——该语句需排他锁，多线程并发执行会互锁
+        # （"database is locked" 病根之一：RiskManager/LiveController/EvolutionManager 等
+        # 每次连接都执行 WAL，DataCollector 高频写库撞锁）
         self.conn = get_connection(self.db_path, check_same_thread=False)
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA busy_timeout=30000")
+        self.conn.row_factory = sqlite3.Row
         self.conn.row_factory = sqlite3.Row
         cursor = self.conn.cursor()
         

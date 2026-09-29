@@ -177,6 +177,11 @@ TRAILING_HOLD_RATIO = 0.6        # 追踪止盈：峰值浮盈回撤到60%即落
 # 精髓：价差大≠赚钱。尖峰型价差（瞬间拉开、快速回归）能赚；结构性贴水（现货长期低于永续）接刀必亏。
 SPIKE_THRESHOLD = 0.005          # 尖峰门槛：|价差|≥0.5% 才视为可交易事件（比旧的0.17%动态门槛更严）
 SPIKE_RECOVERY_BUCKETS = 2       # 尖峰判定：5min桶×2=10min内打回0.17%以内=真尖峰
+
+# 2026-09-29 双轨制（中华拍板方向2）：尖峰单保持0.5%不变；新增"慢回归单"——
+# 结构性价差≥0.17%且持续30min才开，抓稳定价差而非尖峰。
+SLOW_REGRESS_THRESHOLD = 0.0017     # 慢回归开仓门槛：0.17%（=旧动态门槛，BI_SIDE_COST+MIN_NET_PROFIT）
+SLOW_REGRESS_SUSTAIN_SECONDS = 1800  # 持续30min：该币同向价差≥门槛的最早tick要撑满30min才放行
 STRUCTURE_LOOKBACK_DAYS = 14     # 结构性判定回看窗口（14天market_data）
 STRUCTURE_DISCOUNT_LIMIT = 0.0010  # 全期均值 < -0.10% = 结构性贴水 → 禁止开多（多=赌贴水回归=接刀）
 STRUCTURE_PREMIUM_LIMIT = 0.0010   # 全期均值 > +0.10% = 结构性升水 → 禁止开空
@@ -589,21 +594,41 @@ class ExecutionEngine:
                     perp_self_spread = (perp_ask - perp_bid) / mid_perp if mid_perp > 0 else 0
                     spike_min_required = max(min_required + max(perp_self_spread, 0), SPIKE_THRESHOLD)
                     # 判定门槛必须用真实成交价（吃单方），不许再用 mid 价——这是假价差根源
+                    # 双轨制（2026-09-29）：先试尖峰轨（0.5%+尖峰分类器），再试慢回归轨（0.17%+持续30min）
+                    slow_min_required = max(min_required + max(perp_self_spread, 0), SLOW_REGRESS_THRESHOLD)
+                    entry_mode = None
                     if real_spread_sell >= spike_min_required:
                         main_perp_side = 'sell'
                         signed_spread = real_spread_sell
+                        entry_mode = 'spike'
                     elif real_spread_buy <= -spike_min_required:
                         main_perp_side = 'buy'
                         signed_spread = real_spread_buy
+                        entry_mode = 'spike'
+                    elif real_spread_sell >= slow_min_required:
+                        main_perp_side = 'sell'
+                        signed_spread = real_spread_sell
+                        entry_mode = 'slow'
+                    elif real_spread_buy <= -slow_min_required:
+                        main_perp_side = 'buy'
+                        signed_spread = real_spread_buy
+                        entry_mode = 'slow'
                     else:
                         continue
 
-                    # === 2026-09-28 尖峰分类器关卡（结构判断+尖峰历史）===
-                    # 结构性贴水→禁开多；结构性升水→禁开空；近7天无尖峰回归记录→不进
-                    _allowed, _why = self._classify_symbol_entry(ex_name, symbol)
-                    if not _allowed:
-                        logger.info(f"🧪 {ex_name} {symbol}: 尖峰分类拦截({_why})，跳过")
-                        continue
+                    # === 2026-09-29 双轨制关卡 ===
+                    # 尖峰轨：过尖峰分类器（结构判断+7天尖峰历史≥3次）
+                    # 慢回归轨：该币同向真实价差≥0.17%必须已持续30min（market_data 里该币该所
+                    #           同向 spread 首次达到 slow_min_required 的 tick 时间戳），抓稳定结构价差
+                    if entry_mode == 'spike':
+                        _allowed, _why = self._classify_symbol_entry(ex_name, symbol)
+                        if not _allowed:
+                            logger.info(f"🧪 {ex_name} {symbol}: 尖峰分类拦截({_why})，跳过")
+                            continue
+                    else:  # slow
+                        if not self._sustain_confirmed(ex_name, symbol, main_perp_side, slow_min_required):
+                            logger.info(f"🐢 {ex_name} {symbol}: 慢回归未持续30min({signed_spread*100:.3f}%)，暂不开")
+                            continue
 
                     # 2026-09-12：取消非黄金时段1.5x加严，全时段统一门槛
                     # 价差 > 双边成本0.16% + 净利0.01% = 0.17% 时任何时候都赚，时段不再挡下单
@@ -638,6 +663,34 @@ class ExecutionEngine:
 
                 except Exception as e:
                     logger.debug(f"{ex_name} {symbol} 扫描失败: {e}")
+
+    def _sustain_confirmed(self, ex_name, symbol, side, threshold):
+        """2026-09-29 双轨制慢回归关卡：该币同向真实价差≥门槛必须已持续 30min。
+        用 market_data 近似判定：该所该币的 spread 在连续 ≥ SLOW_REGRESS_SUSTAIN_SECONDS 的窗口内
+        始终达到同向门槛（sell: spread≥门槛; buy: spread≤-门槛）。不足30min不放行，防尖峰伪装成结构价差。
+        market_data 的 spread_pct 是 mid 口径，比真实成交价口径偏松；持续 30min 是硬条件，偏松不影响"必须持续"的判定。
+        """
+        try:
+            db = self.get_db()
+            cur = db.cursor()
+            now_ts = int(time.time())
+            sign_col = 1.0 if side == 'sell' else -1.0
+            # 窗口起点：now - 30min，要求窗口内每个 5min 桶的最小值都≥门槛（同向）
+            start_ts = now_ts - SLOW_REGRESS_SUSTAIN_SECONDS
+            sql = (
+                "SELECT COUNT(DISTINCT bucket) FROM ("
+                "  SELECT (timestamp/300) AS bucket, MIN(spread_pct*?) AS min_signed"
+                "  FROM market_data"
+                "  WHERE exchange=? AND symbol=? AND timestamp>? AND spread_pct IS NOT NULL"
+                "  GROUP BY (timestamp/300) HAVING MIN(spread_pct*?) >= ?"
+                ")"
+            )
+            row = cur.execute(sql, (sign_col, ex_name, symbol, start_ts, sign_col, sign_col * threshold)).fetchone()
+            need_buckets = SLOW_REGRESS_SUSTAIN_SECONDS // 300  # 30min / 5min = 6 个桶
+            return row is not None and row[0] >= need_buckets
+        except Exception as e:
+            logger.warning(f"🐢 {ex_name} {symbol} 慢回归持续性查询失败(按未持续处理): {e}")
+            return False
 
     def _trend_allows_entry(self, spot_exchange, symbol, main_perp_side):
         """趋势过滤器：开仓前确认该币不是单边行情（只赌震荡回归）。

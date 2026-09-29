@@ -37,3 +37,21 @@ web/uploads/
 
 # 临时
 /tmp/*
+# 密钥（绝不允许进仓库）
+server/.llm_keys
+server/llm_providers.json
+*.key
+*.env
+# 运行时数据库与日志
+data/trading_system/*.db
+data/trading_system/*.db-shm
+data/trading_system/*.db-wal
+qnt/*.db
+qnt/*.log*
+qnt/data/
+qnt/data/**
+data/trading_system/
+data/trading_system/**
+# 运行时报告（太大不进仓库，只进备份）
+qnt/evolution_reports/
+qnt/evolution_reports/**

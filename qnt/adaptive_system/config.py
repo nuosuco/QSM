@@ -100,7 +100,9 @@ class BacktestConfig:
 class LiveTradingConfig:
     """实盘自动开关配置"""
     enabled: bool = True
-    min_equity: float = 19.0  # 2026-09-13 中华定：临时19U开实盘（没钱充值），权益到30U后改回25.0
+    min_equity: float = 0.0  # 2026-09-26 中华定"开启新策略+开启实盘马上实践"：恢复0，新策略v5.1限价单版上线。
+    # 前一版停机用 999 硬闸（价差回归市价版=负期望）。现换限价单版(maker开仓0.02%+taker平仓0.05%+滑点0.02%=0.09%双边，
+    # 毛利中位0.07-0.14%>0.09%成本=期望转正)，实盘马上实践验证。回退停机=把这里改回999。
     paper_window_hours: int = 24
     min_paper_trades: int = 0
     min_paper_win_rate: float = 0.0

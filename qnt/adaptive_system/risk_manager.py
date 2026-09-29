@@ -25,7 +25,12 @@ class RiskManager:
     MAX_SINGLE_LOSS_PCT = 0.05     # 单笔最大亏损 ≤ 总资金 5%
     MAX_DAILY_LOSS_PCT = 0.10      # 单日最大亏损 ≤ 总资金 10%
     PROFIT_WITHDRAW_PCT = 0.50     # 盈利取出 50% 永不回流
-    MIN_NET_PROFIT_PCT = 0.0010   # 0.10% 净利门槛（2026-09-12 用户定稿：开仓门槛0.26%，只在有把握时交易，配合50x杠杆降低爆仓风险）
+    MIN_NET_PROFIT_PCT = 0.0015   # 0.15% 净利门槛（2026-09-25 中华定"还在亏手续费"后上调）：
+    # 数据结算（近7天54对，gate 实盘）：开仓门槛0.26%(=双边0.16%+净利0.10%)挡不住真实成本——
+    # |价差|<0.28% 的单子净期望 -0.146%/轮（必亏段），≥0.28% 剔除趋势大单后 +0.100%/轮。
+    # 真实双边成本 = taker 0.05%×2 + 滑点（小币 0.04-0.06%）≈ 0.14-0.16%，0.26% 门槛只剩 0.10-0.12% 毛利，
+    # 一遇噪声回撤就亏。门槛提到 0.31%（0.16%双边 + 0.15%净利）= 期望转正分界 0.28% + 安全边际。
+    # 注意：MIN_NET_PROFIT_PCT 同时用于平仓判断（net >= 此值才算达标止盈），提高后止盈也更保守。
     
     def __init__(self, db_path: str, paper_mode: bool = False, paper_balance: float = 1000.0, exchanges_config: Dict = None):
         self.db_path = db_path
