@@ -42,6 +42,22 @@ function initNavigation() {
             }
         });
     });
+    
+    // 2026-09-29 小蕊加：URL 路由支持（?tab=xxx 或 #xxx 进页自动切 tab）
+    // 服务号菜单点「有机好物」「我」等跳转 som.top?tab=products 时自动定位到对应页
+    try {
+        let targetTab = null;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('tab')) targetTab = params.get('tab');
+        if (!targetTab && window.location.hash.startsWith('#')) {
+            const h = window.location.hash.substring(1);
+            if (['chat','products','yangshenggu','health-test','profile'].includes(h)) targetTab = h;
+        }
+        if (targetTab) {
+            const targetBtn = document.querySelector('.nav-btn[data-tab="' + targetTab + '"]');
+            if (targetBtn) targetBtn.click();
+        }
+    } catch (e) { /* 静默失败，不影响默认聊天页 */ }
 }
 
 // ========== 对话功能 ==========
