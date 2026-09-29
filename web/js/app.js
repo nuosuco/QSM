@@ -7,6 +7,14 @@ const API_BASE = '';
 
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
+
+    // 2026-09-29 小蕊补回：微信菜单路径路由（被 13bc7d81 备份覆盖时丢失）
+    // 菜单跳转 som.top/products、/yangshenggu、/profile 时自动定位到对应 tab
+    var _path = window.location.pathname;
+    var _tabMap = {'/products': 'products', '/yangshenggu': 'yangshenggu', '/profile': 'profile'};
+    if (_tabMap[_path]) {
+        switchTab(_tabMap[_path]);
+    }
     initChat();
     initHealthTest();
     initProductSearch();
@@ -19,6 +27,32 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ========== 导航切换 ==========
+
+function switchTab(targetTab) {
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    navBtns.forEach(btn => {
+        if (btn.dataset.tab === targetTab) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+
+    var tabEl = document.getElementById(targetTab + '-tab');
+    if (tabEl) {
+        tabEl.classList.add('active');
+    }
+
+    if (targetTab === 'health-test') {
+        renderHealthTestPage();
+    }
+}
 
 function initNavigation() {
     const navBtns = document.querySelectorAll('.nav-btn');
