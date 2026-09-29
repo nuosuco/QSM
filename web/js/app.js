@@ -791,6 +791,13 @@ function initProductSearch() {
             if (currentCategory) {
                 searchProducts(true);
             } else if (currentKeyword) {
+                // 空结果友好提示
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'products-list';
+                emptyMsg.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#999;font-size:14px;line-height:1.8"><div style="font-size:40px;margin-bottom:12px">📦</div>没找到「' + currentKeyword + '」相关商品<br>数据源同步中，稍后再试，或换个关键词看看</div>';
+                productsList.innerHTML = '';
+                productsList.appendChild(emptyMsg);
+                return;
                 searchProducts(true);
             }
         });
