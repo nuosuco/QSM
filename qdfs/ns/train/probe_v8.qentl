@@ -1,0 +1,133 @@
+# probe_v8.qentl - 微探针：25万次 dot_arr + axpy_arr 批量调用计时
+#
+# 目的：QVM 升级注册 dot_arr/axpy_arr 后，测单批量 op 代价，
+#       与 v7b 时代 ae 池逐元素访问（25万次=24秒，见 SKILL §20）对比。
+# 用法（QVM 升级完成后由主控执行，本文件当前不运行不编译）：
+#   ./bin/qcl_boot_c run/probe_v8.qbc run/probe_v8.qbc >/dev/null 2>probe_v8.out
+#   （shell 计时：time ./bin/qvm_boot run/probe_v8.qbc）
+#
+# 设计：
+#   - 9段定长数组 g_W0-8[65535]，布局 W[c*1024+p]，与训练器一致
+#   - 25万次 dot_arr(65535, 0, 1024)：跨段内积（65535/1024=64类余0），测段路由+内积
+#   - 25万次 axpy_arr(0, 0, 1024, 500)：跨段对比式更新，测段路由+axpy
+#   - 对照：25万次空载整数循环（基线，约 0.07s）
+#   - 25万次 get_w(65535)+set_w(65535,1)：v7b 时代逐元素池访问基线（约 24s）
+#
+# 估算公式（SKILL §20）：epoch 池操作数 × 每操作~40指令 ≈ 总指令数
+#   v7b 每样本池访问 ≈ 6000 次（predict 105万/1024 + 2×1024 更新）
+#   v8  每样本池访问 ≈ 515 dot_arr + 1-2 axpy_arr = 515-517 次批量调用
+#   降幅 ≈ 6000 → 517 = 11.6 倍
+#
+# QCL 语法坑合规：无 elif（用 else{if}）；var 不与函数参数同名；
+# 全局变量顶部声明；无字符串+拼接。
+
+var g_W0[65535]
+var g_W1[65535]
+var g_W2[65535]
+var g_W3[65535]
+var g_W4[65535]
+var g_W5[65535]
+var g_W6[65535]
+var g_W7[65535]
+var g_W8[65535]
+var g_x[1024]
+
+var g_i = 0
+var g_total = 250000
+var g_sink = 0
+
+def get_w(idx):
+    var seg = idx / 65535
+    var off = idx % 65535
+    if (seg == 0): return g_W0[off] end
+    if (seg == 1): return g_W1[off] end
+    if (seg == 2): return g_W2[off] end
+    if (seg == 3): return g_W3[off] end
+    if (seg == 4): return g_W4[off] end
+    if (seg == 5): return g_W5[off] end
+    if (seg == 6): return g_W6[off] end
+    if (seg == 7): return g_W7[off] end
+    return g_W8[off]
+end
+
+def set_w(idx, v):
+    var seg = idx / 65535
+    var off = idx % 65535
+    if (seg == 0): g_W0[off] = v
+    end
+    if (seg == 1): g_W1[off] = v
+    end
+    if (seg == 2): g_W2[off] = v
+    end
+    if (seg == 3): g_W3[off] = v
+    end
+    if (seg == 4): g_W4[off] = v
+    end
+    if (seg == 5): g_W5[off] = v
+    end
+    if (seg == 6): g_W6[off] = v
+    end
+    if (seg == 7): g_W7[off] = v
+    end
+    if (seg == 8): g_W8[off] = v
+    end
+end
+
+def probe_empty():
+    # 基线：空载整数循环（≈0.07s / 25万，SKILL §20）
+    g_i = 0
+    while (g_i < g_total):
+        g_sink = g_sink + 1
+        g_i = g_i + 1
+    end
+end
+
+def probe_dot_arr():
+    # 25万次 dot_arr：跨段内积，每调用覆盖 1024 元素
+    g_i = 0
+    while (g_i < g_total):
+        var s = dot_arr(65535, 0, 1024)
+        g_sink = g_sink + s
+        g_i = g_i + 1
+    end
+end
+
+def probe_axpy_arr():
+    # 25万次 axpy_arr：跨段对比式更新
+    g_i = 0
+    while (g_i < g_total):
+        axpy_arr(65535, 0, 1024, 500)
+        g_i = g_i + 1
+    end
+end
+
+def probe_getset_w():
+    # 对照基线：v7b 时代逐元素池访问（≈24s / 25万，SKILL §20）
+    g_i = 0
+    while (g_i < g_total):
+        var v = get_w(65535)
+        set_w(65535, v + 1)
+        g_sink = g_sink + v
+        g_i = g_i + 1
+    end
+end
+
+def main():
+    printf("=== probe_v8: 25万次批量op计时（QVM升级后运行）===\n")
+    printf("sink初始=%d\n", g_sink)
+    printf("[1/4] 空载整数循环 25万次（基线）\n")
+    probe_empty()
+    printf("[1/4] done sink=%d\n", g_sink)
+    printf("[2/4] dot_arr 25万次（跨段内积）\n")
+    probe_dot_arr()
+    printf("[2/4] done sink=%d\n", g_sink)
+    printf("[3/4] axpy_arr 25万次（跨段对比式更新）\n")
+    probe_axpy_arr()
+    printf("[3/4] done sink=%d\n", g_sink)
+    printf("[4/4] get_w/set_w 25万次（v7b逐元素基线）\n")
+    probe_getset_w()
+    printf("[4/4] done sink=%d\n", g_sink)
+    printf("=== probe_v8 完成 ===\n")
+end
+
+main()

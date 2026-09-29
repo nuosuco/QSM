@@ -1,0 +1,8 @@
+QVM v1: QEntL编写的QBC1虚拟机
+[QVM-Q] 加载 target.qbc code=380 pool=482 funcs=2
+D:BEGIN
+D:loopfill(0..30000)=7 -> idx0=7 idx100=7 idx1000=7 idx10000=7 idx30000=7
+D:literal -> idx5000=111 idx15000=222 idx400000=333 idx527359=444
+D:expr b=8192 -> idx(b+0)=7 idx(b+512)=7
+D:expr global g_j=8192 -> idx(g_j+0)=7 idx(g_j+512)=7
+D:DONE

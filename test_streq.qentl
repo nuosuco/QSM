@@ -1,0 +1,9 @@
+# test_streq.qentl - 测试 str_eq
+def main():
+    var a = "arr_new"
+    var b = "arr_new"
+    printf("str_eq(arr_new, arr_new)=%d\n", str_eq(a, b))
+    var c = "qscl_init"
+    printf("str_eq(arr_new, qscl_init)=%d\n", str_eq(a, c))
+end
+main()

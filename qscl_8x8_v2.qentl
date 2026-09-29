@@ -1,0 +1,153 @@
+# QSCL 8×8 真叠加态训练器 v2 — 4态不同数据分片并行, 坍缩合并
+# 铁律: 对比感知机 W[正确]+=x, W[错分]-=x (直接加减输入)
+# 真叠加态: 每态训不同数据分片(样本区间), 学到不同知识, 最后坍缩合并W
+var g_x[64]                    # 当前样本像素(8×8)
+var g_W[4096]                  # 权重矩阵 64类×64像素 (合并后完整W)
+var g_Ws[4096]                 # 单态累加权重(坍缩前)
+var g_i = 0
+var g_c = 0
+var g_idx = 0
+var g_score = 0
+var g_max = 0
+var g_maxi = 0
+var g_label = 0
+var g_pred = 0
+var g_ep = 0
+var g_epoch = 20
+var g_s = 0
+var g_state = 0
+var g_correct = 0
+var g_updates = 0
+var g_lo = 0
+var g_hi = 0
+
+def train_one():
+    # forward: 64类内积
+    g_max = -30000
+    g_maxi = 0
+    g_c = 0
+    while (g_c < 64):
+        g_score = 0
+        g_idx = g_c * 64
+        g_i = 0
+        while (g_i < 64):
+            g_score = g_score + g_W[g_idx + g_i] * g_x[g_i]
+            g_i = g_i + 1
+        end
+        if (g_score > g_max):
+            g_max = g_score
+            g_maxi = g_c
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_maxi
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+    else:
+        g_updates = g_updates + 1
+        # 对比感知机: W[正确]+=x, W[错分]-=x
+        g_idx = g_label * 64
+        g_i = 0
+        while (g_i < 64):
+            g_W[g_idx + g_i] = g_W[g_idx + g_i] + g_x[g_i]
+            g_i = g_i + 1
+        end
+        g_idx = g_pred * 64
+        g_i = 0
+        while (g_i < 64):
+            g_W[g_idx + g_i] = g_W[g_idx + g_i] - g_x[g_i]
+            g_i = g_i + 1
+        end
+    end
+end
+
+def train_state():
+    # 每态清零权重, 训自己的数据分片[g_lo, g_hi)
+    g_i = 0
+    while (g_i < 4096):
+        g_W[g_i] = 0
+        g_i = g_i + 1
+    end
+    printf("  态%d 分片[%d,%d) 训%d样本\n", g_state, g_lo, g_hi, g_hi - g_lo)
+    g_ep = 0
+    while (g_ep < g_epoch):
+        g_correct = 0
+        g_updates = 0
+        g_s = g_lo
+        while (g_s < g_hi):
+            flat_load("qdfs/ns/data/yi_glyph_4226_8x8_flat.data", g_x, g_s, 64)
+            g_label = g_s
+            train_one()
+            g_s = g_s + 1
+        end
+        printf("  态%d ep%d: 正确%d/%d 更新%d\n", g_state, g_ep, g_correct, g_hi - g_lo, g_updates)
+        if (g_correct >= g_hi - g_lo):
+            g_ep = g_epoch   # 收敛,提前退出
+        end
+        g_ep = g_ep + 1
+    end
+    # 坍缩: 该态W累加到 g_Ws
+    g_i = 0
+    while (g_i < 4096):
+        g_Ws[g_i] = g_Ws[g_i] + g_W[g_i]
+        g_i = g_i + 1
+    end
+end
+
+def main():
+    printf("=== QSCL 8×8 真叠加态并行训练(4态分片+坍缩合并) ===\n")
+    # 清零累加权重
+    g_i = 0
+    while (g_i < 4096):
+        g_Ws[g_i] = 0
+        g_i = g_i + 1
+    end
+    # 4态: 态0训[0,16) 态1训[16,32) 态2训[32,48) 态3训[48,64)
+    g_state = 0
+    while (g_state < 4):
+        g_lo = g_state * 16
+        g_hi = g_lo + 16
+        train_state()
+        g_state = g_state + 1
+    end
+    # 坍缩合并: W = Ws (平均)
+    g_i = 0
+    while (g_i < 4096):
+        g_W[g_i] = g_Ws[g_i]
+        g_i = g_i + 1
+    end
+    printf("=== 4态坍缩合并完成, 开始验证 ===\n")
+    # 用合并W验证全部64类
+    g_correct = 0
+    g_s = 0
+    while (g_s < 64):
+        flat_load("qdfs/ns/data/yi_glyph_4226_8x8_flat.data", g_x, g_s, 64)
+        g_label = g_s
+        # forward
+        g_max = -30000
+        g_maxi = 0
+        g_c = 0
+        while (g_c < 64):
+            g_score = 0
+            g_idx = g_c * 64
+            g_i = 0
+            while (g_i < 64):
+                g_score = g_score + g_W[g_idx + g_i] * g_x[g_i]
+                g_i = g_i + 1
+            end
+            if (g_score > g_max):
+                g_max = g_score
+                g_maxi = g_c
+            end
+            g_c = g_c + 1
+        end
+        g_pred = g_maxi
+        if (g_pred == g_label):
+            g_correct = g_correct + 1
+        end
+        g_s = g_s + 1
+    end
+    printf("=== 最终准确率: %d/64 ===\n", g_correct)
+end
+
+main()

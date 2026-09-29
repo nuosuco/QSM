@@ -1,0 +1,35 @@
+# 检查1: 字面量位宽 (arr_new(527360) 是否回绕成 3072 / 池重叠)
+# 检查2: off 计算值 (arr_set(arr_get off=526336 是否精确, 验证VM运行时整数是32位)
+def main():
+    # ============ 检查1: 字面量位宽 + 池重叠 ============
+    var h = arr_new(527360)
+    var xh = arr_new(1024)
+    arr_set(h, 527359, 123)
+    arr_set(xh, 0, 456)
+    var v_last = arr_get(h, 527359)
+    var v_3072 = arr_get(h, 3072)
+    var v_xh0 = arr_get(xh, 0)
+    printf("[CHK1] handle h=%d xh=%d\\n", h, xh)
+    printf("[CHK1] h[527359] = %d  (expect 123)\\n", v_last)
+    printf("[CHK1] h[3072]   = %d  (expect 0; 若=456 则池重叠/回绕)\\n", v_3072)
+    printf("[CHK1] xh[0]     = %d  (expect 456)\\n", v_xh0)
+
+    # ============ 检查2: off 计算值 (c=514, off=514*1024=526336) ============
+    var h2 = arr_new(527360)
+    var c = 514
+    var off = c * 1024
+    arr_set(h2, off, 77)
+    var v_off = arr_get(h2, off)
+    printf("[CHK2] c=514 off=c*1024=%d  (expect 526336)\\n", off)
+    printf("[CHK2] h2[526336] = %d  (expect 77)\\n", v_off)
+    var off2 = 0
+    var cc = 0
+    while (cc < 514):
+        off2 = off2 + 1024
+        cc = cc + 1
+    end
+    printf("[CHK2] 累加1024共514次 = %d  (expect 526336)\\n", off2)
+    return 0
+end
+
+main()

@@ -1,0 +1,6 @@
+# diag - figure out argument stack layout of builtins
+# printf takes args and pushes ret. Let's see what the arg slots look like.
+printf("start\n")
+emit_str("MARK1")
+emit_ints(0, 0, 0)
+printf("\nend\n")

@@ -1,0 +1,66 @@
+# split_probe.qentl — 按类切分实验: 每进程只 save 1 类 vs 515 类
+#
+# 背景: 归因已证明 str_concat 泄漏 ~9.3MB/类，515类=4.89GB（文件读写通道无关）。
+#   本探针验证唯一零泄漏出路: 一个 QVM 进程只 save 1 类。
+#   SAVE_START/SAVE_END 由 shell sed 注入（默认全 515 类，便于对照）。
+#
+# 判据:
+#   N=515 -> VmHWM 约 4.9GB（复现破线）
+#   N=1   -> VmHWM 应 < 300MB（= 进程固定开销 + 1 类）
+#     则 515 个独立进程各跑 1 类 = 各自退出各自释放，save 路径 RSS 硬线可达
+#
+# 铁律合规: 无 >65535 字面量; 无 elif; 无 var 遮蔽全局; 无 str_to_int hex
+
+var g_wh = 0
+var g_c = 0
+var g_save_start = 0
+var g_save_end = 515
+
+def fill_pool():
+    var sv_j = 0
+    while (sv_j < 2500):
+        if (sv_j % 25 < 4):
+            arr_set(g_wh, sv_j, 0 - 100)
+        else:
+            if (sv_j % 25 < 20):
+                arr_set(g_wh, sv_j, 100)
+            end
+        end
+        sv_j = sv_j + 1
+    end
+end
+
+def main():
+    printf("SPLIT:BEGIN start=%d end=%d\n", g_save_start, g_save_end)
+    var ws = 515
+    ws = ws * 1024
+    g_wh = arr_new(ws)
+    fill_pool()
+    var rnd = 7
+    g_c = g_save_start
+    while (g_c < g_save_end):
+        var cls = ""
+        var b = g_c * 1024
+        var j = 0
+        while (j < 1024):
+            var vv = arr_get(g_wh, b + j)
+            rnd = rnd * 1103 + 12345
+            if (rnd < 0): rnd = 0 - rnd end
+            if (rnd % 25 < 2):
+                vv = 100
+            end
+            cls = str_concat(cls, int_to_str(vv))
+            cls = str_concat(cls, ",")
+            j = j + 1
+        end
+        var pn = "run/split_c"
+        pn = str_concat(pn, int_to_str(g_c))
+        pn = str_concat(pn, ".w")
+        var wr = file_write_bytes(pn, cls)
+        printf("SPLIT:done class%d clen=%d write=%d\n", g_c, str_len(cls), wr)
+        g_c = g_c + 1
+    end
+    printf("SPLIT:DONE classes_done=%d\n", g_save_end - g_save_start)
+end
+
+main()

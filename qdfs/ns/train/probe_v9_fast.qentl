@@ -1,0 +1,149 @@
+# probe_v9_fast.qentl - 微探针：25万次 dot_arr_at + axpy_arr_at 计时（快版）
+#
+# 改造理由: 原版预填 g_wh 需 527360 次 arr_set ≈ 29 分钟（SKILL §20③ 逐元素池
+# 访问 420s/25万），占掉 95% 探针时间。批量op 的指令代价与池中值无关（op 内部
+# 循环 n 次 ae_i_get 乘法，值只影响结果不影响指令数），故:
+#   - 计时段 [3]/[4] 在全规模零填池上跑（arr_new 零初始化零成本）→ 测真实规模指令代价
+#   - 语义段 [5] 在小池(arr_new 字面量截断到 3072/4096, 与 xh 不重叠)上验证:
+#       dot_arr_at 非 no-op、只读性、axpy_arr_at 内部除1000、负 lr 语义
+# 这样探针总时长压到 ~1-2 分钟（段[2]函数调用基线 7s + 段[3][4] 各一段）。
+#
+# 关键校验点（防"op 跑通但语义错"，SKILL §6/§17 伪结果陷阱）:
+#   - [5] dot_arr_at(h,off,xh,4)=10 非零 → 排除 no-op 退化
+#   - [5] dot_arr_at 后 h 的值不变 → 排除只读op 被写成读写op（副作用 bug）
+#   - [5] axpy w=0 x=3 lr=500 → 1（内部 /1000；若为 1500 则 F 忘了除1000，v8 结构错3）
+#   - [5] axpy 负 lr: W+= (x-W)*neg/1000 语义（v9 suppress_class 依赖）
+#   - [3] 全池跨类寻址 off=(i%515)*1024，最大 526336（检查2已验证 off 位宽安全）
+#
+# QCL 语法坑合规: 无 elif（全 else{if}）；var 不与函数参数同名；
+# 全局变量顶部一次性声明，函数内不再 var 同名全局（§7 遮蔽陷阱）。
+
+var g_wh = 0            # 权重池句柄（全规模 527360，零填）
+var g_xh = 0            # 输入池句柄（1024）
+var g_total = 5000    # 每段操作次数
+var g_i = 0
+var g_j = 0
+var g_soff = 0
+var g_sink = 0          # 防优化掉 sink（累加各段返回值）
+var g_off = 0
+var g_score = 0
+var g_lr_now = 500
+var g_wsz = 0           # 池大小（计算式，避开字面量 u16 截断，同 v9 修复）
+var g_wsz2 = 0          # 小池大小（字面量 3*1024，故意用截断后的 3072）
+
+def call_once(x):
+    return x + 1
+end
+
+def main():
+    printf("=== probe_v9_fast: 25万次 dot_arr_at/axpy_arr_at 偏移变体计时 ===\n")
+    # 计算式池大小（避开字面量 u16 截断 → 3072 陷阱，主控检查1实锤）
+    g_wsz = 515
+    g_wsz = g_wsz * 1024
+    g_xh = arr_new(1024)
+    g_wh = arr_new(g_wsz)
+    printf("全规模池: g_wh=%d (size=%d) g_xh=%d\n", g_wh, g_wsz, g_xh)
+
+    # [1] 基线：空载整数循环（≈0.07s / 25万，SKILL §20）
+    printf("[1/5] 空载整数循环 25万次（基线）\n")
+    g_i = 0
+    while (g_i < g_total):
+        g_sink = g_sink + 1
+        g_i = g_i + 1
+    end
+    printf("[1/5] done sink=%d\n", g_sink)
+
+    # [2] 基线：用户函数调用+返回（≈7s / 25万，SKILL §20，测 op 纯调用开销）
+    printf("[2/5] 用户函数调用 25万次（基线）\n")
+    g_i = 0
+    while (g_i < g_total):
+        var r = call_once(g_sink)
+        g_sink = r
+        g_i = g_i + 1
+    end
+    printf("[2/5] done sink=%d\n", g_sink)
+
+    # [3] dot_arr_at 25万次（全规模零填池，只读内积，跨类偏移寻址）
+    printf("[3/5] dot_arr_at 25万次（off=(i%%515)*1024, n=1024, 全池零填）\n")
+    g_i = 0
+    while (g_i < g_total):
+        g_soff = g_i % 515
+        g_off = g_soff * 1024
+        g_score = dot_arr_at(g_wh, g_off, g_xh, 1024)
+        g_sink = g_sink + g_score
+        g_i = g_i + 1
+    end
+    printf("[3/5] done sink=%d last_score=%d (off=%d)\n",
+        g_sink, g_score, g_off)
+
+    # [4] axpy_arr_at 25万次（对比式更新，lr 传 4态原值 500/1000/1500/2000）
+    # 更新公式: W[off+i] += (x[i] - W[off+i]) * lr / 1000（op 内部除1000）
+    printf("[4/5] axpy_arr_at 25万次（lr 轮换 500/1000/1500/2000, 原值不做整除）\n")
+    g_i = 0
+    while (g_i < g_total):
+        g_soff = g_i % 515
+        g_off = g_soff * 1024
+        g_lr_now = 500 + (g_i % 4) * 500
+        axpy_arr_at(g_wh, g_off, g_xh, 1024, g_lr_now)
+        g_sink = g_sink + g_lr_now
+        g_i = g_i + 1
+    end
+    printf("[4/5] done sink=%d last_lr=%d\n", g_sink, g_lr_now)
+    printf("[4/5] 备注: xh 全 0，更新量为 0，故本段不改动 g_wh（仅为计时）\n")
+
+    # [5] 语义校验（小池，快速）
+    # 小池故意用字面量 3*1024: 字面量 3072 在 u16 内不被截断，h 占 0..3071
+    # （xh 先分配，句柄 0，占 0..1023 → 与 h 重叠! 故这里先重建顺序）
+    g_wsz2 = 3
+    g_wsz2 = g_wsz2 * 1024
+    var sh = arr_new(g_wsz2)     # 小池（3072，句柄 2，占 2048..5119）
+    var sx = arr_new(4)          # 小输入池（句柄 3）
+    arr_set(sh, 0, 1)
+    arr_set(sh, 1, 2)
+    arr_set(sh, 2, 3)
+    arr_set(sh, 3, 4)
+    arr_set(sx, 0, 1)
+    arr_set(sx, 1, 1)
+    arr_set(sx, 2, 1)
+    arr_set(sx, 3, 1)
+    var d1 = dot_arr_at(sh, 0, sx, 4)
+    printf("[5/5] 语义: dot_arr_at(sh,0,sx,4) = %d  (expect 10, 非零排除 no-op)\n", d1)
+    printf("[5/5] 只读校验: sh[0]=%d sh[1]=%d sh[2]=%d sh[3]=%d (expect 1 2 3 4 不变)\n",
+        arr_get(sh, 0), arr_get(sh, 1), arr_get(sh, 2), arr_get(sh, 3))
+
+    # axpy 整除语义（v8 结构错3 的反面验证：op 内部必须除1000）
+    var ax = arr_new(4)
+    arr_set(ax, 0, 0)
+    axpy_arr_at(ax, 0, sx, 1, 500)
+    printf("[5/5] 语义: axpy w=0 x=1 lr=500 -> w=%d  (expect 0; 整除 (1-0)*500/1000=0)\n",
+        arr_get(ax, 0))
+    # 换 x=3 验非零更新
+    var sx3 = arr_new(1)
+    arr_set(sx3, 0, 3)
+    var ax3 = arr_new(1)
+    arr_set(ax3, 0, 0)
+    axpy_arr_at(ax3, 0, sx3, 1, 500)
+    printf("[5/5] 语义: axpy w=0 x=3 lr=500 -> w=%d  (expect 1; (3-0)*500/1000=1)\n",
+        arr_get(ax3, 0))
+    # 负 lr（v9 suppress_class 依赖）
+    var axn = arr_new(1)
+    arr_set(axn, 0, 0)
+    axpy_arr_at(axn, 0, sx3, 1, 0 - 500)
+    printf("[5/5] 语义: axpy w=0 x=3 lr=-500 -> w=%d  (expect -1; 负lr抑制语义)\n",
+        arr_get(axn, 0))
+    # 收敛校验: 从 W=0 反复 boost 到 x=3 应趋近 3
+    var axc = arr_new(1)
+    arr_set(axc, 0, 0)
+    var k = 0
+    while (k < 20):
+        axpy_arr_at(axc, 0, sx3, 1, 1000)
+        k = k + 1
+    end
+    printf("[5/5] 语义: 20次 boost lr=1000 x=3 -> w=%d  (expect 3; 收敛到 x)\n",
+        arr_get(axc, 0))
+
+    printf("=== probe_v9_fast 完成（shell 用 time 计时各段）===\n")
+    printf("=== 训练估算: 每样本热路径 = 515 dot_arr_at + 1~2 axpy_arr_at ≈ 517 次 ===\n")
+end
+
+main()

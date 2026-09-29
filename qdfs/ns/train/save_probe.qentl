@@ -1,0 +1,79 @@
+# save_probe.qentl — save 循环形态复刻探针（判定 RSS 有界 vs 线性累积）
+#
+# 目的: 判定 v9 新 save 方案（每类 1024 次 str_concat 拼约 5-6KB 串 + file_write_bytes）
+#       在 515 类规模下的真实 RSS 峰值。
+#
+# 结构完全复刻 v9 新 save_weights():
+#   每类: cls = 1024 次 str_concat(int_to_str(arr_get(...)) + ",")
+#         -> file_write_bytes(path_c{c}, cls)
+#         -> cls 重新赋值 ""（上一类串变不可达，若 VM 回收则 RSS 有界）
+#
+# 填池值域贴近 v9 真实权重: 76% 为 0（未点亮像素），24% 为 100（点亮，×100 缩放），
+#   少数 -100/-200（抑制态）。故类串长度贴近真实场景（约 4000-5800 字节），
+#   探针测得的 RSS 就是 v9 真实 save 的 RSS 上界。
+#
+# 铁律合规（SKILL §20/§18）:
+#   - 全部数字字面量 < 65536（515/1024/2500/76/24/1103/12345）；无 >65535 字面量
+#   - 数组句柄尺寸用计算式（var ws=515; ws=ws*1024），禁字面量 527360（§20③）
+#   - 局部变量名不遮蔽全局（fill_pool 用 sv_j，非 g_j）
+#   - 无 str_to_int 做 hex 转换
+#
+# 预期耗时: ~90s（3072 次 concat 实测 0.42s，527K 次外推 92s）
+# 超时判定: 若 300s 未结束 = 单类 concat 成本远超预期，方案A 不可行 -> 换方案
+
+var g_wh = 0
+var g_c = 0
+
+def fill_pool():
+    # 值域贴近 v9 真实权重: 基线 0（未点亮像素，占多数），
+    #   76/100 = 76% 的像素点亮为 100（×100 缩放），4% 为 -100（抑制态）
+    var sv_j = 0
+    while (sv_j < 2500):
+        if (sv_j % 25 < 4):
+            arr_set(g_wh, sv_j, 0 - 100)
+        else:
+            if (sv_j % 25 < 20):
+                arr_set(g_wh, sv_j, 100)
+            end
+        end
+        sv_j = sv_j + 1
+    end
+end
+
+def main():
+    printf("P:BEGIN\n")
+    var ws = 515
+    ws = ws * 1024
+    g_wh = arr_new(ws)
+    fill_pool()
+    var rnd = 7
+    g_c = 0
+    while (g_c < 515):
+        var cls = ""
+        var b = g_c * 1024
+        var j = 0
+        while (j < 1024):
+            var vv = arr_get(g_wh, b + j)
+            rnd = rnd * 1103 + 12345
+            if (rnd < 0): rnd = 0 - rnd end
+            if (rnd % 25 < 2):
+                vv = 100
+            end
+            cls = str_concat(cls, int_to_str(vv))
+            cls = str_concat(cls, ",")
+            j = j + 1
+        end
+        var pn = "run/sp_c"
+        pn = str_concat(pn, int_to_str(g_c))
+        pn = str_concat(pn, ".w")
+        var wr = file_write_bytes(pn, cls)
+        # 每 50 类打印进度（含 str_len），便于进程被外部强杀时仍能读到已完成的段
+        if (g_c % 50 == 0):
+            printf("P:prog class%d clen=%d write=%d\n", g_c, str_len(cls), wr)
+        end
+        g_c = g_c + 1
+    end
+    printf("P:SAVE_DONE classes=515\n")
+end
+
+main()

@@ -1,0 +1,9 @@
+# tiny2 - 只测 emit_str
+var g_h = arr_new(4)
+arr_set(g_h, 0, 1)
+arr_set(g_h, 1, 2)
+printf("A: ")
+emit_str("HELLO")
+printf(" B\n")
+emit_ints(g_h, 0, 2)
+printf("\n")

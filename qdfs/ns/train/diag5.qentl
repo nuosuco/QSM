@@ -1,0 +1,31 @@
+# 诊断5: 池句柄塌缩 — 函数内分配 vs 顶层语句分配
+def mk3():
+    var a = arr_new(8)
+    var b = arr_new(8)
+    var c = arr_new(8)
+    arr_set(a, 0, 111)
+    arr_set(b, 0, 222)
+    arr_set(c, 0, 333)
+    printf("[F1] a=%d b=%d c=%d\n", a, b, c)
+    printf("[F2] a[0]=%d b[0]=%d c[0]=%d\n", arr_get(a, 0), arr_get(b, 0), arr_get(c, 0))
+    return a
+end
+
+def main():
+    printf("=== diag5: in-function vs top-level alloc ===\n")
+    mk3()
+    var r = mk3()
+    printf("[F3] 第二次调用: r=%d\n", r)
+    return 0
+end
+
+main()
+# ---- 顶层语句区（不经过函数调用栈）----
+var ta = arr_new(8)
+var tb = arr_new(8)
+var tc = arr_new(8)
+arr_set(ta, 0, 411)
+arr_set(tb, 0, 422)
+arr_set(tc, 0, 433)
+printf("[T1] ta=%d tb=%d tc=%d\n", ta, tb, tc)
+printf("[T2] ta[0]=%d tb[0]=%d tc[0]=%d\n", arr_get(ta, 0), arr_get(tb, 0), arr_get(tc, 0))

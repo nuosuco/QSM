@@ -1,0 +1,11 @@
+# test_arr_new.qentl - 最小测试: arr_new + arr_set + arr_get
+def main():
+    var h = arr_new(10)
+    arr_set(h, 0, 42)
+    arr_set(h, 5, 100)
+    printf("h=%d", h)
+    printf("arr_get(0)=%d\n", arr_get(h, 0))
+    printf("arr_get(5)=%d\n", arr_get(h, 5))
+    printf("arr_get(9)=%d\n", arr_get(h, 9))
+end
+main()

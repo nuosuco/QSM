@@ -1,0 +1,54 @@
+# 诊断10: 复现 v9 训练循环结构（函数内 boost_class），定位权重全零根因
+var g_wh = 0
+var g_xh = 0
+var g_nxh = 0
+
+def boost_class(c_off, lr):
+    axpy_arr_at(g_wh, c_off, g_xh, 1024, lr)
+end
+
+def main():
+    printf("=== diag10: v9 train loop structure ===\n")
+    var wsz = 515
+    wsz = wsz * 1024
+    g_wh = arr_new(wsz)
+    g_xh = arr_new(1024)
+    g_nxh = arr_new(1024)
+    printf("[0] wh=%d xh=%d nxh=%d wsz=%d\n", g_wh, g_xh, g_nxh, wsz)
+
+    # 模拟样本0: x = 真实像素 (类0, 稀疏, 含1和0)
+    arr_set(g_xh, 0, 1)
+    arr_set(g_xh, 1, 0)
+    arr_set(g_xh, 2, 1)
+    arr_set(g_xh, 3, 0)
+    arr_set(g_xh, 4, 1)
+    arr_set(g_xh, 5, 1)
+    arr_set(g_xh, 6, 0)
+    arr_set(g_xh, 7, 1)
+    arr_set(g_nxh, 0, 0 - 1)
+    arr_set(g_nxh, 1, 0)
+    arr_set(g_nxh, 2, 0 - 1)
+    arr_set(g_nxh, 3, 0)
+    printf("[1] xh[0]=%d xh[2]=%d xh[4]=%d nxh[0]=%d\n",
+        arr_get(g_xh, 0), arr_get(g_xh, 2), arr_get(g_xh, 4), arr_get(g_nxh, 0))
+
+    # boost_class(label=0, lr=500) 走 v9 的函数包装
+    boost_class(0, 500)
+    printf("[2] boost lr=500 后: wh[0]=%d wh[2]=%d wh[4]=%d wh[5]=%d wh[7]=%d\n",
+        arr_get(g_wh, 0), arr_get(g_wh, 2), arr_get(g_wh, 4),
+        arr_get(g_wh, 5), arr_get(g_wh, 7))
+
+    # 同样但 lr=1000
+    boost_class(0, 1000)
+    printf("[3] boost lr=1000 后: wh[0]=%d wh[2]=%d wh[4]=%d wh[7]=%d\n",
+        arr_get(g_wh, 0), arr_get(g_wh, 2), arr_get(g_wh, 4), arr_get(g_wh, 7))
+
+    # 直接调 axpy_arr_at 不走函数包装（lr=500）
+    arr_set(g_wh, 100, 0)
+    axpy_arr_at(g_wh, 100, g_xh, 8, 500)
+    printf("[4] 直接axpy lr=500 off=100: wh[100]=%d wh[102]=%d wh[104]=%d wh[107]=%d\n",
+        arr_get(g_wh, 100), arr_get(g_wh, 102), arr_get(g_wh, 104), arr_get(g_wh, 107))
+    return 0
+end
+
+main()

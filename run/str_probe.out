@@ -1,0 +1,14 @@
+QVM v1: QEntL编写的QBC1虚拟机
+[QVM-Q] 加载 target.qbc code=627 pool=913 funcs=1
+S:BEGIN
+S:after1024 str_len=10240 (期望10240)
+S:after1024 head=123456789,12 tail=9,123456789,
+S:after2048 str_len=20480 (期望20480)
+S:write20k ret=20480 str_len=20480
+S:class1024vals str_len=4010
+S:class1024vals write ret=4010 str_len=4010
+S:small len=8 write=8
+S:empty write=0
+S:class2 neg/len str_len=5736 write=5736 readback_len=5736
+S:class2 readback head=200,192,184,176,168,160,
+S:DONE

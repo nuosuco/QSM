@@ -1,0 +1,62 @@
+# 单样本完整解析 + 分段计时（用循环次数代替时间，找最慢的函数）
+var g_data = ""
+var g_x[1024]
+var g_i = 0
+var g_ps = 0
+var g_pe = 0
+var g_rem = ""
+var g_pv = ""
+var g_line = ""
+var g_c1 = 0
+var g_pix = ""
+
+def main():
+    g_data = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    # 取第1行
+    g_rem = str_substring(g_data, 0, 4000)
+    g_pe = str_index_of(g_rem, "\n")
+    g_line = str_substring(g_rem, 0, g_pe)
+    g_c1 = str_index_of(g_line, ":")
+    g_pix = str_substring(g_line, g_c1 + 1, 4000)
+    printf("第1行像素串长度=%d\n", str_len(g_pix))
+    # 完整解析1024个像素（逐逗号）
+    g_ps = 0
+    g_i = 0
+    while (g_i < 1024):
+        g_rem = str_substring(g_pix, g_ps, 4000)
+        g_pe = str_index_of(g_rem, ",")
+        if (g_pe < 0):
+            g_pv = g_rem
+            g_ps = 4000
+        else:
+            g_pv = str_substring(g_rem, 0, g_pe)
+            g_ps = g_ps + g_pe + 1
+        end
+        g_x[g_i] = str_to_int(g_pv)
+        g_i = g_i + 1
+    end
+    printf("单样本1024像素解析完成, x[0]=%d x[1023]=%d\n", g_x[0], g_x[1023])
+    # 重复100次完整解析，测总时长
+    var round = 0
+    while (round < 100):
+        g_ps = 0
+        g_i = 0
+        while (g_i < 1024):
+            g_rem = str_substring(g_pix, g_ps, 4000)
+            g_pe = str_index_of(g_rem, ",")
+            if (g_pe < 0):
+                g_pv = g_rem
+                g_ps = 4000
+            else:
+                g_pv = str_substring(g_rem, 0, g_pe)
+                g_ps = g_ps + g_pe + 1
+            end
+            g_x[g_i] = str_to_int(g_pv)
+            g_i = g_i + 1
+        end
+        round = round + 1
+    end
+    printf("100次完整解析完成\n")
+end
+
+main()

@@ -1,0 +1,7 @@
+# leak_probe3: emit only, no fill
+var g_size = 515
+g_size = g_size * 1024
+var g_h = arr_new(g_size)
+printf("NO FILL\n")
+emit_ints(g_h, 0, g_size)
+printf("\nDONE\n")

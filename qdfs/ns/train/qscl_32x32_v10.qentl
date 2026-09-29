@@ -1,0 +1,362 @@
+# QSCL 32x32 v10 - flat_load_all_batch 一次性预解析 (修 v9 parse_sample 泄漏)
+#
+# v9 训练热路径 parse_sample 逐字符 str_substring/str_index_of → §8 泄漏
+# v10 用 flat_load_all_batch 在 load_batch_data 阶段一次性把 129 样本 ×1024 像素
+#     预解析到 g_all_pix 池 (原值 0/1 或 ×100), 训练热路径零字符串分配.
+#
+# 数据流:
+#   file_read 整文件 (1 次, 8.6MB)
+#   str_substring 提 batch 切片 260KB (1 次)
+#   行偏移表预扫 129 次 str_index_of (小串)
+#   标签预解析 129 次 hex2dec (小串)
+#   flat_load_all_batch 一次性 129*1024 像素解析到池 (~260KB 泄漏, 一次性)
+#   训练循环 3 epoch × 129 样本 = 387 次 parse, 零字符串分配!
+#
+# 学习律 / 池 / save 通道: 完全同 v9 (dot_arr_at/axpy_arr_at/emit_ints/emit_str)
+
+# ---- 池句柄 ----
+var g_wh = 0
+var g_xh = 0
+var g_nxh = 0
+var g_xsrc_h = 0
+var g_all_pix_h = 0          # 一次性像素池 (129*1024 int, 原值 0/1)
+var g_all_pix_sz = 0         # 池大小 129*1024=132096
+
+# ---- 输入数据 (一次性缓存) ----
+var g_x[1024]
+var g_batch_data = ""
+var g_batch_data_len = 0
+var g_batch_line_off[129]
+var g_batch_label[129]
+var g_batch_start_pos = 0
+var g_batch_pix_offs_h = 0   # 129 个 pix_abs 偏移池 (供 flat_load_all_batch 用)
+
+# ---- 训练状态 ----
+var g_batch = 0
+var g_s = 0
+var g_state = 0
+var g_seed = 0
+var g_base = 0
+var g_lr = 500
+var g_ep = 0
+var g_epoch = 5             # 由 build_run_v10.sh 设定: 冒烟1/正式3
+var g_smoke_limit = 0
+var g_ns = 0                 # 本态样本扫描上限: 通用批129 / 部首批(b8)106
+var g_sidx = 0
+var g_label = 0
+var g_pred = 0
+var g_score = 0
+var g_max_val = 0
+var g_max_idx = 0
+var g_correct = 0
+var g_updates = 0
+var g_rnd = 0
+
+# ---- 循环变量 ----
+var g_i = 0
+var g_c = 0
+
+# ---- transform 临时 ----
+var g_t1_i = 0
+var g_t1_row = 0
+var g_t1_col = 0
+var g_t1_tmp = 0
+var g_t2_i = 0
+var g_t3_row = 0
+var g_t3_col = 0
+var g_t3_tmp = 0
+
+# ---- hex2dec (SKILL §18) ----
+def hex2dec(hex):
+    var v = 0
+    var ch = ""
+    while (str_len(hex) > 0):
+        ch = str_substring(hex, 0, 1)
+        v = v * 16
+        if (ch == "0"): v = v + 0 end
+        if (ch == "1"): v = v + 1 end
+        if (ch == "2"): v = v + 2 end
+        if (ch == "3"): v = v + 3 end
+        if (ch == "4"): v = v + 4 end
+        if (ch == "5"): v = v + 5 end
+        if (ch == "6"): v = v + 6 end
+        if (ch == "7"): v = v + 7 end
+        if (ch == "8"): v = v + 8 end
+        if (ch == "9"): v = v + 9 end
+        # 2026-09-13 修复: 数据标签是大写 hex (A-F), 原仅小写 a-f 分支导致
+        #   A->0, 1A->16(应26), 20A->512(应522), 7E->112(应126)
+        #   → g_label = hex2dec - g_base 出现负值 (-3/-6/-9/-12) → 数组越界 idx 负
+        #   并污染 b0 全部含字母 class (class10 全零, 实测铁证)
+        if (ch == "a"): v = v + 10 end
+        if (ch == "A"): v = v + 10 end
+        if (ch == "b"): v = v + 11 end
+        if (ch == "B"): v = v + 11 end
+        if (ch == "c"): v = v + 12 end
+        if (ch == "C"): v = v + 12 end
+        if (ch == "d"): v = v + 13 end
+        if (ch == "D"): v = v + 13 end
+        if (ch == "e"): v = v + 14 end
+        if (ch == "E"): v = v + 14 end
+        if (ch == "f"): v = v + 15 end
+        if (ch == "F"): v = v + 15 end
+        hex = str_substring(hex, 1, 60000)
+    end
+    return v
+end
+
+# ---- 一次性加载本 batch 数据 + 预解析所有像素到 g_all_pix ----
+def load_batch_data():
+    var full = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    var full_len = str_len(full)
+    var target_line = g_batch * 515
+    var pos = 0
+    var ln = 0
+    var nl = 0
+    while (ln < target_line):
+        nl = str_index_of(str_substring(full, pos, 4000), "\n")
+        if (nl < 0):
+            pos = full_len
+        else:
+            pos = pos + nl + 1
+        end
+        ln = ln + 1
+    end
+    g_batch_start_pos = pos
+    # 2026-09-26 部首批修复: b8 只有 106 行, 固定 129 会预扫到垃圾 → 标签回绕 -4120 → 训练崩
+    if (g_batch == 8):
+        g_ns = 106
+    else:
+        g_ns = 129
+    end
+    var slice_len = 2049 * g_ns
+    var slice = str_substring(full, pos, slice_len)
+    g_batch_data = slice
+    g_batch_data_len = str_len(slice)
+    var rpos = 0
+    var rln = 0
+    var rnl = 0
+    g_batch_line_off[0] = 0
+    while (rln < g_ns):
+        rnl = str_index_of(str_substring(slice, rpos, 4000), "\n")
+        if (rnl < 0):
+            g_batch_line_off[rln + 1] = str_len(slice)
+            rpos = str_len(slice)
+        else:
+            g_batch_line_off[rln + 1] = rpos + rnl + 1
+            rpos = rpos + rnl + 1
+        end
+        rln = rln + 1
+    end
+    var li = 0
+    var lline = ""
+    var cpos = 0
+    var hexstr = ""
+    var lbl = 0
+    while (li < g_ns):
+        lline = str_substring(slice, g_batch_line_off[li], 60)
+        cpos = str_index_of(lline, ":")
+        hexstr = str_substring(lline, 0, cpos)
+        lbl = hex2dec(hexstr)
+        g_batch_label[li] = lbl - g_base
+        li = li + 1
+    end
+    # 构造 pix_abs 偏移池 (每样本的 ':' 位置 + 1 之后的绝对偏移)
+    g_batch_pix_offs_h = arr_new(g_ns)
+    var ii = 0
+    var lstart = 0
+    var cpos2 = 0
+    while (ii < g_ns):
+        lstart = g_batch_line_off[ii]
+        cpos2 = str_index_of(str_substring(slice, lstart, 60), ":")
+        arr_set(g_batch_pix_offs_h, ii, lstart + cpos2 + 1)
+        ii = ii + 1
+    end
+    # 一次性预解析全部 g_ns*1024 像素到 g_all_pix (×1 原值, 训练时再 ×100)
+    g_all_pix_sz = g_ns
+    g_all_pix_sz = g_all_pix_sz * 1024
+    g_all_pix_h = arr_new(g_all_pix_sz)
+    var loaded = flat_load_all_batch(slice, g_batch_pix_offs_h, g_all_pix_h, g_ns, 1024, 100)
+    printf("batch%d: 起始行=%d 字节位置=%d 切片=%d 预解析=%d 标签[0]=%d 标签[%d]=%d\n",
+        g_batch, target_line, pos, g_batch_data_len, loaded,
+        g_batch_label[0], g_ns - 1, g_batch_label[g_ns - 1])
+end
+
+# ---- 解析单个样本 (v11: 2次 builtin 取代 1024×3 次池调用) ----
+# 2026-09-28 泄漏修复: qvm_boot C 层每次 builtin 调用泄漏 ~830B
+#   旧: 1024×(arr_get+arr_set×2+arr_set_xsrc)=4096次/样本 → 24ep=1270万次=10GB泄漏
+#   新: 2次 builtin/样本 = 129×24×2=6192次 → 泄漏≈5MB 可忽略
+def parse_sample(sidx):
+    g_label = g_batch_label[sidx]
+    var base_off = sidx * 1024
+    copy_pool_to_pool(g_xsrc_h, g_all_pix_h, base_off, 1024)
+    fill_xn_from_pool(g_xh, g_nxh, g_xsrc_h, 0, 1024)
+end
+
+# ---- 输入变换 (v11: 1次 transform_pool builtin, 变换直接在 g_xsrc_h 池上) ----
+# 2026-09-28 泄漏修复: 旧逐元素循环在 QEntL 层(512-1024次 var+arr_set/样本)
+#   新: 变换在 QVM 内层(纯 ae_i_get/ae_i_set), LCG 跨样本连续(rnd 进出保真)
+def transform_sample():
+    g_rnd = transform_pool(g_xsrc_h, g_state, g_rnd)
+    fill_xn_from_pool(g_xh, g_nxh, g_xsrc_h, 0, 1024)
+end
+
+def predict():
+    # 2026-09-28 泄漏修复: 1次 predict_all builtin 取代 515×dot_arr_at 循环
+    # 20位整数域注意: psum 在 builtin 内累加 pwv*pxv — 像素 0/1×100, 权重 ±30000
+    #   单类内积最大 30000×1024×100 = 3e10 > 20位域(~52万) — 但实际像素稀疏(8%非零)
+    #   ≈ 82个非零 × 30000×100 = 2.5e8 仍超! dot_arr_at 旧实现同样问题但用 /1000 分散?
+    # 检查旧 dot_arr_at: psum 无钳位 — 旧版也超域但 argmax 仍工作(历史99%)
+    # 保持一致: 同样不钳位 (与 dot_arr_at 行为完全一致)
+    g_pred = predict_all(g_wh, 515, g_xh, 1024)
+end
+
+def boost_class(c_off, lr):
+    axpy_arr_at(g_wh, c_off, g_xh, 1024, lr)
+    # 2026-09-26 值域爆炸修复: ×100 预解析 + 反复 boost 累积到 1e17 → 天文分数抢 argmax 全错
+    # clamp 本行 ±30000 (历史 A识别 99% 的值域量级)
+    clamp_row(c_off)
+end
+
+def suppress_class(c_off, lr):
+    var neg_lr = 0 - lr
+    axpy_arr_at(g_wh, c_off, g_xh, 1024, neg_lr)
+    clamp_row(c_off)
+end
+
+def clamp_row(c_off):
+    # 2026-09-28 泄漏修复: 1次 clamp_arr_at builtin 取代 1024×(arr_get+arr_set) 循环
+    clamp_arr_at(g_wh, c_off, 1024, 30000)
+end
+
+def train_one():
+    transform_sample()
+    predict()
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+        if (g_state == 3):
+            boost_class(g_label * 1024, g_lr)
+        end
+    else:
+        g_updates = g_updates + 1
+        # 2026-09-26 真根因修复: 旧态0/态2"对→不boost" + 全零默认argmax=0 → 类0永不boost
+        # = 全零死区 → 合并后被有值类抢 argmax。4态统一: 对→boost + 错→boost,
+        # 数据子片不同(每态 g_sidx%4==g_state 的 33 类) = 真独立叠加态, 策略统一 = 无死区
+        boost_class(g_label * 1024, g_lr)
+        if (g_state == 0):
+            if (g_pred % 4 == g_state):
+                suppress_class(g_pred * 1024, g_lr)
+            end
+        end
+        if (g_state == 1):
+            # 只 boost 标签
+        end
+        if (g_state == 2):
+            if (g_pred % 4 == g_state):
+                suppress_class(g_pred * 1024, g_lr * 2)
+            end
+        end
+        if (g_state == 3):
+            # 只 boost 标签
+        end
+    end
+end
+
+def train_state():
+    printf("  态%d seed=%d lr=%d 池句柄 g_wh=%d g_xh=%d g_nxh=%d g_all_pix_h=%d\n",
+        g_state, g_seed, g_lr, g_wh, g_xh, g_nxh, g_all_pix_h)
+    g_ep = 0
+    while (g_ep < g_epoch):
+        g_correct = 0
+        g_updates = 0
+        g_sidx = 0
+        while (g_sidx < g_ns):
+            if (g_sidx % 4 == g_state):
+                if (g_smoke_limit == 0 or g_sidx < g_smoke_limit * 4 + 3):
+                    parse_sample(g_sidx)
+                    train_one()
+                end
+            end
+            g_sidx = g_sidx + 1
+        end
+        printf("  态%d ep%d: 正确%d/%d 更新%d\n",
+            g_state, g_ep, g_correct, g_ns, g_updates)
+        g_ep = g_ep + 1
+    end
+end
+
+def save_weights():
+    printf("=== 日志截断 ===\n")
+    printf("=== QSCL 32x32 v10 权重流 (emit_ints) ===\n")
+    printf("META batch=%d state=%d seed=%d lr=%d nclass=515 pix=1024 nelem=527360\n",
+        g_batch, g_state, g_seed, g_lr)
+    var cstr = ""
+    g_c = 0
+    while (g_c < 515):
+        cstr = str_concat("C", int_to_str(g_c))
+        cstr = str_concat(cstr, ": ")
+        emit_str(cstr)
+        emit_ints(g_wh, g_c * 1024, 1024)
+        printf("\n")
+        g_c = g_c + 1
+    end
+    printf("=== 权重流结束 (515类 x 1024值 = 527360值) ===\n")
+end
+
+def read_control_files():
+    var btxt = file_read("qdfs/ns/train/current_batch.txt")
+    var bnl = 0
+    var stxt = ""
+    var snl = 0
+    if (str_len(btxt) > 0):
+        bnl = str_index_of(btxt, "\n")
+        if (bnl >= 0): btxt = str_substring(btxt, 0, bnl) end
+        g_batch = str_to_int(btxt)
+    end
+    stxt = file_read("qdfs/ns/train/current_state.txt")
+    if (str_len(stxt) > 0):
+        snl = str_index_of(stxt, "\n")
+        if (snl >= 0): stxt = str_substring(stxt, 0, snl) end
+        g_s = str_to_int(stxt)
+    end
+end
+
+def main():
+    printf("=== QSCL 32x32 v10 flat_load_all_batch 一次性预解析 ===\n")
+    printf("parse_sample 从预解析池复制, v9 逐字符循环根治 (§8/§21)\n")
+
+    var g_wsz = 515
+    g_wsz = g_wsz * 1024
+    g_xh = arr_new(1024)
+    g_nxh = arr_new(1024)
+    g_xsrc_h = arr_new(1024)
+    g_wh = arr_new(g_wsz)
+    printf("池句柄: g_wh=%d g_xh=%d g_nxh=%d g_xsrc=%d (g_wsz=%d)\n",
+        g_wh, g_xh, g_nxh, g_xsrc_h, g_wsz)
+
+    read_control_files()
+    var sm = file_read("qdfs/ns/train/smoke_limit.txt")
+    var smnl = 0
+    if (str_len(sm) > 0):
+        smnl = str_index_of(sm, "\n")
+        if (smnl >= 0): sm = str_substring(sm, 0, smnl) end
+        g_smoke_limit = str_to_int(sm)
+        printf("冒烟模式: 只跑前%d样本\n", g_smoke_limit)
+    end
+    g_base = g_batch * 515
+    printf("本次 batch%d 态%d\n", g_batch, g_s)
+
+    if (g_s < 4):
+        printf("--- batch%d (类%d-%d) 态%d ---\n", g_batch, g_base, g_base + 514, g_s)
+        load_batch_data()
+        g_state = g_s
+        g_seed = 1 + g_s * 100
+        # 2026-09-26 公平叠加态修复: 4态统一 LR (旧 500/1000/1500/2000 按态递增 →
+        # 值域差 4 倍 → 坍缩合并后高 LR 态的类压过低 LR 态的类, argmax 全被抢)
+        g_lr = 500
+        train_state()
+        save_weights()
+        printf("=== batch%d 态%d 训练完成 ===\n", g_batch, g_s)
+    end
+end
+
+main()

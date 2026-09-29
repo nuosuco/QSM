@@ -1,0 +1,42 @@
+# 测试 dot_arr_at / axpy_arr_at 偏移变体批量op (经QVM二级路径验证)
+def main():
+    # ---- 测试a: dot_arr_at 偏移读 ----
+    var h = arr_new(70000)
+    var xh = arr_new(4)
+    arr_set(h, 65000, 1)
+    arr_set(h, 65001, 2)
+    arr_set(h, 65002, 3)
+    arr_set(h, 65003, 4)
+    arr_set(xh, 0, 1)
+    arr_set(xh, 1, 1)
+    arr_set(xh, 2, 1)
+    arr_set(xh, 3, 1)
+    var da = dot_arr_at(h, 65000, xh, 4)
+    printf("[TEST-a] dot_arr_at(h,65000,xh,4) = %d  (expect 10)\n", da)
+
+    # ---- 测试b: axpy_arr_at 整除语义 ----
+    var axh = arr_new(70000)
+    var axi = arr_new(4)
+    arr_set(axh, 65000, 0)
+    arr_set(axi, 0, 3)
+    var an = axpy_arr_at(axh, 65000, axi, 1, 500)
+    var got = arr_get(axh, 65000)
+    printf("[TEST-b] axpy_arr_at(off=65000,w=0,x=3,n=1,lr=500) -> w=%d  (expect 1, 整除=(3-0)*500/1000=1)\n", got)
+
+    # ---- 测试c: dot_arr 段0回归 ----
+    var a = arr_new(4)
+    var b = arr_new(4)
+    arr_set(a, 0, 10)
+    arr_set(a, 1, 10)
+    arr_set(a, 2, 10)
+    arr_set(a, 3, 10)
+    arr_set(b, 0, 1)
+    arr_set(b, 1, 1)
+    arr_set(b, 2, 1)
+    arr_set(b, 3, 2)
+    var d0 = dot_arr(a, b, 4)
+    printf("[TEST-c] dot_arr(a,b,4) = %d  (expect 50, 段0回归)\n", d0)
+    return 0
+end
+
+main()

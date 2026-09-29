@@ -1,0 +1,6 @@
+# test as regular function call (not builtin)
+def emit_str(s):
+    printf("%s", s)
+    return 0
+end
+emit_str("HELLO_AS_FUNC")

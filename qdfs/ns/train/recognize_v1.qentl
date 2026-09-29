@@ -1,0 +1,149 @@
+# recognize_v1.qentl - QVM二级推理器 (权重池+dot_arr_at+argmax)
+#
+# 规格:
+#   输入:  像素1024值(逗号分隔, 由 b_recognize.sh 写入 /tmp/recognize_input.txt)
+#   权重:  qdfs/ns/models/qscl_32x32_b0.w (515类x1024值=527360, 布局 W[c*1024+p])
+#   流程:  load_ints_from_file(C原生)批量入权重池 → load_ints_from_file批量入像素池
+#           → 512类 dot_arr_at 内积 → argmax → printf 输出
+#   输出:  'recognize: class=k score=S'
+#
+# 2026-09-13 关键修复(实测根因):
+#   旧版用 flat_load(path, xh, 1, 1024) 装载像素 → 实测 nzero_x=0, 像素池全零,
+#   argmax 恒返回 class=0 (探针: nzero_x=0 sum_x=0, 而输入文件确有123个非零像素)。
+#   flat_load 走 QEntL 层 str_index_of/str_substring/str_to_int 循环解析, 在本场景
+#   静默失效(与 §5 长串原语异常一致), 不报错只是读空 → 伪"识别成功"。
+#   改用与权重同一通道 load_ints_from_file(C原生, 一级, 零字符串分配), 像素加载已验证
+#   nzero_x=123 sum_x=123 正确。教训: 批量数值装载一律走 C 原生 builtin, 禁用 QEntL
+#   层 str_* 循环解析(§8/§21)。
+#
+# 模型状态(实测, 非臆造):
+#   qscl_32x32_b0.w 仅 81 类非零, 其中 3 类(2/64/98)的 s2 shard 是 |W|>1e16 的溢出
+#   垃圾值 → 推理时跳过这 3 类。其余 434 类权重全零(含 class10) → 数学上不可能被
+#   argmax 识别。故本推理器链路正确但模型未收敛, class10 类闭环不成立(见任务报告)。
+#
+# 用法:
+#   bash build/b_recognize.sh "样本1"          # 从训练数据第1行抽像素
+#   bash build/b_recognize.sh "0,0,1,..."      # 直接给1024像素
+#   bin/qvm_boot run run/recognize_v1.qbc      # 直接调用(target.qbc 已就位时)
+
+# ---- 池句柄 ----
+var g_wh = 0          # 权重池句柄 (515*1024=527360 int)
+var g_xh = 0          # 输入像素池句柄 (1024 int)
+
+# ---- 池大小 (计算式构造, 避开u16字面量截断 §20⑧) ----
+var g_wsz = 515
+g_wsz = g_wsz * 1024  # 527360
+
+# ---- 推理状态 ----
+var g_max_val = 0
+var g_max_idx = 0
+var g_score = 0
+var g_c = 0
+var g_i = 0
+var g_nvalid = 0
+
+# ---- 损坏类排除表 (2026-09-13 实测诊断) ----
+# qscl_32x32_b0.w 中 class 2/64/98 的 s2 shard 是溢出垃圾值(|W|>1e16)。
+# 若不跳过, 它们以 1e17 级 score 恒压过所有真类(离线复核: row1 时 class2 score=4.18e17,
+# 真类最高仅 1.03e7) → argmax 永返 class2。故跳过, 保留 512 类参与。
+var g_skip0 = 2
+var g_skip1 = 64
+var g_skip2 = 98
+
+def is_skip_cls(c):
+    if (c == g_skip0): return 1 end
+    if (c == g_skip1): return 1 end
+    if (c == g_skip2): return 1 end
+    return 0
+end
+
+# ---- 加载验证 ----
+var g_nw = 0
+var g_nx = 0
+
+# ---- 文件路径 (qvm_boot cwd=/root/QSM/QLife) ----
+var g_wfile = "qdfs/ns/models/qscl_32x32_b0.w"
+var g_pifile = "/tmp/recognize_input.txt"
+
+# ---- 一次性加载权重 (C原生, 零字符串分配) ----
+def load_weights():
+    g_nw = load_ints_from_file(g_wfile, g_wh, g_wsz)
+end
+
+# ---- 一次性加载像素 (C原生, 与权重同通道; 修复 flat_load 全零缺陷) ----
+def load_pixel_input():
+    g_nx = load_ints_from_file(g_pifile, g_xh, 1024)
+end
+
+# ---- 512类内积 + argmax (跳过损坏类 2/64/98) ----
+# 注意: (a) QCL 无 continue, 用嵌套 if/else 跳过;
+#       (b) QEntL 整数是 u16 无符号(§19), 不能设负数哨兵,
+#           故用 fv 标志以"第一个参与类"的 score 作初始值。
+def predict():
+    g_max_val = 0
+    g_max_idx = 0
+    g_c = 0
+    g_nvalid = 0
+    var fv = 1
+    while (g_c < 515):
+        if (is_skip_cls(g_c) == 1):
+            g_c = g_c + 1
+        else:
+            g_score = dot_arr_at(g_wh, g_c * 1024, g_xh, 1024)
+            if (fv == 1):
+                g_max_val = g_score
+                g_max_idx = g_c
+                fv = 0
+            else:
+                if (g_score > g_max_val):
+                    g_max_val = g_score
+                    g_max_idx = g_c
+                end
+            end
+            g_c = g_c + 1
+        end
+    end
+    g_nvalid = 515 - 3
+end
+
+# ---- 主流程 ----
+def main():
+    printf("=== recognize_v1: QVM二级推理器 ===\n")
+
+    # 1. 创建池 (计算式避开u16截断)
+    g_wh = arr_new(g_wsz)
+    g_xh = arr_new(1024)
+    printf("池创建: g_wh=%d g_xh=%d wsz=%d\n", g_wh, g_xh, g_wsz)
+
+    # 2. 加载权重 (527360值, C原生批量)
+    load_weights()
+    printf("权重加载: %d值  W[1]=%d\n", g_nw, arr_get(g_wh, 1))
+
+    # 3. 加载像素输入 (1024值, C原生批量)
+    load_pixel_input()
+    printf("像素加载: %d值\n", g_nx)
+    # 加载验证: 统计非零像素数(确认不是全零)
+    g_i = 0
+    var nz = 0
+    var sx = 0
+    var pv = 0
+    while (g_i < 1024):
+        pv = arr_get(g_xh, g_i)
+        if (pv != 0): nz = nz + 1 end
+        sx = sx + pv
+        g_i = g_i + 1
+    end
+    printf("验证: nzero_x=%d sum_x=%d\n", nz, sx)
+    if (nz == 0):
+        printf("recognize: class=-1 score=0 (输入像素全零, 无法识别)\n")
+    end
+
+    # 4. 推理: 512类dot_arr_at + argmax
+    predict()
+
+    # 5. 输出
+    printf("recognize: class=%d score=%d\n", g_max_idx, g_max_val)
+    printf("info: nvalid_classes=%d (跳过损坏类2/64/98)\n", g_nvalid)
+end
+
+main()

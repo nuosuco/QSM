@@ -1,0 +1,56 @@
+# save_noio.qentl — save 循环去掉 file_write_bytes（对照归因实验）
+#
+# 与 save_probe.qentl 唯一差异: 去掉 file_write_bytes 落盘，只做 str_concat。
+# 判据: 若本程序 RSS 小(≈210MB+训练开销)，则 4.66GB 增量主要来自 file_write_bytes
+#       每类的 ~9.27MB 分配/不回收，而非 str_concat 本身。
+# 铁律合规: 无 >65535 字面量; 无 elif; 无 var 遮蔽全局
+
+var g_wh = 0
+var g_c = 0
+
+def fill_pool():
+    var sv_j = 0
+    while (sv_j < 2500):
+        if (sv_j % 25 < 4):
+            arr_set(g_wh, sv_j, 0 - 100)
+        else:
+            if (sv_j % 25 < 20):
+                arr_set(g_wh, sv_j, 100)
+            end
+        end
+        sv_j = sv_j + 1
+    end
+end
+
+def main():
+    printf("N:BEGIN\n")
+    var ws = 515
+    ws = ws * 1024
+    g_wh = arr_new(ws)
+    fill_pool()
+    var rnd = 7
+    g_c = 0
+    while (g_c < 515):
+        var cls = ""
+        var b = g_c * 1024
+        var j = 0
+        while (j < 1024):
+            var vv = arr_get(g_wh, b + j)
+            rnd = rnd * 1103 + 12345
+            if (rnd < 0): rnd = 0 - rnd end
+            if (rnd % 25 < 2):
+                vv = 100
+            end
+            cls = str_concat(cls, int_to_str(vv))
+            cls = str_concat(cls, ",")
+            j = j + 1
+        end
+        if (g_c % 50 == 0):
+            printf("N:prog class%d clen=%d\n", g_c, str_len(cls))
+        end
+        g_c = g_c + 1
+    end
+    printf("N:NOIO_DONE classes=515\n")
+end
+
+main()

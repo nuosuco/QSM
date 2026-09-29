@@ -1,0 +1,91 @@
+# leak_probe_v10.qentl - 训练热路径泄漏定位探针
+#
+# 背景(2026-09-27 实测): v10 全量(129样本) 1ep RSS=858MB, 2ep=1300MB
+#   → +442MB/epoch 线性泄漏, 24epoch ≈ 11GB 会挤爆服务器
+# 本探针隔离热路径各环节, 找出泄漏源:
+#   阶段1: arr_new 池 + 1万次 arr_get/arr_set 循环
+#   阶段2: 1万次 dot_arr_at(1024内积) 循环  ← predict() 6.7万次/epoch
+#   阶段3: 1万次 axpy_arr_at+clamp 模拟 boost_class ← 训练写路径
+#   每阶段打印进度 (RSS 由外部 /usr/bin/time 测)
+#
+# 运行: bash qdfs/ns/train/probe_v10.sh (外部先 arr_new 池同 v10)
+
+# ---- 池句柄 ----
+var g_wh = 0
+var g_xh = 0
+var g_nxh = 0
+
+var g_wsz = 515
+g_wsz = g_wsz * 1024
+
+var g_i = 0
+var g_c = 0
+var g_ep = 0
+var g_v = 0
+var g_score = 0
+
+def main():
+    printf("=== leak_probe_v10: 热路径泄漏定位 ===\n")
+    g_wh = arr_new(g_wsz)
+    g_xh = arr_new(1024)
+    g_nxh = arr_new(1024)
+    printf("池创建: %d %d %d wsz=%d\n", g_wh, g_xh, g_nxh, g_wsz)
+
+    # 初始化像素池 (模拟128非零像素)
+    g_i = 0
+    while (g_i < 1024):
+        if (g_i % 8 == 0):
+            arr_set(g_xh, g_i, 100)
+        end
+        arr_set(g_nxh, g_i, 0 - arr_get(g_xh, g_i))
+        g_i = g_i + 1
+    end
+
+    # 阶段1: arr_get/arr_set 1万次
+    g_ep = 0
+    while (g_ep < 10):
+        g_i = 0
+        while (g_i < 1000):
+            g_v = arr_get(g_wh, g_ep * 1000 + g_i)
+            arr_set(g_wh, g_ep * 1000 + g_i, g_v + 1)
+            g_i = g_i + 1
+        end
+        printf("阶段1 rep%d 完成\n", g_ep)
+        g_ep = g_ep + 1
+    end
+
+    # 阶段2: dot_arr_at 1万次 (每次1024内积)
+    g_ep = 0
+    while (g_ep < 10000):
+        g_score = dot_arr_at(g_wh, (g_ep % 515) * 1024, g_xh, 1024)
+        if (g_ep % 2000 == 0):
+            printf("阶段2 rep%d score=%d\n", g_ep, g_score)
+        end
+        g_ep = g_ep + 1
+    end
+    printf("阶段2 完成 1万次\n")
+
+    # 阶段3: axpy+clamp 模拟 1万次 boost
+    g_ep = 0
+    while (g_ep < 10000):
+        axpy_arr_at(g_wh, (g_ep % 515) * 1024, g_xh, 1024, 5)
+        var ci = 0
+        while (ci < 1024):
+            g_v = arr_get(g_wh, (g_ep % 515) * 1024 + ci)
+            if (g_v > 30000):
+                arr_set(g_wh, (g_ep % 515) * 1024 + ci, 30000)
+            end
+            if (g_v < 0 - 30000):
+                arr_set(g_wh, (g_ep % 515) * 1024 + ci, 0 - 30000)
+            end
+            ci = ci + 1
+        end
+        if (g_ep % 2000 == 0):
+            printf("阶段3 rep%d\n", g_ep)
+        end
+        g_ep = g_ep + 1
+    end
+    printf("=== 探针完成 ===\n")
+end
+
+main()

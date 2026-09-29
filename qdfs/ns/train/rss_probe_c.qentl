@@ -1,0 +1,20 @@
+# rss_probe.c — 大索引 arr_set/arr_get 往返校验（probe_b 填值出零的排查）
+var g_wh = 0
+var g_j = 0
+
+def main():
+    printf("C:BEGIN\n")
+    g_wh = arr_new(527360)
+    g_j = 0
+    while (g_j < 527360):
+        arr_set(g_wh, g_j, 50)
+        g_j = g_j + 1
+    end
+    printf("C:filled handle=%d\n", g_wh)
+    printf("C:idx0=%d idx511=%d idx10000=%d idx500000=%d idx527359=%d\n",
+        arr_get(g_wh, 0), arr_get(g_wh, 511), arr_get(g_wh, 10000),
+        arr_get(g_wh, 500000), arr_get(g_wh, 527359))
+    printf("C:DONE\n")
+end
+
+main()

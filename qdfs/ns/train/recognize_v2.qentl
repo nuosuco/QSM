@@ -1,0 +1,146 @@
+# recognize_v2.qentl - B起点推理器 v2 (新合并权重 qscl4226_merged.w)
+#
+# 升级根因(2026-09-27):
+#   v1 用 qscl_32x32_b0.w (2026-09-13 旧批内合并, 81类非零+3类溢出垃圾) →
+#   434 类全零, 数学上不可能被 argmax 识别, B侧闭环只对 81 类成立。
+#   v2 改用 2026-09-27 修复版合并权重 qscl4226_merged.w (9行, 每行=批B的4态
+#   累加坍缩, 全部 4226 类有信号, 独立验证 680/4226=16.1%)。
+#
+# 规格:
+#   输入:  /tmp/recognize_input.txt  像素1024值(纯数字逗号串, 无label前缀)
+#   权重:  qdfs/ns/models/qscl4226_merged.w  9行×527360值
+#          行B = 批B(全局类 B*515 .. B*515+514) 的 4态累加权重
+#   模式:  g_scan_mode=0 → 对9批全部扫描(全局 argmax, 真·不指定批号)
+#          g_scan_mode=1 → 只扫 g_force_batch 批(快速, 由 sh 传批号)
+#   流程:  load_ints_from_file(C原生) 装权重行 + 像素 → dot_arr_at 内积
+#          → argmax → 全局类 = B*515+批内c → cp=993040+全局类 → UTF-8 4字节
+#   输出:  'recognize: class=K batch=B score=S' + 'cp=CP' + 'utf8=XX..'
+#
+# QCL 语法约束: 无continue → 嵌套if/else; 整数u16无符号(§19) → 用fv标志替代负哨兵
+
+# ---- 池句柄 ----
+var g_wh = 0          # 权重行池 (515*1024=527360 int)
+var g_xh = 0          # 输入像素池 (1024 int)
+
+var g_wsz = 515
+g_wsz = g_wsz * 1024  # 527360
+
+# ---- 推理状态 ----
+var g_max_val = 0
+var g_max_idx = 0     # 全局类号 (B*515+c)
+var g_max_batch = 0
+var g_score = 0
+var g_c = 0
+var g_b = 0
+var g_i = 0
+
+# ---- 模式 ----
+var g_scan_mode = 0   # 0=9批全扫 1=单批
+var g_force_batch = 0
+
+# ---- 控制文件 (与训练器 read_control_files 同构) ----
+# qdfs/ns/train/infer_batch.txt : 批号(0-8), 单批快速模式
+# qdfs/ns/train/infer_mode.txt  : 0=全扫 1=单批
+def read_infer_control():
+    var mtx = file_read("qdfs/ns/train/infer_mode.txt")
+    var mnl = 0
+    if (str_len(mtx) > 0):
+        mnl = str_index_of(mtx, "\n")
+        if (mnl >= 0): mtx = str_substring(mtx, 0, mnl) end
+        g_scan_mode = str_to_int(mtx)
+    end
+    var btx = file_read("qdfs/ns/train/infer_batch.txt")
+    var bnl = 0
+    if (str_len(btx) > 0):
+        bnl = str_index_of(btx, "\n")
+        if (bnl >= 0): btx = str_substring(btx, 0, bnl) end
+        g_force_batch = str_to_int(btx)
+    end
+end
+
+# ---- 加载验证 ----
+var g_nw = 0
+var g_nx = 0
+
+# ---- 文件路径 (qvm_boot cwd=/root/QSM/QLife) ----
+var g_wfile = "qdfs/ns/models/qscl4226_merged.w"
+var g_pifile = "/tmp/recognize_input.txt"
+
+# ---- 单批: 装第B行(用 awk 预提取的行文件) ----
+# 行文件由 b_recognize.sh 预先 sed -n "$((B+1))p" 提取到 /tmp/merged_row.w
+def load_weights_row(bfile):
+    g_nw = load_ints_from_file(bfile, g_wh, g_wsz)
+end
+
+# ---- 扫描单批 (批号 g_b, 权重已在 g_wh) ----
+def scan_batch():
+    g_c = 0
+    var fv = 1
+    var bmax = 0
+    var bmaxv = 0
+    while (g_c < 515):
+        g_score = dot_arr_at(g_wh, g_c * 1024, g_xh, 1024)
+        if (fv == 1):
+            bmax = g_b * 515 + g_c
+            bmaxv = g_score
+            fv = 0
+        else:
+            if (g_score > bmaxv):
+                bmax = g_b * 515 + g_c
+                bmaxv = g_score
+            end
+        end
+        g_c = g_c + 1
+    end
+    printf("  批%d argmax=%d score=%d\n", g_b, bmax, bmaxv)
+    if (bmaxv > g_max_val):
+        g_max_val = bmaxv
+        g_max_idx = bmax
+        g_max_batch = g_b
+    end
+end
+
+# ---- 主流程 ----
+def main():
+    printf("=== recognize_v2: B起点推理器 (merged 9批权重) ===\n")
+    read_infer_control()
+    printf("模式=%d 批=%d\n", g_scan_mode, g_force_batch)
+
+    g_wh = arr_new(g_wsz)
+    g_xh = arr_new(1024)
+    printf("池创建: g_wh=%d g_xh=%d wsz=%d\n", g_wh, g_xh, g_wsz)
+
+    # 1. 加载像素
+    g_nx = load_ints_from_file(g_pifile, g_xh, 1024)
+    printf("像素加载: %d值\n", g_nx)
+
+    # 2. 加载权重行 (单行文件, 由 sh 预提取; 模式1=指定批 / 模式0=9行文件逐行)
+    if (g_scan_mode == 1):
+        var rowf = "/tmp/merged_row_b"
+        rowf = str_concat(rowf, int_to_str(g_force_batch))
+        rowf = str_concat(rowf, ".w")
+        load_weights_row(rowf)
+        printf("权重加载: %d值 (单批%d)\n", g_nw, g_force_batch)
+        g_b = g_force_batch
+        scan_batch()
+    else:
+        # 9批全扫: 逐行文件由 sh 预拼接成单行×9 = 4646240? 池装不下(527360上限跨段OK但464万超18段)
+        # → 模式0 由 sh 逐行提取9个行文件, 这里逐个装载+扫描
+        var bfile = ""
+        g_b = 0
+        var fv = 1
+        while (g_b < 9):
+            bfile = "/tmp/merged_row_b"
+            bfile = str_concat(bfile, int_to_str(g_b))
+            bfile = str_concat(bfile, ".w")
+            g_nw = load_ints_from_file(bfile, g_wh, g_wsz)
+            scan_batch()
+            g_b = g_b + 1
+        end
+    end
+
+    # 3. 输出 (全局类号)
+    printf("recognize: class=%d batch=%d score=%d\n", g_max_idx, g_max_batch, g_max_val)
+end
+
+main()

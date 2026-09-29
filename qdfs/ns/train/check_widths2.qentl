@@ -1,0 +1,28 @@
+# 测试: 计算式是否绕过 u16 字面量截断 (v9 修复方案的可行性验证)
+def main():
+    # 方案A: 计算式
+    var g_wsz = 515
+    g_wsz = g_wsz * 1024
+    printf("[A] g_wsz = 515*1024 = %d  (expect 527360)\\n", g_wsz)
+    var hA = arr_new(g_wsz)
+    printf("[A] handle hA=%d  (expect 3072 若u16截断, 或大值)\\n", hA)
+    arr_set(hA, 527359, 123)
+    arr_set(hA, 3072, 999)
+    printf("[A] hA[527359]=%d (expect 123)  hA[3072]=%d (expect 999, 若=0说明截断)\\n",
+        arr_get(hA, 527359), arr_get(hA, 3072))
+
+    # 方案B: 小池先, 大池最后, 计算式
+    var xhB = arr_new(1024)
+    var nxhB = arr_new(1024)
+    var hB = arr_new(g_wsz)
+    printf("[B] xhB=%d nxhB=%d hB=%d\\n", xhB, nxhB, hB)
+    arr_set(hB, 527359, 123)
+    arr_set(hB, 3072, 999)
+    arr_set(xhB, 0, 456)
+    printf("[B] hB[527359]=%d (expect 123) hB[3072]=%d (expect 999) xhB[0]=%d (expect 456)\\n",
+        arr_get(hB, 527359), arr_get(hB, 3072), arr_get(xhB, 0))
+
+    return 0
+end
+
+main()

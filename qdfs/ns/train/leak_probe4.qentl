@@ -1,0 +1,6 @@
+var g_size = 515
+g_size = g_size * 1024
+var g_h = arr_new(g_size)
+printf("h=%d\n", g_h)
+var g_last = g_size - 1
+printf("last: %d\n", arr_get(g_h, g_last))

@@ -1,0 +1,39 @@
+# rss_probe.d — 定位数组中段地址失效: 区分「循环写入bug」还是「索引寻址bug」
+var g_wh = 0
+var g_j = 0
+
+def fill_small():
+    var k = 0
+    while (k < 30001):
+        arr_set(g_wh, k, 7)
+        k = k + 1
+    end
+end
+
+def main():
+    printf("D:BEGIN\n")
+    g_wh = arr_new(527360)
+    fill_small()
+    printf("D:loopfill(0..30000)=7 -> idx0=%d idx100=%d idx1000=%d idx10000=%d idx30000=%d\n",
+        arr_get(g_wh, 0), arr_get(g_wh, 100), arr_get(g_wh, 1000),
+        arr_get(g_wh, 10000), arr_get(g_wh, 30000))
+    # 字面量索引直接写读（不经循环变量）
+    arr_set(g_wh, 5000, 111)
+    arr_set(g_wh, 15000, 222)
+    arr_set(g_wh, 400000, 333)
+    arr_set(g_wh, 527359, 444)
+    printf("D:literal -> idx5000=%d idx15000=%d idx400000=%d idx527359=%d\n",
+        arr_get(g_wh, 5000), arr_get(g_wh, 15000), arr_get(g_wh, 400000),
+        arr_get(g_wh, 527359))
+    # 局部+全局索引表达式 arr_get(h, b+i) 形态（v9 保存循环的真实写法）
+    var b = 8 * 1024
+    var i = 0
+    printf("D:expr b=%d -> idx(b+0)=%d idx(b+512)=%d\n", b,
+        arr_get(g_wh, b + 0), arr_get(g_wh, b + 512))
+    g_j = 8 * 1024
+    printf("D:expr global g_j=%d -> idx(g_j+0)=%d idx(g_j+512)=%d\n", g_j,
+        arr_get(g_wh, g_j + 0), arr_get(g_wh, g_j + 512))
+    printf("D:DONE\n")
+end
+
+main()

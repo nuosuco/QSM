@@ -1,0 +1,39 @@
+# 诊断2: 多个池共用一个全局数组变量 → 句柄污染根因定位
+def main():
+    printf("=== 诊断2: 全局数组槽句柄污染 ===\n")
+    var g_ws[4]
+    g_ws[0] = arr_new(65536)
+    arr_set(g_ws[0], 0, 77)
+    printf("[1] g_ws[0]=%d, arr_get[g_ws[0],0]=%d (期望77)\n", g_ws[0], arr_get(g_ws[0], 0))
+    g_ws[1] = arr_new(4)
+    printf("[2] g_ws[1]=%d, g_ws[0]=%d, arr_get[g_ws[0],0]=%d (期望77)\n",
+        g_ws[1], g_ws[0], arr_get(g_ws[0], 0))
+    arr_set(g_ws[1], 0, 1)
+    printf("[3] 写 g_ws[1][0]=1 后, arr_get[g_ws[0],0]=%d (期望77)\n",
+        arr_get(g_ws[0], 0))
+
+    # 独立全局变量（v9 用法）
+    printf("--- 独立全局变量 ---\n")
+    g_wh = arr_new(65536)
+    g_xh = arr_new(4)
+    arr_set(g_wh, 0, 77)
+    arr_set(g_xh, 0, 1)
+    printf("[4] g_wh=%d g_xh=%d, wh[0]=%d (期望77) xh[0]=%d (期望1)\n",
+        g_wh, g_xh, arr_get(g_wh, 0), arr_get(g_xh, 0))
+    axpy_arr_at(g_wh, 0, g_xh, 1, 1000)
+    printf("[5] axpy后 wh[0]=%d (期望78)\n", arr_get(g_wh, 0))
+
+    # 三个池独立全局变量
+    printf("--- 三个池独立全局变量 ---\n")
+    g_wh2 = arr_new(65536)
+    g_xh2 = arr_new(4)
+    g_nxh2 = arr_new(4)
+    arr_set(g_wh2, 0, 5)
+    arr_set(g_xh2, 0, 1)
+    arr_set(g_nxh2, 0, 2)
+    printf("[6] wh2=%d xh2=%d nxh2=%d -> wh[0]=%d(期望5) x[0]=%d(期望1) nx[0]=%d(期望2)\n",
+        g_wh2, g_xh2, g_nxh2, arr_get(g_wh2, 0), arr_get(g_xh2, 0), arr_get(g_nxh2, 0))
+    return 0
+end
+
+main()

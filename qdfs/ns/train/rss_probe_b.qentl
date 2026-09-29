@@ -1,0 +1,33 @@
+# rss_probe.b — 仅保存循环（515类 x 1024值 = 527360 次 printf），形态照抄 save_weights_stderr
+var g_wh = 0
+var g_c = 0
+var g_j = 0
+
+def main():
+    printf("B:BEGIN\n")
+    g_wh = arr_new(527360)
+    g_j = 0
+    while (g_j < 527360):
+        arr_set(g_wh, g_j, 50)
+        g_j = g_j + 1
+    end
+    printf("B:pool g_wh=%d\n", g_wh)
+    g_c = 0
+    while (g_c < 515):
+        printf("C%d: ", g_c)
+        var b = g_c * 1024
+        g_j = 0
+        while (g_j < 1024):
+            printf("%d", arr_get(g_wh, b + g_j))
+            if (g_j < 1023):
+                printf(",")
+            end
+            g_j = g_j + 1
+        end
+        printf("\n")
+        g_c = g_c + 1
+    end
+    printf("B:SAVE_DONE\n")
+end
+
+main()

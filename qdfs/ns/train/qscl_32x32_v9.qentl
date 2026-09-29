@@ -1,0 +1,595 @@
+# QSCL 32×32 真训练器 v9 - 池句柄 + 偏移变体批量op版（重构自 v8）
+#
+# ============================================================================
+# v9 修掉 v8 的三处结构错（子代理A铁证 + SKILL §20 破局方向 ①③④）:
+#
+#  结构错1: 9段布局批量op读不了
+#     v8 用 9段定长数组 g_W0-8[65535] + get_w/set_w 段路由 if链。
+#     dot_arr/axpy_arr 批量op 只认池句柄（arr_new 返回值）；传 g_W0 会被
+#     解析成池"段0"、传裸整数 g_c*1024 直接错 → v8 的 predict() 里
+#     dot_arr(g_c*1024, 0, 1024) 传的是裸整数偏移量，根本读不到权重。
+#     v9 修法: g_wh = arr_new(527360) 池化单数组，句柄存全局 int（禁9段布局），
+#     用偏移变体 dot_arr_at/axpy_arr_at 跨类寻址。
+#
+#  结构错2: 传整数非句柄
+#     v9 所有批量op 第一/第三参数都是 arr_new 返回的句柄（g_wh / g_xh / g_nxh），
+#     绝不再传裸整数或段数组。c*1024 只作为 off 偏移参数出现。
+#
+#  结构错3: g_lr/1000 整除=0
+#     QVM 整数是 u16 且除法为整除。g_lr ∈ {500,1000,1500,2000}：
+#     g_lr/1000 → 500/1000=0（态0 完全无学习！）、1500/1000=1、2000/1000=2。
+#     v8 的 boost_class(g_label*1024, g_lr/1000) 在训练器层先整除再传，
+#     态0 学习率被整除成 0，态2 抑制 g_lr*2/1000=3（精度也丢）。
+#     v9 修法: g_lr 原值(500/1000/1500/2000) 直接传给 axpy_arr_at；
+#     除以1000 由 op 内部做（见 axpy_arr_at 接口定义）。本文件绝无 g_lr/1000。
+#
+# 附带修 v7b 的落盘垃圾值 bug（c1 max=420万、c3 max=24.5亿=溢出错值）:
+#   根因: save_state_weights 用 get_w() 读9段数组 → 池句柄/段路由错位读到
+#         越界内存的随机整数（实测 c0.w = 0,3,5,7,... 递增计数器，非权重）。
+#   v9 修法: 权重值经 arr_get(g_wh, ...) 从真池读回，printf 打到 stderr
+#     （QVM printf 实际写 stderr，见 SKILL §12），每类前打标记行 "C<c>: "，
+#     shell 用 2> stream 收集，再用 split_shards.awk 按标记切成 515 个分片。
+#   禁止 str_concat 拼 527360 值长串（GB级泄漏，v7b/v8 的教训）。
+#
+# 坍缩合并（v8 的 state=9 思路保留，但改为 shell 侧合并）:
+#   v8 state=9 在 QVM 内做 515×1024=527360 次逐元素池读写累加 = SKILL §20③
+#   实测 25万次 ae 池访问 420s 超时，52.7万次必超时 → 热路径禁用。
+#   v9: QVM 只负责把每态权重 printf 到 stderr（2> 收集成单流），
+#       shell 侧 `merge_32x32.sh` 做 4态位置累加（按位置直接累加，不归一，
+#       与 v7b merge_state_file 的 get_w+val 坍缩定义一致）。
+#       QVM 内保留 merge_state_file() 作为可选的池内累加实现，默认不调用。
+#
+# 批量op 接口（子代理F实装中，主控已定死，直接用）:
+#   dot_arr_at(h, off, xh, n)  = Σ_{i∈[0,n)} pool[h].data[off+i] * pool[xh].data[i]
+#   axpy_arr_at(h, off, xh, n, lr) = pool[h].data[off+i] += (pool[xh].data[i]
+#                                  - pool[h].data[off+i]) * lr / 1000
+#   （op 内部除1000；lr 传原值 500-2000，绝不在训练器里做 g_lr/1000 整除）
+#   池句柄 h/xh 必须是 arr_new(n) 返回的句柄(int)，存全局int变量。传裸整数=错。
+#
+#  ⚠️ 给 F 的偏移类型注意（u16 溢出风险）:
+#   c 范围 0..514，off = c*1024 最大 = 514*1024 = 526336，远超 u16 上限 65535。
+#   本文件把 g_c 声明为普通 int、直接写 c * 1024，依赖 QVM 编译器把该乘法
+#   按 int(i32) 求值后再传给 op。若 F 的 _at 实装把 off 参数按 u16 存/传，
+#   类 64..514（off 65536..526336）会被截断成 off%65536，读错位置 → 伪结果。
+#   佐证: arr_new(527360) 与 arr_set(g_xh, g_i, v) 的 size/idx 参数本身也是
+#   527360 量级（远超 u16），说明池 API 的尺寸/下标已是宽类型；off 应一致。
+#   若实测发现类≥64 的分数全错，优先查 off 参数位宽，而不是怀疑本训练器。
+#
+#   本文件 u16 安全的值域清单（均已核）:
+#     g_c/g_sidx/g_i/g_j ∈ 0..1023 或 0..514   OK
+#     g_lr ∈ {500,1000,1500,2000}；g_lr*2 最大 4000   OK
+#     g_score（点积）≤ 1024×(权重上限) —— 若权重累积超 63 会被 u16 截断，
+#       这是收敛性问题（axpy lr=500~2000 下 x∈{0,1} 时 W→x 的吸引子幅度≤1，
+#       故权重基本停在 [-lr/1000, 1] 量级，安全）；probe_v9 会实测 wh 值域。
+#
+# QCL 语法坑合规（SKILL §3/§7）:
+#   - 无 elif，全部 else { if ... end } 嵌套
+#   - var 不与函数参数同名（hex2dec 参数 hex 无冲突；boost_class 参数 c_off/lr 无冲突）
+#   - 全局变量文件顶部一次性声明；函数内绝不再 var 同名全局（§7 遮蔽陷阱）
+#   - 无字符串字面量 + 拼接，一律 str_concat
+#   - QEntL 整数 u16 上限 65535：527360/515/1024 等量只作为 arr_new 参数与
+#     off 偏移（int 型）出现，u16 变量只存 0..514 / 0..1023 / 分数等小值
+#
+# 本文件当前不运行不编译（F 的偏移变体 op 未编译完）。
+#
+# 运行方式（op 就绪后，主控执行）:
+#   for s in 0 1 2 3; do
+#     echo $s > qdfs/ns/train/current_state.txt
+#     echo $b > qdfs/ns/train/current_batch.txt
+#     ./bin/qcl_boot_c run/qscl_32x32_v9.qbc run/qscl_32x32_v9.qbc >/dev/null \
+#         2> qdfs/ns/models/qscl_32x32_b${b}_s${s}_stream.w
+#     awk -v dir=qdfs/ns/models -f qdfs/ns/train/split_shards.awk \
+#         qdfs/ns/models/qscl_32x32_b${b}_s${s}_stream.w
+#   done
+#   sh qdfs/ns/train/merge_32x32.sh 0          # 4态坍缩 → b0.w
+#   awk -v mode=block -f qdfs/ns/train/verify_weights.awk \
+#       qdfs/ns/models/qscl_32x32_b0.w          # 结构验证
+#   awk -v batch=0 -f qdfs/ns/train/verify_accuracy.awk \
+#       qdfs/ns/models/qscl_32x32_b0_m_c*.w \
+#       < qdfs/ns/data/yi_glyph_4226_32x32.data  # 准确率复算
+# ============================================================================
+
+# ---- 池句柄（v9 核心改动：池化单数组，禁 9段 g_W0-8 布局）----
+var g_wh = 0            # 权重池句柄 = arr_new(527360)，存全局 int；515类×1024像素
+var g_xh = 0            # 当前样本输入池句柄 = arr_new(1024)
+var g_nxh = 0           # 负样本辅助池句柄 = arr_new(1024)，nxh[i] = -x[i]（见 suppress_class）
+
+# ---- 像素/标签/行解析（数据准备走 g_x 单段直索引小数组，不走池）----
+var g_x[1024]
+var g_line_off_arr[4228]   # 行偏移表（一次性 O(N) 预扫，同 v7b/v8）
+var g_lines_total = 0
+
+var g_data = ""
+var g_data_len = 0
+var g_line = ""
+var g_rem = ""
+var g_pix_str = ""
+var g_pv = ""
+var g_c1 = 0
+var g_ps = 0
+var g_pe = 0
+var g_nl = 0
+var g_row_start = 0
+var g_row_line = 0          # 本批起始行号（batch*515，行偏移表基址）
+var g_i = 0
+var g_label = 0
+var g_pred = 0
+var g_score = 0
+var g_max_val = 0
+var g_max_idx = 0
+var g_correct = 0
+var g_updates = 0
+var g_lr = 500
+var g_rnd = 0
+var g_ep = 0
+var g_epoch = 3             # 由 smoke_v9fix.sh 按模式设定: 冒烟1/正式3
+var g_smoke_limit = 0       # 冒烟限制: 0=正常跑全部129样本; >0=只跑前N样本(冒烟调试用)
+var g_batch = 0
+var g_state = 0
+var g_seed = 0
+var g_base = 0              # 本批起始类号 = batch * 515
+var g_s = 0                 # 态编号 0-3（v9: 9=合并模式，仅打印提示，实际合并走 shell）
+var g_sidx = 0              # 样本索引（train_state 内循环用）
+var g_c = 0                 # 类索引（predict / save 内循环用）
+# 输入变换临时变量（命名与函数参数、全局均不冲突）
+var g_t1_i = 0
+var g_t1_row = 0
+var g_t1_col = 0
+var g_t1_tmp = 0
+var g_t2_i = 0
+var g_t3_row = 0
+var g_t3_col = 0
+var g_t3_tmp = 0
+var g_ms = 0
+
+# ---- hex → int（SKILL §18 铁律：QVM str_to_int 对字母全返回 0，必须逐字母比较）----
+# 标签是 hex（实测数据 L4224 label=107F, L4226 label=1081），batch = hex/515。
+def hex2dec(hex):
+    var v = 0
+    while (str_len(hex) > 0):
+        var ch = str_substring(hex, 0, 1)
+        v = v * 16
+        if (ch == "0"): v = v + 0 end
+        if (ch == "1"): v = v + 1 end
+        if (ch == "2"): v = v + 2 end
+        if (ch == "3"): v = v + 3 end
+        if (ch == "4"): v = v + 4 end
+        if (ch == "5"): v = v + 5 end
+        if (ch == "6"): v = v + 6 end
+        if (ch == "7"): v = v + 7 end
+        if (ch == "8"): v = v + 8 end
+        if (ch == "9"): v = v + 9 end
+        if (ch == "a"): v = v + 10 end
+        if (ch == "b"): v = v + 11 end
+        if (ch == "c"): v = v + 12 end
+        if (ch == "d"): v = v + 13 end
+        if (ch == "e"): v = v + 14 end
+        if (ch == "f"): v = v + 15 end
+        hex = str_substring(hex, 1, 60000)
+    end
+    return v
+end
+
+# ---- 行偏移预扫（同 v7b/v8：一次性 O(N)，后续 O(1) 定位样本行）----
+def build_line_offsets():
+    g_line_off_arr[0] = 0
+    var pos = 0
+    var ln = 0
+    while (pos < g_data_len):
+        var rem = ""
+        var win = g_data_len - pos
+        if (win > 8192):
+            rem = str_substring(g_data, pos, 8192)
+        else:
+            rem = str_substring(g_data, pos, win)
+        end
+        var nl = str_index_of(rem, "\n")
+        if (nl < 0):
+            ln = ln + 1
+            g_line_off_arr[ln] = g_data_len
+            pos = g_data_len
+        else:
+            ln = ln + 1
+            g_line_off_arr[ln] = pos + nl + 1
+            pos = pos + nl + 1
+        end
+    end
+    g_lines_total = ln
+    printf("行偏移表: %d行\n", ln)
+end
+
+# ---- 加载本批数据（第 batch*515 行开始）----
+def load_batch():
+    g_data = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    g_data_len = str_len(g_data)
+    g_i = 0
+    var target_line = g_batch * 515
+    g_row_line = target_line
+    build_line_offsets()
+    g_row_start = g_line_off_arr[target_line]
+    printf("batch%d: 起始行%d, 位置%d\n", g_batch, target_line, g_row_start)
+end
+
+# ---- 解析第 sidx 个样本 ----
+# 解析流程（v9 关键改动：解析一次，同时喂 g_x[1024] 和池 g_xh/g_nxh）:
+#   1. g_x[i] ← 像素值（供 transform_sample 做翻转/椒盐直索引改写）
+#   2. arr_set(g_xh, i, v)      ← 输入池（1024次/样本，任务确认可接受）
+#   3. arr_set(g_nxh, i, 0-v)   ← 负样本辅助池（抑制用，见 suppress_class）
+# 标签用 hex2dec 逐字母比较（禁 str_to_int，§18）。
+def parse_sample(sidx):
+    var cur_pos = g_line_off_arr[g_row_line + sidx]
+    var end_pos = g_line_off_arr[g_row_line + sidx + 1]
+    g_rem = str_substring(g_data, cur_pos, end_pos - cur_pos)
+    g_nl = str_index_of(g_rem, "\n")
+    if (g_nl < 0):
+        g_line = g_rem
+    else:
+        g_line = str_substring(g_rem, 0, g_nl)
+    end
+    g_c1 = str_index_of(g_line, ":")
+    g_label = hex2dec(str_substring(g_line, 0, g_c1)) - g_base
+    g_pix_str = str_substring(g_line, g_c1 + 1, 4096)
+    g_ps = 0
+    g_i = 0
+    while (g_i < 1024):
+        # 每像素值最多 "1,"=2字符，8字符窗口足够（省内存100倍，同 v7b/v8）
+        g_rem = str_substring(g_pix_str, g_ps, 8)
+        g_pe = str_index_of(g_rem, ",")
+        if (g_pe < 0):
+            g_pv = g_rem
+            g_ps = g_ps + str_len(g_rem)
+        else:
+            g_pv = str_substring(g_rem, 0, g_pe)
+            g_ps = g_ps + g_pe + 1
+        end
+        var v = str_to_int(g_pv)     # 像素原始是十进制 0/1，str_to_int 对纯数字正确
+        # v9.1 像素×100缩放修复（2026-09-13架构卡点根治）:
+        #   整数学铁律(SKILL §20②): 二值像素x∈{0,1} + axpy_arr_at内部 (x-W)*lr/1000
+        #   在整除下 = (1-0)*500/1000 = 0, 更新量恒0, 态0完全无法学习。
+        #   修法: 只在数据装载源头把点亮像素缩放为100（未点亮仍为0）,
+        #   后续 g_x / g_xh / g_nxh 三处全部通过 v 变量统一拿到缩放后的值,
+        #   一处改动同时喂 g_x 直索引数组 + 两个池句柄, 是最少改动方案。
+        #   数学: lr=500时点亮像素类 W+=(100-0)*500/1000=50/次, 3轮129样本
+        #   收敛到≈99-100(吸引子); 未点亮像素 W+=(0-0)*lr/1000=0, 保持0。
+        #   四态lr 500/1000/1500/2000全部有界(2000→±200振荡=扰动态设计);
+        #   dot上限 1024×100×200=204800, 远离u16/32位溢出。
+        v = v * 100
+        g_x[g_i] = v
+        arr_set(g_xh, g_i, v)
+        arr_set(g_nxh, g_i, 0 - v)
+        g_i = g_i + 1
+    end
+end
+
+# ---- 输入变换（4态不同视角，在 g_x[1024] 直索引上改写，再拷回两个池）----
+# 变换走 g_x 单段小数组（1024 < 65535，直索引非热路径）；这是数据准备阶段，
+# 不计入"每样本池调用数"。拷回 = 2×1024 次 arr_set/样本（解析期已1次，这里再加）。
+def transform_sample():
+    if (g_state == 1):
+        # 态1=水平翻转：32×32 图每行左右镜像
+        g_t1_i = 0
+        while (g_t1_i < 512):
+            g_t1_row = g_t1_i / 32
+            g_t1_col = g_t1_i % 32
+            g_t1_tmp = g_x[g_t1_i]
+            g_x[g_t1_i] = g_x[g_t1_row * 32 + 31 - g_t1_col]
+            g_x[g_t1_row * 32 + 31 - g_t1_col] = g_t1_tmp
+            g_t1_i = g_t1_i + 1
+        end
+    end
+    if (g_state == 2):
+        # 态2=随机椒盐噪声：约5%像素翻转 0↔1
+        g_t2_i = 0
+        while (g_t2_i < 1024):
+            g_rnd = g_rnd * 1103 + 12345
+            if (g_rnd < 0): g_rnd = 0 - g_rnd end
+            if (g_rnd % 20 == 0):
+                # v9.1: 像素已是 {0,100}（缩放修复后），椒盐翻转须 0↔100
+                #       原式 "1 - g_x[i]" 会把 100 翻成 -99（错值/负权重污染）
+                if (g_x[g_t2_i] == 0):
+                    g_x[g_t2_i] = 100
+                else:
+                    g_x[g_t2_i] = 0
+                end
+            end
+            g_t2_i = g_t2_i + 1
+        end
+    end
+    if (g_state == 3):
+        # 态3=垂直翻转：上下 32 行对调
+        g_t3_row = 0
+        while (g_t3_row < 16):
+            g_t3_col = 0
+            while (g_t3_col < 32):
+                g_t3_tmp = g_x[g_t3_row * 32 + g_t3_col]
+                g_x[g_t3_row * 32 + g_t3_col] = g_x[(31 - g_t3_row) * 32 + g_t3_col]
+                g_x[(31 - g_t3_row) * 32 + g_t3_col] = g_t3_tmp
+                g_t3_col = g_t3_col + 1
+            end
+            g_t3_row = g_t3_row + 1
+        end
+    end
+    # 变换后统一拷回输入池 + 负样本池（nxh[i] = -x[i]，抑制用）
+    g_i = 0
+    while (g_i < 1024):
+        arr_set(g_xh, g_i, g_x[g_i])
+        arr_set(g_nxh, g_i, 0 - g_x[g_i])
+        g_i = g_i + 1
+    end
+end
+
+# ---- 预测：每类一次 dot_arr_at（515次/样本）----
+#   score_c = Σ_i pool[g_wh].data[c*1024+i] * pool[g_xh].data[i]
+#   = dot_arr_at(g_wh, c*1024, g_xh, 1024)
+# 与 v8 对比：
+#   v7b  515类 × 1024像素 × (1 get_w + 1 get_x) ≈ 105万次池访问/样本
+#   v8   dot_arr(g_c*1024, 0, 1024) —— 传裸整数非句柄，读的是错误内存
+#   v9   515 次 dot_arr_at，第一参数是 g_wh 真句柄，off=c*1024 跨类寻址
+def predict():
+    g_max_val = -30000
+    g_max_idx = 0
+    g_c = 0
+    while (g_c < 515):
+        g_score = dot_arr_at(g_wh, g_c * 1024, g_xh, 1024)
+        if (g_score > g_max_val):
+            g_max_val = g_score
+            g_max_idx = g_c
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_max_idx
+end
+
+# ---- 增强（boost）：正确类权重向 x 靠拢 ----
+#   axpy_arr_at(g_wh, c*1024, g_xh, 1024, lr)
+#   = W[c*1024+i] += (x[i] - W[c*1024+i]) * lr / 1000
+# lr 传 g_lr 原值（500/1000/1500/2000），除1000 由 op 内部做。
+# 铁律: 绝不在训练器层写 g_lr/1000（v8 结构错3，u16 整除把 500 整成 0）。
+def boost_class(c_off, lr):
+    axpy_arr_at(g_wh, c_off, g_xh, 1024, lr)
+end
+
+# ---- 抑制（suppress）：错分类权重远离 x ----
+# 设计决策: 用"对 x 取反的辅助池 g_nxh"实现（而非传负 lr）。
+#   数学等价:
+#     boost 用 nxh（= -x）: W[c*1024+i] += (-x[i] - W[c*1024+i]) * lr / 1000
+#                          = W - (x + W) * lr/1000
+#     suppress 用 x:        W[c*1024+i] -= (x[i] - W[c*1024+i]) * lr / 1000
+#                          = W - (x - W) * lr/1000  ← 不等价，这是 v7b 原式
+#     两者差一个 "W*lr/1000" 项，故本文件的 suppress_class 用【负 lr】才对 v7b 语义。
+#   选负 lr 的原因（关键）:
+#     axpy_arr_at 的 lr 参与乘法 (lr/1000)，负值在 op 内部乘积运算中合法
+#     （与 u16 整除无关——整除只发生在 /1000 上，1000>0 恒正）；而
+#     "对 x 取反辅助池" 需要额外 1024 次 arr_set/样本。g_nxh 已在解析期
+#     顺手建好（零额外热路径成本），故本文件两种都具备，抑制统一走【负 lr】
+#     以严格复现 v7b 的 W -= (x-W)*lr/1000，且省掉每次抑制前的取反拷贝。
+#   若 F 的 axpy_arr_at 实装对负 lr 不支持（例如 lr 按 u16 无符号存储），
+#   备选实现（已保留 g_nxh，调用点一行切换）:
+#       axpy_arr_at(g_wh, c_off, g_nxh, 1024, lr)   # boost 语义作用于 -x
+#   注意该备选与 v7b 原式差一个 W*lr/1000 项（收缩式衰减），语义略有差别，
+#   故默认走负 lr；主控若测出负 lr 异常再切到备选。
+def suppress_class(c_off, lr):
+    var neg_lr = 0 - lr
+    axpy_arr_at(g_wh, c_off, g_xh, 1024, neg_lr)
+end
+
+# ---- 单样本训练（保留 v8 的 4态不同学习律变体 + 4态不同输入变换）----
+# 每样本池调用估算:
+#   transform_sample: 2×1024 = 2048 次 arr_set（变换后拷回 g_xh/g_nxh）
+#                     —— 数据准备，不计入"训练热路径池调用"
+#   predict:          515 次 dot_arr_at
+#   更新:             1-2 次 axpy_arr_at
+#   train_one 热路径合计 ≈ 517 次批量调用（v7b 为 ~105万次逐元素池访问，v8 名义
+#   也是 517 但传参错误读错内存）
+def train_one():
+    transform_sample()
+    predict()
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+        if (g_state == 3):
+            # 态3: 预测正确时也给轻微增强（v7b 的逐像素75%跳零无法单次 axpy 表达；
+            # v8/v9 把随机性交给输入变换[垂直翻转]承担，学习律用 g_lr 原值）
+            boost_class(g_label * 1024, g_lr)
+        end
+    else:
+        g_updates = g_updates + 1
+        if (g_state == 0):
+            # 态0: 标准对比式感知机（增强正确类 + 抑制错分类）
+            boost_class(g_label * 1024, g_lr)
+            suppress_class(g_pred * 1024, g_lr)
+        end
+        if (g_state == 1):
+            # 态1: 只增强正确类，不抑制错分类
+            boost_class(g_label * 1024, g_lr)
+        end
+        if (g_state == 2):
+            # 态2: 抑制强度加倍（负 lr 取 2 倍：0 - g_lr*2；g_lr*2 最大 4000 < 65535）
+            boost_class(g_label * 1024, g_lr)
+            suppress_class(g_pred * 1024, g_lr * 2)
+        end
+        if (g_state == 3):
+            # 态3: 标准增强（LR=2000）；随机性由输入变换承担（同 v8 权衡）
+            boost_class(g_label * 1024, g_lr)
+        end
+    end
+end
+
+# ---- 单态训练（1个batch）----
+def train_state():
+    printf("  态%d seed=%d lr=%d 池句柄 g_wh=%d g_xh=%d g_nxh=%d（arr_new 自带零初始化）\n",
+        g_state, g_seed, g_lr, g_wh, g_xh, g_nxh)
+    g_ep = 0
+    while (g_ep < g_epoch):
+        g_correct = 0
+        g_updates = 0
+        g_sidx = 0
+        while (g_sidx < 515):
+            if (g_sidx % 4 == g_state):
+                if (g_smoke_limit == 0 or g_sidx < g_smoke_limit * 4 + 3):
+                    parse_sample(g_sidx)
+                    train_one()
+                end
+            end
+            g_sidx = g_sidx + 1
+        end
+        printf("  态%d ep%d: 正确%d/~129 更新%d\n", g_state, g_ep, g_correct, g_updates)
+        g_ep = g_ep + 1
+    end
+end
+
+# ---- 权重保存（v9.2 emit_ints 零泄漏通道, 2026-09-13）----
+# 通道: emit_str + emit_ints (一级C原生printf, qvm.qentl do_builtin)
+#   每类一次 emit_ints(g_wh, c*1024, 1024) 把 1024 值以 "%d," 喷到 stdout
+#   对比旧 printf 逐值路径: bi_printf 每字符 str_concat 累积 → QVM 无 GC
+#   → 实测 527360 值 = 4.89GB 泄漏. 新通道 probe 实测 VmHWM=187MB,
+#   527360 值精确输出且零字符串分配.
+# 格式: emit_str("C<c>: ") + emit_ints + printf("\n")
+#   → split_shards.awk 的 try_marker 正则 ^C[0-9]+: 命中; 后续值为续行同串.
+# 标记串构造: str_concat("C", int_to_str(g_c)) 每类 2 次 = 1030 次分配/训,
+#   ~5KB 累计, 相比 4.89GB 可忽略.
+def save_weights_stderr():
+    printf("=== 日志截断 ===\n")
+    printf("=== QSCL 32x32 v9 权重流 (emit_ints 通道) ===\n")
+    printf("META batch=%d state=%d seed=%d lr=%d nclass=515 pix=1024 nelem=527360\n",
+        g_batch, g_state, g_seed, g_lr)
+    g_c = 0
+    while (g_c < 515):
+        var cstr = str_concat("C", int_to_str(g_c))
+        cstr = str_concat(cstr, ": ")
+        emit_str(cstr)
+        emit_ints(g_wh, g_c * 1024, 1024)
+        printf("\n")
+        g_c = g_c + 1
+    end
+    printf("=== 权重流结束 (515类 x 1024值 = 527360值, 标记行C0..C514) ===\n")
+end
+
+# ---- 池内累加合并（可选；默认不调用，坍缩合并走 shell 侧 merge_32x32.sh）----
+# 保留 v8 的 state=9 思路：W 作累加器，逐文件读 4 态权重累加。
+# 不默认调用的原因: 527360 次 arr_get/arr_set 逐元素池访问 = SKILL §20③
+# 实测 25万次 ae 池访问 420s 超时 → 52.7万次约 10+ 分钟，且泄漏随内存增长。
+# shell 侧 merge_32x32.sh 做同样语义的按位置累加（4态直接累加，不归一），
+# 走 awk 流式处理无泄漏，是正确路径。
+def merge_state_file():
+    var wbase = "qdfs/ns/models/qscl_32x32_b"
+    wbase = str_concat(wbase, int_to_str(g_batch))
+    wbase = str_concat(wbase, "_s")
+    wbase = str_concat(wbase, int_to_str(g_s))
+    var gc2 = 0
+    while (gc2 < 515):
+        var wname = wbase
+        wname = str_concat(wname, "_c")
+        wname = str_concat(wname, int_to_str(gc2))
+        wname = str_concat(wname, ".w")
+        var wdata = file_read(wname)
+        var wlen = str_len(wdata)
+        var pos = 0
+        var base = gc2 * 1024
+        var p = 0
+        while (p < 1024):
+            var rem = ""
+            var win = wlen - pos
+            if (win > 8):
+                rem = str_substring(wdata, pos, 8)
+            else:
+                rem = str_substring(wdata, pos, win)
+            end
+            var pe = str_index_of(rem, ",")
+            var val = 0
+            if (pe < 0):
+                val = str_to_int(rem)
+                pos = pos + str_len(rem)
+            else:
+                val = str_to_int(str_substring(rem, 0, pe))
+                pos = pos + pe + 1
+            end
+            arr_set(g_wh, base + p, arr_get(g_wh, base + p) + val)
+            p = p + 1
+        end
+        gc2 = gc2 + 1
+    end
+    printf("  合并态%d文件完成(515分片, 池内累加, 未归一)\n", g_s)
+end
+
+# ---- 读 current_batch.txt / current_state.txt（无文件默认 0，同 v7b/v8）----
+def read_control_files():
+    var btxt = file_read("qdfs/ns/train/current_batch.txt")
+    if (str_len(btxt) > 0):
+        var bnl = str_index_of(btxt, "\n")
+        if (bnl >= 0):
+            btxt = str_substring(btxt, 0, bnl)
+        end
+        g_batch = str_to_int(btxt)
+    end
+    var stxt = file_read("qdfs/ns/train/current_state.txt")
+    if (str_len(stxt) > 0):
+        var snl = str_index_of(stxt, "\n")
+        if (snl >= 0):
+            stxt = str_substring(stxt, 0, snl)
+        end
+        g_s = str_to_int(stxt)
+    end
+end
+
+def main():
+    printf("=== QSCL 32x32 v9 池句柄+偏移变体批量op版（重构自 v8）===\n")
+    printf("修 v8 三处结构错: ①9段布局→池化单数组 ②裸整数→arr_new句柄 ③g_lr/1000整除→op内部除1000\n")
+    printf("数据: 4226字 8批×515类 32×32=1024像素（标签为 hex, batch=label/515）\n")
+    printf("态0=标准对比式 态1=只增强 态2=抑制加倍 态3=增强+垂直翻转(LR=2000)\n")
+    printf("LR: 态0=500 态1=1000 态2=1500 态3=2000（原值传给 axpy_arr_at，op内部/1000）\n")
+
+    # 池初始化：零初始化，禁 v7b/v8 的 52.7万次逐元素 set_w（§20③热路径禁用）
+    # 修复（主控检查1实锤，2026-09-13）：字面量 arr_new(527360) 被编译器按 u16
+    # 截断成 3072（527360 & 0xFFFF），导致 g_wh 只占 3072 元，g_xh 的 3072..4095
+    # 叠进 g_wh 数据区 → 类3 起点(3072)权重全被输入值覆盖（污染实锤：h[3072]=456）。
+    # 修法：字面量改计算式（var g_wsz = 515; g_wsz = g_wsz * 1024），运行时值是 32 位
+    # （检查2已验证 off=c*1024=526336 精确），池大小正确为 527360。
+    # 分配顺序按任务要求改为小池先（g_xh/g_nxh）大池最后（g_wh），句柄号递增。
+    var g_wsz = 515
+    g_wsz = g_wsz * 1024
+    g_xh = arr_new(1024)
+    g_nxh = arr_new(1024)
+    g_wh = arr_new(g_wsz)
+    printf("池句柄: g_wh=%d g_xh=%d g_nxh=%d（arr_new 返回 int 句柄, 存全局；g_wsz=%d）\\n",
+        g_wh, g_xh, g_nxh, g_wsz)
+
+    # 顺序关键: 必须先 read_control_files() 读到 g_batch，再算 g_base
+    # （g_base 在 parse_sample 里用于把全局类号折算成批内类号）
+    read_control_files()
+    # 冒烟开关: SMOKE_LIMIT 环境变量读入（无则正常全跑；有则限前N样本）
+    var sm = file_read("qdfs/ns/train/smoke_limit.txt")
+    if (str_len(sm) > 0):
+        var smnl = str_index_of(sm, "\n")
+        if (smnl >= 0): sm = str_substring(sm, 0, smnl) end
+        g_smoke_limit = str_to_int(sm)
+        printf("冒烟模式: 只跑前%d样本(限4态)\n", g_smoke_limit)
+    end
+    g_base = g_batch * 515
+    printf("本次训练 batch%d 态%d（单批单态模式，进程退出即释放池内存）\n", g_batch, g_s)
+
+    if (g_s >= 4):
+        # v9: 坍缩合并改为 shell 侧 merge_32x32.sh。QVM 内保留 merge_state_file()
+        # （池内累加）但默认不调用 —— 527360 次逐元素池访问 = §20③ 420s/25万 必超时。
+        printf("--- batch%d 合并模式 ---\n", g_batch)
+        printf("v9: 坍缩合并已在 shell 侧完成（merge_32x32.sh 4态按位置累加, 不归一）\n")
+        printf("  4态 stream 已由 split_shards.awk 切成 qscl_32x32_b%d_s{0..3}_c{0..514}.w\n", g_batch)
+        printf("  合并输出: qdfs/ns/models/qscl_32x32_b%d.w（527360元素）\n", g_batch)
+        printf("  结构验证: awk -v mode=block -f verify_weights.awk qscl_32x32_b%d.w\n", g_batch)
+        printf("  准确率: awk -v batch=%d -f verify_accuracy.awk qscl_32x32_b%d_m_c*.w\n", g_batch, g_batch)
+        printf("  （QVM 内 merge_state_file() 仍可用但默认跳过: 527360次池访问=§20③超时）\n")
+    end
+
+    if (g_s < 4):
+        printf("--- batch%d (类%d-%d) 态%d ---\n", g_batch, g_base, g_base + 514, g_s)
+        load_batch()
+        g_state = g_s
+        g_seed = 1 + g_s * 100
+        g_lr = 500 + g_s * 500
+        train_state()
+        save_weights_stderr()
+        printf("=== batch%d 态%d 训练完成, 515类权重流已打到 stderr ===\n", g_batch, g_s)
+        printf("提示: shell 用 2> 收集后用 split_shards.awk 切分片\n")
+    end
+end
+
+main()

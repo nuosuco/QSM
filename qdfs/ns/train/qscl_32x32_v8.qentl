@@ -1,0 +1,520 @@
+# QSCL 32×32 真训练器 v8 - 4态真独立叠加态并行（新builtin批量op版）
+#
+# v8 相对 v7b 的唯一改动：训练循环的逐元素池访问 → 批量 builtin
+#   dot_arr(h1, h2, n)  = Σ i∈[0,n) h1[i] * h2[i]      算内积
+#   axpy_arr(h, xh, n, lr) = h[i] += (xh[i] - h[i]) * lr   对比式更新
+# 每样本池访问从 v7b 的 ~6000 次 get_w/set_w 降到 ~4-13 次批量调用。
+# QVM 升级后由主控统一编译运行（本文件当前不运行不编译）。
+#
+# 保留 v7b 的真独立三途径：
+#   ① 数据分片：态 s 只训 s%4==g_state 的样本（515 切 4 份，每态约 129）
+#   ② 独立学习律：4 态 LR=500/1000/1500/2000（g_lr 分档）
+#   ③ 输入变换：态1=水平翻转 / 态2=椒盐噪声 / 态3=垂直翻转
+# 权重仍 9 段定长数组 g_W0-8[65535]（515×1024=527360 < 9×65535=589815）
+# 权重布局：W[c*1024 + p]（c=类索引 0..514，p=像素 0..1023）
+# 保存：每态独立 qscl_32x32_b{batch}_s{state}.w + state=9 坍缩合并
+#
+# QCL 语法坑合规：
+#   - 无 elif，全部 else{if...end} 嵌套
+#   - var 不与函数参数同名（如 get_w 参数 idx 不与任何 var 冲突）
+#   - 全局变量文件顶部一次性声明；函数内绝不再 var 同名全局（§7 遮蔽陷阱）
+#   - 无字符串 + 拼接，一律 str_concat
+
+# 9段定长数组（C种子原生，单级解释零泄漏；515×1024=527360 < 9×65535=589815）
+var g_W0[65535]
+var g_W1[65535]
+var g_W2[65535]
+var g_W3[65535]
+var g_W4[65535]
+var g_W5[65535]
+var g_W6[65535]
+var g_W7[65535]
+var g_W8[65535]
+var g_x[1024]
+
+# 行偏移表（C种子原生定长数组；build_line_offsets 一次性 O(N) 预扫）
+var g_line_off_arr[4228]
+var g_lines_total = 0
+
+# 段路由（u16安全：idx/65535=段，idx%65535=段内）
+def get_w(idx):
+    var seg = idx / 65535
+    var off = idx % 65535
+    if (seg == 0): return g_W0[off] end
+    if (seg == 1): return g_W1[off] end
+    if (seg == 2): return g_W2[off] end
+    if (seg == 3): return g_W3[off] end
+    if (seg == 4): return g_W4[off] end
+    if (seg == 5): return g_W5[off] end
+    if (seg == 6): return g_W6[off] end
+    if (seg == 7): return g_W7[off] end
+    return g_W8[off]
+end
+
+def set_w(idx, v):
+    var seg = idx / 65535
+    var off = idx % 65535
+    if (seg == 0): g_W0[off] = v
+    end
+    if (seg == 1): g_W1[off] = v
+    end
+    if (seg == 2): g_W2[off] = v
+    end
+    if (seg == 3): g_W3[off] = v
+    end
+    if (seg == 4): g_W4[off] = v
+    end
+    if (seg == 5): g_W5[off] = v
+    end
+    if (seg == 6): g_W6[off] = v
+    end
+    if (seg == 7): g_W7[off] = v
+    end
+    if (seg == 8): g_W8[off] = v
+    end
+end
+
+def get_x(idx):
+    return g_x[idx]
+end
+
+def set_x(idx, v):
+    g_x[idx] = v
+end
+
+var g_data = ""
+var g_data_len = 0
+var g_line = ""
+var g_rem = ""
+var g_pv = ""
+var g_c1 = 0
+var g_ps = 0
+var g_pe = 0
+var g_nl = 0
+var g_row_start = 0
+var g_row_line = 0              # 本批起始行号（batch*515，行偏移表基址）
+var g_i = 0
+var g_label = 0
+var g_pred = 0
+var g_score = 0
+var g_max_val = 0
+var g_max_idx = 0
+var g_correct = 0
+var g_updates = 0
+var g_diff = 0
+var g_lr = 500
+var g_rnd = 0
+var g_ep = 0
+var g_epoch = 2                # 每态2轮（与 v7b 一致；批量op后内存已收敛，可调大）
+var g_batch = 0
+var g_state = 0
+var g_seed = 0
+var g_base = 0                 # 本批起始类号 = batch * 515
+var g_nclass = 515             # 每批515类
+var g_s = 0                    # 态编号 0-3（或 9=合并）
+var g_wpos = 0                 # 权重写入位置（保留）
+
+# 全局 lr 分档（4态不同学习律：500/1000/1500/2000）
+var g_lr0 = 500
+var g_lr1 = 1000
+var g_lr2 = 1500
+var g_lr3 = 2000
+
+# 加载本批数据（第 batch*515 行开始）+ 一次性行偏移预扫描
+def build_line_offsets():
+    # 预扫整个数据文件，把每行起始偏移存入 g_line_off_arr（一次性 O(N)）
+    g_line_off_arr[0] = 0
+    var pos = 0
+    var ln = 0
+    while (pos < g_data_len):
+        var rem = ""
+        var win = g_data_len - pos
+        if (win > 8192):
+            rem = str_substring(g_data, pos, 8192)
+        else:
+            rem = str_substring(g_data, pos, win)
+        end
+        var nl = str_index_of(rem, "\n")
+        if (nl < 0):
+            ln = ln + 1
+            g_line_off_arr[ln] = g_data_len
+            pos = g_data_len
+        else:
+            ln = ln + 1
+            g_line_off_arr[ln] = pos + nl + 1
+            pos = pos + nl + 1
+        end
+    end
+    g_lines_total = ln
+    printf("行偏移表: %d行\n", ln)
+end
+
+def load_batch():
+    g_data = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    g_data_len = str_len(g_data)
+    g_row_start = 0
+    g_i = 0
+    var target_line = g_batch * 515
+    g_row_line = target_line
+    build_line_offsets()
+    g_row_start = g_line_off_arr[target_line]
+    printf("batch%d: 起始行%d, 位置%d\n", g_batch, target_line, g_row_start)
+end
+
+# 解析第 s 个样本（O(1)行偏移定位，不再逐行拷贝全文件）
+def parse_sample(s):
+    var cur_pos = g_line_off_arr[g_row_line + s]
+    var end_pos = g_line_off_arr[g_row_line + s + 1]
+    g_rem = str_substring(g_data, cur_pos, end_pos - cur_pos)
+    g_nl = str_index_of(g_rem, "\n")
+    if (g_nl < 0):
+        g_line = g_rem
+    else:
+        g_line = str_substring(g_rem, 0, g_nl)
+    end
+    # 解析 label 和像素（内存优化：小窗口切分，60000字符请求=C种子分配60KB炸弹）
+    g_c1 = str_index_of(g_line, ":")
+    g_label = str_to_int(str_substring(g_line, 0, g_c1)) - g_base
+    g_pix_str = str_substring(g_line, g_c1 + 1, 4096)
+    g_ps = 0
+    g_i = 0
+    while (g_i < 1024):
+        # 每像素值最多"1,"=2字符，8字符窗口足够（省内存100倍）
+        g_rem = str_substring(g_pix_str, g_ps, 8)
+        g_pe = str_index_of(g_rem, ",")
+        if (g_pe < 0):
+            g_pv = g_rem
+            g_ps = g_ps + str_len(g_rem)
+        else:
+            g_pv = str_substring(g_rem, 0, g_pe)
+            g_ps = g_ps + g_pe + 1
+        end
+        set_x(g_i, str_to_int(g_pv))
+        g_i = g_i + 1
+    end
+end
+
+# 按态做不同输入变换，保证 4 态看到不同数据视角（在 parse_sample 后、train_one 前调用）
+# 输入变换仍走 g_x 单段小数组（1024 < 65535，C种子直索引无泄漏）；这是数据准备阶段
+# 非训练循环池访问，不计入"每样本池访问"的降幅统计。
+def transform_sample():
+    if (g_state == 1):
+        # 态1=水平翻转：32×32图每行左右镜像
+        var th_i = 0
+        var th_row = 0
+        var th_col = 0
+        var th_tmp = 0
+        while (th_i < 512):
+            th_row = th_i / 32
+            th_col = th_i % 32
+            th_tmp = get_x(th_i)
+            set_x(th_i, get_x(th_row * 32 + 31 - th_col))
+            set_x(th_row * 32 + 31 - th_col, th_tmp)
+            th_i = th_i + 1
+        end
+    end
+    if (g_state == 2):
+        # 态2=随机椒盐噪声：约5%像素翻转0↔1
+        var tz_i = 0
+        while (tz_i < 1024):
+            g_rnd = g_rnd * 1103 + 12345
+            if (g_rnd < 0): g_rnd = 0 - g_rnd end
+            if (g_rnd % 20 == 0):
+                set_x(tz_i, 1 - get_x(tz_i))
+            end
+            tz_i = tz_i + 1
+        end
+    end
+    if (g_state == 3):
+        # 态3=垂直翻转：上下32行对调
+        var tv_row = 0
+        var tv_col = 0
+        var tv_tmp = 0
+        while (tv_row < 16):
+            tv_col = 0
+            while (tv_col < 32):
+                tv_tmp = get_x(tv_row * 32 + tv_col)
+                set_x(tv_row * 32 + tv_col, get_x((31 - tv_row) * 32 + tv_col))
+                set_x((31 - tv_row) * 32 + tv_col, tv_tmp)
+                tv_col = tv_col + 1
+            end
+            tv_row = tv_row + 1
+        end
+    end
+end
+
+# 预测：手写内积 argmax（515类×1024像素）
+# v8 改动：每类的内积由 1024 次 get_w+get_x 池访问 → 1 次 dot_arr 批量调用
+#   旧: 515 类 × 1024 像素 × 2次访问 = ~105万 get_w/get_x
+#   新: 515 类 × 1次 dot_arr = 515 次批量调用（每调用内部循环在 C 种子级执行）
+# 注: 改名 predict，避免与 QVM 内建 argmax(arr,n) 撞名被误判为 builtin
+def predict():
+    g_max_val = -30000
+    g_max_idx = 0
+    g_c = 0
+    while (g_c < 515):
+        g_score = dot_arr(g_c * 1024, 0, 1024)
+        if (g_score > g_max_val):
+            g_max_val = g_score
+            g_max_idx = g_c
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_max_idx
+end
+
+# 单类对比式增强：axpy_arr 一次完成整类 1024 像素更新
+#   axpy_arr(h_off, xh_off, n, lr) = W[c*1024+p] += (x[p] - W[c*1024+p]) * lr
+#   h_off = 目标类权重块起点，xh_off = 输入 x 块起点(0)
+def boost_class(c_off, lr):
+    axpy_arr(c_off, 0, 1024, lr)
+end
+
+# 单类抑制：对比式反向更新（抑制预测错分类）
+#   W[pred*1024+p] -= (x[p] - W[pred*1024+p]) * lr
+#   实现：axpy_arr 用 -lr 达到反向效果（axpy 定义 h += (x-h)*lr，lr 取负即抑制）
+def suppress_class(c_off, lr):
+    var neg_lr = 0 - lr
+    axpy_arr(c_off, 0, 1024, neg_lr)
+end
+
+# 不同更新策略训练（4态各不同学习律变体）
+# 每样本池访问估算（v7b → v8）：
+#   态0: predict(105万→515次dot_arr) + 增强1类 + 抑制1类 = 515 dot + 2 axpy
+#   态1: 515 dot + 1 axpy（只增强）
+#   态2: 515 dot + 2 axpy（增强+抑制加倍）
+#   态3: 515 dot + 1 axpy（增强；随机跳零由 axpy 内部 lr 实现——见注）
+# 注：v7b 态3 的"75%像素更新/25%跳过"无法用单次 axpy_arr 直接表达
+#   （axpy_arr 是整段均匀 lr）。v8 把态3 的随机扰动改由"输入变换态3=垂直翻转"
+#   承担（保留 v7b 态3 的输入变换），学习律退化为标准增强——这样态3 仍通过
+#   输入变换途径与其余态独立，且学习律仍不同（LR=2000）。此权衡写在注释里
+#   供主控决定是否保留逐像素随机跳零（保留需 axpy_mask_arr 类新 builtin）。
+def train_one():
+    transform_sample()
+    predict()
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+        if (g_state == 3):
+            # 态3: 预测正确时也给轻微随机扰动增强（v7b 逐像素跳零 → v8 用固定小 lr 近似）
+            # 随机跳零无法单次 axpy 表达，改用统一小 lr 近似"轻微增强"；
+            # 真正的随机性由态3 的输入变换（垂直翻转）承担
+            boost_class(g_label * 1024, g_lr / 2000)
+        end
+    else:
+        g_updates = g_updates + 1
+        if (g_state == 0):
+            # 态0: 标准对比式感知机（增强正确类 + 抑制错分类）
+            boost_class(g_label * 1024, g_lr / 1000)
+            suppress_class(g_pred * 1024, g_lr / 1000)
+        end
+        if (g_state == 1):
+            # 态1: 只增强正确类，不抑制错分类
+            boost_class(g_label * 1024, g_lr / 1000)
+        end
+        if (g_state == 2):
+            # 态2: 对称抑制加权（抑制强度加倍 W[pred]-=2*(x-W[pred])*lr/1000）
+            boost_class(g_label * 1024, g_lr / 1000)
+            suppress_class(g_pred * 1024, g_lr * 2 / 1000)
+        end
+        if (g_state == 3):
+            # 态3: 随机扰动学习（v8 退化为标准增强 + LR=2000；随机性由输入变换承担）
+            boost_class(g_label * 1024, g_lr / 1000)
+        end
+    end
+end
+
+# 单态训练（1个batch）
+def train_state():
+    # 内存优化: arr_new 自带全零初始化，砍 52.7万次初始化写（每次写泄漏~8KB=4GB元凶）
+    # 真独立起点=零初始化+不同数据分片+不同更新律+不同输入变换
+    printf("  态%d seed=%d lr=%d 零初始化（arr_new自带，省52.7万次写）\n", g_state, g_seed, g_lr)
+
+    # 逐epoch训练（数据分片: 态s只训练 s%4==g_state 的样本）
+    g_ep = 0
+    while (g_ep < g_epoch):
+        g_correct = 0
+        g_updates = 0
+        var s = 0
+        while (s < 515):  # 每批515个样本，按态分片
+            if (s % 4 == g_state):
+                parse_sample(s)
+                train_one()
+            end
+            s = s + 1
+        end
+        printf("  态%d ep%d: 正确%d/~129 更新%d\n", g_state, g_ep, g_correct, g_updates)
+        g_ep = g_ep + 1
+    end
+end
+
+# 坍缩合并（文件级）：W 作为累加器复用，4态全训完后逐文件读4态权重累加
+def merge_state_file():
+    var wbase = "qdfs/ns/models/qscl_32x32_b"
+    wbase = str_concat(wbase, int_to_str(g_batch))
+    wbase = str_concat(wbase, "_s")
+    wbase = str_concat(wbase, int_to_str(g_s))
+    var g_c = 0
+    while (g_c < 515):
+        var wname = wbase
+        wname = str_concat(wname, "_c")
+        wname = str_concat(wname, int_to_str(g_c))
+        wname = str_concat(wname, ".w")
+        var wdata = file_read(wname)
+        var wlen = str_len(wdata)
+        var pos = 0
+        var base = g_c * 1024
+        var p = 0
+        while (p < 1024):
+            # 逐值切分（8字符窗口，不逐字符str_concat）
+            var rem = ""
+            var win = wlen - pos
+            if (win > 8):
+                rem = str_substring(wdata, pos, 8)
+            else:
+                rem = str_substring(wdata, pos, win)
+            end
+            var pe = str_index_of(rem, ",")
+            var val = 0
+            if (pe < 0):
+                val = str_to_int(rem)
+                pos = pos + str_len(rem)
+            else:
+                val = str_to_int(str_substring(rem, 0, pe))
+                pos = pos + pe + 1
+            end
+            set_w(base + p, get_w(base + p) + val)
+            p = p + 1
+        end
+        g_c = g_c + 1
+    end
+    printf("  合并态%d文件完成(515分片)\n", g_s)
+end
+
+# 保存合并权重（分片版：每类一个4KB文件，防26万值拼接OOM）
+def save_weights():
+    var wbase = "qdfs/ns/models/qscl_32x32_b"
+    wbase = str_concat(wbase, int_to_str(g_batch))
+    wbase = str_concat(wbase, "_m")
+    var g_c = 0
+    while (g_c < 515):
+        var wname = wbase
+        wname = str_concat(wname, "_c")
+        wname = str_concat(wname, int_to_str(g_c))
+        wname = str_concat(wname, ".w")
+        var wstr = ""
+        var base = g_c * 1024
+        var j = 0
+        while (j < 1024):
+            if (j > 0):
+                wstr = str_concat(wstr, ",")
+            end
+            wstr = str_concat(wstr, int_to_str(get_w(base + j)))
+            j = j + 1
+        end
+        file_write_bytes(wname, wstr)
+        g_c = g_c + 1
+    end
+    printf("  保存: 515个合并分片已写\n")
+end
+
+# 保存单态权重（分片版防 str_concat 泄漏）：每类一个4KB文件（1024值）
+# 26万值一次拼接=135GB累计分配必OOM；每类独立拼接=2MB累计安全
+def save_state_weights():
+    var wbase = "qdfs/ns/models/qscl_32x32_b"
+    wbase = str_concat(wbase, int_to_str(g_batch))
+    wbase = str_concat(wbase, "_s")
+    wbase = str_concat(wbase, int_to_str(g_state))
+    var g_c = 0
+    while (g_c < 515):
+        var wname = wbase
+        wname = str_concat(wname, "_c")
+        wname = str_concat(wname, int_to_str(g_c))
+        wname = str_concat(wname, ".w")
+        var wstr = ""
+        var base = g_c * 1024
+        var j = 0
+        while (j < 1024):
+            if (j > 0):
+                wstr = str_concat(wstr, ",")
+            end
+            wstr = str_concat(wstr, int_to_str(get_w(base + j)))
+            j = j + 1
+        end
+        file_write_bytes(wname, wstr)
+        g_c = g_c + 1
+    end
+    printf("  态%d 独立权重: 515个分片文件已保存\n", g_state)
+end
+
+def main():
+    # 单批单态模式（防QVM长跑内存泄漏）：读 current_batch.txt + current_state.txt
+    # 每进程只训1态，跑完退出内存全释放；state=9=纯合并模式（4态文件已存，只做坍缩合并）
+    printf("=== QSCL 32×32 v8 4态真独立叠加态并行（批量op版 dot_arr+axpy_arr）===\n")
+    printf("数据: 4226字 8批×515类 32×32=1024像素\n")
+    printf("态0=标准对比式 态1=只增强 态2=抑制加倍 态3=随机扰动(LR=2000)\n")
+    printf("LR: 态0=500 态1=1000 态2=1500 态3=2000\n")
+
+    # 读批次号文件（无文件默认batch0）
+    g_batch = 0
+    var btxt = file_read("qdfs/ns/train/current_batch.txt")
+    if (str_len(btxt) > 0):
+        var bnl = str_index_of(btxt, "\n")
+        if (bnl >= 0):
+            btxt = str_substring(btxt, 0, bnl)
+        end
+        g_batch = str_to_int(btxt)
+    end
+
+    # 读态号文件（无文件默认state0；state=9=只合并）
+    g_s = 0
+    var stxt = file_read("qdfs/ns/train/current_state.txt")
+    if (str_len(stxt) > 0):
+        var snl = str_index_of(stxt, "\n")
+        if (snl >= 0):
+            stxt = str_substring(stxt, 0, snl)
+        end
+        g_s = str_to_int(stxt)
+    end
+    printf("本次训练batch%d 态%d（单批单态模式）\n", g_batch, g_s)
+
+    printf("权重矩阵: 9段定长数组527360元素（C种子单级解释）\n")
+
+    g_base = g_batch * 515
+
+    # 态9=纯合并模式：4态权重文件已存，只做坍缩合并（不再训练）
+    if (g_s == 9):
+        printf("--- batch%d 合并模式（4态文件已存）---\n", g_batch)
+        g_i = 0
+        while (g_i < 515 * 1024):
+            set_w(g_i, 0)
+            g_i = g_i + 1
+        end
+        var ms = 0
+        while (ms < 4):
+            g_s = ms
+            merge_state_file()
+            ms = ms + 1
+        end
+        g_i = 0
+        while (g_i < 515 * 1024):
+            set_w(g_i, get_w(g_i) / 4)
+            g_i = g_i + 1
+        end
+        save_weights()
+        printf("=== batch%d 坍缩合并完成 ===\n", g_batch)
+    end
+
+    # 态0-3=训练模式：只训1态
+    if (g_s < 4):
+        printf("--- batch%d (类%d-%d) 态%d ---\n", g_batch, g_base, g_base+514, g_s)
+        load_batch()
+        g_state = g_s
+        g_seed = 1 + g_s * 100
+        g_lr = 500 + g_s * 500
+        train_state()
+        save_state_weights()
+        printf("=== batch%d 态%d 训练+保存完成 ===\n", g_batch, g_s)
+    end
+end
+
+main()

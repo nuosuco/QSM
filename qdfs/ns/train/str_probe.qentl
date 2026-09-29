@@ -1,0 +1,91 @@
+# str_probe.qentl — 字符串能力探针（方案A/B 判据）
+#
+# 目的: 判定 "1024 次 str_concat 拼出约 5-10KB 串" 是否可用:
+#   1) str_len 是否随真实长度增长（§5 疑点: 疑似 2KB 截断 / u16 长度字段溢出）
+#   2) file_write_bytes 落盘字节数是否 == str_len（字节级完整性）
+#   3) 单类串（5-6KB）的 str_len + 落盘是否一致
+# 方案A(file_write_bytes 直写 515 次) 需: 5KB 串 str_len 完整 + 落盘一致
+# 方案B(3 段 file_append 各约 2KB) 备选: 若 str_len 在 ~2048 截断则走 B
+#
+# 铁律合规（SKILL §20/§18）:
+#   - 全部数字字面量 < 65536（1024/2048/8/10 等）；无 >65535 字面量
+#   - 无 str_to_int 做 hex 转换
+#   - 无 var 遮蔽全局（本文件无同名全局声明）
+
+var g_c = 0
+var g_s = ""
+var g_len = 0
+
+def main():
+    printf("S:BEGIN\n")
+
+    # ---- 阶段1: 1024 次 concat，每次 10 字符 -> 真实长度 10240 ----
+    g_s = ""
+    g_c = 0
+    while (g_c < 1024):
+        g_s = str_concat(g_s, "123456789,")
+        g_c = g_c + 1
+    end
+    g_len = str_len(g_s)
+    printf("S:after1024 str_len=%d (期望10240)\n", g_len)
+    printf("S:after1024 head=%s tail=%s\n", str_substring(g_s, 0, 12), str_substring(g_s, g_len - 12, 12))
+
+    # ---- 阶段2: 再 1024 次 concat -> 真实长度 20480，探测 2KB 截断点 ----
+    g_c = 0
+    while (g_c < 1024):
+        g_s = str_concat(g_s, "123456789,")
+        g_c = g_c + 1
+    end
+    g_len = str_len(g_s)
+    printf("S:after2048 str_len=%d (期望20480)\n", g_len)
+
+    # ---- 阶段3: file_write_bytes 直写长串，返回字节数应 == str_len ----
+    var wbig = file_write_bytes("run/probe_str_20k.w", g_s)
+    printf("S:write20k ret=%d str_len=%d\n", wbig, g_len)
+
+    # ---- 阶段4: 单类串形态（1024 个值 + 1023 逗号，值域 0..-500 模拟真实权重）----
+    # 真实 save 场景: 1024 次 str_concat，每次最多 6 字符 ("-1234,"=6 / "12345,"=6)
+    var cls = ""
+    g_c = 0
+    while (g_c < 1024):
+        var one = str_concat(int_to_str(g_c), ",")
+        cls = str_concat(cls, one)
+        g_c = g_c + 1
+    end
+    g_len = str_len(cls)
+    printf("S:class1024vals str_len=%d\n", g_len)
+    var wcls = file_write_bytes("run/probe_str_class.w", cls)
+    printf("S:class1024vals write ret=%d str_len=%d\n", wcls, g_len)
+
+    # ---- 阶段5: 极小对照串（排除 file_write_bytes 本身故障）----
+    var small = ""
+    small = str_concat(small, "42,")
+    small = str_concat(small, "17,")
+    small = str_concat(small, "0,")
+    var len_s = str_len(small)
+    var wsmall = file_write_bytes("run/probe_str_small.w", small)
+    printf("S:small len=%d write=%d\n", len_s, wsmall)
+
+    # ---- 阶段6: 空串边界 ----
+    var wempty = file_write_bytes("run/probe_str_empty.w", "")
+    printf("S:empty write=%d\n", wempty)
+
+    # ---- 阶段7: 负值+长值类串（值域 -5000..200，贴近真实权重），并回读校验 ----
+    var cls2 = ""
+    g_c = 0
+    while (g_c < 1024):
+        var v2 = 200 - (g_c % 601) * 8
+        cls2 = str_concat(cls2, int_to_str(v2))
+        cls2 = str_concat(cls2, ",")
+        g_c = g_c + 1
+    end
+    g_len = str_len(cls2)
+    var wcls2 = file_write_bytes("run/probe_str_class2.w", cls2)
+    var rb = file_read("run/probe_str_class2.w")
+    printf("S:class2 neg/len str_len=%d write=%d readback_len=%d\n", g_len, wcls2, str_len(rb))
+    printf("S:class2 readback head=%s\n", str_substring(rb, 0, 24))
+
+    printf("S:DONE\n")
+end
+
+main()

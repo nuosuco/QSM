@@ -1,0 +1,9 @@
+# tiny3 - only emit_ints, no emit_str
+var g_h = arr_new(4)
+arr_set(g_h, 0, 1)
+arr_set(g_h, 1, -2)
+arr_set(g_h, 2, 3)
+arr_set(g_h, 3, -4)
+printf("A ")
+emit_ints(g_h, 0, 4)
+printf(" B\n")

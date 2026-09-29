@@ -1,0 +1,52 @@
+# concat_attr.qentl — concat 单步分配精确归因（10 秒实验）
+#
+# 目的: 分离 str_concat 的分配行为,判定方案A(每类1024次 concat + file_write_bytes)
+#       的 RSS 增量是否可控。
+#
+# 变量控制:
+#   阶段1: 1024 次 concat, 每次 "123456789," (10字符) -> 真实长度 10240
+#   阶段2: 再 1024 次 concat, 同 token           -> 真实长度 20480
+#   阶段3: 再 1024 次, 每步中间 str_len(模拟 save_probe 的真实调用模式)
+#
+# 判据:
+#   若 str_concat 是原地追加(旧串复用, 零新分配): RSS 近恒定, 阶段间几乎无增量
+#   若 str_concat 每次分配新串且无回收(当前证据): 每阶段增量随真实长度线性增长
+#   后者 -> 515类 save 的 concat 分配 = 4.66GB/505类 ≈ 9.3MB/类, 方案A 破 1GB 硬线
+#
+# 铁律合规: 无 >65535 字面量(1024/10/24); 无 elif; 无 var 遮蔽全局; 无 str_to_int hex
+
+var g_s = ""
+var g_c = 0
+var g_len = 0
+
+def main():
+    printf("A:BEGIN\n")
+
+    g_c = 0
+    while (g_c < 1024):
+        g_s = str_concat(g_s, "123456789,")
+        g_c = g_c + 1
+    end
+    g_len = str_len(g_s)
+    printf("A:after1024 len=%d\n", g_len)
+
+    g_c = 0
+    while (g_c < 1024):
+        g_s = str_concat(g_s, "123456789,")
+        g_c = g_c + 1
+    end
+    g_len = str_len(g_s)
+    printf("A:after2048 len=%d\n", g_len)
+
+    g_c = 0
+    while (g_c < 1024):
+        g_s = str_concat(g_s, "123456789,")
+        g_c = g_c + 1
+    end
+    g_len = str_len(g_s)
+    printf("A:after3072 len=%d\n", g_len)
+
+    printf("A:DONE\n")
+end
+
+main()

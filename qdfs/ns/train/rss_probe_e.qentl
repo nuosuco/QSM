@@ -1,0 +1,36 @@
+# rss_probe.e — 二分定位: 循环填充超过多大开始失效（probe_c 中段出零的边界）
+var g_wh = 0
+var g_j = 0
+
+def fill_to(n):
+    var k = 0
+    while (k < n):
+        arr_set(g_wh, k, 9)
+        k = k + 1
+    end
+end
+
+def main():
+    printf("E:BEGIN\n")
+    var n = 100001
+    g_wh = arr_new(527360)
+    fill_to(n)
+    printf("E:fill%d -> i0=%d i50000=%d i99999=%d\n", n,
+        arr_get(g_wh, 0), arr_get(g_wh, 50000), arr_get(g_wh, 99999))
+    n = 200001
+    fill_to(n)
+    printf("E:fill%d -> i0=%d i150000=%d i199999=%d\n", n,
+        arr_get(g_wh, 0), arr_get(g_wh, 150000), arr_get(g_wh, 199999))
+    n = 400001
+    fill_to(n)
+    printf("E:fill%d -> i0=%d i200000=%d i399999=%d\n", n,
+        arr_get(g_wh, 0), arr_get(g_wh, 200000), arr_get(g_wh, 399999))
+    n = 527360
+    fill_to(n)
+    printf("E:fill%d -> i0=%d i10000=%d i300000=%d i527359=%d\n", n,
+        arr_get(g_wh, 0), arr_get(g_wh, 10000), arr_get(g_wh, 300000),
+        arr_get(g_wh, 527359))
+    printf("E:DONE\n")
+end
+
+main()

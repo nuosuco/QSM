@@ -1,0 +1,77 @@
+=== START b=1 s=0 23:48:53 ===
+RUN b=1 s=0 rc=0 code=3079 rss_mb=1471.4 elap_s=165 shards=515
+CURVE 态0 ep0: 正确1/129 更新32
+CURVE 态0 ep1: 正确29/129 更新4
+CURVE 态0 ep2: 正确31/129 更新2
+GARBAGECHECK b=1 s=0 bad=0
+RANGE b=1 s=0 min=1197 max=-1732
+STATE_OK b=1 s=0
+=== START b=1 s=1 23:51:38 ===
+RUN b=1 s=1 rc=0 code=3079 rss_mb=1575.9 elap_s=158 shards=515
+CURVE 态1 ep0: 正确3/129 更新29
+CURVE 态1 ep1: 正确4/129 更新28
+CURVE 态1 ep2: 正确4/129 更新28
+GARBAGECHECK b=1 s=1 bad=0
+RANGE b=1 s=1 min=100 max=-1
+STATE_OK b=1 s=1
+=== START b=1 s=2 23:54:18 ===
+RUN b=1 s=2 rc=1 code=3079 rss_mb=253.5 elap_s=8 shards=0
+FAIL_EXIT b=1 s=2 rc=1
+=== START b=1 s=3 23:54:26 ===
+RUN b=1 s=3 rc=1 code=3079 rss_mb=251.2 elap_s=8 shards=0
+FAIL_EXIT b=1 s=3 rc=1
+VERIFY_BATCH 1
+sh: qdfs/ns/train/merge_32x32.sh: No such file or directory
+=== START b=2 s=0 23:54:34 ===
+RUN b=2 s=0 rc=1 code=3079 rss_mb=223.9 elap_s=4 shards=0
+FAIL_EXIT b=2 s=0 rc=1
+=== START b=2 s=1 23:54:38 ===
+RUN b=2 s=1 rc=1 code=3079 rss_mb=226.9 elap_s=5 shards=0
+FAIL_EXIT b=2 s=1 rc=1
+=== START b=2 s=2 23:54:43 ===
+RUN b=2 s=2 rc=1 code=3079 rss_mb=228.0 elap_s=5 shards=0
+FAIL_EXIT b=2 s=2 rc=1
+=== START b=2 s=3 23:54:48 ===
+RUN b=2 s=3 rc=1 code=3079 rss_mb=226.8 elap_s=5 shards=0
+FAIL_EXIT b=2 s=3 rc=1
+VERIFY_BATCH 2
+sh: qdfs/ns/train/merge_32x32.sh: No such file or directory
+=== START b=3 s=0 23:54:53 ===
+RUN b=3 s=0 rc=1 code=3079 rss_mb=227.7 elap_s=4 shards=0
+FAIL_EXIT b=3 s=0 rc=1
+=== START b=3 s=1 23:54:57 ===
+RUN b=3 s=1 rc=1 code=3079 rss_mb=216.3 elap_s=4 shards=0
+FAIL_EXIT b=3 s=1 rc=1
+=== START b=3 s=2 23:55:01 ===
+RUN b=3 s=2 rc=1 code=3079 rss_mb=217.0 elap_s=3 shards=0
+FAIL_EXIT b=3 s=2 rc=1
+=== START b=3 s=3 23:55:04 ===
+RUN b=3 s=3 rc=1 code=3079 rss_mb=216.4 elap_s=4 shards=0
+FAIL_EXIT b=3 s=3 rc=1
+VERIFY_BATCH 3
+sh: qdfs/ns/train/merge_32x32.sh: No such file or directory
+=== START b=4 s=0 23:55:08 ===
+RUN b=4 s=0 rc=1 code=3079 rss_mb=218.7 elap_s=3 shards=0
+FAIL_EXIT b=4 s=0 rc=1
+=== START b=4 s=1 23:55:11 ===
+RUN b=4 s=1 rc=1 code=3079 rss_mb=220.2 elap_s=4 shards=0
+FAIL_EXIT b=4 s=1 rc=1
+=== START b=4 s=2 23:55:15 ===
+RUN b=4 s=2 rc=1 code=3079 rss_mb=220.7 elap_s=3 shards=0
+FAIL_EXIT b=4 s=2 rc=1
+=== START b=4 s=3 23:55:18 ===
+RUN b=4 s=3 rc=1 code=3079 rss_mb=220.2 elap_s=3 shards=0
+FAIL_EXIT b=4 s=3 rc=1
+VERIFY_BATCH 4
+sh: qdfs/ns/train/merge_32x32.sh: No such file or directory
+=== ALL DONE 23:55:22 ===
+b1_s2 attempt=1 rc=1 code=3079 elap=9s rss=253MB [QVM] 数组越界 idx=-3838 size=65535 pc=1688
+b1_s2 attempt=2 rc=1 code=3079 elap=9s rss=253MB [QVM] 数组越界 idx=-3838 size=65535 pc=1688
+b1_s2 attempt=3 rc=1 code=3079 elap=9s rss=253MB [QVM] 数组越界 idx=-3838 size=65535 pc=1688
+b1_s2 attempt=4 rc=1 code=3079 elap=8s rss=253MB [QVM] 数组越界 idx=-3838 size=65535 pc=1688
+b1_s2 attempt=5 rc=1 code=3079 elap=9s rss=253MB [QVM] 数组越界 idx=-3838 size=65535 pc=1688
+b1_s3 attempt=1 rc=1 code=3079 elap=9s rss=251MB [QVM] 数组越界 idx=-12030 size=65535 pc=1688
+b1_s3 attempt=2 rc=1 code=3079 elap=8s rss=251MB [QVM] 数组越界 idx=-12030 size=65535 pc=1688
+b1_s3 attempt=3 rc=1 code=3079 elap=8s rss=251MB [QVM] 数组越界 idx=-12030 size=65535 pc=1688
+b1_s3 attempt=4 rc=1 code=3079 elap=9s rss=251MB [QVM] 数组越界 idx=-12030 size=65535 pc=1688
+b1_s3 attempt=5 rc=1 code=3079 elap=8s rss=251MB [QVM] 数组越界 idx=-12030 size=65535 pc=1688

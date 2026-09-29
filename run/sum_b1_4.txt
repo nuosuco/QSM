@@ -1,0 +1,129 @@
+=== START b=1 s=0 23:11:02 ===
+CURVE 态0 ep0: 正确1/129 更新32
+CURVE 态0 ep1: 正确29/129 更新4
+CURVE 态0 ep2: 正确31/129 更新2
+GARBAGECHECK b=1 s=0 bad=0 min=-1732 max=1197
+STATE_OK b=1 s=0
+=== START b=1 s=1 23:14:10 ===
+CURVE 态1 ep0: 正确3/129 更新29
+CURVE 态1 ep1: 正确4/129 更新28
+CURVE 态1 ep2: 正确4/129 更新28
+GARBAGECHECK b=1 s=1 bad=0 min=-1 max=100
+STATE_OK b=1 s=1
+=== START b=1 s=2 23:17:56 ===
+FAIL_EXIT b=1 s=2 rc=1
+=== RETRY b=1 s=2 r=1 ===
+FAIL_EXIT b=1 s=2 rc=1
+=== START b=1 s=3 23:18:22 ===
+FAIL_EXIT b=1 s=3 rc=1
+=== RETRY b=1 s=3 r=1 ===
+FAIL_EXIT b=1 s=3 rc=1
+VERIFY_BATCH 1
+  b1_s0:   纯数字元素数   : 527360
+  b1_s0:   非零元素个数   : 11030
+  b1_s0:   权重值范围     : min=-1732  max=1197
+  b1_s0: [PASS] 元素总数 = 527360 (结构性标记成立)
+  b1_s0: [PASS] 非零元素 = 11030 (2.0916%)
+  b1_s0: [PASS] 值范围非退化: -1732..1197
+  b1_s0: 结论: 权重结构校验 通过
+  b1_s1:   纯数字元素数   : 527360
+  b1_s1:   非零元素个数   : 1104
+  b1_s1:   权重值范围     : min=0  max=100
+  b1_s1: [PASS] 元素总数 = 527360 (结构性标记成立)
+  b1_s1: [PASS] 非零元素 = 1104 (0.2093%)
+  b1_s1: [PASS] 值范围非退化: 0..100
+  b1_s1: 结论: 权重结构校验 通过
+--- batch1: 4态坍缩 (527360 元素 x 4 态) ---
+  态0 读入 527360 元素 OK
+  态1 读入 527360 元素 OK
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b1_s2_c0.w
+ERROR batch1 态2 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b1_s3_c0.w
+ERROR batch1 态3 无可读数值 (文件缺失或空)
+
+=== 坍缩合并存在失败 ===
+=== START b=2 s=0 23:18:42 ===
+FAIL_EXIT b=2 s=0 rc=1
+=== RETRY b=2 s=0 r=1 ===
+FAIL_EXIT b=2 s=0 rc=1
+=== START b=2 s=1 23:18:53 ===
+FAIL_EXIT b=2 s=1 rc=1
+=== RETRY b=2 s=1 r=1 ===
+FAIL_EXIT b=2 s=1 rc=1
+=== START b=2 s=2 23:19:04 ===
+FAIL_EXIT b=2 s=2 rc=1
+=== RETRY b=2 s=2 r=1 ===
+FAIL_EXIT b=2 s=2 rc=1
+=== START b=2 s=3 23:19:14 ===
+FAIL_EXIT b=2 s=3 rc=1
+=== RETRY b=2 s=3 r=1 ===
+FAIL_EXIT b=2 s=3 rc=1
+VERIFY_BATCH 2
+--- batch2: 4态坍缩 (527360 元素 x 4 态) ---
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b2_s0_c0.w
+ERROR batch2 态0 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b2_s1_c0.w
+ERROR batch2 态1 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b2_s2_c0.w
+ERROR batch2 态2 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b2_s3_c0.w
+ERROR batch2 态3 无可读数值 (文件缺失或空)
+
+=== 坍缩合并存在失败 ===
+=== START b=3 s=0 23:19:25 ===
+FAIL_EXIT b=3 s=0 rc=1
+=== RETRY b=3 s=0 r=1 ===
+FAIL_EXIT b=3 s=0 rc=1
+=== START b=3 s=1 23:19:35 ===
+FAIL_EXIT b=3 s=1 rc=1
+=== RETRY b=3 s=1 r=1 ===
+FAIL_EXIT b=3 s=1 rc=1
+=== START b=3 s=2 23:19:42 ===
+FAIL_EXIT b=3 s=2 rc=1
+=== RETRY b=3 s=2 r=1 ===
+FAIL_EXIT b=3 s=2 rc=1
+=== START b=3 s=3 23:19:49 ===
+FAIL_EXIT b=3 s=3 rc=1
+=== RETRY b=3 s=3 r=1 ===
+FAIL_EXIT b=3 s=3 rc=1
+VERIFY_BATCH 3
+--- batch3: 4态坍缩 (527360 元素 x 4 态) ---
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b3_s0_c0.w
+ERROR batch3 态0 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b3_s1_c0.w
+ERROR batch3 态1 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b3_s2_c0.w
+ERROR batch3 态2 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b3_s3_c0.w
+ERROR batch3 态3 无可读数值 (文件缺失或空)
+
+=== 坍缩合并存在失败 ===
+=== START b=4 s=0 23:19:57 ===
+FAIL_EXIT b=4 s=0 rc=1
+=== RETRY b=4 s=0 r=1 ===
+FAIL_EXIT b=4 s=0 rc=1
+=== START b=4 s=1 23:20:04 ===
+FAIL_EXIT b=4 s=1 rc=1
+=== RETRY b=4 s=1 r=1 ===
+FAIL_EXIT b=4 s=1 rc=1
+=== START b=4 s=2 23:20:11 ===
+FAIL_EXIT b=4 s=2 rc=1
+=== RETRY b=4 s=2 r=1 ===
+FAIL_EXIT b=4 s=2 rc=1
+=== START b=4 s=3 23:20:18 ===
+FAIL_EXIT b=4 s=3 rc=1
+=== RETRY b=4 s=3 r=1 ===
+FAIL_EXIT b=4 s=3 rc=1
+VERIFY_BATCH 4
+--- batch4: 4态坍缩 (527360 元素 x 4 态) ---
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b4_s0_c0.w
+ERROR batch4 态0 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b4_s1_c0.w
+ERROR batch4 态1 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b4_s2_c0.w
+ERROR batch4 态2 无可读数值 (文件缺失或空)
+ERROR 缺分片: /root/QSM/QLife/qdfs/ns/models/qscl_32x32_b4_s3_c0.w
+ERROR batch4 态3 无可读数值 (文件缺失或空)
+
+=== 坍缩合并存在失败 ===
+=== ALL DONE 23:20:26 ===

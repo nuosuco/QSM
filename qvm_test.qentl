@@ -1,0 +1,15 @@
+def do_builtin(bname, nargs):
+    if (str_eq(bname, "arr_new")):
+        do_pop1()
+        push_int(0)
+        return
+    end
+    printf("[QVM-Q] 未知内置函数: %s\n", bname)
+    push_int(0)
+end
+
+def main():
+    var r = do_builtin("arr_new", 1)
+    printf("test ok r=%d\n", r)
+end
+main()

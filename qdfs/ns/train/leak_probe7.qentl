@@ -1,0 +1,10 @@
+# 对比: arr_new 1万 vs 10万 vs 50万
+var g_size = 515
+g_size = g_size * 1024
+var g_h = arr_new(g_size)
+printf("h=%d\n", g_h)
+var g_i = 0
+while (g_i < g_size):
+    g_i = g_i + 1
+end
+printf("no set done i=%d\n", g_i)

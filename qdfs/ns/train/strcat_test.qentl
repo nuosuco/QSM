@@ -1,0 +1,9 @@
+# str_concat内存行为实验：拼接10万次，看RSS增长
+var g_acc = ""
+var g_i = 0
+printf("=== str_concat内存实验 ===\n")
+while (g_i < 30000):
+    g_acc = str_concat(g_acc, "1234")
+    g_i = g_i + 1
+end
+printf("拼接3万次完成，长度=%d\n", str_len(g_acc))

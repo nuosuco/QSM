@@ -1,0 +1,29 @@
+# 诊断4: 最小复现池句柄塌缩
+def main():
+    printf("=== diag4: pool handle collapse repro ===\n")
+    var p1 = arr_new(8)
+    arr_set(p1, 0, 111)
+    var v1 = arr_get(p1, 0)
+    printf("[1] p1=%d v1=%d\n", p1, v1)
+    var p2 = arr_new(8)
+    arr_set(p2, 0, 222)
+    var v1b = arr_get(p1, 0)
+    var v2 = arr_get(p2, 0)
+    printf("[2] p1=%d p2=%d v1b=%d v2=%d\n", p1, p2, v1b, v2)
+    var p3 = arr_new(8)
+    arr_set(p3, 0, 333)
+    var v1c = arr_get(p1, 0)
+    var v2c = arr_get(p2, 0)
+    var v3 = arr_get(p3, 0)
+    printf("[3] p3=%d v1c=%d v2c=%d v3=%d\n", p3, v1c, v2c, v3)
+    var p4 = arr_new(8)
+    arr_set(p4, 0, 444)
+    var v1d = arr_get(p1, 0)
+    var v2d = arr_get(p2, 0)
+    var v3d = arr_get(p3, 0)
+    var v4 = arr_get(p4, 0)
+    printf("[4] p4=%d v1d=%d v2d=%d v3d=%d v4=%d\n", p4, v1d, v2d, v3d, v4)
+    return 0
+end
+
+main()

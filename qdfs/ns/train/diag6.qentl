@@ -1,0 +1,30 @@
+# 诊断6: 池句柄是否真正参数化（交换句柄后值是否跟着换）
+def main():
+    printf("=== diag6: 句柄是否真正参数化 ===\n")
+    var A = arr_new(8)
+    var B = arr_new(8)
+    arr_set(A, 0, 111)
+    arr_set(B, 0, 222)
+    var va = arr_get(A, 0)
+    var vb = arr_get(B, 0)
+    printf("[1] A=%d B=%d  get(A)=%d  get(B)=%d\n", A, B, va, vb)
+
+    # 交换句柄值，再用原变量名读
+    var tmp = A
+    A = B
+    B = tmp
+    var va2 = arr_get(A, 0)
+    var vb2 = arr_get(B, 0)
+    printf("[2] 交换后 A=%d B=%d  get(A)=%d  get(B)=%d\n", A, B, va2, vb2)
+    printf("    若get(A)变成222 -> 句柄真参数化(池隔离正常)\n")
+    printf("    若get(A)仍是111 -> 句柄被忽略(共享单槽, 池未隔离)\n")
+
+    # 再用第三个池覆盖，看旧池是否被污染
+    var C = arr_new(8)
+    arr_set(C, 0, 333)
+    printf("[3] C=%d get(A)=%d get(B)=%d get(C)=%d\n",
+        C, arr_get(A, 0), arr_get(B, 0), arr_get(C, 0))
+    return 0
+end
+
+main()

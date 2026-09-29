@@ -1,0 +1,28 @@
+# 诊断3: arr_new 返回值经全局变量 vs 局部变量的决定性对照
+def main():
+    printf("=== 诊断3: 全局 vs 局部句柄变量 ===\n")
+    # 局部对照（先跑，证明局部可用）
+    var lh = arr_new(4)
+    arr_set(lh, 0, 123)
+    printf("[L] 局部 lh=%d, arr_get[lh,0]=%d (期望123)\n", lh, arr_get(lh, 0))
+
+    # 全局（v9 用法）
+    g_h = arr_new(4)
+    arr_set(g_h, 0, 456)
+    printf("[G] 全局 g_h=%d, arr_get[g_h,0]=%d (期望456)\n", g_h, arr_get(g_h, 0))
+    printf("[G] 对比: g_h(全局)=%d  vs lh(局部)=%d\n", g_h, lh)
+
+    # 同一全局变量重复取句柄 → 是否递增
+    var a1 = arr_new(4)
+    var a2 = arr_new(4)
+    var a3 = arr_new(4)
+    printf("[seq] 局部 a1=%d a2=%d a3=%d (期望递增 0,1,2 或 0,4,8)\n", a1, a2, a3)
+
+    # 全局重复取
+    var g_h2 = arr_new(4)
+    var g_h3 = arr_new(4)
+    printf("[seq-G] 全局 g_h2=%d g_h3=%d (若全=0 则全局变量无法存句柄)\n", g_h2, g_h3)
+    return 0
+end
+
+main()

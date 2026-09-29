@@ -1,0 +1,6 @@
+# test_qscl_init.qentl - 测试 qscl_init builtin
+def main():
+    var h = qscl_init()
+    printf("qscl_init h=%d\n", h)
+end
+main()

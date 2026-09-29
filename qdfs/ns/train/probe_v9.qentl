@@ -1,0 +1,153 @@
+# probe_v9.qentl - 微探针：25万次 dot_arr_at + axpy_arr_at 偏移变体计时
+#
+# 目的: 子代理F 实装 dot_arr_at/axpy_arr_at 后，测单批量 op 代价，判断
+#       v9 训练器在 QVM 二级上的可行性，并与 v7b 逐元素基线对比。
+#
+# 用法（QVM 升级完成后由主控执行，本文件当前不运行不编译）:
+#   ./bin/qcl_boot_c run/probe_v9.qbc run/probe_v9.qbc >/dev/null 2>probe_v9.out
+#   time ./bin/qvm_boot run/probe_v9.qbc
+#
+# 设计（池句柄版，与 v9 训练器同款布局 W[c*1024+p]）:
+#   - g_wh = arr_new(527360)  权重池（句柄 int，存全局）
+#   - g_xh = arr_new(1024)    输入池（句柄 int，存全局）
+#   - 预填: g_xh[i]=1 (1024次 arr_set)，g_wh[c*1024+i]=c (527360次 arr_set)
+#     → dot_arr_at(g_wh, c*1024, g_xh, 1024) 真值 = c*1024（非零，防 op 退化成 no-op）
+#   - [1] 空载整数循环 25万次（基线 ≈0.07s，SKILL §20）
+#   - [2] 用户函数调用 25万次（基线 ≈7s，SKILL §20，测 op 调用的纯调用开销）
+#   - [3] dot_arr_at 25万次: 每调用取 off=(i%515)*1024，覆盖全池跨类寻址
+#   - [4] axpy_arr_at 25万次: lr 取 500/1000/1500/2000 轮换（4态原值），off 同上
+#   - [5] 对照: arr_get+arr_set 逐元素池访问 25万次（v7b 热路径，§20③ 实测420s）
+#
+# 关键校验点（防"op 跑通但语义错"，SKILL §6 验证门 + §17 伪结果陷阱）:
+#   - [3] 结束时打印 g_wh 的若干样本值，确认 dot_arr_at 是只读 op
+#     （dot_arr_at 正确实现不得改动 pool[h]；若变化则 F 的实现有副作用 bug）
+#   - [4] 结束时打印 axpy_arr_at 更新后的权重值，验算 (x-W)*lr/1000 的缩放
+#     （lr 传原值 500-2000，除1000 在 op 内部；若变化量为 x-W 的整数倍则
+#       说明 F 忘了内部除1000 —— 这正是 v8 结构错3 的反面验证）
+#
+# 估算公式（SKILL §20）: 每样本训练热路径池调用 = 515 dot_arr_at + 1~2 axpy_arr_at
+#   ≈ 517 次；若单 op ≈ 0.05ms 则每样本 ≈ 26ms，单态 129样本×2epoch ≈ 6.7s
+#   若单 op 接近 ae 池逐元素的 420s/25万 = 1.68ms 则每样本 ≈ 870ms，单态 ≈ 4min
+#   → 两个数量级的差距，决定 v9 能否在 QVM 二级放大。
+#
+# QCL 语法坑合规: 无 elif（全 else{if}）；var 不与函数参数同名；
+# 全局变量顶部一次性声明，函数内不再 var 同名全局（§7 遮蔽陷阱）。
+#
+# 注: 本探针只做测量，不做训练；arr_new 在 QVM 二级上自带零初始化。
+# 池大小 527360 与 v9 一致，确保测得的是真实规模下的 op 代价。
+
+var g_wh = 0            # 权重池句柄
+var g_xh = 0            # 输入池句柄
+var g_total = 250000    # 每段操作次数
+var g_i = 0
+var g_j = 0
+var g_soff = 0
+var g_sink = 0          # 防优化掉 sink（累加各段返回值）
+var g_off = 0
+var g_score = 0
+var g_lr_now = 500
+
+def call_once(x):
+    return x + 1
+end
+
+def main():
+    printf("=== probe_v9: 25万次 dot_arr_at/axpy_arr_at 偏移变体计时 ===\n")
+    g_wh = arr_new(527360)
+    g_xh = arr_new(1024)
+    printf("池句柄: g_wh=%d g_xh=%d (arr_new 返回 int 句柄)\n", g_wh, g_xh)
+
+    # 预填 g_xh[i] = 1（1024 次，一次性，不计入 25万计时段）
+    g_i = 0
+    while (g_i < 1024):
+        arr_set(g_xh, g_i, 1)
+        g_i = g_i + 1
+    end
+    # 预填 g_wh[c*1024+i] = c（527360 次，一次性）
+    # → dot_arr_at(g_wh, c*1024, g_xh, 1024) 真值 = c * 1024
+    g_i = 0
+    while (g_i < 515):
+        var base = g_i * 1024
+        g_j = 0
+        while (g_j < 1024):
+            arr_set(g_wh, base + g_j, g_i)
+            g_j = g_j + 1
+        end
+        g_i = g_i + 1
+    end
+    printf("预填完成: xh[i]=1, wh[c*1024+i]=c（dot 真值=c*1024, 非零防 no-op）\n")
+
+    # [1] 基线：空载整数循环（≈0.07s / 25万，SKILL §20）
+    printf("[1/5] 空载整数循环 25万次（基线）\n")
+    g_i = 0
+    while (g_i < g_total):
+        g_sink = g_sink + 1
+        g_i = g_i + 1
+    end
+    printf("[1/5] done sink=%d\n", g_sink)
+
+    # [2] 基线：用户函数调用+返回（≈7s / 25万，SKILL §20）
+    printf("[2/5] 用户函数调用 25万次（基线）\n")
+    g_i = 0
+    while (g_i < g_total):
+        var r = call_once(g_sink)
+        g_sink = r
+        g_i = g_i + 1
+    end
+    printf("[2/5] done sink=%d\n", g_sink)
+
+    # [3] dot_arr_at 25万次（只读内积，跨类偏移寻址）
+    printf("[3/5] dot_arr_at 25万次（off=(i%%515)*1024, n=1024）\n")
+    g_i = 0
+    while (g_i < g_total):
+        g_soff = g_i % 515
+        g_off = g_soff * 1024
+        g_score = dot_arr_at(g_wh, g_off, g_xh, 1024)
+        g_sink = g_sink + g_score
+        g_i = g_i + 1
+    end
+    printf("[3/5] done sink=%d last_score=%d (off=%d 期望 %d)\n",
+        g_sink, g_score, g_off, g_soff * 1024)
+
+    # dot_arr_at 只读性校验：pool[h] 不应被内积改动
+    printf("dot只读校验: wh[0]=%d (期望0) wh[514*1024+3]=%d (期望514) wh[527359]=%d (期望514)\n",
+        arr_get(g_wh, 0), arr_get(g_wh, 514 * 1024 + 3), arr_get(g_wh, 527359))
+
+    # [4] axpy_arr_at 25万次（对比式更新，lr 传 4态原值 500/1000/1500/2000）
+    # 更新公式: W[off+i] += (x[i] - W[off+i]) * lr / 1000（op 内部除1000）
+    printf("[4/5] axpy_arr_at 25万次（lr 轮换 500/1000/1500/2000, 原值不做整除）\n")
+    g_i = 0
+    while (g_i < g_total):
+        g_soff = g_i % 515
+        g_off = g_soff * 1024
+        g_lr_now = 500 + (g_i % 4) * 500
+        axpy_arr_at(g_wh, g_off, g_xh, 1024, g_lr_now)
+        g_sink = g_sink + g_lr_now
+        g_i = g_i + 1
+    end
+    printf("[4/5] done sink=%d last_lr=%d\n", g_sink, g_lr_now)
+
+    # 缩放校验: x=1, 起始 W=0（c0 段被反复更新，观察量级）
+    # 单次更新量 = (1 - W) * lr/1000 → 应远小于 (1-W)*lr，验证 op 内部确实做了 /1000
+    # 若 wh[0] 出现几万/几千万级数值，说明 F 的实现忘了内部除1000（v8 结构错3 同类风险）
+    printf("axpy缩放校验: wh[0]=%d wh[1]=%d wh[1023]=%d wh[527359]=%d\n",
+        arr_get(g_wh, 0), arr_get(g_wh, 1), arr_get(g_wh, 1023), arr_get(g_wh, 527359))
+    printf("  判据: 若 wh[0] 在 0~100 量级 = op 内部已 /1000（正确）\n")
+    printf("        若 wh[0] > 10000 = op 未 /1000（bug，lr 原值被整段乘入）\n")
+
+    # [5] 对照：arr_get + arr_set 逐元素池访问 25万次（v7b 热路径，§20③ 实测 420s）
+    printf("[5/5] arr_get+arr_set 25万次（v7b 逐元素基线，§20③ 实测420s）\n")
+    g_i = 0
+    while (g_i < g_total):
+        var v = arr_get(g_wh, g_off)
+        arr_set(g_wh, g_off, v)
+        g_sink = g_sink + v
+        g_i = g_i + 1
+    end
+    printf("[5/5] done sink=%d\n", g_sink)
+
+    printf("=== probe_v9 完成（shell 用 time 计时各段）===\n")
+    printf("=== 训练可行性估算: 每样本热路径 = 515 dot_arr_at + 1~2 axpy_arr_at ≈ 517 次 ===\n")
+end
+
+main()

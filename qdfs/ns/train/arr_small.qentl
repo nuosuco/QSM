@@ -1,0 +1,14 @@
+# 池访问泄漏微实验：25万次池写+读（v7b训练同款指令，5000×50）
+var g_arr[65535]
+var g_i = 0
+var g_acc = 0
+while (g_i < 5000):
+    var j = 0
+    while (j < 50):
+        g_arr[j] = g_acc + j
+        g_acc = g_arr[j]
+        j = j + 1
+    end
+    g_i = g_i + 1
+end
+printf("池访问25万次完成 acc=%d\n", g_acc)

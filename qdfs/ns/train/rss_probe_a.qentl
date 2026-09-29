@@ -1,0 +1,40 @@
+# rss_probe.a — 仅训练热路径（无保存循环），用于归因 RSS 增长来源
+# 形态完全照抄 v9: g_wh=527360, g_xh=1024, x=100 点亮, dot_arr_at+axpy_arr_at
+# 跑法: cp rss_probe.a input.qentl && bin/qvm_boot run run/qcl.qbc && cp output.qbc target.qbc
+#   /usr/bin/time -v bin/qvm_boot run run/qvm.qbc
+var g_wh = 0
+var g_xh = 0
+var g_lr = 500
+var g_i = 0
+var g_j = 0
+var g_v = 0
+var g_sink = 0
+
+def main():
+    printf("A:BEGIN\n")
+    g_xh = arr_new(1024)
+    g_wh = arr_new(527360)
+    printf("A:pool g_wh=%d g_xh=%d\n", g_wh, g_xh)
+    g_i = 0
+    while (g_i < 1024):
+        arr_set(g_xh, g_i, 100)
+        g_i = g_i + 1
+    end
+    # 129 样本 x 515 类 predict + 2 次 axpy_arr_at（v9 态0 热路径）
+    g_i = 0
+    while (g_i < 129):
+        g_j = 0
+        while (g_j < 515):
+            g_v = dot_arr_at(g_wh, g_j * 1024, g_xh, 1024)
+            g_sink = g_sink + g_v
+            g_j = g_j + 1
+        end
+        axpy_arr_at(g_wh, 0, g_xh, 1024, g_lr)
+        axpy_arr_at(g_wh, 1024, g_xh, 1024, 0 - g_lr)
+        g_i = g_i + 1
+    end
+    printf("A:TRAIN_DONE sink=%d sink129=%d\n", g_sink, g_sink / 129)
+    g_sink = g_sink
+end
+
+main()

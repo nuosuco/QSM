@@ -1,0 +1,51 @@
+# 诊断: 全局句柄语义（解释 v9 落盘全 0）
+# 现象: v9 用全局 g_wh/g_xh/g_nxh 句柄，落盘权重全 0，但训练日志报"更新3"
+# 对比: probe_v9_fast 用【局部】句柄，axpy 语义段全对（dot=10, axpy=1, 负lr=-1）
+def main():
+    printf("=== 诊断: 全局句柄语义 ===\n")
+
+    # [G1] 全局变量 + arr_new 返回值
+    g_wh = arr_new(65536)
+    printf("[G1] 全局 g_wh = %d\n", g_wh)
+
+    # [G2] 全局句柄 arr_set / arr_get 往返
+    arr_set(g_wh, 0, 123)
+    arr_set(g_wh, 65535, 456)
+    printf("[G2] 全局 g_wh: arr_get[0]=%d (期望123) arr_get[65535]=%d (期望456)\n",
+        arr_get(g_wh, 0), arr_get(g_wh, 65535))
+
+    # [G3] 全局句柄 + axpy_arr_at（模拟 v9 boost）
+    g_xh = arr_new(4)
+    arr_set(g_xh, 0, 1)
+    arr_set(g_xh, 1, 1)
+    arr_set(g_xh, 2, 1)
+    arr_set(g_xh, 3, 1)
+    axpy_arr_at(g_wh, 0, g_xh, 4, 1000)
+    printf("[G3] 全局句柄 axpy lr=1000 x=1: wh[0]=%d (期望1, 0+(1-0)*1000/1000=1)\n",
+        arr_get(g_wh, 0))
+
+    # [G4] 局部句柄对照（探针已知正确）
+    var lh = arr_new(4)
+    var lx = arr_new(4)
+    arr_set(lh, 0, 0)
+    arr_set(lx, 0, 3)
+    axpy_arr_at(lh, 0, lx, 1, 500)
+    printf("[G4] 局部句柄 axpy lr=500 x=3: lh[0]=%d (期望1)\n", arr_get(lh, 0))
+
+    # [G5] 句柄存全局数组槽（变体方案测试）
+    var g_ws_arr[4]
+    g_ws_arr[0] = arr_new(65536)
+    g_ws_arr[1] = arr_new(4)
+    printf("[G5] 全局数组槽: g_ws_arr[0]=%d g_ws_arr[1]=%d\n",
+        g_ws_arr[0], g_ws_arr[1])
+    arr_set(g_ws_arr[0], 0, 77)
+    arr_set(g_ws_arr[1], 0, 1)      # 输入 x=1（arr_new 零初始化，需显式设）
+    printf("[G5] 全局数组槽 g_ws_arr[0]: arr_get[0]=%d (期望77)  x[0]=%d (期望1)\n",
+        arr_get(g_ws_arr[0], 0), arr_get(g_ws_arr[1], 0))
+    axpy_arr_at(g_ws_arr[0], 0, g_ws_arr[1], 1, 1000)
+    printf("[G5] 全局数组槽 axpy: arr_get[0]=%d (期望78, 77+(1-77)*1000/1000=78)\n",
+        arr_get(g_ws_arr[0], 0))
+    return 0
+end
+
+main()

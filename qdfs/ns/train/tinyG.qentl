@@ -1,0 +1,7 @@
+# debug: check if is_builtin knows emit_ints/emit_str
+printf("test1: str_eq(%s,%s)=%d\n", "emit_ints", "emit_ints", str_eq("emit_ints", "emit_ints"))
+printf("test2: str_eq(%s,%s)=%d\n", "emit_str", "emit_str", str_eq("emit_str", "emit_str"))
+emit_str("HELLO_FROM_EMIT_STR")
+printf("\nnext: ")
+emit_ints(0, 0, 0)
+printf("\nDONE\n")

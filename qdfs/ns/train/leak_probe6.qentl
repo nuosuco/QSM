@@ -1,0 +1,5 @@
+# 10万 arr_new 对比
+var g_size = 100
+g_size = g_size * 1024
+var g_h = arr_new(g_size)
+printf("h=%d done\n", g_h)

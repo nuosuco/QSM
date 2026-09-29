@@ -1,0 +1,109 @@
+# QSCL 8×8 真训练器 v1 — 4态不同起点叠加态并行（坍缩合并）
+# 数据: 8×8=64像素, 分批(每批515类), 4态 seed/LR 不同
+# 用 flat_load 消除逐字符解析瓶颈
+var g_x[64]                    # 当前样本像素(8×8)
+var g_W[4096]                # 权重矩阵 64类×64像素=4096 (小批验证)
+var g_i = 0
+var g_c = 0
+var g_idx = 0
+var g_score = 0
+var g_max = 0
+var g_maxi = 0
+var g_label = 0
+var g_pred = 0
+var g_diff = 0
+var g_lr = 100
+var g_rnd = 0
+var g_ep = 0
+var g_epoch = 25
+var g_s = 0
+var g_state = 0
+var g_seed = 1
+var g_batch = 0
+var g_base = 0
+var g_correct = 0
+var g_updates = 0
+
+def train_one():
+    # forward: 64类内积(8×8=64像素)
+    g_max = -30000
+    g_maxi = 0
+    g_c = 0
+    while (g_c < 64):
+        g_score = 0
+        g_idx = g_c * 64
+        g_i = 0
+        while (g_i < 64):
+            g_score = g_score + g_W[g_idx + g_i] * g_x[g_i]
+            g_i = g_i + 1
+        end
+        if (g_score > g_max):
+            g_max = g_score
+            g_maxi = g_c
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_maxi
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+    else:
+        g_updates = g_updates + 1
+        # 对比感知机铁律: W[正确] += x, W[错分] -= x (直接加减输入)
+        g_idx = g_label * 64
+        g_i = 0
+        while (g_i < 64):
+            g_W[g_idx + g_i] = g_W[g_idx + g_i] + g_x[g_i]
+            g_i = g_i + 1
+        end
+        # 抑制错分类: W[pred] -= x
+        g_idx = g_pred * 64
+        g_i = 0
+        while (g_i < 64):
+            g_W[g_idx + g_i] = g_W[g_idx + g_i] - g_x[g_i]
+            g_i = g_i + 1
+        end
+    end
+end
+
+def train_state():
+    # 不同起点初始化权重 —— 全0起点(对比感知机标准起点), seed只影响后续(augment占位)
+    g_rnd = g_seed
+    g_i = 0
+    while (g_i < 4096):
+        g_W[g_i] = 0
+        g_i = g_i + 1
+    end
+    printf("  态%d seed=%d lr=%d 权重初始化完成\n", g_state, g_seed, g_lr)
+    # 训练 epoch
+    g_ep = 0
+    while (g_ep < g_epoch):
+        g_correct = 0
+        g_updates = 0
+        g_s = 0
+        while (g_s < 64):   # 每态训64样本
+            flat_load("qdfs/ns/data/yi_glyph_4226_8x8_flat.data", g_x, g_base + g_s, 64)
+            g_label = g_s
+            train_one()
+            g_s = g_s + 1
+        end
+        printf("  态%d ep%d: 正确%d/64 更新%d\n", g_state, g_ep, g_correct, g_updates)
+        g_ep = g_ep + 1
+    end
+end
+
+def main():
+    printf("=== QSCL 8×8 4态叠加态并行训练 ===\n")
+    g_batch = 0
+    g_base = 0
+    # 4态循环(不同起点)
+    g_state = 0
+    while (g_state < 4):
+        g_seed = 1 + g_state * 100
+        g_lr = 500 + g_state * 500
+        train_state()
+        g_state = g_state + 1
+    end
+    printf("=== 4态训练完成 ===\n")
+end
+
+main()

@@ -669,7 +669,26 @@ def is_builtin(nm):
     if (str_eq(nm, "arr_new")): return 1 end
     if (str_eq(nm, "arr_get")): return 1 end
     if (str_eq(nm, "arr_set")): return 1 end
+    if (str_eq(nm, "dot_arr")): return 1 end
+    if (str_eq(nm, "axpy_arr")): return 1 end
+    if (str_eq(nm, "axpy_neg_arr")): return 1 end
+    if (str_eq(nm, "dot_arr_at")): return 1 end
+    if (str_eq(nm, "axpy_arr_at")): return 1 end
     if (str_eq(nm, "qscl_init")): return 1 end
+    if (str_eq(nm, "flat_load")): return 1 end
+    if (str_eq(nm, "flat_load_data")): return 1 end
+    if (str_eq(nm, "flat_load_b100")): return 1 end
+    if (str_eq(nm, "flat_load_all_batch")): return 1 end
+    # 2026-09-28 泄漏修复: 批量钳位/填充 (内层纯 ae_i_get/ae_i_set, 见 qvm.qentl do_builtin)
+    if (str_eq(nm, "clamp_arr_at")): return 1 end
+    if (str_eq(nm, "fill_xn_from_pool")): return 1 end
+    if (str_eq(nm, "copy_pool_to_pool")): return 1 end
+    if (str_eq(nm, "transform_pool")): return 1 end
+    if (str_eq(nm, "predict_all")): return 1 end
+    # 2026-09-13 零泄漏批量输出op (挂一级C原生printf, 见 qvm.qentl do_builtin)
+    if (str_eq(nm, "emit_ints")): return 1 end
+    if (str_eq(nm, "emit_str")): return 1 end
+    if (str_eq(nm, "load_ints_from_file")): return 1 end
     return 0
 end
 

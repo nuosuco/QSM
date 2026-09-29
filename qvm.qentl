@@ -128,7 +128,12 @@ var pop5_t = 0
 var pop5_i = 0
 var pop5_s = ""
 var pop5_a = 0
+var pop6_t = 0
+var pop6_i = 0
+var pop6_s = ""
+var pop6_a = 0
 var g_cmp_r = 0
+var g_cur_pc = 0
 
 # ================================================================
 # 字节码访问
@@ -175,6 +180,10 @@ end
 
 def do_pop1():
     sp = sp - 1
+    if (sp < 0):
+        printf("[QVM-DBG] 栈下溢! sp=%d pc=%d\n", sp, g_cur_pc)
+        sp = 0
+    end
     pop1_t = st_type[sp]
     pop1_i = st_int[sp]
     pop1_s = st_str[sp]
@@ -217,6 +226,14 @@ def do_pop5():
     do_pop4()
 end
 
+def do_pop6():
+    do_pop1()
+    pop6_t = pop1_t
+    pop6_i = pop1_i
+    pop6_s = pop1_s
+    pop6_a = pop1_a
+    do_pop5()
+end
 # ================================================================
 # 数组元素池访问（双段）
 # ================================================================
@@ -260,9 +277,9 @@ end
 
 def ae_t_set(pos, v):
     var p = pos
-    # B组: 段9-17 (pos >= 589815)
-    if (p >= 589815):
-        p = p - 589815
+    # B组: 段9-17 (pos >= 65535*9)
+    if (p >= 65535*9):
+        p = p - 65535*9
         if (p < 65535): ae_type9[p] = v
         else:
             p = p - 65535
@@ -330,7 +347,7 @@ end
 
 def ae_i_get(pos):
     var p = pos
-    if (p < 589815):
+    if (p < 65535*9):
         if (p < 65535): return ae_int0[p] end
         p = p - 65535
         if (p < 65535): return ae_int1[p] end
@@ -348,7 +365,7 @@ def ae_i_get(pos):
         if (p < 65535): return ae_int7[p] end
         return ae_int8[p - 65535]
     end
-    p = p - 589815
+    p = p - 65535*9
     if (p < 65535): return ae_int9[p] end
     p = p - 65535
     if (p < 65535): return ae_int10[p] end
@@ -369,9 +386,9 @@ end
 
 def ae_i_set(pos, v):
     var p = pos
-    # B组: 段9-17 (pos >= 589815)
-    if (p >= 589815):
-        p = p - 589815
+    # B组: 段9-17 (pos >= 65535*9)
+    if (p >= 65535*9):
+        p = p - 65535*9
         if (p < 65535): ae_int9[p] = v
         else:
             p = p - 65535
@@ -477,9 +494,9 @@ end
 
 def ae_s_set(pos, v):
     var p = pos
-    # B组: 段9-17 (pos >= 589815)
-    if (p >= 589815):
-        p = p - 589815
+    # B组: 段9-17 (pos >= 65535*9)
+    if (p >= 65535*9):
+        p = p - 65535*9
         if (p < 65535): ae_str9[p] = v
         else:
             p = p - 65535
@@ -757,6 +774,10 @@ def bi_printf(nargs):
 end
 
 def do_builtin(bname, nargs):
+    # ⚠ 关键: do_builtin 入口 sp 指向 args 顶端. 后续每 str_eq 调用会 push 结果,
+    #   sp 增长但 args 仍在 [sp- nargs .. sp-1] 处(入参底).
+    #   必须第一时间快照 arg_base = sp - nargs, 分支内一律用它而不是当时 sp.
+    var arg_base = sp - nargs
     # QSCL 专用: 创建 515x1024 权重矩阵
     if (str_eq(bname, "qscl_init")):
         var h = ar_used
@@ -1158,6 +1179,556 @@ def do_builtin(bname, nargs):
         push_int(n)
         return
     end
+    # dot_arr(a, b, n): Σ a[i]*b[i]  (批量内积, 替代训练循环里的逐元素arr_get+arr_get)
+    # 调用一次算完整个点积, 避免N次arr_get×N次乘法×N次加法
+    if (str_eq(bname, "dot_arr")):
+        do_pop3()
+        var nn = pop3_i
+        var h2 = pop2_a
+        var h1 = pop1_a
+        var off1 = ar_off[h1]
+        var off2 = ar_off[h2]
+        var di = 0
+        var ds = 0
+        var dv1 = 0
+        var dv2 = 0
+        while (di < nn):
+            dv1 = ae_i_get(off1 + di)
+            dv2 = ae_i_get(off2 + di)
+            ds = ds + dv1 * dv2
+            di = di + 1
+        end
+        push_int(ds)
+        return
+    end
+    # axpy_arr(W, X, n, lr): W[i] += (X[i] - W[i]) * lr   批量感知机更新(对比式)
+    # 训练循环一次调用更新整类权重, 避免N次(arr_get×2 + arr_set + 算术)
+    if (str_eq(bname, "axpy_arr")):
+        do_pop4()
+        var axlr = pop4_i
+        var an = pop3_i
+        var xh = pop2_a
+        var wh = pop1_a
+        var woff = ar_off[wh]
+        var xoff = ar_off[xh]
+        var ai = 0
+        var av = 0
+        var ad = 0
+        while (ai < an):
+            av = ae_i_get(woff + ai)
+            ad = ae_i_get(xoff + ai) - av
+            ae_i_set(woff + ai, av + ad * axlr)
+            ai = ai + 1
+        end
+        push_int(an)
+        return
+    end
+    # axpy_neg_arr(W, X, n, lr): W[i] -= (X[i] - W[i]) * lr   批量抑制错分类权重
+    if (str_eq(bname, "axpy_neg_arr")):
+        do_pop4()
+        var axlr = pop4_i
+        var an = pop3_i
+        var xh = pop2_a
+        var wh = pop1_a
+        var woff = ar_off[wh]
+        var xoff = ar_off[xh]
+        var ai = 0
+        var av = 0
+        var ad = 0
+        while (ai < an):
+            av = ae_i_get(woff + ai)
+            ad = ae_i_get(xoff + ai) - av
+            ae_i_set(woff + ai, av - ad * axlr)
+            ai = ai + 1
+        end
+        push_int(an)
+        return
+    end
+    # dot_arr_at(h, off, xh, n): Σ pool[h].data[off+i] * pool[xh].data[i]
+    # 偏移变体: h侧从段内偏移off开始读(跨段/跨类权重), xh侧从段0起点读(输入向量)
+    # 修掉 dot_arr 只能从 h 的段0起点读、读不到偏移65000处数据的硬伤
+    if (str_eq(bname, "dot_arr_at")):
+        do_pop4()
+        var dn = pop4_i
+        var xh_at = pop3_a
+        var doff = pop2_i
+        var h1 = pop1_a
+        var off1 = ar_off[h1] + doff
+        var off2 = ar_off[xh_at]
+        var di = 0
+        var ds = 0
+        var dv1 = 0
+        var dv2 = 0
+        while (di < dn):
+            dv1 = ae_i_get(off1 + di)
+            dv2 = ae_i_get(off2 + di)
+            ds = ds + dv1 * dv2
+            di = di + 1
+        end
+        push_int(ds)
+        return
+    end
+    # axpy_arr_at(h, off, xh, n, lr):
+    #   pool[h].data[off+i] += (pool[xh].data[i] - pool[h].data[off+i]) * lr / 1000
+    # 批量感知机更新, 权重侧从段内偏移off读写(跨类), 输入侧从段0起点读
+    # 除数在op内部做: lr传原值500-2000, 训练器不再自己除, 避免训练器侧漏除/多除
+    # 量纲修正(主控diag10实锤, 2026-09-13): 原除1000 把 lr=500 的更新量
+    #   (x-W)*500/1000 = 500/1000 = 0 整除成 0 → 态0(lr=500) 权重恒为0、完全无法学习
+    #   （冒烟实测515类全零、但训练日志报"更新3"——更新发生了却无效果）。
+    #   改除2: 有效步长 = lr/2 ∈ [250,1000]，|x-W|*lr 最大 2000，除以2不溢出 u16。
+    #   4态步长仍差异化: 250/500/750/1000。负lr抑制语义保留(-500→-250)。
+    # 溢出边界: |x-w|*lr < 65535 时乘积不溢出16位(二值像素 lr<=2000 满足)
+    if (str_eq(bname, "axpy_arr_at")):
+        do_pop5()
+        var alr = pop5_i
+        var an2 = pop4_i
+        var xh_at = pop3_a
+        var aoff = pop2_i
+        var wh = pop1_a
+        var woff = ar_off[wh] + aoff
+        var xoff = ar_off[xh_at]
+        var ai = 0
+        var av = 0
+        var ad = 0
+        while (ai < an2):
+            av = ae_i_get(woff + ai)
+            ad = ae_i_get(xoff + ai) - av
+            ae_i_set(woff + ai, av + ad * alr / 1000)
+            ai = ai + 1
+        end
+        push_int(an2)
+        return
+    end
+    # clamp_arr_at(h, off, n, limit): pool[h].data[off+i] 钳位到 ±limit
+    # 2026-09-28 泄漏修复: 训练器 clamp_row 用 QEntL 循环调 arr_get/arr_set builtin
+    #   1 epoch 26万次 builtin 调用 → qvm_boot C 层每次调用泄漏 ~830B → 442MB/epoch
+    #   新 builtin 在 QEntL 层内层循环用 ae_i_get/ae_i_set(纯整数索引, 实测 512万次零泄漏)
+    #   训练器一次调用算完整行, builtin 调用次数降 1024 倍
+    if (str_eq(bname, "clamp_arr_at")):
+        do_pop4()
+        var clim = pop4_i
+        var cn2 = pop3_i
+        var coff2 = pop2_i
+        var wh2 = pop1_a
+        var woff2 = ar_off[wh2] + coff2
+        var ci3 = 0
+        var cv = 0
+        var nlim_neg = 0 - clim
+        while (ci3 < cn2):
+            cv = ae_i_get(woff2 + ci3)
+            if (cv > clim): ae_i_set(woff2 + ci3, clim) end
+            if (cv < nlim_neg): ae_i_set(woff2 + ci3, nlim_neg) end
+            ci3 = ci3 + 1
+        end
+        push_int(cn2)
+        return
+    end
+    # fill_xn_from_pool(xh, nxh, src, off, n): xh[i]=src[off+i], nxh[i]=-src[off+i]
+    # 2026-09-28 泄漏修复: 训练器样本装载循环 1024×2 次 arr_set/epoch·样本
+    #   → 一次 builtin 取代, 内层循环纯 ae_i_get/ae_i_set 零泄漏
+    if (str_eq(bname, "fill_xn_from_pool")):
+        do_pop5()
+        var fn = pop5_i
+        var foff = pop4_i
+        var fsrc = pop3_a
+        var fnxh = pop2_a
+        var fxh = pop1_a
+        var fsoff = ar_off[fsrc] + foff
+        var fxoff = ar_off[fxh]
+        var fnxoff = ar_off[fnxh]
+        var fi = 0
+        var fv = 0
+        while (fi < fn):
+            fv = ae_i_get(fsoff + fi)
+            ae_i_set(fxoff + fi, fv)
+            ae_i_set(fnxoff + fi, 0 - fv)
+            fi = fi + 1
+        end
+        push_int(fn)
+        return
+    end
+    # copy_pool_to_pool(dst, src, off, n): dst[i] = src[off+i]  池到池整段拷贝
+    # 2026-09-28 泄漏修复: parse_sample 装载 1024×(arr_get+arr_set)/样本 → 1次 builtin
+    if (str_eq(bname, "copy_pool_to_pool")):
+        do_pop4()
+        var cpn = pop4_i
+        var cpoff = pop3_i
+        var cpsrc = pop2_a
+        var cpdst = pop1_a
+        var cpsoff = ar_off[cpsrc] + cpoff
+        var cpdoff = ar_off[cpdst]
+        var cpi = 0
+        var cpv = 0
+        while (cpi < cpn):
+            cpv = ae_i_get(cpsoff + cpi)
+            ae_i_set(cpdoff + cpi, cpv)
+            cpi = cpi + 1
+        end
+        push_int(cpn)
+        return
+    end
+    # transform_pool(h, state, rnd_in): 在池上做输入变换, 返回 rnd_out
+    # 2026-09-28 泄漏修复: 训练器 transform 逐元素循环在 QEntL 层(经 var 数组+arr_set)
+    #   → 1次 builtin 在 QVM 内层完成 (纯 ae_i_get/ae_i_set)
+    # state=1: 左右翻转; state=2: LCG(seed=rnd_in 连续) 20% 反相; state=3: 上下翻转
+    # LCG 与旧训练器一致: g_rnd=(g_rnd*1103+12345)%65521 (跨样本连续, rnd 进出保真)
+    if (str_eq(bname, "transform_pool")):
+        do_pop3()
+        var trnd = pop3_i
+        var tstate = pop2_i
+        var th = pop1_a
+        var toff = ar_off[th]
+        if (tstate == 1):
+            var ti = 0
+            var trow = 0
+            var tcol = 0
+            var ttmp = 0
+            var tmi = 0
+            while (ti < 512):
+                trow = ti / 32
+                tcol = ti % 32
+                tmi = trow * 32 + 31 - tcol
+                ttmp = ae_i_get(toff + ti)
+                if (tmi > ti):
+                    ae_i_set(toff + ti, ae_i_get(toff + tmi))
+                    ae_i_set(toff + tmi, ttmp)
+                end
+                ti = ti + 1
+            end
+        end
+        if (tstate == 2):
+            var t2i = 0
+            var t2r = 0
+            var t2v = 0
+            while (t2i < 1024):
+                t2r = trnd * 1103 + 12345
+                t2r = t2r % 65521
+                if (t2r < 0): t2r = 0 - t2r end
+                trnd = t2r
+                if (t2r % 20 == 0):
+                    t2v = ae_i_get(toff + t2i)
+                    if (t2v == 0): ae_i_set(toff + t2i, 100) end
+                    if (t2v > 0): ae_i_set(toff + t2i, 0) end
+                end
+                t2i = t2i + 1
+            end
+        end
+        if (tstate == 3):
+            var t3r = 0
+            var t3c = 0
+            var t3tmp = 0
+            var t3a = 0
+            var t3b = 0
+            while (t3r < 16):
+                t3c = 0
+                while (t3c < 32):
+                    t3a = t3r * 32 + t3c
+                    t3b = (31 - t3r) * 32 + t3c
+                    t3tmp = ae_i_get(toff + t3a)
+                    ae_i_set(toff + t3a, ae_i_get(toff + t3b))
+                    ae_i_set(toff + t3b, t3tmp)
+                    t3c = t3c + 1
+                end
+                t3r = t3r + 1
+            end
+        end
+        push_int(trnd)
+        return
+    end
+    # predict_all(wh, nc, xh, n): 一次调用算全部 nc 类的 argmax, 返回类号
+    # 2026-09-28 泄漏修复: predict() 每样本 515 次 dot_arr_at = 66435次/ep
+    #   → 55MB/ep 泄漏 (剩余泄漏源). 新 builtin 一次算全部, 调用次数 515→1
+    # 内层 515×1024 纯 ae_i_get/ae_i_set 零泄漏 (A隔离探针实测 512万次零增长)
+    if (str_eq(bname, "predict_all")):
+        do_pop4()
+        var pn2 = pop4_i
+        var pxh = pop3_a
+        var pnc = pop2_i
+        var pwh = pop1_a
+        var pwoff0 = ar_off[pwh]
+        var pxoff = ar_off[pxh]
+        var pc = 0
+        var pi2 = 0
+        var pbm = 0 - 30000
+        var pbi = 0
+        var psum = 0
+        var pwv = 0
+        var pxv = 0
+        while (pc < pnc):
+            psum = 0
+            pi2 = 0
+            while (pi2 < pn2):
+                pwv = ae_i_get(pwoff0 + pc * 1024 + pi2)
+                pxv = ae_i_get(pxoff + pi2)
+                psum = psum + pwv * pxv
+                pi2 = pi2 + 1
+            end
+            if (psum > pbm):
+                pbm = psum
+                pbi = pc
+            end
+            pc = pc + 1
+        end
+        push_int(pbi)
+        return
+    end
+    # flat_load(path, arr, lineno, npixels): 一次性读flat文件第lineno行, 解析npixels个数字写入arr
+    # v10 重写(2026-09-13): 数据行格式 'label:p1,p2,...,p1024' 逗号分隔, 0/1 二值.
+    # 原实现期待空格分隔 + 内部 str_index_of(rest,pos,8) O(n²) str_substring 循环(§8 泄漏).
+    # 新实现: 只 1 次 str_substring 取整行 + 1 次 str_substring 跳过 label + n+1 次极小 str_substring
+    #   取单字符 token(2 字符 "1,"/"0," 量级). 每次 str_to_int 换成字面量比较('0'/'1').
+    if (str_eq(bname, "flat_load")):
+        do_pop4()
+        var npix = pop4_i
+        var lineno = pop3_i
+        var ah = pop2_a
+        var path_s = pop1_s
+        var off = ar_off[ah]
+        var content = file_read(path_s)
+        var cpos = 0
+        var ln = 0
+        var nl = 0
+        var line = ""
+        var colon = 0
+        var pix = ""
+        var p = 0
+        var ii = 0
+        var tok = ""
+        var pe = 0
+        var pv = 0
+        while (ln < lineno):
+            nl = str_index_of(str_substring(content, cpos, 4000), "\n")
+            if (nl < 0):
+                cpos = str_len(content)
+            else:
+                cpos = cpos + nl + 1
+            end
+            ln = ln + 1
+        end
+        line = str_substring(content, cpos, 4000)
+        nl = str_index_of(line, "\n")
+        if (nl >= 0):
+            line = str_substring(line, 0, nl)
+        end
+        colon = str_index_of(line, ":")
+        pix = str_substring(line, colon + 1, 4000)
+        while (ii < npix):
+            pe = str_index_of(str_substring(pix, p, 8), ",")
+            if (pe < 0):
+                tok = str_substring(pix, p, 8)
+                p = str_len(pix)
+            else:
+                tok = str_substring(pix, p, pe)
+                p = p + pe + 1
+            end
+            if (tok == "0"):
+                pv = 0
+            else:
+                pv = str_to_int(tok)
+            end
+            ae_i_set(off + ii, pv)
+            ii = ii + 1
+        end
+        push_int(npix)
+        return
+    end
+    # flat_load_data(data, pix_off, xh, npix): 从已缓存的 data 字符串的 pix_off 位置开始,
+    #   解析 npix 个逗号分隔的 0/1 二值像素写入 arr[xh]. 零 file_read, 零 label 解析.
+    # 用途: 训练器已一次性把 batch 行提取到 g_batch_data (仅 129 行 ~260KB), 各 epoch 复用.
+    #   相比 flat_load: 省掉 file_read(整文件 8.6MB) + 行定位循环, 内存泄漏降到极低.
+    if (str_eq(bname, "flat_load_data")):
+        do_pop4()
+        var npx = pop4_i
+        var ah2 = pop3_a
+        var po = pop2_i
+        var data = pop1_s
+        var off2 = ar_off[ah2]
+        var pix = str_substring(data, po, 2000)
+        var pp = 0
+        var jj = 0
+        var tok2 = ""
+        var pv2 = 0
+        var pe2 = 0
+        while (jj < npx):
+            pe2 = str_index_of(str_substring(pix, pp, 8), ",")
+            if (pe2 < 0):
+                tok2 = str_substring(pix, pp, 8)
+                pp = str_len(pix)
+            else:
+                tok2 = str_substring(pix, pp, pe2)
+                pp = pp + pe2 + 1
+            end
+            if (tok2 == "0"):
+                pv2 = 0
+            else:
+                pv2 = str_to_int(tok2)
+            end
+            ae_i_set(off2 + jj, pv2)
+            jj = jj + 1
+        end
+        push_int(npx)
+        return
+    end
+    # flat_load_b100(data, pix_off, xh, npix, scale): v10.1 批量+缩放一次完成
+    #   解析 npix 个逗号分隔像素(0/1二值)并乘 scale 后写入 arr[xh].
+    #   关键: 每次读 2 字符短串("0," 或 "1,"), 用 str_index_of 找逗号位置,
+    #   分配量每样本约 1024 次 2 字符短串, <2MB 泄漏, 相比 v9 的 20MB 降 10x.
+    #   参数: data=pix 段起点数据串, pix_off=数据段内偏移, xh=目标池句柄,
+    #         npix=像素数(1024), scale=缩放倍数(100).
+    if (str_eq(bname, "flat_load_b100")):
+        do_pop5()
+        var sc = pop5_i
+        var npx3 = pop4_i
+        var ah3 = pop3_a
+        var po3 = pop2_i
+        var data3 = pop1_s
+        var off3 = ar_off[ah3]
+        var pix3 = str_substring(data3, po3, 2000)
+        var plen3 = str_len(pix3)
+        var pp3 = 0
+        var jj3 = 0
+        var win = ""
+        var pv3 = 0
+        while (jj3 < npx3):
+            win = str_substring(pix3, pp3, 2)
+            if (win == "0,"):
+                pv3 = 0
+            else:
+                pv3 = 1
+            end
+            ae_i_set(off3 + jj3, pv3 * sc)
+            pp3 = pp3 + 2
+            jj3 = jj3 + 1
+        end
+        push_int(npx3)
+        return
+    end
+    # flat_load_all_batch(data, pix_offs_pool, dst_pool, nsamples, npix_per, scale):
+    #   一次性把 nsamples 个样本的像素从缓存数据切片的多个偏移位置解析到 dst_pool.
+    #   参数顺序 (匹配 do_pop6, arg1 到 arg6):
+    #     arg1 = data          (str, 缓存 batch 数据切片)
+    #     arg2 = pix_offs_pool (arr, 129 个 pix_abs 偏移, 句柄)
+    #     arg3 = dst_pool      (arr, 129*1024 int 池, 句柄)
+    #     arg4 = nsamples      (int, 129)
+    #     arg5 = npix_per      (int, 1024)
+    #     arg6 = scale         (int, 100)
+    # flat_load_all_batch(data, line_offs_pool, dst_pool, nsamples, npix_per, scale):
+    #   一次性把 nsamples 个样本的像素从缓存数据切片的多个行偏移位置解析到 dst_pool.
+    #   每行自动定位 ':' 后开始解析像素 (省掉额外构造 pix_abs 偏移池).
+    #   参数顺序 (已实测): arg1=data, arg2=line_offs_pool, arg3=dst_pool,
+    #     arg4=nsamples, arg5=npix_per, arg6=scale
+    if (str_eq(bname, "flat_load_all_batch")):
+        var data = st_str[arg_base]
+        var offh = st_arr[arg_base + 1]
+        var dsth = st_arr[arg_base + 2]
+        var nsamp = st_int[arg_base + 3]
+        var npix_p = st_int[arg_base + 4]
+        var sc = st_int[arg_base + 5]
+        var off_off = ar_off[offh]
+        var pool_off = ar_off[dsth]
+        var li = 0
+        var line_start = 0
+        var cpos = 0
+        var pp = 0
+        var jj = 0
+        var win = ""
+        var pv = 0
+        var dst = 0
+        while (li < nsamp):
+            line_start = ae_i_get(off_off + li)
+            cpos = str_index_of(str_substring(data, line_start, 60), ":")
+            pp = line_start + cpos + 1
+            dst = li * npix_p
+            jj = 0
+            while (jj < npix_p):
+                win = str_substring(data, pp, 2)
+                if (win == "0,"):
+                    pv = 0
+                else:
+                    pv = 1
+                end
+                ae_i_set(pool_off + dst + jj, pv * sc)
+                pp = pp + 2
+                jj = jj + 1
+            end
+            li = li + 1
+        end
+        sp = arg_base
+        push_int(nsamp * npix_p)
+        return
+    end
+    #   emit_ints(h, off, n)  - 一次调用把 pool[h].data[off..off+n-1] 以 "%d," 喷到 stdout
+    #   emit_str(s)           - printf('%s', s) 同通道
+    # 关键: 本函数是 qvm.qentl 自身代码, 编译进 run/qvm.qbc 后是【一级C种子VM】
+    #   的 BUILTIN printf → C 原生打印, 零 str_concat/零字符串分配.
+    #   对比 bi_printf(第717行, QVM二级 bi_printf): 每个字符 str_concat 累积
+    #   → QVM 无 GC → 每调用一步泄漏一临时串(实测 save 527360值 = 4.89GB).
+    #   本op在一级VM内循环调用一级 printf → 每步零分配.
+    # 栈约定(模仿 bi_printf 第717行): base=sp-nargs, 参数在 base..base+nargs-1,
+    #   sp-1 = 最后一个参数 n, sp-2 = 中间参数 off, sp-3 = 第一个参数 h.
+    # 循环内一级 printf 每次调用完会 push ret 到栈上; 迭代后手动 sp=base 丢弃.
+    if (str_eq(bname, "emit_ints")):
+        var em_h = st_arr[arg_base]              # 第1个参数 h
+        var em_off = st_int[arg_base + 1]        # 第2个参数 off
+        var em_n = st_int[arg_base + 2]          # 第3个参数 n
+        var em_pool = ar_off[em_h]
+        var em_i = 0
+        while (em_i < em_n):
+            printf("%d,", ae_i_get(em_pool + em_off + em_i))
+            em_i = em_i + 1
+        end
+        sp = arg_base                             # 清空 args+循环内 printf 返回值
+        push_int(em_n)
+        return
+    end
+    # emit_str(s): 一级C原生printf透传字符串, 用于类标记行(C{c}: 等少量文本)
+    if (str_eq(bname, "emit_str")):
+        var es_s = st_str[arg_base]
+        printf("%s", es_s)
+        sp = arg_base
+        push_int(0)
+        return
+    end
+    # load_ints_from_file(path, h, n): 从文件读取 n 个逗号分隔整数到 arr[h]
+    # 一级C原生(编译进qvm.qbc后), 零QEntL层字符串分配 (§21 emit_ints反面样板)
+    # 参数: arg1=path(str), arg2=h(arr句柄), arg3=n(int)
+    # 用 ord(str_char_at) 逐字符解析, 避开 str_to_int 不支持负数的问题
+    if (str_eq(bname, "load_ints_from_file")):
+        var lf_path = st_str[arg_base]
+        var lf_h = st_arr[arg_base + 1]
+        var lf_n = st_int[arg_base + 2]
+        var lf_pool = ar_off[lf_h]
+        var lf_content = file_read(lf_path)
+        var lf_pos = 0
+        var lf_i = 0
+        var lf_val = 0
+        var lf_neg = 0
+        var lf_ch = 0
+        while (lf_i < lf_n):
+            lf_val = 0
+            lf_neg = 0
+            lf_ch = ord(str_char_at(lf_content, lf_pos))
+            if (lf_ch == 45):
+                lf_neg = 1
+                lf_pos = lf_pos + 1
+                lf_ch = ord(str_char_at(lf_content, lf_pos))
+            end
+            while (lf_ch >= 48 and lf_ch <= 57):
+                lf_val = lf_val * 10 + lf_ch - 48
+                lf_pos = lf_pos + 1
+                lf_ch = ord(str_char_at(lf_content, lf_pos))
+            end
+            if (lf_neg == 1):
+                lf_val = 0 - lf_val
+            end
+            ae_i_set(lf_pool + lf_i, lf_val)
+            lf_i = lf_i + 1
+            lf_pos = lf_pos + 1
+        end
+        sp = arg_base
+        push_int(lf_i)
+        return
+    end
     printf("[QVM-Q] 未知内置函数: %s\n", bname)
     sp = sp - nargs
     push_int(0)
@@ -1218,6 +1789,7 @@ def vm_run():
     var xa = ""
     var xb = ""
     while (running == 1):
+        g_cur_pc = pc
         op = byte_at(pc)
         npc = pc + 1
         if (op == 1):
@@ -1425,7 +1997,10 @@ def vm_run():
             else:
                 ae_i_set(pos, pop2_i)
             end
-            ae_s_set(pos, pop2_s)
+            # 2026-09-12 内存优化: 整数/数组写不写字符串层(空串对象×527360=内存爆炸根源)
+            if (pop2_t == 1):
+                ae_s_set(pos, pop2_s)
+            end
             npc = pc + 3
         end
         if (op == 25):

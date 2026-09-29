@@ -1,0 +1,13 @@
+# 最小探针: arr_new 是否可调用
+var g_h = 0
+var g_v = 0
+def main():
+    printf("BEGIN\n")
+    g_h = arr_new(10)
+    printf("arr_new(10) -> %d\n", g_h)
+    arr_set(g_h, 0, 7)
+    g_v = arr_get(g_h, 0)
+    printf("arr_get -> %d\n", g_v)
+    printf("END\n")
+end
+main()

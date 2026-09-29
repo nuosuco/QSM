@@ -1,0 +1,14 @@
+# 池读写泄漏实验：定长数组500万次写+读（训练循环同款指令）
+var g_arr[65535]
+var g_i = 0
+var g_acc = 0
+while (g_i < 20000):
+    g_i = g_i + 1
+    var j = 0
+    while (j < 50):
+        g_arr[j] = g_acc + j
+        g_acc = g_arr[j]
+        j = j + 1
+    end
+end
+printf("池读写500万次完成 acc=%d\n", g_acc)

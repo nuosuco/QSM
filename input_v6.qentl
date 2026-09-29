@@ -1,0 +1,223 @@
+# QSCL 32×32 真训练器 v6 - 8批×64类×1024像素，规避u16限制
+# 每批独立训练，4态不同起点（seed+LR不同）
+
+var g_W[64512]               # 64类 × 1024像素 = 65536（刚好u16上限）
+var g_x[1024]                # 当前样本像素
+var g_data = ""
+var g_data_len = 0
+var g_line = ""
+var g_rem = ""
+var g_pv = ""
+var g_c1 = 0
+var g_ps = 0
+var g_pe = 0
+var g_nl = 0
+var g_row_start = 0
+var g_row_end = 0
+var g_i = 0
+var g_label = 0
+var g_pred = 0
+var g_score = 0
+var g_max_val = 0
+var g_max_idx = 0
+var g_correct = 0
+var g_updates = 0
+var g_diff = 0
+var g_lr = 100                # LR_32 = 100（skill说30-150）
+var g_rnd = 0
+var g_ep = 0
+var g_epoch = 10
+var g_batch = 0
+var g_state = 0
+var g_seed = 0
+var g_base = 0                # 本批起始类号 = batch * 64
+var g_nclass = 63
+
+def load_batch():
+    # 只加载本批的64类样本（第batch*512到batch*512+511行）
+    g_data = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    g_data_len = str_len(g_data)
+    
+    # 定位起始行
+    g_row_start = 0
+    g_i = 0
+    var target_line = g_batch * 512
+    while (g_i < target_line):
+        g_rem = str_substring(g_data, g_row_start, g_data_len - g_row_start)
+        g_nl = str_index_of(g_rem, "\n")
+        if (g_nl < 0):
+            g_row_start = g_data_len
+        else:
+            g_row_start = g_row_start + g_nl + 1
+        end
+        g_i = g_i + 1
+    end
+    printf("batch%d: 起始行%d, 位置%d\n", g_batch, target_line, g_row_start)
+end
+
+def parse_sample(s):
+    # 从g_row_start开始读第s行
+    var cur_pos = g_row_start
+    var cnt = 0
+    while (cnt < s):
+        g_rem = str_substring(g_data, cur_pos, g_data_len - cur_pos)
+        g_nl = str_index_of(g_rem, "\n")
+        if (g_nl < 0):
+            cur_pos = g_data_len
+        else:
+            cur_pos = cur_pos + g_nl + 1
+        end
+        cnt = cnt + 1
+    end
+    
+    g_rem = str_substring(g_data, cur_pos, g_data_len - cur_pos)
+    g_nl = str_index_of(g_rem, "\n")
+    if (g_nl < 0):
+        g_line = g_rem
+    else:
+        g_line = str_substring(g_rem, 0, g_nl)
+    end
+    
+    # 解析label和像素
+    g_c1 = str_index_of(g_line, ":")
+    g_label = str_to_int(str_substring(g_line, 0, g_c1)) - g_base
+    g_pix_str = str_substring(g_line, g_c1 + 1, 60000)
+    
+    g_ps = 0
+    g_i = 0
+    while (g_i < 1024):
+        g_rem = str_substring(g_pix_str, g_ps, 60000)
+        g_pe = str_index_of(g_rem, ",")
+        if (g_pe < 0):
+            g_pv = g_rem
+            g_ps = 60000
+        else:
+            g_pv = str_substring(g_rem, 0, g_pe)
+            g_ps = g_ps + g_pe + 1
+        end
+        g_x[g_i] = str_to_int(g_pv)
+        g_i = g_i + 1
+    end
+end
+
+def argmax():
+    g_max_val = -30000
+    g_max_idx = 0
+    g_c = 0
+    while (g_c < 63):
+        g_score = 0
+        var idx = g_c * 1024
+        g_i = 0
+        while (g_i < 1024):
+            g_score = g_score + g_W[idx + g_i] * g_x[g_i]
+            g_i = g_i + 1
+        end
+        if (g_score > g_max_val):
+            g_max_val = g_score
+            g_max_idx = g_c
+        end
+        g_c = g_c + 1
+    end
+    g_pred = g_max_idx
+end
+
+def train_one():
+    argmax()
+    if (g_pred == g_label):
+        g_correct = g_correct + 1
+    else:
+        g_updates = g_updates + 1
+        # 增强正确类
+        var idx1 = g_label * 1024
+        g_i = 0
+        while (g_i < 1024):
+            g_diff = g_x[g_i] - g_W[idx1 + g_i]
+            g_W[idx1 + g_i] = g_W[idx1 + g_i] + g_diff * g_lr / 100
+            g_i = g_i + 1
+        end
+        # 抑制错分类
+        var idx2 = g_pred * 1024
+        g_i = 0
+        while (g_i < 1024):
+            g_diff = g_x[g_i] - g_W[idx2 + g_i]
+            g_W[idx2 + g_i] = g_W[idx2 + g_i] - g_diff * g_lr / 100
+            g_i = g_i + 1
+        end
+    end
+end
+
+def main():
+    # 从环境变量读seed和state
+    g_state = 0
+    g_seed = 1
+    if (g_state == 1): g_seed = 101 end
+    if (g_state == 2): g_seed = 202 end
+    if (g_state == 3): g_seed = 303 end
+    
+    # 不同LR
+    if (g_state == 0): g_lr = 50 end
+    if (g_state == 1): g_lr = 80 end
+    if (g_state == 2): g_lr = 120 end
+    if (g_state == 3): g_lr = 150 end
+    
+    printf("=== QSCL 32×32 v6 态%d seed=%d lr=%d ===\n", g_state, g_seed, g_lr)
+    
+    # 初始化权重（随机）
+    g_rnd = g_seed
+    g_i = 0
+    while (g_i < 64512):
+        g_rnd = g_rnd * 1103 + 12345
+        if (g_rnd < 0): g_rnd = 0 - g_rnd end
+        g_W[g_i] = g_rnd % 3
+        g_i = g_i + 1
+    end
+    printf("权重初始化完成\n")
+    
+    # 逐批训练
+    g_batch = 0
+    while (g_batch < 8):
+        g_base = g_batch * 64
+        printf("--- batch%d (类%d-%d) ---\n", g_batch, g_base, g_base+63)
+        
+        load_batch()
+        
+        g_ep = 0
+        while (g_ep < g_epoch):
+            g_correct = 0
+            g_updates = 0
+            var s = 0
+            while (s < 100):  # 每批只训100个样本（512类太多）
+                parse_sample(s)
+                train_one()
+                s = s + 1
+            end
+            printf("  ep%d: 正确%d/100 更新%d\n", g_ep, g_correct, g_updates)
+            g_ep = g_ep + 1
+        end
+        
+        # 保存本批权重
+        var wname = "qdfs/ns/models/qscl_32x32_b"
+        wname = str_concat(wname, int_to_str(g_batch))
+        wname = str_concat(wname, "_s")
+        wname = str_concat(wname, int_to_str(g_state))
+        wname = str_concat(wname, ".w")
+        
+        var wstr = ""
+        g_i = 0
+        while (g_i < 64512):
+            if (g_i > 0):
+                wstr = str_concat(wstr, ",")
+            end
+            wstr = str_concat(wstr, int_to_str(g_W[g_i]))
+            g_i = g_i + 1
+        end
+        file_write_bytes(wname, wstr)
+        printf("  保存: %s\n", wname)
+        
+        g_batch = g_batch + 1
+    end
+    
+    printf("=== 态%d 全部8批完成 ===\n", g_state)
+end
+
+main()

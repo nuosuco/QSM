@@ -1,0 +1,16 @@
+# 性能测试：flat_load 读 100 个样本总耗时
+var g_x[1024]
+var g_i = 0
+var g_s = 0
+
+def main():
+    printf("开始 flat_load 100样本测试\n")
+    g_s = 0
+    while (g_s < 100):
+        flat_load("qdfs/ns/data/yi_glyph_4226_32x32_flat.data", g_x, g_s, 1024)
+        g_s = g_s + 1
+    end
+    printf("100样本 flat_load 完成\n")
+end
+
+main()

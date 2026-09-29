@@ -1,0 +1,8 @@
+# QVM空载泄漏实验：纯整数循环500万次（无池操作无字符串无文件）
+var g_i = 0
+var g_acc = 0
+while (g_i < 5000000):
+    g_acc = g_acc + 1
+    g_i = g_i + 1
+end
+printf("空载500万次完成 acc=%d\n", g_acc)

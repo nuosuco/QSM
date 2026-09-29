@@ -1,0 +1,32 @@
+# 调试 flat_load 行定位
+var g_x[1024]
+var g_i = 0
+var g_data = ""
+var g_cur = 0
+var g_ln = 0
+var g_nl = 0
+var g_line = ""
+var g_sp = 0
+var g_rest = ""
+
+def main():
+    g_data = file_read("qdfs/ns/data/yi_glyph_4226_32x32_flat.data")
+    printf("数据长度=%d\n", str_len(g_data))
+    # 手动定位第500行（复刻 flat_load 逻辑）
+    g_cur = 0
+    g_ln = 0
+    while (g_ln < 500):
+        g_nl = str_index_of(str_substring(g_data, g_cur, 4000), "\n")
+        if (g_nl < 0):
+            g_cur = str_len(g_data)
+        else:
+            g_cur = g_cur + g_nl + 1
+        end
+        g_ln = g_ln + 1
+    end
+    printf("定位后 cur=%d\n", g_cur)
+    g_line = str_substring(g_data, g_cur, 60)
+    printf("第500行前60字节:[%s]\n", g_line)
+end
+
+main()

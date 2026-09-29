@@ -1,0 +1,39 @@
+# 诊断8: 大池句柄塌缩定位（逐步增大池大小，找出临界点）
+def main():
+    printf("=== diag8: 大池句柄塌缩临界点 ===\n")
+    var s1 = arr_new(1000)
+    var s2 = arr_new(1000)
+    arr_set(s1, 0, 11)
+    arr_set(s2, 0, 22)
+    printf("[a] size=1000  s1=%d s2=%d  get(s1)=%d get(s2)=%d\n",
+        s1, s2, arr_get(s1, 0), arr_get(s2, 0))
+
+    var m1 = arr_new(65536)
+    var m2 = arr_new(4)
+    arr_set(m1, 0, 11)
+    arr_set(m2, 0, 22)
+    printf("[b] size=65536+4  m1=%d m2=%d  get(m1)=%d get(m2)=%d\n",
+        m1, m2, arr_get(m1, 0), arr_get(m2, 0))
+
+    # v9 真实: 1024, 1024, 527360（小池先）
+    var xh1 = arr_new(1024)
+    var nxh1 = arr_new(1024)
+    var wsz = 515
+    wsz = wsz * 1024
+    var wh1 = arr_new(wsz)
+    printf("[c] v9布局 xh=%d nxh=%d wh=%d wsz=%d\n", xh1, nxh1, wh1, wsz)
+    arr_set(wh1, 0, 77)
+    arr_set(wh1, 527359, 88)
+    arr_set(xh1, 0, 99)
+    printf("[d] wh[0]=%d wh[527359]=%d xh[0]=%d\n",
+        arr_get(wh1, 0), arr_get(wh1, 527359), arr_get(xh1, 0))
+    # axpy 到 wh 的类3 起点(3072) — 这是原字面量截断污染的位置
+    arr_set(wh1, 3072, 123)
+    printf("[e] wh[3072]=%d xh[0]=%d (若xh[0]变123则池重叠)\n",
+        arr_get(wh1, 3072), arr_get(xh1, 0))
+    axpy_arr_at(wh1, 0, xh1, 1, 1000)
+    printf("[f] axpy后 wh[0]=%d(期望99)\n", arr_get(wh1, 0))
+    return 0
+end
+
+main()

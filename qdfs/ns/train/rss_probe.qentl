@@ -1,0 +1,61 @@
+# rss_probe.qentl — 内存归属探针: 训练热路径 vs 527360次 printf 保存循环
+# 目的: 判定 v9 冒烟 RSS 2.6GB 的增长来自训练(dense批量op)还是保存循环。
+# 跑法: bin/qvm_boot run run/qcl.qbc (编译) → cp output.qbc target.qbc → bin/qvm_boot run run/qvm.qbc
+var g_wh = 0
+var g_xh = 0
+var g_lr = 500
+var g_wsz = 515
+var g_i = 0
+var g_j = 0
+var g_c = 0
+var g_v = 0
+var g_sink = 0
+
+def main():
+    printf("PBEGIN\n")
+    g_wsz = g_wsz * 1024
+    g_xh = arr_new(1024)
+    g_wh = arr_new(g_wsz)
+    printf("P: pools g_wh=%d g_xh=%d wsz=%d\n", g_wh, g_xh, g_wsz)
+    # 填 x = 100 (点亮像素), 复用 v9 缩放
+    g_i = 0
+    while (g_i < 1024):
+        arr_set(g_xh, g_i, 100)
+        g_i = g_i + 1
+    end
+    # 训练热路径: 129 次 (predict 515次 dot_arr_at + 1-2次 axpy_arr_at)
+    g_i = 0
+    while (g_i < 129):
+        g_j = 0
+        while (g_j < 515):
+            g_v = dot_arr_at(g_wh, g_j * 1024, g_xh, 1024)
+            g_sink = g_sink + g_v
+            g_j = g_j + 1
+        end
+        boost = 1
+        axpy_arr_at(g_wh, 0, g_xh, 1024, g_lr)
+        suppress = 0 - g_lr
+        axpy_arr_at(g_wh, boost * 1024, g_xh, 1024, suppress)
+        g_i = g_i + 1
+    end
+    printf("P: training loop done sink=%d (hot path exercised 129x517 batch ops)\n", g_sink)
+    # 保存循环: 527360 次 printf（v9 save_weights_stderr 的形态）
+    g_c = 0
+    while (g_c < 515):
+        printf("C%d: ", g_c)
+        var b = g_c * 1024
+        var j = 0
+        while (j < 1024):
+            printf("%d", arr_get(g_wh, b + j))
+            if (j < 1023):
+                printf(",")
+            end
+            j = j + 1
+        end
+        printf("\n")
+        g_c = g_c + 1
+    end
+    printf("PEND\n")
+end
+
+main()
