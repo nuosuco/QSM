@@ -176,6 +176,7 @@ TRAILING_HOLD_RATIO = 0.6        # 追踪止盈：峰值浮盈回撤到60%即落
 # 2026-09-28 尖峰分类器（市场母体回测验证：19天108笔+33点，胜率~96%，19/19组合全正）
 # 精髓：价差大≠赚钱。尖峰型价差（瞬间拉开、快速回归）能赚；结构性贴水（现货长期低于永续）接刀必亏。
 SPIKE_THRESHOLD = 0.0017         # 尖峰门槛：|价差|≥0.17%（2026-10-02 中华拍板从0.5%下调，与慢回归轨同线）
+MID_SPREAD_THRESHOLD = 0.005     # 三档制：中档线0.5%。深档>=0.5%满仓20%，中档0.17-0.5%仓位10%，浅档<0.17%跳过（2026-10-02 升级）
 SPIKE_RECOVERY_BUCKETS = 2       # 尖峰判定：5min桶×2=10min内打回0.17%以内=真尖峰
 
 # 2026-09-29 双轨制（中华拍板方向2）：尖峰单保持0.5%不变；新增"慢回归单"——
@@ -850,11 +851,28 @@ class ExecutionEngine:
             conn.close()
             if r and r[0]:
                 age = time.time() - r[0]
-                if age < 1800:  # 30分钟
+                # 2026-10-02 三档制：深档（最近亏损单对应价差≥0.5%）冷却缩10min（深价差出现频率高，等30min错过下一个峰）；中/浅档保持30min
+                cooldown_sec = 600 if self._last_loss_was_deep(ex_name, symbol) else 1800
+                if age < cooldown_sec:
                     return True
         except Exception as e:
             logger.debug(f"{ex_name} {symbol} 冷却查询失败(放行): {e}")
         return False
+
+    def _last_loss_was_deep(self, ex_name, symbol) -> bool:
+        """2026-10-02 三档制：该币最近一条亏损平仓单是否为深档（价差≥0.5%）。深档冷却缩10min。"""
+        try:
+            import sqlite3
+            conn = sqlite3.connect(self.config.data.db_path)
+            cur = conn.cursor()
+            cur.execute("SELECT pnl_pct FROM engine_trades WHERE exchange=? AND symbol=? AND pnl < 0 ORDER BY timestamp DESC LIMIT 1", (ex_name, symbol))
+            r = cur.fetchone()
+            conn.close()
+            if r and r[0] is not None:
+                return abs(r[0]) >= MID_SPREAD_THRESHOLD
+            return False
+        except Exception:
+            return False
 
     def _open_spread_position(self, ex_name: str, spot_exchange: ccxt.Exchange, perp_exchange: ccxt.Exchange,
                               symbol: str, spot_bid: float, spot_ask: float,
@@ -898,6 +916,21 @@ class ExecutionEngine:
             logger.info(f"📉 {ex_name} {symbol}: 亏损币种浅价差仓位降{UNDERPERFORMER_POSITION_SCALE*100:.0f}% → {position_size:.2f}U")
         elif base in UNDERPERFORMER_SYMBOLS:
             logger.info(f"🚀 {ex_name} {symbol}: 深价差{abs(signed_spread)*100:.2f}%≥{DEEP_SPREAD_THRESHOLD*100:.1f}% → 大单模式，亏损币种免降仓满仓{position_size:.2f}U")
+
+        # === 2026-10-02 三档制（中华拍板）：按价差深度分仓位，20%总闸不动，档内分档 ===
+        # 浅档<0.17%（已在扫描层拦，这里兜底）跳过；中档0.17-0.5%仓位×0.5（=10%总权益）；
+        # 深档≥0.5%维持20%满仓（B大单模式不变）。深档豁免60s碎单判定由 _maybe_frag_breaker 处理。
+        spread_abs = abs(signed_spread)
+        if spread_abs >= MID_SPREAD_THRESHOLD:
+            tier = 'deep'
+        elif spread_abs >= SLOW_REGRESS_THRESHOLD:
+            tier = 'mid'
+            position_size *= 0.5
+            logger.info(f"📊 {ex_name} {symbol}: 中档价差{spread_abs*100:.3f}% → 仓位降50%={position_size:.2f}U")
+        else:
+            logger.info(f"🚫 {ex_name} {symbol}: 浅档价差{spread_abs*100:.3f}%<0.17%，跳过（薄利不白送手续费）")
+            return
+        # 深档冷却缩10min（深价差出现频率高，等30min就错过下一个峰）：见 _in_stop_loss_cooldown
         
         perp_side = main_perp_side
 
