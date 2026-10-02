@@ -746,15 +746,12 @@ class ExecutionEngine:
             if not cnt or cnt < 100:
                 conn.close()
                 return False, "样本不足"
-            if mean_sp < -STRUCTURE_DISCOUNT_LIMIT:
-                conn.close()
-                return False, f"结构性贴水{mean_sp*100:.2f}%，禁止开多(接刀)"
-            if mean_sp > STRUCTURE_PREMIUM_LIMIT:
-                conn.close()
-                return False, f"结构性升水{mean_sp*100:.2f}%，禁止开空"
+            # 2026-10-02 尖峰型币豁免（中华拍板）：结构性贴水/升水均值是14天平均，但尖峰币瞬间进瞬间出，
+            # 尖峰回归史≥3次的币期望为正，贴水均值不代表瞬间进场亏——豁免结构禁令。
+            # 尖峰史在下方计算，此处先占位，豁免判定放在 spike_cnt 之后。
+            _structure_discount = mean_sp < -STRUCTURE_DISCOUNT_LIMIT
+            _structure_premium = mean_sp > STRUCTURE_PREMIUM_LIMIT
             # 7天尖峰历史（2026-09-28口径修复）：tick A|spread|>=0.5% 且 600s内存在 tick B<0.17%
-            # 旧bug：把"相邻两条>=0.5%的tick互查"当回归，40s一条tick下永远False→全拦
-            # 2026-09-28 修复：conn.close() 移到所有查询之后（旧代码先关库再查→"closed database"→全币被拦）
             look7 = time.time() - SPIKE_LOOKBACK_DAYS * 86400
             spike_cnt = cur.execute(
                 "SELECT COUNT(DISTINCT a.id) FROM market_data a "
@@ -765,9 +762,20 @@ class ExecutionEngine:
                 "AND b.spread_pct IS NOT NULL AND ABS(b.spread_pct)<0.0017",
                 (symbol, ex_name, look7)).fetchone()[0]
             conn.close()
+            # 尖峰豁免：≥3次尖峰回归史的币，结构贴水/升水禁令不生效（瞬间进出，均值不代表瞬间）
+            if spike_cnt >= 3 and (_structure_discount or _structure_premium):
+                if _structure_discount:
+                    return True, f"尖峰豁免: 贴水{mean_sp*100:.2f}%但尖峰{spike_cnt}次≥3，放行"
+                else:
+                    return True, f"尖峰豁免: 升水{mean_sp*100:.2f}%但尖峰{spike_cnt}次≥3，放行"
+            if _structure_discount:
+                return False, f"结构性贴水{mean_sp*100:.2f}%，禁止开多(接刀)"
+            if _structure_premium:
+                return False, f"结构性升水{mean_sp*100:.2f}%，禁止开空"
             if spike_cnt < 3:
                 return False, f"近7天尖峰回归记录{spike_cnt}次(<3)，不够稳"
             return True, f"ok(尖峰{spike_cnt}次)"
+
         except Exception as e:
             # 查询失败保守：不进（宁可错过，不接刀）
             logger.info(f"🧪 {ex_name} {symbol} 尖峰分类查询失败(按禁止处理): {e}")
