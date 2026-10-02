@@ -175,7 +175,7 @@ DEEP_SPREAD_THRESHOLD = 0.005     # 深价差线：|价差|≥0.5% = 大单模�
 TRAILING_HOLD_RATIO = 0.6        # 追踪止盈：峰值浮盈回撤到60%即落袋（旧0.5），多锁10%利润
 # 2026-09-28 尖峰分类器（市场母体回测验证：19天108笔+33点，胜率~96%，19/19组合全正）
 # 精髓：价差大≠赚钱。尖峰型价差（瞬间拉开、快速回归）能赚；结构性贴水（现货长期低于永续）接刀必亏。
-SPIKE_THRESHOLD = 0.0017         # 尖峰门槛：|价差|≥0.17%（2026-10-02 中华拍板从0.5%下调，与慢回归轨同线）
+SPIKE_THRESHOLD = 0.005          # 尖峰门槛：|价差|≥0.5%（2026-10-02 回放验尸：0.17%三档5538笔-984负期望，拉回9/28验证+33点正期望的0.5%线）
 MID_SPREAD_THRESHOLD = 0.005     # 三档制：中档线0.5%。深档>=0.5%满仓20%，中档0.17-0.5%仓位10%，浅档<0.17%跳过（2026-10-02 升级）
 SPIKE_RECOVERY_BUCKETS = 2       # 尖峰判定：5min桶×2=10min内打回0.17%以内=真尖峰
 
@@ -928,16 +928,15 @@ class ExecutionEngine:
         # === 2026-10-02 三档制（中华拍板）：按价差深度分仓位，20%总闸不动，档内分档 ===
         # 浅档<0.17%（已在扫描层拦，这里兜底）跳过；中档0.17-0.5%仓位×0.5（=10%总权益）；
         # 深档≥0.5%维持20%满仓（B大单模式不变）。深档豁免60s碎单判定由 _maybe_frag_breaker 处理。
+        # 2026-10-02 回放验尸后收紧（5538笔-984负期望）：中档关死，只进深档≥0.5%，
+        # 且深档仓位先压到 50%（=总权益10%，攒20笔净利为正再恢复20%）。中档0.17-0.5%负期望不开。
         spread_abs = abs(signed_spread)
-        if spread_abs >= MID_SPREAD_THRESHOLD:
-            tier = 'deep'
-        elif spread_abs >= SLOW_REGRESS_THRESHOLD:
-            tier = 'mid'
-            position_size *= 0.5
-            logger.info(f"📊 {ex_name} {symbol}: 中档价差{spread_abs*100:.3f}% → 仓位降50%={position_size:.2f}U")
-        else:
-            logger.info(f"🚫 {ex_name} {symbol}: 浅档价差{spread_abs*100:.3f}%<0.17%，跳过（薄利不白送手续费）")
+        if spread_abs < MID_SPREAD_THRESHOLD:
+            logger.info(f"🚫 {ex_name} {symbol}: 中档价差{spread_abs*100:.3f}%<0.5%负期望，跳过（只进深档）")
             return
+        # 深档：仓位压到 50%（先小仓验证实质正期望，达标再恢复满仓）
+        position_size *= 0.5
+        logger.info(f"🚀 {ex_name} {symbol}: 深档价差{spread_abs*100:.3f}%≥0.5%，小仓模式仓位降50%={position_size:.2f}U")
         # 深档冷却缩10min（深价差出现频率高，等30min就错过下一个峰）：见 _in_stop_loss_cooldown
         
         perp_side = main_perp_side
