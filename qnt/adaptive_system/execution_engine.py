@@ -671,23 +671,26 @@ class ExecutionEngine:
         market_data 的 spread_pct 是 mid 口径，比真实成交价口径偏松；持续 30min 是硬条件，偏松不影响"必须持续"的判定。
         """
         try:
-            db = self.get_db()
-            cur = db.cursor()
-            now_ts = int(time.time())
-            sign_col = 1.0 if side == 'sell' else -1.0
-            # 窗口起点：now - 30min，要求窗口内每个 5min 桶的最小值都≥门槛（同向）
-            start_ts = now_ts - SLOW_REGRESS_SUSTAIN_SECONDS
-            sql = (
-                "SELECT COUNT(DISTINCT bucket) FROM ("
-                "  SELECT (timestamp/300) AS bucket, MIN(spread_pct*?) AS min_signed"
-                "  FROM market_data"
-                "  WHERE exchange=? AND symbol=? AND timestamp>? AND spread_pct IS NOT NULL"
-                "  GROUP BY (timestamp/300) HAVING MIN(spread_pct*?) >= ?"
-                ")"
-            )
-            row = cur.execute(sql, (sign_col, ex_name, symbol, start_ts, sign_col, sign_col * threshold)).fetchone()
-            need_buckets = SLOW_REGRESS_SUSTAIN_SECONDS // 300  # 30min / 5min = 6 个桶
-            return row is not None and row[0] >= need_buckets
+            db = get_connection(self.config.data.db_path)
+            try:
+                cur = db.cursor()
+                now_ts = int(time.time())
+                sign_col = 1.0 if side == 'sell' else -1.0
+                # 窗口起点：now - 30min，要求窗口内每个 5min 桶的最小值都≥门槛（同向）
+                start_ts = now_ts - SLOW_REGRESS_SUSTAIN_SECONDS
+                sql = (
+                    "SELECT COUNT(DISTINCT bucket) FROM ("
+                    "  SELECT (timestamp/300) AS bucket, MIN(spread_pct*?) AS min_signed"
+                    "  FROM market_data"
+                    "  WHERE exchange=? AND symbol=? AND timestamp>? AND spread_pct IS NOT NULL"
+                    "  GROUP BY (timestamp/300) HAVING MIN(spread_pct*?) >= ?"
+                    ")"
+                )
+                row = cur.execute(sql, (sign_col, ex_name, symbol, start_ts, sign_col, sign_col * threshold)).fetchone()
+                need_buckets = SLOW_REGRESS_SUSTAIN_SECONDS // 300  # 30min / 5min = 6 个桶
+                return row is not None and row[0] >= need_buckets
+            finally:
+                db.close()
         except Exception as e:
             logger.warning(f"🐢 {ex_name} {symbol} 慢回归持续性查询失败(按未持续处理): {e}")
             return False
@@ -738,6 +741,7 @@ class ExecutionEngine:
                 "SELECT AVG(spread_pct), COUNT(*) FROM market_data "
                 "WHERE symbol=? AND exchange=? AND timestamp>? AND spread_pct IS NOT NULL AND ABS(spread_pct)<1.0",
                 (symbol, ex_name, look14)).fetchone()
+            mean_sp, cnt = (row or (None, 0))
             if not cnt or cnt < 100:
                 conn.close()
                 return False, "样本不足"
