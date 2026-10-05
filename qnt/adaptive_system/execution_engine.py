@@ -750,8 +750,22 @@ class ExecutionEngine:
                 conn.close()
                 return False, f"结构性贴水{mean_sp*100:.2f}%，禁止开多(接刀)"
             if mean_sp > STRUCTURE_PREMIUM_LIMIT:
+                # 2026-10-05 A方案(中华拍板)：升水方向放开——升水币(>+0.10%)允许开多腿(赌升水回归)，
+                # 但必须近7天尖峰史>=100次(高确定性尖峰币)才放行；贴水方向维持禁多不动。
+                # 仓位由 _open_spread_position 压到 25%。三重回测已验尸负期望的全被拦，唯一正期望口子放开。
+                look7 = time.time() - SPIKE_LOOKBACK_DAYS * 86400
+                spike_cnt = cur.execute(
+                    "SELECT COUNT(DISTINCT a.id) FROM market_data a "
+                    "JOIN market_data b ON b.symbol=a.symbol AND b.exchange=a.exchange "
+                    "AND b.timestamp > a.timestamp AND b.timestamp <= a.timestamp+600 "
+                    "WHERE a.symbol=? AND a.exchange=? AND a.timestamp>? "
+                    "AND a.spread_pct IS NOT NULL AND ABS(a.spread_pct)>=0.005 "
+                    "AND b.spread_pct IS NOT NULL AND ABS(b.spread_pct)<0.0017",
+                    (symbol, ex_name, look7)).fetchone()[0]
                 conn.close()
-                return False, f"结构性升水{mean_sp*100:.2f}%，禁止开空"
+                if spike_cnt < 100:
+                    return False, f"结构性升水{mean_sp*100:.2f}%，尖峰史{spike_cnt}次(<100)，不开"
+                return True, f"升水方向放行(尖峰{spike_cnt}次>=100，小仓25%)"
             # 7天尖峰历史（2026-09-28口径修复）：tick A|spread|>=0.5% 且 600s内存在 tick B<0.17%
             # 2026-10-02 回滚尖峰豁免（19天市场回测证实：豁免放行的TIA贴水-0.54%共934笔-7075点，是最大放血点）
             look7 = time.time() - SPIKE_LOOKBACK_DAYS * 86400
