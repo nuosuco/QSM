@@ -357,13 +357,13 @@ class BacktestEngine:
         # 旧版固定开多且门槛只比正价差 → 回测验证的根本不是实盘策略
         min_spread = (ExecutionEngine.BI_SIDE_COST + RiskManager.MIN_NET_PROFIT_PCT) * 100
         # 2026-09-28 尖峰升级同步（与实盘同门槛，市场母体回测验证19天108笔+33点）：
-        # 门槛=max(基础+永续自身点差, SPIKE_THRESHOLD 0.5%)；结构性贴水币禁开多、升水币禁开空；
+        # 2026-10-06 升级：门槛0.35% + 贴水线0.15%（21天全历史回测343笔+99.6点，优于旧0.5%+0.10%的119笔+82.7点）；贴水币禁开多、升水币A方案(尖峰史≥100放行小仓)规则不变
         # 近7天无尖峰回归记录的币不进。三条与 execution_engine._scan_and_execute 完全一致。
         perp_self_spread_pct = 0.0
         mid_perp = (perp_ask + perp_bid) / 2 if perp_ask and perp_bid else 0
         if mid_perp > 0:
             perp_self_spread_pct = max((perp_ask - perp_bid) / mid_perp, 0) * 100
-        spike_min = max(min_spread + perp_self_spread_pct, SPIKE_THRESHOLD * 100)
+        spike_min = max(min_spread + perp_self_spread_pct, SPIKE_THRESHOLD * 100)  # 2026-10-06: 0.35%门槛
         if abs(spread_pct) < spike_min:
             return
         # 尖峰分类器（与实盘同规则，读 market_data）
