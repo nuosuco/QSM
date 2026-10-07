@@ -16,7 +16,7 @@ import ccxt
 
 from .config import SystemConfig
 from .risk_manager import RiskManager
-from .execution_engine import ExecutionEngine, MIN_COIN_AMOUNT, SPIKE_THRESHOLD, MAKER_FEE_BI, STRUCTURE_DISCOUNT_LIMIT, STRUCTURE_PREMIUM_LIMIT
+from .execution_engine import ExecutionEngine, MIN_COIN_AMOUNT, SPIKE_THRESHOLD, MAKER_FEE_BI, STRUCTURE_DISCOUNT_LIMIT, STRUCTURE_PREMIUM_LIMIT, SPIKE_LOOKBACK_DAYS
 
 # 各交易所永续合约最小金额限制
 PERP_MIN_NOTIONAL = {'bitget': 5.0, 'htx': 1.0, 'gate': 3.0}

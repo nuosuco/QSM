@@ -186,7 +186,7 @@ SLOW_REGRESS_SUSTAIN_SECONDS = 1800  # 持续30min：该币同向价差≥门槛
 STRUCTURE_LOOKBACK_DAYS = 14     # 结构性判定回看窗口（14天market_data）
 STRUCTURE_DISCOUNT_LIMIT = 0.0015  # 2026-10-06 升级：贴水线收紧到0.15%——21天回测下0.35%门槛+0.15%结构线=+99.6点全组合最高；放宽TIA/ATOM/WIF/PEPE等-0.1~-0.5%贴水币的尖峰多腿（正方向开空仍是主要利润来源，负方向贴水禁多保留）
 STRUCTURE_PREMIUM_LIMIT = 0.0010   # 全期均值 > +0.10% = 结构性升水 → 禁止开空
-SPIKE_LOOKBACK_DAYS = 7          # 尖峰历史判定窗口：该币近7天有过≥1次"10min内打回"记录才允许进场
+SPIKE_LOOKBACK_DAYS = 14         # 2026-10-07 中华拍板(48h零单诊断)：7天窗口太窄，gate ATOM(14d均值+0.04%正期望)尖峰史0次被"≥3"全拦→放宽到14天窗口+≥1次门槛，只放开"有尖峰史"的准入门槛，接刀防守线(贴水-0.15%/升水+0.10%)一律不动
 MAKER_FEE_BI = 0.0012           # 全maker双边成本0.12%（旧taker 0.16%），尖峰单默认全maker
 
 
@@ -778,8 +778,8 @@ class ExecutionEngine:
                 "AND b.spread_pct IS NOT NULL AND ABS(b.spread_pct)<0.0017",
                 (symbol, ex_name, look7)).fetchone()[0]
             conn.close()
-            if spike_cnt < 3:
-                return False, f"近7天尖峰回归记录{spike_cnt}次(<3)，不够稳"
+            if spike_cnt < 1:
+                return False, f"近14天尖峰回归记录{spike_cnt}次(<1)，不是尖峰型，不进"
             return True, f"ok(尖峰{spike_cnt}次)"
 
         except Exception as e:
