@@ -1310,6 +1310,10 @@ class ExecutionEngine:
                 ok = True
                 try:
                     close_params = dict(pos['close_params'])
+                    # 2026-10-08 修复：gate市价单不支持postOnly（"gate market orders cannot be postOnly"），
+                    # 开仓postOnly挂单参数不能原样带到平仓市价单上，清掉postOnly只留reduceOnly
+                    close_params.pop('postOnly', None)
+                    close_params.pop('post_only', None)
                     close_params['reduceOnly'] = True  # 关键：Gate/HTX 平仓必须 reduceOnly，否则 sell 会被当成新开空单
                     perp_exchange.create_order(
                         symbol=pos['perp_symbol'],
