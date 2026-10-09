@@ -581,7 +581,7 @@ class ExecutionEngine:
             try:
                 conn = get_connection(self.config.data.db_path)
                 c = conn.cursor()
-                c.execute("SELECT MAX(timestamp) FROM engine_trades WHERE ex_name=?", (ex_name,))
+                c.execute("SELECT MAX(timestamp) FROM engine_trades WHERE exchange=?", (ex_name,))
                 r = c.fetchone()
                 conn.close()
                 if r and r[0]:
