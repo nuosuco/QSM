@@ -92,6 +92,21 @@ def _notify_risk_pause(ex_name, reason):
         logger.debug(f"风控熔断通知失败: {e}")
 
 
+def _notify_no_trade(window_hours: int):
+    """出单密度闸门报警（2026-10-09 中华拍板选3）：连续window_hours无开仓/平仓→推QQ"""
+    try:
+        ts = datetime.now().strftime('%H:%M:%S')
+        msg = (f"⚠️ QNT出单密度闸门\n连续{window_hours}h无开仓/平仓\n"
+               f"0.30%门槛可能稀释密度(实测12h仅1单ONDO-0.37%)\n时间: {ts}\n"
+               f"请拍板: 回0.35% / 维持观察 / 降0.26%")
+        if _send_qq_msg(msg):
+            logger.info(f"📤 出单密度闸门报警已发送({window_hours}h无单)")
+        else:
+            logger.warning(f"⚠️ 出单密度闸门报警发送失败")
+    except Exception as e:
+        logger.debug(f"出单密度闸门报警失败: {e}")
+
+
 def _notify_trade(ex_name, symbol, side, price, amount, position_size, profit_pct):
     """发送交易通知到QQ"""
     try:
@@ -151,6 +166,11 @@ MIN_COIN_AMOUNT = 0.01
 # 多头目标线 = +(BI_SIDE_COST - MIN_NET_PROFIT_PCT)
 SPREAD_CLOSE_THRESHOLD = -0.005   # -0.50%：让利润奔跑（2026-09-22中华选定A方案），仅当价差深度回归0.5%才落袋
 SPREAD_ENTRY_CALM_SECONDS = 60    # 开仓冷静期（2026-09-24 定稿，中华报"频繁交易亏手续费"）：开仓后60s内跳过止损/止盈检查，等瞬态价差尖峰衰减，杜绝2-5秒开平白送双边手续费
+
+# 2026-10-09 中华拍板选3：出单密度闸门。0.30%门槛下连续NO_TRADE_WINDOW无单(开仓或平仓)→即时推QQ报警，
+# 避免静默空转(实测0.30%跑12h仅1单，密度远低回测)。报警后继续正常监控，只报一次直到有单。
+NO_TRADE_WINDOW = 6 * 3600        # 6h 无单窗口
+NO_TRADE_ALARM_COOLDOWN = 2 * 3600  # 报警后2h冷却，防刷屏
 SPREAD_POSITION_TIMEOUT = 7200   # 持仓超时120分钟（中华定稿 2026-09-11；90分钟被 openclaw 改错过）
 # 硬止损：标的价格变动 ≥ 0.4% 立即平仓。
 # 2026-09-13 口径澄清（中华指出模拟出现单笔-3.06%亏损远超止损线，定位到此处）：
@@ -551,6 +571,50 @@ class ExecutionEngine:
     
 
     def _scan_and_execute(self, ex_name: str, spot_exchange: ccxt.Exchange, perp_exchange: ccxt.Exchange):
+        # 2026-10-09 选3出单密度闸门：每轮扫描检查距最近一笔成交(开仓或平仓)是否超NO_TRADE_WINDOW，
+        # 超了且不在冷却期→推QQ一次。基准取当前活跃持仓的开仓时间(重启后从DB恢复仍算数)。
+        try:
+            last_activity = time.time()
+            for pos in self.spread_positions.get(ex_name, {}).values():
+                last_activity = min(last_activity, pos.get('entry_time', time.time()))
+            recent_trade = 0
+            try:
+                conn = get_connection(self.config.data.db_path)
+                c = conn.cursor()
+                c.execute("SELECT MAX(timestamp) FROM engine_trades WHERE ex_name=?", (ex_name,))
+                r = c.fetchone()
+                conn.close()
+                if r and r[0]:
+                    recent_trade = r[0]
+            except Exception:
+                pass
+            last_activity = max(last_activity, recent_trade)
+            silent_seconds = time.time() - last_activity
+            if silent_seconds >= NO_TRADE_WINDOW:
+                # 用 risk_state 表记报警时间戳（risk_manager 无通用 set/get_state API，直接写DB）
+                alarm_ts = 0
+                try:
+                    conn2 = get_connection(self.config.data.db_path)
+                    c2 = conn2.cursor()
+                    c2.execute("SELECT value FROM risk_state WHERE key='last_no_trade_alarm'")
+                    r2 = c2.fetchone()
+                    conn2.close()
+                    alarm_ts = float(r2[0]) if r2 and r2[0] else 0
+                except Exception:
+                    pass
+                if time.time() - alarm_ts >= NO_TRADE_ALARM_COOLDOWN:
+                    _notify_no_trade(NO_TRADE_WINDOW // 3600)
+                    try:
+                        conn3 = get_connection(self.config.data.db_path)
+                        c3 = conn3.cursor()
+                        c3.execute("INSERT OR REPLACE INTO risk_state (key, value) VALUES ('last_no_trade_alarm', ?)",
+                                    (str(time.time()),))
+                        conn3.commit()
+                        conn3.close()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
             """扫描并执行价差回归套利策略（永续，等价差回归后平仓）"""
             # 2026-09-12：htx 资金太少（0.56U），只监控低价币，跳过高价币避免反复"仓位不足"
             watchlist = [s for s in self.config.data.symbols if s in HTX_LOW_PRICE_SYMBOLS] if ex_name == 'htx' else self.config.data.symbols
