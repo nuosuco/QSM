@@ -574,9 +574,8 @@ class ExecutionEngine:
         # 2026-10-09 选3出单密度闸门：每轮扫描检查距最近一笔成交(开仓或平仓)是否超NO_TRADE_WINDOW，
         # 超了且不在冷却期→推QQ一次。基准取当前活跃持仓的开仓时间(重启后从DB恢复仍算数)。
         try:
-            last_activity = time.time()
-            for pos in self.spread_positions.get(ex_name, {}).values():
-                last_activity = min(last_activity, pos.get('entry_time', time.time()))
+            # 2026-10-09 修复：last_activity 基准取「最近一笔成交(DB)或活跃持仓开仓时间」的最大值，
+            # 不用 time.time() 做基准（旧逻辑无持仓时基准=now，silent 恒为 0，闸门永不触发）。
             recent_trade = 0
             try:
                 conn = get_connection(self.config.data.db_path)
@@ -588,7 +587,12 @@ class ExecutionEngine:
                     recent_trade = r[0]
             except Exception:
                 pass
-            last_activity = max(last_activity, recent_trade)
+            last_activity = recent_trade
+            for pos in self.spread_positions.get(ex_name, {}).values():
+                last_activity = max(last_activity, pos.get('entry_time', 0))
+            if last_activity <= 0:
+                # 该交易所从未有过成交/持仓：无历史可算，跳过（不误报）
+                last_activity = time.time()
             silent_seconds = time.time() - last_activity
             if silent_seconds >= NO_TRADE_WINDOW:
                 # 用 risk_state 表记报警时间戳（risk_manager 无通用 set/get_state API，直接写DB）
