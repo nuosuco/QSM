@@ -97,8 +97,7 @@ def _notify_no_trade(window_hours: int):
     try:
         ts = datetime.now().strftime('%H:%M:%S')
         msg = (f"⚠️ QNT出单密度闸门\n连续{window_hours}h无开仓/平仓\n"
-               f"0.30%门槛可能稀释密度(实测12h仅1单ONDO-0.37%)\n时间: {ts}\n"
-               f"请拍板: 回0.35% / 维持观察 / 降0.26%")
+               f"请拍板: 维持观察 / 回调门槛(0.26↔0.30↔0.35)\n时间: {ts}")
         if _send_qq_msg(msg):
             logger.info(f"📤 出单密度闸门报警已发送({window_hours}h无单)")
         else:
