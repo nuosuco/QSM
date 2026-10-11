@@ -364,14 +364,38 @@ async def search_products(
     if not search_kw and keyword:
         search_kw = keyword
 
-    items = shop.search(search_kw, platform=platform, page=page, page_size=page_size, sort=sort)
+    # 2026-10-11 小蕊加（中华拍板：菜单进频道太慢）：淘宝实时搜偶发卡满15秒(eco.taobao超时)，
+    # 用户点菜单后干等转圈。加缓存兜底：实时搜6秒内没结果 → 立刻用本地商品缓存(product_cache.db)秒回，
+    # 结果太少时缓存补足。缓存介入时 from_cache=1。不动搜索词/过滤/凑页逻辑。
+    import concurrent.futures as _cf
+    import time as _time
+    _t0 = _time.time()
+    with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+        _f = _ex.submit(shop.search, search_kw, platform, page, page_size, sort)
+        try:
+            items = _f.result(timeout=6)
+        except Exception:
+            items = []  # 超时/异常 → 走下面缓存兜底
+    from_cache = 1 if _time.time() - _t0 > 5.8 else 0
+    if len(items) < 5 and page == 1:
+        try:
+            cached = shop.search_from_cache(search_kw, page=1, page_size=page_size)
+            seen = {i.get('title', '') for i in items}
+            for c in cached:
+                if c.get('title') and c['title'] not in seen and len(items) < 12:
+                    items.append(c)
+                    seen.add(c['title'])
+            if cached and len(items) > 4:
+                from_cache = 1
+        except Exception:
+            pass
 
     return {
         "keyword": keyword,
         "search_keyword": search_kw,
         "platform": platform,
         "total": len(items),
-        "from_cache": 0,
+        "from_cache": from_cache,
         "items": items
     }
 
