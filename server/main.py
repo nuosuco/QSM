@@ -1274,22 +1274,24 @@ async def wechat_menu_create():
         access_token = token_data["access_token"]
         
         # 菜单配置（微信限制3个按钮，合并小麦SOM+有机好物）
+        # 2026-10-11 中华拍板改推：裸路径 /products /profile 在微信新开窗格+缓存下会落回默认聊天首页，
+        # 改带 ?tab= 查询参数（前端 ?tab= 路由更靠前更可靠，且强制微信重新加载不吃缓存）
         menu_json = {
             "button": [
                 {
                     "type": "view",
                     "name": "小麦SOM",
-                    "url": "https://som.top/"
+                    "url": "https://som.top/?tab=chat"
                 },
                 {
                     "type": "view",
                     "name": "有机好物",
-                    "url": "https://som.top/products"
+                    "url": "https://som.top/?tab=products"
                 },
                 {
                     "type": "view",
                     "name": "我",
-                    "url": "https://som.top/profile"
+                    "url": "https://som.top/?tab=profile"
                 }
             ]
         }
