@@ -404,27 +404,19 @@ async def search_products(
                     pass
             _th.Thread(target=_bg_refresh, daemon=True).start()
     else:
-        # 翻页：缓存优先，缓存不够再实时补
+        # 翻页：缓存优先（毫秒级），缓存不够也不阻塞——实时补搜放后台，本次仍秒回
         try:
             items = shop.search_from_cache(search_kw, page=page, page_size=page_size)
             if items:
                 from_cache = 1
         except Exception:
             items = []
-        if not items:
-            # 缓存没有这页 → 实时搜(限时 3s)
-            with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
-                _f = _ex.submit(shop.search, search_kw, platform, page, page_size, sort)
-                try:
-                    items = _f.result(timeout=3)
-                except Exception:
-                    items = []
     if not items and page == 1:
-        # 缓存空(首次/新关键词) → 实时搜, 限时 3s
+        # 缓存空(首次/新关键词) → 限时 1s 试一次实时, 拿不到也照样秒回(空态), 后台补刷
         with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
             _f = _ex.submit(shop.search, search_kw, platform, page, page_size, sort)
             try:
-                items = _f.result(timeout=3)
+                items = _f.result(timeout=1)
             except Exception:
                 items = []
         from_cache = 0
