@@ -363,6 +363,9 @@ async def search_products(
     search_kw = shop.get_category_keyword(keyword) if keyword else ''
     if not search_kw and keyword:
         search_kw = keyword
+    # 2026-10-11 小蕊改(中华拍板:日化洗护及后面所有分类搜不出商品,根因=EXCLUDE_KEYWORDS 杀光日化/美妆词):
+    # 给 search_from_cache 传类目名做 context, 日化/美妆类目不排日化词, 食品类照旧排。
+    _ctx_cat = keyword.strip() if keyword and keyword.strip() in ('日化洗护', '美妆护肤', '家居日用', '医用环保') else ''
 
     # 2026-10-11 小蕊改（中华拍板：全部/每个分类菜单都太慢 → 缓存先秒出、实时后台悄悄刷新）：
     # 原逻辑：阻塞等淘宝实时搜（超时卡 10~30s），页面转圈。
@@ -380,7 +383,7 @@ async def search_products(
     if page == 1:
         # 缓存优先：毫秒级返回上一轮商品，用户秒进页面
         try:
-            items = shop.search_from_cache(search_kw, page=1, page_size=page_size)
+            items = shop.search_from_cache(search_kw, page=1, page_size=page_size, category=_ctx_cat)
             if items:
                 from_cache = 1
         except Exception:
@@ -402,7 +405,7 @@ async def search_products(
     else:
         # 翻页：缓存优先（毫秒级），缓存不够也秒回，实时补刷放后台
         try:
-            items = shop.search_from_cache(search_kw, page=page, page_size=page_size)
+            items = shop.search_from_cache(search_kw, page=page, page_size=page_size, category=_ctx_cat)
             if items:
                 from_cache = 1
         except Exception:

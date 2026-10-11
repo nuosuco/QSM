@@ -52,9 +52,17 @@ EXCLUDE_KEYWORDS = [
     '玻璃', '片材', '管材', '型材', '有机硅', '有机涂料', '有机色',
     # 服饰/鞋帽（标题含"有机"但不是食材）
     '服装', '衣服', '鞋', '袜', '帽子', '围巾', '毛巾', '床单', '被套', '枕套',
-    # 化妆品/洗护（标题含"有机"但不是食材）
-    '洗发水', '沐浴露', '护肤品', '化妆品', '精油', '香薰', '口红', '唇膏', '粉底',
 ]
+
+# 2026-10-11 小蕊改(中华拍板:日化洗护及后面所有分类搜不出商品,根因=EXCLUDE_KEYWORDS 把 洗发水/沐浴露/护肤品 等词全杀了):
+# 旧版 EXCLUDE_KEYWORDS 末尾误加了日化洗护/美妆护肤类目的核心词, 导致这些类目的缓存命中被 _is_excluded 全杀掉 → 0 条。
+# 这些词只对"食品"类目是噪音, 对"日化洗护/美妆护肤"类目是正常商品。
+# 改法: 把日化类词从全局 EXCLUDE_KEYWORDS 移走, 放到 _is_excluded 里按 context(调用方传入的 category 名)条件排除——
+# 食品类搜索时仍排除, 日化/美妆类搜索时不排除。
+EXCLUDE_CONTEXT = {
+    '日化洗护': [],  # 日化类目不排除任何日化词
+    '美妆护肤': [],  # 美妆类目不排除任何美妆词
+}
 
 # 加工制品排除关键词（用于 chat_engine 的 _search_products_from_reply）
 # 松麦只推原材料食材，不推加工饮品/保健品/化妆品
@@ -231,6 +239,11 @@ class ShopService:
         
         seen_titles = set()
         items = []
+        # 2026-10-11 小蕊改(中华拍板:日化洗护及后面所有分类搜不出商品,根因=EXCLUDE_KEYWORDS 把日化/美妆核心词杀光):
+        # 按类目名把日化/美妆类目的搜索 context 传进 _is_excluded——食品类照旧排除日化词(防噪),
+        # 日化洗护/美妆护肤类目搜索时不排除, 否则命中全被杀 → 0 条。
+        _CTX_CATS = {'日化洗护', '美妆护肤', '家居日用', '医用环保'}
+        context_cat = keyword.strip() if keyword.strip() in _CTX_CATS else ''
         
         def search_single_keyword(single_kw: str) -> list:
             """搜索单个关键词，搜多页直到凑够数量"""
@@ -248,7 +261,7 @@ class ShopService:
                     break
                 for item in sub_items:
                     title = item.get('title', '')
-                    if title and title not in local_titles and not self._is_excluded(item):
+                    if title and title not in local_titles and not self._is_excluded(item, context=context_cat):
                         tl = title.lower()
                         if any(w in tl for w in match_words):
                             local_titles.add(title)
@@ -262,15 +275,47 @@ class ShopService:
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(keywords), 15)) as executor:
             future_map = {executor.submit(search_single_keyword, kw): kw for kw in keywords}
-            for future in concurrent.futures.as_completed(future_map, timeout=15):
+            for future in concurrent.futures.as_completed(future_map, timeout=25):
                 try:
                     for item in future.result():
                         title = item.get('title', '')
                         if title and title not in seen_titles:
                             seen_titles.add(title)
+                            seen_titles.add(item.get('item_id', ''))
                             items.append(item)
                 except Exception:
                     pass
+        
+        # 2026-10-11 小蕊改(中华拍板:日化洗护及后面所有分类搜不出商品):
+        # 实时搜到的商品顺手写回 product_cache.db, 下次同分类直接缓存秒回。
+        # 用 crawler.save_product(字段对齐), 写失败不影响本次返回。
+        if items:
+            try:
+                from services.product_crawler import save_product as _save_cache
+                # crawler 的 dict 字段: item_id/title/price/main_image/images/json/shop_name/brand/commission_rate/click_url/sales/category/raw_data
+                _rows = []
+                for it in items:
+                    _imgs = it.get('images') or []
+                    _main = it.get('image', '')
+                    if not _imgs and _main:
+                        _imgs = [_main]
+                    _rows.append({
+                        'item_id': it.get('item_id', ''),
+                        'title': it.get('title', ''),
+                        'price': it.get('price', ''),
+                        'main_image': _main,
+                        'images': json.dumps(_imgs[:5]),
+                        'shop_name': it.get('shop_name', ''),
+                        'brand': it.get('brand', ''),
+                        'commission_rate': it.get('commission_rate', ''),
+                        'click_url': it.get('url', '') or it.get('click_url', ''),
+                        'sales': it.get('sales', ''),
+                        'category': it.get('category', ''),
+                        'raw_data': json.dumps(it, ensure_ascii=False),
+                    })
+                _save_cache(_rows, platform)
+            except Exception as _e:
+                print(f"实时结果写缓存失败: {_e}")
         
         return items
 
@@ -285,8 +330,9 @@ class ShopService:
         # 没匹配到分类名，返回原词（用户自定义搜索）
         return keyword
 
-    def search_from_cache(self, keyword: str, page: int = 1, page_size: int = 10) -> List[dict]:
-        """从SQLite缓存数据库搜索商品"""
+    def search_from_cache(self, keyword: str, page: int = 1, page_size: int = 10, category: str = '') -> List[dict]:
+        """从SQLite缓存数据库搜索商品
+        2026-10-11 小蕊改: 新增 category 参数, 传给 _is_excluded 的 context, 日化/美妆类目不排除日化词"""
         import sqlite3
         db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'product_cache.db')
         if not os.path.exists(db_path):
@@ -334,7 +380,7 @@ class ShopService:
             for row in rows:
                 r = dict(row)
                 rid = r.get('item_id', '')
-                if rid not in seen_ids and not self._is_excluded(r):
+                if rid not in seen_ids and not self._is_excluded(r, context=category):
                     seen_ids.add(rid)
                     items.append({
                         'item_id': rid,
@@ -385,9 +431,15 @@ class ShopService:
         except Exception as e:
             return {'total': 0, 'error': str(e)}
 
-    def _is_excluded(self, item: dict) -> bool:
-        """检查商品是否应该被排除（书籍、化工、玩具等无关品类）"""
+    def _is_excluded(self, item: dict, context: str = '') -> bool:
+        """检查商品是否应该被排除（书籍、化工、玩具等无关品类）
+        2026-10-11 小蕊改: 新增 context 参数——食品类搜索时排除日化词, 日化/美妆类搜索时不排除(否则这些类目 0 条)
+        """
         title = (item.get('title', '') or '').lower()
+        # 日化洗护/美妆护肤类目的搜索, 日化/美妆词不算噪音, 跳过这些排除词
+        if context in ('日化洗护', '美妆护肤'):
+            _skip = {'洗发水', '沐浴露', '护肤品', '化妆品', '精油', '口红'}
+            return any(ex in title for ex in EXCLUDE_KEYWORDS if ex not in _skip)
         for ex in EXCLUDE_KEYWORDS:
             if ex in title:
                 return True
