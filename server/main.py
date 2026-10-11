@@ -368,8 +368,8 @@ async def search_products(
     # 原逻辑：阻塞等淘宝实时搜（超时卡 10~30s），页面转圈。
     # 新逻辑：
     #   1) 第 1 页：立即从本地缓存 search_from_cache 秒回（加索引后 0.01s），from_cache=1
-    #      同时在后台线程悄悄跑实时淘宝搜索，结果写回缓存（不影响本次响应）
-    #   2) 翻页(>1)：也走缓存优先，缓存不够再实时补
+    #      后台线程悄悄跑实时淘宝搜索（限时 2s，不阻塞主响应），结果写回缓存
+    #   2) 翻页(>1)：缓存优先，缓存不够也秒回，后台补刷
     #   3) 实时后台刷新有冷却(60s)，避免频繁打淘宝
     import concurrent.futures as _cf
     import time as _time
@@ -385,32 +385,41 @@ async def search_products(
                 from_cache = 1
         except Exception:
             items = []
-        # 后台悄悄刷新实时搜索（不阻塞响应）
-        _should_refresh = True
+        # 后台悄悄刷新实时搜索（限时 2s，不阻塞主响应，不拖慢下次请求）
         _cool_key = f"tbrefresh_{keyword}_{platform}"
         _last = getattr(shop, '_tb_refresh_last', {})
-        if _last.get(_cool_key, 0) > _time.time() - 60:
-            _should_refresh = False
-        if _should_refresh:
+        if _last.get(_cool_key, 0) < _time.time() - 60:
             _last[_cool_key] = _time.time()
             shop._tb_refresh_last = _last
             def _bg_refresh():
-                try:
-                    live = shop.search(search_kw, platform=platform, page=1, page_size=page_size, sort=sort)
-                    if live:
-                        # 写回缓存(复用 warmup 写库逻辑, 简化: 仅标记最新, 不强制插库)
+                with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                    _f = _ex.submit(shop.search, search_kw, platform, 1, page_size, sort)
+                    try:
+                        _f.result(timeout=2)  # 限时 2s，拿不到就放弃，不阻塞
+                    except Exception:
                         pass
-                except Exception:
-                    pass
             _th.Thread(target=_bg_refresh, daemon=True).start()
     else:
-        # 翻页：缓存优先（毫秒级），缓存不够也不阻塞——实时补搜放后台，本次仍秒回
+        # 翻页：缓存优先（毫秒级），缓存不够也秒回，实时补刷放后台
         try:
             items = shop.search_from_cache(search_kw, page=page, page_size=page_size)
             if items:
                 from_cache = 1
         except Exception:
             items = []
+        _cool_key = f"tbrefresh_{keyword}_{platform}_{page}"
+        _last = getattr(shop, '_tb_refresh_last', {})
+        if _last.get(_cool_key, 0) < _time.time() - 60:
+            _last[_cool_key] = _time.time()
+            shop._tb_refresh_last = _last
+            def _bg_refresh():
+                with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                    _f = _ex.submit(shop.search, search_kw, platform, page, page_size, sort)
+                    try:
+                        _f.result(timeout=2)
+                    except Exception:
+                        pass
+            _th.Thread(target=_bg_refresh, daemon=True).start()
     if not items and page == 1:
         # 缓存空(首次/新关键词) → 限时 1s 试一次实时, 拿不到也照样秒回(空态), 后台补刷
         with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
