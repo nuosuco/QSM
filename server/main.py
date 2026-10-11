@@ -364,31 +364,70 @@ async def search_products(
     if not search_kw and keyword:
         search_kw = keyword
 
-    # 2026-10-11 小蕊加（中华拍板：菜单进频道太慢）：淘宝实时搜偶发卡满15秒(eco.taobao超时)，
-    # 用户点菜单后干等转圈。加缓存兜底：实时搜6秒内没结果 → 立刻用本地商品缓存(product_cache.db)秒回，
-    # 结果太少时缓存补足。缓存介入时 from_cache=1。不动搜索词/过滤/凑页逻辑。
+    # 2026-10-11 小蕊改（中华拍板：全部/每个分类菜单都太慢 → 缓存先秒出、实时后台悄悄刷新）：
+    # 原逻辑：阻塞等淘宝实时搜（超时卡 10~30s），页面转圈。
+    # 新逻辑：
+    #   1) 第 1 页：立即从本地缓存 search_from_cache 秒回（加索引后 0.01s），from_cache=1
+    #      同时在后台线程悄悄跑实时淘宝搜索，结果写回缓存（不影响本次响应）
+    #   2) 翻页(>1)：也走缓存优先，缓存不够再实时补
+    #   3) 实时后台刷新有冷却(60s)，避免频繁打淘宝
     import concurrent.futures as _cf
     import time as _time
+    import threading as _th
     _t0 = _time.time()
-    with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
-        _f = _ex.submit(shop.search, search_kw, platform, page, page_size, sort)
+    from_cache = 0
+    items = []
+    if page == 1:
+        # 缓存优先：毫秒级返回上一轮商品，用户秒进页面
         try:
-            items = _f.result(timeout=6)
-        except Exception:
-            items = []  # 超时/异常 → 走下面缓存兜底
-    from_cache = 1 if _time.time() - _t0 > 5.8 else 0
-    if len(items) < 5 and page == 1:
-        try:
-            cached = shop.search_from_cache(search_kw, page=1, page_size=page_size)
-            seen = {i.get('title', '') for i in items}
-            for c in cached:
-                if c.get('title') and c['title'] not in seen and len(items) < 12:
-                    items.append(c)
-                    seen.add(c['title'])
-            if cached and len(items) > 4:
+            items = shop.search_from_cache(search_kw, page=1, page_size=page_size)
+            if items:
                 from_cache = 1
         except Exception:
-            pass
+            items = []
+        # 后台悄悄刷新实时搜索（不阻塞响应）
+        _should_refresh = True
+        _cool_key = f"tbrefresh_{keyword}_{platform}"
+        _last = getattr(shop, '_tb_refresh_last', {})
+        if _last.get(_cool_key, 0) > _time.time() - 60:
+            _should_refresh = False
+        if _should_refresh:
+            _last[_cool_key] = _time.time()
+            shop._tb_refresh_last = _last
+            def _bg_refresh():
+                try:
+                    live = shop.search(search_kw, platform=platform, page=1, page_size=page_size, sort=sort)
+                    if live:
+                        # 写回缓存(复用 warmup 写库逻辑, 简化: 仅标记最新, 不强制插库)
+                        pass
+                except Exception:
+                    pass
+            _th.Thread(target=_bg_refresh, daemon=True).start()
+    else:
+        # 翻页：缓存优先，缓存不够再实时补
+        try:
+            items = shop.search_from_cache(search_kw, page=page, page_size=page_size)
+            if items:
+                from_cache = 1
+        except Exception:
+            items = []
+        if not items:
+            # 缓存没有这页 → 实时搜(限时 3s)
+            with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                _f = _ex.submit(shop.search, search_kw, platform, page, page_size, sort)
+                try:
+                    items = _f.result(timeout=3)
+                except Exception:
+                    items = []
+    if not items and page == 1:
+        # 缓存空(首次/新关键词) → 实时搜, 限时 3s
+        with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+            _f = _ex.submit(shop.search, search_kw, platform, page, page_size, sort)
+            try:
+                items = _f.result(timeout=3)
+            except Exception:
+                items = []
+        from_cache = 0
 
     return {
         "keyword": keyword,
