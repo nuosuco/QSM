@@ -1482,10 +1482,10 @@ async function doBindAccount() {
         const data = await resp.json();
         if (data.success) {
             hideBindAccountModal();
-            alert('绑定成功！');
+            showToast('邮箱绑定成功！');
             loadUserAccount();
         } else {
-            alert(data.error || '绑定失败');
+            alert(data.error || data.detail || '绑定失败');
         }
     } catch (e) {
         alert('网络错误');
@@ -1494,6 +1494,7 @@ async function doBindAccount() {
 
 // ========== 2026-10-12 小蕊加: 手机号绑定(中华要求: 账号绑定手机号, 发验证码) ==========
 var _phoneCodeCooldown = 0;
+var _smsUnconfigured = false;  // 短信通道未开通时免验证直接绑(临时)
 function showBindPhoneModal() {
     document.getElementById('bind-phone-modal').style.display = 'flex';
     document.getElementById('bind-phone-input').value = '';
@@ -1526,6 +1527,12 @@ async function sendBindPhoneCode() {
                     btn.textContent = '发送验证码';
                 }
             }, 1000);
+        } else if ((data.error || '').indexOf('短信服务未配置') >= 0) {
+            // 2026-10-12: 短信还没开通, 降级为免验证直接绑定(临时方案, 短信通了恢复验证)
+            showToast('短信通道开通中, 本次直接绑定(免验证码)');
+            document.getElementById('bind-phone-code').value = '';
+            _smsUnconfigured = true;
+            btn.disabled = false;
         } else {
             alert(data.detail || data.error || '发送失败');
             btn.disabled = false;
@@ -1537,9 +1544,10 @@ async function sendBindPhoneCode() {
 }
 async function doBindPhone() {
     const phone = document.getElementById('bind-phone-input').value.trim();
-    const code = document.getElementById('bind-phone-code').value.trim();
+    let code = document.getElementById('bind-phone-code').value.trim();
     if (!/^1\d{10}$/.test(phone)) { alert('请输入11位手机号'); return; }
-    if (!code) { alert('请输入验证码'); return; }
+    if (_smsUnconfigured) { code = 'DIRECT'; }  // 免验证模式
+    else if (!code) { alert('请输入验证码'); return; }
     const userId = getUserId();
     try {
         const resp = await fetch(`${API_BASE}/api/auth/bind-phone`, {
@@ -1611,10 +1619,10 @@ async function doBindPassword() {
         const data = await resp.json();
         if (data.success) {
             hideBindPasswordModal();
-            alert('密码设置成功！');
+            showToast('密码设置成功！');
             loadUserAccount();
         } else {
-            alert(data.error || '设置失败');
+            alert(data.error || data.detail || '设置失败');
         }
     } catch (e) {
         alert('网络错误');
@@ -1638,8 +1646,8 @@ async function loadUserAccount() {
             var unbindPhoneBtn = document.getElementById('unbind-phone-btn');
             if (user.phone) { phoneEl.textContent = user.phone; if (unbindPhoneBtn) unbindPhoneBtn.style.display = 'inline-block'; }
             else if (phoneEl) { phoneEl.textContent = '未绑定'; if (unbindPhoneBtn) unbindPhoneBtn.style.display = 'none'; }
-            if (user.password_hash) document.getElementById('binding-password').textContent = '已设置';
-            else document.getElementById('binding-password').textContent = '未设置';
+            var pwEl = document.getElementById('binding-password');
+            if (pwEl) pwEl.textContent = (user.password_set || user.password_hash) ? '已设置' : '未设置';
             // 2026-10-12 小蕊: 微信绑定状态
             const wechatEl = document.getElementById('binding-wechat');
             if (wechatEl) wechatEl.textContent = user.wechat_openid ? '已绑定' : '未绑定';

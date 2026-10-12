@@ -1110,12 +1110,17 @@ async def user_register(request: UserRegisterRequest):
 
 @app.get("/api/user/profile")
 async def user_profile(user_id: str):
-    """获取用户信息"""
+    """获取用户信息 (2026-10-12: 补绑定状态布尔; 脱敏 password_hash)"""
     from services.user_system import get_user, get_latest_tizhi
     user = get_user(user_id)
     if not user:
         return {"success": False, "error": "user not found"}
     user["latest_tizhi"] = get_latest_tizhi(user_id)
+    # 脱敏: 不返回密码哈希, 只报是否已设置
+    user["password_set"] = bool(user.get("password_hash"))
+    user.pop("password_hash", None)
+    user["phone_set"] = bool(user.get("phone"))
+    user["email_set"] = bool(user.get("account"))
     return {"success": True, "user": user}
 
 @app.post("/api/user/login")
@@ -1501,9 +1506,13 @@ async def auth_bind_anon(request: dict):
 
 @app.post("/api/auth/bind-phone")
 async def auth_bind_phone(request: BindPhoneRequest):
-    """微信用户绑定手机号（需短信验证码）"""
+    """微信用户绑定手机号（需短信验证码; 短信通道未开通时 code=DIRECT 免验证, 临时方案）"""
     from services import auth_service
     e164 = auth_service.normalize_phone(request.phone, request.country_code)
+    cfg = auth_service._load_auth_config()
+    if request.code == "DIRECT" and not cfg.get("sms", {}).get("enabled"):
+        # 短信未配置: 免验证直接绑定(中华 2026-10-12: 先能用, 短信开通后升级验证)
+        return auth_service.bind_phone_to_wechat(request.user_id, e164)
     check = auth_service.verify_code(e164, request.code)
     if not check.get("success"):
         return {"success": False, "error": check.get("error", "验证码错误")}
