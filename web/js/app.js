@@ -1462,8 +1462,10 @@ async function doPasswordLogin() {
 
 // 账号绑定弹窗
 function showBindAccountModal(type) {
+    try {
     document.getElementById('bind-account-modal').style.display = 'flex';
     document.getElementById('bind-account-input').value = '';
+    } catch(e) { alert('弹窗打开失败: ' + e.message + '。请下拉刷新页面后重试'); }
 }
 function hideBindAccountModal() {
     document.getElementById('bind-account-modal').style.display = 'none';
@@ -1496,9 +1498,11 @@ async function doBindAccount() {
 var _phoneCodeCooldown = 0;
 var _smsUnconfigured = false;  // 短信通道未开通时免验证直接绑(临时)
 function showBindPhoneModal() {
+    try {
     document.getElementById('bind-phone-modal').style.display = 'flex';
     document.getElementById('bind-phone-input').value = '';
     document.getElementById('bind-phone-code').value = '';
+    } catch(e) { alert('弹窗打开失败: ' + e.message + '。请下拉刷新页面后重试'); }
 }
 function hideBindPhoneModal() {
     document.getElementById('bind-phone-modal').style.display = 'none';
@@ -1595,9 +1599,11 @@ async function doUnbindAccount() {
 }
 
 function showBindPasswordModal() {
+    try {
     document.getElementById('bind-password-modal').style.display = 'flex';
     document.getElementById('bind-password-input').value = '';
     document.getElementById('bind-password-confirm').value = '';
+    } catch(e) { alert('弹窗打开失败: ' + e.message + '。请下拉刷新页面后重试'); }
 }
 function hideBindPasswordModal() {
     document.getElementById('bind-password-modal').style.display = 'none';
