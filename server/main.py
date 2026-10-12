@@ -1564,6 +1564,32 @@ async def auth_unbind_account(request: dict):
         return {"success": False, "error": "缺少user_id"}
     return auth_service.unbind_account(user_id, account_type)
 
+# ========== 人脸特征向量 API(方案B, 隐私合规: 只存向量不存原图) ==========
+
+class FaceCheckRequest(BaseModel):
+    user_id: str
+    image: str  # base64 图片(data: 前缀可选)
+
+@app.post("/api/face/check")
+async def face_check(request: FaceCheckRequest):
+    """比对输入图 vs 全量已存向量, 判断是否本人/像别人"""
+    from services import face_service
+    vectors = face_service.load_all_vectors()
+    return face_service.check_face(request.image, vectors)
+
+@app.post("/api/face/save")
+async def face_save(request: FaceCheckRequest):
+    """存当前用户人脸向量(覆盖旧)。前端首次拍且勾选'记住我的脸'时调用"""
+    from services import face_service
+    return face_service.save_embedding(request.user_id, request.image)
+
+@app.delete("/api/face")
+async def face_delete(user_id: str):
+    """一键删除某人的人脸存档(隐私合规)"""
+    from services import face_service
+    n = face_service.delete_user_face(user_id)
+    return {"success": True, "deleted": n}
+
 # ========== 体质评测 API ==========
 
 @app.post("/api/tizhi/save")

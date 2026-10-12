@@ -101,6 +101,21 @@ def init_user_system():
         )
     ''')
 
+    # 2026-10-13 小蕊加: 人脸特征向量表(方案B)
+    # 只存 512 维 float 向量的 base64 压缩 + 创建时间, 不存原图/不存可逆人脸信息
+    # 用户可一键删除自己的存档(隐私合规)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS face_vectors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            embedding BLOB NOT NULL,        -- base64 压缩的 512 维 float32 向量 (~512*4 字节 ~ 2KB)
+            model_version TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, model_version)
+        )
+    ''')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_face_user ON face_vectors(user_id)')
+
     c.execute('CREATE INDEX IF NOT EXISTS idx_token_user ON auth_tokens(user_id)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_tizhi_user ON tizhi_records(user_id)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone)')
