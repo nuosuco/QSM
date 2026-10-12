@@ -382,7 +382,17 @@ async function sendMessage() {
             }
             appendFollowUpSuggestions(hasImage);
             appendMessageActions(msgId, replyText);
-            saveChatRecord('[图片辨证x' + imagesToSend.length + '] ' + message, replyText, '');
+            // 2026-10-13 小蕊: 图片辨证结果从回复里提取体质, 同步保存
+        var imgTizhi = '';
+        var tizhiMatch = replyText.match(/(?:体质倾向|综合判断|体质|属于)[：:]\s*([\u4e00-\u9fa5、,，]+(?:质)[\u4e00-\u9fa5、,，]*)/);
+        if (tizhiMatch) imgTizhi = tizhiMatch[1].split(/[、,，]/).slice(0, 3).join('、');
+        if (!imgTizhi) {
+            // 兜底: 回复里出现常见体质词就抓
+            for (var ti of ['气虚质','阳虚质','阴虚质','痰湿质','湿热质','血瘀质','特禀质','平和质']) {
+                if (replyText.indexOf(ti) >= 0) { imgTizhi += imgTizhi ? '、' : ''; imgTizhi += ti; }
+            }
+        }
+        saveChatRecord('[图片辨证x' + imagesToSend.length + '] ' + message, replyText, imgTizhi);
             scrollToLastUserMessage();
             sendBtn.disabled = false;
             return;
@@ -2184,7 +2194,8 @@ function loadProfile() {
     document.getElementById('profile-checkin').textContent = checkedInToday ? '✅ 今天已签到' : '签到：今天未签到';
     
     document.getElementById('stat-chats').textContent = (data.chats || []).length;
-    document.getElementById('stat-checkins').textContent = (data.checkins || []).length;
+    // 2026-10-13 小蕊修(中华反馈): 签到天数原来读本地数组(永远0), 改读后端 checkin_records
+    loadCheckinStats();
     document.getElementById('stat-products').textContent = data.productBrowses || 0;
     
     // 优先从后端加载体质记录，失败则用本地
@@ -2192,6 +2203,25 @@ function loadProfile() {
 }
 
 // 从后端加载体质记录
+// 2026-10-13 小蕊加: 从后端拉签到总天数, 修"连续签到2次但我的数据显示0"
+async function loadCheckinStats() {
+    const userId = getUserId();
+    const el = document.getElementById('stat-checkins');
+    if (!el || !userId) return;
+    try {
+        // 后端 /api/checkin/status 返回 total_points(每次+10), 用 total_points/10 得到总签到天数
+        const resp = await fetch(`${API_BASE}/api/checkin/status?user_id=${encodeURIComponent(userId)}`);
+        const data = await resp.json();
+        const totalDays = Math.round((data.total_points || 0) / 10);
+        el.textContent = String(totalDays);
+        // 顺带刷新"连续X天"显示
+        var streakEl = document.getElementById('checkin-streak');
+        if (streakEl) streakEl.textContent = '连续 ' + (data.streak || 0) + ' 天 · 总积分 ' + (data.total_points || 0);
+        var pc = document.getElementById('profile-checkin');
+        if (pc) pc.textContent = data.checked_in_today ? '✅ 今天已签到' : '签到：今天未签到';
+    } catch (e) {}
+}
+
 async function loadTizhiRecordsFromBackend() {
     const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=5`);
     const result = await resp.json();
@@ -2206,10 +2236,13 @@ async function loadTizhiRecordsFromBackend() {
     
     let html = '';
     for (const r of records) {
-        html += '<div class="history-item">';
-        html += '  <span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span>';
-        html += '  <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span>';
-        html += '  <span class="history-desc">' + escapeHtml((r.symptoms || '').substring(0, 30)) + '</span>';
+        const full = escapeHtml((r.symptoms || '') + (r.advice ? '\n【调理建议】' + r.advice : ''));
+        html += '<div class="history-item" style="display:block;padding:8px;border-bottom:1px solid #f0f0f0;">';
+        html += '  <div style="display:flex;justify-content:space-between;align-items:center;">';
+        html += '    <div><span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span> ';
+        html += '    <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span></div>';
+        html += '    <button onclick="toggleTizhiDetail(this, \'' + ' + JSON.stringify(full) + ' + '\')" style="background:none;border:none;color:#07c160;font-size:12px;cursor:pointer;white-space:nowrap;">展开</button>';
+        html += '  </div>';
         html += '</div>';
     }
     history.innerHTML = html;
