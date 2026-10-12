@@ -1024,27 +1024,21 @@ function openProduct(webUrl, platform, itemId, appUrl) {
                     copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
                 });
         } else if (isMobile) {
-            // 手机浏览器：尝试用app_url直接跳转淘宝APP
-            // app_url格式: taobao://item/detail?itemId=xxx
-            if (appUrl && appUrl !== '#' && appUrl !== 'undefined') {
-                try {
-                    var startTime = Date.now();
-                    window.location.href = appUrl;
-                    setTimeout(function() {
-                        if (Date.now() - startTime < 3000) {
-                            // 成功跳转了
-                        } else {
-                            // 失败，fallback到web版
-                            window.open(webUrl, '_blank');
-                        }
-                    }, 3000);
-                } catch(e) {
-                    window.open(webUrl, '_blank');
-                }
-            } else {
-                // 没有app_url，用web链接
-                window.open(webUrl, '_blank');
-            }
+            // 2026-10-12 小蕊改(中华要求:手机浏览器点击购买要干脆唤起淘宝APP, 不要进H5)
+            // 方案: 先用iframe加载淘宝联盟落地页(webUrl), 它会检测APP已安装则自动唤起APP并落商品页;
+            // 同时主页面也跳转到 webUrl 作兜底, 未安装APP时进淘宝H5商品页。
+            // 用iframe是为了让淘宝的redirect在"后台"完成, 用户体验更像"点一下直接进APP"。
+            var target = webUrl;
+            if (target.indexOf('//') === 0) target = 'https:' + target;
+            // 隐藏iframe加载淘宝deeplink, 触发APP唤起
+            var iframe = document.createElement('iframe');
+            iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;top:0;left:0;opacity:0;pointer-events:none;z-index:-1';
+            iframe.src = target;
+            document.body.appendChild(iframe);
+            // 主页面同时跳转, 保证未装APP时进H5商品页
+            window.location.href = target;
+            // 1.5s后清理iframe
+            setTimeout(function(){ if(iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 1500);
         } else {
             // 电脑端：直接跳转淘宝商品详情页
             // 注意：淘宝联盟 click_url (s.click.taobao.com) 已失效，跳转后到 error.taobao.com
@@ -1129,7 +1123,7 @@ function showQRCode(url, title) {
     
     var hint = document.createElement('p');
     hint.className = 'qr-hint';
-    hint.innerHTML = '<span class="qr-hint-icon">📱</span> 用手机淘宝APP扫描购买';
+    hint.innerHTML = '<span class="qr-hint-icon">📱</span> 打开手机淘宝APP，点"扫一扫"即可购买';
     modal.appendChild(hint);
     
     var container = document.createElement('div');
@@ -1141,18 +1135,6 @@ function showQRCode(url, title) {
     titleDiv.className = 'qr-title';
     titleDiv.textContent = title || '';
     modal.appendChild(titleDiv);
-    
-    var footer = document.createElement('div');
-    footer.className = 'qr-footer';
-    var copyBtn = document.createElement('button');
-    copyBtn.className = 'detail-buy';
-    copyBtn.textContent = '复制链接';
-    copyBtn.onclick = function() {
-        copyToClipboard(url, '链接已复制');
-        overlay.remove();
-    };
-    footer.appendChild(copyBtn);
-    modal.appendChild(footer);
     
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
@@ -1286,7 +1268,7 @@ function showProductDetail(product) {
                 ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
                 <div class="detail-actions">
                     <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}', '${escapeHtml(itemId)}', '${escapeHtml(product.app_url || '#')}')">点击购买</button>
-                    <button class="detail-qr-btn" onclick="showQRCode('${escapeHtml(product.url || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
+                    <button class="detail-qr-btn" onclick="(function(){var u='${escapeHtml(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeHtml(itemId)}';} showQRCode(u, '${escapeHtml(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${escapeHtml(imgSrc)}', '${escapeHtml(product.url || '')}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
@@ -1299,7 +1281,7 @@ function showProductDetail(product) {
                 </div>
                 <div class="detail-detail-footer">
                     <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}', '${escapeHtml(itemId)}', '${escapeHtml(product.app_url || '#')}')">点击购买</button>
-                    <button class="detail-detail-qr-btn" onclick="showQRCode('${escapeHtml(detailUrl || '#')}', '${escapeHtml(product.title || '')}')" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
+                    <button class="detail-detail-qr-btn" onclick="(function(){var u='${escapeHtml(detailUrl || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeHtml(itemId)}';} showQRCode(u, '${escapeHtml(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                 </div>
             </div>
         </div>
@@ -1541,20 +1523,36 @@ async function loadUserAccount() {
     const token = localStorage.getItem('som_auth_token');
     if (!token) return;
     try {
-        const resp = await fetch(`${API_BASE}/api/user/profile?user_id=${userId}`, {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
+        const resp = await fetch(`${API_BASE}/api/user/profile?user_id=${userId}`);
         const data = await resp.json();
         if (data.success && data.user) {
             const user = data.user;
-            if (user.account) {
-                document.getElementById('binding-email').textContent = user.account;
-            }
-            if (user.password_hash) {
-                document.getElementById('binding-password').textContent = '已设置';
-            }
+            if (user.account) document.getElementById('binding-email').textContent = user.account;
+            if (user.password_hash) document.getElementById('binding-password').textContent = '已设置';
+            // 2026-10-12 小蕊: 微信绑定状态
+            const wechatEl = document.getElementById('binding-wechat');
+            if (wechatEl) wechatEl.textContent = user.wechat_openid ? '已绑定' : '未绑定';
+            // 积分同步(后端 users.points)
+            if (user.points !== undefined) document.getElementById('profile-points').textContent = '积分：' + (user.points || 0);
+            // 头像/昵称 跟随微信(用户可自行修改)
+            refreshProfileAvatarName(user);
         }
     } catch (e) {}
+}
+
+// 2026-10-12 小蕊加: 头像/昵称 显示(微信登录默认取微信侧, 用户改过的优先)
+function refreshProfileAvatarName(user) {
+    const avatarEl = document.getElementById('profile-avatar');
+    const nameEl = document.getElementById('profile-name');
+    if (!user) return;
+    if (nameEl && user.nickname) nameEl.textContent = user.nickname;
+    if (avatarEl) {
+        if (user.avatar) {
+            avatarEl.innerHTML = '<img src="' + user.avatar + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="头像">';
+        } else {
+            avatarEl.textContent = '松';
+        }
+    }
 }
 
 // 注册弹窗
@@ -1632,9 +1630,10 @@ async function sendForgotPassword() {
 
 // 微信服务号登录
 function wechatLogin() {
-    // 微信服务号OAuth2.0授权
+    // 微信服务号OAuth2.0授权 (2026-10-12 小蕊接通: 原为 YOUR_APPID 占位符, 导致服务号登录一直失败)
+    // appId 与后端 auth_config.json 的 wechat.appid 一致 (服务号 som.top)
     var redirectUrl = encodeURIComponent(window.location.origin + '/wechat-callback');
-    var appId = 'YOUR_APPID'; // 待中华提供
+    var appId = 'wx82287ef5c8de2fd2';
     var state = 'som_wechat_login';
     
     // 跳转到微信授权页
@@ -1642,11 +1641,38 @@ function wechatLogin() {
         '?appid=' + appId +
         '&redirect_uri=' + redirectUrl +
         '&response_type=code' +
-        '&scope=snsapi_base' +
+        '&scope=snsapi_userinfo' +
         '&state=' + state +
         '#wechat_redirect';
     
     window.location.href = authUrl;
+}
+
+// 2026-10-12 小蕊加: 微信登录后自动补匿名合并(账户四统一: 微信/账密/邮箱/匿名)
+// wechat-callback 返回的登录态写入 localStorage 后, 把旧匿名 user_id 数据迁到统一账号
+function mergeAnonymousToWechat() {
+    try {
+        var userId = localStorage.getItem('som_user_id');
+        if (!userId) return;
+        // 匿名 user 的 user_id 形如 user_xxx_ 开头, 正式账号 u_xxx
+        if (userId.indexOf('u_') !== 0) return;
+        // 找 localStorage 里旧匿名数据键 som_user_data_user_...
+        var anonDataKey = null;
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf('som_user_data_user_') === 0) { anonDataKey = k; break; }
+        }
+        if (anonDataKey && anonDataKey !== ('som_user_data_' + userId)) {
+            var anonId = anonDataKey.replace('som_user_data_', '');
+            if (anonId !== userId) {
+                fetch(API_BASE + '/api/auth/bind-anon', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: userId, anonymous_user_id: anonId })
+                }).catch(function(){});
+            }
+        }
+    } catch(e) {}
 }
 
 function showLoginError(msg) {
@@ -1757,6 +1783,126 @@ function doLogout() {
     updateLoginUI();
 }
 
+// 2026-10-12 小蕊加: 修改头像/昵称 弹窗(中华要求: 头像与用户名都可以自己修改)
+function showEditProfileModal() {
+    var modal = document.getElementById('edit-profile-modal');
+    if (!modal) { alert('请刷新页面后再试'); return; }
+    try {
+        var user = JSON.parse(localStorage.getItem('som_auth_user') || '{}');
+        document.getElementById('edit-avatar-url').value = user.avatar || '';
+        document.getElementById('edit-nickname').value = user.nickname || '';
+    } catch(e) {}
+    modal.style.display = 'flex';
+}
+function hideEditProfileModal() {
+    var m = document.getElementById('edit-profile-modal');
+    if (m) m.style.display = 'none';
+}
+async function doEditProfile() {
+    var userId = getUserId();
+    var token = localStorage.getItem('som_auth_token');
+    if (!token) { alert('请先登录'); return; }
+    var nickname = document.getElementById('edit-nickname').value.trim() || undefined;
+    var avatar = document.getElementById('edit-avatar-url').value.trim() || '';
+    try {
+        var resp = await fetch(`${API_BASE}/api/user/profile/update`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, nickname: nickname, avatar: avatar })
+        });
+        var data = await resp.json();
+        if (data.success) {
+            // 更新本地登录态
+            var user = JSON.parse(localStorage.getItem('som_auth_user') || '{}');
+            if (data.user) user = Object.assign(user, data.user);
+            localStorage.setItem('som_auth_user', JSON.stringify(user));
+            refreshProfileAvatarName(user);
+            hideEditProfileModal();
+            showToast('已保存');
+            loadUserAccount();
+        } else {
+            alert(data.error || '修改失败');
+        }
+    } catch(e) {
+        alert('网络错误, 请重试');
+    }
+}
+
+// ========== 2026-10-12 小蕊加: 每日签到(中华要求: 让用户能签到) ==========
+async function doCheckin() {
+    var userId = getUserId();
+    var token = localStorage.getItem('som_auth_token');
+    var btn = document.getElementById('checkin-btn');
+    if (!token) {
+        alert('请先登录后再签到');
+        if (btn) { btn.disabled = false; btn.textContent = '立即签到'; }
+        return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = '签到中…'; }
+    try {
+        var resp = await fetch(`${API_BASE}/api/checkin/do`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId })
+        });
+        var data = await resp.json();
+        if (data.success) {
+            // 本地积分累加(与后端保持一致)
+            var data2 = getUserData();
+            data2.points = (data.total_points || 0);
+            saveUserData(data2);
+            loadCheckinStatus();
+            loadProfile();
+            loadUserAccount();
+            showToast(data.message || '签到成功！');
+            if (btn) { btn.textContent = '✅ 今天已签到'; }
+        } else {
+            showToast(data.message || '签到失败');
+            if (btn) { btn.disabled = false; btn.textContent = '立即签到'; }
+            loadCheckinStatus();
+        }
+    } catch(e) {
+        alert('网络错误, 请重试');
+        if (btn) { btn.disabled = false; btn.textContent = '立即签到'; }
+    }
+}
+
+// 签到状态刷新(显示连续天数 + 按钮状态)
+async function loadCheckinStatus() {
+    var userId = getUserId();
+    var btn = document.getElementById('checkin-btn');
+    var streakEl = document.getElementById('checkin-streak');
+    var section = document.getElementById('checkin-section');
+    if (!userId || !btn) return;
+    try {
+        var resp = await fetch(`${API_BASE}/api/checkin/status?user_id=${encodeURIComponent(userId)}`);
+        var data = await resp.json();
+        if (data.checked_in_today) {
+            btn.disabled = true;
+            btn.textContent = '✅ 今天已签到';
+        } else {
+            btn.disabled = false;
+            btn.textContent = '立即签到';
+        }
+        if (streakEl) streakEl.textContent = '连续 ' + (data.streak || 0) + ' 天 · 总积分 ' + (data.total_points || 0);
+        // 同步用户卡片的"签到"行
+        var pc = document.getElementById('profile-checkin');
+        if (pc) pc.textContent = data.checked_in_today ? '✅ 今天已签到' : '签到：今天未签到';
+    } catch(e) {}
+}
+
+// 显示签到区 + 初始化
+function showCheckinSection() {
+    var section = document.getElementById('checkin-section');
+    if (section && isLoggedIn()) section.style.display = 'block';
+}
+
+// 页面加载/登录成功后调用
+function initCheckin() {
+    showCheckinSection();
+    loadCheckinStatus();
+}
+
 function isLoggedIn() {
     return !!localStorage.getItem('som_auth_token');
 }
@@ -1767,16 +1913,21 @@ function updateLoginUI() {
     if (isLoggedIn()) {
         loginSection.style.display = 'none';
         profileCard.style.display = 'flex';
-        // 显示昵称
+        // 显示昵称/头像(微信登录默认取微信侧, 可修改)
         try {
             const user = JSON.parse(localStorage.getItem('som_auth_user') || '{}');
-            if (user.nickname) {
-                document.getElementById('profile-name').textContent = user.nickname;
-            }
+            refreshProfileAvatarName(user);
         } catch(e) {}
+        // 显示绑定状态 + 签到区
+        loadUserAccount();
+        initCheckin();
+        // 匿名→统一 数据合并(四统一)
+        try { mergeAnonymousToWechat(); } catch(e) {}
     } else {
         loginSection.style.display = 'block';
         profileCard.style.display = 'none';
+        var cs = document.getElementById('checkin-section');
+        if (cs) cs.style.display = 'none';
     }
 }
 
@@ -1786,6 +1937,10 @@ function initProfile() {
     updateLoginUI();
     loadProfile();
     loadUserAccount();
+    // 2026-10-12 小蕊: 已登录(微信登录过)时, 补一次匿名数据合并(四统一)
+    if (isLoggedIn()) {
+        try { mergeAnonymousToWechat(); } catch(e) {}
+    }
 }
 
 function getUserId() {
@@ -1930,13 +2085,15 @@ function saveChatRecord(message, reply, tizhi) {
 // 同步体质评测结果到后端
 async function saveTizhiToBackend(tizhi, symptoms) {
     try {
+        // 2026-10-12 中华要求: 健康大数据压缩到最小存储
+        // 只存: 体质类型 + 症状关键词(截断80字) + 来源 + 时间。不存完整对话、不存原文。
         await fetch(`${API_BASE}/api/tizhi/save`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 user_id: getUserId(),
                 tizhi: tizhi,
-                symptoms: (symptoms || '').substring(0, 200),
+                symptoms: (symptoms || '').substring(0, 80),
                 source: 'web_chat'
             })
         });
