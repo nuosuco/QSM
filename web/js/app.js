@@ -1024,21 +1024,14 @@ function openProduct(webUrl, platform, itemId, appUrl) {
                     copyToClipboard(webUrl, '链接已复制，打开淘宝APP即可查看');
                 });
         } else if (isMobile) {
-            // 2026-10-12 小蕊改(中华要求:手机浏览器点击购买要干脆唤起淘宝APP, 不要进H5)
-            // 方案: 先用iframe加载淘宝联盟落地页(webUrl), 它会检测APP已安装则自动唤起APP并落商品页;
-            // 同时主页面也跳转到 webUrl 作兜底, 未安装APP时进淘宝H5商品页。
-            // 用iframe是为了让淘宝的redirect在"后台"完成, 用户体验更像"点一下直接进APP"。
-            var target = webUrl;
-            if (target.indexOf('//') === 0) target = 'https:' + target;
-            // 隐藏iframe加载淘宝deeplink, 触发APP唤起
-            var iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;top:0;left:0;opacity:0;pointer-events:none;z-index:-1';
-            iframe.src = target;
-            document.body.appendChild(iframe);
-            // 主页面同时跳转, 保证未装APP时进H5商品页
+            // 2026-10-12 小蕊改(中华要求:手机浏览器点购买要干脆唤起淘宝APP, 不要绕H5)
+            // 直接跳 app_url(taobao:// 协议), 淘宝APP 已装就立刻唤起并落到商品页; 没装则走淘宝H5兜底。
+            var target = appUrl || '';
+            if (!target || target === '#') {
+                var u = webUrl.indexOf('//') === 0 ? 'https:' + webUrl : webUrl;
+                target = u.replace(/^https:\/\//, 'taobao://');
+            }
             window.location.href = target;
-            // 1.5s后清理iframe
-            setTimeout(function(){ if(iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 1500);
         } else {
             // 电脑端：直接跳转淘宝商品详情页
             // 注意：淘宝联盟 click_url (s.click.taobao.com) 已失效，跳转后到 error.taobao.com
