@@ -184,60 +184,7 @@
                                 <p class="login-link" onclick="showRegisterModal()">没有账号？立即注册</p>
                                 <p class="login-link" onclick="showForgotPassword()">忘记密码？</p>
                             </div>
-                            <!-- 绑定账号弹窗 -->
-                            <div class="forgot-password-modal" id="bind-account-modal" style="display:none;">
-                                <div class="forgot-password-content">
-                                    <h4>绑定账号</h4>
-                                    <input type="text" class="login-input" id="bind-account-input" placeholder="输入邮箱或账号">
-                                    <button class="login-btn" onclick="doBindAccount()">确认绑定</button>
-                                    <button class="login-btn secondary" onclick="hideBindAccountModal()">取消</button>
-                                </div>
-                            </div>
-                            <!-- 2026-10-12 小蕊加: 手机号绑定弹窗(中华要求: 账号绑定手机号) -->
-                            <div class="forgot-password-modal" id="bind-phone-modal" style="display:none;">
-                                <div class="forgot-password-content">
-                                    <h4>绑定手机号</h4>
-                                    <input type="text" class="login-input" id="bind-phone-input" placeholder="手机号" maxlength="15" inputmode="tel">
-                                    <div style="display:flex;gap:8px;margin-top:8px;">
-                                        <input type="text" class="login-input" id="bind-phone-code" placeholder="验证码" maxlength="6" style="flex:1;">
-                                        <button class="login-btn secondary" id="send-phone-code-btn" onclick="sendBindPhoneCode()" style="white-space:nowrap;">发送验证码</button>
-                                    </div>
-                                    <button class="login-btn" onclick="doBindPhone()">确认绑定</button>
-                                    <button class="login-btn secondary" onclick="hideBindPhoneModal()">取消</button>
-                                </div>
-                            </div>
-                            <!-- 设置密码弹窗 -->
-                            <div class="forgot-password-modal" id="bind-password-modal" style="display:none;">
-                                <div class="forgot-password-content">
-                                    <h4>设置密码</h4>
-                                    <input type="password" class="login-input" id="bind-password-input" placeholder="输入密码（至少6位）">
-                                    <input type="password" class="login-input" id="bind-password-confirm" placeholder="确认密码">
-                                    <button class="login-btn" onclick="doBindPassword()">确认设置</button>
-                                    <button class="login-btn secondary" onclick="hideBindPasswordModal()">取消</button>
-                                </div>
-                            </div>
-                            <!-- 注册弹窗 -->
-                            <div class="forgot-password-modal" id="register-modal" style="display:none;">
-                                <div class="forgot-password-content">
-                                    <h4>注册新账号</h4>
-                                    <input type="text" class="login-input" id="register-account" placeholder="账号（邮箱或自定义）">
-                                    <input type="text" class="login-input" id="register-nickname" placeholder="昵称（可选）">
-                                    <input type="password" class="login-input" id="register-password" placeholder="密码">
-                                    <input type="password" class="login-input" id="register-confirm-password" placeholder="确认密码">
-                                    <button class="login-btn" onclick="registerAccount()">注册</button>
-                                    <button class="login-btn secondary" onclick="hideRegisterModal()">取消</button>
-                                </div>
-                            </div>
-                            <!-- 忘记密码弹窗 -->
-                            <div class="forgot-password-modal" id="forgot-password-modal" style="display:none;">
-                                <div class="forgot-password-content">
-                                    <h4>重置密码</h4>
-                                    <input type="text" class="login-input" id="forgot-account" placeholder="输入你的账号">
-                                    <button class="login-btn" onclick="sendForgotPassword()">发送重置链接</button>
-                                    <button class="login-btn secondary" onclick="hideForgotPassword()">取消</button>
-                                </div>
-                            </div>
-                            <!-- 手机号登录（隐藏，代码保留） -->
+                            
                             <div class="login-form" id="login-form-sms" style="display:none;"></div>
                             <!-- 邮箱登录 -->
                             <div class="login-form" id="login-form-email" style="display:none;">
@@ -361,5 +308,59 @@
     <script src="js/qrcode.min.js?v=20261012"></script>
     <script src="js/error-trap.js?v=20261012"></script>
     <script src="js/app.js?v=20261012"></script>
+<!-- 绑定账号弹窗 -->
+                            <div class="forgot-password-modal" id="bind-account-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>绑定账号</h4>
+                                    <input type="text" class="login-input" id="bind-account-input" placeholder="输入邮箱或账号">
+                                    <button class="login-btn" onclick="doBindAccount()">确认绑定</button>
+                                    <button class="login-btn secondary" onclick="hideBindAccountModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 2026-10-12 小蕊加: 手机号绑定弹窗(中华要求: 账号绑定手机号) -->
+                            <div class="forgot-password-modal" id="bind-phone-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>绑定手机号</h4>
+                                    <input type="text" class="login-input" id="bind-phone-input" placeholder="手机号" maxlength="15" inputmode="tel">
+                                    <div style="display:flex;gap:8px;margin-top:8px;">
+                                        <input type="text" class="login-input" id="bind-phone-code" placeholder="验证码" maxlength="6" style="flex:1;">
+                                        <button class="login-btn secondary" id="send-phone-code-btn" onclick="sendBindPhoneCode()" style="white-space:nowrap;">发送验证码</button>
+                                    </div>
+                                    <button class="login-btn" onclick="doBindPhone()">确认绑定</button>
+                                    <button class="login-btn secondary" onclick="hideBindPhoneModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 设置密码弹窗 -->
+                            <div class="forgot-password-modal" id="bind-password-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>设置密码</h4>
+                                    <input type="password" class="login-input" id="bind-password-input" placeholder="输入密码（至少6位）">
+                                    <input type="password" class="login-input" id="bind-password-confirm" placeholder="确认密码">
+                                    <button class="login-btn" onclick="doBindPassword()">确认设置</button>
+                                    <button class="login-btn secondary" onclick="hideBindPasswordModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 注册弹窗 -->
+                            <div class="forgot-password-modal" id="register-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>注册新账号</h4>
+                                    <input type="text" class="login-input" id="register-account" placeholder="账号（邮箱或自定义）">
+                                    <input type="text" class="login-input" id="register-nickname" placeholder="昵称（可选）">
+                                    <input type="password" class="login-input" id="register-password" placeholder="密码">
+                                    <input type="password" class="login-input" id="register-confirm-password" placeholder="确认密码">
+                                    <button class="login-btn" onclick="registerAccount()">注册</button>
+                                    <button class="login-btn secondary" onclick="hideRegisterModal()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 忘记密码弹窗 -->
+                            <div class="forgot-password-modal" id="forgot-password-modal" style="display:none;">
+                                <div class="forgot-password-content">
+                                    <h4>重置密码</h4>
+                                    <input type="text" class="login-input" id="forgot-account" placeholder="输入你的账号">
+                                    <button class="login-btn" onclick="sendForgotPassword()">发送重置链接</button>
+                                    <button class="login-btn secondary" onclick="hideForgotPassword()">取消</button>
+                                </div>
+                            </div>
+                            <!-- 手机号登录（隐藏，代码保留） -->
 </body>
 </html>

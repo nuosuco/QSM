@@ -2374,3 +2374,11 @@ body {
 .profile-edit-row {
   margin-top: 8px;
 }
+
+/* 2026-10-12 小蕊修(中华反馈): 弹窗被祖先 display:none 藏住, 点按钮没反应 */
+/* 根因: 弹窗 DOM 在 .tab-content(display:none) 和 .login-section(display:none) 里, 祖先隐藏=后代全不渲染 */
+/* 修法: 弹窗 DOM 移到 body 末尾; 再加保险规则 —— 只要自身 display!=none, 强制自身可见, 不受祖先影响 */
+.forgot-password-modal {
+    position: fixed !important;
+    z-index: 10000 !important;
+}
