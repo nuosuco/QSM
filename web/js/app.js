@@ -2222,26 +2222,32 @@ async function loadCheckinStats() {
     } catch (e) {}
 }
 
-// 2026-10-13 小蕊修(中华反馈): 展开/收起体质记录完整内容, 事件委托避免内联onclick拼接出JS错误
+// 2026-10-13 小蕊重写(中华反馈"展开不能展开"): 每条记录自带详情 div, 点展开直接 toggle 相邻 div
+// 不再依赖 event delegation + 全局 _tizhiFullTexts 数组, 彻底排除"绑定失败/数组为空"两类根因
 function initTizhiToggle() {
-    const container = document.getElementById('profile-history');
-    if (!container || container._toggleBound) return;
-    container._toggleBound = true;
-    container.addEventListener('click', function(e) {
-        const btn = e.target.closest('.tizhi-toggle-btn');
-        if (!btn) return;
-        const idx = parseInt(btn.getAttribute('data-tidx') || '0', 10);
-        const full = (window._tizhiFullTexts && window._tizhiFullTexts[idx]) || '';
-        const detail = document.getElementById('profile-history-detail');
-        if (!detail) return;
-        if (btn.textContent.trim() === '展开' || detail.style.display === 'none') {
-            detail.textContent = full;
-            detail.style.display = 'block';
-            btn.textContent = '收起';
-        } else {
-            detail.style.display = 'none';
-            btn.textContent = '展开';
-        }
+    document.querySelectorAll('.tizhi-toggle-btn').forEach(function(btn) {
+        if (btn._bound) return;  // 防重复绑定
+        btn._bound = true;
+        btn.addEventListener('click', function() {
+            // 详情 div 是按钮的最近同级兄弟(渲染顺序: 按钮后紧跟 detail)
+            let detail = btn.parentElement.parentElement.querySelector(':scope > .tizhi-detail-block');
+            if (!detail) {
+                // 兜底: 在按钮所在 history-item 里找/建
+                const item = btn.closest('.history-item');
+                if (!item) return;
+                detail = document.createElement('div');
+                detail.className = 'tizhi-detail-block';
+                detail.style.cssText = 'display:none;margin:8px 0 4px;padding:10px;background:#f9f9f9;border-radius:8px;font-size:13px;color:#666;white-space:pre-wrap;line-height:1.6;';
+                item.appendChild(detail);
+            }
+            if (btn.textContent.trim() === '展开' || detail.style.display === 'none') {
+                detail.style.display = 'block';
+                btn.textContent = '收起';
+            } else {
+                detail.style.display = 'none';
+                btn.textContent = '展开';
+            }
+        });
     });
 }
 
@@ -2264,19 +2270,18 @@ async function loadTizhiRecordsFromBackend() {
         return;
     }
     
-    // full 文本存进全局数组, 按钮用 data-tidx 引用, 彻底避免属性转义问题
-    window._tizhiFullTexts = [];
+    // 2026-10-13 小蕊重写: 每条记录自带详情 div, 点展开 toggle 相邻 div, 不依赖全局数组
     let html = '';
     for (let i = 0; i < records.length; i++) {
         const r = records[i];
         const full = (r.symptoms || '') + (r.advice ? '\n【调理建议】' + r.advice : '');
-        window._tizhiFullTexts.push(full);
         html += '<div class="history-item" style="display:block;padding:8px;border-bottom:1px solid #f0f0f0;">';
         html += '  <div style="display:flex;justify-content:space-between;align-items:center;">';
         html += '    <div><span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span> ';
         html += '    <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span></div>';
-        html += '    <button class="tizhi-toggle-btn" data-tidx="' + i + '" style="background:none;border:none;color:#07c160;font-size:12px;cursor:pointer;white-space:nowrap;">展开</button>';
+        html += '    <button class="tizhi-toggle-btn" style="background:none;border:none;color:#07c160;font-size:12px;cursor:pointer;white-space:nowrap;">展开</button>';
         html += '  </div>';
+        html += '  <div class="tizhi-detail-block" style="display:none;margin:8px 0 4px;padding:10px;background:#f9f9f9;border-radius:8px;font-size:13px;color:#666;white-space:pre-wrap;line-height:1.6;">' + escapeHtml(full) + '</div>';
         html += '</div>';
     }
     history.innerHTML = html;
