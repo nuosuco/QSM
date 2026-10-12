@@ -2193,7 +2193,9 @@ function loadProfile() {
     const checkedInToday = data.checkins && data.checkins.indexOf(today) >= 0;
     document.getElementById('profile-checkin').textContent = checkedInToday ? '✅ 今天已签到' : '签到：今天未签到';
     
-    document.getElementById('stat-chats').textContent = (data.chats || []).length;
+    // 2026-10-13 小蕊修(中华反馈): 对话次数原来读本地数组(清缓存后归零), 改读后端 chat_history
+    loadChatStats();
+    document.getElementById('stat-chats').textContent = (data.chats || []).length; // 先显示本地, 后端返回后覆盖
     // 2026-10-13 小蕊修(中华反馈): 签到天数原来读本地数组(永远0), 改读后端 checkin_records
     loadCheckinStats();
     document.getElementById('stat-products').textContent = data.productBrowses || 0;
@@ -2204,6 +2206,19 @@ function loadProfile() {
 
 // 从后端加载体质记录
 // 2026-10-13 小蕊加: 从后端拉签到总天数, 修"连续签到2次但我的数据显示0"
+// 2026-10-13 小蕊加: 从后端拉对话次数, 修"清缓存后我的数据对话次数归零"
+async function loadChatStats() {
+    const userId = getUserId();
+    const el = document.getElementById('stat-chats');
+    if (!el || !userId) return;
+    try {
+        const resp = await fetch(`${API_BASE}/api/chat/history?user_id=${encodeURIComponent(userId)}&limit=1`);
+        const data = await resp.json();
+        const total = data.total !== undefined ? data.total : (data.records || []).length;
+        el.textContent = String(total);
+    } catch (e) {}
+}
+
 async function loadCheckinStats() {
     const userId = getUserId();
     const el = document.getElementById('stat-checkins');
