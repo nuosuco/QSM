@@ -1492,6 +1492,100 @@ async function doBindAccount() {
     }
 }
 
+// ========== 2026-10-12 小蕊加: 手机号绑定(中华要求: 账号绑定手机号, 发验证码) ==========
+var _phoneCodeCooldown = 0;
+function showBindPhoneModal() {
+    document.getElementById('bind-phone-modal').style.display = 'flex';
+    document.getElementById('bind-phone-input').value = '';
+    document.getElementById('bind-phone-code').value = '';
+}
+function hideBindPhoneModal() {
+    document.getElementById('bind-phone-modal').style.display = 'none';
+}
+async function sendBindPhoneCode() {
+    const phone = document.getElementById('bind-phone-input').value.trim();
+    if (!/^1\d{10}$/.test(phone)) { alert('请输入11位手机号'); return; }
+    const btn = document.getElementById('send-phone-code-btn');
+    btn.disabled = true;
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/send-code`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ target: phone, channel: 'sms' })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showToast(data.message || '验证码已发送');
+            _phoneCodeCooldown = 60;
+            const t = setInterval(function() {
+                _phoneCodeCooldown--;
+                btn.textContent = _phoneCodeCooldown + 's';
+                if (_phoneCodeCooldown <= 0) {
+                    clearInterval(t);
+                    btn.disabled = false;
+                    btn.textContent = '发送验证码';
+                }
+            }, 1000);
+        } else {
+            alert(data.detail || data.error || '发送失败');
+            btn.disabled = false;
+        }
+    } catch(e) {
+        alert('网络错误');
+        btn.disabled = false;
+    }
+}
+async function doBindPhone() {
+    const phone = document.getElementById('bind-phone-input').value.trim();
+    const code = document.getElementById('bind-phone-code').value.trim();
+    if (!/^1\d{10}$/.test(phone)) { alert('请输入11位手机号'); return; }
+    if (!code) { alert('请输入验证码'); return; }
+    const userId = getUserId();
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/bind-phone`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, phone: phone, code: code })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            hideBindPhoneModal();
+            showToast('手机号绑定成功！');
+            loadUserAccount();
+        } else {
+            alert(data.error || '绑定失败');
+        }
+    } catch(e) { alert('网络错误'); }
+}
+async function doUnbindPhone() {
+    if (!confirm('解绑手机号后, 该手机号可绑到其他账号, 确定?')) return;
+    const userId = getUserId();
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/unbind-account`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, account_type: 'phone' })
+        });
+        const data = await resp.json();
+        if (data.success) { showToast('已解绑'); loadUserAccount(); }
+        else alert(data.error || '解绑失败');
+    } catch(e) { alert('网络错误'); }
+}
+async function doUnbindAccount() {
+    if (!confirm('解绑邮箱账号后, 该邮箱可被其他人注册绑定, 确定?')) return;
+    const userId = getUserId();
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/unbind-account`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, account_type: 'email' })
+        });
+        const data = await resp.json();
+        if (data.success) { showToast('已解绑'); loadUserAccount(); }
+        else alert(data.error || '解绑失败');
+    } catch(e) { alert('网络错误'); }
+}
+
 function showBindPasswordModal() {
     document.getElementById('bind-password-modal').style.display = 'flex';
     document.getElementById('bind-password-input').value = '';
@@ -1536,8 +1630,16 @@ async function loadUserAccount() {
         const data = await resp.json();
         if (data.success && data.user) {
             const user = data.user;
-            if (user.account) document.getElementById('binding-email').textContent = user.account;
+            var emailEl = document.getElementById('binding-email');
+            emailEl.textContent = user.account || '未绑定';
+            var unbindEmailBtn = document.getElementById('unbind-email-btn');
+            if (unbindEmailBtn) unbindEmailBtn.style.display = user.account ? 'inline-block' : 'none';
+            var phoneEl = document.getElementById('binding-phone');
+            var unbindPhoneBtn = document.getElementById('unbind-phone-btn');
+            if (user.phone) { phoneEl.textContent = user.phone; if (unbindPhoneBtn) unbindPhoneBtn.style.display = 'inline-block'; }
+            else if (phoneEl) { phoneEl.textContent = '未绑定'; if (unbindPhoneBtn) unbindPhoneBtn.style.display = 'none'; }
             if (user.password_hash) document.getElementById('binding-password').textContent = '已设置';
+            else document.getElementById('binding-password').textContent = '未设置';
             // 2026-10-12 小蕊: 微信绑定状态
             const wechatEl = document.getElementById('binding-wechat');
             if (wechatEl) wechatEl.textContent = user.wechat_openid ? '已绑定' : '未绑定';
