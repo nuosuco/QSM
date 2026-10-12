@@ -247,6 +247,12 @@ def save_product(items: List[dict], platform: str = 'taobao'):
     
     conn.commit()
     conn.close()
+    # 2026-10-13 小蕊加(中华要求): 入库后自动检查缓存大小, 超 1.05GB 删旧记录 + VACUUM, 新爬的自动补进来
+    try:
+        from services.cache_gc import auto_gc_if_needed
+        auto_gc_if_needed()
+    except Exception as e:
+        print(f'[cache-gc] 自动清理跳过: {e}')
     return saved
 
 

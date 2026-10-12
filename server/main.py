@@ -815,6 +815,18 @@ async def get_warmup_status():
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
+# ========== 2026-10-13 小蕊加: 商品缓存自动清理(中华要求: 保持 ~1GB) ==========
+@app.post("/api/cache/gc")
+async def trigger_cache_gc():
+    """手动触发缓存清理(超 1.05GB 才删旧记录 + VACUUM)"""
+    import threading
+    from services.cache_gc import gc_product_cache
+    def _run():
+        r = gc_product_cache(verbose=True)
+        print(f"[cache-gc] 手动触发结果: {r}")
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started", "message": "后台清理中, 日志看 [cache-gc]"}
+
 @app.get("/api/cache/warmup/trigger")
 async def trigger_warmup():
     """触发缓存预热（异步）"""
