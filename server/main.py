@@ -184,6 +184,7 @@ class TizhiSaveRequest(BaseModel):
     symptoms: Optional[str] = None
     advice: Optional[str] = None
     source: str = "chat"
+    session_id: Optional[str] = None  # 2026-10-13 小蕊加: 同 session 只存一条, 保证一次对话=一条记录
 
 class TokenVerifyRequest(BaseModel):
     token: str
@@ -1572,6 +1573,7 @@ async def tizhi_save(request: TizhiSaveRequest):
     record = add_tizhi_record(
         request.user_id, request.tizhi, zhengxing=request.zhengxing,
         symptoms=request.symptoms, advice=request.advice, source=request.source,
+        session_id=request.session_id,
     )
     return {"success": True, "record": record}
 

@@ -2222,30 +2222,65 @@ async function loadCheckinStats() {
     } catch (e) {}
 }
 
+// 2026-10-13 小蕊修(中华反馈): 展开/收起体质记录完整内容, 事件委托避免内联onclick拼接出JS错误
+function initTizhiToggle() {
+    const container = document.getElementById('profile-history');
+    if (!container || container._toggleBound) return;
+    container._toggleBound = true;
+    container.addEventListener('click', function(e) {
+        const btn = e.target.closest('.tizhi-toggle-btn');
+        if (!btn) return;
+        const idx = parseInt(btn.getAttribute('data-tidx') || '0', 10);
+        const full = (window._tizhiFullTexts && window._tizhiFullTexts[idx]) || '';
+        const detail = document.getElementById('profile-history-detail');
+        if (!detail) return;
+        if (btn.textContent.trim() === '展开' || detail.style.display === 'none') {
+            detail.textContent = full;
+            detail.style.display = 'block';
+            btn.textContent = '收起';
+        } else {
+            detail.style.display = 'none';
+            btn.textContent = '展开';
+        }
+    });
+}
+
 async function loadTizhiRecordsFromBackend() {
     const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=5`);
     const result = await resp.json();
     const history = document.getElementById('profile-history');
     if (!history) return;
     
-    const records = result.records || [];
+    // 2026-10-13 小蕊: 按 session 去重 —— 同一 session_id 只保留最新一条, 保证"一次对话=一条记录"
+    const seen = {};
+    const records = [];
+    for (const r of (result.records || [])) {
+        const key = r.session_id || r.id;
+        if (!seen[key]) { seen[key] = true; records.push(r); }
+    }
+    
     if (records.length === 0) {
         history.innerHTML = '<p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>';
         return;
     }
     
+    // full 文本存进全局数组, 按钮用 data-tidx 引用, 彻底避免属性转义问题
+    window._tizhiFullTexts = [];
     let html = '';
-    for (const r of records) {
-        const full = escapeHtml((r.symptoms || '') + (r.advice ? '\n【调理建议】' + r.advice : ''));
+    for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const full = (r.symptoms || '') + (r.advice ? '\n【调理建议】' + r.advice : '');
+        window._tizhiFullTexts.push(full);
         html += '<div class="history-item" style="display:block;padding:8px;border-bottom:1px solid #f0f0f0;">';
         html += '  <div style="display:flex;justify-content:space-between;align-items:center;">';
         html += '    <div><span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span> ';
         html += '    <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span></div>';
-        html += '    <button onclick="toggleTizhiDetail(this, \'' + ' + JSON.stringify(full) + ' + '\')" style="background:none;border:none;color:#07c160;font-size:12px;cursor:pointer;white-space:nowrap;">展开</button>';
+        html += '    <button class="tizhi-toggle-btn" data-tidx="' + i + '" style="background:none;border:none;color:#07c160;font-size:12px;cursor:pointer;white-space:nowrap;">展开</button>';
         html += '  </div>';
         html += '</div>';
     }
     history.innerHTML = html;
+    initTizhiToggle();
 }
 
 function loadTizhiRecords(data) {
@@ -2283,11 +2318,20 @@ function saveChatRecord(message, reply, tizhi) {
     
     if (tizhi && tizhi !== '未检测') {
         if (!data.tizhiRecords) data.tizhiRecords = [];
-        data.tizhiRecords.push({
-            date: new Date().toISOString().split('T')[0],
-            tizhi: tizhi,
-            desc: message.substring(0, 50)
-        });
+        // 2026-10-13 小蕊(中华要求): 同一次对话只留一条体质记录, 按 session 覆盖旧的
+        var sid = getSessionId();
+        var existing = data.tizhiRecords.filter(function(r){ return r.session_id === sid; });
+        if (existing.length > 0) {
+            existing[0].tizhi = tizhi;
+            existing[0].desc = message.substring(0, 50);
+        } else {
+            data.tizhiRecords.push({
+                date: new Date().toISOString().split('T')[0],
+                tizhi: tizhi,
+                desc: message.substring(0, 50),
+                session_id: sid
+            });
+        }
         data.tizhi = tizhi;
         // 同步体质记录到后端
         saveTizhiToBackend(tizhi, message);
@@ -2297,6 +2341,7 @@ function saveChatRecord(message, reply, tizhi) {
 }
 
 // 同步体质评测结果到后端
+// 2026-10-13 小蕊改(中华反馈): 传 session_id, 同一次对话只存一条体质记录
 async function saveTizhiToBackend(tizhi, symptoms) {
     try {
         // 2026-10-12 中华要求: 健康大数据压缩到最小存储
@@ -2308,7 +2353,8 @@ async function saveTizhiToBackend(tizhi, symptoms) {
                 user_id: getUserId(),
                 tizhi: tizhi,
                 symptoms: (symptoms || '').substring(0, 80),
-                source: 'web_chat'
+                source: 'web_chat',
+                session_id: getSessionId()
             })
         });
     } catch (e) {
