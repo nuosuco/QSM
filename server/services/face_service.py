@@ -192,3 +192,38 @@ def delete_user_face(user_id: str) -> int:
     conn.commit()
     conn.close()
     return n
+
+
+def ensure_face_record(user_id: str, b64_image: str, remember: bool = True) -> dict:
+    """2026-10-13 小蕊: 前端拍照后调用。remember=True 时存/覆盖该用户向量; False 不存(只比对)。"""
+    if remember:
+        return save_embedding(user_id, b64_image)
+    return {"success": True, "skipped": True}
+
+
+def list_user_face(user_id: str) -> dict:
+    """查某用户是否已存脸向量(前端"我"里显示/删除入口用)"""
+    from services.user_system import _conn
+    conn = _conn()
+    row = conn.execute(
+        "SELECT model_version, created_at FROM face_vectors WHERE user_id=? ORDER BY id DESC LIMIT 1",
+        (user_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"has_face": False}
+    return {"has_face": True, "model_version": row["model_version"], "created_at": str(row["created_at"])}
+
+
+def match_user(b64_image: str, exclude_user_id: str = None) -> dict:
+    """2026-10-13 小蕊: 找出"这张脸是谁"。
+    exclude_user_id: 若传了且匹配到的就是本人, 返回 matched_self=True。
+    返回 {matched, matched_self, best_user_id, best_score}
+    """
+    vectors = load_all_vectors()
+    result = check_face(b64_image, vectors)
+    matched_self = False
+    if exclude_user_id and result.get("best_user_id") == exclude_user_id:
+        matched_self = True
+    result["matched_self"] = matched_self
+    return result

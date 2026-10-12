@@ -1569,6 +1569,7 @@ async def auth_unbind_account(request: dict):
 class FaceCheckRequest(BaseModel):
     user_id: str
     image: str  # base64 图片(data: 前缀可选)
+    remember: bool = False  # 2026-10-13: 是否存/覆盖当前用户脸向量(用户勾选"记住我的脸"时 True)
 
 @app.post("/api/face/check")
 async def face_check(request: FaceCheckRequest):
@@ -1589,6 +1590,33 @@ async def face_delete(user_id: str):
     from services import face_service
     n = face_service.delete_user_face(user_id)
     return {"success": True, "deleted": n}
+
+@app.get("/api/face/status")
+async def face_status(user_id: str):
+    """查当前用户是否已存脸向量(前端"我"里展示/删除入口用)"""
+    from services import face_service
+    return face_service.list_user_face(user_id)
+
+class FaceMatchRequest(BaseModel):
+    user_id: str
+    image: str
+
+@app.post("/api/face/match")
+async def face_match(request: FaceMatchRequest):
+    """2026-10-13 小蕊: 找出"这张脸是谁"。传入的 user_id 是"声称的本人",
+    若匹配到的是别人则 matched_self=False, 前端提示"这不是当前账户的人"。
+    隐私: 只存向量不存原图, 用户可删除自己的向量。"""
+    from services import face_service
+    return face_service.match_user(request.image, exclude_user_id=request.user_id)
+
+@app.post("/api/face/ensure")
+async def face_ensure(request: FaceCheckRequest):
+    """2026-10-13 小蕊: 前端拍照后统一入口。request.remember=True 时存向量, 否则只比对。"""
+    from services import face_service
+    vectors = face_service.load_all_vectors()
+    chk = face_service.check_face(request.image, vectors)
+    ensure = face_service.ensure_face_record(request.user_id, request.image, remember=getattr(request, "remember", False))
+    return {"check": chk, "ensure": ensure}
 
 # ========== 体质评测 API ==========
 
