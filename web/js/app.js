@@ -138,7 +138,7 @@ function initChat() {
         imageInput.setAttribute('multiple', 'multiple');
         imageInput.click();
     });
-    imageInput.addEventListener('change', handleImageSelect);
+    imageInput.addEventListener('change', handleImageSelectWithConfirm); // 2026-10-13 小蕊: 先过本人确认
     
     // 连拍按钮：预览区底部有"＋继续拍"按钮，点击直接打开拍照
     document.addEventListener('click', function(e) {
@@ -224,6 +224,50 @@ function goBackFromTest() {
 
 // 当前选中的图片 base64 列表（支持多张）
 let pendingImages = [];
+
+// ========== 2026-10-13 小蕊加(中华要求): 拍舌照前确认是本人拍摄 ==========
+// 一人一户微信, 不做多人建档。新对话第一次拍弹确认, 本 session 连拍不再弹。
+let _ownerConfirmedSession = null;  // 已确认本人的 session_id
+
+// ========== 2026-10-13 小蕊加(中华要求): 拍照前量化人脸比对(方案B前端侧) ==========
+// 本人确认后, 调后端 /api/face/check: 提取人脸特征向量, 比对当前用户已存档向量
+// 返回 matched=true(本人) / matched=false(像别人) / no_record(未建档)
+// 不存原图, 只存向量; 用户可在"我"里一键删除自己的存档
+async function checkFaceMatch(firstImageDataUrl) {
+    const userId = getUserId();
+    if (!userId) return { matched: false, no_record: true };
+    try {
+        const resp = await fetch(`${API_BASE}/api/face/check`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, image: firstImageDataUrl })
+        });
+        return await resp.json();
+    } catch (e) { return { matched: false, no_record: true, error: String(e) }; }
+}
+
+function confirmOwnerBeforeCapture() {
+    const sid = getSessionId();
+    if (_ownerConfirmedSession === sid) return true;  // 本 session 已确认过
+    const ok = confirm('请确认：现在拍照的是本人（当前微信账户主人）\n\n一人一户，档案只记录在你自己的健康数据里。\n如果不是本人，请让对方用自己的微信登录。\n\n点【确定】= 是本人，继续分析；点【取消】= 不是本人，不分析。');
+    if (ok) {
+        _ownerConfirmedSession = sid;
+        showToast('已确认本人拍摄 📷');
+    } else {
+        showToast('已取消（未拍摄）', 'warn');
+    }
+    return ok;
+}
+
+// 选图后统一入口: 先过本人确认, 再真正处理图片
+function handleImageSelectWithConfirm(e) {
+    if (!confirmOwnerBeforeCapture()) {
+        // 用户取消: 清空 input, 不加入 pendingImages
+        e.target.value = '';
+        return;
+    }
+    handleImageSelect(e);
+}
 
 function handleImageSelect(e) {
     const files = Array.from(e.target.files || []);
