@@ -1033,14 +1033,10 @@ function openProduct(webUrl, platform, itemId, appUrl) {
             }
             window.location.href = target;
         } else {
-            // 电脑端：直接跳转淘宝商品详情页
-            // 注意：淘宝联盟 click_url (s.click.taobao.com) 已失效，跳转后到 error.taobao.com
-            // 改用 item.taobao.com 直链，保留佣金参数
-            if (itemId) {
-                window.open('https://item.taobao.com/item.htm?id=' + itemId, '_blank');
-            } else {
-                window.open(webUrl, '_blank');
-            }
+            // 电脑端：直接跳转淘宝推广链接（click_url），淘宝会识别并跳转到商品页/引导下载APP
+            // 2026-10-12 小蕊修复(中华报:电脑端"宝贝不存在")：之前误改为 item.taobao.com/item.htm?id=<淘口令>
+            // 但 item_id 是淘宝联盟淘口令编码而非数字商品ID，导致淘宝报不存在；现恢复为以前的 window.open(webUrl)
+            window.open(webUrl, '_blank');
         }
     } else {
         // 京东等平台：直接复制链接
