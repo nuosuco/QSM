@@ -142,11 +142,13 @@ class RegisterRequest(BaseModel):
     account: str
     password: str
     nickname: Optional[str] = None
+    anonymous_user_id: Optional[str] = None  # 2026-10-12 中华: 注册时也把匿名数据并进来
 
 class PasswordLoginRequest(BaseModel):
     """账号密码登录"""
     account: str
     password: str
+    anonymous_user_id: Optional[str] = None  # 2026-10-12 中华: 四种登录统一, 匿名数据归并
 
 class ForgotPasswordRequest(BaseModel):
     """忘记密码"""
@@ -529,6 +531,18 @@ async def do_checkin(request: CheckinRequest):
         cursor.execute('INSERT INTO checkin_records (user_id, last_date, total_points, streak) VALUES (?, ?, ?, ?)',
                        (request.user_id, today, total_points, streak))
 
+    conn.commit()
+
+    # 2026-10-12 小蕊加: 签到积分同步到 users.points, 让"我的数据"统一展示
+    try:
+        cursor.execute('SELECT 1 FROM users WHERE user_id = ?', (request.user_id,))
+        if cursor.fetchone():
+            cursor.execute('UPDATE users SET points = ? WHERE user_id = ?', (total_points, request.user_id))
+        else:
+            cursor.execute('INSERT INTO users (user_id, points, is_anonymous, created_at, last_active) VALUES (?, ?, 1, ?, ?)',
+                           (request.user_id, total_points, now.isoformat(), now.isoformat()))
+    except sqlite3.Error:
+        pass
     conn.commit()
     conn.close()
 
@@ -1133,6 +1147,21 @@ async def user_profile_update(request: UserProfileUpdateRequest):
 
 # ========== 统一认证 API（全球手机号 + 邮箱 + 微信） ==========
 
+
+def _merge_anon_to_user(user_id, anon_id):
+    """2026-10-12 小蕊加: 四种登录统一——匿名 user_id 下的体质/聊天/搜索/签到/收藏 迁到正式账号"""
+    if not anon_id or anon_id == user_id:
+        return
+    if anon_id.startswith('u_'):
+        return  # 已是正式账号, 不合并
+    from services.user_system import _conn, _merge_anonymous
+    conn = _conn()
+    try:
+        _merge_anonymous(conn, anon_id, user_id)
+        conn.commit()
+    finally:
+        conn.close()
+
 @app.get("/api/auth/status")
 async def auth_status():
     """查询各登录方式的配置状态"""
@@ -1194,9 +1223,12 @@ async def auth_register(request: RegisterRequest):
 
 @app.post("/api/auth/login/password")
 async def auth_login_password(request: PasswordLoginRequest):
-    """账号密码登录"""
+    """账号密码登录 (2026-10-12 中华: 加匿名合并, 四账户统一)"""
     from services.user_system import login_with_password
-    return login_with_password(request.account, request.password)
+    result = login_with_password(request.account, request.password)
+    if result.get("success"):
+        _merge_anon_to_user(result["user"]["user_id"], request.anonymous_user_id)
+    return result
 
 @app.get("/api/auth/check-account")
 async def auth_check_account(account: str):
@@ -1294,24 +1326,49 @@ async def wechat_message_receive():
 
 @app.get("/wechat-callback")
 async def wechat_oauth_callback(code: str = None, state: str = None):
-    """微信服务号OAuth2.0回调"""
+    """微信服务号OAuth2.0回调
+    2026-10-12 小蕊修(中华要求: 登录后跳回个人中心页, 不跳首页; 四账户统一):
+    - 匿名合并: 原 wechat_web_login(code) 没传 anonymous_user_id, 匿名数据永远不合并。
+      现前端 wechatLogin() 把 localStorage 的 som_user_id 以 anon=<uid> 拼进 state,
+      回调拆出来传给后端, 一次性完成匿名数据归并(tizhi/聊天/搜索/签到/收藏)。
+    - 登录成功/失败都跳 '/?tab=profile' (个人中心), 不再跳首页 '/'
+    """
     if not code:
-        return HTMLResponse("<script>window.location.href='/';alert('微信授权失败');</script>")
-    
+        return HTMLResponse("<html><body><script>window.location.href='/profile';</script></body></html>")
+
     from services import auth_service
-    result = auth_service.wechat_web_login(code)
-    
+    # state 形如 som_wechat_login:anon=user_123_xxx
+    anon_id = None
+    if state:
+        for kv in state.split(':'):
+            if kv.startswith('anon='):
+                anon_id = kv[5:].strip() or None
+    result = auth_service.wechat_web_login(code, anonymous_user_id=anon_id)
+
     if result.get('success'):
-        response = HTMLResponse(f"""
-            <script>
-                localStorage.setItem('som_auth_token', '{result['token']}');
-                localStorage.setItem('som_auth_user', JSON.stringify({json.dumps(result['user'])}));
-                window.location.href='/';
-            </script>
-        """)
-        return response
+        user_id = result['user']['user_id']
+        token = str(result.get('token') or '').replace("'", '')
+        user_json = json.dumps(result['user'], ensure_ascii=False)
+        script = (
+            "<html><body><script>"
+            "localStorage.setItem('som_auth_token', '" + token + "');"
+            "localStorage.setItem('som_auth_user', " + user_json + ");"
+            "var prevUid = localStorage.getItem('som_user_id');"
+            "localStorage.setItem('som_user_id', '" + user_id + "');"
+            "if (prevUid && prevUid !== '" + user_id + "' && !/^u_/.test(prevUid)) {"
+            "fetch('/api/auth/bind-anon', {method:'POST', headers:{'Content-Type':'application/json'}, "
+            "body: JSON.stringify({user_id: '" + user_id + "', anonymous_user_id: prevUid})}).catch(function(){});"
+            "}"
+            "window.location.href='/profile';"
+            "</script></body></html>"
+        )
+        return HTMLResponse(script)
     else:
-        return HTMLResponse(f"<script>window.location.href='/';alert('{result.get('error', '登录失败')}');</script>")
+        err = str(result.get('error') or '登录失败').replace("'", '')
+        return HTMLResponse(
+            "<html><body><script>alert('微信登录: " + err + "');"
+            "window.location.href='/profile';</script></body></html>"
+        )
 
 @app.post("/api/wechat/menu")
 async def wechat_menu_create():
@@ -1421,14 +1478,25 @@ async def wechat_menu_get():
     except Exception as e:
         return {"success": False, "error": f"获取菜单异常: {str(e)}"}
 
-@app.post("/api/auth/wechat-login")
-async def auth_wechat_login():
-    """微信服务号登录（二维码扫描方式）"""
-    return {
-        "success": True,
-        "message": "请使用账号密码登录",
-        "login_methods": ["password", "email"]
-    }
+
+@app.post("/api/auth/bind-anon")
+async def auth_bind_anon(request: dict):
+    """2026-10-12 小蕊加(中华要求: 四统一): 匿名 user_id 数据合并到正式账号
+    body: { user_id: 正式账号u_xxx, anonymous_user_id: 旧匿名 user_xxx }
+    幂等: 多次调用安全。不要求登录态(回调页里调用时 token 刚写入, 直接按 user_id 操作)。
+    """
+    from services import user_system
+    user_id = request.get("user_id")
+    anon_id = request.get("anonymous_user_id")
+    if not user_id or not anon_id or user_id == anon_id:
+        return {"success": True, "message": "无需合并"}
+    conn = user_system._conn()
+    try:
+        # 校验两边用户都存在(正式账号必须存在; 匿名可能没注册过, 也允许合并) — 直接合并不报错
+        user_system._merge_anonymous(conn, anon_id, user_id)
+    finally:
+        conn.close()
+    return {"success": True, "message": f"匿名数据已合并到 {user_id}"}
 
 @app.post("/api/auth/bind-phone")
 async def auth_bind_phone(request: BindPhoneRequest):

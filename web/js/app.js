@@ -1418,10 +1418,13 @@ async function doPasswordLogin() {
     if (!password) { showLoginError('请输入密码'); return; }
     
     try {
+        // 2026-10-12 中华: 四账户统一, 把匿名uid带过去, 后端合并匿名数据
+        let anonUid = '';
+        try { anonUid = localStorage.getItem('som_user_id') || ''; } catch(e) {}
         const resp = await fetch(`${API_BASE}/api/auth/login/password`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ account, password })
+            body: JSON.stringify({ account, password, anonymous_user_id: anonUid })
         });
         const data = await resp.json();
         if (data.success) {
@@ -1620,18 +1623,22 @@ async function sendForgotPassword() {
 // 微信服务号登录
 function wechatLogin() {
     // 微信服务号OAuth2.0授权 (2026-10-12 小蕊接通: 原为 YOUR_APPID 占位符, 导致服务号登录一直失败)
-    // appId 与后端 auth_config.json 的 wechat.appid 一致 (服务号 som.top)
+    // 2026-10-12 中华升级(服务号域名备案通过, 现在OAuth可直接通):
+    // - state 里带 anon=<当前匿名uid>, 回调时后端一次性合并匿名数据(四账户统一)
+    // - 授权成功后回调跳 '/?tab=profile'(个人中心), 不再跳首页
     var redirectUrl = encodeURIComponent(window.location.origin + '/wechat-callback');
     var appId = 'wx82287ef5c8de2fd2';
-    var state = 'som_wechat_login';
+    var anonUid = '';
+    try { anonUid = localStorage.getItem('som_user_id') || ''; } catch(e) {}
+    var state = 'som_wechat_login' + (anonUid ? ':anon=' + encodeURIComponent(anonUid) : '');
     
-    // 跳转到微信授权页
+    // 跳转到微信授权页 (snsapi_userinfo 拿昵称头像; 服务号域名已备案, 授权页可直接显示)
     var authUrl = 'https://open.weixin.qq.com/connect/oauth2/authorize' +
         '?appid=' + appId +
         '&redirect_uri=' + redirectUrl +
         '&response_type=code' +
         '&scope=snsapi_userinfo' +
-        '&state=' + state +
+        '&state=' + encodeURIComponent(state) +
         '#wechat_redirect';
     
     window.location.href = authUrl;
@@ -1819,14 +1826,8 @@ async function doEditProfile() {
 
 // ========== 2026-10-12 小蕊加: 每日签到(中华要求: 让用户能签到) ==========
 async function doCheckin() {
-    var userId = getUserId();
-    var token = localStorage.getItem('som_auth_token');
+    var userId = getUserId();  // 匿名uid也行, 后端 checkin_records 按 user_id 存
     var btn = document.getElementById('checkin-btn');
-    if (!token) {
-        alert('请先登录后再签到');
-        if (btn) { btn.disabled = false; btn.textContent = '立即签到'; }
-        return;
-    }
     if (btn) { btn.disabled = true; btn.textContent = '签到中…'; }
     try {
         var resp = await fetch(`${API_BASE}/api/checkin/do`, {
@@ -1883,7 +1884,7 @@ async function loadCheckinStatus() {
 // 显示签到区 + 初始化
 function showCheckinSection() {
     var section = document.getElementById('checkin-section');
-    if (section && isLoggedIn()) section.style.display = 'block';
+    if (section) section.style.display = 'block';  // 2026-10-12 中华要求: 签到对所有用户开放, 不只登录用户
 }
 
 // 页面加载/登录成功后调用

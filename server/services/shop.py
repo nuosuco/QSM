@@ -394,12 +394,15 @@ class ShopService:
                 rid = r.get('item_id', '')
                 if rid not in seen_ids and not self._is_excluded(r, context=category):
                     seen_ids.add(rid)
+                    click_url = r.get('click_url') or r.get('url') or ''
+                    app_url = click_url.replace('https://', 'taobao://', 1) if click_url else ''
                     items.append({
                         'item_id': rid,
                         'title': r.get('title', ''),
                         'price': r.get('price', ''),
                         'image': r.get('main_image', '') or r.get('images', '').strip('[]"') if isinstance(r.get('images'), str) else (r.get('images') or [])[0] if isinstance(r.get('images'), list) else '',
-                        'url': r.get('click_url', ''),
+                        'url': click_url,
+                        'app_url': app_url,
                         'platform': r.get('platform', 'taobao'),
                         'commission_rate': r.get('commission_rate', ''),
                         'shop_name': r.get('shop_name', ''),

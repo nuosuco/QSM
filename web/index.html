@@ -242,14 +242,41 @@
                     </div>
                     <!-- 用户信息卡片（登录后显示） -->
                     <div class="profile-card" id="profile-card" style="display:none;">
-                        <div class="profile-avatar">松</div>
+                        <div class="profile-avatar" id="profile-avatar">松</div>
                         <div class="profile-info">
                             <h3 id="profile-name">养生用户</h3>
                             <p id="profile-tizhi">体质：未检测</p>
                             <p id="profile-points">积分：0</p>
                             <p id="profile-checkin">签到：今天未签到</p>
+                            <div class="profile-edit-row">
+                                <button class="binding-btn" onclick="showEditProfileModal()">✏️ 修改头像/昵称</button>
+                            </div>
                         </div>
                         <button class="logout-btn" onclick="doLogout()">退出</button>
+                    </div>
+                    <!-- 编辑资料弹窗(头像/昵称, 2026-10-12 中华要求: 头像与用户名都可以自己修改) -->
+                    <div class="modal" id="edit-profile-modal" style="display:none;">
+                        <div class="modal-content" style="width:300px;">
+                            <button class="close-btn" onclick="hideEditProfileModal()">✕</button>
+                            <h3>修改头像 / 昵称</h3>
+                            <p style="font-size:13px;color:#888;margin-top:4px;">修改后所有登录方式共用同一份</p>
+                            <div style="margin:14px 0;">
+                                <input type="text" id="edit-avatar-url" placeholder="头像图片URL(可留空)" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px;font-size:13px;">
+                            </div>
+                            <div style="margin:14px 0;">
+                                <input type="text" id="edit-nickname" placeholder="昵称" maxlength="20" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;">
+                            </div>
+                            <button class="login-btn" onclick="doEditProfile()" style="width:100%;">保存</button>
+                        </div>
+                    </div>
+                    <!-- 2026-10-12 小蕊加(中华要求): 签到入口按钮, 登录后显示 -->
+                    <div class="profile-section checkin-section" id="checkin-section" style="display:none;">
+                        <h3>📅 每日签到</h3>
+                        <div class="checkin-row">
+                            <button class="checkin-btn" id="checkin-btn" onclick="doCheckin()">立即签到</button>
+                            <span class="checkin-streak" id="checkin-streak">连续 0 天</span>
+                        </div>
+                        <p class="checkin-tip">每天签到领积分，连续签到不中断哦</p>
                     </div>
                     <div class="profile-section">
                         <h3>🔐 账号绑定</h3>
@@ -272,7 +299,7 @@
                         </div>
                     </div>
                     <div class="profile-section">
-                        <h3>📋 我的体质记录</h3>
+                        <h3>📋 我的体质记录 <small class="sync-hint">（已云端统一保存）</small></h3>
                         <div class="profile-history" id="profile-history">
                             <p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>
                         </div>

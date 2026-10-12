@@ -2337,3 +2337,40 @@ body {
 .binding-btn:hover {
     background: var(--secondary-color);
 }
+
+/* 2026-10-12 小蕊加: 签到区 + 资料编辑行 */
+.checkin-section .checkin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.checkin-section .checkin-btn {
+  background: linear-gradient(135deg, #4a9d6e, #3d8b60);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(74,157,110,0.3);
+}
+.checkin-section .checkin-btn:disabled {
+  background: #cfd8d4;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.checkin-section .checkin-streak {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+.checkin-section .checkin-tip {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+.profile-edit-row {
+  margin-top: 8px;
+}

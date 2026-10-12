@@ -1,0 +1,32 @@
+{
+  "sms": {
+    "enabled": false,
+    "provider": "aliyun",
+    "access_key_id": "",
+    "access_key_secret": "",
+    "sign_name": "",
+    "template_code": "",
+    "intl_sign_name": "国际短信签名（可选，没有就留空用国内的）",
+    "intl_template_code": "国际短信模板ID（可选）",
+    "region": "cn-hangzhou"
+  },
+  "email": {
+    "enabled": false,
+    "smtp_host": "",
+    "smtp_port": 465,
+    "smtp_user": "",
+    "smtp_pass": "",
+    "from_name": "SOM松麦",
+    "use_ssl": true
+  },
+  "wechat": {
+    "enabled": true,
+    "appid": "wx82287ef5c8de2fd2",
+    "secret": "3c8343ba522c80c76d88fe47088f9631",
+    "redirect_uri": "https://som.top/wechat-callback"
+  },
+  "code_length": 6,
+  "code_expire_minutes": 5,
+  "code_cooldown_seconds": 60,
+  "max_attempts_per_hour": 10
+}

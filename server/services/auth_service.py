@@ -355,9 +355,12 @@ def wechat_login(code: str, anonymous_user_id: str = None) -> dict:
         return {"success": False, "error": f"微信接口异常: {str(e)[:100]}"}
 
 
-def wechat_web_login(code: str) -> dict:
+def wechat_web_login(code: str, anonymous_user_id: str = None) -> dict:
     """
     微信服务号OAuth2.0网页授权：code → 换access_token → 换openid → 登录/注册
+    2026-10-12 小蕊修: 原来函数体里 conn.close() 后还在用 conn 生成 token (永远返回 None),
+    且存在匿名合并 + 死代码。重写为: 先查/建用户 → 合并匿名 → 生成 token → 最后 close。
+    同时把微信头像/昵称拉下来存库, 登录后默认显示微信的, 但用户可在前端自行修改。
     """
     import requests as http_requests
 
@@ -384,29 +387,27 @@ def wechat_web_login(code: str) -> dict:
             return {"success": False, "error": f"微信授权失败: {data.get('errmsg', '未知错误')}"}
         openid = data["openid"]
         access_token = data.get("access_token")
-        refresh_token = data.get("refresh_token")
     except Exception as e:
         return {"success": False, "error": f"微信接口异常: {str(e)[:100]}"}
 
-    # 获取用户信息（可选，需要snsapi_userinfo权限）
-    nickname = "微信用户"
-    try:
-        user_resp = http_requests.get(
-            "https://api.weixin.qq.com/sns/userinfo",
-            params={
-                "access_token": access_token,
-                "openid": openid,
-                "lang": "zh_CN",
-            },
-            timeout=10,
-        )
-        user_data = user_resp.json()
-        if "nickname" in user_data:
-            nickname = user_data["nickname"]
-    except Exception:
-        pass
+    # 拉取微信侧资料: 昵称 + 头像 (snsapi_base 只有 openid; 头像昵称需要 snsapi_userinfo
+    # 或用户在授权页点"允许"。这里尽力而为, 失败就用默认值, 不影响登录)
+    wx_nickname = None
+    wx_avatar = None
+    if access_token:
+        try:
+            user_resp = http_requests.get(
+                "https://api.weixin.qq.com/sns/userinfo",
+                params={"access_token": access_token, "openid": openid, "lang": "zh_CN"},
+                timeout=10,
+            )
+            user_data = user_resp.json()
+            if "nickname" in user_data:
+                wx_nickname = user_data["nickname"]
+                wx_avatar = user_data.get("headimgurl")
+        except Exception:
+            pass
 
-    # 查找/创建用户
     from services import user_system
     conn = user_system._conn()
     now = user_system._now_beijing().isoformat()
@@ -415,46 +416,31 @@ def wechat_web_login(code: str) -> dict:
 
     if row:
         user_id = row["user_id"]
-        conn.execute("UPDATE users SET is_anonymous = 0, last_active = ? WHERE user_id = ?", (now, user_id))
+        updates = ["is_anonymous = 0", "last_active = ?"]
+        vals = [now]
+        # 微信侧昵称/头像: 用户没自己改过就跟随微信; 改过则尊重用户设置
+        if wx_nickname and not row["nickname"]:
+            updates.append("nickname = ?"); vals.append(wx_nickname)
+        elif wx_nickname:
+            # 已登录过的用户, 昵称保持用户自己改过的, 不覆盖
+            pass
+        if wx_avatar and not row["avatar"]:
+            updates.append("avatar = ?"); vals.append(wx_avatar)
+        vals.append(user_id)
+        conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE user_id = ?", vals)
     else:
         user_id = "u_" + secrets.token_hex(12)
+        nickname = wx_nickname or "微信用户"
+        avatar = wx_avatar
         conn.execute(
-            "INSERT INTO users (user_id, wechat_openid, nickname, is_anonymous, created_at, last_active) VALUES (?, ?, ?, 0, ?, ?)",
-            (user_id, openid, nickname, now, now),
-        )
-
-    conn.commit()
-    conn.close()
-
-    token = user_system._issue_token(conn, user_id) if conn else None
-    user = dict(conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()) if conn else None
-    
-    if user:
-        user.pop("phone", None)
-        user.pop("email", None)
-        user.pop("wechat_openid", None)
-
-    return {"success": True, "user": user, "token": token}
-
-    # 这个代码永远不会执行，因为上面已经return了
-
-    conn = user_system._conn()
-    now = user_system._now_beijing().isoformat()
-
-    row = conn.execute("SELECT * FROM users WHERE wechat_openid = ?", (openid,)).fetchone()
-
-    if row:
-        user_id = row["user_id"]
-        conn.execute("UPDATE users SET is_anonymous = 0, last_active = ? WHERE user_id = ?", (now, user_id))
-    else:
-        user_id = "u_" + secrets.token_hex(12)
-        conn.execute(
-            "INSERT INTO users (user_id, wechat_openid, nickname, is_anonymous, created_at, last_active) VALUES (?, ?, ?, 0, ?, ?)",
-            (user_id, openid, "微信用户", now, now),
+            "INSERT INTO users (user_id, wechat_openid, nickname, avatar, is_anonymous, created_at, last_active) VALUES (?, ?, ?, ?, 0, ?, ?)",
+            (user_id, openid, nickname, avatar, now, now),
         )
 
     conn.commit()
 
+    # 2026-10-12 中华要求: 微信/账密/邮箱/匿名 四统一
+    # 把浏览器里旧的匿名 user_id 数据(体质记录/对话/搜索/收藏/签到)迁到统一账号
     if anonymous_user_id and anonymous_user_id != user_id:
         user_system._merge_anonymous(conn, anonymous_user_id, user_id)
 
@@ -465,8 +451,9 @@ def wechat_web_login(code: str) -> dict:
     user.pop("phone", None)
     user.pop("email", None)
     user.pop("wechat_openid", None)
+    user.pop("password_hash", None)
 
-    return {"success": True, "user": user, "token": token}
+    return {"success": True, "user": user, "token": token, "wx_nickname": wx_nickname, "wx_avatar": wx_avatar}
 
 
 def bind_phone_to_wechat(user_id: str, phone: str) -> dict:

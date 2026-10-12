@@ -254,10 +254,20 @@ def verify_token(token: str):
 
 def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
                      symptoms: str = None, advice: str = None, source: str = "chat") -> dict:
+    """存体质记录。
+    2026-10-12 中华要求: 用户中心数据是健康大数据, 要压缩到最小存储——
+    只留关键字段, symptoms/advice 截断存摘要, 不存整段原文。
+    """
+    def _clip(s, n):
+        if not s: return s
+        s = s.replace('\n', ' ')
+        return s[:n] if len(s) > n else s
+    symptoms_c = _clip(symptoms, 500)
+    advice_c = _clip(advice, 500)
     conn = _conn()
     cur = conn.execute(
         "INSERT INTO tizhi_records (user_id, tizhi, zhengxing, symptoms, advice, source) VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, tizhi, zhengxing, symptoms, advice, source),
+        (user_id, tizhi, zhengxing, symptoms_c, advice_c, source),
     )
     rid = cur.lastrowid
     conn.commit()
