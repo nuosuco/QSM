@@ -26,6 +26,23 @@ document.addEventListener('DOMContentLoaded', () => {
     loadYaoshiList();
 });
 
+// 2026-10-12 小蕊修(中华反馈"乱码还在"): 浏览器 localStorage 里残留的历史脏 som_auth_user
+// (旧版回调页无 charset, 中文昵称被写坏), 页面加载时检测到乱码就修好回写, 一次清干净。
+(function _cleanAuthUserMojibake() {
+    try {
+        var raw = localStorage.getItem('som_auth_user');
+        if (!raw) return;
+        var u = JSON.parse(raw);
+        if (!u || !u.nickname || typeof u.nickname !== 'string') return;
+        if (!/[\u00c0-\u00ff]/.test(u.nickname)) return;  // 正常中文不动
+        var fixed = _fixMojibake(u.nickname);
+        if (fixed !== u.nickname) {
+            u.nickname = fixed;
+            localStorage.setItem('som_auth_user', JSON.stringify(u));
+        }
+    } catch(e) {}
+})();
+
 // ========== 导航切换 ==========
 
 function switchTab(targetTab) {
@@ -1533,14 +1550,34 @@ async function loadUserAccount() {
 }
 
 // 2026-10-12 小蕊加: 头像/昵称 显示(微信登录默认取微信侧, 用户改过的优先)
+// 2026-10-12 小蕊修(中华反馈): 微信昵称乱码兜底
+// 现象: 微信 sns/userinfo 返回的 UTF-8 昵称被按 latin-1 逐字节解出后存进库
+//       (例 "用音乐说世界" -> "ç\x94\x8é\x9f\xb..."), 或历史脏数据。
+// 修法: 仅当原文确实含 latin-1 扩展区字符(ç è é 等 U+00C0-U+00FF)才尝试
+//       unescape(encodeURIComponent(s)) 还原; 还原结果须全为 CJK/常规字符才采用,
+//       避免把正常中文二次"修复"成乱码。
+function _fixMojibake(s) {
+    if (!s || typeof s !== 'string') return s;
+    var hasLatinExt = /[\u00c0-\u00ff]/.test(s);
+    if (!hasLatinExt) return s;  // 正常中文/英文, 不动
+    try {
+        var fixed = unescape(encodeURIComponent(s));
+        // 修好后应基本全是 CJK / 常规可读字符; 若仍混入 latin-1 伪字符则失败
+        var stillBroken = /[\u00c0-\u00ff]/.test(fixed);
+        if (stillBroken) return s;
+        return fixed;
+    } catch(e) { return s; }
+}
 function refreshProfileAvatarName(user) {
     const avatarEl = document.getElementById('profile-avatar');
     const nameEl = document.getElementById('profile-name');
     if (!user) return;
-    if (nameEl && user.nickname) nameEl.textContent = user.nickname;
+    var nick = _fixMojibake(user.nickname || '');
+    if (nameEl) nameEl.textContent = nick || '养生用户';
     if (avatarEl) {
         if (user.avatar) {
-            avatarEl.innerHTML = '<img src="' + user.avatar + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" alt="头像">';
+            // 2026-10-12 小蕊修(中华反馈): 微信头像没变圆 - img 的 border-radius 写死 8px 覆盖了容器的圆形
+            avatarEl.innerHTML = '<img src="' + user.avatar + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="头像">';
         } else {
             avatarEl.textContent = '松';
         }
@@ -1783,10 +1820,19 @@ function doLogout() {
 function showEditProfileModal() {
     var modal = document.getElementById('edit-profile-modal');
     if (!modal) { alert('请刷新页面后再试'); return; }
+    _editAvatarDataUrl = null;
+    var fileInput = document.getElementById('edit-avatar-file');
+    if (fileInput) fileInput.value = '';
     try {
         var user = JSON.parse(localStorage.getItem('som_auth_user') || '{}');
+        var nick = _fixMojibake(user.nickname || '');
         document.getElementById('edit-avatar-url').value = user.avatar || '';
-        document.getElementById('edit-nickname').value = user.nickname || '';
+        document.getElementById('edit-nickname').value = nick || '';
+        var prev = document.getElementById('edit-avatar-preview');
+        if (prev) {
+            if (user.avatar) { prev.src = user.avatar; prev.style.display = 'block'; }
+            else { prev.style.display = 'none'; }
+        }
     } catch(e) {}
     modal.style.display = 'flex';
 }
@@ -1794,12 +1840,41 @@ function hideEditProfileModal() {
     var m = document.getElementById('edit-profile-modal');
     if (m) m.style.display = 'none';
 }
+// 2026-10-12 小蕊加(中华要求): 头像支持点击上传本地图片(转128x128 JPEG dataURL存库, 压缩到最小), 不依赖外链
+var _editAvatarDataUrl = null;
+function onEditAvatarFile(input) {
+    var f = input.files && input.files[0];
+    if (!f) return;
+    if (f.size > 8*1024*1024) { alert('图片太大, 请选 8MB 以内的'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+            var canvas = document.createElement('canvas');
+            var size = 128;
+            canvas.width = size; canvas.height = size;
+            var ctx = canvas.getContext('2d');
+            var min = Math.min(img.width, img.height);
+            var sx = (img.width - min)/2, sy = (img.height - min)/2;
+            ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+            _editAvatarDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            var prev = document.getElementById('edit-avatar-preview');
+            if (prev) { prev.src = _editAvatarDataUrl; prev.style.display = 'block'; }
+            var urlInput = document.getElementById('edit-avatar-url');
+            if (urlInput) urlInput.placeholder = '已选图片(128x128), 保存时优先用它';
+            showToast('图片已选, 点保存生效');
+        };
+        img.onerror = function() { alert('图片读取失败, 换个图试试'); };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(f);
+}
 async function doEditProfile() {
     var userId = getUserId();
     var token = localStorage.getItem('som_auth_token');
     if (!token) { alert('请先登录'); return; }
     var nickname = document.getElementById('edit-nickname').value.trim() || undefined;
-    var avatar = document.getElementById('edit-avatar-url').value.trim() || '';
+    var avatar = _editAvatarDataUrl || document.getElementById('edit-avatar-url').value.trim() || '';
     try {
         var resp = await fetch(`${API_BASE}/api/user/profile/update`, {
             method: 'POST',

@@ -20,6 +20,21 @@ from email.mime.text import MIMEText
 
 AUTH_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "auth_config.json")
 
+def _fix_mojibake(s: str) -> str:
+    """
+    2026-10-12 小蕊修(中华反馈): 微信昵称/头像入库前的乱码修复。
+    现象: UTF-8 字节被按 latin-1 逐字节解出 (例 '用音乐说世界' -> 'ç¨é³...')。
+    修复: s.encode('latin-1').decode('utf-8') 还原; 失败或结果仍含高字节伪字符则原样返回。"""
+    if not s:
+        return s
+    try:
+        fixed = s.encode('latin-1').decode('utf-8')
+        # 修好后不应再含 latin-1 扩展区常见伪字符
+        return fixed
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return s
+
+
 def _load_auth_config() -> dict:
     """加载认证配置（阿里云SMS、SMTP邮箱、微信小程序）"""
     defaults = {
@@ -403,7 +418,7 @@ def wechat_web_login(code: str, anonymous_user_id: str = None) -> dict:
             )
             user_data = user_resp.json()
             if "nickname" in user_data:
-                wx_nickname = user_data["nickname"]
+                wx_nickname = _fix_mojibake(user_data["nickname"])
                 wx_avatar = user_data.get("headimgurl")
         except Exception:
             pass

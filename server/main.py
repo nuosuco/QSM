@@ -1348,11 +1348,12 @@ async def wechat_oauth_callback(code: str = None, state: str = None):
     if result.get('success'):
         user_id = result['user']['user_id']
         token = str(result.get('token') or '').replace("'", '')
-        user_json = json.dumps(result['user'], ensure_ascii=False)
+        user_json = json.dumps(result['user'], ensure_ascii=True)  # 2026-10-12 小蕊: \uXXXX 转义, 不依赖 charset
         script = (
-            "<html><body><script>"
+            "<html><head><meta charset=\"utf-8\"></head><body><script>"
             "localStorage.setItem('som_auth_token', '" + token + "');"
-            "localStorage.setItem('som_auth_user', " + user_json + ");"
+            "var _u = " + json.dumps(json.loads(user_json), ensure_ascii=True) + ";"
+            "localStorage.setItem('som_auth_user', JSON.stringify(_u));"
             "var prevUid = localStorage.getItem('som_user_id');"
             "localStorage.setItem('som_user_id', '" + user_id + "');"
             "if (prevUid && prevUid !== '" + user_id + "' && !/^u_/.test(prevUid)) {"
