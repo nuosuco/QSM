@@ -1020,9 +1020,8 @@ async def chat_vision(request: VisionChatRequest):
             "reply": "抱歉，我暂时无法分析这些图片。请确保图片清晰、光线充足，或者直接用文字描述你的身体状况，我一样可以帮你分析。"
         }
 
-    # 2026-10-13 小蕊修(中华反馈: 拍照辨证后个人中心体质不出来的根因):
-    # 老代码写 chat_history 时 tizhi/zhengxing 恒为空串, 且从不写 tizhi_records,
-    # 体质全靠前端从回复里正则抓(老版浏览器缓存/抓不到短语就丢)。改成服务端统一提取+存档:
+    # 2026-10-13 小蕊修(中华反馈: 展开时应显示完整内容): advice 也存(截断800字), 展开块 = 症状/表现 + 完整分析/调理建议
+    # 体质+证型仍从服务端提取; 展开内容优先存完整回复, 让"展开"名副其实
     extracted_tizhi, extracted_zhengxing = _extract_tizhi_from_vision_reply(result["content"])
 
     # 保存对话记录
@@ -1045,13 +1044,16 @@ async def chat_vision(request: VisionChatRequest):
         pass
 
     # 体质写入 tizhi_records(个人中心数据源), 同 session 覆盖旧记录(与前端 saveTizhiToBackend 同语义)
+    # 2026-10-13 中华要求: 症状/建议也要全, 展开时能看完整内容(之前只存80字 symptoms, advice=None, 展开几乎空白)
     if extracted_tizhi:
         try:
             from services.user_system import add_tizhi_record
-            add_tizhi_record(
+            advice_full = result["content"][:2000]
+            rec = add_tizhi_record(
                 request.user_id or 'anonymous', extracted_tizhi,
                 zhengxing=extracted_zhengxing,
                 symptoms=(request.message or '')[:80],
+                advice=advice_full,
                 source='vision_chat',
                 session_id=request.session_id or 'vision',
             )
