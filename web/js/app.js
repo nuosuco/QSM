@@ -249,7 +249,7 @@ async function checkFaceMatch(firstImageDataUrl) {
 function confirmOwnerBeforeCapture() {
     const sid = getSessionId();
     if (_ownerConfirmedSession === sid) return true;  // 本 session 已确认过
-    const ok = confirm('请确认：现在拍照的是本人（当前微信账户主人）\n\n一人一户，档案只记录在你自己的健康数据里。\n如果不是本人，请让对方用自己的微信登录。\n\n点【确定】= 是本人，继续分析；点【取消】= 不是本人，不分析。');
+    const ok = confirm('请确认：现在拍照的是本人（当前账户主人）\n\n一人一户，档案只记录在你自己的健康数据里。\n如果不是本人，请让对方用自己的账户登录。\n\n点【确定】= 是本人，继续分析；点【取消】= 不是本人，不分析。');
     if (ok) {
         _ownerConfirmedSession = sid;
         showToast('已确认本人拍摄 📷');
@@ -259,7 +259,8 @@ function confirmOwnerBeforeCapture() {
     return ok;
 }
 
-// 选图后统一入口: 先过本人确认, 再真正处理图片
+// 选图后统一入口: 先过本人确认, 再真正处理图片; 本 session 首次拍时顺带跑人脸量化(方案B)
+let _faceCheckedSession = null;  // 2026-10-13 小蕊: 本 session 是否已跑过人脸比对(连拍不重复跑)
 function handleImageSelectWithConfirm(e) {
     if (!confirmOwnerBeforeCapture()) {
         // 用户取消: 清空 input, 不加入 pendingImages
@@ -267,6 +268,33 @@ function handleImageSelectWithConfirm(e) {
         return;
     }
     handleImageSelect(e);
+    runFaceCheckOncePerSession(e);
+}
+
+// 方案B: 本 session 首次拍照时, 拿第一张图存/比当前用户人脸向量(不阻断分析, 只提示)
+async function runFaceCheckOncePerSession(e) {
+    const sid = getSessionId();
+    if (_faceCheckedSession === sid) return;  // 连拍不重复
+    _faceCheckedSession = sid;
+    const userId = getUserId();
+    if (!userId || pendingImages.length === 0) return;
+    const firstImg = pendingImages[0];
+    try {
+        const resp = await fetch(`${API_BASE}/api/face/ensure`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, image: firstImg, remember: true })
+        });
+        const data = await resp.json();
+        const chk = (data && data.check) || {};
+        if (chk.matched && chk.best_user_id && chk.best_user_id !== userId) {
+            showToast('⚠️ 这张脸更像已建档的另一个账户, 请确认是本人拍摄', 'warn');
+        } else if (chk.no_record || chk.matched) {
+            // 首次存档或本人命中, 静默存好向量
+        }
+    } catch (err) {
+        // 人脸比对失败不阻断舌苔分析
+    }
 }
 
 function handleImageSelect(e) {

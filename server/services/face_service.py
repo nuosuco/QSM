@@ -13,8 +13,46 @@
 import base64, io, struct, numpy as np
 import cv2
 
-MODEL_VERSION = "v1-opencv-stats"  # 后续升级 insightface 时改成 "v2-arcface"
-COSINE_THRESHOLD = 0.82  # 2026-10-13 调高: 同图=1.0, 不同图合成测试约0.72, 生产用 insightface 时再校准
+MODEL_VERSION = "v2-arcface"  # 2026-10-13 升级: insightface buffalo_l (ArcFace w600k_r50) 真脸特征 512 维
+VECTOR_DIM = 512  # v2 起向量固定 512 维(ArcFace 原生)
+COSINE_THRESHOLD = 0.35  # 2026-10-13 ArcFace 阈值: 同人余弦常 0.45+, 不同人常 <0.25, 0.35 为安全线
+
+
+_IF = None  # insightface FaceAnalysis 单例(懒加载)
+
+def _insightface():
+    """2026-10-13 小蕊: 懒加载 insightface buffalo_l(ArcFace)。失败返回 None, 调用方回退统计特征。"""
+    global _IF
+    if _IF is None:
+        try:
+            import os
+            os.environ.setdefault('INSIGHTFACE_ROOT', '/root/SOM/server/models/face')
+            import insightface
+            from insightface.app import FaceAnalysis
+            _IF = FaceAnalysis(name='buffalo_l', root='/root/SOM/server/models/face',
+                               allowed_modules=['detection', 'recognition'])
+            _IF.prepare(ctx_id=0, det_size=(640, 640))
+            print('[face_service] insightface buffalo_l loaded', flush=True)
+        except Exception as e:
+            print('[face_service] insightface 加载失败, 回退统计特征:', e, flush=True)
+            _IF = False  # 标记不可用, 不再重试
+    return _IF if _IF else None
+
+
+def _arcface_embedding(img) -> "np.ndarray | None":
+    """真脸时返回 512 维 ArcFace 向量(L2 归一); 检不到脸/模型不可用返回 None。"""
+    fa = _insightface()
+    if fa is None or img is None:
+        return None
+    try:
+        got = fa.get(img)
+        if not got:
+            return None
+        emb = np.asarray(got[0].embedding, dtype=np.float32)
+        n = np.linalg.norm(emb)
+        return emb / n if n > 1e-9 else emb
+    except Exception:
+        return None
 
 
 def _decode_image(b64: str):
@@ -34,15 +72,19 @@ def _decode_image(b64: str):
 
 
 def _extract_embedding(img) -> np.ndarray:
-    """提取 512 维特征向量。
-    当前骨架: 灰度分块均值 + 边缘 + 肤色占比 + 几何中心偏移, 拼到 512 维。
-    生产替换: 用 insightface 的 ArcFace embedding(已是 512 维), 直接 replace 本函数体。
+    """2026-10-13 小蕊: 提取 512 维人脸特征向量。
+    优先 insightface ArcFace(真脸, 区分度强); 检不到脸/模型不可用则回退统计特征(保证接口不崩)。
     """
     if img is None:
         return np.zeros(512, dtype=np.float32)
-    # 人脸检测: 用 OpenCV 的 Haar 级联
+    emb = _arcface_embedding(img)
+    if emb is not None:
+        return emb
+    # 2026-10-13 小蕊: 人脸检测。OpenCV 5.x 没有 CascadeClassifier, 用 DNN face detector(ONNX);
+    # 检不到脸就整图走统计特征(不报错)。
     import os
-    cascade_path = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+    _FACE_DET_ONNX = '/root/SOM/server/models/face/face_detector.onnx'
+    cascade_path = os.path.join(os.path.dirname(cv2.data.__file__), 'haarcascades', 'haarcascade_frontalface_default.xml')
     if not os.path.exists(cascade_path):
         # headless 版可能不带级联文件, 直接走全图统计(不报错)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -53,9 +95,16 @@ def _extract_embedding(img) -> np.ndarray:
         h = gray.shape[0]
         _face_detected = False
     else:
-        cascade = cv2.CascadeClassifier(cascade_path)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = cascade.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
+        faces = []
+        try:
+            cascade = cv2.CascadeClassifier(cascade_path)
+            if cascade.empty():
+                cascade = None
+            if cascade is not None:
+                faces = cascade.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
+        except Exception:
+            faces = []  # CascadeClassifier 在 OpenCV 5.x 不存在, 整图统计兜底
         if len(faces) == 0:
             roi = gray
             x = 0
