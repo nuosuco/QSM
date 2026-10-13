@@ -274,8 +274,7 @@ function handleImageSelectWithConfirm(e) {
 // 方案B: 本 session 首次拍照时, 拿第一张图存/比当前用户人脸向量(不阻断分析, 只提示)
 async function runFaceCheckOncePerSession(e) {
     const sid = getSessionId();
-    if (_faceCheckedSession === sid) return;  // 连拍不重复
-    _faceCheckedSession = sid;
+    if (_faceCheckedSession === sid) return;  // 本 session 已成功存过, 连拍不重复
     const userId = getUserId();
     if (!userId || pendingImages.length === 0) return;
     const firstImg = pendingImages[0];
@@ -286,14 +285,18 @@ async function runFaceCheckOncePerSession(e) {
             body: JSON.stringify({ user_id: userId, image: firstImg, remember: true })
         });
         const data = await resp.json();
+        // 2026-10-13 小蕊修: 只有 ensure 真正成功(库里有记录)才锁本 session;
+        // 失败/没写库就【不锁】, 下次拍照再试 —— 避免一次静默失败后本 session 永远不再存脸
+        const ensured = (data && data.ensure && data.ensure.success === true);
         const chk = (data && data.check) || {};
         if (chk.matched && chk.best_user_id && chk.best_user_id !== userId) {
             showToast('⚠️ 这张脸更像已建档的另一个账户, 请确认是本人拍摄', 'warn');
-        } else if (chk.no_record || chk.matched) {
-            // 首次存档或本人命中, 静默存好向量
+        }
+        if (ensured) {
+            _faceCheckedSession = sid;  // 存成功才锁
         }
     } catch (err) {
-        // 人脸比对失败不阻断舌苔分析
+        // 失败不锁, 下次再试; 不阻断舌苔分析
     }
 }
 
