@@ -907,6 +907,34 @@ def _base64_to_url(data_uri: str) -> str:
     return f"https://som.top/uploads/{filename}"
 
 
+def _extract_tizhi_from_vision_reply(reply: str):
+    """2026-10-13 小蕊: 从图片辨证回复里提取体质/证型(服务端统一做, 不依赖前端JS版本)。
+    返回 (tizhi, zhengxing)。抓不到体质词就 (('', ''), 不硬塞)。"""
+    import re
+    if not reply:
+        return '', ''
+    # 1) 常见体质词(中医体质分类9型 + 辨证常见名)
+    tizhi_words = ['平和质', '气虚质', '阳虚质', '阴虚质', '痰湿质', '湿热质', '血瘀质', '特禀质', '过敏质',
+                   '脾虚湿盛质', '脾虚质', '肝郁质', '气郁质', '血瘀体质']
+    found = [t for t in tizhi_words if t in reply]
+    # 去重保持顺序, 最多3个(脾虚湿盛质含气虚/痰湿语义, 与单项去重)
+    seen, uniq = set(), []
+    for t in found:
+        key = t.replace('质', '')
+        if key not in seen:
+            seen.add(key)
+            uniq.append(t)
+    tizhi = '、'.join(uniq[:3])
+    # 2) 证型: 抓“兼有X”“X证”里的关键词
+    zhs = []
+    for m in re.finditer(r'兼有([\u4e00-\u9fa5]{2,6})|([\u4e00-\u9fa5]{2,4}证)', reply):
+        z = (m.group(1) or m.group(2) or '').strip()
+        if z and z not in zhs:
+            zhs.append(z)
+    zhengxing = '、'.join(zhs[:3])
+    return tizhi, zhengxing
+
+
 @app.post("/api/chat/vision")
 async def chat_vision(request: VisionChatRequest):
     """图片理解辨证（支持多张图片：舌苔/面色/皮肤/患处）"""
@@ -992,6 +1020,11 @@ async def chat_vision(request: VisionChatRequest):
             "reply": "抱歉，我暂时无法分析这些图片。请确保图片清晰、光线充足，或者直接用文字描述你的身体状况，我一样可以帮你分析。"
         }
 
+    # 2026-10-13 小蕊修(中华反馈: 拍照辨证后个人中心体质不出来的根因):
+    # 老代码写 chat_history 时 tizhi/zhengxing 恒为空串, 且从不写 tizhi_records,
+    # 体质全靠前端从回复里正则抓(老版浏览器缓存/抓不到短语就丢)。改成服务端统一提取+存档:
+    extracted_tizhi, extracted_zhengxing = _extract_tizhi_from_vision_reply(result["content"])
+
     # 保存对话记录
     try:
         conn = get_user_db()
@@ -1004,12 +1037,26 @@ async def chat_vision(request: VisionChatRequest):
             request.session_id or 'vision',
             f'[图片辨证x{len(image_list)}] {request.message[:200]}',
             result["content"][:2000],
-            '', '',
+            extracted_tizhi, extracted_zhengxing,
         ))
         conn.commit()
         conn.close()
     except Exception:
         pass
+
+    # 体质写入 tizhi_records(个人中心数据源), 同 session 覆盖旧记录(与前端 saveTizhiToBackend 同语义)
+    if extracted_tizhi:
+        try:
+            from services.user_system import add_tizhi_record
+            add_tizhi_record(
+                request.user_id or 'anonymous', extracted_tizhi,
+                zhengxing=extracted_zhengxing,
+                symptoms=(request.message or '')[:80],
+                source='vision_chat',
+                session_id=request.session_id or 'vision',
+            )
+        except Exception as e:
+            print(f"vision体质存档失败: {e}")
 
     # 从回复中提取食材，搜索有机商品推荐
     products = []

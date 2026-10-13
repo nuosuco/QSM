@@ -454,13 +454,13 @@ async function sendMessage() {
             }
             appendFollowUpSuggestions(hasImage);
             appendMessageActions(msgId, replyText);
-            // 2026-10-13 小蕊: 图片辨证结果从回复里提取体质, 同步保存
+            // 2026-10-13 小蕊改: 后端 /api/chat/vision 现在统一提取体质并写 tizhi_records;
+        // 前端兜底仍保留(浏览器缓存旧版时也能存), 兜底词表加全 9 型 + 辨证常见名
         var imgTizhi = '';
         var tizhiMatch = replyText.match(/(?:体质倾向|综合判断|体质|属于)[：:]\s*([\u4e00-\u9fa5、,，]+(?:质)[\u4e00-\u9fa5、,，]*)/);
         if (tizhiMatch) imgTizhi = tizhiMatch[1].split(/[、,，]/).slice(0, 3).join('、');
         if (!imgTizhi) {
-            // 兜底: 回复里出现常见体质词就抓
-            for (var ti of ['气虚质','阳虚质','阴虚质','痰湿质','湿热质','血瘀质','特禀质','平和质']) {
+            for (var ti of ['脾虚湿盛质','气虚质','阳虚质','阴虚质','痰湿质','湿热质','血瘀质','特禀质','平和质']) {
                 if (replyText.indexOf(ti) >= 0) { imgTizhi += imgTizhi ? '、' : ''; imgTizhi += ti; }
             }
         }
