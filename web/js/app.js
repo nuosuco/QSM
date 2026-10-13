@@ -2284,9 +2284,14 @@ async function loadChatStats() {
     const el = document.getElementById('stat-chats');
     if (!el || !userId) return;
     try {
-        const resp = await fetch(`${API_BASE}/api/chat/history?user_id=${encodeURIComponent(userId)}&limit=1`);
+        // 2026-10-13 小蕊修(中华反馈: 对话次数显示1应该是2):
+        // 原来 limit=1 导致 total 被截断成1; 改 limit=9999 拿全量后按 session 去重(一次对话=1)
+        const resp = await fetch(`${API_BASE}/api/chat/history?user_id=${encodeURIComponent(userId)}&limit=9999`);
         const data = await resp.json();
-        const total = data.total !== undefined ? data.total : (data.records || []).length;
+        const history = data.history || data.records || [];
+        const sessions = new Set(history.map(h => h.session_id).filter(Boolean));
+        // 对话次数 = 去重后的 session 数(一次对话=1), 没 session_id 的按记录数兜底
+        const total = sessions.size > 0 ? sessions.size : history.length;
         el.textContent = String(total);
     } catch (e) {}
 }

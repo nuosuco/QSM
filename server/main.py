@@ -332,6 +332,22 @@ async def chat(request: ChatRequest):
     except Exception as e:
         print(f"保存对话历史失败: {e}")
 
+    # 2026-10-13 中华要求: 文字辨证也要自动存进健康数据(tizhi_records), 和拍照辨证/体质评测一个待遇
+    # 仅存"判出了体质"的轮次(规则引擎 BianzhengEngine 判定), 同 session 覆盖旧记录(与拍照同一语义)
+    if result.get('tizhi'):
+        try:
+            from services.user_system import add_tizhi_record
+            add_tizhi_record(
+                request.user_id or 'anonymous', result.get('tizhi', ''),
+                zhengxing=result.get('zhengxing'),
+                symptoms=(request.message or '')[:80],
+                advice=result["reply"][:2000],
+                source='text_chat',
+                session_id=request.session_id or 'default',
+            )
+        except Exception as e:
+            print(f"文字辨证体质存档失败: {e}")
+
     return ChatResponse(
         reply=result["reply"],
         tizhi=result.get("tizhi"),
@@ -560,7 +576,18 @@ async def get_chat_history(user_id: str, limit: int = 20):
                    (user_id, limit))
     rows = cursor.fetchall()
     conn.close()
-    return {"total": len(rows), "history": [dict(r) for r in rows]}
+    # 2026-10-13 小蕊改(中华反馈: 对话次数显示1应该是2):
+    # total 改为"去重后的对话 session 数(一次对话=1)", history 仍按 limit 截断返回记录
+    # 前端 loadChatStats 读 total 就是对话次数, 不用改前端
+    conn2 = get_user_db()
+    cur2 = conn2.cursor()
+    cur2.execute(
+        "SELECT COUNT(DISTINCT session_id) FROM chat_history WHERE user_id=? AND session_id IS NOT NULL AND session_id != ''",
+        (user_id,)
+    )
+    total_sessions = cur2.fetchone()[0]
+    conn2.close()
+    return {"total": total_sessions, "history": [dict(r) for r in rows]}
 
 @app.get("/api/chat/history/session")
 async def get_session_history(session_id: str):
@@ -1718,6 +1745,25 @@ async def tizhi_test_save(data: dict):
          data.get("result_name",""), data.get("score",0), _json.dumps(data.get("answers",[]))))
     conn.commit()
     conn.close()
+
+    # 2026-10-13 中华要求: 体质评测结果也要进健康数据(tizhi_records), 和拍照/文字一个待遇
+    # result_name 是评测出的体质名(如"气虚质"), 有值就存; 同一 session 覆盖旧记录
+    result_name = (data.get("result_name") or "").strip()
+    user_id = (data.get("user_id") or "").strip()
+    if result_name and user_id:
+        try:
+            from services.user_system import add_tizhi_record
+            session_id = (data.get("session_id") or "tizhi_test").strip()
+            add_tizhi_record(
+                user_id, result_name,
+                symptoms=f'[体质评测] {data.get("mode","")}',
+                advice=(data.get("advice") or result_name)[:2000] or None,
+                source='tizhi_test',
+                session_id=session_id,
+            )
+        except Exception as e:
+            print(f"体质评测存档失败: {e}")
+
     return {"success": True}
 
 @app.get("/api/tizhi-test/count")
