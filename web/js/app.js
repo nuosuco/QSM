@@ -2361,7 +2361,8 @@ async function loadTizhiRecordsFromBackend() {
     let html = '';
     for (let i = 0; i < records.length; i++) {
         const r = records[i];
-        const full = (r.symptoms || '') + (r.advice ? '\n【调理建议】' + r.advice : '');
+        // 2026-10-13 小蕊改(中华反馈: 展开应该是完整内容): advice=完整分析/建议优先, 无 advice 才用 symptoms 兜底
+        const full = (r.advice ? r.advice : (r.symptoms || '')) ;
         html += '<div class="history-item" style="display:block;padding:8px;border-bottom:1px solid #f0f0f0;">';
         html += '  <div style="display:flex;justify-content:space-between;align-items:center;">';
         html += '    <div><span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span> ';
