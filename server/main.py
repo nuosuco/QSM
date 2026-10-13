@@ -1745,25 +1745,9 @@ async def tizhi_test_save(data: dict):
          data.get("result_name",""), data.get("score",0), _json.dumps(data.get("answers",[]))))
     conn.commit()
     conn.close()
-
-    # 2026-10-13 中华要求: 体质评测结果也要进健康数据(tizhi_records), 和拍照/文字一个待遇
-    # result_name 是评测出的体质名(如"气虚质"), 有值就存; 同一 session 覆盖旧记录
-    result_name = (data.get("result_name") or "").strip()
-    user_id = (data.get("user_id") or "").strip()
-    if result_name and user_id:
-        try:
-            from services.user_system import add_tizhi_record
-            session_id = (data.get("session_id") or "tizhi_test").strip()
-            add_tizhi_record(
-                user_id, result_name,
-                symptoms=f'[体质评测] {data.get("mode","")}',
-                advice=(data.get("advice") or result_name)[:2000] or None,
-                source='tizhi_test',
-                session_id=session_id,
-            )
-        except Exception as e:
-            print(f"体质评测存档失败: {e}")
-
+    # 2026-10-13 中华要求(重要): 测评结果本身不进健康数据!
+    # 规则: 用户测评后去问小麦, 小麦辨证了才算一次对话、才进健康数据(1辨证=1对话=1条)
+    # 所以测评结果只存 tizhi_test 表, 后续用户拿测评结果问小麦时走 /api/chat 自动存档
     return {"success": True}
 
 @app.get("/api/tizhi-test/count")

@@ -2284,15 +2284,11 @@ async function loadChatStats() {
     const el = document.getElementById('stat-chats');
     if (!el || !userId) return;
     try {
-        // 2026-10-13 小蕊修(中华反馈: 对话次数显示1应该是2):
-        // 原来 limit=1 导致 total 被截断成1; 改 limit=9999 拿全量后按 session 去重(一次对话=1)
-        const resp = await fetch(`${API_BASE}/api/chat/history?user_id=${encodeURIComponent(userId)}&limit=9999`);
+        // 2026-10-13 中华规则: 小麦辨证一次=一次对话=一条健康数据, 一一对应
+        // 对话次数 = 该用户 tizhi_records 总条数(不再按 session 去重, 不再用 chat_history limit=1)
+        const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(userId)}&limit=9999`);
         const data = await resp.json();
-        const history = data.history || data.records || [];
-        const sessions = new Set(history.map(h => h.session_id).filter(Boolean));
-        // 对话次数 = 去重后的 session 数(一次对话=1), 没 session_id 的按记录数兜底
-        const total = sessions.size > 0 ? sessions.size : history.length;
-        el.textContent = String(total);
+        el.textContent = String((data.records || []).length);
     } catch (e) {}
 }
 
@@ -2344,18 +2340,14 @@ function initTizhiToggle() {
 }
 
 async function loadTizhiRecordsFromBackend() {
-    const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=5`);
+    const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=50`);
     const result = await resp.json();
     const history = document.getElementById('profile-history');
     if (!history) return;
     
-    // 2026-10-13 小蕊: 按 session 去重 —— 同一 session_id 只保留最新一条, 保证"一次对话=一条记录"
-    const seen = {};
-    const records = [];
-    for (const r of (result.records || [])) {
-        const key = r.session_id || r.id;
-        if (!seen[key]) { seen[key] = true; records.push(r); }
-    }
+    // 2026-10-13 中华规则: 小麦辨证一次=一次对话=一条记录, 一一对应
+    // 所以【不按 session 去重】, 每次辨证都显示(后端已保证每次辨证=一条)
+    const records = (result.records || []);
     
     if (records.length === 0) {
         history.innerHTML = '<p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>';
@@ -2416,23 +2408,18 @@ function saveChatRecord(message, reply, tizhi) {
     
     if (tizhi && tizhi !== '未检测') {
         if (!data.tizhiRecords) data.tizhiRecords = [];
-        // 2026-10-13 小蕊(中华要求): 同一次对话只留一条体质记录, 按 session 覆盖旧的
-        var sid = getSessionId();
-        var existing = data.tizhiRecords.filter(function(r){ return r.session_id === sid; });
-        if (existing.length > 0) {
-            existing[0].tizhi = tizhi;
-            existing[0].desc = message.substring(0, 50);
-        } else {
-            data.tizhiRecords.push({
-                date: new Date().toISOString().split('T')[0],
-                tizhi: tizhi,
-                desc: message.substring(0, 50),
-                session_id: sid
-            });
-        }
+        // 2026-10-13 中华规则: 小麦辨证一次=一次对话=一条记录, 一一对应
+        // 所以【不按 session 覆盖】, 每次辨证都新增一条(同 session 多次辨证=多条)
+        data.tizhiRecords.push({
+            date: new Date().toISOString().split('T')[0],
+            tizhi: tizhi,
+            desc: message.substring(0, 50),
+            session_id: getSessionId()
+        });
         data.tizhi = tizhi;
-        // 同步体质记录到后端
-        saveTizhiToBackend(tizhi, message);
+        // 2026-10-13 小蕊改(中华规则): 后端 /api/chat 和 /api/chat/vision 已自动存 tizhi_records,
+        // 前端不再调 /api/tizhi/save, 避免一次辨证存两条(破坏 1:1 对应)
+        // 本地 data.tizhiRecords 仍记录(离线兜底), 但不重复推后端
     }
     
     saveUserData(data);

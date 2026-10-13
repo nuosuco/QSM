@@ -273,7 +273,9 @@ def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
     """存体质记录。
     2026-10-12 中华要求: 用户中心数据是健康大数据, 要压缩到最小存储——
     只留关键字段, symptoms/advice 截断存摘要, 不存整段原文。
-    2026-10-13 小蕊加 session_id: 同一会话只保留一条体质记录, 保证"一次对话=一条记录"。
+    2026-10-13 中华规则(重要): 小麦辨证一次 = 一次对话 = 一条记录, 一一对应。
+    所以【不去重】——每次辨证调用都新增一条, 同 session 多次辨证就是多条。
+    session_id 仍记录(追溯用), 但不再用它覆盖旧记录。
     """
     def _clip(s, n):
         if not s: return s
@@ -282,21 +284,6 @@ def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
     symptoms_c = _clip(symptoms, 500)
     advice_c = _clip(advice, 500)
     conn = _conn()
-    # 2026-10-13: 同 session 已有记录则更新(不新增), 保证一次对话=一条记录
-    if session_id:
-        existing = conn.execute(
-            "SELECT id FROM tizhi_records WHERE user_id=? AND session_id=? LIMIT 1",
-            (user_id, session_id)
-        ).fetchone()
-        if existing:
-            conn.execute(
-                "UPDATE tizhi_records SET tizhi=?, zhengxing=?, symptoms=?, advice=?, source=?, created_at=CURRENT_TIMESTAMP WHERE id=?",
-                (tizhi, zhengxing, symptoms_c, advice_c, source, existing['id'])
-            )
-            conn.commit()
-            row = conn.execute("SELECT * FROM tizhi_records WHERE id=?", (existing['id'],)).fetchone()
-            conn.close()
-            return dict(row)
     cur = conn.execute(
         "INSERT INTO tizhi_records (user_id, tizhi, zhengxing, symptoms, advice, source, session_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (user_id, tizhi, zhengxing, symptoms_c, advice_c, source, session_id),
@@ -310,22 +297,12 @@ def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
 
 def get_tizhi_records(user_id: str, limit: int = 50) -> list:
     conn = _conn()
-    # 2026-10-13 小蕊修(中华反馈): 按 session 去重, 同一会话只返回一条(取最新),
-    # 保证"一次对话=一条体质记录"。无 session_id 的旧记录原样保留。
-    # 注意: OR 必须用括号包裹, 否则会绕过 WHERE 的 session 条件
-    rows = conn.execute('''
-        SELECT * FROM tizhi_records t1
-        WHERE t1.user_id = ? AND (
-            (t1.session_id IS NOT NULL AND t1.session_id != '') AND
-              t1.id = (
-                  SELECT MAX(t2.id) FROM tizhi_records t2
-                  WHERE t2.user_id = t1.user_id AND t2.session_id = t1.session_id
-              )
-            OR (t1.session_id IS NULL OR t1.session_id = '')
-        )
-        ORDER BY t1.id DESC
-        LIMIT ?
-    ''', (user_id, limit)).fetchall()
+    # 2026-10-13 中华规则: 小麦辨证一次=一次对话=一条记录, 一一对应
+    # 所以【不按 session 去重】, 直接返回最新 limit 条(每次辨证=一条)
+    rows = conn.execute(
+        "SELECT * FROM tizhi_records WHERE user_id=? ORDER BY created_at DESC, id DESC LIMIT ?",
+        (user_id, limit)
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
