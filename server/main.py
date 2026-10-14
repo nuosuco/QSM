@@ -1445,47 +1445,49 @@ async def auth_check_account(account: str):
 
 @app.post("/api/auth/forgot-password")
 async def auth_forgot_password(request: ForgotPasswordRequest):
-    """忘记密码 - 认识 account/email 两列, 命中才真发重置邮件(2026-10-15 中华要求)"""
+    """忘记密码(2026-10-15 中华要求): 查不到账号明确告知; 查到了异步发邮件不阻塞界面"""
     from services.user_system import generate_reset_token, _conn
-    import smtplib
+    import smtplib, threading
     from email.mime.text import MIMEText
     from services.auth_service import _load_auth_config
     acc = request.account.strip()
     conn = _conn()
-    # 同时查 account 列和 email 列(邮箱验证码登录存在 email 列, 自定义账号存在 account 列)
     user = conn.execute(
-        "SELECT user_id, email, account FROM users WHERE account = ? OR email = ? COLLATE NOCASE", (acc, acc)).fetchone()
+        "SELECT user_id, email, account FROM users WHERE account = ? OR email = ? COLLATE NOCASE",
+        (acc, acc)).fetchone()
     conn.close()
     if not user or not (user["email"] or user["account"] or ""):
-        # 安全考虑: 不暴露账号是否存在
-        return {"success": True, "message": "如果账号存在且绑定了邮箱，已发送重置邮件"}
-    # 发重置邮件到该用户的邮箱
+        return {"success": False, "error": "该账号不存在，请检查是否输入正确"}
     send_to = user["email"] or user["account"]
-    token = generate_reset_token(user["user_id"])
-    reset_url = f"https://som.top/web/reset-password.html?token={token}"
+    tok = generate_reset_token(user["user_id"])
+    reset_url = "https://som.top/web/reset-password.html?token=" + tok
     email_cfg = _load_auth_config()["email"]
-    body_html = f"""
-    <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #4a9d6e;">SOM 松麦</h2>
-        <p>您正在重置密码，请点击下方链接（1 小时内有效）：</p>
-        <p style="margin: 16px 0;"><a href="{reset_url}" style="background:#4a9d6e;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;display:inline-block;">重置密码</a></p>
-        <p style="color:#999;font-size:12px;">如非本人操作，请忽略本邮件。</p>
-    </div>"""
-    try:
-        msg = MIMEText(body_html, "html", "utf-8")
-        msg["Subject"] = "【SOM松麦】密码重置"
-        # 2026-10-15 修: From 只写纯邮箱地址(不带中文 display-name),
-        # QQ 邮箱对 From 头严格校验, 中文 display-name 会触发 550 "From header is missing or invalid" 拒收
-        msg["From"] = email_cfg["smtp_user"]
-        msg["To"] = send_to
-        server = smtplib.SMTP_SSL(email_cfg["smtp_host"], email_cfg["smtp_port"], timeout=15)
-        server.login(email_cfg["smtp_user"], email_cfg["smtp_pass"])
-        server.sendmail(email_cfg["smtp_user"], [send_to], msg.as_string())
-        server.quit()
-        return {"success": True, "message": f"重置邮件已发送至 {send_to}"}
-    except Exception as e:
-        print(f"forgot-password 邮件发送失败: {e}")
-        return {"success": False, "error": "邮件发送失败，请稍后重试"}
+
+    def _send_reset_email():
+        try:
+            body_html = (
+                '<div style="font-family:sans-serif;max-width:400px;padding:20px;">'
+                '<h2 style="color:#4a9d6e;">SOM 松麦</h2>'
+                '<p>您正在重置密码，请点击下方链接（1 小时内有效）：</p>'
+                '<p style="margin:16px 0;">'
+                + f'<a href="{reset_url}" style="background:#4a9d6e;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;display:inline-block;">重置密码</a>' +
+                '</p>'
+                '<p style="color:#999;font-size:12px;">如非本人操作，请忽略本邮件。</p>'
+                '</div>'
+            )
+            msg = MIMEText(body_html, "html", "utf-8")
+            msg["Subject"] = "【SOM松麦】密码重置"
+            msg["From"] = email_cfg["smtp_user"]
+            msg["To"] = send_to
+            s = smtplib.SMTP_SSL(email_cfg["smtp_host"], email_cfg["smtp_port"], timeout=15)
+            s.login(email_cfg["smtp_user"], email_cfg["smtp_pass"])
+            s.sendmail(email_cfg["smtp_user"], [send_to], msg.as_string())
+            s.quit()
+        except Exception as e:
+            print(f"forgot-password 异步邮件发送失败: {e}")
+
+    threading.Thread(target=_send_reset_email, daemon=True).start()
+    return {"success": True, "message": f"重置邮件已发送至 {send_to}，请查收（注意垃圾邮件）"}
 
 @app.post("/api/auth/reset-password")
 async def auth_reset_password(request: ResetPasswordRequest):
