@@ -934,6 +934,23 @@ def _base64_to_url(data_uri: str) -> str:
     return f"https://som.top/uploads/{filename}"
 
 
+def _strip_tizhi_data_json(reply: str) -> str:
+    """2026-10-14 中华反馈: 小麦辨证回复里漏出了 tizhi_data 原始 JSON 代码块。
+    通道1要求 LLM 末尾输出 tizhi_data:{...} 供服务端存档, 但回复要给用户看, 不能带代码。
+    把末尾的 tizhi_data JSON 行/块从回复里剥掉(保留正文)。"""
+    import re
+    if not reply:
+        return reply
+    # 1) 带前缀的固定块: tizhi_data: {...}(可能带前导空行/换行)
+    reply = re.sub(r'\s*tizhi_data\s*:\s*\{\s*"tizhi"\s*:\s*"[^"]*"\s*(?:,\s*"zhengxing"\s*:\s*"[^"]*")?\s*\}\s*$', '', reply)
+    # 2) 无 tizhi_data 前缀的裸 JSON 块(兼容 LLM 没写前缀)
+    reply = re.sub(r'\s*\{\s*"tizhi"\s*:\s*"[^"]*"\s*(?:,\s*"zhengxing"\s*:\s*"[^"]*")?\s*\}\s*$', '', reply)
+    # 3) 兜底: 任何位置残留的 tizhi_data 行(防 LLM 把它插到正文中间)
+    reply = re.sub(r'[ \t]*tizhi_data\s*:\s*\{[^{}]*\}\s*', '', reply)
+    # 4) 清掉尾部多余空行
+    return (reply.rstrip() + '\n') if reply.strip() else reply
+
+
 def _extract_tizhi_from_vision_reply(reply: str):
     """2026-10-13 小蕊: 从图片辨证回复里提取体质/证型(服务端统一做, 不依赖前端JS版本)。
     2026-10-14 双通道升级(中华要求: 辨证必须稳定进体质记录):
@@ -1143,7 +1160,8 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
     if extracted_tizhi and not rejected:
         try:
             from services.user_system import add_tizhi_record
-            advice_full = result["content"][:2000]
+            # 存库前先剥掉 tizhi_data JSON(中华反馈: 代码不能混进存档数据)
+            advice_full = _strip_tizhi_data_json(result["content"])[:2000]
             # 2026-10-14 健康画像多维升级(中华要求): 该次拍照的第一张图提视觉特征向量
             # (face_service._extract_embedding, 检不到脸回退统计特征), base64 ~2KB 存
             # tizhi_records.photo_features + photo_hash(前8字节短指纹), 不存原图。
@@ -1180,8 +1198,11 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
     except Exception as e:
         print(f"vision商品搜索失败: {e}")
 
+    # 2026-10-14 中华反馈: 从回复里剥掉 tizhi_data 原始 JSON(服务端存档已用, 用户不该看到代码)
+    # 必须在追加商品引导语/AI免责声明【之前】剥, 否则 JSON 不在末尾, 正则 $ 锚定失效
+    reply_text = _strip_tizhi_data_json(result["content"])
+
     # 如果有商品推荐，在回复末尾追加引导语
-    reply_text = result["content"]
     if products and '下方推荐' not in reply_text and '就在下面' not in reply_text:
         reply_text += '\n\n🛒 上面提到的食材，我在下方帮你找了有机认证的，点击即可购买～'
     elif not products:
@@ -1190,7 +1211,6 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
 
     # 末尾追加AI生成提示（小程序审核要求）
     reply_text += '\n\n_以上内容由人工智能生成，仅供参考。_'
-
     return {
         "success": True,
         "reply": reply_text,
@@ -1795,10 +1815,12 @@ async def tizhi_save(request: TizhiSaveRequest):
     return {"success": True, "record": record}
 
 @app.get("/api/tizhi/records")
-async def tizhi_records(user_id: str, limit: int = 50):
-    """体质评测历史"""
+async def tizhi_records(user_id: str, limit: int = 10, offset: int = 0):
+    """体质评测历史。2026-10-14 小蕊修(中华要求): 支持 offset 真翻页(上一页/下一页),
+    返回 total 让前端算总页数。库内 created_at 已是北京时间, 前端直接用。"""
     from services.user_system import get_tizhi_records
-    return {"success": True, "records": get_tizhi_records(user_id, limit=limit)}
+    records, total = get_tizhi_records(user_id, limit=limit, offset=offset)
+    return {"success": True, "records": records, "total": total}
 
 @app.get("/api/tizhi/latest")
 async def tizhi_latest(user_id: str):
@@ -1808,7 +1830,7 @@ async def tizhi_latest(user_id: str):
 
 
 @app.get("/api/health/portrait")
-async def health_portrait(user_id: str, days: int = 90, offset: int = 0):
+async def health_portrait(user_id: str, days: int = 0, offset: int = 0):
     """2026-10-14 中华要求: 个人中心健康画像(多维时间画像)。
     聚合该用户: ① 小麦辨证时间线(体质/证型随时间变化) ② 人脸向量组积累(学习进度)
     ③ 体质分布 ④ 健康趋势。用户一看画像变化就掌握自己的健康。"""
@@ -1816,18 +1838,22 @@ async def health_portrait(user_id: str, days: int = 90, offset: int = 0):
     conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "data", "user_data.db"))
     conn.row_factory = sqlite3.Row
     now = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8)))
-    cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    # 2026-10-14 中华反馈(体质记录与健康画像条数不统一): 健康画像改为【全量】口径,
+    # 与体质记录卡片同数据源同条数, 不再是近90天窗口。
+    # 库内 created_at 已统一为北京时间, cutoff 用北京时间直接比(默认全量=很大窗口)
+    cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S") if days else "1970-01-01 00:00:00"
+    _w1 = "WHERE user_id=?" if days else "WHERE user_id=?"
+    _w2 = "AND created_at >= ?" if days else ""
 
-    # ① 辨证时间线(最近 N 天, 按时间正序, 前端画时间轴)
-    # 2026-10-14 中华要求: 10条以上翻下一页 → 加 offset 分页, 前端每页 10 条
+    # ① 辨证时间线(按时间正序, 前端画时间轴; 10条以上翻下一页 offset 分页)
     total_rows = conn.execute(
-        "SELECT COUNT(*) n FROM tizhi_records WHERE user_id=? AND created_at >= ?",
-        (user_id, cutoff)
+        ("SELECT COUNT(*) n FROM tizhi_records " + _w1 + _w2 + (" (?)" if days else "")),
+        ((user_id,) + ((cutoff,) if days else ()))
     ).fetchone()["n"]
     timeline_rows = conn.execute(
-        "SELECT created_at, tizhi, zhengxing, source, photo_hash, photo_features FROM tizhi_records "
-        "WHERE user_id=? AND created_at >= ? ORDER BY created_at ASC, id ASC LIMIT 10 OFFSET ?",
-        (user_id, cutoff, offset)
+        ("SELECT created_at, tizhi, zhengxing, source, photo_hash, photo_features FROM tizhi_records "
+         + _w1 + _w2 + (" (?)" if days else "") + " ORDER BY created_at ASC, id ASC LIMIT 10 OFFSET ?"),
+        ((user_id,) + ((cutoff,) if days else ()) + (offset,))
     ).fetchall()
     # 2026-10-14 健康画像: 每行带 photo_hash(该次拍照特征指纹, 无照片=NULL);
     # 相邻两次有照片的时间线点算余弦距离, 给出"视觉相似度趋势"(脸/舌苔/患处随时间变没变)
@@ -1841,8 +1867,10 @@ async def health_portrait(user_id: str, days: int = 90, offset: int = 0):
     timeline = []
     _prev_vec = None
     for r in timeline_rows:
+        # 2026-10-14 时区统一后: 库内 created_at 已是北京时间, 直接用(不再换算, 避免双重+8)
+        _dt_val = r["created_at"]
         entry = {
-            "date": r["created_at"], "tizhi": r["tizhi"] or "",
+            "date": _dt_val, "tizhi": r["tizhi"] or "",
             "zhengxing": r["zhengxing"] or "", "source": r["source"] or "",
             "has_photo": bool(r["photo_hash"]),
             "photo_hash": (r["photo_hash"] or "")[:12],  # 短指纹(非原图), 前端画占位
@@ -1863,17 +1891,26 @@ async def health_portrait(user_id: str, days: int = 90, offset: int = 0):
         "SELECT COUNT(*) n, MIN(created_at) first_seen, MAX(updated_at) last_seen FROM face_vectors WHERE user_id=?",
         (user_id,)
     ).fetchone()
+    # 2026-10-14 时区统一后: face_vectors 时间已是北京时间, 直接返回
+    def _to_bj(ts):
+        return ts
     face = {
         "vector_count": face_rows["n"] or 0,
-        "first_seen": face_rows["first_seen"],
-        "last_seen": face_rows["last_seen"] or face_rows["first_seen"],
+        "first_seen": _to_bj(face_rows["first_seen"]),
+        "last_seen": _to_bj(face_rows["last_seen"]) or _to_bj(face_rows["first_seen"]),
     }
 
-    # ③ 体质分布(最近 N 天内各体质出现次数, 找主体质)
-    dist_rows = conn.execute(
-        "SELECT tizhi, COUNT(*) c FROM tizhi_records WHERE user_id=? AND created_at>=? GROUP BY tizhi ORDER BY c DESC",
-        (user_id, cutoff)
-    ).fetchall()
+    # ③ 体质分布(全量与体质记录口径一致; 指定 days 时按窗口)
+    if days:
+        dist_rows = conn.execute(
+            "SELECT tizhi, COUNT(*) c FROM tizhi_records WHERE user_id=? AND created_at>=? GROUP BY tizhi ORDER BY c DESC",
+            (user_id, cutoff)
+        ).fetchall()
+    else:
+        dist_rows = conn.execute(
+            "SELECT tizhi, COUNT(*) c FROM tizhi_records WHERE user_id=? GROUP BY tizhi ORDER BY c DESC",
+            (user_id,)
+        ).fetchall()
     tizhi_dist = {r["tizhi"] or "未知": r["c"] for r in dist_rows}
 
     # ④ 健康趋势: 比对最近一次 vs 最早一次体质, 看有没有变化
@@ -1893,7 +1930,10 @@ async def health_portrait(user_id: str, days: int = 90, offset: int = 0):
     registered_days = None
     if reg_row and reg_row["d"]:
         try:
-            reg_dt = datetime.strptime(reg_row["d"][:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=8)))
+            # 2026-10-14 小蕊修: users.created_at 是应用层 ISO 带 +08:00(北京时间), 直接解析算天数
+            reg_dt = datetime.fromisoformat(reg_row["d"])
+            if reg_dt.tzinfo is None:
+                reg_dt = reg_dt.replace(tzinfo=timezone(timedelta(hours=8)))
             registered_days = (now - reg_dt).days
         except Exception:
             pass

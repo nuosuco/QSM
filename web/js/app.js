@@ -2296,25 +2296,27 @@ async function loadHealthPortrait() {
     if (!isLoggedIn()) { section.style.display = 'none'; return; }
     const userId = getUserId();
     if (!userId) { section.style.display = 'none'; return; }
-    _portraitPage = 0; _portraitHasMore = true; await fetchPortraitPage(true);
+    _portraitPage = 1; await fetchPortraitPage();
 }
 
-// 2026-10-14 中华要求: 健康画像时间线 10 条以上翻下一页(与体质记录一致, 每页 10)
+// 2026-10-14 小蕊修(中华要求: 卡片底部应该是翻页, 不是加载更多/向下滑动)
+// 健康画像真翻页器: 上一页 / 第X页共Y页 / 下一页, 每页 10 条
+// 口径与体质记录统一: 不传 days = 全量, 两张卡片条数一致
 const PORTRAIT_PAGE_SIZE = 10;
-let _portraitPage = 0;
-let _portraitHasMore = true;
+let _portraitPage = 1;
+let _portraitTotal = 0;
 let _portraitCache = { total: 0, face: {}, dist: {}, trend: {}, registered_days: null };
 
-async function fetchPortraitPage(isFirst) {
+async function fetchPortraitPage() {
     const section = document.getElementById('health-portrait-section');
     const box = document.getElementById('health-portrait');
     if (!section || !box) return;
     const userId = getUserId();
-    _portraitPage++;
     const offset = (_portraitPage - 1) * PORTRAIT_PAGE_SIZE;
+    const isFirst = _portraitPage === 1;
     let result;
     try {
-        const resp = await fetch(`${API_BASE}/api/health/portrait?user_id=${encodeURIComponent(userId)}&days=90&offset=${offset}`);
+        const resp = await fetch(`${API_BASE}/api/health/portrait?user_id=${encodeURIComponent(userId)}&offset=${offset}`);
         result = await resp.json();
     } catch (e) { console.warn('health portrait 拉取失败', e); section.style.display = 'none'; return; }
     const p = result && result.portrait;
@@ -2323,37 +2325,33 @@ async function fetchPortraitPage(isFirst) {
         return;
     }
     section.style.display = 'block';
+    _portraitTotal = result.total || 0;
+    const totalPages = Math.max(1, Math.ceil(_portraitTotal / PORTRAIT_PAGE_SIZE));
+    if (_portraitPage > totalPages) _portraitPage = 1;
     // 缓存汇总数据(第 1 页拉取时保存, 后续翻页复用)
     if (isFirst) {
         _portraitCache = { total: result.total || 0, face: p.face || {}, dist: p.tizhi_distribution || {}, trend: p.trend || {}, registered_days: p.registered_days };
     }
-    _portraitHasMore = result.has_more === true;
-    // 时间线容器(不存在则建, 已存在则只往里追加下一页 —— 累积式, 旧记录不丢)
-    let tlBox = document.getElementById('health-portrait-timeline');
-    if (!tlBox) {
-        const d = _portraitCache.trend || {}, face = _portraitCache.face || {}, dist = _portraitCache.dist || {};
-        const distStr = Object.keys(dist).map(k => `${k}×${dist[k]}`).join('、') || '暂无';
-        let html = '';
-        // ① 汇总条(只渲染一次)
-        html += '<div style="font-size:13px;color:#555;line-height:1.9;">';
-        html += `<div>📊 近90天辨证 <b>${d.total || 0}</b> 次 · 体质分布: ${escapeHtml(distStr)}</div>`;
-        if (face.vector_count) {
-            html += `<div>🧬 人脸向量组已学 <b>${face.vector_count}</b> 张(认得你变老/换角度/换光线)</div>`;
-        }
-        if (d.first_tizhi && d.last_tizhi) {
-            const changed = d.changed ? ' <span style="color:#fa5151;">↺ 体质发生了变化</span>' : ' <span style="color:#07c160;">✔ 体质保持稳定</span>';
-            html += `<div>📈 趋势: ${escapeHtml(d.first_tizhi)}(${escapeHtml((d.first_date||'').slice(0,10))}) → ${escapeHtml(d.last_tizhi)}(${escapeHtml((d.last_date||'').slice(0,10))})${changed}</div>`;
-        }
-        if (_portraitCache.registered_days != null) html += `<div>⏳ 健康大数据已积累 ${_portraitCache.registered_days} 天</div>`;
-        html += '</div>';
-        // ② 时间线容器(新→旧, 后面加载更多往里 append)
-        html += '<div id="health-portrait-timeline" style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;font-size:12px;color:#666;"></div>';
-        // ③ 加载更多按钮占位(每条时间线下方)
-        html += '<div id="portrait-more-slot"></div>';
-        box.innerHTML = html;
-        tlBox = document.getElementById('health-portrait-timeline');
+    // 重建整卡(翻页不累积, 每页独立渲染)
+    const d = _portraitCache.trend || {}, face = _portraitCache.face || {}, dist = _portraitCache.dist || {};
+    const distStr = Object.keys(dist).map(k => `${k}×${dist[k]}`).join('、') || '暂无';
+    let html = '';
+    // ① 汇总条
+    html += '<div style="font-size:13px;color:#555;line-height:1.9;">';
+    html += `<div>📊 累计辨证 <b>${_portraitTotal}</b> 次 · 体质分布: ${escapeHtml(distStr)}</div>`;
+    if (face.vector_count) {
+        html += `<div>🧬 人脸向量组已学 <b>${face.vector_count}</b> 张(认得你变老/换角度/换光线)</div>`;
     }
-    // 本页条目(新→旧)追加到时间线容器底部(已加载的旧条目在上方, 视觉顺序新→旧)
+    if (d.first_tizhi && d.last_tizhi) {
+        const changed = d.changed ? ' <span style="color:#fa5151;">↺ 体质发生了变化</span>' : ' <span style="color:#07c160;">✔ 体质保持稳定</span>';
+        html += `<div>📈 趋势: ${escapeHtml(d.first_tizhi)}(${escapeHtml((d.first_date||'').slice(0,10))}) → ${escapeHtml(d.last_tizhi)}(${escapeHtml((d.last_date||'').slice(0,10))})${changed}</div>`;
+    }
+    if (_portraitCache.registered_days != null) html += `<div>⏳ 健康大数据已积累 ${_portraitCache.registered_days} 天</div>`;
+    html += '</div>';
+    // ② 时间线(本页 10 条, 新→旧)
+    html += '<div id="health-portrait-timeline" style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;font-size:12px;color:#666;"></div>';
+    box.innerHTML = html;
+    const tlBox = document.getElementById('health-portrait-timeline');
     const tl = (p.timeline || []).slice().reverse();
     let pageHtml = '';
     for (let i = 0; i < tl.length; i++) {
@@ -2370,24 +2368,17 @@ async function fetchPortraitPage(isFirst) {
         pageHtml += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #f5f5f5;">`;
         pageHtml += `<span>${tag} ${date}</span><span><b>${escapeHtml(t.tizhi || '未知')}</b>${delta}</span></div>`;
     }
-    tlBox.innerHTML += pageHtml;
-    // ③ 翻页按钮(10 条以上才出现)
-    const slot = document.getElementById('portrait-more-slot');
-    if (slot) {
-        if (_portraitHasMore) {
-            slot.innerHTML = '<div style="padding:10px;text-align:center;"><button id="portrait-load-more" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:8px 24px;font-size:13px;cursor:pointer;">加载更多</button></div>';
-            const moreBtn = document.getElementById('portrait-load-more');
-            if (moreBtn) {
-                moreBtn.addEventListener('click', async function() {
-                    moreBtn.textContent = '加载中...';
-                    moreBtn.disabled = true;
-                    await fetchPortraitPage(false);
-                });
-            }
-        } else {
-            slot.innerHTML = '';
-        }
-    }
+    // ③ 翻页器(上一页 / 第X页共Y页 / 下一页)
+    pageHtml += '<div style="display:flex;justify-content:center;align-items:center;gap:12px;padding:12px 0;">';
+    pageHtml += `  <button id="portrait-prev" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:6px 18px;font-size:13px;cursor:pointer;${_portraitPage <= 1 ? 'opacity:0.35;cursor:default;' : ''}">上一页</button>`;
+    pageHtml += `  <span style="font-size:12px;color:#666;">第 ${_portraitPage} / ${totalPages} 页 · 共 ${_portraitTotal} 条</span>`;
+    pageHtml += `  <button id="portrait-next" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:6px 18px;font-size:13px;cursor:pointer;${_portraitPage >= totalPages ? 'opacity:0.35;cursor:default;' : ''}">下一页</button>`;
+    pageHtml += '</div>';
+    tlBox.innerHTML = pageHtml;
+    const prevBtn = document.getElementById('portrait-prev');
+    const nextBtn = document.getElementById('portrait-next');
+    if (prevBtn && _portraitPage > 1) prevBtn.addEventListener('click', async () => { _portraitPage--; await fetchPortraitPage(); });
+    if (nextBtn && _portraitPage < totalPages) nextBtn.addEventListener('click', async () => { _portraitPage++; await fetchPortraitPage(); });
 }
 
 // 从后端加载体质记录
@@ -2453,67 +2444,59 @@ function initTizhiToggle() {
     });
 }
 
-// 2026-10-14 小蕊(中华要求): 体质记录分页 —— 太多时不用翻到最下面, 点"加载更多"下一页
-let _tizhiPage = 0;
-let _tizhiHasMore = true;
+// 2026-10-14 小蕊修(中华要求: 卡片底部应该是翻页, 不是加载更多/向下滑动)
+// 体质记录真翻页器: 上一页 / 第X页共Y页 / 下一页, 每页 10 条
+let _tizhiPage = 1;
 const TIZHI_PAGE_SIZE = 10;
+let _tizhiTotal = 0;
 
 async function loadTizhiRecordsFromBackend() {
-    _tizhiPage = 0;
-    _tizhiHasMore = true;
-    await fetchTizhiPage(true);
+    _tizhiPage = 1;
+    await fetchTizhiPage();
 }
 
-async function fetchTizhiPage(isFirst) {
-    _tizhiPage++;
-    const limit = TIZHI_PAGE_SIZE * _tizhiPage;
-    const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=${limit}`);
+async function fetchTizhiPage() {
+    const offset = (_tizhiPage - 1) * TIZHI_PAGE_SIZE;
+    const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=${TIZHI_PAGE_SIZE}&offset=${offset}`);
     const result = await resp.json();
     const history = document.getElementById('profile-history');
     if (!history) return;
 
     const records = (result.records || []);
+    _tizhiTotal = result.total || 0;
+    const totalPages = Math.max(1, Math.ceil(_tizhiTotal / TIZHI_PAGE_SIZE));
+    if (_tizhiPage > totalPages) _tizhiPage = 1;
 
-    if (records.length === 0 && isFirst) {
+    if (records.length === 0 && _tizhiTotal === 0) {
         history.innerHTML = '<p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>';
         return;
     }
 
-    // records 按 created_at DESC 返回, limit=PAGE_SIZE*page 一次拉前 N 页全量重渲染
-    // (微信 WebView 内存可承受: 每条记录展开内容是懒渲染的, 默认折叠)
-    const shown = records;
-    _tizhiHasMore = records.length > TIZHI_PAGE_SIZE * _tizhiPage;
-
     let html = '';
-    for (let i = 0; i < shown.length; i++) {
-        const r = shown[i];
+    for (let i = 0; i < records.length; i++) {
+        const r = records[i];
         const full = (r.advice ? r.advice : (r.symptoms || ''));
         html += '<div class="history-item" style="display:block;padding:8px;border-bottom:1px solid #f0f0f0;">';
         html += '  <div style="display:flex;justify-content:space-between;align-items:center;">';
-        html += '    <div><span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span> ';
+        html += '    <div><span class="history-date">' + escapeHtml((r.created_at || '').slice(0, 10)) + '</span> ';
         html += '    <span class="history-tizhi">' + escapeHtml(r.tizhi || '') + '</span></div>';
         html += '    <button class="tizhi-toggle-btn" style="background:none;border:none;color:#07c160;font-size:12px;cursor:pointer;white-space:nowrap;">展开</button>';
         html += '  </div>';
         html += '  <div class="tizhi-detail-block" style="display:none;margin:8px 0 4px;padding:10px;background:#f9f9f9;border-radius:8px;font-size:13px;color:#666;white-space:pre-wrap;line-height:1.6;">' + escapeHtml(full) + '</div>';
         html += '</div>';
     }
-    // 分页按钮
-    if (_tizhiHasMore) {
-        html += '<div style="padding:10px;text-align:center;">';
-        html += '  <button id="tizhi-load-more" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:8px 24px;font-size:13px;cursor:pointer;">加载更多</button>';
-        html += '</div>';
-    }
+    // 翻页器(上一页 / 第X页共Y页 / 下一页)
+    html += '<div style="display:flex;justify-content:center;align-items:center;gap:12px;padding:12px 0;">';
+    html += `  <button id="tizhi-prev" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:6px 18px;font-size:13px;cursor:pointer;${_tizhiPage <= 1 ? 'opacity:0.35;cursor:default;' : ''}">上一页</button>`;
+    html += `  <span style="font-size:12px;color:#666;">第 ${_tizhiPage} / ${totalPages} 页 · 共 ${_tizhiTotal} 条</span>`;
+    html += `  <button id="tizhi-next" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:6px 18px;font-size:13px;cursor:pointer;${_tizhiPage >= totalPages ? 'opacity:0.35;cursor:default;' : ''}">下一页</button>`;
+    html += '</div>';
     history.innerHTML = html;
     initTizhiToggle();
-    // 绑定"加载更多"
-    const moreBtn = document.getElementById('tizhi-load-more');
-    if (moreBtn) {
-        moreBtn.addEventListener('click', async function() {
-            moreBtn.textContent = '加载中...';
-            moreBtn.disabled = true;
-            await fetchTizhiPage(false);
-        });
-    }
+    const prevBtn = document.getElementById('tizhi-prev');
+    const nextBtn = document.getElementById('tizhi-next');
+    if (prevBtn && _tizhiPage > 1) prevBtn.addEventListener('click', async () => { _tizhiPage--; await fetchTizhiPage(); });
+    if (nextBtn && _tizhiPage < totalPages) nextBtn.addEventListener('click', async () => { _tizhiPage++; await fetchTizhiPage(); });
 }
 
 function loadTizhiRecords(data) {

@@ -325,10 +325,14 @@ def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
     if advice_c and len(advice_c) > 4000:
         advice_c = advice_c[:4000]
     conn = _conn()
+    # 2026-10-14 时区统一: created_at 显式存北京时间(UTC+8), 不用 SQLite CURRENT_TIMESTAMP(UTC),
+    # 与 face_vectors(_now()) 及前端显示口径一致, 避免时间顺序混乱。
+    from datetime import datetime, timezone, timedelta as _td
+    _ca = datetime.now(timezone.utc).astimezone(timezone(_td(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
     cur = conn.execute(
-        "INSERT INTO tizhi_records (user_id, tizhi, zhengxing, symptoms, advice, source, session_id, photo_features, photo_hash) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (user_id, tizhi, zhengxing, symptoms_c, advice_c, source, session_id, photo_features, photo_hash),
+        "INSERT INTO tizhi_records (user_id, tizhi, zhengxing, symptoms, advice, source, session_id, photo_features, photo_hash, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, tizhi, zhengxing, symptoms_c, advice_c, source, session_id, photo_features, photo_hash, _ca),
     )
     rid = cur.lastrowid
     conn.commit()
@@ -337,16 +341,20 @@ def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
     return dict(row)
 
 
-def get_tizhi_records(user_id: str, limit: int = 50) -> list:
+def get_tizhi_records(user_id: str, limit: int = 50, offset: int = 0) -> tuple:
     conn = _conn()
     # 2026-10-13 中华规则: 小麦辨证一次=一次对话=一条记录, 一一对应
     # 所以【不按 session 去重】, 直接返回最新 limit 条(每次辨证=一条)
+    total = conn.execute(
+        "SELECT COUNT(*) n FROM tizhi_records WHERE user_id=?", (user_id,)
+    ).fetchone()["n"]
     rows = conn.execute(
-        "SELECT * FROM tizhi_records WHERE user_id=? ORDER BY created_at DESC, id DESC LIMIT ?",
-        (user_id, limit)
+        "SELECT * FROM tizhi_records WHERE user_id=? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
+        (user_id, limit, offset)
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    # 2026-10-14 时区统一: 库内 created_at 已是北京时间(UTC+8), 直接返回, 不再换算
+    return [dict(r) for r in rows], total
 
 
 def get_latest_tizhi(user_id: str):
