@@ -1082,7 +1082,7 @@ async def chat_vision(request: VisionChatRequest):
             # 1. 先比对: 这张脸像谁(全库已存向量)
             vectors = face_service.load_all_vectors()
             chk = face_service.check_face(face_img, vectors)
-            # 2. 存当前用户的脸(覆盖旧的, 每次拍照都刷新到最新状态)
+            # 2. 把该用户新脸向量累加进历史向量组(向量组学习, 不覆盖, 见 face_service.add_user_vector)
             if request.user_id:
                 face_service.save_embedding(request.user_id, face_img)
             result["face_identity"] = {
