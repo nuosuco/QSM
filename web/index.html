@@ -245,33 +245,6 @@
                         </div>
                         <p class="checkin-tip">每天签到领积分，连续签到不中断哦</p>
                     </div>
-                    <div class="profile-section">
-                        <h3>🔐 账号绑定</h3>
-                        <div class="account-binding">
-                            <div class="binding-item">
-                                <span class="binding-label">📱 手机号</span>
-                                <span class="binding-value" id="binding-phone">未绑定</span>
-                                <button class="binding-btn" onclick="showBindPhoneModal()">绑定</button>
-                                <button class="binding-btn secondary" id="unbind-phone-btn" style="display:none;margin-left:6px;" onclick="doUnbindPhone()">解绑</button>
-                            </div>
-                            <div class="binding-item">
-                                <span class="binding-label">📧 邮箱账号</span>
-                                <span class="binding-value" id="binding-email">未绑定</span>
-                                <button class="binding-btn" onclick="showBindAccountModal('email')">绑定</button>
-                                <button class="binding-btn secondary" id="unbind-email-btn" style="display:none;margin-left:6px;" onclick="doUnbindAccount()">解绑</button>
-                            </div>
-                            <div class="binding-item">
-                                <span class="binding-label">🔑 密码</span>
-                                <span class="binding-value" id="binding-password">未设置</span>
-                                <button class="binding-btn" onclick="showBindPasswordModal()">设置</button>
-                            </div>
-                            <div class="binding-item">
-                                <span class="binding-label">💬 微信</span>
-                                <span class="binding-value" id="binding-wechat">未绑定</span>
-                                <button class="binding-btn" onclick="alert('微信登录请在登录页面操作')">绑定</button>
-                            </div>
-                        </div>
-                    </div>
                     <div class="profile-section" id="health-portrait-section" style="display:none;">
                         <h3>🖼️ 我的健康画像</h3>
                         <div id="health-portrait">
@@ -302,6 +275,34 @@
                             </div>
                         </div>
                     </div>
+                    <div class="profile-section">
+                        <h3>🔐 账号绑定</h3>
+                        <div class="account-binding">
+                            <div class="binding-item">
+                                <span class="binding-label">📱 手机号</span>
+                                <span class="binding-value" id="binding-phone">未绑定</span>
+                                <button class="binding-btn" onclick="showBindPhoneModal()">绑定</button>
+                                <button class="binding-btn secondary" id="unbind-phone-btn" style="display:none;margin-left:6px;" onclick="doUnbindPhone()">解绑</button>
+                            </div>
+                            <div class="binding-item">
+                                <span class="binding-label">📧 邮箱账号</span>
+                                <span class="binding-value" id="binding-email">未绑定</span>
+                                <button class="binding-btn" onclick="showBindAccountModal('email')">绑定</button>
+                                <button class="binding-btn secondary" id="unbind-email-btn" style="display:none;margin-left:6px;" onclick="doUnbindAccount()">解绑</button>
+                            </div>
+                            <div class="binding-item">
+                                <span class="binding-label">🔑 密码</span>
+                                <span class="binding-value" id="binding-password">未设置</span>
+                                <button class="binding-btn" onclick="showBindPasswordModal()">设置</button>
+                            </div>
+                            <div class="binding-item">
+                                <span class="binding-label">💬 微信</span>
+                                <span class="binding-value" id="binding-wechat">未绑定</span>
+                                <button class="binding-btn" onclick="alert('微信登录请在登录页面操作')">绑定</button>
+                            </div>
+                        </div>
+                    </div>
+                    
                 </div>
             </div>
         
