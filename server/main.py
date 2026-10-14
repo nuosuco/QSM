@@ -1126,14 +1126,17 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
             rejected = bool(own and own["has_record"] and own["face_detected"] and not own["matched"])
             # 2. 把该用户新脸向量累加进历史向量组(向量组学习, 不覆盖, 见 face_service.add_user_vector)
             #    非本人照片拒档: 不把别人的脸向量塞进你的向量组(否则组被污染, 本人识别也坏)
-            if request.user_id and not rejected:
+            #    2026-10-14 中华反馈补充: 已存组但检不到真脸的照片也不入库(回退统计特征不是真脸,
+            #    入库会稀释组均值、让后续拒档变迟钝), 只存 ArcFace 检到真脸且判定为本人的向量
+            face_vec_ok = bool(own and own["face_detected"] and own["matched"]) if own else False
+            if request.user_id and not rejected and face_vec_ok:
                 face_service.save_embedding(request.user_id, face_img)
             result["face_identity"] = {
                 "matched": chk.get("matched"),
                 "no_record": chk.get("no_record"),
                 "best_user_id": chk.get("best_user_id"),
                 "best_score": chk.get("best_score"),
-                "saved": bool(request.user_id and not rejected),
+                "saved": bool(request.user_id and not rejected and face_vec_ok),
                 "rejected": rejected,  # 2026-10-14 中华铁律: 非本人照片拒档
             }
             # 2026-10-14 中华要求: 拒档时小麦明确大白话告诉用户"这不是你本人, 请用本人真实照片,
