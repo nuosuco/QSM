@@ -2283,6 +2283,64 @@ function loadProfile() {
     
     // 优先从后端加载体质记录，失败则用本地
     loadTizhiRecordsFromBackend().catch(() => loadTizhiRecords(data));
+    // 2026-10-14 健康画像多维时间线(中华要求): 登录后拉后端 /api/health/portrait
+    loadHealthPortrait();
+}
+
+// ========== 2026-10-14 健康画像(多维时间画像) ==========
+// 脸/舌苔/面色/患处的照片视觉特征 + 小麦辨证, 随时间积累, 用户一看趋势就掌握自己的健康
+async function loadHealthPortrait() {
+    const section = document.getElementById('health-portrait-section');
+    const box = document.getElementById('health-portrait');
+    if (!section || !box) return;
+    if (!isLoggedIn()) { section.style.display = 'none'; return; }
+    const userId = getUserId();
+    if (!userId) { section.style.display = 'none'; return; }
+    let result;
+    try {
+        const resp = await fetch(`${API_BASE}/api/health/portrait?user_id=${encodeURIComponent(userId)}&days=90`);
+        result = await resp.json();
+    } catch (e) { console.warn('health portrait 拉取失败', e); section.style.display = 'none'; return; }
+    const p = result && result.portrait;
+    if (!p || !p.timeline || p.timeline.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+
+    const d = p.trend || {};
+    const face = p.face || {};
+    const dist = p.tizhi_distribution || {};
+    let html = '';
+    // ① 汇总条
+    const distStr = Object.keys(dist).map(k => `${k}×${dist[k]}`).join('、') || '暂无';
+    html += '<div style="font-size:13px;color:#555;line-height:1.9;">';
+    html += `<div>📊 近90天辨证 <b>${d.total || 0}</b> 次 · 体质分布: ${escapeHtml(distStr)}</div>`;
+    if (face.vector_count) {
+        html += `<div>🧬 人脸向量组已学 <b>${face.vector_count}</b> 张(认得你变老/换角度/换光线)</div>`;
+    }
+    if (d.first_tizhi && d.last_tizhi) {
+        const changed = d.changed ? ' <span style="color:#fa5151;">↺ 体质发生了变化</span>' : ' <span style="color:#07c160;">✔ 体质保持稳定</span>';
+        html += `<div>📈 趋势: ${escapeHtml(d.first_tizhi)}(${escapeHtml((d.first_date||'').slice(0,10))}) → ${escapeHtml(d.last_tizhi)}(${escapeHtml((d.last_date||'').slice(0,10))})${changed}</div>`;
+    }
+    if (p.registered_days != null) html += `<div>⏳ 健康大数据已积累 ${p.registered_days} 天</div>`;
+    html += '</div>';
+    // ② 时间线(新→旧, 带照片指纹占位 + 相邻两次视觉差异)
+    const tl = (p.timeline || []).slice().reverse();
+    html += '<div style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;font-size:12px;color:#666;">';
+    for (let i = 0; i < tl.length; i++) {
+        const t = tl[i];
+        const date = escapeHtml((t.date || '').slice(0, 16));
+        const tag = t.has_photo ? '📷' : '💬';
+        let delta = '';
+        if (t.visual_delta != null) {
+            const sim = t.visual_delta; // 0=两次拍照几乎一样, 越大越不同
+            delta = sim < 0.25 ? '<span style="color:#07c160;">(照片变化小)</span>'
+                   : sim < 0.6 ? '<span style="color:#faad14;">(照片有变化)</span>'
+                   : '<span style="color:#fa5151;">(照片变化大)</span>';
+        }
+        html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #f5f5f5;">`;
+        html += `<span>${tag} ${date}</span><span><b>${escapeHtml(t.tizhi || '未知')}</b>${delta}</span></div>`;
+    }
+    html += '</div>';
+    box.innerHTML = html;
 }
 
 // 从后端加载体质记录
@@ -2348,27 +2406,41 @@ function initTizhiToggle() {
     });
 }
 
+// 2026-10-14 小蕊(中华要求): 体质记录分页 —— 太多时不用翻到最下面, 点"加载更多"下一页
+let _tizhiPage = 0;
+let _tizhiHasMore = true;
+const TIZHI_PAGE_SIZE = 20;
+
 async function loadTizhiRecordsFromBackend() {
-    const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=50`);
+    _tizhiPage = 0;
+    _tizhiHasMore = true;
+    await fetchTizhiPage(true);
+}
+
+async function fetchTizhiPage(isFirst) {
+    _tizhiPage++;
+    const limit = TIZHI_PAGE_SIZE * _tizhiPage;
+    const resp = await fetch(`${API_BASE}/api/tizhi/records?user_id=${encodeURIComponent(getUserId())}&limit=${limit}`);
     const result = await resp.json();
     const history = document.getElementById('profile-history');
     if (!history) return;
-    
-    // 2026-10-13 中华规则: 小麦辨证一次=一次对话=一条记录, 一一对应
-    // 所以【不按 session 去重】, 每次辨证都显示(后端已保证每次辨证=一条)
+
     const records = (result.records || []);
-    
-    if (records.length === 0) {
+
+    if (records.length === 0 && isFirst) {
         history.innerHTML = '<p class="empty-hint">暂无体质记录，快去和小麦SOM对话吧</p>';
         return;
     }
-    
-    // 2026-10-13 小蕊重写: 每条记录自带详情 div, 点展开 toggle 相邻 div, 不依赖全局数组
+
+    // records 按 created_at DESC 返回, limit=PAGE_SIZE*page 一次拉前 N 页全量重渲染
+    // (微信 WebView 内存可承受: 每条记录展开内容是懒渲染的, 默认折叠)
+    const shown = records;
+    _tizhiHasMore = records.length > TIZHI_PAGE_SIZE * _tizhiPage;
+
     let html = '';
-    for (let i = 0; i < records.length; i++) {
-        const r = records[i];
-        // 2026-10-13 小蕊改(中华反馈: 展开应该是完整内容): advice=完整分析/建议优先, 无 advice 才用 symptoms 兜底
-        const full = (r.advice ? r.advice : (r.symptoms || '')) ;
+    for (let i = 0; i < shown.length; i++) {
+        const r = shown[i];
+        const full = (r.advice ? r.advice : (r.symptoms || ''));
         html += '<div class="history-item" style="display:block;padding:8px;border-bottom:1px solid #f0f0f0;">';
         html += '  <div style="display:flex;justify-content:space-between;align-items:center;">';
         html += '    <div><span class="history-date">' + escapeHtml((r.created_at || '').split('T')[0]) + '</span> ';
@@ -2378,8 +2450,23 @@ async function loadTizhiRecordsFromBackend() {
         html += '  <div class="tizhi-detail-block" style="display:none;margin:8px 0 4px;padding:10px;background:#f9f9f9;border-radius:8px;font-size:13px;color:#666;white-space:pre-wrap;line-height:1.6;">' + escapeHtml(full) + '</div>';
         html += '</div>';
     }
+    // 分页按钮
+    if (_tizhiHasMore) {
+        html += '<div style="padding:10px;text-align:center;">';
+        html += '  <button id="tizhi-load-more" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:8px 24px;font-size:13px;cursor:pointer;">加载更多</button>';
+        html += '</div>';
+    }
     history.innerHTML = html;
     initTizhiToggle();
+    // 绑定"加载更多"
+    const moreBtn = document.getElementById('tizhi-load-more');
+    if (moreBtn) {
+        moreBtn.addEventListener('click', async function() {
+            moreBtn.textContent = '加载中...';
+            moreBtn.disabled = true;
+            await fetchTizhiPage(false);
+        });
+    }
 }
 
 function loadTizhiRecords(data) {

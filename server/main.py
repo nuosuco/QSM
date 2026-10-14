@@ -936,29 +936,44 @@ def _base64_to_url(data_uri: str) -> str:
 
 def _extract_tizhi_from_vision_reply(reply: str):
     """2026-10-13 小蕊: 从图片辨证回复里提取体质/证型(服务端统一做, 不依赖前端JS版本)。
-    返回 (tizhi, zhengxing)。抓不到体质词就 (('', ''), 不硬塞)。"""
+    2026-10-14 双通道升级(中华要求: 辨证必须稳定进体质记录):
+      通道1(优先): 解析 LLM 末尾固定 JSON 块: tizhi_data: {"tizhi":"...","zhengxing":"..."}
+      通道2(兜底): 原有词表/正则匹配
+    返回 (tizhi, zhengxing)。两通道都抓不到就 ('', '', 不硬塞)。"""
     import re
     if not reply:
         return '', ''
-    # 1) 常见体质词(中医体质分类9型 + 辨证常见名)
-    tizhi_words = ['平和质', '气虚质', '阳虚质', '阴虚质', '痰湿质', '湿热质', '血瘀质', '特禀质', '过敏质',
-                   '脾虚湿盛质', '脾虚质', '肝郁质', '气郁质', '血瘀体质']
-    found = [t for t in tizhi_words if t in reply]
-    # 去重保持顺序, 最多3个(脾虚湿盛质含气虚/痰湿语义, 与单项去重)
-    seen, uniq = set(), []
-    for t in found:
-        key = t.replace('质', '')
-        if key not in seen:
-            seen.add(key)
-            uniq.append(t)
-    tizhi = '、'.join(uniq[:3])
-    # 2) 证型: 抓“兼有X”“X证”里的关键词
-    zhs = []
-    for m in re.finditer(r'兼有([\u4e00-\u9fa5]{2,6})|([\u4e00-\u9fa5]{2,4}证)', reply):
-        z = (m.group(1) or m.group(2) or '').strip()
-        if z and z not in zhs:
-            zhs.append(z)
-    zhengxing = '、'.join(zhs[:3])
+    tizhi = ''
+    zhengxing = ''
+    # ===== 通道1: LLM 固定 JSON 块(提示词末尾要求 tizhi_data: {...}) =====
+    m = re.search(r'tizhi_data\s*:\s*\{\s*"tizhi"\s*:\s*"([^"]*)"\s*(?:,\s*"zhengxing"\s*:\s*"([^"]*)")?\s*\}', reply)
+    if not m:
+        # 兼容 LLM 没写 tizhi_data 前缀、直接裸 JSON 的情况
+        m = re.search(r'\{\s*"tizhi"\s*:\s*"([^"]*)"\s*(?:,\s*"zhengxing"\s*:\s*"([^"]*)")?\s*\}', reply)
+    if m:
+        tizhi = m.group(1).strip()
+        zhengxing = (m.group(2) or '').strip()
+    # ===== 通道2: 词表兜底(通道1没抓到体质才跑) =====
+    if not tizhi:
+        tizhi_words = ['平和质', '气虚质', '阳虚质', '阴虚质', '痰湿质', '湿热质', '血瘀质', '特禀质', '过敏质',
+                       '脾虚湿盛质', '脾虚质', '肝郁质', '气郁质', '血瘀体质']
+        found = [t for t in tizhi_words if t in reply]
+        # 去重保持顺序, 最多3个(脾虚湿盛质含气虚/痰湿语义, 与单项去重)
+        seen, uniq = set(), []
+        for t in found:
+            key = t.replace('质', '')
+            if key not in seen:
+                seen.add(key)
+                uniq.append(t)
+        tizhi = '、'.join(uniq[:3])
+    # 通道2: 证型兜底(通道1没抓到证型才跑)
+    if not zhengxing:
+        zhs = []
+        for m2 in re.finditer(r'兼有([\u4e00-\u9fa5]{2,6})|([\u4e00-\u9fa5]{2,4}证)', reply):
+            z = (m2.group(1) or m2.group(2) or '').strip()
+            if z and z not in zhs:
+                zhs.append(z)
+        zhengxing = '、'.join(zhs[:3])
     return tizhi, zhengxing
 
 
@@ -990,7 +1005,9 @@ async def chat_vision(request: VisionChatRequest):
 注意：
 - 用通俗易懂的语言，不堆砌术语
 - 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医
-- 如果图片看不清，礼貌说明并建议重新拍摄"""
+- 如果图片看不清，礼貌说明并建议重新拍摄
+- 最末尾必须追加一行固定JSON块(供服务端自动存档, 用户看不到): 体质用中医九分法(平和质/气虚质/阳虚质/阴虚质/痰湿质/湿热质/血瘀质/特禀质/过敏质), 最多3个顿号连接; 没有明显体质就留空字符串。格式:
+tizhi_data: {"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}"""
     else:
         system_prompt = f"""你是小麦SOM，一位经验丰富的中医养生顾问，擅长多维度望诊。
 用户发来了{len(image_list)}张照片（可能包含舌苔、面色、皮肤、患处等不同部位）。
@@ -1004,7 +1021,9 @@ async def chat_vision(request: VisionChatRequest):
 注意：
 - 多维度综合分析比单张照片更准确，请充分利用多张图的信息
 - 用通俗易懂的语言
-- 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医"""
+- 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医
+- 最末尾必须追加一行固定JSON块(供服务端自动存档, 用户看不到): 体质用中医九分法, 最多3个顿号连接; 没有明显体质就留空字符串。格式:
+tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
 
     # 加载会话历史（让小麦记住之前的对话上下文，包括之前的拍照扫描结果）
     history_context = ""
@@ -1102,6 +1121,21 @@ async def chat_vision(request: VisionChatRequest):
         try:
             from services.user_system import add_tizhi_record
             advice_full = result["content"][:2000]
+            # 2026-10-14 健康画像多维升级(中华要求): 该次拍照的第一张图提视觉特征向量
+            # (face_service._extract_embedding, 检不到脸回退统计特征), base64 ~2KB 存
+            # tizhi_records.photo_features + photo_hash(前8字节短指纹), 不存原图。
+            # 随时间积累后可画"健康画像"时间线: 脸/舌苔/面色/患处的向量变化 + 辨证变化。
+            photo_features_b, photo_hash_s = None, None
+            try:
+                from services import face_service
+                _img0 = face_service._decode_image(image_list[0])
+                if _img0 is not None:
+                    _emb = face_service._extract_embedding(_img0)
+                    photo_features_b = face_service.encode_embedding(_emb)
+                    import base64 as _b64
+                    photo_hash_s = _b64.b64encode(photo_features_b[:8]).decode('ascii')
+            except Exception as _pe:
+                print(f"[vision] photo_features 提取失败(忽略): {_pe}")
             rec = add_tizhi_record(
                 request.user_id or 'anonymous', extracted_tizhi,
                 zhengxing=extracted_zhengxing,
@@ -1109,6 +1143,8 @@ async def chat_vision(request: VisionChatRequest):
                 advice=advice_full,
                 source='vision_chat',
                 session_id=request.session_id or 'vision',
+                photo_features=photo_features_b,
+                photo_hash=photo_hash_s,
             )
         except Exception as e:
             print(f"vision体质存档失败: {e}")
@@ -1746,6 +1782,105 @@ async def tizhi_latest(user_id: str):
     """最新一次体质结果"""
     from services.user_system import get_latest_tizhi
     return {"success": True, "record": get_latest_tizhi(user_id)}
+
+
+@app.get("/api/health/portrait")
+async def health_portrait(user_id: str, days: int = 90):
+    """2026-10-14 中华要求: 个人中心健康画像(多维时间画像)。
+    聚合该用户: ① 小麦辨证时间线(体质/证型随时间变化) ② 人脸向量组积累(学习进度)
+    ③ 体质分布 ④ 健康趋势。用户一看画像变化就掌握自己的健康。"""
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "data", "user_data.db"))
+    conn.row_factory = sqlite3.Row
+    now = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8)))
+    cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+
+    # ① 辨证时间线(最近 N 天, 按时间正序, 前端画时间轴)
+    timeline_rows = conn.execute(
+        "SELECT created_at, tizhi, zhengxing, source, photo_hash, photo_features FROM tizhi_records "
+        "WHERE user_id=? AND created_at >= ? ORDER BY created_at ASC, id ASC",
+        (user_id, cutoff)
+    ).fetchall()
+    # 2026-10-14 健康画像: 每行带 photo_hash(该次拍照特征指纹, 无照片=NULL);
+    # 相邻两次有照片的时间线点算余弦距离, 给出"视觉相似度趋势"(脸/舌苔/患处随时间变没变)
+    def _vec(row):
+        try:
+            import base64
+            from services import face_service
+            return face_service.decode_embedding(base64.b64decode(row["photo_features"])) if row["photo_features"] else None
+        except Exception:
+            return None
+    timeline = []
+    _prev_vec = None
+    for r in timeline_rows:
+        entry = {
+            "date": r["created_at"], "tizhi": r["tizhi"] or "",
+            "zhengxing": r["zhengxing"] or "", "source": r["source"] or "",
+            "has_photo": bool(r["photo_hash"]),
+            "photo_hash": (r["photo_hash"] or "")[:12],  # 短指纹(非原图), 前端画占位
+        }
+        cur_vec = _vec(r)
+        if cur_vec is not None and _prev_vec is not None:
+            try:
+                from services import face_service as _fs
+                entry["visual_delta"] = round(1.0 - _fs.cosine(cur_vec, _prev_vec), 3)  # 相邻两次拍照视觉差异(0=完全像, 1=不同)
+            except Exception:
+                pass
+        if cur_vec is not None:
+            _prev_vec = cur_vec
+        timeline.append(entry)
+
+    # ② 人脸向量组(学习进度: 累积几张脸向量, 最早/最近时间)
+    face_rows = conn.execute(
+        "SELECT COUNT(*) n, MIN(created_at) first_seen, MAX(updated_at) last_seen FROM face_vectors WHERE user_id=?",
+        (user_id,)
+    ).fetchone()
+    face = {
+        "vector_count": face_rows["n"] or 0,
+        "first_seen": face_rows["first_seen"],
+        "last_seen": face_rows["last_seen"] or face_rows["first_seen"],
+    }
+
+    # ③ 体质分布(最近 N 天内各体质出现次数, 找主体质)
+    dist_rows = conn.execute(
+        "SELECT tizhi, COUNT(*) c FROM tizhi_records WHERE user_id=? AND created_at>=? GROUP BY tizhi ORDER BY c DESC",
+        (user_id, cutoff)
+    ).fetchall()
+    tizhi_dist = {r["tizhi"] or "未知": r["c"] for r in dist_rows}
+
+    # ④ 健康趋势: 比对最近一次 vs 最早一次体质, 看有没有变化
+    first = timeline[0] if timeline else None
+    last = timeline[-1] if timeline else None
+    trend = {
+        "first_date": first["date"] if first else None,
+        "last_date": last["date"] if last else None,
+        "first_tizhi": first["tizhi"] if first else None,
+        "last_tizhi": last["tizhi"] if last else None,
+        "changed": bool(first and last and (first["tizhi"] != last["tizhi"])),
+        "total": len(timeline),
+    }
+
+    # 注册时长(健康大数据积累多少天)
+    reg_row = conn.execute("SELECT MIN(created_at) d FROM users WHERE user_id=?", (user_id,)).fetchone()
+    registered_days = None
+    if reg_row and reg_row["d"]:
+        try:
+            reg_dt = datetime.strptime(reg_row["d"][:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=8)))
+            registered_days = (now - reg_dt).days
+        except Exception:
+            pass
+
+    conn.close()
+    return {
+        "success": True,
+        "portrait": {
+            "timeline": timeline,
+            "face": face,
+            "tizhi_distribution": tizhi_dist,
+            "trend": trend,
+            "registered_days": registered_days,
+        }
+    }
 
 
 # ========== 健康测评 API ==========

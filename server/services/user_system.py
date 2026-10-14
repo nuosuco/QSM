@@ -97,9 +97,23 @@ def init_user_system():
             symptoms TEXT,
             advice TEXT,
             source TEXT DEFAULT 'chat',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            session_id TEXT,
+            photo_features BLOB,    -- 2026-10-14 照片视觉特征向量(base64 float32), 健康画像多维趋势用, 不存原图
+            photo_hash TEXT        -- 2026-10-14 照片视觉指纹(短字符串), 健康画像趋势比对用
         )
     ''')
+    # 2026-10-14 向量组学习(老库迁移): tizhi_records 若缺新列则补上(幂等)
+    try:
+        _tcols = [r[1] for r in c.execute('PRAGMA table_info(tizhi_records)').fetchall()]
+        if 'session_id' not in _tcols:
+            c.execute('ALTER TABLE tizhi_records ADD COLUMN session_id TEXT')
+        if 'photo_features' not in _tcols:
+            c.execute('ALTER TABLE tizhi_records ADD COLUMN photo_features BLOB')
+        if 'photo_hash' not in _tcols:
+            c.execute('ALTER TABLE tizhi_records ADD COLUMN photo_hash TEXT')
+    except Exception as e:
+        print(f'[user_system] tizhi_records 迁移(忽略): {e}')
 
     # 2026-10-13 小蕊加: 人脸特征向量表(方案B)
     # 只存 512 维 float 向量的 base64 压缩 + 创建时间, 不存原图/不存可逆人脸信息
@@ -291,7 +305,8 @@ def verify_token(token: str):
 
 def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
                      symptoms: str = None, advice: str = None, source: str = "chat",
-                     session_id: str = None) -> dict:
+                     session_id: str = None,
+                     photo_features: bytes = None, photo_hash: str = None) -> dict:
     """存体质记录。
     2026-10-12 中华要求: 用户中心数据是健康大数据, 要压缩到最小存储——
     只留关键字段, symptoms/advice 截断存摘要, 不存整段原文。
@@ -311,8 +326,9 @@ def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
         advice_c = advice_c[:4000]
     conn = _conn()
     cur = conn.execute(
-        "INSERT INTO tizhi_records (user_id, tizhi, zhengxing, symptoms, advice, source, session_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (user_id, tizhi, zhengxing, symptoms_c, advice_c, source, session_id),
+        "INSERT INTO tizhi_records (user_id, tizhi, zhengxing, symptoms, advice, source, session_id, photo_features, photo_hash) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, tizhi, zhengxing, symptoms_c, advice_c, source, session_id, photo_features, photo_hash),
     )
     rid = cur.lastrowid
     conn.commit()
