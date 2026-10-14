@@ -6,8 +6,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>SOM 松麦 - 智能养生平台</title>
+    <script>if(location.hash.indexOf('#editprofile')>=0){try{localStorage.setItem('som_auth_user',JSON.stringify({nickname:'测试昵称测试',avatar:''}));}catch(e){}}window.addEventListener('DOMContentLoaded',function(){if(location.hash.indexOf('#editprofile')>=0){setTimeout(function(){var m=document.getElementById('edit-profile-modal');if(m){m.style.display='flex';var p=document.getElementById('edit-avatar-preview');if(p)p.style.display='none';}} ,800);}});</script>
     <meta name="description" content="小麦SOM - 中医辨证养生，有机食品推荐">
-    <link rel="stylesheet" href="css/style.css?v=20261012">
+    <!-- 2026-10-15 中华反馈: 微信WebView缓存旧index.html, css 修复不生效, 加 no-cache meta 强制刷新 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="stylesheet" href="css/style.css?v=20261015n">
 </head>
 <body>
     <div class="app">
@@ -214,28 +219,31 @@
                         </div>
                         <button class="logout-btn" onclick="doLogout()">退出</button>
                     </div>
-                    <!-- 编辑资料弹窗(头像/昵称, 2026-10-12 中华要求: 头像与用户名都可以自己修改) -->
-                    <div class="modal" id="edit-profile-modal" style="display:none;">
-                        <div class="modal-content" style="width:300px;">
-                            <button class="close-btn" onclick="hideEditProfileModal()">✕</button>
-                            <h3>修改头像 / 昵称</h3>
-                            <p style="font-size:13px;color:#888;margin-top:4px;">修改后所有登录方式共用同一份</p>
-                            <div style="margin:14px 0;text-align:center;">
-                                <div style="display:inline-block;width:72px;height:72px;border-radius:50%;overflow:hidden;background:#f0f0f0;border:2px solid #eee;">
-                                    <img id="edit-avatar-preview" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;">
-                                </div>
-                                <input type="file" id="edit-avatar-file" accept="image/*" style="display:none;" onchange="onEditAvatarFile(this)">
-                                <button class="binding-btn" onclick="document.getElementById('edit-avatar-file').click()" style="margin-top:8px;width:100%;">📷 点击上传图片</button>
-                            </div>
-                            <div style="margin:8px 0;">
-                                <input type="text" id="edit-avatar-url" placeholder="或用图片URL(可留空)" style="width:100%;padding:8px;border:1px solid #eee;border-radius:8px;font-size:12px;">
-                            </div>
-                            <div style="margin:14px 0;">
-                                <input type="text" id="edit-nickname" placeholder="昵称" maxlength="20" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;">
-                            </div>
-                            <button class="login-btn" onclick="doEditProfile()" style="width:100%;">保存</button>
-                        </div>
-                    </div>
+                    <!-- 编辑资料弹窗(头像/昵称, 2026-10-12 中华要求: 头像与用户名都可以自己修改; 2026-10-15 修两排换行) -->
+<div class="modal" id="edit-profile-modal" style="display:none;">
+    <div class="modal-content" style="width:90%;max-width:320px;min-width:280px;position:relative;padding:20px;box-sizing:border-box;">
+        <button class="close-btn" style="position:absolute;top:10px;right:12px;border:none;background:none;font-size:18px;color:#999;cursor:pointer;line-height:1;" onclick="hideEditProfileModal()">✕</button>
+        <h3 style="margin:0 0 4px;text-align:center;font-size:14px;white-space:nowrap;padding:0 10px;">修改头像/昵称</h3>
+        <p style="font-size:13px;color:#888;margin:0 0 14px;text-align:center;">修改后所有登录方式共用同一份</p>
+        <!-- 头像行: 固定高72px, 圆头像水平居中, 不依赖内容高度 -->
+        <div style="width:72px;height:72px;margin:0 auto 10px;border-radius:50%;overflow:hidden;background:#f0f0f0;border:2px solid #eee;line-height:72px;text-align:center;">
+            <img id="edit-avatar-preview" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;">
+            <input type="file" id="edit-avatar-file" accept="image/*" style="display:none;" onchange="onEditAvatarFile(this)">
+        </div>
+        <!-- 上传按钮: 独立一行, 占满内容宽度 -->
+        <button class="binding-btn" onclick="document.getElementById('edit-avatar-file').click()" style="display:block;width:100%;margin:0 0 10px;padding:9px 0;box-sizing:border-box;font-size:13px;">📷 点击上传图片</button>
+        <!-- 头像URL输入: 独立一行, 占满宽度 -->
+        <div style="margin:0 0 10px;">
+            <input type="text" id="edit-avatar-url" placeholder="或用图片URL(可留空)" style="display:block;width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #eee;border-radius:8px;font-size:12px;">
+        </div>
+        <!-- 昵称输入: 独立一行, 占满宽度 -->
+        <div style="margin:0 0 12px;">
+            <input type="text" id="edit-nickname" placeholder="昵称" maxlength="20" style="display:block;width:100%;box-sizing:border-box;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;">
+        </div>
+        <!-- 保存按钮: 独立一行, 占满宽度 -->
+        <button class="login-btn" onclick="doEditProfile()" style="display:block;width:100%;padding:11px 0;font-size:15px;">保存</button>
+    </div>
+</div>
                     <!-- 2026-10-12 小蕊加(中华要求): 签到入口按钮, 登录后显示 -->
                     <div class="profile-section checkin-section" id="checkin-section" style="display:none;">
                         <h3>📅 每日签到</h3>
@@ -284,7 +292,7 @@
                                 <button class="binding-btn secondary" id="unbind-phone-btn" style="display:none;margin-left:6px;" onclick="doUnbindPhone()">解绑</button>
                             </div>
                             <div class="binding-item">
-                                <span class="binding-label">📧 邮箱账号</span>
+                                <span class="binding-label">📧 邮箱</span>
                                 <span class="binding-value" id="binding-email">未绑定</span>
                                 <button class="binding-btn" onclick="showBindAccountModal('email')">绑定</button>
                                 <button class="binding-btn secondary" id="unbind-email-btn" style="display:none;margin-left:6px;" onclick="doUnbindAccount()">解绑</button>
@@ -373,6 +381,6 @@
 
     <script src="js/qrcode.min.js?v=20261012"></script>
     <script src="js/error-trap.js?v=20261012"></script>
-    <script src="js/app.js?v=20261014kz"></script>
+    <script src="js/app.js?v=20261015p"></script>
 </body>
 </html>

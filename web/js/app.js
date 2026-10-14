@@ -1772,9 +1772,9 @@ async function loadUserAccount() {
         if (data.success && data.user) {
             const user = data.user;
             var emailEl = document.getElementById('binding-email');
-            emailEl.textContent = user.account || '未绑定';
+            emailEl.textContent = user.email || '未绑定';  // 2026-10-15 中华反馈: 绑定页显示邮箱(email列), 不再显示账号名(account列)
             var unbindEmailBtn = document.getElementById('unbind-email-btn');
-            if (unbindEmailBtn) unbindEmailBtn.style.display = user.account ? 'inline-block' : 'none';
+            if (unbindEmailBtn) unbindEmailBtn.style.display = user.email ? 'inline-block' : 'none';
             var phoneEl = document.getElementById('binding-phone');
             var unbindPhoneBtn = document.getElementById('unbind-phone-btn');
             if (user.phone) { phoneEl.textContent = user.phone; if (unbindPhoneBtn) unbindPhoneBtn.style.display = 'inline-block'; }

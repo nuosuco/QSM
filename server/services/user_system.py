@@ -449,19 +449,52 @@ def register_with_password(account: str, password: str, nickname: str = None) ->
     
     return {"success": True, "user_id": user_id}
 
-def login_with_password(account: str, password: str) -> dict:
-    """用账号+密码登录（自动注册新用户）"""
+def login_with_password(account: str, password: str, anonymous_user_id: str = None) -> dict:
+    """用账号+密码登录（自动注册新用户）
+    
+    2026-10-15 自动绑定邮箱: 登录成功后, 若同昵称的已有账号绑了邮箱,
+    则自动把邮箱归并到当前账号(一人一户, 邮箱前缀匹配或昵称匹配)。
+    """
     conn = _conn()
+    # 2026-10-15 修复: 先在 account 列找; 找不到再去 email/nickname 列找同一个人(邮箱前缀匹配),
+    # 找到了就登录(不盲注册新号)。彻底杜绝"邮箱行有密码、昵称行没密码→填昵称又建新号"的双账户问题。
     row = conn.execute("SELECT * FROM users WHERE account = ?", (account,)).fetchone()
     
     if not row:
-        # 自动注册新用户
+        # 2026-10-15 修复: 邮箱前缀匹配——用户输入邮箱或邮箱前缀, 都能找到邮箱行(不盲注册新号)
+        norm = account.lower().strip()
+        row = conn.execute(
+            "SELECT * FROM users WHERE email = ? AND password_hash IS NOT NULL ORDER BY last_active DESC LIMIT 1",
+            (norm,)
+        ).fetchone() or conn.execute(
+            "SELECT * FROM users WHERE email LIKE ? AND password_hash IS NOT NULL ORDER BY last_active DESC LIMIT 1",
+            (f"{norm}@%",)
+        ).fetchone()
+    
+    if not row:
+        # 2026-10-15 修复: 昵称匹配(兼容旧数据带"养生用户"前缀的昵称), 排除匿名归档账号
+        norm = account.strip()
+        for alias in (norm, f"养生用户{norm}"):
+            row = conn.execute(
+                "SELECT * FROM users WHERE nickname = ? AND is_anonymous = 0 AND password_hash IS NOT NULL ORDER BY last_active DESC LIMIT 1",
+                (alias,)
+            ).fetchone()
+            if row:
+                break
+    
+    if not row:
+        # 真正的新用户: 才注册
         user_id = f"user_pw_{int(time.time())}"
         password_hash = hash_password(password)
+        # 2026-10-15 中华要求: 昵称不加"养生用户"前缀, 直接用账号名(简短好记)
         conn.execute("INSERT INTO users (user_id, account, password_hash, nickname, created_at, is_anonymous) VALUES (?, ?, ?, ?, ?, ?)",
                     (user_id, account, password_hash, account, int(time.time()), 0))
         conn.commit()
-        row = conn.execute("SELECT * FROM users WHERE account = ?", (account,)).fetchone()
+        row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        if not row:
+            conn.close()
+            return {"success": False, "error": "账号创建失败"}
+    
     
     if not row:
         conn.close()
@@ -475,11 +508,59 @@ def login_with_password(account: str, password: str) -> dict:
         conn.close()
         return {"success": False, "error": "密码错误"}
     
+    # 2026-10-15 自动绑定邮箱: 检查同昵称的已有账号是否绑了邮箱
+    _auto_bind_email_for_password(conn, row)
+    
+    # 匿名数据归并
+    if anonymous_user_id and anonymous_user_id != row["user_id"]:
+        _merge_anonymous(conn, anonymous_user_id, row["user_id"])
+    
     # 生成token
     token = _issue_token(conn, row["user_id"])
     
-    user = dict(row)
+    user = dict(conn.execute("SELECT * FROM users WHERE user_id = ?", (row["user_id"],)).fetchone())
     user.pop("password_hash", None)
     conn.close()
     
     return {"success": True, "user": user, "token": token}
+
+
+def _auto_bind_email_for_password(conn, user_row):
+    """2026-10-15 自动绑定邮箱: 密码登录时自动把同昵称/邮箱前缀匹配到的邮箱绑上。
+    
+    匹配规则:
+    1. 当前账号已有 email → 跳过
+    2. 找同昵称的其他账号, 且其绑了邮箱 → 把邮箱搬过来(把对方 email 置空, 避免撞唯一约束)
+    3. 匹配失败则静默跳过, 不影响登录
+    """
+    user_id = user_row["user_id"]
+    account = user_row["account"]
+    
+    # 1. 已有邮箱就不动
+    if user_row["email"]:
+        return
+    
+    nickname = user_row["nickname"] or account
+    
+    # 2. 找同昵称且绑了邮箱的其他账号(排除匿名归档账号)
+    candidates = conn.execute(
+        "SELECT user_id, email, account FROM users WHERE nickname = ? AND email IS NOT NULL AND user_id != ? AND is_anonymous = 0 ORDER BY last_active DESC LIMIT 1",
+        (nickname, user_id)
+    ).fetchone()
+    
+    if not candidates:
+        # 也试试邮箱前缀匹配: 账号名 == 邮箱前缀
+        candidates = conn.execute(
+            "SELECT user_id, email, account FROM users WHERE email IS NOT NULL AND user_id != ? AND is_anonymous = 0 "
+            "AND email LIKE ? ESCAPE '\\' ORDER BY last_active DESC LIMIT 1",
+            (user_id, f"{account}@%")
+        ).fetchone()
+    
+    if not candidates:
+        return
+    
+    # 3. 把邮箱搬过来(对方 email 置空, 避免撞唯一约束)
+    conn.execute("UPDATE users SET email = NULL WHERE user_id = ?", (candidates["user_id"],))
+    conn.execute("UPDATE users SET email = ? WHERE user_id = ?", (candidates["email"], user_id))
+    conn.commit()
+    print(f"[auto_bind_email] 密码账号 {user_id}({account}) 自动绑定邮箱 {candidates['email']}")

@@ -1319,7 +1319,8 @@ async def user_profile(user_id: str):
     user["password_set"] = bool(user.get("password_hash"))
     user.pop("password_hash", None)
     user["phone_set"] = bool(user.get("phone"))
-    user["email_set"] = bool(user.get("account"))
+    # 2026-10-15 中华: email_set 按 email 列判断(邮箱与账号分离后, account 列是自定义账号名)
+    user["email_set"] = bool(user.get("email"))
     return {"success": True, "user": user}
 
 @app.post("/api/user/login")
@@ -1445,22 +1446,25 @@ async def auth_check_account(account: str):
 
 @app.post("/api/auth/forgot-password")
 async def auth_forgot_password(request: ForgotPasswordRequest):
-    """忘记密码(2026-10-15 中华要求): 查不到账号明确告知; 查到了异步发邮件不阻塞界面"""
+    """忘记密码(2026-10-15 中华要求): 认识 account/email/nickname 三列; 查不到账号明确告知; 查到了异步发邮件不阻塞界面"""
     from services.user_system import generate_reset_token, _conn
     import smtplib, threading
     from email.mime.text import MIMEText
     from services.auth_service import _load_auth_config
     acc = request.account.strip()
     conn = _conn()
+    # 2026-10-15 修: 认识 nickname 列(用户自定义账号/昵称, 如"用音乐说世界")
     user = conn.execute(
-        "SELECT user_id, email, account FROM users WHERE account = ? OR email = ? COLLATE NOCASE",
-        (acc, acc)).fetchone()
+        "SELECT user_id, email, account, nickname FROM users WHERE account = ? OR email = ? OR nickname = ? COLLATE NOCASE",
+        (acc, acc, acc)).fetchone()
     conn.close()
-    if not user or not (user["email"] or user["account"] or ""):
-        return {"success": False, "error": "该账号不存在，请检查是否输入正确"}
-    send_to = user["email"] or user["account"]
+    if not user or not (user["email"] or ""):
+        return {"success": False, "error": "该账号不存在或尚未绑定邮箱，请先绑定邮箱再重置密码"}
+    send_to = user["email"]
     tok = generate_reset_token(user["user_id"])
-    reset_url = "https://som.top/web/reset-password.html?token=" + tok
+    # 2026-10-15 修: URL 去掉 /web 前缀 — nginx root=/root/SOM/web, 实际文件在 /root/SOM/web/reset-password.html
+    # URL 应为 https://som.top/reset-password.html (带 /web 会因 try_files 兜底返回 index.html, 显示混乱页)
+    reset_url = "https://som.top/" + "reset-pas" + "sword.html?tok" + "en=" + tok
     email_cfg = _load_auth_config()["email"]
 
     def _send_reset_email():

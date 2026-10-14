@@ -202,7 +202,13 @@ def send_sms_code(phone: str, country_code: str = "+86") -> dict:
 # ---------- 邮件发送 ----------
 
 def send_email_code(email: str) -> dict:
-    """发送邮件验证码"""
+    """发送邮件验证码(同步等待 SMTP 结果, 失败回显给用户)
+
+    2026-10-15 中华要求: 用户乱写错误邮箱时发送失败必须提示失败。
+    实现: 线程跑同步发送(126 SMTP 实测十几秒, 不直接阻塞 HTTP 请求太久),
+    Event 等结果: 成功才存验证码; 失败删除已存记录并返回 error, 前端提示。
+    超时上限 25s, 超时同样报"发送失败"(不误导用户已发送)。
+    """
     cfg = _load_auth_config()
     email_cfg = cfg["email"]
 
@@ -215,41 +221,19 @@ def send_email_code(email: str) -> dict:
     if not _check_rate_limit(email, cfg["max_attempts_per_hour"]):
         return {"success": False, "error": "今日发送次数已达上限，请明天后再试"}
 
+    # 2026-10-15 中华要求: 乱写错误邮箱要提示发送失败。
+    # 126 SMTP 对不存在的域名"假接受"(收件方拒收后发信端拿不到错误),
+    # 所以发信前先用域名 DNS 校验: 解析不了域名就立即报失败, 不浪费 SMTP 往返。
+    import socket as _socket
+    _domain = email.split("@",1)[-1].lower().strip()
+    try:
+        _socket.getaddrinfo(_domain, 25, _socket.AF_UNSPEC, _socket.SOCK_STREAM)
+    except Exception:
+        return {"success": False, "error": f"邮箱域名「{_domain}」不存在或无法解析，请检查邮箱地址是否正确"}
+
     code = _generate_code(cfg["code_length"])
 
-    # SMTP 发送
-    try:
-        subject = f"【SOM松麦】验证码：{code}"
-        body_html = f"""
-        <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #4a9d6e;">SOM 松麦</h2>
-            <p>您的验证码是：</p>
-            <p style="font-size: 32px; font-weight: bold; color: #333; letter-spacing: 4px;">{code}</p>
-            <p style="color: #666;">{cfg['code_expire_minutes']} 分钟内有效，请勿泄露给他人。</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px;">SOM 松麦 · 中医辨证 · 有机养生</p>
-        </div>
-        """
-        msg = MIMEText(body_html, "html", "utf-8")
-        msg["Subject"] = subject
-        # 2026-10-15 修: From 只写纯邮箱地址(不带中文 display-name),
-        # QQ 邮箱对 From 头严格校验, 中文 display-name 会触发 550 "From header is missing or invalid" 拒收
-        msg["From"] = email_cfg["smtp_user"]
-        msg["To"] = email
-
-        if email_cfg.get("use_ssl", True):
-            server = smtplib.SMTP_SSL(email_cfg["smtp_host"], email_cfg["smtp_port"], timeout=15)
-        else:
-            server = smtplib.SMTP(email_cfg["smtp_host"], email_cfg["smtp_port"], timeout=15)
-            server.starttls()
-
-        server.login(email_cfg["smtp_user"], email_cfg["smtp_pass"])
-        server.sendmail(email_cfg["smtp_user"], [email], msg.as_string())
-        server.quit()
-    except Exception as e:
-        return {"success": False, "error": f"邮件发送失败: {str(e)[:100]}"}
-
-    # 存储验证码
+    # 存储验证码(先存, 发送失败再回滚删除, 避免坏邮箱残留)
     expire_at = time.time() + cfg["code_expire_minutes"] * 60
     _code_store[email] = {
         "code": code,
@@ -260,7 +244,64 @@ def send_email_code(email: str) -> dict:
         "channel": "email"
     }
 
-    return {"success": True, "message": f"验证码已发送至 {email}"}
+    # SMTP 发送(线程内同步执行, 结果通过 Event 回传)
+    import threading as _th
+    send_result = {"ok": False, "error": None}
+    done_evt = _th.Event()
+
+    def _do_send():
+        try:
+            subject = f"【SOM松麦】验证码：{code}"
+            body_html = f"""
+            <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #4a9d6e;">SOM 松麦</h2>
+                <p>您的验证码是：</p>
+                <p style="font-size: 32px; font-weight: bold; color: #333; letter-spacing: 4px;">{code}</p>
+                <p style="color: #666;">{cfg['code_expire_minutes']} 分钟内有效，请勿泄露给他人。</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">SOM 松麦 · 中医辨证 · 有机养生</p>
+            </div>
+            """
+            msg = MIMEText(body_html, "html", "utf-8")
+            msg["Subject"] = subject
+            # 2026-10-15 修: From 只写纯邮箱地址(不带中文 display-name),
+            # QQ 邮箱对 From 头严格校验, 中文 display-name 会触发 550 拒收
+            msg["From"] = email_cfg["smtp_user"]
+            msg["To"] = email
+            if email_cfg.get("use_ssl", True):
+                server = smtplib.SMTP_SSL(email_cfg["smtp_host"], email_cfg["smtp_port"], timeout=20)
+            else:
+                server = smtplib.SMTP(email_cfg["smtp_host"], email_cfg["smtp_port"], timeout=20)
+                server.starttls()
+            server.login(email_cfg["smtp_user"], email_cfg["smtp_pass"])
+            server.sendmail(email_cfg["smtp_user"], [email], msg.as_string())
+            server.quit()
+            send_result["ok"] = True
+        except Exception as e:
+            send_result["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+            print(f"邮箱验证码发送失败 {email}: {send_result['error']}")
+        finally:
+            done_evt.set()
+
+    _th.Thread(target=_do_send, daemon=True).start()
+
+    # 等结果(上限 25s, 覆盖 126 SMTP 十几秒 + 余量)
+    done_evt.wait(25)
+
+    if not send_result["ok"]:
+        # 失败/超时: 回滚已存验证码, 明确告知用户发送失败
+        _code_store.pop(email, None)
+        err = send_result["error"] or "发送超时（SMTP 未响应）"
+        # SMTP 错误码翻译, 给用户看得懂的提示
+        if "550" in err or "551" in err or "554" in err or "recipient" in err.lower():
+            err = f"邮件被对方服务器拒收: 请检查邮箱地址是否正确（{err[:80]}）"
+        elif "535" in err or "login" in err.lower():
+            err = f"SMTP 登录失败，请联系管理员检查发信配置（{err[:60]}）"
+        elif "timed out" in err.lower() or "超时" in err:
+            err = "发信超时，请稍后重试（126 发信较慢）"
+        return {"success": False, "error": f"验证码发送失败: {err}。请确认邮箱地址后重试。"}
+
+    return {"success": True, "message": f"验证码已发送至 {email}，请查收（1-2 分钟内到达，注意垃圾邮件）"}
 
 
 # ---------- 验证码校验 ----------
@@ -310,15 +351,13 @@ def login_or_register(target: str, channel: str, anonymous_user_id: str = None) 
 
     if row:
         user_id = row["user_id"]
-        # 2026-10-15 中华: 邮箱验证码登录成功后, 若该账号没绑定过邮箱, 自动把登录邮箱写进 account 列
-        # (一人一户, 邮箱挂到账号上, 下次账号绑定页直接显示已绑)
+        # 2026-10-15 中华反馈"自动绑定邮箱时绑定了账号而不是邮箱":
+        # 邮箱只写 email 列, 不动 account 列(前端绑定页显示的 account 会被邮箱污染)。
+        # 邮箱未被其他人占用时才绑定; 冲突则只更新活跃时间。
         if channel == "email" and target:
-            cur_acct = row["account"]
-            cur_email = row["email"]
-            # 只在"该邮箱未被任何其他人占用"时绑定
-            conflict = conn.execute("SELECT user_id FROM users WHERE account = ? AND user_id != ?", (target, user_id)).fetchone()
+            conflict = conn.execute("SELECT user_id FROM users WHERE email = ? AND user_id != ?", (target, user_id)).fetchone()
             if not conflict:
-                conn.execute("UPDATE users SET is_anonymous = 0, last_active = ?, account = ?, email = ? WHERE user_id = ?", (now, target, target, user_id))
+                conn.execute("UPDATE users SET is_anonymous = 0, last_active = ?, email = ? WHERE user_id = ?", (now, target, user_id))
             else:
                 conn.execute("UPDATE users SET is_anonymous = 0, last_active = ? WHERE user_id = ?", (now, user_id))
         else:
@@ -326,7 +365,9 @@ def login_or_register(target: str, channel: str, anonymous_user_id: str = None) 
     else:
         # 新用户
         user_id = "u_" + secrets.token_hex(12)
-        nickname = f"养生用户{target[-4:]}" if channel == "phone" else f"养生用户{target.split('@')[0][:6]}"
+        # 2026-10-15 中华要求: 手机号取后4位, 邮箱取前缀前6位(与手机号风格一致, 简短好记)
+        # 2026-10-15 中华要求: 手机号取后4位, 邮箱取前缀前6位(与手机号风格一致, 简短好记)
+        nickname = target[-4:] if channel == "phone" else target.split('@')[0][:6]
         conn.execute(
             f"INSERT INTO users (user_id, {field}, nickname, is_anonymous, created_at, last_active) VALUES (?, ?, ?, 0, ?, ?)",
             (user_id, target, nickname, now, now),
@@ -516,7 +557,9 @@ def bind_account_to_user(user_id: str, account: str, account_type: str = "email"
         conn.close()
         return {"success": False, "error": "该账号已被其他用户占用"}
     
-    conn.execute("UPDATE users SET account = ?, email = ? WHERE user_id = ?", (account, account, user_id))
+    # 2026-10-15 中华反馈: 绑定邮箱时只存 email 列, account 列存自定义账号名(可空)
+    # 邮箱是邮箱, 自定义账号是自定义账号, 两列各司其职, 前端绑定页显示 email 列
+    conn.execute("UPDATE users SET email = ? WHERE user_id = ?", (account, user_id))
     conn.commit()
     conn.close()
     return {"success": True, "message": "账号绑定成功"}

@@ -2301,6 +2301,64 @@ body {
     background: #999;
 }
 
+/* 2026-10-15 中华反馈: 微信里修改头像/昵称弹窗被挤成两排 */
+/* 原因: 该弹窗 .modal/.modal-content/.close-btn 没有专属 CSS, 裸奔在文档流里被父级宽度挤压换行 */
+/* 修法: 按同类弹窗(.forgot-password-modal/.forgot-password-content)规格补齐, 固定宽度+flex 居中, 内容不换行 */
+#edit-profile-modal.modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 12px;
+}
+#edit-profile-modal .modal-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 300px;
+    min-width: 280px;
+    box-sizing: border-box;
+    position: relative;
+    white-space: normal;
+}
+#edit-profile-modal .close-btn {
+    position: absolute;
+    top: 10px; right: 12px;
+    border: none;
+    background: none;
+    font-size: 18px;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+}
+#edit-profile-modal .close-btn:hover { color: #333; }
+#edit-profile-modal .modal-content h3 {
+    margin: 0 0 4px;
+    text-align: center;
+    font-size: 14px;
+    letter-spacing: -0.5px;
+    padding: 0 4px;
+    /* 2026-10-15 中华反馈: 标题"修改头像/昵称"最后一个字"称"被挤到第二排 */
+    /* 字号 15→14 + 左右收紧 + 强制不换行, 确保整行放下 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* 上传按钮强制单行不换行 */
+#edit-profile-modal .binding-btn {
+    white-space: nowrap;
+    display: block;
+}
+#edit-profile-modal .login-btn {
+    white-space: nowrap;
+    display: block;
+    margin-top: 12px;
+}
+
 /* 账号绑定 */
 .account-binding {
     display: flex;
