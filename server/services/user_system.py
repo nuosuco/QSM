@@ -111,10 +111,32 @@ def init_user_system():
             embedding BLOB NOT NULL,        -- base64 压缩的 512 维 float32 向量 (~512*4 字节 ~ 2KB)
             model_version TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, model_version)
+            updated_at TIMESTAMP DEFAULT NULL
         )
     ''')
-    c.execute('CREATE INDEX IF NOT EXISTS idx_face_user ON face_vectors(user_id)')
+    # 2026-10-14 向量组学习: 不再 UNIQUE(user_id, model_version), 允许一个用户存多条历史脸向量
+    c.execute('CREATE INDEX IF NOT EXISTS idx_face_user ON face_vectors(user_id, model_version)')
+    # 兼容旧库: 若已有 UNIQUE 约束的旧表, 迁移去 UNIQUE(保留数据)
+    try:
+        tsql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='face_vectors'").fetchone()[0]
+        if 'UNIQUE(user_id, model_version)' in tsql.replace(' ', ''):
+            old_rows = conn.execute("SELECT id, user_id, embedding, model_version, created_at FROM face_vectors").fetchall()
+            conn.execute("ALTER TABLE face_vectors RENAME TO face_vectors_old")
+            conn.execute('''CREATE TABLE face_vectors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                embedding BLOB NOT NULL,
+                model_version TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT NULL
+            )''')
+            conn.execute("INSERT INTO face_vectors (id, user_id, embedding, model_version, created_at) "
+                         "SELECT id, user_id, embedding, model_version, created_at FROM face_vectors_old")
+            conn.execute("DROP TABLE face_vectors_old")
+            print('[user_system] face_vectors 迁移: 去掉 UNIQUE, 支持向量组学习')
+    except Exception as e:
+        print(f'[user_system] face_vectors 迁移检查(忽略): {e}')
+    conn.commit()
 
     c.execute('CREATE INDEX IF NOT EXISTS idx_token_user ON auth_tokens(user_id)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_tizhi_user ON tizhi_records(user_id)')
@@ -282,7 +304,11 @@ def add_tizhi_record(user_id: str, tizhi: str, zhengxing: str = None,
         s = s.replace('\n', ' ')
         return s[:n] if len(s) > n else s
     symptoms_c = _clip(symptoms, 500)
-    advice_c = _clip(advice, 500)
+    # 2026-10-13 中华反馈: 自动记录的 advice 被截到 500 字显得"不完整、混乱"(换行被压成空格)。
+    # advice 存完整原文 + 保留换行(展开时 markdown 渲染); 仅极端情况(>4000字)才截断防膨胀。
+    advice_c = advice if advice else None
+    if advice_c and len(advice_c) > 4000:
+        advice_c = advice_c[:4000]
     conn = _conn()
     cur = conn.execute(
         "INSERT INTO tizhi_records (user_id, tizhi, zhengxing, symptoms, advice, source, session_id) VALUES (?, ?, ?, ?, ?, ?, ?)",

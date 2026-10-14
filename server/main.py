@@ -1070,6 +1070,32 @@ async def chat_vision(request: VisionChatRequest):
     except Exception:
         pass
 
+    # 2026-10-14 中华要求(重要): 人脸识别必须放后端, 不依赖前端触发。
+    # 用户每次拍照辨证, 后端顺手提取人脸向量存进 face_vectors, 并对比全库识别身份。
+    # 这样: 一人一户, 不会串数据; 前端怎么缓存/怎么刷都无所谓, 后端必存。
+    # 隐私: 只存 512 维向量, 不存原图; 用户删账号时一并清脸(前端删除入口保留不显示)。
+    try:
+        from services import face_service
+        # 取第一张图提人脸(舌象/面色/皮肤里带脸的那张最有信息量)
+        face_img = image_list[0] if image_list else None
+        if face_img:
+            # 1. 先比对: 这张脸像谁(全库已存向量)
+            vectors = face_service.load_all_vectors()
+            chk = face_service.check_face(face_img, vectors)
+            # 2. 存当前用户的脸(覆盖旧的, 每次拍照都刷新到最新状态)
+            if request.user_id:
+                face_service.save_embedding(request.user_id, face_img)
+            result["face_identity"] = {
+                "matched": chk.get("matched"),
+                "no_record": chk.get("no_record"),
+                "best_user_id": chk.get("best_user_id"),
+                "best_score": chk.get("best_score"),
+                "saved": bool(request.user_id),
+            }
+    except Exception as e:
+        # 人脸识别失败不阻断辨证(舌象分析照常), 只打日志
+        print(f"vision人脸存档失败: {e}")
+
     # 体质写入 tizhi_records(个人中心数据源), 同 session 覆盖旧记录(与前端 saveTizhiToBackend 同语义)
     # 2026-10-13 中华要求: 症状/建议也要全, 展开时能看完整内容(之前只存80字 symptoms, advice=None, 展开几乎空白)
     if extracted_tizhi:
@@ -1113,6 +1139,8 @@ async def chat_vision(request: VisionChatRequest):
         "recommendations": [],
         "provider": result.get("provider"),
         "model": result.get("model"),
+        # 2026-10-14 中华要求: 人脸识别放后端, 把身份识别结果一并返回前端
+        "face_identity": result.get("face_identity"),
     }
 
 # ========== som.skill API 管理 ==========
