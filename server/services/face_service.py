@@ -207,12 +207,14 @@ def add_user_vector(user_id: str, b64_image: str, _dedup: bool = True) -> dict:
     """2026-10-14 向量组学习: 把当前用户新拍图的人脸向量加入其历史向量组(累加, 不覆盖)。
     - 去重: 与组内已有向量余弦 > DEDUP_COSINE 视为同脸, 更新最近一条不新增
     - 上限: VECTOR_CAP, 超出丢最老的
+    - 2026-10-14 中华铁律(拒档堵死): 该用户已有向量组时, 新脸必须先过本人校验
+      (与组均值余弦 >= COSINE_THRESHOLD 且 ArcFace 检到真脸), 否则拒存 ——
+      别人的脸绝不能学进你的组(进了拒档就永远失灵)。首次建档(组空)放行。
     """
     from services.user_system import _conn
     img = _decode_image(b64_image)
     if img is None:
         return {"success": False, "error": "decode_failed"}
-    emb = _extract_embedding(img)
     conn = _conn()
     # 读该用户已有向量组(当前模型版本)
     rows = conn.execute(
@@ -220,6 +222,17 @@ def add_user_vector(user_id: str, b64_image: str, _dedup: bool = True) -> dict:
         (user_id, MODEL_VERSION)
     ).fetchall()
     existing = [decode_embedding(bytes(r[0])) for r in rows]
+    # 2026-10-14 拒档堵死: 已有组 → 本人校验(ArcFace 检到真脸 + 组均值余弦 >= 阈值), 不过就拒存
+    if existing:
+        emb_arc = _arcface_embedding(img)
+        mean_vec = np.mean(np.stack(existing, axis=0), axis=0)
+        mean_vec /= (np.linalg.norm(mean_vec) + 1e-9)
+        _score = float(cosine(emb_arc, mean_vec)) if emb_arc is not None else 0.0
+        if emb_arc is None or _score < COSINE_THRESHOLD:
+            print(f"[face_service] add_user_vector 拒存: 非本人/检不到真脸 user={user_id} score={_score:.4f}")
+            conn.close()
+            return {"success": False, "error": "rejected_not_self", "score": round(_score, 4)}
+    emb = _extract_embedding(img)
     # 最近一条的 id(去重时更新它, 让它保持"最新的脸"状态)
     last_id = rows[0][0] if rows else None
     if _dedup:
