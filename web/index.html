@@ -310,7 +310,11 @@
                             <div class="forgot-password-modal" id="bind-account-modal" style="display:none;">
                                 <div class="forgot-password-content">
                                     <h4>绑定账号</h4>
-                                    <input type="text" class="login-input" id="bind-account-input" placeholder="输入邮箱或账号">
+                                    <input type="email" class="login-input" id="bind-account-input" placeholder="输入邮箱">
+                                    <div style="display:flex;gap:8px;margin-top:8px;">
+                                        <input type="text" class="login-input" id="bind-email-code" placeholder="验证码" maxlength="6" style="flex:1;">
+                                        <button class="login-btn secondary" id="send-bind-email-code-btn" onclick="sendBindEmailCode()" style="white-space:nowrap;">发送验证码</button>
+                                    </div>
                                     <button class="login-btn" onclick="doBindAccount()">确认绑定</button>
                                     <button class="login-btn secondary" onclick="hideBindAccountModal()">取消</button>
                                 </div>
@@ -322,7 +326,7 @@
                                     <input type="text" class="login-input" id="bind-phone-input" placeholder="手机号" maxlength="15" inputmode="tel">
                                     <div style="display:flex;gap:8px;margin-top:8px;">
                                         <input type="text" class="login-input" id="bind-phone-code" placeholder="验证码" maxlength="6" style="flex:1;">
-                                        <button class="login-btn secondary" id="send-phone-code-btn" onclick="sendBindPhoneCode()" style="white-space:nowrap;">发送验证码</button>
+                                        <button class="login-btn secondary" id="send-phone-code-btn" onclick="alert('手机号验证即将上线, 暂请用邮箱/微信登录')" style="white-space:nowrap;background:#f5f5f5;color:#aaa;cursor:not-allowed;">发送验证码(即将上线)</button>
                                     </div>
                                     <button class="login-btn" onclick="doBindPhone()">确认绑定</button>
                                     <button class="login-btn secondary" onclick="hideBindPhoneModal()">取消</button>
@@ -354,7 +358,7 @@
                             <div class="forgot-password-modal" id="forgot-password-modal" style="display:none;">
                                 <div class="forgot-password-content">
                                     <h4>重置密码</h4>
-                                    <input type="text" class="login-input" id="forgot-account" placeholder="输入你的账号">
+                                    <input type="text" class="login-input" id="forgot-account" placeholder="输入你的账号（邮箱或自定义账号）">
                                     <button class="login-btn" onclick="sendForgotPassword()">发送重置链接</button>
                                     <button class="login-btn secondary" onclick="hideForgotPassword()">取消</button>
                                 </div>

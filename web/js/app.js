@@ -1552,11 +1552,46 @@ async function doPasswordLogin() {
 }
 
 // 账号绑定弹窗
+var _emailCodeCooldown = 0;
 function showBindAccountModal(type) {
     try {
     document.getElementById('bind-account-modal').style.display = 'flex';
     document.getElementById('bind-account-input').value = '';
+    var _codeEl = document.getElementById('bind-email-code');
+    if (_codeEl) _codeEl.value = '';
+    var _btn = document.getElementById('send-bind-email-code-btn');
+    if (_btn) _btn.textContent = '发送验证码';
     } catch(e) { alert('弹窗打开失败: ' + e.message + '。请下拉刷新页面后重试'); }
+}
+async function sendBindEmailCode() {
+    const email = document.getElementById('bind-account-input').value.trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert('请输入有效邮箱'); return; }
+    const btn = document.getElementById('send-bind-email-code-btn');
+    btn.disabled = true;
+    try {
+        const resp = await fetch(`${API_BASE}/api/auth/send-code`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ target: email, channel: 'email' })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showToast(data.message || '验证码已发送至邮箱');
+            _emailCodeCooldown = 60;
+            const t = setInterval(function() {
+                _emailCodeCooldown--;
+                if (_emailCodeCooldown <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = '发送验证码'; }
+                else btn.textContent = _emailCodeCooldown + 's';
+            }, 1000);
+            btn.textContent = '60s';
+        } else {
+            alert(data.error || data.detail || '发送失败');
+            btn.disabled = false;
+        }
+    } catch(e) {
+        alert('网络错误');
+        btn.disabled = false;
+    }
 }
 function hideBindAccountModal() {
     document.getElementById('bind-account-modal').style.display = 'none';
@@ -1564,13 +1599,14 @@ function hideBindAccountModal() {
 
 async function doBindAccount() {
     const account = document.getElementById('bind-account-input').value.trim();
-    if (!account) { alert('请输入账号'); return; }
+    if (!account) { alert('请输入邮箱'); return; }
+    const code = (document.getElementById('bind-email-code') || {}).value ? document.getElementById('bind-email-code').value.trim() : '';
     const userId = getUserId();
     try {
         const resp = await fetch(`${API_BASE}/api/auth/bind-account`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ user_id: userId, account, account_type: 'email' })
+            body: JSON.stringify({ user_id: userId, account, account_type: 'email', code })
         });
         const data = await resp.json();
         if (data.success) {

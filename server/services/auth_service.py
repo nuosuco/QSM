@@ -232,7 +232,9 @@ def send_email_code(email: str) -> dict:
         """
         msg = MIMEText(body_html, "html", "utf-8")
         msg["Subject"] = subject
-        msg["From"] = f"{email_cfg['from_name']} <{email_cfg['smtp_user']}>"
+        # 2026-10-15 修: From 只写纯邮箱地址(不带中文 display-name),
+        # QQ 邮箱对 From 头严格校验, 中文 display-name 会触发 550 "From header is missing or invalid" 拒收
+        msg["From"] = email_cfg["smtp_user"]
         msg["To"] = email
 
         if email_cfg.get("use_ssl", True):
@@ -308,7 +310,19 @@ def login_or_register(target: str, channel: str, anonymous_user_id: str = None) 
 
     if row:
         user_id = row["user_id"]
-        conn.execute("UPDATE users SET is_anonymous = 0, last_active = ? WHERE user_id = ?", (now, user_id))
+        # 2026-10-15 中华: 邮箱验证码登录成功后, 若该账号没绑定过邮箱, 自动把登录邮箱写进 account 列
+        # (一人一户, 邮箱挂到账号上, 下次账号绑定页直接显示已绑)
+        if channel == "email" and target:
+            cur_acct = row["account"]
+            cur_email = row["email"]
+            # 只在"该邮箱未被任何其他人占用"时绑定
+            conflict = conn.execute("SELECT user_id FROM users WHERE account = ? AND user_id != ?", (target, user_id)).fetchone()
+            if not conflict:
+                conn.execute("UPDATE users SET is_anonymous = 0, last_active = ?, account = ?, email = ? WHERE user_id = ?", (now, target, target, user_id))
+            else:
+                conn.execute("UPDATE users SET is_anonymous = 0, last_active = ? WHERE user_id = ?", (now, user_id))
+        else:
+            conn.execute("UPDATE users SET is_anonymous = 0, last_active = ? WHERE user_id = ?", (now, user_id))
     else:
         # 新用户
         user_id = "u_" + secrets.token_hex(12)
@@ -502,7 +516,7 @@ def bind_account_to_user(user_id: str, account: str, account_type: str = "email"
         conn.close()
         return {"success": False, "error": "该账号已被其他用户占用"}
     
-    conn.execute("UPDATE users SET account = ? WHERE user_id = ?", (account, user_id))
+    conn.execute("UPDATE users SET account = ?, email = ? WHERE user_id = ?", (account, account, user_id))
     conn.commit()
     conn.close()
     return {"success": True, "message": "账号绑定成功"}
