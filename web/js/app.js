@@ -2296,51 +2296,98 @@ async function loadHealthPortrait() {
     if (!isLoggedIn()) { section.style.display = 'none'; return; }
     const userId = getUserId();
     if (!userId) { section.style.display = 'none'; return; }
+    _portraitPage = 0; _portraitHasMore = true; await fetchPortraitPage(true);
+}
+
+// 2026-10-14 中华要求: 健康画像时间线 10 条以上翻下一页(与体质记录一致, 每页 10)
+const PORTRAIT_PAGE_SIZE = 10;
+let _portraitPage = 0;
+let _portraitHasMore = true;
+let _portraitCache = { total: 0, face: {}, dist: {}, trend: {}, registered_days: null };
+
+async function fetchPortraitPage(isFirst) {
+    const section = document.getElementById('health-portrait-section');
+    const box = document.getElementById('health-portrait');
+    if (!section || !box) return;
+    const userId = getUserId();
+    _portraitPage++;
+    const offset = (_portraitPage - 1) * PORTRAIT_PAGE_SIZE;
     let result;
     try {
-        const resp = await fetch(`${API_BASE}/api/health/portrait?user_id=${encodeURIComponent(userId)}&days=90`);
+        const resp = await fetch(`${API_BASE}/api/health/portrait?user_id=${encodeURIComponent(userId)}&days=90&offset=${offset}`);
         result = await resp.json();
     } catch (e) { console.warn('health portrait 拉取失败', e); section.style.display = 'none'; return; }
     const p = result && result.portrait;
-    if (!p || !p.timeline || p.timeline.length === 0) { section.style.display = 'none'; return; }
+    if (!p || !p.timeline || p.timeline.length === 0) {
+        if (isFirst) section.style.display = 'none';
+        return;
+    }
     section.style.display = 'block';
-
-    const d = p.trend || {};
-    const face = p.face || {};
-    const dist = p.tizhi_distribution || {};
-    let html = '';
-    // ① 汇总条
-    const distStr = Object.keys(dist).map(k => `${k}×${dist[k]}`).join('、') || '暂无';
-    html += '<div style="font-size:13px;color:#555;line-height:1.9;">';
-    html += `<div>📊 近90天辨证 <b>${d.total || 0}</b> 次 · 体质分布: ${escapeHtml(distStr)}</div>`;
-    if (face.vector_count) {
-        html += `<div>🧬 人脸向量组已学 <b>${face.vector_count}</b> 张(认得你变老/换角度/换光线)</div>`;
+    // 缓存汇总数据(第 1 页拉取时保存, 后续翻页复用)
+    if (isFirst) {
+        _portraitCache = { total: result.total || 0, face: p.face || {}, dist: p.tizhi_distribution || {}, trend: p.trend || {}, registered_days: p.registered_days };
     }
-    if (d.first_tizhi && d.last_tizhi) {
-        const changed = d.changed ? ' <span style="color:#fa5151;">↺ 体质发生了变化</span>' : ' <span style="color:#07c160;">✔ 体质保持稳定</span>';
-        html += `<div>📈 趋势: ${escapeHtml(d.first_tizhi)}(${escapeHtml((d.first_date||'').slice(0,10))}) → ${escapeHtml(d.last_tizhi)}(${escapeHtml((d.last_date||'').slice(0,10))})${changed}</div>`;
+    _portraitHasMore = result.has_more === true;
+    // 时间线容器(不存在则建, 已存在则只往里追加下一页 —— 累积式, 旧记录不丢)
+    let tlBox = document.getElementById('health-portrait-timeline');
+    if (!tlBox) {
+        const d = _portraitCache.trend || {}, face = _portraitCache.face || {}, dist = _portraitCache.dist || {};
+        const distStr = Object.keys(dist).map(k => `${k}×${dist[k]}`).join('、') || '暂无';
+        let html = '';
+        // ① 汇总条(只渲染一次)
+        html += '<div style="font-size:13px;color:#555;line-height:1.9;">';
+        html += `<div>📊 近90天辨证 <b>${d.total || 0}</b> 次 · 体质分布: ${escapeHtml(distStr)}</div>`;
+        if (face.vector_count) {
+            html += `<div>🧬 人脸向量组已学 <b>${face.vector_count}</b> 张(认得你变老/换角度/换光线)</div>`;
+        }
+        if (d.first_tizhi && d.last_tizhi) {
+            const changed = d.changed ? ' <span style="color:#fa5151;">↺ 体质发生了变化</span>' : ' <span style="color:#07c160;">✔ 体质保持稳定</span>';
+            html += `<div>📈 趋势: ${escapeHtml(d.first_tizhi)}(${escapeHtml((d.first_date||'').slice(0,10))}) → ${escapeHtml(d.last_tizhi)}(${escapeHtml((d.last_date||'').slice(0,10))})${changed}</div>`;
+        }
+        if (_portraitCache.registered_days != null) html += `<div>⏳ 健康大数据已积累 ${_portraitCache.registered_days} 天</div>`;
+        html += '</div>';
+        // ② 时间线容器(新→旧, 后面加载更多往里 append)
+        html += '<div id="health-portrait-timeline" style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;font-size:12px;color:#666;"></div>';
+        // ③ 加载更多按钮占位(每条时间线下方)
+        html += '<div id="portrait-more-slot"></div>';
+        box.innerHTML = html;
+        tlBox = document.getElementById('health-portrait-timeline');
     }
-    if (p.registered_days != null) html += `<div>⏳ 健康大数据已积累 ${p.registered_days} 天</div>`;
-    html += '</div>';
-    // ② 时间线(新→旧, 带照片指纹占位 + 相邻两次视觉差异)
+    // 本页条目(新→旧)追加到时间线容器底部(已加载的旧条目在上方, 视觉顺序新→旧)
     const tl = (p.timeline || []).slice().reverse();
-    html += '<div style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;font-size:12px;color:#666;">';
+    let pageHtml = '';
     for (let i = 0; i < tl.length; i++) {
         const t = tl[i];
         const date = escapeHtml((t.date || '').slice(0, 16));
         const tag = t.has_photo ? '📷' : '💬';
         let delta = '';
         if (t.visual_delta != null) {
-            const sim = t.visual_delta; // 0=两次拍照几乎一样, 越大越不同
+            const sim = t.visual_delta;
             delta = sim < 0.25 ? '<span style="color:#07c160;">(照片变化小)</span>'
                    : sim < 0.6 ? '<span style="color:#faad14;">(照片有变化)</span>'
                    : '<span style="color:#fa5151;">(照片变化大)</span>';
         }
-        html += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #f5f5f5;">`;
-        html += `<span>${tag} ${date}</span><span><b>${escapeHtml(t.tizhi || '未知')}</b>${delta}</span></div>`;
+        pageHtml += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #f5f5f5;">`;
+        pageHtml += `<span>${tag} ${date}</span><span><b>${escapeHtml(t.tizhi || '未知')}</b>${delta}</span></div>`;
     }
-    html += '</div>';
-    box.innerHTML = html;
+    tlBox.innerHTML += pageHtml;
+    // ③ 翻页按钮(10 条以上才出现)
+    const slot = document.getElementById('portrait-more-slot');
+    if (slot) {
+        if (_portraitHasMore) {
+            slot.innerHTML = '<div style="padding:10px;text-align:center;"><button id="portrait-load-more" style="background:#07c160;color:#fff;border:none;border-radius:16px;padding:8px 24px;font-size:13px;cursor:pointer;">加载更多</button></div>';
+            const moreBtn = document.getElementById('portrait-load-more');
+            if (moreBtn) {
+                moreBtn.addEventListener('click', async function() {
+                    moreBtn.textContent = '加载中...';
+                    moreBtn.disabled = true;
+                    await fetchPortraitPage(false);
+                });
+            }
+        } else {
+            slot.innerHTML = '';
+        }
+    }
 }
 
 // 从后端加载体质记录
@@ -2409,7 +2456,7 @@ function initTizhiToggle() {
 // 2026-10-14 小蕊(中华要求): 体质记录分页 —— 太多时不用翻到最下面, 点"加载更多"下一页
 let _tizhiPage = 0;
 let _tizhiHasMore = true;
-const TIZHI_PAGE_SIZE = 20;
+const TIZHI_PAGE_SIZE = 10;
 
 async function loadTizhiRecordsFromBackend() {
     _tizhiPage = 0;

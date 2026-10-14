@@ -1097,27 +1097,50 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
         from services import face_service
         # 取第一张图提人脸(舌象/面色/皮肤里带脸的那张最有信息量)
         face_img = image_list[0] if image_list else None
+        rejected = False
         if face_img:
             # 1. 先比对: 这张脸像谁(全库已存向量)
             vectors = face_service.load_all_vectors()
             chk = face_service.check_face(face_img, vectors)
+            # 2026-10-14 中华铁律(一人一户, 杜绝别人照片混进健康档案大数据):
+            # 该用户已有向量组 + ArcFace 检到真脸 + 与本人向量组余弦<阈值 → 非本人, 拒档。
+            # 放行场景: 首次建档(无向量组) / 检不到脸(纯舌苔照, 统计特征区分不了, 不误伤)。
+            own = face_service.check_own(face_img, request.user_id, vectors) if request.user_id else None
+            rejected = bool(own and own["has_record"] and own["face_detected"] and not own["matched"])
             # 2. 把该用户新脸向量累加进历史向量组(向量组学习, 不覆盖, 见 face_service.add_user_vector)
-            if request.user_id:
+            #    非本人照片拒档: 不把别人的脸向量塞进你的向量组(否则组被污染, 本人识别也坏)
+            if request.user_id and not rejected:
                 face_service.save_embedding(request.user_id, face_img)
             result["face_identity"] = {
                 "matched": chk.get("matched"),
                 "no_record": chk.get("no_record"),
                 "best_user_id": chk.get("best_user_id"),
                 "best_score": chk.get("best_score"),
-                "saved": bool(request.user_id),
+                "saved": bool(request.user_id and not rejected),
+                "rejected": rejected,  # 2026-10-14 中华铁律: 非本人照片拒档
             }
+            # 2026-10-14 中华要求: 拒档时小麦明确大白话告诉用户"这不是你本人, 请用本人真实照片,
+            # 才能构建你的健康数据分析"(语气同前端确认本人弹窗, 但这次是后端识别出非本人)
+            if rejected:
+                _warn = (
+                    "\n\n⚠️ **这不是你本人的照片。**\n"
+                    "一人一户, 健康档案只记录你本人的健康数据——别人的照片混进来, "
+                    "你的健康数据分析就会被带偏, 以后辨证也不准了。\n"
+                    "请用**你本人的真实照片**(脸清晰、光线正常)重新拍一次, "
+                    "才能正常构建你的健康档案大数据。"
+                )
+                result["content"] = (result.get("content") or "") + _warn
     except Exception as e:
         # 人脸识别失败不阻断辨证(舌象分析照常), 只打日志
         print(f"vision人脸存档失败: {e}")
+        rejected = False
 
-    # 体质写入 tizhi_records(个人中心数据源), 同 session 覆盖旧记录(与前端 saveTizhiToBackend 同语义)
+    # 体质写入 tizhi_records(个人中心数据源)
+    # 2026-10-14 中华铁律(一人一户, 杜绝别人照片混进健康档案大数据):
+    # 非本人照片(rejected=True)【不】写 tizhi_records —— 健康档案只记本人数据。
+    # 首次建档/检不到脸/本人 均放行(只有 rejected=True 才拦)。
     # 2026-10-13 中华要求: 症状/建议也要全, 展开时能看完整内容(之前只存80字 symptoms, advice=None, 展开几乎空白)
-    if extracted_tizhi:
+    if extracted_tizhi and not rejected:
         try:
             from services.user_system import add_tizhi_record
             advice_full = result["content"][:2000]
@@ -1785,7 +1808,7 @@ async def tizhi_latest(user_id: str):
 
 
 @app.get("/api/health/portrait")
-async def health_portrait(user_id: str, days: int = 90):
+async def health_portrait(user_id: str, days: int = 90, offset: int = 0):
     """2026-10-14 中华要求: 个人中心健康画像(多维时间画像)。
     聚合该用户: ① 小麦辨证时间线(体质/证型随时间变化) ② 人脸向量组积累(学习进度)
     ③ 体质分布 ④ 健康趋势。用户一看画像变化就掌握自己的健康。"""
@@ -1796,10 +1819,15 @@ async def health_portrait(user_id: str, days: int = 90):
     cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
 
     # ① 辨证时间线(最近 N 天, 按时间正序, 前端画时间轴)
+    # 2026-10-14 中华要求: 10条以上翻下一页 → 加 offset 分页, 前端每页 10 条
+    total_rows = conn.execute(
+        "SELECT COUNT(*) n FROM tizhi_records WHERE user_id=? AND created_at >= ?",
+        (user_id, cutoff)
+    ).fetchone()["n"]
     timeline_rows = conn.execute(
         "SELECT created_at, tizhi, zhengxing, source, photo_hash, photo_features FROM tizhi_records "
-        "WHERE user_id=? AND created_at >= ? ORDER BY created_at ASC, id ASC",
-        (user_id, cutoff)
+        "WHERE user_id=? AND created_at >= ? ORDER BY created_at ASC, id ASC LIMIT 10 OFFSET ?",
+        (user_id, cutoff, offset)
     ).fetchall()
     # 2026-10-14 健康画像: 每行带 photo_hash(该次拍照特征指纹, 无照片=NULL);
     # 相邻两次有照片的时间线点算余弦距离, 给出"视觉相似度趋势"(脸/舌苔/患处随时间变没变)
@@ -1873,6 +1901,8 @@ async def health_portrait(user_id: str, days: int = 90):
     conn.close()
     return {
         "success": True,
+        "total": total_rows,
+        "has_more": offset + len(timeline_rows) < total_rows,
         "portrait": {
             "timeline": timeline,
             "face": face,

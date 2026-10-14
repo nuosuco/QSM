@@ -174,6 +174,35 @@ def check_face(b64_image: str, stored_vectors: list) -> dict:
     }
 
 
+def check_own(b64_image: str, user_id: str, stored_vectors: list) -> dict:
+    """2026-10-14 中华铁律(一人一户, 杜绝别人照片混进健康档案大数据):
+    比对照片 vs 该用户自己的向量组(均值)。
+    返回 {has_record, face_detected, matched, score}:
+    - has_record: 该用户已有向量组(无=首次建档, 放行)
+    - face_detected: ArcFace 检到真脸(检不到=纯舌苔照/低清, 统计特征区分不了, 放行不误伤)
+    - matched: 与本人向量组均值余弦 >= COSINE_THRESHOLD
+    拒档判定(在 main.py vision 里做): has_record 且 face_detected 且 非 matched → 非本人, 拒档。
+    """
+    out = {"has_record": False, "face_detected": False, "matched": False, "score": 0.0}
+    if not user_id:
+        return out
+    img = _decode_image(b64_image)
+    if img is None:
+        return out
+    emb_arc = _arcface_embedding(img)
+    out["face_detected"] = emb_arc is not None
+    own = [v for v, uid in (stored_vectors or []) if uid == user_id]
+    out["has_record"] = bool(own)
+    if not own:
+        return out
+    emb = emb_arc if emb_arc is not None else _extract_embedding(img)
+    mean_vec = np.mean(np.stack(own, axis=0), axis=0)
+    mean_vec /= (np.linalg.norm(mean_vec) + 1e-9)
+    out["score"] = round(cosine(emb, mean_vec), 4)
+    out["matched"] = out["score"] >= COSINE_THRESHOLD
+    return out
+
+
 def add_user_vector(user_id: str, b64_image: str, _dedup: bool = True) -> dict:
     """2026-10-14 向量组学习: 把当前用户新拍图的人脸向量加入其历史向量组(累加, 不覆盖)。
     - 去重: 与组内已有向量余弦 > DEDUP_COSINE 视为同脸, 更新最近一条不新增
