@@ -1805,9 +1805,9 @@ async def health_portrait(user_id: str, days: int = 90):
     # 相邻两次有照片的时间线点算余弦距离, 给出"视觉相似度趋势"(脸/舌苔/患处随时间变没变)
     def _vec(row):
         try:
-            import base64
             from services import face_service
-            return face_service.decode_embedding(base64.b64decode(row["photo_features"])) if row["photo_features"] else None
+            vec = face_service.decode_embedding(row["photo_features"]) if row["photo_features"] else None
+            return vec
         except Exception:
             return None
     timeline = []
