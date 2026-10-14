@@ -271,12 +271,18 @@ function handleImageSelectWithConfirm(e) {
     runFaceCheckOncePerSession(e);
 }
 
-// 方案B: 本 session 首次拍照时, 拿第一张图存/比当前用户人脸向量(不阻断分析, 只提示)
+// 2026-10-14 小蕊修(中华反馈: 前端调不到 face/ensure):
+// 旧代码在图片 onload 异步完成前就取 pendingImages[0], 连拍/快拍时 pendingImages 可能还没装好 → 静默跳过。
+// 改成: 等 300ms 让 handleImageSelect 的 img.onload 把 pendingImages 填满, 再取第一张。
 async function runFaceCheckOncePerSession(e) {
     const sid = getSessionId();
     if (_faceCheckedSession === sid) return;  // 本 session 已成功存过, 连拍不重复
     const userId = getUserId();
-    if (!userId || pendingImages.length === 0) return;
+    if (!userId) return;
+    // 等图片异步 onload 进 pendingImages (handleImageSelect 是异步的)
+    await new Promise(function(r){ setTimeout(r, 300); });
+    if (_faceCheckedSession === sid) return;  // 等期间已被锁
+    if (pendingImages.length === 0) return;    // 300ms 后仍没图, 这次跳过, 下次拍照再试
     const firstImg = pendingImages[0];
     try {
         const resp = await fetch(`${API_BASE}/api/face/ensure`, {
