@@ -103,6 +103,10 @@ class FavoriteRemoveRequest(BaseModel):
     user_id: str
     item_id: str
 
+class FavRemoveContentRequest(BaseModel):
+    user_id: str
+    id: int
+
 class FeedbackRequest(BaseModel):
     """用户反馈请求"""
     user_id: str
@@ -264,6 +268,23 @@ def init_user_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_search_user ON search_history(user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_fav_user ON product_favorites(user_id)')
 
+    # 2026-10-15 中华要求: 收藏卡片混排(商品+小麦辨证内容), 内容收藏云端统一保存
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS fav_content (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            title TEXT,
+            content TEXT,
+            user_message TEXT,
+            products TEXT,
+            source TEXT DEFAULT 'chat',
+            content_fp TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_favc_user ON fav_content(user_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_favc_fp ON fav_content(user_id, content_fp)')
+
     conn.commit()
     conn.close()
 
@@ -360,6 +381,41 @@ async def chat(request: ChatRequest):
     )
 
 # ========== 商品搜索接口 ==========
+
+# ========== 服务端渲染分享图(2026-10-16 中华要求: 微信内分享图可用, 绕开 canvas 跨域) ==========
+
+class ShareContentRequest(BaseModel):
+    text: str = ""
+    site_url: str = "https://som.top/"
+
+
+class ShareProductRequest(BaseModel):
+    title: str = ""
+    price: str = ""
+    shop: str = ""
+    image: str = ""      # 商品主图 URL
+    buy_url: str = ""     # 淘宝购买链接(无则用站点码)
+    site_url: str = "https://som.top/"
+
+
+@app.post("/api/share/content-image")
+async def share_content_image(request: ShareContentRequest):
+    """辨证内容分享图: 前端把回复文本 POST 过来, 服务端 Pillow 渲染 PNG 回传"""
+    from services.share_image import render_content_share_image
+    png = render_content_share_image(request.text or "养生参考", request.site_url)
+    return Response(content=png, media_type="image/png")
+
+
+@app.post("/api/share/product-image")
+async def share_product_image(request: ShareProductRequest):
+    """商品分享图: 商品主图 + 标题/价格/店铺 + 淘宝链接二维码"""
+    from services.share_image import render_product_share_image
+    png = render_product_share_image(
+        title=request.title, price=request.price, shop=request.shop,
+        image_url=request.image, buy_url=request.buy_url or "https://item.taobao.com/",
+        site_url=request.site_url)
+    return Response(content=png, media_type="image/png")
+
 
 @app.get("/api/products/categories")
 async def get_product_categories():
@@ -649,9 +705,19 @@ async def clear_search_history(request: ClearHistoryRequest):
 # ========== 商品收藏接口 ==========
 
 @app.get("/api/favorites")
-async def get_favorites(user_id: str, limit: int = 50):
+async def get_favorites(user_id: str, limit: int = 50, page: int = 1, page_size: int = 10):
     conn = get_user_db()
     cursor = conn.cursor()
+    # 2026-10-15 我的收藏改双分类区独立分页: 优先 page/page_size(偏移分页), 兼容旧 limit
+    if page > 1 or page_size != 10:
+        total = cursor.execute('SELECT COUNT(*) FROM product_favorites WHERE user_id=?', (user_id,)).fetchone()[0]
+        rows = cursor.execute(
+            'SELECT * FROM product_favorites WHERE user_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            (user_id, page_size, (page - 1) * page_size)).fetchall()
+        conn.close()
+        return {"total": total, "page": page, "page_size": page_size,
+                "total_pages": (total + page_size - 1) // page_size,
+                "favorites": [dict(r) for r in rows]}
     cursor.execute('SELECT * FROM product_favorites WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
                    (user_id, limit))
     rows = cursor.fetchall()
@@ -688,6 +754,108 @@ async def remove_favorite(request: FavoriteRemoveRequest):
     conn.commit()
     conn.close()
     return {"success": True, "deleted": affected}
+
+# ========== 2026-10-15 中华要求: 收藏卡片要同时展示【商品收藏】和【小麦辨证内容收藏】, 混排+10条翻页 ==========
+# 辨证内容收藏目前只有 localStorage 存了一份, 要混排到卡片里就必须让后端也存一份,
+# 否则换设备/清缓存就丢了, 和商品收藏"云端统一保存"的设计矛盾。所以新增内容收藏表 + 两个接口。
+
+class FavContentAddRequest(BaseModel):
+    user_id: str
+    title: str = ""
+    content: str = ""   # 小麦辨证回答全文
+    user_message: str = ""
+    products: list = []
+    source: str = "chat"  # chat / vision_chat
+
+@app.post("/api/favorites/content/add")
+async def add_fav_content(request: FavContentAddRequest):
+    conn = get_user_db()
+    cursor = conn.cursor()
+    # 内容收藏表: 同一用户同一段回答不重复存(按 content 前80字指纹去重)
+    fp = (request.content or "")[:80]
+    try:
+        cursor.execute('SELECT 1 FROM fav_content WHERE user_id=? AND content_fp=? LIMIT 1',
+                       (request.user_id, fp))
+        dup = cursor.fetchone()
+        if dup:
+            conn.close()
+            return {"success": True, "added": False}
+    except Exception:
+        # 表不存在(老库未迁移)时忽略去重, 直接插
+        pass
+    try:
+        cursor.execute('''
+            INSERT INTO fav_content (user_id, title, content, user_message, products, source, content_fp, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (request.user_id, request.title[:120], request.content, request.user_message[:300],
+              json.dumps(request.products or []), request.source, fp, get_beijing_now().strftime('%Y-%m-%d %H:%M:%S')))
+        conn.commit()
+        added = cursor.rowcount > 0
+    except Exception as e:
+        conn.close()
+        return {"success": False, "error": str(e)}
+    conn.close()
+    return {"success": True, "added": added}
+
+@app.get("/api/favorites/content")
+async def list_fav_content(user_id: str, page: int = 1, page_size: int = 10):
+    """辨证内容收藏列表(分页), 2026-10-15 收藏卡片分类展示"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    try:
+        total = cursor.execute('SELECT COUNT(1) FROM fav_content WHERE user_id=?', (user_id,)).fetchone()[0]
+        rows = cursor.execute(
+            'SELECT id, title, content, user_message, products, source, created_at FROM fav_content '
+            'WHERE user_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            (user_id, page_size, (page - 1) * page_size)).fetchall()
+    except Exception:
+        total, rows = 0, []
+    conn.close()
+    items = [{"id": str(r["id"]), "title": r["title"] or "", "content": r["content"],
+              "user_message": r["user_message"], "products": json.loads(r["products"] or "[]"),
+              "source": r["source"], "created_at": r["created_at"] or ""} for r in rows]
+    return {"total": total, "page": page, "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size if total else 1, "items": items}
+
+@app.post("/api/favorites/content/remove")
+async def remove_fav_content(request: FavRemoveContentRequest):
+    conn = get_user_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM fav_content WHERE user_id=? AND id=?',
+                   (request.user_id, request.id))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return {"success": True, "deleted": affected}
+
+@app.get("/api/favorites/mixed")
+async def get_mixed_favorites(user_id: str, page: int = 1, page_size: int = 10):
+    """混排: 商品收藏(product_favorites) + 辨证内容收藏(fav_content), 按时间倒序合并, 10条/页"""
+    conn = get_user_db()
+    cursor = conn.cursor()
+    # 两类收藏全量拉出再在内存里合并(单用户量级很小, 无需复杂 SQL)
+    p_rows = cursor.execute(
+        'SELECT item_id, title, price, image, url, platform, shop_name, created_at FROM product_favorites WHERE user_id=?',
+        (user_id,)).fetchall()
+    c_rows = cursor.execute(
+        'SELECT id, title, content, user_message, products, source, created_at FROM fav_content WHERE user_id=?',
+        (user_id,)).fetchall()
+    conn.close()
+    items = []
+    for r in p_rows:
+        items.append({"type": "product", "id": r["item_id"], "title": r["title"], "price": r["price"],
+                      "image": r["image"], "url": r["url"], "platform": r["platform"],
+                      "shop_name": r["shop_name"], "created_at": r["created_at"] or ""})
+    for r in c_rows:
+        items.append({"type": "content", "id": str(r["id"]), "title": r["title"] or "", "content": r["content"],
+                      "user_message": r["user_message"], "products": json.loads(r["products"] or "[]"),
+                      "source": r["source"], "created_at": r["created_at"] or ""})
+    items.sort(key=lambda x: x["created_at"], reverse=True)
+    total = len(items)
+    start = (page - 1) * page_size
+    page_items = items[start:start + page_size]
+    return {"total": total, "page": page, "page_size": page_size, "total_pages": (total + page_size - 1) // page_size,
+            "items": page_items}
 
 @app.post("/api/favorites/batch-check")
 async def batch_check_favorites(user_ids: dict = None):
@@ -1017,7 +1185,13 @@ async def chat_vision(request: VisionChatRequest):
 2. 或面色（红润/萎黄/苍白/晦暗）、光泽、唇色
 3. 或皮肤（肤色、皮疹、干燥、湿疹等）
 4. 综合判断可能的体质倾向
-5. 给出2-3条食养建议（用药食同源食材）
+5. 给出食疗方（配方形式，具体到用量单位）
+
+【食疗方硬性要求——中华 2026-10-15 铁律，违反则不合格】
+- 食疗方必须写成"配方"：每个食材后面紧跟数量单位，如"黄芪15g、乌鸡半只、红枣5枚、枸杞10g、山药20g"，绝不允许只写食材名不写用量。
+- 一个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
+- 方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
+- 目的：系统会按你列的食材自动匹配有机商品，你食材列得越全、用量越具体，下面商品卡片越丰富（每个食材出2款），别偷懒只给两三种食材。
 
 注意：
 - 用通俗易懂的语言，不堆砌术语
@@ -1032,8 +1206,14 @@ tizhi_data: {"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}"""
 1. 逐一分析每张照片的特征（舌色/舌苔/面色/皮肤/患处等）
 2. 综合多张照片的信息，交叉验证，给出更准确的体质判断
 3. 给出综合辨证结论（主证+兼证）
-4. 给出药膳食疗方案（具体食材+做法）
-5. 推荐3-5种适合的有机食材
+4. 给出食疗方（配方形式，具体到用量单位）+ 做法
+
+【食疗方硬性要求——中华 2026-10-15 铁律，违反则不合格】
+- 食疗方必须写成"配方"：每个食材后面紧跟数量单位，如"黄芪15g、乌鸡半只、红枣5枚、枸杞10g、山药20g"，绝不允许只写食材名不写用量。
+- 一个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
+- 方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
+- 目的：系统会按你列的食材自动匹配有机商品，你食材列得越全、用量越具体，下面商品卡片越丰富（每个食材出2款），别偷懒只给两三种食材。
+5. 推荐适合该体质的有机食材（与食疗方食材尽量重叠，让系统好匹配商品）
 
 注意：
 - 多维度综合分析比单张照片更准确，请充分利用多张图的信息
@@ -1063,6 +1243,24 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
                 system_prompt += f"\n\n【之前的对话记录】\n{history_context}\n\n请结合以上对话历史，特别是之前的拍照扫描/辨证结果，来回答用户当前的问题。"
         except Exception as e:
             print(f"vision加载会话历史失败: {e}")
+
+    # 2026-10-15 中华反馈(最重要): 小麦辨证时常说"结合之前的历史记录(假设)"——
+    # 根因: vision 端点没注入用户跨会话体质档案(只读当前 session_id, 前端每次加载 session 都变),
+    # 模型拿不到真实历史就只能瞎猜。修复: 复用 chat_engine 的 _build_user_profile_context,
+    # 让 vision 也带上该用户真实存档(体质档案+历史对话), 并明确告知"这是真实记录不是假设"。
+    if request.user_id and request.user_id != 'anonymous':
+        try:
+            from services.chat_engine import _build_user_profile_context
+            _profile_ctx = _build_user_profile_context(request.user_id)
+            if _profile_ctx:
+                system_prompt += (
+                    "\n\n" + _profile_ctx +
+                    "\n\n【重要】上面【用户体质档案】和【历史对话记录】是系统真实存档的历史数据。"
+                    "你在分析当前照片做趋势对比时, 必须基于这些真实记录, 严禁凭空假设或编造“之前的情况”;"
+                    "档案里没有的信息, 就如实说“没有相关记录”, 不要猜测。"
+                )
+        except Exception as _pe:
+            print(f"[vision] 加载用户体质档案失败: {_pe}")
 
     # RAG 上下文
     context = rag.build_context(request.message, max_chars=1500)

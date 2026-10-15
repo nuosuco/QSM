@@ -12,7 +12,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="css/style.css?v=20261015z">
+    <link rel="stylesheet" href="css/style.css?v=20261016b">
 </head>
 <body>
     <div class="app">
@@ -215,7 +215,6 @@
                             <p id="profile-checkin">签到：今天未签到</p>
                             <div class="profile-edit-row">
                                 <button class="binding-btn" onclick="showEditProfileModal()">✏️ 修改头像/昵称</button>
-                                <button class="binding-btn" id="my-favorites-entry" onclick="openMyFavorites()" style="display:block;width:100%;margin-top:8px;">♥ 我的收藏 <span id="fav-count-label">(0)</span></button>
                             </div>
                         </div>
                         <button class="logout-btn" onclick="doLogout()">退出</button>
@@ -282,6 +281,20 @@
                                 <span class="stat-label">浏览商品</span>
                             </div>
                         </div>
+                    </div>
+                    <div class="profile-section" id="my-favorites-section" style="display:none;">
+                        <h3>♥ 我的收藏 <small class="sync-hint" id="fav-count-label">（共 0 件）</small></h3>
+                        <!-- 2026-10-15 中华要求: 商品与辨证内容不混编, 上下两个分类区, 各自独立10条/页 -->
+                        <div class="fav-group" id="fav-group-content" style="display:none;">
+                            <div class="fav-group-title">🌿 小麦辨证</div>
+                            <div id="fav-content-list"><p class="empty-hint">加载中…</p></div>
+                        </div>
+                        <div class="fav-group" id="fav-group-product" style="display:none;">
+                            <div class="fav-group-title">🛍️ 有机商品</div>
+                            <div id="fav-product-list"><p class="empty-hint">加载中…</p></div>
+                        </div>
+                        <button id="fav-more-content" class="fav-more-btn" style="display:none;">辨证内容 加载更多</button>
+                        <button id="fav-more-product" class="fav-more-btn" style="display:none;">商品 加载更多</button>
                     </div>
                     <div class="profile-section">
                         <h3>🔐 账号绑定</h3>
@@ -384,7 +397,7 @@
     <button id="scroll-to-top" title="回到顶部" aria-label="回到顶部">↑</button>
 
     <script src="js/qrcode.min.js?v=20261012"></script>
-    <script src="js/error-trap.js?v=20261015z"></script>
-    <script src="js/app.js?v=20261015z"></script>
+    <script src="js/error-trap.js?v=20261016b"></script>
+    <script src="js/app.js?v=20261016b"></script>
 </body>
 </html>

@@ -512,12 +512,31 @@ body {
 }
 
 .product-card {
+    position: relative;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     overflow: hidden;
     transition: transform 0.3s, box-shadow 0.3s;
     cursor: pointer;
+}
+
+/* 2026-10-16 中华要求: 商品卡片分享按钮(生成商品图+淘宝二维码分享卡) */
+.product-card-share {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    z-index: 2;
+    padding: 5px 10px;
+    border: 1px solid rgba(7,193,96,.5);
+    border-radius: 14px;
+    background: rgba(255,255,255,.92);
+    color: #07c160;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .product-card:hover {
@@ -1333,6 +1352,12 @@ body {
     background: #fff; color: #e74c3c; font-size: 14px; font-weight: 600; cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
 }
+/* 2026-10-16 中华要求: 详情弹窗内商品分享按钮(同辨证卡片模板+商品图+淘宝二维码) */
+.detail-fav.detail-share {
+    border-color: #07c160; color: #07c160;
+    padding: 14px 16px; white-space: nowrap;
+}
+.detail-fav.detail-share:hover { box-shadow: 0 4px 15px rgba(7,193,96,0.25); }
 .detail-fav:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(231,76,60,0.2); }
 .detail-fav.favorited {
     background: #e74c3c; color: #fff;
@@ -2470,3 +2495,83 @@ body {
     position: fixed !important;
     z-index: 10000 !important;
 }
+
+/* ========== 2026-10-15 小蕊: 我的收藏双分类区(辨证/商品)卡片样式 ========== */
+/* 分类区标题 */
+.fav-group { margin-bottom: 10px; }
+.fav-group:last-of-type { margin-bottom: 0; }
+.fav-group-title {
+    font-size: 14px; font-weight: 600; color: var(--text-primary, #333);
+    padding: 6px 0 8px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color, #e0e6e3);
+}
+
+/* 收藏卡片(通用) */
+.fav-card {
+    background: #fafcf9;
+    border: 1px solid var(--border-color, #e0e6e3);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+    position: relative;
+}
+.fav-card:last-child { margin-bottom: 0; }
+.fav-card-badge {
+    display: inline-block;
+    font-size: 11px; font-weight: 600;
+    color: #2e7d4f; background: #e8f5ee;
+    border-radius: 4px; padding: 2px 6px;
+    margin-bottom: 6px;
+}
+.fav-card-img {
+    width: 72px; height: 72px;
+    object-fit: cover; border-radius: 8px;
+    float: left; margin-right: 10px;
+    background: #f0f0f0;
+}
+.fav-card-body { overflow: hidden; min-height: 72px; }
+.fav-card-title {
+    font-size: 14px; font-weight: 600; color: var(--text-primary, #333);
+    margin-bottom: 4px; word-break: break-all;
+}
+.fav-card-meta { font-size: 12px; color: var(--text-secondary, #7f8c8d); margin-bottom: 4px; }
+.fav-card-preview {
+    font-size: 12px; color: var(--text-secondary, #7f8c8d);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fav-card-detail {
+    margin-top: 8px; padding: 10px;
+    background: #fff; border: 1px dashed var(--border-color, #e0e6e3);
+    border-radius: 8px; font-size: 13px; color: #444;
+    line-height: 1.6; word-break: break-word;
+    max-height: 300px; overflow-y: auto;
+}
+
+/* 卡片操作按钮 */
+.fav-card-actions {
+    margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;
+}
+.fav-card-btn {
+    font-size: 12px; padding: 4px 10px;
+    border: 1px solid var(--primary-color, #4a9d6e);
+    color: var(--primary-color, #4a9d6e);
+    background: #fff; border-radius: 6px; cursor: pointer;
+}
+.fav-card-btn:active { opacity: 0.8; }
+.fav-card-remove {
+    border-color: #e0e0e0; color: #999;
+}
+.fav-card-remove:active { opacity: 0.6; }
+
+/* 加载更多按钮(各分类区独立) */
+.fav-more-btn {
+    display: block; width: 100%;
+    margin-top: 4px; padding: 8px;
+    font-size: 13px; color: var(--primary-color, #4a9d6e);
+    background: #f0f7f3; border: 1px solid #d5e5da;
+    border-radius: 8px; cursor: pointer; text-align: center;
+}
+.fav-more-btn:active { opacity: 0.8; }
+
+/* 收藏数量角标 */
+#my-favorites-section .sync-hint { font-size: 12px; color: var(--text-secondary, #7f8c8d); font-weight: 400; }

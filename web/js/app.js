@@ -826,7 +826,7 @@ function openMyFavorites() {
         });
 }
 
-// 收藏入口上的数量角标: 登录后拉一次
+// 收藏入口上的数量角标: 登录后拉一次 (2026-10-15 改为读混排接口, 商品+辨证内容都算)
 function refreshFavCount() {
     var userId = getUserId();
     var label = document.getElementById('fav-count-label');
@@ -834,35 +834,259 @@ function refreshFavCount() {
         if (label) label.textContent = '';
         return;
     }
-    fetch(API_BASE + '/api/favorites?user_id=' + encodeURIComponent(userId) + '&limit=100')
+    fetch(API_BASE + '/api/favorites/mixed?user_id=' + encodeURIComponent(userId) + '&page=1')
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var n = data.total || 0;
-            label.textContent = n ? '(' + n + ')' : '';
+            label.textContent = n ? '（共 ' + n + ' 件）' : '（共 0 件）';
         })
         .catch(function() {});
 }
 
-// 登录成功/进「我」页时刷新角标
-(function hookFavCountRefresh() {
-    var _orig = null;
-    document.addEventListener('DOMContentLoaded', function() {
-        // 用户卡片显示时刷一次
-        var _origUpdate = window.updateProfileCard;
-        if (typeof _origUpdate === 'function') {
-            window.updateProfileCard = function() {
-                var r = _origUpdate.apply(this, arguments);
-                setTimeout(refreshFavCount, 100);
-                return r;
+// ========== 2026-10-15 中华要求: 「我」页收藏 = 上下两个分类区(小麦辨证 / 有机商品), 不混编, 各自独立10条/页 ========== //
+// 辨证内容区: fav-group-content + fav-content-list + fav-more-content (走 /api/favorites/content 独立分页)
+// 商品区: fav-group-product + fav-product-list + fav-more-product (走 /api/favorites 独立分页)
+// 每区「加载更多」只翻该区下一页, 互不影响; 某区 0 条时隐藏整区
+var _favContentPage = 1, _favProductPage = 1;
+var _favContentTotal = 0, _favProductTotal = 0;
+var _favProductItems = []; // 已渲染商品(供「查看」回查多图/链接)
+
+function favEsc(v) { var d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
+
+function loadFavoritesCard() {
+    var userId = getUserId();
+    var section = document.getElementById('my-favorites-section');
+    var gC = document.getElementById('fav-group-content');
+    var gP = document.getElementById('fav-group-product');
+    if (!section || !gC || !gP) return;
+    if (!userId || userId === 'anonymous') {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = '';
+    fetchFavoritesContent(false);
+    fetchFavoritesProduct(false);
+    setTimeout(refreshFavCount, 100);
+}
+
+// ---- 辨证内容区(独立分页) ----
+function fetchFavoritesContent(append) {
+    var userId = getUserId();
+    var list = document.getElementById('fav-content-list');
+    var group = document.getElementById('fav-group-content');
+    var moreBtn = document.getElementById('fav-more-content');
+    if (!list || !group) return;
+    if (!append) {
+        _favContentPage = 1;
+        list.innerHTML = '<p class="empty-hint">加载中…</p>';
+        if (moreBtn) moreBtn.style.display = 'none';
+    }
+    fetch(API_BASE + '/api/favorites/content?user_id=' + encodeURIComponent(userId) + '&page=' + _favContentPage + '&page_size=10')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var items = data.items || [];
+            _favContentTotal = data.total || 0;
+            var hasMore = _favContentPage < (data.total_pages || 1);
+            if (!append && !items.length && _favContentPage === 1) {
+                group.style.display = 'none';
+                if (moreBtn) moreBtn.style.display = 'none';
+                _favContentTotal = 0;
+                return;
+            }
+            group.style.display = '';
+            var html = '';
+            items.forEach(function(it) {
+                var preview = String(it.content || '').slice(0, 40);
+                html +=
+                    '<div class="fav-card fav-card-content" data-cid="' + favEsc(it.id) + '">' +
+                        '<div class="fav-card-badge">🌿 小麦辨证</div>' +
+                        '<div class="fav-card-body">' +
+                            '<div class="fav-card-title">' + (favEsc(it.title || '') || '养生辨证分析') + '</div>' +
+                            '<div class="fav-card-meta">' + favEsc((it.created_at || '').slice(0, 10)) + '</div>' +
+                            '<div class="fav-card-preview">' + favEsc(preview) + '…</div>' +
+                        '</div>' +
+                        '<div class="fav-card-actions">' +
+                            '<button class="fav-card-btn" data-act="toggle">展开</button>' +
+                            '<button class="fav-card-btn" data-act="share">🖼️ 分享图</button>' +
+                            '<button class="fav-card-btn fav-card-remove" data-act="rm-c" data-id="' + favEsc(it.id) + '">删除</button>' +
+                        '</div>' +
+                        '<div class="fav-card-detail" style="display:none;">' + favEsc(it.content || '') + '</div>' +
+                    '</div>';
+            });
+            if (append) {
+                var tmp = document.createElement('div');
+                tmp.innerHTML = html;
+                var first = list.firstElementChild;
+                if (first && first.classList.contains('empty-hint')) first.remove();
+                while (tmp.firstElementChild) list.appendChild(tmp.firstElementChild);
+            } else {
+                list.innerHTML = html;
+            }
+            if (moreBtn) moreBtn.style.display = hasMore ? '' : 'none';
+            bindFavContentEvents(list);
+        })
+        .catch(function() {
+            if (!append) list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
+        });
+}
+
+// ---- 商品区(独立分页) ----
+function fetchFavoritesProduct(append) {
+    var userId = getUserId();
+    var list = document.getElementById('fav-product-list');
+    var group = document.getElementById('fav-group-product');
+    var moreBtn = document.getElementById('fav-more-product');
+    if (!list || !group) return;
+    if (!append) {
+        _favProductPage = 1;
+        _favProductItems = [];
+        list.innerHTML = '<p class="empty-hint">加载中…</p>';
+        if (moreBtn) moreBtn.style.display = 'none';
+    }
+    fetch(API_BASE + '/api/favorites?user_id=' + encodeURIComponent(userId) + '&page=' + _favProductPage + '&page_size=10')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var items = data.favorites || data.items || [];
+            var total = (typeof data.total !== 'undefined') ? data.total : items.length;
+            var totalPages = (typeof data.total_pages !== 'undefined') ? data.total_pages : 1;
+            _favProductTotal = total;
+            var hasMore = _favProductPage < totalPages;
+            if (!append && !items.length && _favProductPage === 1) {
+                group.style.display = 'none';
+                if (moreBtn) moreBtn.style.display = 'none';
+                _favProductTotal = 0;
+                return;
+            }
+            group.style.display = '';
+            var html = '';
+            items.forEach(function(it) {
+                var iid = it.item_id || it.id;
+                html +=
+                    '<div class="fav-card fav-card-product">' +
+                        '<img class="fav-card-img" src="' + favEsc(it.image || '') + '" onerror="this.style.visibility=\'hidden\'" alt="">' +
+                        '<div class="fav-card-body">' +
+                            '<div class="fav-card-title">' + favEsc(it.title || '未命名商品') + '</div>' +
+                            '<div class="fav-card-meta">¥' + favEsc(it.price || '0') + ' · ' + favEsc(it.shop_name || it.platform || '') + '</div>' +
+                        '</div>' +
+                        '<div class="fav-card-actions">' +
+                            '<button class="fav-card-btn" data-act="view" data-id="' + favEsc(iid) + '">查看</button>' +
+                            '<button class="fav-card-btn fav-card-remove" data-act="rm-p" data-id="' + favEsc(iid) + '">取消</button>' +
+                        '</div>' +
+                    '</div>';
+            });
+            if (append) {
+                var tmp = document.createElement('div');
+                tmp.innerHTML = html;
+                var first = list.firstElementChild;
+                if (first && first.classList.contains('empty-hint')) first.remove();
+                while (tmp.firstElementChild) list.appendChild(tmp.firstElementChild);
+                _favProductItems = _favProductItems.concat(items);
+            } else {
+                list.innerHTML = html;
+                _favProductItems = items;
+            }
+            if (moreBtn) moreBtn.style.display = hasMore ? '' : 'none';
+            bindFavProductEvents(list);
+        })
+        .catch(function() {
+            if (!append) list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
+        });
+}
+
+// 辨证内容卡片交互: 展开/分享图/删除
+function bindFavContentEvents(list) {
+    var userId = getUserId();
+    list.querySelectorAll('[data-act="toggle"]').forEach(function(b) {
+        b.onclick = function() {
+            var card = b.closest('.fav-card-content');
+            var detail = card.querySelector('.fav-card-detail');
+            var open = detail.style.display !== 'none';
+            detail.style.display = open ? 'none' : 'block';
+            b.textContent = open ? '展开' : '收起';
+        };
+    });
+    list.querySelectorAll('[data-act="share"]').forEach(function(b) {
+        b.onclick = function() {
+            var card = b.closest('.fav-card-content');
+            var detail = card.querySelector('.fav-card-detail');
+            generateShareImage((detail && detail.textContent) || (b.closest('.fav-card').querySelector('.fav-card-title').textContent || ''));
+        };
+    });
+    list.querySelectorAll('[data-act="rm-c"]').forEach(function(b) {
+        b.onclick = function() {
+            fetch(API_BASE + '/api/favorites/content?user_id=' + encodeURIComponent(userId) + '&id=' + encodeURIComponent(b.dataset.id), { method: 'DELETE' })
+                .then(function() {
+                    var card = b.closest('.fav-card'); if (card) card.remove();
+                    _favContentTotal = Math.max(0, _favContentTotal - 1);
+                    var gl = document.getElementById('fav-content-list');
+                    if (gl && !gl.querySelectorAll('.fav-card').length) document.getElementById('fav-group-content').style.display = 'none';
+                    refreshFavCount();
+                }).catch(function() { alert('删除失败, 请重试'); });
+        };
+    });
+}
+
+// 商品卡片交互: 查看(多图轮播回查)/取消
+function bindFavProductEvents(list) {
+    var userId = getUserId();
+    list.querySelectorAll('[data-act="view"]').forEach(function(b) {
+        b.onclick = function() {
+            var item = _favProductItems.filter(function(x){ return String(x.item_id || x.id) === b.dataset.id; })[0];
+            if (!item) return;
+            var iid = item.item_id || item.id;
+            var fakeProduct = {
+                item_id: iid, title: item.title, price: item.price,
+                image: item.image, url: item.url,
+                app_url: String(item.url || '').replace('https://', 'taobao://', 1),
+                platform: item.platform || 'taobao', shop_name: item.shop_name, images: []
             };
-        } else {
-            setTimeout(refreshFavCount, 800);
-        }
+            var _open = function() { showProductDetail(fakeProduct); };
+            if (iid && (item.title || '')) {
+                fetch(API_BASE + '/api/products/search?keyword=' + encodeURIComponent(item.title) + '&platform=' + encodeURIComponent(item.platform || 'taobao') + '&limit=50')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var found = null;
+                        (data.items || []).forEach(function(p) { if (!found && String(p.item_id) === String(iid)) found = p; });
+                        if (found) { fakeProduct.images = found.images || []; if (found.app_url) fakeProduct.app_url = found.app_url; }
+                        _open();
+                    })
+                    .catch(_open);
+            } else { _open(); }
+        };
+    });
+    list.querySelectorAll('[data-act="rm-p"]').forEach(function(b) {
+        b.onclick = function() {
+            fetch(API_BASE + '/api/favorites/remove', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, item_id: b.dataset.id })
+            }).then(function() {
+                var card = b.closest('.fav-card'); if (card) card.remove();
+                _favProductTotal = Math.max(0, _favProductTotal - 1);
+                _favProductItems = _favProductItems.filter(function(x){ return String(x.item_id || x.id) !== b.dataset.id; });
+                var gl = document.getElementById('fav-product-list');
+                if (gl && !gl.querySelectorAll('.fav-card').length) document.getElementById('fav-group-product').style.display = 'none';
+                refreshFavCount();
+            }).catch(function() { alert('取消失败, 请重试'); });
+        };
+    });
+}
+
+// 各区「加载更多」独立翻页
+(function hookFavMore() {
+    document.addEventListener('DOMContentLoaded', function() {
+        var mc = document.getElementById('fav-more-content');
+        var mp = document.getElementById('fav-more-product');
+        if (mc) mc.onclick = function() { _favContentPage += 1; fetchFavoritesContent(true); };
+        if (mp) mp.onclick = function() { _favProductPage += 1; fetchFavoritesProduct(true); };
     });
 })();
 
+// 2026-10-16 小蕊删: 原 hookFavoritesCard 把 loadFavoritesCard 挂到 window.updateProfileCard,
+// 但 updateProfileCard 全项目从未定义/调用, hook 永远不触发 → 收藏区不出现。
+// 已改由 loadProfile() 直接调用(见 loadProfile 末尾)。
 
-    const bar = document.createElement('div');
+
+const bar = document.createElement('div');
     bar.className = 'msg-action-bar';
 
     const favBtn = document.createElement('button');
@@ -899,69 +1123,70 @@ function refreshFavCount() {
     content.appendChild(bar);
 }
 
-// 用 canvas 把小麦回答画成分享卡片图，长按可保存/转发
+// 2026-10-16 小蕊重写(中华反馈「微信里不能分享」):
+// 原实现用 canvas 画分享图, 但微信 WebView 里只要画过跨域图(淘宝/天猫商品图)
+// canvas 就被污染, toDataURL() 直接抛 SecurityError → 分享图弹不出来, 微信里点不动。
+// 改服务端渲染: POST 文本到 /api/share/content-image, 后端 Pillow 出 PNG 回传,
+// 前端只回显, 永远绕开跨域。普通浏览器也走同一通道, 模板与原来一致。
 function generateShareImage(text) {
-    const W = 750, padding = 50, lineHeight = 40, fontSize = 28;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    showShareLoading();
+    fetch(API_BASE + '/api/share/content-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: String(text == null ? '' : text) })
+    })
+        .then(function(r) { if (!r.ok) throw new Error('render failed'); return r.blob(); })
+        .then(function(blob) {
+            var reader = new FileReader();
+            reader.onloadend = function() { showSharePreview(reader.result); };
+            reader.readAsDataURL(blob);
+        })
+        .catch(function() {
+            removeShareLoading();
+            alert('分享图生成失败, 请重试');
+        });
+}
 
-    // 先算文字换行，确定高度
-    ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
-    const maxTextW = W - padding * 2;
-    const rawLines = String(text).split('\n');
-    const lines = [];
-    rawLines.forEach(raw => {
-        if (raw.trim() === '') { lines.push(''); return; }
-        let cur = '';
-        for (const ch of raw) {
-            if (ctx.measureText(cur + ch).width > maxTextW) {
-                lines.push(cur); cur = ch;
-            } else cur += ch;
-        }
-        if (cur) lines.push(cur);
-    });
+// 商品分享图(2026-10-16 中华要求: 商品像辨证内容一样可分享, 同模板 + 商品图 + 淘宝二维码)
+// product = { title, price, shop_name, image, url, item_id, platform, app_url }
+function generateProductShareImage(product) {
+    var p = product || {};
+    var buyUrl = p.url || '';
+    if (!buyUrl || buyUrl === '#') buyUrl = 'https://item.taobao.com/item.htm?id=' + (p.item_id || '');
+    showShareLoading();
+    fetch(API_BASE + '/api/share/product-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            title: p.title || '', price: String(p.price == null ? '' : p.price),
+            shop: p.shop_name || '', image: p.image || '', buy_url: buyUrl
+        })
+    })
+        .then(function(r) { if (!r.ok) throw new Error('render failed'); return r.blob(); })
+        .then(function(blob) {
+            var reader = new FileReader();
+            reader.onloadend = function() { showSharePreview(reader.result); };
+            reader.readAsDataURL(blob);
+        })
+        .catch(function() {
+            removeShareLoading();
+            alert('商品分享图生成失败, 请重试');
+        });
+}
 
-    const headerH = 130, footerH = 240;
-    const bodyH = lines.length * lineHeight + 40;
-    const H = headerH + bodyH + footerH;
-    canvas.width = W; canvas.height = H;
+function showShareLoading() {
+    var old = document.getElementById('share-preview-mask');
+    if (old) old.remove();
+    var mask = document.createElement('div');
+    mask.id = 'share-preview-mask';
+    mask.className = 'share-preview-mask';
+    mask.innerHTML = '<div class="share-preview-box"><p style="padding:40px 10px;color:#666;">正在生成分享图…</p></div>';
+    document.body.appendChild(mask);
+}
 
-    // 背景
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#f0f7f2'); grad.addColorStop(1, '#e3f0e8');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-
-    // 头部
-    ctx.fillStyle = '#3a7d5c';
-    ctx.font = 'bold 40px "PingFang SC", sans-serif';
-    ctx.fillText('🌾 小麦SOM · 养生辨证', padding, 75);
-    ctx.fillStyle = '#7ba892'; ctx.font = '24px sans-serif';
-    ctx.fillText('中医辨证 · 有机养生', padding, 110);
-
-    // 正文
-    ctx.fillStyle = '#2d3b33'; ctx.font = fontSize + 'px "PingFang SC", "Microsoft YaHei", sans-serif';
-    let y = headerH + 30;
-    lines.forEach(l => { ctx.fillText(l, padding, y); y += lineHeight; });
-
-    // 底部
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#3a7d5c'; ctx.font = 'bold 26px sans-serif';
-    ctx.fillText('扫码体验 SOM 松麦 · 你的养生助手', W / 2, H - 195);
-    ctx.fillStyle = '#9bb8a8'; ctx.font = '22px sans-serif';
-    ctx.fillText('som.top · 以上为养生文化参考，不构成医疗诊断', W / 2, H - 160);
-
-    // 小程序码
-    const qrImg = new Image();
-    qrImg.onload = () => {
-        const qrSize = 130;
-        ctx.drawImage(qrImg, W / 2 - qrSize / 2, H - 145, qrSize, qrSize);
-        showSharePreview(canvas.toDataURL('image/png'));
-    };
-    qrImg.onerror = () => {
-        // 二维码加载失败也要能分享
-        showSharePreview(canvas.toDataURL('image/png'));
-    };
-    qrImg.src = '/public/qrcode.jpg';
+function removeShareLoading() {
+    var m = document.getElementById('share-preview-mask');
+    if (m) m.remove();
 }
 
 function showSharePreview(dataUrl) {
@@ -1310,6 +1535,7 @@ function displayProducts(products, append = false) {
                 <div class="product-price">¥${product.price}</div>
                 <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
             </div>
+            <button class="product-card-share" data-share-idx="${_productIndex}" title="生成商品分享图（商品图+淘宝二维码）" aria-label="分享该商品">📤 分享图</button>
         </div>
         `;
     }).join('');
@@ -1321,8 +1547,17 @@ function displayProducts(products, append = false) {
     }
 }
 
-// 事件委托：商品卡片点击
+// 事件委托：商品卡片点击 / 分享按钮(2026-10-16 中华要求: 商品也要能生成分享图, 商品图+淘宝二维码)
 document.addEventListener('click', (e) => {
+    // 卡片上的「📤 分享图」按钮: 先拦下来, 不触发详情弹窗
+    var shareBtn = e.target.closest('.product-card-share');
+    if (shareBtn) {
+        e.stopPropagation();
+        var sidx = parseInt(shareBtn.dataset.shareIdx, 10);
+        var sp = _productCache[sidx];
+        if (sp) generateProductShareImage(sp);
+        return;
+    }
     const card = e.target.closest('.product-card');
     if (card) {
         const idx = parseInt(card.dataset.productIdx);
@@ -1595,6 +1830,7 @@ function showProductDetail(product) {
                     <button class="detail-buy" onclick="openProduct('${escapeJsAttr(product.url || '#')}', '${escapeJsAttr(product.platform)}', '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.app_url || '#')}')">点击购买</button>
                     <button class="detail-qr-btn" onclick="(function(){var u='${escapeJsAttr(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeJsAttr(itemId)}';} showQRCode(u, '${escapeJsAttr(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.title || '')}', '${escapeJsAttr(product.price || '')}', '${escapeJsAttr(imgSrc)}', '${escapeJsAttr(product.url || '')}', '${escapeJsAttr(product.platform || 'taobao')}', '${escapeJsAttr(product.shop_name || '')}')">♡ 收藏</button>
+                    <button class="detail-fav detail-share" id="detail-share-btn" onclick="generateProductShareImage({title:'${escapeJsAttr(product.title || '')}', price:'${escapeJsAttr(product.price || '')}', shop_name:'${escapeJsAttr(product.shop_name || '')}', image:'${escapeJsAttr(imgSrc)}', url:'${escapeJsAttr(product.url || '')}', item_id:'${escapeJsAttr(itemId)}', platform:'${escapeJsAttr(product.platform || 'taobao')}'})" title="生成商品分享图（商品图+淘宝二维码）">📤 分享图</button>
                 </div>
             </div>
             <div class="detail-detail-section">
@@ -2549,6 +2785,17 @@ function loadProfile() {
     loadTizhiRecordsFromBackend().catch(() => loadTizhiRecords(data));
     // 2026-10-14 健康画像多维时间线(中华要求): 登录后拉后端 /api/health/portrait
     loadHealthPortrait();
+
+    // 2026-10-16 小蕊修(中华反馈「收藏没有出现」):
+    // 原实现把 loadFavoritesCard 挂在 window.updateProfileCard 上, 但 updateProfileCard
+    // 全项目从未被定义/调用(旧版是 openMyFavorites 弹窗式收藏), 导致收藏区永远
+    // display:none 不出现, 清微信缓存也没用(不是缓存问题, 是代码没被调用)。
+    // 改直接挂 loadProfile —— 登录/注册/签到后都会走这里, 进「我」页即加载收藏。
+    var _favSec = document.getElementById('my-favorites-section');
+    if (_favSec) {
+        if (isLoggedIn()) { _favSec.style.display = ''; loadFavoritesCard(); }
+        else { _favSec.style.display = 'none'; }
+    }
 }
 
 // ========== 2026-10-14 健康画像(多维时间画像) ==========
