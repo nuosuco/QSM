@@ -24,7 +24,58 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEyeExercise();
     loadTizhiGrid();
     loadYaoshiList();
+    initScrollToTop();
 });
+
+// 2026-10-15 中华要求: 一键到顶按钮(右下角↑, 滚动过阈值才显示)
+// 页面主滚动容器是 .app(100vh + overflow:hidden, 内部 .main overflow-y:auto), 不是 window。
+// 之前监 window.scroll 永远不触发 → 按钮从不显示(中华反馈"没出来"的根因)。
+function initScrollToTop() {
+    var btn = document.getElementById('scroll-to-top');
+    if (!btn) return;
+    var THRESHOLD = 300; // 滚过 300px 才显示
+    function getScroller() {
+        // 主滚动容器: <main class="main">(flex 布局 100vh, 内部 overflow-y:auto)
+        var main = document.querySelector('main.main') || document.querySelector('.main');
+        return main || null;
+    }
+    function currentPos() {
+        var sc = getScroller();
+        if (sc) return sc.scrollTop;
+        return window.pageYOffset || document.documentElement.scrollTop || 0;
+    }
+    function onScroll() {
+        var pos = currentPos();
+        if (pos > THRESHOLD) btn.classList.add('show');
+        else btn.classList.remove('show');
+    }
+    var scroller = getScroller();
+    if (scroller) {
+        scroller.addEventListener('scroll', onScroll, { passive: true });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // 切换 tab 时刷新显隐(有的 tab 内容长/短不一)
+    var _origSwitchTab = switchTab;
+    switchTab = function(targetTab) {
+        _origSwitchTab(targetTab);
+        setTimeout(onScroll, 80);
+    };
+    // 切 tab 后滚动容器 scrollTop 归零, 但要等渲染完再算
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.matches && e.target.matches('.nav-btn')) {
+            setTimeout(onScroll, 120);
+        }
+    }, true);
+    btn.addEventListener('click', function() {
+        var sc = getScroller();
+        if (sc) {
+            sc.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+    onScroll(); // 初始状态
+}
 
 // 2026-10-12 小蕊修(中华反馈"乱码还在"): 浏览器 localStorage 里残留的历史脏 som_auth_user
 // (旧版回调页无 charset, 中文昵称被写坏), 页面加载时检测到乱码就修好回写, 一次清干净。
@@ -646,6 +697,171 @@ function appendMessageActions(msgId, replyText) {
     const content = chatMsg.querySelector('.message-content');
     if (!content) return;
 
+// ========== 我的收藏列表页 (2026-10-15 中华要求: 收藏的商品要随时能打开) ==========
+// 入口: 「我」页用户卡片里的「♥ 我的收藏」按钮
+// 数据: 服务器 product_favorites 表(随登录同步, 换设备也能看到)
+// 打开: 每条收藏可点详情(多图轮播弹窗, 复用 openProductDetailModal) + 取消收藏
+function openMyFavorites() {
+    var userId = getUserId();
+    if (!userId || userId === 'anonymous') {
+        alert('请先在「我」页登录后再查看收藏');
+        switchTab('profile');
+        return;
+    }
+    // 移除旧弹窗
+    var old = document.getElementById('favorites-modal');
+    if (old) old.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'favorites-modal';
+    modal.className = 'detail-overlay show';
+    modal.style.zIndex = '9998';
+    modal.innerHTML =
+        '<div class="favorites-panel" onclick="event.stopPropagation()">' +
+            '<div class="favorites-header">' +
+                '<span>♥ 我的收藏</span>' +
+                '<button class="favorites-close" onclick="document.getElementById(\'favorites-modal\').remove()">✕</button>' +
+            '</div>' +
+            '<div class="favorites-list" id="favorites-list"><div class="favorites-loading">加载中...</div></div>' +
+        '</div>';
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
+
+    fetch(API_BASE + '/api/favorites?user_id=' + encodeURIComponent(userId) + '&limit=100')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var list = document.getElementById('favorites-list');
+            if (!list) return;
+            var favs = data.favorites || [];
+            if (!favs.length) {
+                list.innerHTML = '<div class="favorites-empty">还没有收藏的商品<br><small>在商品详情的「♡ 收藏」点一下，下次就能在这里找到</small></div>';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < favs.length; i++) {
+                var f = favs[i];
+                var esc = function(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+                html +=
+                    '<div class="fav-item">' +
+                        '<img class="fav-image" src="' + esc(f.image || '') + '" onerror="this.style.visibility=\'hidden\'" alt="">' +
+                        '<div class="fav-info">' +
+                            '<div class="fav-title">' + esc(f.title || '未命名商品') + '</div>' +
+                            '<div class="fav-price">¥' + esc(f.price || '0') + '</div>' +
+                            '<div class="fav-shop">' + esc(f.shop_name || f.platform || '') + ' · ' + esc(f.created_at || '') + '</div>' +
+                            '<div class="fav-actions">' +
+                                '<button class="fav-btn fav-view" data-idx="' + i + '">查看</button>' +
+                                '<button class="fav-btn fav-remove" data-item="' + esc(f.item_id) + '">取消收藏</button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+            }
+            list.innerHTML = html;
+            list.dataset.favs = JSON.stringify(favs);
+            list.querySelectorAll('.fav-view').forEach(function(b) {
+                b.onclick = function() {
+                    var idx = parseInt(b.dataset.idx, 10);
+                    var items = JSON.parse(list.dataset.favs || '[]');
+                    var f = items[idx];
+                    if (!f) return;
+                    // 复用商品详情弹窗(多图轮播): 传完整 product 结构, images 走搜索接口回查
+                    var fakeProduct = {
+                        item_id: f.item_id,
+                        title: f.title,
+                        price: f.price,
+                        image: f.image,
+                        url: f.url,
+                        app_url: (f.url || '').replace('https://', 'taobao://', 1),
+                        platform: f.platform || 'taobao',
+                        shop_name: f.shop_name,
+                        images: []
+                    };
+                    // 收藏只有单张主图, 用收藏时的关键词(title)回查搜索接口补多图, 查不到就只展示主图
+                    var _fillAndOpen = function() { showProductDetail(fakeProduct); };
+                    var _kw = f.title || '';
+                    if (f.item_id && _kw) {
+                        fetch(API_BASE + '/api/products/search?keyword=' + encodeURIComponent(_kw) + '&platform=' + encodeURIComponent(f.platform || 'taobao') + '&limit=50')
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                var found = null;
+                                (data.items || []).forEach(function(p) {
+                                    if (!found && String(p.item_id) === String(f.item_id)) found = p;
+                                });
+                                if (found) {
+                                    fakeProduct.images = found.images || [];
+                                    if (!fakeProduct.url && found.url) fakeProduct.url = found.url;
+                                    if (!fakeProduct.app_url && found.app_url) fakeProduct.app_url = found.app_url;
+                                }
+                                _fillAndOpen();
+                            })
+                            .catch(_fillAndOpen);
+                    } else {
+                        _fillAndOpen();
+                    }
+                    var favModal = document.getElementById('favorites-modal');
+                    if (favModal) favModal.remove();
+                };
+            });
+            list.querySelectorAll('.fav-remove').forEach(function(b) {
+                b.onclick = function() {
+                    var item = b.dataset.item;
+                    fetch(API_BASE + '/api/favorites/remove', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: userId, item_id: item })
+                    }).then(function() {
+                        b.closest('.fav-item').remove();
+                        var empty = document.getElementById('favorites-empty');
+                        var rest = list.querySelectorAll('.fav-item');
+                        if (!rest.length) {
+                            list.innerHTML = '<div class="favorites-empty">收藏都取消啦</div>';
+                        }
+                        refreshFavCount();
+                    }).catch(function() { alert('取消失败, 请重试'); });
+                };
+            });
+        })
+        .catch(function() {
+            var list = document.getElementById('favorites-list');
+            if (list) list.innerHTML = '<div class="favorites-empty">加载失败, 请重试</div>';
+        });
+}
+
+// 收藏入口上的数量角标: 登录后拉一次
+function refreshFavCount() {
+    var userId = getUserId();
+    var label = document.getElementById('fav-count-label');
+    if (!userId || userId === 'anonymous' || !label) {
+        if (label) label.textContent = '';
+        return;
+    }
+    fetch(API_BASE + '/api/favorites?user_id=' + encodeURIComponent(userId) + '&limit=100')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var n = data.total || 0;
+            label.textContent = n ? '(' + n + ')' : '';
+        })
+        .catch(function() {});
+}
+
+// 登录成功/进「我」页时刷新角标
+(function hookFavCountRefresh() {
+    var _orig = null;
+    document.addEventListener('DOMContentLoaded', function() {
+        // 用户卡片显示时刷一次
+        var _origUpdate = window.updateProfileCard;
+        if (typeof _origUpdate === 'function') {
+            window.updateProfileCard = function() {
+                var r = _origUpdate.apply(this, arguments);
+                setTimeout(refreshFavCount, 100);
+                return r;
+            };
+        } else {
+            setTimeout(refreshFavCount, 800);
+        }
+    });
+})();
+
+
     const bar = document.createElement('div');
     bar.className = 'msg-action-bar';
 
@@ -845,7 +1061,19 @@ function appendMessage(text, type, isHtml = false, autoScroll = true) {
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
-    return div.innerHTML;
+    // 2026-10-15 小蕊修: div.innerHTML 只转义 & < > "，不转义单引号;
+    // 但内联 onclick 的属性值用单引号包 JS 字符串, 标题含 ' 会炸整页 JS(SyntaxError)。
+    // 追加单引号 → &#39;, 反斜杠原样保留即可(JS 字符串内 \\ 与 \ 等价转义)。
+    return div.innerHTML.replace(/'/g, '&#39;');
+}
+// 2026-10-15 小蕊加: 内联事件处理器(onclick 单引号串)专用转义, 比 escapeHtml 更严格
+function escapeJsAttr(text) {
+    return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 function getSessionId() {
@@ -1364,9 +1592,9 @@ function showProductDetail(product) {
                 ${product.brand ? `<div class="detail-brand">品牌：${escapeHtml(product.brand)}</div>` : ''}
                 ${product.sales ? `<div class="modal-sales">月销：${product.sales}</div>` : ''}
                 <div class="detail-actions">
-                    <button class="detail-buy" onclick="openProduct('${escapeHtml(product.url || '#')}', '${product.platform}', '${escapeHtml(itemId)}', '${escapeHtml(product.app_url || '#')}')">点击购买</button>
-                    <button class="detail-qr-btn" onclick="(function(){var u='${escapeHtml(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeHtml(itemId)}';} showQRCode(u, '${escapeHtml(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
-                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeHtml(itemId)}', '${escapeHtml(product.title || '')}', '${product.price || ''}', '${escapeHtml(imgSrc)}', '${escapeHtml(product.url || '')}', '${product.platform || 'taobao'}', '${escapeHtml(product.shop_name || '')}')">♡ 收藏</button>
+                    <button class="detail-buy" onclick="openProduct('${escapeJsAttr(product.url || '#')}', '${escapeJsAttr(product.platform)}', '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.app_url || '#')}')">点击购买</button>
+                    <button class="detail-qr-btn" onclick="(function(){var u='${escapeJsAttr(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeJsAttr(itemId)}';} showQRCode(u, '${escapeJsAttr(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
+                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.title || '')}', '${escapeJsAttr(product.price || '')}', '${escapeJsAttr(imgSrc)}', '${escapeJsAttr(product.url || '')}', '${escapeJsAttr(product.platform || 'taobao')}', '${escapeJsAttr(product.shop_name || '')}')">♡ 收藏</button>
                 </div>
             </div>
             <div class="detail-detail-section">
@@ -1377,8 +1605,8 @@ function showProductDetail(product) {
                     }).join('')}
                 </div>
                 <div class="detail-detail-footer">
-                    <button class="detail-detail-btn" onclick="openProduct('${escapeHtml(detailUrl || '#')}', '${product.platform}', '${escapeHtml(itemId)}', '${escapeHtml(product.app_url || '#')}')">点击购买</button>
-                    <button class="detail-detail-qr-btn" onclick="(function(){var u='${escapeHtml(detailUrl || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeHtml(itemId)}';} showQRCode(u, '${escapeHtml(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
+                    <button class="detail-detail-btn" onclick="openProduct('${escapeJsAttr(detailUrl || '#')}', '${escapeJsAttr(product.platform)}', '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.app_url || '#')}')">点击购买</button>
+                    <button class="detail-detail-qr-btn" onclick="(function(){var u='${escapeJsAttr(detailUrl || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeJsAttr(itemId)}';} showQRCode(u, '${escapeJsAttr(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                 </div>
             </div>
         </div>
@@ -2388,18 +2616,25 @@ async function fetchPortraitPage() {
     html += '<div id="health-portrait-timeline" style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;font-size:12px;color:#666;"></div>';
     box.innerHTML = html;
     const tlBox = document.getElementById('health-portrait-timeline');
-    const tl = (p.timeline || []).slice().reverse();
+    // 2026-10-15 小蕊修: 后端已改倒序(最新在前), 前端不再 reverse, 避免双重反转
+    const tl = p.timeline || [];
     let pageHtml = '';
     for (let i = 0; i < tl.length; i++) {
         const t = tl[i];
         const date = escapeHtml((t.date || '').slice(0, 16));
         const tag = t.has_photo ? '📷' : '💬';
         let delta = '';
-        if (t.visual_delta != null) {
-            const sim = t.visual_delta;
-            delta = sim < 0.25 ? '<span style="color:#07c160;">(照片变化小)</span>'
-                   : sim < 0.6 ? '<span style="color:#faad14;">(照片有变化)</span>'
-                   : '<span style="color:#fa5151;">(照片变化大)</span>';
+        if (t.has_photo) {
+            // 2026-10-15 中华指出: 最新一条是"待比较者", 历史均值是基准, 应显示最新相对历史的变化
+            if (t.visual_delta == null) {
+                // 只有一张有照片记录(无历史可比) 或 计算异常
+                delta = '<span style="color:#888;">(首张记录)</span>';
+            } else {
+                const sim = t.visual_delta;
+                delta = sim < 0.25 ? '<span style="color:#07c160;">(照片变化小)</span>'
+                       : sim < 0.6 ? '<span style="color:#faad14;">(照片有变化)</span>'
+                       : '<span style="color:#fa5151;">(照片变化大)</span>';
+            }
         }
         pageHtml += `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #f5f5f5;">`;
         pageHtml += `<span>${tag} ${date}</span><span><b>${escapeHtml(t.tizhi || '未知')}</b>${delta}</span></div>`;

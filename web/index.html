@@ -12,7 +12,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="stylesheet" href="css/style.css?v=20261015q">
+    <link rel="stylesheet" href="css/style.css?v=20261015z">
 </head>
 <body>
     <div class="app">
@@ -215,6 +215,7 @@
                             <p id="profile-checkin">签到：今天未签到</p>
                             <div class="profile-edit-row">
                                 <button class="binding-btn" onclick="showEditProfileModal()">✏️ 修改头像/昵称</button>
+                                <button class="binding-btn" id="my-favorites-entry" onclick="openMyFavorites()" style="display:block;width:100%;margin-top:8px;">♥ 我的收藏 <span id="fav-count-label">(0)</span></button>
                             </div>
                         </div>
                         <button class="logout-btn" onclick="doLogout()">退出</button>
@@ -379,8 +380,11 @@
         </footer>
     </div>
 
+    <!-- 一键到顶按钮(滚动到一定深度时显示, 方便用户快速回到顶部选分类/搜索) -->
+    <button id="scroll-to-top" title="回到顶部" aria-label="回到顶部">↑</button>
+
     <script src="js/qrcode.min.js?v=20261012"></script>
-    <script src="js/error-trap.js?v=20261012"></script>
-    <script src="js/app.js?v=20261015r"></script>
+    <script src="js/error-trap.js?v=20261015z"></script>
+    <script src="js/app.js?v=20261015z"></script>
 </body>
 </html>

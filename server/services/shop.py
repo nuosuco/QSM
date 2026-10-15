@@ -401,6 +401,9 @@ class ShopService:
                         'title': r.get('title', ''),
                         'price': r.get('price', ''),
                         'image': r.get('main_image', '') or r.get('images', '').strip('[]"') if isinstance(r.get('images'), str) else (r.get('images') or [])[0] if isinstance(r.get('images'), list) else '',
+                        # 2026-10-15 小蕊修(中华反馈: 商品图片只剩一张, 一直都是多张): 缓存路径漏传 images 多图字段,
+                        # 前端 product.images || [] 拿到空 → 弹窗只剩主图。这里补上(库内是 JSON 字符串, 解析成数组)。
+                        'images': (json.loads(r.get('images')) if isinstance(r.get('images'), str) and r.get('images') else (r.get('images') if isinstance(r.get('images'), list) else [])) or [],
                         'url': click_url,
                         'app_url': app_url,
                         'platform': r.get('platform', 'taobao'),

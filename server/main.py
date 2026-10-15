@@ -1069,6 +1069,39 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
     if context:
         system_prompt += f"\n\n【参考知识】\n{context}"
 
+    # 2026-10-15 中华要求(B): 辨证时参考历史照片趋势 — 把该用户历史照片的均值向量算成
+    # "视觉趋势参考"拼进提示词, 让小麦同时看到"这次是什么样"和"你之前整体是什么样"。
+    # 算力代价: 均值向量是 512 维数字, 只多几行文字进 prompt, 几乎零额外推理时间;
+    # ArcFace 提向量每次拍照已在跑, 这里复用已存向量, 不新增拍照流程、不让你多等。
+    if request.user_id:
+        try:
+            from services import face_service as _fs
+            import numpy as _np
+            _conn2 = get_user_db()
+            _hist = _conn2.execute(
+                "SELECT photo_features FROM tizhi_records WHERE user_id=? AND photo_features IS NOT NULL "
+                "AND photo_features != '' ORDER BY created_at DESC, id DESC LIMIT 24",
+                (request.user_id,)
+            ).fetchall()
+            _conn2.close()
+            if len(_hist) >= 2:  # 至少 2 张历史照片才有"趋势"可比
+                _vecs = [_fs.decode_embedding(r["photo_features"]) for r in _hist if r["photo_features"]]
+                _vecs = [v for v in _vecs if v is not None and len(v) > 0]
+                if len(_vecs) >= 2:
+                    _avg = _np.mean(_np.stack(_vecs, axis=0), axis=0)
+                    _avg = _avg / (float(_np.linalg.norm(_avg)) + 1e-9)
+                    # 取 6 维摘要: 灰度均值/方差/肤色占比/梯度能量(与 _fallback_embedding 维度对齐), 大白话喂给 LLM
+                    _gray_info = f"平均灰度强度{_avg[0]:.2f}(0黑-1白), 对比度{_avg[1]:.2f}, 肤色占比{_avg[66]:.2f}, 纹理梯度{_avg[64]+_avg[65]:.2f}"
+                    _trend_note = (
+                        "请结合当前这张照片与历史均值对比, 判断【是否随时间有明显变化】(如舌苔由白转黄、面色由红转暗), "
+                        "在结论里点出变化趋势; 若无变化也请明确说明【稳定】。"
+                    )
+                    system_prompt += (
+                        f"\n\n【视觉趋势参考】该用户历史已存 {len(_vecs)} 张照片, 其整体视觉特征均值: {_gray_info}。" + _trend_note
+                    )
+        except Exception as _e:
+            print(f"[vision] 加载历史视觉趋势参考失败: {_e}")
+
     result = llm_router.vision(
         request.message,
         image_list,
@@ -1890,14 +1923,17 @@ async def health_portrait(user_id: str, days: int = 0, offset: int = 0):
     _w1 = "WHERE user_id=?" if days else "WHERE user_id=?"
     _w2 = "AND created_at >= ?" if days else ""
 
-    # ① 辨证时间线(按时间正序, 前端画时间轴; 10条以上翻下一页 offset 分页)
+    # ① 辨证时间线(按时间倒序, 最新排第一; 10条以上翻下一页 offset 分页)
+    # 2026-10-15 小蕊修(中华反馈): 上一版把排序改倒序后, 前端仍 .reverse() 反转了一次,
+    # 双重反转导致时间线正序(旧在上、新在下), 且 visual_delta 按倒序算, 趋势失真。
+    # 修法: 后端维持倒序(DESC), 前端删掉 .reverse(), visual_delta 语义改为"本次 vs 更早一次"。
     total_rows = conn.execute(
         ("SELECT COUNT(*) n FROM tizhi_records " + _w1 + _w2 + (" (?)" if days else "")),
         ((user_id,) + ((cutoff,) if days else ()))
     ).fetchone()["n"]
     timeline_rows = conn.execute(
-        ("SELECT created_at, tizhi, zhengxing, source, photo_hash, photo_features FROM tizhi_records "
-         + _w1 + _w2 + (" (?)" if days else "") + " ORDER BY created_at ASC, id ASC LIMIT 10 OFFSET ?"),
+        ("SELECT id, created_at, tizhi, zhengxing, source, photo_hash, photo_features FROM tizhi_records "
+         + _w1 + _w2 + (" (?)" if days else "") + " ORDER BY created_at DESC, id DESC LIMIT 10 OFFSET ?"),
         ((user_id,) + ((cutoff,) if days else ()) + (offset,))
     ).fetchall()
     # 2026-10-14 健康画像: 每行带 photo_hash(该次拍照特征指纹, 无照片=NULL);
@@ -1909,8 +1945,25 @@ async def health_portrait(user_id: str, days: int = 0, offset: int = 0):
             return vec
         except Exception:
             return None
+    # 2026-10-15 中华要求(A): 每条照片跟【该用户历史所有照片的均值向量】比,
+    # 不只看本窗口紧邻一条。历史均值在循环外一次查好(该用户全部历史向量), 避免循环内反复查库。
+    try:
+        from services import face_service as _fs_mod
+        import numpy as _np_mod
+        _hist_all = conn.execute(
+            "SELECT id, photo_features FROM tizhi_records WHERE user_id=? AND photo_features IS NOT NULL AND photo_features != '' ORDER BY id ASC",
+            (user_id,)
+        ).fetchall()
+        _hist_vecs = []  # (id, vec)
+        for hr in _hist_all:
+            hv = _vec(hr)
+            if hv is not None:
+                _hist_vecs.append((hr["id"], hv))
+    except Exception as _e_hist:
+        print(f"[portrait] 加载历史向量均值失败: {_e_hist}")
+        _hist_vecs = []
+
     timeline = []
-    _prev_vec = None
     for r in timeline_rows:
         # 2026-10-14 时区统一后: 库内 created_at 已是北京时间, 直接用(不再换算, 避免双重+8)
         _dt_val = r["created_at"]
@@ -1921,14 +1974,19 @@ async def health_portrait(user_id: str, days: int = 0, offset: int = 0):
             "photo_hash": (r["photo_hash"] or "")[:12],  # 短指纹(非原图), 前端画占位
         }
         cur_vec = _vec(r)
-        if cur_vec is not None and _prev_vec is not None:
-            try:
-                from services import face_service as _fs
-                entry["visual_delta"] = round(1.0 - _fs.cosine(cur_vec, _prev_vec), 3)  # 相邻两次拍照视觉差异(0=完全像, 1=不同)
-            except Exception:
-                pass
-        if cur_vec is not None:
-            _prev_vec = cur_vec
+        if cur_vec is not None and _hist_vecs:
+            # 基准 = 该用户历史所有照片向量均值(不含当前这张自己), 抗单次光照/角度异常
+            _excluded = r.get("id") if isinstance(r, dict) and "id" in r.keys() else None
+            _cands = [v for (hid, v) in _hist_vecs if hid != _excluded]
+            if _cands:
+                import numpy as _np2
+                avg = _np2.mean(_np2.stack(_cands, axis=0), axis=0)
+                avg = avg / (float(_np2.linalg.norm(avg)) + 1e-9)
+                try:
+                    from services import face_service as _fs2
+                    entry["visual_delta"] = round(1.0 - _fs2.cosine(cur_vec, avg), 3)  # 0=跟历史完全像, 1=不同
+                except Exception:
+                    pass
         timeline.append(entry)
 
     # ② 人脸向量组(学习进度: 累积几张脸向量, 最早/最近时间)
@@ -1959,6 +2017,7 @@ async def health_portrait(user_id: str, days: int = 0, offset: int = 0):
     tizhi_dist = {r["tizhi"] or "未知": r["c"] for r in dist_rows}
 
     # ④ 健康趋势: 比对最近一次 vs 最早一次体质, 看有没有变化
+    # 2026-10-15 小蕊: timeline 已改倒序(最新在前), first=最新, last=最早
     first = timeline[0] if timeline else None
     last = timeline[-1] if timeline else None
     trend = {

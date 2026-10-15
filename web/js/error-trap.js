@@ -31,7 +31,7 @@
                 'padding:10px 12px;font-size:12px;z-index:99999;max-height:50%;overflow:auto;white-space:pre-wrap;';
             document.body.appendChild(div);
         }
-        var lines = ['⚠ 页面检测到 ' + errors.length + ' 个 JS 错误 (最近5条):'];
+        var lines = ['⚠ 本次会话检测到 ' + errors.length + ' 个 JS 错误 (最近5条, 关闭页面即清空):'];
         errors.slice(0, 5).forEach(function(x, i) {
             lines.push((i + 1) + '. [' + x.kind + '] ' + x.msg);
         });
