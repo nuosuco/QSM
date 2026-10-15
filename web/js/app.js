@@ -1147,19 +1147,25 @@ function generateShareImage(text) {
         });
 }
 
-// 商品分享图(2026-10-16 中华要求: 商品像辨证内容一样可分享, 同模板 + 商品图 + 淘宝二维码)
-// product = { title, price, shop_name, image, url, item_id, platform, app_url }
+// 商品分享图(2026-10-16 中华要求 v2: 同辨证模板, 正文换成全部商品图(最多4张)+商品名, 加淘宝二维码, 底部留松麦服务号码, 不放价格)
+// product = { title, price, shop_name, image, images[], url, item_id, platform, app_url }
 function generateProductShareImage(product) {
     var p = product || {};
-    var buyUrl = p.url || '';
+    var buyUrl = p.url || p.app_url || '';
     if (!buyUrl || buyUrl === '#') buyUrl = 'https://item.taobao.com/item.htm?id=' + (p.item_id || '');
+    // 收集全部商品图: image + images[] 去重, 最多4张(服务端再保险一次)
+    var all = [];
+    if (p.image) all.push(p.image);
+    (p.images || []).forEach(function(u) { if (u && all.indexOf(u) < 0) all.push(u); });
+    if (all.length > 4) all = all.slice(0, 4);
     showShareLoading();
     fetch(API_BASE + '/api/share/product-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             title: p.title || '', price: String(p.price == null ? '' : p.price),
-            shop: p.shop_name || '', image: p.image || '', buy_url: buyUrl
+            shop: p.shop_name || '', image: p.image || '',
+            images: all, buy_url: buyUrl
         })
     })
         .then(function(r) { if (!r.ok) throw new Error('render failed'); return r.blob(); })
@@ -1830,7 +1836,7 @@ function showProductDetail(product) {
                     <button class="detail-buy" onclick="openProduct('${escapeJsAttr(product.url || '#')}', '${escapeJsAttr(product.platform)}', '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.app_url || '#')}')">点击购买</button>
                     <button class="detail-qr-btn" onclick="(function(){var u='${escapeJsAttr(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeJsAttr(itemId)}';} showQRCode(u, '${escapeJsAttr(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.title || '')}', '${escapeJsAttr(product.price || '')}', '${escapeJsAttr(imgSrc)}', '${escapeJsAttr(product.url || '')}', '${escapeJsAttr(product.platform || 'taobao')}', '${escapeJsAttr(product.shop_name || '')}')">♡ 收藏</button>
-                    <button class="detail-fav detail-share" id="detail-share-btn" onclick="generateProductShareImage({title:'${escapeJsAttr(product.title || '')}', price:'${escapeJsAttr(product.price || '')}', shop_name:'${escapeJsAttr(product.shop_name || '')}', image:'${escapeJsAttr(imgSrc)}', url:'${escapeJsAttr(product.url || '')}', item_id:'${escapeJsAttr(itemId)}', platform:'${escapeJsAttr(product.platform || 'taobao')}'})" title="生成商品分享图（商品图+淘宝二维码）">📤 分享图</button>
+                    <button class="detail-fav detail-share" id="detail-share-btn" onclick="generateProductShareImage({title:'${escapeJsAttr(product.title || '')}', price:'${escapeJsAttr(product.price || '')}', shop_name:'${escapeJsAttr(product.shop_name || '')}', image:'${escapeJsAttr(imgSrc)}', images:JSON.stringify(allImgs), url:'${escapeJsAttr(product.url || '')}', item_id:'${escapeJsAttr(itemId)}', platform:'${escapeJsAttr(product.platform || 'taobao')}'})" title="生成商品分享图（全部商品图+淘宝二维码）">📤 分享图</button>
                 </div>
             </div>
             <div class="detail-detail-section">

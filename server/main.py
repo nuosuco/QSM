@@ -393,7 +393,8 @@ class ShareProductRequest(BaseModel):
     title: str = ""
     price: str = ""
     shop: str = ""
-    image: str = ""      # 商品主图 URL
+    image: str = ""      # 主图 URL(兼容旧调用)
+    images: list = []    # 2026-10-16 中华要求: 全部商品图(最多4张进分享卡)
     buy_url: str = ""     # 淘宝购买链接(无则用站点码)
     site_url: str = "https://som.top/"
 
@@ -408,11 +409,14 @@ async def share_content_image(request: ShareContentRequest):
 
 @app.post("/api/share/product-image")
 async def share_product_image(request: ShareProductRequest):
-    """商品分享图: 商品主图 + 标题/价格/店铺 + 淘宝链接二维码"""
+    """商品分享图 v2: 全部商品图(最多4张) + 商品名 + 淘宝购买二维码, 头尾同辨证模板"""
     from services.share_image import render_product_share_image
+    pics = list(request.images or [])
+    if request.image and request.image not in pics:
+        pics.insert(0, request.image)
     png = render_product_share_image(
         title=request.title, price=request.price, shop=request.shop,
-        image_url=request.image, buy_url=request.buy_url or "https://item.taobao.com/",
+        images=pics, buy_url=request.buy_url or "https://item.taobao.com/",
         site_url=request.site_url)
     return Response(content=png, media_type="image/png")
 
