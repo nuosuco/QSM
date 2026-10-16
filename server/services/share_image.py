@@ -19,6 +19,7 @@ toDataURL() 被浏览器安全策略拒绝 → 微信内点「分享图」无反
 中文字体: /usr/share/fonts/NotoSansSC-Regular.ttf (已确认存在)
 """
 import io
+import os
 import re
 import qrcode
 import requests
@@ -107,25 +108,88 @@ def _wrap(text: str, font, draw: ImageDraw.ImageDraw, max_width: int) -> list:
     return [l for l in lines if l != ""]
 
 
-def _header(img: Image.Image, main: str, sub: str):
-    """共享头: 与辨证图同一模板(中华要求: 商品图头尾与内容分享一样)。
-    品牌名不含 emoji(Noto Sans SC 无 emoji 字形, 避免方框)。"""
-    d = ImageDraw.Draw(img)
-    pad = 50
-    d.text((pad, 55), main, font=_font(40), fill=_C_HEADER_TITLE)
-    d.text((pad, 100), sub, font=_font(24), fill=_C_HEADER_SUB)
+_LOGO_CACHE = None
+
+def _wheat_logo(size: int = 96):
+    """小麦帽子小图(中华要求: 分享图开头加形象图)。
+    用 logo 自动裁白边后居中; 加载失败返回 None。"""
+    global _LOGO_CACHE
+    if _LOGO_CACHE is None:
+        _LOGO_CACHE = None
+        try:
+            src = Image.open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'wheat_logo_256.png')).convert('RGB')
+            # 自动裁白边
+            px = src.load(); w, h = src.size
+            xs, ys = [], []
+            for y in range(0, h, 2):
+                for x in range(0, w, 2):
+                    r, g, b = px[x, y]
+                    if not (r > 245 and g > 245 and b > 245):
+                        xs.append(x); ys.append(y)
+            if xs:
+                x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+                core = src.crop((max(0, x0 - 4), max(0, y0 - 4), min(w, x1 + 4), min(h, y1 + 4)))
+            else:
+                core = src
+            # 白底圆角方(柔和)
+            side = int(size * 1.15)
+            bg = Image.new('RGBA', (side, side), (255, 255, 255, 0))
+            d = ImageDraw.Draw(bg)
+            d.rounded_rectangle([0, 0, side - 1, side - 1], radius=side // 8, fill=(255, 255, 255, 255),
+                                outline=_C_HEADER_SUB, width=2)
+            core = core.resize((size, size), Image.LANCZOS)
+            bg.paste(core, ((side - size) // 2, (side - size) // 2))
+            _LOGO_CACHE = bg
+        except Exception as e:
+            print('logo 加载失败:', e)
+    return _LOGO_CACHE
 
 
-def _footer(img: Image.Image, H: int, qr_url: str, qr_label: str):
-    """共享尾: 小程序码固定底部正中央(中华确认: 底部保留松麦服务号二维码)。
-    返回二维码中心 x, 供商品图把淘宝码放到左侧不重叠。"""
+def _header(img: Image.Image, main: str, sub: str, with_logo: bool = True):
+    """共享头 v3(中华要求 2026-10-16): 小麦帽子小图 + 标题居中, 更美观。
+    返回正文区顶 y。品牌名不含 emoji(Noto Sans SC 无 emoji 字形)。"""
     d = ImageDraw.Draw(img)
-    d.text((W // 2, H - 195), qr_label, font=_font(26), fill=_C_HEADER_TITLE, anchor="mm")
-    qr = _qr_png(qr_url, 130)
-    qr_cx = W // 2
+    if with_logo:
+        logo = _wheat_logo(96)
+        if logo:
+            img.paste(logo, (46, 34), logo)
+        tx = 46 + 112 + 22
+    else:
+        tx = 50
+    d.text((tx, 52), main, font=_font(40), fill=_C_HEADER_TITLE)
+    d.text((tx, 100), sub, font=_font(24), fill=_C_HEADER_SUB)
+    return 150
+
+
+def _footer_dual(img: Image.Image, H: int, left_url: str, left_label: str,
+                 right_url: str, right_label: str, qr_size: int = 150):
+    """共享尾 v3(中华要求 2026-10-16): 双码并排 — 左淘宝商品码 + 右服务号码,
+    说明文字写在码【上方】(不再压码), 底部一行 som.top 免责。返回画布底部余量。"""
+    d = ImageDraw.Draw(img)
+    gap = 70
+    total_w = qr_size * 2 + gap
+    x0 = (W - total_w) // 2
+    label_y = H - 235
+    # 左
+    d.text((x0 + qr_size // 2, label_y), left_label, font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
+    ql = _qr_png(left_url, qr_size)
+    if ql:
+        img.paste(ql, (x0, H - 215))
+        d = ImageDraw.Draw(img)
+        d.rectangle([x0 - 4, H - 219, x0 + qr_size + 4, H - 211 + qr_size],
+                    outline=_C_HEADER_TITLE, width=2)
+    # 右
+    xr = x0 + qr_size + gap
+    d.text((xr + qr_size // 2, label_y), right_label, font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
+    qr = _qr_png(right_url, qr_size)
     if qr:
-        img.paste(qr, (qr_cx - 65, H - 175))
-    return qr_cx
+        img.paste(qr, (xr, H - 215))
+        d = ImageDraw.Draw(img)
+        d.rectangle([xr - 4, H - 219, xr + qr_size + 4, H - 211 + qr_size],
+                    outline=_C_HEADER_TITLE, width=2)
+    d.text((W // 2, H - 30), "som.top · 以上信息仅供参考，不构成医疗诊断",
+           font=_font(20), fill=_C_LIGHT, anchor="mm")
+    return H - 250
 
 
 def _clean_text(text: str, max_lines: int = 30) -> list:
@@ -136,7 +200,9 @@ def _clean_text(text: str, max_lines: int = 30) -> list:
 
 
 def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
-    """辨证内容分享图: 头尾模板 + 换行文案 + som.top 小程序码"""
+    """辨证内容分享图 v3(中华要求 2026-10-16):
+    开头小麦帽子形象图 + 标题; 文案正文; 底部 som.top 服务号二维码,
+    说明文字写在码【上方】不再压码。"""
     lines = _clean_text(text)
     if not lines:
         lines = ["养生参考"]
@@ -145,7 +211,7 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     fs = 28
     lh = 40
     f_body = _font(fs)
-    headerH, footerH = 130, 240
+    headerH, footerH = 150, 270
 
     tmp = ImageDraw.Draw(Image.new("RGB", (W, 10)))
     wrapped = []
@@ -155,18 +221,28 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     H = headerH + bodyH + footerH
 
     img = _new_canvas(H)
-    _header(img, "小麦SOM · 养生辨证", "中医辨证 · 有机养生")
+    _header(img, "小麦SOM · 养生辨证", "中医辨证 · 有机养生", with_logo=True)
 
     d = ImageDraw.Draw(img)
-    y = headerH + 30
+    y = headerH + 20
     for l in wrapped:
         d.text((pad, y), l, font=f_body, fill=_C_BODY)
         y += lh
 
-    _footer(img, H, site_url, "扫码体验 SOM 松麦 · 你的养生助手")
+    # 底部单码居中, 说明文字在码上方
     d = ImageDraw.Draw(img)
-    d.text((W // 2, H - 55), "som.top · 以上为养生文化参考，不构成医疗诊断",
-           font=_font(22), fill=_C_LIGHT, anchor="mm")
+    qr_size = 150
+    qcx = W // 2
+    d.text((qcx, H - 235), "扫码进 SOM 松麦 · 你的养生助手",
+           font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
+    qr = _qr_png(site_url, qr_size)
+    if qr:
+        img.paste(qr, (qcx - qr_size // 2, H - 215))
+        d = ImageDraw.Draw(img)
+        d.rectangle([qcx - qr_size // 2 - 4, H - 219, qcx + qr_size // 2 + 4, H - 211 + qr_size],
+                    outline=_C_HEADER_TITLE, width=2)
+    d.text((W // 2, H - 30), "som.top · 以上为养生文化参考，不构成医疗诊断",
+           font=_font(20), fill=_C_LIGHT, anchor="mm")
 
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)
@@ -206,72 +282,56 @@ def render_product_share_image(title: str, price: str, shop: str,
         pics = [""]
 
     n = len(pics)
-    gridW = 260 if n > 1 else 300          # 2 列 / 单列网格总宽
-    cell = (gridW - 12) // 2 if n > 1 else gridW
-    gridX = 50                               # 网格左边距
-    imgTop = 150                              # 图片区顶边(与标题对齐)
-
-    nameX = gridX + gridW + 30               # 商品名区 x
-    nameW = W - 50 - nameX                    # 商品名区宽(右留 50)
-    if nameW < 120:
-        nameX, nameW = 50, W - 100            # 网格放不下时商品名放上方单行
-
-    H = max(imgTop + n * (cell + 12) + 140, imgTop + 400)
+    # v3 版式(中华要求 2026-10-16): 商品名写在图片【开头】, 图片单列全宽竖排;
+    # 末尾双码: 左=淘宝商品码, 右=松麦服务号码, 说明文字在码上方不压码
+    cell = 600
+    gridX = 50
+    name_block_H = 220            # 商品名区(图片开头): 名称(最多2行) + 店铺名
+    nameTop = 160                 # 名称区顶边(头部之下)
+    imgTop = nameTop + name_block_H + 10
+    gap = 14
+    H = imgTop + n * (cell + gap) + 300     # 尾部 300 = 双码区
 
     img = _new_canvas(H)
-    _header(img, "小麦SOM · 有机好物", "有机认证 · 淘宝同源")
+    _header(img, "小麦SOM · 有机好物", "有机认证 · 淘宝同源", with_logo=True)
 
     d = ImageDraw.Draw(img)
 
-    # 商品图网格
+    # 商品名(图片开头, 放大, 自动缩字号最多2行) + 店铺名
+    name = (title or "未命名商品").strip()
+    nameW = W - 100
+    f_name = _font(36)
+    while f_name.size > 22 and d.textlength(name, font=f_name) > nameW:
+        f_name = _font(f_name.size - 2)
+    y = nameTop
+    for l in _wrap(name, f_name, d, nameW)[:2]:
+        d.text((gridX, y), l, font=f_name, fill=_C_HEADER_TITLE)
+        y += f_name.size + 10
+    if shop:
+        d.text((gridX, y + 4), shop[:24], font=_font(22), fill=(120, 120, 120))
+
+    # 商品图单列全宽竖排
     for i, u in enumerate(pics):
-        col = i % 2
-        row = i // 2
-        gx = gridX + col * (cell + 12)
-        gy = imgTop + row * (cell + 12)
+        gy = imgTop + i * (cell + gap)
         pic = _load_remote_image(u, cell)
         if pic:
-            img.paste(pic, (gx, gy))
+            img.paste(pic, (gridX, gy))
             d = ImageDraw.Draw(img)
-            d.rectangle([gx, gy, gx + cell, gy + cell],
+            d.rectangle([gridX, gy, gridX + cell, gy + cell],
                         outline=_C_HEADER_SUB, width=1)
         else:
-            d.rectangle([gx, gy, gx + cell, gy + cell],
+            d.rectangle([gridX, gy, gridX + cell, gy + cell],
                         outline=_C_HEADER_SUB, width=2, fill=_C_PLACEHOLDER)
-            d.text((gx + cell // 2, gy + cell // 2),
+            d.text((gridX + cell // 2, gy + cell // 2),
                    "暂无图片" if not u else "图片加载失败",
                    font=_font(20), fill=_C_HEADER_SUB, anchor="mm")
 
-    # 商品名(网格右侧, 自动缩字号 + 最多3行)
-    name = (title or "未命名商品").strip()
-    f_name = _font(30)
-    while f_name.size > 18 and d.textlength(name, font=f_name) > nameW:
-        f_name = _font(f_name.size - 2)
-    y = imgTop + 4
-    for l in _wrap(name, f_name, d, nameW)[:3]:
-        d.text((nameX, y), l, font=f_name, fill=_C_BODY)
-        y += f_name.size + 10
-    if shop:
-        d.text((nameX, min(y + 4, imgTop + 220)), (shop or "")[:16],
-               font=_font(20), fill=(120, 120, 120))
-
-    # 淘宝购买链接二维码(商品图区左上角, 白底绿框), 与底部 som.top 码区分
-    tb_url = buy_url or "https://item.taobao.com/"
-    qr = _qr_png(tb_url, 120)
-    tx, ty = 50, imgTop + 4
-    if qr:
-        img.paste(qr, (tx, ty))
-        d = ImageDraw.Draw(img)
-        d.rectangle([tx - 4, ty - 4, tx + 124, ty + 124],
-                    outline=_C_HEADER_TITLE, width=2)
-    d.text((tx + 60, ty - 10), "淘宝扫码购买", font=_font(20),
-           fill=_C_HEADER_TITLE, anchor="mm")
-
-    # 共享尾: som.top 服务号二维码(底部正中央, 中华确认保留)
-    _footer(img, H, site_url, "扫 松麦服务号 · 看更多养生好物")
-    d = ImageDraw.Draw(img)
-    d.text((W // 2, H - 55), "som.top · 以上商品信息仅供参考",
-           font=_font(22), fill=_C_LIGHT, anchor="mm")
+    # 末尾双码: 左淘宝商品码 + 右松麦服务号码(中华要求), 说明文字在码上方不压码
+    _footer_dual(img, H,
+                 left_url=(buy_url or "https://item.taobao.com/"),
+                 left_label="淘宝扫码购买",
+                 right_url=site_url,
+                 right_label="松麦服务号 · 更多好物")
 
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)
