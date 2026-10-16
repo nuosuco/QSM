@@ -25,6 +25,11 @@ SYSTEM_PROMPT = """你是小麦，松麦平台的中医养生顾问。你不是�
 - 一个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
 - 方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
 - 目的：系统会按你列的食材自动匹配有机商品，你食材列得越全、用量越具体，下面商品卡片越丰富（每个食材出2款），别偷懒只给两三种食材。
+- 【方案分段铁律——中华 2026-10-16 反馈"食量两方案混在一起"】多个方案（方案一/二/三、食量方案等）必须每个方案单独成段：
+  1) 方案标题必须独占一行，写成「### 方案一：……」或「### 食量方案一：……」这样的 markdown 小标题，不要用**加粗**、不要和正文写在同一行；
+  2) 两个方案之间用「---」或空行明显隔开；
+  3) 绝不允许把两个方案的食材/用量/做法揉在同一段文字里；
+  4) 食量/分量类建议（如每日吃多少）如果分成方案，同样遵守 1)3)。
 3. 结合当前节气，给出时令养生提醒
 4. 关注用户情绪和心情，身心一起调
 5. 发现严重症状时，第一时间建议就医，再给辅助食养参考
@@ -245,12 +250,134 @@ def chat_with_llm(user_message: str, history: list = None, user_id: str = None) 
     }
 
 
+def _extract_ingredient_plan_map(reply: str) -> list:
+    """返回 [(食材名, 所属方案标签), ...]; 老格式/无分段时标签为 ''(前端显示为通用推荐)。
+    2026-10-16 小蕊加(中华反馈「方案二方案三商品没输出」): 前端商品卡片按方案分组显示。"""
+    names, labels = _extract_ingredients_labeled(reply)
+    return list(zip(names, labels))
+
+
 def _extract_ingredients_from_reply(reply: str) -> list:
-    """从回复中提取所有食材（包括多食谱和肉类），按出现顺序返回，不过滤排骨/猪骨"""
-    ingredient_names = []
+    """从回复中提取所有食材（含多食谱方案食材），按出现顺序返回去重食材名, 不过滤排骨/猪骨
+
+    2026-10-16 小蕊改(中华反馈「方案二方案三商品没输出」):
+    旧版全篇正则会把「做法」里的句子(加清水/小火煲/连续7天/冲入沸水...)误当食材,
+    且全篇匹配后去重, 共享食材(红枣/麦冬)被方案一占用, 方案二三的独有食材搜索被挤掉。
+    新逻辑: 先按「方案一/方案二/方案三」(或 食谱一/食疗方N)分段, 每段只从【配方行】提食材,
+    每段单独去重后按方案顺序拼接 → 3 个方案的食材全部进商品搜索, 卡片按方案分组。"""
+    import re as _re
+
+    # 分段: 匹配 方案一/方案二/方案三/方案1-9/食谱一/食疗方二/方子一 等段头
+    _seg_pat = _re.compile(
+        r'(?:^|\n)\s*(?:###?\s*)?(?:方案|食谱|食疗方|调理方|药膳方|方子)\s*([一二三1-9])\s*[:：、]?')
+    names, labels = _extract_ingredients_labeled(reply)
+    return names
+
+
+def _extract_ingredients_labeled(reply: str) -> tuple:
+    """返回 (食材名列表去重, 对应方案标签列表); 老格式标签为 \'\'
+    2026-10-16 小蕊重写(中华反馈「方案二三没商品」): 逐行识别「方案N」段头,
+    段内只认真配方行(食材+用量结构), 做法/加料/调味/分隔线一律不进食材提取。
+    老格式(无方案分段)回退全篇提取(剥做法段), 保持旧行为不炸。"""
+    import re as _re2
+    lines = reply.split('\n')
+    # 1) 逐行找「方案一/二/三」段头(行首, 可带 markdown 井号), 避免正文里的「方案一」字样误判
+    _head_pat = _re2.compile(r'^[\s#*]*(?:食量|份量|剂量|用量)?(?:方案|食谱|食疗方|调理方|药膳方|方子|食材方|药膳)(?:\s*([一二三四五六七八九1-9]))?[:：、]?')
+    _NUM_CN = {'一':'一','二':'二','三':'三','4':'四','5':'五','6':'六','7':'七','8':'八','9':'九'}
+    segs = []  # [(方案标签, 段内行文本)]
+    i = 0
+    while i < len(lines):
+        s = lines[i].strip()
+        m2 = _head_pat.match(s)
+        if m2:
+            end = i + 1
+            while end < len(lines):
+                s2 = lines[end].strip()
+                if _head_pat.match(s2):
+                    break
+                end += 1
+            # 2026-10-16 小蕊补: 无序号段头(如「食疗方:」「食谱:」) → 标签''(通用推荐, 前端分组为「推荐商品」)
+            # 段内统一 = 段头行段头之后的文字(如有) + 后续行(直到下一段头/段尾)
+            tail = s[m2.end():].strip()
+            seg_lines = ([tail] if tail else []) + lines[i+1:end]
+            # 2026-10-16 小蕊补(中华反馈「食量两方案没分段」): LLM 可能写「食量方案一」「份量方案二」,
+            # 段头带「食量/份量/剂量/用量」前缀时也认段头, 标签保留前缀(前端商品卡按标签分组, 食量方案一般无配方行, 不影响)
+            prefix = ''
+            for _p in ('食量方案', '份量方案', '剂量方案', '用量方案'):
+                if s.startswith(_p):
+                    prefix = _p[:2]  # 食量/份量/剂量/用量
+                    break
+            if m2.group(1):
+                num_cn = _NUM_CN.get(m2.group(1), m2.group(1))
+                segs.append((f"{prefix}方案{num_cn}" if prefix else f"方案{num_cn}", '\n'.join(seg_lines)))
+            else:
+                segs.append(('', '\n'.join(seg_lines)))
+            i = end
+        else:
+            i += 1
+
     seen = set()
-    # 仅过滤明显不是食材的词，排骨、猪骨就是食材！
-    # 只过滤明显不是食材的词（冰糖、红糖是食材，不过滤！）
+    out_names = []
+    out_labels = []
+
+    def _push(name, label):
+        if name not in seen:
+            seen.add(name)
+            out_names.append(name)
+            out_labels.append(label)
+
+    def _append(name, label):
+        out_names.append(name)
+        out_labels.append(label)
+
+    if not segs:
+        # 老格式/单方/纯文字聊天: 全篇提取, 只剥「独立 做法:」行(锚行首), 行内「。做法:」不影响
+        # (行内老格式「食疗方：黄芪15g...。做法：煮水...」做法词在行中, 不剥, 全篇提食材不丢)
+        whole = _re2.sub(
+            r'(?:^|\n)\s*(?:[-*#]*\s*)?(?:做法|食用方法|服用方法|步骤|喝法|用法|材料处理)\s*[：:]?[\s\S]*$',
+            '', reply, flags=_re2.M)
+        _extract_from_text(whole, seen, out_names, push=_append)
+        return out_names, out_labels
+
+    # 2) 多方案: 段内只认真配方行(含「食材+用量」结构)
+    # 用量结构: 数字(可带 ~区间) + 单位(g/克/毫升/ml/朵/片/枚/粒/只/条/根/块/个/碗/勺/杯/袋/包/瓶/盒/罐/颗/斤/两),
+    # 或 中药剂量单位(钱), 或 半/适量/少许。食材名为 2-6 汉字。
+    _dosage_re = _re2.compile(
+        r'([一-龥]{2,6})\s*[：:]?\s*[（(]?\s*'
+        r'(?:\d+(?:[-~]\d+)?|半|适量|少许)'
+        r'\s*'
+        r'[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两钱]?')
+    for label, seg_text in segs:
+        # 段内逐行: 只保留「真配方行」——含 食材+用量 结构, 且不是做法/加料/调味/分隔线
+        recipe_lines = []
+        for ln in seg_text.split('\n'):
+            s = ln.strip().lstrip('#').strip()
+            s = s.replace('**', '').strip()
+            # 分隔线/空行/标题行直接跳
+            if not s or s.startswith('---') or s.startswith('***'):
+                continue
+            # 做法/加料/调味/频率句子一律排除(不进食材提取)
+            if _re2.search(
+                r'做法|食用方法|服用方法|步骤|喝法|用法|材料处理|提前|加料|加水|加清水|加盐|调味|煲汤|煮粥|焖|冲泡|代茶|取出|放入|砂锅|保温杯|去渣|药包|焯水|浸泡|煮沸|小火|大火|烧开后|转为|连服|每周|每日|隔日',
+                s):
+                continue
+            # 真配方行: 至少有一个 食材+用量 结构匹配(如「沙参15g」「银耳半朵」「瘦肉150g」)
+            if _dosage_re.search(s):
+                recipe_lines.append(s)
+        if recipe_lines:
+            _extract_from_text(' '.join(recipe_lines), seen, out_names, push=_append, label=label)
+        else:
+            # 2026-10-16 小蕊补(中华反馈「老格式食疗方商品没了」):
+            # 段内无真配方行(如老格式单行「食疗方：黄芪15g...。做法：...」被做法词整行排除),
+            # 回退整段全篇提取(不剥行内做法), 兼容老格式不丢食材。
+            _extract_from_text(seg_text, seen, out_names, push=_append, label=label)
+    return out_names, out_labels
+
+
+def _extract_from_text(text: str, seen: set, out: list, push=None, label: str = ""):
+    """从一段配方文本提食材(食材名+用量), 全回复级去重(seen)。
+    push(name, label) 钩子: 有则用它记录(支持方案标签); 无则直接 out.append(name)(老调用兼容)。"""
+    import re as _re
     # 2026-10-16 小蕊补(中华反馈「商品还是只有2个」):
     # 正则贪婪匹配「中文2-6字 + 数字/适量/少许」时, 会把小标题、功效词、症状词
     # 当食材(如「食养建议」「健脾补气」「为主」), 白白占用匹配名额,
@@ -277,11 +404,25 @@ def _extract_ingredients_from_reply(reply: str) -> list:
         '补肾固精', '安神助眠', '宁心安神', '润肺止咳', '养心安神',
         '补肝肾', '益肝肾', '健脾', '益气', '养阴', '清热',
         '滋阴', '祛湿', '化湿', '理气', '活血', '化瘀', '安神', '养血',
+        # 做法步骤词(中华反馈 2026-10-16: 做法句子被误当食材)
+        '加清水', '大火', '小火', '砂锅', '煮至', '转小火', '沸后', '后转',
+        '大火烧', '烧开后', '焯水', '泡发', '提前浸泡', '纱布包', '药包',
+        '待水', '降温', '冲入', '焖泡', '反复冲泡', '可反复', '食用', '连服',
+        '每日', '连续', '每周', '早晚', '温热食用', '调味', '去渣', '取药',
+        # 做法动词短语(中华反馈 2026-10-16: 「开后转小火煲/所有材料加水/芡实提前浸泡」混进食材)
+        '转小火煲', '转小火', '小火煮', '大火煮', '小火煲', '大火烧', '烧开后',
+        '开后转', '所有材料', '材料加', '材料放', '提前浸泡', '提前泡', '提前',
+        '洗净', '洗净切', '切块', '切小', '撕小朵', '焯水', '沸后', '水开后',
+        '加水', '加入', '取出', '放砂锅', '砂锅', '保温杯', '冲入沸水',
+        '焖', '焖泡', '泡水', '冲泡', '煮至', '煮粥', '煲汤', '代茶饮', '代茶',
+        '食用', '服用', '温热', '温服', '趁热', '待凉', '放凉', '加少许', '调味',
+        # 整句做法片段(2-6字贪婪匹配截出来的句子碎片, 中华反馈 2026-10-16)
+        '开后转小火煲', '开后转小火', '转小火煲一小时', '小火煲一小时',
+        '大火烧开后', '烧开后转', '煮沸后', '沸腾', '水开后', '沸后',
     }
 
     # 1. 匹配所有 "食材名+用量" 的模式，兼容多种 LLM 输出格式：
     #    黄芪15g / 黄芪：15g / 黄芪（15g）/ 乌鸡半只 / 红枣5枚 / 黄芪15-20g / 冰糖适量
-    import re
     dosage_pattern = (
         r"([一-龥]{2,6})"          # 食材名（2-6个汉字）
         r"\s*[：:]?\s*"            # 可选冒号（中英文）
@@ -290,23 +431,21 @@ def _extract_ingredients_from_reply(reply: str) -> list:
         r"\s*"
         r"[gG克毫升mlML朵片枚粒只条根块个碗勺杯袋包瓶盒罐颗斤两]?"  # 单位（适量/少许时可省略）
     )
-    matches = re.findall(dosage_pattern, reply)
+    matches = _re.findall(dosage_pattern, text)
     for m in matches:
         m = m.strip()
         if m not in seen and m not in skip_words and 2 <= len(m) <= 6:
             seen.add(m)
-            ingredient_names.append(m)
+            (push(m, label) if push else out.append(m))
 
     # 2. 提取肉类/禽类食材（排骨、猪骨、乌鸡、瘦肉等，它们就是需要推荐的食材）
     meat_pattern = r"(?:加)?(排骨|猪骨|乌鸡|鸡肉|瘦肉|羊肉|牛肉|鸭肉|鸽子|鲫鱼|鲈鱼|猪蹄)"
-    meat_matches = re.findall(meat_pattern, reply)
+    meat_matches = _re.findall(meat_pattern, text)
     for m in meat_matches:
         m_clean = m.strip()
         if m_clean not in seen and 2 <= len(m_clean) <= 6:
             seen.add(m_clean)
-            ingredient_names.append(m_clean)
-
-    return ingredient_names
+            (push(m_clean, label) if push else out.append(m_clean))
 
 
 def _search_products_from_reply(reply: str, recommendations: list, zhengxing: str = None,
@@ -316,7 +455,9 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
     import concurrent.futures
 
     # 1. 从回复中按食谱顺序提取所有食材
-    ingredient_names = _extract_ingredients_from_reply(reply)
+    ingredient_names, plan_labels = _extract_ingredients_labeled(reply)
+    # 每个食材对应的方案标签(与 ingredient_names 一一对应); 前端按标签分组展示商品卡片
+    _ing_plan = dict(zip(ingredient_names, plan_labels))
 
     # 2. 如果回复没提取到，从推荐列表取
     if not ingredient_names and recommendations:
@@ -404,7 +545,10 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
         for q in queries:
             if len(result) >= 2:
                 break
-            for page in range(1, 4):
+            # 2026-10-16 小蕊改(中华反馈「商品输出不完整, 不要限制搜索页」):
+            # 每查询词最多翻 20 页(200个商品位)才放弃, 凑够 2 个不同品牌就停;
+            # 某查询词 20 页没凑够, 换下一个查询词继续凑, 不轻易放弃
+            for page in range(1, 21):
                 if len(result) >= 2:
                     break
                 try:
@@ -450,14 +594,18 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_map = {executor.submit(search_one, ing): ing for ing in ingredient_names}
-        concurrent.futures.wait(future_map, timeout=20)
-        # 按原食材顺序收集结果
+        # 2026-10-16 小蕊改: 页上限 6→20 后单食材最坏 4查询x20页x~1s, 等 90s 才收结果, 避免搜够前被截断
+        concurrent.futures.wait(future_map, timeout=90)
+        # 按原食材顺序收集结果, 每个商品打上所属方案标签(前端按方案分组显示商品卡片)
         for ing in ingredient_names:
             for future in future_map:
                 if future_map[future] == ing:
                     try:
                         items = future.result()
-                        products.extend(items)
+                        plan = _ing_plan.get(ing, '')
+                        for it in items:
+                            it['plan'] = plan  # 方案一/二/三, 老格式为 ''
+                            products.append(it)
                     except Exception:
                         pass
                     break

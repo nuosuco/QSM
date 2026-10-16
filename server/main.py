@@ -401,10 +401,16 @@ class ShareProductRequest(BaseModel):
 
 @app.post("/api/share/content-image")
 async def share_content_image(request: ShareContentRequest):
-    """辨证内容分享图: 前端把回复文本 POST 过来, 服务端 Pillow 渲染 PNG 回传"""
+    """辨证内容分享图 v3: 服务端 Pillow 渲染 PNG(帽子形象图+文案+底部码不压字)
+    2026-10-16 小蕊补(中华反馈「分享图不能用微信分享」): 额外把 PNG 存到
+    data/share_tmp/ 并返回 X-Share-Url(http 直链)——微信 WebView 里 http 图片
+    才能稳定长按保存, data URL 长按不一定出保存菜单。"""
     from services.share_image import render_content_share_image
     png = render_content_share_image(request.text or "养生参考", request.site_url)
-    return Response(content=png, media_type="image/png")
+    share_url = _save_share_tmp(png, 'content')
+    return Response(content=png, media_type="image/png",
+                    headers={"Content-Disposition": "inline; filename=som-share.png",
+                             **({"X-Share-Url": share_url} if share_url else {})})
 
 
 @app.post("/api/share/product-image")
@@ -418,7 +424,55 @@ async def share_product_image(request: ShareProductRequest):
         title=request.title, price=request.price, shop=request.shop,
         images=pics, buy_url=request.buy_url or "https://item.taobao.com/",
         site_url=request.site_url)
-    return Response(content=png, media_type="image/png")
+    share_url = _save_share_tmp(png, 'product')
+    return Response(content=png, media_type="image/png",
+                    headers={"Content-Disposition": "inline; filename=som-product.png",
+                             **({"X-Share-Url": share_url} if share_url else {})})
+
+
+# ========== 2026-10-16 小蕊加: 分享图 http 直链(微信内长按保存→手动分享) ==========
+# 注意: os/time/uuid 顶部已 import(time 以 time_module 别名), 不用重复 import
+
+_SHARE_TMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "share_tmp")
+
+
+def _save_share_tmp(png: bytes, kind: str) -> str:
+    """PNG 存到 data/share_tmp/{token}.png, 返回 /api/share/file/{token} 相对直链。
+    顺带清 24h 前的旧文件。失败不影响分享图本身(返回'')。"""
+    try:
+        os.makedirs(_SHARE_TMP_DIR, exist_ok=True)
+        # 清理 24h 前旧文件
+        now = time_module.time()
+        for f in os.listdir(_SHARE_TMP_DIR):
+            p = os.path.join(_SHARE_TMP_DIR, f)
+            try:
+                if os.path.isfile(p) and now - os.path.getmtime(p) > 86400:
+                    os.remove(p)
+            except Exception:
+                pass
+        token = uuid.uuid4().hex
+        with open(os.path.join(_SHARE_TMP_DIR, token + '.png'), 'wb') as fh:
+            fh.write(png)
+        return "/api/share/file/" + token
+    except Exception:
+        return ""
+
+
+@app.get("/api/share/file/{token}")
+async def share_file(token: str):
+    """分享图 http 直链: 微信内 <img src> 指这里, 长按→保存图片→发微信好友。"""
+    import re as _re
+    if not _re.fullmatch(r'[a-f0-9]{32}', token):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="bad token")
+    p = os.path.join(_SHARE_TMP_DIR, token + '.png')
+    if not os.path.isfile(p):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="not found")
+    with open(p, 'rb') as fh:
+        data = fh.read()
+    return Response(content=data, media_type="image/png",
+                    headers={"Content-Disposition": "inline; filename=som-share.png"})
 
 
 @app.get("/api/products/categories")
@@ -728,6 +782,27 @@ async def get_favorites(user_id: str, limit: int = 50, page: int = 1, page_size:
     conn.close()
     return {"total": len(rows), "favorites": [dict(r) for r in rows]}
 
+def _clean_fav_image(image):
+    """2026-10-16 小蕊修: 收藏 image 字段历史上被写脏过——
+    前端某版本把整个 images 数组 JSON 串(带转义引号 `\\"`, 逗号)直接存进 image,
+    导致收藏卡片 <img src> 加载失败。
+    清洗: 能解析成 JSON 数组取第一张; 含多URL(带 `\",` 分隔)取第一段; 单URL原样返回。"""
+    s = (image or "").strip()
+    if not s:
+        return ""
+    if s.startswith("["):
+        try:
+            arr = json.loads(s)
+            if isinstance(arr, list) and arr:
+                s = str(arr[0]).strip()
+        except Exception:
+            pass
+    if s.startswith("http") and '","' in s:
+        s = s.split('","')[0].strip().strip('"')
+    elif '","' in s:
+        s = s.split('","')[0].strip().strip('"')
+    return s
+
 @app.post("/api/favorites/add")
 async def add_favorite(request: FavoriteAddRequest):
     conn = get_user_db()
@@ -738,7 +813,7 @@ async def add_favorite(request: FavoriteAddRequest):
             (user_id, item_id, title, price, image, url, platform, shop_name)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (request.user_id, request.item_id, request.title, request.price,
-              request.image, request.url, request.platform, request.shop_name))
+              _clean_fav_image(request.image), request.url, request.platform, request.shop_name))
         conn.commit()
         added = cursor.rowcount > 0
     except Exception as e:
@@ -1184,17 +1259,18 @@ async def chat_vision(request: VisionChatRequest):
     # 根据图片数量调整提示词
     if len(image_list) == 1:
         system_prompt = """你是小麦SOM，一位经验丰富的中医养生顾问，擅长舌诊、面诊、皮肤望诊。
-请观察用户发来的图片，从以下角度分析：
+请观察用户发来的图片，并【结合用户文字里描述的症状/不适】（如失眠、疲倦、口苦、大便、月经等）做综合辨证：
 1. 舌色（淡红/淡白/红/紫暗）、舌苔（薄白/白腻/黄腻/少苔）、舌形（胖大/瘦薄/齿痕/裂纹）
 2. 或面色（红润/萎黄/苍白/晦暗）、光泽、唇色
 3. 或皮肤（肤色、皮疹、干燥、湿疹等）
-4. 综合判断可能的体质倾向
-5. 给出食疗方（配方形式，具体到用量单位）
+4. 把【照片观察】和【用户症状描述】交叉印证，综合判断体质倾向（两者矛盾时以照片为主，但要说明分歧）
+5. 给出3个不同的食疗方（配方形式，具体到用量单位），按"方案一/方案二/方案三"分条列出
 
 【食疗方硬性要求——中华 2026-10-15 铁律，违反则不合格】
+- 必须给满3个食疗方案（方案一/方案二/方案三，侧重点不同：如一个健脾、一个养阴、一个祛湿），每个方子都独立成段、独立配方+做法。
 - 食疗方必须写成"配方"：每个食材后面紧跟数量单位，如"黄芪15g、乌鸡半只、红枣5枚、枸杞10g、山药20g"，绝不允许只写食材名不写用量。
-- 一个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
-- 方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
+- 每个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
+- 每个方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
 - 目的：系统会按你列的食材自动匹配有机商品，你食材列得越全、用量越具体，下面商品卡片越丰富（每个食材出2款），别偷懒只给两三种食材。
 
 注意：
@@ -1206,16 +1282,17 @@ tizhi_data: {"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}"""
     else:
         system_prompt = f"""你是小麦SOM，一位经验丰富的中医养生顾问，擅长多维度望诊。
 用户发来了{len(image_list)}张照片（可能包含舌苔、面色、皮肤、患处等不同部位）。
-请综合所有照片进行多维度分析：
+请综合所有照片，并【结合用户文字里描述的症状/不适】（如失眠、疲倦、口苦、大便、月经等）做交叉印证：
 1. 逐一分析每张照片的特征（舌色/舌苔/面色/皮肤/患处等）
 2. 综合多张照片的信息，交叉验证，给出更准确的体质判断
-3. 给出综合辨证结论（主证+兼证）
-4. 给出食疗方（配方形式，具体到用量单位）+ 做法
+3. 给出综合辨证结论（主证+兼证），并点明照片证据与用户症状的呼应之处
+4. 给出3个不同的食疗方（配方形式，具体到用量单位）+ 做法，按"方案一/方案二/方案三"分条列出
 
 【食疗方硬性要求——中华 2026-10-15 铁律，违反则不合格】
+- 必须给满3个食疗方案（方案一/方案二/方案三，侧重点不同：如一个健脾、一个养阴、一个祛湿），每个方子都独立成段、独立配方+做法。
 - 食疗方必须写成"配方"：每个食材后面紧跟数量单位，如"黄芪15g、乌鸡半只、红枣5枚、枸杞10g、山药20g"，绝不允许只写食材名不写用量。
-- 一个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
-- 方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
+- 每个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
+- 每个方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
 - 目的：系统会按你列的食材自动匹配有机商品，你食材列得越全、用量越具体，下面商品卡片越丰富（每个食材出2款），别偷懒只给两三种食材。
 5. 推荐适合该体质的有机食材（与食疗方食材尽量重叠，让系统好匹配商品）
 

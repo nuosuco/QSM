@@ -120,6 +120,13 @@ function switchTab(targetTab) {
     if (targetTab === 'health-test') {
         renderHealthTestPage();
     }
+
+    // 2026-10-16 小蕊修(中华反馈「我的收藏还是没有出来」):
+    // 每次进「我」页重新拉一次收藏区(后端双写已存库, 刷新即见),
+    // 不依赖页面加载时的一次性 initProfile —— 用户会话中登录/收藏后, 切回「我」也能看到。
+    if (targetTab === 'profile') {
+        try { loadProfile(); } catch (e) { console.warn('loadProfile 出错', e); }
+    }
 }
 
 function initNavigation() {
@@ -484,33 +491,9 @@ async function sendMessage() {
         // 图片辨证：显示回复 + 商品推荐 + 多轮引导（3个建议问题）+ 收藏分享
         if (hasImage) {
             const msgId = appendMessage(replyText, 'assistant', false, false);
-            // 渲染商品推荐（和小麦对话一样的逻辑）
-            if (data.products && data.products.length > 0) {
-                const chatContainer = document.getElementById('chat-messages');
-                const productsDiv = document.createElement('div');
-                productsDiv.className = 'chat-products';
-                productsDiv.innerHTML = '<div class="chat-products-title">🛒 为你推荐以下有机好物：</div>';
-                const productsGrid = document.createElement('div');
-                productsGrid.className = 'products-grid chat-products-grid';
-                productsDiv.appendChild(productsGrid);
-                for (let i = 0; i < data.products.length; i++) {
-                    const product = data.products[i];
-                    _productIndex++;
-                    _productCache[_productIndex] = product;
-                    const card = document.createElement('div');
-                    card.className = 'product-card';
-                    card.setAttribute('data-product-idx', _productIndex);
-                    card.innerHTML = `
-                        <img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
-                        <div class="product-info">
-                            <div class="product-title">${escapeHtml(product.title)}</div>
-                            <div class="product-price">¥${product.price}</div>
-                            <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
-                        </div>
-                    `;
-                    productsGrid.appendChild(card);
-                }
-                chatContainer.appendChild(productsDiv);
+            // 2026-10-16 小蕊改(中华反馈「方案二三商品没输出」): 按方案分组渲染
+            if (typeof appendGroupedProducts === 'function') {
+                appendGroupedProducts(data, msgId);
             }
             appendFollowUpSuggestions(hasImage);
             appendMessageActions(msgId, replyText);
@@ -537,32 +520,10 @@ async function sendMessage() {
         if (data.products && data.products.length > 0) {
             // 不自动滚底！等商品全部渲染完后一次性定位
             const chatMsgDiv = appendMessage(replyText, 'assistant', false, false);
-            const chatContainer = document.getElementById('chat-messages');
             
-            // 在回复消息后面插入商品卡片区域
-            const productsDiv = document.createElement('div');
-            productsDiv.className = 'chat-products';
-            productsDiv.innerHTML = '<div class="chat-products-title">🛒 为你推荐以下有机好物：</div>';
-            const productsGrid = document.createElement('div');
-            productsGrid.className = 'products-grid chat-products-grid';
-            productsDiv.appendChild(productsGrid);
-            
-            for (let i = 0; i < data.products.length; i++) {
-                const product = data.products[i];
-                _productIndex++;
-                _productCache[_productIndex] = product;
-                const card = document.createElement('div');
-                card.className = 'product-card';
-                card.setAttribute('data-product-idx', _productIndex);
-                card.innerHTML = `
-                    <img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
-                    <div class="product-info">
-                        <div class="product-title">${escapeHtml(product.title)}</div>
-                        <div class="product-price">¥${product.price}</div>
-                        <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
-                    </div>
-                `;
-                productsGrid.appendChild(card);
+            // 2026-10-16 小蕊改(中华反馈「方案二三商品没输出」): 按方案分组渲染
+            if (typeof appendGroupedProducts === 'function') {
+                appendGroupedProducts(data, chatMsgDiv);
             }
             
             // 给小麦回答框添加收藏+分享图按钮
@@ -582,18 +543,41 @@ async function sendMessage() {
                     } else {
                         this.innerHTML = '♥ 已收藏';
                         this.classList.add('favorited');
-                        // 收藏内容：用户问题+小麦回答+推荐商品
-                        const userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
-                        const favData = {
+                        // 2026-10-16 小蕊改(中华反馈「收藏商品与辨证内容没出来」):
+                        // 原来只写 localStorage(换机/清缓存就丢), 现在上报后端存库,
+                        // 「我」页收藏区(辨证内容)才查得到。localStorage 兜底保留。
+                        var userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
+                        var umText = userMsg ? userMsg.querySelector('.message-text').textContent : '';
+                        var prodArr = (data.products && data.products.length) ? data.products : [];
+                        var favData = {
                             type: 'chat_with_products',
-                            userMessage: userMsg ? userMsg.querySelector('.message-text').textContent : '',
+                            userMessage: umText,
                             assistantReply: replyText,
-                            products: data.products,
+                            products: prodArr,
                             time: new Date().toISOString()
                         };
-                        let favs = JSON.parse(localStorage.getItem('som_favorites') || '[]');
-                        favs.push(favData);
-                        localStorage.setItem('som_favorites', JSON.stringify(favs));
+                        try {
+                            var lsFavs = JSON.parse(localStorage.getItem('som_favorites') || '[]');
+                            lsFavs.push(favData);
+                            localStorage.setItem('som_favorites', JSON.stringify(lsFavs));
+                        } catch (e) { /* localStorage 满/禁用也不影响上报 */ }
+                        var uid = getUserId();
+                        if (uid) {
+                            fetch(API_BASE + '/api/favorites/content/add', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    user_id: uid,
+                                    title: (prodArr.length ? ('🛒 ' + prodArr.length + '款好物 · ') : '辨证') + (replyText || '').replace(/\s+/g, ' ').slice(0, 40) + (replyText && replyText.length > 40 ? '…' : ''),
+                                    content: replyText,
+                                    user_message: umText,
+                                    products: prodArr,
+                                    source: 'chat'
+                                })
+                            }).then(function(r) { return r.json(); })
+                              .then(function(j) { if (!j || j.success === false) console.warn('收藏内容上报失败', j); })
+                              .catch(function(e) { console.warn('收藏内容上报网络错误', e); });
+                        }
                     }
                 };
 
@@ -607,7 +591,6 @@ async function sendMessage() {
                 chatMsg.querySelector('.message-content').appendChild(bar);
             }
             
-            chatContainer.appendChild(productsDiv);
             appendFollowUpSuggestions(false);
             scrollToLastUserMessage();
             
@@ -961,9 +944,15 @@ function fetchFavoritesProduct(append) {
             var html = '';
             items.forEach(function(it) {
                 var iid = it.item_id || it.id;
+                // 2026-10-16 小蕊修: image 字段历史脏数据(整串多图+转义引号)兜底取第一个URL
+                var _favImg = String(it.image || '').trim();
+                if (_favImg.indexOf('",') >= 0 || _favImg.indexOf('", ') >= 0) {
+                    _favImg = _favImg.split('",')[0].trim().replace(/^[\u0022]+/, '');
+                }
+                if (_favImg.indexOf('http') !== 0) _favImg = '';
                 html +=
                     '<div class="fav-card fav-card-product">' +
-                        '<img class="fav-card-img" src="' + favEsc(it.image || '') + '" onerror="this.style.visibility=\'hidden\'" alt="">' +
+                        '<img class="fav-card-img" src="' + favEsc(_favImg) + '" onerror="this.style.visibility=\'hidden\'" alt="">' +
                         '<div class="fav-card-body">' +
                             '<div class="fav-card-title">' + favEsc(it.title || '未命名商品') + '</div>' +
                             '<div class="fav-card-meta">¥' + favEsc(it.price || '0') + ' · ' + favEsc(it.shop_name || it.platform || '') + '</div>' +
@@ -1101,15 +1090,36 @@ const bar = document.createElement('div');
             this.innerHTML = '♥ 已收藏';
             this.classList.add('favorited');
             const userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
+            const umText = userMsg ? userMsg.querySelector('.message-text').textContent : '';
             const favData = {
                 type: 'chat',
-                userMessage: userMsg ? userMsg.querySelector('.message-text').textContent : '',
+                userMessage: umText,
                 assistantReply: replyText,
                 time: new Date().toISOString()
             };
-            let favs = JSON.parse(localStorage.getItem('som_favorites') || '[]');
-            favs.push(favData);
-            localStorage.setItem('som_favorites', JSON.stringify(favs));
+            try {
+                var lsFavs2 = JSON.parse(localStorage.getItem('som_favorites') || '[]');
+                lsFavs2.push(favData);
+                localStorage.setItem('som_favorites', JSON.stringify(lsFavs2));
+            } catch (e) { /* 兜底保留, 不炸 */ }
+            // 2026-10-16 小蕊改(中华反馈「收藏商品与辨证内容没出来」): 辨证内容收藏上报后端存库
+            var uid2 = getUserId();
+            if (uid2) {
+                fetch(API_BASE + '/api/favorites/content/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: uid2,
+                        title: '辨证 · ' + (replyText || '').replace(/\s+/g, ' ').slice(0, 40) + (replyText && replyText.length > 40 ? '…' : ''),
+                        content: replyText,
+                        user_message: umText,
+                        products: [],
+                        source: 'chat'
+                    })
+                }).then(function(r) { return r.json(); })
+                  .then(function(j) { if (!j || j.success === false) console.warn('收藏内容上报失败', j); })
+                  .catch(function(e) { console.warn('收藏内容上报网络错误', e); });
+            }
         }
     };
 
@@ -1135,11 +1145,20 @@ function generateShareImage(text) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: String(text == null ? '' : text) })
     })
-        .then(function(r) { if (!r.ok) throw new Error('render failed'); return r.blob(); })
-        .then(function(blob) {
+        .then(function(r) {
+            if (!r.ok) throw new Error('render failed');
+            // 2026-10-16 小蕊改(中华反馈「分享图不能用微信分享」):
+            // 后端 X-Share-Url 返回 http 直链, <img src> 指向 http URL——
+            // 微信 WebView 里 http 图片才能长按保存, data URL 长按不出保存菜单。
+            var shareUrl = r.headers.get('X-Share-Url');
+            if (shareUrl) { showSharePreview(API_BASE + shareUrl); return; }
+            return r.blob();
+        })
+        .then(function(blobOrUrl) {
+            if (typeof blobOrUrl === 'string') return; // 已走 http 直链
             var reader = new FileReader();
             reader.onloadend = function() { showSharePreview(reader.result); };
-            reader.readAsDataURL(blob);
+            reader.readAsDataURL(blobOrUrl);
         })
         .catch(function() {
             removeShareLoading();
@@ -1168,11 +1187,18 @@ function generateProductShareImage(product) {
             images: all, buy_url: buyUrl
         })
     })
-        .then(function(r) { if (!r.ok) throw new Error('render failed'); return r.blob(); })
-        .then(function(blob) {
+        .then(function(r) {
+            if (!r.ok) throw new Error('render failed');
+            // 同 generateShareImage: 优先 http 直链(X-Share-Url), 微信内长按保存才可靠
+            var shareUrl = r.headers.get('X-Share-Url');
+            if (shareUrl) { showSharePreview(API_BASE + shareUrl); return; }
+            return r.blob();
+        })
+        .then(function(blobOrUrl) {
+            if (typeof blobOrUrl === 'string') return;
             var reader = new FileReader();
             reader.onloadend = function() { showSharePreview(reader.result); };
-            reader.readAsDataURL(blob);
+            reader.readAsDataURL(blobOrUrl);
         })
         .catch(function() {
             removeShareLoading();
@@ -1195,7 +1221,17 @@ function removeShareLoading() {
     if (m) m.remove();
 }
 
-function showSharePreview(dataUrl) {
+function showSharePreview(imgSrc) {
+    // 2026-10-16 小蕊改(中华反馈「分享图不能用微信分享」):
+    // 微信 WebView 不支持 Web Share API, 长按保存 http 图片后手动发微信是唯一可靠路径。
+    // 微信内: 隐藏"分享给朋友"按钮, 把长按保存提示放大加粗; 非微信: 保留原生分享。
+    var isWx = /MicroMessenger/i.test(navigator.userAgent);
+    var nativeBtn = isWx
+        ? ''
+        : '<button class="share-native-btn" onclick="nativeShareImage()">📤 分享给朋友</button>';
+    var tipText = isWx
+        ? '长按上面图片 → 选择「保存图片」→ 回到微信聊天里发给朋友 💚'
+        : '长按图片保存，或点击下方按钮分享 💚';
     let mask = document.getElementById('share-preview-mask');
     if (mask) mask.remove();
     mask = document.createElement('div');
@@ -1203,11 +1239,11 @@ function showSharePreview(dataUrl) {
     mask.className = 'share-preview-mask';
     mask.innerHTML =
         '<div class="share-preview-box">' +
-          '<img src="' + dataUrl + '" alt="分享图">' +
-          '<div class="share-preview-tip">长按图片保存，或点击下方按钮分享 💚</div>' +
+          '<img src="' + imgSrc + '" alt="分享图" style="' + (isWx ? 'border:2px dashed #07c160; padding:2px;' : '') + '">' +
+          '<div class="share-preview-tip" style="' + (isWx ? 'font-size:14px; color:#07c160; font-weight:700;' : '') + '">' + tipText + '</div>' +
           '<div class="share-preview-btns">' +
-            '<button class="share-native-btn" onclick="nativeShareImage()">📤 分享给朋友</button>' +
-            '<a class="share-dl-btn" href="' + dataUrl + '" download="xiaomai-share.png">⬇️ 保存图片</a>' +
+            nativeBtn +
+            '<a class="share-dl-btn" href="' + imgSrc + '" download="xiaomai-share.png">⬇️ 保存图片</a>' +
             '<button class="share-close-btn" onclick="document.getElementById(\'share-preview-mask\').remove()">关闭</button>' +
           '</div>' +
         '</div>';
@@ -1264,22 +1300,24 @@ function appendMessage(text, type, isHtml = false, autoScroll = true) {
     messageDiv.id = messageId;
     
     const avatar = type === 'user' ? '你' : '麦';
-    
+    // 2026-10-16 小蕊修(中华反馈「表格输出框太窄就乱了」):
+    // 小麦回复是 markdown(### 表格 | 加粗 * 列表 -), 原 escapeHtml 直接进气泡,
+    // pre-line 下 | 符号原样显示 → 乱。现在助手气泡走 mdToHtml(表格转卡片化、加粗/列表/小标题美化),
+    // 用户消息(输入内容)仍走 escapeHtml, 不受影响。
+    let bodyHtml;
     if (isHtml) {
-        messageDiv.innerHTML = `
-            <div class="message-avatar">${avatar}</div>
-            <div class="message-content">
-                <div class="message-text">${text}</div>
-            </div>
-        `;
+        bodyHtml = text;
+    } else if (type === 'assistant' && typeof mdToHtml === 'function') {
+        bodyHtml = mdToHtml(text);
     } else {
-        messageDiv.innerHTML = `
-            <div class="message-avatar">${avatar}</div>
-            <div class="message-content">
-                <div class="message-text">${escapeHtml(text)}</div>
-            </div>
-        `;
+        bodyHtml = escapeHtml(text);
     }
+    messageDiv.innerHTML = `
+        <div class="message-avatar">${avatar}</div>
+        <div class="message-content">
+            <div class="message-text${type === 'assistant' ? ' md-text' : ''}">${bodyHtml}</div>
+        </div>
+    `;
     
     messagesContainer.appendChild(messageDiv);
     if (autoScroll) {
@@ -1287,6 +1325,75 @@ function appendMessage(text, type, isHtml = false, autoScroll = true) {
     }
     
     return messageId;
+}
+
+// 2026-10-16 小蕊加: 轻量 markdown → HTML(表格/加粗/小标题/列表/分隔线), 无外部依赖,
+// 兼容老浏览器; 先整体转义再渲染标记, 防 XSS。表格转「响应式卡片表」: 表头深色,
+// 窄屏(手机)自动变竖排卡片(每行一格), 解决「框太窄表格乱」问题。
+function mdToHtml(text) {
+    var s = String(text == null ? '' : text);
+    // 1) 整体转义
+    var esc = escapeHtml(s);
+    // 2) 表格: 匹配连续的 | 行(含表头分隔行 |---|---|)
+    esc = esc.replace(/(^|\n)((?:\|.*\|\n?)+)/g, function(all, lead, block) {
+        var rows = block.trim().split('\n').filter(function(l) { return l.trim() !== ''; });
+        if (rows.length < 2) return all;
+        var tableRows = rows.map(function(l) {
+            return l.trim().replace(/^\|/, '').replace(/\|$/, '').split('\|').map(function(c) { return c.trim(); });
+        }).filter(function(cells) {
+            // 表头分隔行(---)跳过
+            return !cells.every(function(c) { return /^:?-+:?$/.test(c.replace(/[^-]/g, '')) && /^[-: ]+$/.test(c.replace(/\|/g, '')); });
+        }).filter(function(cells) {
+            return !(cells.length === 1 && /^:?-+:?$/.test(cells[0]));
+        });
+        if (tableRows.length < 2) return all;
+        var head = tableRows[0];
+        var html = '<div class="md-table-wrap"><table class="md-table"><thead><tr>';
+        head.forEach(function(c) { html += '<th>' + c + '</th>'; });
+        html += '</tr></thead><tbody>';
+        tableRows.slice(1).forEach(function(cells) {
+            html += '<tr>';
+            for (var i = 0; i < head.length; i++) html += '<td>' + (cells[i] || '') + '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        return lead + html;
+    });
+    // 3) 小标题 ###/##/# → <div class="md-h3">等(保留层级感, 手机端不爆炸)
+    esc = esc.replace(/^#{1,3}\s+(.+)$/gm, '<div class="md-h3">$1</div>');
+    // 4) 加粗 **xxx** → <strong>(转义后 \*\* 仍匹配)
+    esc = esc.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // 5) 斜体 _xxx_ → <em>(仅 ASCII 单词边界, 中文下划线不转, 避免误伤)
+    esc = esc.replace(/(^|[^\w_])_([A-Za-z0-9]+)_(?=$|[^\w])/g, '$1<em>$2</em>');
+    // 6) 列表行 "- xxx" / "· xxx" / "• xxx" / "1. xxx" → <li>, 收尾时自动补 <ul>/</ul>
+    esc = esc.replace(/(^|\n)(\s*)([-·•*]|\d+[.、])\s+/g, function(all, lead, sp, marker) {
+        if (/\d/.test(marker)) return lead + '<li class="md-ol">';
+        return lead + '<li class="md-ul">';
+    });
+    // 7) 分隔线 --- 单独一行 → hr
+    esc = esc.replace(/^\n\s*(?:---|\*\*\*)\s*\n/g, '\n<hr class="md-hr">\n');
+    // 8) 剩余换行 → 保持(气泡 CSS pre-line 处理); 自动补 <ul>/</ul> 包 li
+    esc = esc.split('\n').map(function(l) {
+        var isLi = /^\s*<li/.test(l);
+        var nextIsLi = false;
+        return l;
+    }).join('\n');
+    // 简单补全: 在 <li 行组前补 <ul class="md-ul">, 组后补 </ul>
+    var lines8 = esc.split('\n');
+    var out8 = [];
+    var inUl = false;
+    for (var i8 = 0; i8 < lines8.length; i8++) {
+        var l8 = lines8[i8];
+        var isLi8 = /^\s*<li/.test(l8);
+        var isUlOpen = /^\s*<ul/.test(l8);
+        var isUlClose = /^\s*<\/ul/.test(l8);
+        if (isLi8 && !inUl) { out8.push('<ul class="md-ul">'); inUl = true; }
+        if (!isLi8 && !isUlOpen && inUl) { out8.push('</ul>'); inUl = false; }
+        out8.push(l8);
+    }
+    if (inUl) out8.push('</ul>');
+    esc = out8.join('\n');
+    return esc;
 }
 
 function escapeHtml(text) {
@@ -1524,6 +1631,72 @@ async function loadMoreProducts() {
 // 商品数据缓存，用ID索引
 let _productCache = {};
 let _productIndex = 0;
+
+
+// 2026-10-16 小蕊加(中华反馈「方案二三商品没输出」): 商品卡片按 方案一/二/三 分组渲染。
+// product.plan = '方案一'/'方案二'/'方案三'/''(通用); 无 plan 字段的老数据全归「推荐好物」。
+// 返回已 append 到 chatContainer 的容器 div。
+function appendGroupedProducts(data, chatMsgId) {
+    var chatContainer = document.getElementById('chat-messages');
+    var products = (data && data.products) || [];
+    if (!products.length) return;
+    var afterEl = chatMsgId ? document.getElementById(chatMsgId) : null;
+
+    function makeCard(product) {
+        _productIndex++;
+        _productCache[_productIndex] = product;
+        var card = document.createElement('div');
+        card.className = 'product-card';
+        card.setAttribute('data-product-idx', _productIndex);
+        card.innerHTML = `
+            <img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f5f7f6%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 fill=%22%237bc49f%22 font-size=%2220%22>暂无图片</text></svg>'">
+            <div class="product-info">
+                <div class="product-title">${escapeHtml(product.title)}</div>
+                <div class="product-price">¥${product.price}</div>
+                <div class="product-shop">${escapeHtml(product.shop_name || '')} · ${product.platform === 'taobao' ? '淘宝' : '京东'}</div>
+            </div>
+            <button class="product-card-share" data-share-idx="${_productIndex}" title="生成商品分享图（商品图+淘宝二维码）" aria-label="分享该商品">📤 分享图</button>
+        `;
+        return card;
+    }
+
+    // 按 plan 分组(保持首次出现顺序); 空 plan → 通用组
+    var groups = {};
+    var order = [];
+    products.forEach(function(p) {
+        var g = (p.plan || '推荐好物');
+        if (!groups[g]) { groups[g] = []; order.push(g); }
+        groups[g].push(p);
+    });
+
+    var hasPlan = order.some(function(g) { return g !== '推荐好物'; });
+    var wrapper = document.createElement('div');
+    wrapper.className = 'chat-products';
+
+    if (hasPlan) {
+        // 有方案分组: 每个方案一个小区块, 区块内小卡横排/网格
+        order.forEach(function(g) {
+            var sec = document.createElement('div');
+            sec.className = 'plan-group';
+            sec.innerHTML = '<div class="plan-group-title">🌿 ' + escapeHtml(g) + ' 食材</div>';
+            var grid = document.createElement('div');
+            grid.className = 'products-grid plan-group-grid';
+            groups[g].forEach(function(p) { grid.appendChild(makeCard(p)); });
+            sec.appendChild(grid);
+            wrapper.appendChild(sec);
+        });
+    } else {
+        wrapper.innerHTML = '<div class="chat-products-title">🛒 为你推荐以下有机好物：</div>';
+        var grid = document.createElement('div');
+        grid.className = 'products-grid chat-products-grid';
+        products.forEach(function(p) { grid.appendChild(makeCard(p)); });
+        wrapper.appendChild(grid);
+    }
+
+    if (afterEl) afterEl.after(wrapper);
+    else chatContainer.appendChild(wrapper);
+    return wrapper;
+}
 
 function displayProducts(products, append = false) {
     const productsGrid = document.getElementById('products-grid');
@@ -1835,8 +2008,10 @@ function showProductDetail(product) {
                 <div class="detail-actions">
                     <button class="detail-buy" onclick="openProduct('${escapeJsAttr(product.url || '#')}', '${escapeJsAttr(product.platform)}', '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.app_url || '#')}')">点击购买</button>
                     <button class="detail-qr-btn" onclick="(function(){var u='${escapeJsAttr(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeJsAttr(itemId)}';} showQRCode(u, '${escapeJsAttr(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
+                </div>
+                <div class="detail-actions detail-actions-sub">
                     <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.title || '')}', '${escapeJsAttr(product.price || '')}', '${escapeJsAttr(imgSrc)}', '${escapeJsAttr(product.url || '')}', '${escapeJsAttr(product.platform || 'taobao')}', '${escapeJsAttr(product.shop_name || '')}')">♡ 收藏</button>
-                    <button class="detail-fav detail-share" id="detail-share-btn" onclick="generateProductShareImage({title:'${escapeJsAttr(product.title || '')}', price:'${escapeJsAttr(product.price || '')}', shop_name:'${escapeJsAttr(product.shop_name || '')}', image:'${escapeJsAttr(imgSrc)}', images:JSON.stringify(allImgs), url:'${escapeJsAttr(product.url || '')}', item_id:'${escapeJsAttr(itemId)}', platform:'${escapeJsAttr(product.platform || 'taobao')}'})" title="生成商品分享图（全部商品图+淘宝二维码）">📤 分享图</button>
+                    <button class="detail-fav detail-share" id="detail-share-btn" title="生成商品分享图（全部商品图+淘宝二维码）">📤 分享图</button>
                 </div>
             </div>
             <div class="detail-detail-section">
@@ -1924,6 +2099,28 @@ function showProductDetail(product) {
                 }
             })
             .catch(() => {});
+    }
+
+    // 2026-10-16 小蕊修: 分享按钮原内联 onclick 里嵌 JSON.stringify(allImgs)(双引号炸 HTML 属性)
+    // 且 allImgs 是闭包变量根本不在内联作用域里 → 一点就 ReferenceError, 错误越攒越多。
+    // 改闭包直接绑定, 数据走变量不走内联字符串。
+    const shareBtn = document.getElementById('detail-share-btn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            var shareProduct = {
+                title: product.title || '',
+                price: String(product.price == null ? '' : product.price),
+                shop_name: product.shop_name || '',
+                image: imgSrc,
+                images: allImgs,
+                url: detailUrl,
+                app_url: product.app_url || '',
+                item_id: itemId,
+                platform: product.platform || 'taobao'
+            };
+            generateProductShareImage(shareProduct);
+        });
     }
 
     saveProductBrowse(product.title || '', 1);
@@ -2799,7 +2996,8 @@ function loadProfile() {
     // 改直接挂 loadProfile —— 登录/注册/签到后都会走这里, 进「我」页即加载收藏。
     var _favSec = document.getElementById('my-favorites-section');
     if (_favSec) {
-        if (isLoggedIn()) { _favSec.style.display = ''; loadFavoritesCard(); }
+        if (isLoggedIn()) { _favSec.style.display = '';
+            try { loadFavoritesCard(); } catch (e) { console.warn('loadFavoritesCard 出错', e); } }
         else { _favSec.style.display = 'none'; }
     }
 }

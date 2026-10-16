@@ -688,17 +688,18 @@ body {
 /* 一键到顶按钮(2026-10-15 中华要求: 长页面右下角↑, 快速回顶选分类/搜索) */
 #scroll-to-top {
     position: fixed;
-    right: 18px;
-    bottom: 70px;
+    right: 16px;
+    /* 2026-10-16 中华要求: 放底部右下角(原 bottom:70px 悬在半空被指「没变小没透明」的观感根因之一) */
+    bottom: 24px;
     z-index: 9999;
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     border: none;
     background: #07c160;
     color: #fff;
-    font-size: 22px;
-    line-height: 44px;
+    font-size: 18px;
+    line-height: 42px;
     text-align: center;
     cursor: pointer;
     box-shadow: 0 3px 12px rgba(7,193,96,.35);
@@ -709,11 +710,12 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 #scroll-to-top.show {
-    opacity: 1;
+    /* 半透明观感: 显示时 0.75, 比满色更轻(中华要求「变小与透明」) */
+    opacity: 0.75;
     visibility: visible;
     transform: translateY(0);
 }
-#scroll-to-top:active { transform: scale(.92); }
+#scroll-to-top.show:active { transform: scale(.92); }
 
 /* 底部 */
 .footer {
@@ -1340,6 +1342,13 @@ body {
 }
 .detail-actions .detail-fav {
     flex: 0 0 auto; padding: 14px 20px;
+}
+/* 2026-10-16 中华要求: 收藏/分享排在购买按钮上方, 两列并排 */
+.detail-actions-sub {
+    margin-top: 8px;
+}
+.detail-actions-sub .detail-fav {
+    flex: 1; text-align: center;
 }
 .detail-buy {
     width: 100%; padding: 14px; background: linear-gradient(135deg, #ff6b35, #e85d2c);
@@ -2575,3 +2584,117 @@ body {
 
 /* 收藏数量角标 */
 #my-favorites-section .sync-hint { font-size: 12px; color: var(--text-secondary, #7f8c8d); font-weight: 400; }
+
+/* ===== 2026-10-16 小蕊加: 小麦回复下方的收藏/分享图按钮 ===== */
+/* 中华反馈: 辨证内容收藏按钮点完变黑, 应像商品收藏一样变红(#e74c3c) */
+.msg-action-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+.msg-action-btn {
+    padding: 6px 12px;
+    border: 1px solid #bfe3cf;
+    background: #f0f7f3;
+    color: #2f6b4f;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    line-height: 1.4;
+}
+.msg-action-btn:active { opacity: 0.8; }
+.msg-action-btn.favorited {
+    background: #e74c3c;
+    border-color: #e74c3c;
+    color: #fff;
+}
+
+
+/* ===== 2026-10-16 小蕊加: 小麦回复 markdown 渲染 + 商品按方案分组 ===== */
+/* 助手气泡 markdown 正文: 让表格/小标题/列表在窄框里也美观 */
+.message.assistant .message-text.md-text {
+    white-space: normal;
+    line-height: 1.75;
+    word-break: break-word;
+}
+.md-text .md-h3 {
+    margin: 14px 0 8px;
+    padding: 4px 10px;
+    background: #eef7f1;
+    border-left: 4px solid #3a7d5c;
+    border-radius: 6px;
+    font-weight: 700;
+    color: #2f6b4f;
+}
+.md-text .md-hr {
+    border: none;
+    border-top: 1px dashed #bfe3cf;
+    margin: 14px 0;
+}
+.md-text li {
+    margin: 4px 0;
+    padding-left: 4px;
+}
+/* 响应式表格: 桌面是普通表, 手机窄屏自动变卡片(每行一格, 不再挤成乱码) */
+.md-table-wrap {
+    overflow-x: auto;
+    margin: 12px 0;
+    border-radius: 10px;
+    border: 1px solid #d7ecdf;
+}
+.md-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    min-width: 320px;
+}
+.md-table th {
+    background: #eef7f1;
+    color: #2f6b4f;
+    font-weight: 700;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 2px solid #3a7d5c;
+}
+.md-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e5f2e9;
+    vertical-align: top;
+}
+.md-table tbody tr:nth-child(even) td { background: #f7fcf9; }
+@media (max-width: 480px) {
+    .md-table-wrap { overflow-x: visible; }
+    .md-table, .md-table tbody, .md-table tr, .md-table td, .md-table th, .md-table thead { display: block; }
+    .md-table thead { display: none; }
+    .md-table tr {
+        border: 1px solid #d7ecdf;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .md-table td {
+        border-bottom: 1px solid #e5f2e9;
+        padding: 8px 10px;
+    }
+    .md-table td:first-child { font-weight: 700; color: #2f6b4f; background: #f0f7f2; }
+}
+
+/* 商品按方案分组: 每个方案一个小区块 */
+.plan-group { margin-bottom: 14px; }
+.plan-group:last-child { margin-bottom: 0; }
+.plan-group-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2f6b4f;
+    margin: 0 0 8px;
+    padding: 5px 10px;
+    background: #eef7f1;
+    border-left: 4px solid #3a7d5c;
+    border-radius: 8px;
+}
+.plan-group-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
