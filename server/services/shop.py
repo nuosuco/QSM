@@ -396,14 +396,28 @@ class ShopService:
                     seen_ids.add(rid)
                     click_url = r.get('click_url') or r.get('url') or ''
                     app_url = click_url.replace('https://', 'taobao://', 1) if click_url else ''
+                    # 2026-10-19 小蕊修(中华反馈"轮播第一张图重复", 拖了几天终于挖到根因):
+                    # 上面 SQL 把 main_image 起别名为 image, 但旧映射代码却读 r.get('main_image')
+                    # (dict 里没这个 key) → 永远拿到空串 → 走兜底 r.get('images','').strip('[]"')
+                    # 把整串 JSON 数组(如 '["https://a.jpg", "https://b.jpg"]')剥掉首尾括号,
+                    # 拼出 400+ 字符脏串(开头就是第一张图的URL+一堆引号逗号) → 前端拿它当第1张,
+                    # 后面 images[0] 又是第一张 → 轮播第一张"重复/错乱"。指纹去重识别不了脏串, 去不掉。
+                    # 修法: 直接用别名列 image 取主图; 主图空才从 images 数组取第一个 http URL。
+                    _mi = r.get('image') or r.get('main_image') or ''
+                    _il = (json.loads(r.get('images')) if isinstance(r.get('images'), str) and r.get('images')
+                           else (r.get('images') if isinstance(r.get('images'), list) else [])) or []
+                    if not isinstance(_il, list):
+                        _il = []
+                    if not _mi:
+                        _mi = next((x for x in _il if isinstance(x, str) and x.startswith('http')), '')
                     items.append({
                         'item_id': rid,
                         'title': r.get('title', ''),
                         'price': r.get('price', ''),
-                        'image': r.get('main_image', '') or r.get('images', '').strip('[]"') if isinstance(r.get('images'), str) else (r.get('images') or [])[0] if isinstance(r.get('images'), list) else '',
+                        'image': _mi,
                         # 2026-10-15 小蕊修(中华反馈: 商品图片只剩一张, 一直都是多张): 缓存路径漏传 images 多图字段,
                         # 前端 product.images || [] 拿到空 → 弹窗只剩主图。这里补上(库内是 JSON 字符串, 解析成数组)。
-                        'images': (json.loads(r.get('images')) if isinstance(r.get('images'), str) and r.get('images') else (r.get('images') if isinstance(r.get('images'), list) else [])) or [],
+                        'images': _il,
                         'url': click_url,
                         'app_url': app_url,
                         'platform': r.get('platform', 'taobao'),

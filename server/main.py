@@ -21,7 +21,7 @@ _parent = str(_server_dir.parent)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Response, Request
 from starlette.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from api_qnt import router as qnt_router
@@ -405,31 +405,65 @@ class ShareProductRequest(BaseModel):
     site_url: str = "https://som.top/"
 
 
-@app.post("/api/share/content-image")
-async def share_content_image(request: ShareContentRequest):
+@app.api_route("/api/share/content-image", methods=["GET", "POST"])
+async def share_content_image(request: Request):
     """辨证内容分享图 v3: 服务端 Pillow 渲染 PNG(帽子形象图+文案+底部码不压字)
     2026-10-16 小蕊补(中华反馈「分享图不能用微信分享」): 额外把 PNG 存到
     data/share_tmp/ 并返回 X-Share-Url(http 直链)——微信 WebView 里 http 图片
-    才能稳定长按保存, data URL 长按不一定出保存菜单。"""
+    才能稳定长按保存, data URL 长按不一定出保存菜单。
+    2026-10-19 小蕊补(中华反馈分享图生成失败): 加 GET 兜底——旧版 js(手机微信缓存)
+    用 GET 调本接口拿到 405 直接挂掉, 现 GET/POST 都支持, 新旧版前端都能出图。
+    GET 参数: text=辨证文案(必填), site_url=站点URL(可选)。"""
+    if request.method == "GET":
+        text = (request.query_params.get("text") or "养生参考").strip()
+        site_url = request.query_params.get("site_url") or ""
+        site_url = site_url or (os.environ.get("SOM_SITE_URL", "").strip() or "https://som.top")
+    else:
+        body = await request.json()
+        text = (body.get("text") or "养生参考").strip()
+        site_url = body.get("site_url") or ""
+        site_url = site_url or (os.environ.get("SOM_SITE_URL", "").strip() or "https://som.top")
     from services.share_image import render_content_share_image
-    png = render_content_share_image(request.text or "养生参考", request.site_url)
+    png = render_content_share_image(text, site_url)
     share_url = _save_share_tmp(png, 'content')
     return Response(content=png, media_type="image/png",
                     headers={"Content-Disposition": "inline; filename=som-share.png",
                              **({"X-Share-Url": share_url} if share_url else {})})
 
 
-@app.post("/api/share/product-image")
-async def share_product_image(request: ShareProductRequest):
-    """商品分享图 v2: 全部商品图(最多4张) + 商品名 + 淘宝购买二维码, 头尾同辨证模板"""
+@app.api_route("/api/share/product-image", methods=["GET", "POST"])
+async def share_product_image(request: Request):
+    """商品分享图 v2: 全部商品图(最多4张) + 商品名 + 淘宝购买二维码, 头尾同辨证模板
+    2026-10-19 小蕊补: 加 GET 兜底(旧版 js 缓存用 GET 调本接口会 405 失败),
+    GET 参数: item_id/title/price/shop/image/images(逗号分隔多张图,可选)/buy_url/site_url。"""
+    if request.method == "GET":
+        q = request.query_params
+        title = q.get("title") or "推荐商品"
+        price = q.get("price") or ""
+        shop = q.get("shop") or ""
+        image = q.get("image") or ""
+        images = [x for x in (q.get("images") or "").split(",") if x]
+        buy_url = q.get("buy_url") or ("https://s.click.taobao.com/" + q["item_id"] if q.get("item_id") else "https://item.taobao.com/")
+        site_url = q.get("site_url") or ""
+        site_url = site_url or (os.environ.get("SOM_SITE_URL", "").strip() or "https://som.top")
+    else:
+        body = await request.json()
+        title = body.get("title") or "推荐商品"
+        price = body.get("price") or ""
+        shop = body.get("shop") or ""
+        image = body.get("image") or ""
+        images = list(body.get("images") or [])
+        buy_url = body.get("buy_url") or ""
+        site_url = body.get("site_url") or ""
+        site_url = site_url or (os.environ.get("SOM_SITE_URL", "").strip() or "https://som.top")
     from services.share_image import render_product_share_image
-    pics = list(request.images or [])
-    if request.image and request.image not in pics:
-        pics.insert(0, request.image)
+    pics = [x for x in images if x]
+    if image and image not in pics:
+        pics.insert(0, image)
     png = render_product_share_image(
-        title=request.title, price=request.price, shop=request.shop,
-        images=pics, buy_url=request.buy_url or "https://item.taobao.com/",
-        site_url=request.site_url)
+        title=title, price=price, shop=shop,
+        images=pics, buy_url=buy_url or "https://item.taobao.com/",
+        site_url=site_url)
     share_url = _save_share_tmp(png, 'product')
     return Response(content=png, media_type="image/png",
                     headers={"Content-Disposition": "inline; filename=som-product.png",
