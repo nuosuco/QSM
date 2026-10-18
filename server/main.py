@@ -796,12 +796,15 @@ async def get_favorites(user_id: str, limit: int = 50, page: int = 1, page_size:
 
 def _clean_fav_image(image):
     """2026-10-16 小蕊修: 收藏 image 字段历史上被写脏过——
-    前端某版本把整个 images 数组 JSON 串(带转义引号 `\\"`, 逗号)直接存进 image,
+    前端某版本把整个 images 数组 JSON 串(带转义引号, 逗号)直接存进 image,
     导致收藏卡片 <img src> 加载失败。
-    清洗: 能解析成 JSON 数组取第一张; 含多URL(带 `\",` 分隔)取第一段; 单URL原样返回。"""
+    清洗: 能解析成 JSON 数组取第一张; 含多URL取第一段; 单URL原样返回。
+    2026-10-18 中华要求强化: 写路径也过一遍清洗(源头堵死),
+    反复截断到只留第一个 http URL, 尾部残留引号/逗号/反斜杠全剥掉。"""
     s = (image or "").strip()
     if not s:
         return ""
+    # 1) JSON 数组串 → 取第一张
     if s.startswith("["):
         try:
             arr = json.loads(s)
@@ -809,10 +812,20 @@ def _clean_fav_image(image):
                 s = str(arr[0]).strip()
         except Exception:
             pass
-    if s.startswith("http") and '","' in s:
-        s = s.split('","')[0].strip().strip('"')
-    elif '","' in s:
-        s = s.split('","')[0].strip().strip('"')
+    # 2) 反复截断: 只要段里还有第二个 http 起点(下一个 URL), 就截到它前面
+    for _ in range(30):
+        _i = s.find("http")
+        if _i > 0:
+            s = s[_i:]
+        _next = s.find("http", 4)
+        if _next < 0:
+            break
+        s = s[:_next].rstrip().rstrip('",').strip()
+        if not s.startswith("http"):
+            break
+    # 3) 尾部残留引号/逗号/反斜杠剥掉
+    while s and s[-1] in '\"",':
+        s = s[:-1].rstrip()
     return s
 
 @app.post("/api/favorites/add")
