@@ -1729,69 +1729,79 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
         return _new_title + '\n' + '\n'.join(_lines).strip('\n')
     reply_text = _re2a.sub(r'(###\s*\d+\.\s*[^\n]+)([\s\S]*?)(?=\n###\s*\d+\.|\n## |\n以上|🛒|$)', _fix_section_title, reply_text)
 
-    # 2026-10-18k/l 中华要求(主证/兼证/体质倾向混堆): 强制逐行断开成独立段,
-    # 顺序统一为: 体质倾向 → 主证 → 兼证(先说倾向再下结论, 最清晰), 中间各空一行。
-    # 兼容: 裸文字行(主证：/兼证：/体质倾向：)、加粗行(**主证**：)、bullet 行(- 主证：)、
-    # 全角半角冒号、项间被空格/换行任意混排。做法: 先把三项抽出(保持首次出现顺序),
-    # 删掉原位置, 在辨证结论段落末尾按固定顺序重建。若某项不存在则跳过该项。
+    # 2026-10-18p 重写(主证/兼证/体质倾向拆段): 旧版整行抽取的正则抓不到 LLM 实际输出
+    # (如 "**主证**：...  **兼证**：...  体质倾向：..." 挤一行, 或 ** 夹在关键词与冒号之间),
+    # 导致三项常被整体移到全文末尾(连 AI 声明后面都跑出去了)。改为逐行线性扫描:
+    # 1) 行内含多个关键词项 → 按行拆开, 一项一行; 2) 三项全齐时按 体质倾向→主证→兼证 排序
+    #    (缺哪项跳哪项), 每项之间空一行; 3) 保持原位(在辨证结论段内), 不再整段移位。
     import re as _re2l
-    def _grab_item(text, name):
-        # 匹配整行含该关键词开头的项: 行首可带 bullet/-/数字, 可有 ** 包裹, 冒号全/半角, 直到下一关键词或段落结束
-        _pat = (r'(?:^|\n)\s*(?:[-*•]\s*)?(?:\*\*)?\s*' + name + r'\s*(?:\*\*)?\s*[：:]\s*'
-                r'([\s\S]*?)'
-                r'(?=\n\s*(?:[-*•]\s*)?(?:\*\*)?(兼证|主证|体质倾向)\s*(?:\*\*)?\s*[：:]'
-                r'|\n\s*#{1,6}\s|\n\s*[-*•]\s+\S|\n\s*(?:\n|---|===|\ufeff)|\Z)')
-        _m = _re2l.search(_pat, text)
-        if _m:
-            return _m.group(0).strip('\n').rstrip(), _m
-        return None, None
-    _item_defs = [('体质倾向', r'体质倾向|体质(倾向)?'), ('主证', r'主证'), ('兼证', r'兼证')]
-    # 先按出现顺序抽出各项(用更宽松的查找)
-    _grabbed = []  # (label, line_text)
-    for _i, (_lbl, _kw) in enumerate([('主证', r'主证[：:]'), ('兼证', r'兼证[：:]'), ('体质倾向', r'体质倾向[：:]|体质[：:]')]):
-        # 找到该关键词所在行(取该关键词后到行尾的内容, 含关键词本身), 若行内有多个关键词只取第一个起点之后的部分
-        _m = _re2l.search(r'(^|\n)([ \t]*(?:[-*•][ \t]*)?(?:\*\*)?' + _kw + r'[ \t]*[\s\S]*?)(?=\n(?!\s*$))\n?', text)
-        if _m:
-            _line = _m.group(2).strip()
-            # 剥掉行内多余的其他关键词尾巴(如一行里既有主证又有兼证时, 只保留到下一个关键词前)
-            _line = _re2l.split(r'(?=(?:\*\*)?(兼证|主证|体质倾向)\s*(?:\*\*)?\s*[：:])', _line, maxsplit=1)[0].rstrip()
-            if _line:
-                _grabbed.append((_lbl, _line, _m))
-    if _grabbed:
-        # 删掉原位置(倒序删避免位移)
-        for _lbl, _line, _m in reversed(_grabbed):
-            _s, _e = _m.span()
-            # 找行尾: 从 _e 往后到下一个 \n
-            _line_end = text.find('\n', _e - 1)
-            if _line_end < 0:
-                _line_end = len(text)
+    _ITEM_LINE = _re2l.compile(r'\*{0,2}(体质倾向|主证|兼证)\s*\*{0,2}\s*[：:]')
+    _raw_lines = reply_text.split('\n')
+    _new_lines = []
+    _items = []  # [order, label, line_text]
+    _order_map = {'体质倾向': 0, '主证': 1, '兼证': 2}
+    _drop_this_line = False
+    for _l in _raw_lines:
+        _stripped = _l.strip()
+        _hits = list(_ITEM_LINE.finditer(_stripped))
+        if len(_hits) >= 1:
+            # 这一行属于 主证/兼证/体质 项: 按关键词起点切成若干项
+            _segs = []
+            for _j, _h in enumerate(_hits):
+                _seg_start = _h.start()
+                _seg_end = _hits[_j + 1].start() if _j + 1 < len(_hits) else len(_stripped)
+                _segs.append(_stripped[_seg_start:_seg_end].rstrip())
+            if len(_hits) == 1:
+                # 只有单项 → 保留这一行原样(可能带 ** 加粗), 记录用于排序
+                _lbl = _hits[0].group(1)
+                _items.append((_order_map[_lbl], _lbl, _stripped))
+                # 行原样保留在原地(不摘除), 只靠排序+空行处理
+                _new_lines.append(_stripped)
             else:
-                _line_end += 1
-            # 只删该行(保留其余)
-            text = text[:_s] + text[_line_end:]
-        # 规范化各项文本: 去首尾 ** 空格
-        _norm = []
-        for _lbl, _line, _m in _grabbed:
-            _t = _line.replace('**', '').strip()
-            # 若开头是关键词本身(主证/兼证/体质倾向), 补回 "label: " 前缀
-            _prefix = {'主证': '主证：', '兼证': '兼证：', '体质倾向': '体质倾向：'}[_lbl]
-            if not _t.startswith(_prefix.rstrip('：')):
-                _t = _prefix + _t.lstrip(_lbl).lstrip()
-            _norm.append(_t)
-        # 按 体质倾向 → 主证 → 兼证 固定顺序重建(缺哪项跳哪项)
-        _order = ['体质倾向', '主证', '兼证']
-        _rebuild = []
-        for _o in _order:
-            for _lbl, _line, _m in _grabbed:
-                if _lbl == _o:
-                    _rebuild.append(_line.replace('**', '').strip())
-        text = text.rstrip() + '\n' + '\n'.join(_rebuild)
-    # 兜底: 若三项仍挤在同一行(抽取失败时), 强拆
-    import re as _re2d
-    text = _re2d.sub(r'([\u4e00-\u9fff])\s*(?=兼证[：:])', r'\1\n', text)
-    text = _re2d.sub(r'([\u4e00-\u9fff])\s*(?=体质倾向[：:])', r'\1\n', text)
-    text = _re2d.sub(r'([\u4e00-\u9fff])\s*(?=主证[：:])', r'\1\n', text)
-    reply_text = text
+                # 多项挤一行 → 原地只放回第一项, 其余各项按序重插(后面 _idx_map 统一处理)
+                for _seg in _segs:
+                    _lbl2 = _re2l.match(r'\*{0,2}(体质倾向|主证|兼证)', _seg)
+                    _items.append((_order_map[_lbl2.group(1)], _lbl2.group(1), _seg))
+                _new_lines.append(_segs[0])
+            _drop_this_line = False
+        else:
+            _new_lines.append(_l)
+            _drop_this_line = False
+    # 若一行里挤了多项, 需要把其余各项也放回去: 找到 _new_lines 里第一项位置, 按序插入其余项
+    if _items:
+        # 找 _new_lines 中出现的各项行, 重排为 体质倾向→主证→兼证, 项间空一行
+        # 策略: 找到最早出现的 _items 项在 _new_lines 的下标, 把该处起连续的项行替换成按序排列的三行
+        _idx_map = []  # (position_in_new_lines, item_tuple)
+        _seen_pos = set()
+        for _ord_i, _lbl, _txt in _items:
+            # 定位: 第一次出现 _txt (作为整行) 在 _new_lines 中的位置
+            for _pi, _pl in enumerate(_new_lines):
+                if _pl.strip() == _txt and _pi not in _seen_pos:
+                    _idx_map.append((_pi, _ord_i, _lbl, _txt))
+                    _seen_pos.add(_pi)
+                    break
+        _idx_map.sort(key=lambda x: x[0])
+        if len(_idx_map) >= 2:
+            # 多行情况: 原地逐项替换为按序排列 + 空行分隔
+            _first_pos = _idx_map[0][0]
+            _ordered = sorted(_idx_map, key=lambda x: x[1])
+            _ordered_texts = [t[3] for t in _ordered]
+            # 从后往前删掉原来占位, 再在第一个位置插回按序文本
+            for _pos in sorted([t[0] for t in _idx_map], reverse=True):
+                if _pos != _first_pos:
+                    del _new_lines[_pos]
+            _insert_block = _ordered_texts[0]
+            if len(_ordered_texts) > 1:
+                _insert_block = '\n\n'.join(_ordered_texts)
+            _new_lines[_first_pos] = _insert_block
+        elif len(_idx_map) == 1:
+            pass  # 只有一项, 无需重排
+    reply_text = '\n'.join(_new_lines)
+    # 兜底: 汉字后紧跟 兼证/体质倾向/主证 行首词时, 断行(兼容 **关键词**： 加粗写法)
+    _strong_pat = _re2l.compile(r'([\u4e00-\u9fff])\s*(?=\*{0,2}(?:兼证|体质倾向|主证)\*{0,2}\s*[：:])')
+    reply_text = _strong_pat.sub(r'\1\n', reply_text)
+
+
 
     # 2026-10-17d 中华要求(方案二雷同): 服务端检测 3 方案食材重叠度,
     # 方案二与方案一重叠 >40% → 追加更正提示(兜底, 正常不应触发)
