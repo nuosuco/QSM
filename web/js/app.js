@@ -443,14 +443,14 @@ async function sendMessage() {
         const loadingEl = document.getElementById(loadingId);
         if (loadingEl) {
             const textEl = loadingEl.querySelector('.message-text');
-            if (textEl) textEl.innerHTML = '<div class="loading"></div><div style="color:#999;font-size:13px;margin-top:8px">正在分析图片，请稍候…可能需要30-60秒</div>';
+            if (textEl) textEl.innerHTML = '<div class="loading"></div><div style="color:#999;font-size:13px;margin-top:8px">正在分析图片，请稍候…可能需要30-120秒（整人照/多图会久一点）</div>';
         }
     }, 30000);
     
     try {
         let response;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 90000); // 90秒超时（LLM 45s + 商品搜索 10s + 余量）
+        const timeoutId = setTimeout(() => controller.abort(), 95000); // 2026-10-17 中华铁律: 辨证总耗时不超过90秒, 前端95s兜底, 后端80s总预算先返回
         if (hasImage) {
             // 图片辨证：走 vision 接口（支持多图）
             response = await fetch(`${API_BASE}/api/chat/vision`, {
@@ -841,7 +841,11 @@ function loadFavoritesCard() {
     var section = document.getElementById('my-favorites-section');
     var gC = document.getElementById('fav-group-content');
     var gP = document.getElementById('fav-group-product');
-    if (!section || !gC || !gP) return;
+    if (!section || !gC || !gP) {
+        // 2026-10-17 小蕊诊断: DOM 缺收藏区节点(旧版 HTML 缓存)时打日志, 方便定位
+        console.warn('[favorites] loadFavoritesCard: DOM 缺节点 section=' + !!section, 'gC=' + !!gC, 'gP=' + !!gP);
+        return;
+    }
     if (!userId || userId === 'anonymous') {
         section.style.display = 'none';
         return;
@@ -850,6 +854,24 @@ function loadFavoritesCard() {
     fetchFavoritesContent(false);
     fetchFavoritesProduct(false);
     setTimeout(refreshFavCount, 100);
+    // 2026-10-17 小蕊修(中华反馈「我的收藏没出现商品与辨证内容」): 两区都加载完仍是空时,
+    // 给一条明确的空状态提示, 不再整区消失看不出有没有数据
+    setTimeout(function() {
+        var hasAny = document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length;
+        var emptyHint = document.getElementById('fav-empty-hint');
+        if (!hasAny) {
+            if (!emptyHint) {
+                emptyHint = document.createElement('p');
+                emptyHint.id = 'fav-empty-hint';
+                emptyHint.className = 'empty-hint';
+                emptyHint.style.cssText = 'padding:10px 0;color:#999;font-size:13px;text-align:center;';
+                section.appendChild(emptyHint);
+            }
+            emptyHint.textContent = '还没有收藏哦～在商品卡片或小麦回复上点「♡ 收藏」，这里就会显示';
+        } else if (emptyHint) {
+            emptyHint.remove();
+        }
+    }, 1500);
 }
 
 // ---- 辨证内容区(独立分页) ----
@@ -908,7 +930,8 @@ function fetchFavoritesContent(append) {
             if (moreBtn) moreBtn.style.display = hasMore ? '' : 'none';
             bindFavContentEvents(list);
         })
-        .catch(function() {
+        .catch(function(e) {
+            console.warn('[favorites] 内容收藏加载失败', e);
             if (!append) list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
         });
 }
@@ -977,7 +1000,8 @@ function fetchFavoritesProduct(append) {
             if (moreBtn) moreBtn.style.display = hasMore ? '' : 'none';
             bindFavProductEvents(list);
         })
-        .catch(function() {
+        .catch(function(e) {
+            console.warn('[favorites] 商品收藏加载失败', e);
             if (!append) list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
         });
 }
@@ -1140,6 +1164,14 @@ const bar = document.createElement('div');
 // 前端只回显, 永远绕开跨域。普通浏览器也走同一通道, 模板与原来一致。
 function generateShareImage(text) {
     showShareLoading();
+    // 2026-10-17 修(中华反馈「图片分享生成太慢, 一直默默加载卡住」):
+    // 原来 loading 遮罩只有「正在生成分享图…」一句, 没超时兜底、没进度感知,
+    // 后端 Pillow 渲染大图/拉商品图偶尔要 3~6s, 微信里用户就以为卡死。现在:
+    // (1) 45s 强制兜底: 超时自动关遮罩+提示; (2) 文案写明大概要多久。
+    var _shareTimer = setTimeout(function() {
+        removeShareLoading();
+        alert('分享图生成超时了(超过45秒), 请重试; 也可以长按商品图片直接保存');
+    }, 45000);
     fetch(API_BASE + '/api/share/content-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1151,7 +1183,12 @@ function generateShareImage(text) {
             // 后端 X-Share-Url 返回 http 直链, <img src> 指向 http URL——
             // 微信 WebView 里 http 图片才能长按保存, data URL 长按不出保存菜单。
             var shareUrl = r.headers.get('X-Share-Url');
-            if (shareUrl) { showSharePreview(API_BASE + shareUrl); return; }
+            if (shareUrl) {
+                showSharePreview(API_BASE + shareUrl);
+                // 2026-10-17 小蕊修: 必须返回字符串! 原来 return undefined 会掉进下面
+                // FileReader.readAsDataURL(undefined) 抛 TypeError → 误报「生成失败」
+                return API_BASE + shareUrl;
+            }
             return r.blob();
         })
         .then(function(blobOrUrl) {
@@ -1160,9 +1197,13 @@ function generateShareImage(text) {
             reader.onloadend = function() { showSharePreview(reader.result); };
             reader.readAsDataURL(blobOrUrl);
         })
-        .catch(function() {
+        .catch(function(e) {
+            console.error('辨证分享图生成失败:', e);
+            alert('分享图生成失败: ' + (e && e.message ? e.message : '未知错误') + ', 请重试');
+        })
+        .then(function() {
+            clearTimeout(_shareTimer);
             removeShareLoading();
-            alert('分享图生成失败, 请重试');
         });
 }
 
@@ -1178,6 +1219,12 @@ function generateProductShareImage(product) {
     (p.images || []).forEach(function(u) { if (u && all.indexOf(u) < 0) all.push(u); });
     if (all.length > 4) all = all.slice(0, 4);
     showShareLoading();
+    // 2026-10-17 修(同 generateShareImage): 加 45s 超时兜底 + 进度文案,
+    // 避免微信里遮罩默默转圈被当成卡死
+    var _shareTimer = setTimeout(function() {
+        removeShareLoading();
+        alert('分享图生成超时了(超过45秒), 请重试; 也可以长按商品图片直接保存');
+    }, 45000);
     fetch(API_BASE + '/api/share/product-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1191,7 +1238,11 @@ function generateProductShareImage(product) {
             if (!r.ok) throw new Error('render failed');
             // 同 generateShareImage: 优先 http 直链(X-Share-Url), 微信内长按保存才可靠
             var shareUrl = r.headers.get('X-Share-Url');
-            if (shareUrl) { showSharePreview(API_BASE + shareUrl); return; }
+            if (shareUrl) {
+                showSharePreview(API_BASE + shareUrl);
+                // 2026-10-17 小蕊修: 必须返回字符串, 否则掉进 FileReader(undefined) 误报失败
+                return API_BASE + shareUrl;
+            }
             return r.blob();
         })
         .then(function(blobOrUrl) {
@@ -1200,9 +1251,13 @@ function generateProductShareImage(product) {
             reader.onloadend = function() { showSharePreview(reader.result); };
             reader.readAsDataURL(blobOrUrl);
         })
-        .catch(function() {
+        .catch(function(e) {
+            console.error('商品分享图生成失败:', e);
+            alert('商品分享图生成失败：' + (e && e.message ? e.message : '未知错误') + '。请重试，或长按商品卡片图片直接保存。');
+        })
+        .then(function() {
+            clearTimeout(_shareTimer);
             removeShareLoading();
-            alert('商品分享图生成失败, 请重试');
         });
 }
 
@@ -1212,7 +1267,25 @@ function showShareLoading() {
     var mask = document.createElement('div');
     mask.id = 'share-preview-mask';
     mask.className = 'share-preview-mask';
-    mask.innerHTML = '<div class="share-preview-box"><p style="padding:40px 10px;color:#666;">正在生成分享图…</p></div>';
+    // 2026-10-17 修: 原来只一句「正在生成分享图…」, 用户不知道要等多久以为卡死。
+    // 改成: 标题 + 时长说明 + 动画圆点, 让用户知道在干活、正常要多久。
+    mask.innerHTML =
+        '<div class="share-preview-box">' +
+            '<p style="padding:20px 10px 6px;color:#3a7d5c;font-size:15px;font-weight:600;">⏳ 正在生成分享图</p>' +
+            '<p style="padding:0 10px 14px;color:#888;font-size:12px;">一般 3~6 秒就好, 最多约 30 秒; 超过 45 秒会自动提示重试</p>' +
+            '<div style="display:flex;gap:8px;justify-content:center;padding-bottom:10px;">' +
+                '<span style="width:10px;height:10px;border-radius:50%;background:#7bc49f;animation:shareDot 1s infinite 0s;"></span>' +
+                '<span style="width:10px;height:10px;border-radius:50%;background:#7bc49f;animation:shareDot 1s infinite .2s;"></span>' +
+                '<span style="width:10px;height:10px;border-radius:50%;background:#7bc49f;animation:shareDot 1s infinite .4s;"></span>' +
+            '</div>' +
+        '</div>';
+    // 动画 keyframes(只在分享 loading 期间用到, 动态注入不重复)
+    if (!document.getElementById('share-dot-style')) {
+        var st = document.createElement('style');
+        st.id = 'share-dot-style';
+        st.textContent = '@keyframes shareDot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1.15);opacity:1}}';
+        document.head.appendChild(st);
+    }
     document.body.appendChild(mask);
 }
 
@@ -1985,6 +2058,25 @@ function showProductDetail(product) {
     const itemId = product.item_id || '';
     const detailUrl = product.url || '';
     const allImgs = [imgSrc, ...(product.images || [])].filter(Boolean);
+    // 2026-10-17/18 小蕊修: 主图常常就是 images[0], 淘宝图床还存在同图不同URL(尺寸后缀不同),
+    // 轮播出现"看起来重复"的两张 → 双重去重: URL 精确去重 + 图床指纹去重(去掉尺寸后缀/查询串比较)
+    var _seenImgs = {};
+    var _seenFp = {};
+    var _fp = function(u) {
+        // 取图床指纹: 去掉 ?查询串 与尺寸后缀(如 _60x60.jpg / !!6000000000976-0-... 图床规格标记)
+        var s = String(u || '').split('?')[0];
+        s = s.replace(/_\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.jpg');
+        s = s.replace(/\!\!/g, '');
+        return s;
+    };
+    var _deduped = [];
+    for (var _ai = 0; _ai < allImgs.length; _ai++) {
+        var _u = allImgs[_ai], _f = _fp(_u);
+        if (_seenImgs[_u] || _seenFp[_f]) continue;
+        _seenImgs[_u] = 1; _seenFp[_f] = 1;
+        _deduped.push(_u);
+    }
+    allImgs.length = 0; allImgs.push.apply(allImgs, _deduped);
     var currentImgIdx = 0;
 
     overlay.innerHTML = `
@@ -1992,7 +2084,7 @@ function showProductDetail(product) {
         <div class="detail-modal detail-modal-full">
             <div class="detail-img-wrap">
                 <button class="detail-arrow detail-arrow-left" data-arrow="prev">‹</button>
-                <img id="detail-main-img" src="${escapeHtml(imgSrc)}" alt="${escapeHtml(product.title || '')}" onclick="window.open('${escapeHtml(imgSrc)}','_blank')" style="cursor:pointer" onerror="this.parentElement.innerHTML+='<div class=\'detail-no-img\'>暂无图片</div>'">
+                <img id="detail-main-img" src="${escapeHtml(imgSrc)}" alt="${escapeHtml(product.title || '')}" onclick="location.href='${escapeHtml(imgSrc)}'" style="cursor:pointer" onerror="this.parentElement.innerHTML+='<div class=\'detail-no-img\'>暂无图片</div>'">
                 <button class="detail-arrow detail-arrow-right" data-arrow="next">›</button>
                 <div class="detail-img-counter"><span id="detail-img-cur">1</span>/<span id="detail-img-total">${allImgs.length}</span></div>
             </div>
@@ -2017,7 +2109,7 @@ function showProductDetail(product) {
             <div class="detail-detail-section">
                 <div class="detail-detail-title">— 商品详情 —</div>
                 <div class="detail-detail-gallery">
-                    ${allImgs.map(function(img, i) {
+                    ${allImgs.slice(1).map(function(img, i) {
                         return '<div class="detail-detail-img"><img src="' + escapeHtml(img) + '" onclick="window.open(\'' + escapeHtml(img) + '\',\'_blank\')" style="cursor:pointer" onerror="this.style.display=\'none\'"></div>';
                     }).join('')}
                 </div>
@@ -2045,11 +2137,17 @@ function showProductDetail(product) {
     }
 
     overlay.addEventListener('click', function(e) {
-        var arrow = e.target.getAttribute('data-arrow');
-        if (arrow === 'prev') { switchImg(currentImgIdx - 1); e.stopPropagation(); }
-        else if (arrow === 'next') { switchImg(currentImgIdx + 1); e.stopPropagation(); }
-        var thumbIdx = e.target.getAttribute('data-thumb-idx');
-        if (thumbIdx !== null) { switchImg(parseInt(thumbIdx)); e.stopPropagation(); }
+        // 2026-10-17 小蕊修: 点缩略图时 e.target 常是内层 <img>(没有 data-thumb-idx),
+        // 原来取不到 idx 就什么都不发生, 用户以为点了没反应; 改用 closest 找带属性的祖先
+        var arrowEl = e.target.closest ? e.target.closest('[data-arrow]') : null;
+        if (arrowEl) {
+            var arrow = arrowEl.getAttribute('data-arrow');
+            if (arrow === 'prev') { switchImg(currentImgIdx - 1); e.stopPropagation(); }
+            else if (arrow === 'next') { switchImg(currentImgIdx + 1); e.stopPropagation(); }
+            return;
+        }
+        var thumbEl = e.target.closest ? e.target.closest('[data-thumb-idx]') : null;
+        if (thumbEl) { switchImg(parseInt(thumbEl.getAttribute('data-thumb-idx')) || 0); e.stopPropagation(); }
     });
 
     // 自动轮播（3秒切换）
@@ -2999,6 +3097,36 @@ function loadProfile() {
         if (isLoggedIn()) { _favSec.style.display = '';
             try { loadFavoritesCard(); } catch (e) { console.warn('loadFavoritesCard 出错', e); } }
         else { _favSec.style.display = 'none'; }
+    }
+}
+
+// 2026-10-17 小蕊修(中华反馈「清完缓存收藏还是不出来」):
+// loadProfile 只在「登录后」才设 _favSec 的 display, 但用户进「我」页的时机可能是:
+// 1) 已登录直接切到 profile tab → loadProfile 没重跑 → _favSec 保持初始 display:none
+// 2) loadProfile 跑了但 my-favorites-section 节点当时还没渲染完(时序问题)
+// 修法: switchTab('profile') 每次进「我」页都强制触发一次 loadFavoritesCard,
+// 并先确保节点可见。loadFavoritesCard 内部会去 fetch 后端, 有数据才渲染, 没数据就隐藏。
+if (!window.__favTabHookInstalled) {
+    window.__favTabHookInstalled = true;
+    var _origSwitchTab = window.switchTab;
+    if (typeof _origSwitchTab === 'function') {
+        window.switchTab = function(tabName) {
+            var _ret = _origSwitchTab(tabName);
+            if (tabName === 'profile') {
+                // 延迟一拍, 等 tab 切换后的 DOM 就绪
+                setTimeout(function() {
+                    var _sec = document.getElementById('my-favorites-section');
+                    if (!_sec) return;
+                    if (isLoggedIn()) {
+                        _sec.style.display = '';
+                        try { loadFavoritesCard(); } catch (e) { console.warn('[fav-tab-hook] loadFavoritesCard 出错', e); }
+                    } else {
+                        _sec.style.display = 'none';
+                    }
+                }, 50);
+            }
+            return _ret;
+        };
     }
 }
 

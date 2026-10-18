@@ -3,6 +3,7 @@ SOM 松麦 - 后端服务入口
 小麦SOM = Qwen3.5 2B + RAG知识库
 """
 import json
+import asyncio
 import os
 import sys
 import sqlite3
@@ -312,6 +313,11 @@ async def health_check():
 async def chat(request: ChatRequest):
     from services.chat_engine import chat_with_llm
 
+    # 2026-10-16 小蕊修: 阻塞工作(LLM+商品搜索+存档)放线程池, 不卡事件循环
+    # (同 chat_vision 的"短路"问题, 见 _chat_vision_work 注释)
+    return await asyncio.to_thread(_chat_work, request, chat_with_llm)
+
+def _chat_work(request, chat_with_llm):
     # 加载当前会话的历史对话（传给LLM，让小麦记住上下文）
     history = []
     if request.session_id:
@@ -773,14 +779,20 @@ async def get_favorites(user_id: str, limit: int = 50, page: int = 1, page_size:
             'SELECT * FROM product_favorites WHERE user_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?',
             (user_id, page_size, (page - 1) * page_size)).fetchall()
         conn.close()
+        favs = []
+        for r in rows:
+            d = dict(r); d['image'] = _clean_fav_image(d.get('image')); favs.append(d)
         return {"total": total, "page": page, "page_size": page_size,
                 "total_pages": (total + page_size - 1) // page_size,
-                "favorites": [dict(r) for r in rows]}
+                "favorites": favs}
     cursor.execute('SELECT * FROM product_favorites WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
                    (user_id, limit))
     rows = cursor.fetchall()
     conn.close()
-    return {"total": len(rows), "favorites": [dict(r) for r in rows]}
+    out = []
+    for r in rows:
+        d = dict(r); d['image'] = _clean_fav_image(d.get('image')); out.append(d)
+    return {"total": len(rows), "favorites": out}
 
 def _clean_fav_image(image):
     """2026-10-16 小蕊修: 收藏 image 字段历史上被写脏过——
@@ -1241,70 +1253,138 @@ def _extract_tizhi_from_vision_reply(reply: str):
     return tizhi, zhengxing
 
 
-@app.post("/api/chat/vision")
-async def chat_vision(request: VisionChatRequest):
-    """图片理解辨证（支持多张图片：舌苔/面色/皮肤/患处）"""
+def _chat_vision_work(request, image_list):
+    """chat_vision 阻塞工作(LLM调用+人脸+商品搜索+存档), 由 asyncio.to_thread 调起。
+    2026-10-16 小蕊加。返回与原 chat_vision 相同结构。
+    2026-10-17 中华铁律: 辨证总耗时不超过90秒。全流程 80s deadline——
+    LLM最多60s + 人脸~3s + 商品搜索最多25s, 超预算就跳过商品搜索直接返回辨证。
+    """
+    import time as _time
+    _vision_deadline = _time.time() + 80  # 全流程硬预算(留10s余量给存档/序列化/nginx)
     from services import llm_router, rag
-
-    # 兼容旧版单图 + 新版多图
-    image_list = request.images or []
-    if request.image_url and request.image_url not in image_list:
-        image_list.insert(0, request.image_url)
-    if not image_list:
-        return {"success": False, "error": "no_image", "reply": "请上传至少一张照片哦～"}
-
     # 图片格式由 llm_router 按服务商自动处理：
     # sensenova 直接收 base64（无需下载，最稳），agnes 自动转公网URL
 
     # 根据图片数量调整提示词
     if len(image_list) == 1:
-        system_prompt = """你是小麦SOM，一位经验丰富的中医养生顾问，擅长舌诊、面诊、皮肤望诊。
-请观察用户发来的图片，并【结合用户文字里描述的症状/不适】（如失眠、疲倦、口苦、大便、月经等）做综合辨证：
-1. 舌色（淡红/淡白/红/紫暗）、舌苔（薄白/白腻/黄腻/少苔）、舌形（胖大/瘦薄/齿痕/裂纹）
-2. 或面色（红润/萎黄/苍白/晦暗）、光泽、唇色
-3. 或皮肤（肤色、皮疹、干燥、湿疹等）
-4. 把【照片观察】和【用户症状描述】交叉印证，综合判断体质倾向（两者矛盾时以照片为主，但要说明分歧）
-5. 给出3个不同的食疗方（配方形式，具体到用量单位），按"方案一/方案二/方案三"分条列出
+        system_prompt = """你是小麦SOM，一位经验丰富的老中医，擅长望闻问切四诊合参，看的是【人】不是【部位清单】。
+
+【辨证原则——像真正的老中医一样，看见什么辨什么，绝不局限于固定几项】
+1. 望（照片里一切看得清的异常都要看, 清单只是提示不是边界, 看见任何异常都要写出来并辨证）：
+   - 舌头：舌色（淡红/淡白/红/紫暗/舌尖红）、舌苔（薄白/白腻/黄腻/黄燥/少苔/无苔/花剥/剥苔）、舌形（胖大/瘦薄/齿痕/裂纹/点刺/瘀斑）、舌下络脉（紫暗/迂曲, 拍舌下照时看）
+   - 眼睛：眼神（有神/疲惫/散漫）、眼白（清白/发黄/血丝）、眼袋、眼睑（浮肿/色暗）、瞳孔色泽、老年黄斑样浑浊
+   - 面色：红润/萎黄/苍白/晦暗/潮红、光泽、油光、斑疹（老年斑/肝斑/痤疮/血痣/痣/色素斑/痘印）
+   - 唇：唇色（淡白/淡红/深红/紫暗）、唇周（干燥/脱屑/口角炎）
+   - 皮肤：润燥、皮疹（湿疹/荨麻疹/瘙痒）、脓疱/粉刺、血痣、老年斑、面色斑点
+   - 头发：黑/黄/白/灰、油腻、干燥、稀疏、早白（30岁前白发）
+   - 颈部/体态：消瘦/肥胖、颈纹、皮肤松弛
+   - 患处/其他任何照片里看得清的身体信息
+   看得清就都要说; 看不清的部位如实说看不清, 严禁编造。
+2. 问：用户文字里描述的症状/不适（失眠、疲倦、口苦、大便、月经、出汗、怕冷怕热、腰膝、情绪等）逐条纳入。
+3. 照片证据 + 文字症状 + 该用户【全部历史照片、全部历史辨证、全部历史对话】交叉印证（提示词里会给, 必须逐条对照; 没有记录就如实说没有, 严禁编造）。
+4. 【见症即诊铁律——诊断不限于九种体质】发现什么异常就诊断什么, 不套体质: 皮肤老年斑/血痣/痘→辨血瘀/湿热; 眼白发黄→肝胆湿热; 头发早白→肝肾不足; 夜尿多→肾阳虚; 口苦→肝胆; 失眠→心脾两虚/阴虚火旺; 便秘→肠燥; 便溏→脾虚泄泻; 潮热盗汗→阴虚内热; 乏力懒言→气虚; 怕冷→阳虚; 怕热→阴虚火旺; 痰多→痰湿; 胁痛→肝郁; 腰酸→肾虚; 头晕→肝阳上亢/气血亏虚……诊断要覆盖: 所有症状+病状+可能疾病+医治方向(食疗/起居/穴位/预防/生活调摄)+必要就医提醒, 像真正给病人治病的老年中医, 不是只填九体质模板。
+5. 给出综合辨证结论（主证+兼证），说明每个证候对应的照片/文字/历史证据。
+6. 【方案侧重铁律——中华 2026-10-17c 要求，违反则不合格】必须给满3个食疗方，且三者侧重点【必须不同、不得雷同、不得换汤不换药】：
+   - 方案一：针对本次辨出的【主证】（最突出的证候），标题写"方案一：XXX（主证·XX证）"
+   - 方案二：针对【兼证/次要证候】（与方案一完全不同的调理方向，食材组合必须与方案一明显不同，**方案二里不得出现方案一里的主药**），标题写"方案二：XXX（兼证·XX证）"
+   - 方案三：做【整体固本/防复发】（长期调理方向，如健脾固本、补肾、安神等），标题写"方案三：XXX（固本·XX方向）"
+   每个方子独立成段，配方形式、用量具体到单位。
+   【自查】输出前默念：方案二和方案一的核心主药有没有重复？有就换方向重写。
 
 【食疗方硬性要求——中华 2026-10-15 铁律，违反则不合格】
 - 必须给满3个食疗方案（方案一/方案二/方案三，侧重点不同：如一个健脾、一个养阴、一个祛湿），每个方子都独立成段、独立配方+做法。
 - 食疗方必须写成"配方"：每个食材后面紧跟数量单位，如"黄芪15g、乌鸡半只、红枣5枚、枸杞10g、山药20g"，绝不允许只写食材名不写用量。
 - 每个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
 - 每个方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
+- 【2026-10-17b 排版铁律】每个方案内部严格分两段，中间空一行：
+  第一段：固定以"**配方：**"开头（这两个字加粗，后面紧跟中文冒号），食材+用量顿号连写成一行，这一行末尾必须加句号。
+  空一行。
+  第二段：固定以"**做法：**"开头（这两个字加粗，后面紧跟中文冒号），写怎么煮/怎么吃/吃多久。
+  配方和做法严禁混在同一行同一句里。示例：
+  **配方：** 黄芪15g、西洋参10g、麦冬15g、玉竹15g、百合15g、枸杞10g、山药20g、乌鸡半只、红枣5枚、生姜3片。
+  **做法：** 乌鸡切块焯水去腥，所有药材洗净，与乌鸡、红枣、生姜一同放入砂锅，加清水约1500ml，大火烧开后转小火慢炖1.5小时，加少许盐调味即可。
+- 【2026-10-18m 排版铁律】正文到三个食疗方 + 总结提醒结束即可【到此为止】，不要在正文里写"以上为养生文化参考""以上内容由人工智能生成""🛒推荐"这类尾部内容——服务端会统一在结尾追加固定的三段尾部（养生参考 → 🛒推荐 → AI声明），你正文里再写一遍就会重复。
 - 目的：系统会按你列的食材自动匹配有机商品，你食材列得越全、用量越具体，下面商品卡片越丰富（每个食材出2款），别偷懒只给两三种食材。
 
 注意：
 - 用通俗易懂的语言，不堆砌术语
+- 【排版铁律】整篇回复分段清晰：每个大块之间空一行即可，不要使用"---"分隔线、不要使用"==="等装饰符号；小节标题用"##"或加粗即可。
 - 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医
 - 如果图片看不清，礼貌说明并建议重新拍摄
 - 最末尾必须追加一行固定JSON块(供服务端自动存档, 用户看不到): 体质用中医九分法(平和质/气虚质/阳虚质/阴虚质/痰湿质/湿热质/血瘀质/特禀质/过敏质), 最多3个顿号连接; 没有明显体质就留空字符串。格式:
 tizhi_data: {"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}"""
     else:
-        system_prompt = f"""你是小麦SOM，一位经验丰富的中医养生顾问，擅长多维度望诊。
-用户发来了{len(image_list)}张照片（可能包含舌苔、面色、皮肤、患处等不同部位）。
-请综合所有照片，并【结合用户文字里描述的症状/不适】（如失眠、疲倦、口苦、大便、月经等）做交叉印证：
-1. 逐一分析每张照片的特征（舌色/舌苔/面色/皮肤/患处等）
-2. 综合多张照片的信息，交叉验证，给出更准确的体质判断
-3. 给出综合辨证结论（主证+兼证），并点明照片证据与用户症状的呼应之处
-4. 给出3个不同的食疗方（配方形式，具体到用量单位）+ 做法，按"方案一/方案二/方案三"分条列出
+        system_prompt = f"""你是小麦SOM，一位经验丰富的老中医，擅长望闻问切四诊合参，看的是【人】不是【部位清单】。
+用户发来了{len(image_list)}张照片（可能包含舌苔、面色、眼睛、皮肤、患处等不同部位）。
+
+【辨证原则——像真正的老中医一样，看见什么辨什么，绝不局限于固定几项】
+1. 望：逐张分析每张照片里【一切看得清的异常, 清单只是提示不是边界, 看见任何异常都要写出来并辨证】——舌头(舌色/舌苔/舌形/舌下络脉)、眼睛(眼神/眼白发黄/眼袋/眼睑/老年黄斑)、面色(红润/萎黄/苍白/晦暗/斑疹:老年斑/肝斑/痤疮/血痣/痘印)、唇(唇色/唇周)、皮肤(润燥/皮疹/脓疱/血痣/老年斑)、头发(黑/黄/白/油腻/稀疏/早白)、颈部体态、患处……看得清就都要说, 看不清如实说明, 严禁编造。
+2. 问：用户文字里描述的症状/不适逐条纳入。
+3. 综合所有照片 + 文字症状 + 该用户【全部历史照片、全部历史辨证、全部历史对话】交叉印证（提示词里会给, 必须逐条对照; 没有记录就如实说没有, 严禁编造）。
+4. 【见症即诊铁律——诊断不限于九种体质】发现什么异常就诊断什么, 不套体质: 皮肤老年斑/血痣/痘→辨血瘀/湿热; 眼白发黄→肝胆湿热; 头发早白→肝肾不足; 夜尿多→肾阳虚; 口苦→肝胆; 失眠→心脾两虚/阴虚火旺; 便秘→肠燥; 便溏→脾虚泄泻; 潮热盗汗→阴虚内热; 乏力懒言→气虚; 怕冷→阳虚; 怕热→阴虚火旺; 痰多→痰湿; 胁痛→肝郁; 腰酸→肾虚; 头晕→肝阳上亢/气血亏虚……诊断要覆盖: 所有症状+病状+可能疾病+医治方向(食疗/起居/穴位/预防/生活调摄)+必要就医提醒, 像真正给病人治病的老年中医, 不是只填九体质模板。
+5. 给出综合辨证结论（主证+兼证），说明每个证候对应的照片/文字/历史证据。
+6. 【方案侧重铁律——中华 2026-10-17c 要求，违反则不合格】必须给满3个食疗方，且三者侧重点【必须不同、不得雷同、不得换汤不换药】：
+   - 方案一：针对【主证】（最突出的证候），标题写"方案一：XXX（主证·XX证）"
+   - 方案二：针对【兼证/次要证候】（与方案一完全不同的调理方向，食材组合必须与方案一明显不同，**方案二里不得出现方案一里的主药**），标题写"方案二：XXX（兼证·XX证）"
+   - 方案三：做【整体固本/防复发】（长期调理方向），标题写"方案三：XXX（固本·XX方向）"
+   每个方子独立成段 + 做法，配方形式、用量具体到单位。
+   【自查】输出前默念：方案二和方案一的核心主药有没有重复？有就换方向重写。
 
 【食疗方硬性要求——中华 2026-10-15 铁律，违反则不合格】
 - 必须给满3个食疗方案（方案一/方案二/方案三，侧重点不同：如一个健脾、一个养阴、一个祛湿），每个方子都独立成段、独立配方+做法。
 - 食疗方必须写成"配方"：每个食材后面紧跟数量单位，如"黄芪15g、乌鸡半只、红枣5枚、枸杞10g、山药20g"，绝不允许只写食材名不写用量。
 - 每个方子至少给 5~8 味食材，用量要具体到克/枚/朵/只/片，不要用"适量""少许"含糊带过（整方可以有一味写"适量"，但不能全部模糊）。
 - 每个方子后面必须跟"做法"（怎么煮/怎么吃、吃多久）。
+- 【2026-10-17b 排版铁律】每个方案内部严格分两段，中间空一行：
+  第一段：固定以"**配方：**"开头（这两个字加粗，后面紧跟中文冒号），食材+用量顿号连写成一行，这一行末尾必须加句号。
+  空一行。
+  第二段：固定以"**做法：**"开头（这两个字加粗，后面紧跟中文冒号），写怎么煮/怎么吃/吃多久。
+  配方和做法严禁混在同一行同一句里。示例：
+  **配方：** 黄芪15g、西洋参10g、麦冬15g、玉竹15g、百合15g、枸杞10g、山药20g、乌鸡半只、红枣5枚、生姜3片。
+  **做法：** 乌鸡切块焯水去腥，所有药材洗净，与乌鸡、红枣、生姜一同放入砂锅，加清水约1500ml，大火烧开后转小火慢炖1.5小时，加少许盐调味即可。
+- 【2026-10-18m 排版铁律】正文到三个食疗方 + 总结提醒结束即可【到此为止】，不要在正文里写"以上为养生文化参考""以上内容由人工智能生成""🛒推荐"这类尾部内容——服务端会统一在结尾追加固定的三段尾部（养生参考 → 🛒推荐 → AI声明），你正文里再写一遍就会重复。
 - 目的：系统会按你列的食材自动匹配有机商品，你食材列得越全、用量越具体，下面商品卡片越丰富（每个食材出2款），别偷懒只给两三种食材。
 5. 推荐适合该体质的有机食材（与食疗方食材尽量重叠，让系统好匹配商品）
 
 注意：
 - 多维度综合分析比单张照片更准确，请充分利用多张图的信息
 - 用通俗易懂的语言
+- 【排版铁律】整篇回复分段清晰：每个大块之间空一行即可，不要使用"---"分隔线、不要使用"==="等装饰符号；小节标题用"##"或加粗即可。
 - 结尾必须加：以上为养生文化参考，不构成医疗诊断，身体不适请及时就医
 - 最末尾必须追加一行固定JSON块(供服务端自动存档, 用户看不到): 体质用中医九分法, 最多3个顿号连接; 没有明显体质就留空字符串。格式:
 tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
 
     # 加载会话历史（让小麦记住之前的对话上下文，包括之前的拍照扫描结果）
+    # 2026-10-18n 升级(中华要求): 问诊要能读到用户给小麦说的所有历史对话——
+    # 原来只读当前 session_id(前端每次刷新/换设备 session 就变, 读不到历史),
+    # 现在跨会话全量拉该用户的历史对话(按 user_id), 让小麦真正掌握用户的完整病历/历史症状。
     history_context = ""
+    if request.user_id and request.user_id != 'anonymous':
+        try:
+            conn = get_user_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT user_message, assistant_reply FROM chat_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 30',
+                (request.user_id,)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            if rows:
+                history_lines = []
+                for row in reversed(rows):
+                    _um = (row['user_message'] or '')[:400]
+                    _ar = (row['assistant_reply'] or '')[:400]
+                    history_lines.append(f"用户: {_um}")
+                    history_lines.append(f"小麦: {_ar}")
+                history_context = "\n".join(history_lines)
+                system_prompt += (
+                    f"\n\n【用户的全部历史对话记录（跨会话, 共 {len(rows)} 轮真实存档, 非假设）】\n{history_context}\n\n"
+                    "【问诊铁律】上面的历史对话是这位用户和之前的小麦的真实往来(问诊记录)。"
+                    "辨证时必须结合这些真实病历: 用户之前说过什么症状/不适/调理反馈, 小麦给过什么判断, 据此对照本次照片。"
+                    "严禁编造历史对话里不存在的内容, 没有记录的就如实说没有记录。"
+                )
+        except Exception as e:
+            print(f"vision加载用户全部历史对话失败: {e}")
     if request.session_id:
         try:
             conn = get_user_db()
@@ -1316,12 +1396,13 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
             rows = cursor.fetchall()
             conn.close()
             if rows:
-                history_lines = []
+                _sess_lines = []
                 for row in reversed(rows):
-                    history_lines.append(f"用户: {row['user_message'][:300]}")
-                    history_lines.append(f"小麦: {row['assistant_reply'][:500]}")
-                history_context = "\n".join(history_lines)
-                system_prompt += f"\n\n【之前的对话记录】\n{history_context}\n\n请结合以上对话历史，特别是之前的拍照扫描/辨证结果，来回答用户当前的问题。"
+                    _sess_lines.append(f"用户: {(row['user_message'] or '')[:300]}")
+                    _sess_lines.append(f"小麦: {(row['assistant_reply'] or '')[:300]}")
+                _sess_ctx = "\n".join(_sess_lines)
+                if _sess_ctx and _sess_ctx not in history_context:
+                    system_prompt += f"\n\n【本次会话最近的对话】\n{_sess_ctx}"
         except Exception as e:
             print(f"vision加载会话历史失败: {e}")
 
@@ -1374,10 +1455,55 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
                     _trend_note = (
                         "请结合当前这张照片与历史均值对比, 判断【是否随时间有明显变化】(如舌苔由白转黄、面色由红转暗), "
                         "在结论里点出变化趋势; 若无变化也请明确说明【稳定】。"
+                        "同时请结合【用户体质档案】里的历史辨证结论(之前的体质/证型判断), 分析本次结果与历史辨证是否一致、"
+                        "哪些在改善、哪些还没好转、有无新出现的证候。"
                     )
                     system_prompt += (
                         f"\n\n【视觉趋势参考】该用户历史已存 {len(_vecs)} 张照片, 其整体视觉特征均值: {_gray_info}。" + _trend_note
                     )
+                    _has_photo_trend = True
+                else:
+                    _has_photo_trend = False
+            else:
+                _has_photo_trend = False
+            # 2026-10-17 中华要求: 历史辨证内容也要一起对比 — 把该用户最近的历史辨证结论拉出来拼进提示词,
+            # 即使历史照片不足 2 张(没有视觉趋势), 只要有历史辨证记录也要做"本次 vs 历史"对比
+            try:
+                _conn3 = get_user_db()
+                _hist_tz = _conn3.execute(
+                    "SELECT created_at, tizhi, zhengxing, advice FROM tizhi_records "
+                    "WHERE user_id=? AND (tizhi IS NOT NULL AND tizhi != '' OR advice IS NOT NULL AND advice != '') "
+                    "ORDER BY created_at DESC, id DESC LIMIT 20",
+                    (request.user_id,)
+                ).fetchall()
+                _conn3.close()
+                if _hist_tz:
+                    _hz_lines = []
+                    for _r in reversed(_hist_tz):
+                        _adv = (_r['advice'] or '')
+                        # 取 advice 里的"主证/兼证"部分给 LLM 做对照 (不取全部, 避免 prompt 爆炸)
+                        import re as _re3
+                        _main = _re3.search(r'主证[：:]\s*([一-龥、，,]+)', _adv)
+                        _sec  = _re3.search(r'兼证[：:]\s*([一-龥、，,]+)', _adv)
+                        _hz = "{} 体质:{} 证型:{}".format(
+                            str(_r['created_at'] or '')[:10],
+                            _r['tizhi'] or '未定',
+                            _r['zhengxing'] or '未定')
+                        if _main: _hz += " 主证:{}".format(_main.group(1)[:40])
+                        if _sec:  _hz += " 兼证:{}".format(_sec.group(1)[:40])
+                        _hz_lines.append(_hz)
+                    _hist_note = (
+                        "\n\n【历史辨证记录(真实存档, 非假设)】该用户之前的辨证结论(旧→新):\n"
+                        + "\n".join(_hz_lines)
+                        + "\n【铁律】本次辨证必须在分析里加一节【与历史对比】: 逐条对照上面历史记录, "
+                          "点出哪些证候/体质延续了、哪些好转了、哪些是新出现的; 若本次与某次历史一致, "
+                          "明确说与该日期那次相同; 若全部历史都查不到, 才说暂无历史记录。严禁编造不存在的历史结论。"
+                        "\n【铁律】照片里能看到的部位(舌头/眼睛/面色/皮肤等)必须逐一写进分析, "
+                          "看不清楚的部位就如实说看不清, 严禁编造。"
+                    )
+                    system_prompt += _hist_note
+            except Exception as _e3:
+                print("[vision] 拼接历史辨证记录失败:", _e3)
         except Exception as _e:
             print(f"[vision] 加载历史视觉趋势参考失败: {_e}")
 
@@ -1506,12 +1632,15 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
             print(f"vision体质存档失败: {e}")
 
     # 从回复中提取食材，搜索有机商品推荐
+    # 2026-10-17 中华铁律(90s总预算): 预算耗尽(到deadline还有不足25s)就跳过商品搜索,
+    # 直接带辨证结果返回, 不默默等
     products = []
-    try:
-        from services.chat_engine import _search_products_from_reply
-        products = _search_products_from_reply(result["content"], [], "", request.message or "")
-    except Exception as e:
-        print(f"vision商品搜索失败: {e}")
+    if _time.time() < _vision_deadline - 25:
+        try:
+            from services.chat_engine import _search_products_from_reply
+            products = _search_products_from_reply(result["content"], [], "", request.message or "")
+        except Exception as e:
+            print(f"vision商品搜索失败: {e}")
 
     # 2026-10-14 中华反馈: 从回复里剥掉 tizhi_data 原始 JSON(服务端存档已用, 用户不该看到代码)
     # 必须在追加商品引导语/AI免责声明【之前】剥, 否则 JSON 不在末尾, 正则 $ 锚定失效
@@ -1525,7 +1654,201 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
         pass
 
     # 末尾追加AI生成提示（小程序审核要求）
-    reply_text += '\n\n_以上内容由人工智能生成，仅供参考。_'
+    # 2026-10-18 中华要求: 尾部固定顺序三段: 养生参考 → 🛒推荐 → AI声明; 去重去下划线
+    # 🛒 推荐句是代码后面统一追加的, 若 LLM 自己也写了, 先剥掉(服务端统一加)
+    import re as _re2c
+    # 剥掉 LLM 写的 AI 生成声明(含 _ 下划线版)
+    _ai_pat = r'(?:^|\n)\s*[_*]*以上内容由人工智能生成，仅供参考。[_*]*(?=\n|$)'
+    while _re2c.search(_ai_pat, reply_text):
+        reply_text = _re2c.sub(_ai_pat, '', reply_text)
+    # 剥掉 LLM 写的 🛒 推荐句(服务端统一在结尾加)
+    _cart_pat = r'(?:^|\n)\s*🛒[\s\S]{0,60}?点击即可购买[～~。]?\s*(?=\n|$)'
+    while _re2c.search(_cart_pat, reply_text):
+        reply_text = _re2c.sub(_cart_pat, '', reply_text)
+    # "以上为养生文化参考" 若多次, 只保留第一次
+    _ref_pat = r'(?:^|\n)\s*以上为养生文化参考，不构成医疗诊断，身体不适请及时就医(?=\n|$)'
+    _refs = list(_re2c.finditer(_ref_pat, reply_text))
+    if len(_refs) > 1:
+        for m in reversed(_refs[:-1]):
+            _s, _e = m.span()
+            _ls = reply_text.rfind('\n', 0, _s) + 1
+            _le = reply_text.find('\n', _e)
+            if _le < 0: _le = len(reply_text)
+            reply_text = reply_text[:_ls] + reply_text[_le:]
+    reply_text = reply_text.rstrip()
+    # 统一按固定顺序追加: 养生参考(若LLM没写) → 🛒推荐 → AI声明
+    if not reply_text.endswith('以上为养生文化参考，不构成医疗诊断，身体不适请及时就医'):
+        reply_text += '\n\n以上为养生文化参考，不构成医疗诊断，身体不适请及时就医'
+    reply_text += '\n\n🛒 上面提到的食材，我在下方帮你找了有机认证的，点击即可购买～'
+    reply_text += '\n\n以上内容由人工智能生成，仅供参考。'
+    # 合并多余空行
+    reply_text = _re2c.sub(r'\n{3,}', '\n\n', reply_text).rstrip()
+
+    # 2026-10-18 小蕊修: LLM 写 "### 2. 面色 & 眼部" 但内容含皮肤/头发/唇,
+    # 服务端按该节实际内容补全标题(把出现的项目补进标题, 不再错位)
+    # 2026-10-18l 升级(中华反馈"题目只提到两样, 内容三样合在一起"): 不再只补标题,
+    # 直接重写该节正文——按节内实际出现的项目, 逐条断开成独立段落(一行一项),
+    # 标题也只写节内真实出现的项目。标题与内容从此严格一致。
+    import re as _re2a
+    _ITEM_WORDS = [('面色', '面色'), ('眼神', '眼神'), ('眼袋', '眼周'), ('眼睑', '眼周'),
+                   ('眼部', '眼周'), ('皮肤', '皮肤'), ('头发', '头发'), ('唇色', '唇色'),
+                   ('唇', '唇色'), ('气色', '气色')]
+    def _fix_section_title(m):
+        _title, _body = m.group(1), m.group(2)
+        _t = _title[5:].strip() if _title[:5].startswith('###') else _title
+        _present = []
+        for _kw, _label in _ITEM_WORDS:
+            if _label in _t:  # 标题已含, 保持原顺序标记
+                _present.append(_label)
+            elif _kw in _body:
+                _present.append(_label)
+        if not _present:
+            return m.group(0)
+        # 正文逐条断开: 把 "面色：xxx 眼神：xxx 皮肤：xxx" 这类连排(含表格外的列表/行内)改成一行一项
+        _lines = []
+        for _bl in _body.split('\n'):
+            _s = _bl.strip()
+            if not _s:
+                _lines.append('')
+                continue
+            # 行内含多个 "项目：" 起始点(如 "面色：...眼神：...皮肤：...") → 在第二个起拆行
+            _m2 = list(_re2a.finditer(r'(面色|眼神|眼周|皮肤|头发|唇色|气色)\s*[:：]', _s))
+            if len(_m2) >= 2:
+                _first = _s[:_m2[1].start()].rstrip()
+                _lines.append(_first)
+                for _j in range(1, len(_m2)):
+                    _seg_end = _m2[_j + 1].start() if _j + 1 < len(_m2) else len(_s)
+                    _lines.append(_s[_m2[_j].start():_seg_end].rstrip())
+            else:
+                _lines.append(_bl)
+        # 标题重写: 只用真实出现的项目, 连词用 "、"
+        _new_title = '### ' + _title[len('###'):].split(' ')[0].split('.')[0].strip() + '. ' + '、'.join(_present)
+        _num = _re2a.match(r'###\s*(\d+)', _title)
+        if _num:
+            _new_title = '### ' + _num.group(1) + '. ' + '、'.join(_present)
+        return _new_title + '\n' + '\n'.join(_lines).strip('\n')
+    reply_text = _re2a.sub(r'(###\s*\d+\.\s*[^\n]+)([\s\S]*?)(?=\n###\s*\d+\.|\n## |\n以上|🛒|$)', _fix_section_title, reply_text)
+
+    # 2026-10-18k/l 中华要求(主证/兼证/体质倾向混堆): 强制逐行断开成独立段,
+    # 顺序统一为: 体质倾向 → 主证 → 兼证(先说倾向再下结论, 最清晰), 中间各空一行。
+    # 兼容: 裸文字行(主证：/兼证：/体质倾向：)、加粗行(**主证**：)、bullet 行(- 主证：)、
+    # 全角半角冒号、项间被空格/换行任意混排。做法: 先把三项抽出(保持首次出现顺序),
+    # 删掉原位置, 在辨证结论段落末尾按固定顺序重建。若某项不存在则跳过该项。
+    import re as _re2l
+    def _grab_item(text, name):
+        # 匹配整行含该关键词开头的项: 行首可带 bullet/-/数字, 可有 ** 包裹, 冒号全/半角, 直到下一关键词或段落结束
+        _pat = (r'(?:^|\n)\s*(?:[-*•]\s*)?(?:\*\*)?\s*' + name + r'\s*(?:\*\*)?\s*[：:]\s*'
+                r'([\s\S]*?)'
+                r'(?=\n\s*(?:[-*•]\s*)?(?:\*\*)?(兼证|主证|体质倾向)\s*(?:\*\*)?\s*[：:]'
+                r'|\n\s*#{1,6}\s|\n\s*[-*•]\s+\S|\n\s*(?:\n|---|===|\ufeff)|\Z)')
+        _m = _re2l.search(_pat, text)
+        if _m:
+            return _m.group(0).strip('\n').rstrip(), _m
+        return None, None
+    _item_defs = [('体质倾向', r'体质倾向|体质(倾向)?'), ('主证', r'主证'), ('兼证', r'兼证')]
+    # 先按出现顺序抽出各项(用更宽松的查找)
+    _grabbed = []  # (label, line_text)
+    for _i, (_lbl, _kw) in enumerate([('主证', r'主证[：:]'), ('兼证', r'兼证[：:]'), ('体质倾向', r'体质倾向[：:]|体质[：:]')]):
+        # 找到该关键词所在行(取该关键词后到行尾的内容, 含关键词本身), 若行内有多个关键词只取第一个起点之后的部分
+        _m = _re2l.search(r'(^|\n)([ \t]*(?:[-*•][ \t]*)?(?:\*\*)?' + _kw + r'[ \t]*[\s\S]*?)(?=\n(?!\s*$))\n?', text)
+        if _m:
+            _line = _m.group(2).strip()
+            # 剥掉行内多余的其他关键词尾巴(如一行里既有主证又有兼证时, 只保留到下一个关键词前)
+            _line = _re2l.split(r'(?=(?:\*\*)?(兼证|主证|体质倾向)\s*(?:\*\*)?\s*[：:])', _line, maxsplit=1)[0].rstrip()
+            if _line:
+                _grabbed.append((_lbl, _line, _m))
+    if _grabbed:
+        # 删掉原位置(倒序删避免位移)
+        for _lbl, _line, _m in reversed(_grabbed):
+            _s, _e = _m.span()
+            # 找行尾: 从 _e 往后到下一个 \n
+            _line_end = text.find('\n', _e - 1)
+            if _line_end < 0:
+                _line_end = len(text)
+            else:
+                _line_end += 1
+            # 只删该行(保留其余)
+            text = text[:_s] + text[_line_end:]
+        # 规范化各项文本: 去首尾 ** 空格
+        _norm = []
+        for _lbl, _line, _m in _grabbed:
+            _t = _line.replace('**', '').strip()
+            # 若开头是关键词本身(主证/兼证/体质倾向), 补回 "label: " 前缀
+            _prefix = {'主证': '主证：', '兼证': '兼证：', '体质倾向': '体质倾向：'}[_lbl]
+            if not _t.startswith(_prefix.rstrip('：')):
+                _t = _prefix + _t.lstrip(_lbl).lstrip()
+            _norm.append(_t)
+        # 按 体质倾向 → 主证 → 兼证 固定顺序重建(缺哪项跳哪项)
+        _order = ['体质倾向', '主证', '兼证']
+        _rebuild = []
+        for _o in _order:
+            for _lbl, _line, _m in _grabbed:
+                if _lbl == _o:
+                    _rebuild.append(_line.replace('**', '').strip())
+        text = text.rstrip() + '\n' + '\n'.join(_rebuild)
+    # 兜底: 若三项仍挤在同一行(抽取失败时), 强拆
+    import re as _re2d
+    text = _re2d.sub(r'([\u4e00-\u9fff])\s*(?=兼证[：:])', r'\1\n', text)
+    text = _re2d.sub(r'([\u4e00-\u9fff])\s*(?=体质倾向[：:])', r'\1\n', text)
+    text = _re2d.sub(r'([\u4e00-\u9fff])\s*(?=主证[：:])', r'\1\n', text)
+    reply_text = text
+
+    # 2026-10-17d 中华要求(方案二雷同): 服务端检测 3 方案食材重叠度,
+    # 方案二与方案一重叠 >40% → 追加更正提示(兜底, 正常不应触发)
+    # 2026-10-17d 中华要求(方案二雷同): 服务端检测 3 方案食材重叠度,
+    # 若方案二与方案一重叠 >50%, 在回复后追加一行提醒"方案二应与方案一方向不同"
+    import re as _re2b
+    # 2026-10-17e 归一: LLM 偶尔输出 "**配方：** 方： 麦冬15g..." (开头多了"方："前缀), 剥掉
+    # 2026-10-17h 修: 容忍 ** 后任意空白 + 全角/半角冒号 + 方后可能还有空格
+    reply_text = _re2b.sub(r'(\*\*配方：\*\*)\s*方\s*[:：]\s*', r'\1 ', reply_text)
+    reply_text = _re2b.sub(r'(\*\*做法：\*\*)\s*方\s*[:：]\s*', r'\1 ', reply_text)
+    # 2026-10-18 补: LLM 还会输出 "**做法：** 法： 铁皮石斛..." (做法行首多"法："前缀), 剥掉
+    reply_text = _re2b.sub(r'(\*\*做法：\*\*)\s*法\s*[:：]\s*', r'\1 ', reply_text)
+    reply_text = _re2b.sub(r'(\*\*配方：\*\*)\s*法\s*[:：]\s*', r'\1 ', reply_text)
+    _plan_blocks = _re2b.findall(r'方案[一二三][^\n]*\n+\*\*配方：\*\*\s*([\s\S]*?)(?=\n\n\*\*做法|\n###|\n## |\n以上|🛒|$)', reply_text)
+    if len(_plan_blocks) >= 2:
+        def _extract_ingredients(txt):
+            # 取食材名(去掉用量数字单位): "黄芪15g" → "黄芪"
+            return set(_re2b.findall(r'([\u4e00-\u9fff]{1,6})(?:\d+(?:\.\d+)?\s*(?:g|克|枚|朵|只|片|颗|粒|个|根|支|条|瓣|勺|汤匙|毫升|ml|ML)|个|枚|朵|只|片|颗|粒|根|支|条|瓣|勺|汤匙)?\s*(?:[、,，]|$)', txt))
+        _i1 = _extract_ingredients(_plan_blocks[0])
+        _i2 = _extract_ingredients(_plan_blocks[1])
+        _i3 = _extract_ingredients(_plan_blocks[2]) if len(_plan_blocks) > 2 else set()
+        _overlap_12 = (_i1 & _i2) if _i1 and _i2 else set()
+        _overlap_23 = (_i2 & _i3) if _i2 and _i3 else set()
+        _dup = len(_overlap_12) > max(len(_i1),1)*0.4 or len(_overlap_23) > max(len(_i2),1)*0.4
+        if _dup:
+            reply_text += ('\n\n⚠️ 注意：方案二与方案一食材重叠较多，建议在实际执行时根据主证/兼证侧重调整用量与主次；'
+                          '方案三作为长期固本调理，可与前两方交替使用。')
+
+    # 2026-10-17b 中华要求: 配方/做法 排版铁律 服务端兜底规范化——
+    # LLM 有时输出 "配方：xxx" 不加粗/不加分号, 前端 mdToHtml 只认 **xxx** 加粗,
+    # 这里统一: 配方行 → **配方：**xxx。  做法行 → **做法：**xxx
+    _lines = reply_text.split('\n')
+    _new_lines = []
+    for _l in _lines:
+        _s = _l.lstrip()
+        if _s.startswith('配方：') or _s.startswith('配方:') or _s.startswith('**配方：**') or _s.startswith('**配方:**'):
+            _prefix = '配方'
+            _body = _s[len(_prefix)+1:].lstrip('：:').strip()
+            # 去掉可能已有的 ** 包裹
+            _body = _body.replace('**','')
+            # 2026-10-17g 归一: LLM 偶尔在配方行首多写一个"方："(如 "**配方：** 方： 麦冬15g..."), 剥掉
+            # 2026-10-18k 补: 同理剥"法："前缀
+            import re as _re2g
+            _body = _re2g.sub(r'^方[:：]\s*', '', _body)
+            _body = _re2g.sub(r'^法[:：]\s*', '', _body)
+            if not _body.endswith('。') and _body:
+                _body += '。'
+            _new_lines.append('**配方：** ' + _body)
+        elif _s.startswith('做法：') or _s.startswith('做法:') or _s.startswith('**做法：**') or _s.startswith('**做法:**'):
+            _body = _s[3:].lstrip('：:').strip()
+            _body = _body.replace('**','')
+            _body = _re2g.sub(r'^方[:：]\s*', '', _body)
+            _body = _re2g.sub(r'^法[:：]\s*', '', _body)
+            _new_lines.append('**做法：** ' + _body)
+        else:
+            _new_lines.append(_l)
+    reply_text = '\n'.join(_new_lines)
     return {
         "success": True,
         "reply": reply_text,
@@ -1537,7 +1860,23 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
         "face_identity": result.get("face_identity"),
     }
 
-# ========== som.skill API 管理 ==========
+@app.post("/api/chat/vision")
+async def chat_vision(request: VisionChatRequest):
+    """图片理解辨证（支持多张图片：舌苔/面色/皮肤/患处）"""
+    from services import llm_router, rag
+
+    # 兼容旧版单图 + 新版多图
+    image_list = request.images or []
+    if request.image_url and request.image_url not in image_list:
+        image_list.insert(0, request.image_url)
+    if not image_list:
+        return {"success": False, "error": "no_image", "reply": "请上传至少一张照片哦～"}
+
+    # 2026-10-16 小蕊修(中华反馈「前面卡住后面全卡住」): LLM/人脸/淘宝搜索全是阻塞调用,
+    # 原实现在 async 事件循环线程里直接跑, 一个慢请求(淘宝搜索最坏90s)会卡死整个服务,
+    # 后续所有请求(新拍照/收藏/分享图)全部排队 → "短路"。放 to_thread 后互不影响。
+    return await asyncio.to_thread(_chat_vision_work, request, image_list)
+
 
 @app.get("/api/skill/status")
 async def skill_status():

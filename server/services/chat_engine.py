@@ -548,10 +548,9 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
         for q in queries:
             if len(result) >= 2:
                 break
-            # 2026-10-16 小蕊改(中华反馈「商品输出不完整, 不要限制搜索页」):
-            # 每查询词最多翻 20 页(200个商品位)才放弃, 凑够 2 个不同品牌就停;
-            # 某查询词 20 页没凑够, 换下一个查询词继续凑, 不轻易放弃
-            for page in range(1, 21):
+            # 2026-10-17 中华铁律(90s总预算): 每查询词最多翻 4 页(40个商品位),
+            # 凑够 2 个不同品牌就停; 翻页上限收紧, 单次搜索不再死磕, 保整体耗时
+            for page in range(1, 5):
                 if len(result) >= 2:
                     break
                 try:
@@ -597,8 +596,9 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_map = {executor.submit(search_one, ing): ing for ing in ingredient_names}
-        # 2026-10-16 小蕊改: 页上限 6→20 后单食材最坏 4查询x20页x~1s, 等 90s 才收结果, 避免搜够前被截断
-        concurrent.futures.wait(future_map, timeout=90)
+        # 2026-10-17 中华铁律: 辨证总耗时不超过90秒。
+        # LLM视觉最多90s, 商品搜索并发收结果最多30s(凑到多少回多少), 保证整体不超90s
+        concurrent.futures.wait(future_map, timeout=30)
         # 按原食材顺序收集结果, 每个商品打上所属方案标签(前端按方案分组显示商品卡片)
         for ing in ingredient_names:
             for future in future_map:

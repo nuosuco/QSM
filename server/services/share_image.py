@@ -109,12 +109,19 @@ def _wrap(text: str, font, draw: ImageDraw.ImageDraw, max_width: int) -> list:
 
 
 _LOGO_CACHE = None
+_LOGO_FAILED = False
 
 def _wheat_logo(size: int = 96):
     """小麦帽子小图(中华要求: 分享图开头加形象图)。
-    用 logo 自动裁白边后居中; 加载失败返回 None。"""
-    global _LOGO_CACHE
-    if _LOGO_CACHE is None:
+    用 logo 自动裁白边后居中; 加载失败返回 None。
+    2026-10-17 修: 原 except 分支会把 _LOGO_CACHE 置 None, 每次分享图调用
+    都会重新 open 一次 logo, 且文件缺失时反复打异常日志。加 _LOGO_FAILED
+    标记, 只试一次, 失败则后续直接返回 None。"""
+    global _LOGO_CACHE, _LOGO_FAILED
+    if _LOGO_CACHE is not None:
+        return _LOGO_CACHE
+    if _LOGO_FAILED:
+        return None
         _LOGO_CACHE = None
         try:
             src = Image.open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'wheat_logo_256.png')).convert('RGB')
@@ -141,7 +148,8 @@ def _wheat_logo(size: int = 96):
             bg.paste(core, ((side - size) // 2, (side - size) // 2))
             _LOGO_CACHE = bg
         except Exception as e:
-            print('logo 加载失败:', e)
+            print('logo 加载失败(已忽略, 分享图不带帽子图):', e)
+            _LOGO_FAILED = True
     return _LOGO_CACHE
 
 
