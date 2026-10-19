@@ -785,7 +785,7 @@ function openMyFavorites() {
     modal.innerHTML =
         '<div class="favorites-panel" onclick="event.stopPropagation()">' +
             '<div class="favorites-header">' +
-                '<span>♥ 我的收藏</span>' +
+                '<span><span style="color:#e8433d;font-size:1.1em;">♥</span> 我的收藏</span> +'
                 '<button class="favorites-close" onclick="document.getElementById(\'favorites-modal\').remove()">✕</button>' +
             '</div>' +
             '<div class="favorites-list" id="favorites-list"><div class="favorites-loading">加载中...</div></div>' +
@@ -976,15 +976,22 @@ function loadFavoritesCard() {
     // 2026-10-19 中华反馈「每次回到我, 我的收藏数据都加载一次, 加载太慢」:
     // 60s 会话缓存: 短时间内反复进「我」页直接复用已加载数据, 不重发请求;
     // 只有首次进或超过 60s(可能删除/新增了)才真请求。
+    // 2026-10-19 根治(日志实锤): 微信服务号菜单点进 ?tab=profile 是整页重载,
+    // 内存 60s 缓存全部清零 → 每次进页都真发请求。改 localStorage 持久缓存:
+    // 60s 内反复进「我」页直接跳过网络请求(秒开), 新增/删除收藏时清标记强制刷新。
     var _now = Date.now();
-    var _fresh = (_favLastLoadUser === userId && (_now - _favLastLoadT) < 60000 && _favLastLoaded);
-    if (_fresh) {
-        // 60s 内反复进「我」页: 直接复用已渲染数据(秒开不请求), 顺手清掉可能残留的空提示
+    var _lsFresh = false;
+    try {
+        var _lsMeta = JSON.parse(localStorage.getItem('som_fav_load') || 'null');
+        _lsFresh = !!(_lsMeta && _lsMeta.u === userId && _now - _lsMeta.t < 60000);
+    } catch (e) {}
+    if (_lsFresh || (_favLastLoadUser === userId && (_now - _favLastLoadT) < 60000 && _favLastLoaded)) {
         var _eh = document.getElementById('fav-empty-hint');
         if (_eh && document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length) _eh.remove();
         return;
     }
     _favLastLoadUser = userId; _favLastLoadT = _now;
+    try { localStorage.setItem('som_fav_load', JSON.stringify({ u: userId, t: _now })); } catch (e) {}
     _favContentDone = false; _favProductDone = false;
     fetchFavoritesContent(false);
     fetchFavoritesProduct(false);
@@ -1207,6 +1214,7 @@ function bindFavContentEvents(list) {
         b.onclick = function() {
             fetch(API_BASE + '/api/favorites/content?user_id=' + encodeURIComponent(userId) + '&id=' + encodeURIComponent(b.dataset.id), { method: 'DELETE' })
                 .then(function() {
+                    try { localStorage.removeItem('som_fav_load'); } catch (e) {}
                     var card = b.closest('.fav-card'); if (card) card.remove();
                     _favContentTotal = Math.max(0, _favContentTotal - 1);
                     var gl = document.getElementById('fav-content-list');
@@ -1267,6 +1275,7 @@ function bindFavProductEvents(list) {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId, item_id: b.dataset.id })
             }).then(function() {
+                try { localStorage.removeItem('som_fav_load'); } catch (e) {}
                 var card = b.closest('.fav-card'); if (card) card.remove();
                 _favProductTotal = Math.max(0, _favProductTotal - 1);
                 _favProductItems = _favProductItems.filter(function(x){ return String(x.item_id || x.id) !== b.dataset.id; });
@@ -2401,7 +2410,7 @@ function showProductDetail(product) {
             .then(data => {
                 const favBtn = document.getElementById('detail-fav-btn');
                 if (favBtn && data.favorited) {
-                    favBtn.textContent = '♥ 已收藏';
+                    favBtn.textContent = '❤️ 已收藏';
                     favBtn.classList.add('favorited');
                 }
             })
@@ -2463,6 +2472,7 @@ globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, plat
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({user_id: userId, item_id: itemId})
         }).then(function() {
+            try { localStorage.removeItem('som_fav_load'); } catch (e) {}
             btn.classList.remove('favorited');
             btn.textContent = '♡ 收藏';
         }).catch(function() {});
@@ -2482,6 +2492,7 @@ globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, plat
                 images: _imgList
             })
         }).then(function() {
+            try { localStorage.removeItem('som_fav_load'); } catch (e) {}
             btn.classList.add('favorited');
             btn.textContent = '♥ 已收藏';
         }).catch(function() {});

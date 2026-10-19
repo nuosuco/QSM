@@ -509,7 +509,17 @@ def _save_share_tmp(png: bytes, kind: str) -> str:
     顺带清 24h 前的旧文件。失败不影响分享图本身(返回'')。"""
     try:
         os.makedirs(_SHARE_TMP_DIR, exist_ok=True)
-        # 清理 24h 前旧文件
+        # 2026-10-19 中华反馈「分享图加载不完/太慢」根治: PNG 不压缩, 商品图+二维码
+        # 一张 1.4~2MB, 微信里下载要十几秒。转 JPEG 质量 82, 体积砍到 ~250KB(快 5~8 倍)。
+        # 旧 .png 文件继续保留可读(下面 share_file 同时查 .png/.jpg), 新图一律 .jpg。
+        from PIL import Image
+        import io as _io
+        _im = Image.open(_io.BytesIO(png))
+        if _im.mode in ('RGBA', 'P'):
+            _im = _im.convert('RGB')
+        _buf = _io.BytesIO()
+        _im.save(_buf, 'JPEG', quality=82, optimize=True)
+        _jpg = _buf.getvalue()
         now = time_module.time()
         for f in os.listdir(_SHARE_TMP_DIR):
             p = os.path.join(_SHARE_TMP_DIR, f)
@@ -519,8 +529,8 @@ def _save_share_tmp(png: bytes, kind: str) -> str:
             except Exception:
                 pass
         token = uuid.uuid4().hex
-        with open(os.path.join(_SHARE_TMP_DIR, token + '.png'), 'wb') as fh:
-            fh.write(png)
+        with open(os.path.join(_SHARE_TMP_DIR, token + '.jpg'), 'wb') as fh:
+            fh.write(_jpg)
         return "/api/share/file/" + token
     except Exception:
         return ""
@@ -533,7 +543,9 @@ async def share_file(token: str):
     if not _re.fullmatch(r'[a-f0-9]{32}', token):
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="bad token")
-    p = os.path.join(_SHARE_TMP_DIR, token + '.png')
+    p = os.path.join(_SHARE_TMP_DIR, token + '.jpg')
+    if not os.path.isfile(p):
+        p = os.path.join(_SHARE_TMP_DIR, token + '.png')
     if not os.path.isfile(p):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="not found")
