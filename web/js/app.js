@@ -916,6 +916,16 @@ function refreshFavCount() {
 // 商品区: fav-group-product + fav-product-list + fav-more-product (走 /api/favorites 独立分页)
 // 每区「加载更多」只翻该区下一页, 互不影响; 某区 0 条时隐藏整区
 var _favContentPage = 1, _favProductPage = 1;
+// 2026-10-19 中华反馈「辨证内容与商品都加载非常慢」: 收藏接口加会话内 5s 缓存,
+// 同一 user+page+size 短时间内重复进「我」页直接复用, 不再重复发 fetch。
+var _favCache = {};
+function _favCacheGet(key) {
+    var c = _favCache[key];
+    if (c && (Date.now() - c.t) < 5000) return c.data;
+    return null;
+}
+function _favCacheSet(key, data) { _favCache[key] = { t: Date.now(), data: data }; }
+
 // 2026-10-19 收藏详情懒加载: 原文按 cid 存, 展开时才 mdToHtml, 列表渲染瞬间完成
 var _favContentTextMap = {} ;
 var _favContentTotal = 0, _favProductTotal = 0;
@@ -973,17 +983,34 @@ function fetchFavoritesContent(append, keepPage) {
     var list = document.getElementById('fav-content-list');
     var group = document.getElementById('fav-group-content');
     if (!list || !group) return;
+    // 2026-10-19 缓存: 翻页/刷新场景(append 或 keepPage)查 5s 缓存, 命中直接渲染不发请求
+    var _cKey = 'c|' + userId + '|' + _favContentPage;
+    var _cached = _favCacheGet(_cKey);
+    if (_cached) { _favRenderContent(userId, _cached, list, group); return; }
     if (!append && !keepPage) {
+        // 首次进收藏区: 清空占位
         _favContentPage = 1;
         list.innerHTML = '<p class="empty-hint">加载中…</p>';
         var pgC0 = document.getElementById('fav-content-pager'); if (pgC0) pgC0.style.display = 'none';
-    } else if (append || keepPage) {
-        list.innerHTML = '<p class="empty-hint">加载中…</p>';
-        var pgC1 = document.getElementById('fav-content-pager'); if (pgC1) pgC1.style.display = 'none';
     }
+    // 2026-10-19 中华反馈「点下一页先跑到底部再弹回, 头晕浪费时间」:
+    // 翻页(keepPage)时不清空旧列表, 等新数据到位一次性整页替换, 杜绝『列表塌掉→整页变短→视觉跑到底→再弹回』。
+    // 只在渲染完成时滚回辨证组顶, 且瞬间定位(auto), 不滑动画。
     fetch(API_BASE + '/api/favorites/content?user_id=' + encodeURIComponent(userId) + '&page=' + _favContentPage + '&page_size=5')
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            _favCacheSet(_cKey, data);
+            _favRenderContent(userId, data, list, group, append, keepPage);
+        })
+        .catch(function(e) {
+            console.warn('[favorites] 内容收藏加载失败', e);
+            if (!append) list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
+        });
+}
+function _favRenderContent(userId, data, list, group, append, keepPage) {
+    if (false) { // 旧的 catch 分支占位, 实际逻辑在 fetch 回调里
+    }
+    var _inner = function() {
             var items = data.items || [];
             _favContentTotal = data.total || 0;
             if (!append && !items.length && _favContentPage === 1) {
@@ -1025,18 +1052,17 @@ function fetchFavoritesContent(append, keepPage) {
             });
             bindFavContentEvents(list);
             // 2026-10-19 中华反馈「小麦辨证点下一页跑到有机商品末尾」:
-            // 辨证组在商品组上方, 翻页后列表变长, 视口可能停在商品区。
+            // 辨证组在商品区上方, 翻页后列表变长, 视口可能停在商品区。
             // 翻页(keepPage)后滚回辨证组顶部, 让用户看到辨证内容。
             if (keepPage) {
-                setTimeout(function() {
-                    group.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 60);
+                // 瞬间定位到组顶(不滑动画, 且只在组不在视口内才滚, 避免多余跳变)
+                requestAnimationFrame(function() {
+                    var top = group.getBoundingClientRect().top;
+                    if (top < 0 || top > 200) group.scrollIntoView({ behavior: 'auto', block: 'start' });
+                });
             }
-        })
-        .catch(function(e) {
-            console.warn('[favorites] 内容收藏加载失败', e);
-            if (!append) list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
-        });
+    };
+    _inner();
 }
 
 // ---- 商品区(独立分页) ----
@@ -1045,18 +1071,26 @@ function fetchFavoritesProduct(append, keepPage) {
     var list = document.getElementById('fav-product-list');
     var group = document.getElementById('fav-group-product');
     if (!list || !group) return;
+    // 2026-10-19 缓存: 同一 user+page 5s 内重复进「我」页直接复用, 不再重发请求(加载慢)
+    var _pKey = 'p|' + userId + '|' + _favProductPage;
+    var _pCached = _favCacheGet(_pKey);
+    if (_pCached) { _favRenderProduct(_pCached, list, group, false, true); return; }
     if (!append && !keepPage) {
         _favProductPage = 1;
         _favProductItems = [];
         list.innerHTML = '<p class="empty-hint">加载中…</p>';
         var pgP0 = document.getElementById('fav-product-pager'); if (pgP0) pgP0.style.display = 'none';
-    } else {
-        list.innerHTML = '<p class="empty-hint">加载中…</p>';
-        var pgP1 = document.getElementById('fav-product-pager'); if (pgP1) pgP1.style.display = 'none';
     }
+    // 2026-10-19 翻页不清空旧列表, 数据到位整页替换, 杜绝先塌底再弹回(头晕)
     fetch(API_BASE + '/api/favorites?user_id=' + encodeURIComponent(userId) + '&page=' + _favProductPage + '&page_size=5')
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            _favCacheSet(_pKey, data);
+            _favRenderProduct(data, list, group, append, keepPage);
+        });
+}
+function _favRenderProduct(data, list, group, append, keepPage) {
+    var _pInner = function() {
             var items = data.favorites || data.items || [];
             var total = (typeof data.total !== 'undefined') ? data.total : items.length;
             var totalPages = (typeof data.total_pages !== 'undefined') ? data.total_pages : 1;
@@ -1115,15 +1149,13 @@ function fetchFavoritesProduct(append, keepPage) {
             bindFavProductEvents(list);
             // 商品区翻页后滚回商品组顶部
             if (keepPage) {
-                setTimeout(function() {
-                    group.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 60);
+                requestAnimationFrame(function() {
+                    var top = group.getBoundingClientRect().top;
+                    if (top < 0 || top > 200) group.scrollIntoView({ behavior: 'auto', block: 'start' });
+                });
             }
-        })
-        .catch(function(e) {
-            console.warn('[favorites] 商品收藏加载失败', e);
-            if (!append) list.innerHTML = '<p class="empty-hint">加载失败，请刷新重试</p>';
-        });
+    };
+    _pInner();
 }
 
 // 辨证内容卡片交互: 展开/分享图/删除
@@ -1451,18 +1483,35 @@ function showSharePreview(imgSrc) {
     document.body.appendChild(mask);
     // 2026-10-19 中华反馈「分享图弹窗弹出但内容没加载完」:
     // img 显示前先转圈, onload 后再显图, 避免"弹窗空了没图"
-    var _prevImg = mask.querySelector('img');
-    if (_prevImg) {
-        _prevImg.onload = function() {
-            var _ld = document.getElementById('share-preview-loading');
-            if (_ld) _ld.style.display = 'none';
-            _prevImg.style.display = '';
-        };
-        _prevImg.onerror = function() {
-            var _ld = document.getElementById('share-preview-loading');
-            if (_ld) { _ld.textContent = '🖼️ 分享图加载失败, 请重试'; _ld.style.display = ''; }
-        };
-    }
+    // 2026-10-19 中华反馈「分享图一直在生成中」: 微信 WebView 里 <img> 的 onload 经常不触发
+    // (http 直链 + 微信缓存策略), loading 态永远不关。改用 new Image() 预加载,
+    // onload/onerror 明确回调 + 8s 轮询兜底 + 最终强制显图, 保证 loading 一定被关。
+    var _ld0 = document.getElementById('share-preview-loading');
+    var _done = false;
+    var _reveal = function() {
+        if (_done) return; _done = true;
+        if (_ld0) _ld0.style.display = 'none';
+        var _img = mask.querySelector('img');
+        if (_img) _img.style.display = '';
+    };
+    var _fail = function() {
+        if (_done) return; _done = true;
+        if (_ld0) { _ld0.textContent = '🖼️ 分享图加载失败, 请关闭重试'; _ld0.style.display = ''; }
+    };
+    var _probe = new Image();
+    _probe.onload = _reveal;
+    _probe.onerror = _fail;
+    _probe.src = imgSrc;
+    // 8s 轮询兜底: 微信里 onload 没触发但图其实已缓存, 直接显
+    var _pollCount = 0;
+    var _poll = setInterval(function() {
+        _pollCount++;
+        if (_done || _pollCount > 8) { clearInterval(_poll); if (!_done) _reveal(); return; }
+        // 探测图片是否已可显示(width>0 = 已加载)
+        try { if (_probe.width > 0) { clearInterval(_poll); _reveal(); } } catch (e) {}
+    }, 1000);
+    // 10s 硬兜底: 无论如何关 loading(显图或提示), 不卡死
+    setTimeout(function() { if (!_done) { clearInterval(_poll); _reveal(); } }, 10000);
 }
 
 // 调用系统原生分享（手机浏览器支持）
@@ -2247,7 +2296,7 @@ function showProductDetail(product) {
                     <button class="detail-qr-btn" onclick="(function(){var u='${escapeJsAttr(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeJsAttr(itemId)}';} showQRCode(u, '${escapeJsAttr(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                 </div>
                 <div class="detail-actions detail-actions-sub">
-                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.title || '')}', '${escapeJsAttr(product.price || '')}', '${escapeJsAttr(imgSrc)}', '${escapeJsAttr(product.url || '')}', '${escapeJsAttr(product.platform || 'taobao')}', '${escapeJsAttr(product.shop_name || '')}', ${JSON.stringify(allImgs)})">♡ 收藏</button>
+                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}">♡ 收藏</button>
                     <button class="detail-fav detail-share" id="detail-share-btn" title="生成商品分享图（全部商品图+淘宝二维码）">📤 分享图</button>
                 </div>
             </div>
@@ -2347,6 +2396,16 @@ function showProductDetail(product) {
     // 2026-10-16 小蕊修: 分享按钮原内联 onclick 里嵌 JSON.stringify(allImgs)(双引号炸 HTML 属性)
     // 且 allImgs 是闭包变量根本不在内联作用域里 → 一点就 ReferenceError, 错误越攒越多。
     // 改闭包直接绑定, 数据走变量不走内联字符串。
+    // 2026-10-19 小蕊修(中华反馈"商品收藏点不动, 底部红色JS错误"): 原收藏按钮内联 onclick 里嵌
+    // JSON.stringify(allImgs)(双引号炸 HTML 属性) → 解析报错。改闭包直接绑定, 与分享按钮同套路。
+    const favBtn = document.getElementById('detail-fav-btn');
+    if (favBtn) {
+        favBtn.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            toggleFavorite(favBtn, itemId, product.title || '', String(product.price == null ? '' : product.price), imgSrc, detailUrl, product.platform || 'taobao', product.shop_name || '', allImgs);
+        });
+    }
+
     const shareBtn = document.getElementById('detail-share-btn');
     if (shareBtn) {
         shareBtn.addEventListener('click', function(ev) {
