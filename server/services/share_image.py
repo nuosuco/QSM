@@ -371,7 +371,7 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     if not lines:
         lines = ["养生参考"]
 
-    pad = 50
+    pad = 40  # 2026-10-20 中华要求「宽度再调宽一些」: 左右边距 50→40, 文字区更宽
     headerH, footerH = 150, 270
 
     # 2026-10-19 小蕊修(中华反馈食疗配方与做法没分段/末尾没排版):
@@ -392,7 +392,7 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     # 从 28/40 起逐级缩小字号行距, 直到总高 ≤3000px, 内容一个字不删。
     tmp = ImageDraw.Draw(Image.new("RGB", (W, 10)))
     PARA_GAP = 26
-    MAX_H = 3000
+    MAX_H = 3600   # 2026-10-20 中华要求「辩证图字太小看不清」: 高度上限放宽, 优先保证字号
     def _layout(fs, lh):
         f_body = _font(fs)
         w2 = []
@@ -407,7 +407,8 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         h = headerH + len(w2) * _lh + 40 + extra + footerH
         return _fs, _lh, _font(_fs), w2, extra, h
     _lv = None
-    for _fs, _lh in ((28, 40), (25, 36), (22, 32), (20, 29), (18, 26)):
+    # 2026-10-20 中华要求: 起始字号 28→30, 行距 40→44, 各级+2, 字更大更清楚
+    for _fs, _lh in ((30, 44), (28, 42), (25, 38), (22, 34), (20, 30)):
         _lv = _layout(_fs, _lh)
         if _lv[5] <= MAX_H:
             break
@@ -473,10 +474,10 @@ def _normalize_images(images, limit: int = 5) -> list:  # 2026-10-20 中华要�
 
 def render_product_share_image(title: str, price: str, shop: str,
                                images, buy_url: str,
-                               site_url: str = SITE, cell: int = 480) -> bytes:
+                               site_url: str = SITE, cell: int = 560) -> bytes:
     """商品分享图(竖排单张):
     - 头尾与辨证图同一模板; 正文: 商品图最多 5 张, 竖排单张全宽, 缺图占位。
-    - cell 默认 480(750 宽画布下 64%, 看得清; 5 张体积 ~270KB)。"""
+    - cell 默认 560(750 宽画布下 75%, 更大靠边看得清; 5 张体积 ~400KB)。"""
     """商品分享图 v2(2026-10-16 中华要求):
     - 头尾与辨证图同一模板(顶部标题 + 底部 som.top 服务号二维码)
     - 正文: 商品全部图片(最多5张, 竖排单张全宽, 缺图占位)
@@ -492,8 +493,9 @@ def render_product_share_image(title: str, price: str, shop: str,
     pics = pics[:5]
     # 2026-10-20 中华反馈「商品分享图 2x2 不够看清」: 改回竖排单张全宽, 5 张竖排。
     # 之前 8KB 就断的根因是直链不支持 HEAD(已修), 不是竖排本身; 并发下载+磁盘缓存保留, 提速。
-    # cell 600→480: 5张600px竖排体积 2.1MB 太卡微信, 480px 仍够大看得清, 体积砍到 ~270KB。
-    cell = 480
+    # 2026-10-20 中华要求「商品图太小看不清, 调大靠边」: cell 480→560, 宽 560/750=75%, 贴边更大。
+    # 5张竖排 H≈3660px, JPEG 75 体积 ~400KB, 微信可接受(直链+7天缓存, 二次秒开)。
+    cell = 560
     gap = 14
     gridX = 50
     name_block_H = 220            # 商品名区(图片开头): 名称(最多2行) + 店铺名
