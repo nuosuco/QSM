@@ -1418,7 +1418,7 @@ function generateProductShareImage(product) {
     var all = [];
     if (p.image) all.push(p.image);
     (p.images || []).forEach(function(u) { if (u && all.indexOf(u) < 0) all.push(u); });
-    if (all.length > 4) all = all.slice(0, 4);
+    if (all.length > 5) all = all.slice(0, 5); // 2026-10-20 中华要求: 5张全出(竖排看得清), 上限从4改5
     showShareLoading();
     // 2026-10-17 修(同 generateShareImage): 加 45s 超时兜底 + 进度文案,
     // 避免微信里遮罩默默转圈被当成卡死

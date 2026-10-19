@@ -496,7 +496,7 @@ async def share_content_image(request: Request):
     if _im.mode in ('RGBA', 'P'):
         _im = _im.convert('RGB')
     _buf = _io.BytesIO()
-    _im.save(_buf, 'JPEG', quality=82, optimize=True)
+    _im.save(_buf, 'JPEG', quality=75, optimize=True)
     _jpg = _buf.getvalue()
     return Response(content=_jpg, media_type="image/jpeg",
                     headers={"Content-Disposition": "inline; filename=som-share.jpg",
@@ -566,7 +566,7 @@ async def share_product_image(request: Request):
     if _im.mode in ('RGBA', 'P'):
         _im = _im.convert('RGB')
     _buf = _io.BytesIO()
-    _im.save(_buf, 'JPEG', quality=82, optimize=True)
+    _im.save(_buf, 'JPEG', quality=75, optimize=True)
     _jpg = _buf.getvalue()
     return Response(content=_jpg, media_type="image/jpeg",
                     headers={"Content-Disposition": "inline; filename=som-product.jpg",
@@ -593,7 +593,7 @@ def _save_share_tmp(png: bytes, kind: str) -> str:
         if _im.mode in ('RGBA', 'P'):
             _im = _im.convert('RGB')
         _buf = _io.BytesIO()
-        _im.save(_buf, 'JPEG', quality=82, optimize=True)
+        _im.save(_buf, 'JPEG', quality=75, optimize=True)
         _jpg = _buf.getvalue()
         now = time_module.time()
         for f in os.listdir(_SHARE_TMP_DIR):

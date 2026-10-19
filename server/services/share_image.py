@@ -26,6 +26,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 
 FONT_PATH = "/usr/share/fonts/NotoSansSC-Regular.ttf"
+_font_cache = {}  # 2026-10-20 提速: 字体对象按尺寸缓存
 SITE = "https://som.top/"
 W = 750
 
@@ -38,10 +39,14 @@ _C_PLACEHOLDER = (235, 243, 239)  # 图片占位底色
 
 
 def _font(size: int) -> ImageFont.ImageFont:
-    try:
-        return ImageFont.truetype(FONT_PATH, size)
-    except Exception:
-        return ImageFont.load_default()
+    # 2026-10-20 提速: 字体对象按尺寸缓存(原来每次 _font() 都重新 truetype 加载, 绘制 1s 里一大块)
+    global _font_cache
+    if size not in _font_cache:
+        try:
+            _font_cache[size] = ImageFont.truetype(FONT_PATH, size)
+        except Exception:
+            _font_cache[size] = ImageFont.load_default()
+    return _font_cache[size]
 
 
 def _new_canvas(H: int) -> Image.Image:
@@ -441,11 +446,14 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
            font=_font(20), fill=_C_LIGHT, anchor="mm")
 
     buf = io.BytesIO()
-    img.save(buf, "PNG", optimize=True)
+    # 2026-10-20 中华要求「商品图 5 张竖排加载快」: PNG 1.9MB 太大, 直接存 JPEG 质量 75
+    if img.mode in ('RGBA', 'P'):
+        img = img.convert('RGB')
+    img.save(buf, "JPEG", quality=75, optimize=True)
     return buf.getvalue()
 
 
-def _normalize_images(images, limit: int = 4) -> list:
+def _normalize_images(images, limit: int = 5) -> list:  # 2026-10-20 中华要求 5 张全出
     """images 入参归一: None/str/list → 去重去空, 限 limit 张"""
     if images is None:
         images = []
@@ -465,10 +473,13 @@ def _normalize_images(images, limit: int = 4) -> list:
 
 def render_product_share_image(title: str, price: str, shop: str,
                                images, buy_url: str,
-                               site_url: str = SITE) -> bytes:
+                               site_url: str = SITE, cell: int = 480) -> bytes:
+    """商品分享图(竖排单张):
+    - 头尾与辨证图同一模板; 正文: 商品图最多 5 张, 竖排单张全宽, 缺图占位。
+    - cell 默认 480(750 宽画布下 64%, 看得清; 5 张体积 ~270KB)。"""
     """商品分享图 v2(2026-10-16 中华要求):
     - 头尾与辨证图同一模板(顶部标题 + 底部 som.top 服务号二维码)
-    - 正文: 商品全部图片(最多4张, 2x2 网格, 缺图占位)
+    - 正文: 商品全部图片(最多5张, 竖排单张全宽, 缺图占位)
     - 商品名(左侧, 自动换行最多3行) + 淘宝购买链接二维码(商品图区左上角)
     - 不放价格(价格易变, 商品名+二维码够用)
     price 参数保留签名兼容, 不渲染。
@@ -477,19 +488,18 @@ def render_product_share_image(title: str, price: str, shop: str,
     if not pics:
         pics = [""]
 
-    n = len(pics)
-    # 2026-10-20 中华反馈「商品分享图加载识别或生成失败」: 单列竖排 4 张 → 图高 3146px,
-    # 微信对超高图识别/下载不稳(ninja 日志实锤直链只下 8KB 就断)。
-    # 改 2x2 网格(最多 4 张 2 列): 高度砍半(~1900px), 微信识别更稳; 顺手并发下载提速。
-    cols = 2
-    rows = (n + cols - 1) // cols
-    cell = 600
+    n = min(len(pics), 5)        # 2026-10-20 中华要求: 5 张全出竖排(看得清), 上限从 4 改 5
+    pics = pics[:5]
+    # 2026-10-20 中华反馈「商品分享图 2x2 不够看清」: 改回竖排单张全宽, 5 张竖排。
+    # 之前 8KB 就断的根因是直链不支持 HEAD(已修), 不是竖排本身; 并发下载+磁盘缓存保留, 提速。
+    # cell 600→480: 5张600px竖排体积 2.1MB 太卡微信, 480px 仍够大看得清, 体积砍到 ~270KB。
+    cell = 480
     gap = 14
     gridX = 50
     name_block_H = 220            # 商品名区(图片开头): 名称(最多2行) + 店铺名
     nameTop = 160                 # 名称区顶边(头部之下)
     imgTop = nameTop + name_block_H + 10
-    H = imgTop + rows * (cell + gap) + 300     # 尾部 300 = 双码区
+    H = imgTop + n * (cell + gap) + 300     # 尾部 300 = 双码区
 
     img = _new_canvas(H)
     _header(img, "小麦SOM · 有机好物", "有机认证 · 淘宝同源", with_logo=True)
@@ -509,24 +519,22 @@ def render_product_share_image(title: str, price: str, shop: str,
     if shop:
         d.text((gridX, y + 4), shop[:24], font=_font(22), fill=(120, 120, 120))
 
-    # 商品图 2x2 网格(并发下载, 提速)
+    # 商品图竖排单张全宽(并发下载, 提速; 磁盘缓存已内置在 _load_remote_image)
     import concurrent.futures as _cf
-    colW = (W - 2 * gridX - gap) // 2   # 两列各占半宽(扣除间距), 保持正方形
-    with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
-        _pics = list(_ex.map(lambda u: _load_remote_image(u, colW), pics))
+    with _cf.ThreadPoolExecutor(max_workers=5) as _ex:
+        _pics = list(_ex.map(lambda u: _load_remote_image(u, cell), pics))
     for i, u in enumerate(pics):
-        cx = gridX + (i % cols) * (colW + gap)
-        cy = imgTop + (i // cols) * (colW + gap)
+        gy = imgTop + i * (cell + gap)
         pic = _pics[i]
         if pic:
-            img.paste(pic, (cx, cy))
+            img.paste(pic, (gridX, gy))
             d = ImageDraw.Draw(img)
-            d.rectangle([cx, cy, cx + colW, cy + colW],
+            d.rectangle([gridX, gy, gridX + cell, gy + cell],
                         outline=_C_HEADER_SUB, width=1)
         else:
-            d.rectangle([cx, cy, cx + colW, cy + colW],
+            d.rectangle([gridX, gy, gridX + cell, gy + cell],
                         outline=_C_HEADER_SUB, width=2, fill=_C_PLACEHOLDER)
-            d.text((cx + colW // 2, cy + colW // 2),
+            d.text((gridX + cell // 2, gy + cell // 2),
                    "暂无图片" if not u else "图片加载失败",
                    font=_font(20), fill=_C_HEADER_SUB, anchor="mm")
 
@@ -538,5 +546,8 @@ def render_product_share_image(title: str, price: str, shop: str,
                  right_label="松麦服务号 · 更多好物")
 
     buf = io.BytesIO()
-    img.save(buf, "PNG", optimize=True)
+    # 2026-10-20 中华要求「加载快」: 商品图 5 张竖排 PNG ~1.9MB, 改 JPEG 75 (~300KB, 快 6 倍)
+    if img.mode in ('RGBA', 'P'):
+        img = img.convert('RGB')
+    img.save(buf, "JPEG", quality=75, optimize=True)
     return buf.getvalue()
