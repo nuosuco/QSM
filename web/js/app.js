@@ -566,7 +566,7 @@ async function sendMessage() {
                         this.innerHTML = '♡ 收藏';
                         this.classList.remove('favorited');
                     } else {
-                        this.innerHTML = '♥ 已收藏';
+                        this.innerHTML = '❤️ 已收藏';
                         this.classList.add('favorited');
                         // 2026-10-16 小蕊改(中华反馈「收藏商品与辨证内容没出来」):
                         // 原来只写 localStorage(换机/清缓存就丢), 现在上报后端存库,
@@ -717,7 +717,7 @@ function appendMessageActions(msgId, replyText) {
             this.innerHTML = '♡ 收藏';
             this.classList.remove('favorited');
         } else {
-            this.innerHTML = '♥ 已收藏';
+            this.innerHTML = '❤️ 已收藏';
             this.classList.add('favorited');
             const userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
             const umText = userMsg ? userMsg.querySelector('.message-text').textContent : '';
@@ -983,9 +983,9 @@ function loadFavoritesCard() {
     var _lsFresh = false;
     try {
         var _lsMeta = JSON.parse(localStorage.getItem('som_fav_load') || 'null');
-        _lsFresh = !!(_lsMeta && _lsMeta.u === userId && _now - _lsMeta.t < 60000);
+        _lsFresh = !!(_lsMeta && _lsMeta.u === userId && _now - _lsMeta.t < 600000); // 10min 持久缓存(整页重载也拦得住)
     } catch (e) {}
-    if (_lsFresh || (_favLastLoadUser === userId && (_now - _favLastLoadT) < 60000 && _favLastLoaded)) {
+    if (_lsFresh || (_favLastLoadUser === userId && (_now - _favLastLoadT) < 600000 && _favLastLoaded)) {
         var _eh = document.getElementById('fav-empty-hint');
         if (_eh && document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length) _eh.remove();
         return;
@@ -2494,7 +2494,7 @@ globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, plat
         }).then(function() {
             try { localStorage.removeItem('som_fav_load'); } catch (e) {}
             btn.classList.add('favorited');
-            btn.textContent = '♥ 已收藏';
+            btn.textContent = '❤️ 已收藏';
         }).catch(function() {});
     }
 };
