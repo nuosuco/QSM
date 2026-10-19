@@ -458,9 +458,9 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         d = ImageDraw.Draw(img)
         d.rectangle([qcx - qr_size // 2 - 4, H - 234, qcx + qr_size // 2 + 4, H - 226 + qr_size],
                     outline=_C_HEADER_TITLE, width=2)
-    # 码下方: som.top(与码底留间距) → 免责声明(与 som.top 再留间距)
-    d.text((qcx, H - 42), "som.top", font=_font(40), fill=_C_LIGHT, anchor="mm")
-    d.text((W // 2, H - 10), "以上为养生文化参考，不构成医疗诊断",
+    # 码下方: som.top(与码底留~30px间距) → 免责小字(与 som.top 再留~24px间距)
+    d.text((qcx, H - 48), "som.top", font=_font(40), fill=_C_LIGHT, anchor="mm")
+    d.text((W // 2, H - 14), "以上为养生文化参考，不构成医疗诊断",
            font=_font(18), fill=_C_LIGHT, anchor="mm")
 
     buf = io.BytesIO()
@@ -570,9 +570,9 @@ def render_product_share_image(title: str, price: str, shop: str,
         d = ImageDraw.Draw(img)
         d.rectangle([qcx - qr_size // 2 - 4, H - 234, qcx + qr_size // 2 + 4, H - 226 + qr_size],
                     outline=_C_HEADER_TITLE, width=2)
-    # 码下方: som.top(与码底留间距) → 松麦好物小字(再留间距)
-    d.text((qcx, H - 42), "som.top", font=_font(40), fill=_C_LIGHT, anchor="mm")
-    d.text((W // 2, H - 10), "松麦 · 更多有机好物", font=_font(18), fill=_C_LIGHT, anchor="mm")
+    # 码下方: som.top(与码底留~30px间距) → 松麦好物小字(与 som.top 再留~24px间距)
+    d.text((qcx, H - 48), "som.top", font=_font(40), fill=_C_LIGHT, anchor="mm")
+    d.text((W // 2, H - 14), "松麦 · 更多有机好物", font=_font(18), fill=_C_LIGHT, anchor="mm")
 
     buf = io.BytesIO()
     # 2026-10-20 中华要求「加载快」: 商品图 5 张竖排 PNG ~1.9MB, 改 JPEG 75 (~300KB, 快 6 倍)
