@@ -614,3 +614,127 @@ def _search_products_from_reply(reply: str, recommendations: list, zhengxing: st
                     break
 
     return products
+import re
+
+# 症状关键词(命中即认为该句在自述症状)
+_symptom_kw = [
+    "瘙痒", "痒", "疼", "痛", "红肿", "皮疹", "起疹", "湿疹", "风团", "荨麻疹", "疱疹", "水泡",
+    "口干", "口苦", "口臭", "反酸", "胃酸", "烧心", "胃胀", "腹胀", "腹痛", "腹泻", "拉肚子",
+    "便秘", "便溏", "便稀", "尿频", "尿急", "夜尿", "失眠", "多梦", "嗜睡", "乏力", "疲倦",
+    "气短", "胸闷", "心悸", "心慌", "盗汗", "自汗", "怕冷", "怕热", "畏寒", "畏风", "手脚冰凉",
+    "潮热", "腰膝酸软", "腰酸", "腿软", "脱发", "掉发", "月经", "痛经", "白带", "咳嗽",
+    "咳", "痰多", "咽干", "咽痒", "喉咙", "鼻塞", "流涕", "水肿", "浮肿", "虚胖", "消瘦",
+    "口疮", "溃疡", "牙龈", "关节痛", "关节", "酸痛", "麻木", "抽筋", "恶心", "呕吐",
+    "没胃口", "食欲", "消化不良", "打嗝", "嗳气", "反胃", "多汗", "冷汗", "耳鸣", "眼干", "眼涩",
+]
+_seen = set()
+_SYMPTOM_KW = [k for k in _symptom_kw if not (k in _seen or _seen.add(k))]
+# 长短有序: 先匹配长词(瘙痒 先于 痒), 加粗时不叠星号
+_SYMPTOM_KW_SORTED = sorted(_SYMPTOM_KW, key=len, reverse=True)
+
+# "已好"状态词
+_RESOLVED_KW = ["已经好", "早就好", "现在不", "不痒了", "不痛了", "不疼了", "减轻了", "缓解了", "痊愈", "已缓解", "不发作", "没有了", "恢复了"]
+# "假症状"状态词(用户明确否认/口误, 优先级最高)
+_FAKE_KW = ["打错字", "打错了", "打错", "说错", "误打", "误说", "其实是", "搞错", "弄错", "没有这个症状", "没有此症状", "并不是", "不是"]
+
+_SENT_SPLIT = re.compile(r"[。！？；!?\n]+")
+
+
+def _find_symptom_kws(msg):
+    """找出该消息里提到的症状词(去重, 按长度排)。"""
+    return [kw for kw in _SYMPTOM_KW_SORTED if kw in msg]
+
+
+def _classify_one(msg, created_at):
+    """对单条用户消息分类: 返回 (kind, symptom, line, date) 或 None。"""
+    msg = (msg or "").strip()
+    if not msg:
+        return None
+    hits = _find_symptom_kws(msg)
+    # 先判 fake
+    kind = None
+    for fk in _FAKE_KW:
+        if fk in msg:
+            kind = "fake"
+            break
+    if kind is None:
+        for rk in _RESOLVED_KW:
+            if rk in msg:
+                kind = "resolved"
+                break
+    if kind is None and not hits:
+        return None
+    if kind is None:
+        kind = "complaint"
+    # fake 且没提到具体症状词时, 也接受(用户泛泛说"刚才那个是打错的")
+    if kind == "fake" and not hits:
+        # 找含 fake 词的句段
+        sents = [s.strip() for s in _SENT_SPLIT.split(msg) if s.strip()]
+        best = msg[:80]
+        for s in sents:
+            if any(fk in s for fk in _FAKE_KW):
+                best = s
+                break
+        return ("fake", "", best, (created_at or "")[:10])
+    # 取命中症状词最多的句段
+    sents = [s.strip() for s in _SENT_SPLIT.split(msg) if s.strip()]
+    best, best_score = msg[:80], 0
+    for s in sents:
+        sc = sum(1 for kw in hits if kw in s)
+        if sc > best_score:
+            best, best_score = s, sc
+    if not hits:
+        return ("complaint", "", best, (created_at or "")[:10])
+    # 症状词加粗: 先用占位符避免短词命中已替换的长词(叠星号)
+    s = best
+    for i, kw in enumerate(hits):
+        s = s.replace(kw, f"\x00{i}\x00")
+    for i, kw in enumerate(hits):
+        s = s.replace(f"\x00{i}\x00", f"**{kw}**")
+    return (kind, hits[0], s, (created_at or "")[:10])
+
+
+def extract_user_symptoms(rows):
+    """rows: [(user_message, created_at), ...] 时间正序。
+    返回 {"complaint": [...], "resolved": [...], "fake": [...]}。
+    按症状名去重, 同症状多状态时取【最近一次】的状态(后发生的覆盖先前的)。"""
+    # 每个症状名: 记最后一条 (kind, line, date)
+    last_by_sym = {}
+    for um, ca in rows:
+        r = _classify_one(um, ca)
+        if not r:
+            continue
+        kind, sym, line, date = r
+        if not sym:
+            # 无具体症状词的 fake 单独记
+            key = "|fake"
+            last_by_sym[key] = {"kind": "fake", "line": line, "date": date}
+            continue
+        # 同症状: 如果之前已有 complaint 且现在也是同 kind, 保留较新的
+        key = sym
+        if key not in last_by_sym or last_by_sym[key]["date"] <= date:
+            last_by_sym[key] = {"kind": kind, "line": line, "date": date}
+    out = {"complaint": [], "resolved": [], "fake": []}
+    for key, v in last_by_sym.items():
+        sym = key if key and not key.startswith("|") else ""
+        prefix = f"- {v['date']} 自述【{sym}】" if sym else f"- {v['date']}"
+        out[v["kind"]].append(f"{prefix}: {v['line']}")
+    return out
+
+
+def render_symptom_block(rows):
+    """拼进 vision/文本 prompt 的【用户自述症状(高亮)】块, 含三铁律。rows 时间正序 [(msg, created_at)]。"""
+    c = extract_user_symptoms(rows)
+    if not any(c.values()):
+        return ""
+    parts = ["【用户自述症状(高亮·必须逐条对照)】"]
+    if c["complaint"]:
+        parts.append("■ 历史主诉症状(本次辨证必须回应/对照, 即使照片看不出来也要提, 可写'照片未见明显异常, 但结合主诉仍建议...'):")
+        parts.extend(c["complaint"])
+    if c["resolved"]:
+        parts.append("■ 用户后来说过【已好】的症状(要记住这是历史症状, 本次提示可能复发/注意观察/调护防复):")
+        parts.extend(c["resolved"])
+    if c["fake"]:
+        parts.append("■ 用户明确否认/打错字的症状(假症状, 本次必须绕过, 不得当作真实症状分析, 可末尾附注'已确认非真实症状'):")
+        parts.extend(c["fake"])
+    return "\n".join(parts)

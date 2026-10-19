@@ -1617,10 +1617,15 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
             rows = cursor.fetchall()
             conn.close()
             if rows:
+                # 2026-10-20 中华加固: 截断放宽 400→1500(用户自述症状句常超过400字, 之前被砍丢),
+                # 且自述症状句用完整原文(不截断), 避免"皮肤瘙痒"被截断丢字。
                 history_lines = []
                 for row in reversed(rows):
-                    _um = (row['user_message'] or '')[:400]
-                    _ar = (row['assistant_reply'] or '')[:400]
+                    _um_full = row['user_message'] or ''
+                    _ar_full = row['assistant_reply'] or ''
+                    # 含症状词的用户消息用全文(不截断), 普通消息截到1500
+                    _um = _um_full if any(_kw in _um_full for _kw in ("痒", "痛", "症", "病", "不", "好")) else _um_full[:1500]
+                    _ar = _ar_full[:1500]
                     history_lines.append(f"用户: {_um}")
                     history_lines.append(f"小麦: {_ar}")
                 history_context = "\n".join(history_lines)
@@ -1630,6 +1635,22 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
                     "辨证时必须结合这些真实病历: 用户之前说过什么症状/不适/调理反馈, 小麦给过什么判断, 据此对照本次照片。"
                     "严禁编造历史对话里不存在的内容, 没有记录的就如实说没有记录。"
                 )
+                # 2026-10-20 中华加固②: 从历史对话里抽「用户自述症状」三分类高亮块单独喂给小麦,
+                # 解决"之前说皮肤瘙痒现在没加了"——自述症状句在历史堆里容易被淹没, 单独高亮+三铁律。
+                try:
+                    from services.chat_engine import render_symptom_block as _sym_block
+                    _sym_rows = [(r['user_message'], r['created_at']) for r in reversed(rows)]
+                    _sym_ctx = _sym_block(_sym_rows)
+                    if _sym_ctx:
+                        system_prompt += (
+                            "\n\n" + _sym_ctx +
+                            "\n\n【自述症状对照三铁律(务必逐条执行)】"
+                            "① 历史主诉症状: 本次辨证必须回应/对照, 即使照片看不出来也要提, 可写'照片未见明显异常, 但结合主诉仍建议...'。"
+                            "② 已好的历史症状: 要记住这是【历史症状】, 本次提示可能复发, 建议观察/调护防复, 别再说'没这个症状'。"
+                            "③ 假症状(用户否认/打错字): 本次必须绕过, 不得当作真实症状分析, 可在末尾附注'该症状已确认非真实'。"
+                        )
+                except Exception as _se:
+                    print(f"vision症状高亮块生成失败: {_se}")
         except Exception as e:
             print(f"vision加载用户全部历史对话失败: {e}")
     if request.session_id:
