@@ -980,10 +980,8 @@ function loadFavoritesCard() {
     // 内存 60s 缓存全部清零 → 每次进页都真发请求。改 localStorage 持久缓存:
     // 60s 内反复进「我」页直接跳过网络请求(秒开), 新增/删除收藏时清标记强制刷新。
     var _now = Date.now();
-    var _lsFresh = false;
     try {
         var _lsMeta = JSON.parse(localStorage.getItem('som_fav_load') || 'null');
-        _lsFresh = !!(_lsMeta && _lsMeta.u === userId && _now - _lsMeta.t < 600000); // 10min 持久缓存(整页重载也拦得住)
     } catch (e) {}
     // 2026-10-19 中华反馈「每次回到我都加载一次、还挂着空提示」根治:
     // 关键区分两种「回到我」:
