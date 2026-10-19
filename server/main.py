@@ -363,7 +363,7 @@ def _chat_work(request, chat_with_llm):
             conn = get_user_db()
             cursor = conn.cursor()
             cursor.execute(
-                'SELECT user_message, assistant_reply FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
+                'SELECT user_message, assistant_reply, created_at FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
                 (request.session_id,)
             )
             rows = cursor.fetchall()
@@ -1611,10 +1611,15 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
             conn = get_user_db()
             cursor = conn.cursor()
             cursor.execute(
-                'SELECT user_message, assistant_reply FROM chat_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 30',
+                # 2026-10-20 中华: 症状块全量拉该用户全部历史对话(不限窗口)——vision 存档的用户消息
+                # 是固定模板([图片辨证x1]...), 自述症状句全被顶掉, 靠 LIMIT 截窗口根本捞不到
+                # (如 10-14 皮肤瘙痒在 100 条外)。全量拉 + 渲染端按症状词过滤, 只取有症状词的行。
+                # 历史对话存档上限 ~200 轮, 全量拉内存可承受; 对话窗口(喂 prompt 的)仍截 30 轮。
+                'SELECT user_message, assistant_reply, created_at FROM chat_history WHERE user_id = ? ORDER BY created_at ASC',
                 (request.user_id,)
             )
-            rows = cursor.fetchall()
+            all_rows = cursor.fetchall()
+            rows = all_rows[-30:]  # 喂 prompt 的对话窗口: 最近 30 轮(截断用)
             conn.close()
             if rows:
                 # 2026-10-20 中华加固: 截断放宽 400→1500(用户自述症状句常超过400字, 之前被砍丢),
@@ -1639,7 +1644,7 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
                 # 解决"之前说皮肤瘙痒现在没加了"——自述症状句在历史堆里容易被淹没, 单独高亮+三铁律。
                 try:
                     from services.chat_engine import render_symptom_block as _sym_block
-                    _sym_rows = [(r['user_message'], r['created_at']) for r in reversed(rows)]
+                    _sym_rows = [(r['user_message'], r['created_at']) for r in reversed(all_rows)]  # 全量历史(时间正序喂给抽取器)
                     _sym_ctx = _sym_block(_sym_rows)
                     if _sym_ctx:
                         system_prompt += (
@@ -1658,7 +1663,7 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
             conn = get_user_db()
             cursor = conn.cursor()
             cursor.execute(
-                'SELECT user_message, assistant_reply FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
+                'SELECT user_message, assistant_reply, created_at FROM chat_history WHERE session_id = ? ORDER BY created_at DESC LIMIT 10',
                 (request.session_id,)
             )
             rows = cursor.fetchall()

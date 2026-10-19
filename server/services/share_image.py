@@ -290,7 +290,32 @@ def _clean_text(text: str, max_lines: int = 200) -> list:
     text = re.sub(r"<[^>]*>", "", text)
     # HTML 实体 → 可见字符
     text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "'").replace("&#39;", "'").replace("&nbsp;", " ")
-    text = re.sub(r"[#*`]", "", text).strip()
+    # 2026-10-20 中华反馈「辨证分享图全混乱没分段」: LLM 实际输出大量 markdown
+    # (## 标题 / **加粗** / 表格 | | / --- 分隔线), 旧代码只删 [#*`] 字符, 表格竖线/|---|
+    # 残留在图里, --- 分隔线也画进去 → 满屏碎线。统一归一:
+    # ① markdown 表格 | a | b | → 顿号连接一行(保留文字不画线); 表格分隔行全删;
+    # ② 独立 ---/***/=== 分隔线 → 空行(段落留白, 不画线);
+    # ③ 行首 # 标题符删掉(标题文字保留, 交给 _is_para_start 识别段起点);
+    # ④ **加粗** 删星号保留文字; 行首 -/* 列表符删掉。
+    lines_in = text.split("\n")
+    lines_norm = []
+    for _li in lines_in:
+        _si = _li.strip()
+        if re.fullmatch(r"[|\-:\s]{2,}", _si) or re.fullmatch(r"[-*]{3,}", _si):
+            lines_norm.append("")          # 表格分隔行 / --- 分隔线 → 留空(段间空隙)
+            continue
+        if "|" in _si:
+            cells = [c.strip() for c in _si.strip("|").split("|")]
+            cells = [c for c in cells if c and not re.fullmatch(r"[\-:\s]+", c)]
+            lines_norm.append(" · ".join(cells) if cells else "")
+            continue
+        lines_norm.append(_li)
+    text = "\n".join(lines_norm)
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)   # **加粗** → 保留文字
+    text = re.sub(r"\*", "", text)                        # 残留未配对的 * 全删(防 LLM 写错)
+    text = re.sub(r"^[#>\s]+", "", text, flags=re.M)      # 行首标题符
+    text = re.sub(r"^\s*[-*]\s+", "", text, flags=re.M)  # 行首列表符
+    text = text.strip()
     out = []
     for raw in text.split("\n"):
         l = raw.strip()
@@ -397,7 +422,9 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         s = l.strip()
         if s.startswith('\u3010') or s.startswith('【'):
             return True
-        for kw in ('食疗', '配方', '做法', '养生参考', 'AI提示', '忌口', '忌', '注意事项'):
+        for kw in ('食疗', '配方', '做法', '养生参考', 'AI提示', '忌口', '忌', '注意事项',
+                    '方案一', '方案二', '方案三', '望诊', '辨证', '主证', '兼证',
+                    '体质倾向', '叮嘱', '食疗方案', '食疗方', '日常注意', '节气'):
             if s.startswith(kw):
                 return True
         return False
