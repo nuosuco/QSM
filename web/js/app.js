@@ -853,7 +853,9 @@ function openMyFavorites() {
                                     if (!found && String(p.item_id) === String(f.item_id)) found = p;
                                 });
                                 if (found) {
-                                    fakeProduct.images = found.images || [];
+                                    // 2026-10-19 中华反馈"详情缺第一张": 首图 f.image 永远保留,
+                                    // 再拼回查到的全部图, showProductDetail 首图豁免去重统一处理
+                                    fakeProduct.images = (f.image ? [f.image] : []).concat(found.images || []);
                                     if (!fakeProduct.url && found.url) fakeProduct.url = found.url;
                                     if (!fakeProduct.app_url && found.app_url) fakeProduct.app_url = found.app_url;
                                 }
@@ -964,26 +966,27 @@ function loadFavoritesCard() {
 }
 
 // ---- 辨证内容区(独立分页) ----
-function fetchFavoritesContent(append) {
+function fetchFavoritesContent(append, keepPage) {
     var userId = getUserId();
     var list = document.getElementById('fav-content-list');
     var group = document.getElementById('fav-group-content');
-    var moreBtn = document.getElementById('fav-more-content');
     if (!list || !group) return;
-    if (!append) {
+    if (!append && !keepPage) {
         _favContentPage = 1;
         list.innerHTML = '<p class="empty-hint">加载中…</p>';
-        if (moreBtn) moreBtn.style.display = 'none';
+        var pgC0 = document.getElementById('fav-content-pager'); if (pgC0) pgC0.style.display = 'none';
+    } else if (append || keepPage) {
+        list.innerHTML = '<p class="empty-hint">加载中…</p>';
+        var pgC1 = document.getElementById('fav-content-pager'); if (pgC1) pgC1.style.display = 'none';
     }
-    fetch(API_BASE + '/api/favorites/content?user_id=' + encodeURIComponent(userId) + '&page=' + _favContentPage + '&page_size=10')
+    fetch(API_BASE + '/api/favorites/content?user_id=' + encodeURIComponent(userId) + '&page=' + _favContentPage + '&page_size=5')
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var items = data.items || [];
             _favContentTotal = data.total || 0;
-            var hasMore = _favContentPage < (data.total_pages || 1);
             if (!append && !items.length && _favContentPage === 1) {
                 group.style.display = 'none';
-                if (moreBtn) moreBtn.style.display = 'none';
+                var pgC = document.getElementById('fav-content-pager'); if (pgC) pgC.style.display = 'none';
                 _favContentTotal = 0;
                 return;
             }
@@ -1004,19 +1007,18 @@ function fetchFavoritesContent(append) {
                             '<button class="fav-card-btn" data-act="share">🖼️ 分享图</button>' +
                             '<button class="fav-card-btn fav-card-remove" data-act="rm-c" data-id="' + favEsc(it.id) + '">删除</button>' +
                         '</div>' +
-                        '<div class="fav-card-detail" style="display:none;">' + favEsc(it.content || '') + '</div>' +
+                        '<div class="fav-card-detail fav-card-detail-md" style="display:none;">' + mdToHtml(String(it.content || '')) + '</div>' +
                     '</div>';
             });
-            if (append) {
-                var tmp = document.createElement('div');
-                tmp.innerHTML = html;
-                var first = list.firstElementChild;
-                if (first && first.classList.contains('empty-hint')) first.remove();
-                while (tmp.firstElementChild) list.appendChild(tmp.firstElementChild);
-            } else {
-                list.innerHTML = html;
-            }
-            if (moreBtn) moreBtn.style.display = hasMore ? '' : 'none';
+            // 2026-10-19 中华要求「学体质记录那种翻页器, 辨证与商品各自独立」:
+            // 上一页 / 第X页共Y页 / 下一页, 5 条/页, 整页替换(不追加)
+            list.innerHTML = html;
+            var totalPagesC = data.total_pages || 1;
+            if (_favContentPage > totalPagesC) _favContentPage = Math.max(1, totalPagesC);
+            renderFavPager('fav-content-pager', _favContentPage, totalPagesC, function(d) {
+                _favContentPage += d;
+                fetchFavoritesContent(false, true);
+            });
             bindFavContentEvents(list);
         })
         .catch(function(e) {
@@ -1026,19 +1028,21 @@ function fetchFavoritesContent(append) {
 }
 
 // ---- 商品区(独立分页) ----
-function fetchFavoritesProduct(append) {
+function fetchFavoritesProduct(append, keepPage) {
     var userId = getUserId();
     var list = document.getElementById('fav-product-list');
     var group = document.getElementById('fav-group-product');
-    var moreBtn = document.getElementById('fav-more-product');
     if (!list || !group) return;
-    if (!append) {
+    if (!append && !keepPage) {
         _favProductPage = 1;
         _favProductItems = [];
         list.innerHTML = '<p class="empty-hint">加载中…</p>';
-        if (moreBtn) moreBtn.style.display = 'none';
+        var pgP0 = document.getElementById('fav-product-pager'); if (pgP0) pgP0.style.display = 'none';
+    } else {
+        list.innerHTML = '<p class="empty-hint">加载中…</p>';
+        var pgP1 = document.getElementById('fav-product-pager'); if (pgP1) pgP1.style.display = 'none';
     }
-    fetch(API_BASE + '/api/favorites?user_id=' + encodeURIComponent(userId) + '&page=' + _favProductPage + '&page_size=10')
+    fetch(API_BASE + '/api/favorites?user_id=' + encodeURIComponent(userId) + '&page=' + _favProductPage + '&page_size=5')
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var items = data.favorites || data.items || [];
@@ -1048,7 +1052,7 @@ function fetchFavoritesProduct(append) {
             var hasMore = _favProductPage < totalPages;
             if (!append && !items.length && _favProductPage === 1) {
                 group.style.display = 'none';
-                if (moreBtn) moreBtn.style.display = 'none';
+                var pgP = document.getElementById('fav-product-pager'); if (pgP) pgP.style.display = 'none';
                 _favProductTotal = 0;
                 return;
             }
@@ -1088,18 +1092,14 @@ function fetchFavoritesProduct(append) {
                         '</div>' +
                     '</div>';
             });
-            if (append) {
-                var tmp = document.createElement('div');
-                tmp.innerHTML = html;
-                var first = list.firstElementChild;
-                if (first && first.classList.contains('empty-hint')) first.remove();
-                while (tmp.firstElementChild) list.appendChild(tmp.firstElementChild);
-                _favProductItems = _favProductItems.concat(items);
-            } else {
-                list.innerHTML = html;
-                _favProductItems = items;
-            }
-            if (moreBtn) moreBtn.style.display = hasMore ? '' : 'none';
+            // 2026-10-19 中华要求「学体质记录那种翻页器, 辨证与商品各自独立」: 整页替换
+            list.innerHTML = html;
+            _favProductItems = items;
+            if (_favProductPage > totalPages) _favProductPage = Math.max(1, totalPages);
+            renderFavPager('fav-product-pager', _favProductPage, totalPages, function(d) {
+                _favProductPage += d;
+                fetchFavoritesProduct(false, true);
+            });
             bindFavProductEvents(list);
         })
         .catch(function(e) {
@@ -1124,7 +1124,11 @@ function bindFavContentEvents(list) {
         b.onclick = function() {
             var card = b.closest('.fav-card-content');
             var detail = card.querySelector('.fav-card-detail');
-            generateShareImage((detail && detail.textContent) || (b.closest('.fav-card').querySelector('.fav-card-title').textContent || ''));
+            // 2026-10-19 中华反馈「分享图内容与图片都没有」: detail 现在是 mdToHtml 渲染的
+            // (h1/h2/li/table/strong), detail.textContent 会把标签文字连成一片、丢掉段落/表格结构。
+            // 改传 detail.innerHTML(服务端 _clean_text 会剥 markdown 符号+压缩空白+限量, 能消化 HTML 残留标签)
+            var _raw = detail ? (detail.innerHTML || detail.textContent || '') : (b.closest('.fav-card').querySelector('.fav-card-title').textContent || '');
+            generateShareImage(_raw);
         };
     });
     list.querySelectorAll('[data-act="rm-c"]').forEach(function(b) {
@@ -1149,14 +1153,18 @@ function bindFavProductEvents(list) {
             var item = _favProductItems.filter(function(x){ return String(x.item_id || x.id) === b.dataset.id; })[0];
             if (!item) return;
             var iid = item.item_id || item.id;
-            // 2026-10-19 多图: 收藏行自带 images(收藏时存进去的)优先, 没有再回查搜索接口补全
+            // 2026-10-19 小蕊修(中华反馈"收藏商品详情没图"): 老收藏 images 列为空,
+            // 点「查看」回查搜索接口也匹配不到(商品下架/关键词漂移) → 弹窗图空白。
+            // 修: fakeProduct.images 至少包含首图 item.image(收藏时存的单张),
+            // 保证弹窗轮播永远有 ≥1 张图; 收藏行自带多图则优先全量。
             var fakeProduct = {
                 item_id: iid, title: item.title, price: item.price,
                 image: item.image, url: item.url,
                 app_url: String(item.url || '').replace('https://', 'taobao://', 1),
                 platform: item.platform || 'taobao', shop_name: item.shop_name,
-                images: (item._images || []).slice()
+                images: (item._images && item._images.length ? item._images : []).concat(item.image || []).filter(Boolean)
             };
+            // 老收藏(无自带多图)时, 回查搜索接口补全; 首图已兜底所以即使回查失败弹窗也有图
             var _open = function() { showProductDetail(fakeProduct); };
             if (fakeProduct.images.length > 1) {
                 // 收藏行已有多图, 直接开弹窗(快, 不依赖搜索接口)
@@ -1167,7 +1175,14 @@ function bindFavProductEvents(list) {
                     .then(function(data) {
                         var found = null;
                         (data.items || []).forEach(function(p) { if (!found && String(p.item_id) === String(iid)) found = p; });
-                        if (found) { fakeProduct.images = found.images || []; if (found.app_url) fakeProduct.app_url = found.app_url; }
+                        if (found) {
+                            // 2026-10-19 中华反馈"详情缺第一张": 保留首图 item.image,
+                            // 再拼回查到的全部图, 交给 showProductDetail 的"首图豁免去重"统一处理
+                            var _base = item._images && item._images.length ? item._images.slice() : (item.image ? [item.image] : []);
+                            var _all = _base.concat(found.images || []);
+                            fakeProduct.images = _all.length ? _all : (item.image ? [item.image] : []);
+                            if (found.app_url) fakeProduct.app_url = found.app_url;
+                        }
                         _open();
                     })
                     .catch(_open);
@@ -1192,12 +1207,40 @@ function bindFavProductEvents(list) {
 }
 
 // 各区「加载更多」独立翻页
+// 2026-10-19 中华要求「5 条/页 + 下一页(替换, 不是加载更多追加)」: 点「下一页」翻到下一页, 替换当前列表
+
+// 2026-10-19 中华要求: 收藏分页学「体质记录」那种翻页器(上一页/第X页共Y页/下一页), 辨证与商品各自独立
+function renderFavPager(pagerId, page, totalPages, onNav) {
+    var pager = document.getElementById(pagerId);
+    if (!pager) return;
+    totalPages = Math.max(1, totalPages | 0);
+    if (page > totalPages) page = totalPages;
+    if (totalPages <= 1) {
+        // 只有一页, 隐藏整个翻页器(不显示按钮)
+        pager.style.display = 'none';
+        pager.innerHTML = '';
+        return;
+    }
+    var html = '';
+    html += '<button class="fav-pager-btn" ' + (page <= 1 ? 'disabled' : '') + ' data-d="-1">上一页</button>';
+    html += '<span class="fav-pager-info">第 ' + page + ' / ' + totalPages + ' 页</span>';
+    html += '<button class="fav-pager-btn" ' + (page >= totalPages ? 'disabled' : '') + ' data-d="1">下一页</button>';
+    pager.style.display = '';
+    pager.innerHTML = html;
+    Array.prototype.forEach.call(pager.querySelectorAll('.fav-pager-btn'), function(b) {
+        b.onclick = function() {
+            if (b.disabled) return;
+            onNav(parseInt(b.dataset.d, 10));
+        };
+    });
+}
+
 (function hookFavMore() {
     document.addEventListener('DOMContentLoaded', function() {
         var mc = document.getElementById('fav-more-content');
         var mp = document.getElementById('fav-more-product');
-        if (mc) mc.onclick = function() { _favContentPage += 1; fetchFavoritesContent(true); };
-        if (mp) mp.onclick = function() { _favProductPage += 1; fetchFavoritesProduct(true); };
+        if (mc) mc.onclick = function() { _favContentPage += 1; fetchFavoritesContent(false); };
+        if (mp) mp.onclick = function() { _favProductPage += 1; fetchFavoritesProduct(false); };
     });
 })();
 
@@ -1315,10 +1358,12 @@ function generateProductShareImage(product) {
 }
 
 function showShareLoading() {
-    var old = document.getElementById('share-preview-mask');
+    // 2026-10-19 小蕊修: 原来 loading 和 preview 抢同一个 share-preview-mask,
+    // 导致"正在生成"遮罩和弹窗互相覆盖。现在 loading 独立 id/class。
+    var old = document.getElementById('share-loading-mask');
     if (old) old.remove();
     var mask = document.createElement('div');
-    mask.id = 'share-preview-mask';
+    mask.id = 'share-loading-mask';
     mask.className = 'share-preview-mask';
     // 2026-10-17 修: 原来只一句「正在生成分享图…」, 用户不知道要等多久以为卡死。
     // 改成: 标题 + 时长说明 + 动画圆点, 让用户知道在干活、正常要多久。
@@ -1343,7 +1388,10 @@ function showShareLoading() {
 }
 
 function removeShareLoading() {
-    var m = document.getElementById('share-preview-mask');
+    // 2026-10-19 小蕊修: 原来这里删的是 share-preview-mask, 和弹窗共用一个 id,
+    // 结果"正在生成"遮罩删掉的瞬间, 已渲染的分享图弹窗也被一起删了 → 中华看到
+    // "等了一会儿什么都没有"。现在只删独立的 loading 遮罩。
+    var m = document.getElementById('share-loading-mask');
     if (m) m.remove();
 }
 
@@ -2125,7 +2173,11 @@ function showProductDetail(product) {
     var _deduped = [];
     for (var _ai = 0; _ai < allImgs.length; _ai++) {
         var _u = allImgs[_ai], _f = _fp(_u);
-        if (_seenImgs[_u] || _seenFp[_f]) continue;
+        // 2026-10-19 小蕊修(中华反馈"详情弹窗第一张没放进去, 只有4张"):
+        // 首图(_ai===0, 即 product.image)永远保留, 不参与指纹去重——
+        // 淘宝首图常和 images[0] 是同图不同尺寸后缀(_600x600 vs _800x800),
+        // 原去重把首图吞了导致详情少一张。只去重"非首图之间"的真重复。
+        if (_ai > 0 && (_seenImgs[_u] || _seenFp[_f])) continue;
         _seenImgs[_u] = 1; _seenFp[_f] = 1;
         _deduped.push(_u);
     }
@@ -2162,7 +2214,7 @@ function showProductDetail(product) {
             <div class="detail-detail-section">
                 <div class="detail-detail-title">— 商品详情 —</div>
                 <div class="detail-detail-gallery">
-                    ${allImgs.slice(1).map(function(img, i) {
+                    ${allImgs.map(function(img, i) {
                         return '<div class="detail-detail-img"><img src="' + escapeHtml(img) + '" onclick="window.open(\'' + escapeHtml(img) + '\',\'_blank\')" style="cursor:pointer" onerror="this.style.display=\'none\'"></div>';
                     }).join('')}
                 </div>

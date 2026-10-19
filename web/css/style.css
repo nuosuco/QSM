@@ -2555,6 +2555,15 @@ body {
     line-height: 1.6; word-break: break-word;
     max-height: 300px; overflow-y: auto;
 }
+/* 2026-10-19 中华反馈: 收藏的辨证内容展开成一团, 改用 mdToHtml 渲染后需段落/小标题/表格样式 */
+.fav-card-detail-md h1, .fav-card-detail-md h2, .fav-card-detail-md h3 { font-size: 14px; color: #3a7d5c; margin: 10px 0 4px; font-weight: 700; }
+.fav-card-detail-md p { margin: 4px 0; }
+.fav-card-detail-md ul, .fav-card-detail-md ol { margin: 4px 0 4px 18px; padding: 0; }
+.fav-card-detail-md li { margin: 2px 0; }
+.fav-card-detail-md hr { border: none; border-top: 1px dashed #d7e3dc; margin: 8px 0; }
+.fav-card-detail-md table { border-collapse: collapse; margin: 6px 0; width: 100%; }
+.fav-card-detail-md th, .fav-card-detail-md td { border: 1px solid #e0e6e3; padding: 3px 6px; font-size: 12px; }
+.fav-card-detail-md th { background: #f0f7f2; }
 
 /* 卡片操作按钮 */
 .fav-card-actions {
@@ -2581,6 +2590,12 @@ body {
     border-radius: 8px; cursor: pointer; text-align: center;
 }
 .fav-more-btn:active { opacity: 0.8; }
+
+/* 2026-10-19 中华要求: 收藏分页学「体质记录」翻页器(上一页/第X/Y页/下一页) */
+.fav-pager { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 0; }
+.fav-pager-btn { background: #07c160; color: #fff; border: none; border-radius: 16px; padding: 6px 18px; font-size: 13px; cursor: pointer; }
+.fav-pager-btn:disabled { opacity: 0.35; cursor: default; }
+.fav-pager-info { font-size: 12px; color: #666; }
 
 /* 收藏数量角标 */
 #my-favorites-section .sync-hint { font-size: 12px; color: var(--text-secondary, #7f8c8d); font-weight: 400; }

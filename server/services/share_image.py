@@ -224,6 +224,9 @@ def _footer_dual(img: Image.Image, H: int, left_url: str, left_label: str,
 
 
 def _clean_text(text: str, max_lines: int = 30) -> list:
+    # 忌口匹配: 行内「忌...」到标点/行尾(模块内共用, 2026-10-19 修 UnboundLocalError)
+    TABB_RX = re.compile(r"忌[^,，、;；。.]*(?:[。.]|$)")
+
     """去掉 markdown 符号, 压缩空白行, 限量。
     2026-10-19 小蕊修(中华反馈食疗配方与做法没分成两段/末尾没排版分段):
     (a) 一行内多个【X】小标题 → 从第 2 个【起独立成行;
@@ -253,7 +256,6 @@ def _clean_text(text: str, max_lines: int = 30) -> list:
             tag = tag_m.group(1)
             # (b) 单个【食疗...做法】合并小标题: 拆 食疗段 + 做法段 + 忌口段
             # 忌口匹配: 行尾「忌」到行尾, 只拦在标点后(避免误伤「忌」单字夹中间)
-            TABB_RX = re.compile(r"忌[^,，、;；。.]*(?:[。.]|$)")
             if "食疗" in tag:
                 t_shi = "【" + re.split(r"与|及|和|、", tag)[0] + "】"
                 mtab_all = TABB_RX.search(l)
@@ -274,8 +276,8 @@ def _clean_text(text: str, max_lines: int = 30) -> list:
                 continue
             out.append(l)
             continue
-        # (c) 无【】文本, 食疗...做法 拆行
-        m_food = re.search(r"食疗", l)
+        # (c) 无【】文本, 食疗/配方/养生参考...做法 拆行(2026-10-19 中华反馈"配方：... 做法：..."同行要拆成两段)
+        m_food = re.search(r"食疗|配方|养生参考", l)
         m_zuo = re.search(r"做法", l)
         if m_food and m_zuo and m_food.start() < m_zuo.start():
             head = l[:m_zuo.start()].rstrip().rstrip("。.；; ")
@@ -302,6 +304,15 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     开头小麦帽子形象图 + 标题; 文案正文; 底部 som.top 服务号二维码,
     说明文字写在码【上方】不再压码。"""
     lines = _clean_text(text)
+    # 2026-10-19 小蕊修(中华反馈"末尾提示语不要包括"): 剔除末尾的 AI 声明段
+    # 匹配「AI提示」「AI 提示」「以上为…不构成医疗诊断」「仅供参考」等尾部免责行
+    _TAIL_RX = re.compile(r"^(?:AI\s*提示|AI\s*说明|免责声明)?[：:]?\s*(?:以上|以上内容).{0,40}(?:仅供参考|不构成医疗|医疗诊断)|^AI\s*提示")
+    _new_lines = []
+    for _l in lines:
+        if _TAIL_RX.match(_l.strip()):
+            continue
+        _new_lines.append(_l)
+    lines = _new_lines
     if not lines:
         lines = ["养生参考"]
 
@@ -319,7 +330,7 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         s = l.strip()
         if s.startswith('\u3010') or s.startswith('【'):
             return True
-        for kw in ('食疗', '做法', '养生参考', 'AI提示', '忌口', '忌'):
+        for kw in ('食疗', '配方', '做法', '养生参考', 'AI提示', '忌口', '忌', '注意事项'):
             if s.startswith(kw):
                 return True
         return False
