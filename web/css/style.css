@@ -2629,7 +2629,9 @@ body {
 /* ===== 2026-10-16 小蕊加: 小麦回复 markdown 渲染 + 商品按方案分组 ===== */
 /* 助手气泡 markdown 正文: 让表格/小标题/列表在窄框里也美观 */
 .message.assistant .message-text.md-text {
-    white-space: normal;
+    /* 2026-10-20 中华: white-space:normal→pre-line, 保留段间换行/空行(分段视觉),
+       HTML 元素(strong/table/md-h3)照常渲染不受影响 */
+    white-space: pre-line;
     line-height: 1.75;
     word-break: break-word;
 }
