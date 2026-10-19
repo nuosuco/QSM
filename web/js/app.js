@@ -985,24 +985,33 @@ function loadFavoritesCard() {
         var _lsMeta = JSON.parse(localStorage.getItem('som_fav_load') || 'null');
         _lsFresh = !!(_lsMeta && _lsMeta.u === userId && _now - _lsMeta.t < 600000); // 10min 持久缓存(整页重载也拦得住)
     } catch (e) {}
-    if (_lsFresh || (_favLastLoadUser === userId && (_now - _favLastLoadT) < 600000 && _favLastLoaded)) {
-        // 2026-10-19 中华反馈「每次回到我都加载一次、还挂着空提示」: 整页重载后 DOM 全新,
-        // 缓存命中不发请求, 但收藏区节点此时是隐藏的(display:none)且无内容。
-        // 必须恢复显示 + 用缓存数据就地重渲染, 否则收藏区空白, 用户误以为没数据。
+    // 2026-10-19 中华反馈「每次回到我都加载一次、还挂着空提示」根治:
+    // 关键区分两种「回到我」:
+    //  A) 同一次页面会话内反复切 tab(不重载): 内存 _favCache 有数据, 直接秒开不发请求
+    //  B) 微信服务号菜单整页重载(?tab=profile 全新 URL): 内存 _favCache 已清零,
+    //     必须重新拉数据(接口 0.006s, 很快), 拉完就地渲染, 杜绝空白/误显空提示。
+    //  所以: 内存缓存命中(同会话切 tab)→ 秒开不请求; 否则(整页重载)→ 重新拉。
+    var _memFresh = (_favLastLoadUser === userId && (_now - _favLastLoadT) < 600000 && _favLastLoaded);
+    if (_memFresh) {
+        // 同一会话内反复进「我」页: 内存缓存秒开, 不发网络请求, 顺手清残留空提示
         section.style.display = '';
-        var _eh = document.getElementById('fav-empty-hint');
-        if (_eh) _eh.remove();
-        // 用内存/接口缓存就地重画(不发网络请求, 秒开)
-        var _c = _favCacheGet('c|' + userId + '|' + _favContentPage);
-        var _p = _favCacheGet('p|' + userId + '|' + _favProductPage);
-        if (_c) _favRenderContent(userId, _c, document.getElementById('fav-content-list'), document.getElementById('fav-group-content'));
-        if (_p) _favRenderProduct(_p, document.getElementById('fav-product-list'), document.getElementById('fav-group-product'));
-        _favContentDone = !!_c; _favProductDone = !!_p; _favMaybeShowEmpty();
+        var _eh0 = document.getElementById('fav-empty-hint');
+        if (_eh0 && document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length) _eh0.remove();
+        var _c0 = _favCacheGet('c|' + userId + '|' + _favContentPage);
+        var _p0 = _favCacheGet('p|' + userId + '|' + _favProductPage);
+        if (_c0) _favRenderContent(userId, _c0, document.getElementById('fav-content-list'), document.getElementById('fav-group-content'));
+        if (_p0) _favRenderProduct(_p0, document.getElementById('fav-product-list'), document.getElementById('fav-group-product'));
+        _favContentDone = true; _favProductDone = true; _favMaybeShowEmpty();
         return;
     }
+    // 整页重载后首次进「我」: 重新拉数据(快), 标记防并发重复请求
     _favLastLoadUser = userId; _favLastLoadT = _now;
     try { localStorage.setItem('som_fav_load', JSON.stringify({ u: userId, t: _now })); } catch (e) {}
     _favContentDone = false; _favProductDone = false;
+    // 防抖: 整页重载可能触发多次 loadFavoritesCard(nav-click + url-route + fav-tab-hook),
+    // 300ms 内重复调用直接忽略, 避免同一接口并发打 3 份
+    if (loadFavoritesCard._inflight && _now - loadFavoritesCard._inflightT < 300) return;
+    loadFavoritesCard._inflight = true; loadFavoritesCard._inflightT = _now;
     fetchFavoritesContent(false);
     fetchFavoritesProduct(false);
     setTimeout(refreshFavCount, 100);
