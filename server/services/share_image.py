@@ -110,47 +110,70 @@ def _wrap(text: str, font, draw: ImageDraw.ImageDraw, max_width: int) -> list:
 
 _LOGO_CACHE = None
 _LOGO_FAILED = False
+_LOGO_LOGGED = False
+
+def _resolve_logo_path():
+    """2026-10-19 小蕊修: 原 os.path.dirname(os.path.dirname(__file__)) 在部分
+    CWD/导入方式下解析到 services/assets/ 导致静默失败。多路兜底保证命中
+    server/assets/。"""
+    cands = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'wheat_logo_256.png'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'wheat_logo_256.png'),
+        os.path.join(os.getcwd(), 'server', 'assets', 'wheat_logo_256.png'),
+        os.path.join(os.getcwd(), 'assets', 'wheat_logo_256.png'),
+        '/root/SOM/server/assets/wheat_logo_256.png',
+    ]
+    for p in cands:
+        if os.path.exists(p):
+            return p
+    return None
 
 def _wheat_logo(size: int = 96):
     """小麦帽子小图(中华要求: 分享图开头加形象图)。
-    用 logo 自动裁白边后居中; 加载失败返回 None。
-    2026-10-17 修: 原 except 分支会把 _LOGO_CACHE 置 None, 每次分享图调用
-    都会重新 open 一次 logo, 且文件缺失时反复打异常日志。加 _LOGO_FAILED
-    标记, 只试一次, 失败则后续直接返回 None。"""
-    global _LOGO_CACHE, _LOGO_FAILED
+    2026-10-17 修: 加 _LOGO_FAILED 只试一次。
+    2026-10-19 小蕊修(中华反馈 logo 没显示): 原成功分支 _LOGO_CACHE = bg 那行
+    因缩进错误实际没执行到, 且 try 块整段成了死代码, 函数永远返回初始 None
+    → logo 没画进图。现在路径多路兜底 + 显式赋值返回 + 首次加载打日志。"""
+    global _LOGO_CACHE, _LOGO_FAILED, _LOGO_LOGGED
     if _LOGO_CACHE is not None:
         return _LOGO_CACHE
     if _LOGO_FAILED:
         return None
-        _LOGO_CACHE = None
-        try:
-            src = Image.open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'wheat_logo_256.png')).convert('RGB')
-            # 自动裁白边
-            px = src.load(); w, h = src.size
-            xs, ys = [], []
-            for y in range(0, h, 2):
-                for x in range(0, w, 2):
-                    r, g, b = px[x, y]
-                    if not (r > 245 and g > 245 and b > 245):
-                        xs.append(x); ys.append(y)
-            if xs:
-                x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
-                core = src.crop((max(0, x0 - 4), max(0, y0 - 4), min(w, x1 + 4), min(h, y1 + 4)))
-            else:
-                core = src
-            # 白底圆角方(柔和)
-            side = int(size * 1.15)
-            bg = Image.new('RGBA', (side, side), (255, 255, 255, 0))
-            d = ImageDraw.Draw(bg)
-            d.rounded_rectangle([0, 0, side - 1, side - 1], radius=side // 8, fill=(255, 255, 255, 255),
-                                outline=_C_HEADER_SUB, width=2)
-            core = core.resize((size, size), Image.LANCZOS)
-            bg.paste(core, ((side - size) // 2, (side - size) // 2))
-            _LOGO_CACHE = bg
-        except Exception as e:
-            print('logo 加载失败(已忽略, 分享图不带帽子图):', e)
-            _LOGO_FAILED = True
-    return _LOGO_CACHE
+    try:
+        lp = _resolve_logo_path()
+        if not lp:
+            raise FileNotFoundError('wheat_logo_256.png 未找到(多路候选都缺失)')
+        if not _LOGO_LOGGED:
+            print('[share_image] logo 加载成功: ' + lp, flush=True)
+            _LOGO_LOGGED = True
+        src_img = Image.open(lp).convert('RGB')
+        # 自动裁白边
+        px = src_img.load(); w, h = src_img.size
+        xs, ys = [], []
+        for yy in range(0, h, 2):
+            for xx in range(0, w, 2):
+                r, g, b = px[xx, yy]
+                if not (r > 245 and g > 245 and b > 245):
+                    xs.append(xx); ys.append(yy)
+        if xs:
+            x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+            core = src_img.crop((max(0, x0 - 4), max(0, y0 - 4), min(w, x1 + 4), min(h, y1 + 4)))
+        else:
+            core = src_img
+        # 白底圆角方(柔和)
+        side = int(size * 1.15)
+        bg = Image.new('RGBA', (side, side), (255, 255, 255, 0))
+        d = ImageDraw.Draw(bg)
+        d.rounded_rectangle([0, 0, side - 1, side - 1], radius=side // 8, fill=(255, 255, 255, 255),
+                            outline=_C_HEADER_SUB, width=2)
+        core = core.resize((size, size), Image.LANCZOS)
+        bg.paste(core, ((side - size) // 2, (side - size) // 2))
+        _LOGO_CACHE = bg
+        return _LOGO_CACHE
+    except Exception as e:
+        print('[share_image] logo 加载失败(分享图将不带帽子图): ' + repr(e), flush=True)
+        _LOGO_FAILED = True
+        return None
 
 
 def _header(img: Image.Image, main: str, sub: str, with_logo: bool = True):
@@ -201,11 +224,78 @@ def _footer_dual(img: Image.Image, H: int, left_url: str, left_label: str,
 
 
 def _clean_text(text: str, max_lines: int = 30) -> list:
-    """去掉 markdown 符号, 压缩空白行, 限量"""
+    """去掉 markdown 符号, 压缩空白行, 限量。
+    2026-10-19 小蕊修(中华反馈食疗配方与做法没分成两段/末尾没排版分段):
+    (a) 一行内多个【X】小标题 → 从第 2 个【起独立成行;
+    (b) 单【小标题】里同时含「食疗」+「做法」(如【食疗配方与做法】)
+        → 拆成 食疗段/做法段/忌口段;
+    (c) 无【】文本, 同行出现「食疗」「做法」→ 在「做法」前拆行, 忌口独立。
+    注意: 逐行处理, 正则里不出现换行转义(避免写文件时 \n 丢失)。"""
     text = re.sub(r"[#*`>]", "", text or "").strip()
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-    return lines[:max_lines]
-
+    out = []
+    for raw in text.split("\n"):
+        l = raw.strip()
+        if not l:
+            continue
+        idxs = [m.start() for m in re.finditer(r"【[^】]{1,20}】", l)]
+        if len(idxs) > 1:
+            # (a) 行内多【X】: 第 1 段 = 行首到第 2 个【前; 之后每【起一段
+            segs = []
+            prev = 0
+            for i, ix in enumerate(idxs):
+                end = idxs[i + 1] if i + 1 < len(idxs) else len(l)
+                segs.append(l[prev:end].strip())
+                prev = end
+            out.extend(s for s in segs if s)
+            continue
+        if len(idxs) == 1:
+            tag_m = re.match(r"^【([^】]+)】", l)
+            tag = tag_m.group(1)
+            # (b) 单个【食疗...做法】合并小标题: 拆 食疗段 + 做法段 + 忌口段
+            # 忌口匹配: 行尾「忌」到行尾, 只拦在标点后(避免误伤「忌」单字夹中间)
+            TABB_RX = re.compile(r"忌[^,，、;；。.]*(?:[。.]|$)")
+            if "食疗" in tag:
+                t_shi = "【" + re.split(r"与|及|和|、", tag)[0] + "】"
+                mtab_all = TABB_RX.search(l)
+                taboo = mtab_all.group(0).rstrip("。.").strip() if mtab_all else ""
+                body = (l[:mtab_all.start()].rstrip().rstrip("。.；; ") if mtab_all else l).strip()
+                mz = re.search(r"做法", body)
+                if mz:
+                    shi_part = body[:mz.start()].rstrip().rstrip("。.；; ")
+                    zuo_part = body[mz.start():].lstrip()
+                else:
+                    shi_part, zuo_part = body, ""
+                if shi_part:
+                    out.append(t_shi + shi_part if not shi_part.startswith(t_shi) else shi_part)
+                if zuo_part:
+                    out.append("【做法】" + zuo_part if not zuo_part.startswith("【做法】") else zuo_part)
+                if taboo:
+                    out.append("【忌口】" + taboo if not taboo.startswith("【忌口】") else taboo)
+                continue
+            out.append(l)
+            continue
+        # (c) 无【】文本, 食疗...做法 拆行
+        m_food = re.search(r"食疗", l)
+        m_zuo = re.search(r"做法", l)
+        if m_food and m_zuo and m_food.start() < m_zuo.start():
+            head = l[:m_zuo.start()].rstrip().rstrip("。.；; ")
+            tail = l[m_zuo.start():].lstrip()
+            mtab = TABB_RX.search(tail)
+            if mtab:
+                body = tail[:mtab.start()].rstrip().rstrip("。.；; ")
+                taboo = mtab.group(0).rstrip("。.").strip()
+                if head:
+                    out.append(head)
+                if body:
+                    out.append(body if body.startswith("做法") else "做法：" + body)
+                if taboo:
+                    out.append(taboo if taboo.startswith("忌") else "忌口：" + taboo)
+            else:
+                out.extend(x for x in [head, tail] if x)
+            continue
+        out.append(l)
+    out = [l for l in out if l and l.strip()]
+    return out[:max_lines]
 
 def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     """辨证内容分享图 v3(中华要求 2026-10-16):
@@ -221,21 +311,51 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     f_body = _font(fs)
     headerH, footerH = 150, 270
 
+    # 2026-10-19 小蕊修(中华反馈食疗配方与做法没分段/末尾没排版):
+    # 原来所有行等距 40px 连着排, 食疗/做法/AI提示这些独立段视觉上挤成一片。
+    # 现在: (1) 段落间留 26px 额外空隙(以【X】小标题或食疗/做法/养生参考/AI提示开头的行
+    # 视为新段起点); (2) 【X】小标题用标题绿+加粗渲染, 正文用深绿灰, 层次分明。
+    def _is_para_start(l):
+        s = l.strip()
+        if s.startswith('\u3010') or s.startswith('【'):
+            return True
+        for kw in ('食疗', '做法', '养生参考', 'AI提示', '忌口', '忌'):
+            if s.startswith(kw):
+                return True
+        return False
+
     tmp = ImageDraw.Draw(Image.new("RGB", (W, 10)))
-    wrapped = []
+    wrapped = []          # 每元素 (line, is_para_start)
     for l in lines:
-        wrapped.extend(_wrap(l, f_body, tmp, W - pad * 2))
-    bodyH = len(wrapped) * lh + 40
+        first, rest = True, []
+        rest = _wrap(l, f_body, tmp, W - pad * 2)
+        if not rest:
+            continue
+        wrapped.append((rest[0], _is_para_start(rest[0])))
+        for r in rest[1:]:
+            wrapped.append((r, False))
+    PARA_GAP = 26
+    body_extra = sum(PARA_GAP for _, s in wrapped[1:] if s)
+    bodyH = len(wrapped) * lh + 40 + body_extra
     H = headerH + bodyH + footerH
 
     img = _new_canvas(H)
     _header(img, "小麦SOM · 养生辨证", "中医辨证 · 有机养生", with_logo=True)
 
     d = ImageDraw.Draw(img)
+    f_title = _font(fs + 2)
     y = headerH + 20
-    for l in wrapped:
-        d.text((pad, y), l, font=f_body, fill=_C_BODY)
+    prev_start = True  # 首行前不计空隙
+    for i, (l, s) in enumerate(wrapped):
+        if s and not prev_start:
+            y += PARA_GAP
+        if l.strip().startswith('【'):
+            # 小标题行整行用标题色; 有正文部分则正文随本行同色更清晰, 但【】内字放大
+            d.text((pad, y), l, font=f_title, fill=_C_HEADER_TITLE)
+        else:
+            d.text((pad, y), l, font=f_body, fill=_C_BODY)
         y += lh
+        prev_start = s
 
     # 底部单码居中, 说明文字在码上方
     d = ImageDraw.Draw(img)
