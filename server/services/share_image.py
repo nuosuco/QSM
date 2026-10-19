@@ -219,27 +219,42 @@ def _header(img: Image.Image, main: str, sub: str, with_logo: bool = True):
     return 150
 
 
+def _service_qr(size: int = 150) -> Image.Image:
+    """服务号二维码(中华发的 som_wechat_service_qr_pure.png 裁好的纯码区), 缩到 size, 白底黑码"""
+    p = os.path.join(os.path.dirname(__file__), "..", "assets", "som_wechat_service_qr_pure.png")
+    try:
+        im = Image.open(p).convert("RGB")
+        return im.resize((size, size), Image.LANCZOS)
+    except Exception:
+        return None
+
+
 def _footer_dual(img: Image.Image, H: int, left_url: str, left_label: str,
                  right_url: str, right_label: str, qr_size: int = 150):
     """共享尾 v3(中华要求 2026-10-16): 双码并排 — 左淘宝商品码 + 右服务号码,
-    说明文字写在码【上方】(不再压码), 底部一行 som.top 免责。返回画布底部余量。"""
+    说明文字写在码【上方】(不再压码), 底部一行 som.top 免责。返回画布底部余量。
+    2026-10-20 中华: 右码改用服务号二维码图(som_wechat_service_qr_pure.png, 不走网址生成),
+    右码上方两段文字: 上=right_label, 下=som.top。"""
     d = ImageDraw.Draw(img)
     gap = 70
     total_w = qr_size * 2 + gap
     x0 = (W - total_w) // 2
-    label_y = H - 235
-    # 左
+    label_y = H - 245
+    somtop_y = H - 215
+    # 左(淘宝商品码, 网址生成)
     d.text((x0 + qr_size // 2, label_y), left_label, font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
+    d.text((x0 + qr_size // 2, somtop_y), "som.top", font=_font(22), fill=_C_LIGHT, anchor="mm")
     ql = _qr_png(left_url, qr_size)
     if ql:
         img.paste(ql, (x0, H - 215))
         d = ImageDraw.Draw(img)
         d.rectangle([x0 - 4, H - 219, x0 + qr_size + 4, H - 211 + qr_size],
                     outline=_C_HEADER_TITLE, width=2)
-    # 右
+    # 右(服务号二维码图, 中华发的)
     xr = x0 + qr_size + gap
     d.text((xr + qr_size // 2, label_y), right_label, font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
-    qr = _qr_png(right_url, qr_size)
+    d.text((xr + qr_size // 2, somtop_y), "som.top", font=_font(22), fill=_C_LIGHT, anchor="mm")
+    qr = _service_qr(qr_size)
     if qr:
         img.paste(qr, (xr, H - 215))
         d = ImageDraw.Draw(img)
@@ -431,13 +446,13 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         y += lh
         prev_start = s
 
-    # 底部单码居中, 说明文字在码上方
+    # 底部单码居中, 说明文字在码上方 (2026-10-20 中华: 改服务号二维码 + 两段文字)
     d = ImageDraw.Draw(img)
     qr_size = 150
     qcx = W // 2
-    d.text((qcx, H - 235), "扫码进 SOM 松麦 · 你的养生助手",
-           font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
-    qr = _qr_png(site_url, qr_size)
+    d.text((qcx, H - 245), "松麦服务号 · 扫码关注", font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
+    d.text((qcx, H - 215), "som.top", font=_font(22), fill=_C_LIGHT, anchor="mm")
+    qr = _service_qr(qr_size)
     if qr:
         img.paste(qr, (qcx - qr_size // 2, H - 215))
         d = ImageDraw.Draw(img)
@@ -540,12 +555,19 @@ def render_product_share_image(title: str, price: str, shop: str,
                    "暂无图片" if not u else "图片加载失败",
                    font=_font(20), fill=_C_HEADER_SUB, anchor="mm")
 
-    # 末尾双码: 左淘宝商品码 + 右松麦服务号码(中华要求), 说明文字在码上方不压码
-    _footer_dual(img, H,
-                 left_url=(buy_url or "https://item.taobao.com/"),
-                 left_label="淘宝扫码购买",
-                 right_url=site_url,
-                 right_label="松麦服务号 · 更多好物")
+    # 末尾单码: 只留淘宝商品码(2026-10-20 中华方案A: 用户扫商品图总是扫错网站码,
+    # 商品图只管买东西, 松麦入口靠辨证图底部服务号码+som.top 文字引导)
+    d = ImageDraw.Draw(img)
+    qr_size = 150
+    qcx = W // 2
+    d.text((qcx, H - 245), "淘宝扫码 · 立即购买", font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
+    d.text((qcx, H - 215), "松麦 som.top · 更多有机好物", font=_font(22), fill=_C_LIGHT, anchor="mm")
+    qr = _qr_png(buy_url or "https://item.taobao.com/", qr_size)
+    if qr:
+        img.paste(qr, (qcx - qr_size // 2, H - 215))
+        d = ImageDraw.Draw(img)
+        d.rectangle([qcx - qr_size // 2 - 4, H - 219, qcx + qr_size // 2 + 4, H - 211 + qr_size],
+                    outline=_C_HEADER_TITLE, width=2)
 
     buf = io.BytesIO()
     # 2026-10-20 中华要求「加载快」: 商品图 5 张竖排 PNG ~1.9MB, 改 JPEG 75 (~300KB, 快 6 倍)
