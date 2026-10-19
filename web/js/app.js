@@ -1062,6 +1062,19 @@ function fetchFavoritesProduct(append) {
                     _favImg = _favImg.split('",')[0].trim().replace(/^[\u0022]+/, '');
                 }
                 if (_favImg.indexOf('http') !== 0) _favImg = '';
+                // 2026-10-19 多图: 解析收藏行 images 列(JSON 数组串或数组), 点「查看」全轮播
+                var _favImages = [];
+                try {
+                    var _rawImgs = it.images;
+                    if (typeof _rawImgs === 'string' && _rawImgs) {
+                        var _parsed = JSON.parse(_rawImgs);
+                        if (Array.isArray(_parsed)) _favImages = _parsed;
+                    } else if (Array.isArray(_rawImgs)) {
+                        _favImages = _rawImgs;
+                    }
+                } catch (e) { /* 脏串兜底: 不炸, 回退回查补全 */ }
+                _favImages = _favImages.filter(function(u){ return typeof u === 'string' && u.indexOf('http') === 0; });
+                if (_favImages.length) it._images = _favImages;
                 html +=
                     '<div class="fav-card fav-card-product">' +
                         '<img class="fav-card-img" src="' + favEsc(_favImg) + '" onerror="this.style.visibility=\'hidden\'" alt="">' +
@@ -1136,14 +1149,19 @@ function bindFavProductEvents(list) {
             var item = _favProductItems.filter(function(x){ return String(x.item_id || x.id) === b.dataset.id; })[0];
             if (!item) return;
             var iid = item.item_id || item.id;
+            // 2026-10-19 多图: 收藏行自带 images(收藏时存进去的)优先, 没有再回查搜索接口补全
             var fakeProduct = {
                 item_id: iid, title: item.title, price: item.price,
                 image: item.image, url: item.url,
                 app_url: String(item.url || '').replace('https://', 'taobao://', 1),
-                platform: item.platform || 'taobao', shop_name: item.shop_name, images: []
+                platform: item.platform || 'taobao', shop_name: item.shop_name,
+                images: (item._images || []).slice()
             };
             var _open = function() { showProductDetail(fakeProduct); };
-            if (iid && (item.title || '')) {
+            if (fakeProduct.images.length > 1) {
+                // 收藏行已有多图, 直接开弹窗(快, 不依赖搜索接口)
+                _open();
+            } else if (iid && (item.title || '')) {
                 fetch(API_BASE + '/api/products/search?keyword=' + encodeURIComponent(item.title) + '&platform=' + encodeURIComponent(item.platform || 'taobao') + '&limit=50')
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
@@ -2137,7 +2155,7 @@ function showProductDetail(product) {
                     <button class="detail-qr-btn" onclick="(function(){var u='${escapeJsAttr(product.url || '#')}'; if(!u||u==='#'){u='https://item.taobao.com/item.htm?id=${escapeJsAttr(itemId)}';} showQRCode(u, '${escapeJsAttr(product.title || '')}');})()" title="手机扫码购买">📱 用手机淘宝APP扫描购买</button>
                 </div>
                 <div class="detail-actions detail-actions-sub">
-                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.title || '')}', '${escapeJsAttr(product.price || '')}', '${escapeJsAttr(imgSrc)}', '${escapeJsAttr(product.url || '')}', '${escapeJsAttr(product.platform || 'taobao')}', '${escapeJsAttr(product.shop_name || '')}')">♡ 收藏</button>
+                    <button class="detail-fav" id="detail-fav-btn" data-item-id="${escapeHtml(itemId)}" onclick="toggleFavorite(this, '${escapeJsAttr(itemId)}', '${escapeJsAttr(product.title || '')}', '${escapeJsAttr(product.price || '')}', '${escapeJsAttr(imgSrc)}', '${escapeJsAttr(product.url || '')}', '${escapeJsAttr(product.platform || 'taobao')}', '${escapeJsAttr(product.shop_name || '')}', ${JSON.stringify(allImgs)})">♡ 收藏</button>
                     <button class="detail-fav detail-share" id="detail-share-btn" title="生成商品分享图（全部商品图+淘宝二维码）">📤 分享图</button>
                 </div>
             </div>
@@ -2267,10 +2285,11 @@ function closeProductDetail() {
 
 // ========== 收藏功能 ==========
 
-globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, platform, shopName) {
+globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, platform, shopName, images) {
     if (!itemId) return;
     var userId = getUserId();
     var isFav = btn.classList.contains('favorited');
+    var _imgList = Array.isArray(images) ? images.filter(function(u){ return u && u.indexOf('http') === 0; }) : [];
     
     if (isFav) {
         fetch(API_BASE + '/api/favorites/remove', {
@@ -2293,7 +2312,8 @@ globalThis.toggleFavorite = function(btn, itemId, title, price, image, url, plat
                 image: image || '',
                 url: url || '',
                 platform: platform || 'taobao',
-                shop_name: shopName || ''
+                shop_name: shopName || '',
+                images: _imgList
             })
         }).then(function() {
             btn.classList.add('favorited');

@@ -99,6 +99,7 @@ class FavoriteAddRequest(BaseModel):
     url: str = ""
     platform: str = ""
     shop_name: str = ""
+    images: object = None  # 2026-10-19 小蕊加: 多图, 前端传 JSON 数组(list), 也可传 JSON 字符串串, 统一落库成 JSON 串
 
 class FavoriteRemoveRequest(BaseModel):
     user_id: str
@@ -260,6 +261,7 @@ def init_user_db():
             url TEXT,
             platform TEXT,
             shop_name TEXT,
+            images TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, item_id)
         )
@@ -286,6 +288,14 @@ def init_user_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_favc_user ON fav_content(user_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_favc_fp ON fav_content(user_id, content_fp)')
 
+    # 2026-10-19 小蕊加: 旧库 product_favorites 没有 images 列时自动 ALTER
+    try:
+        _cols = [r[1] for r in cursor.execute('PRAGMA table_info(product_favorites)').fetchall()]
+        if 'images' not in _cols:
+            cursor.execute('ALTER TABLE product_favorites ADD COLUMN images TEXT')
+            print('[init] product_favorites 已加 images 列')
+    except Exception as _e:
+        print('[init] product_favorites images 列处理:', _e)
     conn.commit()
     conn.close()
 
@@ -803,30 +813,69 @@ async def clear_search_history(request: ClearHistoryRequest):
 # ========== 商品收藏接口 ==========
 
 @app.get("/api/favorites")
-async def get_favorites(user_id: str, limit: int = 50, page: int = 1, page_size: int = 10):
+async def get_favorites(request: Request, user_id: str, limit: int = 50, page: int = 1, page_size: int = 10):
     conn = get_user_db()
     cursor = conn.cursor()
     # 2026-10-15 我的收藏改双分类区独立分页: 优先 page/page_size(偏移分页), 兼容旧 limit
-    if page > 1 or page_size != 10:
-        total = cursor.execute('SELECT COUNT(*) FROM product_favorites WHERE user_id=?', (user_id,)).fetchone()[0]
-        rows = cursor.execute(
-            'SELECT * FROM product_favorites WHERE user_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?',
-            (user_id, page_size, (page - 1) * page_size)).fetchall()
+    # 2026-10-19 根治: 旧条件 `page>1 or page_size!=10` 在默认参数下恒为 False,
+    # 前端正常传 page=1&page_size=10 也走旧 limit 分支 → 响应缺 total_pages,
+    # 前端 hasMore 恒 false, 「加载更多」按钮永不显示, 分页形同虚设。
+    # 现改为: 调用方显式带了 page/page_size 查询参数才走旧 limit 兼容分支,
+    # 否则一律分页分支(返回 total_pages)。显式判断用 request.query_params,
+    # 因为 FastAPI 默认值让 page/page_size 变量本身无法区分"显式传了"还是"默认"。
+    _qp = dict(request.query_params)
+    if "page" not in _qp and "page_size" not in _qp:
+        # 旧调用方(只带 limit, 不分页): 保持原行为, 不破坏任何现存调用
+        cursor.execute('SELECT * FROM product_favorites WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+                       (user_id, limit))
+        rows = cursor.fetchall()
         conn.close()
-        favs = []
+        out = []
         for r in rows:
-            d = dict(r); d['image'] = _clean_fav_image(d.get('image')); favs.append(d)
-        return {"total": total, "page": page, "page_size": page_size,
-                "total_pages": (total + page_size - 1) // page_size,
-                "favorites": favs}
-    cursor.execute('SELECT * FROM product_favorites WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
-                   (user_id, limit))
-    rows = cursor.fetchall()
+            d = dict(r); d['image'] = _clean_fav_image(d.get('image')); out.append(d)
+        return {"total": len(out), "favorites": out}
+    total = cursor.execute('SELECT COUNT(*) FROM product_favorites WHERE user_id=?', (user_id,)).fetchone()[0]
+    rows = cursor.execute(
+        'SELECT * FROM product_favorites WHERE user_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+        (user_id, page_size, (page - 1) * page_size)).fetchall()
     conn.close()
-    out = []
+    favs = []
     for r in rows:
-        d = dict(r); d['image'] = _clean_fav_image(d.get('image')); out.append(d)
-    return {"total": len(rows), "favorites": out}
+        d = dict(r); d['image'] = _clean_fav_image(d.get('image')); favs.append(d)
+    return {"total": total, "page": page, "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size,
+            "favorites": favs}
+
+def _clean_images(images):
+    """2026-10-19 小蕊加: 把前端传来的 images 统一成 JSON 数组串存单列。
+    兼容: list[URL] / JSON 数组字符串 / 单个 URL 串 / 空。
+    非 http URL 全部过滤掉, 避免脏数据进库。"""
+    if images is None:
+        return ""
+    if isinstance(images, list):
+        lst = images
+    elif isinstance(images, str):
+        s = images.strip()
+        if not s:
+            return ""
+        try:
+            parsed = json.loads(s)
+            if isinstance(parsed, list):
+                lst = parsed
+            else:
+                lst = [s]
+        except Exception:
+            lst = [s]
+    else:
+        return ""
+    clean = [u for u in lst if isinstance(u, str) and u.strip().startswith("http")]
+    # 去重保序
+    seen = set(); out = []
+    for u in clean:
+        u = u.strip()
+        if u in seen: continue
+        seen.add(u); out.append(u)
+    return json.dumps(out, ensure_ascii=False) if out else ""
 
 def _clean_fav_image(image):
     """2026-10-16 小蕊修: 收藏 image 字段历史上被写脏过——
@@ -869,10 +918,11 @@ async def add_favorite(request: FavoriteAddRequest):
     try:
         cursor.execute('''
             INSERT OR IGNORE INTO product_favorites
-            (user_id, item_id, title, price, image, url, platform, shop_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (user_id, item_id, title, price, image, url, platform, shop_name, images)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (request.user_id, request.item_id, request.title, request.price,
-              _clean_fav_image(request.image), request.url, request.platform, request.shop_name))
+              _clean_fav_image(request.image), request.url, request.platform, request.shop_name,
+              _clean_images(request.images)))
         conn.commit()
         added = cursor.rowcount > 0
     except Exception as e:
