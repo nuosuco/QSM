@@ -780,13 +780,30 @@ async def checkin_status(user_id: str):
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM checkin_records WHERE user_id = ?', (user_id,))
     row = cursor.fetchone()
+    # 2026-10-20 中华反馈「连续签到8天变1天」: streak 改从历史表 checkin_daily 往回连续数
+    # (每天签到达一条日期, 永不因 last_date 单字段误判丢连续)。close 前查完。
+    _seen = set()
+    _streak = 0
+    if row:
+        _seen = {r[0] for r in cursor.execute(
+            'SELECT check_date FROM checkin_daily WHERE user_id = ?', (user_id,)).fetchall()}
+        if row['last_date'] in _seen:
+            _streak = 1
+            _d = datetime.strptime(row['last_date'], '%Y-%m-%d')
+            while True:
+                _d -= timedelta(days=1)
+                if _d.strftime('%Y-%m-%d') not in _seen:
+                    break
+                _streak += 1
+                if _streak > 3650:
+                    break
     conn.close()
 
     if row:
         return {
             "checked_in_today": row['last_date'] == today,
             "total_points": row['total_points'],
-            "streak": row['streak'],
+            "streak": _streak,
             "today": today
         }
 
@@ -816,14 +833,32 @@ async def do_checkin(request: CheckinRequest):
     if row:
         last_date = row['last_date']
         total_points = row['total_points']
-        streak = row['streak']
-        streak = streak + 1 if last_date == yesterday else 1
         total_points += 10
+    else:
+        total_points = 10
+
+    # 2026-10-20 中华反馈「连续签到8天变1天」: 旧算法只比 last_date 是否=昨天,
+    # 中间漏一天/时区边界误判就把 streak 归1, 累积连续天数全丢。
+    # 现改为: 写签到历史表 checkin_daily(每日一条), streak 从今天往回连续数, 永不丢。
+    cursor.execute('INSERT OR IGNORE INTO checkin_daily (user_id, check_date) VALUES (?, ?)',
+                   (request.user_id, today))
+    streak = 1
+    cur2 = cursor.execute('SELECT check_date FROM checkin_daily WHERE user_id = ? ORDER BY check_date DESC',
+                          (request.user_id,))
+    _seen = {r[0] for r in cur2.fetchall()}
+    _d = datetime.strptime(today, '%Y-%m-%d')
+    while True:
+        _d -= timedelta(days=1)
+        if _d.strftime('%Y-%m-%d') not in _seen:
+            break
+        streak += 1
+        if streak > 3650:
+            break
+
+    if row:
         cursor.execute('UPDATE checkin_records SET last_date = ?, total_points = ?, streak = ? WHERE user_id = ?',
                        (today, total_points, streak, request.user_id))
     else:
-        total_points = 10
-        streak = 1
         cursor.execute('INSERT INTO checkin_records (user_id, last_date, total_points, streak) VALUES (?, ?, ?, ?)',
                        (request.user_id, today, total_points, streak))
 
