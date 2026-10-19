@@ -454,8 +454,18 @@ async def share_content_image(request: Request):
             _oldest = sorted(_share_image_dedup.items(), key=lambda kv: kv[1][1])[:10]
             for k, _ in _oldest:
                 _share_image_dedup.pop(k, None)
-    return Response(content=png, media_type="image/png",
-                    headers={"Content-Disposition": "inline; filename=som-share.png",
+    # 2026-10-19 中华反馈「分享图夹杂代码/加载不了」: 统一返回 JPEG(体积 2MB→43KB,
+    # 微信按 Content-Type 解析, 之前存 jpg 但 Content-Type 写 image/png → 花屏出代码)。
+    from PIL import Image
+    import io as _io
+    _im = Image.open(_io.BytesIO(png))
+    if _im.mode in ('RGBA', 'P'):
+        _im = _im.convert('RGB')
+    _buf = _io.BytesIO()
+    _im.save(_buf, 'JPEG', quality=82, optimize=True)
+    _jpg = _buf.getvalue()
+    return Response(content=_jpg, media_type="image/jpeg",
+                    headers={"Content-Disposition": "inline; filename=som-share.jpg",
                              **({"X-Share-Url": share_url} if share_url else {})})
 
 
@@ -493,8 +503,17 @@ async def share_product_image(request: Request):
         images=pics, buy_url=buy_url or "https://item.taobao.com/",
         site_url=site_url)
     share_url = _save_share_tmp(png, 'product')
-    return Response(content=png, media_type="image/png",
-                    headers={"Content-Disposition": "inline; filename=som-product.png",
+    # 2026-10-19 商品分享图同样改 JPEG, 体积从 ~1.4MB 砍到 ~150KB
+    from PIL import Image
+    import io as _io
+    _im = Image.open(_io.BytesIO(png))
+    if _im.mode in ('RGBA', 'P'):
+        _im = _im.convert('RGB')
+    _buf = _io.BytesIO()
+    _im.save(_buf, 'JPEG', quality=82, optimize=True)
+    _jpg = _buf.getvalue()
+    return Response(content=_jpg, media_type="image/jpeg",
+                    headers={"Content-Disposition": "inline; filename=som-product.jpg",
                              **({"X-Share-Url": share_url} if share_url else {})})
 
 
@@ -551,8 +570,12 @@ async def share_file(token: str):
         raise HTTPException(status_code=404, detail="not found")
     with open(p, 'rb') as fh:
         data = fh.read()
-    return Response(content=data, media_type="image/png",
-                    headers={"Content-Disposition": "inline; filename=som-share.png"})
+    # 2026-10-19 中华反馈「分享图夹杂代码/加载不了」: 微信 WebView 按 Content-Type 解析,
+    # 我 m 版改存 .jpg 但这里还写死 image/png → JPEG 字节被当 PNG 解码 → 花屏/出代码。
+    # 按真实文件后缀返回 media_type, 新图 .jpg=image/jpeg, 旧图 .png=image/png。
+    _is_jpg = p.endswith('.jpg')
+    return Response(content=data, media_type="image/jpeg" if _is_jpg else "image/png",
+                    headers={"Content-Disposition": "inline; filename=som-share." + ("jpg" if _is_jpg else "png")})
 
 
 @app.get("/api/products/categories")

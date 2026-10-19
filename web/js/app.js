@@ -1030,7 +1030,9 @@ function fetchFavoritesContent(append, keepPage) {
     // 2026-10-19 缓存: 翻页/刷新场景(append 或 keepPage)查 5s 缓存, 命中直接渲染不发请求
     var _cKey = 'c|' + userId + '|' + _favContentPage;
     var _cached = _favCacheGet(_cKey);
-    if (_cached) { _favRenderContent(userId, _cached, list, group); return; }
+    // 2026-10-19 中华反馈「下一页点击没反应」: 缓存命中早退时把 append/keepPage 透传,
+    // 否则翻页器不重绑/不滚回组顶, 列表点了没反应
+    if (_cached) { _favRenderContent(userId, _cached, list, group, append, keepPage); return; }
     if (!append && !keepPage) {
         // 首次进收藏区: 清空占位
         _favContentPage = 1;
@@ -1118,7 +1120,8 @@ function fetchFavoritesProduct(append, keepPage) {
     // 2026-10-19 缓存: 同一 user+page 5s 内重复进「我」页直接复用, 不再重发请求(加载慢)
     var _pKey = 'p|' + userId + '|' + _favProductPage;
     var _pCached = _favCacheGet(_pKey);
-    if (_pCached) { _favRenderProduct(_pCached, list, group, false, true); return; }
+    // 2026-10-19 同上: 翻页缓存命中早退, 透传 append/keepPage 保证翻页器重绑+滚回
+    if (_pCached) { _favRenderProduct(_pCached, list, group, append, keepPage); return; }
     if (!append && !keepPage) {
         _favProductPage = 1;
         _favProductItems = [];
