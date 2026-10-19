@@ -1642,22 +1642,41 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
                     "辨证时必须结合这些真实病历: 用户之前说过什么症状/不适/调理反馈, 小麦给过什么判断, 据此对照本次照片。"
                     "严禁编造历史对话里不存在的内容, 没有记录的就如实说没有记录。"
                 )
-                # 2026-10-20 中华加固②: 从历史对话里抽「用户自述症状」三分类高亮块单独喂给小麦,
+                # 2026-10-20 中华加固②+③: 从历史对话里抽「用户自述症状」三分类高亮块单独喂给小麦,
                 # 解决"之前说皮肤瘙痒现在没加了"——自述症状句在历史堆里容易被淹没, 单独高亮+三铁律。
+                # 2026-10-20 中华三催: 去掉 try 静默吞错(原 try/except 把异常吞掉, 症状块偶发没喂进 prompt,
+                # 小麦就漏了历史主诉症状/腹胀/瘙痒)。失败打印完整 traceback 并降级喂全量原文, 绝不静默。
                 try:
                     from services.chat_engine import render_symptom_block as _sym_block
-                    _sym_rows = [(r['user_message'], r['created_at']) for r in reversed(all_rows)]  # 全量历史(时间正序喂给抽取器)
+                    _sym_rows = [(r['user_message'], r['created_at']) for r in reversed(all_rows)]
                     _sym_ctx = _sym_block(_sym_rows)
-                    if _sym_ctx:
-                        system_prompt += (
-                            "\n\n" + _sym_ctx +
-                            "\n\n【自述症状对照三铁律(务必逐条执行)】"
-                            "① 历史主诉症状: 本次辨证必须回应/对照, 即使照片看不出来也要提, 可写'照片未见明显异常, 但结合主诉仍建议...'。"
-                            "② 已好的历史症状: 要记住这是【历史症状】, 本次提示可能复发, 建议观察/调护防复, 别再说'没这个症状'。"
-                            "③ 假症状(用户否认/打错字): 本次必须绕过, 不得当作真实症状分析, 可在末尾附注'该症状已确认非真实'。"
-                        )
                 except Exception as _se:
-                    print(f"vision症状高亮块生成失败: {_se}")
+                    import traceback as _tb
+                    print("vision症状高亮块生成失败(降级全量原文): " + str(_se))
+                    print(_tb.format_exc())
+                    _sym_ctx = ""
+                if _sym_ctx:
+                    system_prompt += (
+                        "\n\n" + _sym_ctx +
+                        "\n\n【自述症状对照五铁律(务必逐条执行, 不得遗漏任何一条)】"
+                        "① 历史主诉症状: 必须写进【综合辨证】段的主证/兼证里(不是只提一句), 即使照片看不出来也要作为辨证依据。"
+                        "② 已好的历史症状: 记住是【历史症状】, 本次提示可能复发/注意观察/调护防复, 别再说'没这个症状'。"
+                        "③ 假症状(用户否认/打错字): 本次必须绕过, 不得当作真实症状分析, 可在末尾附注'该症状已确认非真实'。"
+                        "④ 【主诉症状入三方案铁律】每个历史主诉症状必须落到三个食疗方案之一(方案一主证/方案二兼证/方案三固本), 该方案标题里标明对应症状(如'兼证·皮肤瘙痒')。"
+                        "⑤ 【症状-方案映射表】输出三个方案后, 必须附一张小表: 症状名 | 落在哪个方案 | 方案里哪味食材对应。"
+                    )
+                else:
+                    # 症状块抽取失败降级: 把全量历史里含症状词的行直接喂给小麦(保历史主诉不漏)
+                    _sym_kw = ("痒","痛","症","病","不","好","乏","胀","溏","虚","热","寒","汗","眠","咳","痰","痛","酸","麻","肿")
+                    _fallback_lines = []
+                    for r in reversed(all_rows):
+                        _um = (r['user_message'] or '')
+                        if any(k in _um for k in _sym_kw):
+                            _fallback_lines.append(f"({r['created_at'][:10]}) {_um}")
+                    if _fallback_lines:
+                        system_prompt += (
+                            "\n\n【用户自述症状(降级直读, 逐条对照)】\n" + "\n".join(_fallback_lines)
+                        )
         except Exception as e:
             print(f"vision加载用户全部历史对话失败: {e}")
     if request.session_id:
