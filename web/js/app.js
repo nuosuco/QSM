@@ -1225,8 +1225,9 @@ function bindFavContentEvents(list) {
             var detail = card.querySelector('.fav-card-detail');
             // 2026-10-19 中华反馈「分享图内容与图片都没有」: detail 现在是 mdToHtml 渲染的
             // (h1/h2/li/table/strong), detail.textContent 会把标签文字连成一片、丢掉段落/表格结构。
-            // 改传 detail.innerHTML(服务端 _clean_text 会剥 markdown 符号+压缩空白+限量, 能消化 HTML 残留标签)
-            var _raw = detail ? (detail.textContent || detail.innerHTML || '') : (b.closest('.fav-card').querySelector('.fav-card-title').textContent || ''); // 2026-10-20 改传 textContent: 后端 _clean_text 现虽剥 HTML, 但从源头传纯文本更稳(图里不再可能夹代码)
+            // 传 detail.innerHTML(服务端 _clean_text 会剥 HTML 标签+剥 markdown 符号+压缩空白+限量, 能消化 HTML 残留标签)
+            // 2026-10-20 中华反馈「分享图排版全混乱」: textContent 把所有段落/表格压成一坨, 改回 innerHTML 服务端才能保段落结构
+            var _raw = detail ? (detail.innerHTML || detail.textContent || '') : (b.closest('.fav-card').querySelector('.fav-card-title').textContent || '');
             generateShareImage(_raw);
         };
     });

@@ -1809,7 +1809,7 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
             request.user_id or 'anonymous',
             request.session_id or 'vision',
             f'[图片辨证x{len(image_list)}] {request.message[:200]}',
-            result["content"][:2000],
+            result["content"][:4000],  # 2026-10-20 中华: 2000→4000(原截断在方案二三+叮嘱+尾部三段前, 收藏/分享图读不全)
             extracted_tizhi, extracted_zhengxing,
         ))
         conn.commit()
