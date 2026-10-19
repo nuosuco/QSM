@@ -986,8 +986,18 @@ function loadFavoritesCard() {
         _lsFresh = !!(_lsMeta && _lsMeta.u === userId && _now - _lsMeta.t < 600000); // 10min 持久缓存(整页重载也拦得住)
     } catch (e) {}
     if (_lsFresh || (_favLastLoadUser === userId && (_now - _favLastLoadT) < 600000 && _favLastLoaded)) {
+        // 2026-10-19 中华反馈「每次回到我都加载一次、还挂着空提示」: 整页重载后 DOM 全新,
+        // 缓存命中不发请求, 但收藏区节点此时是隐藏的(display:none)且无内容。
+        // 必须恢复显示 + 用缓存数据就地重渲染, 否则收藏区空白, 用户误以为没数据。
+        section.style.display = '';
         var _eh = document.getElementById('fav-empty-hint');
-        if (_eh && document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length) _eh.remove();
+        if (_eh) _eh.remove();
+        // 用内存/接口缓存就地重画(不发网络请求, 秒开)
+        var _c = _favCacheGet('c|' + userId + '|' + _favContentPage);
+        var _p = _favCacheGet('p|' + userId + '|' + _favProductPage);
+        if (_c) _favRenderContent(userId, _c, document.getElementById('fav-content-list'), document.getElementById('fav-group-content'));
+        if (_p) _favRenderProduct(_p, document.getElementById('fav-product-list'), document.getElementById('fav-group-product'));
+        _favContentDone = !!_c; _favProductDone = !!_p; _favMaybeShowEmpty();
         return;
     }
     _favLastLoadUser = userId; _favLastLoadT = _now;
