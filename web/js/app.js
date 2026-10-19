@@ -1399,7 +1399,7 @@ function generateShareImage(text) {
             alert('分享图生成失败: ' + (e && e.message ? e.message : '未知错误') + ', 请重试');
         })
         .then(function() {
-            clearTimeout(_shareTimer);
+            clearTimeout(_shareTimer); generateProductShareImage._inflight = false;
             removeShareLoading();
         });
 }
@@ -1407,6 +1407,10 @@ function generateShareImage(text) {
 // 商品分享图(2026-10-16 中华要求 v2: 同辨证模板, 正文换成全部商品图(最多4张)+商品名, 加淘宝二维码, 底部留松麦服务号码, 不放价格)
 // product = { title, price, shop_name, image, images[], url, item_id, platform, app_url }
 function generateProductShareImage(product) {
+    // 2026-10-20 中华反馈「商品分享图生成失败」: 连点/多商品同时点 → 并发请求互相挤, 微信里
+    // 一个没回来就再发一个, 容易 499 中断 + 失败弹窗乱飞。加进行中锁, 已有请求在飞就忽略点击。
+    if (generateProductShareImage._inflight) { alert('分享图正在生成中, 请稍候'); return; }
+    generateProductShareImage._inflight = true;
     var p = product || {};
     var buyUrl = p.url || p.app_url || '';
     if (!buyUrl || buyUrl === '#') buyUrl = 'https://item.taobao.com/item.htm?id=' + (p.item_id || '');
@@ -1455,6 +1459,7 @@ function generateProductShareImage(product) {
         .then(function() {
             clearTimeout(_shareTimer);
             removeShareLoading();
+            generateProductShareImage._inflight = false;
         });
 }
 

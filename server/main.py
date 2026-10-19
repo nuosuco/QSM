@@ -611,7 +611,10 @@ def _save_share_tmp(png: bytes, kind: str) -> str:
         return ""
 
 
-@app.get("/api/share/file/{token}")
+@app.api_route("/api/share/file/{token}", methods=["GET", "HEAD"])
+# 2026-10-20 中华反馈「商品分享图加载识别或生成失败」: 微信 <img>/长按识别流程
+# 会先发 HEAD 探活, 原来只声明 @app.get → HEAD 405 被拒 → 识别管线放弃,
+# 只下了几 KB 就断(nginx 日志实锤 8192/40960 字节)。加 HEAD + 短缓存。
 async def share_file(token: str):
     """分享图 http 直链: 微信内 <img src> 指这里, 长按→保存图片→发微信好友。"""
     import re as _re
@@ -631,7 +634,10 @@ async def share_file(token: str):
     # 按真实文件后缀返回 media_type, 新图 .jpg=image/jpeg, 旧图 .png=image/png。
     _is_jpg = p.endswith('.jpg')
     return Response(content=data, media_type="image/jpeg" if _is_jpg else "image/png",
-                    headers={"Content-Disposition": "inline; filename=som-share." + ("jpg" if _is_jpg else "png")})
+                    headers={
+                        "Content-Disposition": "inline; filename=som-share." + ("jpg" if _is_jpg else "png"),
+                        "Cache-Control": "public, max-age=604800",  # 7天: token 本身就是随机指纹, 可强缓存
+                    })
 
 
 @app.get("/api/products/categories")

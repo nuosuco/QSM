@@ -69,17 +69,39 @@ def _qr_png(url: str, size: int = 150) -> Image.Image:
         return None
 
 
+_IMG_CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'img_cache')
+
 def _load_remote_image(url: str, size: int) -> Image.Image:
-    """拉取商品图并裁成正方形; 失败返回 None"""
+    """拉取商品图并裁成正方形; 失败返回 None
+    2026-10-20 加磁盘缓存: 同 URL 商品图下载一次存 data/img_cache/, 重复分享秒开不重下淘宝 CDN。"""
     if not url or url in ("#", "about:blank"):
         return None
     if url.startswith("//"):
         url = "https:" + url
+    # 磁盘缓存: 命中直接读本地
     try:
-        r = requests.get(url, timeout=6,
-                         headers={"User-Agent": "Mozilla/5.0 (compatible; SOM-share/1.0)"})
-        r.raise_for_status()
-        img = Image.open(io.BytesIO(r.content)).convert("RGB")
+        os.makedirs(_IMG_CACHE_DIR, exist_ok=True)
+        import hashlib as _hl
+        _ck = _hl.md5(url.encode('utf-8')).hexdigest()
+        _cf = os.path.join(_IMG_CACHE_DIR, _ck + '.jpg')
+        if os.path.isfile(_cf):
+            r = None
+            _content = open(_cf, 'rb').read()
+        else:
+            r = requests.get(url, timeout=6,
+                             headers={"User-Agent": "Mozilla/5.0 (compatible; SOM-share/1.0)"})
+            r.raise_for_status()
+            _content = r.content
+            try:
+                with open(_cf, 'wb') as _fh:
+                    _fh.write(_content)
+            except Exception:
+                pass
+    except Exception:
+        r = None
+        _content = None
+    try:
+        img = Image.open(io.BytesIO(_content)).convert("RGB")
         w, h = img.size
         side = min(w, h)
         img = img.crop(((w - side) // 2, (h - side) // 2,
@@ -314,14 +336,28 @@ def _clean_text(text: str, max_lines: int = 30) -> list:
 def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     """辨证内容分享图 v3(中华要求 2026-10-16):
     开头小麦帽子形象图 + 标题; 文案正文; 底部 som.top 服务号二维码,
-    说明文字写在码【上方】不再压码。"""
-    lines = _clean_text(text)
-    # 2026-10-19 小蕊修(中华反馈"末尾提示语不要包括"): 剔除末尾的 AI 声明段
-    # 匹配「AI提示」「AI 提示」「以上为…不构成医疗诊断」「仅供参考」等尾部免责行
-    _TAIL_RX = re.compile(r"^(?:AI\s*提示|AI\s*说明|免责声明)?[：:]?\s*(?:以上|以上内容).{0,40}(?:仅供参考|不构成医疗|医疗诊断)|^AI\s*提示")
+    说明文字写在码【上方】不再压码。
+    2026-10-20 中华要求: 完整输出小麦全部辨证内容, 不带系统提示类尾部行。"""
+    # 2026-10-20 中华反馈「内容不完整」: 原来 30 行封顶, 长辨证(表格+食养方案+调理建议
+    # 78+ 行)被截断。放开到 200 行, 完整输出小麦所有内容。
+    lines = _clean_text(text, max_lines=200)
+    # 2026-10-20 中华要求「不带系统提示那些内容」: 剥尾部 3 类服务端固定追加的免责/引导行
+    # ①「🛒 上面提到的食材...点击即可购买」(图里没下方商品, 去了)
+    # ②「以上为养生文化参考, 不构成医疗诊断, 身体不适请及时就医」(免责声明)
+    # ③「以上内容由人工智能生成, 仅供参考。」(AI 声明)
+    # ④ markdown 分隔线「---」/「***」单独成行 → 不画进图(视觉噪音)
     _new_lines = []
     for _l in lines:
-        if _TAIL_RX.match(_l.strip()):
+        _s = _l.strip()
+        if _s.startswith('🛒'):
+            continue
+        if '不构成医疗' in _s:
+            continue
+        if '养生文化参考' in _s:
+            continue
+        if '以上内容由人工智能生成' in _s:
+            continue
+        if re.fullmatch(r'-{3,}|\*{3,}', _s):
             continue
         _new_lines.append(_l)
     lines = _new_lines
@@ -433,15 +469,18 @@ def render_product_share_image(title: str, price: str, shop: str,
         pics = [""]
 
     n = len(pics)
-    # v3 版式(中华要求 2026-10-16): 商品名写在图片【开头】, 图片单列全宽竖排;
-    # 末尾双码: 左=淘宝商品码, 右=松麦服务号码, 说明文字在码上方不压码
+    # 2026-10-20 中华反馈「商品分享图加载识别或生成失败」: 单列竖排 4 张 → 图高 3146px,
+    # 微信对超高图识别/下载不稳(ninja 日志实锤直链只下 8KB 就断)。
+    # 改 2x2 网格(最多 4 张 2 列): 高度砍半(~1900px), 微信识别更稳; 顺手并发下载提速。
+    cols = 2
+    rows = (n + cols - 1) // cols
     cell = 600
+    gap = 14
     gridX = 50
     name_block_H = 220            # 商品名区(图片开头): 名称(最多2行) + 店铺名
     nameTop = 160                 # 名称区顶边(头部之下)
     imgTop = nameTop + name_block_H + 10
-    gap = 14
-    H = imgTop + n * (cell + gap) + 300     # 尾部 300 = 双码区
+    H = imgTop + rows * (cell + gap) + 300     # 尾部 300 = 双码区
 
     img = _new_canvas(H)
     _header(img, "小麦SOM · 有机好物", "有机认证 · 淘宝同源", with_logo=True)
@@ -461,19 +500,24 @@ def render_product_share_image(title: str, price: str, shop: str,
     if shop:
         d.text((gridX, y + 4), shop[:24], font=_font(22), fill=(120, 120, 120))
 
-    # 商品图单列全宽竖排
+    # 商品图 2x2 网格(并发下载, 提速)
+    import concurrent.futures as _cf
+    colW = (W - 2 * gridX - gap) // 2   # 两列各占半宽(扣除间距), 保持正方形
+    with _cf.ThreadPoolExecutor(max_workers=4) as _ex:
+        _pics = list(_ex.map(lambda u: _load_remote_image(u, colW), pics))
     for i, u in enumerate(pics):
-        gy = imgTop + i * (cell + gap)
-        pic = _load_remote_image(u, cell)
+        cx = gridX + (i % cols) * (colW + gap)
+        cy = imgTop + (i // cols) * (colW + gap)
+        pic = _pics[i]
         if pic:
-            img.paste(pic, (gridX, gy))
+            img.paste(pic, (cx, cy))
             d = ImageDraw.Draw(img)
-            d.rectangle([gridX, gy, gridX + cell, gy + cell],
+            d.rectangle([cx, cy, cx + colW, cy + colW],
                         outline=_C_HEADER_SUB, width=1)
         else:
-            d.rectangle([gridX, gy, gridX + cell, gy + cell],
+            d.rectangle([cx, cy, cx + colW, cy + colW],
                         outline=_C_HEADER_SUB, width=2, fill=_C_PLACEHOLDER)
-            d.text((gridX + cell // 2, gy + cell // 2),
+            d.text((cx + colW // 2, cy + colW // 2),
                    "暂无图片" if not u else "图片加载失败",
                    font=_font(20), fill=_C_HEADER_SUB, anchor="mm")
 
