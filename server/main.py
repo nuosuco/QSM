@@ -388,7 +388,7 @@ def _chat_work(request, chat_with_llm):
             request.user_id or 'anonymous',
             request.session_id or 'default',
             request.message[:500],
-            result["reply"][:2000],
+            result["reply"][:4000],
             result.get('tizhi', ''),
             result.get('zhengxing', ''),
         ))
@@ -406,7 +406,7 @@ def _chat_work(request, chat_with_llm):
                 request.user_id or 'anonymous', result.get('tizhi', ''),
                 zhengxing=result.get('zhengxing'),
                 symptoms=(request.message or '')[:80],
-                advice=result["reply"][:2000],
+                advice=result["reply"][:4000],
                 source='text_chat',
                 session_id=request.session_id or 'default',
             )
@@ -1875,7 +1875,7 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
         try:
             from services.user_system import add_tizhi_record
             # 存库前先剥掉 tizhi_data JSON(中华反馈: 代码不能混进存档数据)
-            advice_full = _strip_tizhi_data_json(result["content"])[:2000]
+            advice_full = _strip_tizhi_data_json(result["content"])[:4000]
             # 2026-10-14 健康画像多维升级(中华要求): 该次拍照的第一张图提视觉特征向量
             # (face_service._extract_embedding, 检不到脸回退统计特征), base64 ~2KB 存
             # tizhi_records.photo_features + photo_hash(前8字节短指纹), 不存原图。
@@ -2135,14 +2135,14 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
     # 2026-10-20 中华反馈「小麦输出内容没分段排版、把__这些符号删了、尾部三段也要分开」:
     # LLM 有时不守排版铁律, 把「方案一/配方/做法」挤在同一行(乌鸦胀气混成一团), 且输出大量
     # markdown 装饰(## 标题 / ** 加粗 / --- 分隔线 / === 装饰), 用户复制粘贴出来全糊成一坨。
-    # 服务端兜底强制排版: ① 段起点词(方案一/二/三/配方/做法/主证/兼证/体质倾向/望诊/辨证/
-    # 叮嘱/节气/日常注意/总结/注意事项)前若紧跟前一段正文 → 强制断行, 段起点词独立成行;
+    # 服务端兜底强制排版(2026-10-20 中华二次反馈"还是没分段/乌鸦胀气"根治):
+    # ① 段起点词(方案一/二/三/配方/做法——结构性词; 主证/兼证/望诊/辨证常嵌句子里不当段起点)
+    #    前若紧跟前一段正文 → 强制断行, 段起点词独立成行;
     # ② 删 markdown 装饰: 独立 ---/=== 分隔线 → 空行(留白不画线), 行首 ## 标题符删掉,
-    #    ** 加粗符号全删(保留文字), 行首 -/* 列表符删掉; ③ 尾部三段(养生参考/🛒/AI生成)
-    #    若被 LLM 挤到同一行 → 强制断行成三段; ④ 多个连续空行压缩成一个。
+    #    ** 加粗符号全删(保留文字), 行首 -/* 列表符删掉;
+    # ③ 尾部三段(养生参考/🛒/AI生成)若被 LLM 挤到同一行 → 强制断行成三段;
+    # ④ 多个连续空行压缩成一个。
     import re as _re2d
-    _PARA_KWS = ('方案一', '方案二', '方案三', '配方', '做法', '主证', '兼证', '体质倾向',
-                 '望诊', '辨证', '叮嘱', '节气', '日常注意', '总结', '注意事项')
     _TILE_WORDS = ('养生文化参考', '🛒', '人工智能生成')
     _lines = reply_text.split('\n')
     _clean = []
@@ -2161,16 +2161,25 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
         _s2 = _s2.replace('**', '')
         # ④ 行首列表符 -/* 删掉
         _s2 = _re2d.sub(r'^\s*[-*]\s+', '', _s2)
-        # ⑤ 段起点词前若紧跟前一段正文(>5字) → 拆成两行(段起点词独立成行)
-        _kw_hit = None
-        for _kw in _PARA_KWS:
-            _idx = _s2.find(_kw)
-            if 0 <= _idx < 30:
-                _kw_hit = _idx
-                break
-        if _kw_hit is not None and _kw_hit > 5:
-            _clean.append(_s2[:_kw_hit].rstrip())
-            _clean.append(_s2[_kw_hit:])
+        # ⑤ 段起点词强制断行(仅针对结构性词 方案一/二/三、配方、做法——主证/兼证/望诊/辨证
+        #    这类词常嵌在句子里(如"治主证""养阴生津"), 是句子内容不是段起点, 不能用来断行,
+        #    否则"方案一：健脾益气汤（主证·脾气虚弱证）"会被截成两行。)
+        #    2026-10-20 中华三催修复(挤一行实测 bug): 旧游标逻辑 _cursor 推过本段起点词,
+        #    导致 3 个以上分界点时后段被吞(方案三整段消失、养生参考重复 11 次)。
+        #    改为: 按分界点顺序把整行切成 [0..b1) [b1..b2) [b2..end] 依次输出, 每个分界点
+        #    前自动多一行, 后段不重复不丢失。行内 --- 分隔符同时删掉(挤一行时粘在行内)。
+        _STRUCT_KWS = ('方案一', '方案二', '方案三', '配方', '做法')
+        _s2 = _re2d.sub(r'\s*-\s*\*\s*\*\s*\*\s*|\s*-{3,}\s*', ' ', _s2)
+        import re as _re2d5
+        _pat5 = _re2d5.compile('|'.join(_re2d5.escape(k) for k in _STRUCT_KWS))
+        _matches = list(_pat5.finditer(_s2))
+        _split_pts = [m.start() for m in _matches if m.start() > 4]
+        if _split_pts:
+            _prev = 0
+            for _bp in _split_pts:
+                _clean.append(_s2[_prev:_bp].rstrip())
+                _prev = _bp
+            _clean.append(_s2[_prev:].rstrip())
         else:
             _clean.append(_s2)
     # ⑥ 尾部三段挤一行 → 拆开
