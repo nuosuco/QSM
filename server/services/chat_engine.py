@@ -698,7 +698,7 @@ def extract_user_symptoms(rows):
     """rows: [(user_message, created_at), ...] 时间正序。
     返回 {"complaint": [...], "resolved": [...], "fake": [...]}。
     按症状名去重, 同症状多状态时取【最近一次】的状态(后发生的覆盖先前的)。"""
-    # 每个症状名: 记最后一条 (kind, line, date)
+    # 每个症状名: 记最后一条 (kind, line, date) + 巩固台账(consol_count=已好后再确认已好的次数)
     last_by_sym = {}
     for um, ca in rows:
         r = _classify_one(um, ca)
@@ -710,15 +710,35 @@ def extract_user_symptoms(rows):
             key = "|fake"
             last_by_sym[key] = {"kind": "fake", "line": line, "date": date}
             continue
-        # 同症状: 如果之前已有 complaint 且现在也是同 kind, 保留较新的
         key = sym
-        if key not in last_by_sym or last_by_sym[key]["date"] <= date:
-            last_by_sym[key] = {"kind": kind, "line": line, "date": date}
+        rec = last_by_sym.get(key)
+        if rec is None or rec["date"] <= date:
+            if rec is None:
+                rec = {"kind": kind, "line": line, "date": date,
+                       "consol_count": 0, "first_complaint_date": None, "resolved_date": None}
+            # 首次 complaint 记日期(给"隔了多久"用)
+            if kind == "complaint" and rec["first_complaint_date"] is None:
+                rec["first_complaint_date"] = date
+            # 已好: 第一次记 resolved_date; 之后每次再出现"已好"=一次巩固(consol_count+1)
+            if kind == "resolved":
+                if rec["resolved_date"] is None:
+                    rec["resolved_date"] = date
+                elif date != rec["resolved_date"]:
+                    rec["consol_count"] += 1
+            # 已好又被复发(变回 complaint) → 巩固清零重来
+            if kind == "complaint" and rec["resolved_date"] is not None:
+                rec["consol_count"] = 0
+            last_by_sym[key] = rec
     out = {"complaint": [], "resolved": [], "fake": []}
     for key, v in last_by_sym.items():
         sym = key if key and not key.startswith("|") else ""
         prefix = f"- {v['date']} 自述【{sym}】" if sym else f"- {v['date']}"
-        out[v["kind"]].append(f"{prefix}: {v['line']}")
+        if v["kind"] == "resolved":
+            # 给小麦可数的巩固台账: 已好日期 + 巩固次数, 让它自己推理该减没减
+            extra = f"【已好·巩固{v['consol_count']}次】" if v.get("consol_count") else "【已好】"
+            out[v["kind"]].append(f"{prefix}: {v['line']} {extra}")
+        else:
+            out[v["kind"]].append(f"{prefix}: {v['line']}")
     return out
 
 
@@ -732,7 +752,9 @@ def render_symptom_block(rows):
         parts.append("■ 历史主诉症状(本次辨证必须回应/对照, 即使照片看不出来也要提, 可写'照片未见明显异常, 但结合主诉仍建议...'):")
         parts.extend(c["complaint"])
     if c["resolved"]:
-        parts.append("■ 用户后来说过【已好】的症状(要记住这是历史症状, 本次提示可能复发/注意观察/调护防复):")
+        parts.append("■ 用户后来说过【已好】的症状(要记住这是历史症状, 本次提示可能复发/注意观察/调护防复; "
+                     "【已好·巩固N次】=该症状说好之后又反复确认N次已好。N 越大、隔的日子越久, "
+                     "下次开方就该把它的巩固食材逐步撤掉——巩固到位的旧症状不必再长期加食材, 这是小麦的长期记忆, 要数得清):")
         parts.extend(c["resolved"])
     if c["fake"]:
         parts.append("■ 用户明确否认/打错字的症状(假症状, 本次必须绕过, 不得当作真实症状分析, 可末尾附注'已确认非真实症状'):")
