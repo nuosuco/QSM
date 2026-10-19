@@ -2132,6 +2132,81 @@ tizhi_data: {{"tizhi":"气虚质、阴虚质","zhengxing":"脾虚"}}"""
         else:
             _new_lines.append(_l)
     reply_text = '\n'.join(_new_lines)
+    # 2026-10-20 中华反馈「小麦输出内容没分段排版、把__这些符号删了、尾部三段也要分开」:
+    # LLM 有时不守排版铁律, 把「方案一/配方/做法」挤在同一行(乌鸦胀气混成一团), 且输出大量
+    # markdown 装饰(## 标题 / ** 加粗 / --- 分隔线 / === 装饰), 用户复制粘贴出来全糊成一坨。
+    # 服务端兜底强制排版: ① 段起点词(方案一/二/三/配方/做法/主证/兼证/体质倾向/望诊/辨证/
+    # 叮嘱/节气/日常注意/总结/注意事项)前若紧跟前一段正文 → 强制断行, 段起点词独立成行;
+    # ② 删 markdown 装饰: 独立 ---/=== 分隔线 → 空行(留白不画线), 行首 ## 标题符删掉,
+    #    ** 加粗符号全删(保留文字), 行首 -/* 列表符删掉; ③ 尾部三段(养生参考/🛒/AI生成)
+    #    若被 LLM 挤到同一行 → 强制断行成三段; ④ 多个连续空行压缩成一个。
+    import re as _re2d
+    _PARA_KWS = ('方案一', '方案二', '方案三', '配方', '做法', '主证', '兼证', '体质倾向',
+                 '望诊', '辨证', '叮嘱', '节气', '日常注意', '总结', '注意事项')
+    _TILE_WORDS = ('养生文化参考', '🛒', '人工智能生成')
+    _lines = reply_text.split('\n')
+    _clean = []
+    for _l in _lines:
+        _s = _l.strip()
+        if not _s:
+            _clean.append('')
+            continue
+        # ① 删独立装饰线(---/===/***/___) → 空行
+        if _re2d.fullmatch(r'-{2,}|={2,}|\*{3,}|_{2,}', _s):
+            _clean.append('')
+            continue
+        # ② 行首 ## 标题符删掉(保留标题文字)
+        _s2 = _re2d.sub(r'^\s*#{1,6}\s*', '', _s)
+        # ③ ** 加粗符号全删(保留文字)
+        _s2 = _s2.replace('**', '')
+        # ④ 行首列表符 -/* 删掉
+        _s2 = _re2d.sub(r'^\s*[-*]\s+', '', _s2)
+        # ⑤ 段起点词前若紧跟前一段正文(>5字) → 拆成两行(段起点词独立成行)
+        _kw_hit = None
+        for _kw in _PARA_KWS:
+            _idx = _s2.find(_kw)
+            if 0 <= _idx < 30:
+                _kw_hit = _idx
+                break
+        if _kw_hit is not None and _kw_hit > 5:
+            _clean.append(_s2[:_kw_hit].rstrip())
+            _clean.append(_s2[_kw_hit:])
+        else:
+            _clean.append(_s2)
+    # ⑥ 尾部三段挤一行 → 拆开
+    _final = []
+    for _l in _clean:
+        _s = _l.strip()
+        if not _s:
+            _final.append('')
+            continue
+        # 同一行里同时出现两段尾部词 → 拆开
+        _hits = [(w, _s.find(w)) for w in _TILE_WORDS if w in _s]
+        if len(_hits) >= 2:
+            _hits.sort(key=lambda x: x[1])
+            # 按尾部词起点切段
+            _segs = []
+            for _j, (_w, _pos) in enumerate(_hits):
+                _seg_end = _hits[_j+1][1] if _j+1 < len(_hits) else len(_s)
+                _segs.append(_s[_pos:_seg_end].rstrip())
+            _final.extend(_segs)
+        else:
+            _final.append(_s)
+    # ⑦ 多个连续空行压缩成单个
+    _out = []
+    _prev_blank = False
+    for _l in _final:
+        if _l.strip():
+            _out.append(_l)
+            _prev_blank = False
+        else:
+            if not _prev_blank:
+                _out.append('')
+            _prev_blank = True
+    # 去头尾空行
+    while _out and not _out[0].strip(): _out.pop(0)
+    while _out and not _out[-1].strip(): _out.pop()
+    reply_text = '\n'.join(_out)
     return {
         "success": True,
         "reply": reply_text,
