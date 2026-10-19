@@ -311,6 +311,9 @@ def get_beijing_now():
     beijing_tz = timezone(timedelta(hours=8))
     return utc_now.astimezone(beijing_tz)
 
+# 2026-10-19 分享图去重缓存: {content_md5: (png_bytes, ts, share_url)}, 60s 内同内容秒回
+_share_image_dedup = {}
+
 # ========== API 路由 ==========
 
 @app.get("/api/health")
@@ -434,8 +437,23 @@ async def share_content_image(request: Request):
         site_url = body.get("site_url") or ""
         site_url = site_url or (os.environ.get("SOM_SITE_URL", "").strip() or "https://som.top")
     from services.share_image import render_content_share_image
-    png = render_content_share_image(text, site_url)
-    share_url = _save_share_tmp(png, 'content')
+    # 2026-10-19 中华反馈「分享图加载太慢, 根本加载不完」: 相同内容(前 2000 字)
+    # 60s 内复用已渲染的 token, 不重复 Pillow 渲染(3~6s), 直接回已存在直链(秒级)。
+    import hashlib
+    _key = hashlib.md5(text[:2000].encode('utf-8')).hexdigest()
+    _dedup = _share_image_dedup.get(_key)
+    if _dedup and (time_module.time() - _dedup[1]) < 60:
+        png = _dedup[0]
+        share_url = _dedup[2]
+    else:
+        png = render_content_share_image(text, site_url)
+        share_url = _save_share_tmp(png, 'content')
+        _share_image_dedup[_key] = (png, time_module.time(), share_url)
+        # 内存去重表控制大小: 超过 30 条清掉最旧
+        if len(_share_image_dedup) > 30:
+            _oldest = sorted(_share_image_dedup.items(), key=lambda kv: kv[1][1])[:10]
+            for k, _ in _oldest:
+                _share_image_dedup.pop(k, None)
     return Response(content=png, media_type="image/png",
                     headers={"Content-Disposition": "inline; filename=som-share.png",
                              **({"X-Share-Url": share_url} if share_url else {})})

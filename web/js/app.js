@@ -926,9 +926,10 @@ function _favCacheGet(key) {
 }
 function _favCacheSet(key, data) { _favCache[key] = { t: Date.now(), data: data }; }
 
-// 2026-10-19 收藏详情懒加载: 原文按 cid 存, 展开时才 mdToHtml, 列表渲染瞬间完成
-var _favContentTextMap = {} ;
+
 var _favContentTotal = 0, _favProductTotal = 0;
+// 2026-10-19 收藏 60s 会话缓存: 同 user 短时间内反复进「我」不重发请求
+var _favLastLoadUser = null, _favLastLoadT = 0, _favLastLoaded = false;
 var _favProductItems = []; // 已渲染商品(供「查看」回查多图/链接)
 
 function favEsc(v) { var d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
@@ -954,6 +955,13 @@ function loadFavoritesCard() {
         return;
     }
     section.style.display = '';
+    // 2026-10-19 中华反馈「每次回到我, 我的收藏数据都加载一次, 加载太慢」:
+    // 60s 会话缓存: 短时间内反复进「我」页直接复用已加载数据, 不重发请求;
+    // 只有首次进或超过 60s(可能删除/新增了)才真请求。
+    var _now = Date.now();
+    var _fresh = (_favLastLoadUser === userId && (_now - _favLastLoadT) < 60000 && _favLastLoaded);
+    if (_fresh) return;
+    _favLastLoadUser = userId; _favLastLoadT = _now;
     fetchFavoritesContent(false);
     fetchFavoritesProduct(false);
     setTimeout(refreshFavCount, 100);
@@ -1000,6 +1008,7 @@ function fetchFavoritesContent(append, keepPage) {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             _favCacheSet(_cKey, data);
+            _favLastLoaded = true; _favLastLoadUser = userId; _favLastLoadT = Date.now();
             _favRenderContent(userId, data, list, group, append, keepPage);
         })
         .catch(function(e) {
@@ -1036,10 +1045,8 @@ function _favRenderContent(userId, data, list, group, append, keepPage) {
                             '<button class="fav-card-btn" data-act="share">🖼️ 分享图</button>' +
                             '<button class="fav-card-btn fav-card-remove" data-act="rm-c" data-id="' + favEsc(it.id) + '">删除</button>' +
                         '</div>' +
-                        '<div class="fav-card-detail fav-card-detail-md" style="display:none;" data-lazy-cid="' + favEsc(it.id) + '"></div>' +
+                        '<div class="fav-card-detail fav-card-detail-md" style="display:none;">' + mdToHtml(String(it.content || '')) + '</div>' +
                     '</div>';
-                // 存原文, 展开时才 mdToHtml(懒加载, 2026-10-19 中华反馈加载慢)
-                _favContentTextMap[it.id] = String(it.content || '');
             });
             // 2026-10-19 中华要求「学体质记录那种翻页器, 辨证与商品各自独立」:
             // 上一页 / 第X页共Y页 / 下一页, 5 条/页, 整页替换(不追加)
@@ -1086,6 +1093,7 @@ function fetchFavoritesProduct(append, keepPage) {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             _favCacheSet(_pKey, data);
+            _favLastLoaded = true; _favLastLoadUser = userId; _favLastLoadT = Date.now();
             _favRenderProduct(data, list, group, append, keepPage);
         });
 }
@@ -1166,13 +1174,6 @@ function bindFavContentEvents(list) {
             var card = b.closest('.fav-card-content');
             var detail = card.querySelector('.fav-card-detail');
             var open = detail.style.display !== 'none';
-            // 懒加载: 首次展开才算 mdToHtml(从 _favContentTextMap 取原文)
-            if (!open && detail && !detail.dataset.rendered) {
-                var cid = detail.dataset.lazyCid || (card.dataset.cid || '');
-                var raw = _favContentTextMap[cid] || detail.textContent || '';
-                detail.innerHTML = mdToHtml(raw);
-                detail.dataset.rendered = '1';
-            }
             detail.style.display = open ? 'none' : 'block';
             b.textContent = open ? '展开' : '收起';
         };
