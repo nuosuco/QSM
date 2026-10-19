@@ -573,7 +573,9 @@ def render_product_share_image(title: str, price: str, shop: str,
     cell = 650
     gap = 14
     gridX = 50
-    name_block_H = 220            # 商品名区(图片开头): 名称(最多2行) + 店铺名
+    # 2026-10-20 中华反馈「商品图离商品名太远」: 名称区原固定 220 太浪费(名称最多2行+店名实际≈120),
+    # 收紧到 135 → 商品图整体上移 ~85px, 更贴近标题; 总图高同步变短更紧凑。
+    name_block_H = 135
     nameTop = 160                 # 名称区顶边(头部之下)
     imgTop = nameTop + name_block_H + 10
     H = imgTop + n * (cell + gap) + 300     # 尾部 300 = 双码区
