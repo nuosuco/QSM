@@ -446,19 +446,19 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         y += lh
         prev_start = s
 
-    # 底部单码居中, 说明文字在码上方 (2026-10-20 中华: 改服务号二维码 + 两段文字)
+    # 底部单码居中, 说明文字在码上方 (2026-10-20 中华: 码上「松麦生态 · 扫码关注」, som.top 调大且在码上方)
     d = ImageDraw.Draw(img)
     qr_size = 150
     qcx = W // 2
-    d.text((qcx, H - 245), "松麦服务号 · 扫码关注", font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
-    d.text((qcx, H - 215), "som.top", font=_font(22), fill=_C_LIGHT, anchor="mm")
+    d.text((qcx, H - 245), "松麦生态 · 搜索关注", font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
+    d.text((qcx, H - 210), "som.top", font=_font(40), fill=_C_LIGHT, anchor="mm")
     qr = _service_qr(qr_size)
     if qr:
-        img.paste(qr, (qcx - qr_size // 2, H - 215))
+        img.paste(qr, (qcx - qr_size // 2, H - 190))
         d = ImageDraw.Draw(img)
-        d.rectangle([qcx - qr_size // 2 - 4, H - 219, qcx + qr_size // 2 + 4, H - 211 + qr_size],
+        d.rectangle([qcx - qr_size // 2 - 4, H - 194, qcx + qr_size // 2 + 4, H - 186 + qr_size],
                     outline=_C_HEADER_TITLE, width=2)
-    d.text((W // 2, H - 30), "som.top · 以上为养生文化参考，不构成医疗诊断",
+    d.text((W // 2, H - 30), "以上为养生文化参考，不构成医疗诊断",
            font=_font(20), fill=_C_LIGHT, anchor="mm")
 
     buf = io.BytesIO()
@@ -560,14 +560,16 @@ def render_product_share_image(title: str, price: str, shop: str,
     d = ImageDraw.Draw(img)
     qr_size = 150
     qcx = W // 2
-    d.text((qcx, H - 245), "淘宝扫码 · 立即购买", font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
-    d.text((qcx, H - 215), "松麦 som.top · 更多有机好物", font=_font(22), fill=_C_LIGHT, anchor="mm")
+    # 2026-10-20 中华: som.top 从码上方移到码下方(原来压码), 且调大
+    d.text((qcx, H - 245), "淘宝扫码 · 健康养生", font=_font(24), fill=_C_HEADER_TITLE, anchor="mm")
     qr = _qr_png(buy_url or "https://item.taobao.com/", qr_size)
     if qr:
         img.paste(qr, (qcx - qr_size // 2, H - 215))
         d = ImageDraw.Draw(img)
         d.rectangle([qcx - qr_size // 2 - 4, H - 219, qcx + qr_size // 2 + 4, H - 211 + qr_size],
                     outline=_C_HEADER_TITLE, width=2)
+    d.text((qcx, H - 38), "som.top", font=_font(40), fill=_C_LIGHT, anchor="mm")
+    d.text((W // 2, H - 14), "松麦 · 更多有机好物", font=_font(20), fill=_C_LIGHT, anchor="mm")
 
     buf = io.BytesIO()
     # 2026-10-20 中华要求「加载快」: 商品图 5 张竖排 PNG ~1.9MB, 改 JPEG 75 (~300KB, 快 6 倍)
