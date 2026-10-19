@@ -316,6 +316,35 @@ def _clean_text(text: str, max_lines: int = 200) -> list:
     text = re.sub(r"^[#>\s]+", "", text, flags=re.M)      # 行首标题符
     text = re.sub(r"^\s*[-*]\s+", "", text, flags=re.M)  # 行首列表符
     text = text.strip()
+    # 2026-10-20 中华二次反馈「方案一二三还是混成一团、尾部不三段」根治:
+    # 前端 textContent 会把 <p> 段落压成一行, 段起点词(方案一/望诊/辨证/体质倾向/叮嘱/节气/
+    # 主证/兼证/日常注意...)和长正文挤在同一行 → 渲染器 _is_para_start 识别不到段起点。
+    # 治本: 段起点词出现在行前 30 字内且前缀正文 >10 字时, 把段起点词切到下一行,
+    # 让渲染器能按段起点加 26px 段间空隙。
+    _para_kws = ('方案一', '方案二', '方案三', '望诊', '辨证', '体质倾向', '叮嘱', '节气',
+                 '日常注意', '食疗方案', '食疗方', '主证', '兼证', '注意事项', '总结')
+    _out_lines = []
+    for _ln in text.split("\n"):
+        _stripped = _ln.strip()
+        if not _stripped:
+            _out_lines.append("")
+            continue
+        _kw_hit = None
+        for _kw in _para_kws:
+            _idx = _stripped.find(_kw)
+            if 0 <= _idx < 30:
+                _kw_hit = _idx
+                break
+        if _kw_hit is not None:
+            _prefix = _stripped[:_kw_hit]
+            if len(_prefix) > 10:
+                _out_lines.append(_prefix.rstrip())
+                _out_lines.append(_stripped[_kw_hit:])
+            else:
+                _out_lines.append(_stripped)
+        else:
+            _out_lines.append(_stripped)
+    text = "\n".join(_out_lines)
     out = []
     for raw in text.split("\n"):
         l = raw.strip()
