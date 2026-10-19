@@ -465,7 +465,7 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
     # 从 28/40 起逐级缩小字号行距, 直到总高 ≤3000px, 内容一个字不删。
     tmp = ImageDraw.Draw(Image.new("RGB", (W, 10)))
     PARA_GAP = 26
-    MAX_H = 4200   # 2026-10-20 中华要求「辩证图字太小看不清」: 高度上限放宽, 优先保证字号
+    MAX_H = 4800   # 2026-10-20 中华要求「辩证图字太小看不清」: 高度上限放宽, 优先保证字号
     def _layout(fs, lh):
         f_body = _font(fs)
         w2 = []
@@ -481,7 +481,7 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         return _fs, _lh, _font(_fs), w2, extra, h
     _lv = None
     # 2026-10-20 中华要求: 起始字号 28→30, 行距 40→44, 各级+2, 字更大更清楚
-    for _fs, _lh in ((32, 46), (30, 44), (28, 42), (25, 38), (22, 34)):
+    for _fs, _lh in ((34, 48), (32, 46), (30, 44), (28, 42), (25, 38)):
         _lv = _layout(_fs, _lh)
         if _lv[5] <= MAX_H:
             break
