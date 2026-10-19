@@ -474,10 +474,10 @@ def _normalize_images(images, limit: int = 5) -> list:  # 2026-10-20 中华要�
 
 def render_product_share_image(title: str, price: str, shop: str,
                                images, buy_url: str,
-                               site_url: str = SITE, cell: int = 560) -> bytes:
+                               site_url: str = SITE, cell: int = 650) -> bytes:
     """商品分享图(竖排单张):
     - 头尾与辨证图同一模板; 正文: 商品图最多 5 张, 竖排单张全宽, 缺图占位。
-    - cell 默认 560(750 宽画布下 75%, 更大靠边看得清; 5 张体积 ~400KB)。"""
+    - cell 默认 650(铺满可用宽度, 与辩证图正文同宽, 靠边看得清)。"""
     """商品分享图 v2(2026-10-16 中华要求):
     - 头尾与辨证图同一模板(顶部标题 + 底部 som.top 服务号二维码)
     - 正文: 商品全部图片(最多5张, 竖排单张全宽, 缺图占位)
@@ -493,9 +493,9 @@ def render_product_share_image(title: str, price: str, shop: str,
     pics = pics[:5]
     # 2026-10-20 中华反馈「商品分享图 2x2 不够看清」: 改回竖排单张全宽, 5 张竖排。
     # 之前 8KB 就断的根因是直链不支持 HEAD(已修), 不是竖排本身; 并发下载+磁盘缓存保留, 提速。
-    # 2026-10-20 中华要求「商品图太小看不清, 调大靠边」: cell 480→560, 宽 560/750=75%, 贴边更大。
-    # 5张竖排 H≈3660px, JPEG 75 体积 ~400KB, 微信可接受(直链+7天缓存, 二次秒开)。
-    cell = 560
+    # 2026-10-20 中华要求「商品图和辩证图同宽、靠边」: cell 650 = 750-50-50, 铺满可用宽度,
+    # 与辩证图正文区(左右各留50)完全同宽。
+    cell = 650
     gap = 14
     gridX = 50
     name_block_H = 220            # 商品名区(图片开头): 名称(最多2行) + 店铺名
