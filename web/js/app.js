@@ -930,6 +930,24 @@ function _favCacheSet(key, data) { _favCache[key] = { t: Date.now(), data: data 
 var _favContentTotal = 0, _favProductTotal = 0;
 // 2026-10-19 收藏 60s 会话缓存: 同 user 短时间内反复进「我」不重发请求
 var _favLastLoadUser = null, _favLastLoadT = 0, _favLastLoaded = false;
+// 2026-10-19 空提示根治: 两区各自标记"已加载完"(true/false), 都加载完且都为空才显示空提示
+var _favContentDone = false, _favProductDone = false;
+function _favMaybeShowEmpty() {
+    if (!(_favContentDone && _favProductDone)) return;
+    var hasAny = document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length;
+    var emptyHint = document.getElementById('fav-empty-hint');
+    var sec = document.getElementById('my-favorites-section');
+    if (!hasAny && !emptyHint && sec) {
+        emptyHint = document.createElement('p');
+        emptyHint.id = 'fav-empty-hint';
+        emptyHint.className = 'empty-hint';
+        emptyHint.style.cssText = 'padding:10px 0;color:#999;font-size:13px;text-align:center;';
+        sec.appendChild(emptyHint);
+        emptyHint.textContent = '还没有收藏哦～在商品卡片或小麦回复上点「♡ 收藏」，这里就会显示';
+    } else if (hasAny && emptyHint) {
+        emptyHint.remove();
+    }
+}
 var _favProductItems = []; // 已渲染商品(供「查看」回查多图/链接)
 
 function favEsc(v) { var d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
@@ -960,29 +978,23 @@ function loadFavoritesCard() {
     // 只有首次进或超过 60s(可能删除/新增了)才真请求。
     var _now = Date.now();
     var _fresh = (_favLastLoadUser === userId && (_now - _favLastLoadT) < 60000 && _favLastLoaded);
-    if (_fresh) return;
+    if (_fresh) {
+        // 60s 内反复进「我」页: 直接复用已渲染数据(秒开不请求), 顺手清掉可能残留的空提示
+        var _eh = document.getElementById('fav-empty-hint');
+        if (_eh && document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length) _eh.remove();
+        return;
+    }
     _favLastLoadUser = userId; _favLastLoadT = _now;
+    _favContentDone = false; _favProductDone = false;
     fetchFavoritesContent(false);
     fetchFavoritesProduct(false);
     setTimeout(refreshFavCount, 100);
     // 2026-10-17 小蕊修(中华反馈「我的收藏没出现商品与辨证内容」): 两区都加载完仍是空时,
     // 给一条明确的空状态提示, 不再整区消失看不出有没有数据
-    setTimeout(function() {
-        var hasAny = document.querySelectorAll('#fav-content-list .fav-card, #fav-product-list .fav-card').length;
-        var emptyHint = document.getElementById('fav-empty-hint');
-        if (!hasAny) {
-            if (!emptyHint) {
-                emptyHint = document.createElement('p');
-                emptyHint.id = 'fav-empty-hint';
-                emptyHint.className = 'empty-hint';
-                emptyHint.style.cssText = 'padding:10px 0;color:#999;font-size:13px;text-align:center;';
-                section.appendChild(emptyHint);
-            }
-            emptyHint.textContent = '还没有收藏哦～在商品卡片或小麦回复上点「♡ 收藏」，这里就会显示';
-        } else if (emptyHint) {
-            emptyHint.remove();
-        }
-    }, 1500);
+    // 2026-10-19 中华反馈「加载完数据后, 下面还挂着『还没有收藏哦』空提示」:
+    // 原来 1.5s 兜底查不到 .fav-card 就显示空提示, 但接口可能还没返回(加载中)→ 误显示。
+    // 根治: 不在 loadFavoritesCard 里定时误判; 改由两个 fetch 的 .then(数据到手)后
+    // 调 _favMaybeShowEmpty(两区都返回且确实为空)才显示, 任一区有数据就移除空提示。
 }
 
 // ---- 辨证内容区(独立分页) ----
@@ -1009,6 +1021,7 @@ function fetchFavoritesContent(append, keepPage) {
         .then(function(data) {
             _favCacheSet(_cKey, data);
             _favLastLoaded = true; _favLastLoadUser = userId; _favLastLoadT = Date.now();
+            _favContentDone = true; _favMaybeShowEmpty();
             _favRenderContent(userId, data, list, group, append, keepPage);
         })
         .catch(function(e) {
@@ -1094,6 +1107,7 @@ function fetchFavoritesProduct(append, keepPage) {
         .then(function(data) {
             _favCacheSet(_pKey, data);
             _favLastLoaded = true; _favLastLoadUser = userId; _favLastLoadT = Date.now();
+            _favProductDone = true; _favMaybeShowEmpty();
             _favRenderProduct(data, list, group, append, keepPage);
         });
 }
