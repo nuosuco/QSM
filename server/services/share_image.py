@@ -233,8 +233,20 @@ def _clean_text(text: str, max_lines: int = 30) -> list:
     (b) 单【小标题】里同时含「食疗」+「做法」(如【食疗配方与做法】)
         → 拆成 食疗段/做法段/忌口段;
     (c) 无【】文本, 同行出现「食疗」「做法」→ 在「做法」前拆行, 忌口独立。
-    注意: 逐行处理, 正则里不出现换行转义(避免写文件时 \n 丢失)。"""
-    text = re.sub(r"[#*`>]", "", text or "").strip()
+    注意: 逐行处理, 正则里不出现换行转义(避免写文件时 \n 丢失)。
+    2026-10-20 中华反馈「分享图夹杂代码」根治: 前端现在传 detail.innerHTML
+    (mdToHtml 渲染出的 <div>/<li>/<table> 等标签), 老代码只剥 markdown 符号,
+    HTML 标签被 Pillow 原样画进图 → 图里满屏代码。先剥 HTML 再剥 markdown。"""
+    text = text or ""
+    # 块级闭合标签 → 换行(保住段落结构)
+    text = re.sub(r"<\s*/\s*(p|div|li|ul|ol|tr|table|section|article|blockquote|h[1-6])\s*>", "\n", text, flags=re.I)
+    # <br> → 换行
+    text = re.sub(r"<\s*(br|hr)\s*/?\s*>", "\n", text, flags=re.I)
+    # 剩余所有 HTML 标签直接删
+    text = re.sub(r"<[^>]*>", "", text)
+    # HTML 实体 → 可见字符
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "'").replace("&#39;", "'").replace("&nbsp;", " ")
+    text = re.sub(r"[#*`]", "", text).strip()
     out = []
     for raw in text.split("\n"):
         l = raw.strip()

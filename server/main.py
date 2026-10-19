@@ -313,6 +313,31 @@ def get_beijing_now():
 
 # 2026-10-19 分享图去重缓存: {content_md5: (png_bytes, ts, share_url)}, 60s 内同内容秒回
 _share_image_dedup = {}
+# 2026-10-20 中华反馈「分享图加载慢/出不来」: 去重表原只在内存, 服务重启即清空,
+# 每次都要 Pillow 重新渲染(3~6s)+生成 300~450KB 长图, 微信再下载几秒 → 体感很慢。
+# 磁盘持久化: 同内容 10min 内(重启也不丢)直接复用已存好的 jpg 直链文件, 秒级返回。
+_SHARE_DEDUP_FILE = os.path.join(os.path.dirname(__file__) or '.', 'data', 'share_dedup.json')
+
+def _dedup_load():
+    import json as _json
+    try:
+        if os.path.isfile(_SHARE_DEDUP_FILE):
+            with open(_SHARE_DEDUP_FILE, encoding='utf-8') as _fh:
+                for _k, (_ts, _url) in _json.load(_fh).items():
+                    _share_image_dedup[_k] = (b'', _ts, _url)  # 重启后只留 ts+url, 命中时直读文件
+    except Exception:
+        pass
+
+def _dedup_save():
+    import json as _json
+    try:
+        os.makedirs(os.path.dirname(_SHARE_DEDUP_FILE), exist_ok=True)
+        with open(_SHARE_DEDUP_FILE, 'w', encoding='utf-8') as _fh:
+            _json.dump({k: [v[1], v[2]] for k, v in _share_image_dedup.items() if isinstance(v, tuple)}, _fh)
+    except Exception:
+        pass
+
+_dedup_load()
 
 # ========== API 路由 ==========
 
@@ -442,18 +467,27 @@ async def share_content_image(request: Request):
     import hashlib
     _key = hashlib.md5(text[:2000].encode('utf-8')).hexdigest()
     _dedup = _share_image_dedup.get(_key)
-    if _dedup and (time_module.time() - _dedup[1]) < 60:
-        png = _dedup[0]
+    # 10min 磁盘去重: 命中且直链文件仍在 → 不重新渲染, 复用已存好的图
+    _dedup_hit = bool(_dedup and (time_module.time() - _dedup[1]) < 600 and _dedup[2])
+    if _dedup_hit:
+        _tok = _dedup[2].rsplit('/', 1)[-1]
+        _jf = os.path.join(_SHARE_TMP_DIR, _tok + '.jpg')
+        _pf = os.path.join(_SHARE_TMP_DIR, _tok + '.png')
+        _fp = _jf if os.path.isfile(_jf) else (_pf if os.path.isfile(_pf) else None)
+        if not _fp:
+            _dedup_hit = False
+    if _dedup_hit:
+        png = open(_fp, 'rb').read()
         share_url = _dedup[2]
     else:
         png = render_content_share_image(text, site_url)
         share_url = _save_share_tmp(png, 'content')
         _share_image_dedup[_key] = (png, time_module.time(), share_url)
-        # 内存去重表控制大小: 超过 30 条清掉最旧
-        if len(_share_image_dedup) > 30:
-            _oldest = sorted(_share_image_dedup.items(), key=lambda kv: kv[1][1])[:10]
+        if len(_share_image_dedup) > 50:
+            _oldest = sorted(_share_image_dedup.items(), key=lambda kv: kv[1][1])[:15]
             for k, _ in _oldest:
                 _share_image_dedup.pop(k, None)
+        _dedup_save()
     # 2026-10-19 中华反馈「分享图夹杂代码/加载不了」: 统一返回 JPEG(体积 2MB→43KB,
     # 微信按 Content-Type 解析, 之前存 jpg 但 Content-Type 写 image/png → 花屏出代码)。
     from PIL import Image
@@ -498,11 +532,33 @@ async def share_product_image(request: Request):
     pics = [x for x in images if x]
     if image and image not in pics:
         pics.insert(0, image)
-    png = render_product_share_image(
-        title=title, price=price, shop=shop,
-        images=pics, buy_url=buy_url or "https://item.taobao.com/",
-        site_url=site_url)
-    share_url = _save_share_tmp(png, 'product')
+    # 2026-10-20 商品分享图磁盘去重: 同商品+同图 10min 内秒级复用, 不重复渲染+下载商品图
+    import hashlib as _hl2
+    _pkey = _hl2.md5(('p|' + title + '|' + price + '|' + '|'.join(pics) + '|' + (buy_url or '')).encode('utf-8')).hexdigest()
+    _pdedup = _share_image_dedup.get(_pkey)
+    _phit = bool(_pdedup and (time_module.time() - _pdedup[1]) < 600 and _pdedup[2])
+    if _phit:
+        _tok = _pdedup[2].rsplit('/', 1)[-1]
+        _jf = os.path.join(_SHARE_TMP_DIR, _tok + '.jpg')
+        _pf = os.path.join(_SHARE_TMP_DIR, _tok + '.png')
+        _fp = _jf if os.path.isfile(_jf) else (_pf if os.path.isfile(_pf) else None)
+        if not _fp:
+            _phit = False
+    if _phit:
+        png = open(_fp, 'rb').read()
+        share_url = _pdedup[2]
+    else:
+        png = render_product_share_image(
+            title=title, price=price, shop=shop,
+            images=pics, buy_url=buy_url or "https://item.taobao.com/",
+            site_url=site_url)
+        share_url = _save_share_tmp(png, 'product')
+        _share_image_dedup[_pkey] = (png, time_module.time(), share_url)
+        if len(_share_image_dedup) > 50:
+            _oldest = sorted(_share_image_dedup.items(), key=lambda kv: kv[1][1])[:15]
+            for k, _ in _oldest:
+                _share_image_dedup.pop(k, None)
+        _dedup_save()
     # 2026-10-19 商品分享图同样改 JPEG, 体积从 ~1.4MB 砍到 ~150KB
     from PIL import Image
     import io as _io
