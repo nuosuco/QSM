@@ -363,7 +363,9 @@ def _clean_text(text: str, max_lines: int = 200) -> list:
             continue
         if len(idxs) == 1:
             tag_m = re.match(r"^【([^】]+)】", l)
-            tag = tag_m.group(1)
+            # 2026-10-20 修: 行中才出现单个【】(非行首)时 re.match 返回 None → .group 炸 500
+            # (新版回复里表格/段落被前缀文字顶住, 【X】不在行首)。取第一个【】内文作 tag, 无【】兜底跳过。
+            tag = tag_m.group(1) if tag_m else (re.findall(r"【([^】]{1,20})】", l) or [""])[0]
             # (b) 单个【食疗...做法】合并小标题: 拆 食疗段 + 做法段 + 忌口段
             # 忌口匹配: 行尾「忌」到行尾, 只拦在标点后(避免误伤「忌」单字夹中间)
             if "食疗" in tag:
