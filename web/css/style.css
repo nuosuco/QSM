@@ -2713,3 +2713,6 @@ body {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
 }
+
+/* 2026-10-19 分享图弹窗加载态(图生成中先转圈, 到了再显图) */
+.share-preview-loading { padding: 40px 16px; text-align: center; color: #07c160; font-size: 14px; font-weight: 600; }

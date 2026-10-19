@@ -916,6 +916,8 @@ function refreshFavCount() {
 // 商品区: fav-group-product + fav-product-list + fav-more-product (走 /api/favorites 独立分页)
 // 每区「加载更多」只翻该区下一页, 互不影响; 某区 0 条时隐藏整区
 var _favContentPage = 1, _favProductPage = 1;
+// 2026-10-19 收藏详情懒加载: 原文按 cid 存, 展开时才 mdToHtml, 列表渲染瞬间完成
+var _favContentTextMap = {} ;
 var _favContentTotal = 0, _favProductTotal = 0;
 var _favProductItems = []; // 已渲染商品(供「查看」回查多图/链接)
 
@@ -1007,8 +1009,10 @@ function fetchFavoritesContent(append, keepPage) {
                             '<button class="fav-card-btn" data-act="share">🖼️ 分享图</button>' +
                             '<button class="fav-card-btn fav-card-remove" data-act="rm-c" data-id="' + favEsc(it.id) + '">删除</button>' +
                         '</div>' +
-                        '<div class="fav-card-detail fav-card-detail-md" style="display:none;">' + mdToHtml(String(it.content || '')) + '</div>' +
+                        '<div class="fav-card-detail fav-card-detail-md" style="display:none;" data-lazy-cid="' + favEsc(it.id) + '"></div>' +
                     '</div>';
+                // 存原文, 展开时才 mdToHtml(懒加载, 2026-10-19 中华反馈加载慢)
+                _favContentTextMap[it.id] = String(it.content || '');
             });
             // 2026-10-19 中华要求「学体质记录那种翻页器, 辨证与商品各自独立」:
             // 上一页 / 第X页共Y页 / 下一页, 5 条/页, 整页替换(不追加)
@@ -1020,6 +1024,14 @@ function fetchFavoritesContent(append, keepPage) {
                 fetchFavoritesContent(false, true);
             });
             bindFavContentEvents(list);
+            // 2026-10-19 中华反馈「小麦辨证点下一页跑到有机商品末尾」:
+            // 辨证组在商品组上方, 翻页后列表变长, 视口可能停在商品区。
+            // 翻页(keepPage)后滚回辨证组顶部, 让用户看到辨证内容。
+            if (keepPage) {
+                setTimeout(function() {
+                    group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 60);
+            }
         })
         .catch(function(e) {
             console.warn('[favorites] 内容收藏加载失败', e);
@@ -1101,6 +1113,12 @@ function fetchFavoritesProduct(append, keepPage) {
                 fetchFavoritesProduct(false, true);
             });
             bindFavProductEvents(list);
+            // 商品区翻页后滚回商品组顶部
+            if (keepPage) {
+                setTimeout(function() {
+                    group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 60);
+            }
         })
         .catch(function(e) {
             console.warn('[favorites] 商品收藏加载失败', e);
@@ -1116,6 +1134,13 @@ function bindFavContentEvents(list) {
             var card = b.closest('.fav-card-content');
             var detail = card.querySelector('.fav-card-detail');
             var open = detail.style.display !== 'none';
+            // 懒加载: 首次展开才算 mdToHtml(从 _favContentTextMap 取原文)
+            if (!open && detail && !detail.dataset.rendered) {
+                var cid = detail.dataset.lazyCid || (card.dataset.cid || '');
+                var raw = _favContentTextMap[cid] || detail.textContent || '';
+                detail.innerHTML = mdToHtml(raw);
+                detail.dataset.rendered = '1';
+            }
             detail.style.display = open ? 'none' : 'block';
             b.textContent = open ? '展开' : '收起';
         };
@@ -1413,7 +1438,8 @@ function showSharePreview(imgSrc) {
     mask.className = 'share-preview-mask';
     mask.innerHTML =
         '<div class="share-preview-box">' +
-          '<img src="' + imgSrc + '" alt="分享图" style="' + (isWx ? 'border:2px dashed #07c160; padding:2px;' : '') + '">' +
+          '<div class="share-preview-loading" id="share-preview-loading">🖼️ 分享图生成中…</div>' +
+          '<img src="' + imgSrc + '" alt="分享图" style="display:none;' + (isWx ? 'border:2px dashed #07c160; padding:2px;' : '') + '">' +
           '<div class="share-preview-tip" style="' + (isWx ? 'font-size:14px; color:#07c160; font-weight:700;' : '') + '">' + tipText + '</div>' +
           '<div class="share-preview-btns">' +
             nativeBtn +
@@ -1423,6 +1449,20 @@ function showSharePreview(imgSrc) {
         '</div>';
     mask.addEventListener('click', (e) => { if (e.target === mask) mask.remove(); });
     document.body.appendChild(mask);
+    // 2026-10-19 中华反馈「分享图弹窗弹出但内容没加载完」:
+    // img 显示前先转圈, onload 后再显图, 避免"弹窗空了没图"
+    var _prevImg = mask.querySelector('img');
+    if (_prevImg) {
+        _prevImg.onload = function() {
+            var _ld = document.getElementById('share-preview-loading');
+            if (_ld) _ld.style.display = 'none';
+            _prevImg.style.display = '';
+        };
+        _prevImg.onerror = function() {
+            var _ld = document.getElementById('share-preview-loading');
+            if (_ld) { _ld.textContent = '🖼️ 分享图加载失败, 请重试'; _ld.style.display = ''; }
+        };
+    }
 }
 
 // 调用系统原生分享（手机浏览器支持）
