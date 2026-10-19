@@ -149,6 +149,19 @@ function initNavigation() {
             if (targetTab === 'health-test') {
                 renderHealthTestPage();
             }
+            // 2026-10-19 根治(中华反馈"两个微信清缓存重登, 收藏列表/分享图还是不出来"):
+            // 点导航按钮「我」进 profile tab 时必刷收藏区。原 window.switchTab 钩子只拦
+            // URL 路由 switchTab('profile') 那条路, 手动点按钮走的是这里的 addEventListener,
+            // 不经过 window.switchTab → 收藏列表接口(/api/favorites)从不发出。
+            if (targetTab === 'profile') {
+                setTimeout(function() {
+                    var _sec = document.getElementById('my-favorites-section');
+                    if (_sec && isLoggedIn()) {
+                        _sec.style.display = '';
+                        try { loadFavoritesCard(); } catch (e) { console.warn('[nav-click-fav] 出错', e); }
+                    }
+                }, 50);
+            }
         });
     });
     
@@ -165,6 +178,18 @@ function initNavigation() {
         if (targetTab) {
             const targetBtn = document.querySelector('.nav-btn[data-tab="' + targetTab + '"]');
             if (targetBtn) targetBtn.click();
+            // 2026-10-19 根治: URL 路由(?tab=profile / #profile)进「我」页, click() 已触发
+            // nav-click 钩子(带 50ms 延迟), 这里不再重复; 但 click() 找不到按钮时兜底一次。
+            // 2026-10-19 根治: URL 路由(?tab=profile / #profile)进「我」页兜底刷收藏区(80ms 晚于 nav-click 的 50ms, loadFavoritesCard 幂等可重复调)
+            if (targetTab === 'profile') {
+                setTimeout(function() {
+                    var _sec = document.getElementById('my-favorites-section');
+                    if (_sec && isLoggedIn()) {
+                        _sec.style.display = '';
+                        try { loadFavoritesCard(); } catch (e) {}
+                    }
+                }, 80);
+            }
         }
     } catch (e) { /* 静默失败，不影响默认聊天页 */ }
 }
@@ -680,6 +705,64 @@ function appendMessageActions(msgId, replyText) {
     const content = chatMsg.querySelector('.message-content');
     if (!content) return;
 
+    const bar = document.createElement('div');
+    bar.className = 'msg-action-bar';
+
+    const favBtn = document.createElement('button');
+    favBtn.className = 'msg-action-btn';
+    favBtn.innerHTML = '♡ 收藏';
+    favBtn.onclick = function() {
+        const isFav = this.classList.contains('favorited');
+        if (isFav) {
+            this.innerHTML = '♡ 收藏';
+            this.classList.remove('favorited');
+        } else {
+            this.innerHTML = '♥ 已收藏';
+            this.classList.add('favorited');
+            const userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
+            const umText = userMsg ? userMsg.querySelector('.message-text').textContent : '';
+            const favData = {
+                type: 'chat',
+                userMessage: umText,
+                assistantReply: replyText,
+                time: new Date().toISOString()
+            };
+            try {
+                var lsFavs2 = JSON.parse(localStorage.getItem('som_favorites') || '[]');
+                lsFavs2.push(favData);
+                localStorage.setItem('som_favorites', JSON.stringify(lsFavs2));
+            } catch (e) { /* 兜底保留, 不炸 */ }
+            // 2026-10-16 小蕊改(中华反馈「收藏商品与辨证内容没出来」): 辨证内容收藏上报后端存库
+            var uid2 = getUserId();
+            if (uid2) {
+                fetch(API_BASE + '/api/favorites/content/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: uid2,
+                        title: '辨证 · ' + (replyText || '').replace(/\s+/g, ' ').slice(0, 40) + (replyText && replyText.length > 40 ? '…' : ''),
+                        content: replyText,
+                        user_message: umText,
+                        products: [],
+                        source: 'chat'
+                    })
+                }).then(function(r) { return r.json(); })
+                  .then(function(j) { if (!j || j.success === false) console.warn('收藏内容上报失败', j); })
+                  .catch(function(e) { console.warn('收藏内容上报网络错误', e); });
+            }
+        }
+    };
+
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'msg-action-btn';
+    shareBtn.innerHTML = '🖼️ 分享图';
+    shareBtn.onclick = function() { generateShareImage(replyText); };
+
+    bar.appendChild(favBtn);
+    bar.appendChild(shareBtn);
+    content.appendChild(bar);
+}
+
 // ========== 我的收藏列表页 (2026-10-15 中华要求: 收藏的商品要随时能打开) ==========
 // 入口: 「我」页用户卡片里的「♥ 我的收藏」按钮
 // 数据: 服务器 product_favorites 表(随登录同步, 换设备也能看到)
@@ -838,6 +921,12 @@ function favEsc(v) { var d = document.createElement('div'); d.textContent = v ==
 
 function loadFavoritesCard() {
     var userId = getUserId();
+    // 2026-10-19 根治: 已登录但 userId 还是旧匿名号(user_ 开头非 u_)时, 强制切到正式账号再查,
+    // 这是清缓存+微信登录后收藏区空、分享图出不来的根因: 数据在 u_ 账号, 查询却拿 user_ 匿名号, 查个空。
+    if (isLoggedIn() && userId && userId.indexOf('u_') !== 0) {
+        try { var _au = JSON.parse(localStorage.getItem('som_auth_user') || '{}');
+            if (_au && _au.user_id && _au.user_id.indexOf('u_') === 0) userId = _au.user_id; } catch (e) {}
+    }
     var section = document.getElementById('my-favorites-section');
     var gC = document.getElementById('fav-group-content');
     var gP = document.getElementById('fav-group-product');
@@ -1098,64 +1187,10 @@ function bindFavProductEvents(list) {
 // 但 updateProfileCard 全项目从未定义/调用, hook 永远不触发 → 收藏区不出现。
 // 已改由 loadProfile() 直接调用(见 loadProfile 末尾)。
 
-
-const bar = document.createElement('div');
-    bar.className = 'msg-action-bar';
-
-    const favBtn = document.createElement('button');
-    favBtn.className = 'msg-action-btn';
-    favBtn.innerHTML = '♡ 收藏';
-    favBtn.onclick = function() {
-        const isFav = this.classList.contains('favorited');
-        if (isFav) {
-            this.innerHTML = '♡ 收藏';
-            this.classList.remove('favorited');
-        } else {
-            this.innerHTML = '♥ 已收藏';
-            this.classList.add('favorited');
-            const userMsg = document.querySelector('#chat-messages .message.user:last-of-type');
-            const umText = userMsg ? userMsg.querySelector('.message-text').textContent : '';
-            const favData = {
-                type: 'chat',
-                userMessage: umText,
-                assistantReply: replyText,
-                time: new Date().toISOString()
-            };
-            try {
-                var lsFavs2 = JSON.parse(localStorage.getItem('som_favorites') || '[]');
-                lsFavs2.push(favData);
-                localStorage.setItem('som_favorites', JSON.stringify(lsFavs2));
-            } catch (e) { /* 兜底保留, 不炸 */ }
-            // 2026-10-16 小蕊改(中华反馈「收藏商品与辨证内容没出来」): 辨证内容收藏上报后端存库
-            var uid2 = getUserId();
-            if (uid2) {
-                fetch(API_BASE + '/api/favorites/content/add', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: uid2,
-                        title: '辨证 · ' + (replyText || '').replace(/\s+/g, ' ').slice(0, 40) + (replyText && replyText.length > 40 ? '…' : ''),
-                        content: replyText,
-                        user_message: umText,
-                        products: [],
-                        source: 'chat'
-                    })
-                }).then(function(r) { return r.json(); })
-                  .then(function(j) { if (!j || j.success === false) console.warn('收藏内容上报失败', j); })
-                  .catch(function(e) { console.warn('收藏内容上报网络错误', e); });
-            }
-        }
-    };
-
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'msg-action-btn';
-    shareBtn.innerHTML = '🖼️ 分享图';
-    shareBtn.onclick = function() { generateShareImage(replyText); };
-
-    bar.appendChild(favBtn);
-    bar.appendChild(shareBtn);
-    content.appendChild(bar);
-}
+// 2026-10-19 小蕊修: 原 edit 失误把整段收藏系统嵌进 appendMessageActions 函数体内 →
+// loadFavoritesCard 等 8 个函数不在全局作用域, loadProfile/switchTab/nav-click 调用全部
+// ReferenceError, 收藏区永远不出现、不发起 fetch。已把收藏函数提回顶层, appendMessageActions
+// 还原为纯按钮追加逻辑。
 
 // 2026-10-16 小蕊重写(中华反馈「微信里不能分享」):
 // 原实现用 canvas 画分享图, 但微信 WebView 里只要画过跨域图(淘宝/天猫商品图)
@@ -3017,6 +3052,17 @@ function initProfile() {
 }
 
 function getUserId() {
+    // 2026-10-19 根治(中华反馈"收藏商品与辨证内容收藏没出来/分享图不出来"): 登录态优先。
+    // 旧实现只读 som_user_id: 清缓存→微信登录 bind-anon 把 som_user_id 改成 u_xxx 后,
+    // 但页面内旧渲染/定时器仍可能拿旧匿名 user_xxx 去查收藏/分享, 查的是空匿名号→显示不出。
+    // 现: 只要已登录(som_auth_user 在), 一律返回正式账号 u_xxx; 未登录才回退 som_user_id/生成匿名号。
+    var _authUser = '';
+    try { _authUser = JSON.parse(localStorage.getItem('som_auth_user') || '{}'); } catch (e) {}
+    if (_authUser && _authUser.user_id && _authUser.user_id.indexOf('u_') === 0) {
+        // 顺带把 som_user_id 同步回正式账号, 保证所有调用点口径一致
+        try { localStorage.setItem('som_user_id', _authUser.user_id); } catch (e) {}
+        return _authUser.user_id;
+    }
     let uid = localStorage.getItem('som_user_id');
     if (!uid) {
         uid = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
