@@ -245,7 +245,9 @@ def _footer_dual(img: Image.Image, H: int, left_url: str, left_label: str,
     return H - 250
 
 
-def _clean_text(text: str, max_lines: int = 30) -> list:
+def _clean_text(text: str, max_lines: int = 200) -> list:
+    # 2026-10-20 中华反馈「辨证内容不完整」: 原来 30 行封顶, 长辨证(望诊+辨证+食养方案
+    # 78 行)被截断, 后半段食养/调理建议全丢了。放开到 200 行, 完整输出小麦全部内容。
     # 忌口匹配: 行内「忌...」到标点/行尾(模块内共用, 2026-10-19 修 UnboundLocalError)
     TABB_RX = re.compile(r"忌[^,，、;；。.]*(?:[。.]|$)")
 
@@ -365,9 +367,6 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
         lines = ["养生参考"]
 
     pad = 50
-    fs = 28
-    lh = 40
-    f_body = _font(fs)
     headerH, footerH = 150, 270
 
     # 2026-10-19 小蕊修(中华反馈食疗配方与做法没分段/末尾没排版):
@@ -383,21 +382,31 @@ def render_content_share_image(text: str, site_url: str = SITE) -> bytes:
                 return True
         return False
 
+    # 2026-10-20 中华反馈「分享图加载太慢/识别失败」: 内容放开 200 行后图高 4600px,
+    # 微信对超高图下载/识别不稳(实锤: 直链只下 8KB 就断)。自适应压高度:
+    # 从 28/40 起逐级缩小字号行距, 直到总高 ≤3000px, 内容一个字不删。
     tmp = ImageDraw.Draw(Image.new("RGB", (W, 10)))
-    wrapped = []          # 每元素 (line, is_para_start)
-    for l in lines:
-        first, rest = True, []
-        rest = _wrap(l, f_body, tmp, W - pad * 2)
-        if not rest:
-            continue
-        wrapped.append((rest[0], _is_para_start(rest[0])))
-        for r in rest[1:]:
-            wrapped.append((r, False))
     PARA_GAP = 26
-    body_extra = sum(PARA_GAP for _, s in wrapped[1:] if s)
-    bodyH = len(wrapped) * lh + 40 + body_extra
-    H = headerH + bodyH + footerH
-
+    MAX_H = 3000
+    def _layout(fs, lh):
+        f_body = _font(fs)
+        w2 = []
+        for l in lines:
+            rest = _wrap(l, _font(_fs), tmp, W - pad * 2)
+            if not rest:
+                continue
+            w2.append((rest[0], _is_para_start(rest[0])))
+            for r in rest[1:]:
+                w2.append((r, False))
+        extra = sum(PARA_GAP for _, s in w2[1:] if s)
+        h = headerH + len(w2) * _lh + 40 + extra + footerH
+        return _fs, _lh, _font(_fs), w2, extra, h
+    _lv = None
+    for _fs, _lh in ((28, 40), (25, 36), (22, 32), (20, 29), (18, 26)):
+        _lv = _layout(_fs, _lh)
+        if _lv[5] <= MAX_H:
+            break
+    fs, lh, f_body, wrapped, body_extra, H = _lv
     img = _new_canvas(H)
     _header(img, "小麦SOM · 养生辨证", "中医辨证 · 有机养生", with_logo=True)
 
