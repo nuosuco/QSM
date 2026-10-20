@@ -1507,7 +1507,7 @@ def _chat_vision_work(request, image_list):
     LLM最多60s + 人脸~3s + 商品搜索最多25s, 超预算就跳过商品搜索直接返回辨证。
     """
     import time as _time
-    _vision_deadline = _time.time() + 80  # 全流程硬预算(留10s余量给存档/序列化/nginx)
+    _vision_deadline = _time.time() + 120  # 全流程硬预算(2026-10-20 中华: 80→120s, 给搜商品~24s留出余量, 确保每次都能出商品推荐)
     from services import llm_router, rag
     # 图片格式由 llm_router 按服务商自动处理：
     # sensenova 直接收 base64（无需下载，最稳），agnes 自动转公网URL
