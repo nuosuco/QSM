@@ -7,7 +7,7 @@ SOM 松麦 - 每日内容自动化流水线 v3
   - 1条横屏视频（1-3分钟，含配音+字幕+配图）
 """
 
-import json, os, sys, time, asyncio, subprocess, re, traceback, requests
+import os, json, os, sys, time, asyncio, subprocess, re, traceback, requests
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -37,6 +37,10 @@ def get_provider(name):
     cfg = json.load(open("/root/SOM/server/llm_providers.json"))
     for p in cfg["providers"]:
         if p["name"] == name:
+            # 官方姿势: key 不进 json, 从环境变量读 (key_env 指定变量名)
+            key_env = p.get("key_env", "")
+            if key_env and not p.get("api_key"):
+                p["api_key"] = os.environ.get(key_env, "")
             return p
     return None
 
