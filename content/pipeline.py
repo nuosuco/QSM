@@ -96,33 +96,46 @@ def call_llm(model_key, system_prompt, user_prompt, temperature=0.7, max_tokens=
     return None
 
 def call_image_gen(prompt, size="1024x1024"):
-    """调用图片生成模型（Agnes）"""
-    prov = get_provider("agnes")
-    model_id = prov["models"].get("image_gen", "agnes-image-2.1-flash")
-    api_key = prov.get("api_key", prov.get("api_keys", ""))
-    if isinstance(api_key, (list, tuple, set)):
-        api_key = api_keys[0] if api_keys else ""
-    api_key = str(api_key)
-    base_url = prov["base_url"]
-    
-    # 官方 raw 鉴权: Authorization 直接放裸 key(带 Bearer 会 401)
-    headers = {"Authorization": api_key, "Content-Type": "application/json"}
-    payload = {
-        "model": model_id,
-        "prompt": prompt,
-        "n": 1,
-        "size": size,
-    }
-    
-    try:
-        log(f"生成图片: {prompt[:40]}...")
-        resp = requests.post(f"{base_url}/images/generations", json=payload, headers=headers, timeout=120)
-        if resp.status_code == 200:
-            return resp.json().get("data", [{}])[0].get("url")
-        else:
-            log(f"图片生成失败: {resp.status_code} {resp.text[:100]}")
-    except Exception as e:
-        log(f"图片生成异常: {e}")
+    """调用图片生成模型: sensenova-u1.5-lite 优先(中文标签准), agnes-image 降级"""
+    for pname in ["sensenova", "agnes"]:
+        prov = get_provider(pname)
+        if not prov or not prov.get("enabled", True):
+            continue
+        model_id = prov["models"].get("image_gen", "agnes-image-2.1-flash")
+        api_key = str(prov.get("api_key", prov.get("api_keys", "")))
+        if not api_key:
+            continue
+        base_url = prov["base_url"]
+
+        # 官方 raw 鉴权: Authorization 直接放裸 key(带 Bearer 会 401)
+        headers = {"Authorization": api_key, "Content-Type": "application/json"}
+        payload = {
+            "model": model_id,
+            "prompt": prompt,
+            "n": 1,
+            "size": size,
+        }
+
+        try:
+            log(f"生成图片 [{pname}/{model_id}]: {prompt[:40]}...")
+            resp = requests.post(f"{base_url}/images/generations", json=payload, headers=headers, timeout=180)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [{}])[0]
+                url = data.get("url")
+                if url:
+                    log(f"{pname} 返回 url, 下载中...")
+                    return download_image(url, "/tmp/som_sn_image.jpg")
+                b64 = data.get("b64_json")
+                if b64:
+                    import base64
+                    out = "/tmp/som_sn_image.jpg"
+                    open(out, "wb").write(base64.b64decode(b64))
+                    log(f"{pname} 返回 b64, 已存 {out}")
+                    return out
+            else:
+                log(f"{pname} 图片生成失败: {resp.status_code} {resp.text[:200]}")
+        except Exception as e:
+            log(f"{pname} 图片生成异常: {e}")
     return None
 
 def download_image(url, save_path):
