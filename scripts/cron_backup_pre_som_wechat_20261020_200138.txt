@@ -1,0 +1,4 @@
+*/5 * * * * cd /root/SOM/qnt && /usr/bin/python3.11 qnt_heartbeat.py >> /root/SOM/qnt/qnt_heartbeat.log 2>&1
+*/5 * * * * cd /root/SOM/qnt && /usr/bin/python3.11 qnt_monitor.py >> /root/SOM/qnt/qnt_monitor.log 2>&1
+*/5 * * * * /usr/bin/python3.11 /root/.openclaw/workspace/scripts/qnt_5min_watch.py >> /root/.openclaw/workspace/memory/qnt-watch-cron.log 2>&1
+*/30 * * * * cd /root/QSM/QLife && bash qdfs/ns/train/patrol.sh 2>&1
