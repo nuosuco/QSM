@@ -53,10 +53,14 @@ def call_llm(model_key, system_prompt, user_prompt, temperature=0.7, max_tokens=
             continue
         
         api_key = prov.get("api_key", prov.get("api_keys", ""))
+        if isinstance(api_key, (list, tuple, set)):
+            api_key = api_keys[0] if api_keys else ""
+        api_key = str(api_key)
         base_url = prov["base_url"]
         model_id = prov["models"].get(model_key, prov["models"]["chat"])
         
-        headers = {"Authorization": {api_key}, "Content-Type": "application/json"}
+        # 官方 raw 鉴权: Authorization 直接放裸 key(带 Bearer 会 401)
+        headers = {"Authorization": api_key, "Content-Type": "application/json"}
         payload = {
             "model": model_id,
             "messages": [
@@ -96,9 +100,13 @@ def call_image_gen(prompt, size="1024x1024"):
     prov = get_provider("agnes")
     model_id = prov["models"].get("image_gen", "agnes-image-2.1-flash")
     api_key = prov.get("api_key", prov.get("api_keys", ""))
+    if isinstance(api_key, (list, tuple, set)):
+        api_key = api_keys[0] if api_keys else ""
+    api_key = str(api_key)
     base_url = prov["base_url"]
     
-    headers = {"Authorization": {api_key}, "Content-Type": "application/json"}
+    # 官方 raw 鉴权: Authorization 直接放裸 key(带 Bearer 会 401)
+    headers = {"Authorization": api_key, "Content-Type": "application/json"}
     payload = {
         "model": model_id,
         "prompt": prompt,
