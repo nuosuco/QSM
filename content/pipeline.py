@@ -56,7 +56,7 @@ def call_llm(model_key, system_prompt, user_prompt, temperature=0.7, max_tokens=
         base_url = prov["base_url"]
         model_id = prov["models"].get(model_key, prov["models"]["chat"])
         
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        headers = {"Authorization": {api_key}, "Content-Type": "application/json"}
         payload = {
             "model": model_id,
             "messages": [
@@ -98,7 +98,7 @@ def call_image_gen(prompt, size="1024x1024"):
     api_key = prov.get("api_key", prov.get("api_keys", ""))
     base_url = prov["base_url"]
     
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": {api_key}, "Content-Type": "application/json"}
     payload = {
         "model": model_id,
         "prompt": prompt,
