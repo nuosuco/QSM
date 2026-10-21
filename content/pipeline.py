@@ -96,16 +96,38 @@ def call_llm(model_key, system_prompt, user_prompt, temperature=0.7, max_tokens=
     return None
 
 def call_image_gen(prompt, size="1024x1024"):
-    """调用图片生成模型: sensenova-u1.5-lite 优先(中文标签准), agnes-image 降级"""
+    """调用图片生成模型: sensenova-u1.5-lite 优先(中文标签准), agnes-image 降级
+    返回本地文件路径(url下载或b64存盘), 失败返回 None
+    """
     for pname in ["sensenova", "agnes"]:
         prov = get_provider(pname)
         if not prov or not prov.get("enabled", True):
             continue
         model_id = prov["models"].get("image_gen", "agnes-image-2.1-flash")
         api_key = str(prov.get("api_key", prov.get("api_keys", "")))
+        if isinstance(api_key, (list, tuple, set)):
+            api_key = api_key[0] if api_key else ""
+        api_key = str(api_key)
         if not api_key:
             continue
         base_url = prov["base_url"]
+
+        # 归一化 size: sensenova 要求宽高都是 32 的倍数且在 [512,4096] 范围
+        # (必须在构建 payload 前做, 否则 API 会 400)
+        try:
+            import re as _re
+            _mm = _re.match(r"^(\d+)x(\d+)$", size)
+            if _mm:
+                w, h = int(_mm.group(1)), int(_mm.group(2))
+                def _snap(v):
+                    v = max(512, min(4096, v))
+                    return int(round(v / 32.0)) * 32
+                w2, h2 = _snap(w), _snap(h)
+                if (w2, h2) != (w, h):
+                    log(f"size 归一化: {size} -> {w2}x{h2}")
+                    size = f"{w2}x{h2}"
+        except Exception:
+            pass
 
         # 官方 raw 鉴权: Authorization 直接放裸 key(带 Bearer 会 401)
         headers = {"Authorization": api_key, "Content-Type": "application/json"}
@@ -117,7 +139,7 @@ def call_image_gen(prompt, size="1024x1024"):
         }
 
         try:
-            log(f"生成图片 [{pname}/{model_id}]: {prompt[:40]}...")
+            log(f"生成图片 [{pname}/{model_id}] size={size}: {prompt[:40]}...")
             resp = requests.post(f"{base_url}/images/generations", json=payload, headers=headers, timeout=180)
             if resp.status_code == 200:
                 data = resp.json().get("data", [{}])[0]
