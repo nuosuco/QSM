@@ -736,6 +736,20 @@ def extract_user_symptoms(rows):
         if v["kind"] == "resolved":
             # 给小麦可数的巩固台账: 已好日期 + 巩固次数, 让它自己推理该减没减
             extra = f"【已好·巩固{v['consol_count']}次】" if v.get("consol_count") else "【已好】"
+            # 2026-10-22 改"按时间撤方": 用户"已好"通常只说一次, N 不会涨, 撤减必须按
+            # "说好之后过了几天"算(7天内可留巩固食材; 7天起默认不再加, 仅提示防复发)。
+            # 这里把 resolved_date 与当前日期差算出来喂给小麦, 让它数得清天数。
+            days_since = None
+            if v.get("resolved_date"):
+                try:
+                    from datetime import date as _dt
+                    y, m, dd = (int(x) for x in v["resolved_date"].split("-"))
+                    today = _dt.today()
+                    days_since = (today - _dt(y, m, dd)).days
+                except Exception:
+                    days_since = None
+            if days_since is not None and days_since >= 0:
+                extra += f"·说好已{days_since}天"
             out[v["kind"]].append(f"{prefix}: {v['line']} {extra}")
         else:
             out[v["kind"]].append(f"{prefix}: {v['line']}")
