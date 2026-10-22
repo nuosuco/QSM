@@ -168,7 +168,7 @@ SPREAD_ENTRY_CALM_SECONDS = 60    # 开仓冷静期（2026-09-24 定稿，中华
 
 # 2026-10-09 中华拍板选3：出单密度闸门。0.30%门槛下连续NO_TRADE_WINDOW无单(开仓或平仓)→即时推QQ报警，
 # 避免静默空转(实测0.30%跑12h仅1单，密度远低回测)。报警后继续正常监控，只报一次直到有单。
-NO_TRADE_WINDOW = 2 * 3600        # 2h 无单窗口（2026-10-09 降门槛0.26%配套：门槛更低=尖峰更频繁，2h无单即异常）
+NO_TRADE_WINDOW = 0             # 2026-10-22 中华拍板关闭出单密度闸门: 空仓/模拟盘攒数据阶段 2h无单是常态, 该闸门纯噪音。恢复方法: 改回 2*3600 即重新启用(2h无单报警+1h冷却)。硬风控(熔断/保证金)不受影响。
 NO_TRADE_ALARM_COOLDOWN = 1 * 3600  # 报警后1h冷却，防刷屏（0.26%高频期）
 SPREAD_POSITION_TIMEOUT = 7200   # 持仓超时120分钟（中华定稿 2026-09-11；90分钟被 openclaw 改错过）
 # 硬止损：标的价格变动 ≥ 0.4% 立即平仓。
@@ -593,7 +593,7 @@ class ExecutionEngine:
                 # 该交易所从未有过成交/持仓：无历史可算，跳过（不误报）
                 last_activity = time.time()
             silent_seconds = time.time() - last_activity
-            if silent_seconds >= NO_TRADE_WINDOW:
+            if NO_TRADE_WINDOW > 0 and silent_seconds >= NO_TRADE_WINDOW:
                 # 用 risk_state 表记报警时间戳（risk_manager 无通用 set/get_state API，直接写DB）
                 alarm_ts = 0
                 try:
