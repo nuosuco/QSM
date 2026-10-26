@@ -2699,10 +2699,10 @@ async def wechat_menu_create():
         return {"success": False, "error": "微信服务号未配置"}
     
     try:
-        # 获取access_token
-        resp = http_requests.get(
-            "https://api.weixin.qq.com/cgi-bin/token",
-            params={"appid": appid, "secret": secret, "grant_type": "client_credential"},
+        # 获取access_token (2026-10-23 小蕊改: 常规/cgi-bin/token 改 stable_token, 避免与脚本双通道互顶40001)
+        resp = http_requests.post(
+            "https://api.weixin.qq.com/cgi-bin/stable_token",
+            json={"appid": appid, "secret": secret, "grant_type": "client_credential"},
             timeout=10
         )
         token_data = resp.json()
@@ -2765,10 +2765,10 @@ async def wechat_menu_get():
         return {"success": False, "error": "微信服务号未配置"}
     
     try:
-        # 获取access_token
-        resp = http_requests.get(
-            "https://api.weixin.qq.com/cgi-bin/token",
-            params={"appid": appid, "secret": secret, "grant_type": "client_credential"},
+        # 获取access_token (2026-10-23 小蕊改: 常规/cgi-bin/token 改 stable_token, 避免与脚本双通道互顶40001)
+        resp = http_requests.post(
+            "https://api.weixin.qq.com/cgi-bin/stable_token",
+            json={"appid": appid, "secret": secret, "grant_type": "client_credential"},
             timeout=10
         )
         token_data = resp.json()
