@@ -212,6 +212,11 @@ function initChat() {
             sendMessage();
         }
     });
+    // 2026-10-27 小蕊: 输入框随文字自动长高(微信式), 空/少字时保持小, 最多长到 5 行
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 160) + 'px';
+    });
     
     // 图片上传/拍照（支持多张，连续拍）
     uploadBtn.addEventListener('click', () => {
@@ -758,6 +763,34 @@ function appendMessageActions(msgId, replyText) {
     shareBtn.innerHTML = '🖼️ 分享图';
     shareBtn.onclick = function() { generateShareImage(replyText); };
 
+    // 2026-10-27 小蕊: 收藏/分享按钮前加「复制」按钮, 一键复制整段辨证内容
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-action-btn';
+    copyBtn.innerHTML = '📋 复制';
+    copyBtn.onclick = function() {
+        var self = this;
+        function done() {
+            self.innerHTML = '✅ 已复制';
+            setTimeout(function() { self.innerHTML = '📋 复制'; }, 1500);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(replyText || '').then(done, function() { legacyCopy(); });
+        } else {
+            legacyCopy();
+        }
+        function legacyCopy() {
+            var ta = document.createElement('textarea');
+            ta.value = replyText || '';
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选择内容复制'); }
+            document.body.removeChild(ta);
+        }
+    };
+
+    bar.appendChild(copyBtn);
     bar.appendChild(favBtn);
     bar.appendChild(shareBtn);
     content.appendChild(bar);

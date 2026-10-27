@@ -308,6 +308,11 @@ body {
     resize: none;
     font-family: inherit;
     font-size: 14px;
+    min-height: 44px;
+    max-height: 160px;
+    overflow-y: auto;
+    transition: height 0.15s ease;
+    line-height: 1.5;
 }
 
 .chat-input:focus {
@@ -2605,18 +2610,19 @@ body {
 .msg-action-bar {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     margin-top: 10px;
 }
 .msg-action-btn {
-    padding: 6px 12px;
+    padding: 5px 10px;
     border: 1px solid #bfe3cf;
     background: #f0f7f3;
     color: #2f6b4f;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
     line-height: 1.4;
+    white-space: nowrap;
 }
 .msg-action-btn:active { opacity: 0.8; }
 .msg-action-btn.favorited {
