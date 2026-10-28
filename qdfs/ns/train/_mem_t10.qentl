@@ -1,0 +1,19 @@
+# 内存泄漏隔离测试 v10: 循环2次构建完整SMP响应 (str_concat 累积)
+var req = 0
+while (req < 2):
+    var out = "SMP#"
+    out = str_concat(out, int_to_str(1000))
+    out = str_concat(out, ": class=")
+    out = str_concat(out, int_to_str(1000))
+    out = str_concat(out, " batch=")
+    out = str_concat(out, int_to_str(7))
+    out = str_concat(out, "\ncodepoint=")
+    out = str_concat(out, int_to_str(994040))
+    out = str_concat(out, "\n")
+    var gf2 = str_concat(str_concat("qdfs/ns/models/wviz/c", int_to_str(1000)), ".grid")
+    var gtxt2 = file_read(gf2)
+    out = str_concat(out, gtxt2)
+    printf("请求%d 响应len=%d\n", req, str_len(out))
+    req = req + 1
+end
+printf("结束\n")

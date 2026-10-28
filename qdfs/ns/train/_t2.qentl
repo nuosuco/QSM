@@ -1,0 +1,6 @@
+def main():
+    var big = 995539
+    printf("局部var big=995539 读=%d\n", big)
+    printf("995539/65536=%d 余=%d\n", 995539 / 65536, 995539 % 65536)
+end
+main()

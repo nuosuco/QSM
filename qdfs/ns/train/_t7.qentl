@@ -1,0 +1,16 @@
+def main():
+    var p = arr_new(4)
+    arr_set(p, 0, -4968)
+    arr_set(p, 1, -4531)
+    arr_set(p, 2, 60059)
+    printf("存-4968 读=%d\n", arr_get(p, 0))
+    printf("存-4531 读=%d\n", arr_get(p, 1))
+    printf("存60059  读=%d\n", arr_get(p, 2))
+    # 类5000 段1(偏移-4968): 码点=5000-4968=32
+    var cls=5000; var off=arr_get(p, 0); var cp=cls+off
+    printf("类5000 码点=类+偏移=%d (期望32)\n", cp)
+    # 类5222 段17(偏移60059): 码点=5222+60059=65281
+    cls=5222; off=arr_get(p, 2); cp=cls+off
+    printf("类5222 码点=类+偏移=%d (期望65281)\n", cp)
+end
+main()

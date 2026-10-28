@@ -1293,7 +1293,7 @@ def do_builtin(bname, nargs):
         while (ai < an2):
             av = ae_i_get(woff + ai)
             ad = ae_i_get(xoff + ai) - av
-            ae_i_set(woff + ai, av + ad * alr / 1000)
+            ae_i_set(woff + ai, av + ad * alr / 2)
             ai = ai + 1
         end
         push_int(an2)

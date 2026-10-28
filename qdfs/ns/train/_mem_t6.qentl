@@ -1,0 +1,99 @@
+# 内存泄漏隔离测试 v6: 完整 arecog 函数调用 (含 enc_cp) 循环2次
+var g_enc_th[16]
+var g_enc_off[17]
+var g_enc_init = 0
+var g_arec_best = 0
+var g_arec_bestv = 0
+var g_rec_wh = 0
+var g_rec_xh = 0
+var g_wsz2 = 515
+
+def enc_init():
+    if (g_enc_init == 1): return 0 end
+    g_enc_th[0] = 95
+    g_enc_th[1] = 102
+    g_enc_th[2] = 112
+    g_enc_th[3] = 116
+    g_enc_th[4] = 117
+    g_enc_th[5] = 118
+    g_enc_th[6] = 120
+    g_enc_th[7] = 121
+    g_enc_th[8] = 122
+    g_enc_th[9] = 123
+    g_enc_th[10] = 212
+    g_enc_th[11] = 217
+    g_enc_th[12] = 219
+    g_enc_th[13] = 220
+    g_enc_th[14] = 221
+    g_enc_th[15] = 222
+    g_enc_off[0] = -4968
+    g_enc_off[1] = -4932
+    g_enc_off[2] = -4931
+    g_enc_off[3] = -4930
+    g_enc_off[4] = -4929
+    g_enc_off[5] = -4902
+    g_enc_off[6] = -4871
+    g_enc_off[7] = -4815
+    g_enc_off[8] = -4790
+    g_enc_off[9] = -4557
+    g_enc_off[10] = -4531
+    g_enc_off[11] = -4444
+    g_enc_off[12] = -4442
+    g_enc_off[13] = -4441
+    g_enc_off[14] = -4440
+    g_enc_off[15] = -4414
+    g_enc_off[16] = 60059
+    g_enc_init = 1
+    return 1
+end
+
+def enc_cp(d):
+    enc_init()
+    if (d < 5000):
+        return 10000 + d
+    end
+    var lcl = d - 5000
+    var seg = 0
+    var ti = 0
+    while (ti < 16):
+        if (lcl >= g_enc_th[ti]):
+            seg = seg + 1
+        end
+        ti = ti + 1
+    end
+    var off = g_enc_off[seg]
+    return d + off
+end
+
+var wsz = 527360
+g_rec_wh = arr_new(wsz)
+g_rec_xh = arr_new(1024)
+var req = 0
+while (req < 2):
+    var j = 0
+    while (j < 1024):
+        arr_set(g_rec_xh, j, 1)
+        j = j + 1
+    end
+    var rb = 0
+    while (rb < 42):
+        var rf = "qdfs/ns/models/merged_row_b"
+        rf = str_concat(rf, int_to_str(rb))
+        rf = str_concat(rf, ".w")
+        var nw = load_ints_from_file(rf, g_rec_wh, wsz)
+        var bmaxv = 0 - 30000
+        var cc = 0
+        while (cc < 129):
+            var sc = dot_arr_at(g_rec_wh, cc * 1024, g_rec_xh, 1024)
+            if (sc > bmaxv):
+                bmaxv = sc
+            end
+            cc = cc + 1
+        end
+        rb = rb + 1
+    end
+    var cp = enc_cp(1000)
+    printf("请求%d 完成 cp=%d\n", req, cp)
+    req = req + 1
+end
+printf("结束\n")

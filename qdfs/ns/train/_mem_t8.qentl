@@ -1,0 +1,77 @@
+# 内存泄漏隔离测试 v8: 函数调用是否扩池 (handle_request/arecog 函数局部var)
+var g_rec_wh = 0
+var g_rec_xh = 0
+var g_wsz2 = 515
+var g_arec_best = 0
+var g_arec_bestv = 0
+
+def arecog(pixelstr):
+    var pbuf = pixelstr
+    var pdlen = str_len(pbuf)
+    var pbase = 0
+    var found_colon = 0
+    while (pbase < pdlen):
+        var pch = ord(str_char_at(pbuf, pbase))
+        if (pch == 58):
+            found_colon = 1
+            pbase = pbase + 1
+            break
+        end
+        pbase = pbase + 1
+    end
+    if (found_colon == 0):
+        pbase = 0
+    end
+    var g_j2 = 0
+    while (g_j2 < 1024 and pbase < pdlen):
+        var pb = ord(str_char_at(pbuf, pbase))
+        if (pb == 49):
+            arr_set(g_rec_xh, g_j2, 1)
+        else:
+            arr_set(g_rec_xh, g_j2, 0)
+        end
+        pbase = pbase + 2
+        g_j2 = g_j2 + 1
+    end
+    var rb = 0
+    var bestv = 0 - 30000
+    while (rb < 42):
+        var rf = "qdfs/ns/models/merged_row_b"
+        rf = str_concat(rf, int_to_str(rb))
+        rf = str_concat(rf, ".w")
+        var nw = load_ints_from_file(rf, g_rec_wh, 527360)
+        var cc = 0
+        while (cc < 129):
+            var sc = dot_arr_at(g_rec_wh, cc * 1024, g_rec_xh, 1024)
+            if (sc > bestv):
+                bestv = sc
+            end
+            cc = cc + 1
+        end
+        rb = rb + 1
+    end
+    g_arec_best = 0
+    g_arec_bestv = bestv
+    return bestv
+end
+
+g_wsz2 = g_wsz2 * 1024
+g_rec_wh = arr_new(g_wsz2)
+g_rec_xh = arr_new(1024)
+# 模拟像素串
+var px = "0:"
+var j = 0
+while (j < 1024):
+    px = str_concat(px, "0")
+    if (j < 1023):
+        px = str_concat(px, ",")
+    end
+    j = j + 1
+end
+var req = 0
+while (req < 2):
+    var bestv = arecog(px)
+    printf("请求%d 完成 bestv=%d\n", req, bestv)
+    req = req + 1
+end
+printf("结束\n")

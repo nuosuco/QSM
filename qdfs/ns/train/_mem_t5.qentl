@@ -1,0 +1,32 @@
+# 内存泄漏隔离测试 v5: 循环2次完整识别逻辑 (模拟长驻服务2请求)
+var wsz = 527360
+var wh = arr_new(wsz)
+var xh = arr_new(1024)
+var req = 0
+while (req < 2):
+    var j = 0
+    while (j < 1024):
+        arr_set(xh, j, 1)
+        j = j + 1
+    end
+    var rb = 0
+    while (rb < 42):
+        var rf = "qdfs/ns/models/merged_row_b"
+        rf = str_concat(rf, int_to_str(rb))
+        rf = str_concat(rf, ".w")
+        var nw = load_ints_from_file(rf, wh, wsz)
+        var bmaxv = 0 - 30000
+        var cc = 0
+        while (cc < 129):
+            var sc = dot_arr_at(wh, cc * 1024, xh, 1024)
+            if (sc > bmaxv):
+                bmaxv = sc
+            end
+            cc = cc + 1
+        end
+        rb = rb + 1
+    end
+    printf("请求%d 完成\n", req)
+    req = req + 1
+end
+printf("结束\n")

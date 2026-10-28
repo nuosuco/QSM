@@ -142,6 +142,9 @@ def route(data):
     if (str_eq(path, "/api/yi")):
         out = call_argmax(body)
     end
+    if (str_eq(path, "/api/yi32")):
+        out = call_argmax(body)
+    end
     if (str_eq(path, "/api/xiaoqu")):
         out = call_xiaoqu(body)
     end

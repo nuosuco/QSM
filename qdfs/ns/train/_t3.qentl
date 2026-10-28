@@ -1,0 +1,13 @@
+def main():
+    var off = arr_new(18)
+    arr_set(off, 0, 993040 % 65536)
+    arr_set(off, 1, -4968)
+    arr_set(off, 17, 60059)
+    printf("偏移16位池: [0]=%d [1]=%d [17]=%d\n", arr_get(off, 0), arr_get(off, 1), arr_get(off, 17))
+    # 类0 彝文段: 码点=0+993040, 高4位=993040/65536=15, 低16位=10000
+    var cls=0; var segoff=arr_get(off,0)
+    printf("类0: 高4位=%d 低16位=%d 码点=高*65536+低=%d\n", 993040/65536, segoff, 993040/65536*65536+segoff)
+    var cls5222=5222; var segoff2=arr_get(off,17)
+    printf("类5222: 码点=5222+60059=65281 高4位=%d 低16位=%d\n", 65281/65536, 65281%65536)
+end
+main()

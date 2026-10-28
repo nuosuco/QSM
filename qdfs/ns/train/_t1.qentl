@@ -1,0 +1,35 @@
+var g_a = 0
+var g_b = 0
+def main():
+    g_a = arr_new(10)
+    printf("arr_new ok: %d\n", g_a)
+    arr_set(g_a, 0, 42)
+    g_b = arr_get(g_a, 0)
+    printf("arr_set/get ok: %d\n", g_b)
+    # 位运算测试 (/ 代替 int_div)
+    var v = 5
+    var b0 = v % 2
+    var b1 = v / 2 % 2
+    var b2 = v / 4 % 2
+    printf("v=5: b0=%d b1=%d b2=%d\n", b0, b1, b2)
+    # 大数测试 (类号5136)
+    var v3 = 5136
+    var bit12 = v3 / 4096 % 2
+    printf("v=5136: bit12=%d\n", bit12)
+    # hex2dec 测试
+    var h = "F2710"
+    var v2 = 0
+    var i = 0
+    while (i < 5):
+        v2 = v2 * 16
+        var ch = str_substring(h, i, 1)
+        if (ch == "F"): v2 = v2 + 15 end
+        if (ch == "2"): v2 = v2 + 2 end
+        if (ch == "7"): v2 = v2 + 7 end
+        if (ch == "1"): v2 = v2 + 1 end
+        if (ch == "0"): v2 = v2 + 0 end
+        i = i + 1
+    end
+    printf("hex F2710 = %d (期望993040)\n", v2)
+end
+main()

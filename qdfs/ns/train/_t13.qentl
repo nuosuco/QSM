@@ -1,0 +1,24 @@
+var g_enc_th[16]
+var g_enc_off[17]
+def main():
+    var d = 100
+    # 模拟 bgen_grid d=100
+    var batch = d / 515
+    # enc_cp 彝文段
+    var cpb = 15
+    cpb = cpb * 65535
+    cpb = cpb + 15
+    var lo = 10000 + d
+    var cp_full = cpb + lo
+    printf("d=%d batch=%d cp=%d\n", d, batch, cp_full)
+    var hxd = cp_full % 65536
+    printf("hxd=%d\n", hxd)
+    var hpos = 3
+    while (hpos >= 0):
+        var hv = hxd % 16
+        hxd = hxd / 16
+        hpos = hpos - 1
+    end
+    printf("hex4 完成\n")
+end
+main()

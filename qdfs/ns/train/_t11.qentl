@@ -1,0 +1,10 @@
+def main():
+    var p = arr_new(10)
+    var i = 0
+    while (i < 1000):
+        arr_set(p, i % 10, i)
+        i = i + 1
+    end
+    printf("arr_set 循环1000次: 池未爆 (arr_set 固定偏移写回)\n")
+end
+main()

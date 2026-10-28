@@ -1,0 +1,10 @@
+def main():
+    var p = arr_new(18)
+    arr_set(p, 0, 993040)
+    arr_set(p, 1, -4968)
+    arr_set(p, 11, -4531)
+    arr_set(p, 17, 60059)
+    printf("存993040读=%d 存-4968读=%d 存-4531读=%d 存60059读=%d\n",
+        arr_get(p, 0), arr_get(p, 1), arr_get(p, 11), arr_get(p, 17))
+end
+main()

@@ -1,0 +1,251 @@
+# 类号→码点 编码权重训练器 (不查表, 纯权重内积)
+# 特征: 类号 13 位二进制 one-hot (cls0..cls12)
+# 目标: 码点 20 位逐位 (cp0..cp19)
+# 架构: 13 段选择权重 x 20 位码点 = 260 权重 + 20 偏置
+# 感知机: 段选择位=1时增强对应码点位, 其他位抑制
+
+# ---- 池句柄 ----
+var g_wh = 0       # 段选择x码点 权重 260
+var g_bias = 0     # 码点偏置 20
+var g_feat = 0     # 类号特征 13
+var g_target = 0   # 码点目标 20
+var g_pool = 0     # 暂存 100
+
+# ---- 状态 ----
+var g_ns = 0
+var g_ep = 0
+var g_epoch = 50
+var g_lr = 100
+var g_i = 0
+var g_j = 0
+var g_line = ""
+var g_nl = 0
+var g_cls = 0
+var g_cp = 0
+var g_val = 0
+var g_correct = 0
+
+# ---- 读数据: 类号\t码点hex ----
+def load_data():
+    g_ns = 0
+    var f = file_read("qdfs/ns/data/yi_5316_codepoints.txt")
+    var p = 0
+    var ll = ""
+    while (g_ns < 5316):
+        g_nl = str_index_of(str_substring(f, p, 4000), "\n")
+        if (g_nl < 0):
+            ll = str_substring(f, p)
+            p = str_len(f)
+            g_ns = g_ns + 1
+        else:
+            ll = str_substring(f, p, g_nl)
+            p = p + g_nl + 1
+            g_ns = g_ns + 1
+        end
+        # 解析: 类号\tU+XXXX
+        var tab = str_index_of(ll, "\t")
+        var cls_str = str_substring(ll, 0, tab)
+        var hex_str = str_substring(ll, tab + 1, 200)
+        # 去 U+
+        if (str_substring(hex_str, 0, 1) == "U"):
+            hex_str = str_substring(hex_str, 2, 200)
+        end
+        g_cls = str_to_int(cls_str)
+        g_cp = hex2dec(hex_str)
+        # 存到池 (类号13位 + 码点20位)
+        arr_set(g_feat, g_i2bit(g_cls, 0), 1)
+        arr_set(g_feat, 12, 0)
+        g_i = 0
+        var cs = g_cls
+        while (g_i < 13):
+            arr_set(g_feat, g_i, g_i2bit(g_cls, g_i))
+            g_i = g_i + 1
+        end
+        g_i = 0
+        var cps = g_cp
+        while (g_i < 20):
+            arr_set(g_target, g_i, g_i2bit(g_cp, g_i))
+            g_i = g_i + 1
+        end
+    end
+end
+
+# 取 class 的第 b 位 (0=LSB)
+def g_i2bit(v, b):
+    g_val = 0
+    g_j = 0
+    while (g_j < b):
+        if (g_val == 0): g_val = 1 end
+        g_val = g_val * 2
+        g_j = g_j + 1
+    end
+    g_val = v / g_val
+    g_val = g_val % 2
+    return g_val
+end
+
+# hex2dec
+def hex2dec(hex):
+    var v = 0
+    var ch = ""
+    while (str_len(hex) > 0):
+        ch = str_substring(hex, 0, 1)
+        v = v * 16
+        if (ch == "0"): v = v + 0 end
+        if (ch == "1"): v = v + 1 end
+        if (ch == "2"): v = v + 2 end
+        if (ch == "3"): v = v + 3 end
+        if (ch == "4"): v = v + 4 end
+        if (ch == "5"): v = v + 5 end
+        if (ch == "6"): v = v + 6 end
+        if (ch == "7"): v = v + 7 end
+        if (ch == "8"): v = v + 8 end
+        if (ch == "9"): v = v + 9 end
+        if (ch == "a"): v = v + 10 end
+        if (ch == "A"): v = v + 10 end
+        if (ch == "b"): v = v + 11 end
+        if (ch == "B"): v = v + 11 end
+        if (ch == "c"): v = v + 12 end
+        if (ch == "C"): v = v + 12 end
+        if (ch == "d"): v = v + 13 end
+        if (ch == "D"): v = v + 13 end
+        if (ch == "e"): v = v + 14 end
+        if (ch == "E"): v = v + 14 end
+        if (ch == "f"): v = v + 15 end
+        if (ch == "F"): v = v + 15 end
+        hex = str_substring(hex, 1, 60000)
+    end
+    return v
+end
+
+def main():
+    printf("=== 类号→码点 编码权重训练 ===\n")
+    g_wh = arr_new(260)
+    g_bias = arr_new(20)
+    g_feat = arr_new(13)
+    g_target = arr_new(20)
+    g_pool = arr_new(100)
+    printf("池: g_wh=%d g_bias=%d g_feat=%d g_target=%d\n", g_wh, g_bias, g_feat, g_target)
+
+    g_ep = 0
+    var ftxt = file_read("qdfs/ns/data/yi_5316_codepoints.txt")
+    var p = 0
+    var line = ""
+    var nl = 0
+    var cls = 0
+    var cp = 0
+    var tab = 0
+    var hstr = ""
+    var ok = 0
+    var tot = 0
+
+    while (g_ep < g_epoch):
+        ok = 0
+        p = 0
+        while (p < str_len(ftxt)):
+            nl = str_index_of(str_substring(ftxt, p, 4000), "\n")
+            if (nl < 0):
+                line = str_substring(ftxt, p)
+                p = str_len(ftxt) + 1
+            else:
+                line = str_substring(ftxt, p, nl)
+                p = p + nl + 1
+            end
+            tab = str_index_of(line, "\t")
+            if (tab < 0):
+                continue
+            end
+            hstr = str_substring(line, tab + 1, 200)
+            if (str_substring(hstr, 0, 1) == "U"):
+                hstr = str_substring(hstr, 2, 200)
+            end
+            cls = str_to_int(str_substring(line, 0, tab))
+            cp = hex2dec(hstr)
+            tot = tot + 1
+
+            # 类号 13 位特征
+            g_i = 0
+            while (g_i < 13):
+                g_val = 1
+                g_j = 0
+                while (g_j < g_i):
+                    g_val = g_val * 2
+                    g_j = g_j + 1
+                end
+                var bit_v = cls / g_val % 2
+                arr_set(g_feat, g_i, bit_v)
+                g_i = g_i + 1
+            end
+
+            # 码点 20 位目标
+            g_i = 0
+            while (g_i < 20):
+                g_val = 1
+                g_j = 0
+                while (g_j < g_i):
+                    g_val = g_val * 2
+                    g_j = g_j + 1
+                end
+                var tbit = cp / g_val % 2
+                arr_set(g_target, g_i, tbit)
+                g_i = g_i + 1
+            end
+
+            # 预测: 逐码点位 内积(段选择权重 x 类号特征) + 偏置
+            g_i = 0
+            var all_ok = 1
+            while (g_i < 20):
+                var pred_v = arr_get(g_bias, g_i)
+                g_j = 0
+                while (g_j < 13):
+                    var wv = arr_get(g_wh, g_j * 20 + g_i)
+                    var fv = arr_get(g_feat, g_j)
+                    pred_v = pred_v + wv * fv
+                    g_j = g_j + 1
+                end
+                var tv = arr_get(g_target, g_i)
+                if (pred_v != tv):
+                    all_ok = 0
+                    # 感知机更新: 错则推
+                    if (pred_v > tv):
+                        g_j = 0
+                        while (g_j < 13):
+                            var fv2 = arr_get(g_feat, g_j)
+                            if (fv2 == 1):
+                                arr_set(g_wh, g_j * 20 + g_i, arr_get(g_wh, g_j * 20 + g_i) - g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                        arr_set(g_bias, g_i, arr_get(g_bias, g_i) - g_lr)
+                    else:
+                        g_j = 0
+                        while (g_j < 13):
+                            var fv3 = arr_get(g_feat, g_j)
+                            if (fv3 == 1):
+                                arr_set(g_wh, g_j * 20 + g_i, arr_get(g_wh, g_j * 20 + g_i) + g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                        arr_set(g_bias, g_i, arr_get(g_bias, g_i) + g_lr)
+                    end
+                end
+                g_i = g_i + 1
+            end
+            if (all_ok):
+                ok = ok + 1
+            end
+        end
+        printf("ep%d: 正确%d/%d 正确率%d%%\n", g_ep, ok, 5316, ok * 100 / 5316)
+        g_ep = g_ep + 1
+    end
+
+    # 保存权重
+    printf("=== 日志截断 ===\n")
+    printf("=== 类号→码点 编码权重 (260+20值) ===\n")
+    emit_ints(g_wh, 0, 260)
+    printf("\n")
+    emit_ints(g_bias, 0, 20)
+    printf("\n=== 编码权重结束 ===\n")
+end
+
+main()

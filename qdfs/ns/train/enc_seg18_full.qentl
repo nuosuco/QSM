@@ -1,0 +1,152 @@
+# 类号→码点 3大段选择器 v10 (预计算幂表, 内存受控)
+var g_wh = 0
+var g_pow = 0
+var g_so = 0
+var g_i = 0
+var g_j = 0
+var g_gi = 0
+var g_gj = 0
+var g_lr = 40
+
+def main():
+    printf("=== 3大段选择器 v10 (幂表预计算) ===\n")
+    g_wh = arr_new(39)
+    g_pow = arr_new(13)
+    g_so = arr_new(18)
+    var pv = 1
+    g_i = 0
+    while (g_i < 13):
+        arr_set(g_pow, g_i, pv)
+        pv = pv * 2
+        g_i = g_i + 1
+    end
+    arr_set(g_so, 0, 993040)
+    arr_set(g_so, 1, -4968)
+    arr_set(g_so, 2, -4932)
+    arr_set(g_so, 3, -4931)
+    arr_set(g_so, 4, -4930)
+    arr_set(g_so, 5, -4929)
+    arr_set(g_so, 6, -4902)
+    arr_set(g_so, 7, -4871)
+    arr_set(g_so, 8, -4815)
+    arr_set(g_so, 9, -4790)
+    arr_set(g_so, 10, -4557)
+    arr_set(g_so, 11, -4531)
+    arr_set(g_so, 12, -4444)
+    arr_set(g_so, 13, -4442)
+    arr_set(g_so, 14, -4441)
+    arr_set(g_so, 15, -4440)
+    arr_set(g_so, 16, -4414)
+    arr_set(g_so, 17, 60059)
+
+    var ep = 0
+    while (ep < 30):
+        var tc = 0
+        var tw = 0
+        var cls = 0
+        while (cls < 5316):
+            var big = 0
+            if (cls >= 5000):
+                big = 1
+            end
+            if (cls >= 5222):
+                big = 2
+            end
+            g_gj = 0
+            while (g_gj < 3):
+                var sact = 0
+                g_j = 0
+                while (g_j < 13):
+                    var bcv = 0
+                    if (cls / arr_get(g_pow, g_j) % 2 == 1):
+                        bcv = 1
+                    end
+                    sact = sact + arr_get(g_wh, g_j * 3 + g_gj) * bcv
+                    g_j = g_j + 1
+                end
+                var on = 0
+                if (sact > 0):
+                    on = 1
+                end
+                var tgtb = 0
+                if (g_gj == big):
+                    tgtb = 1
+                end
+                if (on == tgtb):
+                    tc = tc + 1
+                else:
+                    tw = tw + 1
+                    if (tgtb == 1):
+                        g_j = 0
+                        while (g_j < 13):
+                            if (cls / arr_get(g_pow, g_j) % 2 == 1):
+                                arr_set(g_wh, g_j * 3 + g_gj, arr_get(g_wh, g_j * 3 + g_gj) + g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                    else:
+                        g_j = 0
+                        while (g_j < 13):
+                            if (cls / arr_get(g_pow, g_j) % 2 == 1):
+                                arr_set(g_wh, g_j * 3 + g_gj, arr_get(g_wh, g_j * 3 + g_gj) - g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                    end
+                end
+                g_gj = g_gj + 1
+            end
+            cls = cls + 1
+        end
+        var cr = tc * 100 / (tc + tw)
+        printf("ep%d: 3大段(5316x3) 对%d 错%d = %d%%\n", ep, tc, tw, cr)
+        if (tw == 0):
+            break
+        end
+        ep = ep + 1
+    end
+
+    var vok = 0
+    var cls2 = 0
+    while (cls2 < 5316):
+        var big2 = 0
+        if (cls2 >= 5000):
+            big2 = 1
+        end
+        if (cls2 >= 5222):
+            big2 = 2
+        end
+        var bs2 = 0
+        var ba2 = 0
+        g_gj = 0
+        while (g_gj < 3):
+            var sa2 = 0
+            g_j = 0
+            while (g_j < 13):
+                var cv2 = 0
+                if (cls2 / arr_get(g_pow, g_j) % 2 == 1):
+                    cv2 = 1
+                end
+                sa2 = sa2 + arr_get(g_wh, g_j * 3 + g_gj) * cv2
+                g_j = g_j + 1
+            end
+            if (sa2 > ba2):
+                ba2 = sa2
+                bs2 = g_gj
+            end
+            g_gj = g_gj + 1
+        end
+        if (bs2 == big2):
+            vok = vok + 1
+        end
+        cls2 = cls2 + 1
+    end
+    printf("3大段验证: 对%d/5316 = %d%%\n", vok, vok * 100 / 5316)
+
+    printf("=== 保存 3大段权重(39) + 段偏移(18) ===\n")
+    emit_ints(g_wh, 0, 39)
+    printf("\n")
+    emit_ints(g_so, 0, 18)
+    printf("\n=== 完成 ===\n")
+end
+main()

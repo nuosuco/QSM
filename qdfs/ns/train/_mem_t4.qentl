@@ -1,0 +1,31 @@
+# 内存泄漏隔离测试 v4: str_concat 是否扩池 (模拟 arecog 构建响应)
+var wsz = 527360
+var wh = arr_new(wsz)
+var xh = arr_new(1024)
+var j = 0
+while (j < 1024):
+    arr_set(xh, j, 1)
+    j = j + 1
+end
+var rb = 0
+while (rb < 42):
+    var rf = "qdfs/ns/models/merged_row_b"
+    rf = str_concat(rf, int_to_str(rb))
+    rf = str_concat(rf, ".w")
+    var nw = load_ints_from_file(rf, wh, wsz)
+    rb = rb + 1
+end
+# 模拟 arecog 响应构建: 13次 str_concat
+var out = "SMP#"
+out = str_concat(out, int_to_str(0))
+out = str_concat(out, ": class=")
+out = str_concat(out, int_to_str(0))
+out = str_concat(out, " batch=")
+out = str_concat(out, int_to_str(0))
+out = str_concat(out, "\ncodepoint=")
+out = str_concat(out, int_to_str(993040))
+out = str_concat(out, "\n")
+var gf2 = str_concat(str_concat("qdfs/ns/models/wviz/c", int_to_str(0)), ".grid")
+var gtxt2 = file_read(gf2)
+out = str_concat(out, gtxt2)
+printf("out_len=%d\n", str_len(out))

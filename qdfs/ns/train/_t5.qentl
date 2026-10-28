@@ -1,0 +1,10 @@
+def main():
+    var pool = arr_new(3)
+    arr_set(pool, 0, 993040)
+    arr_set(pool, 1, 60059)
+    arr_set(pool, 2, 40000)
+    printf("pool[0]存993040 读=%d (若16位则=10000)\n", arr_get(pool, 0))
+    printf("pool[1]存60059  读=%d (16位内, 应=60059)\n", arr_get(pool, 1))
+    printf("pool[2]存40000  读=%d (16位内, 应=40000)\n", arr_get(pool, 2))
+end
+main()

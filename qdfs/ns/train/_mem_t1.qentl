@@ -1,0 +1,52 @@
+# 内存泄漏隔离测试: 全局代码 (不用def main, QCL不自动调用main)
+# 读 /proc/self/statm 第1字段(页数) → KB
+
+var wsz = 527360
+var wh = arr_new(wsz)
+var xh = arr_new(1024)
+var j = 0
+while (j < 1024):
+    arr_set(xh, j, 1)
+    j = j + 1
+end
+printf("A 基线 rss=%dKB\n", rss_kb())
+# 阶段1: 42 次 load
+var rb = 0
+while (rb < 42):
+    var rf = "qdfs/ns/models/merged_row_b"
+    rf = str_concat(rf, int_to_str(rb))
+    rf = str_concat(rf, ".w")
+    var nw = load_ints_from_file(rf, wh, wsz)
+    if (rb == 0):
+        printf("  load首次 nw=%d\n", nw)
+    end
+    rb = rb + 1
+end
+printf("B 42次load后 rss=%dKB\n", rss_kb())
+# 阶段2: 5000 次 dot
+var c = 0
+var acc = 0
+while (c < 5000):
+    var sc = dot_arr_at(wh, 0, xh, 1024)
+    acc = acc + sc
+    c = c + 1
+end
+printf("C 5000次dot后 rss=%dKB (acc=%d)\n", rss_kb(), acc)
+printf("D 结束 rss=%dKB\n", rss_kb())
+
+def rss_kb():
+    var s = file_read("/proc/self/statm")
+    var i = 0
+    var n = 0
+    var ln = str_len(s)
+    while (i < ln):
+        var ch = ord(str_char_at(s, i))
+        if (ch >= 48 and ch <= 57):
+            n = n * 10 + (ch - 48)
+            i = i + 1
+        else:
+            return n * 4
+        end
+    end
+    return n * 4
+end

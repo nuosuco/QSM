@@ -1,0 +1,50 @@
+var g_enc_th[16]
+var g_enc_off[17]
+def main():
+    g_enc_th[0]=95; g_enc_th[1]=102; g_enc_th[2]=112; g_enc_th[3]=116
+    g_enc_th[4]=117; g_enc_th[5]=118; g_enc_th[6]=120; g_enc_th[7]=121
+    g_enc_th[8]=122; g_enc_th[9]=123; g_enc_th[10]=212; g_enc_th[11]=217
+    g_enc_th[12]=219; g_enc_th[13]=220; g_enc_th[14]=221; g_enc_th[15]=222
+    g_enc_off[0]=-4968; g_enc_off[1]=-4932; g_enc_off[2]=-4931; g_enc_off[3]=-4930
+    g_enc_off[4]=-4929; g_enc_off[5]=-4902; g_enc_off[6]=-4871; g_enc_off[7]=-4815
+    g_enc_off[8]=-4790; g_enc_off[9]=-4557; g_enc_off[10]=-4531; g_enc_off[11]=-4444
+    g_enc_off[12]=-4442; g_enc_off[13]=-4441; g_enc_off[14]=-4440; g_enc_off[15]=-4414
+    g_enc_off[16]=60059
+    # 彝文段 d=100
+    var d = 100
+    var cpb = 15
+    cpb = cpb * 65535
+    cpb = cpb + 15
+    var lo = 10000 + d
+    var cp_full = cpb + lo
+    printf("彝文段 d=100 cp=%d\n", cp_full)
+    var hxd = cp_full % 65536
+    printf("hxd=%d\n", hxd)
+    var hpos = 3
+    while (hpos >= 0):
+        var hv = hxd % 16
+        hxd = hxd / 16
+        hpos = hpos - 1
+    end
+    printf("hex4 OK\n")
+    # 标点段 d=5000
+    d = 5000
+    var lcl = d - 5000
+    var seg = 0
+    var ti = 0
+    while (ti < 16):
+        if (lcl >= g_enc_th[ti]):
+            seg = seg + 1
+        end
+        ti = ti + 1
+    end
+    var off = g_enc_off[seg]
+    var cpb2 = 15
+    cpb2 = cpb2 * 65535
+    cpb2 = cpb2 + 15
+    var lo2 = 10000 + d + off
+    var cp2 = cpb2 + lo2
+    printf("标点段 d=5000 seg=%d off=%d cp=%d\n", seg, off, cp2)
+    printf("测试完成\n")
+end
+main()

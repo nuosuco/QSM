@@ -1,0 +1,13 @@
+def main():
+    var pool = arr_new(4)
+    arr_set(pool, 0, 993040)
+    arr_set(pool, 1, 60059)
+    arr_set(pool, 2, 200000)
+    printf("pool[0]=993040 读=%d (16位=%d)\n", arr_get(pool, 0), 993040 % 65536)
+    printf("pool[1]=60059  读=%d (16位=%d)\n", arr_get(pool, 1), 60059 % 65536)
+    printf("pool[2]=200000 读=%d (16位=%d)\n", arr_get(pool, 2), 200000 % 65536)
+    # 负数
+    arr_set(pool, 3, -4968)
+    printf("pool[3]=-4968 读=%d\n", arr_get(pool, 3))
+end
+main()

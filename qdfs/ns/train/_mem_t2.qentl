@@ -1,0 +1,35 @@
+# 内存泄漏隔离测试 v2: 用 QVM pool 大小测 (不依赖 /proc)
+# 阶段1: arr_new 后 pool; 阶段2: 42次 load; 阶段3: 5000次 dot
+
+var wsz = 527360
+var wh = arr_new(wsz)
+var xh = arr_new(1024)
+var j = 0
+while (j < 1024):
+    arr_set(xh, j, 1)
+    j = j + 1
+end
+# 阶段1: 42 次 load
+var rb = 0
+while (rb < 42):
+    var rf = "qdfs/ns/models/merged_row_b"
+    rf = str_concat(rf, int_to_str(rb))
+    rf = str_concat(rf, ".w")
+    var nw = load_ints_from_file(rf, wh, wsz)
+    if (rb == 0):
+        printf("  load首次 nw=%d\n", nw)
+    end
+    if (rb == 41):
+        printf("  load最后 nw=%d\n", nw)
+    end
+    rb = rb + 1
+end
+# 阶段2: 5000 次 dot
+var c = 0
+var acc = 0
+while (c < 5000):
+    var sc = dot_arr_at(wh, 0, xh, 1024)
+    acc = acc + sc
+    c = c + 1
+end
+printf("完成 acc=%d\n", acc)

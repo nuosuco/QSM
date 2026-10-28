@@ -1,0 +1,170 @@
+# 类号→码点 编码权重训练 — 测试: 只训彝文段(类0~4999, 码点=类+993040 纯线性)
+# 验证线性模型能否学出 +993040
+var g_wh = 0
+var g_bias = 0
+var g_feat = 0
+var g_target = 0
+var g_i = 0
+var g_j = 0
+var g_lr = 8
+var g_correct = 0
+
+def main():
+    printf("=== 线性测试: 类0~4999 → 码点 ===\n")
+    g_wh = arr_new(260)   # 13 bits x 20 bits
+    g_bias = arr_new(20)
+    g_feat = arr_new(13)
+    g_target = arr_new(20)
+    printf("池: g_wh=%d g_bias=%d\n", g_wh, g_bias)
+
+    var ep = 0
+    var ftxt = file_read("qdfs/ns/data/yi_5316_classcode.txt")
+    var p = 0
+    var nl = 0
+    var line = ""
+    var cls = 0
+    var cp = 0
+    var sp = 0
+    var ok = 0
+    var tot = 0
+
+    while (ep < 30):
+        ok = 0
+        tot = 0
+        p = 0
+        while (p < str_len(ftxt)):
+            nl = str_index_of(str_substring(ftxt, p, 4000), "\n")
+            if (nl < 0):
+                line = str_substring(ftxt, p)
+                p = str_len(ftxt) + 1
+            else:
+                line = str_substring(ftxt, p, nl)
+                p = p + nl + 1
+            end
+            sp = str_index_of(line, " ")
+            if (sp < 0): continue end
+            cls = str_to_int(str_substring(line, 0, sp))
+            cp = str_to_int(str_substring(line, sp + 1, 200))
+            # 只训彝文段
+            if (cls >= 5000): continue end
+            tot = tot + 1
+
+            # 类号 13 位特征
+            g_i = 0
+            while (g_i < 13):
+                var gv = 1
+                g_j = 0
+                while (g_j < g_i):
+                    gv = gv * 2
+                    g_j = g_j + 1
+                end
+                arr_set(g_feat, g_i, cls / gv % 2)
+                g_i = g_i + 1
+            end
+            # 码点 20 位目标
+            g_i = 0
+            while (g_i < 20):
+                var gv2 = 1
+                g_j = 0
+                while (g_j < g_i):
+                    gv2 = gv2 * 2
+                    g_j = g_j + 1
+                end
+                arr_set(g_target, g_i, cp / gv2 % 2)
+                g_i = g_i + 1
+            end
+
+            # 预测+更新 (逐位感知机)
+            g_i = 0
+            var all_ok = 1
+            while (g_i < 20):
+                var pred_v = arr_get(g_bias, g_i)
+                g_j = 0
+                while (g_j < 13):
+                    pred_v = pred_v + arr_get(g_wh, g_j * 20 + g_i) * arr_get(g_feat, g_j)
+                    g_j = g_j + 1
+                end
+                var tv = arr_get(g_target, g_i)
+                if (pred_v != tv):
+                    all_ok = 0
+                    if (pred_v > tv):
+                        g_j = 0
+                        while (g_j < 13):
+                            if (arr_get(g_feat, g_j) == 1):
+                                arr_set(g_wh, g_j * 20 + g_i, arr_get(g_wh, g_j * 20 + g_i) - g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                        arr_set(g_bias, g_i, arr_get(g_bias, g_i) - g_lr)
+                    else:
+                        g_j = 0
+                        while (g_j < 13):
+                            if (arr_get(g_feat, g_j) == 1):
+                                arr_set(g_wh, g_j * 20 + g_i, arr_get(g_wh, g_j * 20 + g_i) + g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                        arr_set(g_bias, g_i, arr_get(g_bias, g_i) + g_lr)
+                    end
+                end
+                g_i = g_i + 1
+            end
+            if (all_ok): ok = ok + 1 end
+        end
+        printf("ep%d: 正确%d/%d 正确率%d%%\n", ep, ok, tot, ok * 100 / tot)
+        ep = ep + 1
+    end
+
+    # 验证: 类0~4999 全量
+    printf("=== 验证: 线性模型预测 vs 真实 ===\n")
+    p = 0
+    var vok = 0
+    var vtot = 0
+    while (p < str_len(ftxt)):
+        nl = str_index_of(str_substring(ftxt, p, 4000), "\n")
+        if (nl < 0):
+            line = str_substring(ftxt, p)
+            p = str_len(ftxt) + 1
+        else:
+            line = str_substring(ftxt, p, nl)
+            p = p + nl + 1
+        end
+        sp = str_index_of(line, " ")
+        if (sp < 0): continue end
+        cls = str_to_int(str_substring(line, 0, sp))
+        cp = str_to_int(str_substring(line, sp + 1, 200))
+        if (cls >= 5000): continue end
+        vtot = vtot + 1
+        # 预测码点
+        g_i = 0
+        var pred_cp = 0
+        while (g_i < 20):
+            var pred_v = arr_get(g_bias, g_i)
+            g_j = 0
+            while (g_j < 13):
+                var gv = 1
+                g_j2 = 0
+                while (g_j2 < g_j):
+                    gv = gv * 2
+                    g_j2 = g_j2 + 1
+                end
+                pred_v = pred_v + arr_get(g_wh, g_j * 20 + g_i) * (cls / gv % 2)
+                g_j = g_j + 1
+            end
+            if (pred_v > 0):
+                # 第 g_i 位 =1
+                var gv3 = 1
+                g_j = 0
+                while (g_j < g_i):
+                    gv3 = gv3 * 2
+                    g_j = g_j + 1
+                end
+                pred_cp = pred_cp + gv3
+            end
+            g_i = g_i + 1
+        end
+        if (pred_cp == cp): vok = vok + 1 end
+    end
+    printf("彝文段验证: 正确%d/%d = %d%%\n", vok, vtot, vok * 100 / vtot)
+end
+main()

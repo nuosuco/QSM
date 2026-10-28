@@ -1,0 +1,9 @@
+def main():
+    var a = 995539
+    printf("大数 a=995539 直读=%d\n", a)
+    var b = a % 65536
+    printf("b=a%%65536 得=%d (若=12499说明QVM自动16位)\n", b)
+    var c = 993040
+    printf("993040 直读=%d\n", c)
+end
+main()

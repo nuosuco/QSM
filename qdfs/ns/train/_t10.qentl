@@ -1,0 +1,12 @@
+def main():
+    var p = arr_new(4)
+    arr_set(p, 0, 10000)
+    arr_set(p, 1, 60059)
+    arr_set(p, 2, -4968)
+    arr_set(p, 3, 1)
+    printf("池存: 10000=%d 60059=%d -4968=%d 1=%d\n",
+        arr_get(p, 0), arr_get(p, 1), arr_get(p, 2), arr_get(p, 3))
+    var cp = 10000 + 4999
+    printf("彝文段cp=10000+4999=%d (QVM内算, 16位内)\n", cp)
+end
+main()

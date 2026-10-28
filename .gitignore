@@ -40,3 +40,27 @@ web/uploads/
 
 # 训练中间chunk产物不入库(只入最终尾权重 *_final.w)
 qdfs/ns/models/qscl_32x32_weights/*/
+
+# 叠加态多进程工作目录 (态A/态B, 含 target.qbc/qvm.qbc 软链+复制)
+.state_a/
+.state_b/
+
+# run/ 训练时间戳日志与中间探针 (只保留必要 .qbc 产物, 其余不入库)
+run/*_time.txt
+run/watch_done_*.txt
+
+# ACME 验证残留
+web/.well-known/
+
+# 旧脚本备份 (planB-backup 等)
+*.planB-backup
+
+# 中间变体像素数据 (v4 单份 166MB/142MB 超 GitHub 100MB 上限, 不入仓库; 保留训练主数据/变体v6/主表)
+qdfs/ns/data/yi_glyph_5316_32x32_variant_v4*.comma.data
+
+# run/ 下训练时间戳与日志类产物 (只保留必要 .qbc 成品, 中间探针/日志不入库)
+run/*.time
+run/*.all
+run/*.chk
+run/*.txt
+run/*.log

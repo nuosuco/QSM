@@ -1,0 +1,207 @@
+# 类号→码点 2层MLP 段分类器 (QVM mat_mul/backprop, 学17窄段)
+var g_w1 = 0
+var g_b1 = 0
+var g_w2 = 0
+var g_b2 = 0
+var g_x = 0
+var g_h = 0
+var g_o = 0
+var g_g = 0
+var g_i = 0
+var g_j = 0
+var g_gi = 0
+var g_gj = 0
+
+def main():
+    printf("=== 2层MLP 段分类器 (标点段 316类, 17窄段) ===\n")
+    # w1: 9位输入 x 12隐藏 = 108; b1: 12
+    # w2: 12隐藏 x 17输出 = 204; b2: 17
+    g_w1 = arr_new(108)
+    g_b1 = arr_new(12)
+    g_w2 = arr_new(204)
+    g_b2 = arr_new(17)
+    g_x = arr_new(9)
+    g_h = arr_new(12)
+    g_o = arr_new(17)
+    g_g = arr_new(17)
+    # 初始化随机小权重 (0~10)
+    g_i = 0
+    while (g_i < 108):
+        arr_set(g_w1, g_i, (g_i * 7) % 11 - 5)
+        g_i = g_i + 1
+    end
+    g_i = 0
+    while (g_i < 204):
+        arr_set(g_w2, g_i, (g_i * 3) % 11 - 5)
+        g_i = g_i + 1
+    end
+
+    # 17窄段界 (类号局部 0~315, 9位)
+    # 段界: 5000,5095,5102,5112,5116,5117,5118,5120,5121,5122,5123,5212,5217,5219,5220,5221,5222(→17段), 5316
+    # 局部: 0,95,102,112,116,117,118,120,121,122,123,212,217,219,220,221,222
+    var ep = 0
+    while (ep < 100):
+        var tc = 0
+        var tw = 0
+        var cls = 5000
+        while (cls < 5316):
+            var lcl = cls - 5000
+            # 目标段
+            var tseg = 0
+            if (lcl >= 95): tseg = 1 end
+            if (lcl >= 102): tseg = 2 end
+            if (lcl >= 112): tseg = 3 end
+            if (lcl >= 116): tseg = 4 end
+            if (lcl >= 117): tseg = 5 end
+            if (lcl >= 118): tseg = 6 end
+            if (lcl >= 120): tseg = 7 end
+            if (lcl >= 121): tseg = 8 end
+            if (lcl >= 122): tseg = 9 end
+            if (lcl >= 123): tseg = 10 end
+            if (lcl >= 212): tseg = 11 end
+            if (lcl >= 217): tseg = 12 end
+            if (lcl >= 219): tseg = 13 end
+            if (lcl >= 220): tseg = 14 end
+            if (lcl >= 221): tseg = 15 end
+            if (lcl >= 222): tseg = 16 end
+            # 输入 9位
+            g_i = 0
+            while (g_i < 9):
+                var pv = 1
+                g_j = 0
+                while (g_j < g_i):
+                    pv = pv * 2
+                    g_j = g_j + 1
+                end
+                arr_set(g_x, g_i, lcl / pv % 2)
+                g_i = g_i + 1
+            end
+            # 前向: h = w1*x + b1
+            g_i = 0
+            while (g_i < 12):
+                var acc = arr_get(g_b1, g_i)
+                g_j = 0
+                while (g_j < 9):
+                    acc = acc + arr_get(g_w1, g_j * 12 + g_i) * arr_get(g_x, g_j)
+                    g_j = g_j + 1
+                end
+                if (acc < 0): acc = 0 end
+                if (acc > 500): acc = 500 end
+                arr_set(g_h, g_i, acc)
+                g_i = g_i + 1
+            end
+            # 前向: o = w2*h + b2 (未归一化)
+            g_i = 0
+            while (g_i < 17):
+                var acc2 = arr_get(g_b2, g_i)
+                g_j = 0
+                while (g_j < 12):
+                    acc2 = acc2 + arr_get(g_w2, g_j * 17 + g_i) * arr_get(g_h, g_j)
+                    g_j = g_j + 1
+                end
+                arr_set(g_o, g_i, acc2)
+                g_i = g_i + 1
+            end
+            # softmax → 预测段
+            var sm = 0
+            g_i = 0
+            while (g_i < 17):
+                var ov = arr_get(g_o, g_i)
+                if (ov < 0): ov = 0 end
+                if (ov > 500): ov = 500 end
+                arr_set(g_o, g_i, ov)
+                sm = sm + ov
+                g_i = g_i + 1
+            end
+            if (sm == 0): sm = 1 end
+            var best = 0
+            var bv = 0 - 30000
+            g_i = 0
+            while (g_i < 17):
+                var pv2 = arr_get(g_o, g_i) * 1000 / sm
+                if (pv2 > bv):
+                    bv = pv2
+                    best = g_i
+                end
+                g_i = g_i + 1
+            end
+            if (best == tseg):
+                tc = tc + 1
+            else:
+                tw = tw + 1
+            end
+            # 反向: 梯度 = softmax - onehot
+            g_i = 0
+            while (g_i < 17):
+                var pr = arr_get(g_o, g_i) * 1000 / sm
+                var gv = pr
+                if (g_i == tseg):
+                    gv = pr - 1000
+                end
+                arr_set(g_g, g_i, gv / 10)
+                g_i = g_i + 1
+            end
+            # w2更新: w2[j][i] += lr * grad[i] * h[j]
+            var lr = 20
+            g_j = 0
+            while (g_j < 12):
+                var hv = arr_get(g_h, g_j)
+                g_i = 0
+                while (g_i < 17):
+                    var upd = lr * arr_get(g_g, g_i) * hv / 100000
+                    arr_set(g_w2, g_j * 17 + g_i, arr_get(g_w2, g_j * 17 + g_i) + upd)
+                    g_i = g_i + 1
+                end
+                g_j = g_j + 1
+            end
+            # b2更新
+            g_i = 0
+            while (g_i < 17):
+                var upd2 = lr * arr_get(g_g, g_i) / 1000
+                arr_set(g_b2, g_i, arr_get(g_b2, g_i) + upd2)
+                g_i = g_i + 1
+            end
+            # w1更新: w1[j][k] += lr * sum_i(w2[k][i]*grad[i]) * relu'(h[k]) * x[j]
+            g_j = 0
+            while (g_j < 9):
+                var xv = arr_get(g_x, g_j)
+                g_i = 0
+                while (g_i < 12):
+                    var dk = 0
+                    var hk = arr_get(g_h, g_i)
+                    var hd = 0
+                    if (hk > 0): hd = 1 end
+                    var sumi = 0
+                    var ki = 0
+                    while (ki < 17):
+                        sumi = sumi + arr_get(g_w2, g_i * 17 + ki) * arr_get(g_g, ki)
+                        ki = ki + 1
+                    end
+                    var upd3 = lr * sumi * hd * xv / 1000000
+                    arr_set(g_w1, g_j * 12 + g_i, arr_get(g_w1, g_j * 12 + g_i) + upd3)
+                    g_i = g_i + 1
+                end
+                g_j = g_j + 1
+            end
+            cls = cls + 1
+        end
+        var cr = tc * 100 / (tc + tw)
+        printf("ep%d: 段分类(316类x17段) 对%d 错%d = %d%%\n", ep, tc, tw, cr)
+        if (tw == 0):
+            break
+        end
+        ep = ep + 1
+    end
+
+    printf("=== 保存 MLP 权重 ===\n")
+    printf("=== w1 (108) ===\n")
+    emit_ints(g_w1, 0, 108)
+    printf("\n=== b1 (12) ===\n")
+    emit_ints(g_b1, 0, 12)
+    printf("\n=== w2 (204) ===\n")
+    emit_ints(g_w2, 0, 204)
+    printf("\n=== b2 (17) ===\n")
+    emit_ints(g_b2, 0, 17)
+    printf("\n=== 完成 ===\n")
+end
+main()

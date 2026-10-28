@@ -1,0 +1,170 @@
+# 类号→码点 18段one-hot 编码训练器 v5 (码点20位逐位编码, 绕开16位截断)
+# 段选择wh(13类号位x18段) 感知机学段界 (QVM真训)
+# 段偏置: 20码点位x18段, 每段存"码点=类+偏移"的逐位0/1
+# 推理: 选段s → 码点逐位 = 类号逐位 ^ 段偏置逐位 (XOR, 16位安全)
+var g_wh = 0
+var g_bias = 0
+var g_ss = 0
+var g_so = 0
+var g_i = 0
+var g_j = 0
+var g_j2 = 0
+var g_gi = 0
+var g_gj = 0
+var g_lr = 30
+
+def main():
+    printf("=== 18段one-hot 类号→码点 编码训练 v5 (码点20位逐位, 绕16位截断) ===\n")
+    g_wh = arr_new(234)
+    g_bias = arr_new(360)
+    g_ss = arr_new(19)
+    g_so = arr_new(18)
+    arr_set(g_ss, 0, 0)
+    arr_set(g_ss, 1, 5000)
+    arr_set(g_ss, 2, 5095)
+    arr_set(g_ss, 3, 5102)
+    arr_set(g_ss, 4, 5112)
+    arr_set(g_ss, 5, 5116)
+    arr_set(g_ss, 6, 5117)
+    arr_set(g_ss, 7, 5118)
+    arr_set(g_ss, 8, 5120)
+    arr_set(g_ss, 9, 5121)
+    arr_set(g_ss, 10, 5122)
+    arr_set(g_ss, 11, 5123)
+    arr_set(g_ss, 12, 5212)
+    arr_set(g_ss, 13, 5217)
+    arr_set(g_ss, 14, 5219)
+    arr_set(g_ss, 15, 5220)
+    arr_set(g_ss, 16, 5221)
+    arr_set(g_ss, 17, 5222)
+    arr_set(g_ss, 18, 5316)
+    arr_set(g_so, 0, 993040)
+    arr_set(g_so, 1, -4968)
+    arr_set(g_so, 2, -4932)
+    arr_set(g_so, 3, -4931)
+    arr_set(g_so, 4, -4930)
+    arr_set(g_so, 5, -4929)
+    arr_set(g_so, 6, -4902)
+    arr_set(g_so, 7, -4871)
+    arr_set(g_so, 8, -4815)
+    arr_set(g_so, 9, -4790)
+    arr_set(g_so, 10, -4557)
+    arr_set(g_so, 11, -4531)
+    arr_set(g_so, 12, -4444)
+    arr_set(g_so, 13, -4442)
+    arr_set(g_so, 14, -4441)
+    arr_set(g_so, 15, -4440)
+    arr_set(g_so, 16, -4414)
+    arr_set(g_so, 17, 60059)
+
+    # 偏置逐位: 码点=类号+偏移, 逐位算 偏移 的 20位0/1
+    printf("--- 偏置逐位 (20码点位x18段, 偏移各位) ---\n")
+    g_gi = 0
+    while (g_gi < 18):
+        var off = arr_get(g_so, g_gi)
+        # 偏移可能负, 逐位用 (off/2^b)%2 对负数awk无, 用 off的20位补码
+        g_gj = 0
+        while (g_gj < 20):
+            var dv = 1
+            g_j = 0
+            while (g_j < g_gj):
+                dv = dv * 2
+                g_j = g_j + 1
+            end
+            var obit = off / dv % 2
+            if (obit < 0):
+                obit = obit + 2
+            end
+            arr_set(g_bias, g_gj * 18 + g_gi, obit)
+            g_gj = g_gj + 1
+        end
+        g_gi = g_gi + 1
+    end
+
+    # 段选择wh感知机
+    var ep = 0
+    while (ep < 60):
+        var tc = 0
+        var tw = 0
+        g_gi = 0
+        while (g_gi < 18):
+            var mid = (arr_get(g_ss, g_gi) + arr_get(g_ss, g_gi + 1) - 1) / 2
+            g_gj = 0
+            while (g_gj < 18):
+                var active = 0
+                g_j = 0
+                while (g_j < 13):
+                    var gv = 1
+                    g_j2 = 0
+                    while (g_j2 < g_j):
+                        gv = gv * 2
+                        g_j2 = g_j2 + 1
+                    end
+                    var bv = mid / gv % 2
+                    active = active + arr_get(g_wh, g_j * 18 + g_gj) * bv
+                    g_j = g_j + 1
+                end
+                var active_b = 0
+                if (active > 0):
+                    active_b = 1
+                end
+                var tgt = 0
+                if (g_gi == g_gj):
+                    tgt = 1
+                end
+                if (active_b == tgt):
+                    tc = tc + 1
+                else:
+                    tw = tw + 1
+                    if (tgt == 1):
+                        g_j = 0
+                        while (g_j < 13):
+                            var gv2 = 1
+                            g_j2 = 0
+                            while (g_j2 < g_j):
+                                gv2 = gv2 * 2
+                                g_j2 = g_j2 + 1
+                            end
+                            if (mid / gv2 % 2 == 1):
+                                arr_set(g_wh, g_j * 18 + g_gj, arr_get(g_wh, g_j * 18 + g_gj) + g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                    else:
+                        g_j = 0
+                        while (g_j < 13):
+                            var gv3 = 1
+                            g_j2 = 0
+                            while (g_j2 < g_j):
+                                gv3 = gv3 * 2
+                                g_j2 = g_j2 + 1
+                            end
+                            if (mid / gv3 % 2 == 1):
+                                arr_set(g_wh, g_j * 18 + g_gj, arr_get(g_wh, g_j * 18 + g_gj) - g_lr)
+                            end
+                            g_j = g_j + 1
+                        end
+                    end
+                end
+                g_gj = g_gj + 1
+            end
+            g_gi = g_gi + 1
+        end
+        var cr = tc * 100 / (tc + tw)
+        printf("ep%d: 段判别 对%d 错%d = %d%%\n", ep, tc, tw, cr)
+        if (tw == 0):
+            break
+        end
+        ep = ep + 1
+    end
+
+    printf("=== 保存编码权重 ===\n")
+    printf("=== 段选择权重 wh (13类号位 x 18段 = 234值) ===\n")
+    emit_ints(g_wh, 0, 234)
+    printf("\n=== 段偏置逐位 (20码点位 x 18段 = 360值, 0/1) ===\n")
+    emit_ints(g_bias, 0, 360)
+    printf("\n=== 段偏移 (18值, 供参考, 码点=类+偏移) ===\n")
+    emit_ints(g_so, 0, 18)
+    printf("\n=== 完成 ===\n")
+end
+main()

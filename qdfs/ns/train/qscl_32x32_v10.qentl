@@ -39,7 +39,7 @@ var g_seed = 0
 var g_base = 0
 var g_lr = 500
 var g_ep = 0
-var g_epoch = 5             # 由 build_run_v10.sh 设定: 冒烟1/正式3
+var g_epoch = 10             # 由 build_run_v10.sh 设定: 冒烟1/正式3
 var g_smoke_limit = 0
 var g_ns = 0                 # 本态样本扫描上限: 通用批129 / 部首批(b8)106
 var g_sidx = 0
@@ -106,9 +106,9 @@ end
 
 # ---- 一次性加载本 batch 数据 + 预解析所有像素到 g_all_pix ----
 def load_batch_data():
-    var full = file_read("qdfs/ns/data/yi_glyph_4226_32x32.data")
+    var full = file_read("qdfs/ns/data/yi_glyph_5316_32x32.comma.data")
     var full_len = str_len(full)
-    var target_line = g_batch * 515
+    var target_line = g_batch * 129
     var pos = 0
     var ln = 0
     var nl = 0
@@ -123,12 +123,12 @@ def load_batch_data():
     end
     g_batch_start_pos = pos
     # 2026-09-26 部首批修复: b8 只有 106 行, 固定 129 会预扫到垃圾 → 标签回绕 -4120 → 训练崩
-    if (g_batch == 8):
-        g_ns = 106
+    if (g_batch == 41):
+        g_ns = 27
     else:
         g_ns = 129
     end
-    var slice_len = 2049 * g_ns
+    var slice_len = 2053 * g_ns
     var slice = str_substring(full, pos, slice_len)
     g_batch_data = slice
     g_batch_data_len = str_len(slice)
@@ -201,13 +201,16 @@ def transform_sample():
 end
 
 def predict():
-    # 2026-09-28 泄漏修复: 1次 predict_all builtin 取代 515×dot_arr_at 循环
+    # 2026-09-28 泄漏修复: 1次 predict_all builtin 取代 474×dot_arr_at 循环
     # 20位整数域注意: psum 在 builtin 内累加 pwv*pxv — 像素 0/1×100, 权重 ±30000
     #   单类内积最大 30000×1024×100 = 3e10 > 20位域(~52万) — 但实际像素稀疏(8%非零)
     #   ≈ 82个非零 × 30000×100 = 2.5e8 仍超! dot_arr_at 旧实现同样问题但用 /1000 分散?
-    # 检查旧 dot_arr_at: psum 无钳位 — 旧版也超域但 argmax 仍工作(历史99%)
+    #   检查旧 dot_arr_at: psum 无钳位 — 旧版也超域但 argmax 仍工作(历史99%)
     # 保持一致: 同样不钳位 (与 dot_arr_at 行为完全一致)
-    g_pred = predict_all(g_wh, 515, g_xh, 1024)
+    # 2026-10-01 42批修复: batch41 只有 77 类(5239-5315), 其余批 129 类
+    var pcls = 129
+    if (g_batch == 41): pcls = 27 end
+    g_pred = predict_all(g_wh, pcls, g_xh, 1024)
 end
 
 def boost_class(c_off, lr):
@@ -287,11 +290,14 @@ end
 def save_weights():
     printf("=== 日志截断 ===\n")
     printf("=== QSCL 32x32 v10 权重流 (emit_ints) ===\n")
-    printf("META batch=%d state=%d seed=%d lr=%d nclass=515 pix=1024 nelem=527360\n",
-        g_batch, g_state, g_seed, g_lr)
+    # 2026-10-01 42批修复: batch41 只有 77 类(5239-5315), 其余批 129 类
+    var ncls = 129
+    if (g_batch == 41): ncls = 27 end
+    printf("META batch=%d state=%d seed=%d lr=%d nclass=%d pix=1024 nelem=%d\n",
+        g_batch, g_state, g_seed, g_lr, ncls, ncls * 1024)
     var cstr = ""
     g_c = 0
-    while (g_c < 515):
+    while (g_c < ncls):
         cstr = str_concat("C", int_to_str(g_c))
         cstr = str_concat(cstr, ": ")
         emit_str(cstr)
@@ -299,7 +305,7 @@ def save_weights():
         printf("\n")
         g_c = g_c + 1
     end
-    printf("=== 权重流结束 (515类 x 1024值 = 527360值) ===\n")
+    printf("=== 权重流结束 (%d类 x 1024值) ===\n", ncls)
 end
 
 def read_control_files():
@@ -324,7 +330,7 @@ def main():
     printf("=== QSCL 32x32 v10 flat_load_all_batch 一次性预解析 ===\n")
     printf("parse_sample 从预解析池复制, v9 逐字符循环根治 (§8/§21)\n")
 
-    var g_wsz = 515
+    var g_wsz = 474
     g_wsz = g_wsz * 1024
     g_xh = arr_new(1024)
     g_nxh = arr_new(1024)
@@ -342,11 +348,11 @@ def main():
         g_smoke_limit = str_to_int(sm)
         printf("冒烟模式: 只跑前%d样本\n", g_smoke_limit)
     end
-    g_base = g_batch * 515
+    g_base = g_batch * 129
     printf("本次 batch%d 态%d\n", g_batch, g_s)
 
     if (g_s < 4):
-        printf("--- batch%d (类%d-%d) 态%d ---\n", g_batch, g_base, g_base + 514, g_s)
+        printf("--- batch%d (类%d-%d) 态%d ---\n", g_batch, g_base, g_base + 128, g_s)
         load_batch_data()
         g_state = g_s
         g_seed = 1 + g_s * 100

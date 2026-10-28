@@ -1,0 +1,45 @@
+# 内存泄漏隔离测试 v7b: 像素串解析 (str_char_at 循环) — 简化, 不用全局数组
+var g_rec_wh = 0
+var g_rec_xh = 0
+var wsz = 527360
+g_rec_wh = arr_new(wsz)
+g_rec_xh = arr_new(1024)
+# 模拟像素串
+var px = "0:"
+var j = 0
+while (j < 1024):
+    px = str_concat(px, "0")
+    if (j < 1023):
+        px = str_concat(px, ",")
+    end
+    j = j + 1
+end
+var req = 0
+while (req < 2):
+    var pdlen = str_len(px)
+    var pbase = 0
+    var found_colon = 0
+    while (pbase < pdlen):
+        var pch = ord(str_char_at(px, pbase))
+        if (pch == 58):
+            found_colon = 1
+            pbase = pbase + 1
+            break
+        end
+        pbase = pbase + 1
+    end
+    var g_j2 = 0
+    while (g_j2 < 1024 and pbase < pdlen):
+        var pb = ord(str_char_at(px, pbase))
+        var val = 0
+        if (pb == 49):
+            val = 1
+        end
+        arr_set(g_rec_xh, g_j2, val)
+        pbase = pbase + 2
+        g_j2 = g_j2 + 1
+    end
+    printf("请求%d 完成 (解析%d像素)\n", req, g_j2)
+    req = req + 1
+end
+printf("结束\n")

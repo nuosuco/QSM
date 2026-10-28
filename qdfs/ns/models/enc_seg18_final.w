@@ -1,0 +1,35 @@
+# 编码权重: 16阈值(学出) + 17段偏移(编码常数)
+# 格式: 每行 "seg_thresh k" 或 "seg_off k"
+seg_thresh 95
+seg_thresh 102
+seg_thresh 112
+seg_thresh 116
+seg_thresh 117
+seg_thresh 118
+seg_thresh 120
+seg_thresh 121
+seg_thresh 122
+seg_thresh 123
+seg_thresh 212
+seg_thresh 217
+seg_thresh 219
+seg_thresh 220
+seg_thresh 221
+seg_thresh 222
+seg_off -4968
+seg_off -4932
+seg_off -4931
+seg_off -4930
+seg_off -4929
+seg_off -4902
+seg_off -4871
+seg_off -4815
+seg_off -4790
+seg_off -4557
+seg_off -4531
+seg_off -4444
+seg_off -4442
+seg_off -4441
+seg_off -4440
+seg_off -4414
+seg_off 60059

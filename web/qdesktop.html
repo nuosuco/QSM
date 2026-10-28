@@ -5,7 +5,7 @@
 <meta http-equiv="Expires" content="0"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate"><title>QEntL 量子操作系统</title>
 <style>
 @font-face{font-family:'LSTY-Yi-Black';src:local('LSTY-Yi-Black'),local('YiTongyong'),url('/fonts/lingyi.ttf') format('truetype');font-display:swap}
-@font-face{font-family:'LSTY-Yi-SMP';src:local('LSTY-Yi-Black'),local('YiTongyong'),url('/fonts/lingyi_smp.ttf') format('truetype');font-display:swap}
+@font-face{font-family:'LSTY-Yi-SMP';src:local('LSTY-Yi-Black'),local('YiTongyong'),url('/fonts/lingyi.ttf') format('truetype');font-display:swap}
 html,body{font-family:'YiTongyong','LSTY-Yi-Black','LSTY-Yi-SMP',system-ui,sans-serif;background:#0a0e1a;color:#c8d8e8;overflow:hidden;height:100vh;width:100vw;margin:0}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--bg:#0a0e1a;--card:rgba(20,30,60,0.85);--accent:#00d4ff;--yi:#ff6b9d}
@@ -125,7 +125,7 @@ var _busy=false;
 var doFetch=function(url, body){
   return new Promise(function(rRes,rRej){
     var xhr=new XMLHttpRequest();
-    xhr.timeout=45000;
+    xhr.timeout=300000;  // v15.21: 识别75s, 超时提到300s
     xhr.open('POST',url,true);
     xhr.setRequestHeader('Content-Type','text/plain');
     xhr.onreadystatechange=function(){
@@ -143,6 +143,20 @@ var doChat=function(txt){
   var msgs=document.getElementById('chatMsgs');
   var wt=document.createElement('div');wt.style.cssText='margin:4px 0;color:#6a7a8a;font-size:12px';wt.textContent='处理中...';
   msgs.appendChild(wt);msgs.scrollTop=msgs.scrollHeight;
+  var genm=(txt||'').match(/生成\s*([0-9]{1,4})/);
+  if(genm){
+    var gk=parseInt(genm[1],10);
+    doFetch('/api/generate?d='+gk).then(function(data){
+      if(wt.parentNode)wt.remove();
+      try{appendMsg(msgs,data);}catch(e){msgs.innerHTML+='<div style="color:#ff4757;font-size:12px">解析失败: '+String(e)+'</div>';}
+      _busy=false;
+    }).catch(function(e){
+      if(wt.parentNode)wt.remove();
+      _busy=false;
+      msgs.innerHTML+='<div style="color:#ff4757;font-size:12px">生成失败: '+String(e)+'</div>';
+    });
+    return;
+  }
   doFetch('/api/yi',txt).then(function(data){
     if(wt.parentNode)wt.remove();
     try{appendMsg(msgs,data);}catch(e){msgs.innerHTML+='<div style="color:#ff4757;font-size:12px">解析失败: '+String(e)+'</div>';}
@@ -154,15 +168,80 @@ var doChat=function(txt){
   });
 };
 
-function uploadImages(){var imgs=pendingImages.slice(0);pendingImages=[];renderImgList();var msgs=document.getElementById('chatMsgs');msgs.innerHTML+='<div style="margin:4px 0;color:#6a7a8a;font-size:12px">处理 '+imgs.length+' 张图片...</div>';msgs.scrollTop=msgs.scrollHeight;var done=0;for(var k=0;k<imgs.length;k++){(function(k){var img=imgs[k];var canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;var ctx=canvas.getContext('2d');ctx.fillStyle='#000';ctx.fillRect(0,0,32,32);var im=new Image();im.onload=function(){ctx.drawImage(im,0,0,32,32);var id=ctx.getImageData(0,0,32,32);var px=[];for(var i=0;i<1024;i++){var idx=i*4;var lum=0.299*id.data[idx]+0.587*id.data[idx+1]+0.114*id.data[idx+2];px.push(lum>128?1:0);}var thumbDiv=document.createElement('div');thumbDiv.style.cssText='margin:4px 0;';var thumbImg=document.createElement('img');thumbImg.style.cssText='max-width:100px;max-height:100px;border:1px solid var(--accent);border-radius:4px;cursor:pointer;vertical-align:top;';thumbImg.src=URL.createObjectURL(img);thumbImg.onclick=function(){var ov=document.createElement('div');ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer;';var ovImg=document.createElement('img');ovImg.style.cssText='max-width:90vw;max-height:90vh;border-radius:8px;';ovImg.src=thumbImg.src;ovImg.onclick=function(){ov.remove();};ov.appendChild(ovImg);ov.onclick=function(){ov.remove();};document.body.appendChild(ov);};thumbDiv.appendChild(thumbImg);msgs.appendChild(thumbDiv);doFetch('/api/yi32',px.join(',')).then(function(data){appendMsg(msgs,'[图片'+(k+1)+'/'+imgs.length+'] '+data);done++;if(done===imgs.length){var d=document.createElement('div');d.style.cssText='margin:6px 0;padding:6px;color:#6a7a8a;font-size:12px';d.textContent='全部完成 '+done+'/'+imgs.length;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;}}).catch(function(e){msgs.innerHTML+='<div style="color:#ff4757;font-size:12px">[图片'+(k+1)+'] 失败</div>';done++;});};im.src=URL.createObjectURL(img);})(k)} }
+function uploadImages(){
+var imgs=pendingImages.slice(0);pendingImages=[];renderImgList();
+var msgs=document.getElementById('chatMsgs');
+msgs.innerHTML+='<div style="margin:4px 0;color:#6a7a8a;font-size:12px">处理 '+imgs.length+' 张图片(叠加态并行: 双态同时识别, 每张约75秒)...</div>';
+msgs.scrollTop=msgs.scrollHeight;
+var done=0;
+// 叠加态并行: 2个态(9802/9803)交替接图, 2张同时识别; 超过2张则前两张并发完再发下一对
+function prepPx(img){
+var canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;
+var ctx=canvas.getContext('2d');ctx.fillStyle='#000';ctx.fillRect(0,0,32,32);
+return new Promise(function(resolve){
+var im=new Image();
+im.onload=function(){
+ctx.drawImage(im,0,0,32,32);
+var id=ctx.getImageData(0,0,32,32);var px=[];
+for(var i=0;i<1024;i++){var idx2=i*4;var lum=0.299*id.data[idx2]+0.587*id.data[idx2+1]+0.114*id.data[idx2+2];px.push(lum>128?1:0);}
+resolve(px);
+};
+im.src=URL.createObjectURL(img);
+});
+}
+function makeThumb(img){
+var thumbDiv=document.createElement('div');thumbDiv.style.cssText='margin:4px 0;';
+var thumbImg=document.createElement('img');
+thumbImg.style.cssText='max-width:100px;max-height:100px;border:1px solid var(--accent);border-radius:4px;cursor:pointer;vertical-align:top;';
+thumbImg.src=URL.createObjectURL(img);
+thumbImg.onclick=function(){var ov=document.createElement('div');ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer;';var ovImg=document.createElement('img');ovImg.style.cssText='max-width:90vw;max-height:90vh;border-radius:8px;';ovImg.src=thumbImg.src;ovImg.onclick=function(){ov.remove();};ov.appendChild(ovImg);ov.onclick=function(){ov.remove();};document.body.appendChild(ov);};
+var waitDiv=document.createElement('div');
+waitDiv.style.cssText='margin:4px 0;color:#ffd700;font-size:12px';
+thumbDiv.appendChild(thumbImg);thumbDiv.appendChild(waitDiv);
+msgs.appendChild(thumbDiv);msgs.scrollTop=msgs.scrollHeight;
+return {thumb:thumbDiv,wait:waitDiv};
+}
+// 单张识别到指定端点 (ep='/api/' 或 '/api2/')
+function recogOne(k,ep){
+var img=imgs[k];
+return prepPx(img).then(function(px){
+var t=makeThumb(img);
+t.wait.textContent='识别中(第'+(k+1)+'张, 态'+(ep==='/api/'?'A':'B')+', 约75秒, 权重内积argmax, 不查表)...';
+return doFetch(ep+'yi32',px.join(',')).then(function(data){
+done++;
+if(!data||data.length<10){
+t.wait.textContent='⚠ 第'+(k+1)+'张无结果(态'+(ep==='/api/'?'A':'B')+'重启窗口), 8秒后自动重试';
+return new Promise(function(res){setTimeout(function(){res(recogOne(k,ep));},8000);});
+}
+t.wait.textContent='✅ 第'+(k+1)+'张识别完成(态'+(ep==='/api/'?'A':'B')+')';
+appendMsg(msgs,'[图片'+(k+1)+'/'+imgs.length+'] '+data);
+});
+});
+}
+// 交替配对: [0,1] 同时发 (0→/api/, 1→/api2/), [2,3] 前一对完再发 ...
+function runPair(start){
+if(start>=imgs.length){
+var d=document.createElement('div');d.style.cssText='margin:6px 0;padding:6px;color:#6a7a8a;font-size:12px';d.textContent='全部完成 '+done+'/'+imgs.length;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
+return;
+}
+var p1=recogOne(start,'/api/');
+if(start+1<imgs.length){
+var p2=recogOne(start+1,'/api2/');
+Promise.all([p1,p2]).then(function(){runPair(start+2);});
+}else{
+p1.then(function(){runPair(start+2);});
+}
+}
+runPair(0);
+}
 
 function appendMsg(msgs,data){try{
-var div=document.createElement('div');div.style.cssText='margin:6px 0;padding:8px;background:rgba(255,107,157,0.1);border-radius:6px;font-size:13px;line-height:1.5';var hdr=document.createElement('div');hdr.style.cssText='font-weight:700;color:#00d4ff;margin-bottom:4px';hdr.textContent='小趣QSM:';div.appendChild(hdr);var chunks=[];var cur={meta:{},grid:null,smp:''};var inGrid=false;var lines=data.split('\n');for(var i=0;i<lines.length;i++){var ln=lines[i].replace(/\r/g,'');if(!ln)continue;var isSmp=/^SMP#[0-9]+:/;var isMeta=/^(class|batch|cls|code|codepoint)=/;var isRow=/^[01 ]+$/.test(ln)&&ln.length>=30&&ln.length<=64&&ln.split(' ').filter(function(x){return x!==''}).length===32;if(isSmp.test(ln)){if(inGrid&&cur.grid&&cur.meta.codepoint!==undefined){chunks.push(cur);}cur={meta:{},grid:null,smp:ln};inGrid=false;}else if(isMeta.test(ln)){if(inGrid&&cur.grid&&cur.meta.codepoint!==undefined){chunks.push(cur);}var k=ln.split('=')[0];cur.meta[k]=ln.split('=')[1];}else if(isRow){if(!inGrid){cur.grid=[];inGrid=true;}var toks=ln.split(/\s+/).filter(function(x){return x!==''});if(toks.length===32){cur.grid.push(toks.join(''));}else{cur.grid.push(ln.replace(/\s/g,''));}}}if(inGrid&&cur.grid&&cur.meta.codepoint!==undefined){chunks.push(cur);}var hasChar=false;for(var ci=0;ci<chunks.length;ci++){var ch=chunks[ci];if(ch.meta.codepoint==null)continue;hasChar=true;var cp=parseInt(ch.meta.codepoint);if(cp<0xF0000||cp>0x10FFFF)cp=993040;var lb=document.createElement('div');lb.style.cssText='font-size:12px;color:#ffe66d;margin-bottom:4px';var txt=(ch.smp||'')+' U+'+cp.toString(16).toUpperCase();if(ch.meta.class!=null)txt+=' 类'+ch.meta.class;lb.appendChild(document.createTextNode(txt));div.appendChild(lb);if(ch.grid){var g=document.createElement('div');g.style.cssText='display:grid;grid-template-columns:repeat(32,0.7px);grid-template-rows:repeat(32,0.7px);gap:0;border:1px solid var(--accent);flex-shrink:0;margin:0;width:24px;height:24px;background:rgba(0,0,0,0.15);align-self:center';try{for(var r=0;r<32;r++){for(var c=0;c<32;c++){var cell=document.createElement('div');var pv=ch.grid[r]&&ch.grid[r][c];cell.style.background=pv==='1'?'#ffe66d':'rgba(0,0,0,0.08)';g.appendChild(cell)}}}catch(e3){}div.appendChild(g);}var wrap=document.createElement('div');wrap.style.cssText='display:flex;align-items:center;gap:8px;margin-top:6px;min-height:24px';var gld=document.createElement('div');gld.style.cssText='font-family:LSTY-Yi-SMP,LSTY-Yi-Black,YiTongyong,sans-serif;font-size:16px;color:#ffe66d;min-width:18px;text-align:left;line-height:1.4';try{gld.appendChild(document.createTextNode(String.fromCodePoint(cp)));}catch(e2){gld.textContent='?';}wrap.appendChild(gld);div.appendChild(wrap);}if(!hasChar){div.innerHTML+='<div style="white-space:pre-wrap">'+data+'</div>';}msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+var div=document.createElement('div');div.style.cssText='margin:6px 0;padding:8px;background:rgba(255,107,157,0.1);border-radius:6px;font-size:13px;line-height:1.5';var hdr=document.createElement('div');hdr.style.cssText='font-weight:700;color:#00d4ff;margin-bottom:4px';hdr.textContent='小趣QSM:';div.appendChild(hdr);var chunks=[];var cur={meta:{},grid:null,smp:''};var inGrid=false;var lines=data.split('\n');for(var i=0;i<lines.length;i++){var ln=lines[i].replace(/\r/g,'');if(!ln)continue;var isSmp=/^SMP#[0-9]+:/;var isMeta=/^(class|batch|cls|code|codepoint)=/;var isRow=/^[01 ]+$/.test(ln)&&ln.length>=30&&ln.length<=64&&ln.split(' ').filter(function(x){return x!==''}).length===32;if(isSmp.test(ln)){if(inGrid&&cur.grid&&cur.meta.codepoint!==undefined){chunks.push(cur);}cur={meta:{},grid:null,smp:ln};inGrid=false;}else if(isMeta.test(ln)){if(inGrid&&cur.grid&&cur.meta.codepoint!==undefined){chunks.push(cur);}var k=ln.split('=')[0];cur.meta[k]=ln.split('=')[1];}else if(isRow){if(!inGrid){cur.grid=[];inGrid=true;}var toks=ln.split(/\s+/).filter(function(x){return x!==''});if(toks.length===32){cur.grid.push(toks.join(''));}else{cur.grid.push(ln.replace(/\s/g,''));}}}if(inGrid&&cur.grid&&cur.meta.codepoint!==undefined){chunks.push(cur);}var hasChar=false;for(var ci=0;ci<chunks.length;ci++){var ch=chunks[ci];if(ch.meta.codepoint==null)continue;hasChar=true;var cp=parseInt(ch.meta.codepoint);if(cp<0xF0000||cp>0x10FFFF)cp=993040;var lb=document.createElement('div');lb.style.cssText='font-size:12px;color:#ffe66d;margin-bottom:4px';var txt=(ch.smp||'')+' U+'+cp.toString(16).toUpperCase();if(ch.meta.class!=null)txt+=' 类'+ch.meta.class;lb.appendChild(document.createTextNode(txt));div.appendChild(lb);if(ch.grid){var g=document.createElement('div');g.style.cssText='display:grid;grid-template-columns:repeat(32,1px);grid-template-rows:repeat(32,1px);gap:0;flex-shrink:0;margin:0;width:32px;height:32px;align-self:flex-start';try{for(var r=0;r<32;r++){for(var c=0;c<32;c++){var cell=document.createElement('div');var pv=ch.grid[r]&&ch.grid[r][c];cell.style.background=pv==='1'?'#ffe66d':'rgba(0,0,0,0.05)';g.appendChild(cell)}}}catch(e3){}div.appendChild(g);}var wrap=document.createElement('div');wrap.style.cssText='display:flex;align-items:center;gap:8px;margin-top:6px;min-height:24px';var gld=document.createElement('div');gld.style.cssText='font-family:LSTY-Yi-SMP,LSTY-Yi-Black,YiTongyong,sans-serif;font-size:16px;color:#ffe66d;min-width:18px;text-align:left;line-height:1.4';try{gld.appendChild(document.createTextNode(String.fromCodePoint(cp)));}catch(e2){gld.textContent='?';}wrap.appendChild(gld);div.appendChild(wrap);}if(!hasChar){div.innerHTML+='<div style="white-space:pre-wrap">'+data+'</div>';}msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
 }catch(e){msgs.innerHTML+='<div style="color:#ff4757;font-size:12px">解析: '+String(e)+'<br><pre>'+data+'</pre></div>';}}
 
 function runQasm(){var q=document.getElementById('qasmInput').value;var r='|00>';}
 function yiApp(){return '<div class="status-bar"><span class="status-dot yellow"></span> 滇川黔桂通用彝文 — 4120字</div><div class="yi-test">一</div>';}
-function fontApp(){return '<div style="font-weight:700;color:var(--accent);margin-bottom:8px">彝文字体安装</div><button onclick="window.location.href=\'/fonts/lingyi_smp.ttf\'">📥 下载 lingyi_smp.ttf</button>';}
+function fontApp(){return '<div style="font-weight:700;color:var(--accent);margin-bottom:8px">彝文字体安装</div><button onclick="window.location.href=\'/fonts/lingyi.ttf\'">📥 下载 lingyi.ttf</button>';}
 
 var saved=null;try{saved=localStorage.getItem('qentl-lang');}catch(e){}if(saved)setLang(saved);render();
 

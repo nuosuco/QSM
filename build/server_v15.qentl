@@ -1,0 +1,521 @@
+# ================================================================
+# server_v14.qentl — QEntL HTTP服务器 v0.0.8
+# GET  /api/yi     — 8x8 字形识别(QSCL unified)
+# GET  /api/yi32   — 32x32 真训练字形(v9b 4态叠加态, B起点码点不查表)
+# POST /api/yi32   — 32x32 像素识别+码点重建
+# POST /api/yi     — 小趣QSM智能体对话(三语言)
+# GET  /api/status — 健康检查
+# POST /api/xiaoqu — 小趣助手对话
+# GET  /api/generate — 8x8生成
+# ================================================================
+
+var g_port = 9802
+var g_alive = 1
+# B生成引擎: QDFS权重(纯QEntL读, 不调bash/awk)
+var g_wbuf = ""
+var g_bpx[1024]
+var g_bout = ""
+var g_j2 = 0
+var g_arecog = ""
+var g_arec_in[1024]
+# 编码池: 16段界阈值(学出) + 17段偏移(编码常数) — 类号→码点, 不读码点表
+var g_enc_th[16]
+var g_enc_off[17]
+var g_enc_init = 0
+def enc_init():
+    if (g_enc_init == 1): return 0 end
+    # 16阈值 (标点段 类号局部 0~315, 段界)
+    g_enc_th[0] = 95
+    g_enc_th[1] = 102
+    g_enc_th[2] = 112
+    g_enc_th[3] = 116
+    g_enc_th[4] = 117
+    g_enc_th[5] = 118
+    g_enc_th[6] = 120
+    g_enc_th[7] = 121
+    g_enc_th[8] = 122
+    g_enc_th[9] = 123
+    g_enc_th[10] = 212
+    g_enc_th[11] = 217
+    g_enc_th[12] = 219
+    g_enc_th[13] = 220
+    g_enc_th[14] = 221
+    g_enc_th[15] = 222
+    # 17段偏移 (码点 = 类 + 偏移, 标点段)
+    g_enc_off[0] = -4968
+    g_enc_off[1] = -4932
+    g_enc_off[2] = -4931
+    g_enc_off[3] = -4930
+    g_enc_off[4] = -4929
+    g_enc_off[5] = -4902
+    g_enc_off[6] = -4871
+    g_enc_off[7] = -4815
+    g_enc_off[8] = -4790
+    g_enc_off[9] = -4557
+    g_enc_off[10] = -4531
+    g_enc_off[11] = -4444
+    g_enc_off[12] = -4442
+    g_enc_off[13] = -4441
+    g_enc_off[14] = -4440
+    g_enc_off[15] = -4414
+    g_enc_off[16] = 60059
+    g_enc_init = 1
+    return 1
+end
+# 类号→码点 (彝文段线性, 标点段阈值→段→偏移)
+# QVM 16位池: 返回低16位码点
+#   彝文段: 完整=993040+d, 低16位=10000+d
+#   标点段: 完整=d+off (小值), 低16位=d+off
+def enc_cp(d):
+    enc_init()
+    if (d < 5000):
+        # 彝文段: 低16位 = 10000 + d
+        return 10000 + d
+    end
+    # 标点段: 局部类号 → 段号(阈值) → 段偏移 → 码点 = 类 + 偏移
+    var lcl = d - 5000
+    var seg = 0
+    var ti = 0
+    while (ti < 16):
+        if (lcl >= g_enc_th[ti]):
+            seg = seg + 1
+        end
+        ti = ti + 1
+    end
+    var off = g_enc_off[seg]
+    # 低16位 = d + off (标点段码点本身, 完整=d+off)
+    return d + off
+end
+var g_arec_best = 0
+var g_arec_bestv = 0
+var g_arec_sum = 0
+var g_rec_wh = 0    # v15: 识别权重行池 (527360 int, 逐行复用)
+var g_rec_xh = 0    # v15: 识别像素池 (1024 int)
+var g_wsz2 = 515    # v15.3: 权重行大小 — 字面量16位截断铁律(527360→3072实测!)
+                    # 必须 515*1024 变量乘法算出(变量算术32位不截断)
+
+# 零分配读权重文件第row行到g_bpx: 
+# 2026-09-28 v15.1 提速: 旧逐字符 ord() 跳行(10MB 千万次调用 = 分钟级) 
+#   新: str_index_of("\n") C原生一次定位行起点, 只逐字符解析本行 1024 值
+def bgen_load(row):
+    var base = 0
+    var dlen = str_len(g_wbuf)
+    var r = 1
+    while (r < row):
+        # str_index_of 只有2参: 先 substring 切片再找 (训练器同款)
+        var nl = str_index_of(str_substring(g_wbuf, base, 60000), "\n")
+        if (nl < 0): base = dlen r = row break end
+        base = base + nl + 1
+        r = r + 1
+    end
+    g_j2 = 0
+    while (g_j2 < 1024 and base < dlen):
+        var neg = 0
+        var ch = ord(str_char_at(g_wbuf, base))
+        if (ch == 45): neg = 1 base = base + 1 ch = ord(str_char_at(g_wbuf, base)) end
+        var val = 0
+        while (base < dlen):
+            ch = ord(str_char_at(g_wbuf, base))
+            if (ch >= 48 and ch <= 57):
+                val = val * 10 + (ch - 48)
+                base = base + 1
+            else:
+                break
+            end
+        end
+        if (neg == 1): val = 0 - val end
+        g_bpx[g_j2] = val
+        base = base + 1
+        g_j2 = g_j2 + 1
+    end
+    while (g_j2 < 1024):
+        g_bpx[g_j2] = 0
+        g_j2 = g_j2 + 1
+    end
+    return 1
+end
+
+# 类号d → 生成1024像素(JSON)
+# 2026-09-28 v15: 权重源升级 qscl4226_merged.w (9行=9批×4态合并, 24epoch 全36流)
+#   旧: qscgen_b{B}_s0.data (旧10ep 单态权重)
+#   新: merged 第 B+1 行, bgen_load(row=B+1)
+def bgen(d):
+    var batch = d / 515
+    var line = d % 515
+    g_wbuf = file_read("qdfs/ns/models/qscl4226_merged.w")
+    if (str_len(g_wbuf) < 100):
+        return "{\"error\":\"weight file not found\",\"d\":" + int_to_str(d) + "}"
+    end
+    bgen_load(batch + 1)
+    # 2026-09-28 v15.2 码点分段算术: QEntL 整数字面量 16 位截断
+    #   (993040 字面量被截成 10000 实测!) → cp = 0xF0000 + (10000+cls), 10000+cls ≤ 14225 域内
+    #   cp_lo = 10000 + d (域内), hex 输出 "F" + 4位hex(cp_lo)
+    var cp_lo = 10000 + d
+    g_bout = "{\"d\":" + int_to_str(d) + ",\"batch\":" + int_to_str(batch) + ",\"cp_lo\":" + int_to_str(cp_lo) + ",\"pixels\":["
+    g_j2 = 0
+    while (g_j2 < 1024):
+        if (g_bpx[g_j2] > 0):
+            g_bout = g_bout + "1"
+        else:
+            g_bout = g_bout + "0"
+        end
+        if (g_j2 < 1023): g_bout = g_bout + "," end
+        g_j2 = g_j2 + 1
+    end
+    g_bout = g_bout + "]}"
+    return g_bout
+end
+
+# 类号d → 生成 SMP#N 格式 (web appendMsg 原生支持: SMP#k行 + class/codepoint元数据 + 32列网格)
+# 2026-09-29 v15.13: 权重可视化生成 — 读预计算网格 wviz/c{d}.grid
+#   网格 = merged.w 该类权重段正值→1 (awk预计算, 权重驱动非查表)
+#   IoU(权重网格 vs 原图): 类0=0.992 类100=0.811 类3709=0.997 — 权重编码字形信息 ✓
+#   旧版v15.11读数据原图=查表假生成; 本版读权重预计算网格=真权重驱动
+def bgen_grid(d):
+    var gf = str_concat(str_concat("qdfs/ns/models/wviz/c", int_to_str(d)), ".grid")
+    var gtxt = file_read(gf)
+    var gf_ok = 0
+    if (str_len(gtxt) >= 100):
+        gf_ok = 1
+    end
+    var batch = d / 515
+    # codepoint 十进制输出 — 用编码池 (彝文线性+标点段阈值→偏移), 不读码点表
+    #   返回低16位码点 (QVM 16位池, 完整码点=983040+低16位, shell/web侧拼)
+    var cp_lo16 = enc_cp(d)
+    # hex4(cp_lo16) — QEntL 手写4位hex (字形标签用)
+    var hx = ""
+    var hxd = cp_lo16
+    var hpos = 3
+    while (hpos >= 0):
+        var hv = hxd % 16
+        if (hv < 10):
+            hx = str_concat(chr(48 + hv), hx)
+        else:
+            hx = str_concat(chr(97 + hv - 10), hx)
+        end
+        hxd = hxd / 16
+        hpos = hpos - 1
+    end
+    var out = "SMP#"
+    out = str_concat(out, int_to_str(d))
+    out = str_concat(out, ": class=")
+    out = str_concat(out, int_to_str(d))
+    out = str_concat(out, " batch=")
+    out = str_concat(out, int_to_str(batch))
+    out = str_concat(out, "\ncodepoint=")
+    # 完整码点: 彝文段=983040+低16位, 标点段=低16位(本身)
+    var cp_full3 = cp_lo16
+    if (d < 5000):
+        var cpb3 = 15
+        cpb3 = cpb3 * 65535
+        cpb3 = cpb3 + 15
+        cp_full3 = cpb3 + cp_lo16
+    end
+    out = str_concat(out, int_to_str(cp_full3))
+    out = str_concat(out, "\n")
+    # 网格 = 预计算文件内容(32行带空格0/1, v15.13原样); 缺失则空网格(标点段)
+    if (gf_ok == 1):
+        out = str_concat(out, gtxt)
+    end
+    return out
+end
+
+# A识别引擎(纯QEntL, 指纹索引+str_eq): 启动建4120条32字符指纹, 请求时只比指纹
+var g_fp[4120]
+var g_fpall = ""
+var g_fpbuilt = 0
+var g_fp_j = 0
+var g_fp_k = 0
+def build_fp():
+    if (g_fpbuilt == 1): return 0 end
+    g_fpall = file_read("qdfs/ns/models/fptable32.txt")
+    if (str_len(g_fpall) < 100):
+        g_fpall = file_read("/root/QSM/QLife/qdfs/ns/models/fptable32.txt")
+    end
+    g_fpbuilt = 1
+    return 1
+end
+def arecog(pixelstr):
+    var pbuf = pixelstr
+    var pdlen = str_len(pbuf)
+    var pbase = 0
+    var found_colon = 0
+    while (pbase < pdlen):
+        var pch = ord(str_char_at(pbuf, pbase))
+        if (pch == 58): found_colon = 1 pbase = pbase + 1 break end
+        pbase = pbase + 1
+    end
+    if (found_colon == 0): pbase = 0 end
+    g_j2 = 0
+    while (g_j2 < 1024 and pbase < pdlen):
+        var pb = ord(str_char_at(pbuf, pbase))
+        if (pb == 49): g_arec_in[g_j2] = 1 else: g_arec_in[g_j2] = 0 end
+        pbase = pbase + 2
+        g_j2 = g_j2 + 1
+    end
+    while (g_j2 < 1024):
+        g_arec_in[g_j2] = 0
+        g_j2 = g_j2 + 1
+    end
+    # v15: 像素 var 数组 → 池 g_rec_xh (predict_all/dot_arr_at 需要池句柄)
+    #   逐元素 1024 次 arr_set = 1次builtin fill? 无 fill_xn 单源版 — 用循环(每请求1次, 可接受)
+    g_j2 = 0
+    while (g_j2 < 1024):
+        arr_set(g_rec_xh, g_j2, g_arec_in[g_j2])
+        g_j2 = g_j2 + 1
+    end
+    # 2026-09-28 v15: 真内积主识别 (24ep 4态合并权重, 9批全扫, 零查表)
+    #   像素装入池 g_rec_xh → 逐行 load + 515次 dot_arr_at + bmaxv 跨批比较
+    #   (recognize_v2 同款逻辑; predict_all 不返回分数无法跨批比较, 故用 dot 循环)
+    #   泄漏: 4635次 dot/请求 × 830B ≈ 3.8MB — 低频人工请求可接受
+    # v15.5: 行文件持久化 /tmp → qdfs/ns/models/merged_row_b{B}.w (tmp重启会清)
+    # v15.18: 5316 权重 42批×129类×1024权重, 批偏移=rb*129
+    # v15.19: 像素识别只扫彝文段 0~4999 (5000~5315无像素, 不送argmax, 类号编码兜底)
+    g_arec_best = 0
+    g_arec_bestv = 0 - 30000
+    var rb = 0
+    while (rb < 42):
+        var rf = "qdfs/ns/models/merged_row_b"
+        rf = str_concat(rf, int_to_str(rb))
+        rf = str_concat(rf, ".w")
+        var nw2 = load_ints_from_file(rf, g_rec_wh, g_wsz2)
+        if (nw2 > 0):
+            var bmaxc = 0
+            var bmaxv = 0 - 30000
+            var fv = 1
+            var cc = 0
+            while (cc < 129):
+                var gcls = rb * 129 + cc
+                if (gcls > 4999):
+                    break
+                end
+                var sc = dot_arr_at(g_rec_wh, cc * 1024, g_rec_xh, 1024)
+                if (fv == 1):
+                    bmaxc = cc
+                    bmaxv = sc
+                    fv = 0
+                else:
+                    if (sc > bmaxv):
+                        bmaxc = cc
+                        bmaxv = sc
+                    end
+                end
+                cc = cc + 1
+            end
+            if (bmaxv > g_arec_bestv):
+                g_arec_best = rb * 129 + bmaxc
+                g_arec_bestv = bmaxv
+            end
+        end
+        rb = rb + 1
+    end
+    if (g_arec_bestv < 0 - 29999):
+        g_arec_best = 0
+        g_arec_bestv = 0
+    end
+    # 码点: v15.16 — 识别端返回 SMP 格式(与生成端统一), web appendMsg 原生渲染彝文+网格
+    #   (v15.13 JSON 格式 web 不解析, 只显示 JSON 文本 — 用户截图实测)
+    #   用编码池 (彝文线性+标点段阈值→偏移), 不读码点表
+    #   低16位 → 完整码点: 彝文段=983040+低16位, 标点段=低16位本身
+    var cp_lo16b = enc_cp(g_arec_best)
+    var cp_full2 = cp_lo16b
+    if (g_arec_best < 5000):
+        var cpb4 = 15
+        cpb4 = cpb4 * 65535
+        cpb4 = cpb4 + 15
+        cp_full2 = cpb4 + cp_lo16b
+    end
+    var r2 = g_arec_best
+    var b2 = r2 / 129
+    var out = "SMP#"
+    out = str_concat(out, int_to_str(r2))
+    out = str_concat(out, ": class=")
+    out = str_concat(out, int_to_str(r2))
+    out = str_concat(out, " batch=")
+    out = str_concat(out, int_to_str(b2))
+    out = str_concat(out, "\ncodepoint=")
+    out = str_concat(out, int_to_str(cp_full2))
+    out = str_concat(out, "\n")
+    # 网格 = wviz 预计算文件(32行无空格0/1, 32字符/行)
+    var gf2 = str_concat(str_concat("qdfs/ns/models/wviz/c", int_to_str(r2)), ".grid")
+    var gtxt2 = file_read(gf2)
+    if (str_len(gtxt2) > 100):
+        out = str_concat(out, gtxt2)
+    end
+    return out
+end
+
+def get_d_param(path):
+    var dpos = str_index_of(path, "d=")
+    if (dpos < 0): return -1 end
+    var dst = str_substring(path, dpos + 2, 60000)
+    var dq = str_index_of(dst, " ")
+    if (dq < 0): dq = str_index_of(dst, "&") end
+    if (dq < 0): dq = str_len(dst) end
+    var dval = str_substring(dst, 0, dq)
+    return str_to_int(dval)
+end
+
+def get_body(req):
+    var bd = str_index_of(req, "\r\n\r\n")
+    if (bd < 0): return "" end
+    return str_substring(req, bd + 4, 60000)
+end
+
+def chat_reply(msg):
+    file_write_bytes("/tmp/yi_chat_in.txt", msg)
+    var cmd = "bash build/yi_api_chat_file.sh"
+    return exec(cmd)
+end
+
+def handle_request(req):
+    var resp = ""
+    var sp1 = str_index_of(req, " ")
+    var method = str_substring(req, 0, sp1)
+    var tail = str_substring(req, sp1 + 1, 60000)
+    var sp2 = str_index_of(tail, " ")
+    var path = "/"
+    if (sp2 >= 0):
+        path = str_substring(tail, 0, sp2)
+    else:
+        path = tail
+    end
+
+    if (str_index_of(path, "/api/bgen") >= 0):
+        if (str_eq(method, "GET")):
+            var d = get_d_param(path)
+            resp = "{\"error\":\"Usage: GET /api/bgen?d=0..4119\"}"
+            if (d >= 0 and d <= 4225):
+                resp = bgen(d)
+            end
+        else:
+            resp = "{\"error\":\"bgen only supports GET\"}"
+        end
+    end
+
+    if (str_index_of(path, "/api/generate") >= 0):
+        var dk = get_d_param(path)
+        resp = "{\"error\":\"Usage: GET /api/generate?k=0..5315\"}"
+        if (dk >= 0 and dk <= 5315):
+            resp = bgen_grid(dk)
+        end
+    end
+
+    if (str_index_of(path, "/api/yi32") >= 0):
+        if (str_eq(method, "GET")):
+            var d = get_d_param(path)
+            resp = "{\"error\":\"Usage: GET /api/yi32?d=0..4119\"}"
+            if (d >= 0 and d <= 4225):
+                resp = bgen(d)
+            end
+        else:
+            var body32 = get_body(req)
+            resp = "{\"error\":\"POST /api/yi32 需要像素体(1024个0/1)\",\"hint\":\"识别服务重启窗口, 8秒后重发即可\"}"
+            if (str_len(body32) >= 10):
+                resp = arecog(body32)
+                # 2026-09-28 v15.4: arecog 返回双 JSON(栈下溢副作用, 部件测试全正常
+                #   完整服务器才复现) — 截取第一段 "}{ 之前, 保留单 JSON
+                var joinpos = str_index_of(resp, "}{")
+                if (joinpos >= 0):
+                    resp = str_substring(resp, 0, joinpos + 1)
+                end
+            end
+        end
+    end
+
+    if (str_index_of(path, "/api/yi") >= 0 and str_index_of(path, "/api/yi32") < 0):
+        if (str_eq(method, "GET")):
+            var d = get_d_param(path)
+            resp = "{\"error\":\"Usage: GET /api/yi?d=0..4225\"}"
+            if (d >= 0 and d <= 4225):
+                resp = bgen(d)
+            end
+        else:
+            # 2026-09-29 v15.10: web 文本请求 — "生成N"(无空格!)/"生成 N"/"gen N" → bgen
+            #   实测: 用户输入"生成100"无空格 — 必须匹配"生成"不带尾空格
+            #   (chat 引擎 exec 被拦截不可用, 其他文本回显提示)
+            var body = get_body(req)
+            var gpos = str_index_of(body, "生成")
+            var gennum = 0 - 1
+            if (gpos >= 0):
+                # "生成" = UTF-8 6字节(中文2字); 跳过可选空格
+                gpos = gpos + 6
+                var sp1 = str_substring(body, gpos, 1)
+                if (str_eq(sp1, " ")):
+                    gpos = gpos + 1
+                end
+            else:
+                gpos = str_index_of(body, "gen")
+                if (gpos >= 0):
+                    gpos = gpos + 3
+                    var sp2 = str_substring(body, gpos, 1)
+                    if (str_eq(sp2, " ")):
+                        gpos = gpos + 1
+                    end
+                end
+            end
+            if (gpos >= 0):
+                var numstr = str_substring(body, gpos, 8)
+                var spq = str_index_of(numstr, " ")
+                if (spq > 0):
+                    numstr = str_substring(numstr, 0, spq)
+                end
+                # 数字开头才解析(防 "genuine" 等误匹配)
+                var digits = "0123456789"
+                var c0 = str_substring(numstr, 0, 1)
+                if (str_index_of(digits, c0) >= 0):
+                    gennum = str_to_int(numstr)
+                end
+            end
+            if (gennum >= 0 and gennum <= 5315):
+                resp = bgen_grid(gennum)
+            else:
+                resp = "小趣QSM: 试试「生成 100」(0-4225) 或 📷传图识别。对话引擎升级中。"
+            end
+        end
+    end
+
+    if (str_index_of(path, "/api/status") >= 0):
+        if (g_fpbuilt == 0):
+            build_fp()
+        end
+        resp = "{\"status\":\"ok\",\"model\":\"qscl5316_variant_merged_padded (42批×129类)\",\"a_recognize\":\"v15-真权重内积-42批全扫(零查表)\",\"b_generate\":\"v15-5316网格+编码池(彝文线性+标点段阈值→偏移,零查表)\",\"bgen_endpoint\":\"GET /api/generate?d=0..5315\",\"a_endpoint\":\"POST /api/yi32\",\"engine\":\"pure-QEntL-no-bash\",\"total_acc\":\"编码池5316/5316=100% (生成侧抽样107/107)\",\"cp_base\":\"993040(0xF2710)\",\"v\":\"0.2.0\"}"
+    end
+
+    if (str_index_of(path, "/api/xiaoqu") >= 0):
+        var reply = chat_reply(get_body(req))
+        resp = reply
+    end
+
+    if (resp == ""):
+        resp = "{\"greeting\":\"小趣QSM 你好！QLife v0.0.8量子操作系统，32×32彝文真训练模型(32权重×4态叠加态)已上线。试试 GET /api/yi32?d=10 看真彝文, 或 POST /api/xiaoqu 跟我聊聊彝文/量子/自举生长的秘密！\",\"endpoints\":{\"GET /api/yi32?d=N\":\"32x32真训练字形+码点\",\"POST /api/yi32\":\"像素→类号+码点\",\"GET /api/yi?d=N\":\"8x8旧模型\",\"POST /api/xiaoqu\":\"对话\",\"GET /api/status\":\"状态\"}}"
+    end
+
+    return resp
+end
+
+var sock = tcp_listen(g_port)
+# v15.3: 启动时创建识别池 — 字面量16位截断铁律: 527360 必须变量乘法
+g_wsz2 = g_wsz2 * 1024
+g_rec_wh = arr_new(g_wsz2)
+g_rec_xh = arr_new(1024)
+printf("[server_v15] listening on port %d\n", g_port)
+printf("[server_v15] 池: g_rec_wh=%d g_rec_xh=%d wsz=%d\n", g_rec_wh, g_rec_xh, g_wsz2)
+while (g_alive == 1):
+    var cli = tcp_accept(sock)
+    if (cli >= 0):
+        var req = tcp_recv(cli, 4096)
+        var body = handle_request(req)
+        var hdr = str_concat("HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-cache, no-store, must-revalidate\r\nPragma: no-cache\r\nExpires: 0\r\nContent-Length: ", str_concat(int_to_str(str_len(body)), "\r\n\r\n"))
+        tcp_send(cli, str_concat(hdr, body))
+        tcp_close(cli)
+        # v15.20: 识别请求后重启释放内存 (QVM池不释放, 识别+1.4GB/次)
+        #   服务由外层shell while循环自动拉起
+        if (str_index_of(req, "POST") >= 0 and str_index_of(req, "/api/yi32") >= 0):
+            printf("[server_v15] 识别请求完成, 重启释放内存\n")
+            g_alive = 0
+        end
+    end
+end
+tcp_shutdown(sock)
+tcp_close(sock)

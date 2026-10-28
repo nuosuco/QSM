@@ -1,0 +1,28 @@
+# 内存泄漏隔离测试 v9: tcp 网络循环是否扩池 (模拟 server 主循环2次请求)
+var g_port = 9802
+var g_alive = 1
+var g_rec_wh = 0
+var g_rec_xh = 0
+var g_wsz2 = 515
+g_wsz2 = g_wsz2 * 1024
+g_rec_wh = arr_new(g_wsz2)
+g_rec_xh = arr_new(1024)
+var sock = tcp_listen(g_port)
+printf("listening %d\n", g_port)
+var nreq = 0
+while (nreq < 2):
+    var cli = tcp_accept(sock)
+    if (cli >= 0):
+        var req = tcp_recv(cli, 4096)
+        var bd = str_index_of(req, "\r\n\r\n")
+        var body = ""
+        if (bd >= 0):
+            body = str_substring(req, bd + 4, 60000)
+        end
+        printf("请求%d body_len=%d\n", nreq, str_len(body))
+        tcp_close(cli)
+        nreq = nreq + 1
+    end
+end
+tcp_shutdown(sock)
+printf("结束\n")

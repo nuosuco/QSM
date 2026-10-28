@@ -1,0 +1,89 @@
+# 标点段 17窄段 分类器 (QVM predict_all, 9位输入 x 17段 = 153权重, 固定池)
+var g_w = 0
+var g_x = 0
+var g_i = 0
+var g_j = 0
+var g_gi = 0
+var g_gj = 0
+var g_lr = 40
+
+def main():
+    printf("=== 标点段 17窄段分类器 (predict_all) ===\n")
+    g_w = arr_new(153)
+    g_x = arr_new(9)
+    # 初始化
+    g_i = 0
+    while (g_i < 153):
+        arr_set(g_w, g_i, 1)
+        g_i = g_i + 1
+    end
+    var ep = 0
+    while (ep < 200):
+        var tc = 0
+        var tw = 0
+        var lcl = 0
+        while (lcl < 316):
+            # 目标段
+            var tseg = 0
+            if (lcl >= 95): tseg = 1 end
+            if (lcl >= 102): tseg = 2 end
+            if (lcl >= 112): tseg = 3 end
+            if (lcl >= 116): tseg = 4 end
+            if (lcl >= 117): tseg = 5 end
+            if (lcl >= 118): tseg = 6 end
+            if (lcl >= 120): tseg = 7 end
+            if (lcl >= 121): tseg = 8 end
+            if (lcl >= 122): tseg = 9 end
+            if (lcl >= 123): tseg = 10 end
+            if (lcl >= 212): tseg = 11 end
+            if (lcl >= 217): tseg = 12 end
+            if (lcl >= 219): tseg = 13 end
+            if (lcl >= 220): tseg = 14 end
+            if (lcl >= 221): tseg = 15 end
+            if (lcl >= 222): tseg = 16 end
+            # 输入 9位
+            g_i = 0
+            while (g_i < 9):
+                var pv = 1
+                g_j = 0
+                while (g_j < g_i):
+                    pv = pv * 2
+                    g_j = g_j + 1
+                end
+                arr_set(g_x, g_i, lcl / pv % 2)
+                g_i = g_i + 1
+            end
+            # predict_all: 17段 argmax
+            var best = predict_all(9, g_x, 17, g_w)
+            if (best == tseg):
+                tc = tc + 1
+            else:
+                tw = tw + 1
+                # 感知机更新: 错时调权
+                g_j = 0
+                while (g_j < 9):
+                    var xv = arr_get(g_x, g_j)
+                    if (xv == 1):
+                        # 目标段 +lr, 预测段 -lr
+                        var cur_t = arr_get(g_w, g_j * 17 + tseg)
+                        arr_set(g_w, g_j * 17 + tseg, cur_t + g_lr)
+                        var cur_b = arr_get(g_w, g_j * 17 + best)
+                        arr_set(g_w, g_j * 17 + best, cur_b - g_lr)
+                    end
+                    g_j = g_j + 1
+                end
+            end
+            lcl = lcl + 1
+        end
+        var cr = tc * 100 / (tc + tw)
+        printf("ep%d: 17段分类(316类) 对%d 错%d = %d%%\n", ep, tc, tw, cr)
+        if (tw == 0):
+            break
+        end
+        ep = ep + 1
+    end
+    printf("=== 保存 17段权重 (153) ===\n")
+    emit_ints(g_w, 0, 153)
+    printf("\n=== 完成 ===\n")
+end
+main()
