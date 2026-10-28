@@ -89,6 +89,15 @@ end
 var g_arec_best = 0
 var g_arec_bestv = 0
 var g_arec_sum = 0
+# v15.21: 叠加态并行推理 — 每进程内 2 个独立态时序全扫 argmax + 坍缩投票
+#   态S = g_statoff + S (9802 进程 g_statoff=0 → 态0/1, 9803 进程 g_statoff=2 → 态2/3)
+#   各态读独立 state{S}_row_b{B}.w (非坍缩合并, 真叠加态各自不同权重)
+#   投票: 两态同选一类→该类(高置信); 不同类→取分数更高者(诚实标注分歧)
+var g_statoff = 0    # 9803 编译版 sed 改 2
+var g_st0_cls = 0
+var g_st0_val = 0
+var g_st1_cls = 0
+var g_st1_val = 0
 var g_rec_wh = 0    # v15: 识别权重行池 (527360 int, 逐行复用)
 var g_rec_xh = 0    # v15: 识别像素池 (1024 int)
 var g_wsz2 = 515    # v15.3: 权重行大小 — 字面量16位截断铁律(527360→3072实测!)
@@ -271,11 +280,18 @@ def arecog(pixelstr):
     # v15.5: 行文件持久化 /tmp → qdfs/ns/models/merged_row_b{B}.w (tmp重启会清)
     # v15.18: 5316 权重 42批×129类×1024权重, 批偏移=rb*129
     # v15.19: 像素识别只扫彝文段 0~4999 (5000~5315无像素, 不送argmax, 类号编码兜底)
-    g_arec_best = 0
-    g_arec_bestv = 0 - 30000
+    # v15.21: 叠加态并行推理 — 每进程内 2 个独立态 (state{g_statoff}+state{g_statoff+1})
+    #   各态独立权重全扫 argmax → 2 票坍缩投票: 同选→该类(高置信); 不同→分数高者
+    #   真叠加态: 非坍缩合并单权重, 各态 weight 独立 (variant_b*_s*_stream.w 展开)
+    var sbest = g_statoff    # 态0 = g_statoff, 态1 = g_statoff+1
+    # ---- 态0 全扫 argmax (复用 g_rec_wh 池, 读 state{g_statoff}_row_b{B}.w) ----
+    g_st0_cls = 0
+    g_st0_val = 0 - 30000
     var rb = 0
     while (rb < 42):
-        var rf = "qdfs/ns/models/merged_row_b"
+        var rf = "qdfs/ns/models/state"
+        rf = str_concat(rf, int_to_str(g_statoff))
+        rf = str_concat(rf, "_row_b")
         rf = str_concat(rf, int_to_str(rb))
         rf = str_concat(rf, ".w")
         var nw2 = load_ints_from_file(rf, g_rec_wh, g_wsz2)
@@ -302,12 +318,68 @@ def arecog(pixelstr):
                 end
                 cc = cc + 1
             end
-            if (bmaxv > g_arec_bestv):
-                g_arec_best = rb * 129 + bmaxc
-                g_arec_bestv = bmaxv
+            if (bmaxv > g_st0_val):
+                g_st0_cls = rb * 129 + bmaxc
+                g_st0_val = bmaxv
             end
         end
         rb = rb + 1
+    end
+    # ---- 态1 全扫 argmax (复用同一 g_rec_wh 池, 读 state{g_statoff+1}_row_b{B}.w) ----
+    g_st1_cls = 0
+    g_st1_val = 0 - 30000
+    rb = 0
+    while (rb < 42):
+        var rf2 = "qdfs/ns/models/state"
+        rf2 = str_concat(rf2, int_to_str(g_statoff + 1))
+        rf2 = str_concat(rf2, "_row_b")
+        rf2 = str_concat(rf2, int_to_str(rb))
+        rf2 = str_concat(rf2, ".w")
+        var nw3 = load_ints_from_file(rf2, g_rec_wh, g_wsz2)
+        if (nw3 > 0):
+            var bmaxc2 = 0
+            var bmaxv2 = 0 - 30000
+            var fv2 = 1
+            var cc2 = 0
+            while (cc2 < 129):
+                var gcls2 = rb * 129 + cc2
+                if (gcls2 > 4999):
+                    break
+                end
+                var sc2 = dot_arr_at(g_rec_wh, cc2 * 1024, g_rec_xh, 1024)
+                if (fv2 == 1):
+                    bmaxc2 = cc2
+                    bmaxv2 = sc2
+                    fv2 = 0
+                else:
+                    if (sc2 > bmaxv2):
+                        bmaxc2 = cc2
+                        bmaxv2 = sc2
+                    end
+                end
+                cc2 = cc2 + 1
+            end
+            if (bmaxv2 > g_st1_val):
+                g_st1_cls = rb * 129 + bmaxc2
+                g_st1_val = bmaxv2
+            end
+        end
+        rb = rb + 1
+    end
+    # ---- 坍缩投票: 两态同选→该类(高置信); 不同→分数高者(诚实标注分歧) ----
+    var agree = 0
+    if (g_st0_cls == g_st1_cls):
+        agree = 1
+        g_arec_best = g_st0_cls
+        g_arec_bestv = g_st0_val
+    else:
+        if (g_st0_val >= g_st1_val):
+            g_arec_best = g_st0_cls
+            g_arec_bestv = g_st0_val
+        else:
+            g_arec_best = g_st1_cls
+            g_arec_bestv = g_st1_val
+        end
     end
     if (g_arec_bestv < 0 - 29999):
         g_arec_best = 0
@@ -335,6 +407,22 @@ def arecog(pixelstr):
     out = str_concat(out, int_to_str(b2))
     out = str_concat(out, "\ncodepoint=")
     out = str_concat(out, int_to_str(cp_full2))
+    # v15.21: 叠加态投票透明化 — 显示本进程 2 态各自 argmax 结果 + 是否一致
+    var superflag = "2态并行投票: "
+    superflag = str_concat(superflag, int_to_str(g_statoff))
+    superflag = str_concat(superflag, "类=")
+    superflag = str_concat(superflag, int_to_str(g_st0_cls))
+    superflag = str_concat(superflag, "/")
+    superflag = str_concat(superflag, int_to_str(g_statoff + 1))
+    superflag = str_concat(superflag, "类=")
+    superflag = str_concat(superflag, int_to_str(g_st1_cls))
+    if (g_st0_cls == g_st1_cls):
+        superflag = str_concat(superflag, " [一致=高置信]")
+    else:
+        superflag = str_concat(superflag, " [分歧=取分高者]")
+    end
+    out = str_concat(out, "\n")
+    out = str_concat(out, superflag)
     out = str_concat(out, "\n")
     # 网格 = wviz 预计算文件(32行无空格0/1, 32字符/行)
     var gf2 = str_concat(str_concat("qdfs/ns/models/wviz/c", int_to_str(r2)), ".grid")
@@ -479,7 +567,7 @@ def handle_request(req):
         if (g_fpbuilt == 0):
             build_fp()
         end
-        resp = "{\"status\":\"ok\",\"model\":\"qscl5316_variant_merged_padded (42批×129类)\",\"a_recognize\":\"v15-真权重内积-42批全扫(零查表)\",\"b_generate\":\"v15-5316网格+编码池(彝文线性+标点段阈值→偏移,零查表)\",\"bgen_endpoint\":\"GET /api/generate?d=0..5315\",\"a_endpoint\":\"POST /api/yi32\",\"engine\":\"pure-QEntL-no-bash\",\"total_acc\":\"编码池5316/5316=100% (生成侧抽样107/107)\",\"cp_base\":\"993040(0xF2710)\",\"v\":\"0.2.0\"}"
+        resp = "{\"status\":\"ok\",\"model\":\"qscl5316 4态叠加态并行 (state0~3 独立权重) a态=9802投态0/1 b态=9803投态2/3\",\"a_recognize\":\"v15.21-真叠加态并行-每进程2态独立权重全扫argmax+坍缩投票(零查表)\",\"b_generate\":\"v15-5316网格+编码池(彝文线性+标点段阈值→偏移,零查表)\",\"bgen_endpoint\":\"GET /api/generate?d=0..5315\",\"a_endpoint\":\"POST /api/yi32\",\"engine\":\"pure-QEntL-no-bash\",\"total_acc\":\"编码池5316/5316=100% (识别端2态投票, 像素精度待重训)\",\"cp_base\":\"993040(0xF2710)\",\"v\":\"0.2.1\"}"
     end
 
     if (str_index_of(path, "/api/xiaoqu") >= 0):

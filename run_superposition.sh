@@ -13,15 +13,15 @@ LOG_B=/tmp/state_b_9803.log
 
 # 预编译两版 target.qbc (态A=9802, 态B=9803)
 make_target() {
-  local PORT=$1 OUT=$2
-  sed "s/var g_port = 9802/var g_port = $PORT/" $BASE/build/server_v15.qentl > $BASE/input.qentl
+  local PORT=$1 STATOFF=$2 OUT=$3
+  sed -e "s/var g_port = 9802/var g_port = $PORT/" -e "s/^var g_statoff = 0/var g_statoff = $STATOFF/" $BASE/build/server_v15.qentl > $BASE/input.qentl
   (cd $BASE && bin/qvm_boot run run/qcl.qbc > /dev/null 2>&1 && cp output.qbc $OUT)
-  echo "  编译 port=$PORT -> $OUT ($(stat -c%s $OUT 2>/dev/null)字节)"
+  echo "  编译 port=$PORT statoff=$STATOFF -> $OUT ($(stat -c%s $OUT 2>/dev/null)字节)"
 }
 echo "=== 编译两版 target.qbc ==="
 mkdir -p $STATE_A $STATE_B
-make_target 9802 $STATE_A/target.qbc
-make_target 9803 $STATE_B/target.qbc
+make_target 9802 0 $STATE_A/target.qbc
+make_target 9803 2 $STATE_B/target.qbc
 
 # 各态独立目录: 软链 qdfs(权重) + bin(qvm_boot) + qvm.qbc(运行时)
 ln -sfn $BASE/qdfs $STATE_A/qdfs
