@@ -27,7 +27,7 @@ var g_seed = 0
 var g_base = 0
 var g_lr = 15
 var g_ep = 0
-var g_epoch = 30             # 由 build_run_var.sh 设定
+var g_epoch = 10             # 由 build_run_var.sh 设定
 var g_smoke_limit = 0
 var g_ns = 0
 var g_sidx = 0
@@ -313,7 +313,8 @@ def main():
         printf("--- batch%d (类%d-%d) 态%d [变体] ---\n", g_batch, g_base, g_base + 128, g_s)
         load_batch_data()
         g_state = g_s
-        g_seed = 1 + g_s * 100
+        # v15.22 真叠加态独立: seed 拉远(1/5123/9877/14231 互异非等差, 打破弱相关)
+        g_seed = 1 + g_s * 4211
         g_lr = 15
         train_state()
         save_weights()

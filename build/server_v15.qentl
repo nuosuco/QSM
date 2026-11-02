@@ -302,7 +302,7 @@ def arecog(pixelstr):
             var cc = 0
             while (cc < 129):
                 var gcls = rb * 129 + cc
-                if (gcls > 4999):
+                if (gcls > 4233):
                     break
                 end
                 var sc = dot_arr_at(g_rec_wh, cc * 1024, g_rec_xh, 1024)
@@ -343,7 +343,7 @@ def arecog(pixelstr):
             var cc2 = 0
             while (cc2 < 129):
                 var gcls2 = rb * 129 + cc2
-                if (gcls2 > 4999):
+                if (gcls2 > 4233):
                     break
                 end
                 var sc2 = dot_arr_at(g_rec_wh, cc2 * 1024, g_rec_xh, 1024)
